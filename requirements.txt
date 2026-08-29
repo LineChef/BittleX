@@ -1,0 +1,8 @@
+# Fill in as dependencies are added per phase
+# RL training (Phase 3):
+# stable-baselines3
+# pybullet
+# gymnasium
+
+# Pi pipeline (Phase 7+):
+# anthropic

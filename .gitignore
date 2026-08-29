@@ -1,0 +1,31 @@
+# Secrets — never commit these
+.env
+*.env
+config.local.*
+**/secrets.py
+**/api_keys.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+*.egg-info/
+
+# Trained model checkpoints (large binary files — consider Git LFS if you want to version these)
+*.zip
+*.pkl
+rl_training/models/
+rl_training/logs/
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Local data / memory DB (personal conversation history — don't commit)
+pi_pipeline/memory/*.db
+pi_pipeline/memory/data/
