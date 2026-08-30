@@ -33,3 +33,7 @@ pi_pipeline/memory/data/
 
 # Run console logs
 *.log
+
+# Automated-iteration scratch
+rl_training/opencat-gym/eval_frames/
+rl_training/opencat-gym/STOP

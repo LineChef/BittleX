@@ -14,6 +14,7 @@ PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS --
 FAC_MOVEMENT = 1000       # Reward movement in x-direction
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
+FAC_HEADING = 0.5         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg right by the end of an episode (yaw builds progressively: -0.3/-7.9/-11.0/-12.5 deg over the four quarters). First-pass weight -- expect to tune. Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
 FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps
 FAC_ARM_CONTACT = 0.01    # Punish crawling on arms and elbows
@@ -187,6 +188,11 @@ class OpenCatGymEnv(gym.Env):
         # straight line, but not added to the observation (self.state_robot)
         # to keep the observation space unchanged for this iteration.
         yaw_rate_clip = np.clip(state_vel_raw[2]*ANG_FACTOR, -1, 1)
+        # Absolute heading error: yaw relative to the reset heading (0 = straight
+        # ahead). Penalized below so accumulated drift is corrected, not just
+        # turn rate. Stays small for a roughly-straight walker, so no wraparound
+        # handling is needed; clip anyway for safety.
+        heading_error_clip = np.clip(p.getEulerFromQuaternion(state_ang)[2], -np.pi, np.pi)
         state_vel = state_vel_raw[0:2]*ANG_FACTOR
         state_vel_clip = np.clip(state_vel, -1, 1)
         # Cyclical time/phase signal (adapted from bmabsout/opencat-gym) -- a
@@ -230,12 +236,17 @@ class OpenCatGymEnv(gym.Env):
                                           + FAC_Z_VELOCITY * z_velocity**2
                                           + FAC_YAW * yaw_rate_clip**2)
 
+        # Accumulated-heading penalty -- its own term (not folded into
+        # body_stability) so its contribution shows up separately in info.
+        heading_penalty = FAC_HEADING * heading_error_clip**2
+
         movement_forward = current_position - last_position
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * movement_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  - penalty_scale * (
                     smooth_movement + body_stability
+                    + heading_penalty
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
@@ -252,6 +263,7 @@ class OpenCatGymEnv(gym.Env):
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
+            "r_heading": -penalty_scale * heading_penalty,
             "r_paw_clearance": -penalty_scale * FAC_CLEARANCE * paw_clearance,
             "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
