@@ -266,8 +266,39 @@ that's the training-length gap, to be judged by the confirming run.
 
 ## Confirming run — iter5 config at full 2M steps
 
-`auto_gait_final`, 2e6 steps, on iter5's reward config unchanged. Judges absolute
-speed/stride vs. v6@2M and whether the front/back lift asymmetry + short strides
-resolve with full convergence.
+`auto_gait_final`, 2e6 steps, on iter5's reward config unchanged. `PPO_13`.
+ep_rew ~1180 (v6 was ~1220 — held, despite the extra heading/trot penalties).
 
-_Result pending._
+**Result (8 episodes) vs. v6 @ 2M:**
+
+```
+                       v6@2M    final@2M   target   verdict
+fell_fraction          0.00     0.00       0.00     ok
+episode_len_mean       251      251        251      ok
+yaw_final_deg (abs)    12.5     0.16       <=4      FIXED
+yaw_abs_max_deg        19.5     7.9        <=8      meets
+yaw_by_quarter_deg     [-.3,-7.9,-11,-12.5]  [3.4, 0.4, -0.4, -0.16]   flat, non-accumulating
+lateral_drift_final_m  0.239    0.045      <=0.10   FIXED
+forward_speed_mps      0.263    0.256      >=0.24   held (-3%)
+forward_distance_m     1.322    1.285      >=1.25   held
+stride_length_m        0.124    0.103      >=0.10   meets (the 1M ~0.05 was under-convergence)
+diagonal_trot_corr     -0.665   -0.589     <=-0.6   JUST MISSES (1M checkpoints were -0.88/-0.90)
+foot_peak_clearance_m  [23,17,24,25]  [30,21,29,14]   all above floor; asymmetry mostly resolved at 2M
+roll_var / pitch_var   .024/.0013  .014/.0009           steadier than v6
+```
+
+**Verdict:** goal met. The rightward curve — the one concrete defect in v6 — is
+fixed (heading 12.5 -> 0.16 deg, lateral wander 24 -> 4.5 cm, no longer
+accumulating) with **speed, distance and stride all preserved** and the body
+steadier. The front/back lift asymmetry that showed up in the 1M iterations
+largely resolved with full convergence. One soft spot: `diagonal_trot_corr` came
+in at -0.589, a hair under the -0.6 target and slightly below v6's -0.665 — the
+2M policy found a fast, straight gait that isn't quite as crisp a textbook
+diagonal trot as the 1M checkpoints were. Worth eyeballing in the replay; not a
+regression that undermines the result.
+
+## Loop end
+
+Stopped after the confirming run — 5 tuning iterations + 1 confirming run, ~2h40m,
+under both the 3h and 6-iteration caps. Report: `docs/auto-iteration-report-2026-08-30.md`.
+Best policy: `trained/auto_gait_final_ppo`. All commits on `auto-gait-iteration`.

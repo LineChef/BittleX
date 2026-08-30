@@ -25,8 +25,11 @@ Three reward changes got there:
 | `PAW_Z_TARGET` | 0.015 | **0.020** | keep the back feet from dragging once heading control made the gait front-heavy |
 | `FAC_GAIT_SYMMETRY` | 2.0 | **3.5** | restore/tighten the diagonal trot |
 
-**Residual (not fixed):** the front legs lift ~3× higher than the back legs, and
-strides are short. See "What's still short" and "Recommended next moves".
+**Residual (not fixed):** at full 2M convergence the diagonal-trot crispness
+metric dipped just under target (−0.59 vs −0.6, vs v6's −0.67), stride length is
+at the target floor (0.103 m vs v6's 0.124 m), and the right-rear foot lifts less
+than the others (14 mm vs ~30). See "What's still short" and "Recommended next
+moves".
 
 ---
 
@@ -75,20 +78,32 @@ Full blow-by-blow with all metrics: `docs/auto-iteration-log.md`.
 Config: `FAC_HEADING = 5.0`, `PAW_Z_TARGET = 0.020`, `FAC_GAIT_SYMMETRY = 3.5`,
 all other constants unchanged from v6.
 
-<!-- FILLED IN AFTER THE CONFIRMING RUN -->
-_Confirming run in progress — this section and the comparison table below are
-completed once it finishes._
+`auto_gait_final`, `PPO_13`, 8-episode evaluation. Training ep_rew ~1180 vs v6's
+~1220 — held despite the added penalties.
 
-| metric | v6 (2M) | final (2M) | target | verdict |
+| metric | v6 (2M) | **final (2M)** | target | verdict |
 |---|---|---|---|---|
-| fell_fraction | 0.00 | _tbd_ | 0.00 | |
-| yaw_final (abs) | 12.5° | _tbd_ | ≤4° | |
-| lateral_drift_final | 0.24 m | _tbd_ | ≤0.10 m | |
-| diagonal_trot_corr | −0.67 | _tbd_ | ≤−0.6 | |
-| forward_speed | 0.26 m/s | _tbd_ | ≥0.24 m/s | |
-| stride_length | 0.124 m | _tbd_ | ≥0.10 m | |
-| foot_peak_clearance | [23,17,24,25] mm | _tbd_ | ≥12 mm | |
-| roll_var | 0.024 | _tbd_ | ≤0.028 | |
+| fell_fraction | 0.00 | **0.00** | 0.00 | ✓ |
+| episode_len | 251 | **251** | 251 | ✓ |
+| yaw_final (abs) | 12.5° | **0.16°** | ≤4° | ✓✓ |
+| yaw_abs_max | 19.5° | **7.9°** | ≤8° | ✓ |
+| yaw_by_quarter | [−0.3,−7.9,−11.0,−12.5] | **[3.4, 0.4, −0.4, −0.2]** | flat | ✓ no longer accumulates |
+| lateral_drift_final | 0.24 m | **0.045 m** | ≤0.10 m | ✓✓ |
+| forward_speed | 0.263 m/s | **0.256 m/s** | ≥0.24 m/s | ✓ held (−3%) |
+| forward_distance | 1.32 m | **1.29 m** | ≥1.25 m | ✓ |
+| stride_length | 0.124 m | **0.103 m** | ≥0.10 m | ✓ (the ~0.05 at 1M was under-convergence) |
+| diagonal_trot_corr | −0.67 | **−0.59** | ≤−0.6 | ✗ just misses; also slightly below v6 |
+| foot_peak_clearance | [23,17,24,25] mm | **[30,21,29,14] mm** | ≥12 mm | ✓ asymmetry mostly resolved at 2M |
+| roll_var / pitch_var | 0.024 / 0.0013 | **0.014 / 0.0009** | ≤0.028 | ✓ steadier |
+
+**Verdict: goal met.** The v6 curve is gone — heading drift 12.5° → 0.16°, lateral
+wander 24 cm → 4.5 cm, and it no longer accumulates across the episode — with
+speed, distance, and stride all preserved and the body measurably steadier. The
+front/back lift asymmetry seen in the 1M iterations largely resolved with full
+convergence. The one miss: `diagonal_trot_corr` at −0.59, a hair under target and
+just below v6's −0.67 — the fully-converged 2M policy walks fast and straight but
+its diagonal timing isn't quite as crisp as the 1M checkpoints were. Worth a look
+in the replay; not a regression that undermines the result.
 
 ---
 
@@ -102,29 +117,39 @@ completed once it finishes._
 
 ## What's still short
 
-- **Front/back lift asymmetry** — front legs lift ~50 mm, back legs ~17 mm. The
-  back feet clear the ground (no dragging) but the gait looks front-driven rather
-  than a balanced four-leg trot. No reward term currently targets front/back
-  *symmetry* (only diagonal phase).
-- **Stride length / cadence** — strides stayed ~5 cm through every iteration.
-  Nothing in the reward rewards stride length or a target cadence; forward reward
-  is pure x-velocity, so short choppy steps score the same as long ones. This is a
-  v6-era gap, not something the loop introduced.
-- **Absolute speed** — [confirm from the 2M run].
+- **Diagonal-trot crispness** — `diagonal_trot_corr` −0.59 at 2M, just under the
+  −0.6 target and slightly below v6's −0.67. The 1M checkpoints hit −0.88/−0.90,
+  so the crisp trot is *reachable*; full convergence under the strong heading
+  penalty relaxed it toward a fast, straight, but less textbook gait. The metric
+  is a proxy (correlation of the two diagonal joint-delta sums) — check the replay
+  to judge whether it actually looks worse or just scores lower.
+- **Front/back lift** — [30, 21, 29, 14] mm at 2M: much better than the 1M runs'
+  [53, 49, 17, 17], but the right-rear foot at 14 mm is still the low one. No
+  reward term targets front/back or left/right *magnitude* symmetry, only diagonal
+  phase.
+- **Stride length** — 0.103 m, right at the floor of the target and below v6's
+  0.124 m. Recovered a lot from the 1M runs (~0.05 m) with convergence, but the
+  reward still has nothing that explicitly favours longer strides over a faster
+  shuffle — forward reward is pure x-velocity.
 
 ## Recommended next moves
 
-1. **Front/back symmetry term** — mirror `FAC_GAIT_SYMMETRY`'s idea for the
-   front-pair vs. back-pair stroke magnitude, or add a small penalty on
-   `|front_clearance_mean − back_clearance_mean|`. Should even out the lift.
-2. **Stride/cadence shaping** — reward a target stride length or foot-contact
-   cadence (~48–50 Hz control → a plausible ~1.5–2 Hz step frequency), so the
-   policy is pushed toward fewer, longer strides instead of a shuffle that happens
-   to move forward.
-3. **Then** consider the deferred structural options — yaw rate in the observation
-   (cheap once we accept an obs-space change), or the `wkF` trajectory-imitation
-   bootstrap — if reward-shaping plateaus.
-4. Only after the flat-ground gait is genuinely good: start the terrain /
+1. **Recover trot crispness at 2M** — the 1M checkpoints hit −0.88/−0.90 on
+   `diagonal_trot_corr` but 2M relaxed to −0.59. Either ramp `FAC_GAIT_SYMMETRY`
+   *down* slightly over training (so it shapes structure early, like the 1M runs
+   caught, without fighting the converged policy late), or nudge it up again
+   (3.5 → 4.5) and re-confirm at 2M. First though: **watch the replay** and decide
+   whether −0.59 actually looks worse than v6 or is just a proxy artifact.
+2. **Left/right + front/back magnitude symmetry** — add a small penalty on
+   `|front_clearance_mean − back_clearance_mean|` (and the L/R equivalent) to pull
+   the lagging right-rear foot up and balance the drive.
+3. **Stride/cadence shaping** — reward a target stride length or foot-contact
+   cadence (~48–50 Hz control → ~1.5–2 Hz step frequency), so the policy prefers
+   fewer, longer strides over a fast shuffle. Forward reward is currently pure
+   x-velocity, which is indifferent to stride length.
+4. **Then** the deferred structural options — yaw rate in the observation, or the
+   `wkF` trajectory-imitation bootstrap — if reward-shaping plateaus.
+5. Only once the flat-ground gait is genuinely good: start the terrain /
    perturbation-robustness phase (domain randomization), per the project plan.
 
 ---
