@@ -109,4 +109,45 @@ roll_var                 0.024    0.016      <=0.028  improved
 Hypothesis: if the drift is correctable via a heading signal, yaw_final drops
 toward 0; watch for a forward-speed tradeoff.
 
-**Run:** `auto_iter2`, 1M steps. _Result pending._
+**Run:** `auto_iter2`, 1M steps (~19 min), `PPO_9`. Training clean.
+
+**Result:**
+
+```
+                       iter1@1M   iter2@1M   target
+episode_len_mean       251        251        251      ok (never falls)
+yaw_final_deg (abs)    12.9       2.5        <=4      FIXED
+yaw_abs_max_deg        13.4       9.9        <=8      close (v6 was 19.5)
+yaw_by_quarter_deg     [6,9,12,13]  [4.3, 2.7, -1.2, -2.5]   now oscillates around 0, not building
+lateral_drift_final_m  0.073      0.019      <=0.10   FIXED
+forward_speed_mps      0.139      0.135      >=0.24   ~flat (still the 1M-convergence gap, not the penalty)
+diagonal_trot_corr     -0.876     -0.823     <=-0.6   ok
+foot_peak_clearance_m  [.040,.033,.018,.022]  [.051,.046,.012,.010]   front feet lift MORE, back feet now drag
+stride_length_m        0.058      0.042      >=0.10   shrank further
+roll_var / pitch_var   .016/.0025 .015/.0099           pitch bob 4x worse
+```
+
+**Diagnosis:** the strong heading penalty **worked for the curve** — yaw drift
+2.5 deg, lateral drift 19 mm, and yaw now oscillates around 0 (active correction)
+instead of accumulating. Cost: the policy is steering with the front legs and
+planting the back ones — back-foot clearance fell to ~10 mm (below the 12 mm
+floor) while front feet lift ~50 mm, strides shortened, pitch bob up. A
+front-heavy, choppy gait that goes straight.
+
+**Keep/revert:** keep `FAC_HEADING = 5.0` (straight-line goal met). Next: fix the
+front/back clearance split.
+
+---
+
+## Iteration 3 — raise the swing-height target to un-plant the back feet
+
+**Baseline for comparison:** `iter2` (1M).
+**Change:** `PAW_Z_TARGET` 0.015 -> **0.025** m. `FAC_CLEARANCE` penalizes squared
+deviation from this target in *both* directions, so raising it asymmetrically
+helps here: the dragging back feet (~10 mm) go from `(0.010-0.015)^2` to
+`(0.010-0.025)^2` — 9x more penalty for not lifting — while the high front feet
+(~50 mm) are penalized *less* than before, so they needn't come all the way down.
+Should even out the gait. 0.025 also matches what v6 actually achieved (~23 mm)
+and looked good. Single variable; `FAC_HEADING` held at 5.0.
+
+**Run:** `auto_iter3`, 1M steps. _Result pending._
