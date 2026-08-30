@@ -104,6 +104,7 @@ def summarize(episodes):
     strides, slip, rollv, pitchv, lens, falls = [], [], [], [], [], []
     yaw_quarters = [[], [], [], []]
     diag_corr = []
+    startup_ratio, startup_jerk_ratio = [], []   # start-of-episode "stutter"
 
     for rec, per_term, steps, fell in episodes:
         x, y = np.array(rec["x"]), np.array(rec["y"])
@@ -136,6 +137,18 @@ def summarize(episodes):
         if np.std(diag_a) > 1e-6 and np.std(diag_b) > 1e-6:
             diag_corr.append(float(np.corrcoef(diag_a, diag_b)[0, 1]))
 
+        # Start-of-episode "stutter": compare the first 0.5 s (25 steps) to the
+        # following 1 s (steps 25-75). A stutter shows as low early speed and/or
+        # high early joint-jerk relative to the settled gait. Ratio ~1 = no stutter.
+        if len(x) > 75:
+            early_sp = (x[25] - x[0]) / 25
+            mid_sp = (x[75] - x[25]) / 50
+            if abs(mid_sp) > 1e-5:
+                startup_ratio.append(float(early_sp / mid_sp))
+            ddj = np.abs(np.diff(dj, axis=0)).sum(axis=1)   # per-step total joint jerk
+            if ddj[25:75].mean() > 1e-9:
+                startup_jerk_ratio.append(float(ddj[:25].mean() / ddj[25:75].mean()))
+
     m = lambda a: float(np.mean(a)) if len(a) else None
     return {
         "episodes": len(episodes),
@@ -151,6 +164,8 @@ def summarize(episodes):
         "foot_peak_clearance_m_mean": [m(c) for c in clr],
         "stride_length_m_mean": m(strides),
         "diagonal_trot_corr_mean": m(diag_corr),        # want strongly negative (anti-phase diagonals)
+        "startup_speed_ratio_mean": m(startup_ratio),    # first-25-steps speed / next-50-steps speed; ~1 = no stutter
+        "startup_jerk_ratio_mean": m(startup_jerk_ratio),# first-25-steps joint jerk / next-50; >1 = jerky start
         "roll_var_mean": m(rollv),
         "pitch_var_mean": m(pitchv),
         "paw_slip_term_mean_abs": m(slip),
@@ -166,6 +181,13 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     from stable_baselines3 import PPO
+    # Print the env's start-state config so a policy/env mismatch is visible
+    # (evaluating a policy under different reset randomization than it trained on
+    # skews startup_speed_ratio and fell_fraction badly).
+    _rsi = getattr(opencat_gym_env, "RSI_JOINT_NOISE_DEG", 0)
+    _phase = getattr(opencat_gym_env, "RSI_RANDOMIZE_PHASE", False)
+    print(f"env start-state: RSI_JOINT_NOISE_DEG={_rsi}  RSI_RANDOMIZE_PHASE={_phase}"
+          "  (must match how the checkpoint was trained)")
     env = OpenCatGymEnv()
     model = PPO.load(args.checkpoint)
 

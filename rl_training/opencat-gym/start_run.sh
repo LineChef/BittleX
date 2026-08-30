@@ -52,9 +52,9 @@ if compgen -G "trained/${TAG}_ppo.zip" >/dev/null \
 fi
 
 # ---- 2. don't stack runs (interpreter shows as ".../Python train.py", capital P) ----
-if pgrep -f "[a-z_]*train\.py" >/dev/null; then
+if pgrep -f "[ /]train\.py" >/dev/null; then
   echo "A training run is already in progress:"
-  pgrep -fl "[a-z_]*train\.py" | sed 's/^/  /'
+  pgrep -fl "[ /]train\.py" | sed 's/^/  /'
   echo "Stop it first (kill <PID>), or let it finish. Aborting."
   exit 1
 fi

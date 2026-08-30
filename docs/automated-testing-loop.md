@@ -152,10 +152,32 @@ wrong.
 
 ---
 
+## Pre-run summary (post before every run — loop or single training run)
+
+Right before launching any training run, post a short summary-level block. Always
+include an **ETA** with how it's derived. Keep it terse:
+
+- **ETA** — wall-clock estimate. Basis: ~19–20 min per 1M steps on this machine
+  (~40 min per 2M). For a loop: `(iterations planned × ~25 min incl. eval) +
+  ~40 min confirming run`, plus current clock time → expected finish time.
+- **This run** — one line: what's changing and the hypothesis (or "baseline, no
+  change").
+- **Scope** — steps per run; for a loop, iterations planned and the caps
+  (default 3h / 6 iterations).
+- **Stop** — `touch rl_training/opencat-gym/STOP` (clean stop after current
+  iteration) or interrupt the session.
+- **On completion** — what the user gets: notification + (for a loop) report,
+  TensorBoard, `g2watch` replay, and the merge question.
+
+**Every status update** (loop or run) leads with **percent done** and **estimated
+time to finish** (a clock time, plus a range if iteration count may still flex),
+then the current iteration's state.
+
 ## Kickoff checklist
 
-- [ ] `git checkout auto-gait-iteration` (create from `development` if new), `git merge development`
+- [ ] `git checkout development && git pull --ff-only`, then `git checkout auto-gait-iteration && git merge development` (stop and hand back if it conflicts)
 - [ ] Confirm caps (default 3h / 6 iterations) and machine prereqs with the user
 - [ ] `evaluate_policy.py` exists and runs
+- [ ] Post the **pre-run summary** (above) — ETA + details
 - [ ] State metric set + target numbers
 - [ ] Evaluate iteration-0 baseline, then begin the per-iteration procedure
