@@ -1,3 +1,6 @@
+import argparse
+from datetime import datetime
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
@@ -24,6 +27,18 @@ def linear_schedule(initial_value):
 
 
 if __name__ == "__main__":
+    # --tag names this run everywhere: checkpoints land in
+    # trained/checkpoints/<tag>_<steps>_steps.zip and the final model in
+    # trained/<tag>_ppo.zip. The TensorBoard run (PPO_N) still auto-increments.
+    # Pass the reward-iteration label, e.g.  python train.py --tag v7
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tag",
+                        default="run_" + datetime.now().strftime("%Y%m%d_%H%M%S"),
+                        help="label for this run's checkpoint/model filenames")
+    parser.add_argument("--steps", type=float, default=2e6,
+                        help="total env steps to train (default 2e6)")
+    args = parser.parse_args()
+
     # Set up number of parallel environments
     parallel_env = 8
     env = make_vec_env(OpenCatGymEnv,
@@ -39,7 +54,7 @@ if __name__ == "__main__":
     checkpoint_callback = CheckpointCallback(
         save_freq=max(200_000 // parallel_env, 1),
         save_path="trained/checkpoints/",
-        name_prefix="full_run_v5",
+        name_prefix=args.tag,
     )
 
     # Define PPO agent and train
@@ -48,9 +63,9 @@ if __name__ == "__main__":
                 n_steps=int(2048*8/parallel_env),
                 learning_rate=linear_schedule(3e-4),
                 verbose=1,
-                tensorboard_log="trained/tensorboard_logs/").learn(2e6, callback=checkpoint_callback)
+                tensorboard_log="trained/tensorboard_logs/").learn(args.steps, callback=checkpoint_callback)
 
-    model.save("trained/full_run_v5_ppo")
+    model.save(f"trained/{args.tag}_ppo")
 
     # Load model to continue previous training
     #model = PPO.load("trained/opencat_gym_esp32_trained_controller", 

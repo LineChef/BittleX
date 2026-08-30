@@ -30,3 +30,6 @@ rl_training/logs/
 # Local data / memory DB (personal conversation history — don't commit)
 pi_pipeline/memory/*.db
 pi_pipeline/memory/data/
+
+# Run console logs
+*.log

@@ -17,10 +17,10 @@ FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages cu
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
 FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps
 FAC_ARM_CONTACT = 0.01    # Punish crawling on arms and elbows
-FAC_SMOOTH_1 = 1.0        # Punish jitter and vibrational movement, 1st order
-FAC_SMOOTH_2 = 1.0        # Punish jitter and vibrational movement, 2nd order
+FAC_SMOOTH_1 = 0.5        # Punish jitter and vibrational movement, 1st order -- was 1.0; halved because it directly penalizes joint-angle-change magnitude, which was fighting against bigger, more deliberate leg swings (v5 produced fast but very small-stepped movement on all four legs). FAC_JITTER still targets direction-reversal specifically, so genuine oscillation should stay in check.
+FAC_SMOOTH_2 = 0.5        # Punish jitter and vibrational movement, 2nd order -- was 1.0; see FAC_SMOOTH_1 note above
 FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- was 0.0; enabled to reward lifting feet during swing phase
-PAW_Z_TARGET = 0.005      # Target height (m) of paw during swing phase
+PAW_Z_TARGET = 0.015      # Target height (m) of paw during swing phase -- was 0.005 (5mm, barely a lift); raised to 15mm to reward an actual step instead of a shuffle
 FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_GAIT_SYMMETRY = 2.0   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse).
 
@@ -231,9 +231,10 @@ class OpenCatGymEnv(gym.Env):
                                           + FAC_YAW * yaw_rate_clip**2)
 
         movement_forward = current_position - last_position
+        penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * movement_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
-                 - self.step_counter_session/PENALTY_STEPS * (
+                 - penalty_scale * (
                     smooth_movement + body_stability
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
@@ -243,7 +244,19 @@ class OpenCatGymEnv(gym.Env):
         # Set state of the current state.
         terminated = False
         truncated = False
-        info = {}
+        # Per-term reward breakdown (weighted contributions, same units as the
+        # final reward) -- lets us see which term shifts when behavior changes,
+        # instead of only seeing the total reward.
+        info = {
+            "r_movement": FAC_MOVEMENT * movement_forward,
+            "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
+            "r_smooth_movement": -penalty_scale * smooth_movement,
+            "r_body_stability": -penalty_scale * body_stability,
+            "r_paw_clearance": -penalty_scale * FAC_CLEARANCE * paw_clearance,
+            "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
+            "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
+            "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
+        }
 
         # Stop criteria of current learning episode: 
         # Number of steps or robot fell.
