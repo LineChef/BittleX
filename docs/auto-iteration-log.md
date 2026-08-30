@@ -191,4 +191,47 @@ clean diagonal trot is left/right symmetric, it should also cut the heading drif
 that re-appeared in iter3 -- addressing both weak metrics with one lever.
 `FAC_HEADING` held at 5.0, `PAW_Z_TARGET` at 0.025. Single variable.
 
-**Run:** `auto_iter4`, 1M steps. _Result pending._
+**Run:** `auto_iter4`, 1M steps (~19 min), `PPO_11`.
+
+**Result:**
+
+```
+                       iter3@1M   iter4@1M   target
+diagonal_trot_corr     -0.451     -0.875     <=-0.6   TROT RESTORED (best of the loop)
+foot_peak_clearance_m  [.025,.018,.023,.012]  [.034,.030,.026,.019]   all above floor, even-ish
+lateral_drift_final_m  0.090      0.046      <=0.10   better
+stride_length_m        0.041      0.056      >=0.10   slightly better, still short
+yaw_final_deg (abs)    7.8        7.4        <=4      ~unchanged -- the "clean trot => straighter" hope didn't pan out
+yaw_by_quarter_deg     [4.9,5.8,8.8,7.8]  [-7.9,-1.1,0.9,-7.4]   less monotonic, but +/-7-8 swings
+forward_speed_mps      0.179      0.155      >=0.24   dropped back
+roll_var / pitch_var   .0049/.0018  .026/.0074         body less steady again (~v6 level)
+```
+
+**Diagnosis:** the stronger symmetry reward **restored the trot** (-0.45 -> -0.875)
+and kept feet above the clearance floor, but it did *not* tighten heading, and the
+body got wobblier and slower again. Four iterations in, a clear pattern: heading
+tightness, trot cleanliness, body steadiness and speed trade off against each
+other under single-weight tuning, and no 1M config wins on all of them.
+
+**Scoreboard (1M runs):**
+- **iter2** — best heading (2.5 deg, meets target) + clean trot, but front-heavy /
+  planted back feet / bobbing / slow.
+- **iter3** — evenest feet, steadiest body, fastest, but heading 7.8 + weak trot.
+- **iter4** — cleanest trot + even feet, heading 7.4, body wobbly again.
+
+**Keep/revert:** the straight-line goal (the whole point of the loop) is met only
+by iter2's config. One more try to combine iter2's heading with iter3/iter4's
+gait quality, then the confirming run.
+
+---
+
+## Iteration 5 — settle the swing-height target between the two tested values
+
+**Baseline for comparison:** `iter4` (1M).
+**Change:** `PAW_Z_TARGET` 0.025 -> **0.020**. 15 mm (iter2) gave tight heading but
+planted back feet; 25 mm (iter3) freed the feet but broke heading. 20 mm splits
+the difference -- keep enough of the back-foot lift and body-steadiness gain
+without the heading cost. `FAC_HEADING = 5.0` and `FAC_GAIT_SYMMETRY = 3.5` held.
+Single variable. **Last iteration** -- confirming 2M run next regardless.
+
+**Run:** `auto_iter5`, 1M steps. _Result pending._
