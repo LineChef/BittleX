@@ -64,4 +64,49 @@ rightward curve.
 
 **Smoke test:** ep_rew_mean ~56 at 20K steps, no NaN, `r_heading` present. OK.
 
-**Run:** `auto_iter1`, 1M steps, `PPO_N` = (next). _Result pending._
+**Run:** `auto_iter1`, 1M steps (~19 min), `PPO_8`. Training clean (approx_kl 0.002,
+no collapse; LR decayed to ~0 by end, so the last stretch barely learned).
+
+**Result (`evaluate_policy.py --episodes 5`):**
+
+```
+                         v6@2M    iter1@1M   target
+episode_len_mean         251      251        251      ok (never falls)
+forward_speed_mps        0.263    0.139      >=0.24   REGRESSED
+forward_distance_m       1.322    0.698      >=1.25   REGRESSED
+stride_length_m          0.124    0.058      >=0.10   REGRESSED
+yaw_final_deg (abs)      12.5     12.9       <=4      NO CHANGE (sign flipped: now curves LEFT)
+yaw_by_quarter_deg       ...      [6.4, 9.1, 12.5, 12.9]   still builds across episode
+lateral_drift_final_m    0.239    0.073      <=0.10   ok (but partly because it barely moves)
+diagonal_trot_corr       -0.665   -0.876     <=-0.6   IMPROVED
+roll_var                 0.024    0.016      <=0.028  improved
+```
+
+**Diagnosis:**
+1. **`FAC_HEADING = 0.5` was far too weak.** At a 13 deg drift the term is
+   ~`penalty_scale(2.0) * 0.5 * (0.23 rad)^2` ≈ 0.05 / step, vs. a forward reward
+   of ~7 / step — under 1% of the objective. The policy ignored it: yaw drift is
+   unchanged and just landed on a left-curving asymmetry this run instead of a
+   right-curving one (confirms the drift is a weakly-constrained gait-asymmetry
+   artifact, not a fixed mechanical bias).
+2. **The speed/stride regression is mostly the 1M-vs-2M step difference, not the
+   penalty** — v6 only reached ~1220 reward near 2M; at 1M it was far from
+   converged too. Comparing iteration runs (1M) against `v6@2M` is unfair on
+   absolute speed. **Fix going forward:** treat `iter1` as the de-facto 1M
+   baseline (heading penalty present but negligible) and judge each iteration by
+   its delta vs. the previous 1M run. Absolute speed vs. `v6` is judged only by
+   the final 2M confirming run.
+
+**Keep/revert:** keep `FAC_HEADING` (harmless at this weight), crank it next.
+
+---
+
+## Iteration 2 — stronger heading penalty
+
+**Baseline for comparison:** `iter1` (1M).
+**Change:** `FAC_HEADING` 0.5 -> **5.0** (10x). Now ~0.5 / step at a 13 deg drift
+(~7% of the forward reward) — enough to actually register. Single variable.
+Hypothesis: if the drift is correctable via a heading signal, yaw_final drops
+toward 0; watch for a forward-speed tradeoff.
+
+**Run:** `auto_iter2`, 1M steps. _Result pending._
