@@ -234,4 +234,40 @@ the difference -- keep enough of the back-foot lift and body-steadiness gain
 without the heading cost. `FAC_HEADING = 5.0` and `FAC_GAIT_SYMMETRY = 3.5` held.
 Single variable. **Last iteration** -- confirming 2M run next regardless.
 
-**Run:** `auto_iter5`, 1M steps. _Result pending._
+**Run:** `auto_iter5`, 1M steps (~19 min), `PPO_12`.
+
+**Result — best config of the loop:**
+
+```
+                       iter4@1M   iter5@1M   target
+yaw_final_deg (abs)    7.4        0.42       <=4      DEAD STRAIGHT
+yaw_by_quarter_deg     [-7.9,-1.1,0.9,-7.4]  [3.0, 0.8, -1.3, 0.4]   stays within +/-3 deg all episode
+yaw_abs_max_deg        10.9       9.8        <=8      close
+lateral_drift_final_m  0.046      0.038      <=0.10   ok
+diagonal_trot_corr     -0.875     -0.904     <=-0.6   CLEANEST TROT OF ANY RUN
+roll_var / pitch_var   .026/.0074 .014/.0052          steady, never falls
+foot_peak_clearance_m  [.034,.030,.026,.019]  [.053,.049,.017,.017]   front/back split back, but back feet 17mm > floor
+stride_length_m        0.056      0.048      >=0.10   still short
+forward_speed_mps      0.155      0.149      >=0.24   still the 1M number
+```
+
+**Diagnosis:** 20 mm was the right split. iter5 nails the two goals that matter
+most — **dead-straight heading (0.42 deg final, +/-3 deg all episode)** and the
+**cleanest diagonal trot of the whole project (-0.904)** — while keeping the body
+steady and all feet above the clearance floor. Residual imperfections: the front
+legs still lift ~3x higher than the back (stylistic, not a failure), and strides
+are short / speed modest — but iter1-iter5 all show ~0.14-0.18 m/s at 1M, so
+that's the training-length gap, to be judged by the confirming run.
+
+**Winner: iter5's config** — `FAC_HEADING = 5.0`, `PAW_Z_TARGET = 0.020`,
+`FAC_GAIT_SYMMETRY = 3.5`, all else = v6.
+
+---
+
+## Confirming run — iter5 config at full 2M steps
+
+`auto_gait_final`, 2e6 steps, on iter5's reward config unchanged. Judges absolute
+speed/stride vs. v6@2M and whether the front/back lift asymmetry + short strides
+resolve with full convergence.
+
+_Result pending._
