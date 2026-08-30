@@ -14,15 +14,16 @@ PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS --
 FAC_MOVEMENT = 1000       # Reward movement in x-direction
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
+FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
 FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps
 FAC_ARM_CONTACT = 0.01    # Punish crawling on arms and elbows
 FAC_SMOOTH_1 = 0.5        # Punish jitter and vibrational movement, 1st order -- was 1.0; halved because it directly penalizes joint-angle-change magnitude, which was fighting against bigger, more deliberate leg swings (v5 produced fast but very small-stepped movement on all four legs). FAC_JITTER still targets direction-reversal specifically, so genuine oscillation should stay in check.
 FAC_SMOOTH_2 = 0.5        # Punish jitter and vibrational movement, 2nd order -- was 1.0; see FAC_SMOOTH_1 note above
 FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- was 0.0; enabled to reward lifting feet during swing phase
-PAW_Z_TARGET = 0.015      # Target height (m) of paw during swing phase -- was 0.005 (5mm, barely a lift); raised to 15mm to reward an actual step instead of a shuffle
+PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15mm (was 5mm before that). auto_iter3: 25mm -- after FAC_HEADING=5.0 the policy went front-heavy and let the back feet drag at ~10mm; FAC_CLEARANCE penalizes squared deviation from this target both ways, so raising it pushes the dragging back feet up hard while easing the over-high front feet. Matches what v6 actually achieved (~23mm).
 FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
-FAC_GAIT_SYMMETRY = 2.0   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse).
+FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
 
 TIME_PHASE_PERIOD = 100   # Steps per cycle of the time/phase observation input (adapted from bmabsout/opencat-gym) -- gives the policy a rhythmic clock signal to help it learn periodic gaits
 
@@ -187,6 +188,11 @@ class OpenCatGymEnv(gym.Env):
         # straight line, but not added to the observation (self.state_robot)
         # to keep the observation space unchanged for this iteration.
         yaw_rate_clip = np.clip(state_vel_raw[2]*ANG_FACTOR, -1, 1)
+        # Absolute heading error: yaw relative to the reset heading (0 = straight
+        # ahead). Penalized below so accumulated drift is corrected, not just
+        # turn rate. Stays small for a roughly-straight walker, so no wraparound
+        # handling is needed; clip anyway for safety.
+        heading_error_clip = np.clip(p.getEulerFromQuaternion(state_ang)[2], -np.pi, np.pi)
         state_vel = state_vel_raw[0:2]*ANG_FACTOR
         state_vel_clip = np.clip(state_vel, -1, 1)
         # Cyclical time/phase signal (adapted from bmabsout/opencat-gym) -- a
@@ -230,12 +236,17 @@ class OpenCatGymEnv(gym.Env):
                                           + FAC_Z_VELOCITY * z_velocity**2
                                           + FAC_YAW * yaw_rate_clip**2)
 
+        # Accumulated-heading penalty -- its own term (not folded into
+        # body_stability) so its contribution shows up separately in info.
+        heading_penalty = FAC_HEADING * heading_error_clip**2
+
         movement_forward = current_position - last_position
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * movement_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  - penalty_scale * (
                     smooth_movement + body_stability
+                    + heading_penalty
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
@@ -252,6 +263,7 @@ class OpenCatGymEnv(gym.Env):
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
+            "r_heading": -penalty_scale * heading_penalty,
             "r_paw_clearance": -penalty_scale * FAC_CLEARANCE * paw_clearance,
             "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
