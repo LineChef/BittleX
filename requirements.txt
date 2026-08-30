@@ -1,8 +1,12 @@
-# Fill in as dependencies are added per phase
-# RL training (Phase 3):
-# stable-baselines3
-# pybullet
-# gymnasium
+# RL training (Phase 3) — requires Python >= 3.10
+# On macOS, pybullet has no prebuilt wheel and must compile from source, which
+# fails on current macOS SDKs due to a bundled zlib/fdopen macro bug. Fix:
+#   CPPFLAGS="-Dfdopen=fdopen" pip install -r requirements.txt
+stable-baselines3==2.4.1
+pybullet==3.2.7
+gymnasium==1.0.0
+tensorboard==2.21.0
 
 # Pi pipeline (Phase 7+):
 # anthropic
+# python-dotenv

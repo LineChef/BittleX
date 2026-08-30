@@ -26,7 +26,7 @@ Full parts list and cost breakdown: see [`docs/project-plan.md`](docs/project-pl
 ## Repo Structure
 
 ```
-rl_training/       # Simulation-based RL training (opencat-gym-sim2real based)
+rl_training/       # Simulation-based RL training (based on ger01d/opencat-gym)
 pi_pipeline/
   voice/            # Speech-to-text, Claude API integration, text-to-speech
   memory/           # Persistent conversation memory / retrieval
@@ -36,7 +36,13 @@ docs/               # Project plan, notes, learnings
 
 ## Setup
 
-*(To be filled in as each piece comes online)*
+**Secrets**: managed via environment variables. Copy `.env.example` to `.env` and fill
+in real values (`.env` is gitignored and never committed). Loaded at runtime via
+`python-dotenv` (added once Phase 7 code lands).
+
+**RL training**: requires Python >= 3.10 (macOS ships an EOL 3.8, so this project uses
+a `.venv` built with Homebrew's `python@3.11`). See [`rl_training/README.md`](rl_training/README.md)
+for setup (including a required macOS build workaround for `pybullet`).
 
 ## Background
 
