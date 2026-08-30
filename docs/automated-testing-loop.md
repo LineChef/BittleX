@@ -139,6 +139,12 @@ wrong.
      alongside the earlier ones for comparison
    - `g2watch` on the best/final checkpoint (visual replay) ready to run — launch
      it or leave the exact command so the user just hits enter
+   - **Always also publish an HTML review page (Artifact)** — the desktop replay
+     window and local files don't reach a phone. Render the candidate policies to
+     GIFs (`render_gif.py`) and build a page with each gait animation + its key
+     metrics + the recommendation, like `g2_gait_replays.html`. This is the
+     primary deliverable when the user is on mobile; do it every wrap-up
+     regardless, since it's the shareable record.
 4. **Ask the user** whether to merge `auto-gait-iteration` into `development`.
    Merge only on an explicit yes.
 
