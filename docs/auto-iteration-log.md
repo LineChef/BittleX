@@ -150,4 +150,45 @@ helps here: the dragging back feet (~10 mm) go from `(0.010-0.015)^2` to
 Should even out the gait. 0.025 also matches what v6 actually achieved (~23 mm)
 and looked good. Single variable; `FAC_HEADING` held at 5.0.
 
-**Run:** `auto_iter3`, 1M steps. _Result pending._
+**Run:** `auto_iter3`, 1M steps (~19 min), `PPO_10`. Training clean (ep_rew ~785).
+
+**Result:**
+
+```
+                       iter2@1M   iter3@1M   target
+episode_len_mean       251        251        251      ok (never falls)
+foot_peak_clearance_m  [.051,.046,.012,.010]  [.025,.018,.023,.012]   EVENED OUT (back feet un-planted)
+roll_var / pitch_var   .015/.0099 .0049/.0018          body much steadier, pitch bob gone
+forward_speed_mps      0.135      0.179      >=0.24   +33%
+forward_distance_m     0.676      0.900      >=1.25   better
+yaw_final_deg (abs)    2.5        7.8        <=4      REGRESSED (still < v6's 12.5)
+yaw_by_quarter_deg     [4,3,-1,-2] [4.9,5.8,8.8,7.8]  building again, less self-correction
+lateral_drift_final_m  0.019      0.090      <=0.10   regressed, borderline
+diagonal_trot_corr     -0.823     -0.451     <=-0.6   REGRESSED -- trot loosened
+stride_length_m        0.042      0.041      >=0.10   still short
+```
+
+**Diagnosis:** raising the swing-height target did its job — feet lift evenly now,
+body is far steadier, speed up 33%. But rebalancing the gait came at the cost of
+heading tightness (yaw 2.5 -> 7.8 deg) and trot cleanliness (-0.82 -> -0.45).
+There's a real tension: iter2 was straight + clean-trot but front-heavy/bobbing;
+iter3 is even + steady + faster but wanders more and trots less crisply.
+
+**Best config so far:** neither iter2 nor iter3 outright. iter3's gait *quality*
+is clearly better; its heading/trot are the gap.
+
+**Keep/revert:** keep `PAW_Z_TARGET = 0.025`. Next: restore the trot (which should
+also tighten heading -- a symmetric diagonal trot is inherently straighter).
+
+---
+
+## Iteration 4 — restore the diagonal trot
+
+**Baseline for comparison:** `iter3` (1M).
+**Change:** `FAC_GAIT_SYMMETRY` 2.0 -> **3.5**. iter3's trot correlation fell to
+-0.45; a stronger symmetry reward should pull it back toward -0.8, and because a
+clean diagonal trot is left/right symmetric, it should also cut the heading drift
+that re-appeared in iter3 -- addressing both weak metrics with one lever.
+`FAC_HEADING` held at 5.0, `PAW_Z_TARGET` at 0.025. Single variable.
+
+**Run:** `auto_iter4`, 1M steps. _Result pending._
