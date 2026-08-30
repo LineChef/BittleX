@@ -10,33 +10,41 @@ EPISODE_LENGTH = 250      # Number of steps for one training episode
 MAXIMUM_LENGTH = 1.8e6    # Number of total steps for entire training
 
 # Factors to weight rewards and penalties.
-PENALTY_STEPS = 2e6       # Increase of penalty by step_counter/PENALTY_STEPS
+PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
 FAC_MOVEMENT = 1000       # Reward movement in x-direction
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
+FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
-FAC_SLIP = 0.0            # Punish slipping of paws
+FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps
 FAC_ARM_CONTACT = 0.01    # Punish crawling on arms and elbows
 FAC_SMOOTH_1 = 1.0        # Punish jitter and vibrational movement, 1st order
 FAC_SMOOTH_2 = 1.0        # Punish jitter and vibrational movement, 2nd order
-FAC_CLEARANCE = 0.0       # Factor to enfore foot clearance to PAW_Z_TARGET
+FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- was 0.0; enabled to reward lifting feet during swing phase
 PAW_Z_TARGET = 0.005      # Target height (m) of paw during swing phase
+FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
+FAC_GAIT_SYMMETRY = 2.0   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse).
+
+TIME_PHASE_PERIOD = 100   # Steps per cycle of the time/phase observation input (adapted from bmabsout/opencat-gym) -- gives the policy a rhythmic clock signal to help it learn periodic gaits
 
 BOUND_ANG = 110         # Joint maximum angle (deg)
 STEP_ANGLE = 11           # Maximum angle (deg) delta per step
 ANG_FACTOR = 0.1          # Improve angular velocity resolution before clip.
 
 # Values for randomization, to improve sim to real transfer.
-RANDOM_GYRO = 0           # Percent
-RANDOM_JOINT_ANGS = 0      # Percent
+# NOTE: only RANDOM_JOINT_ANGS is actually wired into step()/reset() below.
+# RANDOM_GYRO, RANDOM_MASS, and RANDOM_FRICTION are declared but currently
+# unused dead constants in this version of the code -- setting them has no effect.
+RANDOM_GYRO = 0           # Percent (unused, see note above)
+RANDOM_JOINT_ANGS = 5      # Percent
 RANDOM_MASS = 0           # Percent, currently inactive
 RANDOM_FRICTION = 0       # Percent, currently inactive
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
 
-# Size of oberservation space is set up of: 
-# [LENGTH_JOINT_HISTORY, quaternion, gyro]
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6     
+# Size of oberservation space is set up of:
+# [LENGTH_JOINT_HISTORY, quaternion, gyro, time_phase]
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 1
 
 
 class OpenCatGymEnv(gym.Env):
@@ -174,32 +182,63 @@ class OpenCatGymEnv(gym.Env):
         state_pos, state_ang = p.getBasePositionAndOrientation(self.robot_id)
         p.stepSimulation() # Emulated delay of data transfer via serial port
         state_ang_euler = np.asarray(p.getEulerFromQuaternion(state_ang)[0:2])
-        state_vel = np.asarray(p.getBaseVelocity(self.robot_id)[1])
-        state_vel = state_vel[0:2]*ANG_FACTOR
+        state_vel_raw = np.asarray(p.getBaseVelocity(self.robot_id)[1])
+        # Yaw (turning) rate -- penalized below to discourage curving off a
+        # straight line, but not added to the observation (self.state_robot)
+        # to keep the observation space unchanged for this iteration.
+        yaw_rate_clip = np.clip(state_vel_raw[2]*ANG_FACTOR, -1, 1)
+        state_vel = state_vel_raw[0:2]*ANG_FACTOR
         state_vel_clip = np.clip(state_vel, -1, 1)
-        self.state_robot = np.concatenate((state_ang, state_vel_clip))
-        current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0] 
+        # Cyclical time/phase signal (adapted from bmabsout/opencat-gym) -- a
+        # rhythmic clock input to help the policy learn periodic gaits instead
+        # of an arbitrary, potentially jittery movement pattern.
+        time_obs = np.fmod(self.step_counter / TIME_PHASE_PERIOD, 1.0)
+        self.state_robot = np.concatenate((state_ang, state_vel_clip, [time_obs]))
+        current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
         # Penalty and reward
         smooth_movement = np.sum(
             FAC_SMOOTH_1*np.abs(joint_angs-joint_angs_prev)**2
             + FAC_SMOOTH_2*np.abs(joint_angs
-            - 2*joint_angs_prev 
+            - 2*joint_angs_prev
             + joint_angs_prev_prev)**2)
+
+        # Anti-jitter penalty (adapted from bmabsout/opencat-gym's
+        # change_direction idea): count joints whose movement direction
+        # reversed from the previous frame to this one -- directly targets
+        # jittering/shuffling back and forth in place, rather than just
+        # penalizing the magnitude of movement like FAC_SMOOTH_1/2 do.
+        direction_reversed = np.sign(joint_angs - joint_angs_prev) != np.sign(joint_angs_prev - joint_angs_prev_prev)
+        jitter_penalty = np.sum(direction_reversed)
+
+        # Diagonal trot gait-symmetry reward: front-right (shoulder_right,
+        # idx 2) + back-left (hip_left, idx 6) should swing together, in
+        # opposition to front-left (shoulder_left, idx 0) + back-right
+        # (hip_right, idx 4) -- like a real quadruped trot. Verified
+        # empirically (see docs/project-plan.md) that all 8 joints in this
+        # URDF share the same sign convention, so "same sign of angle change"
+        # genuinely means "in phase" here, no mirroring to account for.
+        joint_delta = joint_angs - joint_angs_prev
+        diagonal_a = joint_delta[2] + joint_delta[6]  # front-right + back-left
+        diagonal_b = joint_delta[0] + joint_delta[4]  # front-left + back-right
+        gait_symmetry = -diagonal_a * diagonal_b  # positive when diagonals move opposite each other
 
         z_velocity = p.getBaseVelocity(self.robot_id)[0][2]
 
-        body_stability = (FAC_STABILITY * (state_vel_clip[0]**2 
-                                          + state_vel_clip[1]**2) 
-                                          + FAC_Z_VELOCITY * z_velocity**2)
+        body_stability = (FAC_STABILITY * (state_vel_clip[0]**2
+                                          + state_vel_clip[1]**2)
+                                          + FAC_Z_VELOCITY * z_velocity**2
+                                          + FAC_YAW * yaw_rate_clip**2)
 
         movement_forward = current_position - last_position
-        reward = (FAC_MOVEMENT * movement_forward 
+        reward = (FAC_MOVEMENT * movement_forward
+                 + FAC_GAIT_SYMMETRY * gait_symmetry
                  - self.step_counter_session/PENALTY_STEPS * (
-                    smooth_movement + body_stability 
-                    + FAC_CLEARANCE * paw_clearance 
-                    + FAC_SLIP * paw_slipping**2 
-                    + FAC_ARM_CONTACT * self.arm_contact))
+                    smooth_movement + body_stability
+                    + FAC_CLEARANCE * paw_clearance
+                    + FAC_SLIP * paw_slipping**2
+                    + FAC_ARM_CONTACT * self.arm_contact
+                    + FAC_JITTER * jitter_penalty))
 
         # Set state of the current state.
         terminated = False
@@ -282,8 +321,11 @@ class OpenCatGymEnv(gym.Env):
         state_ang = p.getBasePositionAndOrientation(self.robot_id)[1]
         state_vel = np.asarray(p.getBaseVelocity(self.robot_id)[1])
         state_vel = state_vel[0:2]*ANG_FACTOR
-        self.state_robot = np.concatenate((state_ang, 
-                                           np.clip(state_vel, -1, 1)))
+        # step_counter is 0 here, so time_obs starts each episode at phase 0.
+        time_obs = np.fmod(self.step_counter / TIME_PHASE_PERIOD, 1.0)
+        self.state_robot = np.concatenate((state_ang,
+                                           np.clip(state_vel, -1, 1),
+                                           [time_obs]))
 
         # Initialize robot state history with reset position
         state_joints = np.asarray(

@@ -19,6 +19,7 @@ env/
 *.pkl
 rl_training/models/
 rl_training/logs/
+**/tensorboard_logs/
 
 # OS/editor cruft
 .DS_Store
