@@ -26,18 +26,25 @@ phase and is out of scope for this loop.
 
 - All automated-iteration work happens on the branch **`auto-gait-iteration`**
   (branched from `development`).
-- **Before making any changes at the start of a run**, merge `development` into
-  `auto-gait-iteration` so it always carries the latest collaborative work:
+- **Before making any changes at the start of a run — always — sync
+  `development` first, then fast-forward it into `auto-gait-iteration`.** This is
+  mandatory every run, so the loop branch never drifts and the eventual merge back
+  is conflict-free:
   ```bash
-  git checkout auto-gait-iteration
+  git checkout development
+  git pull --ff-only origin development     # pick up anything pushed since last time
+  git checkout auto-gait-iteration          # (create from development if it doesn't exist)
   git merge development
   ```
-  (Create the branch from `development` first if it doesn't exist.)
+  If `git merge development` reports conflicts, stop and hand back to the user —
+  do not resolve them inside the loop.
 - **One commit per iteration** on that branch — the reward change plus the
   `auto-iteration-log.md` entry — so any iteration is individually recoverable.
 - The loop never merges to `development` itself. After the user reviews the
   results, **Claude asks whether to merge `auto-gait-iteration` into
-  `development`**, and only merges on an explicit yes.
+  `development`**, and only merges on an explicit yes (`git merge --no-ff` with a
+  message describing the changes and the progress made). Do not `git push` unless
+  the user asks.
 
 ---
 
