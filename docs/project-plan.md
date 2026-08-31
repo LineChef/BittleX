@@ -446,18 +446,35 @@ reliable stair climbing. Those are bounded by the hardware (weak sagittal-plane
 servos, no roll-axis joint, a detection — not depth — camera at head height) and
 by the reactive-recovery ceiling established in Runs 6–7.
 
+**Status:** `pi_pipeline/vision/` is scaffolded and testable against a mock
+detection feed — same mock-interface pattern as voice/memory. `DetectionFeed`
+(`MockDetectionFeed` / `SerialDetectionFeed`), a local `Avoider` reflex
+(debounced, urgent hazards preempt the cooldown; `none → turn → stop → back up`),
+and `scene.summarize` / `scene.narrate` (LLM-injected, decoupled from `voice`).
+Remaining items are the serial wire format, a trained detection model, threshold
+tuning, and the Phase 10 wiring — all hardware-gated.
+
 - **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
   cliff/edge detection, if pursued, must be a camera-based visual classifier
   (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor.
-- [ ] Real-time obstacle avoidance from the vision module's on-device inference
-      (local, fast, no Pi/cloud dependency).
+- [x] **Obstacle-avoidance reflex** — `vision/avoidance.py`. Local, no network;
+      box `area` as the closeness proxy, bearing from `center_x`; consecutive-
+      frame debounce + cooldown, with `STOP`/`BACK_UP` preempting. Thresholds
+      (`AvoiderConfig`) need tuning against real detections + the robot's
+      stopping distance.
+- [ ] Feed it real detections: confirm the camera→Pi serial format against Grove
+      Vision AI V2 / SenseCraft output, finish `SerialDetectionFeed`.
 - [ ] Cliff/edge avoidance (don't walk off a table) — the RL walking policy
       can't learn this (no forward-looking perception), so it needs forward
       sensing + a reflexive stop, kept local. Camera-based classification will be
       less reliable than a physical sensor (lighting/surface sensitive, needs the
       right camera angle) and a failure means a fall, so approach with caution.
       Not yet scheduled.
+- [x] **Scene description path** — `vision/scene.py`: `summarize()` (deterministic
+      text from detections) and `narrate(frame, ask)` where `ask` is an injected
+      `str -> str` (the voice layer's Claude call, or a dedicated one). Structured
+      detections → text → Claude → spoken, no raw frames.
 - [ ] "Reasoning" about what it sees: BiBoard V1's ESP32-U4WDH can't run a vision-
       language model, so send structured detections (type/position) over serial to
       the Pi and hand descriptions to Claude — no raw frames.

@@ -75,6 +75,10 @@ class Settings:
     serial_port: str = field(default_factory=lambda: _env("G2_SERIAL_PORT", "/dev/ttyS0"))
     serial_baud: int = field(default_factory=lambda: _env_int("G2_SERIAL_BAUD", 115200))
 
+    # --- Vision (Phase 8; used on hardware) ---
+    vision_serial_port: str = field(default_factory=lambda: _env("VISION_SERIAL_PORT", "/dev/ttyAMA1"))
+    vision_serial_baud: int = field(default_factory=lambda: _env_int("VISION_SERIAL_BAUD", 921600))
+
     def require_api_key(self) -> str:
         if not self.anthropic_api_key:
             raise RuntimeError(
