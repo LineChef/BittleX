@@ -25,9 +25,9 @@ or open a new terminal to pick them up. RL commands run from `rl_training/openca
 
 | Command | Does |
 |---|---|
-| `g2watch` | Replay the newest `trained/*_ppo.zip` in the PyBullet GUI |
-| `g2watch trained/<tag>_ppo` | Replay a specific checkpoint |
-| `g2watch trained/checkpoints/<tag>_<N>_steps` | Replay a mid-training snapshot (checkpoints save every ~200K steps) |
+| `g2watch` | Opens a PyBullet GUI window and **deterministically replays a trained policy's gait**, episode after episode on a loop, so you can watch how it actually walks. With no argument it uses the newest `trained/*_ppo.zip`. Shell function in `~/.bash_profile`; `cd`s into `rl_training/opencat-gym` and runs `watch_trained.py`. Ctrl+C or close the window to stop. |
+| `g2watch trained/<tag>_ppo` | Same, for a specific saved policy (omit the `.zip`) — e.g. `g2watch trained/phase3-gait_ppo` |
+| `g2watch trained/checkpoints/<tag>_<N>_steps` | Replay a mid-training snapshot (checkpoints save every ~200K steps) — watch the gait as it was partway through a run |
 | `python watch_trained.py trained/<ckpt> --dr-terrain 0.012` | Replay on the 12 mm obstacle course (full DR) |
 | `python watch_trained.py trained/<ckpt> --dr-push 0.35` | Replay with random shoves |
 | `pkill -f watch_trained.py` | Close the replay window |
