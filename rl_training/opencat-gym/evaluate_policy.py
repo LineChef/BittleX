@@ -79,7 +79,8 @@ def run_episode(env, model, render_frames=0, frames_dir=None):
             fell = terminated and steps < EPISODE_CAP
             break
 
-    return rec, per_term, steps, fell
+    recovered = int(getattr(env, "_recovered_count", 0))
+    return rec, per_term, steps, fell, recovered
 
 
 def _save_png(arr, path):
@@ -105,8 +106,9 @@ def summarize(episodes):
     yaw_quarters = [[], [], [], []]
     diag_corr = []
     startup_ratio, startup_jerk_ratio = [], []   # start-of-episode "stutter"
+    fall_events, recov_events, recov_frac = [], [], []   # fall recovery
 
-    for rec, per_term, steps, fell in episodes:
+    for rec, per_term, steps, fell, recovered in episodes:
         x, y = np.array(rec["x"]), np.array(rec["y"])
         yaw = np.unwrap(np.array(rec["yaw"]))
         fwd.append(x[-1] - 0.0)
@@ -128,6 +130,17 @@ def summarize(episodes):
         pitchv.append(float(np.var(rec["pitch"])))
         lens.append(steps)
         falls.append(1 if fell else 0)
+
+        # Fall-recovery: count 0->1 transitions of the "recovering" flag as
+        # distinct fall events; env._recovered_count is how many it climbed out
+        # of. in_recovery_step_fraction = share of the episode spent righting.
+        rc = per_term.get("recovering", [])
+        n_falls = sum(1 for i in range(1, len(rc)) if rc[i] and not rc[i - 1])
+        if rc and rc[0]:
+            n_falls += 1
+        fall_events.append(n_falls)
+        recov_events.append(recovered)
+        recov_frac.append(float(np.mean(rc)) if rc else 0.0)
         if "r_paw_slip" in per_term:
             slip.append(float(np.mean(np.abs(per_term["r_paw_slip"]))))
         j = np.array(rec["joint"])                      # (T, 8)
@@ -164,6 +177,11 @@ def summarize(episodes):
         "foot_peak_clearance_m_mean": [m(c) for c in clr],
         "stride_length_m_mean": m(strides),
         "diagonal_trot_corr_mean": m(diag_corr),        # want strongly negative (anti-phase diagonals)
+        "fall_events_mean": m(fall_events),              # tip-overs per episode (recovered or not)
+        "recovered_events_mean": m(recov_events),        # of those, how many it righted itself from
+        "recovered_fraction": (float(np.sum(recov_events)) / float(np.sum(fall_events))
+                               if np.sum(fall_events) > 0 else None),
+        "in_recovery_step_fraction_mean": m(recov_frac), # share of episode spent righting
         "startup_speed_ratio_mean": m(startup_ratio),    # first-25-steps speed / next-50-steps speed; ~1 = no stutter
         "startup_jerk_ratio_mean": m(startup_jerk_ratio),# first-25-steps joint jerk / next-50; >1 = jerky start
         "roll_var_mean": m(rollv),

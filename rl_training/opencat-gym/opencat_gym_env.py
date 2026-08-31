@@ -35,6 +35,28 @@ FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-lef
 FAC_IMITATION = 20.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 
+# --- Fall recovery / self-righting -------------------------------------------
+# Normally is_fallen() (roll or pitch > 1.3 rad) ends the episode instantly with
+# reward 0, so the policy never sees a single timestep past tipping over and has
+# no signal for how to get back up. With FAC_RECOVERY > 0, a fall instead opens a
+# recovery window: keep stepping, replace the walking reward with a shaped reward
+# for driving roll/pitch back toward level and lifting the body off the ground.
+# Get both |roll| and |pitch| back under RECOVERY_UPRIGHT_RAD for
+# RECOVERY_HOLD_STEPS steps in a row -> "recovered": collect a bonus and resume
+# normal walking rewards. Window runs out still down, or tilt passes
+# RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
+# delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
+FAC_RECOVERY = 8.0          # weight on the recovery shaped reward (0 = disabled)
+RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
+RECOVERY_UPRIGHT_RAD = 0.5  # both |roll| and |pitch| under this = upright again
+RECOVERY_HOLD_STEPS = 5     # consecutive upright steps to count as recovered
+RECOVERY_ABORT_RAD = 2.4    # tilt past this = hopeless, terminate now
+RECOVERY_RESUME_STEPS = 60  # walking steps guaranteed AFTER righting itself, so the
+                            # policy is rewarded for getting back into the wkF gait,
+                            # not just for standing up. A fall extends the episode's
+                            # step budget by (window + resume) rather than eating the
+                            # walking budget; total episode capped at 2x EPISODE_LENGTH.
+
 TIME_PHASE_PERIOD = 100   # Steps per cycle of the time/phase observation input (adapted from bmabsout/opencat-gym) -- gives the policy a rhythmic clock signal to help it learn periodic gaits
 
 BOUND_ANG = 110         # Joint maximum angle (deg)
@@ -53,9 +75,9 @@ RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already
 RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
 RANDOM_FRICTION = 0.3    # +/- fraction on ground lateral friction, per episode. e.g. 0.5
 RANDOM_MASS = 0.15        # +/- fraction on every robot link mass, per episode. e.g. 0.15
-RANDOM_PUSH = 0.0        # random horizontal shove: max instantaneous base-velocity kick (m/s). e.g. 0.35
+RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.018    # scatter small boxes/steps in the forward path, max height (m). e.g. 0.012
+RANDOM_TERRAIN = 0.03    # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
@@ -328,19 +350,79 @@ class OpenCatGymEnv(gym.Env):
             "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
         }
 
-        # Stop criteria of current learning episode: 
-        # Number of steps or robot fell.
+        # Stop criteria of current learning episode:
+        # step budget, or the robot fell (-> recovery window if FAC_RECOVERY > 0).
         self.step_counter += 1
-        if self.step_counter > EPISODE_LENGTH:
+        recovery_reward = 0.0
+        if self.step_counter > self._step_budget:
             self.step_counter_session += self.step_counter
             terminated = False
             truncated = True
 
-        elif self.is_fallen(): # Robot fell
-            self.step_counter_session += self.step_counter
-            reward = 0
-            terminated = True
-            truncated = False
+        elif FAC_RECOVERY <= 0:
+            if self.is_fallen():                     # legacy: fall = instant end
+                self.step_counter_session += self.step_counter
+                reward = 0
+                terminated = True
+                truncated = False
+
+        else:
+            # Recovery-window behavior. roll/pitch from the clean (un-noised)
+            # base orientation already read this step (state_ang).
+            rp = np.abs(p.getEulerFromQuaternion(state_ang)[:2])
+            upright = 1.0 - np.clip((rp[0] + rp[1]) / (2 * 1.3), 0.0, 1.0)
+
+            if not self._in_recovery and self.is_fallen():
+                self._in_recovery = True            # just tipped over
+                self._recovery_steps = 0
+                self._recovery_hold = 0
+                self._prev_upright = upright
+                # give the episode room for the recovery detour + a resume, so a
+                # fall doesn't cost normal walking practice (capped at 2x length)
+                self._step_budget = min(
+                    2 * EPISODE_LENGTH,
+                    max(self._step_budget,
+                        self.step_counter + RECOVERY_WINDOW_STEPS + RECOVERY_RESUME_STEPS))
+
+            if self._in_recovery:
+                self._recovery_steps += 1
+                d_upright = upright - self._prev_upright   # progress toward level
+                self._prev_upright = upright
+                clearance_term = np.clip(base_clearance / 0.06, 0.0, 1.0)
+                recovery_reward = FAC_RECOVERY * (
+                    4.0 * d_upright + 0.15 * upright + 0.05 * clearance_term)
+                reward = recovery_reward            # override walking reward while down
+
+                if rp[0] < RECOVERY_UPRIGHT_RAD and rp[1] < RECOVERY_UPRIGHT_RAD:
+                    self._recovery_hold += 1
+                else:
+                    self._recovery_hold = 0
+
+                if self._recovery_hold >= RECOVERY_HOLD_STEPS:
+                    reward += FAC_RECOVERY * 10.0    # righted itself -> bonus
+                    recovery_reward = reward
+                    self._recovered_count += 1
+                    self._in_recovery = False
+                    self._recovery_steps = 0
+                    self._recovery_hold = 0
+                    # guarantee walking steps after standing up so resuming the
+                    # wkF gait (not just standing) gets rewarded
+                    self._step_budget = min(
+                        2 * EPISODE_LENGTH,
+                        max(self._step_budget, self.step_counter + RECOVERY_RESUME_STEPS))
+                elif (self._recovery_steps >= RECOVERY_WINDOW_STEPS
+                      or float(np.max(rp)) > RECOVERY_ABORT_RAD):
+                    self.step_counter_session += self.step_counter
+                    reward = 0                       # out of time / hopeless
+                    terminated = True
+                    truncated = False
+
+        info["r_recovery"] = recovery_reward
+        info["recovering"] = 1.0 if self._in_recovery else 0.0
+        if self._in_recovery:
+            # walking-reward terms don't apply while it's righting itself
+            for _k in ("r_movement", "r_gait_symmetry", "r_stride", "r_imitation"):
+                info[_k] = 0.0
 
         self.observation = np.hstack((self.state_robot, self.angle_history))
 
@@ -353,6 +435,14 @@ class OpenCatGymEnv(gym.Env):
         self.arm_contact = 0
         self._foot_prev_contact = [False, False, False, False]
         self._foot_td_x = [0.0, 0.0, 0.0, 0.0]
+        # Fall-recovery window state (see FAC_RECOVERY).
+        self._in_recovery = False
+        self._recovery_steps = 0
+        self._recovery_hold = 0
+        self._prev_upright = 1.0
+        self._recovered_count = 0
+        # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
+        self._step_budget = EPISODE_LENGTH
         # Domain-randomization ramp for this episode.
         if DR_EVAL_FULL or DR_RAMP_STEPS <= 0:
             self._dr = 1.0
@@ -446,12 +536,16 @@ class OpenCatGymEnv(gym.Env):
 
 
     def _scatter_obstacles(self, max_h):
-        """Small static boxes/steps in the robot's forward path -- 'small
-        obstacles to walk over'. Amplitude is scaled by the caller (dr ramp)."""
-        for _ in range(np.random.randint(3, 9)):
+        """Small static boxes/steps scattered in the robot's forward path --
+        'obstacles to trip it up a bit', not walls. Amplitude (max_h) is scaled
+        by the caller (dr ramp); the recovery loop raises it slowly per round.
+        Deliberately kept passable: scattered (never spanning the lane), short
+        along-path, so a decent gait clears most and only clips some -- the
+        stumbles that give the FAC_RECOVERY reward its signal."""
+        for _ in range(np.random.randint(4, 10)):
             h = np.random.uniform(0.002, max(0.003, max_h))
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
-                np.random.uniform(0.015, 0.04),   # along-path half-length
+                np.random.uniform(0.015, 0.045),  # along-path half-length
                 np.random.uniform(0.04, 0.10),    # across-path half-width
                 h / 2])
             p.createMultiBody(0, cs, basePosition=[
