@@ -87,6 +87,10 @@ The loop must never be an unstoppable long process.
 9. **Commit** to `auto-gait-iteration`.
 10. If the change made things worse, revert it in the next iteration's baseline
     (keep the better checkpoint as current best).
+11. **Post an update to the user** — this iteration's result (key metrics vs. the
+    previous run), the diagnosis, and the change going into the next iteration —
+    **then immediately launch the next run.** Don't wait for a reply; the user
+    reads the updates as they land and interrupts only if redirecting.
 
 After the loop: one **confirming run at the full 2e6 steps** on the best reward
 config before wrap-up.
