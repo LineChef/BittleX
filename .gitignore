@@ -44,3 +44,5 @@ rl_training/opencat-gym/frames_wkf/
 
 # Downloaded STT/TTS models (Vosk, Piper) -- large, not versioned
 models/
+rl_training/opencat-gym/*.gif
+rl_training/opencat-gym/benchmark_*.gif
