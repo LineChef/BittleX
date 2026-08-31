@@ -33,8 +33,8 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
 TARGET_SPEED = 0.11        # m/s. wkF reference plays open-loop at ~0.10 m/s; R5 walks ~0.12 m/s. 0.11 ties the baseline to the reference walk's own pace with a hair of margin. Change per gait later.
-FAC_SPEED = 7.0            # weight on the speed-tracking bonus. R3: 4 -> 7 -- R1/R2 both converged at ~0.06-0.09 m/s, well under the 0.11 target; the bonus was too weak to pull speed up. Still below r_imitation (~8-12/step).
-SPEED_SHARPNESS = 1.8      # R3: 2.5 -> 1.8 -- wider capture band so the bonus still has a meaningful gradient when the policy is slow (0.06 vs 0.11 target). Error is relative to TARGET_SPEED, so this is scale-free.
+FAC_SPEED = 4.0            # weight on the speed-tracking bonus. R3: 4 -> 7 -- R1/R2 both converged at ~0.06-0.09 m/s, well under the 0.11 target; the bonus was too weak to pull speed up. Still below r_imitation (~8-12/step).
+SPEED_SHARPNESS = 2.5      # R3: 2.5 -> 1.8 -- wider capture band so the bonus still has a meaningful gradient when the policy is slow (0.06 vs 0.11 target). Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
 MOVEMENT_CAP_AT_TARGET = False  # R1 capped FAC_MOVEMENT at TARGET_SPEED and it removed the 'walk briskly' gradient (gait went slow+mushy). R2: off -- uncapped forward-progress reward + the speed tracking bonus.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
@@ -53,7 +53,7 @@ FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-lef
 FAC_IMITATION = 20.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
-IMITATION_FADE_FACTOR = 0.3 # imitation reward multiplier while stumbling
+IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 
 # --- Fall recovery / self-righting -------------------------------------------
 # Normally is_fallen() (roll or pitch > 1.3 rad) ends the episode instantly with
@@ -67,12 +67,12 @@ IMITATION_FADE_FACTOR = 0.3 # imitation reward multiplier while stumbling
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
-FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). R3: 2.0 -> 4.0 -- at 2.0 (R5/R6) it gave good heading but never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). Still below r_imitation.
+FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). R3: 2.0 -> 4.0 -- at 2.0 (R5/R6) it gave good heading but never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). Still below r_imitation.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
 BALANCE_W_ANGLE = 1.0      # weight on frame-to-frame tilt-angle reduction
-BALANCE_W_RATE = 1.0       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
+BALANCE_W_RATE = 0.6       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
 BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get feet down"
 
 # Phase clock (Run 7): the wkF phase index normally advances one step per control
@@ -87,8 +87,8 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
-IMPULSE_PUSH = 0.55       # m/s kick magnitude. R3: 0.4 -> 0.55 -- at 0.4 the converged policy saw ~0 big stumbles on the nominal course, so it never actually practised recovery. 0.55 makes recoverable big wobbles happen without the 0.7 fall-storm.
-IMPULSE_PUSH_PROB = 0.006  # per-step probability (~2x per 300-step episode). R3: 0.003 -> 0.006.
+IMPULSE_PUSH = 0.4       # m/s kick magnitude. R3: 0.4 -> 0.55 -- at 0.4 the converged policy saw ~0 big stumbles on the nominal course, so it never actually practised recovery. 0.55 makes recoverable big wobbles happen without the 0.7 fall-storm.
+IMPULSE_PUSH_PROB = 0.003  # per-step probability (~2x per 300-step episode). R3: 0.003 -> 0.006.
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.

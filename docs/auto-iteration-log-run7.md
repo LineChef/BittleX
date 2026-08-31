@@ -186,4 +186,62 @@ if recovery *still* doesn't move here, reward+curriculum has hit its ceiling and
 the next step is a structural change (recovery sub-policy or CPG action space) —
 flag for a go-ahead rather than spending more rounds.
 
-**Result:** _pending_
+**Result** (`walk_r3_ppo`, PPO_40, 38 min, clean convergence):
+
+| scenario | fell | speed m/s | speed_err | trot | med-stmbl | big-stmbl | recov | yaw° |
+|---|---|---|---|---|---|---|---|---|
+| course (0.03 + 0.20) | 0.125 | 0.060 | 0.051 | **−0.42** | 1 / 0.00 | 4 / **0.00** | – | 8.5 |
+| drills (0.045 + 0.60) | 0.63 | 0.075 | 0.057 | −0.49 | – | 21 / **0.00** | – | 25.5 |
+| flat | **0.25** | 0.080 | 0.030 | −0.41 | – | 3 / **0.00** | – | 8.5 |
+
+**Regressed on every axis and recovery still 0%.** Flat falls back to 0.25 (R2:
+0.00), course falls 0.125 (R2: 0.00), trot down to −0.42 (worst of Run 7), speed
+unchanged despite `FAC_SPEED` 4 → 7, heading up to 8.5° (R2: 4°). **Zero
+recoveries** across ~28 big-stumble episodes and the medium-stumble regime.
+
+**Cause:** the imitation-fade (imitation reward → 30% above 0.6 rad tilt) is a
+subtler version of the same failure as R1's phase-pause — when the gait wobbles
+past 0.6 rad (which the stronger impulses now cause often), the wkF-match signal
+drops, the policy loses gait structure, and doesn't re-lock. `FAC_BALANCE = 4` +
+harder impulses compound it into a fall-prone converged gait.
+
+---
+
+## Conclusion — reward + curriculum has hit its ceiling for stumble recovery
+
+Three rounds, three outcomes:
+
+| Round | Approach | Base gait | `big_stumble_recovery_rate` |
+|---|---|---|---|
+| R1 | all changes at once (obs + phase-pause + speed cap + hard DR) | **broke** (25% flat falls) | 0.00 |
+| R2 | safe core only (IMU obs + tilt-rate shaping) | **solid** (0% falls, best heading) | 0.00 |
+| R3 | recovery push (imitation-fade + FAC_BALANCE 4 + hard impulses) | **broke** again | 0.00 |
+
+**`big_stumble_recovery_rate` never left 0.0** — not one active recovery from a
+> 0.7 rad tilt across every round and scenario. Anything that adds signal to
+"recover from a big tilt" either does nothing (R2) or destabilises the nominal
+gait (R1, R3). This matches Run 6's finding from a different direction: a
+reactive, IMU-only controller with weak position-controlled legs can be tuned to
+keep tilt *low* (R2: excellent heading, no falls) but cannot be tuned to actively
+*climb back* from a large tilt.
+
+**Moving recovery further needs a structural change**, not another reward knob:
+
+- **Recovery sub-policy** — a second policy trained only on episodes that *start*
+  mid-stumble ("get back to walking from here"); the walker hands off control when
+  tilt crosses a threshold. Standard for robust legged control. ~1 day of env +
+  training work.
+- **CPG action space** — the policy modulates a central pattern generator instead
+  of emitting raw joint deltas. Nominal gait becomes rock-solid; policy capacity
+  goes to corrections. Larger redesign.
+- **Accept the ceiling** — ship the Run 6 stumble-catch behaviour (keep tilt low,
+  don't fall) and treat big-stumble recovery as a real-hardware-in-the-loop
+  problem for later.
+
+Loop **paused here for a direction decision.** The env is reverted to the R2
+config (the stable base). `walk_r2_ppo` is the best Run-7 checkpoint: 0% falls
+flat/course, best heading of the project (4–5° max yaw), trot −0.50, target-speed
+infrastructure in place. Speed calibration (getting the converged gait from
+~0.06–0.09 up to the 0.11 target) is decoupled from recovery and still tunable —
+1–2 focused rounds could close it.
+
