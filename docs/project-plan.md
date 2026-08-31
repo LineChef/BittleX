@@ -1,205 +1,476 @@
 # Bittle X Robot Companion — Project Plan
 
-**Goal:** Build a Bittle X quadruped that (1) learns to walk via reinforcement learning rather than scripted movement, (2) perceives its environment via camera and avoids obstacles, (3) holds voice conversations powered by Claude, and (4) develops persistent memory of past interactions over time.
+**Goal:** a Bittle X quadruped ("G2") that (1) learns to walk via reinforcement
+learning rather than scripted keyframes, (2) perceives its surroundings with an
+onboard camera and avoids obstacles, (3) holds voice conversations through the
+Claude API, and (4) keeps persistent memory of past interactions.
 
-**Background:** Builder has strong HTML/JS/CSS experience, no prior Python. Learning Python itself is low-risk; the real challenges are hardware debugging, RL training, and multi-system integration.
+Movement, vision, voice, and memory are built as **independent systems running
+alongside each other**, not a single unified controller.
+
+This is a living document — update phases, specs, and findings as the work
+progresses.
 
 ---
 
-## Parts List (Finalized — $567 total)
+## Parts list (finalized — $567)
 
 | Item | Price |
 |---|---|
 | Petoi Bittle X V2 (alloy servos) | $380 |
-| Raspberry Pi Zero 2 WH kit (pre-soldered GPIO headers, heatsink, mini-HDMI adapter, OTG cable) | $115 |
-| SanDisk 32GB Ultra microSDHC (A1, Class 10, UHS-I) | $22 |
-| 5V/2.5A micro-USB power supply | $10 |
+| Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable) | $115 |
+| SanDisk 32 GB Ultra microSDHC (A1, Class 10, UHS-I) | $22 |
+| 5 V / 2.5 A micro-USB power supply | $10 |
 | Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
-| PiSugar S 1200mAh (independent Pi power — Pi Zero W/WH/2W match; **not** the "S Plus")| — |
+| PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
 
-**Not yet resolved / to check when hardware arrives:**
-- ~~Whether Bittle X's board can reliably power the Pi Zero 2 W long-term, or whether the Pi should be powered independently~~ — **resolved: power the Pi independently.** Petoi's own docs warn of "reduced motion capability" when the Pi draws from the shared battery, and the servo-current-spike / battery-voltage-dip brownout pattern is well-documented in the Pi community. Selected the **PiSugar S 1200mAh** (5V/2.5A, pogo-pins to the Pi's underside pads so it leaves the GPIO header free, UPS safe-shutdown for unattended runs). No conflict with Bittle X's connection: PiSugar contacts the board underside, Bittle X the top-side 40-pin header. To sidestep the two-5V-sources question entirely, wire Bittle X to the Pi's **serial/data pins only (RX/TX/GND), not 5V** — PiSugar is the sole power source. Full research + sources: [`docs/pi-power.md`](pi-power.md). **Open item:** confirm BiBoard V2 can be wired data-only, or whether its mounting ties 5V to the data lines by default (ask Petoi / check when hardware is in hand).
-- Petoi's official BiBoard V1 spec (docs.petoi.com/biboard/biboard-v1-guide) lists Pi compatibility as "Raspberry Pi 3A+, 4, 5" — **Pi Zero 2 WH is not explicitly listed.** Verify the 5-pin socket and serial wiring are still compatible when hardware arrives.
-- ~~No confirmed pre-made enclosure exists yet for Pi-on-Bittle-X~~ — **resolved:** Petoi provides an official STL for a back cover with a Pi cutout: [`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl) (per docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1). This implies the cover *can* close over the Pi, contrary to the original assumption that it'd stay exposed — confirm fit once the Pi is mounted.
-- ~~Which exact ESP32 chip variant ships on Bittle X V2's BiBoard~~ — **resolved:** BiBoard V1 uses a standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an ESP32-MINI-1 module) — not an S3/C3. Per Phase 8, this means the vision approach is "send structured detection results over serial to Pi," not raw frame streaming.
+### Resolved
 
----
+- **Pi power: independent, via PiSugar S 1200 mAh.** Drawing the Pi from Bittle's
+  shared battery causes "reduced motion capability" (Petoi's own docs) and risks
+  servo-spike brownouts. The PiSugar pogo-pins to the Pi's underside pads, leaving
+  the GPIO header free, and provides UPS safe-shutdown. To avoid two 5 V sources,
+  wire BiBoard → Pi **data-only (RX/TX/GND)**, no 5 V. Full reasoning:
+  [`docs/pi-power.md`](pi-power.md).
+- **Enclosure:** Petoi ships an official back-cover STL with a Pi cutout
+  ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
+  so the cover can close over the mounted Pi.
+- **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
+  ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
+  detection results over serial rather than streaming raw frames.
 
-## Phase 1: GitHub Repo Setup
-- [x] Create a repo for the project (decide structure: single repo for everything, or split — e.g., one for RL training code, one for the Pi-side voice/memory pipeline) — complete
-- [x] Add a starter README — project goals, hardware plan, this roadmap — complete
-- [x] Set up a `.gitignore` from the start (exclude API keys/secrets, large trained model files if not meant to be versioned, virtual environment folders) — complete
-- [x] Decide where secrets will live (environment variables or a local gitignored config file — never commit credentials) — complete (documented in `.gitignore`: `.env`, `config.local.*`, `**/secrets.py`, `**/api_keys.py`)
-- [ ] Commit incrementally as each phase progresses, not in one big dump at the end — gives you real history, and doubles as portfolio material later (ongoing practice, not a one-time step)
+### Open (check when hardware arrives)
 
-## Phase 2: Orientation (while hardware ships / before touching real robot)
-- [x] Try the community Bittle simulator (grgv.xyz/blog/bittle) to get a feel for movement/gait — complete
-- [ ] ~~Check Petoi's official browser simulator (via bittle-x.petoi.com docs)~~ — skipped (2026-08-29): searched the full `bittle-x.petoi.com` manual (all 7 chapters + useful links) and the Doc Center's "Supporting Application and Software" page; no official browser-based Bittle X simulator was found. Only found a tutorial for simulating Bittle in **NVIDIA Isaac Sim** (a full robotics simulator — more relevant to Phase 3's RL work than a quick orientation demo) and **OpenCatWeb** (a web UI for controlling a *real*, Pi-mounted robot — not a simulator). Revisit if a tool for this is found later; for now, the community simulator above covers this step.
-- [x] Browse the OpenCat GitHub repo (github.com/PetoiCamp/OpenCat) to see how movements/gaits are structured in code — complete. Note: `OpenCat` (AVR/NyBoard) and `OpenCatEsp32` (ESP32/BiBoard — what Bittle X actually runs) share the same gait architecture, so findings apply to our hardware. See "How gaits are structured" note below.
-- [ ] Try Petoi's free beginner coding curriculum (C++ and/or block-based Petoi Coding Blocks) — deferred (2026-08-29): decided to jump ahead to Phase 3 rather than gate on this; revisit if desired
-- [ ] Get basic Python fundamentals down (variables, functions, loops, classes) — translating existing JS/CSS/HTML logic skills, not starting from zero conceptually — deferred (2026-08-29): will pick this up along the way while building Phase 3 rather than as a prerequisite gate
-
-## Phase 3: RL Training — Simulation Only (can run in parallel with hardware arriving/shipping)
-*This phase only needs software — no physical robot required until the deployment step in Phase 6.*
-- [x] Set up opencat-gym-sim2real (PyBullet + Stable-Baselines3) in simulation — complete (2026-08-29). Found and confirmed the actual repos:
-  - [`github.com/ger01d/opencat-gym`](https://github.com/ger01d/opencat-gym) (MIT license, commit `12b39ff`) — the Phase 3 training environment (PyBullet + Stable-Baselines3 + Gymnasium, `train.py`/`opencat_gym_env.py`). Confirmed it targets our exact hardware: ships `models/bittle_esp32.urdf`. A curated copy (source only, no demo GIFs/pretrained weights) is vendored at `rl_training/opencat-gym/` — see [`rl_training/README.md`](../rl_training/README.md).
-  - [`github.com/ger01d/opencat-gym-sim2real`](https://github.com/ger01d/opencat-gym-sim2real) — a separate, related repo for deploying a trained policy to the real robot over serial. That's Phase 6, not this step.
-  - **Environment blockers hit and resolved along the way** (kept here in case they recur on another machine):
-    - System Python was 3.8.9 (old Xcode-bundled, EOL); Stable-Baselines3/Gymnasium require Python ≥3.10 → installed Python 3.11 via Homebrew, set up a project `.venv` from it.
-    - `brew install python@3.11` first failed because Xcode (13.2.1) was too outdated for Homebrew to build against → fixed by `xcode-select --install` (fresh Command Line Tools), then `sudo xcode-select --switch /Library/Developer/CommandLineTools` to point at them instead of the old Xcode.app.
-    - `pybullet` has no prebuilt wheel for macOS (only Linux) and fails to compile from source on current macOS SDKs — a decades-old zlib compatibility shim in its bundled zlib copy (`#define fdopen(fd,mode) NULL` on `MACOS`/`TARGET_OS_MAC`) clobbers the real `fdopen` declaration in `_stdio.h`. Fixed with `CPPFLAGS="-Dfdopen=fdopen"` during install (documented in `requirements.txt`).
-    - Skipped `stable-baselines3[extra]`'s Atari extras (`ale-py` needs SDL2 dev libraries to build, and we don't need Atari support) — installed plain `stable-baselines3` + `gymnasium` + `tensorboard` instead.
-  - Verified working: `opencat_gym_env.py`'s `OpenCatGymEnv` passes Stable-Baselines3's `check_env`, resets, and steps successfully in this environment.
-- [ ] Design and iterate on the reward function (this is the primary lever — expect multiple rounds of tweaking, not a one-shot success)
-  - First iteration (2026-08-29): decided to start conservative — enable modest domain randomization and leave reward weights at upstream defaults for a baseline run before tuning further. Set `RANDOM_JOINT_ANGS = 5` (%) in `opencat_gym_env.py`. Discovered while doing this: of the four randomization constants declared in the file (`RANDOM_GYRO`, `RANDOM_JOINT_ANGS`, `RANDOM_MASS`, `RANDOM_FRICTION`), only `RANDOM_JOINT_ANGS` is actually wired into `step()`/`reset()` — `RANDOM_MASS`/`RANDOM_FRICTION` are commented "currently inactive" upstream, and `RANDOM_GYRO` is *also* dead code despite not being labeled as such (declared, never referenced). Left those three at 0 rather than set something with no effect; wiring them up for real gyro/mass/friction randomization is future work if the baseline run needs more robustness.
-  - Reward weights (`FAC_SLIP`, `FAC_CLEARANCE` = 0.0 by default — see Reference Notes) intentionally left untouched for this first run, to get a baseline before adding more penalty terms.
-  - Smoke test result (2026-08-29): ran 20K steps (~10 PPO updates, ~23s wall time) via `smoke_train.py`, reward climbed to ~54 and `ep_len_mean` was 245/250 during training. But watching the saved checkpoint deterministically (`watch_trained.py`) showed the robot falling almost immediately and rolling onto its side. Assessed as expected at this step count, not a bug: the stability/smoothness penalty is scaled by `step_counter_session/PENALTY_STEPS` (2e6), so at 20K steps it's only running at ~1% strength — the policy is almost purely optimizing forward movement with very little balance cost yet. Also, training samples actions stochastically while `watch_trained.py` replays deterministically (mean action, no noise), which can look different from the training logs this early. **Watch-point for the full run:** if it still faceplants immediately at the full 2M steps, that's a real signal to revisit the reward function (not expected at 20K).
-- [ ] Run automated training (unattended, potentially hours/days) and monitor the reward curve for improvement/plateau — smoke test passed (pipeline verified end-to-end, see note above).
-  - **Full run v1 (2026-08-29):** `train.py`, 2M steps, ~40 min wall time on this machine (~830-870 fps, much faster than the "hours/days" default expectation since this is lightweight physics-only sim, not vision-based). Reward climbed to a peak of ~900+ around 800K-1.3M steps (episodes running the full 250-step length), then **collapsed hard in the final third** (down to ~25 reward, ~142-181 step episodes) and only partially recovered by the end (94.5 reward). User's visual replay confirmed: a real, improved-looking attempt for the first few steps, then falls onto its side — not an immediate flop, and not a slide/reward-hacking exploit.
-  - **Diagnosis:** `PENALTY_STEPS = 2e6` (the constant that ramps the stability/smoothness penalty up to full strength) exactly equals the total training length, so the policy converged on a fast-but-unbalanced strategy while the penalty was still weak, then got hit with the full penalty right as training ended — visible in elevated `approx_kl`/`clip_fraction` (0.4-0.5) in the final stretch, the signature of large, disruptive policy updates with no remaining budget to re-stabilize.
-  - **Next step chosen: continue training the same checkpoint** (cheapest way to test the diagnosis) rather than changing the reward function yet. `continue_train.py` loads `trained/full_run_v1_ppo` and trains 2M more steps under the now-stable, fully-ramped penalty (`reset_num_timesteps=False`, logs into the same TensorBoard run `PPO_1` so the curve continues seamlessly from ~2.02M onward). If reward recovers and stabilizes, that confirms the diagnosis and future from-scratch runs should either lower `PENALTY_STEPS` (so it ramps earlier, e.g. 500K-750K) or just train longer overall. If it doesn't recover, that points to something else (e.g. hyperparameters/learning rate) needing investigation.
-  - **Continuation result (2026-08-30):** ran to 4,030,464 total steps. Reward recovered strongly — 251/250 episode length, ~331 reward (up from 94.5) — confirming the diagnosis: continuing under a stable, fully-ramped penalty does fix the collapse. One caveat: `approx_kl` spiked to 22.75 (vs. its normal ~0.05-0.09) with `clip_fraction` hitting 0.966 right near the very end (iteration 122 of 123) — a large, unusual policy update that the final rollout numbers still looked good despite. Not fully understood; worth watching for in future runs.
-  - **Visual replay (2026-08-30, robot named "G2" by user going forward):** G2 traveled much farther this time, but via **legs jittering/shuffling rapidly against the floor rather than taking real steps** — net forward movement without genuine walking. Also **curved to the right instead of going straight**, then fell at the end. Diagnosed as two concrete reward-function loopholes, not random flailing:
-    - `FAC_SLIP = 0.0` and `FAC_CLEARANCE = 0.0` (both currently disabled) mean there's no cost for feet dragging/slipping and no incentive to actually lift feet during a step — `FAC_MOVEMENT = 1000` rewards forward x-displacement however it's achieved, so a cheap jitter-and-slide strategy scores well without real stepping.
-    - No yaw penalty exists anywhere in the reward function — `body_stability` only penalizes roll/pitch angular velocity, and `FAC_MOVEMENT` only rewards x-position change, not straight-line heading. Nothing currently discourages curving as long as x keeps increasing.
-  - **Reward function v2 applied (2026-08-30):** `FAC_SLIP` 0.0→0.01, `FAC_CLEARANCE` 0.0→0.1, and a new `FAC_YAW = 0.1` term added to `body_stability` (computed from the previously-unused yaw component of angular velocity — not added to the observation space, to keep this iteration's scope minimal; the policy still can't directly sense yaw drift, only gets penalized for it, which may limit how well it can correct curving. Worth revisiting if curving persists). All three weights are first-pass conservative guesses, not empirically tuned — expect to adjust based on what this run shows. Smoke test (20K steps) passed sanity check: reward ~44 (comparable to v1's ~54), no divergence/NaN.
-  - **Full run v2 launched (2026-08-30):** `train.py`, target 2M steps, saves to `trained/full_run_v2_ppo`, logs to a fresh TensorBoard run `PPO_2` (separate from v1/continuation's `PPO_1`, since the reward function itself changed — not directly comparable on the same curve).
-  - **v2 result:** finished at 2,015,232 steps, no catastrophic collapse this time (`approx_kl` stayed in the normal ~0.05-0.09 range throughout, unlike v1/continuation) — but reward did decline from a mid-run peak of ~901 (~52% through) down to 493 by the end, with episode length at 247/250. **Visual replay:** real progress — G2 exhibited something much closer to actual walking and traveled much farther, though the front-right foot stepped noticeably too high near the end of the episode. Assessed as a smaller, more localized issue than v1's jittering/curving (likely the policy still settling late in the run, possibly interacting with the new yaw-correction asymmetry between left/right legs) rather than a new structural reward loophole — not chasing this further with another `FAC_CLEARANCE` tweak off a single data point.
-  - **Found and adopted ideas from a related project (2026-08-30):** [`bmabsout/opencat-gym`](https://github.com/bmabsout/opencat-gym) (an active fork of our vendored repo, commit messages: "bittle now learns to walk well with only imu", "fixed rewards") independently arrived at removing time-varying reward ramps entirely (validates our `PENALTY_STEPS` diagnosis) and added two techniques adopted into our `opencat_gym_env.py`:
-    - **`FAC_JITTER = 0.2`** — a new anti-jitter penalty counting joints whose movement direction reversed frame-to-frame (adapted from their `change_direction` check), targeting the jittering/shuffling failure mode more directly than `FAC_SMOOTH_1/2` do.
-    - **Cyclical time/phase observation input** (`TIME_PHASE_PERIOD = 100`) — a rhythmic clock signal added to the observation (now 247-dim, up from 246) to help the policy learn periodic, consistent gaits. Their fork also confirmed a concrete real-hardware control-rate figure worth remembering for Phase 6: **~48-50Hz**, tied to actual servo PWM limits (5 physics substeps per control step, "cannot go faster as PWM is 50Hz").
-    - Not adopted (bigger changes, hold for later if needed): their `p_mean`/soft-min reward aggregation (structurally different from our weighted-sum reward — more robust against exploits but a bigger redesign), gravity-direction-vector observation instead of raw quaternion, and dropping joint-history from the observation entirely.
-  - **Also added: periodic checkpointing.** `train.py`/`continue_train.py` previously only saved a model at the very end of `.learn()` — an interruption (crash, sleep, forced OS update restart) would have lost the entire run's progress. Both now use SB3's `CheckpointCallback` to save every ~200K steps to `trained/checkpoints/`.
-  - **Full run v3 launched (2026-08-30):** `train.py` with the `FAC_JITTER` + phase-input changes on top of v2's settings, target 2M steps, saves to `trained/full_run_v3_ppo`, logs to fresh TensorBoard run `PPO_3`.
-  - **v3 stopped before completion (2026-08-30), superseded by v4.** User asked, mid-run, whether we could encourage a real diagonal-trot leg pattern (front-right+back-left swinging together, opposite front-left+back-right, like a real dog) and whether starting from a scripted reference gait (Bittle's own built-in `wkF` walk animation, found earlier in `InstinctBittleESP.h`) could get there faster than pure RL exploration. Discussed three options (lightweight gait-symmetry reward / full scripted-gait bootstrap via behavior cloning or trajectory-imitation / CPG action-space redesign) — user chose the lightweight option to start, consistent with the established cheap-iteration-first approach. v3 stopped (no checkpoint existed yet, nothing lost) so this could be added and tested together rather than as a separate run.
-  - **Gait-symmetry reward added (2026-08-30): `FAC_GAIT_SYMMETRY = 2.0`.** Rewards `-(diagonal_a * diagonal_b)` where `diagonal_a` = front-right + back-left joint-angle deltas, `diagonal_b` = front-left + back-right — positive when the two diagonal pairs move opposite each other (a trot). **Verified empirically before implementing** (not assumed from reading the URDF): all 8 joints share the same rotation-axis sign convention in `models/bittle_esp32.urdf` (confirmed by direct PyBullet test — setting shoulder_left and shoulder_right to the same angle moves both front paws identically), so "same sign of angle change" genuinely means "in phase," no left/right mirroring to account for. Applied **unramped** (not scaled by `PENALTY_STEPS`, unlike `FAC_JITTER`) — deliberately shapes gait structure from step 1, reasoning from the v1 lesson that letting the policy settle into a pattern early under a weak/absent penalty and then disrupting it later causes instability.
-  - **Full scripted-gait bootstrap (behavior cloning or trajectory-imitation from Bittle's built-in `wkF` gait) and CPG redesign were discussed but deferred** — bigger, riskier changes to try after seeing whether the lightweight reward-shaping approach is enough. Revisit if `FAC_GAIT_SYMMETRY` doesn't produce a real diagonal trot.
-  - **Full run v4 launched (2026-08-30):** `train.py` with `FAC_GAIT_SYMMETRY` added on top of v2+v3's changes (this is the first run to include the anti-jitter penalty, phase input, *and* gait symmetry together, since v3 itself was never evaluated), target 2M steps, saves to `trained/full_run_v4_ppo`, logs to fresh TensorBoard run `PPO_4`.
-  - **Sequencing decision confirmed (2026-08-30):** get a solid, reliable flat-ground walking policy first; layer in terrain robustness (domain-randomized rough terrain, per the earlier note above) as a deliberate later phase, not simultaneously. Related caveat to revisit at that point: `FAC_GAIT_SYMMETRY` is currently unramped (full strength for the entire run, by design — see above), which could compete with a mature policy's incentive to deviate from strict diagonal-trot timing when uneven terrain calls for it. Consider decaying this weight over training once terrain randomization is actually introduced, rather than before.
-  - **Process hygiene note added to workflow:** an old, forgotten `watch_trained.py` viewer window (from hours earlier) was found still running and consuming 229% CPU, slowing down a concurrent training run. Now checking for and stopping lingering Python/PyBullet processes before every new run (saved as a standing memory).
-  - **v4 result:** finished at 2,015,232 steps. Reward peaked at ~1010 around step 1.44M (episodes at full 251/250 length) — higher than any previous run's peak — then at step 1,458,176 hit the same catastrophic-collapse signature seen in v1/v1-continuation: `approx_kl` spiked to **26.93** (normal range ~0.02-0.09), `clip_fraction` hit **0.909**, and reward crashed to near-zero (as low as 0.378), staying depressed (~10-27) for most of the remaining run before partially recovering by the very end (final: 477 reward, 251/250 episode length). **Significant finding: this is nearly the identical instability signature as v1, despite v4 having a completely different set of reward terms (gait symmetry, anti-jitter, phase signal vs. v1's plain reward).** This points away from "it's this specific reward term's fault" and toward something more structural — likely a PPO hyperparameter issue (learning rate, clip range) that becomes more likely to trigger a disruptive update late in training as the policy's exploration noise (`std`) shrinks, independent of which reward shaping is in place.
-  - **Isolate-gait-symmetry test prepared then reverted (2026-08-30), never run.** User's idea: comment out every reward rule except `FAC_GAIT_SYMMETRY` (including `FAC_MOVEMENT` itself) to see the symmetry term in isolation and as a diagnostic for whether the recurring collapse relates to interaction between reward terms. Implemented in `opencat_gym_env.py` while v4 was still training (to avoid resource contention), but before it was tested, user asked to uncomment/restore all rules instead. Full v4 reward function (all 8 terms) is back in place and verified working (smoke-tested). This isolation idea remains available to revisit later if wanted — the reasoning above is still valid, it just wasn't pursued this round.
-  - **Root-cause diagnosis across all 4 full runs (2026-08-30):** the same catastrophic-collapse signature (approx_kl spike, reward crash) recurred in v1, v1-continuation, v2 (milder — decline without a violent spike), and v4, *despite completely different reward-function designs each time*. That rules out "it's this specific reward term" and points at something structural, still unaddressed since v1:
-    1. `PENALTY_STEPS = 2e6` had exactly equaled total training length in every run so far (v1-v4) — never actually fixed after the original v1 diagnosis, only worked around by adding new terms on top. The penalty was continuously reshaping the reward landscape for the *entire* run, not just "at the end" (v4's spike hit at 73% through training, not near 100%, showing this is a continuous-pressure problem, not just an endgame one).
-    2. Learning rate (fixed `0.0003`) and clip range (fixed `0.2`) never decayed over training — standard PPO practice decays these specifically to prevent large, destabilizing updates once a policy has already converged (visible in shrinking `std` across every run). A fixed rate means a late-training correction (forced by #1) happens as a violent jump rather than a gradual adjustment.
-  - **Fixes applied for v5 (2026-08-30):**
-    - `PENALTY_STEPS`: 2e6 → **5e5** in `opencat_gym_env.py` — now reaches full, stable strength at 25% through a 2M-step run instead of exactly at the end.
-    - Added a linear learning-rate decay schedule to `train.py` (`linear_schedule(3e-4)`, decaying to ~0 by the end of training) — verified active in the running log (`0.000298` shortly after start, ticking down from `0.0003`).
-    - `clip_range` decay was discussed as a lower-priority third option but not applied this round — revisit if #1/#2 don't fully resolve the collapse pattern.
-  - **Full run v5 launched (2026-08-30):** `train.py` with the two fixes above, same full reward function as v4 (all 8 terms, unchanged), target 2M steps, saves to `trained/full_run_v5_ppo`, logs to fresh TensorBoard run `PPO_5`.
-  - **v5 result: the fix worked — no collapse.** Reward climbed smoothly and monotonically for the entire 2,015,232-step run, from ~47 at the start to **~1,100** at the end (the highest of any run so far, and stable there rather than crashing) — episode length stayed at the full 251/250 for virtually the whole run. `approx_kl` and `clip_fraction` *decreased* toward the end (from ~0.03 to ~0.002, and ~0.35 to ~0.004) instead of spiking — exactly the smooth convergence behavior a decaying learning rate is supposed to produce. **Confirms the root-cause diagnosis**: the recurring collapse across v1/v1-continuation/v2/v4 was structural (penalty ramp timing + non-decaying learning rate), not caused by any specific reward-shaping term.
-  - **Visual replay (2026-08-30):** movement noticeably better and fast, but **all four legs** (not just front) take very small, shuffling steps rather than real strides — jittery at the start of an episode (settling out of the fixed reset pose), smooths into something closer to a real walk for a few steps, then reverts to small steps again near the end (mechanism not fully understood — a real diagnostic question, not confidently explained yet). Diagnosed as a likely consequence of the reward shape rather than a training bug: `PAW_Z_TARGET = 0.005` (5mm) barely rewards any real lift, and `FAC_SMOOTH_1/2` directly penalize joint-angle-change *magnitude*, working against bigger, more deliberate swings — combined with falling being catastrophic (episode-ending), lots of small "safe" steps are a plausible locally-optimal strategy under the current shape.
-  - **Reward function v6 applied (2026-08-30):**
-    - `PAW_Z_TARGET`: 0.005 → **0.015** (5mm → 15mm) — reward an actual step, not a shuffle.
-    - `FAC_SMOOTH_1`/`FAC_SMOOTH_2`: 1.0 → **0.5** each — loosens the penalty on movement magnitude; `FAC_JITTER` (unchanged) should still catch genuine back-and-forth oscillation since it targets direction-reversal, not magnitude.
-    - Added per-term reward logging to `step()`'s `info` dict (`r_movement`, `r_gait_symmetry`, `r_smooth_movement`, `r_body_stability`, `r_paw_clearance`, `r_paw_slip`, `r_arm_contact`, `r_jitter`) — so future "why did behavior change here" questions can be answered from data (e.g. per-episode logs) instead of inference. Verified working in a quick single-env check (terms sum correctly to total reward).
-    - Not yet run as a full training test — verified via lightweight environment check only (not a full `smoke_train.py` pass), since the v5 GUI viewer was still open/using significant CPU at the time. Taking a break before the next full run.
-  - **Full run v6 launched (2026-08-30):** `train.py`, target 2M steps, same reward *structure* as v5 (all 8 terms) with the three v6 tweaks above (`PAW_Z_TARGET` 15mm, `FAC_SMOOTH_1/2` 0.5, per-term `info` logging). Smoke test (`smoke_train.py`, 20K steps) passed first this time — reward ~48, no NaN/divergence, per-term `info` dict verified not to break the training loop. Saves to `trained/full_run_v6_ppo`, logs to fresh TensorBoard run `PPO_6`.
-  - **Tooling added (2026-08-30):** `start_run.sh <tag>` — one-command launcher that does the pre-run checklist (refuses to stack on a live run, warns about lingering PyBullet viewers, starts TensorBoard, launches training in the background). `train.py` now takes `--tag <label>` (names the checkpoint prefix + `trained/<tag>_ppo.zip`) and `--steps`. Shell helpers `g2train` / `g2watch` in `~/.bash_profile`; Claude Code slash command `/train <tag>`.
-  - **v6 evaluated + tagged `gait-v6-known-good` (2026-08-30):** finished 2M steps, ep_rew ~1220 (highest yet), clean convergence, no collapse. Visual replay: best gait so far — reasonable diagonal trot, close to the target — but curves slightly right by the end of the run. Committed + tagged as the revert point.
-  - **Automated reward-iteration loop (2026-08-30):** first unattended run of the `docs/automated-testing-loop.md` workflow, on branch `auto-gait-iteration`. Goal: fix the rightward curve while keeping everything else. Added `evaluate_policy.py` (headless metrics + frame renders). 5 tuning iterations at 1M steps + 1 confirming run at 2M. Outcome — three reward changes from v6: **`FAC_HEADING = 5.0`** (new — penalize accumulated heading error from the quaternion, not just yaw *rate*; this fixed the curve — iter1's 0.5 was far too weak), **`PAW_Z_TARGET` 0.015→0.020** (stop back feet dragging once heading control made the gait front-heavy), **`FAC_GAIT_SYMMETRY` 2.0→3.5** (tighten the diagonal trot). Final policy `trained/auto_gait_final_ppo` (2M) vs v6@2M: heading drift at episode end **12.5°→0.16°** (no longer accumulates), lateral wander **0.24 m→0.045 m**, forward speed held (0.263→0.256 m/s), stride 0.124→0.103 m, roll/pitch variance down, never falls. Known miss: `diagonal_trot_corr` −0.59 at 2M (target ≤−0.6; the 1M checkpoints hit −0.90) — the fully-converged policy walks fast and straight but its diagonal timing loosened. Merged to `development`. Full write-up: `docs/auto-iteration-report-2026-08-30.md`; per-iteration detail: `docs/auto-iteration-log.md`. Next moves logged there (decay/retune `FAC_GAIT_SYMMETRY`, front/back + L/R symmetry terms, stride/cadence shaping) before the terrain-robustness phase.
-  - Note: real-time terrain/disturbance adaptation is realistic and is the actual advantage of RL over scripted gaits, but Bittle's servos have no torque/force feedback and there's no per-foot contact sensing — the policy's only real-time body-state signal is the onboard IMU (orientation/tilt). So it can learn to recover from pushes, slopes, and minor unevenness, but won't have foot-level terrain awareness like research quadrupeds with force-sensing legs. To get real robustness (not just flat-ground walking), the reward function should explicitly reward balance recovery from perturbation, not just forward velocity — and training should use domain randomization (varied simulated terrain roughness, friction, random pushes) so the policy generalizes to real-world variation it never saw exactly. Feeding vision (Phase 8) into the policy later would push this further (reacting to terrain before it's underfoot) but isn't in the base plan.
-  - **Run 5 — domain randomization + `wkF` imitation (2026-08-30/31), merged to `development`:** wired up the previously-dead DR knobs (per-episode friction / link-mass / IMU-noise randomization, random shoves, scattered obstacle boxes) with a curriculum ramp, plus a DeepMimic-style imitation reward (`FAC_IMITATION`) that matches Bittle's built-in `wkF` walk keyframes phase-by-phase (`reference_gait/`, extracted from `InstinctBittleESP.h`, open-loop-verified). The imitation reward is what finally restored a real diagonal trot that pure weight-tuning couldn't (Run 5 iterations). Also added `evaluate_policy.py --dr-*` held-out scenario flags.
-  - **Run 6 — fall-recovery / self-righting loop (2026-08-31, unattended), on `auto-gait-iteration`:** 6 rounds, 2M steps each. **Key finding: a Bittle cannot self-right from a full tip-over (>1.3 rad) — no roll-axis actuation, a missing DOF.** An escalating recovery reward (weight 8→22, denser shaping, eased criteria, pushes suspended while down, actuator torque boosted) converged at **0% recovered every time** (rounds R2, R3). The loop pivoted to the learnable version — *catching a stumble before it becomes a fall* — via `FAC_BALANCE`, an always-on reward for driving body tilt back to level while wobbling. Winner **`auto_rec_r5_ppo`, tagged `gait-v7-stumble-catch`**: crispest `diagonal_trot_corr` of the project (**−0.58** vs the −0.44/−0.59 Phase-3 gait), best heading (7.6° max yaw drift vs 11.7°), steadiest roll, zero falls on the 30 mm obstacle course; trade is ~7% less forward distance (0.38 vs 0.41 m per 5 s) — acceptable under "gait match ≫ speed". The recovery-window code stays in `opencat_gym_env.py` but dormant (`FAC_RECOVERY=0`). Records: `docs/auto-iteration-log-run6.md`, `docs/auto-iteration-report-2026-08-31.md`. **Pending: user review of the `g2watch` replay, then a merge decision for `auto-gait-iteration` → `development`.**
-  - **Three more automated loops + a final run (2026-08-30), all set aside:** attempts to fix the start-up "stutter" and tighten the trot. Run 2 (reference-state initialization) — the stutter turned out to be a *measurement artifact* (baseline evaluated in a mismatched env); real `startup_speed_ratio` is ~0.84, fine. Runs 3–4 (trot: `FAC_GAIT_SYMMETRY` weight tuning, a decay ramp, a phase-locked term reformulation) and a final stride-length reward — every one either dissolved the trot or regressed heading/stride at 2M convergence. **Conclusion: `auto_gait_final` sits at a local optimum that reward-shaping tweaks cannot productively push past.** Records: `docs/auto-iteration-log-run{2,3,4}.md`, `docs/auto-iteration-report-2026-08-30-run{2,3,4}.md`, `docs/auto-iteration-log-final.md` (the reformulated terms live only on the `auto-gait-iteration` branch, not merged). Remaining trot-crispness levers are structural — diagonal-pair phase in the observation, `wkF` imitation, or a CPG action space — and are better done with the physical robot in the loop.
-- [x] Evaluate the trained policy in simulation and save the best checkpoint(s) for later real-world deployment — **done. Phase 3 gait locked: `auto_gait_final`, tag `phase3-gait`.** Straight-line level-ground walk: 0.256 m/s, 1.29 m in a 251-step episode, heading drift 0.16° (non-accumulating), 4.5 cm lateral wander, never falls, `startup_speed_ratio` 0.84, stride 0.103 m, `diagonal_trot_corr` −0.59 (a real but loose diagonal trot). Config on `development`: `FAC_HEADING=5.0`, `PAW_Z_TARGET=0.020`, `FAC_GAIT_SYMMETRY=3.5` on top of v6. Local checkpoint copy: `rl_training/opencat-gym/trained/phase3-gait_ppo.zip` (gitignored). This is the sim-to-real starting point for Phase 6; expect to re-tune against real hardware.
-- [ ] (Stretch goal, optional) Explore imitation learning approaches referencing the UVA/Harvard Bittle research, given standard servos lack position feedback
-- [ ] (Deferred idea, 2026-08-31) Reactive obstacle-purchase behaviour: teach the policy that when a front foot is blocked by an obstacle it should lift that foot higher to get on top. Learnable in sim but needs per-foot contact/height added to the observation — which the real Bittle can't sense (no foot sensors), so it wouldn't transfer without restricting the obs to IMU+timing. The more transferable version: a taller-obstacle curriculum + a loose/decaying imitation weight so the policy learns a generally higher, more adaptive swing without explicit blocked-foot detection. Revisit after the flat-ground robust gait (Run 5) is solid.
-
-## Phase 4: Hardware Assembly
-- [ ] Assemble Bittle X V2 (40–90 min per Petoi's estimate)
-- [ ] Calibrate joint servos — note: Petoi's own manual (bittle-x.petoi.com/4-calibration) says pre-assembled units "should have been calibrated" and you can skip straight to Play; this contradicts the "fine calibration is required" assumption below. Treat calibration as a check/fine-tune step, not an assumed-required one — only dig in if movement looks off.
-- [ ] Get it moving via the stock app/firmware first, before touching custom code — confirms hardware works before adding complexity
-- [ ] Flash/set up the Raspberry Pi Zero 2 WH:
-  - Use Raspberry Pi Imager to pre-configure Wi-Fi + enable SSH before first boot (headless setup — no monitor/HDMI needed)
-  - Confirm SSH access from your regular computer
-- [ ] Mount the Pi to Bittle X's frame; test power delivery and serial communication between Pi and BiBoard independently (known community issue: power can work while serial communication doesn't). Concrete steps per Petoi's Raspberry Pi serial docs (docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac + its "For BiBoard V1" subpage):
-  - **Power the Pi from the PiSugar S, not the BiBoard.** Attach PiSugar to the Pi's underside pads. Wire BiBoard → Pi as **data-only (RX/TX/GND)**, leaving the Pi's 5V pin unconnected, so PiSugar is the sole power source. See [`docs/pi-power.md`](pi-power.md) for the reasoning and the open item (whether BiBoard V2's mount forces 5V + data together).
-  - Install the 5-pin Pi socket on BiBoard V1 (Petoi's official 3D-printed back cover with a Pi cutout: [`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl))
-  - On the Pi: `sudo raspi-config` → Interface Options → Serial Port → disable the login shell over serial, enable the serial port hardware → reboot
-  - Also disable the Pi's 1-wire interface (avoids repeated reset signals on GPIO 4 conflicting with the board)
-  - From researching similar Pi-based robot projects (2026-08-30, see Phase 7 note below for full source list): Raspberry Pi's WiFi power-save mode has a known bug (`brcmfmac`) causing SSH drops under CPU load — worth disabling proactively (`sudo iw wlan0 set power_save off` or via `/etc/rc.local`) during this setup, before it becomes an intermittent mystery bug later during voice pipeline testing.
-  - On the BiBoard: send serial command `XS` (or modify `OpenCat.h` and reflash) to enable "Serial 2" working mode so it talks to the Pi
-  - Serial port device name on Pi: docs say `/dev/ttyS0` for Pi 3/4, `/dev/ttyAMA0` for Pi 5 — Pi Zero 2 W isn't explicitly listed; likely `/dev/ttyS0` given its Pi-3-family SoC, but confirm once wired up
-  - Use `ardSerial.py` from the OpenCat repo as the reference Python serial commander (e.g. `./ardSerial.py kcrF` = "perform skill crawl Forward")
-- [ ] Set up the AI Vision Camera Module: mount at head, connect to Grove socket on BiBoard, upload firmware via Petoi Desktop App or Arduino IDE
-
-## Phase 5: Basic Programming & Control
-- [ ] Send basic movement commands to Bittle X via Python (walk, sit, preset behaviors) — establishes the base control layer. Reference docs: [Python/SerialMaster user guide](https://docs.petoi.com/python/serialmaster-user-guide), [Raspberry Pi serial port as an interface](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac)
-- [ ] Get comfortable with OpenCat's command structure before building anything on top of it
-- [ ] Test the AI Vision Module's on-device detection via the SenseCraft AI Model Assistant web debug GUI
-
-## Phase 6: RL Sim-to-Real Deployment
-- [ ] Deploy the trained policy (from Phase 3) to the real Bittle X. Deployment mechanism (researched 2026-08-30): [`ger01d/opencat-gym-sim2real`](https://github.com/ger01d/opencat-gym-sim2real) — flash modified BiBoard firmware ([`ger01d/OpenCatEsp32-sim2real`](https://github.com/ger01d/OpenCatEsp32-sim2real)) that listens for joint commands over serial, then run `enjoy.py`-equivalent inference loop on a computer connected via serial, streaming the trained policy's output as live joint commands. Author describes this as "still highly experimental."
-  - **New open question, from the original author's own account:** the trained policy requires PyTorch to run inference and was explicitly designed to run "on a computer," not on the robot's own microcontroller (BiBoard/ESP32 can't run it directly) — the author used a full computer for this, not a Pi Zero-class board. Our plan has the mounted Raspberry Pi Zero 2 WH (512MB RAM, weak quad-core Cortex-A53) running this inference loop and talking to the BiBoard over the same serial link researched in Phase 4. **Whether a Pi Zero 2 WH can run PyTorch inference at a usable rate for real-time joint control is untested and unconfirmed** — worth a small standalone benchmark (load the trained policy, time `model.predict()` calls) once the Pi is set up (Phase 4), before assuming this works, and before writing this into the actual runtime code.
-- [ ] Expect a real performance gap vs. simulation — this is normal, not failure
-- [ ] Iterate: adjust reward function and/or retrain in simulation based on what you observe on real hardware, redeploy
-
-## Phase 7: Voice + Claude Integration
-- [ ] Build audio capture pipeline on the Pi (built-in mic on Bittle X's board)
-- [ ] Add speech-to-text (decide: cloud API vs. local model like Whisper — affects Pi RAM headroom decisions)
-  - Research findings (2026-08-30) from similar Pi-based LLM voice-assistant robot projects (SunFounder PiDog's official docs, github.com/marceld23/Ai-Robo-Dog, github.com/rockywuest/pidog-embodiment — note: these target Pi 4/5 with 2GB+ RAM, ours is a Pi Zero 2 WH with 512MB, so treat as directional not directly benchmarked):
-    - Use a **local, always-on wake-word detector (Vosk)** that only triggers full speech-to-text on activation, rather than continuously streaming/processing audio — cheap on CPU, avoids constant network calls on a weak board.
-    - **Local TTS (Piper, small models like `en_US-ryan-low`) is viable** and avoids cloud round-trip latency — worth defaulting to this over a cloud TTS API given the plan's open RAM-headroom question above.
-    - Given the Pi Zero 2 WH's much smaller headroom than the Pi 4/5 these projects target, even "lightweight" Whisper may be too heavy — Vosk for *both* wake-word and full STT is worth evaluating once real hardware testing starts (not resolved by research alone; revisit when the Pi arrives).
-    - pidog-embodiment logs a real pitfall: worker/servo threads dying silently on an unhandled exception, with no auto-restart — build in health-monitoring/restart logic for any long-running audio/hardware threads, not fire-and-forget.
-    - Raspberry Pi OS Bookworm's PEP 668 "externally managed environment" blocks plain `pip install` on-device — use a venv (already our plan) or `--break-system-packages`.
-- [ ] Connect to Claude via the Anthropic API (separate billing from Claude Pro subscription — usage-based cost)
-  - Consider a **config-driven LLM client** (env vars for API key/model/timeout) with an explicit request timeout tuned for the Pi's slower CPU — pidog-embodiment calls this out specifically for CPU-constrained boards.
-  - Consider **splitting Claude's response into spoken text + structured action commands** (SunFounder PiDog's pattern: response parsed into speech + an action list dispatched to hardware) — maps well onto our existing OpenCat serial-command interface from Phase 4/5, letting a single Claude reply both talk and trigger a skill (e.g. sit, wag) in the same turn.
-- [ ] Add text-to-speech for Claude's responses through the robot's speaker
-- [ ] Confirm this runs independently of the built-in 35+ preset voice commands (two separate systems, not in conflict)
-- [ ] Consider a simple state cue (buzzer/beep pattern or posture) during voice pipeline stages (listening/thinking/speaking) — both researched projects use LED feedback for this; useful given Claude round-trips will have noticeable latency on this hardware. Bittle X has no LED array but has a buzzer already documented in Phase 2's Open the Box notes.
-
-## Phase 8: Environment Perception
-- **Hardware constraint (2026-08-30):** there is only one module mounting slot on Bittle X — the AI Vision Camera Module is the confirmed choice for it, so a separate dedicated proximity/distance sensor (for cliff/edge detection, e.g. Grove Ultrasonic or IR distance, per the OpenCat firmware's existing example modules) is not an option alongside it. This matters for the cliff/edge-avoidance idea discussed below: it rules out the "dedicated sensor" approach as a fallback, leaving a camera-based visual classifier (trained via SenseCraft AI to recognize "floor" vs. "edge ahead") as the only viable path if we pursue this, not a choice between the two. Revisit when we get to this phase.
-- [ ] Get real-time obstacle avoidance working using the vision module's on-device inference (local, fast, no Pi/cloud dependency)
-- [ ] (Idea, discussed 2026-08-30, not yet scheduled) Cliff/edge avoidance (e.g. don't walk off a table edge) — the RL walking policy itself cannot learn this regardless of training, since it has no forward-looking perception (only current body orientation/joint history). Requires a forward-looking sensing + reflexive "stop" behavior, kept local/fast rather than routed through Claude (same reasoning as real-time obstacle avoidance below). Given the single-sensor-slot constraint above, this would need to be a camera-based classifier rather than a dedicated distance sensor — expect lower reliability than a physical sensor would give (sensitive to lighting/surface appearance, and needs the camera's mounting angle to actually see near-ground terrain, not just a forward horizon view) — worth being cautious about, since a failure here means physical damage from a fall, not just a missed detection.
-- [ ] Path for "reasoning" about what it sees is now decided: BiBoard V1 is confirmed to use a standard **ESP32-U4WDH** (not S3/C3 — see Parts List notes), so send structured detection results (object type/position) over serial to Pi → hand descriptions to Claude instead of raw images. (Raw frame streaming to the Pi is not an option on this hardware.)
-  - External validation (2026-08-30): pidog-embodiment's own Pi 4 benchmarks for on-device vision-language inference (SmolVLM) show 27-37s per call and ~400MB RAM just to run it — already borderline on a full Pi 4, and very likely infeasible on our Pi Zero 2 WH. This confirms sending structured detections to Claude's cloud API (rather than attempting any on-device VLM reasoning) is the right call, not just a hardware limitation to work around.
-  - SunFounder PiDog explicitly attaches camera images to LLM calls only for occasional "what do you see" style voice queries, not continuously during obstacle avoidance — matches our existing plan split (on-device detection for real-time avoidance, Claude vision reserved for occasional interpretation).
-- [ ] **After vision is working, revisit the locomotion policy (Phase 3) with perception in the loop.** Run 5's terrain/obstacle training is limited to *reactive, IMU-only* robustness (feel a disturbance, recover) — the walking policy has no forward-looking sense, so it can't anticipate terrain or deliberately choose to climb/step-onto an obstacle (see the deferred idea in Phase 3). Once the vision module gives forward terrain/obstacle information, retrain or extend the gait policy with that as an input: enhanced uneven-terrain handling, anticipatory foot placement, and learned strategies for *observed* obstacles (approach differently, step over vs. go around vs. stop). This is a distinct effort from the flat-ground + reactive-robustness gait, and only becomes possible once perception exists.
-
-## Phase 9: Memory System
-- [ ] Design a simple persistent storage layer on the Pi (SQLite or lightweight local vector store) to log conversation history
-  - Research findings (2026-08-30): two concrete alternative approaches worth considering before committing to SQLite/vector-store —
-    - **Plain JSON files** (Ai-Robo-Dog's approach, under a `memory/` dir, with a simple web UI to view/add/edit/delete) — a genuinely simpler option than a database if semantic search isn't a hard requirement, easier to reason about on constrained hardware.
-    - **Decay-based episodic memory** (pidog-embodiment's `pidog_memory.py`: "co-occurrence + decay" — recent/frequent interactions stay salient, older ones fade over time) — a more sophisticated alternative to naive "log everything, retrieve by recency," worth considering if simple recency-based retrieval turns out to feel repetitive/stale in practice.
-- [ ] Build retrieval: pull relevant past context into each new conversation's prompt to Claude
-- [ ] Keep this as a separate system from movement/vision — not a unified "brain," multiple systems running alongside each other
-
-## Phase 10: Full Integration
-- [ ] Get all systems — movement, vision, voice, memory — running alongside each other without conflicts
-- [ ] Expect this phase to surface real bugs/timing issues even after each piece worked individually — budget real time for it
-- [ ] Update the GitHub README with final setup instructions and a demo (video/gif)
-- [ ] Add requirements.txt / dependency list so the setup is reproducible
-- [ ] Optional: write up learnings/notes in the repo — useful for your own reference and as portfolio material
+- Confirm BiBoard V2 can be wired data-only, or whether its mount ties 5 V to the
+  data lines by default.
+- BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
+  isn't listed. Verify the 5-pin socket and serial wiring are compatible.
+- Confirm the back cover fits once the Pi is mounted.
 
 ---
 
-## Known Risks / Honest Expectations
-- Hardware debugging is a different skill than web dev debugging (no console errors — could be code, wiring, power, or hardware itself)
-- RL-trained gaits will likely look rougher/janklier than a real animal's, especially at first
-- Sim-to-real transfer rarely works perfectly on the first deploy — expect a real gap and iteration
-- Full multi-system integration (Phase 10) is realistically the hardest, messiest part — not a clean bolt-together
+## Phase 1 — GitHub repo setup ✅
 
-## Reference Notes: How OpenCat Gaits Are Structured
+- [x] Create the repo (single repo, `rl_training/` + `pi_pipeline/` + `docs/`).
+- [x] Starter README with goals, hardware, and this roadmap.
+- [x] `.gitignore` from the start — secrets, trained models, venvs.
+- [x] Secrets policy: `.env`, `config.local.*`, `**/secrets.py`, `**/api_keys.py`
+      (documented in `.gitignore`); never committed.
+- [ ] Commit incrementally per phase, not one dump at the end (ongoing).
 
-From browsing `github.com/PetoiCamp/OpenCat` (AVR/NyBoard) and `github.com/PetoiCamp/OpenCatEsp32` (ESP32/BiBoard — the actual Bittle X firmware). Relevant background for Phase 3 (contrast with our RL approach) and Phase 5 (sending commands).
+## Phase 2 — Orientation (while hardware ships) ✅ / deferred
 
-- Every named skill (walk, trot, crawl, sit, push-up, kick, etc.) is a **hand-authored, baked-in keyframe animation** — a compact `const int8_t[] PROGMEM` array of servo angles, one array per skill, stored in flash. `InstinctBittleESP.h` (ESP32/Bittle X) currently defines ~93 of these.
-- Two parallel arrays tie it together: `skillNameWithType[]` (e.g. `"wkFI"`, `"trFI"`, `"sitI"` — the trailing `I`/`N` marks "Instinct" (built-in) vs "Newbility" (user-taught, saved to EEPROM)) and `progmemPointer[]` (the matching pointer to each skill's frame array). Sending a serial command like `kwkF` looks up the name and plays back its frames.
-- Each array's header row encodes frame count/period and a direction/type flag; a positive period means a **looping gait** (walk, trot — continuously cycled, and blended in real time with IMU/gyro balance correction via `gyroBalanceQ`), while a negative period means a **one-shot behavior** (sit, push-up, scratch — plays through once, and some even wait on a specific IMU trigger angle mid-sequence, e.g. "rock" only advances once pitch crosses a threshold).
-- The robot has 16 total servo channels (`DOF 16`): 4 for head/tail/gripper, the other 12 for the legs (8 of which — 2 per leg, shoulder + knee — are `WALKING_DOF`, the joints gait keyframes actually drive).
-- **Why this matters for us:** this is the opposite approach from Phase 3's plan — OpenCat's gaits are fixed, hand-tuned animations, not something learned. Our RL-trained policy will need its own runtime path to drive the same 8 walking servos (either bypassing this skill-array system entirely, or injecting learned frames in the same format) rather than picking from `skillNameWithType`.
+- [x] Community Bittle simulator (grgv.xyz/blog/bittle) — done, for gait feel.
+- [x] Browse the OpenCat firmware (`PetoiCamp/OpenCat`, `PetoiCamp/OpenCatEsp32`)
+      to see how gaits are structured in code. See "How OpenCat gaits are
+      structured" below.
+- [ ] ~~Petoi's official browser simulator~~ — none exists. The full
+      `bittle-x.petoi.com` manual and Doc Center were searched; the only
+      simulation options are NVIDIA Isaac Sim (relevant to Phase 3, not a quick
+      demo) and OpenCatWeb (a UI for a *real* Pi-mounted robot).
+- [ ] Petoi beginner coding curriculum — deferred; jumped ahead to Phase 3.
+- [ ] Python fundamentals — deferred; picked up while building Phase 3.
 
-## Community & Support Resources
-- r/petoi (Reddit) — Petoi's own recommended community
+## Phase 3 — RL training in simulation
+
+Software only; no physical robot needed until Phase 6 deployment.
+
+### Current state
+
+- **Phase 3 gait locked:** `auto_gait_final`, tag `phase3-gait`. Straight
+  level-ground walk at 0.256 m/s (≈50 Hz-basis; see the control-rate note below),
+  1.29 m per 251-step episode, heading drift 0.16° (non-accumulating), 4.5 cm
+  lateral wander, never falls, stride 0.103 m, `diagonal_trot_corr` −0.59.
+  Config: `FAC_HEADING=5.0`, `PAW_Z_TARGET=0.020`, `FAC_GAIT_SYMMETRY=3.5` on top
+  of v6. On `development`; checkpoint at
+  `rl_training/opencat-gym/trained/phase3-gait_ppo.zip` (gitignored).
+- **Later gait, on `development` via Run 6:** `auto_rec_r5_ppo`, tag
+  `gait-v7-stumble-catch` — crisper trot (`diagonal_trot_corr` −0.58), tighter
+  heading (7.6° max drift), always-on stumble-catch balance term, no
+  obstacle-course falls; ~7% slower forward than `phase3-gait`.
+- **Active work:** Run 7 ("walk") — a deliberate target walk speed plus a push to
+  make stumble recovery significantly better. On `auto-gait-iteration`.
+
+### Environment
+
+`rl_training/opencat-gym/` is a curated copy of
+[`ger01d/opencat-gym`](https://github.com/ger01d/opencat-gym) (MIT, commit
+`12b39ff`) — PyBullet + Stable-Baselines3 + Gymnasium. It ships
+`models/bittle_esp32.urdf`, our exact hardware. `opencat_gym_env.py` is the whole
+environment and the main lever; `train.py` runs 8 parallel envs with PPO.
+
+Setup blockers hit and resolved (kept in case they recur elsewhere):
+
+- System Python 3.8 is too old for SB3/Gymnasium (need ≥3.10) → Homebrew Python
+  3.11 in a project `.venv`.
+- `brew install python@3.11` failed against an outdated Xcode → `xcode-select
+  --install`, then `sudo xcode-select --switch /Library/Developer/CommandLineTools`.
+- `pybullet` has no macOS wheel and its bundled zlib defines `fdopen` to `NULL`,
+  breaking the source build → install with `CPPFLAGS="-Dfdopen=fdopen"`
+  (documented in `requirements.txt`).
+- Skipped `stable-baselines3[extra]` (Atari deps need SDL2) — plain
+  `stable-baselines3` + `gymnasium` + `tensorboard`.
+
+**Control rate:** one `env.step()` runs 3 PyBullet substeps at the default
+1/240 s → **80 Hz control** (`CONTROL_HZ`). `evaluate_policy.py` assumed 50 Hz
+through Run 6; Run 7 corrected it — multiply pre-Run-7 reported m/s by 1.6 to
+compare. The real BiBoard control rate is ~48–50 Hz (servo PWM limit), relevant
+for Phase 6.
+
+### Training history
+
+Runs are 2M steps unless noted, ~35–40 min wall time each on this machine.
+Reward-shaping constants are the `FAC_*` module-level values in
+`opencat_gym_env.py`.
+
+**v1 — baseline.** Reward peaked ~900 mid-run, then collapsed in the final third
+(down to ~25) with `approx_kl`/`clip_fraction` spiking. Cause: `PENALTY_STEPS =
+2e6` equalled total training length, so the stability/smoothness penalty was
+still ramping when the run ended, and the fixed learning rate turned the forced
+late correction into a violent jump.
+
+**v1 continuation.** Trained 2M more steps under the now-fully-ramped penalty;
+reward recovered to ~331 with full-length episodes — confirming the diagnosis. A
+lone `approx_kl` spike (22.8) near the very end was noted but not understood.
+Visual replay: farther travel, but legs jittering/sliding rather than stepping,
+and a rightward curve ending in a fall.
+
+**v2 — anti-slip / clearance / yaw.** `FAC_SLIP` 0→0.01, `FAC_CLEARANCE` 0→0.1,
+new `FAC_YAW = 0.1` (from the previously-unused yaw rate; not added to the
+observation). No violent collapse this time, but reward declined from a ~900 peak
+to ~490. Visual: much closer to real walking, front-right foot over-lifting late
+in the episode.
+
+**Adopted from [`bmabsout/opencat-gym`](https://github.com/bmabsout/opencat-gym)**
+(an active fork that independently removed time-varying reward ramps, validating
+the `PENALTY_STEPS` diagnosis):
+
+- `FAC_JITTER = 0.2` — penalizes joints reversing direction frame-to-frame,
+  targeting shuffle more directly than `FAC_SMOOTH_1/2`.
+- Cyclical time/phase observation input (`TIME_PHASE_PERIOD = 100`) — a rhythmic
+  clock to help the policy learn periodic gaits (observation 246 → 247).
+- Periodic checkpointing — `train.py`/`continue_train.py` now save every ~200K
+  steps to `trained/checkpoints/`, so an interruption costs one checkpoint, not
+  the whole run.
+- Not adopted (bigger redesigns): soft-min reward aggregation,
+  gravity-vector observation, dropping joint history.
+
+**v3 — jitter + phase input.** Stopped early, superseded by v4 (no checkpoint
+existed yet). The pause added a diagonal-trot goal: could a gait-symmetry reward,
+or bootstrapping from Bittle's built-in `wkF` walk keyframes, produce a real trot
+faster than pure RL exploration? A lightweight reward term was chosen to try
+first; the scripted-gait bootstrap and a CPG action-space redesign were deferred.
+
+**Gait-symmetry reward — `FAC_GAIT_SYMMETRY = 2.0`.** Rewards `−(diagonal_a ·
+diagonal_b)` where `diagonal_a` = front-right + back-left joint-angle deltas,
+`diagonal_b` = front-left + back-right — positive when the diagonal pairs move
+in opposition (a trot). Verified in PyBullet first: all 8 walking joints share
+the same sign convention in the URDF, so "same sign of angle change" genuinely
+means "in phase," no mirroring needed. Applied **unramped** (full strength from
+step 1), so it shapes gait structure before the policy can lock into a different
+pattern.
+
+**v4 — + gait symmetry.** First run with anti-jitter + phase input + gait
+symmetry together. Reward peaked ~1010, then hit the same collapse signature as
+v1 (`approx_kl` 26.9, `clip_fraction` 0.91, reward → ~0.4) at 73% through
+training. **Same failure despite a completely different reward function** — so
+the cause is structural, not any one term.
+
+**Root cause (across v1–v4).** Two issues, both unaddressed since v1:
+
+1. `PENALTY_STEPS = 2e6` had equalled total training length every run — the
+   penalty continuously reshaped the reward landscape for the whole run (v4's
+   spike at 73%, not 100%, shows continuous pressure, not just an endgame
+   effect).
+2. Fixed learning rate (`3e-4`) and clip range (`0.2`) never decayed. Standard
+   PPO practice decays them to prevent destabilizing updates once the policy has
+   converged and its action noise has shrunk.
+
+**Fixes for v5:** `PENALTY_STEPS` 2e6 → **5e5** (full strength at 25% of a 2M
+run), and a linear learning-rate decay in `train.py` (`linear_schedule(3e-4)` →
+~0 by the end). Clip-range decay was left as a fallback.
+
+**v5 — the fix worked.** Reward climbed smoothly and monotonically from ~47 to
+**~1100** (highest yet, stable), full-length episodes throughout, `approx_kl` and
+`clip_fraction` *decreasing* toward the end. Confirms the root-cause diagnosis.
+Visual: faster, but all four legs take small shuffling steps rather than real
+strides. Likely a reward-shape effect — `PAW_Z_TARGET = 0.005` barely rewards a
+lift, `FAC_SMOOTH_1/2` penalize movement magnitude, and a fall ends the episode,
+so many small "safe" steps are locally optimal.
+
+**v6 — bigger steps.** `PAW_Z_TARGET` 5 → **15 mm**, `FAC_SMOOTH_1/2` 1.0 → **0.5**,
+plus per-term reward logging in `step()`'s `info` dict (`r_movement`,
+`r_gait_symmetry`, …) so behavior changes trace to a specific term. Tagged
+`gait-v6-known-good`: ep_rew ~1220, clean convergence, best gait so far —
+reasonable diagonal trot — but curves slightly right by the end.
+
+**Tooling (v6 era).** `start_run.sh <tag>` — one-command launcher with the pre-run
+checklist (no stacked runs, warns about lingering viewers, starts TensorBoard,
+backgrounds training). `train.py` takes `--tag` and `--steps`. Shell helpers
+`g2train` / `g2watch`; the `/train` slash command.
+
+**Automated loop 1 — fix the rightward curve.** First unattended run of the
+[`docs/automated-testing-loop.md`](automated-testing-loop.md) workflow, on
+`auto-gait-iteration`. Added `evaluate_policy.py` (headless metrics + frame
+renders). Five 1M-step tuning iterations + one 2M confirming run. Three changes
+from v6: **`FAC_HEADING = 5.0`** (penalize accumulated heading error from the
+quaternion, not just yaw rate — this fixed the curve), **`PAW_Z_TARGET` 15 → 20 mm**
+(stop the back feet dragging once heading control made the gait front-heavy),
+**`FAC_GAIT_SYMMETRY` 2.0 → 3.5**. Result `auto_gait_final` vs v6: end-of-episode
+heading drift **12.5° → 0.16°**, lateral wander **0.24 → 0.045 m**, speed held,
+never falls. Known miss: `diagonal_trot_corr` −0.59 at 2M (the 1M checkpoints hit
+−0.90 — the fully-converged policy walks straight but its diagonal timing
+loosens). Merged to `development`; write-ups in
+[`docs/auto-iteration-report-2026-08-30.md`](auto-iteration-report-2026-08-30.md)
+and [`docs/auto-iteration-log.md`](auto-iteration-log.md).
+
+**Automated loops 2–4 + a final run — set aside.** Attempts to fix a supposed
+start-up "stutter" and tighten the trot. The stutter turned out to be a
+measurement artifact (baseline evaluated in a mismatched env; real
+`startup_speed_ratio` ≈ 0.84, fine). Every trot attempt — `FAC_GAIT_SYMMETRY`
+weight tuning, a decay ramp, a phase-locked reformulation, a stride-length
+reward — either dissolved the trot or regressed heading/stride at 2M
+convergence. **Conclusion: `auto_gait_final` sits at a local optimum that
+reward-weight tuning cannot push past.** Records:
+`docs/auto-iteration-{log,report-*}-run{2,3,4}.md`,
+`docs/auto-iteration-log-final.md` (reformulated terms live only on
+`auto-gait-iteration`). Remaining trot-crispness levers are structural
+(diagonal-pair phase in the observation, `wkF` imitation, or a CPG action space).
+
+**Run 5 — domain randomization + `wkF` imitation** (merged to `development`).
+Wired up the previously-dead DR knobs — per-episode friction, link-mass, and IMU-
+noise randomization, random shoves, scattered obstacle boxes — behind a curriculum
+ramp. Added a DeepMimic-style imitation reward (`FAC_IMITATION`) that matches
+Bittle's built-in `wkF` walk keyframes phase by phase (`reference_gait/`,
+extracted from `InstinctBittleESP.h`, open-loop verified). The imitation reward is
+what finally produced a real diagonal trot that weight tuning alone could not.
+Also added `evaluate_policy.py --dr-*` held-out scenario flags.
+
+**Run 6 — fall recovery / self-righting** (6 rounds, unattended, on
+`auto-gait-iteration`). **Key finding: a Bittle cannot self-right from a full
+tip-over (> 1.3 rad) — it has no roll-axis actuation, a missing degree of
+freedom.** An escalating recovery reward (weight 8 → 22, denser shaping, eased
+criteria, pushes suspended while down, actuator torque boosted) converged at 0%
+recovered every time. The loop pivoted to the learnable version — *catching a
+stumble before it becomes a fall* — via `FAC_BALANCE`, an always-on reward for
+driving body tilt back toward level while wobbling. Winner **`auto_rec_r5_ppo`,
+tag `gait-v7-stumble-catch`**: `diagonal_trot_corr` −0.58 (crispest in the
+project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
+`phase3-gait`. The recovery-window code stays in `opencat_gym_env.py` but dormant
+(`FAC_RECOVERY = 0`). Merged to `development`. Records:
+[`docs/auto-iteration-log-run6.md`](auto-iteration-log-run6.md),
+[`docs/auto-iteration-report-2026-08-31.md`](auto-iteration-report-2026-08-31.md).
+
+**Run 7 — "walk": target speed + stumble recovery** (in progress, on
+`auto-gait-iteration`). Adds a deliberate `TARGET_SPEED` (0.11 m/s, near the
+`wkF` reference's own open-loop pace) with a tracking-bonus reward held below
+gait-match in priority, and a set of changes aimed at significantly better
+stumble recovery: IMU tilt history + angular acceleration in the observation
+(247 → 273), a gait-phase clock that slows under tilt, tilt-rate damping in
+`FAC_BALANCE`, and concentrated impulse-shove drills. Record:
+[`docs/auto-iteration-log-run7.md`](auto-iteration-log-run7.md).
+
+### Evaluate and lock ✅
+
+- [x] Evaluate in simulation and save the best checkpoint(s) for deployment —
+      **done: `phase3-gait`** (see Current state). `gait-v7-stumble-catch` is the
+      later candidate from Run 6. Both are sim-to-real starting points for Phase
+      6 and will need re-tuning against real hardware.
+
+### Open / deferred (Phase 3)
+
+- Real-time terrain and disturbance adaptation is where RL beats scripted gaits,
+  but Bittle has no torque/force feedback and no foot-contact sensing — the only
+  real-time body-state signal is the IMU (orientation/tilt). So the policy can
+  learn to recover from pushes, slopes, and minor unevenness, but not
+  foot-level terrain awareness. Real robustness needs a reward that explicitly
+  values balance recovery (not just forward speed) plus domain randomization —
+  both now in place from Run 5 on.
+- Imitation-learning approaches from the UVA/Harvard Bittle research (stretch,
+  optional).
+- **Reactive obstacle purchase:** teach the policy that when a front foot is
+  blocked it should lift higher to get on top. Learnable in sim but needs
+  per-foot contact/height in the observation, which the real Bittle can't sense —
+  so it wouldn't transfer. The transferable version is a taller-obstacle
+  curriculum plus a loose/decaying imitation weight, for a generally higher,
+  more adaptive swing. Revisit after the reactive-robustness gait is solid.
+
+## Phase 4 — Hardware assembly
+
+- [ ] Assemble Bittle X V2 (~40–90 min).
+- [ ] Check servo calibration — pre-assembled units ship calibrated, so this is a
+      check/fine-tune, not an assumed step. Only dig in if movement looks off.
+- [ ] Get it moving on stock firmware first, before any custom code.
+- [ ] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
+      (headless), confirm SSH access.
+- [ ] Mount the Pi; test power and serial **independently** (power can work while
+      serial doesn't). Per Petoi's Raspberry Pi serial docs:
+  - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
+    data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/pi-power.md`](pi-power.md).
+  - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
+    the Pi cutout.
+  - `sudo raspi-config` → Interface Options → Serial Port → disable the serial
+    login shell, enable the serial hardware → reboot.
+  - Disable the Pi's 1-wire interface (GPIO 4 reset-signal conflict).
+  - Disable Wi-Fi power-save (`sudo iw wlan0 set power_save off`) proactively —
+    the `brcmfmac` power-save bug drops SSH under CPU load and is a nightmare to
+    diagnose later.
+  - On the BiBoard: serial command `XS` (or edit `OpenCat.h` and reflash) to
+    enable Serial-2 working mode.
+  - Serial device: likely `/dev/ttyS0` on the Pi Zero 2 W (Pi-3-family SoC);
+    confirm once wired.
+  - Use `ardSerial.py` from the OpenCat repo as the reference serial commander.
+- [ ] Set up the AI Vision Camera Module: mount at the head, connect to the Grove
+      socket, upload firmware via Petoi Desktop App or Arduino IDE.
+
+## Phase 5 — Basic programming & control
+
+- [ ] Send basic movement commands from Python (walk, sit, presets) — the base
+      control layer. Refs: Petoi's Python/SerialMaster user guide and the
+      Raspberry-Pi-serial-port interface docs.
+- [ ] Get comfortable with OpenCat's command structure before building on it.
+- [ ] Test the vision module's on-device detection via the SenseCraft AI Model
+      Assistant web debug GUI.
+
+## Phase 6 — RL sim-to-real deployment
+
+- [ ] Deploy the Phase 3 policy to the real robot. Mechanism:
+      [`ger01d/opencat-gym-sim2real`](https://github.com/ger01d/opencat-gym-sim2real)
+      — flash modified BiBoard firmware
+      ([`ger01d/OpenCatEsp32-sim2real`](https://github.com/ger01d/OpenCatEsp32-sim2real))
+      that takes joint commands over serial, then run an inference loop on a
+      connected computer streaming the policy's output. The author calls this
+      "still highly experimental."
+  - **Open question:** the policy needs PyTorch for inference and was designed to
+    run "on a computer," not the ESP32. The plan has the mounted Pi Zero 2 WH
+    (512 MB RAM, weak quad-core A53) doing this. **Whether a Pi Zero 2 WH can run
+    `model.predict()` fast enough for real-time joint control is untested** —
+    benchmark it (load the policy, time `predict()`) once the Pi is up (Phase 4),
+    before writing it into the runtime.
+- [ ] Expect a real sim-to-real performance gap — normal, not failure.
+- [ ] Iterate: adjust the reward and/or retrain in sim based on real-hardware
+      behavior, redeploy.
+
+## Phase 7 — Voice + Claude integration
+
+- [ ] Audio capture on the Pi (Bittle's onboard mic).
+- [ ] Speech-to-text — cloud API vs. local (Whisper/Vosk); affects Pi RAM
+      headroom. From similar Pi-based LLM voice robots (SunFounder PiDog docs,
+      `marceld23/Ai-Robo-Dog`, `rockywuest/pidog-embodiment` — all target Pi
+      4/5 with 2 GB+, so treat as directional):
+  - A local always-on wake-word detector (Vosk) that only triggers full STT on
+    activation — cheap, avoids constant network calls on a weak board.
+  - Local TTS (Piper, e.g. `en_US-ryan-low`) is viable and skips cloud latency.
+  - On the Pi Zero 2 WH's small headroom, even lightweight Whisper may be too
+    heavy — evaluate Vosk for both wake-word and full STT on real hardware.
+  - Health-monitor and auto-restart any long-running audio/hardware threads —
+    pidog-embodiment logs worker threads dying silently with no restart.
+  - Bookworm's PEP 668 blocks plain `pip install` on-device — use a venv (already
+    planned) or `--break-system-packages`.
+- [ ] Connect to Claude via the Anthropic API (usage-billed, separate from any
+      Claude subscription).
+  - Config-driven LLM client (env vars for key/model/timeout) with a request
+    timeout tuned for the Pi's slower CPU.
+  - Split Claude's response into spoken text + structured action commands
+    (PiDog's pattern) — maps onto the OpenCat serial interface, so one reply can
+    both talk and trigger a skill.
+- [ ] Text-to-speech through the robot's speaker.
+- [ ] Confirm this runs independently of the 35+ built-in voice commands (two
+      separate systems).
+- [ ] A simple state cue (buzzer pattern or posture) for listening / thinking /
+      speaking — Claude round-trips will have noticeable latency on this hardware.
+
+## Phase 8 — Environment perception
+
+- **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
+  Camera. A separate proximity/distance sensor is not an option alongside it — so
+  cliff/edge detection, if pursued, must be a camera-based visual classifier
+  (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor.
+- [ ] Real-time obstacle avoidance from the vision module's on-device inference
+      (local, fast, no Pi/cloud dependency).
+- [ ] Cliff/edge avoidance (don't walk off a table) — the RL walking policy
+      can't learn this (no forward-looking perception), so it needs forward
+      sensing + a reflexive stop, kept local. Camera-based classification will be
+      less reliable than a physical sensor (lighting/surface sensitive, needs the
+      right camera angle) and a failure means a fall, so approach with caution.
+      Not yet scheduled.
+- [ ] "Reasoning" about what it sees: BiBoard V1's ESP32-U4WDH can't run a vision-
+      language model, so send structured detections (type/position) over serial to
+      the Pi and hand descriptions to Claude — no raw frames.
+  - pidog-embodiment's Pi 4 benchmarks for on-device VLM (SmolVLM): 27–37 s per
+    call, ~400 MB RAM — borderline on a Pi 4, infeasible on a Pi Zero 2 WH.
+    Confirms cloud reasoning is the right call.
+  - PiDog attaches images to LLM calls only for occasional "what do you see"
+    queries, not continuous avoidance — matches the split above.
+- [ ] **After vision works, revisit the locomotion policy with perception in the
+      loop.** Run 5–7 terrain training is reactive and IMU-only — no forward
+      sense, so the policy can't anticipate terrain or deliberately climb an
+      obstacle. With forward terrain/obstacle information as an input, retrain or
+      extend the gait policy for anticipatory foot placement and learned
+      strategies for observed obstacles (step over vs. around vs. stop). A
+      distinct effort, only possible once perception exists.
+
+## Phase 9 — Memory system
+
+- [ ] A persistent store on the Pi for conversation history. Options:
+  - **Plain JSON files** under a `memory/` dir with a small view/edit UI
+    (Ai-Robo-Dog's approach) — simpler than a database if semantic search isn't
+    required, easier to reason about on constrained hardware.
+  - **Decay-based episodic memory** (pidog-embodiment's `pidog_memory.py`:
+    co-occurrence + decay — recent/frequent interactions stay salient, old ones
+    fade) — worth it if plain recency retrieval feels stale.
+  - Otherwise SQLite or a lightweight local vector store.
+- [ ] Retrieval: pull relevant past context into each new prompt to Claude.
+- [ ] Keep this separate from movement/vision — not a unified brain.
+
+## Phase 10 — Full integration
+
+- [ ] All four systems running alongside each other without conflicts.
+- [ ] Expect this phase to surface real timing/integration bugs even after each
+      piece worked alone — budget real time.
+- [ ] Update the README with final setup instructions and a demo.
+- [ ] Ship a `requirements.txt` / dependency list for reproducibility.
+- [ ] Optional: write up learnings in the repo.
+
+---
+
+## Known risks / honest expectations
+
+- Hardware debugging is a different skill than web debugging — no stack traces; a
+  fault could be code, wiring, power, or the hardware itself.
+- RL gaits will look rougher than an animal's, especially early.
+- Sim-to-real rarely works on the first deploy — expect a gap and iteration.
+- Full integration (Phase 10) is the hardest, messiest part.
+
+## Reference: how OpenCat gaits are structured
+
+From `PetoiCamp/OpenCat` (AVR/NyBoard) and `PetoiCamp/OpenCatEsp32` (ESP32/BiBoard
+— the actual Bittle X firmware). Background for Phase 3 (contrast with the RL
+approach) and Phase 5 (sending commands).
+
+- Every named skill (walk, trot, crawl, sit, kick, …) is a **hand-authored
+  keyframe animation** — a compact `const int8_t[] PROGMEM` array of servo angles,
+  one per skill, in flash. `InstinctBittleESP.h` defines ~93 of them.
+- Two parallel arrays connect it: `skillNameWithType[]` (e.g. `"wkFI"`, `"trFI"`,
+  `"sitI"` — trailing `I`/`N` = Instinct/built-in vs. Newbility/user-taught) and
+  `progmemPointer[]` (pointer to each skill's frames). A serial command like
+  `kwkF` looks up the name and plays its frames.
+- Each array's header encodes frame count/period and a direction/type flag. A
+  positive period is a **looping gait** (walk, trot — cycled continuously, blended
+  in real time with IMU balance correction via `gyroBalanceQ`); a negative period
+  is a **one-shot behavior** (sit, push-up — some wait on an IMU trigger angle
+  mid-sequence).
+- 16 servo channels total: 4 for head/tail/gripper, 12 for the legs — 8 of those
+  (shoulder + knee ×4) are `WALKING_DOF`, the joints gait keyframes drive.
+- **Why it matters here:** this is the opposite of the RL approach. The trained
+  policy needs its own runtime path to drive the same 8 walking servos — either
+  bypassing the skill-array system or injecting learned frames in the same format
+  — rather than selecting from `skillNameWithType`.
+
+## Community & support
+
+- r/petoi (Reddit) — Petoi's recommended community
 - Petoi Forum Archive (petoi.camp)
-- github.com/PetoiCamp/OpenCat — firmware source
-- github.com/PetoiCamp/NonCodeFiles — community 3D-print files/mods
-- opencat-gym-sim2real repo — RL training environment
-
----
-
-*This plan is a living document — update phases, priorities, or specs as we learn more once hardware arrives and testing begins.*
+- `github.com/PetoiCamp/OpenCat` — firmware source
+- `github.com/PetoiCamp/NonCodeFiles` — community 3D-print files
+- `github.com/ger01d/opencat-gym` — the RL training environment
