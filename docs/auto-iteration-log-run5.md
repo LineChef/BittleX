@@ -273,11 +273,22 @@ compete.
 
 ---
 
-## Iteration 5 — imitation reward strong but not dominant
+## Iteration 5 — keep the gait dominant, raise obstacle height
 
-**Change:** `FAC_IMITATION` 30 -> **12** (~2-4x the forward reward at a healthy
-walking speed instead of ~15x). Should keep the wkF *shape* while letting the
-forward-progress reward pull speed back toward baseline. DR curriculum unchanged.
-Fresh 2M. **Last iteration** -- confirming run next.
+**Direction from the user (2026-08-31):** "go fast shouldn't be as important as
+match the gait" -- so *don't* drop the imitation weight to chase speed; keep the
+wkF gait the priority. And "start to raise the height of the obstacles ... not by
+a lot, just enough to start interfering with its natural gait so it can start
+learning to recover from it."
+
+_(A first iter5 attempt at `FAC_IMITATION = 12` was launched then stopped at
+~15% -- it was testing the speed-recovery hypothesis, which the direction above
+supersedes.)_
+
+**Change:** `FAC_IMITATION` -> **20** (still clearly dominant -- ~10x the forward
+reward at 0.09 m/s -- but slightly less rigid than iter4's 30, so the policy can
+deviate to recover from an obstacle and then return to wkF). `RANDOM_TERRAIN`
+0.012 -> **0.018** (18mm boxes vs. wkF's ~20-30mm foot lift -- enough to catch a
+foot mid-swing and force a recovery). DR curriculum otherwise unchanged. Fresh 2M.
 
 **Run:** `auto_dr_iter5`, 2M steps. _Result pending._
