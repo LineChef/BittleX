@@ -78,6 +78,10 @@ class Settings:
     # --- Vision (Phase 8; used on hardware) ---
     vision_serial_port: str = field(default_factory=lambda: _env("VISION_SERIAL_PORT", "/dev/ttyAMA1"))
     vision_serial_baud: int = field(default_factory=lambda: _env_int("VISION_SERIAL_BAUD", 921600))
+    vision_frame_px: int = field(default_factory=lambda: _env_int("VISION_FRAME_PX", 240))
+    vision_labels: list[str] = field(default_factory=lambda: [
+        s.strip() for s in _env("VISION_LABELS").split(",") if s.strip()
+    ])  # deployed model's class names, in id order; empty -> "obj<id>"
 
     def require_api_key(self) -> str:
         if not self.anthropic_api_key:

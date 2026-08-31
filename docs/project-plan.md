@@ -474,8 +474,14 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       frame debounce + cooldown, with `STOP`/`BACK_UP` preempting. Thresholds
       (`AvoiderConfig`) need tuning against real detections + the robot's
       stopping distance.
-- [ ] Feed it real detections: confirm the camera→Pi serial format against Grove
-      Vision AI V2 / SenseCraft output, finish `SerialDetectionFeed`.
+- [x] **Camera→Pi serial format confirmed** (SSCMA AT protocol): JSON lines,
+      921600 baud, `{"name":"INVOKE","data":{"boxes":[[x,y,w,h,score,target_id]]}}`
+      — box centre + size in model-input pixels, score 0–100, numeric class id
+      (labels set out-of-band via `VISION_LABELS`). `SerialDetectionFeed` parses
+      it; `Detection.from_center_px()` normalises. Verify centre-vs-corner and
+      the pixel frame size on a live module.
+- [ ] Train a custom SenseCraft detection model (cables, small objects, table
+      edges); record its label list + input size and the deploy workflow.
 - [ ] Cliff/edge avoidance (don't walk off a table) — the RL walking policy
       can't learn this (no forward-looking perception), so it needs forward
       sensing + a reflexive stop, kept local. Camera-based classification will be

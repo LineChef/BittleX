@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import logging
 
+from ..config import settings
 from .avoidance import ACTION_SKILL, Avoider, AvoidanceAction
 from .feed import MockDetectionFeed, SerialDetectionFeed
 from .scene import summarize
@@ -45,7 +46,10 @@ def main() -> None:
         script = MockDetectionFeed.approaching(steps=args.steps, bearing=args.bearing)
         _run(MockDetectionFeed(script))
     elif args.cmd == "serial":
-        _run(SerialDetectionFeed(args.port))
+        _run(SerialDetectionFeed(
+            args.port, settings.vision_serial_baud,
+            frame_px=settings.vision_frame_px, labels=settings.vision_labels,
+        ))
 
 
 if __name__ == "__main__":

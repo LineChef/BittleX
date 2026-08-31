@@ -35,19 +35,37 @@ the escalation `none → turn → stop → back up` as the object closes in.
 
 ## Detection model
 
-Boxes are normalised `[0,1]`: `(x, y)` top-left, `(w, h)` size. `area` (`w*h`) is
-the closeness proxy — a forward-facing camera sees nearer things bigger.
-`center_x` gives bearing (`left` / `ahead` / `right`). This is a heuristic;
-revisit once real detections show how the camera's FOV and mounting angle map to
-distance.
+Internally, `Detection` boxes are top-left, normalised `[0,1]`. `area` (`w*h`) is
+the closeness proxy — a forward-facing camera sees nearer things bigger;
+`center_x` gives bearing (`left` / `ahead` / `right`). Heuristic; revisit once
+real detections show how the camera's FOV and mounting angle map to distance.
+
+## Camera serial format (Grove Vision AI V2 / SenseCraft SSCMA)
+
+Confirmed from the [SSCMA AT protocol](https://github.com/Seeed-Studio/SSCMA-Micro/blob/dev/docs/protocol/at_protocol.md).
+One JSON object per line, **921600 baud**:
+
+```json
+{"type":1,"name":"INVOKE","code":0,
+ "data":{"count":8,"perf":[8,365,0],
+         "boxes":[[x, y, w, h, score, target_id], ...]}}
+```
+
+- `boxes` values are **integers**: box **centre** `(x, y)` and size `(w, h)` in
+  **model-input pixels** (192 or 240 for common pretrained models — set
+  `VISION_FRAME_PX`), `score` 0–100, `target_id` a class index.
+- **Labels are not in the message.** Set `VISION_LABELS` to the deployed model's
+  class names in id order (empty → `obj<id>`).
+- `perf` = `[preprocess_ms, inference_ms, postprocess_ms]`; other events ignored.
+
+`SerialDetectionFeed` parses exactly this.
 
 ## Still to do
 
-- **Confirm the serial wire format** against real Grove Vision AI V2 / SenseCraft
-  output and finish `SerialDetectionFeed` (`feed.py` has a provisional JSON-lines
-  format).
 - Train a custom detection model in SenseCraft (cables, small household objects,
-  table edges) and note the deploy workflow.
+  table edges) and record the deploy workflow + its label list / input size.
+- Verify centre-vs-corner and the pixel frame size against a live module (sources
+  slightly disagree; the sscma struct says centre).
 - Tune `AvoiderConfig` thresholds against real detections + the robot's stopping
   distance.
 - Cliff/edge avoidance — a "floor vs. edge ahead" classifier (single sensor slot

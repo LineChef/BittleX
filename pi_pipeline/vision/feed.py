@@ -24,11 +24,18 @@ log = logging.getLogger("g2.vision.feed")
 class Detection:
     label: str
     confidence: float
-    x: float
+    x: float          # top-left, normalised [0, 1]
     y: float
     w: float
     h: float
-    t: float = 0.0  # seconds, source clock
+    t: float = 0.0    # seconds, source clock
+
+    @classmethod
+    def from_center_px(cls, label, confidence, cx, cy, w, h, frame_px, t=0.0):
+        """The camera reports box centre in model-input pixels; store top-left
+        normalised to [0, 1]."""
+        f = float(frame_px)
+        return cls(label, confidence, (cx - w / 2) / f, (cy - h / 2) / f, w / f, h / f, t)
 
     @property
     def area(self) -> float:
@@ -84,42 +91,71 @@ class MockDetectionFeed:
 
 
 class SerialDetectionFeed:
-    """Parses detection messages from the camera module over serial.
+    """Parses object-detection events from the Grove Vision AI V2 (SenseCraft /
+    SSCMA firmware) over UART.
 
-    PROVISIONAL wire format (one JSON object per line) -- confirm against the
-    real Grove Vision AI V2 / SenseCraft output when hardware is in hand:
+    Message format (one JSON object per line, default 921600 baud):
 
-        {"t": 12.34, "objs": [{"l": "person", "c": 0.82, "box": [x, y, w, h]}]}
+        {"type":1,"name":"INVOKE","code":0,
+         "data":{"count":8,"perf":[8,365,0],
+                 "boxes":[[x, y, w, h, score, target_id], ...]}}
 
-    `pyserial` is imported lazily.
+    `boxes` values are integers: box centre (x, y) and size (w, h) in
+    model-input pixels, `score` 0-100, `target_id` a class index. Labels aren't
+    in the message -- they come from `labels` (the deployed model's class list,
+    in id order). `perf` lines and other events are ignored.
+
+    `frame_px` is the model input size used to normalise coordinates (192 or 240
+    for the common pretrained models). `pyserial` is imported lazily.
     """
 
-    def __init__(self, port: str, baud: int = 921600):
+    def __init__(
+        self,
+        port: str,
+        baud: int = 921600,
+        *,
+        frame_px: int = 240,
+        labels: list[str] | None = None,
+        min_score: int = 0,
+    ):
         import serial
 
         self._ser = serial.Serial(port, baud, timeout=1)
-        log.info("vision serial on %s @ %d", port, baud)
+        self._frame_px = frame_px
+        self._labels = labels or []
+        self._min_score = min_score
+        self._t = 0.0
+        log.info("vision serial on %s @ %d (frame %dpx)", port, baud, frame_px)
+
+    def _label(self, target_id: int) -> str:
+        if 0 <= target_id < len(self._labels):
+            return self._labels[target_id]
+        return f"obj{target_id}"
 
     def frames(self) -> Iterator[Frame]:
         while True:
             raw = self._ser.readline().decode("utf-8", "replace").strip()
-            if not raw:
+            if not raw or not raw.startswith("{"):
                 continue
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 log.debug("unparseable vision line: %r", raw[:120])
                 continue
-            t = float(msg.get("t", 0.0))
+            if msg.get("name") != "INVOKE":
+                continue
+            self._t += 1.0
             frame: Frame = []
-            for o in msg.get("objs", []):
+            for b in msg.get("data", {}).get("boxes", []):
                 try:
-                    bx = o["box"]
-                    frame.append(Detection(
-                        str(o.get("l", "object")), float(o.get("c", 0.0)),
-                        float(bx[0]), float(bx[1]), float(bx[2]), float(bx[3]), t,
+                    x, y, w, h, score, tid = b[:6]
+                    if score < self._min_score:
+                        continue
+                    frame.append(Detection.from_center_px(
+                        self._label(int(tid)), float(score) / 100.0,
+                        float(x), float(y), float(w), float(h), self._frame_px, self._t,
                     ))
-                except (KeyError, ValueError, TypeError):
+                except (ValueError, TypeError):
                     continue
             yield frame
 
