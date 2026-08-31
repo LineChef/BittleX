@@ -37,3 +37,4 @@ pi_pipeline/memory/data/
 # Automated-iteration scratch
 rl_training/opencat-gym/eval_frames/
 rl_training/opencat-gym/STOP
+rl_training/opencat-gym/frames_wkf/

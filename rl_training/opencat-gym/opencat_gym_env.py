@@ -1,7 +1,14 @@
+import os
 import gymnasium as gym
 import numpy as np
 import pybullet as p
 import pybullet_data
+
+# Bittle's built-in `wkF` walk gait as a per-phase joint reference (radians, URDF
+# joint order), for the FAC_IMITATION reward. Built by
+# reference_gait/build_wkf_reference.py from OpenCatEsp32's InstinctBittleESP.h.
+_WKF_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkf_ref.npy")
+WKF_REF = np.load(_WKF_PATH) if os.path.exists(_WKF_PATH) else None
 
 
 # Constants to define training and visualisation.
@@ -25,6 +32,8 @@ PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15m
 FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 15.0        # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
+FAC_IMITATION = 0.0      # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 
 TIME_PHASE_PERIOD = 100   # Steps per cycle of the time/phase observation input (adapted from bmabsout/opencat-gym) -- gives the policy a rhythmic clock signal to help it learn periodic gaits
 
@@ -275,11 +284,22 @@ class OpenCatGymEnv(gym.Env):
         # body_stability) so its contribution shows up separately in info.
         heading_penalty = FAC_HEADING * heading_error_clip**2
 
+        # Imitation reward: match Bittle's built-in wkF walk at the current gait
+        # phase. DeepMimic-style exp(-sharpness * sum sq per-joint error), in
+        # [0,1]. joint_angs here is already normalised (/ bound_ang); normalise
+        # the reference the same way.
+        imitation_reward = 0.0
+        if FAC_IMITATION > 0 and WKF_REF is not None:
+            ref = WKF_REF[self.step_counter % len(WKF_REF)] / self.bound_ang
+            imit_err = np.sum((joint_angs - ref) ** 2)
+            imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
+
         movement_forward = current_position - last_position
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * movement_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
+                 + FAC_IMITATION * imitation_reward
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -298,6 +318,7 @@ class OpenCatGymEnv(gym.Env):
             "r_movement": FAC_MOVEMENT * movement_forward,
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
+            "r_imitation": FAC_IMITATION * imitation_reward,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
             "r_heading": -penalty_scale * heading_penalty,
