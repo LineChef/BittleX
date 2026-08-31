@@ -36,12 +36,12 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # learned-vs-scripted benchmark (docs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 18   # +/- correction the policy may apply to each joint's scripted angle
+RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 and the policy warped wkF to a crawl; 11 = balance-correction authority without gait-killing authority.
 FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
 
 # --- Stay-down / stay-level shaping (also from the scripted-gait benchmark) ---
-FAC_DUTY = 4.0            # reward (paws in contact / 4): the scripted walk's stability is from keeping 2-3 feet down
-FAC_UPRIGHT = 8.0         # ramped penalty on tilt^2 (always on) -- not-falling is the primary goal for this line
+FAC_DUTY = 0.0            # r1: 4.0 was the main 'freeze with feet planted' attractor -> the gait stalled. wkF already has a good duty factor by construction; don't reward it.
+FAC_UPRIGHT = 3.0         # ramped penalty on tilt^2 (always on). r1: 8.0 stacked with FAC_DUTY + the speed cap into a stand-still attractor. Keep a tilt penalty, don't let it dominate.
 
 # --- Target walk speed (Run 7) ------------------------------------------------
 # "Walk" line: establish a deliberate baseline speed and hold it, rather than
@@ -49,11 +49,13 @@ FAC_UPRIGHT = 8.0         # ramped penalty on tilt^2 (always on) -- not-falling 
 # gait-match in priority (FAC_SPEED << FAC_IMITATION). Faster gaits come later.
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
-TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-loop pace (~0.10). Not chasing speed -- "don't fall" is the goal; faster comes later with vision.
-FAC_SPEED = 2.0            # weight on the speed-tracking bonus. resid line: de-emphasised (4 -> 2) -- the wkF cadence already sets the pace; just don't let the policy stall it.
+TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-loop pace (~0.10).
+FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MOVEMENT_CAP_AT_TARGET = True  # resid line: cap forward-progress reward at TARGET_SPEED so there is no incentive to speed up (fast gaits are the brittle ones -- see docs/gait-benchmark.md).
+MIN_SPEED = 0.07           # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- the resid policy must not stall the wkF walk.
+FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
+MOVEMENT_CAP_AT_TARGET = False  # r1: capping it + weak FAC_SPEED removed the drive to keep walking -> the gait stalled. Uncapped; TARGET_SPEED + FAC_SPEED still discourage going *faster* than wkF.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
 FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
@@ -446,6 +448,9 @@ class OpenCatGymEnv(gym.Env):
                       / ((len(self._x_window) - 1) / CONTROL_HZ))
         else:
             vx_est = 0.0
+        # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
+        # policy cannot learn to stall the wkF walk (r1 failure mode).
+        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
 
@@ -470,6 +475,7 @@ class OpenCatGymEnv(gym.Env):
                  + balance_reward
                  + duty_reward
                  - residual_cost
+                 - min_speed_penalty
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -496,6 +502,7 @@ class OpenCatGymEnv(gym.Env):
             "r_duty": duty_reward,
             "r_upright": -penalty_scale * upright_penalty,
             "r_residual_cost": -residual_cost,
+            "r_min_speed": -min_speed_penalty,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
             "r_heading": -penalty_scale * heading_penalty,

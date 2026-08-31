@@ -42,4 +42,41 @@ Fresh from scratch, 2M steps.
 advantage — because the policy starts at the scripted gait and can only improve
 on it. Re-run `benchmark_gaits.py` after.
 
+**Result** (`resid_r1_ppo`, PPO_42, ~42 min, `ep_len_mean` 251 throughout —
+nothing fell in training):
+
+| benchmark vs scripted `wkF` | flat | 20 mm | 35 mm | 50 mm |
+|---|---|---|---|---|
+| resid speed (m/s) | 0.031 | 0.034 | 0.025 | 0.018 |
+| scripted speed | 0.088 | 0.065 | 0.047 | 0.038 |
+| resid falls | 0% | 0% | **7%** | **21%** |
+| scripted falls | 0% | 0% | 0% | 14% |
+
+**Regressed — lost to scripted on every axis.** The residual policy used its
+±18° budget to **slow `wkF` to ~⅓ speed** and got *less* robust on obstacles
+(worse at 35 and 50 mm). The reward pointed the wrong way: `FAC_DUTY=4` (reward
+feet-down) + `FAC_UPRIGHT=8` (penalise tilt) + `MOVEMENT_CAP_AT_TARGET` + weak
+`FAC_SPEED=2` stacked into a "stand still, feet planted, body level" attractor
+with almost no counter-incentive to keep walking. Architecture is sound (`action
+= 0` = `wkF`, verified); the shaping smothered the walk.
+
+---
+
+## R2 — `resid_r2` — preserve the walk
+
+- **Restore forward drive:** `MOVEMENT_CAP_AT_TARGET` → **False**, `FAC_SPEED`
+  2 → **5**, and a new hard floor: `min_speed_penalty = FAC_MIN_SPEED(120) ·
+  max(0, MIN_SPEED(0.07) − v)` — steep, unramped, so the policy can never learn
+  to stall.
+- **`FAC_DUTY` 4 → 0** — the main freeze attractor; `wkF` already has a good duty
+  factor.
+- **`FAC_UPRIGHT` 8 → 3** — keep a tilt penalty, don't let it dominate.
+- **`RESIDUAL_SCALE_DEG` 18 → 11** — less authority to warp the gait, enough for
+  balance corrections.
+- Kept: `FAC_RESIDUAL_COST` (deviate only when it helps — worked), residual
+  action space, 45 mm terrain, 273-dim obs.
+
+**Hypothesis:** holds ~`wkF` pace (≥ 0.07 m/s) while the learned correction cuts
+the obstacle fall rate to at or below scripted's. Re-benchmark.
+
 **Result:** _pending_
