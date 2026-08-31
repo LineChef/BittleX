@@ -245,3 +245,29 @@ infrastructure in place. Speed calibration (getting the converged gait from
 ~0.06–0.09 up to the 0.11 target) is decoupled from recovery and still tunable —
 1–2 focused rounds could close it.
 
+---
+
+## Run 7 closed — 2026-08-31
+
+Decision: **stop here, bank `walk_r2`, let real hardware decide the RL-vs-scripted
+question.** Rationale: three rounds establish that big-stumble recovery is bounded
+by the control setup (reactive, IMU-only, weak sagittal-plane legs, no roll DOF),
+not by reward tuning — matching Run 6. The reactive ceiling likely depends on real
+servo torque, which is unknown until hardware arrives, so a recovery sub-policy or
+CPG redesign now would be optimising a sim behaviour that may not transfer.
+
+- **Banked:** `walk_r2_ppo`, tag **`walk-v8-r2`**. Best walk of the project on
+  stability and straightness.
+- **Env:** left at the R2 config on `auto-gait-iteration` (273-dim observation
+  with IMU tilt history, `TARGET_SPEED` tracking bonus at `FAC_SPEED=4`,
+  `FAC_BALANCE=2`, mild impulse drills). Not merged to `development` —
+  `gait-v7-stumble-catch` (Run 6) remains the `development` gait pending a
+  real-hardware head-to-head.
+- **Not done:** speed calibration (walk_r2 converges at ~0.07 vs the 0.11
+  target); recovery beyond Run 6's stumble-catch.
+- **Next:** on hardware — run scripted `wkF` vs. `walk-v8-r2` vs.
+  `gait-v7-stumble-catch` head-to-head on the real robot, measure the sim-to-real
+  gap, and decide whether RL locomotion is worth continuing to build on (toward
+  the Phase 8 perception integration) or whether the scripted gait covers plain
+  walking.
+

@@ -88,8 +88,14 @@ Software only; no physical robot needed until Phase 6 deployment.
   `gait-v7-stumble-catch` — crisper trot (`diagonal_trot_corr` −0.58), tighter
   heading (7.6° max drift), always-on stumble-catch balance term, no
   obstacle-course falls; ~7% slower forward than `phase3-gait`.
-- **Active work:** Run 7 ("walk") — a deliberate target walk speed plus a push to
-  make stumble recovery significantly better. On `auto-gait-iteration`.
+- **Run 7 ("walk"), closed:** best checkpoint `walk_r2`, tag `walk-v8-r2` — 0%
+  falls, best heading of the project, but converges slow and is not merged.
+  Established that big-stumble recovery can't be reward-tuned further on this
+  control setup.
+- **Phase 3 RL is paused pending hardware.** The open question — is a learned gait
+  actually better than OpenCat's scripted `wkF` for plain walking — is settled by
+  a real-robot head-to-head, not more sim iteration. Learned-gait work resumes if
+  it transfers well and/or when perception-in-the-loop (Phase 8) becomes active.
 
 ### Environment
 
@@ -261,13 +267,19 @@ project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
 [`docs/auto-iteration-log-run6.md`](auto-iteration-log-run6.md),
 [`docs/auto-iteration-report-2026-08-31.md`](auto-iteration-report-2026-08-31.md).
 
-**Run 7 — "walk": target speed + stumble recovery** (in progress, on
-`auto-gait-iteration`). Adds a deliberate `TARGET_SPEED` (0.11 m/s, near the
-`wkF` reference's own open-loop pace) with a tracking-bonus reward held below
-gait-match in priority, and a set of changes aimed at significantly better
-stumble recovery: IMU tilt history + angular acceleration in the observation
-(247 → 273), a gait-phase clock that slows under tilt, tilt-rate damping in
-`FAC_BALANCE`, and concentrated impulse-shove drills. Record:
+**Run 7 — "walk": target speed + stumble recovery** (closed, on
+`auto-gait-iteration`). Added a deliberate `TARGET_SPEED` (0.11 m/s) with a
+tracking-bonus reward, IMU tilt history + angular acceleration in the observation
+(247 → 273), and several attempts to improve stumble recovery (a tilt-slowed
+phase clock, imitation-fade while wobbling, tilt-rate damping in `FAC_BALANCE`,
+concentrated impulse drills). **Outcome:** `big_stumble_recovery_rate` stayed at
+0.0 across all three rounds — recovery is bounded by the control setup (reactive,
+IMU-only, weak sagittal-plane legs), not by reward tuning, confirming Run 6.
+`walk_r2` is the best checkpoint (tag `walk-v8-r2`): 0% falls on flat ground and
+the 30 mm course, best heading of the project (4–5° max yaw drift), trot −0.50 —
+but it converges slow (~0.07 m/s vs the 0.11 target) and is not merged to
+`development`. **Decision:** stop reward-tuning recovery; settle the RL-vs-scripted
+question on real hardware with a head-to-head once it arrives. Record:
 [`docs/auto-iteration-log-run7.md`](auto-iteration-log-run7.md).
 
 ### Evaluate and lock ✅
