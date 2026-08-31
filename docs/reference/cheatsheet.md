@@ -2,7 +2,7 @@
 
 Curated quick-reference. Add to it by telling me "add this to the cheat sheet".
 For the exhaustive reference (every script, all flags, setup), see
-[`docs/commands.md`](commands.md).
+[`docs/reference/commands.md`](commands.md).
 
 Shell helpers (`g2train`, `g2watch`) live in `~/.bash_profile` — `source ~/.bash_profile`
 or open a new terminal to pick them up. RL commands run from `rl_training/opencat-gym/`.

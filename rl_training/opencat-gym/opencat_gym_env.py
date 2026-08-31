@@ -33,7 +33,7 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # action = 0 reproduces the open-loop scripted walk exactly, so the policy can
 # only add a learned correction on top of a gait that's already robust -- a
 # learned version of the firmware's gyro-balance layer. Motivation: the
-# learned-vs-scripted benchmark (docs/gait-benchmark.md) showed the scripted
+# learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
 RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 and the policy warped wkF to a crawl; 11 = balance-correction authority without gait-killing authority.
@@ -461,7 +461,7 @@ class OpenCatGymEnv(gym.Env):
         capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
                          if MOVEMENT_CAP_AT_TARGET else movement_forward)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
-        # Scripted-gait lessons (docs/gait-benchmark.md): keep feet on the ground
+        # Scripted-gait lessons (docs/rl-runs/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)

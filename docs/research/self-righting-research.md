@@ -62,7 +62,7 @@ scenario.
   stretch goal** — IMU-based flip detection plus a dedicated recovery policy,
   along the lines of quadruped-robotics research. Not a Phase 1 requirement.
   This is the "recovery sub-policy" option raised in the Run 7 wrap-up
-  (`docs/auto-iteration-log-run7.md`).
+  (`docs/rl-runs/auto-iteration-log-run7.md`).
 - **Confirm the actual self-right trigger for Bittle X V2 / BiBoard V1** directly
   (Petoi support or forum) — the infrared-remote description in some docs does
   not apply to this board. Add the token to `pi_pipeline/link/opencat.py` once

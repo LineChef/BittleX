@@ -15,7 +15,7 @@ A Petoi Bittle X quadruped that learns to walk via reinforcement learning, perce
 |---|---|
 | Petoi Bittle X V2 (alloy servos) | Core quadruped platform, built on OpenCat |
 | Raspberry Pi Zero 2 WH | Runs the voice/memory/Claude integration pipeline |
-| PiSugar S 1200mAh | Independent Pi power (not shared with the servo battery) — see [`docs/pi-power.md`](docs/pi-power.md) |
+| PiSugar S 1200mAh | Independent Pi power (not shared with the servo battery) — see [`docs/research/pi-power.md`](docs/research/pi-power.md) |
 | Petoi AI Vision Camera Module | Grove Vision AI V2, onboard neural processor for on-device inference |
 
 Full parts list and cost breakdown: see [`docs/project-plan.md`](docs/project-plan.md)

@@ -69,7 +69,7 @@ trade off against each other under single-weight tuning. iter5 is the point wher
 the two priorities (straight line, clean trot) are both met without the body or
 fall-rate regressing.
 
-Full blow-by-blow with all metrics: `docs/auto-iteration-log.md`.
+Full blow-by-blow with all metrics: `docs/rl-runs/auto-iteration-log.md`.
 
 ---
 
@@ -165,7 +165,7 @@ in the replay; not a regression that undermines the result.
   - any iteration: `g2watch trained/auto_iter<N>_ppo`
 - **Frame strips** (30 rendered frames per policy):
   `rl_training/opencat-gym/eval_frames/iter0_v6/` … `iter5/` … `gait_final/`
-- **Per-iteration detail:** `docs/auto-iteration-log.md`
+- **Per-iteration detail:** `docs/rl-runs/auto-iteration-log.md`
 
 ## Merge
 

@@ -2,12 +2,12 @@
 
 Every runnable command in the project, with the full step sequence for each so
 nothing is missed when running them by hand. To have Claude run one, point at it
-by name — e.g. "run the smoke test from `docs/commands.md`".
+by name — e.g. "run the smoke test from `docs/reference/commands.md`".
 
 Only the RL training system (Phase 3) has code so far. `pi_pipeline/` (voice,
 memory, vision) has no commands yet; this file grows as those land.
 
-For a short, curated quick-reference, see [`docs/cheatsheet.md`](cheatsheet.md).
+For a short, curated quick-reference, see [`docs/reference/cheatsheet.md`](cheatsheet.md).
 
 ---
 

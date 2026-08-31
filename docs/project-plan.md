@@ -33,7 +33,7 @@ should we work on next."
   servo-spike brownouts. The PiSugar pogo-pins to the Pi's underside pads, leaving
   the GPIO header free, and provides UPS safe-shutdown. To avoid two 5 V sources,
   wire BiBoard → Pi **data-only (RX/TX/GND)**, no 5 V. Full reasoning:
-  [`docs/pi-power.md`](pi-power.md).
+  [`docs/research/pi-power.md`](research/pi-power.md).
 - **Enclosure:** Petoi ships an official back-cover STL with a Pi cutout
   ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
   so the cover can close over the mounted Pi.
@@ -98,7 +98,7 @@ Software only; no physical robot needed until Phase 6 deployment.
   head-to-head. Established that big-stumble recovery can't be reward-tuned
   further on this control setup.
 - **Sim benchmark, learned vs scripted** (`benchmark_gaits.py`,
-  [`docs/gait-benchmark.md`](gait-benchmark.md)): on flat ground the learned
+  [`docs/rl-runs/gait-benchmark.md`](rl-runs/gait-benchmark.md)): on flat ground the learned
   gaits win — `phase3-gait` covers ~4× the distance of open-loop `wkF` keyframes.
   On obstacle courses the scripted keyframes are hard to beat; `phase3-gait` does
   markedly worse (brittle, trips), `gait-v7-stumble-catch` only reaches parity.
@@ -231,7 +231,7 @@ backgrounds training). `train.py` takes `--tag` and `--steps`. Shell helpers
 `g2train` / `g2watch`; the `/train` slash command.
 
 **Automated loop 1 — fix the rightward curve.** First unattended run of the
-[`docs/automated-testing-loop.md`](automated-testing-loop.md) workflow, on
+[`docs/reference/automated-testing-loop.md`](reference/automated-testing-loop.md) workflow, on
 `auto-gait-iteration`. Added `evaluate_policy.py` (headless metrics + frame
 renders). Five 1M-step tuning iterations + one 2M confirming run. Three changes
 from v6: **`FAC_HEADING = 5.0`** (penalize accumulated heading error from the
@@ -242,8 +242,8 @@ heading drift **12.5° → 0.16°**, lateral wander **0.24 → 0.045 m**, speed 
 never falls. Known miss: `diagonal_trot_corr` −0.59 at 2M (the 1M checkpoints hit
 −0.90 — the fully-converged policy walks straight but its diagonal timing
 loosens). Merged to `development`; write-ups in
-[`docs/auto-iteration-report-2026-08-30.md`](auto-iteration-report-2026-08-30.md)
-and [`docs/auto-iteration-log.md`](auto-iteration-log.md).
+[`docs/rl-runs/auto-iteration-report-2026-08-30.md`](rl-runs/auto-iteration-report-2026-08-30.md)
+and [`docs/rl-runs/auto-iteration-log.md`](rl-runs/auto-iteration-log.md).
 
 **Automated loops 2–4 + a final run — set aside.** Attempts to fix a supposed
 start-up "stutter" and tighten the trot. The stutter turned out to be a
@@ -254,7 +254,7 @@ reward — either dissolved the trot or regressed heading/stride at 2M
 convergence. **Conclusion: `auto_gait_final` sits at a local optimum that
 reward-weight tuning cannot push past.** Records:
 `docs/auto-iteration-{log,report-*}-run{2,3,4}.md`,
-`docs/auto-iteration-log-final.md` (reformulated terms live only on
+`docs/rl-runs/auto-iteration-log-final.md` (reformulated terms live only on
 `auto-gait-iteration`). Remaining trot-crispness levers are structural
 (diagonal-pair phase in the observation, `wkF` imitation, or a CPG action space).
 
@@ -279,14 +279,14 @@ tag `gait-v7-stumble-catch`**: `diagonal_trot_corr` −0.58 (crispest in the
 project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
 `phase3-gait`. The recovery-window code stays in `opencat_gym_env.py` but dormant
 (`FAC_RECOVERY = 0`). Merged to `development`. Records:
-[`docs/auto-iteration-log-run6.md`](auto-iteration-log-run6.md),
-[`docs/auto-iteration-report-2026-08-31.md`](auto-iteration-report-2026-08-31.md).
+[`docs/rl-runs/auto-iteration-log-run6.md`](rl-runs/auto-iteration-log-run6.md),
+[`docs/rl-runs/auto-iteration-report-2026-08-31.md`](rl-runs/auto-iteration-report-2026-08-31.md).
 
 Note this is the *RL-policy* limit (8 walking joints only). OpenCat's **firmware**
 has a separate built-in scripted self-right skill — but it only covers slow
 side/forward falls, not fast ones and not a flip onto the back, and its usual
 trigger (the IR remote) isn't supported on BiBoard V1. Details, sources, and the
-plug-in points: [`docs/self-righting-research.md`](self-righting-research.md).
+plug-in points: [`docs/research/self-righting-research.md`](research/self-righting-research.md).
 Expect frequent manual righting during real-robot RL sessions.
 
 **Run 7 — "walk": target speed + stumble recovery** (closed, on
@@ -302,7 +302,7 @@ the 30 mm course, best heading of the project (4–5° max yaw drift), trot −0
 but it converges slow (~0.07 m/s vs the 0.11 target) and is not merged to
 `development`. **Decision:** stop reward-tuning recovery; settle the RL-vs-scripted
 question on real hardware with a head-to-head once it arrives. Record:
-[`docs/auto-iteration-log-run7.md`](auto-iteration-log-run7.md).
+[`docs/rl-runs/auto-iteration-log-run7.md`](rl-runs/auto-iteration-log-run7.md).
 
 ### Evaluate and lock ✅
 
@@ -340,7 +340,7 @@ question on real hardware with a head-to-head once it arrives. Record:
 - [ ] Mount the Pi; test power and serial **independently** (power can work while
       serial doesn't). Per Petoi's Raspberry Pi serial docs:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
-    data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/pi-power.md`](pi-power.md).
+    data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/research/pi-power.md`](research/pi-power.md).
   - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
     the Pi cutout.
   - `sudo raspi-config` → Interface Options → Serial Port → disable the serial
@@ -399,7 +399,7 @@ through it. Command reference and a hardware bring-up checklist are in
       remote path doesn't apply — likely a serial command). Add it to
       `pi_pipeline/link/opencat.py`. Falls will be frequent during RL sessions
       and the firmware skill only covers slow side/forward ones — see
-      [`docs/self-righting-research.md`](self-righting-research.md).
+      [`docs/research/self-righting-research.md`](research/self-righting-research.md).
 
 ## Phase 7 — Voice + Claude integration
 
@@ -538,7 +538,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       skill for the cases it covers, a learned fallback for the rest). Ruled out
       as a pure reward-shaping target in Run 7; becomes incremental once the IMU
       is already feeding the policy. See
-      [`docs/self-righting-research.md`](self-righting-research.md).
+      [`docs/research/self-righting-research.md`](research/self-righting-research.md).
 
 ## Phase 9 — Memory system
 

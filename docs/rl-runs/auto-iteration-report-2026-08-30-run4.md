@@ -73,4 +73,4 @@ outside the reward-shaping loop:
 - **TensorBoard:** `PPO_21–23` (Run 4) vs `PPO_13` (`auto_gait_final`).
   http://localhost:6006/
 - **Replays:** `g2watch trained/auto_r4_final_ppo` · `g2watch trained/auto_gait_final_ppo`
-- **Detail:** `docs/auto-iteration-log-run4.md`
+- **Detail:** `docs/rl-runs/auto-iteration-log-run4.md`

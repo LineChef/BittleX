@@ -87,4 +87,4 @@ a term redesign, ~1–2 focused iterations, and belongs in its own run.
   - recommended: `g2watch trained/auto_r2_iter3_ppo`
   - the ramp version: `g2watch trained/auto_r3_final_ppo`
   - Run 1 for reference: `g2watch trained/auto_gait_final_ppo`
-- **Detail:** `docs/auto-iteration-log-run3.md`, `docs/auto-iteration-log-run2.md`
+- **Detail:** `docs/rl-runs/auto-iteration-log-run3.md`, `docs/rl-runs/auto-iteration-log-run2.md`

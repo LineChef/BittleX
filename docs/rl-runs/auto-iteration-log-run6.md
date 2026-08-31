@@ -332,4 +332,4 @@ baseline gait, acceptable under "gait match ≫ speed".
 - **Stumble-catch (`FAC_BALANCE`):** the part that worked — live at 2.0.
 - Revert targets if R5 ever misbehaves: `gait-v7-stumble-catch` →
   `phase3-gait` → `auto_dr_iter4`.
-- Full narrative + recommendation: `docs/auto-iteration-report-2026-08-31.md`.
+- Full narrative + recommendation: `docs/rl-runs/auto-iteration-report-2026-08-31.md`.

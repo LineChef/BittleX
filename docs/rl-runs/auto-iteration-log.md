@@ -300,5 +300,5 @@ regression that undermines the result.
 ## Loop end
 
 Stopped after the confirming run — 5 tuning iterations + 1 confirming run, ~2h40m,
-under both the 3h and 6-iteration caps. Report: `docs/auto-iteration-report-2026-08-30.md`.
+under both the 3h and 6-iteration caps. Report: `docs/rl-runs/auto-iteration-report-2026-08-30.md`.
 Best policy: `trained/auto_gait_final_ppo`. All commits on `auto-gait-iteration`.

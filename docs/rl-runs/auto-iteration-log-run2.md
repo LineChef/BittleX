@@ -214,4 +214,4 @@ Stopped after iter3. 3 iterations (2 failed 1M RSI attempts + the 2M fix), ~1h40
 **Deliverable: RSI at `RSI_JOINT_NOISE_DEG = 6` (no phase randomization), trained
 2M.** Policy `trained/auto_r2_iter3_ppo`. All on `auto-gait-iteration`, not merged
 — Run 3 (trot) stacks on top; combined review + merge after Run 3.
-Report: `docs/auto-iteration-report-2026-08-30-run2.md`.
+Report: `docs/rl-runs/auto-iteration-report-2026-08-30-run2.md`.

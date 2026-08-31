@@ -1,7 +1,7 @@
 # Residual-on-wkF line ("resid")
 
 Motivation: the learned-vs-scripted benchmark
-([`docs/gait-benchmark.md`](gait-benchmark.md)) showed Bittle's open-loop `wkF`
+([`docs/rl-runs/gait-benchmark.md`](gait-benchmark.md)) showed Bittle's open-loop `wkF`
 keyframes are hard to beat on obstacle courses — the fast learned gaits are
 brittle. This line starts *from* the scripted gait and learns a correction on
 top, borrowing what makes the scripted gait robust.

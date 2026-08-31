@@ -26,7 +26,7 @@ in mind this is their first hardware/robotics project.
 
 ## RL Training — Commands
 
-`docs/commands.md` is the full runnable-command reference (training, watching,
+`docs/reference/commands.md` is the full runnable-command reference (training, watching,
 tests, TensorBoard, process management, setup). The essentials:
 
 All commands run **from inside `rl_training/opencat-gym/`** (the scripts import
@@ -112,7 +112,7 @@ result visually with `watch_trained.py`, then analyze the reward curve and propo
 next iteration — and wait for a go-ahead before launching it.
 
 **Automated (unattended) iteration** is a separate workflow — when the user asks for
-"automated testing" / "iterate on your own", follow `docs/automated-testing-loop.md`:
+"automated testing" / "iterate on your own", follow `docs/reference/automated-testing-loop.md`:
 work on the `auto-gait-iteration` branch (merge `development` in first), stay
 interruptible with hard caps, self-evaluate headlessly, and on wrap-up produce a
 report + queue TensorBoard and a visual replay, then ask before merging to
