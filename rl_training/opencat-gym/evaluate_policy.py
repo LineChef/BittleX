@@ -109,6 +109,7 @@ def summarize(episodes):
     fall_events, recov_events, recov_frac = [], [], []   # fall recovery
     speed_err = []                                       # |speed - TARGET_SPEED|
     big_stumble, big_stumble_ok = 0, 0                   # >0.7 rad tilt spike, then recovered
+    med_stumble, med_stumble_ok = 0, 0                   # 0.5-0.7 rad tilt spike (the regime the gait actually operates in)
 
     CONTROL_HZ = float(getattr(opencat_gym_env, "CONTROL_HZ", 80.0))
     TARGET_SPEED = float(getattr(opencat_gym_env, "TARGET_SPEED", 0.11))
@@ -135,6 +136,10 @@ def summarize(episodes):
             big_stumble += 1
             if (not fell) and len(ts) - pk >= 5 and ts[pk + 1:].min() < 0.35:
                 big_stumble_ok += 1
+        elif ts[pk] > 0.5:
+            med_stumble += 1
+            if (not fell) and len(ts) - pk >= 5 and ts[pk + 1:].min() < 0.30:
+                med_stumble_ok += 1
         for q in range(4):
             idx = min(int(len(yaw) * (q + 1) / 4) - 1, len(yaw) - 1)
             yaw_quarters[q].append(np.degrees(yaw[idx]))
@@ -204,6 +209,9 @@ def summarize(episodes):
         "big_stumble_episodes": big_stumble,             # episodes with a >0.7 rad (~40 deg) tilt spike
         "big_stumble_recovery_rate": (big_stumble_ok / big_stumble
                                       if big_stumble > 0 else None),  # ...that then came back < 0.35 rad & finished upright
+        "med_stumble_episodes": med_stumble,             # 0.5-0.7 rad spike (peak) -- the regime the gait actually lives in
+        "med_stumble_recovery_rate": (med_stumble_ok / med_stumble
+                                      if med_stumble > 0 else None),  # ...back < 0.30 rad & upright
         "startup_speed_ratio_mean": m(startup_ratio),    # first-25-steps speed / next-50-steps speed; ~1 = no stutter
         "startup_jerk_ratio_mean": m(startup_jerk_ratio),# first-25-steps joint jerk / next-50; >1 = jerky start
         "roll_var_mean": m(rollv),

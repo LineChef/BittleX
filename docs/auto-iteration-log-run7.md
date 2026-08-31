@@ -136,4 +136,54 @@ and with the IMU history + balance shaping + mild impulses the
 flat, R3 re-introduces a *fixed* phase clock (no pause) but drops imitation weight
 during a wobble, and bumps impulse practice.
 
+**Result** (`walk_r2_ppo`, PPO_39, 39 min, clean):
+
+| scenario | fell | dist m | speed m/s | speed_err | trot | big-stmbl | recov | yaw° |
+|---|---|---|---|---|---|---|---|---|
+| course (0.03 + 0.20) | **0.00** | 0.182 | 0.058 | 0.052 | −0.500 | 0 | – | **5.2** |
+| drills (0.045 + 0.60) | 0.29 | 0.133 | 0.061 | 0.064 | −0.542 | 9 | **0.00** | 17.4 |
+| flat | **0.00** | 0.270 | 0.086 | 0.024 | −0.505 | 0 | – | **4.1** |
+
+**The base-gait regression is fixed** — flat and course `fell_fraction` back to
+0.00 (R1: 0.25), and heading is the best of the project (4–5° max yaw). Confirms
+R1's culprits were the phase-pause + the movement cap. Trot held at −0.50.
+
+**But the two Run-7 goals haven't moved:**
+- **Speed still stuck at ~0.06–0.09 m/s**, well under the 0.11 target (`FAC_SPEED`
+  = 4 too weak to pull a cautious gait up).
+- **Stumble recovery still 0%** — the IMU-history observation *alone* does nothing
+  for it. On the nominal course the converged policy never even reaches a big
+  stumble (`big_stumble_episodes` = 0); only the brutal 0.6-impulse drills produce
+  40°+ spikes, and there it fails (0/9).
+
+**Decision:** R2 is the new stable base. R3 is the real recovery push (plus a
+speed bump, since speed is clearly stuck).
+
+---
+
+## Round 3 — `walk_r3` — recovery push + speed push
+
+**vs R2:**
+- **Imitation fade while stumbling** (the R1 phase-pause idea, done gently): the
+  phase clock keeps running normally, but when prev-step tilt > `IMITATION_TILT_FADE`
+  (0.6 rad) the imitation reward is scaled by `IMITATION_FADE_FACTOR` (0.3) — so
+  matching wkF stops fighting a recovery and `FAC_BALANCE` takes over. No frozen
+  reference, no gait destabilisation.
+- `FAC_BALANCE` 2.0 → **4.0**, `BALANCE_W_RATE` 0.6 → **1.0** — more weight on the
+  catch, emphasis on killing the wobble's *velocity*.
+- `IMPULSE_PUSH` 0.4 → **0.55**, prob 0.003 → **0.006** — the converged policy saw
+  ~0 big stumbles on the nominal course, so it never practised recovery. Make
+  recoverable big wobbles happen ~2×/episode without the 0.7 fall-storm.
+- `FAC_SPEED` 4 → **7**, `SPEED_SHARPNESS` 2.5 → **1.8** — stronger, wider pull
+  toward 0.11 m/s.
+- Eval: added `med_stumble_recovery_rate` (0.5–0.7 rad spike → back < 0.3 rad
+  upright) — the regime the gait actually operates in, so progress shows
+  gradually, not just on the hard >0.7 binary.
+
+**Hypothesis:** `med_stumble_recovery_rate` clearly positive, `big_stumble_recovery_rate`
+off zero, speed climbs toward 0.10+, base gait and trot hold. **Decision point:**
+if recovery *still* doesn't move here, reward+curriculum has hit its ceiling and
+the next step is a structural change (recovery sub-policy or CPG action space) —
+flag for a go-ahead rather than spending more rounds.
+
 **Result:** _pending_
