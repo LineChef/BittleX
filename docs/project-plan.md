@@ -271,6 +271,13 @@ project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
 [`docs/auto-iteration-log-run6.md`](auto-iteration-log-run6.md),
 [`docs/auto-iteration-report-2026-08-31.md`](auto-iteration-report-2026-08-31.md).
 
+Note this is the *RL-policy* limit (8 walking joints only). OpenCat's **firmware**
+has a separate built-in scripted self-right skill — but it only covers slow
+side/forward falls, not fast ones and not a flip onto the back, and its usual
+trigger (the IR remote) isn't supported on BiBoard V1. Details, sources, and the
+plug-in points: [`docs/self-righting-research.md`](self-righting-research.md).
+Expect frequent manual righting during real-robot RL sessions.
+
 **Run 7 — "walk": target speed + stumble recovery** (closed, on
 `auto-gait-iteration`). Added a deliberate `TARGET_SPEED` (0.11 m/s) with a
 tracking-bonus reward, IMU tilt history + angular acceleration in the observation
@@ -377,6 +384,11 @@ through it. Command reference and a hardware bring-up checklist are in
 - [ ] Expect a real sim-to-real performance gap — normal, not failure.
 - [ ] Iterate: adjust the reward and/or retrain in sim based on real-hardware
       behavior, redeploy.
+- [ ] Find and test the **self-right trigger command** for BiBoard V1 (the IR
+      remote path doesn't apply — likely a serial command). Add it to
+      `pi_pipeline/link/opencat.py`. Falls will be frequent during RL sessions
+      and the firmware skill only covers slow side/forward ones — see
+      [`docs/self-righting-research.md`](self-righting-research.md).
 
 ## Phase 7 — Voice + Claude integration
 
@@ -510,6 +522,12 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       gait fundamentally can't do — it has no input to feed vision into — and is
       the main reason the project uses RL for locomotion. Only possible once
       perception exists; a distinct effort from the flat-ground gait.
+- [ ] (Stretch, with vision + IMU in place) More robust self-righting — flip
+      detection from the IMU plus a dedicated recovery policy (or the firmware
+      skill for the cases it covers, a learned fallback for the rest). Ruled out
+      as a pure reward-shaping target in Run 7; becomes incremental once the IMU
+      is already feeding the policy. See
+      [`docs/self-righting-research.md`](self-righting-research.md).
 
 ## Phase 9 — Memory system
 
