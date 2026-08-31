@@ -97,10 +97,19 @@ Software only; no physical robot needed until Phase 6 deployment.
   `gait-v7-stumble-catch` remain the reference gaits until a real-hardware
   head-to-head. Established that big-stumble recovery can't be reward-tuned
   further on this control setup.
+- **Sim benchmark, learned vs scripted** (`benchmark_gaits.py`,
+  [`docs/gait-benchmark.md`](gait-benchmark.md)): on flat ground the learned
+  gaits win — `phase3-gait` covers ~4× the distance of open-loop `wkF` keyframes.
+  On obstacle courses the scripted keyframes are hard to beat; `phase3-gait` does
+  markedly worse (brittle, trips), `gait-v7-stumble-catch` only reaches parity.
+  RL earns its place for flat efficiency, not (yet) for obstacle robustness. The
+  scripted side is open-loop only here — the firmware's gyro-balance layer would
+  widen its obstacle lead — so confirm on hardware.
 - **Phase 3 RL is paused pending hardware.** The open question — is a learned gait
-  actually better than OpenCat's scripted `wkF` for plain walking — is settled by
-  a real-robot head-to-head, not more sim iteration. Learned-gait work resumes if
-  it transfers well and/or when perception-in-the-loop becomes active — see the
+  actually better than OpenCat's scripted `wkF` for plain walking — has a sim
+  answer above; the real-robot head-to-head confirms it against the *firmware*
+  gait. Learned-gait work resumes if it transfers well and/or when
+  perception-in-the-loop becomes active — see the
   **Phase 8 Target capability**, the near-term goal for that work.
 
 ### Environment
