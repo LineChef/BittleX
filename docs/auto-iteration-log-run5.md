@@ -66,6 +66,19 @@ value even where the mild tests already pass.
 ## Iteration 1 — dynamics bundle (friction + mass + IMU noise)
 
 **Change:** `RANDOM_FRICTION = 0.5`, `RANDOM_MASS = 0.15`, `RANDOM_GYRO = 0.04`,
-curriculum-ramped. Finetune from `auto_gait_final_ppo`, 1.5M steps.
+curriculum-ramped.
 
-**Run:** `auto_dr_iter1`, 1.5M steps. _Result pending._
+**First attempt — `--from auto_gait_final_ppo` finetune — aborted at ~250K.** The
+`PPO.load` finetune path diverged immediately: `approx_kl` 40–90 (normal ~0.03),
+reward crashed 1250 → ~25, episodes started falling — all *before* the DR
+curriculum had ramped in (dr ≈ 0.06), so it's the finetune mechanism, not the
+randomization. Reloading a converged policy and resuming PPO with a fresh
+schedule doesn't behave here.
+
+**Switched to fresh-from-scratch + DR curriculum**, `--steps 2000000`. The ramp
+(`dr = 0 → 1` over `DR_RAMP_STEPS = 5e5` session-steps) means the first ~25% of
+training is effectively the clean flat task — it re-learns to walk, then hardens.
+This is the approach every prior run used successfully. `train.py --from` kept but
+unused (would need a much lower LR).
+
+**Run:** `auto_dr_iter1`, 2M steps, fresh. _Result pending._
