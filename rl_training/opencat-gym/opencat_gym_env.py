@@ -36,8 +36,9 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 8    # +/- correction the policy may apply. r1 used 18 (warped wkF to a crawl); resid_r2 used 11. rtune_r3: 8 -- tighter budget keeps the gait closer to the proven-robust wkF keyframes; test whether the policy's own over-corrections are what drive heading drift / obstacle falls.
+RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 (warped wkF to a crawl); resid_r2 used 11. rtune_r3 tried 8 -- fixed heading at 20/35mm but couldn't catch 50mm trips (falls 14->29%). Reverted to 11.
 FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
+FAC_RESID_SMOOTH = 6.0    # rtune_r4: -mean(|action - prev_action|) * this (ramped). Penalise frame-to-frame jerk in the correction, not its magnitude -- a smoother residual should cut roll oscillation / heading drift without capping the authority needed for a 50mm trip.
 
 # --- Stay-down / stay-level shaping (also from the scripted-gait benchmark) ---
 FAC_DUTY = 0.0            # r1: 4.0 was the main 'freeze with feet planted' attractor -> the gait stalled. wkF already has a good duty factor by construction; don't reward it.
@@ -467,6 +468,12 @@ class OpenCatGymEnv(gym.Env):
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
         upright_penalty = FAC_UPRIGHT * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
+        if RESIDUAL_MODE:
+            resid_smooth_cost = FAC_RESID_SMOOTH * float(
+                np.mean(np.abs(np.asarray(action) - self._prev_action)))
+        else:
+            resid_smooth_cost = 0.0
+        self._prev_action = np.asarray(action, dtype=float)
         reward = (FAC_MOVEMENT * capped_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
@@ -479,6 +486,7 @@ class OpenCatGymEnv(gym.Env):
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
+                    + resid_smooth_cost
                     + upright_penalty
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
@@ -502,6 +510,7 @@ class OpenCatGymEnv(gym.Env):
             "r_duty": duty_reward,
             "r_upright": -penalty_scale * upright_penalty,
             "r_residual_cost": -residual_cost,
+            "r_resid_smooth": -penalty_scale * resid_smooth_cost,
             "r_min_speed": -min_speed_penalty,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
@@ -608,6 +617,7 @@ class OpenCatGymEnv(gym.Env):
         # Run 7 state: gait-phase counter (slows under tilt), speed window,
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
+        self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
         self._x_window = []
         self._prev_ang_vel = np.zeros(2)
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)

@@ -122,4 +122,43 @@ else = `resid_r2`.
 stay ≤ baseline, flat speed ≥ 0.08 m/s. Risk: too little authority to catch a
 real stumble → falls creep up like `resid_r1`'s reverse case.
 
+**Result** (`rtune_r3_ppo`, ~39 min, `ep_len_mean` 251, clean). Benchmark vs
+scripted `wkF`, 14 ep/cell:
+
+| | flat | 20 mm | 35 mm | 50 mm | avg 20/35/50 |
+|---|---|---|---|---|---|
+| yaw max° (r3 / r2 / scr) | 4.9/2.9/2.8 | **6.6**/10.4/4.8 | **5.7**/7.4/5.0 | 13.2/6.2/7.0 | 8.5 / 8.0 / 5.6 |
+| roll_var (r3 / r2 / scr) | .006/.005/.003 | **.008**/.015/.006 | .018/.007/.009 | **.039**/.031/.028 | .022 / .018 / .014 |
+| falls (r3 / r2 / scr) | 0/0/0 | 0/7/0 | 7/0/7 | **29**/14/14 | 12% / 7% / 7% |
+| speed (r3 / r2 / scr) | .097/.095/.091 | .069/.072/.066 | .056/.057/.048 | .046/.055/.038 | 0.057 / 0.062 / 0.050 |
+
+Flat speed 0.097 m/s. Score −342 vs baseline −320.
+
+**Rejected — hard fall guard (12% > 7%), but genuinely informative.** The tighter
+±8° budget **fixed heading and roll at 20 & 35 mm** — yaw 6.6°/5.7° (near the
+5.6° target, down from 10.4°/7.4°), roll_var at 20 mm below scripted — and lifted
+flat speed to 0.097. But at 50 mm it has too little authority to catch a big trip:
+falls 14 → 29%, yaw and roll blow out. Confirms the `resid_r1` lesson from the
+other side: **residual authority trades heading-tightness at small obstacles
+against stumble-catch at big ones.** Reverted to 11.
+
+**Takeaway for R4+:** the corrections themselves are too aggressive/jerky. Attack
+that directly without capping magnitude.
+
+---
+
+## R4 — `rtune_r4` — residual-smoothness penalty (reward)
+
+New term: `−FAC_RESID_SMOOTH(6.0) · mean(|action − prev_action|)`, ramped. Keeps
+`RESIDUAL_SCALE_DEG` at 11 (full stumble-catch authority) but penalises
+frame-to-frame *jerk* in the correction. R3 showed a small, smooth residual
+tracks heading well; this rewards smoothness without taking away the authority a
+50 mm trip needs. `self._prev_action` added to `reset()`; `r_resid_smooth` in the
+info breakdown.
+
+**Hypothesis:** roll_var drops toward 0.014 and yaw toward 6° (smoother
+correction = less oscillation) with falls ≤ baseline at *every* level, including
+50 mm, and flat speed ≥ 0.08. Risk: too much smoothing = laggy correction, 50 mm
+falls creep up anyway.
+
 **Result:** _pending_
