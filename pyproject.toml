@@ -1,0 +1,6 @@
+# Minimal — just pytest config for the pi_pipeline test suite.
+# (RL training deps live in requirements.txt; pi_pipeline in pi_pipeline/requirements*.txt.)
+
+[tool.pytest.ini_options]
+testpaths = ["pi_pipeline/tests"]
+addopts = "-q"

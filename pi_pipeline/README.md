@@ -45,9 +45,21 @@ python3.11 -m venv pi_pipeline/.venv
 source pi_pipeline/.venv/bin/activate
 pip install -r pi_pipeline/requirements.txt          # core (anthropic, dotenv)
 pip install -r pi_pipeline/requirements-audio.txt    # optional: vosk / piper / sounddevice
+pip install -r pi_pipeline/requirements-dev.txt      # optional: pytest
 ```
 
 Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`.
+
+## Tests
+
+```bash
+pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
+```
+
+`pi_pipeline/tests/` — no network, audio, or API key. Covers the skill catalogue,
+the conversation parse / tool-ack / retry paths (with a stub Anthropic client),
+the memory store + recall + decay, and the vision detection model + avoidance
+reflex. Run before committing pipeline changes.
 
 ## Run
 

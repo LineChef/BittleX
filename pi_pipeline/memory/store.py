@@ -52,7 +52,8 @@ _STOPWORDS = {
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    # microsecond precision -- these timestamps order the fact set (recency decay)
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
 
 def _fts_query(text: str) -> str:
