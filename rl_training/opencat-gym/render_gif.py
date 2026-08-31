@@ -17,7 +17,26 @@ ap.add_argument("--steps", type=int, default=240)
 ap.add_argument("--stride", type=int, default=2)   # keep every Nth frame
 ap.add_argument("--w", type=int, default=360)
 ap.add_argument("--h", type=int, default=270)
+# DR test overrides (same semantics as evaluate_policy.py): any --dr-* zeroes
+# every DR knob, applies the ones passed, and forces full strength (dr = 1) so
+# the GIF shows the policy on a specific held-out course.
+ap.add_argument("--dr-friction", type=float, default=None)
+ap.add_argument("--dr-mass", type=float, default=None)
+ap.add_argument("--dr-gyro", type=float, default=None)
+ap.add_argument("--dr-push", type=float, default=None)
+ap.add_argument("--dr-terrain", type=float, default=None)
 args = ap.parse_args()
+
+_dr = {"RANDOM_FRICTION": args.dr_friction, "RANDOM_MASS": args.dr_mass,
+       "RANDOM_GYRO": args.dr_gyro, "RANDOM_PUSH": args.dr_push,
+       "RANDOM_TERRAIN": args.dr_terrain}
+if any(v is not None for v in _dr.values()):
+    for k in _dr:
+        setattr(opencat_gym_env, k, 0.0)
+    for k, v in _dr.items():
+        if v is not None:
+            setattr(opencat_gym_env, k, v)
+    opencat_gym_env.DR_EVAL_FULL = True
 
 from stable_baselines3 import PPO
 env = OpenCatGymEnv()
