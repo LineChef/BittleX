@@ -26,17 +26,34 @@ CONTROL_HZ = 80.0
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
 FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (Run 7): reward accrues for progress up to the walk set-point and nothing above it, so this no longer competes with the speed tracker below. Was an unbounded "faster = always better" term through Run 6.
 
+# --- Residual action space (residual-on-wkF, "resid" line) -------------------
+# RESIDUAL_MODE True: the policy output modulates Bittle's scripted wkF keyframe
+# pose instead of accumulating per-step deltas --
+#   joint_target = wkF(phase) + action * deg2rad(RESIDUAL_SCALE_DEG)
+# action = 0 reproduces the open-loop scripted walk exactly, so the policy can
+# only add a learned correction on top of a gait that's already robust -- a
+# learned version of the firmware's gyro-balance layer. Motivation: the
+# learned-vs-scripted benchmark (docs/gait-benchmark.md) showed the scripted
+# keyframes are hard to beat on obstacles; this starts from them and climbs.
+RESIDUAL_MODE = True
+RESIDUAL_SCALE_DEG = 18   # +/- correction the policy may apply to each joint's scripted angle
+FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
+
+# --- Stay-down / stay-level shaping (also from the scripted-gait benchmark) ---
+FAC_DUTY = 4.0            # reward (paws in contact / 4): the scripted walk's stability is from keeping 2-3 feet down
+FAC_UPRIGHT = 8.0         # ramped penalty on tilt^2 (always on) -- not-falling is the primary goal for this line
+
 # --- Target walk speed (Run 7) ------------------------------------------------
 # "Walk" line: establish a deliberate baseline speed and hold it, rather than
 # letting whatever speed falls out of the other terms stand. Speed stays BELOW
 # gait-match in priority (FAC_SPEED << FAC_IMITATION). Faster gaits come later.
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
-TARGET_SPEED = 0.11        # m/s. wkF reference plays open-loop at ~0.10 m/s; R5 walks ~0.12 m/s. 0.11 ties the baseline to the reference walk's own pace with a hair of margin. Change per gait later.
-FAC_SPEED = 4.0            # weight on the speed-tracking bonus. R3: 4 -> 7 -- R1/R2 both converged at ~0.06-0.09 m/s, well under the 0.11 target; the bonus was too weak to pull speed up. Still below r_imitation (~8-12/step).
-SPEED_SHARPNESS = 2.5      # R3: 2.5 -> 1.8 -- wider capture band so the bonus still has a meaningful gradient when the policy is slow (0.06 vs 0.11 target). Error is relative to TARGET_SPEED, so this is scale-free.
+TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-loop pace (~0.10). Not chasing speed -- "don't fall" is the goal; faster comes later with vision.
+FAC_SPEED = 2.0            # weight on the speed-tracking bonus. resid line: de-emphasised (4 -> 2) -- the wkF cadence already sets the pace; just don't let the policy stall it.
+SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MOVEMENT_CAP_AT_TARGET = False  # R1 capped FAC_MOVEMENT at TARGET_SPEED and it removed the 'walk briskly' gradient (gait went slow+mushy). R2: off -- uncapped forward-progress reward + the speed tracking bonus.
+MOVEMENT_CAP_AT_TARGET = True  # resid line: cap forward-progress reward at TARGET_SPEED so there is no incentive to speed up (fast gaits are the brittle ones -- see docs/gait-benchmark.md).
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
 FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
@@ -50,7 +67,7 @@ PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15m
 FAC_JITTER = 0.1          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 20.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 10.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
 IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
@@ -119,7 +136,7 @@ RANDOM_FRICTION = 0.22   # +/- fraction on ground lateral friction, per episode.
 RANDOM_MASS = 0.10       # +/- fraction on every robot link mass, per episode. e.g. 0.15
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.03    # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
+RANDOM_TERRAIN = 0.045   # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
@@ -193,9 +210,14 @@ class OpenCatGymEnv(gym.Env):
                                  lin[1] + mag * np.sin(theta), lin[2]], ang)
         last_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
-                                                   dtype=object)[:,0]
-        ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
-        joint_angs += action * ds # Change per step including agent action
+                                                   dtype=object)[:,0].astype(float)
+        if RESIDUAL_MODE and WKF_REF is not None:
+            # policy modulates the scripted wkF pose; action=0 -> open-loop wkF
+            ref = WKF_REF[int(self._phase) % len(WKF_REF)]
+            joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
+        else:
+            ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
+            joint_angs += action * ds # Change per step including agent action
 
         # Apply joint boundaries individually.
         min_ang = -self.bound_ang
@@ -434,15 +456,24 @@ class OpenCatGymEnv(gym.Env):
         capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
                          if MOVEMENT_CAP_AT_TARGET else movement_forward)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
+        # Scripted-gait lessons (docs/gait-benchmark.md): keep feet on the ground
+        # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
+        # from the scripted pose only when it helps.
+        duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
+        upright_penalty = FAC_UPRIGHT * tilt ** 2
+        residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         reward = (FAC_MOVEMENT * capped_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
                  + speed_reward
                  + balance_reward
+                 + duty_reward
+                 - residual_cost
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
+                    + upright_penalty
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
@@ -462,6 +493,9 @@ class OpenCatGymEnv(gym.Env):
             "r_speed": speed_reward,
             "speed_mps": vx_est,
             "r_balance": balance_reward,
+            "r_duty": duty_reward,
+            "r_upright": -penalty_scale * upright_penalty,
+            "r_residual_cost": -residual_cost,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
             "r_heading": -penalty_scale * heading_penalty,
