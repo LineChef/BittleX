@@ -46,10 +46,10 @@ IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 # normal walking rewards. Window runs out still down, or tilt passes
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
-FAC_RECOVERY = 8.0          # weight on the recovery shaped reward (0 = disabled)
+FAC_RECOVERY = 22.0         # weight on the recovery shaped reward (0 = disabled). R3: 8->22 -- at 8 the recovery window opened (R2: 2.9% of steps) but the policy NEVER righted itself (0% recovered); the shaped reward was ~0.3/step vs ~15-20/step for walking, so learning to get up was not worth it.
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
-RECOVERY_UPRIGHT_RAD = 0.5  # both |roll| and |pitch| under this = upright again
-RECOVERY_HOLD_STEPS = 5     # consecutive upright steps to count as recovered
+RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
+RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
 RECOVERY_ABORT_RAD = 2.4    # tilt past this = hopeless, terminate now
 RECOVERY_RESUME_STEPS = 60  # walking steps guaranteed AFTER righting itself, so the
                             # policy is rewarded for getting back into the wkF gait,
@@ -130,7 +130,8 @@ class OpenCatGymEnv(gym.Env):
     def step(self, action):
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
         # Random horizontal shove (perturbation robustness / balance recovery).
-        if RANDOM_PUSH > 0 and self._dr > 0 and np.random.rand() < RANDOM_PUSH_PROB:
+        if (RANDOM_PUSH > 0 and self._dr > 0 and not self._in_recovery
+                and np.random.rand() < RANDOM_PUSH_PROB):
             lin, ang = p.getBaseVelocity(self.robot_id)
             dv = np.random.uniform(-RANDOM_PUSH, RANDOM_PUSH, 2) * self._dr
             p.resetBaseVelocity(self.robot_id,
@@ -211,7 +212,7 @@ class OpenCatGymEnv(gym.Env):
                                     self.joint_id, 
                                     p.POSITION_CONTROL, 
                                     joint_angs, 
-                                    forces=np.ones(8)*0.2)
+                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2))
         p.stepSimulation() # Delay of data transfer
 
         # Normalize joint_angs
@@ -390,7 +391,7 @@ class OpenCatGymEnv(gym.Env):
                 self._prev_upright = upright
                 clearance_term = np.clip(base_clearance / 0.06, 0.0, 1.0)
                 recovery_reward = FAC_RECOVERY * (
-                    4.0 * d_upright + 0.15 * upright + 0.05 * clearance_term)
+                    6.0 * d_upright + 0.30 * upright + 0.15 * clearance_term)
                 reward = recovery_reward            # override walking reward while down
 
                 if rp[0] < RECOVERY_UPRIGHT_RAD and rp[1] < RECOVERY_UPRIGHT_RAD:

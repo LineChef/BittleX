@@ -128,4 +128,54 @@ stays KG0 = `auto_dr_iter4`.
 margin. If it still shows ~0 falls, R3 raises push/height again; if it falls a lot
 but doesn't recover, R3 raises `FAC_RECOVERY` / eases the recovery threshold.
 
+**Result** (`auto_rec_r2_ppo`, PPO_33, 34 min, clean convergence):
+
+| scenario | ep_len | fell | fall_ev | recov_frac | in_recov | dist m | speed | trot corr | roll_var | yaw_max° |
+|---|---|---|---|---|---|---|---|---|---|---|
+| R2 (terrain 0.04 + push 0.3) | 227 | **0.125** | 0.125 | **0.00** | 2.9% | 0.177 | 0.043 | −0.512 | 0.072 | 12.4 |
+| KG0 @ same | 248 | 0.063 | 0.063 | 0.00 | 0.2% | 0.184 | 0.038 | −0.452 | 0.012 | 17.1 |
+| R2 flat | – | 0.00 | – | – | – | 0.338 | 0.067 | −0.507 | – | – |
+
+**Score R2 = 111.5  vs  KG0 @ same scenario = 115.5 → R2 is WORSE. Strike 1.**
+
+**Diagnosis:** the difficulty bump worked — R2 now *falls* (12.5%, 2× KG0) and the
+recovery window *opens* (2.9% of steps). But **it never rights itself: 0%
+recovered.** The window opens, it flails, the window times out → terminate.
+Root cause: while `_in_recovery` the walking reward is suspended and the shaped
+recovery reward is only ~0.3/step (`FAC_RECOVERY=8` × tiny Δupright), vs
+~15–20/step for walking — so the policy has no incentive to work at getting up;
+it just eats the occasional termination. Flat also regressed (0.34 m vs R1 0.41,
+KG0 0.47) — `FAC_IMITATION=26` + harder DR slowed the base gait.
+
+**Decision:** R2 worse → do NOT carry it forward. R3 keeps R2's difficulty (falls
+are needed) but is entirely about **making the recovery window winnable and worth
+winning**. Revert target still KG0.
+
+---
+
+## Round 3 — `auto_rec_r3` — make the recovery window winnable
+
+**Changes vs R2** (all one idea: a fallen robot can and should get up):
+- `FAC_RECOVERY` 8 → **22** — recovery reward now on the order of the walking
+  reward, so learning to get up pays.
+- Shaped term `4·Δupright + 0.15·upright + 0.05·clr` → **`6·Δupright + 0.30·upright
+  + 0.15·clr`** — denser, rewards being closer to level and body-up even without
+  frame-to-frame progress.
+- `RECOVERY_UPRIGHT_RAD` 0.5 → **0.7**, `RECOVERY_HOLD_STEPS` 5 → **3** — partial
+  recoveries count, so there's a gradient to climb.
+- **Pushes suspended while `_in_recovery`** — you don't keep shoving a fallen
+  robot; removes a confound that was re-tipping it before it could hold upright.
+- **Actuator force 0.2 → 0.5 while `_in_recovery`** only — give the policy the
+  physical authority to push itself back over (0.2 may be too weak for a righting
+  move; walking is unchanged).
+- `FAC_IMITATION` stays 26, `RANDOM_TERRAIN` stays 0.04 (not promoting — hold
+  difficulty, fix recovery first).
+
+**Hypothesis:** `recovered_fraction` goes clearly positive (target > 0.4). If it
+does, R4 backs `FAC_IMITATION` down toward 20–22 to recover flat-ground distance
+while keeping the new recovery skill. If recovery is *still* ~0, the conclusion is
+that righting a force-limited flat quadruped from >1.3 rad is not learnable with
+these actuators, and R4 pivots to *stumble-catch* (raise `is_fallen()` threshold
+so it trains to catch itself at ~0.8–1.0 rad before a full tip).
+
 **Result:** _pending_
