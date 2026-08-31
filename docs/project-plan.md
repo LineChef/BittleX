@@ -9,7 +9,9 @@ Movement, vision, voice, and memory are built as **independent systems running
 alongside each other**, not a single unified controller.
 
 This is a living document — update phases, specs, and findings as the work
-progresses.
+progresses. Behavior ideas to pick from live in
+[`docs/behavior-ideas.md`](behavior-ideas.md) — the reference list for "what
+should we work on next."
 
 ---
 
