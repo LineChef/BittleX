@@ -56,6 +56,15 @@ curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/
 `sounddevice` needs PortAudio — macOS `brew install portaudio`, Pi
 `sudo apt install libportaudio2`.
 
+### Verified on the dev machine (macOS, 2026-08-31)
+
+`vosk 0.3.44`, `piper-tts 1.7.0`, `sounddevice 0.5.6`, `onnxruntime 1.23.2`.
+Checked without a live mic: Piper synthesises + plays through the default output;
+Vosk transcribes a Piper-synthesised phrase back verbatim; `VoskSTT` /
+`VoskWakeWord` construct against `models/vosk`. Still needs a human at the mic to
+exercise live capture, the wake-word trigger, and the silence-detection timing —
+and an `ANTHROPIC_API_KEY` for the Claude leg.
+
 ## Still to do in Phase 7
 
 - Buzzer / posture cue implementations (`cues.py`) — hardware.

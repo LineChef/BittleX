@@ -43,7 +43,8 @@ class MacTTS:
 
 
 class PiperTTS:
-    """Local neural TTS via Piper, played through the default output device."""
+    """Local neural TTS via Piper (piper-tts >= 1.7), played through the default
+    output device."""
 
     def __init__(self, model_path: str):
         from piper.voice import PiperVoice  # piper-tts
@@ -65,13 +66,12 @@ class PiperTTS:
         print(f"\n  G2: {text}\n")
         import numpy as np
 
-        chunks = [
-            np.frombuffer(b, dtype=np.int16)
-            for b in self._voice.synthesize_stream_raw(text)
-        ]
-        if chunks:
-            self._sd.play(np.concatenate(chunks), self._rate)
-            self._sd.wait()
+        chunks = list(self._voice.synthesize(text))
+        if not chunks:
+            return
+        audio = np.concatenate([c.audio_int16_array for c in chunks])
+        self._sd.play(audio, chunks[0].sample_rate)
+        self._sd.wait()
 
 
 def make_tts(mode: str, *, piper_model_path: str) -> TTS:
