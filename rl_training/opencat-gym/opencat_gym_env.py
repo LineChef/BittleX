@@ -32,7 +32,7 @@ PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15m
 FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 26.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 22.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 
 # --- Fall recovery / self-righting -------------------------------------------
@@ -46,7 +46,9 @@ IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 # normal walking rewards. Window runs out still down, or tilt passes
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
-FAC_RECOVERY = 22.0         # weight on the recovery shaped reward (0 = disabled). R3: 8->22 -- at 8 the recovery window opened (R2: 2.9% of steps) but the policy NEVER righted itself (0% recovered); the shaped reward was ~0.3/step vs ~15-20/step for walking, so learning to get up was not worth it.
+FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
+FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). Always on, so every wobble through the obstacle course trains catching it -- the learnable version of "recover from a fall".
+BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -75,9 +77,9 @@ RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already
 RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
 RANDOM_FRICTION = 0.3    # +/- fraction on ground lateral friction, per episode. e.g. 0.5
 RANDOM_MASS = 0.15        # +/- fraction on every robot link mass, per episode. e.g. 0.15
-RANDOM_PUSH = 0.3       # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
-RANDOM_PUSH_PROB = 0.05  # per-step probability of a shove
-RANDOM_TERRAIN = 0.04    # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
+RANDOM_PUSH = 0.25      # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
+RANDOM_PUSH_PROB = 0.03  # per-step probability of a shove
+RANDOM_TERRAIN = 0.035   # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
@@ -317,12 +319,24 @@ class OpenCatGymEnv(gym.Env):
             imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
 
+        # Balance-catch reward: while the body is stumbling (tilt over
+        # BALANCE_TILT_ON but not yet fallen), pay for reducing tilt frame to
+        # frame. Dense, always on -> trains catching a wobble on the obstacle
+        # course, the learnable stand-in for self-righting (R2/R3 showed a
+        # force-limited flat quadruped can't recover once past 1.3 rad).
+        tilt = float(np.max(np.abs(state_ang_euler)))
+        balance_reward = 0.0
+        if FAC_BALANCE > 0 and tilt > BALANCE_TILT_ON:
+            balance_reward = FAC_BALANCE * max(0.0, self._prev_tilt - tilt)
+        self._prev_tilt = tilt
+
         movement_forward = current_position - last_position
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * movement_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
+                 + balance_reward
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -342,6 +356,7 @@ class OpenCatGymEnv(gym.Env):
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
             "r_imitation": FAC_IMITATION * imitation_reward,
+            "r_balance": balance_reward,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
             "r_heading": -penalty_scale * heading_penalty,
@@ -441,6 +456,7 @@ class OpenCatGymEnv(gym.Env):
         self._recovery_steps = 0
         self._recovery_hold = 0
         self._prev_upright = 1.0
+        self._prev_tilt = 0.0
         self._recovered_count = 0
         # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
         self._step_budget = EPISODE_LENGTH

@@ -178,4 +178,48 @@ that righting a force-limited flat quadruped from >1.3 rad is not learnable with
 these actuators, and R4 pivots to *stumble-catch* (raise `is_fallen()` threshold
 so it trains to catch itself at ~0.8–1.0 rad before a full tip).
 
+**Result** (`auto_rec_r3_ppo`, PPO_34, 35 min, clean convergence):
+
+| scenario | ep_len | fell | recov_frac | in_recov | dist m | speed | trot corr | roll_var |
+|---|---|---|---|---|---|---|---|---|
+| R3 (terrain 0.04 + push 0.3) | 234 | **0.15** | **0.00** | 2.0% | 0.154 | 0.035 | −0.560 | 0.070 |
+| KG0 @ same | 248 | 0.063 | 0.00 | 0.2% | 0.184 | 0.038 | −0.452 | 0.012 |
+| R3 flat | – | 0.00 | – | – | 0.351 | 0.070 | −0.584 | – |
+
+**Score R3 = 110.5  vs KG0 115.5 → still WORSE. Strike 2.**
+
+**Diagnosis — the structural finding of this loop:** FAC_RECOVERY 8→22, denser
+reward, eased criteria (0.7 rad / 3 steps), pushes suspended, torque boosted to
+0.5 — **still 0% recovered.** Two independent rounds now confirm: **a Bittle (flat
+body, 8 position-controlled walking joints, ~0.2–0.5 N·m, no roll-axis
+actuation) physically cannot right itself from >1.3 rad tilt.** No reward shaping
+fixes a missing degree of freedom. Trot corr is the best of the loop (−0.56) but
+the walking gait is now the slowest yet (flat 0.35 m). Self-righting is a dead
+end with this hardware/action space — matches the real robot (a flipped Bittle
+needs the scripted "roll-over" skill and even that is unreliable).
+
+**Decision:** two strikes → **revert to R1 config** (loop best, score 124.4) and
+pivot the objective from *self-right after a fall* to *catch a stumble before it
+becomes a fall* — which IS learnable (feet still under the body at 0.5–1.0 rad).
+
+---
+
+## Round 4 — `auto_rec_r4` — pivot: stumble-catch (revert to R1 base + always-on balance reward)
+
+**Reverted to R1 baseline**, then:
+- `FAC_RECOVERY` 22 → **0** — post-fall window disabled (proven unlearnable);
+  legacy instant-terminate at 1.3 rad restored. Window code kept, dormant.
+- **New `FAC_BALANCE = 4.0`** — dense, always-on reward for reducing body tilt
+  whenever `max(|roll|,|pitch|) > 0.5` rad (stumbling, not fallen). Trains the
+  policy to fight every wobble back to level on the obstacle course.
+- `FAC_IMITATION` 26 → **22** (recover flat-ground distance vs R2/R3).
+- `RANDOM_TERRAIN` 0.04 → **0.035**, `RANDOM_PUSH` 0.3 → **0.25**,
+  `RANDOM_PUSH_PROB` 0.05 → **0.03** — between R1 and R2: keep enough stumbles to
+  train the catch, back off the difficulty that tanked R2/R3.
+
+**Hypothesis:** `fell_fraction` on the course drops below KG0's ~0.06 (the policy
+catches stumbles instead of tipping), flat-ground distance recovers toward R1's
+0.41, trot stays ≤ −0.45. That's a real, promotable "handles small obstacles
+without falling" result — the achievable version of the user's goal.
+
 **Result:** _pending_
