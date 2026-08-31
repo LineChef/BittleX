@@ -22,14 +22,20 @@ Full parts list and cost breakdown: see [`docs/project-plan.md`](docs/project-pl
 
 ## Project Status
 
-Hardware has not arrived yet; work so far is software-only.
+Hardware has not arrived yet; everything so far is software-only.
 
-- **Phase 3 (RL training in simulation) — active.** A working PyBullet +
-  Stable-Baselines3 pipeline lives in `rl_training/opencat-gym/`. A straight,
-  stable flat-ground walking gait is locked (`phase3-gait`); reward-function
-  iteration continues. See [`docs/project-plan.md`](docs/project-plan.md) for the
-  run history.
-- `pi_pipeline/` (voice, memory, vision) — not started; READMEs only.
+- **RL locomotion (Phase 3)** — a working PyBullet + Stable-Baselines3 pipeline
+  in `rl_training/opencat-gym/`, with several walking gaits banked
+  (`phase3-gait`, `gait-v7-stumble-catch`, `walk-v8-r2`). Paused pending a
+  real-robot comparison against OpenCat's scripted gait.
+- **Companion pipeline (`pi_pipeline/`)** — voice conversation (Phase 7), memory
+  (Phase 9), vision/obstacle-avoidance (Phase 8), and the BiBoard serial link
+  (Phase 5) are all scaffolded and run on a dev machine with the hardware
+  mocked; 31 tests passing.
+
+See [`docs/hardware-readiness.md`](docs/hardware-readiness.md) for the full
+pre-hardware state and the day-1 checklist, and
+[`docs/project-plan.md`](docs/project-plan.md) for the living detail.
 
 ## Repo Structure
 
