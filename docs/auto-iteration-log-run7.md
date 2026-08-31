@@ -86,4 +86,54 @@ rounds compare to the best Run-7 checkpoint.
 `speed_err` is small (policy sits near 0.11 m/s), trot stays ≤ −0.45, flat
 regression none. Fresh from scratch, DR curriculum, 2M steps.
 
+**Result** (`walk_r1_ppo`, PPO_38, 40 min, clean convergence, approx_kl ~0.003):
+
+| scenario | fell | dist m | speed m/s | speed_err | trot corr | big-stumble | recov_rate | yaw° |
+|---|---|---|---|---|---|---|---|---|
+| course (0.045 + 0.25) | **0.25** | 0.161 | 0.056 | 0.054 | −0.510 | 6 | **0.00** | 9.4 |
+| drills (0.045 + 0.60) | 0.54 | 0.122 | 0.064 | 0.064 | −0.537 | 15 | 0.07 | 16.9 |
+| flat | **0.25** | 0.223 | 0.079 | 0.032 | −0.508 | 3 | 0.00 | 9.1 |
+
+**Regressed. The everything-at-once round broke the base gait: 25% of FLAT-ground
+episodes fall** (R5: 0%). Speed dropped to ~0.08 m/s (below target 0.11 and below
+R5's ~0.12). `big_stumble_recovery_rate` barely moved (0.00–0.07). Trot held
+(−0.51).
+
+**Diagnosis — two prime suspects, both reverted for R2:**
+1. **Phase-clock pause has a design flaw.** It slows `self._phase` under tilt,
+   which also freezes the *imitation reference* — so while wobbling, the policy is
+   told "match wkF frame N" for many steps, and if frame N isn't a recovery pose
+   the imitation reward actively fights the catch. It also seems to let the
+   nominal gait lose cadence and not re-sync.
+2. **`FAC_MOVEMENT` cap removed the main "walk briskly" gradient.** Capped at the
+   target with a speed bonus the policy can't yet reach (~0.08 vs 0.11), there's
+   little pull to move forward at all → slower, mushier, less stable gait.
+
+**Decision:** R1 not carried forward. Revert target = R5's stability. Decompose:
+keep the low-risk additions (IMU history obs, balance-rate shaping), back out the
+two suspects and the harsh DR, re-introduce one at a time.
+
+---
+
+## Round 2 — `walk_r2` — decompose: keep the safe additions, revert the suspects
+
+**vs R1:**
+- **Phase-clock pause OFF** (`PHASE_SLOW_RATE` → 1.0, i.e. phase always advances
+  normally). The gentler "reduce imitation weight while wobbling, don't freeze
+  its target" idea is deferred to R3 if the gait recovers.
+- **`FAC_MOVEMENT` cap removed** — back to uncapped forward-progress reward (R5
+  behavior). The speed tracking bonus stays but at `FAC_SPEED` 6 → **4** so it
+  nudges rather than fights.
+- **DR back toward R5:** `RANDOM_TERRAIN` 0.045 → **0.03**, `IMPULSE_PUSH` 0.7 →
+  **0.4** at prob 0.004 → **0.003** — keep *some* big-hit practice, not a brutal
+  plateau.
+- **Kept:** 273-dim observation (tilt history + ang accel), 3-part balance
+  shaping (angle + rate + feet), `TARGET_SPEED` 0.11.
+
+**Hypothesis:** flat `fell_fraction` back to ~0, trot ≤ −0.52, speed near 0.11,
+and with the IMU history + balance shaping + mild impulses the
+`big_stumble_recovery_rate` shows *some* lift over R5's ~0. If recovery is still
+flat, R3 re-introduces a *fixed* phase clock (no pause) but drops imitation weight
+during a wobble, and bumps impulse practice.
+
 **Result:** _pending_

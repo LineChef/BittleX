@@ -33,9 +33,10 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
 TARGET_SPEED = 0.11        # m/s. wkF reference plays open-loop at ~0.10 m/s; R5 walks ~0.12 m/s. 0.11 ties the baseline to the reference walk's own pace with a hair of margin. Change per gait later.
-FAC_SPEED = 6.0            # weight on the speed-tracking bonus. In practice r_imitation runs ~8-12/step (policy never matches wkF perfectly), so 6 keeps speed clearly sub-dominant to gait-match per the user priority.
+FAC_SPEED = 4.0            # weight on the speed-tracking bonus. R2: 6 -> 4 (nudge toward the set-point, don't fight the gait). r_imitation runs ~8-12/step so this stays clearly sub-dominant.
 SPEED_SHARPNESS = 2.5      # higher = narrower band around TARGET_SPEED for the same bonus; error is measured relative to TARGET_SPEED so this is scale-free
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
+MOVEMENT_CAP_AT_TARGET = False  # R1 capped FAC_MOVEMENT at TARGET_SPEED and it removed the 'walk briskly' gradient (gait went slow+mushy). R2: off -- uncapped forward-progress reward + the speed tracking bonus.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
 FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
@@ -79,13 +80,13 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # off-phase step and re-sync once level. Both time_obs and the imitation reference
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
-PHASE_SLOW_RATE = 0.25     # phase advance per step while tilted (vs 1.0 normally)
+PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
-IMPULSE_PUSH = 0.7        # m/s kick magnitude
-IMPULSE_PUSH_PROB = 0.004  # per-step probability (~once per 250-step episode)
+IMPULSE_PUSH = 0.4        # m/s kick magnitude. R2: 0.7 -> 0.4 -- R1's brutal plateau produced a fall-prone converged gait; keep some big-hit practice, gentler.
+IMPULSE_PUSH_PROB = 0.003  # per-step probability (~once per 300-step episode)
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -116,7 +117,7 @@ RANDOM_FRICTION = 0.22   # +/- fraction on ground lateral friction, per episode.
 RANDOM_MASS = 0.10       # +/- fraction on every robot link mass, per episode. e.g. 0.15
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.045   # obstacle max height (m). Run 7: plateau at 0.045 (up from Run 6's 0.03) -- the DR curriculum ramps to this by ~25% of training and HOLDS, so the policy converges against the hard distribution it's meant to be robust to, not a soft one. Still <= Bittle body clearance (~0.04-0.05 m), a trip hazard not a wall.
+RANDOM_TERRAIN = 0.03    # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
@@ -421,7 +422,8 @@ class OpenCatGymEnv(gym.Env):
         # Forward-progress reward capped at the walk set-point: rewards progress
         # up to TARGET_SPEED's per-step displacement, nothing above, so it no
         # longer competes with the speed tracker. Backward motion still stings.
-        capped_forward = min(movement_forward, TARGET_SPEED / CONTROL_HZ)
+        capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
+                         if MOVEMENT_CAP_AT_TARGET else movement_forward)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         reward = (FAC_MOVEMENT * capped_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
