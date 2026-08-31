@@ -264,4 +264,38 @@ penalties that hold strides small:
 trot stays ≤ −0.50 and heading stays tight (< 8°), no course falls → first score
 clearly over R1's 124.4.
 
+**Result** (`auto_rec_r5_ppo`, PPO_36, 38 min, clean convergence):
+
+| scenario | ep_len | fell | dist m | speed | stride | trot corr | roll_var | yaw_max° |
+|---|---|---|---|---|---|---|---|---|
+| R5 @ R1 scenario (0.03 + 0.2) | 251 | 0.00 | 0.230 | 0.046 | 0.034 | **−0.578** | 0.005 | **7.6** |
+| R1 @ same | 251 | 0.00 | 0.255 | 0.051 | 0.039 | −0.483 | 0.006 | 11.7 |
+| R5 flat | – | 0.00 | 0.381 | 0.076 | 0.067 | −0.583 | – | – |
+| R5 hard (0.045 + 0.35) | – | 0.375 | 0.207 | – | – | −0.582 | – | 23.5 |
+
+**Score R5 = 127.7  vs R1 = 124.4  (+3.3, inside the ±5 margin).**
+
+**Diagnosis:** a **gait-quality win at a small distance cost.** Trot corr −0.58 is
+the crispest of the entire loop (R1 −0.48, KG0 −0.44) and heading is the best on
+the R1 scenario (7.6° vs 11.7°), roll steadier. But easing FAC_SMOOTH/JITTER did
+*not* free the stride — R5 walks a touch shorter than R1 (flat 0.381 vs 0.406,
+stride 0.034 vs 0.039); the tighter wkF lock made it slightly more conservative.
+Falls hard (37.5%) on a course past its training range — robust only within
+distribution. **By the user's stated priority (gait match ≫ speed), R5 is the
+best result of the loop.** One targeted round left to try to also close the
+distance gap.
+
+---
+
+## Round 6 — `auto_rec_r6` — R5 + restore the stride reward
+
+**Change vs R5 (single lever):**
+- `FAC_STRIDE` 0.0 → **8.0** — the touchdown-to-touchdown per-foot forward-distance
+  reward (can't be gamed by air-flicks). Aimed squarely at R5's one weakness:
+  pull the step length back to R1/KG0 range without touching the crisp trot or
+  the heading gain.
+
+**Hypothesis:** distance recovers to ≥ R1 (flat ≥ 0.40) while trot stays ≤ −0.55
+and heading < 9° → a clean promote over R1 on every axis.
+
 **Result:** _pending_
