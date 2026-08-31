@@ -45,7 +45,7 @@ RANDOM_FRICTION = 0.5    # +/- fraction on ground lateral friction, per episode.
 RANDOM_MASS = 0.15        # +/- fraction on every robot link mass, per episode. e.g. 0.15
 RANDOM_PUSH = 0.0        # random horizontal shove: max instantaneous base-velocity kick (m/s). e.g. 0.35
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.0     # scatter small boxes/steps in the forward path, max height (m). e.g. 0.012
+RANDOM_TERRAIN = 0.012    # scatter small boxes/steps in the forward path, max height (m). e.g. 0.012
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles

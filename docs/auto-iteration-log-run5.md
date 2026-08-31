@@ -81,4 +81,49 @@ training is effectively the clean flat task — it re-learns to walk, then harde
 This is the approach every prior run used successfully. `train.py --from` kept but
 unused (would need a much lower LR).
 
-**Run:** `auto_dr_iter1`, 2M steps, fresh. _Result pending._
+**Run:** `auto_dr_iter1`, 2M steps, fresh, `PPO_26`. Clean convergence (ep_len 251
+throughout, approx_kl ~0.02, no collapse).
+
+**Held-out battery (6 ep each), iter1 vs. iter0 baseline (`auto_gait_final`):**
+
+```
+scenario              fell   dist          trot            roll_var
+                      base->iter1           base->iter1     base->iter1
+flat (regression)     0.00   1.28 -> 1.19  -0.58 -> -0.17  0.015 -> 0.002
+friction +/-0.5       0.00   1.27 -> 1.19  -0.62 -> -0.17
+mass +/-0.15          0.00   1.28 -> 1.19  -0.63 -> -0.17
+IMU noise             0.00   1.28 -> 1.19  -0.61 -> -0.17
+all dynamics together 0.00   ---- -> 1.19  ----  -> -0.17  ----  -> 0.002
+push 0.35 (untrained) 0.00   1.23 -> 1.16  -0.52 -> -0.15  0.017 -> 0.004
+obstacles 12mm (untr) 0.00   0.87 -> 0.44  -0.43 ->  0.03  0.011 -> 0.006
+```
+
+**Diagnosis:**
+- **Dynamics robustness achieved.** Never falls anywhere. Friction / mass / IMU
+  noise are now *invisible* — distance is a flat 1.19 across all of them and the
+  combined case, vs. the baseline's ~1.27 that still varied. Body is 7x steadier
+  (roll_var 0.015 -> 0.002). This is the sim-to-real win: the policy no longer
+  depends on exact physics parameters.
+- **Cost 1 — the trot flattened** (-0.58 -> -0.17). The stability pressure from
+  DR pushed the gait toward small, careful, low-amplitude stepping. Expected, and
+  acceptable per Run 5's goal (robustness over gait aesthetics) *if* it stays
+  capable.
+- **Cost 2 — obstacles got WORSE** (0.87 -> 0.44 m, -49%). The over-careful
+  small-stepped gait has less momentum and gets hung up on a box more easily. And
+  obstacles are the actual weak spot we're here to fix.
+- Flat-ground distance 1.19 is right at the regression floor (target >= 1.2).
+
+**Keep/revert:** keep the dynamics bundle (it works), but iter1 as-is is not a
+keeper — it regressed the thing that mattered. Next iteration must train *with*
+obstacles so the policy learns to handle them instead of tiptoeing.
+
+---
+
+## Iteration 2 — add obstacles to the training mix
+
+**Change:** `RANDOM_TERRAIN = 0.012` (scattered 2-12 mm boxes/steps), on top of
+the dynamics bundle, curriculum-ramped. Push held for iter3 (push resistance is
+already fine and more stabilization pressure would flatten the gait further).
+Fresh 2M.
+
+**Run:** `auto_dr_iter2`, 2M steps. _Result pending._
