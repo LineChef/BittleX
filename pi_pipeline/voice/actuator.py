@@ -8,7 +8,6 @@ serial).
 from __future__ import annotations
 
 import logging
-import time
 from typing import Protocol
 
 from . import skills
@@ -41,24 +40,23 @@ class MockActuator:
 
 
 class SerialActuator:
-    """Sends OpenCat serial commands to the BiBoard.
+    """Sends OpenCat skill commands to the BiBoard over a resilient SerialLink.
 
-    Not exercised until hardware is connected. `pyserial` is imported lazily so
-    the dev machine doesn't need it.
+    The link opens lazily and reconnects on drop, so a yanked cable logs a
+    warning instead of crashing the loop. Not exercised until hardware is
+    connected (needs pyserial).
     """
 
-    def __init__(self, port: str, baud: int, settle_s: float = 0.05):
-        import serial  # pyserial; add to requirements when hardware arrives
+    def __init__(self, port: str, baud: int):
+        from ..link import opencat
+        from ..link.serial_link import SerialLink
 
-        self._settle_s = settle_s
-        self._ser = serial.Serial(port, baud, timeout=1)
-        time.sleep(2.0)  # BiBoard resets on serial open
-        log.info("serial actuator on %s @ %d", port, baud)
-
-    def _send(self, command: str) -> None:
-        self._ser.write((command + "\n").encode("ascii"))
-        self._ser.flush()
-        time.sleep(self._settle_s)
+        self._opencat = opencat
+        self._link = SerialLink(port, baud)
+        if self._link.connect():
+            log.info("serial actuator connected on %s @ %d", port, baud)
+        else:
+            log.warning("serial actuator: %s not open yet (will retry on send)", port)
 
     def perform(self, skill_name: str) -> None:
         if not skills.is_valid(skill_name):
@@ -66,16 +64,13 @@ class SerialActuator:
             return
         cmd = skills.serial_command(skill_name)
         log.info("G2 perform %s -> %r", skill_name, cmd)
-        self._send(cmd)
+        self._link.send(cmd, read_reply=False)
 
     def stop(self) -> None:
-        self._send("d")  # OpenCat: rest / lie down, ends any looping gait
+        self._link.send(self._opencat.REST, read_reply=False)
 
     def close(self) -> None:
-        try:
-            self._ser.close()
-        except Exception:  # noqa: BLE001
-            pass
+        self._link.close()
 
 
 def make_actuator(mode: str, *, port: str, baud: int) -> Actuator:
