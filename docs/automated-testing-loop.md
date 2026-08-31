@@ -139,12 +139,12 @@ wrong.
      alongside the earlier ones for comparison
    - `g2watch` on the best/final checkpoint (visual replay) ready to run — launch
      it or leave the exact command so the user just hits enter
-   - **Always also publish an HTML review page (Artifact)** — the desktop replay
-     window and local files don't reach a phone. Render the candidate policies to
-     GIFs (`render_gif.py`) and build a page with each gait animation + its key
-     metrics + the recommendation, like `g2_gait_replays.html`. This is the
-     primary deliverable when the user is on mobile; do it every wrap-up
-     regardless, since it's the shareable record.
+   - **Only if the user has said they're on mobile (or asked for the page view):**
+     also publish an HTML review Artifact — render the candidate policies to GIFs
+     (`render_gif.py`) and build a page with each gait animation + metrics + the
+     recommendation, like `g2_gait_replays.html`. At the desk this is skipped;
+     TensorBoard + `g2watch` are the review. Claude can't detect the device —
+     assume desktop unless told.
 4. **Ask the user** whether to merge `auto-gait-iteration` into `development`.
    Merge only on an explicit yes.
 
