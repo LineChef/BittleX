@@ -533,10 +533,17 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       nothing in movement or vision imports it.
 - [ ] Semantic recall (embeddings) if FTS keyword matching feels too literal —
       weigh model/latency cost on the Pi first.
-- [ ] Small web UI to browse / prune memory (per the plan). CLI exists:
-      `python -m pi_pipeline.memory {facts,log,search,recall,remember,forget,wipe}`.
+- [ ] Small web UI to browse / prune memory (per the plan) — a ~100-line
+      single-file app over the existing `Store`: facts list with add/edit/delete,
+      searchable conversation log, a `recall()` preview, a wipe button.
+      **Deferred: revisit once real multi-session use has accumulated enough
+      history to make browsing/pruning worthwhile.** The CLI covers every
+      function meanwhile: `python -m pi_pipeline.memory
+      {facts,log,search,recall,remember,forget,wipe}`.
 - [ ] Exercise it across real multi-session conversations once the voice loop
-      runs live (needs an API key / hardware).
+      runs live (needs an API key / hardware) — and at that point re-check
+      whether recall quality, the fact cap, and the decay ordering feel right on
+      genuine history rather than test data.
 
 ## Phase 10 — Full integration
 
