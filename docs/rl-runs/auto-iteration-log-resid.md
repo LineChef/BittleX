@@ -79,4 +79,30 @@ with almost no counter-incentive to keep walking. Architecture is sound (`action
 **Hypothesis:** holds ~`wkF` pace (≥ 0.07 m/s) while the learned correction cuts
 the obstacle fall rate to at or below scripted's. Re-benchmark.
 
-**Result:** _pending_
+**Result** (`resid_r2_ppo`, PPO_43, ~41 min, `ep_len_mean` ~250 throughout):
+
+Benchmark vs scripted `wkF` (14 episodes/cell, matched seeds):
+
+| | flat | 20 mm | 35 mm | 50 mm |
+|---|---|---|---|---|
+| resid speed (m/s) | 0.095 | 0.072 | 0.057 | 0.055 |
+| scripted speed | 0.091 | 0.066 | 0.048 | 0.038 |
+| **resid falls** | 0% | **7%** | **0%** | 14% |
+| **scripted falls** | 0% | 0% | 7% | 14% |
+| resid trot corr | −0.57 | −0.54 | −0.54 | −0.56 |
+| scripted trot corr | −0.50 | −0.48 | −0.49 | −0.48 |
+| resid yaw max° | 2.9 | 10.4 | 7.4 | 6.2 |
+| scripted yaw max° | 2.8 | 4.8 | 5.0 | 7.0 |
+
+**The speed fix worked** — 0.095 m/s flat (r1 was 0.031); the `MIN_SPEED` floor
+held the walk at ~`wkF` pace, slightly *faster* than scripted at every level.
+**Falls: at parity** — resid matches or beats scripted at 35 mm (0% vs 7%) and
+50 mm (14% / 14%); scripted is cleaner at 20 mm (0% vs 7%, one episode).
+Trot is crisper than scripted everywhere; distance is longer at every level.
+**Remaining gap:** heading under disturbance — resid yaw 7–10° vs scripted ~5° on
+obstacles.
+
+**This is the first learned gait that holds `wkF`'s pace *and* matches its
+obstacle fall rate.** A review point. `resid_r3` levers if continued: tighten
+`FAC_HEADING` for the yaw gap; chase the 20 mm outlier (probably impulse-push
+timing).
