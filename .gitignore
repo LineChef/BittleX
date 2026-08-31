@@ -38,3 +38,6 @@ pi_pipeline/memory/data/
 rl_training/opencat-gym/eval_frames/
 rl_training/opencat-gym/STOP
 rl_training/opencat-gym/frames_wkf/
+
+# Claude Code project config lives at user level (~/.claude/), not in the repo
+.claude/
