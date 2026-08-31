@@ -25,14 +25,14 @@ FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away 
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
 FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps
 FAC_ARM_CONTACT = 0.01    # Punish crawling on arms and elbows
-FAC_SMOOTH_1 = 0.5        # Punish jitter and vibrational movement, 1st order -- was 1.0; halved because it directly penalizes joint-angle-change magnitude, which was fighting against bigger, more deliberate leg swings (v5 produced fast but very small-stepped movement on all four legs). FAC_JITTER still targets direction-reversal specifically, so genuine oscillation should stay in check.
-FAC_SMOOTH_2 = 0.5        # Punish jitter and vibrational movement, 2nd order -- was 1.0; see FAC_SMOOTH_1 note above
+FAC_SMOOTH_1 = 0.3        # Punish jitter and vibrational movement, 1st order -- was 1.0; halved because it directly penalizes joint-angle-change magnitude, which was fighting against bigger, more deliberate leg swings (v5 produced fast but very small-stepped movement on all four legs). FAC_JITTER still targets direction-reversal specifically, so genuine oscillation should stay in check.
+FAC_SMOOTH_2 = 0.3        # Punish jitter and vibrational movement, 2nd order -- was 1.0; see FAC_SMOOTH_1 note above
 FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- was 0.0; enabled to reward lifting feet during swing phase
 PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15mm (was 5mm before that). auto_iter3: 25mm -- after FAC_HEADING=5.0 the policy went front-heavy and let the back feet drag at ~10mm; FAC_CLEARANCE penalizes squared deviation from this target both ways, so raising it pushes the dragging back feet up hard while easing the over-high front feet. Matches what v6 actually achieved (~23mm).
-FAC_JITTER = 0.2          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
+FAC_JITTER = 0.1          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 22.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 20.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 
 # --- Fall recovery / self-righting -------------------------------------------
@@ -47,7 +47,7 @@ IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
-FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). Always on, so every wobble through the obstacle course trains catching it -- the learnable version of "recover from a fall".
+FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). Always on, so every wobble through the obstacle course trains catching it -- the learnable version of "recover from a fall".
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
@@ -75,11 +75,11 @@ DR_RAMP_STEPS = 5e5
 
 RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already wired, unchanged)
 RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
-RANDOM_FRICTION = 0.3    # +/- fraction on ground lateral friction, per episode. e.g. 0.5
-RANDOM_MASS = 0.15        # +/- fraction on every robot link mass, per episode. e.g. 0.15
-RANDOM_PUSH = 0.25      # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
-RANDOM_PUSH_PROB = 0.03  # per-step probability of a shove
-RANDOM_TERRAIN = 0.035   # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
+RANDOM_FRICTION = 0.22   # +/- fraction on ground lateral friction, per episode. e.g. 0.5
+RANDOM_MASS = 0.10       # +/- fraction on every robot link mass, per episode. e.g. 0.15
+RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
+RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
+RANDOM_TERRAIN = 0.03    # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles

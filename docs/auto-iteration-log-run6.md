@@ -222,4 +222,46 @@ catches stumbles instead of tipping), flat-ground distance recovers toward R1's
 0.41, trot stays ≤ −0.45. That's a real, promotable "handles small obstacles
 without falling" result — the achievable version of the user's goal.
 
+**Result** (`auto_rec_r4_ppo`, PPO_35, 40 min, clean convergence):
+
+| scenario | ep_len | fell | dist m | speed | trot corr | roll_var | yaw_max° |
+|---|---|---|---|---|---|---|---|
+| R4 @ 0.035 + push 0.25 | 251 | **0.00** | 0.196 | 0.039 | −0.515 | 0.005 | **5.1** |
+| KG0 @ same | 251 | 0.00 | 0.228 | 0.045 | −0.446 | 0.002 | 8.1 |
+| R4 @ R1 scenario (0.03 + 0.2) | 249 | 0.10 | 0.243 | 0.049 | −0.508 | 0.010 | 10.5 |
+| R4 flat | – | 0.00 | 0.358 | 0.071 | −0.531 | – | – |
+
+**Score R4 = 115.1  vs R1 = 124.4 → below R1. Third non-improving round.**
+
+**Diagnosis:** the always-on balance reward *did* do its job on heading — yaw_max
+5.1° on its own scenario is the best of the loop (matches KG0-on-flat), and the
+trot stays crisp (−0.51). And it's rock-solid on the course it trained on (0%
+falls). But the extra term plus residual DR keeps the walk cautious: flat
+distance 0.358 recovered only partway toward R1's 0.406 / KG0's 0.467. Net: a
+stability/heading gain that doesn't outweigh the distance cost in the score.
+
+**Decision:** R2–R4 all below R1. R5 is the final round — keep R4's stability
+gains, claw the stride back. Revert target stays R1.
+
+---
+
+## Round 5 (final) — `auto_rec_r5` — R1 base + light balance term + free up the stride
+
+**From R1 config**, keeping R4's balance idea at a lighter touch and easing the
+penalties that hold strides small:
+- `FAC_BALANCE` 4.0 → **2.0** — keep the heading/stability help, don't let it
+  dominate.
+- `FAC_SMOOTH_1/2` 0.5 → **0.3**, `FAC_JITTER` 0.2 → **0.1** — these directly
+  penalise joint-angle-change magnitude and were fighting the fuller wkF stride
+  (noted in CLAUDE.md). Easing them + the imitation target should let it take
+  wkF's real step.
+- `RANDOM_MASS` 0.15 → **0.10**, `RANDOM_FRICTION` 0.3 → **0.22** — lighter
+  dynamics randomisation → less reason to walk conservatively (the "DR → timid
+  shuffle" failure mode).
+- `FAC_IMITATION` 22 → **20**, terrain **0.03**, push **0.2 / 0.02** — back to R1.
+
+**Hypothesis:** flat distance climbs past R1's 0.41 toward KG0's 0.47 while the
+trot stays ≤ −0.50 and heading stays tight (< 8°), no course falls → first score
+clearly over R1's 124.4.
+
 **Result:** _pending_
