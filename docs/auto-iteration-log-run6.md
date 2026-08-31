@@ -298,4 +298,38 @@ distance gap.
 **Hypothesis:** distance recovers to ≥ R1 (flat ≥ 0.40) while trot stays ≤ −0.55
 and heading < 9° → a clean promote over R1 on every axis.
 
-**Result:** _pending_
+**Result** (`auto_rec_r6_ppo`, PPO_37, 39 min, clean convergence):
+
+| scenario | fell | dist m | speed | stride | trot corr | roll_var | yaw_max° |
+|---|---|---|---|---|---|---|---|
+| R6 @ R1 scenario | 0.00 | 0.213 | 0.042 | 0.040 | −0.477 | 0.004 | 7.1 |
+| R6 flat | 0.00 | 0.342 | 0.068 | **0.085** | −0.488 | – | – |
+| R5 @ R1 scenario | 0.00 | 0.230 | 0.046 | 0.034 | −0.578 | 0.005 | 7.6 |
+
+**Score R6 = 123.4  vs R5 = 127.7  vs R1 = 124.4 → R6 is BELOW R5. Not promoted.**
+
+**Diagnosis:** `FAC_STRIDE=8` did lengthen the individual step (flat stride 0.085
+vs R5 0.067) but it **competes with `FAC_IMITATION`** — the policy took bigger,
+less-coordinated steps, so trot corr fell back to −0.49 (from R5's −0.58) and
+total distance actually *dropped* (flat 0.342 vs R5 0.381). Same "stride reward
+muddies the wkF match" effect seen in Run 5. Heading and roll stayed good.
+
+**Decision:** R6 not promoted. **R5 (`auto_rec_r5_ppo`) is the Run 6 winner** —
+best score (127.7), crispest trot of the project (−0.58), best/tied heading
+(7.6°), no course falls; only trade is ~7% less walking distance than the
+baseline gait, acceptable under "gait match ≫ speed".
+
+---
+
+## Final outcome
+
+- **Winner:** `auto_rec_r5_ppo`, tagged **`gait-v7-stumble-catch`** for easy
+  revert. Config committed at R5 (`opencat_gym_env.py` on `auto-gait-iteration`),
+  then R6's `FAC_STRIDE=8` was the only change on top and is reverted back to 0 in
+  the final commit so the file on-branch matches the R5 winner.
+- **Self-righting:** ruled out for this robot (R2/R3, 0% recovered). Recovery
+  window code kept dormant (`FAC_RECOVERY=0`).
+- **Stumble-catch (`FAC_BALANCE`):** the part that worked — live at 2.0.
+- Revert targets if R5 ever misbehaves: `gait-v7-stumble-catch` →
+  `phase3-gait` → `auto_dr_iter4`.
+- Full narrative + recommendation: `docs/auto-iteration-report-2026-08-31.md`.
