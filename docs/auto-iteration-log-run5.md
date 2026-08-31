@@ -196,4 +196,46 @@ Remediation, ranked:
 terrain unchanged). (2) new `FAC_STRIDE` term rewarding per-foot
 touchdown-to-touchdown forward distance. Fresh 2M.
 
-**Run:** `auto_dr_iter3`, 2M steps. _Result pending._
+**Run:** `auto_dr_iter3`, 2M steps, `PPO_28`. Clean convergence.
+
+**Held-out battery (8 ep), iter3 vs iter2:**
+
+```
+scenario         fell      dist          trot         stride
+                 i2 -> i3   i2 -> i3      i2 -> i3     i2 -> i3
+flat             0.00 0.00  1.01 -> 1.07  0.01 -> -0.18  0.023 -> 0.049
+friction 0.3     ---- 0.00  ---- -> 1.09  ---- -> -0.17  ----  -> 0.054
+mass 0.15        ---- 0.00  ---- -> 1.07                 ----  -> 0.051
+IMU noise 0.02   ---- 0.00  ---- -> 1.07
+obstacles 12mm   0.00 0.12  0.60 -> 0.92  (+53%)         0.023 -> 0.046
+obstacles 18mm   0.50 0.12  0.54 -> 0.63
+push 0.35        ---- 0.00  ---- -> 1.01
+EVERYTHING       0.00 0.25  0.80 -> 0.79
+```
+
+**Diagnosis:** the remediation (lighter DR + stride reward) helped where it
+mattered: **obstacle traversal +53%** (12mm) and fewer falls on 18mm
+(0.50 -> 0.12). The gait **partially recovered** -- stride roughly doubled
+(0.023 -> 0.049), trot -0.18 (from ~0), flat distance 1.07. **But fall rate rose
+on the hard combined scenarios** (obstacles 0 -> 0.12, EVERYTHING 0 -> 0.25):
+the less-timid, bigger-stepping gait is more capable but also less "safe" when
+everything is stacked against it -- the stride reward pushed it to commit, which
+cuts both ways.
+
+**Keep/revert:** better than iter2 overall (capability up, gait half-recovered),
+but not a keeper -- gait still far from `auto_gait_final` (trot -0.58, stride
+0.103) and 25% falls on EVERYTHING is too high. This is where the imitation
+reward should help: a strong "walk like wkF" target should restore real strides
+*and* wkF is itself a stable gait, which should also cut falls.
+
+---
+
+## Iteration 4 — heavy wkF imitation reward + DR curriculum
+
+**Change:** `FAC_IMITATION = 30` (dominant term -- match Bittle's built-in `wkF`
+walk at the current gait phase; verified open-loop it walks +0.48 m without
+falling). `FAC_STRIDE` 15 -> 0 (imitation subsumes the stride goal). DR curriculum
+from iter3 unchanged (friction 0.3, mass 0.15, gyro 0.02, terrain 0.012). Fresh
+2M. This is the "mimic the good gait *and* be robust" run.
+
+**Run:** `auto_dr_iter4`, 2M steps. _Result pending._
