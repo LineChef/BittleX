@@ -35,6 +35,40 @@ python -m pi_pipeline.voice --mode voice
 `--actuator mock` (default) logs skill commands; `--actuator serial` sends them
 (hardware only). Say "goodbye g2" or Ctrl+C to stop.
 
+## Audio diagnostics (no API key)
+
+```bash
+python -m pi_pipeline.voice.check_audio devices     # list mic / speaker devices
+python -m pi_pipeline.voice.check_audio wake        # loop: prints each time the wake word fires
+python -m pi_pipeline.voice.check_audio stt         # transcribe one spoken utterance + timing
+python -m pi_pipeline.voice.check_audio tts "text"  # speak with the current voice
+python -m pi_pipeline.voice.check_audio tts "text" --model models/piper/en_US-amy-medium.onnx
+```
+
+Use `wake` to tune the wake phrase: if "hey gee two" mis-triggers or won't catch,
+set `G2_WAKE_WORD` in `.env` to something more distinct. Use `stt` to tune
+`G2_STT_SILENCE_S` (the pause that ends a phrase).
+
+## Voices
+
+Piper voices (`en`) live at
+[`rhasspy/piper-voices`](https://huggingface.co/rhasspy/piper-voices/tree/main/en).
+Tiers: `low` (16 kHz, small, buzzy), `medium` (22 kHz, the sweet spot for the
+Pi), `high` (bigger + slower, likely too heavy for a Pi Zero 2 W). Downloaded
+candidates in `models/piper/`:
+
+| Model | Character |
+|---|---|
+| `en_US-ryan-low` | current default; warm male but low-tier, noticeably synthetic |
+| `en_US-ryan-medium` | same voice, clean; warm, casual, relaxed — good companion fit |
+| `en_US-amy-medium` | female, bright and friendly, upbeat |
+| `en_US-hfc_male-medium` | male, very natural / "real person", personality-neutral |
+| `en_GB-alan-medium` | British male, composed, a bit of gravitas — fun for a small robot |
+
+Pick one by setting `PIPER_MODEL_PATH` in `.env`, e.g.
+`PIPER_MODEL_PATH=models/piper/en_US-ryan-medium.onnx`. To try others, download
+`<name>.onnx` + `<name>.onnx.json` from the repo above into `models/piper/`.
+
 ## Models for voice mode
 
 Not committed (large). Download into `models/` at the repo root:
