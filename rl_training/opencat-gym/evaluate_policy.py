@@ -178,16 +178,35 @@ if __name__ == "__main__":
     ap.add_argument("--episodes", type=int, default=5)
     ap.add_argument("--frames-dir", default=None)
     ap.add_argument("--json-out", default=None)
+    # Domain-randomization test overrides. Any of these forces dr = 1 (full
+    # difficulty) so a policy can be graded on a held-out scenario it never
+    # trained on: --dr-terrain 0.012 (obstacles), --dr-push 0.35 (shoves), etc.
+    ap.add_argument("--dr-friction", type=float, default=None)
+    ap.add_argument("--dr-mass", type=float, default=None)
+    ap.add_argument("--dr-gyro", type=float, default=None)
+    ap.add_argument("--dr-push", type=float, default=None)
+    ap.add_argument("--dr-terrain", type=float, default=None)
     args = ap.parse_args()
 
     from stable_baselines3 import PPO
+    _dr = {"RANDOM_FRICTION": args.dr_friction, "RANDOM_MASS": args.dr_mass,
+           "RANDOM_GYRO": args.dr_gyro, "RANDOM_PUSH": args.dr_push,
+           "RANDOM_TERRAIN": args.dr_terrain}
+    if any(v is not None for v in _dr.values()):
+        for k, v in _dr.items():
+            if v is not None:
+                setattr(opencat_gym_env, k, v)
+        opencat_gym_env.DR_EVAL_FULL = True
     # Print the env's start-state config so a policy/env mismatch is visible
-    # (evaluating a policy under different reset randomization than it trained on
+    # (evaluating a policy under different randomization than it trained on
     # skews startup_speed_ratio and fell_fraction badly).
     _rsi = getattr(opencat_gym_env, "RSI_JOINT_NOISE_DEG", 0)
     _phase = getattr(opencat_gym_env, "RSI_RANDOMIZE_PHASE", False)
     print(f"env start-state: RSI_JOINT_NOISE_DEG={_rsi}  RSI_RANDOMIZE_PHASE={_phase}"
-          "  (must match how the checkpoint was trained)")
+          f"  |  DR: friction={opencat_gym_env.RANDOM_FRICTION} mass={opencat_gym_env.RANDOM_MASS}"
+          f" gyro={opencat_gym_env.RANDOM_GYRO} push={opencat_gym_env.RANDOM_PUSH}"
+          f" terrain={opencat_gym_env.RANDOM_TERRAIN} eval_full={opencat_gym_env.DR_EVAL_FULL}"
+          "  (must match how the checkpoint was trained, except DR test overrides)")
     env = OpenCatGymEnv()
     model = PPO.load(args.checkpoint)
 
