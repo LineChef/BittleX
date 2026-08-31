@@ -40,9 +40,9 @@ ANG_FACTOR = 0.1          # Improve angular velocity resolution before clip.
 DR_RAMP_STEPS = 5e5
 
 RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already wired, unchanged)
-RANDOM_GYRO = 0.0        # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
-RANDOM_FRICTION = 0.0    # +/- fraction on ground lateral friction, per episode. e.g. 0.5
-RANDOM_MASS = 0.0        # +/- fraction on every robot link mass, per episode. e.g. 0.15
+RANDOM_GYRO = 0.04       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
+RANDOM_FRICTION = 0.5    # +/- fraction on ground lateral friction, per episode. e.g. 0.5
+RANDOM_MASS = 0.15        # +/- fraction on every robot link mass, per episode. e.g. 0.15
 RANDOM_PUSH = 0.0        # random horizontal shove: max instantaneous base-velocity kick (m/s). e.g. 0.35
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
 RANDOM_TERRAIN = 0.0     # scatter small boxes/steps in the forward path, max height (m). e.g. 0.012
