@@ -87,6 +87,10 @@ The loop must never be an unstoppable long process.
 9. **Commit** to `auto-gait-iteration`.
 10. If the change made things worse, revert it in the next iteration's baseline
     (keep the better checkpoint as current best).
+11. **Post an update to the user** — this iteration's result (key metrics vs. the
+    previous run), the diagnosis, and the change going into the next iteration —
+    **then immediately launch the next run.** Don't wait for a reply; the user
+    reads the updates as they land and interrupts only if redirecting.
 
 After the loop: one **confirming run at the full 2e6 steps** on the best reward
 config before wrap-up.
@@ -139,12 +143,12 @@ wrong.
      alongside the earlier ones for comparison
    - `g2watch` on the best/final checkpoint (visual replay) ready to run — launch
      it or leave the exact command so the user just hits enter
-   - **Always also publish an HTML review page (Artifact)** — the desktop replay
-     window and local files don't reach a phone. Render the candidate policies to
-     GIFs (`render_gif.py`) and build a page with each gait animation + its key
-     metrics + the recommendation, like `g2_gait_replays.html`. This is the
-     primary deliverable when the user is on mobile; do it every wrap-up
-     regardless, since it's the shareable record.
+   - **Only if the user has said they're on mobile (or asked for the page view):**
+     also publish an HTML review Artifact — render the candidate policies to GIFs
+     (`render_gif.py`) and build a page with each gait animation + metrics + the
+     recommendation, like `g2_gait_replays.html`. At the desk this is skipped;
+     TensorBoard + `g2watch` are the review. Claude can't detect the device —
+     assume desktop unless told.
 4. **Ask the user** whether to merge `auto-gait-iteration` into `development`.
    Merge only on an explicit yes.
 

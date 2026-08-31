@@ -37,6 +37,9 @@ if __name__ == "__main__":
                         help="label for this run's checkpoint/model filenames")
     parser.add_argument("--steps", type=float, default=2e6,
                         help="total env steps to train (default 2e6)")
+    parser.add_argument("--from", dest="from_ckpt", default=None,
+                        help="finetune from this checkpoint (e.g. trained/auto_gait_final_ppo) "
+                             "instead of training a fresh policy")
     args = parser.parse_args()
 
     # Set up number of parallel environments
@@ -57,13 +60,23 @@ if __name__ == "__main__":
         name_prefix=args.tag,
     )
 
-    # Define PPO agent and train
-    model = PPO('MlpPolicy', env, seed=42,
-                policy_kwargs=custom_arch,
-                n_steps=int(2048*8/parallel_env),
-                learning_rate=linear_schedule(3e-4),
-                verbose=1,
-                tensorboard_log="trained/tensorboard_logs/").learn(args.steps, callback=checkpoint_callback)
+    if args.from_ckpt:
+        # Finetune: load the policy, restart the LR schedule + step count over
+        # this run's --steps so the linear decay spans the finetune window.
+        print(f"finetuning from {args.from_ckpt}")
+        model = PPO.load(args.from_ckpt, env=env,
+                         n_steps=int(2048*8/parallel_env),
+                         learning_rate=linear_schedule(3e-4),
+                         tensorboard_log="trained/tensorboard_logs/")
+        model.learn(args.steps, callback=checkpoint_callback,
+                    reset_num_timesteps=True)
+    else:
+        model = PPO('MlpPolicy', env, seed=42,
+                    policy_kwargs=custom_arch,
+                    n_steps=int(2048*8/parallel_env),
+                    learning_rate=linear_schedule(3e-4),
+                    verbose=1,
+                    tensorboard_log="trained/tensorboard_logs/").learn(args.steps, callback=checkpoint_callback)
 
     model.save(f"trained/{args.tag}_ppo")
 
