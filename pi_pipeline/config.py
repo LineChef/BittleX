@@ -62,7 +62,7 @@ class Settings:
     # --- Voice I/O ---
     wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "hey gee two"))
     vosk_model_path: str = field(default_factory=lambda: _env("VOSK_MODEL_PATH", "models/vosk"))
-    piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_US-ryan-low.onnx"))
+    piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_GB-alan-medium.onnx"))
     stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.2))
 
     # --- Robot link (used on hardware; ignored by MockActuator) ---

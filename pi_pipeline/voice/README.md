@@ -65,7 +65,7 @@ candidates in `models/piper/`:
 | `en_US-hfc_male-medium` | male, very natural / "real person", personality-neutral |
 | `en_GB-alan-medium` | British male, composed, a bit of gravitas — fun for a small robot |
 
-Pick one by setting `PIPER_MODEL_PATH` in `.env`, e.g.
+Current default: **`en_GB-alan-medium`**. Change it by setting `PIPER_MODEL_PATH` in `.env`, e.g.
 `PIPER_MODEL_PATH=models/piper/en_US-ryan-medium.onnx`. To try others, download
 `<name>.onnx` + `<name>.onnx.json` from the repo above into `models/piper/`.
 
