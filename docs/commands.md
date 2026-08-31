@@ -1,12 +1,13 @@
 # Command Reference
 
-Every runnable command in this project, with the full step sequence for each so
-nothing gets missed when running them by hand. When you want me (Claude) to run
-one, point at it by name — e.g. "run the smoke test from `docs/commands.md`" or
-"start a run, tag v8".
+Every runnable command in the project, with the full step sequence for each so
+nothing is missed when running them by hand. To have Claude run one, point at it
+by name — e.g. "run the smoke test from `docs/commands.md`".
 
-Status: only the RL training system (Phase 3) has code so far. `pi_pipeline/`
-(voice / memory / vision) has no commands yet — this file grows as those land.
+Only the RL training system (Phase 3) has code so far. `pi_pipeline/` (voice,
+memory, vision) has no commands yet; this file grows as those land.
+
+For a short, curated quick-reference, see [`docs/cheatsheet.md`](cheatsheet.md).
 
 ---
 
@@ -65,7 +66,7 @@ clear message if any check fails. `/train <tag>` in Claude Code does the same.
    ```
 4. **Smoke-test first if you changed `opencat_gym_env.py` or `train.py`:**
    ```bash
-   ../../.venv/bin/python smoke_train.py         # ~90s; reward ~40–55, no NaN
+   ../../.venv/bin/python smoke_train.py         # ~90s; reward a real number in the expected range for the current reward config, no NaN
    ```
 5. **Start TensorBoard** (skip if already running) and open it:
    ```bash
@@ -140,7 +141,7 @@ There is **no test suite or linter.** The closest things, run from
 
 | Command | What it verifies | Pass looks like |
 |---|---|---|
-| `../../.venv/bin/python smoke_train.py` | Whole training pipeline end-to-end at 20K steps (~90s): env, PPO loop, logging, checkpoint save | Reward ~40–55, no `nan`, prints "Saved smoke test checkpoint" |
+| `../../.venv/bin/python smoke_train.py` | Whole training pipeline end-to-end at 20K steps (~90s): env, PPO loop, logging, checkpoint save | Reward finite and in-range, no `nan`, prints "Saved smoke test checkpoint" |
 | `../../.venv/bin/python -c "from stable_baselines3.common.env_checker import check_env; from opencat_gym_env import OpenCatGymEnv; check_env(OpenCatGymEnv()); print('OK')"` | The Gym env's spaces / shapes / return types are valid | Prints `OK` with no warnings |
 
 Run the smoke test after any edit to `opencat_gym_env.py` or `train.py`, before a

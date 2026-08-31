@@ -28,14 +28,14 @@ lever. Iterate until ~06:00.
   30 mm obstacle course, via a light always-on "fight back to level" reward plus
   eased jitter penalties.
 - **Cost:** R5 walks slightly shorter/slower than the R1/baseline gait
-  (flat 0.38 m vs 0.41 m per 5 s). By the user's stated priority — *gait match ≫
+  (flat 0.38 m vs 0.41 m per 5 s). Under the project priority of *gait match ≫
   speed* — this is a good trade. R6 tried to close the distance gap with the
   stride reward and made it worse (see below).
 - **Recommendation: adopt R5** (`auto_rec_r5_ppo`), tagged
   **`gait-v7-stumble-catch`**. It's the best gait the project has produced on the
   metric that matters most here (wkF match), it's more stable and straighter than
   the Phase-3 gait, and it never fell on the obstacle course it was trained for.
-  Merge `auto-gait-iteration` → `development` **pending the user's review of the
+  Merge `auto-gait-iteration` → `development` **pending a review of the
   `g2watch` replay** (queued below).
 
 ---

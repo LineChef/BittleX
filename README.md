@@ -22,7 +22,14 @@ Full parts list and cost breakdown: see [`docs/project-plan.md`](docs/project-pl
 
 ## Project Status
 
-🚧 Early build phase — see the project plan for the full roadmap.
+Hardware has not arrived yet; work so far is software-only.
+
+- **Phase 3 (RL training in simulation) — active.** A working PyBullet +
+  Stable-Baselines3 pipeline lives in `rl_training/opencat-gym/`. A straight,
+  stable flat-ground walking gait is locked (`phase3-gait`); reward-function
+  iteration continues. See [`docs/project-plan.md`](docs/project-plan.md) for the
+  run history.
+- `pi_pipeline/` (voice, memory, vision) — not started; READMEs only.
 
 ## Repo Structure
 
@@ -47,4 +54,6 @@ for setup (including a required macOS build workaround for `pybullet`).
 
 ## Background
 
-This is a personal learning project — first hands-on hardware/robotics build, and first project written in Python (coming from a web dev background in HTML/JS/CSS). Follows the roadmap in `docs/project-plan.md`.
+A personal learning project — a first hardware/robotics build and a first Python
+project, from a web-development background. It follows the roadmap in
+[`docs/project-plan.md`](docs/project-plan.md).

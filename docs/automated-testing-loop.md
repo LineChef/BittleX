@@ -1,50 +1,48 @@
 # Automated Testing Loop — RL Gait Iteration
 
-How Claude runs unattended reward-function iteration on the walking policy. This is
-a **separate workflow** from the normal collaborative one (where the user watches
-every replay and approves each run). When the user asks for "automated testing" /
-"an automated run" / "iterate on your own", follow this document.
+A runbook for unattended reward-function iteration on the walking policy. This is
+a separate workflow from the normal collaborative one, where every replay is
+watched and every run approved. Trigger phrases: "automated testing", "an
+automated run", "iterate on your own".
 
-Established 2026-08-30. Update it as the process is refined.
+Established for the level-ground gait work; extended through Runs 5–7 (domain
+randomization, `wkF` imitation, fall recovery, target speed). Update it as the
+process changes.
 
 ---
 
 ## Goal
 
-Produce a policy that walks **efficiently and stably on level ground**, as close as
-possible to OpenCat's built-in `wkF` walk gait — straight line, real diagonal-trot
-leg pattern, no falling. This is **approach (a): functional equivalence** — pure
-reward-shaping, measured by metrics. Not literal `wkF` keyframe imitation (that was
-considered and deferred).
+The goal is set per loop at kickoff. Historically:
 
-This level-ground gait is the prerequisite. Uneven-terrain training is a later
-phase and is out of scope for this loop.
+- **Loop 1:** an efficient, stable level-ground walk close to OpenCat's built-in
+  `wkF` gait — straight line, real diagonal trot, no falling. Pure reward-shaping,
+  measured by metrics.
+- **Runs 5–7:** robustness to obstacles and disturbances, fall/stumble recovery,
+  and a deliberate target walk speed.
 
 ---
 
 ## Branch discipline
 
-- All automated-iteration work happens on the branch **`auto-gait-iteration`**
-  (branched from `development`).
-- **Before making any changes at the start of a run — always — sync
-  `development` first, then fast-forward it into `auto-gait-iteration`.** This is
-  mandatory every run, so the loop branch never drifts and the eventual merge back
-  is conflict-free:
+- All automated-iteration work happens on **`auto-gait-iteration`**, branched from
+  `development`.
+- **At the start of every run, sync `development` first:**
   ```bash
   git checkout development
-  git pull --ff-only origin development     # pick up anything pushed since last time
-  git checkout auto-gait-iteration          # (create from development if it doesn't exist)
+  git pull --ff-only origin development
+  git checkout auto-gait-iteration          # create from development if needed
   git merge development
   ```
-  If `git merge development` reports conflicts, stop and hand back to the user —
-  do not resolve them inside the loop.
-- **One commit per iteration** on that branch — the reward change plus the
-  `auto-iteration-log.md` entry — so any iteration is individually recoverable.
-- The loop never merges to `development` itself. After the user reviews the
-  results, **Claude asks whether to merge `auto-gait-iteration` into
-  `development`**, and only merges on an explicit yes (`git merge --no-ff` with a
-  message describing the changes and the progress made). Do not `git push` unless
-  the user asks.
+  If the merge conflicts, stop and hand back — do not resolve conflicts inside
+  the loop.
+- **One commit per round** on the branch — the reward/env change plus its
+  `auto-iteration-log-run<N>.md` entry — so any round is individually
+  recoverable.
+- The loop never merges to `development` itself. After the results are reviewed,
+  ask whether to merge `auto-gait-iteration` → `development`; merge only on an
+  explicit yes, with `git merge --no-ff` and a message describing the changes.
+  Do not `git push` unless asked.
 
 ---
 
@@ -52,142 +50,143 @@ phase and is out of scope for this loop.
 
 The loop must never be an unstoppable long process.
 
-- **Longest uninterruptible atom = one training run (~20 min).** Never longer.
-- **Session interrupt (Esc)** stops Claude between or during steps. A training run
-  in progress keeps writing checkpoints; `pkill -f train.py` ends it with nothing
-  lost past the last checkpoint.
-- **`STOP` sentinel file** — before starting each iteration the loop checks for
-  `rl_training/opencat-gym/STOP`. If present, it finishes the current iteration (or
-  stops immediately if between iterations), writes the report, and hands back.
-- **Hard caps** — the loop stops at a wall-clock limit **or** an iteration count,
-  whichever comes first. Defaults: **3 hours or 6 iterations.** Confirm/adjust with
-  the user at kickoff.
-- If targets are met before the cap, stop early.
-- If the cap is hit without meeting targets, stop anyway — keep the best
-  checkpoint, report what's blocking and recommended next moves.
+- **Longest uninterruptible unit = one training run** (~35–40 min for 2M steps).
+- **Session interrupt** stops work between or during steps. A training run keeps
+  writing checkpoints; `pkill -f train.py` ends it losing nothing past the last
+  checkpoint.
+- **`STOP` sentinel file** — before each round, check for
+  `rl_training/opencat-gym/STOP`. If present, finish the current round (or stop
+  immediately if between rounds), write the report, and hand back.
+- **Hard caps** — stop at a wall-clock limit or a round count, whichever comes
+  first. Confirm the caps at kickoff.
+- Stop early if targets are met. If the cap is hit without meeting them, stop
+  anyway — keep the best checkpoint and report what's blocking plus recommended
+  next moves.
 
 ---
 
-## Per-iteration procedure
+## Per-round procedure
 
-1. Check for `STOP` and check the caps. If either says stop, go to **Wrap-up**.
-2. **Evaluate the current best policy** headlessly (see Evaluation below). Iteration
-   0 is the run that exists at kickoff (e.g. `full_run_v6_ppo`).
+1. Check `STOP` and the caps. If either says stop, go to **Wrap-up**.
+2. **Evaluate the current best policy** headlessly (see Evaluation). Round 0 is
+   whatever checkpoint exists at kickoff.
 3. **Diagnose** the single biggest gap between current behavior and the goal.
 4. **Make one change** — a reward constant or a reward-term formula in
-   `opencat_gym_env.py`. One variable per iteration so cause/effect stays legible.
-   Structural changes (observation/action space, PPO hyperparameters, adding an
-   imitation term) are **out of scope** — flag them for the user instead.
-5. **Smoke test**: `../../.venv/bin/python smoke_train.py` — reward ~40–55, no NaN.
-6. **Train**: `./start_run.sh <tag> --steps 1000000` (~20 min). Tag scheme:
-   `auto_iter<N>` (e.g. `auto_iter1`).
-7. **Re-evaluate** the new checkpoint. Compare metrics to the previous iteration.
-8. **Log** the iteration to `docs/auto-iteration-log.md`: what changed, why, metrics
-   before/after, diagnosis, keep/revert decision.
-9. **Commit** to `auto-gait-iteration`.
-10. If the change made things worse, revert it in the next iteration's baseline
-    (keep the better checkpoint as current best).
-11. **Post an update to the user** — this iteration's result (key metrics vs. the
-    previous run), the diagnosis, and the change going into the next iteration —
-    **then immediately launch the next run.** Don't wait for a reply; the user
-    reads the updates as they land and interrupts only if redirecting.
+   `opencat_gym_env.py`. One variable per round so cause and effect stay legible.
+   Structural changes (observation/action space, PPO hyperparameters, a new
+   reward mechanism) are bigger bets — describe the plan and get a go-ahead
+   before spending a round on one, rather than deciding unilaterally inside the
+   loop.
+5. **Smoke test**: `../../.venv/bin/python smoke_train.py` — reward in the
+   expected range for the current reward config, no NaN.
+6. **Train**: `./start_run.sh <tag> --steps 2000000`. Tag scheme:
+   `<loop>_r<N>` (e.g. `walk_r1`). Every run needs a unique tag.
+7. **Re-evaluate** the new checkpoint against the current best.
+8. **Score** with the loop's composite metric. Promote the round if it beats the
+   best by a margin; on two non-improving rounds in a row, revert to the
+   last-good config and change levers.
+9. **Log** to `docs/auto-iteration-log-run<N>.md`: what changed, why,
+   before/after metrics, diagnosis, keep/revert decision.
+10. **Commit** to `auto-gait-iteration`.
+11. **Post an update** — this round's result vs. the previous, the diagnosis, and
+    the next change — then launch the next run immediately. Don't wait for a
+    reply.
 
-After the loop: one **confirming run at the full 2e6 steps** on the best reward
-config before wrap-up.
+Optionally end the loop with one confirming run at full length on the best
+config.
 
 ## Decision-making during the loop
 
-When choosing between options at any step, **take the route Claude would have
-recommended to the user** — do not surface options and wait. Record the choice and
-its reasoning in the iteration log.
+At any choice point, take the route you would recommend rather than surfacing
+options and waiting. Record the choice and its reasoning in the log.
 
 ---
 
 ## Evaluation (headless — no GUI during the loop)
 
-Build `evaluate_policy.py` (headless, `p.DIRECT`) that loads a checkpoint, runs a
-batch of deterministic episodes, and emits JSON metrics:
+`evaluate_policy.py` (headless, `p.DIRECT`) loads a checkpoint, runs a batch of
+deterministic episodes, and emits JSON metrics. Core metrics and the failure mode
+each targets:
 
-| Metric | Targets the failure mode |
+| Metric | Failure mode |
 |---|---|
-| Forward distance (fixed step budget), mean forward speed | overall progress / efficiency |
+| Forward distance, mean forward speed | progress / efficiency |
+| Speed error vs. `TARGET_SPEED` | holding the walk set-point (Run 7+) |
 | Yaw drift / heading deviation | curving off a straight line |
 | Per-foot peak swing height, stride length | shuffling vs. real steps |
 | Foot-slip distance while in contact | dragging feet |
 | Diagonal-trot phase correlation | wrong / no gait pattern |
 | Joint direction-reversal count | jitter |
-| Time-to-fall / fell? | stability |
+| Fell fraction, time-to-fall | stability |
+| Big-stumble recovery rate | catching a stumble before a fall (Run 7+) |
 | Roll & pitch variance | body stability |
 
-Also render ~30 frames of one episode to PNGs (`p.getCameraImage`) for Claude to
-inspect directly — this is the stand-in for the user watching the replay.
+`--dr-*` flags (`--dr-terrain`, `--dr-push`, …) force full-strength domain
+randomization for a held-out scenario the policy never trained on. Any flag
+zeroes every DR knob first, then applies the ones passed.
 
-At kickoff Claude states the metric set **and target numbers** (derived from the
-`wkF` gait characteristics and good quadruped-walking norms), then starts
-immediately — no waiting for pre-approval. The user can interrupt if a target looks
-wrong.
+The script can also render ~30 frames of an episode to PNGs for direct
+inspection — the stand-in for watching a replay during an unattended loop.
+
+State the metric set and target numbers at kickoff, then start immediately — no
+waiting for pre-approval.
 
 ---
 
-## Wrap-up (loop completes, or user interrupts, or STOP file)
+## Wrap-up (loop completes, interrupt, or STOP file)
 
-1. Run the full 2e6-step confirming run on the best config (skip if interrupted
-   mid-loop and the user wants an immediate stop).
+1. Optionally run a full-length confirming run on the best config (skip on an
+   immediate stop).
 2. **Write the report** — `docs/auto-iteration-report-<date>.md`:
-   - every reward change across all iterations, in order, with reasoning
-   - metrics before/after per iteration (table)
+   - every change across all rounds, in order, with reasoning
+   - a before/after metrics table per round
    - final policy metrics vs. targets
    - what improved, what's still short, recommended next moves
-3. **Queue the review artifacts for the user:**
-   - TensorBoard running, browser opened, filtered to the loop's `PPO_N` runs
-     alongside the earlier ones for comparison
-   - `g2watch` on the best/final checkpoint (visual replay) ready to run — launch
-     it or leave the exact command so the user just hits enter
-   - **Only if the user has said they're on mobile (or asked for the page view):**
-     also publish an HTML review Artifact — render the candidate policies to GIFs
-     (`render_gif.py`) and build a page with each gait animation + metrics + the
-     recommendation, like `g2_gait_replays.html`. At the desk this is skipped;
-     TensorBoard + `g2watch` are the review. Claude can't detect the device —
-     assume desktop unless told.
-4. **Ask the user** whether to merge `auto-gait-iteration` into `development`.
-   Merge only on an explicit yes.
+3. **Queue the review artifacts:**
+   - TensorBoard running and open, showing the loop's `PPO_N` runs next to the
+     earlier ones
+   - `g2watch` on the best checkpoint ready to run (launch it or leave the exact
+     command)
+   - Render the candidate policies to GIFs (`render_gif.py`).
+   - **Only when working from mobile (or when a page view is requested):** also
+     publish an HTML review Artifact with each gait GIF + metrics + the
+     recommendation. At a desk this is skipped — TensorBoard + `g2watch` are the
+     review.
+4. **Ask whether to merge** `auto-gait-iteration` → `development`. Merge only on
+   an explicit yes.
 
 ---
 
-## Machine prerequisites (tell the user before starting)
+## Machine prerequisites (state these before starting)
 
-- Laptop **plugged in and set not to sleep** — a sleep mid-run stalls it.
-- The machine will be under sustained multi-core load in ~20-min bursts for the
-  whole window; the user shouldn't need it for other heavy work.
+- Laptop plugged in and set not to sleep — a sleep mid-run stalls it.
+- Sustained multi-core load in ~40-min bursts for the whole window; the machine
+  won't be free for other heavy work.
 
 ---
 
-## Pre-run summary (post before every run — loop or single training run)
+## Pre-run summary (post before every run)
 
-Right before launching any training run, post a short summary-level block. Always
-include an **ETA** with how it's derived. Keep it terse:
+A short block right before launching any training run:
 
-- **ETA** — wall-clock estimate. Basis: ~19–20 min per 1M steps on this machine
-  (~40 min per 2M). For a loop: `(iterations planned × ~25 min incl. eval) +
-  ~40 min confirming run`, plus current clock time → expected finish time.
-- **This run** — one line: what's changing and the hypothesis (or "baseline, no
-  change").
-- **Scope** — steps per run; for a loop, iterations planned and the caps
-  (default 3h / 6 iterations).
-- **Stop** — `touch rl_training/opencat-gym/STOP` (clean stop after current
-  iteration) or interrupt the session.
-- **On completion** — what the user gets: notification + (for a loop) report,
+- **ETA** — wall-clock, with basis. ~35–40 min per 2M steps on this machine. For
+  a loop: `(rounds planned × ~50 min incl. eval) + current time`.
+- **This run** — one line: what's changing and the hypothesis.
+- **Scope** — steps per run; for a loop, rounds planned and the caps.
+- **Stop** — `touch rl_training/opencat-gym/STOP` (clean stop after the current
+  round) or interrupt.
+- **On completion** — what's delivered: notification, and for a loop the report,
   TensorBoard, `g2watch` replay, and the merge question.
 
-**Every status update** (loop or run) leads with **percent done** and **estimated
-time to finish** (a clock time, plus a range if iteration count may still flex),
-then the current iteration's state.
+**Every status update** leads with **percent done** and an **estimated finish
+time** (a clock time, plus a range if the round count may still flex), then the
+current round's state.
 
 ## Kickoff checklist
 
-- [ ] `git checkout development && git pull --ff-only`, then `git checkout auto-gait-iteration && git merge development` (stop and hand back if it conflicts)
-- [ ] Confirm caps (default 3h / 6 iterations) and machine prereqs with the user
-- [ ] `evaluate_policy.py` exists and runs
-- [ ] Post the **pre-run summary** (above) — ETA + details
-- [ ] State metric set + target numbers
-- [ ] Evaluate iteration-0 baseline, then begin the per-iteration procedure
+- [ ] Sync `development` into `auto-gait-iteration` (stop if it conflicts).
+- [ ] Confirm the caps and machine prerequisites.
+- [ ] `evaluate_policy.py` exists and runs.
+- [ ] Post the pre-run summary (ETA + details).
+- [ ] State the metric set and target numbers.
+- [ ] Evaluate the round-0 baseline, then begin the per-round procedure.

@@ -72,7 +72,7 @@ untrained, so recovered_fraction contributes 0; it simply never falls here).
 **Changes vs KG0:**
 - `FAC_RECOVERY` 0 → **8.0** (+ recovery-window mechanism above). NEW.
 - `FAC_IMITATION` 30 → **20** — still heavy (dominant gait signal) but leaves the
-  policy room to deviate for a recovery, per the user's "improvise when needed".
+  policy room to deviate for a recovery ("improvise when needed").
 - `RANDOM_TERRAIN` 0.012 → **0.03** — first slow bump; trips an imperfect gait,
   not a wall.
 - `RANDOM_PUSH` 0 → **0.2** — mild balance noise so recovery keeps getting signal
@@ -115,7 +115,7 @@ stays KG0 = `auto_dr_iter4`.
 **Changes vs R1:**
 - `FAC_IMITATION` 20 → **26** — pin cadence closer to wkF's real pace so the
   policy can't dodge every trip by crawling. Keeps "match the gait" weight high,
-  per the user; not back to 30 (still leaves recovery-improvisation room).
+  kept high; not back to 30 (still leaves recovery-improvisation room).
 - `RANDOM_TERRAIN` 0.03 → **0.04** — slow bump, still ≈ body clearance (step
   height, not a wall).
 - `RANDOM_PUSH` 0.2 → **0.3**, `RANDOM_PUSH_PROB` 0.02 → **0.05** — a more
@@ -220,7 +220,7 @@ becomes a fall* — which IS learnable (feet still under the body at 0.5–1.0 r
 **Hypothesis:** `fell_fraction` on the course drops below KG0's ~0.06 (the policy
 catches stumbles instead of tipping), flat-ground distance recovers toward R1's
 0.41, trot stays ≤ −0.45. That's a real, promotable "handles small obstacles
-without falling" result — the achievable version of the user's goal.
+without falling" result — the achievable version of the goal.
 
 **Result** (`auto_rec_r4_ppo`, PPO_35, 40 min, clean convergence):
 
@@ -281,7 +281,7 @@ the R1 scenario (7.6° vs 11.7°), roll steadier. But easing FAC_SMOOTH/JITTER d
 *not* free the stride — R5 walks a touch shorter than R1 (flat 0.381 vs 0.406,
 stride 0.034 vs 0.039); the tighter wkF lock made it slightly more conservative.
 Falls hard (37.5%) on a course past its training range — robust only within
-distribution. **By the user's stated priority (gait match ≫ speed), R5 is the
+distribution. **Under the project priority (gait match ≫ speed), R5 is the
 best result of the loop.** One targeted round left to try to also close the
 distance gap.
 
