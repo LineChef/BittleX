@@ -479,16 +479,30 @@ by the reactive-recovery ceiling established in Runs 6–7.
 
 ## Phase 9 — Memory system
 
-- [ ] A persistent store on the Pi for conversation history. Options:
-  - **Plain JSON files** under a `memory/` dir with a small view/edit UI
-    (Ai-Robo-Dog's approach) — simpler than a database if semantic search isn't
-    required, easier to reason about on constrained hardware.
-  - **Decay-based episodic memory** (pidog-embodiment's `pidog_memory.py`:
-    co-occurrence + decay — recent/frequent interactions stay salient, old ones
-    fade) — worth it if plain recency retrieval feels stale.
-  - Otherwise SQLite or a lightweight local vector store.
-- [ ] Retrieval: pull relevant past context into each new prompt to Claude.
-- [ ] Keep this separate from movement/vision — not a unified brain.
+**Status:** built and tested on the dev machine — `pi_pipeline/memory/`, wired
+into the voice loop through the `Memory.recall` / `Memory.record` seam.
+
+- [x] **Persistent store** — SQLite (`memory/data/g2_memory.db`, gitignored;
+      stdlib `sqlite3`, inspectable, light for the Pi). Two kinds: an
+      `exchanges` log (every turn, mirrored to an FTS5 index) and `facts` (short
+      durable notes). Chose SQLite over plain JSON (retrieval wouldn't need a
+      full load) and over a vector store (an embedding model/API per turn is too
+      heavy/costly for v1).
+- [x] **Retrieval** — `recall(user_text)` injects the current fact set plus up
+      to `G2_MEMORY_RECALL` older exchanges that match the input (BM25 via FTS5),
+      excluding the recent turns `conversation.py` still holds in-context. A
+      `remember` tool lets G2 choose what facts to keep (no extra API call).
+      Surfacing a fact bumps its `last_recalled`, so stale facts fall off the
+      injected set once it hits `G2_MEMORY_MAX_FACTS` — a light decay without a
+      scheduler.
+- [x] **Kept separate** — Memory only touches the voice loop via one seam;
+      nothing in movement or vision imports it.
+- [ ] Semantic recall (embeddings) if FTS keyword matching feels too literal —
+      weigh model/latency cost on the Pi first.
+- [ ] Small web UI to browse / prune memory (per the plan). CLI exists:
+      `python -m pi_pipeline.memory {facts,log,search,recall,remember,forget,wipe}`.
+- [ ] Exercise it across real multi-session conversations once the voice loop
+      runs live (needs an API key / hardware).
 
 ## Phase 10 — Full integration
 

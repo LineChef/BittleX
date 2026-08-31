@@ -11,6 +11,7 @@ import argparse
 import logging
 
 from ..config import settings
+from ..memory.memory import Memory
 from .actuator import make_actuator
 from .conversation import Conversation
 from .cues import LogCue
@@ -25,6 +26,7 @@ def main() -> None:
     ap.add_argument("--mode", choices=["text", "voice"], default="text")
     ap.add_argument("--actuator", choices=["mock", "serial"], default="mock")
     ap.add_argument("--tts", choices=["auto", "mac", "piper", "print"], default="auto")
+    ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -37,6 +39,10 @@ def main() -> None:
     voice = args.mode == "voice"
     tts_mode = {"auto": "piper" if voice else "mac", "mac": "mac",
                 "piper": "piper", "print": "print"}[args.tts]
+
+    memory = None
+    if settings.memory_enabled and not args.no_memory:
+        memory = Memory(settings)
 
     loop = VoiceLoop(
         wake_word=make_wake_word(
@@ -55,8 +61,13 @@ def main() -> None:
             args.actuator, port=settings.serial_port, baud=settings.serial_baud
         ),
         cue=LogCue(),
+        memory=memory,
     )
-    loop.run_forever()
+    try:
+        loop.run_forever()
+    finally:
+        if memory:
+            memory.close()
 
 
 if __name__ == "__main__":

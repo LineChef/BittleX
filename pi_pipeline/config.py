@@ -65,6 +65,12 @@ class Settings:
     piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_GB-alan-medium.onnx"))
     stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.2))
 
+    # --- Memory (Phase 9) ---
+    memory_enabled: bool = field(default_factory=lambda: _env("G2_MEMORY", "1") not in ("0", "false", "no"))
+    memory_db_path: str = field(default_factory=lambda: _env("G2_MEMORY_DB", "pi_pipeline/memory/data/g2_memory.db"))
+    memory_max_facts: int = field(default_factory=lambda: _env_int("G2_MEMORY_MAX_FACTS", 30))
+    memory_recall_exchanges: int = field(default_factory=lambda: _env_int("G2_MEMORY_RECALL", 3))
+
     # --- Robot link (used on hardware; ignored by MockActuator) ---
     serial_port: str = field(default_factory=lambda: _env("G2_SERIAL_PORT", "/dev/ttyS0"))
     serial_baud: int = field(default_factory=lambda: _env_int("G2_SERIAL_BAUD", 115200))

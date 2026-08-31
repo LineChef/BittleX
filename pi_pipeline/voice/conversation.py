@@ -45,11 +45,30 @@ _PERFORM_SKILL_TOOL = {
     },
 }
 
+_REMEMBER_TOOL = {
+    "name": "remember",
+    "description": (
+        "Save one short, durable fact worth keeping across future "
+        "conversations -- the person's name, things they like or own, ongoing "
+        "situations, stable preferences. Not small talk or one-off details. "
+        "Write it as a standalone sentence (\"Their name is Mark.\", \"They have "
+        "a cat named Biscuit.\"). You may reply and call this in the same turn."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"fact": {"type": "string", "description": "The fact to remember."}},
+        "required": ["fact"],
+    },
+}
+
+_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL]
+
 
 @dataclass
 class AssistantTurn:
     speech: str
     actions: list[str] = field(default_factory=list)
+    facts: list[str] = field(default_factory=list)
 
 
 class Conversation:
@@ -96,7 +115,7 @@ class Conversation:
             model=self._cfg.claude_model,
             max_tokens=self._cfg.claude_max_tokens,
             system=self._cfg.system_prompt,
-            tools=[_PERFORM_SKILL_TOOL],
+            tools=_TOOLS,
             messages=self._history,
         )
         log.info("Claude replied in %.1fs (stop=%s)", time.monotonic() - t0, resp.stop_reason)
@@ -105,20 +124,30 @@ class Conversation:
 
         speech_parts: list[str] = []
         actions: list[str] = []
+        facts: list[str] = []
         for block in resp.content:
             if block.type == "text":
                 speech_parts.append(block.text.strip())
             elif block.type == "tool_use" and block.name == "perform_skill":
                 name = (block.input or {}).get("skill", "")
-                if skills.is_valid(name):
+                ok = skills.is_valid(name)
+                if ok:
                     actions.append(name)
                 else:
                     log.warning("Claude asked for unknown skill %r", name)
-                self._pending_tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": "done" if skills.is_valid(name) else f"unknown skill {name!r}",
-                })
+                self._ack(block.id, "done" if ok else f"unknown skill {name!r}")
+            elif block.type == "tool_use" and block.name == "remember":
+                fact = (block.input or {}).get("fact", "").strip()
+                if fact:
+                    facts.append(fact)
+                self._ack(block.id, "saved" if fact else "empty fact, not saved")
 
         self._trim()
-        return AssistantTurn(speech=" ".join(p for p in speech_parts if p), actions=actions)
+        return AssistantTurn(
+            speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts
+        )
+
+    def _ack(self, tool_use_id: str, content: str) -> None:
+        self._pending_tool_results.append({
+            "type": "tool_result", "tool_use_id": tool_use_id, "content": content,
+        })
