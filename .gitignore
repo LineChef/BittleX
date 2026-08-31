@@ -41,3 +41,6 @@ rl_training/opencat-gym/frames_wkf/
 
 # Claude Code project config lives at user level (~/.claude/), not in the repo
 .claude/
+
+# Downloaded STT/TTS models (Vosk, Piper) -- large, not versioned
+models/

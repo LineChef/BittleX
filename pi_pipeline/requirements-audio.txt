@@ -1,0 +1,14 @@
+# Pi pipeline — optional audio backends for voice mode.
+#   pip install -r pi_pipeline/requirements-audio.txt
+#
+# Then download the models (see pi_pipeline/voice/README.md):
+#   - Vosk small English model  -> models/vosk/
+#   - Piper voice (e.g. en_US-ryan-low) -> models/piper/
+#
+# sounddevice needs PortAudio: macOS `brew install portaudio`; Pi
+# `sudo apt install libportaudio2`.
+
+vosk>=0.3.45
+sounddevice>=0.4.6
+piper-tts>=1.2.0
+numpy>=1.24

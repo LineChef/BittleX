@@ -1,0 +1,10 @@
+# Pi pipeline — core dependencies (Phase 7+). Pure-Python, install anywhere.
+# Audio backends (Vosk / Piper / sounddevice) are in requirements-audio.txt so
+# the text-mode pipeline can run without them.
+#
+#   python3.11 -m venv pi_pipeline/.venv
+#   source pi_pipeline/.venv/bin/activate
+#   pip install -r pi_pipeline/requirements.txt
+
+anthropic>=0.40
+python-dotenv>=1.0

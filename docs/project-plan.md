@@ -369,7 +369,41 @@ question on real hardware with a head-to-head once it arrives. Record:
 
 ## Phase 7 — Voice + Claude integration
 
-- [ ] Audio capture on the Pi (Bittle's onboard mic).
+**Status:** the pipeline is scaffolded and runs end-to-end on a dev machine in
+text mode — `pi_pipeline/voice/` (own venv, `pi_pipeline/requirements.txt`).
+`wake → STT → Claude → TTS → skill` with every hardware-specific stage behind an
+interface (`MockActuator`/`SerialActuator`, `MacTTS`/`PiperTTS`,
+`TextSTT`/`VoskSTT`, `AlwaysAwake`/`VoskWakeWord`). Claude replies parsed into
+spoken text + `perform_skill` tool calls; a curated OpenCat skill catalogue maps
+to serial commands. Offline tests cover the parse path. Remaining items below are
+the audio backends (deps + models) and everything hardware.
+
+- [x] **Config-driven Claude client** — `pi_pipeline/config.py` (env: key, model,
+      max tokens, timeout, history depth, persona) + `voice/conversation.py`
+      (rolling history, retry-on-timeout, memory seam for Phase 9).
+- [x] **Response → spoken text + action commands** — `perform_skill` tool;
+      `voice/skills.py` maps skill names to OpenCat `k<token>` serial commands;
+      one reply can both talk and move.
+- [x] **State-cue interface** — `voice/cues.py` (`LogCue` now; buzzer/posture
+      later).
+- [ ] Audio capture on the Pi (Bittle's onboard mic). `voice/stt.py` /
+      `wake_word.py` use `sounddevice`; test on real mic hardware.
+- [ ] Speech-to-text — Vosk small English model for both wake word and full STT
+      (`requirements-audio.txt` + model download in `voice/README.md`). Confirm
+      it's light enough on the Pi Zero 2 WH; from similar Pi-based LLM voice
+      robots (SunFounder PiDog docs, `marceld23/Ai-Robo-Dog`,
+      `rockywuest/pidog-embodiment` — all Pi 4/5 with 2 GB+, so directional):
+  - Wake-word gate so full STT / network calls only fire on activation.
+  - Local TTS (Piper `en_US-ryan-low`) — `PiperTTS` implemented; needs the model.
+  - Health-monitor / auto-restart the audio + serial threads once they're real
+    (pidog-embodiment logs worker threads dying silently).
+  - Bookworm's PEP 668 blocks plain `pip install` on-device — use the venv.
+- [ ] Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out).
+- [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard, confirm
+      the skill commands land.
+- [ ] Confirm this runs independently of the 35+ built-in voice commands (they're
+      a separate firmware path; these commands go over serial).
+- [ ] A buzzer-pattern / posture implementation of the state cue.
 - [ ] Speech-to-text — cloud API vs. local (Whisper/Vosk); affects Pi RAM
       headroom. From similar Pi-based LLM voice robots (SunFounder PiDog docs,
       `marceld23/Ai-Robo-Dog`, `rockywuest/pidog-embodiment` — all target Pi
