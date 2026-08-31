@@ -36,7 +36,7 @@ FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (R
 # learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 and the policy warped wkF to a crawl; 11 = balance-correction authority without gait-killing authority.
+RESIDUAL_SCALE_DEG = 8    # +/- correction the policy may apply. r1 used 18 (warped wkF to a crawl); resid_r2 used 11. rtune_r3: 8 -- tighter budget keeps the gait closer to the proven-robust wkF keyframes; test whether the policy's own over-corrections are what drive heading drift / obstacle falls.
 FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
 
 # --- Stay-down / stay-level shaping (also from the scripted-gait benchmark) ---
@@ -56,8 +56,8 @@ SPEED_WINDOW = 12          # steps to average base-x velocity over for the rewar
 MIN_SPEED = 0.07           # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- the resid policy must not stall the wkF walk.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = False  # r1: capping it + weak FAC_SPEED removed the drive to keep walking -> the gait stalled. Uncapped; TARGET_SPEED + FAC_SPEED still discourage going *faster* than wkF.
-FAC_STABILITY = 0.4       # Punish body roll and pitch velocities. rtune_r2: 0.1 -> 0.4 to damp the roll oscillation that drives roll_var up on obstacles.
-FAC_YAW = 0.3             # Punish body yaw (turning) velocity -- discourages curving off a straight line. rtune_r2: 0.1 -> 0.3 to catch heading drift at the rate level before it accumulates.
+FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
+FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line. rtune_r2 tried 0.3 with FAC_STABILITY 0.4 -- regressed, reverted.
 FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
 FAC_Z_VELOCITY = 0.0      # Punish z movement of body
 FAC_SLIP = 0.01           # Punish slipping of paws -- was 0.0; enabled to discourage dragging/jittering feet instead of real steps

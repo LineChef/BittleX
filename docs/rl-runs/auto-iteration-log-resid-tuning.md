@@ -89,4 +89,37 @@ and to catch heading drift before it accumulates. Everything else = `resid_r2`.
 with no fall regression and flat speed ≥ 0.08 m/s. Risk: over-damping stiffens
 the correction layer and slows the walk.
 
+**Result** (`rtune_r2_ppo`, ~39 min, `ep_len_mean` 250, `approx_kl` clean).
+Benchmark vs scripted `wkF`, 14 ep/cell:
+
+| avg over 20/35/50 mm | rtune_r2 | resid_r2 (baseline) | scripted |
+|---|---|---|---|
+| yaw max° | **12.92** | 8.01 | 5.62 |
+| roll_var | 0.021 | 0.018 | 0.014 |
+| falls | **0.095** | 0.071 | 0.071 |
+| falls @ 50 mm | **0.214** | 0.143 | 0.143 |
+
+**Rejected — hard fall guard (`falls > resid_r2`).** Over-damping backfired: a
+stiffer correction layer reacts too slowly to a 50 mm trip (falls 14 → 21%) and,
+counter-intuitively, drifts *worse* on heading (yaw 8 → 13°) — a sluggish
+residual can't re-straighten after a stumble. Score −518. Reverted `FAC_YAW` and
+`FAC_STABILITY` to 0.1.
+
+**Two rounds, no gain — reward shaping (harder heading penalty, harder rate
+damping) is not moving these metrics.** Pivoting to the policy/action side.
+
+---
+
+## R3 — `rtune_r3` — `RESIDUAL_SCALE_DEG` 11 → 8 (policy / action space)
+
+Tighten how far the learned correction may push the joints off the `wkF`
+keyframes: ±8° instead of ±11°. If the policy's *own* corrections are what
+overshoot into roll oscillation and heading drift, a smaller budget forces it to
+stay near the proven-robust scripted pose and only nudge for balance. Everything
+else = `resid_r2`.
+
+**Hypothesis:** roll_var and yaw_max both drop (less room to over-correct), falls
+stay ≤ baseline, flat speed ≥ 0.08 m/s. Risk: too little authority to catch a
+real stumble → falls creep up like `resid_r1`'s reverse case.
+
 **Result:** _pending_
