@@ -33,7 +33,7 @@ Hardware has not arrived yet; everything so far is software-only.
   (Phase 5) are all scaffolded and run on a dev machine with the hardware
   mocked; 31 tests passing.
 
-See [`docs/hardware-readiness.md`](docs/hardware-readiness.md) for the full
+For a plain-language tour of how each part works, see [`docs/how-it-works.md`](docs/how-it-works.md). See [`docs/hardware-readiness.md`](docs/hardware-readiness.md) for the full
 pre-hardware state and the day-1 checklist, and
 [`docs/project-plan.md`](docs/project-plan.md) for the living detail.
 
