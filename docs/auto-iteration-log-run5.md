@@ -238,4 +238,46 @@ falling). `FAC_STRIDE` 15 -> 0 (imitation subsumes the stride goal). DR curricul
 from iter3 unchanged (friction 0.3, mass 0.15, gyro 0.02, terrain 0.012). Fresh
 2M. This is the "mimic the good gait *and* be robust" run.
 
-**Run:** `auto_dr_iter4`, 2M steps. _Result pending._
+**Run:** `auto_dr_iter4`, 2M steps, `PPO_29`. ep_rew ~7590 (imitation ceiling
+~7500 -> matching wkF almost perfectly). std 0.446 (very locked in).
+
+**Held-out battery (8 ep):**
+
+```
+scenario         fell  dist  trot   stride  speed     vs iter3 / baseline
+flat             0.00  0.47 -0.44   0.045   0.093     iter3: 1.07 / -0.18 / --- / 0.18   base: 1.28 / -0.58 / 0.103 / 0.256
+friction 0.3     0.00  0.45 -0.44   0.057   0.089
+mass 0.15        0.00  0.49 -0.45   0.047   0.097
+IMU noise 0.02   0.00  0.48 -0.44   0.041   0.096
+obstacles 12mm   0.00  0.39 -0.45   0.045   0.077     iter3: 0.92
+obstacles 18mm   0.00  0.34 -0.43   0.039   0.069
+push 0.35        0.00  0.48 -0.43   0.040   0.096
+EVERYTHING       0.25  0.35 -0.43   0.035   0.078
+```
+
+**Diagnosis:** the imitation reward **worked for gait shape** -- `diagonal_trot_corr`
+**-0.44** (from -0.18 in iter3, ~0 in iter2), a real diagonal trot again,
+approaching the -0.58 baseline. Never falls on single disturbances. **But speed
+collapsed to ~0.09 m/s** (1/3 of iter3, ~1/3 of baseline). `FAC_IMITATION=30` is
+~15x the forward reward at wkF speed, so the policy prioritises *matching wkF
+exactly* over going fast -- and wkF played closed-loop in this sim is slow.
+Obstacle distance is down (0.39 vs iter3's 0.92) only because it covers so little
+ground per episode.
+
+So the trade is now the opposite of iter3: **iter4 has the trot back but walks
+slow**; iter3 was fast but shuffled. The fix is a weight balance, not a
+structural wall.
+
+**Keep/revert:** keep the imitation term, drop its weight so `FAC_MOVEMENT` can
+compete.
+
+---
+
+## Iteration 5 — imitation reward strong but not dominant
+
+**Change:** `FAC_IMITATION` 30 -> **12** (~2-4x the forward reward at a healthy
+walking speed instead of ~15x). Should keep the wkF *shape* while letting the
+forward-progress reward pull speed back toward baseline. DR curriculum unchanged.
+Fresh 2M. **Last iteration** -- confirming run next.
+
+**Run:** `auto_dr_iter5`, 2M steps. _Result pending._
