@@ -193,6 +193,11 @@ if __name__ == "__main__":
            "RANDOM_GYRO": args.dr_gyro, "RANDOM_PUSH": args.dr_push,
            "RANDOM_TERRAIN": args.dr_terrain}
     if any(v is not None for v in _dr.values()):
+        # A held-out scenario is exactly the knobs passed and nothing else --
+        # zero every DR knob first so the file's training config doesn't leak in.
+        # (--dr-friction 0 => a forced-flat run.)
+        for k in _dr:
+            setattr(opencat_gym_env, k, 0.0)
         for k, v in _dr.items():
             if v is not None:
                 setattr(opencat_gym_env, k, v)
