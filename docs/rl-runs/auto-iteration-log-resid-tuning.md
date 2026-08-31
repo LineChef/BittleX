@@ -57,4 +57,36 @@ Directly penalise accumulated yaw drift harder. Everything else = `resid_r2`.
 **Hypothesis:** avg yaw_max drops toward 5–6° with no fall/speed regression;
 roll_var roughly unchanged (a straighter gait is often steadier too).
 
+**Result** (`rtune_r1_ppo`, ~39 min, `ep_len_mean` ~250, `approx_kl` clean —
+nothing fell in training). Benchmark vs scripted `wkF`, 14 ep/cell, matched seeds:
+
+| avg over 20/35/50 mm | rtune_r1 | resid_r2 | scripted |
+|---|---|---|---|
+| yaw max° | 7.73 | 8.01 | 5.62 |
+| roll_var | 0.0207 | 0.0177 | 0.0140 |
+| falls | 0.071 | 0.071 | 0.071 |
+| speed m/s | 0.056 | 0.062 | 0.051 |
+
+Flat speed 0.085 m/s (guard ≥ 0.08 — passes). Score −310.5 vs resid_r2 −320.1.
+
+**Wash — not promoted.** The composite score ticked up, but entirely on a 0.3°
+yaw improvement that is within run-to-run noise, and **roll_var regressed**
+(0.021 vs 0.018) — the wrong direction for half the goal. Falls stayed at parity
+(R1 fixed the 20 mm outlier but picked up a 35 mm fall). Doubling `FAC_HEADING`
+did not meaningfully straighten the walk; accumulated-heading penalty alone isn't
+the lever. Reverting `FAC_HEADING` to 5 and moving to rate-level damping.
+
+---
+
+## R2 — `rtune_r2` — `FAC_YAW` 0.1 → 0.3 + `FAC_STABILITY` 0.1 → 0.4
+
+`FAC_HEADING` (accumulated error) barely moved yaw in R1. Try the **rate** level
+instead: penalise roll/pitch angular velocity (`FAC_STABILITY`) and yaw rate
+(`FAC_YAW`) ~3–4× harder, to damp the body oscillation that inflates `roll_var`
+and to catch heading drift before it accumulates. Everything else = `resid_r2`.
+
+**Hypothesis:** `roll_var` drops toward scripted's 0.014 and yaw_max toward 6°,
+with no fall regression and flat speed ≥ 0.08 m/s. Risk: over-damping stiffens
+the correction layer and slows the walk.
+
 **Result:** _pending_
