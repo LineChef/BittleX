@@ -88,8 +88,18 @@ Software only; no physical robot needed until Phase 6 deployment.
   `gait-v7-stumble-catch` — crisper trot (`diagonal_trot_corr` −0.58), tighter
   heading (7.6° max drift), always-on stumble-catch balance term, no
   obstacle-course falls; ~7% slower forward than `phase3-gait`.
-- **Active work:** Run 7 ("walk") — a deliberate target walk speed plus a push to
-  make stumble recovery significantly better. On `auto-gait-iteration`.
+- **Run 7 ("walk"), closed:** best checkpoint `walk_r2`, tag `walk-v8-r2` — 0%
+  falls, best heading of the project, but converges slow (~0.07 m/s vs the 0.11
+  target). The Run 7 env config (273-dim observation, `TARGET_SPEED` tracking
+  bonus, impulse drills) is now on `development`, but `phase3-gait` and
+  `gait-v7-stumble-catch` remain the reference gaits until a real-hardware
+  head-to-head. Established that big-stumble recovery can't be reward-tuned
+  further on this control setup.
+- **Phase 3 RL is paused pending hardware.** The open question — is a learned gait
+  actually better than OpenCat's scripted `wkF` for plain walking — is settled by
+  a real-robot head-to-head, not more sim iteration. Learned-gait work resumes if
+  it transfers well and/or when perception-in-the-loop becomes active — see the
+  **Phase 8 Target capability**, the near-term goal for that work.
 
 ### Environment
 
@@ -261,13 +271,19 @@ project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
 [`docs/auto-iteration-log-run6.md`](auto-iteration-log-run6.md),
 [`docs/auto-iteration-report-2026-08-31.md`](auto-iteration-report-2026-08-31.md).
 
-**Run 7 — "walk": target speed + stumble recovery** (in progress, on
-`auto-gait-iteration`). Adds a deliberate `TARGET_SPEED` (0.11 m/s, near the
-`wkF` reference's own open-loop pace) with a tracking-bonus reward held below
-gait-match in priority, and a set of changes aimed at significantly better
-stumble recovery: IMU tilt history + angular acceleration in the observation
-(247 → 273), a gait-phase clock that slows under tilt, tilt-rate damping in
-`FAC_BALANCE`, and concentrated impulse-shove drills. Record:
+**Run 7 — "walk": target speed + stumble recovery** (closed, on
+`auto-gait-iteration`). Added a deliberate `TARGET_SPEED` (0.11 m/s) with a
+tracking-bonus reward, IMU tilt history + angular acceleration in the observation
+(247 → 273), and several attempts to improve stumble recovery (a tilt-slowed
+phase clock, imitation-fade while wobbling, tilt-rate damping in `FAC_BALANCE`,
+concentrated impulse drills). **Outcome:** `big_stumble_recovery_rate` stayed at
+0.0 across all three rounds — recovery is bounded by the control setup (reactive,
+IMU-only, weak sagittal-plane legs), not by reward tuning, confirming Run 6.
+`walk_r2` is the best checkpoint (tag `walk-v8-r2`): 0% falls on flat ground and
+the 30 mm course, best heading of the project (4–5° max yaw drift), trot −0.50 —
+but it converges slow (~0.07 m/s vs the 0.11 target) and is not merged to
+`development`. **Decision:** stop reward-tuning recovery; settle the RL-vs-scripted
+question on real hardware with a head-to-head once it arrives. Record:
 [`docs/auto-iteration-log-run7.md`](auto-iteration-log-run7.md).
 
 ### Evaluate and lock ✅
@@ -382,6 +398,20 @@ stumble recovery: IMU tilt history + angular acceleration in the observation
 
 ## Phase 8 — Environment perception
 
+### Target capability — the near-term goal once vision is working
+
+The concrete definition of done for perception-driven locomotion (the bullet
+below on revisiting the gait policy):
+
+> G2 walks confidently across a cluttered floor, steps over cables and small
+> objects it sees, slows or stops at a big obstacle or a table edge, and stumbles
+> noticeably less.
+
+Explicitly **not** in scope: parkour, recovering from a hard kick or shove,
+reliable stair climbing. Those are bounded by the hardware (weak sagittal-plane
+servos, no roll-axis joint, a detection — not depth — camera at head height) and
+by the reactive-recovery ceiling established in Runs 6–7.
+
 - **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
   cliff/edge detection, if pursued, must be a camera-based visual classifier
@@ -403,12 +433,15 @@ stumble recovery: IMU tilt history + angular acceleration in the observation
   - PiDog attaches images to LLM calls only for occasional "what do you see"
     queries, not continuous avoidance — matches the split above.
 - [ ] **After vision works, revisit the locomotion policy with perception in the
-      loop.** Run 5–7 terrain training is reactive and IMU-only — no forward
-      sense, so the policy can't anticipate terrain or deliberately climb an
-      obstacle. With forward terrain/obstacle information as an input, retrain or
-      extend the gait policy for anticipatory foot placement and learned
-      strategies for observed obstacles (step over vs. around vs. stop). A
-      distinct effort, only possible once perception exists.
+      loop — toward the Target capability above.** Run 5–7 terrain training is
+      reactive and IMU-only, so the policy can't anticipate terrain or
+      deliberately step around an obstacle. Feed forward obstacle/detection
+      information into the policy's observation and retrain (or add a perception
+      front-end that biases the existing gait) for anticipatory foot placement
+      and step-over / go-around / stop decisions. This is what a scripted keyframe
+      gait fundamentally can't do — it has no input to feed vision into — and is
+      the main reason the project uses RL for locomotion. Only possible once
+      perception exists; a distinct effort from the flat-ground gait.
 
 ## Phase 9 — Memory system
 

@@ -16,9 +16,27 @@ GUI_MODE = False          # Set "True" to display pybullet in a window
 EPISODE_LENGTH = 250      # Number of steps for one training episode
 MAXIMUM_LENGTH = 1.8e6    # Number of total steps for entire training
 
+# One env.step() runs 3 p.stepSimulation() calls at PyBullet's default 1/240 s
+# timestep -> 1/80 s of sim per control step -> 80 Hz control. (evaluate_policy.py
+# historically assumed 50 Hz; Run 7 fixes it to 80. Multiply any pre-Run-7
+# reported m/s by 1.6 to compare.)
+CONTROL_HZ = 80.0
+
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
-FAC_MOVEMENT = 1000       # Reward movement in x-direction
+FAC_MOVEMENT = 1000       # Reward forward progress -- CAPPED at TARGET_SPEED (Run 7): reward accrues for progress up to the walk set-point and nothing above it, so this no longer competes with the speed tracker below. Was an unbounded "faster = always better" term through Run 6.
+
+# --- Target walk speed (Run 7) ------------------------------------------------
+# "Walk" line: establish a deliberate baseline speed and hold it, rather than
+# letting whatever speed falls out of the other terms stand. Speed stays BELOW
+# gait-match in priority (FAC_SPEED << FAC_IMITATION). Faster gaits come later.
+# Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
+# falling off if too slow OR too fast -- same shape as the imitation reward.
+TARGET_SPEED = 0.11        # m/s. wkF reference plays open-loop at ~0.10 m/s; R5 walks ~0.12 m/s. 0.11 ties the baseline to the reference walk's own pace with a hair of margin. Change per gait later.
+FAC_SPEED = 4.0            # weight on the speed-tracking bonus. R3: 4 -> 7 -- R1/R2 both converged at ~0.06-0.09 m/s, well under the 0.11 target; the bonus was too weak to pull speed up. Still below r_imitation (~8-12/step).
+SPEED_SHARPNESS = 2.5      # R3: 2.5 -> 1.8 -- wider capture band so the bonus still has a meaningful gradient when the policy is slow (0.06 vs 0.11 target). Error is relative to TARGET_SPEED, so this is scale-free.
+SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
+MOVEMENT_CAP_AT_TARGET = False  # R1 capped FAC_MOVEMENT at TARGET_SPEED and it removed the 'walk briskly' gradient (gait went slow+mushy). R2: off -- uncapped forward-progress reward + the speed tracking bonus.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line
 FAC_HEADING = 5.0         # Punish absolute heading error (accumulated yaw away from straight-ahead). FAC_YAW penalizes turn *rate*; nothing pulled accumulated heading back to 0, so v6's gait drifted ~12 deg off straight by episode end. auto_iter1 tried 0.5 -- far too weak (~1% of the forward reward), no effect. auto_iter2: 5.0 (~7% of forward reward at a 13 deg drift). Yaw is recoverable from the base quaternion already in the observation, so no observation-space change.
@@ -34,6 +52,8 @@ FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive 
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
 FAC_IMITATION = 20.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
+IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
+IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 
 # --- Fall recovery / self-righting -------------------------------------------
 # Normally is_fallen() (roll or pitch > 1.3 rad) ends the episode instantly with
@@ -47,8 +67,28 @@ IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
-FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). Always on, so every wobble through the obstacle course trains catching it -- the learnable version of "recover from a fall".
+FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). R3: 2.0 -> 4.0 -- at 2.0 (R5/R6) it gave good heading but never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). Still below r_imitation.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
+# Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
+# (damping the wobble, not just the lean), and planting more feet while tilted.
+BALANCE_W_ANGLE = 1.0      # weight on frame-to-frame tilt-angle reduction
+BALANCE_W_RATE = 0.6       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
+BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get feet down"
+
+# Phase clock (Run 7): the wkF phase index normally advances one step per control
+# step. While the body is tilted past PHASE_SLOW_TILT it advances at PHASE_SLOW_RATE
+# instead, so a stumbling policy isn't told "you must be at stride phase X now" and
+# isn't hit by the imitation penalty for being off-beat -- it can take a corrective
+# off-phase step and re-sync once level. Both time_obs and the imitation reference
+# read this same counter.
+PHASE_SLOW_TILT = 0.6      # rad
+PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
+
+# Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
+# (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
+# phase and direction -- concentrated practice in the big-wobble regime R5 fails.
+IMPULSE_PUSH = 0.4       # m/s kick magnitude. R3: 0.4 -> 0.55 -- at 0.4 the converged policy saw ~0 big stumbles on the nominal course, so it never actually practised recovery. 0.55 makes recoverable big wobbles happen without the 0.7 fall-storm.
+IMPULSE_PUSH_PROB = 0.003  # per-step probability (~2x per 300-step episode). R3: 0.003 -> 0.006.
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -77,17 +117,19 @@ RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already
 RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
 RANDOM_FRICTION = 0.22   # +/- fraction on ground lateral friction, per episode. e.g. 0.5
 RANDOM_MASS = 0.10       # +/- fraction on every robot link mass, per episode. e.g. 0.15
-RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s). Recovery loop: kept MILD -- a light balance disturbance / sim2real robustness knob, not the fall driver. The obstacles are meant to be what trips the bot; pushes just keep the recovery reward fed once the gait gets steady.
+RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.03    # obstacle max height (m). Recovery loop R1: 0.03, up slowly from iter4's 0.012. Goal per the user: tall enough to trip the bot a bit, never so tall it can't walk over them. Raise ~+5mm only on a promoted round: 0.03 -> 0.035 -> 0.04 -> 0.045. Bittle body clearance is ~0.04 m, so the schedule stays at or below "step height", never a wall.
+RANDOM_TERRAIN = 0.03    # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
+LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observation -- lets the policy see a stumble as a developing trajectory, not a snapshot. IMU-only, transfers to hardware.
 
-# Size of oberservation space is set up of:
-# [LENGTH_JOINT_HISTORY, quaternion, gyro, time_phase]
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 1
+# Size of observation space:
+# [ 30*8 joint history | quaternion(4) gyro(2) time_phase(1)
+#   | 12*2 tilt history | roll/pitch angular-accel(2) ]      (Run 7 adds the last two)
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 1 + LENGTH_TILT_HISTORY * 2 + 2
 
 
 class OpenCatGymEnv(gym.Env):
@@ -138,6 +180,17 @@ class OpenCatGymEnv(gym.Env):
             dv = np.random.uniform(-RANDOM_PUSH, RANDOM_PUSH, 2) * self._dr
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + dv[0], lin[1] + dv[1], lin[2]], ang)
+        # Impulse "recovery drill" (Run 7): occasional large kick, random
+        # direction, at whatever gait phase it lands on -- concentrated practice
+        # in the big-wobble regime.
+        if (IMPULSE_PUSH > 0 and self._dr > 0 and not self._in_recovery
+                and np.random.rand() < IMPULSE_PUSH_PROB):
+            lin, ang = p.getBaseVelocity(self.robot_id)
+            theta = np.random.uniform(0, 2 * np.pi)
+            mag = IMPULSE_PUSH * self._dr
+            p.resetBaseVelocity(self.robot_id,
+                                [lin[0] + mag * np.cos(theta),
+                                 lin[1] + mag * np.sin(theta), lin[2]], ang)
         last_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0]
@@ -245,6 +298,10 @@ class OpenCatGymEnv(gym.Env):
         p.stepSimulation() # Emulated delay of data transfer via serial port
         state_ang_euler = np.asarray(p.getEulerFromQuaternion(state_ang)[0:2])
         state_vel_raw = np.asarray(p.getBaseVelocity(self.robot_id)[1])
+        # roll/pitch angular acceleration (Run 7 observation) -- ANG_FACTOR-scaled
+        # like the rates, clipped to [-1, 1].
+        ang_acc = np.clip((state_vel_raw[0:2] - self._prev_ang_vel) * ANG_FACTOR, -1.0, 1.0)
+        self._prev_ang_vel = state_vel_raw[0:2].copy()
         # Yaw (turning) rate -- penalized below to discourage curving off a
         # straight line, but not added to the observation (self.state_robot)
         # to keep the observation space unchanged for this iteration.
@@ -256,19 +313,32 @@ class OpenCatGymEnv(gym.Env):
         heading_error_clip = np.clip(p.getEulerFromQuaternion(state_ang)[2], -np.pi, np.pi)
         state_vel = state_vel_raw[0:2]*ANG_FACTOR
         state_vel_clip = np.clip(state_vel, -1, 1)
-        # Cyclical time/phase signal (adapted from bmabsout/opencat-gym) -- a
-        # rhythmic clock input to help the policy learn periodic gaits instead
-        # of an arbitrary, potentially jittery movement pattern.
-        time_obs = np.fmod(self.step_counter / TIME_PHASE_PERIOD, 1.0)
+        # Cyclical time/phase signal. The phase index advances one step per
+        # control step, but slows to PHASE_SLOW_RATE while the body WAS tilted
+        # last step (self._prev_tilt), so a stumbling policy isn't forced onto
+        # the stride beat and isn't hit by the imitation penalty for stepping
+        # off-phase to catch itself -- it re-syncs once level. time_obs and the
+        # wkF imitation reference both read self._phase.
+        self._phase += PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0
+        time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
         # can oscillate on real data.
         obs_ang, obs_vel_clip = state_ang, state_vel_clip
-        if RANDOM_GYRO > 0 and self._dr > 0:
-            n = RANDOM_GYRO * self._dr
-            obs_ang = np.array(state_ang) + np.random.normal(0.0, n, 4)
-            obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, n, 2), -1, 1)
-        self.state_robot = np.concatenate((obs_ang, obs_vel_clip, [time_obs]))
+        gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
+        if gyro_n:
+            obs_ang = np.array(state_ang) + np.random.normal(0.0, gyro_n, 4)
+            obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
+            ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
+        # Tilt history (Run 7): last LENGTH_TILT_HISTORY steps of (roll, pitch),
+        # normalised so the fall threshold (1.3 rad) is +/-1. Same IMU noise.
+        tnorm = np.clip(state_ang_euler / 1.3, -1.0, 1.0)
+        if gyro_n:
+            tnorm = np.clip(tnorm + np.random.normal(0.0, gyro_n, 2), -1.0, 1.0)
+        self.tilt_history = np.append(self.tilt_history, tnorm)
+        self.tilt_history = np.delete(self.tilt_history, np.s_[0:2])
+        self.state_robot = np.concatenate((obs_ang, obs_vel_clip, [time_obs],
+                                           self.tilt_history, ang_acc))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
         # Penalty and reward
@@ -315,27 +385,60 @@ class OpenCatGymEnv(gym.Env):
         # the reference the same way.
         imitation_reward = 0.0
         if FAC_IMITATION > 0 and WKF_REF is not None:
-            ref = WKF_REF[self.step_counter % len(WKF_REF)] / self.bound_ang
+            ref = WKF_REF[int(self._phase) % len(WKF_REF)] / self.bound_ang
             imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
+            # R3: fade the imitation reward while stumbling (prev-step tilt over
+            # IMITATION_TILT_FADE) so matching wkF stops fighting a recovery --
+            # FAC_BALANCE takes over. The R1 phase-pause tried to do this by
+            # freezing the reference and destabilised the gait; this is the
+            # gentler version (clock keeps running, weight drops).
+            if self._prev_tilt > IMITATION_TILT_FADE:
+                imitation_reward *= IMITATION_FADE_FACTOR
 
-        # Balance-catch reward: while the body is stumbling (tilt over
-        # BALANCE_TILT_ON but not yet fallen), pay for reducing tilt frame to
-        # frame. Dense, always on -> trains catching a wobble on the obstacle
-        # course, the learnable stand-in for self-righting (R2/R3 showed a
-        # force-limited flat quadruped can't recover once past 1.3 rad).
+        # Balance-catch reward (Run 7 shaping): while the body is stumbling
+        # (BALANCE_TILT_ON < tilt < fall threshold), pay for (a) reducing the
+        # tilt ANGLE frame-to-frame, (b) reducing the tilt RATE -- damping the
+        # wobble, not just leaning back -- and (c) having feet planted. Dense,
+        # always on: trains catching a wobble before it becomes a fall (R2/R3
+        # showed a force-limited flat quadruped can't recover past 1.3 rad).
         tilt = float(np.max(np.abs(state_ang_euler)))
+        tilt_rate = abs(tilt - self._prev_tilt)
         balance_reward = 0.0
-        if FAC_BALANCE > 0 and tilt > BALANCE_TILT_ON:
-            balance_reward = FAC_BALANCE * max(0.0, self._prev_tilt - tilt)
+        if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
+            balance_reward = FAC_BALANCE * (
+                BALANCE_W_ANGLE * max(0.0, self._prev_tilt - tilt)
+                + BALANCE_W_RATE * max(0.0, self._prev_tilt_rate - tilt_rate)
+                + BALANCE_W_FEET * (sum(paw_contact) / 4.0))
+        self._prev_tilt_rate = tilt_rate
         self._prev_tilt = tilt
 
+        # Target-speed tracking bonus (Run 7): [0,1] * FAC_SPEED, peaking at
+        # TARGET_SPEED, from a base-x velocity averaged over SPEED_WINDOW steps
+        # (per-step Δx is too noisy). Relative error -> scale-free sharpness.
+        self._x_window.append(current_position)
+        if len(self._x_window) > SPEED_WINDOW + 1:
+            self._x_window.pop(0)
+        if len(self._x_window) >= 3:
+            vx_est = ((self._x_window[-1] - self._x_window[0])
+                      / ((len(self._x_window) - 1) / CONTROL_HZ))
+        else:
+            vx_est = 0.0
+        speed_reward = FAC_SPEED * np.exp(
+            -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
+
         movement_forward = current_position - last_position
+        # Forward-progress reward capped at the walk set-point: rewards progress
+        # up to TARGET_SPEED's per-step displacement, nothing above, so it no
+        # longer competes with the speed tracker. Backward motion still stings.
+        capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
+                         if MOVEMENT_CAP_AT_TARGET else movement_forward)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
-        reward = (FAC_MOVEMENT * movement_forward
+        reward = (FAC_MOVEMENT * capped_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
+                 + speed_reward
                  + balance_reward
                  - penalty_scale * (
                     smooth_movement + body_stability
@@ -352,10 +455,12 @@ class OpenCatGymEnv(gym.Env):
         # final reward) -- lets us see which term shifts when behavior changes,
         # instead of only seeing the total reward.
         info = {
-            "r_movement": FAC_MOVEMENT * movement_forward,
+            "r_movement": FAC_MOVEMENT * capped_forward,
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
             "r_imitation": FAC_IMITATION * imitation_reward,
+            "r_speed": speed_reward,
+            "speed_mps": vx_est,
             "r_balance": balance_reward,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,
@@ -457,7 +562,14 @@ class OpenCatGymEnv(gym.Env):
         self._recovery_hold = 0
         self._prev_upright = 1.0
         self._prev_tilt = 0.0
+        self._prev_tilt_rate = 0.0
         self._recovered_count = 0
+        # Run 7 state: gait-phase counter (slows under tilt), speed window,
+        # tilt history, previous angular velocity for the accel observation.
+        self._phase = 0.0
+        self._x_window = []
+        self._prev_ang_vel = np.zeros(2)
+        self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)
         # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
         self._step_budget = EPISODE_LENGTH
         # Domain-randomization ramp for this episode.
@@ -532,11 +644,14 @@ class OpenCatGymEnv(gym.Env):
         state_ang = p.getBasePositionAndOrientation(self.robot_id)[1]
         state_vel = np.asarray(p.getBaseVelocity(self.robot_id)[1])
         state_vel = state_vel[0:2]*ANG_FACTOR
-        # step_counter is 0 here, so time_obs starts each episode at phase 0.
-        time_obs = np.fmod(self.step_counter / TIME_PHASE_PERIOD, 1.0)
+        # self._phase is 0 here, so time_obs starts each episode at phase 0.
+        time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         self.state_robot = np.concatenate((state_ang,
                                            np.clip(state_vel, -1, 1),
-                                           [time_obs]))
+                                           [time_obs],
+                                           self.tilt_history,      # all zeros at reset (level)
+                                           np.zeros(2)))           # ang accel
+
 
         # Initialize robot state history with reset position
         state_joints = np.asarray(
