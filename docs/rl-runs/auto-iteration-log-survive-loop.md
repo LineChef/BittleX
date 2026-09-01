@@ -826,3 +826,39 @@ gait that also carries the one useful new lever (the curriculum). `surv_r5`
 stays the safe gate-complete fallback; `surv_r2` the higher-survival-but-slow
 alternative. Real gains now depend on perception in the loop (Phase 8) and
 hardware.
+
+---
+
+# gait-polish — closing the surv_r12 gaps
+
+## G1 — `MIN_SPEED` 0.085 -> 0.090 — REJECT
+Cleared the flat-speed gate (0.080 -> 0.085) but crashed pooled conditional
+survival 21% -> 11% and trot -0.55 -> -0.43. Not worth 0.005 m/s. Reverted.
+
+## G2 — same config, trained 5M steps instead of 2M — **PROMOTE (new best of the whole effort)**
+
+Training metrics looked alarming mid-run (`ep_len_mean` 250 -> 182,
+`ep_rew_mean` 2.2e3 -> 714) -- the adaptive push curriculum kept escalating
+across the long run until the policy was falling in most *training* episodes.
+But at fixed benchmark difficulty (curriculum off) the longer-trained policy is
+clearly better: "trained on brutal, tested on hard."
+
+| cell | cond. surv. (g2 / r12) | L falls (g2 / r12 / S) | g2 speed | g2 trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% / 0% | **0.099** | −0.48 |
+| obst-20 | 100% (1) | 4% / 0% / 4% | 0.079 | −0.46 |
+| obst-35 | **50%** (2) | 11% / 7% / 7% | 0.063 | −0.45 |
+| obst-50 | **67%** (3) | 11% / 11% / 11% | 0.060 | −0.46 |
+| push-hard | 7% (15) | **64% / 54% / 54%** | 0.077 | −0.52 |
+| obst-50+push | **44%** (9) | 39% / 25% / 32% | 0.057 | −0.49 |
+
+**Pooled conditional survival: 30% (9/30) — clears the 30% target for the first
+time in the entire loop.** Flat speed 0.099 — **also clears the speed gate** that
+`surv_r12` missed and G1 couldn't fix. Big gains on the obstacle cells (0% -> 50–67%
+at 35/50 mm). Cost: `push-hard` regressed (19% -> 7%, and it now falls *more* than
+scripted there); trot softer (−0.55 -> −0.48, still passing).
+
+**`gp_g2_long` is the new best gait and the coverage-loop base.** Two takeaways:
+5M steps >> 2M for this config, and the adaptive push curriculum + long training
+compound well (it just needs the room). The `push-hard` regression is the one
+thing to watch.
