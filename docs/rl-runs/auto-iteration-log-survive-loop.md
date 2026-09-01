@@ -301,4 +301,53 @@ walk).
 cond. survival back to ≥ 25% and ideally past 0.30 (floor off during the save);
 `obst-50+push` win restored.
 
+**Result** (`surv_r5_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r5 / r2) | L falls (r5 / r2) | S falls | L speed | L trot | L yaw-rate | L roll |
+|---|---|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0% | **0.094** | **−0.55** | 7.6 | .006 |
+| obst-20 | – | 0% / 0% | 0% | 0.073 | −0.55 | 8.2 | .007 |
+| obst-35 | 0% / 0% | 4% / 4% | 4% | 0.056 | −0.54 | 8.7 | .010 |
+| obst-50 | 0% / 0% | 7% / 7% | 4% | 0.053 | −0.54 | 13.8 | .018 |
+| push-hard | **19% / 12%** | **57% / 61%** | 57% | 0.073 | −0.59 | 31.2 | .075 |
+| obst-50+push | **20% / 50%** | 36% / 32% | 36% | 0.050 | −0.56 | 24.2 | .051 |
+
+**Pooled conditional survival: 18% (5/28)** — up from S3/S4's 11%, still under S2's 25%.
+
+| gate | threshold | result | verdict |
+|---|---|---|---|
+| pooled cond. survival | ≥ 0.30 | 0.18 | ❌ FAIL (< S2) |
+| fall ≤ scripted everywhere | no cell worse | obst-50 7% vs 4% (~1 ep) | ❌ FAIL (marginal) |
+| **flat speed** | 0.085–0.125 | **0.094** | ✅ PASS — fixed |
+| trot corr | ≤ −0.45 | −0.54…−0.59 | ✅ PASS — crispest of the loop |
+| yaw-rate rms | ≤ 1.2× surv_r1 | ok | ✅ |
+
+**Mixed — keep the S5 base, target the one regression.** The tilt-gated floor
+**worked for what it was for**: flat speed 0.076 → **0.094** (gate cleared for the
+first time in the loop), trot the crispest yet, and **`push-hard` survival
+improved 12% → 19%** (the policy can now slow to catch a flat shove). But
+**`obst-50+push` regressed 50% → 20%.**
+
+**Diagnosis:** on rough terrain the policy sits at moderate tilt (~0.3–0.45 rad)
+fighting the obstacles — *below* the hard 0.5 rad cutoff, so the 0.085 floor is
+still fully active and still pushing it forward into the terrain. S2's blanket
+0.07 floor gave rough ground more room.
+
+**Learnings → S6:** keep S5 (its speed/trot/`push-hard` gains are real) but
+**ramp** the floor down with tilt instead of a hard cutoff — full at tilt 0,
+zero at ≥ 0.5, so moderately-rough terrain gets partial relief too.
+
+---
+
+## S6 — `surv_r6` — ramp the speed floor out with tilt
+
+`surv_r5` base, one change:
+- `min_speed_penalty *= clip((0.5 − tilt) / 0.5, 0, 1)` — was a hard on/off at
+  tilt 0.5. Now: full floor when upright, ~half at tilt 0.25, off at ≥ 0.5.
+  Rough terrain (tilt 0.3–0.45) gets meaningful relief without letting
+  flat-ground pace sag (flat tilt ≈ 0.1 → ~80% floor).
+
+**Hypothesis:** flat speed stays ≥ 0.09, `push-hard` holds ~19%, `obst-50+push`
+recovers toward 40–50%, pooled clears 25% and ideally 0.30.
+
 **Result:** _pending_

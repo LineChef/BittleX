@@ -459,10 +459,12 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r5: suspend the speed floor while wobbling -- slowing down to catch a
-        # stumble must not be punished. Active only when the body is ~upright.
-        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
-                             if tilt < BALANCE_TILT_ON else 0.0)
+        # surv_r5/r6: fade the speed floor out as the body tilts -- slowing to catch a
+        # stumble must not be punished. surv_r5 used a hard cutoff at BALANCE_TILT_ON;
+        # surv_r6 ramps it so moderately-rough terrain (tilt ~0.3-0.45, where
+        # obst-50+push lives) also gets relief, not just full wobbles.
+        _floor_scale = float(np.clip((BALANCE_TILT_ON - tilt) / BALANCE_TILT_ON, 0.0, 1.0))
+        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est) * _floor_scale
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
