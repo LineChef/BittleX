@@ -733,3 +733,39 @@ now supplies the disturbance response and the policy's job narrows to
 complementing/timing it rather than reinventing it.
 
 **Result:** _pending_
+
+**Result** (`surv_r13_ppo`, trained + evaluated WITH the reflex; scripted
+un-modified). 28 ep/cell:
+
+| cell | cond. surv. (r13/r12/r2) | L falls (r13/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.084 | −0.48 |
+| obst-50 | 0% (1) | 7% / 4% | 0.050 | **−0.39** |
+| push-hard | **6%** / 19% / 12% | 61% / 57% | 0.083 | **−0.40** |
+| obst-50+push | **50%** / 30% / 50% | **25% / 36%** | 0.048 | **−0.37** |
+
+**Pooled conditional survival: 21% (6/28) — a wash vs `surv_r12`.** It just moved
+the survival around: `obst-50+push` 30% -> 50% (now matches `surv_r2`), but
+`push-hard` 19% -> 6%. And the brace-and-lean bias firing mid-gait **dropped the
+trot below the −0.45 gate on three cells** (−0.37 to −0.40). `ep_len_mean` fell
+to 239 in training (the reflex caused more falls during learning).
+
+**REJECT.** Even trained-in, the crude fixed brace-and-lean reflex doesn't lift
+the aggregate and it costs trot crispness. The firmware's real reflex is
+directional and force-angle-aware; this stand-in isn't worth it in sim. Reverted
+(`MIDWALK_PUSH_REFLEX = False`). Best remains `surv_r12` (21%).
+
+## S14 — `surv_r14` — consolidation: surv_r2 reward + the S12 curriculum
+
+`surv_r12` (proj_grav + adaptive curriculum, on the `surv_r5` reward) capped at
+21% -- below `surv_r2`'s 25%. The one reward difference is the speed floor:
+`surv_r5` gates a 0.085 floor by tilt; `surv_r2` uses a plain 0.07 floor and got
+the loop's best raw survival. S14 pairs **`surv_r2`'s reward** (plain 0.07 floor,
+no tilt gate) with the two levers that helped: **`proj_grav` obs + adaptive push
+curriculum**.
+
+**Hypothesis:** `surv_r2`'s more permissive speed floor + the curriculum push
+pooled conditional survival past 25%. Cost: flat speed likely ~0.076 (below the
+gate), as `surv_r2` was.
+
+**Result:** _pending_

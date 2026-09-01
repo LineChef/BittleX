@@ -55,7 +55,7 @@ TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-
 FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- BUT only while upright (tilt < BALANCE_TILT_ON). surv_r5: the 0.085 floor (r3) fixed the flat-speed gate but crushed survival (r3/r4 both 11% vs r2's 25%) because it punished slowing down to catch a stumble. Now suspended whenever the body is wobbling, so survival can slow the walk while flat-ground pace still clears the gate.
+MIN_SPEED = 0.07           # m/s. surv_r14: back to surv_r2's plain low floor (no tilt gate below). surv_r2 (0.07 plain) got the loop's best raw survival (25%); surv_r5's 0.085 tilt-gated floor traded survival for the flat-speed gate. S14 pairs r2's reward with the S12 adaptive curriculum -- accept the ~0.076 flat speed for the higher survival.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -131,7 +131,7 @@ ADAPT_MIN, ADAPT_MAX = 0.35, 1.70   # bounds on the multiplier
 # On a roll spike, blend a brace-and-lean bias into the joint targets for a
 # short window -- crouch/widen all four, prop the falling side, tuck the rising
 # side. Layered UNDER the residual policy: joint = wkF(phase) + reflex + action.
-MIDWALK_PUSH_REFLEX = True   # surv_r13: on from the start of training (eval-only on an untrained policy regressed 21%->11%; test whether training WITH it present helps)
+MIDWALK_PUSH_REFLEX = False  # surv_r13 REJECT: trained-in it was a wash (21%=surv_r12) and dropped trot below the gate. Off again.
 REFLEX_TRIGGER_ROLL = 0.35   # rad -- engage above this |roll|
 REFLEX_TRIGGER_RATE = 2.5    # rad/s -- or this |roll rate|
 REFLEX_WINDOW = 16           # control steps the bias is applied (linear decay)
@@ -528,10 +528,9 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r5: suspend the speed floor while wobbling -- slowing down to catch a
-        # stumble must not be punished. Active only when the body is ~upright.
-        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
-                             if tilt < BALANCE_TILT_ON else 0.0)
+        # surv_r14: plain low floor (surv_r2), no tilt gate -- at 0.07 it does not
+        # need suspending during a stumble (the policy has room to slow well above it).
+        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
