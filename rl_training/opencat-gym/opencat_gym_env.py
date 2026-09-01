@@ -131,7 +131,7 @@ ADAPT_MIN, ADAPT_MAX = 0.35, 1.70   # bounds on the multiplier
 # On a roll spike, blend a brace-and-lean bias into the joint targets for a
 # short window -- crouch/widen all four, prop the falling side, tuck the rising
 # side. Layered UNDER the residual policy: joint = wkF(phase) + reflex + action.
-MIDWALK_PUSH_REFLEX = False
+MIDWALK_PUSH_REFLEX = True   # surv_r13: on from the start of training (eval-only on an untrained policy regressed 21%->11%; test whether training WITH it present helps)
 REFLEX_TRIGGER_ROLL = 0.35   # rad -- engage above this |roll|
 REFLEX_TRIGGER_RATE = 2.5    # rad/s -- or this |roll rate|
 REFLEX_WINDOW = 16           # control steps the bias is applied (linear decay)
