@@ -933,3 +933,27 @@ does matter. Not fixable without redesigning the scenario (force a shove during
 every slip episode, bigger patch) -- and "traction loss on a flat indoor floor"
 is marginal next to slopes, obstacles and shoves. Reverted; `SLIP_PATCH = 0`.
 Base stays `cov_r1_slope`. R3 rebases on it.
+
+## Revised schedule (approved) — capability / "scripted+" focus
+
+Bar for keep/revert changed mid-loop: judge each round on **net policy
+capability**, lean *keep*, revert only if a knob destabilises the gait, costs
+real forward speed, or buys no new capability (R2's case). Whole-effort target:
+the finished gait should be **>= scripted on every benchmark cell** (falls,
+speed, trot, obstacles, slopes, pushes) *and* do what scripted can't. Current
+scripted+ gaps: flat-ground speed (0.091 vs ~0.10) and a thin push-hard margin.
+
+Remaining rounds, base = `cov_r1_slope`:
+
+| round | knob(s) | steps | note |
+|---|---|---|---|
+| R3 | `START_POSE_JITTER=8` | 2M | running |
+| R4 | `SUSTAINED_FORCE` (held directional shove) | 2M | |
+| R5 | commanded speed + yaw-rate (obs +2, reward term) | 2M | +code |
+| R6 | `STUCK_FOOT` (jammed leg joint) | 2M | |
+| **R-rob** | `RANDOM_TERRAIN` 0.03->0.045, `IMPULSE_PUSH_PROB` 0.006->0.013, `RANDOM_PUSH_PROB` 0.02->0.03, `FAC_FALL_PENALTY` -15 | 3M | robustness pass — fewer falls under disturbance |
+| **R-speed** | `TARGET_SPEED` 0.10->0.11, `FAC_IMITATION` 10->15 | 2M | only if flat speed still < 0.10 after R-rob |
+| R7 | all live knobs + `DEFORM_GROUND` 0.2 | 5M | consolidation (5M: G2 proved 5M >> 2M) |
+
+Then: full 12-cell learned-vs-scripted benchmark + per-cell scripted+ scorecard +
+per-scenario keep/tune analysis + HTML report.
