@@ -35,9 +35,8 @@ open items on the bench once the parts are in hand.
   offloading the Pi.
 - → **Only 4 Grove sockets, and they're typed.** The AI Vision module takes one.
   Plan any additional Grove sensors around G1=UART2 / G2=I²C / G3-4=analog.
-- → Servos are feedback-capable; on hardware we could feed measured joint angles
-  as an observation (the sim provides these for free). Reading the 12th servo's
-  feedback needs JP1 disconnected — we only use 9, so not an issue.
+- → **Servo position feedback: CONFIRMED to exist, but slow — not a control-rate
+  signal.** Full write-up below under "Servo position feedback".
 
 ## P1S alloy servos (×9: 8 legs + 1 neck)
 
@@ -54,6 +53,55 @@ open items on the bench once the parts are in hand.
   continuous).
 - → **Overheat protection throttles/cuts hot servos.** Long real-robot RL or eval
   sessions will hit this — build in cooldown breaks.
+
+## Servo position feedback (researched 2026-09-01)
+
+**Confirmed it exists on our hardware.** Petoi added position feedback to servos
+manufactured after **March 2024** (all with a label/laser-mark after May 2024,
+possibly earlier). It works **only on ESP32 BiBoards** (our BiBoard V1 qualifies),
+not NyBoards. Current **Bittle X V2 ships with feedback servos as standard** —
+Amazon/eBay/Petoi listings all say "alloy feedback servos" for the V2 alloy
+model, which is what we ordered. Petoi *does* also sell a servo set "without
+feedback control", so it's not universal across all their SKUs — but the V2 kit
+has them. **Still do the 30-second check on arrival:** flash latest firmware,
+send serial `f`; if it prints a row of changing numbers as you move the joints by
+hand, they're feedback servos (one column per feedback joint).
+
+**How it works** (`OpenCatEsp32/src/espServo.h`, `readFeedback()` /
+`readAllFeedbackFast()`): the servo reports its angle back **on the same PWM
+signal wire**. The firmware, per joint: re-attaches the pin, writes a special
+~3500 µs pulse (wider than the 500–2500 µs command range) to request a reply,
+**detaches the pin and sets it to INPUT**, then measures the width of the pulse
+the servo sends back and converts it to an angle. It takes 3 samples/joint and
+discards the first; `delay(15)` ms per joint (or a shared `delay(3)` in the "fast"
+all-joints path); 10 ms timeout per pulse.
+
+**This is NOT a control-rate signal.** Reading is blocking, time-multiplexed, and
+**momentarily interrupts the PWM command** on each pin while it reads. A full
+9-joint read is on the order of tens of ms → realistically **~5–20 Hz**, versus
+the 80 Hz sim control loop (or the real BiBoard's ~48–50 Hz). You cannot command
+and read feedback on the same wire at the same rate.
+
+**Serial interface** (over the same link `pi_pipeline` already uses):
+`f` = print one feedback row · `fF` = "movement following" (drag a leg, others
+mirror) · `fl` / `fr` = record / replay a hand-puppeted skill · `c16` = auto
+joint calibration. The higher-level modes need **all** joints to be feedback
+servos.
+
+**Implications for our work:**
+- → **The RL policy must not depend on fast measured joint angles.** Good news:
+  in **residual mode** (the whole resid + survive line) `opencat_gym_env.py`
+  already builds its joint-angle observation history from the **commanded**
+  target (`ref + action·scale`, `step()` ~line 224), not from `getJointStates`.
+  The Pi knows those without any feedback read → no sim-to-real gap here. This
+  only becomes a problem if residual mode is turned off, or a term that reads
+  *measured* angles is added.
+- → The IMU (quaternion + angular velocity) is the only true real-time body
+  signal — feedback servos don't change that.
+- → Where feedback IS useful for the project: one-time **auto-calibration** on
+  assembly, a **"puppet a skill" authoring flow** (backlog: "teach me a trick"),
+  quasi-static **stalled/blocked-joint detection**, and sim-to-real calibration
+  spot-checks — all things that tolerate a slow, blocking read.
 
 ## Bittle X body + battery
 
