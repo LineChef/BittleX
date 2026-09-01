@@ -154,6 +154,15 @@ def main():
         ("obst-50+push", 0.050, 0.30, 0.60, 0.010),
     ]
 
+    # Disable the adaptive push curriculum (surv_r12) for benchmarking: it's a
+    # per-instance training-time state (self._push_curr) that would otherwise
+    # persist across the learned run, leak into the scripted run sharing this
+    # same env object, and drift cell to cell -- silently breaking the matched,
+    # controlled-difficulty comparison this benchmark depends on. Each cell's
+    # impulse/push values below are already the controlled difficulty; force
+    # the multiplier to a flat 1.0 regardless of what the checkpoint learned.
+    opencat_gym_env.ADAPTIVE_PUSH = False
+
     env = OpenCatGymEnv()
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)

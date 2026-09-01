@@ -653,3 +653,48 @@ survival on the hard push cells climbs past 25% without a fall-rate regression o
 the milder cells.
 
 **Result:** _pending_
+
+**Bug found and fixed while scoring:** the first benchmark run showed an
+implausible 27% pooled / 60% at obst-50+push, with scripted's fall rate at that
+cell jumping to 54% (historically 36%). Cause: `benchmark_gaits.py` shares one
+`env` instance across the learned run and the scripted run; `self._push_curr`
+(the adaptive-curriculum multiplier) is per-instance training-time state that
+isn't reset between them, so it drifted during the learned run and leaked into
+the scripted run's push strength, and carried across cells too — silently
+breaking the matched-difficulty comparison the whole benchmark depends on.
+**Fixed:** `benchmark_gaits.py` now force-sets `ADAPTIVE_PUSH = False` before
+running (the cells already encode controlled difficulty; adaptive scaling on
+top of that defeats the comparison). Re-ran clean.
+
+**Result** (`surv_r12_ppo`, ~38 min, clean; benchmark re-run after the fix
+above). 28 ep/cell:
+
+| cell | cond. surv. (r12/r5/r2) | L falls (r12/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.080 | −0.55 |
+| obst-35 | 0% (1) | 7% / 4% | 0.057 | −0.55 |
+| obst-50 | 0% (1) | 11% / 4% | 0.049 | −0.55 |
+| push-hard | 19% (16) | **54% / 57%** | 0.069 | −0.57 |
+| obst-50+push | **30%** (10) | **25% / 36%** | 0.045 | −0.56 |
+
+**Pooled conditional survival: 21% (6/28)** — beats `surv_r5`'s 18%, still under
+`surv_r2`'s 25%. **First round where the learned gait's raw fall rate beats
+scripted at *both* hard push cells simultaneously** (54% vs 57%, 25% vs 36%) —
+not just conditional survival on scripted's failures, but fewer falls overall.
+Trot crispest yet (−0.55…−0.57). Flat speed 0.080 — a hair under the 0.085 gate.
+
+**PROMOTE (relative to `surv_r5`) — carrying forward as the base for S13.** The
+adaptive push curriculum is the first lever since S2 to move the number in the
+right direction while also improving trot and (mostly) matching/beating
+scripted's raw fall rate. Doesn't clear the 30% target or beat S2's raw 25% yet;
+flat speed needs a nudge. Confirms the research lever (gradual difficulty beats a
+fixed full-strength ramp).
+
+## Push reflex — eval only, on `surv_r12_ppo`
+
+Bolt the scripted mid-walk brace-and-lean reflex onto `surv_r12` with **no
+retraining** — flip `MIDWALK_PUSH_REFLEX = True`, benchmark. Isolates "does the
+scripted reflex help a policy that never trained with it" before spending a
+training round on it.
+
+**Result:** _pending_

@@ -125,6 +125,18 @@ ADAPT_UP_RATE = 0.75      # survive-rate above this -> harder
 ADAPT_DOWN_RATE = 0.40    # below this -> easier
 ADAPT_STEP = 0.12         # curriculum multiplier change per adjustment
 ADAPT_MIN, ADAPT_MAX = 0.35, 1.70   # bounds on the multiplier
+
+# --- Scripted mid-walk push reflex (surv_r13, from the firmware's --------
+# IMU_EXCEPTION_PUSHED, which the real firmware only runs while standing).
+# On a roll spike, blend a brace-and-lean bias into the joint targets for a
+# short window -- crouch/widen all four, prop the falling side, tuck the rising
+# side. Layered UNDER the residual policy: joint = wkF(phase) + reflex + action.
+MIDWALK_PUSH_REFLEX = False
+REFLEX_TRIGGER_ROLL = 0.35   # rad -- engage above this |roll|
+REFLEX_TRIGGER_RATE = 2.5    # rad/s -- or this |roll rate|
+REFLEX_WINDOW = 16           # control steps the bias is applied (linear decay)
+REFLEX_BRACE_DEG = 9.0       # crouch/widen on all four legs
+REFLEX_LEAN_DEG = 7.0        # asymmetric prop toward the fall
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -180,6 +192,8 @@ class OpenCatGymEnv(gym.Env):
         self._dr = 0.0            # domain-randomization ramp for the current episode
         self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
         self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
+        self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
+        self._reflex_dir = 0.0
         self.state_history = np.array([])
         self.angle_history = np.array([])
         self.bound_ang = np.deg2rad(BOUND_ANG)
@@ -254,6 +268,26 @@ class OpenCatGymEnv(gym.Env):
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
             joint_angs += action * ds # Change per step including agent action
+
+        # Scripted mid-walk push reflex (surv_r13): trigger on a roll spike, then
+        # blend a brace-and-lean bias under the policy for REFLEX_WINDOW steps.
+        if MIDWALK_PUSH_REFLEX and not self._in_recovery:
+            _q = p.getBasePositionAndOrientation(self.robot_id)[1]
+            _roll = p.getEulerFromQuaternion(_q)[0]
+            _rr = p.getBaseVelocity(self.robot_id)[1][0]
+            if self._reflex_timer == 0 and (abs(_roll) > REFLEX_TRIGGER_ROLL
+                                            or abs(_rr) > REFLEX_TRIGGER_RATE):
+                self._reflex_timer = REFLEX_WINDOW
+                self._reflex_dir = float(np.sign(_roll if abs(_roll) > 0.1 else _rr))
+            if self._reflex_timer > 0:
+                d = self._reflex_timer / REFLEX_WINDOW          # linear decay
+                brace = np.deg2rad(REFLEX_BRACE_DEG) * d
+                lean = np.deg2rad(REFLEX_LEAN_DEG) * d * self._reflex_dir
+                # URDF idx 0 FLsh,1 FLel,2 FRsh,3 FRel,4 BRhip,5 BRkn,6 BLhip,7 BLkn
+                joint_angs = joint_angs + np.array([
+                    brace - lean, brace, brace + lean, brace,    # front L / R
+                    brace + lean, brace, brace - lean, brace])   # back  R / L
+                self._reflex_timer -= 1
 
         # Apply joint boundaries individually.
         min_ang = -self.bound_ang
