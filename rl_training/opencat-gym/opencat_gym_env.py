@@ -52,10 +52,10 @@ FAC_UPRIGHT = 3.0         # ramped penalty on tilt^2 (always on). r1: 8.0 stacke
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
 TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-loop pace (~0.10).
-FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
+FAC_SPEED = 10.0           # weight on the speed-tracking Gaussian bonus (peaks at TARGET_SPEED). surv_r9: 5 -> 10 -- make it the DOMINANT positive term (~= imitation) so the policy will sacrifice posture penalties to keep near the set-point under a push, then return (the PA-LOCO mechanism -- duck to survive, recover speed first, height second).
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- BUT only while upright (tilt < BALANCE_TILT_ON). surv_r5: the 0.085 floor (r3) fixed the flat-speed gate but crushed survival (r3/r4 both 11% vs r2's 25%) because it punished slowing down to catch a stumble. Now suspended whenever the body is wobbling, so survival can slow the walk while flat-ground pace still clears the gate.
+MIN_SPEED = 0.07           # m/s. Gentle plain stall-guard (no tilt gate). surv_r9: back to 0.07 -- the 0.085 tilt-gated floor was a workaround for a floor that shouldn't be hard. The dominant FAC_SPEED Gaussian (below, now 10) is what holds the pace at the 0.10 set-point; this only catches an outright stall.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -88,9 +88,10 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
-FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
-FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
-FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
+FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r9: 4.0 -> 2.0, back to a modest orientation-recovery shaping term (the field-standard recipe -- legged_gym / PA-LOCO -- has no dense survival reward at all).
+FAC_SURVIVE_BONUS = 0.0     # surv_r9: DROPPED. S1-S8 hand-crafted a survival reward (terminal bonus, dense band, ramps, tilt-gates) and plateaued at 25% pooled cond-survival. legged_gym & PA-LOCO get push recovery WITHOUT any survival reward -- see docs/rl-runs/auto-iteration-log-survive-loop.md "field-standard reset".
+FAC_SURVIVE_STEP = 0.0     # surv_r9: DROPPED (was 6.0). See above.
+FAC_FALL_PENALTY = 50.0    # surv_r9: explicit NEGATIVE terminal reward on a fall (was just reward=0). legged_gym's _reward_termination -- a sharp failure gradient at the moment of the fall, on top of the lost future reward.
 SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping -> every held step pays FAC_SURVIVE_STEP flat up to SURVIVE_BAND_HI. surv_r7 tried 0.55-1.0 -- push-hard cond-survival 19%->0%, pooled 18%->7%. Reverted to S5's 0.8-1.3.
 SURVIVE_BAND_HI = 1.3     # rad; the fall line.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
@@ -460,13 +461,9 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r5: suspend the speed floor while wobbling -- slowing to catch a stumble
-        # must not be punished. Active only when the body is ~upright.
-        # (surv_r6 tried RAMPING this out with tilt -- it weakened the floor on flat
-        #  ground too: flat speed 0.094 -> 0.082 and trot -0.55 -> -0.40, pooled
-        #  cond-survival 18% -> 11%. Reverted to surv_r5's hard cutoff.)
-        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
-                             if tilt < BALANCE_TILT_ON else 0.0)
+        # surv_r9: plain gentle stall-guard (no tilt gate). The dominant FAC_SPEED
+        # Gaussian holds the pace; this only bites on an outright stall (< 0.07 m/s).
+        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
@@ -485,12 +482,10 @@ class OpenCatGymEnv(gym.Env):
         upright_penalty = FAC_UPRIGHT * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE:
-            # surv_r8: fade the smoothness penalty out as the body tilts. When
-            # upright it keeps the gait clean (rtune_r4's win); during a stumble a
-            # real save needs a fast, large correction -- don't tax the jerk that
-            # catches the fall. Full below BALANCE_TILT_ON, zero by 1.0 rad.
-            _smooth_scale = float(np.clip((1.0 - tilt) / (1.0 - BALANCE_TILT_ON), 0.0, 1.0))
-            resid_smooth_cost = FAC_RESID_SMOOTH * _smooth_scale * float(
+            # rtune_r4: penalise frame-to-frame jerk in the correction (plain, no
+            # tilt gate -- surv_r8 tried gating it off when tilted and it regressed
+            # to the worst of the loop, pooled cond-survival 4%).
+            resid_smooth_cost = FAC_RESID_SMOOTH * float(
                 np.mean(np.abs(np.asarray(action) - self._prev_action)))
         else:
             resid_smooth_cost = 0.0
@@ -566,7 +561,7 @@ class OpenCatGymEnv(gym.Env):
         elif FAC_RECOVERY <= 0:
             if self.is_fallen():                     # legacy: fall = instant end
                 self.step_counter_session += self.step_counter
-                reward = 0
+                reward = -FAC_FALL_PENALTY           # surv_r9: sharp failure gradient (was 0)
                 terminated = True
                 truncated = False
 

@@ -444,4 +444,65 @@ the reward alone and attacks from a different angle.
 policy can now make a decisive corrective move when tilted) with the flat gait
 unchanged (smoothness still full when upright).
 
+**Result** (`surv_r8_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r8/r5/r2) | L falls (r8/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.087 | −0.46 |
+| obst-50 | 0% / 0% / 0% | 4% / 4% | 0.053 | −0.45 |
+| push-hard | **0% / 19% / 12%** | **71% / 57%** | 0.066 | −0.50 |
+| obst-50+push | 10% / 20% / 50% | 46% / 36% | 0.049 | −0.49 |
+
+**Pooled conditional survival: 4% (1/28) — worst of the entire loop.** New
+metrics: no clean recovery events recorded at any cell (a >0.6 rad spike almost
+never came back to <0.35 — it either stayed low or led to a fall).
+
+**REJECT — worst yet, reverted.** Fading the smoothness penalty out when tilted
+let the policy make jerky corrections mid-stumble, which *destabilised* rather
+than saved. `FAC_RESID_SMOOTH` back to plain.
+
+### Loop status after S1–S8
+
+| round | pooled cond. surv. | |
+|---|---|---|
+| **S2** | **25%** | best; too slow (speed gate ❌) |
+| **S5** | 18% | best gate-complete (speed ✅ trot ✅) |
+| S3, S4, S6, S7, S8 | 4–11% | all rejected |
+
+**Eight rounds of tuning the bespoke survival reward (`FAC_SURVIVE_STEP` /
+`FAC_SURVIVE_BONUS` + bands, ramps, tilt-gates) have not beaten S2's 25%, and S8
+was the worst.** The approach is exhausted. Session A abandons it.
+
+---
+
+# Session A — field-standard reset
+
+The research (`legged_gym` / Rudin, PA-LOCO / Xiao) shows robust push recovery is
+achieved **without any bespoke survival reward** — via a dominant soft
+speed-tracking reward + an explicit terminal fall penalty + `projected_gravity`
+in the observation + an adaptive perturbation curriculum. S9–S13 rebuild on that.
+
+## S9 — `surv_r9` — the recipe
+
+Coordinated reset. Changes vs `surv_r5` base:
+- **`FAC_SURVIVE_STEP` 6 → 0, `FAC_SURVIVE_BONUS` 12 → 0** — drop the bespoke
+  survival reward entirely.
+- **New `FAC_FALL_PENALTY = 50`** — a fall now returns `reward = −50` (was 0). A
+  sharp failure gradient at the moment of the fall (legged_gym's
+  `_reward_termination`), on top of the ~2500 lost future reward.
+- **`FAC_SPEED` 5 → 10** — make speed-tracking the dominant positive term (≈
+  imitation), so the policy will sacrifice posture penalties to hold the
+  set-point under a push and then recover (PA-LOCO's duck-then-recover).
+- **`MIN_SPEED` 0.085 → 0.07, un-gated** — back to a gentle plain stall-guard;
+  the dominant `FAC_SPEED` holds the pace now, not a hard floor.
+- **`FAC_RESID_SMOOTH` back to plain** (S8's tilt-gate reverted).
+- **`FAC_BALANCE` 4 → 2** — back to modest orientation-recovery shaping.
+- Kept: harder DR (`IMPULSE_PUSH` 0.55, `RANDOM_MASS` 0.18), `RESIDUAL_SCALE_DEG`
+  11, `FAC_UPRIGHT` 3, `FAC_STABILITY` 0.1, 273-dim obs.
+
+**Hypothesis:** pooled conditional survival breaks past 25% — recovery emerges
+from the fall penalty + dominant speed reward rather than a hand-built bonus. If
+it doesn't clear ~25%, the reactive ceiling on this IMU-only setup is real and we
+stop sim-iterating.
+
 **Result:** _pending_
