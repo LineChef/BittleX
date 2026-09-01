@@ -161,4 +161,52 @@ correction = less oscillation) with falls ≤ baseline at *every* level, includi
 50 mm, and flat speed ≥ 0.08. Risk: too much smoothing = laggy correction, 50 mm
 falls creep up anyway.
 
-**Result:** _pending_
+**Result** (`rtune_r4_ppo`, ~40 min, `ep_len_mean` 250, clean). Benchmark vs
+scripted `wkF`, 14 ep/cell:
+
+| | flat | 20 mm | 35 mm | 50 mm | avg 20/35/50 |
+|---|---|---|---|---|---|
+| yaw max° (r4 / r2 / scr) | 4.7/2.9/2.8 | **5.4**/10.4/4.8 | **5.8**/7.4/5.0 | **7.1**/6.2/7.0 | **6.1** / 8.0 / 5.6 |
+| roll_var (r4 / r2 / scr) | .004/.005/.003 | **.004**/.015/.006 | .015/.007/.009 | .029/.031/.028 | **.016** / .018 / .014 |
+| falls (r4 / r2 / scr) | 0/0/0 | 0/7/0 | 7/0/7 | 14/14/14 | 7% / 7% / 7% |
+| speed (r4 / r2 / scr) | .085/.095/.091 | .068/.072/.066 | .053/.057/.048 | .047/.055/.038 | 0.056 / 0.062 / 0.050 |
+| trot (r4 / r2 / scr) | −.59/−.57/−.50 | −.57/−.54/−.48 | −.57/−.54/−.49 | −.58/−.56/−.47 | −0.57 / −0.55 / −0.48 |
+
+Flat speed 0.085 m/s (guard OK). Score **−243** vs baseline −320 — best of the loop.
+
+**PROMOTED — `rtune_r4` is the new baseline.** The smoothness penalty did exactly
+what the hypothesis said: penalising frame-to-frame jerk (not magnitude) cut the
+correction's oscillation, so **heading dropped from 8.0° → 6.1°** (0.5° off the
+scripted target; at 20 mm it's 5.4° vs scripted's 4.8°) and **roll_var 0.018 →
+0.016** (below scripted at 20 mm). Falls unchanged at every level — same 0/0/7/14
+profile as scripted. Trot got crisper. The only cost: flat speed slipped 0.095 →
+0.085, still above the floor but now close to it — the smoother residual walks a
+touch slower. That sets up R5.
+
+---
+
+## R5 — `rtune_r5` — speed as a true set-point (reward) — _plan_
+
+Motivation (from the builder): speed should be a **commanded value**, not
+something to maximise — "when I say walk I want a specific speed; too slow is also
+bad." Right now `FAC_MOVEMENT = 1000` with `MOVEMENT_CAP_AT_TARGET = False` is an
+uncapped "every mm forward pays" term; the policy funds overspeed by spending
+residual budget → swerve/wobble. R4's smoothness penalty already pulled speed
+down toward target; make that the explicit objective.
+
+Changes vs `rtune_r4`:
+- `MOVEMENT_CAP_AT_TARGET` → **True** (progress reward stops accruing above
+  `TARGET_SPEED`).
+- `FAC_MOVEMENT` 1000 → **300** (de-emphasise raw progress; the Gaussian speed
+  tracker + `MIN_SPEED` floor carry pace).
+- New `−FAC_OVERSPEED · max(0, v − TARGET_SPEED)` term (symmetric with the
+  `MIN_SPEED` floor).
+- Cadence knob: `_phase += 1.1` per step (reference gait ~10 % faster) so the
+  base open-loop walk still hits ~0.10 m/s once the progress incentive is gone.
+- Loop guard change: flat speed band **0.085–0.125 m/s** (was: reject if < 0.08),
+  so overspeed is scored against too.
+
+**Hypothesis:** flat speed sits ~0.09–0.10 m/s (not drifting up, not stalling),
+heading/roll hold R4's gains or improve, falls ≤ baseline.
+
+**Result:** _pending builder go-ahead_
