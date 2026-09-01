@@ -21,6 +21,7 @@ Usage:
 """
 import argparse
 import json
+import math
 import os
 
 import numpy as np
@@ -149,13 +150,20 @@ def main():
     # the last two are the "survive what scripted can't" cells -- strong concentrated
     # shoves that drive the open-loop scripted gait's fall rate up enough to have a
     # meaningful denominator for conditional survival.
+    # 6th field: fixed ground tilt (roll_deg, pitch_deg) or None for a flat/level floor.
+    # +pitch = nose-up = walking UPHILL; -pitch = downhill; roll = side-slope (cross-hill).
+    _S = math.radians
     course = [
-        ("flat",         0.0,   0.0,  0.0,  0.0),
-        ("obst-20",      0.020, 0.15, 0.0,  0.0),
-        ("obst-35",      0.035, 0.25, 0.0,  0.0),
-        ("obst-50",      0.050, 0.35, 0.0,  0.0),
-        ("push-hard",    0.0,   0.20, 0.72, 0.012),
-        ("obst-50+push", 0.050, 0.30, 0.60, 0.010),
+        ("flat",         0.0,   0.0,  0.0,  0.0,   None),
+        ("obst-20",      0.020, 0.15, 0.0,  0.0,   None),
+        ("obst-35",      0.035, 0.25, 0.0,  0.0,   None),
+        ("obst-50",      0.050, 0.35, 0.0,  0.0,   None),
+        ("push-hard",    0.0,   0.20, 0.72, 0.012, None),
+        ("obst-50+push", 0.050, 0.30, 0.60, 0.010, None),
+        ("slope-up-10",  0.0,   0.0,  0.0,  0.0,   (0.0,      _S(10))),
+        ("slope-down-10",0.0,   0.0,  0.0,  0.0,   (0.0,      _S(-10))),
+        ("side-slope-8", 0.0,   0.0,  0.0,  0.0,   (_S(8),    0.0)),
+        ("slope-up+obst",0.030, 0.15, 0.0,  0.0,   (0.0,      _S(9))),
     ]
 
     # Disable the adaptive push curriculum (surv_r12) for benchmarking: it's a
@@ -174,18 +182,28 @@ def main():
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
-    results = {}
-    for label, terr, push, impulse, impulse_prob in course:
-        for k in ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN"):
+    # Neutralise every coverage-loop / DR knob that may be active in the module
+    # (an in-progress round leaves e.g. SLOPE_MAX_DEG=10 set) so each cell tests
+    # exactly and only the difficulty its own tuple specifies. Slope here is
+    # driven solely by SLOPE_FIXED_RP.
+    for k in ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN",
+              "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE",
+              "DEFORM_GROUND", "SLIP_PATCH"):
+        if hasattr(opencat_gym_env, k):
             setattr(opencat_gym_env, k, 0.0)
+
+    results = {}
+    for label, terr, push, impulse, impulse_prob, slope_rp in course:
         opencat_gym_env.RANDOM_TERRAIN = terr
         opencat_gym_env.RANDOM_PUSH = push
         opencat_gym_env.RANDOM_PUSH_PROB = 0.03
         opencat_gym_env.IMPULSE_PUSH = impulse
         opencat_gym_env.IMPULSE_PUSH_PROB = impulse_prob
+        opencat_gym_env.SLOPE_FIXED_RP = slope_rp
         opencat_gym_env.DR_EVAL_FULL = True
 
-        print(f"\n=== {label}  (terrain {terr} m, push {push} m/s, impulse {impulse} m/s @ {impulse_prob}) ===")
+        _sl = "level" if slope_rp is None else f"tilt r{math.degrees(slope_rp[0]):+.0f} p{math.degrees(slope_rp[1]):+.0f} deg"
+        print(f"\n=== {label}  (terrain {terr} m, push {push} m/s, impulse {impulse} m/s @ {impulse_prob}, {_sl}) ===")
         print(f"{'gait':<10} " + " ".join(f"{k.split('_')[0][:6]:>6}" for k in _KEYS))
         rl, rl_eps = _bench(env, learned, args.episodes, args.seed, reflex=args.reflex)
         sc, sc_eps = _bench(env, scripted, args.episodes, args.seed, reflex=False)
@@ -198,6 +216,9 @@ def main():
                      if sc_fall_idx else None)
         results[label] = {"learned": rl, "scripted": sc, "terrain": terr, "push": push,
                           "impulse": impulse, "impulse_prob": impulse_prob,
+                          "slope_rp_deg": (None if slope_rp is None
+                                           else [round(math.degrees(slope_rp[0]), 1),
+                                                 round(math.degrees(slope_rp[1]), 1)]),
                           "learned_fell": [d["fell"] for d in rl_eps],
                           "scripted_fell": [d["fell"] for d in sc_eps],
                           "scripted_fall_episodes": len(sc_fall_idx),
@@ -210,6 +231,7 @@ def main():
             _render(env, learned, "benchmark_learned.gif")
             _render(env, scripted, "benchmark_scripted.gif")
 
+    opencat_gym_env.SLOPE_FIXED_RP = None
     env.close()
     _verdict(results)
     if args.json_out:
@@ -256,14 +278,20 @@ def _verdict(results):
               f"(scripted falls {sc['fell_fraction']:.0%} vs learned {rl['fell_fraction']:.0%}; "
               f"dist {sc['forward_distance_m_mean']:.2f} vs {rl['forward_distance_m_mean']:.2f} m"
               f"{cs_str})")
-    # survive-what-scripted-can't headline: pooled conditional survival over the
-    # cells where the scripted gait actually falls.
-    tot_sc_falls = sum(r["scripted_fall_episodes"] for r in results.values())
-    tot_saved = sum(round((r["conditional_survival"] or 0) * r["scripted_fall_episodes"])
-                    for r in results.values())
-    if tot_sc_falls:
-        print(f"\n  POOLED conditional survival: learned saved {tot_saved}/{tot_sc_falls} "
-              f"= {tot_saved / tot_sc_falls:.0%} of all scripted falls")
+    # survive-what-scripted-can't headline: pooled conditional survival. Report the
+    # original 6 cells (the historical scorecard number) and any added cells
+    # separately so the comparison to prior runs stays apples-to-apples.
+    BASE = {"flat", "obst-20", "obst-35", "obst-50", "push-hard", "obst-50+push"}
+    for tag, keys in (("BASE-6", BASE), ("ADDED", set(results) - BASE), ("ALL", set(results))):
+        subset = {k: v for k, v in results.items() if k in keys}
+        if not subset:
+            continue
+        tot_sc = sum(r["scripted_fall_episodes"] for r in subset.values())
+        tot_sv = sum(round((r["conditional_survival"] or 0) * r["scripted_fall_episodes"])
+                     for r in subset.values())
+        if tot_sc:
+            print(f"  POOLED conditional survival [{tag:>6}]: learned saved {tot_sv}/{tot_sc} "
+                  f"= {tot_sv / tot_sc:.0%} of scripted falls")
     print("\nWhy to look for: on obstacles the learned policy reads body tilt each")
     print("step and adjusts, so it trips less and its roll/pitch variance stays")
     print("lower under disturbance; the scripted gait cycles regardless. On flat")

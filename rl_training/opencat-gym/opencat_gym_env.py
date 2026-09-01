@@ -175,6 +175,7 @@ DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step coun
 # accumulate. Scaled by self._dr like the rest. Benchmark cells in
 # benchmark_gaits.py exercise each with the knob forced on.
 SLOPE_MAX_DEG = 10.0      # coverage R1: per-episode ground tilt, random roll & pitch in +/- this (deg), scaled by _dr
+SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # deg of gaussian noise on the reset joint angles + a small base tilt
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
 STUCK_FOOT_STEPS = 12
@@ -777,7 +778,9 @@ class OpenCatGymEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
-        if SLOPE_MAX_DEG > 0 and self._dr > 0:
+        if SLOPE_FIXED_RP is not None:
+            self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
+        elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
         plane_id = p.loadURDF("plane.urdf", [0, 0, 0],

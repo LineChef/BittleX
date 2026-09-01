@@ -862,3 +862,50 @@ scripted there); trot softer (−0.55 -> −0.48, still passing).
 5M steps >> 2M for this config, and the adaptive push curriculum + long training
 compound well (it just needs the room). The `push-hard` regression is the one
 thing to watch.
+
+---
+
+# coverage loop — robustness in scenarios the gait was never trained on
+
+Base gait: `gp_g2_long`. Each round adds one env knob on top of the last, trains
+~3M steps, then benchmarks vs scripted `wkF` on the **same 10 cells** (the
+historical BASE-6 + 4 slope cells). Goal: improve behaviour in the *new*
+scenario without wrecking the BASE-6 scorecard; a minor regression elsewhere is
+accepted, a large one triggers diagnose -> fix (1–2 rounds) -> else revert just
+that knob.
+
+**Benchmark note:** re-measured `gp_g2_long` on the current env. It scores **21%**
+BASE-6 pooled conditional survival now, not the 30% in the gait-polish section
+above — the `_scatter_obstacles` slope-aware refactor (commit dec14e1) reordered
+the per-episode RNG draws, so the obstacle course is not the same one the 30%
+was measured on. 21% is the honest current base. All coverage-loop deltas below
+are on the current, matched course.
+
+## R1 — `SLOPE_MAX_DEG = 10` (per-episode ground tilt, random roll & pitch ±10°, dr-scaled) — **KEEP**
+
+`cov_r1_slope`, 3M steps. (Re-run clean after the floating-obstacle bug: the
+first attempt placed boxes at a flat-floor z while the plane was tilted.)
+
+| cell | L fall g2 → r1 | L speed g2 → r1 | cond. surv. g2 → r1 | note |
+|---|---|---|---|---|
+| flat | 0% → 0% | 0.099 → 0.091 | – | speed eroded, still > 0.085 gate |
+| obst-20 | 0% → 0% | 0.087 → 0.078 | – | |
+| obst-35 | 7% → **0%** | 0.075 → 0.064 | 100% → 100% | |
+| obst-50 | 14% → **11%** | 0.066 → 0.061 | 50% → 50% | |
+| push-hard | 64% → **50%** | 0.077 → 0.074 | 7% → **20%** | biggest single gain |
+| obst-50+push | 46% → **36%** | 0.070 → 0.058 | 30% → **40%** | |
+| slope-up-10 | 0% → 0% | 0.107 → 0.101 | – | no falls either gait — ≤10° was never a *fall* problem |
+| slope-down-10 | 0% → 0% | 0.080 → 0.071 | – | |
+| side-slope-8 | 0% → 0% | 0.096 → 0.085 | – | |
+| slope-up+obst | 11% → **4%** | 0.087 → 0.080 | – | |
+
+**BASE-6 pooled conditional survival: 21% (6/28) → 32% (9/28), +11pp.** Every
+disturbance cell improved; the push cells most of all. The new scenario itself
+(slopes ≤10°) never caused a fall for either gait — its value was the *transfer*:
+training on tilted ground taught balance that carries into pushes and obstacles.
+
+**Cost:** ~8–10% forward speed across the board (flat 0.099 → 0.091, still
+clearing the 0.085 gate). Accepted — the fall-rate gains are worth it and the
+gate still passes.
+
+**`cov_r1_slope` is the new coverage-loop base.**
