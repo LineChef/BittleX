@@ -96,6 +96,52 @@ built-in 80-class COCO classifier) → approach controller (the `Avoider`
 bearing/area math, inverted to close distance instead of open it) → stop when
 close. Ambitious; a headline demo.
 
+### B11 — Learn its way around the house (topological place memory)
+G2 builds up a sense of *where it is* over time — as **place recognition + a
+graph of places**, never a metric floor plan (no depth/lidar, and monocular
+VSLAM is out of reach on a 512 MB Pi with a 192×192 low-FPS camera).
+
+- **Places:** at a spot, capture the view and store a scene description in the
+  memory DB ("kitchen: checkerboard floor, fridge base on the right, dark
+  doorway ahead"). Match a fresh view against stored ones to re-localize.
+  Matching, cheapest first: Claude compares descriptions → perceptual hash of
+  the thumbnail → image embeddings w/ cosine similarity (if the Grove module or
+  a tiny model can emit them).
+- **Map:** nodes = recognized places, edges = "walked forward ~15 s from A,
+  arrived at B." A graph, not coordinates.
+- **Landmarks:** persistent distinctive objects (fridge, couch, a rug, a door)
+  as anchors; Claude reasons over the detection list ("couch left, TV ahead →
+  living room, facing the hall").
+- **Between anchors:** short-range dead reckoning — gait-cycle count → distance,
+  yaw-rate integration → heading. Drifts; **resets on every recognized place**
+  (topological loop closure).
+- **Storage:** extend `pi_pipeline/memory/` with a `places` table (label,
+  description, hash/embedding, adjacency, last-seen, associated events). Same
+  cross-session mechanism as conversation memory, pointed at location. Needs
+  confidence + decay — furniture moves, doors change.
+- **Known failure modes:** perceptual aliasing (similar corners) → turn-and-scan
+  multi-view + context chaining; lighting/time-of-day drift → several
+  observations per place; low camera height → mostly baseboards/chair legs, a
+  pitch-up glance helps; no global frame, only "this place connects to that."
+
+Realistic end state: reliably answers "which room am I in?" and "roughly which
+way is the kitchen / my charger?", navigates there landmark-to-landmark
+re-localizing at each, and occasionally gets lost and has to wander until
+something looks familiar. Composes with B7 (patrol) and B8 (go-to-object).
+Software on top of vision + link + memory; no new hardware.
+
+**What comes "free" with Claude vs what you build:** the *reasoning* is free —
+match this view to a known place, "couch + TV = living room", pick a heading —
+and early on you can skip embeddings entirely and let Claude compare text
+descriptions. What is NOT free: Claude is stateless per call, so the persistent
+`places` store, loading the relevant subset back into each prompt, the
+perception pipeline that produces the scene description, a cheap retrieval
+pre-filter once the map outgrows the context window (recency / adjacency /
+hash), the actuation loop (intent → serial tokens → monitor → re-query), and
+the local reactive + safety layers. Same split as the rest of the project:
+Claude is the brain on a slow, billed, connectivity-dependent clock; the
+scaffolding that makes its decisions actionable and remembered is the work.
+
 ---
 
 ## Authoring
