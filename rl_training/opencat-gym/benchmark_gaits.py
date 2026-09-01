@@ -152,18 +152,22 @@ def main():
     # meaningful denominator for conditional survival.
     # 6th field: fixed ground tilt (roll_deg, pitch_deg) or None for a flat/level floor.
     # +pitch = nose-up = walking UPHILL; -pitch = downhill; roll = side-slope (cross-hill).
+    # 7th field: SLIP_PATCH fraction (0..1) -- share of episodes with a random
+    # low-friction patch on the floor. 1.0 = every episode (deterministic cell).
     _S = math.radians
     course = [
-        ("flat",         0.0,   0.0,  0.0,  0.0,   None),
-        ("obst-20",      0.020, 0.15, 0.0,  0.0,   None),
-        ("obst-35",      0.035, 0.25, 0.0,  0.0,   None),
-        ("obst-50",      0.050, 0.35, 0.0,  0.0,   None),
-        ("push-hard",    0.0,   0.20, 0.72, 0.012, None),
-        ("obst-50+push", 0.050, 0.30, 0.60, 0.010, None),
-        ("slope-up-10",  0.0,   0.0,  0.0,  0.0,   (0.0,      _S(10))),
-        ("slope-down-10",0.0,   0.0,  0.0,  0.0,   (0.0,      _S(-10))),
-        ("side-slope-8", 0.0,   0.0,  0.0,  0.0,   (_S(8),    0.0)),
-        ("slope-up+obst",0.030, 0.15, 0.0,  0.0,   (0.0,      _S(9))),
+        ("flat",         0.0,   0.0,  0.0,  0.0,   None,          0.0),
+        ("obst-20",      0.020, 0.15, 0.0,  0.0,   None,          0.0),
+        ("obst-35",      0.035, 0.25, 0.0,  0.0,   None,          0.0),
+        ("obst-50",      0.050, 0.35, 0.0,  0.0,   None,          0.0),
+        ("push-hard",    0.0,   0.20, 0.72, 0.012, None,          0.0),
+        ("obst-50+push", 0.050, 0.30, 0.60, 0.010, None,          0.0),
+        ("slope-up-10",  0.0,   0.0,  0.0,  0.0,   (0.0,  _S(10)),  0.0),
+        ("slope-down-10",0.0,   0.0,  0.0,  0.0,   (0.0,  _S(-10)), 0.0),
+        ("side-slope-8", 0.0,   0.0,  0.0,  0.0,   (_S(8), 0.0),    0.0),
+        ("slope-up+obst",0.030, 0.15, 0.0,  0.0,   (0.0,  _S(9)),   0.0),
+        ("slip-patch",   0.0,   0.0,  0.0,  0.0,   None,          1.0),
+        ("slip+push",    0.0,   0.15, 0.55, 0.010, None,          1.0),
     ]
 
     # Disable the adaptive push curriculum (surv_r12) for benchmarking: it's a
@@ -193,17 +197,19 @@ def main():
             setattr(opencat_gym_env, k, 0.0)
 
     results = {}
-    for label, terr, push, impulse, impulse_prob, slope_rp in course:
+    for label, terr, push, impulse, impulse_prob, slope_rp, slip in course:
         opencat_gym_env.RANDOM_TERRAIN = terr
         opencat_gym_env.RANDOM_PUSH = push
         opencat_gym_env.RANDOM_PUSH_PROB = 0.03
         opencat_gym_env.IMPULSE_PUSH = impulse
         opencat_gym_env.IMPULSE_PUSH_PROB = impulse_prob
         opencat_gym_env.SLOPE_FIXED_RP = slope_rp
+        opencat_gym_env.SLIP_PATCH = slip
         opencat_gym_env.DR_EVAL_FULL = True
 
         _sl = "level" if slope_rp is None else f"tilt r{math.degrees(slope_rp[0]):+.0f} p{math.degrees(slope_rp[1]):+.0f} deg"
-        print(f"\n=== {label}  (terrain {terr} m, push {push} m/s, impulse {impulse} m/s @ {impulse_prob}, {_sl}) ===")
+        _sp = f", slip x{slip:g}" if slip else ""
+        print(f"\n=== {label}  (terrain {terr} m, push {push} m/s, impulse {impulse} m/s @ {impulse_prob}, {_sl}{_sp}) ===")
         print(f"{'gait':<10} " + " ".join(f"{k.split('_')[0][:6]:>6}" for k in _KEYS))
         rl, rl_eps = _bench(env, learned, args.episodes, args.seed, reflex=args.reflex)
         sc, sc_eps = _bench(env, scripted, args.episodes, args.seed, reflex=False)
@@ -219,6 +225,7 @@ def main():
                           "slope_rp_deg": (None if slope_rp is None
                                            else [round(math.degrees(slope_rp[0]), 1),
                                                  round(math.degrees(slope_rp[1]), 1)]),
+                          "slip_patch": slip,
                           "learned_fell": [d["fell"] for d in rl_eps],
                           "scripted_fell": [d["fell"] for d in sc_eps],
                           "scripted_fall_episodes": len(sc_fall_idx),
@@ -232,6 +239,7 @@ def main():
             _render(env, scripted, "benchmark_scripted.gif")
 
     opencat_gym_env.SLOPE_FIXED_RP = None
+    opencat_gym_env.SLIP_PATCH = 0.0
     env.close()
     _verdict(results)
     if args.json_out:

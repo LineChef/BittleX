@@ -176,7 +176,7 @@ DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step coun
 # benchmark_gaits.py exercise each with the knob forced on.
 SLOPE_MAX_DEG = 10.0      # coverage R1: per-episode ground tilt, random roll & pitch in +/- this (deg), scaled by _dr
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
-START_POSE_JITTER = 0.0   # deg of gaussian noise on the reset joint angles + a small base tilt
+START_POSE_JITTER = 8.0   # coverage R3: deg of gaussian noise on the reset joint angles + a small base tilt (~0.3x this in deg)
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
 STUCK_FOOT_STEPS = 12
 SUSTAINED_FORCE = 0.0     # N: a held horizontal push, random direction, applied for SUSTAINED_FORCE_STEPS
