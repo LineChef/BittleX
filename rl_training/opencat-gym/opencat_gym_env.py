@@ -24,7 +24,7 @@ CONTROL_HZ = 80.0
 
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
-FAC_MOVEMENT = 350        # Reward forward progress (capped at TARGET_SPEED). surv_r3 tried 550 -- it fixed flat speed but flattened the trot to -0.44 (below the -0.45 gate). surv_r4: 350. The MIN_SPEED floor (0.085, weight 120) is what actually holds the gate now; FAC_MOVEMENT just needs to not fight it.
+FAC_MOVEMENT = 300        # Reward forward progress (capped at TARGET_SPEED). surv_r5: back to surv_r2's 300 (r3's 550 flattened the trot, r4's 350 no better). The tilt-gated MIN_SPEED floor now holds the flat-speed gate without fighting a stumble.
 FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - TARGET_SPEED), unramped -- mirror of the MIN_SPEED floor on the fast side. surv_r2: 60 -> 35, surv_r1 pulled flat speed to 0.081 (just under the 0.085 gate); the MIN_SPEED floor (120) still stops a stall.
 
 # --- Residual action space (residual-on-wkF, "resid" line) -------------------
@@ -55,7 +55,7 @@ TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-
 FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED). surv_r3: 0.07 -> 0.085 -- lift the floor to the loop's flat-speed gate so the policy can't settle below it.
+MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- BUT only while upright (tilt < BALANCE_TILT_ON). surv_r5: the 0.085 floor (r3) fixed the flat-speed gate but crushed survival (r3/r4 both 11% vs r2's 25%) because it punished slowing down to catch a stumble. Now suspended whenever the body is wobbling, so survival can slow the walk while flat-ground pace still clears the gate.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -90,8 +90,8 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
-FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (clip from 0.6 rad) -- that gutted the magnitude in the critical 0.8-1.0 zone (2.6 vs 6.0), pooled cond-survival 25% -> 11%. Reverted to flat. surv_r4: flat 6.0, cutoff lowered 0.8 -> 0.7 to reach fast flat shoves.
-SURVIVE_BAND_LO = 0.7      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line. surv_r4: 0.8 -> 0.7 (r3's ramp-from-0.6 was worse than a flat band).
+FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
+SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -459,7 +459,10 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
+        # surv_r5: suspend the speed floor while wobbling -- slowing down to catch a
+        # stumble must not be punished. Active only when the body is ~upright.
+        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
+                             if tilt < BALANCE_TILT_ON else 0.0)
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)

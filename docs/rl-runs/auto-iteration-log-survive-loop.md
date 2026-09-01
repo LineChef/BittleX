@@ -252,4 +252,53 @@ Effectively `surv_r2` with three corrections:
 **Hypothesis:** restores surv_r2's `obst-50+push` win (≥ 40% cond. survival),
 lifts `push-hard` past 12%, pooled ≥ 0.30; flat speed ≥ 0.085 with trot ≤ −0.47.
 
+**Result** (`surv_r4_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r4 / r2) | L falls (r4 / r2) | S falls | L speed | L trot | L yaw-rate | L roll |
+|---|---|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0% | **0.088** | −0.49 | 8.3 | .009 |
+| obst-20 | – | 0% / 0% | 0% | 0.074 | −0.49 | 8.7 | .008 |
+| obst-35 | 0% / 0% | 7% / 4% | 4% | 0.057 | −0.48 | 9.8 | .013 |
+| obst-50 | 0% / 0% | 7% / 7% | 4% | 0.052 | −0.49 | 11.6 | .016 |
+| push-hard | 6% / 12% | 64% / 61% | 57% | 0.060 | −0.53 | 29.7 | .073 |
+| obst-50+push | **20% / 50%** | **46% / 32%** | 36% | 0.041 | −0.51 | 23.3 | .062 |
+
+**Pooled conditional survival: 11% (3/28)** — no better than surv_r3, well below
+surv_r2's 25%.
+
+| gate | threshold | result | verdict |
+|---|---|---|---|
+| pooled cond. survival | ≥ 0.30 | 0.11 | ❌ FAIL |
+| fall ≤ scripted everywhere | no cell worse | obst-35, obst-50, push-hard, obst-50+push worse | ❌ FAIL |
+| flat speed | 0.085–0.125 | 0.088 | ✅ PASS |
+| trot corr | ≤ −0.45 | −0.48…−0.53 | ✅ PASS |
+| yaw-rate rms | ≤ 1.2× surv_r1 | ok flat/obst, high push cells | ➖ |
+
+**REJECT — 2nd non-improving round; revert to `surv_r2`.** The speed gate is
+fixed (`MIN_SPEED` 0.085 works) but survival collapsed to r3 levels.
+**Root cause identified: the steep `MIN_SPEED` floor (weight 120) and the
+survival objective are in direct conflict.** When shoved, the right move is to
+slow down / widen stance — but the 0.085 floor punishes that ~4/step, so the
+policy keeps driving forward into instability. surv_r2 (`MIN_SPEED` 0.07, lower
+floor) had the room to slow and got the best survival of the loop.
+
+**Learnings → S5:** revert to surv_r2 exactly, then make **one** change — gate the
+`MIN_SPEED` penalty on `tilt < BALANCE_TILT_ON`. Floor active only while upright
+(holds the flat-speed gate); suspended while wobbling (survival can slow the
+walk).
+
+---
+
+## S5 — `surv_r5` — surv_r2 base + tilt-gated speed floor
+
+`surv_r2` config restored (`FAC_MOVEMENT` 300, `SURVIVE_BAND_LO` 0.8, flat
+`FAC_SURVIVE_STEP` 6.0, `FAC_OVERSPEED` 35, `FAC_BALANCE` 4), plus:
+- **`MIN_SPEED` = 0.085, but the penalty applies only when `tilt < 0.5 rad`.**
+  Upright → floor holds flat pace to the gate. Wobbling → no speed-floor
+  pressure, so catching the stumble can cost forward speed for free.
+
+**Hypothesis:** flat speed ≥ 0.085 (floor active on level ground) **and** pooled
+cond. survival back to ≥ 25% and ideally past 0.30 (floor off during the save);
+`obst-50+push` win restored.
+
 **Result:** _pending_
