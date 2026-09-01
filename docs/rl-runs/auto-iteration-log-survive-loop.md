@@ -909,3 +909,27 @@ clearing the 0.085 gate). Accepted — the fall-rate gains are worth it and the
 gate still passes.
 
 **`cov_r1_slope` is the new coverage-loop base.**
+
+## R2 — `SLIP_PATCH = 0.35` (low-friction floor patch, 35% of episodes) — **REVERT**
+
+`cov_r2_slip`, 3M steps from `cov_r1_slope`. Benchmarked on 12 cells (added
+`slip-patch` = a patch every episode, and `slip+push` = patch + a hard shove).
+
+| pooled | cov_r1_slope | cov_r2_slip |
+|---|---|---|
+| BASE-6 conditional survival | 32% (9/28) | **25% (7/28)** |
+| ADDED (slopes + slip) | 71% (5/7) | **57% (4/7)** |
+
+Regressed on **every** pooled metric and the per-cell picture is the same:
+push-hard L 50->57%, obst-50+push L 36->46%, slope-up+obst L 4->7%, forward
+speed down ~0.006-0.009 m/s across the board -- and even the target scenario got
+worse (`slip+push` L 11->14%, cond. surv. 67->50%).
+
+**Why it's a dead knob:** a single low-friction patch on otherwise flat, level
+ground can't destabilise G2 -- the `slip-patch` cell has **0 falls for either
+gait**. So 35% of training episodes carried a perturbation with no consequence
+and no gradient signal; they just diluted the push/obstacle/slope learning that
+does matter. Not fixable without redesigning the scenario (force a shove during
+every slip episode, bigger patch) -- and "traction loss on a flat indoor floor"
+is marginal next to slopes, obstacles and shoves. Reverted; `SLIP_PATCH = 0`.
+Base stays `cov_r1_slope`. R3 rebases on it.
