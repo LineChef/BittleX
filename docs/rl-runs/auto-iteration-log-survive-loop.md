@@ -698,3 +698,38 @@ scripted reflex help a policy that never trained with it" before spending a
 training round on it.
 
 **Result:** _pending_
+
+**Second bug found and fixed:** the first reflex-eval run also came back
+implausible (scripted falling 71% at push-hard vs its historical 57%). Cause:
+`MIDWALK_PUSH_REFLEX` was a single module-level flag, so turning it on for the
+benchmark applied the reflex bias inside `step()` to *both* controllers sharing
+the env -- the "scripted" baseline was silently no longer pure open-loop `wkF`,
+it was "wkF + reflex". **Fixed:** the reflex is now gated by a per-instance
+`env._reflex_on`, which `benchmark_gaits.py`'s `_bench()` sets per call --
+`--reflex` now applies it only to the controller under test, never to the
+scripted baseline it's measured against. Re-ran clean.
+
+**Result** (`surv_r12_ppo` + reflex, eval-only, no retrain; scripted un-modified).
+Pooled conditional survival: **11%** — *worse* than `surv_r12`'s own 21% without
+the reflex (push-hard falls 54% -> 64%, worse than scripted's 57%; obst-50+push
+25% -> 50%, worse than scripted's 36%).
+
+**The scripted reflex bias, bolted onto a policy that never trained with it,
+actively hurts.** Plausible mechanism: the policy's own learned correction and
+the scripted brace-and-lean bias are two uncoordinated signals reacting to the
+same disturbance and fight each other, rather than reinforcing. This does not
+rule out the reflex helping if the policy trains *with* it present from the
+start (the point of S13) -- an untrained interaction being bad is expected; test
+the trained one before judging the mechanism.
+
+## S13 — `surv_r13` — push reflex retrained in
+
+`surv_r12` config (the current best) + `MIDWALK_PUSH_REFLEX = True` from the
+start of training, so the policy learns to work with the scripted brace-and-lean
+bias instead of fighting an unfamiliar one at eval time.
+
+**Hypothesis:** conditional survival exceeds `surv_r12`'s 21%, since the reflex
+now supplies the disturbance response and the policy's job narrows to
+complementing/timing it rather than reinventing it.
+
+**Result:** _pending_

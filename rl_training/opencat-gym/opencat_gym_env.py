@@ -194,6 +194,10 @@ class OpenCatGymEnv(gym.Env):
         self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
         self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
         self._reflex_dir = 0.0
+        self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
+                                                 # sets this so the reflex applies only to the
+                                                 # controller under test, never to the scripted
+                                                 # baseline it's compared against.
         self.state_history = np.array([])
         self.angle_history = np.array([])
         self.bound_ang = np.deg2rad(BOUND_ANG)
@@ -271,7 +275,7 @@ class OpenCatGymEnv(gym.Env):
 
         # Scripted mid-walk push reflex (surv_r13): trigger on a roll spike, then
         # blend a brace-and-lean bias under the policy for REFLEX_WINDOW steps.
-        if MIDWALK_PUSH_REFLEX and not self._in_recovery:
+        if self._reflex_on and not self._in_recovery:
             _q = p.getBasePositionAndOrientation(self.robot_id)[1]
             _roll = p.getEulerFromQuaternion(_q)[0]
             _rr = p.getBaseVelocity(self.robot_id)[1][0]
@@ -710,6 +714,8 @@ class OpenCatGymEnv(gym.Env):
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
+        self._reflex_timer = 0           # a fresh episode starts with no reflex active
+        self._reflex_dir = 0.0
         self._x_window = []
         self._prev_ang_vel = np.zeros(2)
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)

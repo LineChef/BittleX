@@ -72,7 +72,9 @@ def _load_learned(path):
     return PPO.load(path)
 
 
-def _bench(env, model, episodes, seed0):
+def _bench(env, model, episodes, seed0, reflex=False):
+    env._reflex_on = reflex   # per-instance override -- only the controller under
+                              # test gets the reflex; the scripted baseline never does
     eps = []
     per_ep = []                            # per-episode {fell, yaw_rate_rms} -- for
     for e in range(episodes):              # conditional-survival + yaw-rate scoring
@@ -136,6 +138,8 @@ def main():
     ap.add_argument("--episodes", type=int, default=28)
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--scripted-balance", type=float, default=0.0)
+    ap.add_argument("--reflex", action="store_true",
+                    help="force MIDWALK_PUSH_REFLEX on for this benchmark run (eval-only test)")
     ap.add_argument("--gif", action="store_true")
     ap.add_argument("--json-out", default=None)
     args = ap.parse_args()
@@ -162,6 +166,9 @@ def main():
     # impulse/push values below are already the controlled difficulty; force
     # the multiplier to a flat 1.0 regardless of what the checkpoint learned.
     opencat_gym_env.ADAPTIVE_PUSH = False
+    if args.reflex:
+        print("*** mid-walk push reflex FORCED ON for the learned controller only"
+              " (scripted stays the pure open-loop baseline) ***")
 
     env = OpenCatGymEnv()
     learned = _load_learned(args.learned)
@@ -180,8 +187,8 @@ def main():
 
         print(f"\n=== {label}  (terrain {terr} m, push {push} m/s, impulse {impulse} m/s @ {impulse_prob}) ===")
         print(f"{'gait':<10} " + " ".join(f"{k.split('_')[0][:6]:>6}" for k in _KEYS))
-        rl, rl_eps = _bench(env, learned, args.episodes, args.seed)
-        sc, sc_eps = _bench(env, scripted, args.episodes, args.seed)
+        rl, rl_eps = _bench(env, learned, args.episodes, args.seed, reflex=args.reflex)
+        sc, sc_eps = _bench(env, scripted, args.episodes, args.seed, reflex=False)
         print(_row("learned", rl))
         print(_row("scripted", sc))
         # conditional survival: of the episodes where the scripted gait fell, how
