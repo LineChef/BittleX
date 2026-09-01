@@ -182,8 +182,8 @@ STUCK_FOOT_STEPS = 12
 SUSTAINED_FORCE = 0.0     # N: a held horizontal push, random direction, applied for SUSTAINED_FORCE_STEPS
 SUSTAINED_FORCE_PROB = 0.004
 SUSTAINED_FORCE_STEPS = 25
-DEFORM_GROUND = 0.0       # 0..1: randomize ground contact stiffness/damping/restitution (carpet-ish)
-SLIP_PATCH = 0.0          # 0..1: fraction of episodes with a random low-friction patch on the floor
+DEFORM_GROUND = 0.5      # coverage R2: 0..1 randomize ground contact stiffness/damping/restitution (carpet-ish)
+SLIP_PATCH = 0.35        # coverage R2: 0..1 fraction of episodes with a random low-friction patch on the floor
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
