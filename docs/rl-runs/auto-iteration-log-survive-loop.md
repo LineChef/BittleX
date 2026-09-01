@@ -590,3 +590,29 @@ the loop — is Phase 8, not more reactive-recovery sim rounds.
   hardware-in-the-loop pass, not more blind sim iteration.
 - **Recovery (get-up)** is its own workstream — scripted `rc`/`rl` + a
   state-machine switch — see the Recovery section of the project plan.
+
+---
+
+# Session A2 — the levers Session A didn't reach
+
+Session A closed after S9/S10 at a self-imposed decision gate. On review that was
+premature: only 2 of ~5 planned field-standard rounds ran, S9 had a speed-gate
+confound, and the genuinely different levers were untested. Re-opened to test
+them properly. Base: the **S9 field-standard config** (no bespoke survival
+reward, `FAC_FALL_PENALTY` 50, `FAC_SPEED` 10 dominant, `FAC_BALANCE` 2).
+
+## S11 — `surv_r11` — projected-gravity observation + a clean speed floor
+
+- **New observation: `proj_grav` (3-vec)** — the gravity unit vector in the body
+  frame, `R_body_from_world.T @ (0,0,-1)`. A clean, low-dim "which way is down /
+  how tilted" signal; exactly what the real accelerometer gives (no magnetometer
+  needed). Standard in `legged_gym` / PA-LOCO. Added to `state_robot`, obs
+  273 -> 276.
+- **`MIN_SPEED` 0.07 -> 0.085 plain** — fixes S9's speed-gate miss (flat 0.076).
+  With the bespoke survival reward gone, a hard floor no longer competes with a
+  dense save reward; it just holds the gate.
+
+**Hypothesis:** a cleaner orientation signal lets the policy react to a stumble
+sooner -> conditional survival past S2's 25%; flat speed back over 0.085.
+
+**Result:** _pending_
