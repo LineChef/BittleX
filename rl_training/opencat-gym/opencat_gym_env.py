@@ -55,7 +55,7 @@ TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-
 FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Hard floor, BUT suspended while wobbling (tilt < BALANCE_TILT_ON) -- surv_r5/surv_r12 config. surv_r14 tried surv_r2's plain 0.07 floor + proj_grav + curriculum and it regressed to 11%; the tilt-gated 0.085 is the better pairing with the adaptive curriculum. Env left at the surv_r12 config (best research-informed gait, 21%).
+MIN_SPEED = 0.090          # m/s. Hard floor, BUT suspended while wobbling (tilt < BALANCE_TILT_ON). gait-polish G1: 0.085 -> 0.090 -- surv_r12 settled flat speed at 0.080, just under the 0.085 gate; a floor with headroom above the gate should clear it, and it's off during a stumble so survival is unaffected.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
