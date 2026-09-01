@@ -91,7 +91,8 @@ FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a f
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
 FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
-SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
+SURVIVE_BAND_LO = 0.55     # rad; below this = normal wobble (no credit), above = a real stumble -> every held step pays FAC_SURVIVE_STEP flat, up to SURVIVE_BAND_HI.
+SURVIVE_BAND_HI = 1.0      # rad; surv_r7: cap the credit band at 1.0 instead of 1.3. Past ~1.0 rad a flat quadruped with no roll DOF is mostly doomed (Run 6 finding); paying survive credit up to 1.3 mostly rewarded near-hopeless frames. Reward the *catchable* range (0.55-1.0) instead.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -435,8 +436,8 @@ class OpenCatGymEnv(gym.Env):
         self._peak_tilt = max(self._peak_tilt, tilt)
         tilt_rate = abs(tilt - self._prev_tilt)
         # surv_r2/r4: dense survival credit -- flat FAC_SURVIVE_STEP for every step
-        # held upright in the near-tipping band (SURVIVE_BAND_LO..1.3 rad).
-        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
+        # held upright in the catchable-stumble band (SURVIVE_BAND_LO..SURVIVE_BAND_HI).
+        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < SURVIVE_BAND_HI else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
             balance_reward = FAC_BALANCE * (
@@ -459,12 +460,13 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r5/r6: fade the speed floor out as the body tilts -- slowing to catch a
-        # stumble must not be punished. surv_r5 used a hard cutoff at BALANCE_TILT_ON;
-        # surv_r6 ramps it so moderately-rough terrain (tilt ~0.3-0.45, where
-        # obst-50+push lives) also gets relief, not just full wobbles.
-        _floor_scale = float(np.clip((BALANCE_TILT_ON - tilt) / BALANCE_TILT_ON, 0.0, 1.0))
-        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est) * _floor_scale
+        # surv_r5: suspend the speed floor while wobbling -- slowing to catch a stumble
+        # must not be punished. Active only when the body is ~upright.
+        # (surv_r6 tried RAMPING this out with tilt -- it weakened the floor on flat
+        #  ground too: flat speed 0.094 -> 0.082 and trot -0.55 -> -0.40, pooled
+        #  cond-survival 18% -> 11%. Reverted to surv_r5's hard cutoff.)
+        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
+                             if tilt < BALANCE_TILT_ON else 0.0)
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)

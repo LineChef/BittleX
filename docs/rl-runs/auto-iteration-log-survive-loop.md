@@ -350,4 +350,52 @@ zero at ≥ 0.5, so moderately-rough terrain gets partial relief too.
 **Hypothesis:** flat speed stays ≥ 0.09, `push-hard` holds ~19%, `obst-50+push`
 recovers toward 40–50%, pooled clears 25% and ideally 0.30.
 
+**Result** (`surv_r6_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r6/r5/r2) | L falls (r6/S) | L speed | L trot | L yaw-rate |
+|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.082 | **−0.40** | 6.6 |
+| obst-20 | – | 0% / 0% | 0.063 | **−0.40** | 7.7 |
+| obst-35 | 0% / 0% / 0% | 7% / 4% | 0.050 | **−0.40** | 10.7 |
+| obst-50 | 0% / 0% / 0% | **14%** / 4% | 0.049 | **−0.40** | 17.0 |
+| push-hard | 19% / 19% / 12% | 61% / 57% | 0.059 | −0.47 | 31.3 |
+| obst-50+push | **0%** / 20% / 50% | **57%** / 36% | 0.045 | −0.46 | 29.1 |
+
+**Pooled conditional survival: 11% (3/28)** — down from S5's 18%, S2's 25%.
+
+**REJECT — regression. Reverted the ramp; S5's hard cutoff stands.** Ramping the
+floor out with tilt weakened it on *flat* ground too (flat tilt ≈ 0.1 still
+scaled the floor to ~80%): flat speed 0.094 → 0.082 (gate ❌), **trot −0.55 →
+−0.40** (gate ❌), and `obst-50+push` collapsed 20% → 0%. The hard on/off at
+0.5 rad was the better design — keep it.
+
+### Loop status after S1–S6 (the overnight run stalled after S6 — waiter not armed)
+
+| round | pooled cond. survival | flat speed | trot | notes |
+|---|---|---|---|---|
+| S1 | 18% | – | ok | terminal bonus, no gradient |
+| **S2** | **25%** | 0.076 ❌ | −0.49 | best survival; beat scripted at obst-50+push (32<36); too slow |
+| S3 | 11% | 0.085 | −0.44 ❌ | ramped credit gutted it |
+| S4 | 11% | 0.088 | ok | speed floor vs survival conflict found |
+| **S5** | 18% | **0.094 ✅** | **−0.55 ✅** | tilt-gated floor; push-hard 19%; lost obst-50+push |
+| S6 | 11% | 0.082 ❌ | −0.40 ❌ | ramp regressed everything |
+
+**No round cleared all 5 gates.** Two candidates: **S2** (highest survival,
+fails speed) and **S5** (clears speed + trot, survival 18%). Pooled conditional
+survival has plateaued at 18–25% and never reached the 0.30 target.
+
+---
+
+## S7 — `surv_r7` — reward the *catchable* stumble band, not the doomed one
+
+`surv_r5` base (tilt-gated hard floor), one change:
+- **`FAC_SURVIVE_STEP` band `0.8–1.3` → `0.55–1.0` rad.** Past ~1.0 rad a flat
+  quadruped with no roll DOF is mostly doomed (Run 6), so paying survive credit
+  up to 1.3 mostly rewarded near-hopeless frames. Reward holding the range G2 can
+  actually recover from — and start the credit earlier (0.55) so it engages as
+  the stumble begins, not once it's nearly over.
+
+**Hypothesis:** pooled cond. survival climbs past S2's 25% (denser, better-aimed
+gradient on the recoverable range) while S5's speed/trot gates hold.
+
 **Result:** _pending_
