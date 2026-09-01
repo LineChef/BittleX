@@ -769,3 +769,60 @@ pooled conditional survival past 25%. Cost: flat speed likely ~0.076 (below the
 gate), as `surv_r2` was.
 
 **Result:** _pending_
+
+**Result** (`surv_r14_ppo`, ~38 min). 28 ep/cell:
+
+| cell | cond. surv. (r14/r12/r2) | L falls (r14/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.082 | −0.57 |
+| push-hard | 6% / 19% / 12% | 61% / 57% | 0.061 | −0.59 |
+| obst-50+push | 20% / 30% / 50% | 46% / 36% | 0.045 | −0.58 |
+
+**Pooled conditional survival: 11%** — well below `surv_r12` (21%) and
+`surv_r2`'s own 25%. `surv_r2`'s permissive 0.07 floor + the adaptive curriculum
++ `proj_grav` did **not** compound; they regressed. Likely the easy-when-falling
+curriculum + the weak floor together let the policy under-practise. Trot fine
+(−0.54…−0.59); flat speed 0.082 (under the gate).
+
+**REJECT.** Env restored to the `surv_r12` config.
+
+---
+
+# Session A2 — CLOSED. Full research plan tested.
+
+All five planned levers ran:
+
+| round | lever | pooled cond. survival |
+|---|---|---|
+| S11 | `projected_gravity` obs + speed-gate fix (field-standard reward) | 11% — reject |
+| **S12** | **adaptive push curriculum** (surv_r5 reward) | **21% — PROMOTE** |
+| — | push reflex, eval-only (no retrain) | 11% — reject |
+| S13 | push reflex retrained in | 21% (wash) + trot regression — reject |
+| S14 | surv_r2 reward + proj_grav + curriculum | 11% — reject |
+
+**What the research levers gave us:** the **adaptive push curriculum** is the one
+that worked — `surv_r5`'s 18% -> `surv_r12`'s **21%**, and `surv_r12` is the
+first gait in the whole loop whose *raw* fall rate beats scripted at both hard
+push cells (push-hard 54% vs 57%, obst-50+push 25% vs 36%), not just conditional
+survival on scripted's failures. `projected_gravity` was neutral-to-slightly
+negative here (kept anyway — hardware-honest, and the regressions trace to reward
+config). The scripted mid-walk push reflex didn't help even trained-in. The
+field-standard reward recipe (S9–S11) consistently underperformed the bespoke
+one.
+
+## Final standing — the whole survive-loop (S1–S14)
+
+| gait | pooled cond. survival | gates | note |
+|---|---|---|---|
+| **`surv_r2`** | **25%** | flat speed ❌ (0.076) | highest raw survival; walks slow |
+| **`surv_r12`** | **21%** | flat speed ~❌ (0.080), rest ✅ | best research-informed; beats scripted's raw fall rate at both push cells; adaptive curriculum + `proj_grav` |
+| **`surv_r5`** | 18% | all ✅ (flat 0.094, trot −0.55) | the gate-complete gait |
+
+**The ~25% reactive stumble-catch ceiling holds after testing the complete
+research plan.** No configuration cleared the 30% target. This is a platform
+limit (IMU-only sensing, no roll-axis joint, weak sagittal servos), consistent
+with Runs 6–7. `opencat_gym_env.py` is left at the `surv_r12` config — the best
+gait that also carries the one useful new lever (the curriculum). `surv_r5`
+stays the safe gate-complete fallback; `surv_r2` the higher-survival-but-slow
+alternative. Real gains now depend on perception in the loop (Phase 8) and
+hardware.
