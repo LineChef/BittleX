@@ -52,10 +52,10 @@ FAC_UPRIGHT = 3.0         # ramped penalty on tilt^2 (always on). r1: 8.0 stacke
 # Tracking-bonus form (user pick): a [0,1] bonus peaking exactly at the target,
 # falling off if too slow OR too fast -- same shape as the imitation reward.
 TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-loop pace (~0.10).
-FAC_SPEED = 10.0           # weight on the speed-tracking Gaussian bonus (peaks at TARGET_SPEED). surv_r9: 5 -> 10 -- make it the DOMINANT positive term (~= imitation) so the policy will sacrifice posture penalties to keep near the set-point under a push, then return (the PA-LOCO mechanism -- duck to survive, recover speed first, height second).
+FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Plain floor at the loop's flat-speed gate. surv_r9's 0.07 let flat pace settle at 0.076 (dominant FAC_SPEED alone wasn't enough); surv_r11: 0.085 plain. With the bespoke survival reward gone (S9), a hard floor no longer competes with a dense per-step save reward -- it just holds the gate.
+MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- BUT only while upright (tilt < BALANCE_TILT_ON). surv_r5: the 0.085 floor (r3) fixed the flat-speed gate but crushed survival (r3/r4 both 11% vs r2's 25%) because it punished slowing down to catch a stumble. Now suspended whenever the body is wobbling, so survival can slow the walk while flat-ground pace still clears the gate.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -88,12 +88,10 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # RECOVERY_ABORT_RAD (hopeless) -> terminate with reward 0 (the old outcome, just
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
-FAC_BALANCE = 2.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r9: 4.0 -> 2.0, back to a modest orientation-recovery shaping term (the field-standard recipe -- legged_gym / PA-LOCO -- has no dense survival reward at all).
-FAC_SURVIVE_BONUS = 0.0     # surv_r9: DROPPED. S1-S8 hand-crafted a survival reward (terminal bonus, dense band, ramps, tilt-gates) and plateaued at 25% pooled cond-survival. legged_gym & PA-LOCO get push recovery WITHOUT any survival reward -- see docs/rl-runs/auto-iteration-log-survive-loop.md "field-standard reset".
-FAC_SURVIVE_STEP = 0.0     # surv_r9: DROPPED (was 6.0). See above.
-FAC_FALL_PENALTY = 50.0    # surv_r9: explicit NEGATIVE terminal reward on a fall (was just reward=0). legged_gym's _reward_termination -- a sharp failure gradient at the moment of the fall, on top of the lost future reward.
-SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping -> every held step pays FAC_SURVIVE_STEP flat up to SURVIVE_BAND_HI. surv_r7 tried 0.55-1.0 -- push-hard cond-survival 19%->0%, pooled 18%->7%. Reverted to S5's 0.8-1.3.
-SURVIVE_BAND_HI = 1.3     # rad; the fall line.
+FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
+FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
+FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
+SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -115,6 +113,18 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
 IMPULSE_PUSH = 0.55      # m/s kick magnitude. surv_r1: 0.4 -> 0.55 -- the survive-what-scripted-can't loop needs the policy to actually practise big saves; 0.55 = recoverable big wobbles without the 0.7 fall-storm (prior-loop finding).
 IMPULSE_PUSH_PROB = 0.006  # per-step probability (~1.5x per 250-step episode). surv_r1: 0.003 -> 0.006.
+
+# --- Adaptive push curriculum (surv_r12, from PA-LOCO) ---------------------
+# Per-env: track the last ADAPT_WINDOW episode outcomes; scale the impulse
+# magnitude up when the policy is surviving most of them, down when it isn't.
+# The policy masters the catchable range before the pushes escalate, instead of
+# facing full-strength kicks from the moment the fixed DR ramp completes.
+ADAPTIVE_PUSH = True
+ADAPT_WINDOW = 12          # episodes averaged
+ADAPT_UP_RATE = 0.75      # survive-rate above this -> harder
+ADAPT_DOWN_RATE = 0.40    # below this -> easier
+ADAPT_STEP = 0.12         # curriculum multiplier change per adjustment
+ADAPT_MIN, ADAPT_MAX = 0.35, 1.70   # bounds on the multiplier
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -153,12 +163,9 @@ LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
 LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observation -- lets the policy see a stumble as a developing trajectory, not a snapshot. IMU-only, transfers to hardware.
 
 # Size of observation space:
-# [ 30*8 joint history | quaternion(4) gyro(2) proj_gravity(3) time_phase(1)
-#   | 12*2 tilt history | roll/pitch angular-accel(2) ]
-# proj_gravity (surv_r11): the gravity unit vector expressed in the body frame --
-# a clean, low-dim "which way is down / how tilted" signal, exactly what the real
-# accelerometer gives (no magnetometer needed). Standard in legged_gym / PA-LOCO.
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2
+# [ 30*8 joint history | quaternion(4) gyro(2) time_phase(1)
+#   | 12*2 tilt history | roll/pitch angular-accel(2) ]      (Run 7 adds the last two)
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2  # +3 = proj_gravity (surv_r12)
 
 
 class OpenCatGymEnv(gym.Env):
@@ -171,6 +178,8 @@ class OpenCatGymEnv(gym.Env):
         self.step_counter = 0
         self.step_counter_session = 0
         self._dr = 0.0            # domain-randomization ramp for the current episode
+        self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
+        self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
         self.state_history = np.array([])
         self.angle_history = np.array([])
         self.bound_ang = np.deg2rad(BOUND_ANG)
@@ -196,9 +205,24 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        self.observation_space = gym.spaces.Box(np.array([-1]*SIZE_OBSERVATION), 
+        self.observation_space = gym.spaces.Box(np.array([-1]*SIZE_OBSERVATION),
                                                 np.array([1]*SIZE_OBSERVATION))
 
+    def _record_outcome(self, survived: int) -> None:
+        """Adaptive push curriculum (surv_r12): once ADAPT_WINDOW episodes are in,
+        nudge the per-env push multiplier up if the policy is mostly surviving,
+        down if it's mostly falling. Persists across resets within this env."""
+        if not ADAPTIVE_PUSH:
+            return
+        self._ep_outcomes.append(survived)
+        if len(self._ep_outcomes) < ADAPT_WINDOW:
+            return
+        rate = sum(self._ep_outcomes) / len(self._ep_outcomes)
+        if rate >= ADAPT_UP_RATE:
+            self._push_curr = min(ADAPT_MAX, self._push_curr + ADAPT_STEP)
+        elif rate <= ADAPT_DOWN_RATE:
+            self._push_curr = max(ADAPT_MIN, self._push_curr - ADAPT_STEP)
+        self._ep_outcomes = self._ep_outcomes[ADAPT_WINDOW // 2:]  # slide the window
 
     def step(self, action):
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
@@ -216,7 +240,7 @@ class OpenCatGymEnv(gym.Env):
                 and np.random.rand() < IMPULSE_PUSH_PROB):
             lin, ang = p.getBaseVelocity(self.robot_id)
             theta = np.random.uniform(0, 2 * np.pi)
-            mag = IMPULSE_PUSH * self._dr
+            mag = IMPULSE_PUSH * self._dr * (self._push_curr if ADAPTIVE_PUSH else 1.0)
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + mag * np.cos(theta),
                                  lin[1] + mag * np.sin(theta), lin[2]], ang)
@@ -371,9 +395,8 @@ class OpenCatGymEnv(gym.Env):
             tnorm = np.clip(tnorm + np.random.normal(0.0, gyro_n, 2), -1.0, 1.0)
         self.tilt_history = np.append(self.tilt_history, tnorm)
         self.tilt_history = np.delete(self.tilt_history, np.s_[0:2])
-        # projected gravity: gravity unit vector in the body frame (surv_r11).
         _rot = np.asarray(p.getMatrixFromQuaternion(obs_ang)).reshape(3, 3)
-        proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)
+        proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)  # gravity in body frame
         self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
                                            self.tilt_history, ang_acc))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
@@ -443,8 +466,8 @@ class OpenCatGymEnv(gym.Env):
         self._peak_tilt = max(self._peak_tilt, tilt)
         tilt_rate = abs(tilt - self._prev_tilt)
         # surv_r2/r4: dense survival credit -- flat FAC_SURVIVE_STEP for every step
-        # held upright in the catchable-stumble band (SURVIVE_BAND_LO..SURVIVE_BAND_HI).
-        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < SURVIVE_BAND_HI else 0.0
+        # held upright in the near-tipping band (SURVIVE_BAND_LO..1.3 rad).
+        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
             balance_reward = FAC_BALANCE * (
@@ -467,9 +490,10 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r9: plain gentle stall-guard (no tilt gate). The dominant FAC_SPEED
-        # Gaussian holds the pace; this only bites on an outright stall (< 0.07 m/s).
-        min_speed_penalty = FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
+        # surv_r5: suspend the speed floor while wobbling -- slowing down to catch a
+        # stumble must not be punished. Active only when the body is ~upright.
+        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
+                             if tilt < BALANCE_TILT_ON else 0.0)
         overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
         speed_reward = FAC_SPEED * np.exp(
             -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
@@ -488,9 +512,6 @@ class OpenCatGymEnv(gym.Env):
         upright_penalty = FAC_UPRIGHT * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE:
-            # rtune_r4: penalise frame-to-frame jerk in the correction (plain, no
-            # tilt gate -- surv_r8 tried gating it off when tilted and it regressed
-            # to the worst of the loop, pooled cond-survival 4%).
             resid_smooth_cost = FAC_RESID_SMOOTH * float(
                 np.mean(np.abs(np.asarray(action) - self._prev_action)))
         else:
@@ -556,6 +577,7 @@ class OpenCatGymEnv(gym.Env):
             self.step_counter_session += self.step_counter
             terminated = False
             truncated = True
+            self._record_outcome(1)                  # survived to episode length
             # surv_r1: survived to the end -> asymmetric bonus scaled by how rough
             # it got. Calm episode (peak_tilt <= BALANCE_TILT_ON) -> ~0; a near-tip
             # that was held -> full FAC_SURVIVE_BONUS.
@@ -567,9 +589,10 @@ class OpenCatGymEnv(gym.Env):
         elif FAC_RECOVERY <= 0:
             if self.is_fallen():                     # legacy: fall = instant end
                 self.step_counter_session += self.step_counter
-                reward = -FAC_FALL_PENALTY           # surv_r9: sharp failure gradient (was 0)
+                reward = 0
                 terminated = True
                 truncated = False
+                self._record_outcome(0)              # fell
 
         else:
             # Recovery-window behavior. roll/pitch from the clean (un-noised)
@@ -736,7 +759,7 @@ class OpenCatGymEnv(gym.Env):
         proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)
         self.state_robot = np.concatenate((state_ang,
                                            np.clip(state_vel, -1, 1),
-                                           proj_grav,              # gravity in body frame
+                                           proj_grav,
                                            [time_obs],
                                            self.tilt_history,      # all zeros at reset (level)
                                            np.zeros(2)))           # ang accel

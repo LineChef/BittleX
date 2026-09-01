@@ -616,3 +616,40 @@ reward, `FAC_FALL_PENALTY` 50, `FAC_SPEED` 10 dominant, `FAC_BALANCE` 2).
 sooner -> conditional survival past S2's 25%; flat speed back over 0.085.
 
 **Result:** _pending_
+
+**Result** (`surv_r11_ppo`, ~38 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r11/r5/r2) | L falls (r11/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.082 | −0.45 |
+| push-hard | 0% / 19% / 12% | **75% / 57%** | 0.064 | −0.52 |
+| obst-50+push | 20% / 20% / 50% | 46% / 36% | 0.044 | −0.49 |
+
+**Pooled conditional survival: 11%** — worse than surv_r5's 18%. Flat speed 0.082
+(still under the 0.085 gate even with the plain floor there — `FAC_SPEED` 10 +
+`FAC_OVERSPEED` 35 pull it down), trot −0.43…−0.45 on the calm cells (at/under the
+gate). New `recovery_time` metric populated: 16 steps at push-hard, 32 at
+obst-50+push. `proj_grav` in the obs didn't rescue the field-standard reward
+config — this is the 3rd field-standard round (S9/S10/S11) and all land 11–18%,
+never near 25%.
+
+**REJECT.** The reward question is settled: bespoke survival reward (`surv_r5`,
+18% + gate-complete; `surv_r2`, 25%) beats the field-standard recipe on this
+task. Reverting to `surv_r5`'s reward config for the remaining rounds; keeping
+`proj_grav` in the obs (a cheap, hardware-honest addition — the S11 regression is
+attributable to the reward config, not a 3-dim obs vector).
+
+## S12 — `surv_r12` — adaptive push curriculum
+
+`surv_r5` reward config + `proj_grav` obs + a **per-env adaptive push
+curriculum** (PA-LOCO): each env tracks its last 12 episode outcomes and scales
+the impulse-push multiplier up (>= 75% survived) or down (<= 40%), bounded
+[0.35, 1.70], starting at 0.55. Replaces the fixed `_dr` ramp holding
+`IMPULSE_PUSH` at full strength — the policy escalates only as fast as it can
+handle.
+
+**Hypothesis:** the policy masters the catchable range first, so conditional
+survival on the hard push cells climbs past 25% without a fall-rate regression on
+the milder cells.
+
+**Result:** _pending_
