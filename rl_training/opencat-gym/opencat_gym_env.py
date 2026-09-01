@@ -25,7 +25,7 @@ CONTROL_HZ = 80.0
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
 FAC_MOVEMENT = 300        # Reward forward progress. surv_r1: 1000 -> 300 AND MOVEMENT_CAP_AT_TARGET back to True -- with the cap off (resid_r2..rtune_r4) this was an uncapped "faster pays" term the policy funded by spending residual budget (-> swerve). Speed is now a pure set-point: the Gaussian FAC_SPEED + MIN_SPEED floor + FAC_OVERSPEED define the target, this just keeps it moving forward.
-FAC_OVERSPEED = 60.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - TARGET_SPEED), unramped -- mirror of the MIN_SPEED floor on the fast side, so "walk at 0.10" is a band, not a floor.
+FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - TARGET_SPEED), unramped -- mirror of the MIN_SPEED floor on the fast side. surv_r2: 60 -> 35, surv_r1 pulled flat speed to 0.081 (just under the 0.085 gate); the MIN_SPEED floor (120) still stops a stall.
 
 # --- Residual action space (residual-on-wkF, "resid" line) -------------------
 # RESIDUAL_MODE True: the policy output modulates Bittle's scripted wkF keyframe
@@ -89,7 +89,9 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
-FAC_SURVIVE_BONUS = 40.0    # surv_r1: one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). A calm episode gets ~0; surviving to the end after a near-tip gets the full bonus. Asymmetric: rewards the save, not just walking.
+FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
+FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for every step held upright in the DANGER BAND (SURVIVE_BAND_LO < tilt < 1.3 rad), unramped. Continuous "stay up one more step" gradient -- the real "reward the save". Net vs the ramped FAC_UPRIGHT tilt^2 penalty it's only mildly positive, and far below clean-walking reward, so no incentive to linger tilted.
+SURVIVE_BAND_LO = 0.8      # rad; below this it's a normal wobble (no survive credit), above it G2 is near tipping and every held step counts
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -432,6 +434,8 @@ class OpenCatGymEnv(gym.Env):
         tilt = float(np.max(np.abs(state_ang_euler)))
         self._peak_tilt = max(self._peak_tilt, tilt)
         tilt_rate = abs(tilt - self._prev_tilt)
+        # surv_r2: dense danger-band survival credit -- held upright while nearly tipped.
+        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
             balance_reward = FAC_BALANCE * (
@@ -484,6 +488,7 @@ class OpenCatGymEnv(gym.Env):
                  + FAC_IMITATION * imitation_reward
                  + speed_reward
                  + balance_reward
+                 + survive_step_reward
                  + duty_reward
                  - residual_cost
                  - min_speed_penalty
@@ -518,6 +523,7 @@ class OpenCatGymEnv(gym.Env):
             "r_resid_smooth": -penalty_scale * resid_smooth_cost,
             "r_min_speed": -min_speed_penalty,
             "r_overspeed": -overspeed_penalty,
+            "r_survive_step": survive_step_reward,
             "r_survive_bonus": 0.0,
             "r_smooth_movement": -penalty_scale * smooth_movement,
             "r_body_stability": -penalty_scale * body_stability,

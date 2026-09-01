@@ -90,4 +90,60 @@ at every cell, flat speed 0.09–0.10, trot ≤ −0.45. Risk: harder disturbanc
 *both* gaits' fall rates and the gap stays ~parity → the save-reward is too weak
 (S2).
 
+**Result** (`surv_r1_ppo`, ~40 min, `ep_len_mean` 251 in training). Benchmark
+28 ep/cell vs scripted `wkF`:
+
+| cell | cond. surv. | L falls | S falls | L speed | L trot | L yaw-rate | L roll |
+|---|---|---|---|---|---|---|---|
+| flat | – | 0% | 0% | 0.081 | −0.51 | 7.4 | .009 |
+| obst-20 | – | 0% | 0% | 0.062 | −0.50 | 7.8 | .008 |
+| obst-35 | 0% (1) | 4% | 4% | 0.052 | −0.47 | 8.9 | .011 |
+| obst-50 | 0% (1) | **11%** | 4% | 0.049 | −0.47 | 12.7 | .024 |
+| push-hard | **25% (16)** | 57% | 57% | 0.063 | −0.54 | 28.1 | .071 |
+| obst-50+push | 10% (10) | **54%** | 36% | 0.047 | −0.49 | 22.5 | .069 |
+
+**Pooled conditional survival: 18% (5/28).**
+
+| gate | threshold | result | verdict |
+|---|---|---|---|
+| pooled cond. survival | ≥ 0.30 | 0.18 | ❌ FAIL |
+| fall ≤ scripted everywhere | no cell worse | worse at obst-50, obst-50+push | ❌ FAIL |
+| flat speed | 0.085–0.125 | 0.081 | ❌ FAIL (marginal) |
+| trot corr | ≤ −0.45 | −0.47…−0.54 | ✅ PASS |
+| yaw-rate rms | ≤ 1.2× rtune_r4 | no baseline — sets it | ⚪ n/a |
+
+**REJECT — worse-or-tied vs scripted on every axis.** A GUI replay (flat +
+frequent 0.75 m/s shoves) confirmed it: 5 of 7 episodes got a real hit, all 5
+fell (peak tilt 75–81°); the 2 "survivals" were episodes with no big hit.
+
+**Learnings → S2:**
+1. **`FAC_SURVIVE_BONUS` is the wrong shape** — one-shot at episode end, pays 0 if
+   the episode ended in a fall, so a mid-episode recovery earns nothing. No
+   gradient toward the save. → replace with a **dense per-step danger-band
+   reward**.
+2. `obst-50+push` regressed — terrain + shove makes the policy thrash (roll .069,
+   yaw-rate 22) instead of catching. Dense "don't fall" credit should also damp
+   this.
+3. Flat speed 0.081 < 0.085 → `FAC_OVERSPEED` 60 → 35.
+4. The faint positive: `push-hard` cond. survival 25%, `big_stumble_recovery`
+   0.06 vs scripted 0.00 — mechanism exists, far too weak.
+
+---
+
+## S2 — `surv_r2` — dense danger-band survival reward
+
+Changes vs `surv_r1`:
+- **New `FAC_SURVIVE_STEP = 6`** — per step, unramped, while `0.8 < tilt < 1.3`
+  and not fallen. Continuous "stay up one more step" gradient. Below 0.8 rad =
+  normal wobble, no credit → no farming incentive (and the ramped `FAC_UPRIGHT`
+  tilt² penalty still pushes it to leave the band).
+- **`FAC_SURVIVE_BONUS` 40 → 12** — demoted to a small finishing cherry; the
+  dense term is the driver now.
+- **`FAC_OVERSPEED` 60 → 35** — recover the flat-speed gate.
+- Kept: harder DR (`IMPULSE_PUSH` 0.55, `RANDOM_MASS` 0.18), `FAC_BALANCE` 4,
+  `RESIDUAL_SCALE_DEG` 11, speed set-point.
+
+**Hypothesis:** pooled cond. survival clears 0.30, driven by `push-hard` and
+`obst-50+push`; flat speed back ≥ 0.085; no new fall regressions.
+
 **Result:** _pending_
