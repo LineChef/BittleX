@@ -39,15 +39,27 @@ should we work on next."
   so the cover can close over the mounted Pi.
 - **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
-  detection results over serial rather than streaming raw frames.
+  detection results over serial rather than streaming raw frames. Flash is
+  **4 MB**, SRAM **520 KB** (Petoi pages citing "16 MB / WROOM-32D" describe
+  BiBoard V0). Board also carries a **6-axis MPU6050 IMU (no magnetometer)**, an
+  onboard offline voice-recognition module, and a speaker.
+- **Full vendor-doc spec sheet** for every part — with the "why it matters" for
+  each — is in [`docs/research/hardware-specs.md`](research/hardware-specs.md).
+  Key downstream effects: no magnetometer ⇒ favour **yaw-rate** over absolute
+  heading in the RL reward (Phase 3); the vision module can stream **detections
+  or a raw frame but not both**, and runs at 192×192 / ~10–30 FPS (Phase 8);
+  the PiSugar S has **no battery-percentage readout** (hardware-only).
 
 ### Open (check when hardware arrives)
 
 - Confirm BiBoard V2 can be wired data-only, or whether its mount ties 5 V to the
   data lines by default.
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
-  isn't listed. Verify the 5-pin socket and serial wiring are compatible.
+  isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
+  the 5-pin socket and serial wiring are compatible.
 - Confirm the back cover fits once the Pi is mounted.
+- BiBoard V1's onboard voice-recognition module + speaker: decide whether the
+  wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
 
 ---
 
@@ -320,6 +332,14 @@ question on real hardware with a head-to-head once it arrives. Record:
   foot-level terrain awareness. Real robustness needs a reward that explicitly
   values balance recovery (not just forward speed) plus domain randomization —
   both now in place from Run 5 on.
+- **Heading signal on real hardware:** the BiBoard IMU (MPU6050/ICM42670) is
+  6-axis — **no magnetometer**, so there's no absolute yaw reference; real yaw is
+  gyro-integrated and drifts over seconds-to-minutes. The sim optimises against a
+  perfect quaternion yaw. Bias the reward/observation toward **yaw rate** (clean
+  from the gyro) rather than accumulated heading error, and expect real-world
+  heading hold to be looser than the sim's sub-degree numbers. Affects the
+  resid-tuning loop directly. See
+  [`docs/research/hardware-specs.md`](research/hardware-specs.md).
 - Imitation-learning approaches from the UVA/Harvard Bittle research (stretch,
   optional).
 - **Reactive obstacle purchase:** teach the policy that when a front foot is
@@ -491,7 +511,22 @@ tuning, and the Phase 10 wiring — all hardware-gated.
 - **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
   cliff/edge detection, if pursued, must be a camera-based visual classifier
-  (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor.
+  (SenseCraft-trained "floor" vs. "edge ahead"), not a dedicated sensor. Use the
+  module's `classes()` output for that — a boxless classification path, lighter
+  than object detection.
+- **Vision module limits** (vendor docs — full detail in
+  [`docs/research/hardware-specs.md`](research/hardware-specs.md)):
+  - **Detections *or* a raw frame, never both at once.** The `Avoider` reflex
+    (needs the detection stream) and `scene.narrate` (needs a frame for Claude)
+    must timeshare or mode-switch, not run concurrently. Results and frames use
+    different links (UART vs USB), which helps.
+  - Model input is **192 × 192**; object detection runs **~10–30 FPS**. Thin
+    objects (cables) are only detectable when close/large in frame. A
+    vision-conditioned gait policy gets a fresh obstacle read only every ~3–8
+    control steps — assume stale-between-frames data.
+  - Swapping the deployed model takes **1–2 min** — one multi-class model, no
+    runtime switching.
+  - Camera-mode toggle over serial is `XC` on / `Xc` off (distinct from `XS`).
 - [x] **Obstacle-avoidance reflex** — `vision/avoidance.py`. Local, no network;
       box `area` as the closeness proxy, bearing from `center_x`; consecutive-
       frame debounce + cooldown, with `STOP`/`BACK_UP` preempting. Thresholds

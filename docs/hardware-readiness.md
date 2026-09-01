@@ -110,6 +110,22 @@ Run: `pi_pipeline/.venv/bin/pytest`.
 
 ---
 
+## Hardware spec notes (from vendor docs)
+
+Full sheet + rationale: [`research/hardware-specs.md`](research/hardware-specs.md).
+The ones that change plans:
+
+- **BiBoard V1 IMU is 6-axis (MPU6050/ICM42670) — no magnetometer.** No absolute
+  yaw on hardware; real heading drifts. Bias the RL reward toward yaw *rate*.
+- **BiBoard V1 flash is 4 MB / SRAM 520 KB** (not the "16 MB" some Petoi pages
+  show — that's V0). Tight for an on-MCU gait policy.
+- **BiBoard V1 has an onboard offline voice-recognition module + speaker** — a
+  possible wake trigger / offline-command path that offloads the Pi.
+- **Vision module: detections OR a raw frame, never both at once**; 192×192,
+  ~10–30 FPS; model swap takes 1–2 min. Camera toggle over serial: `XC` / `Xc`.
+- **PiSugar S is hardware-only — no battery-% readout.** Battery telemetry must
+  come from the BiBoard firmware (see checklist item 8), not the PiSugar.
+
 ## Day-1-with-hardware checklist
 
 **Assembly & Pi bring-up**

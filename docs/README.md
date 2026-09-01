@@ -19,6 +19,7 @@
 
 | | |
 |---|---|
+| [`hardware-specs.md`](research/hardware-specs.md) | Vendor-doc specs for every part + "why it matters" (IMU has no magnetometer, vision module can't stream frames + detections at once, PiSugar S has no battery readout, …). |
 | [`pi-power.md`](research/pi-power.md) | Powering the Pi (PiSugar S; wire BiBoard data-only). |
 | [`self-righting-research.md`](research/self-righting-research.md) | Bittle's built-in self-right — limited; no BiBoard-V1 IR trigger. |
 
