@@ -91,8 +91,8 @@ FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a f
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
 FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
-SURVIVE_BAND_LO = 0.55     # rad; below this = normal wobble (no credit), above = a real stumble -> every held step pays FAC_SURVIVE_STEP flat, up to SURVIVE_BAND_HI.
-SURVIVE_BAND_HI = 1.0      # rad; surv_r7: cap the credit band at 1.0 instead of 1.3. Past ~1.0 rad a flat quadruped with no roll DOF is mostly doomed (Run 6 finding); paying survive credit up to 1.3 mostly rewarded near-hopeless frames. Reward the *catchable* range (0.55-1.0) instead.
+SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping -> every held step pays FAC_SURVIVE_STEP flat up to SURVIVE_BAND_HI. surv_r7 tried 0.55-1.0 -- push-hard cond-survival 19%->0%, pooled 18%->7%. Reverted to S5's 0.8-1.3.
+SURVIVE_BAND_HI = 1.3     # rad; the fall line.
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -485,7 +485,12 @@ class OpenCatGymEnv(gym.Env):
         upright_penalty = FAC_UPRIGHT * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE:
-            resid_smooth_cost = FAC_RESID_SMOOTH * float(
+            # surv_r8: fade the smoothness penalty out as the body tilts. When
+            # upright it keeps the gait clean (rtune_r4's win); during a stumble a
+            # real save needs a fast, large correction -- don't tax the jerk that
+            # catches the fall. Full below BALANCE_TILT_ON, zero by 1.0 rad.
+            _smooth_scale = float(np.clip((1.0 - tilt) / (1.0 - BALANCE_TILT_ON), 0.0, 1.0))
+            resid_smooth_cost = FAC_RESID_SMOOTH * _smooth_scale * float(
                 np.mean(np.abs(np.asarray(action) - self._prev_action)))
         else:
             resid_smooth_cost = 0.0

@@ -398,4 +398,50 @@ survival has plateaued at 18–25% and never reached the 0.30 target.
 **Hypothesis:** pooled cond. survival climbs past S2's 25% (denser, better-aimed
 gradient on the recoverable range) while S5's speed/trot gates hold.
 
+**Result** (`surv_r7_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r7/r5/r2) | L falls (r7/S) | L speed | L trot | L yaw-rate |
+|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.086 | −0.52 | 6.7 |
+| obst-35 | 0% / 0% / 0% | 4% / 4% | 0.059 | −0.50 | 8.7 |
+| obst-50 | 0% / 0% / 0% | 7% / 4% | 0.053 | −0.50 | 9.6 |
+| push-hard | **0% / 19% / 12%** | **71% / 57%** | 0.068 | −0.57 | 27.7 |
+| obst-50+push | 20% / 20% / 50% | 43% / 36% | 0.047 | −0.53 | 23.1 |
+
+**Pooled conditional survival: 7% (2/28)** — worst of the loop.
+
+**REJECT — regression, reverted.** Moving the survive band down to 0.55–1.0
+**wrecked `push-hard`** (cond. survival 19% → 0%, falls 57% → 71%, worse than
+scripted). Rewarding "hold at 0.6–0.8 rad" under a hard flat shove taught the
+policy to *ride* a moderate lean — which is unstable and mostly just delays the
+fall — and the 1.0 cap removed credit for the desperate near-fall frames where a
+save still counts. Band reverted to 0.8–1.3 (S5's).
+
+### Loop status after S1–S7
+
+| round | pooled cond. surv. | gates | |
+|---|---|---|---|
+| **S2** | **25%** | speed ❌ | best survival, beat scripted at obst-50+push |
+| S3, S4, S6, S7 | 7–11% | — | all rejected |
+| **S5** | 18% | speed ✅ trot ✅ | best gate-complete; push-hard 19% |
+
+**Reward-band tuning (S3 ramp, S7 lower band) has failed three times.** S8 leaves
+the reward alone and attacks from a different angle.
+
+---
+
+## S8 — `surv_r8` — tilt-gate the smoothness penalty (let the save be decisive)
+
+`surv_r5` base (band back to 0.8–1.3), one change:
+- **`FAC_RESID_SMOOTH` now fades out with tilt:** `× clip((1.0 − tilt) /
+  (1.0 − 0.5), 0, 1)` — full when upright (keeps `rtune_r4`'s clean gait), zero
+  by 1.0 rad. The smoothness penalty rewards gentle frame-to-frame corrections;
+  a real stumble catch needs a *fast, large* one. Don't tax the jerk that saves
+  the fall. Same tilt-gating idea that fixed the speed floor in S5, applied to
+  the smoothness term.
+
+**Hypothesis:** `push-hard` and `obst-50+push` conditional survival rise (the
+policy can now make a decisive corrective move when tilted) with the flat gait
+unchanged (smoothness still full when upright).
+
 **Result:** _pending_
