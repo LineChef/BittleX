@@ -29,6 +29,18 @@ PRINT_IMU = "v"                  # provisional
 PAUSE_TOGGLE = "p"               # provisional
 QUERY = "?"                      # provisional
 
+# --- recovery / get-up ------------------------------------------------------
+# Built-in OpenCat keyframe skills for getting back up after a fall. `rc` and
+# `rl` are "Instinct" (firmware) skills; the firmware also auto-runs `rc` on an
+# IMU-detected flip when gyro assist is on. Verified against
+# PetoiCamp/OpenCat/src/InstinctBittle.h -- see docs/research/self-righting-research.md.
+# Bittle has no roll-axis joint, so these scripted sequences (which lever the
+# body over using the legs) are the recovery path -- not a learned policy.
+RECOVER = "krc"                  # self-right / get-up from a side or forward fall
+ROLL_OVER = "krl"               # roll from supine (on its back) toward prone
+BALANCE = "kbalance"            # settle into a balanced stand (used after a get-up)
+STAND = "kup"                   # neutral standing posture
+
 _BLOCKED_PREFIXES = ("c", "cd")  # calibration / factory -- never from the pipeline
 
 

@@ -349,6 +349,58 @@ question on real hardware with a head-to-head once it arrives. Record:
   curriculum plus a loose/decaying imitation weight, for a generally higher,
   more adaptive swing. Revisit after the reactive-robustness gait is solid.
 
+**Survive-loop (Session A, closed 2026-09-01).** 10 rounds (`surv_r1..r10`) tried
+to lift the residual gait's *conditional survival* — the fraction of courses where
+scripted `wkF` falls but the learned gait stays up. Two approaches: a bespoke
+survival reward (S1–S8, capped at 25%) and the field-standard recipe from
+`legged_gym` / PA-LOCO (S9–S10, 18% then 7%). **Neither cleared the 30% target —
+the reactive stumble-catch ceiling on this platform (IMU-only, no roll DOF, weak
+sagittal servos) is real, matching Runs 6–7.** Approved gait: **`surv_r5`** — 18%
+conditional survival but passes every other gate (flat speed 0.094, trot −0.55,
+obstacle fall rate at parity with scripted). `opencat_gym_env.py` on `development`
+is at its config. `surv_r2` (25%, but walks slow) is the higher-survival
+alternative. Full log:
+[`docs/rl-runs/auto-iteration-log-survive-loop.md`](rl-runs/auto-iteration-log-survive-loop.md).
+Field-standard insights (`projected_gravity` obs, explicit terminal fall penalty,
+dominant soft speed reward) are noted there for a future *hardware-in-the-loop*
+pass — not more blind sim iteration.
+
+## Recovery — walk / catch / get-up (separate from the gait)
+
+Architecture from the ANYmal recovery work (Lee/Hwangbo/Hutter 2019): a **switch
+over separate skills**, not one monolithic policy.
+
+| body state | who handles it |
+|---|---|
+| walking, upright | the learned residual gait (Phase 3) |
+| stumbling (tilted, not down) | the gait's own reactive catch — survive-loop ceiling ~18–25% |
+| fallen on a side / front | scripted `rc` skill (`krc`) |
+| fallen on its back (supine) | scripted `rl` then `rc` (`krl` → `krc`) |
+| the switch | `pi_pipeline/link/recovery.py` — a `RecoveryFSM` on IMU roll/pitch |
+
+Bittle has no roll-axis joint, so a *learned* self-right is off the table (Run 6).
+The scripted `rc`/`rl` keyframes lever the body over with the legs; the firmware
+also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
+[`docs/research/self-righting-research.md`](research/self-righting-research.md).
+
+**Built pre-hardware (2026-09-01):**
+- `pi_pipeline/link/opencat.py` — `RECOVER`/`ROLL_OVER`/`BALANCE`/`STAND` tokens.
+- `pi_pipeline/link/recovery.py` — `RecoveryFSM(roll, pitch) → RecoveryAction`
+  (`NONE` / `RECOVER` / `ROLL_THEN_RECOVER` / `SETTLE` / `GIVE_UP`), with a
+  fall debounce, a get-up timeout + bounded retries, and a "needs a human"
+  give-up. `ACTION_COMMANDS` maps actions to serial strings. 11 unit tests
+  (mock orientation traces + a fake clock).
+
+**On hardware (Phase 4–6):**
+- [ ] Test the stock `rc` / `rl` against the fall types training produces; if
+      unreliable, re-author the keyframes in Skill Composer.
+- [ ] Enable gyro assist (`g`) → the firmware's `IMU_EXCEPTION_PUSHED`
+      stand-still push reflex works for free. Decide whether to extend it to
+      fire mid-walk (firmware fork or a Pi-side reimplementation).
+- [ ] Point `RecoveryFSM` at the real IMU (read roll/pitch over serial), wire
+      `ACTION_COMMANDS` through `SerialLink` with a wait between skills, and tune
+      the thresholds (`fall_rad`, `supine_rad`, `getup_timeout_s`).
+
 ## Phase 4 — Hardware assembly
 
 - [ ] Assemble Bittle X V2 (~40–90 min).
