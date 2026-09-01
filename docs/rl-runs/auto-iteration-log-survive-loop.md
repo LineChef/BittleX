@@ -536,4 +536,57 @@ gate* still lands at ~18%, that's two clean rounds confirming the ~25% reactive
 ceiling — bank `surv_r2` and stop sim-iterating stumble-catch. If it clears 25%,
 continue Session A (projected_gravity obs, angular push, adaptive curriculum).
 
-**Result:** _pending_
+**Result** (`surv_r10_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r10/r9/r5/r2) | L falls (r10/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | 0.083 | −0.46 |
+| push-hard | 6% / 6% / 19% / 12% | **75% / 57%** | 0.056 | −0.46 |
+| obst-50+push | 10% / 30% / 20% / 50% | 43% / 36% | 0.042 | −0.45 |
+
+**Pooled conditional survival: 7% (2/28)** — *worse* than S9's 18%. Flat speed
+0.083 — still under the 0.085 gate even with `MIN_SPEED` at 0.08. `push-hard`
+75% falls, trot right at the −0.45 line.
+
+**REJECT.**
+
+---
+
+# Session A — CLOSED. The ~25% reactive ceiling is confirmed.
+
+**Ten rounds, two approaches, no improvement on S2's 25%:**
+
+| approach | rounds | best pooled cond. survival |
+|---|---|---|
+| bespoke survival reward (bonus, dense band, ramps, tilt-gates) | S1–S8 | **25%** (S2) — never beaten |
+| field-standard recipe (drop the bonus, fall penalty, dominant speed) | S9–S10 | 18%, then 7% |
+
+Recovery events stayed ≈ 0 across the whole loop — the policy never learned to
+produce a *clean* catch (>0.6 rad spike → settle) reliably. This matches Run 6
+and Run 7: **reactive stumble-catch on this platform (IMU-only, no roll DOF, weak
+sagittal servos) has a low ceiling regardless of reward design.** Not a tuning
+problem.
+
+## Banked
+
+- **`surv_r5_ppo`** — the recommended gait. Pooled cond. survival **18%**, but it
+  **passes every other gate**: flat speed 0.094, trot −0.55 (crispest of the
+  project), obstacle fall rate at parity with scripted, and it does recover
+  ~1-in-5 of the stumbles that drop the open-loop scripted gait. Config on the
+  branch (env restored to `c4f88dd`).
+- **`surv_r2_ppo`** — the higher-survival alternative. Pooled cond. survival
+  **25%**, beats scripted at `obst-50+push` (32% vs 36% falls), but flat speed
+  0.076 (fails the speed gate — walks visibly slower).
+
+Neither cleared the 30% target. The residual gait's real payoff — perception in
+the loop — is Phase 8, not more reactive-recovery sim rounds.
+
+## What carries forward
+
+- The **benchmark upgrades** (recovery-time, lateral-offset, the 2 hard push
+  cells, per-episode falls) stay — they're the right eval set for hardware.
+- The **field-standard recipe insights** (`projected_gravity` obs, terminal fall
+  penalty, dominant soft speed) go into `docs/project-plan.md` for a future
+  hardware-in-the-loop pass, not more blind sim iteration.
+- **Recovery (get-up)** is its own workstream — scripted `rc`/`rl` + a
+  state-machine switch — see the Recovery section of the project plan.
