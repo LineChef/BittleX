@@ -146,4 +146,58 @@ Changes vs `surv_r1`:
 **Hypothesis:** pooled cond. survival clears 0.30, driven by `push-hard` and
 `obst-50+push`; flat speed back ≥ 0.085; no new fall regressions.
 
+**Result** (`surv_r2_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r2 / r1) | L falls (r2 / r1) | S falls | L speed | L trot | L yaw-rate | L roll |
+|---|---|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0% | 0.076 | −0.49 | 4.9 | .003 |
+| obst-20 | – | 0% / 0% | 0% | 0.060 | −0.50 | 6.1 | .004 |
+| obst-35 | 0% / 0% | 4% / 4% | 4% | 0.050 | −0.47 | 7.9 | .008 |
+| obst-50 | 0% / 0% | 7% / 11% | 4% | 0.049 | −0.48 | 8.2 | .012 |
+| push-hard | **12% / 25%** | 61% / 57% | 57% | 0.053 | −0.50 | 27.7 | .073 |
+| obst-50+push | **50% / 10%** | **32% / 54%** | 36% | 0.038 | −0.50 | 17.2 | .042 |
+
+**Pooled conditional survival: 25% (7/28)** — up from surv_r1's 18%.
+
+| gate | threshold | result | verdict |
+|---|---|---|---|
+| pooled cond. survival | ≥ 0.30 | 0.25 | ❌ FAIL (18 → 25, improving) |
+| fall ≤ scripted everywhere | no cell worse | worse at obst-50, push-hard | ❌ FAIL |
+| flat speed | 0.085–0.125 | **0.076** | ❌ FAIL (worse than r1) |
+| trot corr | ≤ −0.45 | −0.47…−0.50 | ✅ PASS |
+| yaw-rate rms | ≤ 1.2× surv_r1 | flat 4.9 vs 7.4, push similar | ✅ PASS |
+
+**REJECT — but real directional signal, so carry forward (not revert).**
+- **The dense reward works where terrain is involved:** `obst-50+push` cond.
+  survival 10% → **50%**, and learned fall rate there **32% vs scripted 36%** —
+  the first cell where learned beats scripted at staying up.
+- **`push-hard` (pure flat shove) regressed** (25% → 12%). A fast flat shove
+  blows past the 0.8 rad hard cutoff before the credit engages → the policy never
+  earned the save there.
+- **Flat speed dropped again (0.081 → 0.076)** despite softening `FAC_OVERSPEED`.
+  `FAC_MOVEMENT = 300` + cap is too weak a forward pull. This is a hard blocker —
+  no round can promote below the 0.085 gate.
+
+**Learnings → S3:**
+1. Flat-speed gate: `FAC_MOVEMENT` 300 → 550, `MIN_SPEED` floor 0.07 → 0.085.
+2. `push-hard`: make the survive credit **ramp** from 0.6 rad instead of a hard
+   0.8 on/off — engages while the policy can still act, near-zero for routine
+   wobble (no farming a mild tilt).
+
+---
+
+## S3 — `surv_r3` — earlier-engaging survival credit + fix the flat-speed gate
+
+Changes vs `surv_r2`:
+- **`FAC_SURVIVE_STEP` now ramped:** `6 · clip((tilt − 0.6) / 0.7, 0, 1)` — ~0 at
+  routine wobble, full near the 1.3 rad fall line. Was a hard on/off at 0.8.
+- **`FAC_MOVEMENT` 300 → 550**, **`MIN_SPEED` 0.07 → 0.085** — get flat speed into
+  the gate band; still capped at `TARGET_SPEED` so no over-speed swerve.
+- Kept: `FAC_BALANCE` 4, `FAC_SURVIVE_BONUS` 12, `FAC_OVERSPEED` 35, harder DR,
+  `RESIDUAL_SCALE_DEG` 11.
+
+**Hypothesis:** flat speed 0.09–0.10 (gate ✅); pooled cond. survival ≥ 0.30 with
+`push-hard` recovering toward `obst-50+push`'s level; no fall regression vs
+scripted.
+
 **Result:** _pending_
