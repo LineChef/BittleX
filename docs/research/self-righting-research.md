@@ -44,6 +44,52 @@ training, where falls will be frequent and messy.
   apply to this board — the real mechanism is likely a serial/software command;
   confirm once hardware is in hand.
 
+## The actual skills and trigger (from the OpenCat source, 2026-09-01)
+
+Read the firmware directly — `PetoiCamp/OpenCat/src/InstinctBittle.h` (keyframes)
+and `PetoiCamp/OpenCatEsp32/src/reaction.h` (`dealWithExceptions()`).
+
+- **`rc` = the self-right / recover skill.** A 4-frame built-in ("Instinct")
+  keyframe skill. It drives the shoulders to ~−88° and knees to ~+100° (leg
+  extremes) to throw the body over, then settles to a low crouch (all joints
+  ~15°). Serial token: `krc`.
+- **`rl` = a roll-over maneuver.** 6 frames, one shoulder to ~−84°, big knee
+  sweeps — a back-to-belly roll. Serial token: `krl`.
+- Other stock recovery poses: `lnd` (landing), `knock`, `dropRec`,
+  `lifted` / `dropped`.
+- **The flip → get-up trigger is already wired, IMU-based** (no IR remote
+  needed): `dealWithExceptions()` runs whenever `gyroBalanceQ` is on;
+  `IMU_EXCEPTION_FLIPPED` → play a fall sound → load `rc`. So on BiBoard V1 the
+  path is IMU flip-detect → `rc`, not the IR remote the older docs describe.
+- **Firmware also has a scripted *push* reflex** (`IMU_EXCEPTION_PUSHED`): it
+  reads the acceleration direction, computes a force angle, and queues corrective
+  gaits — sidestep (`wkL`/`wkR`) for a side shove, `wkF`+`bkF` for a hard frontal
+  one — then `up`. **Big caveat: it only fires while standing (`skill->period ==
+  1`); it is skipped during a walking gait.** Stumbling *while walking* — exactly
+  what the RL survive-loop targets — is not covered by the firmware. The learned
+  mid-gait catch is complementary, not redundant.
+- `IMU_EXCEPTION_OFFDIRECTION` → auto turn-in-place (`vtR`/`vtL`) to correct
+  heading drift; the gait player also auto-accelerates when tilted.
+
+## RL fall-recovery literature (2026-09-01 scan)
+
+- **`yerenkl/quad-fall-recovery-rl`** (GitHub, RAAI 2024) — PPO self-recovery for
+  Unitree A1 from arbitrary fallen states, no predefined kinematics. Same stack
+  as ours (PPO); env + reward code available — worth reading for reward design.
+- **ANYmal robust recovery controller** (Lee et al., 2019) — the seminal one;
+  recovers from any fall configuration in <5 s.
+- **FR-Net** (arXiv 2025), **Li et al. 2024** (dynamic fall recovery, real-robot
+  tested), **DribbleBot** (adds a recovery policy for harsh conditions),
+  **Yu et al. 2026** (learns 5 separate skills incl. fall recovery + explicit
+  skill-switching criteria).
+- **Structural caveat:** nearly all of this is on robots *with* hip
+  abduction/adduction (a roll DOF) — ANYmal, A1, Go1, Raibo. That is precisely
+  what lets them push from supine to prone. **Bittle has no roll joint**, so the
+  *self-righting* half of this literature does not transfer — consistent with
+  Run 6. What does transfer conceptually: (a) recovery as a **separate policy /
+  skill with a switch** rather than one monolithic gait policy; (b) training the
+  recovery skill against deliberately harsh disturbances.
+
 ## Community context
 
 A maker who built a DIY OpenCat-based robot from raw components lists
@@ -63,10 +109,11 @@ scenario.
   along the lines of quadruped-robotics research. Not a Phase 1 requirement.
   This is the "recovery sub-policy" option raised in the Run 7 wrap-up
   (`docs/rl-runs/auto-iteration-log-run7.md`).
-- **Confirm the actual self-right trigger for Bittle X V2 / BiBoard V1** directly
-  (Petoi support or forum) — the infrared-remote description in some docs does
-  not apply to this board. Add the token to `pi_pipeline/link/opencat.py` once
-  known.
+- **Self-right trigger is now known:** IMU flip-detect → `rc` skill, wired in
+  `reaction.h`. Serial tokens `krc` (recover) / `krl` (roll). Add both to
+  `pi_pipeline/link/opencat.py`. On hardware, test the stock `rc`/`rl` and, if
+  unreliable for the fall types RL produces, re-author the keyframes in Skill
+  Composer.
 
 ## Where this plugs in
 

@@ -38,6 +38,27 @@ for authoring keyframe skills — puppet the robot over USB, loop/sequence poses
 export to an `Instinct*.h` array). This is the authoring capability that B4
 (expressive body language) and B10 (teach-me-a-trick) build on. Needs hardware.
 
+### B9 — Vision + servo-resistance obstacle traversal
+When the **vision module** spots an obstacle it judges walkable-over (small box,
+close, low), use **servo-resistance / position-feedback divergence** (command vs.
+actual angle on the front joints — see `docs/research/hardware-specs.md` "Servo
+position feedback") as a **secondary confirmation signal** that a foot has
+actually made contact, then trigger one of two responses:
+- a dedicated **step-over gait** (exaggerated front-leg swing) for low obstacles, or
+- a **climbing protocol** (front feet up onto the obstacle, shift weight, pull
+  the rear up) for taller ones the step-over can't clear.
+
+Two independent signals gating the action — vision says "something's there and
+it's small", feedback says "I'm touching it now" — should be far more robust than
+either alone (vision at 192×192 / short range misses thin things; blind feedback
+alone can't tell a jam from normal stance load). Layered as a reflex outside the
+learned gait, like the `vision/avoidance.py` pattern. Firmware-side for the
+feedback read (skips the serial round-trip). **Needs vision + hardware;** revisit
+once the vision module is installed and working. Related: the blind-clearance
+tradeoff (rejected as a standalone — costs speed/stability every step for an
+occasional benefit) and the front-foot **jam reflex** (feedback-only version of
+the same idea).
+
 ---
 
 ## Expression & personality
