@@ -24,7 +24,7 @@ CONTROL_HZ = 80.0
 
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
-FAC_MOVEMENT = 550        # Reward forward progress (capped at TARGET_SPEED). surv_r1: 1000 -> 300 was too weak -- flat speed sagged to 0.076 (below the 0.085 gate) two rounds running. surv_r3: 300 -> 550. Still capped, so no "faster pays" swerve incentive; just a firmer pull up to the set-point.
+FAC_MOVEMENT = 350        # Reward forward progress (capped at TARGET_SPEED). surv_r3 tried 550 -- it fixed flat speed but flattened the trot to -0.44 (below the -0.45 gate). surv_r4: 350. The MIN_SPEED floor (0.085, weight 120) is what actually holds the gate now; FAC_MOVEMENT just needs to not fight it.
 FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - TARGET_SPEED), unramped -- mirror of the MIN_SPEED floor on the fast side. surv_r2: 60 -> 35, surv_r1 pulled flat speed to 0.081 (just under the 0.085 gate); the MIN_SPEED floor (120) still stops a stall.
 
 # --- Residual action space (residual-on-wkF, "resid" line) -------------------
@@ -90,8 +90,8 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
-FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3: now RAMPED by how close to falling: survive_step = FAC_SURVIVE_STEP * clip((tilt - SURVIVE_BAND_LO) / (1.3 - SURVIVE_BAND_LO), 0, 1). ~0 at routine wobble, full only near the fall line -> engages earlier (S2's 0.8 hard cutoff missed fast flat shoves) without paying to ride a mild tilt.
-SURVIVE_BAND_LO = 0.6      # rad; tilt at which survive credit starts ramping from 0 (full at the 1.3 fall line). surv_r3: was a hard 0.8 on/off gate; lowered + ramped.
+FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (clip from 0.6 rad) -- that gutted the magnitude in the critical 0.8-1.0 zone (2.6 vs 6.0), pooled cond-survival 25% -> 11%. Reverted to flat. surv_r4: flat 6.0, cutoff lowered 0.8 -> 0.7 to reach fast flat shoves.
+SURVIVE_BAND_LO = 0.7      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line. surv_r4: 0.8 -> 0.7 (r3's ramp-from-0.6 was worse than a flat band).
 BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 # Run 7 balance shaping: reward reducing the tilt ANGLE, reducing the tilt RATE
 # (damping the wobble, not just the lean), and planting more feet while tilted.
@@ -434,10 +434,9 @@ class OpenCatGymEnv(gym.Env):
         tilt = float(np.max(np.abs(state_ang_euler)))
         self._peak_tilt = max(self._peak_tilt, tilt)
         tilt_rate = abs(tilt - self._prev_tilt)
-        # surv_r2/r3: dense survival credit, ramped by how close to the fall line --
-        # held upright while nearly tipped. ~0 at routine wobble, full near 1.3 rad.
-        survive_step_reward = FAC_SURVIVE_STEP * float(np.clip(
-            (tilt - SURVIVE_BAND_LO) / (1.3 - SURVIVE_BAND_LO), 0.0, 1.0)) if tilt < 1.3 else 0.0
+        # surv_r2/r4: dense survival credit -- flat FAC_SURVIVE_STEP for every step
+        # held upright in the near-tipping band (SURVIVE_BAND_LO..1.3 rad).
+        survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
             balance_reward = FAC_BALANCE * (

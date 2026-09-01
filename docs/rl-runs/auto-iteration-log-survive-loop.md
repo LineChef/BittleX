@@ -200,4 +200,56 @@ Changes vs `surv_r2`:
 `push-hard` recovering toward `obst-50+push`'s level; no fall regression vs
 scripted.
 
+**Result** (`surv_r3_ppo`, ~40 min, clean). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r3 / r2) | L falls (r3 / r2) | S falls | L speed | L trot | L yaw-rate | L roll |
+|---|---|---|---|---|---|---|---|
+| flat | – | 0% / 0% | 0% | 0.085 | **−0.45** | 5.7 | .003 |
+| obst-20 | – | 0% / 0% | 0% | 0.067 | **−0.44** | 6.2 | .003 |
+| obst-35 | 0% / 0% | 4% / 4% | 4% | 0.057 | **−0.44** | 9.0 | .009 |
+| obst-50 | 0% / 0% | 7% / 7% | 4% | 0.051 | **−0.44** | 11.1 | .014 |
+| push-hard | **6% / 12%** | 61% / 61% | 57% | 0.066 | −0.49 | 26.8 | .072 |
+| obst-50+push | **20% / 50%** | 36% / 32% | 36% | 0.043 | −0.45 | 20.2 | .050 |
+
+**Pooled conditional survival: 11% (3/28)** — DOWN from surv_r2's 25%, below even
+surv_r1.
+
+| gate | threshold | result | verdict |
+|---|---|---|---|
+| pooled cond. survival | ≥ 0.30 | **0.11** | ❌ FAIL (regressed 25 → 11) |
+| fall ≤ scripted everywhere | no cell worse | obst-50, push-hard worse | ❌ FAIL |
+| flat speed | 0.085–0.125 | 0.085 | ✅ PASS (fix worked) |
+| trot corr | ≤ −0.45 | **−0.44** at 4 cells | ❌ FAIL (new regression) |
+| yaw-rate rms | ≤ 1.2× surv_r1 | ok | ✅ PASS |
+
+**REJECT — regression. Revert to `surv_r2` as the base.** Both bundled changes
+backfired:
+1. **Ramping the survive credit from 0.6 rad gutted its magnitude in the zone
+   that matters.** At 0.9 rad it paid 6·(0.9−0.6)/0.7 ≈ 2.6, vs surv_r2's flat
+   6.0. So the save incentive got *weaker* right where the save happens →
+   `obst-50+push` cond. survival 50% → 20%, the one real win lost.
+2. **`FAC_MOVEMENT` 300 → 550 flattened the trot** to −0.44 (below gate). The
+   `MIN_SPEED` floor at 0.085 is what actually fixed the speed gate (speed landed
+   exactly 0.085), so `FAC_MOVEMENT` doesn't need to be that high.
+
+**Learnings → S4:** keep `MIN_SPEED` 0.085 (that fixed speed), drop `FAC_MOVEMENT`
+back to 350 (restore trot), and un-ramp the survive credit — flat 6.0 with the
+cutoff at **0.7** (between r2's 0.8 and r3's 0.6, without the magnitude loss).
+
+---
+
+## S4 — `surv_r4` — surv_r2 base + un-ramped earlier survive credit + speed-gate fix that keeps the trot
+
+Effectively `surv_r2` with three corrections:
+- **`FAC_SURVIVE_STEP`** back to flat 6.0; **`SURVIVE_BAND_LO` 0.8 → 0.7** (reach
+  fast flat shoves without r3's magnitude loss).
+- **`MIN_SPEED` 0.07 → 0.085** (kept from r3 — this fixed the speed gate).
+- **`FAC_MOVEMENT` 300 → 350** (not r3's 550 — the floor holds the gate; 550
+  killed the trot).
+- Kept: `FAC_BALANCE` 4, `FAC_SURVIVE_BONUS` 12, `FAC_OVERSPEED` 35, harder DR,
+  `RESIDUAL_SCALE_DEG` 11.
+
+**Hypothesis:** restores surv_r2's `obst-50+push` win (≥ 40% cond. survival),
+lifts `push-hard` past 12%, pooled ≥ 0.30; flat speed ≥ 0.085 with trot ≤ −0.47.
+
 **Result:** _pending_
