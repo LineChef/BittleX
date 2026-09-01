@@ -170,6 +170,20 @@ RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
 RANDOM_TERRAIN = 0.045   # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
+# --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
+# Each a DR knob, default 0/off. The loop turns them on one at a time and they
+# accumulate. Scaled by self._dr like the rest. Benchmark cells in
+# benchmark_gaits.py exercise each with the knob forced on.
+SLOPE_MAX_DEG = 0.0       # per-episode ground tilt: random roll & pitch in +/- this (deg)
+START_POSE_JITTER = 0.0   # deg of gaussian noise on the reset joint angles + a small base tilt
+STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
+STUCK_FOOT_STEPS = 12
+SUSTAINED_FORCE = 0.0     # N: a held horizontal push, random direction, applied for SUSTAINED_FORCE_STEPS
+SUSTAINED_FORCE_PROB = 0.004
+SUSTAINED_FORCE_STEPS = 25
+DEFORM_GROUND = 0.0       # 0..1: randomize ground contact stiffness/damping/restitution (carpet-ish)
+SLIP_PATCH = 0.0          # 0..1: fraction of episodes with a random low-friction patch on the floor
+
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
 LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observation -- lets the policy see a stumble as a developing trajectory, not a snapshot. IMU-only, transfers to hardware.
@@ -193,6 +207,12 @@ class OpenCatGymEnv(gym.Env):
         self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
         self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
         self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
+        self._stuck_joint = -1   # coverage loop: index of a currently-jammed leg joint (-1 = none)
+        self._stuck_timer = 0
+        self._stuck_angle = 0.0
+        self._sforce_timer = 0   # sustained-force perturbation
+        self._sforce_vec = (0.0, 0.0)
+        self._slope_rp = (0.0, 0.0)
         self._reflex_dir = 0.0
         self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
                                                  # sets this so the reflex applies only to the
@@ -262,6 +282,25 @@ class OpenCatGymEnv(gym.Env):
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + mag * np.cos(theta),
                                  lin[1] + mag * np.sin(theta), lin[2]], ang)
+        # Sustained directional force (coverage loop): a held push over a window.
+        if SUSTAINED_FORCE > 0 and self._dr > 0 and not self._in_recovery:
+            if self._sforce_timer == 0 and np.random.rand() < SUSTAINED_FORCE_PROB:
+                a = np.random.uniform(0, 2 * np.pi)
+                self._sforce_vec = (np.cos(a), np.sin(a))
+                self._sforce_timer = SUSTAINED_FORCE_STEPS
+            if self._sforce_timer > 0:
+                f = SUSTAINED_FORCE * self._dr
+                p.applyExternalForce(self.robot_id, -1,
+                                     [self._sforce_vec[0] * f, self._sforce_vec[1] * f, 0.0],
+                                     [0, 0, 0], p.LINK_FRAME)
+                self._sforce_timer -= 1
+        # Stuck foot (coverage loop): jam one leg joint at its current angle.
+        if STUCK_FOOT_PROB > 0 and self._dr > 0 and not self._in_recovery:
+            if self._stuck_timer == 0 and np.random.rand() < STUCK_FOOT_PROB:
+                self._stuck_joint = int(np.random.randint(0, 8))
+                self._stuck_angle = float(p.getJointState(
+                    self.robot_id, self.joint_id[self._stuck_joint])[0])
+                self._stuck_timer = STUCK_FOOT_STEPS
         last_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0].astype(float)
@@ -358,11 +397,16 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
+        # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
+        if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
+            joint_angs[self._stuck_joint] = self._stuck_angle
+            self._stuck_timer -= 1
+
         # Set new joint angles
-        p.setJointMotorControlArray(self.robot_id, 
-                                    self.joint_id, 
-                                    p.POSITION_CONTROL, 
-                                    joint_angs, 
+        p.setJointMotorControlArray(self.robot_id,
+                                    self.joint_id,
+                                    p.POSITION_CONTROL,
+                                    joint_angs,
                                     forces=np.ones(8)*(0.5 if self._in_recovery else 0.2))
         p.stepSimulation() # Delay of data transfer
 
@@ -731,15 +775,38 @@ class OpenCatGymEnv(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
         p.setGravity(0,0,-9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        plane_id = p.loadURDF("plane.urdf")
+        # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
+        self._slope_rp = (0.0, 0.0)
+        if SLOPE_MAX_DEG > 0 and self._dr > 0:
+            m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
+            self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
+        plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
+                              p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
+        if DEFORM_GROUND > 0 and self._dr > 0:
+            k = DEFORM_GROUND * self._dr
+            p.changeDynamics(plane_id, -1,
+                             contactStiffness=float(np.random.uniform(3e4, 1e5) * (1 - 0.7 * k) + 1e5 * (1 - k)),
+                             contactDamping=float(np.random.uniform(500, 3000) * (1 + k)),
+                             restitution=float(np.random.uniform(0.0, 0.15 * k)))
+        if SLIP_PATCH > 0 and self._dr > 0 and np.random.rand() < SLIP_PATCH:
+            sx, sy = np.random.uniform(0.10, 0.45), np.random.uniform(-0.15, 0.15)
+            patch = p.createMultiBody(
+                0, p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.06, 0.09, 0.005]),
+                basePosition=[sx, sy, 0.005])
+            p.changeDynamics(patch, -1, lateralFriction=float(np.random.uniform(0.03, 0.18)))
         if RANDOM_TERRAIN > 0 and self._dr > 0:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
 
-        start_pos = [0,0,0.08]
-        start_orient = p.getQuaternionFromEuler([0,0,0])
+        _pose_tilt = 0.0
+        if START_POSE_JITTER > 0 and self._dr > 0:
+            _pose_tilt = np.deg2rad(0.3 * START_POSE_JITTER) * self._dr
+        start_pos = [0, 0, 0.08]
+        start_orient = p.getQuaternionFromEuler([
+            self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
+            self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
 
         urdf_path = "models/"#"/content/drive/My Drive/opencat-gym-esp32/models/"
         self.robot_id = p.loadURDF(urdf_path + "bittle_esp32.urdf", 
@@ -773,6 +840,12 @@ class OpenCatGymEnv(gym.Env):
 
         # Setting start position. This influences training.
         joint_angs = np.deg2rad(np.array([1, 0, 1, 0, 1, 0, 1, 0])*50)
+        if START_POSE_JITTER > 0 and self._dr > 0:
+            joint_angs = joint_angs + np.random.normal(
+                0.0, np.deg2rad(START_POSE_JITTER) * self._dr, 8)
+        self._stuck_timer = 0
+        self._stuck_joint = -1
+        self._sforce_timer = 0
 
         i = 0
         for j in self.joint_id:
