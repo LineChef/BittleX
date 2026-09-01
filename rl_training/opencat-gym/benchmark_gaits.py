@@ -82,18 +82,45 @@ def _bench(env, model, episodes, seed0):
         rec, per_term, steps, fell, recovered = run_episode(env, model)
         eps.append((rec, per_term, steps, fell, recovered))
         yr = np.asarray(rec["yaw_rate"], dtype=float)
-        per_ep.append({"fell": bool(fell),
-                       "yaw_rate_rms_deg": float(np.degrees(np.sqrt(np.mean(yr ** 2))))
-                                           if yr.size else 0.0})
+        tilt = np.maximum(np.abs(rec["roll"]), np.abs(rec["pitch"]))   # per-step body tilt (rad)
+        lat = np.abs(np.asarray(rec["y"], dtype=float))                # |lateral offset| from the start line
+        per_ep.append({
+            "fell": bool(fell),
+            "yaw_rate_rms_deg": float(np.degrees(np.sqrt(np.mean(yr ** 2)))) if yr.size else 0.0,
+            "lat_offset_max_m": float(lat.max()) if lat.size else 0.0,
+            # recovery time: for each tilt spike above 0.6 rad, steps until tilt
+            # falls back below 0.35 (only counts spikes that actually recovered).
+            "recovery_times": _recovery_times(tilt),
+        })
     s = summarize(eps)
     s["yaw_rate_rms_deg_mean"] = float(np.mean([d["yaw_rate_rms_deg"] for d in per_ep]))
+    s["lat_offset_max_m_mean"] = float(np.mean([d["lat_offset_max_m"] for d in per_ep]))
+    all_rt = [t for d in per_ep for t in d["recovery_times"]]
+    s["recovery_time_steps_mean"] = float(np.mean(all_rt)) if all_rt else None
+    s["recovery_events"] = len(all_rt)
     return s, per_ep
+
+
+def _recovery_times(tilt, spike=0.6, settled=0.35):
+    """Steps from each tilt spike (> spike rad) back down to `settled` rad."""
+    out, i, n = [], 0, len(tilt)
+    while i < n:
+        if tilt[i] > spike:
+            j = i
+            while j < n and tilt[j] >= settled:
+                j += 1
+            if j < n:                       # spike that came back down
+                out.append(j - i)
+            i = j
+        else:
+            i += 1
+    return out
 
 
 _KEYS = ["fell_fraction", "forward_distance_m_mean", "forward_speed_mps_mean",
          "episode_len_mean", "diagonal_trot_corr_mean", "roll_var_mean",
-         "yaw_abs_max_deg_mean", "yaw_rate_rms_deg_mean",
-         "med_stumble_recovery_rate", "big_stumble_recovery_rate"]
+         "yaw_rate_rms_deg_mean", "lat_offset_max_m_mean",
+         "recovery_time_steps_mean", "big_stumble_recovery_rate"]
 
 
 def _row(name, s):
