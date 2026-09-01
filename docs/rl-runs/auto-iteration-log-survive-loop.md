@@ -505,4 +505,35 @@ from the fall penalty + dominant speed reward rather than a hand-built bonus. If
 it doesn't clear ~25%, the reactive ceiling on this IMU-only setup is real and we
 stop sim-iterating.
 
+**Result** (`surv_r9_ppo`, ~40 min, clean, `approx_kl` fine). Benchmark 28 ep/cell:
+
+| cell | cond. surv. (r9/r5/r2) | L falls (r9/S) | L speed | L trot |
+|---|---|---|---|---|
+| flat | – | 0% / 0% | **0.076** | −0.52 |
+| obst-35 | 100% (1) | 0% / 4% | 0.050 | −0.51 |
+| obst-50 | 0% (1) | 7% / 4% | 0.048 | −0.52 |
+| push-hard | 6% (16) | 64% / 57% | 0.052 | −0.55 |
+| obst-50+push | **30%** (10) | 43% / 36% | 0.038 | −0.54 |
+
+**Pooled conditional survival: 18% (5/28)** — same as S5, still under S2's 25%.
+Recovery events ≈ 0 everywhere. **Flat speed 0.076 fails the 0.085 gate.**
+
+**REJECT — but with a fixable confound.** The field-standard recipe (drop the
+survival reward, add the fall penalty, dominant speed) landed exactly where S5
+already was — no plateau break. `obst-50+push` improved (20 → 30%), `push-hard`
+regressed (19 → 6%). BUT flat speed came in below its gate: the dominant
+`FAC_SPEED` Gaussian alone, with the floor at 0.07, didn't hold the pace. Can't
+cleanly conclude the recipe is a dead end from a round that failed its speed
+gate.
+
+## S10 — `surv_r10` — S9 recipe with the speed gate fixed
+
+One change vs `surv_r9`: **`MIN_SPEED` 0.07 → 0.08** (a soft plain floor just
+under the 0.085 gate, not the hard 0.085 that fought survival in r3/r4).
+
+**Hypothesis / decision:** if the field-standard recipe *with a passing speed
+gate* still lands at ~18%, that's two clean rounds confirming the ~25% reactive
+ceiling — bank `surv_r2` and stop sim-iterating stumble-catch. If it clears 25%,
+continue Session A (projected_gravity obs, angular push, adaptive curriculum).
+
 **Result:** _pending_
