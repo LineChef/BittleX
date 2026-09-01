@@ -55,7 +55,7 @@ TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-
 FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Below this, a hard linear penalty (FAC_MIN_SPEED) -- BUT only while upright (tilt < BALANCE_TILT_ON). surv_r5: the 0.085 floor (r3) fixed the flat-speed gate but crushed survival (r3/r4 both 11% vs r2's 25%) because it punished slowing down to catch a stumble. Now suspended whenever the body is wobbling, so survival can slow the walk while flat-ground pace still clears the gate.
+MIN_SPEED = 0.085          # m/s. Hard floor, BUT suspended while wobbling (tilt < BALANCE_TILT_ON) -- surv_r5/surv_r12 config. surv_r14 tried surv_r2's plain 0.07 floor + proj_grav + curriculum and it regressed to 11%; the tilt-gated 0.085 is the better pairing with the adaptive curriculum. Env left at the surv_r12 config (best research-informed gait, 21%).
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -113,6 +113,30 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
 IMPULSE_PUSH = 0.55      # m/s kick magnitude. surv_r1: 0.4 -> 0.55 -- the survive-what-scripted-can't loop needs the policy to actually practise big saves; 0.55 = recoverable big wobbles without the 0.7 fall-storm (prior-loop finding).
 IMPULSE_PUSH_PROB = 0.006  # per-step probability (~1.5x per 250-step episode). surv_r1: 0.003 -> 0.006.
+
+# --- Adaptive push curriculum (surv_r12, from PA-LOCO) ---------------------
+# Per-env: track the last ADAPT_WINDOW episode outcomes; scale the impulse
+# magnitude up when the policy is surviving most of them, down when it isn't.
+# The policy masters the catchable range before the pushes escalate, instead of
+# facing full-strength kicks from the moment the fixed DR ramp completes.
+ADAPTIVE_PUSH = True
+ADAPT_WINDOW = 12          # episodes averaged
+ADAPT_UP_RATE = 0.75      # survive-rate above this -> harder
+ADAPT_DOWN_RATE = 0.40    # below this -> easier
+ADAPT_STEP = 0.12         # curriculum multiplier change per adjustment
+ADAPT_MIN, ADAPT_MAX = 0.35, 1.70   # bounds on the multiplier
+
+# --- Scripted mid-walk push reflex (surv_r13, from the firmware's --------
+# IMU_EXCEPTION_PUSHED, which the real firmware only runs while standing).
+# On a roll spike, blend a brace-and-lean bias into the joint targets for a
+# short window -- crouch/widen all four, prop the falling side, tuck the rising
+# side. Layered UNDER the residual policy: joint = wkF(phase) + reflex + action.
+MIDWALK_PUSH_REFLEX = False  # surv_r13 REJECT: trained-in it was a wash (21%=surv_r12) and dropped trot below the gate. Off again.
+REFLEX_TRIGGER_ROLL = 0.35   # rad -- engage above this |roll|
+REFLEX_TRIGGER_RATE = 2.5    # rad/s -- or this |roll rate|
+REFLEX_WINDOW = 16           # control steps the bias is applied (linear decay)
+REFLEX_BRACE_DEG = 9.0       # crouch/widen on all four legs
+REFLEX_LEAN_DEG = 7.0        # asymmetric prop toward the fall
 RECOVERY_WINDOW_STEPS = 120 # steps allowed to right itself before giving up
 RECOVERY_UPRIGHT_RAD = 0.7  # both |roll| and |pitch| under this = upright again. R3: 0.5->0.7 so partial recoveries count and build a learning gradient.
 RECOVERY_HOLD_STEPS = 3     # consecutive upright steps to count as recovered. R3: 5->3 -- being pushed made holding 5 too hard.
@@ -153,7 +177,7 @@ LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observa
 # Size of observation space:
 # [ 30*8 joint history | quaternion(4) gyro(2) time_phase(1)
 #   | 12*2 tilt history | roll/pitch angular-accel(2) ]      (Run 7 adds the last two)
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 1 + LENGTH_TILT_HISTORY * 2 + 2
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2  # +3 = proj_gravity (surv_r12)
 
 
 class OpenCatGymEnv(gym.Env):
@@ -166,6 +190,14 @@ class OpenCatGymEnv(gym.Env):
         self.step_counter = 0
         self.step_counter_session = 0
         self._dr = 0.0            # domain-randomization ramp for the current episode
+        self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
+        self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
+        self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
+        self._reflex_dir = 0.0
+        self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
+                                                 # sets this so the reflex applies only to the
+                                                 # controller under test, never to the scripted
+                                                 # baseline it's compared against.
         self.state_history = np.array([])
         self.angle_history = np.array([])
         self.bound_ang = np.deg2rad(BOUND_ANG)
@@ -191,9 +223,24 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        self.observation_space = gym.spaces.Box(np.array([-1]*SIZE_OBSERVATION), 
+        self.observation_space = gym.spaces.Box(np.array([-1]*SIZE_OBSERVATION),
                                                 np.array([1]*SIZE_OBSERVATION))
 
+    def _record_outcome(self, survived: int) -> None:
+        """Adaptive push curriculum (surv_r12): once ADAPT_WINDOW episodes are in,
+        nudge the per-env push multiplier up if the policy is mostly surviving,
+        down if it's mostly falling. Persists across resets within this env."""
+        if not ADAPTIVE_PUSH:
+            return
+        self._ep_outcomes.append(survived)
+        if len(self._ep_outcomes) < ADAPT_WINDOW:
+            return
+        rate = sum(self._ep_outcomes) / len(self._ep_outcomes)
+        if rate >= ADAPT_UP_RATE:
+            self._push_curr = min(ADAPT_MAX, self._push_curr + ADAPT_STEP)
+        elif rate <= ADAPT_DOWN_RATE:
+            self._push_curr = max(ADAPT_MIN, self._push_curr - ADAPT_STEP)
+        self._ep_outcomes = self._ep_outcomes[ADAPT_WINDOW // 2:]  # slide the window
 
     def step(self, action):
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
@@ -211,7 +258,7 @@ class OpenCatGymEnv(gym.Env):
                 and np.random.rand() < IMPULSE_PUSH_PROB):
             lin, ang = p.getBaseVelocity(self.robot_id)
             theta = np.random.uniform(0, 2 * np.pi)
-            mag = IMPULSE_PUSH * self._dr
+            mag = IMPULSE_PUSH * self._dr * (self._push_curr if ADAPTIVE_PUSH else 1.0)
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + mag * np.cos(theta),
                                  lin[1] + mag * np.sin(theta), lin[2]], ang)
@@ -225,6 +272,26 @@ class OpenCatGymEnv(gym.Env):
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
             joint_angs += action * ds # Change per step including agent action
+
+        # Scripted mid-walk push reflex (surv_r13): trigger on a roll spike, then
+        # blend a brace-and-lean bias under the policy for REFLEX_WINDOW steps.
+        if self._reflex_on and not self._in_recovery:
+            _q = p.getBasePositionAndOrientation(self.robot_id)[1]
+            _roll = p.getEulerFromQuaternion(_q)[0]
+            _rr = p.getBaseVelocity(self.robot_id)[1][0]
+            if self._reflex_timer == 0 and (abs(_roll) > REFLEX_TRIGGER_ROLL
+                                            or abs(_rr) > REFLEX_TRIGGER_RATE):
+                self._reflex_timer = REFLEX_WINDOW
+                self._reflex_dir = float(np.sign(_roll if abs(_roll) > 0.1 else _rr))
+            if self._reflex_timer > 0:
+                d = self._reflex_timer / REFLEX_WINDOW          # linear decay
+                brace = np.deg2rad(REFLEX_BRACE_DEG) * d
+                lean = np.deg2rad(REFLEX_LEAN_DEG) * d * self._reflex_dir
+                # URDF idx 0 FLsh,1 FLel,2 FRsh,3 FRel,4 BRhip,5 BRkn,6 BLhip,7 BLkn
+                joint_angs = joint_angs + np.array([
+                    brace - lean, brace, brace + lean, brace,    # front L / R
+                    brace + lean, brace, brace - lean, brace])   # back  R / L
+                self._reflex_timer -= 1
 
         # Apply joint boundaries individually.
         min_ang = -self.bound_ang
@@ -366,7 +433,9 @@ class OpenCatGymEnv(gym.Env):
             tnorm = np.clip(tnorm + np.random.normal(0.0, gyro_n, 2), -1.0, 1.0)
         self.tilt_history = np.append(self.tilt_history, tnorm)
         self.tilt_history = np.delete(self.tilt_history, np.s_[0:2])
-        self.state_robot = np.concatenate((obs_ang, obs_vel_clip, [time_obs],
+        _rot = np.asarray(p.getMatrixFromQuaternion(obs_ang)).reshape(3, 3)
+        proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)  # gravity in body frame
+        self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
                                            self.tilt_history, ang_acc))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
@@ -459,7 +528,7 @@ class OpenCatGymEnv(gym.Env):
             vx_est = 0.0
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
-        # surv_r5: suspend the speed floor while wobbling -- slowing down to catch a
+        # surv_r5/r12: suspend the speed floor while wobbling -- slowing to catch a
         # stumble must not be punished. Active only when the body is ~upright.
         min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
                              if tilt < BALANCE_TILT_ON else 0.0)
@@ -546,6 +615,7 @@ class OpenCatGymEnv(gym.Env):
             self.step_counter_session += self.step_counter
             terminated = False
             truncated = True
+            self._record_outcome(1)                  # survived to episode length
             # surv_r1: survived to the end -> asymmetric bonus scaled by how rough
             # it got. Calm episode (peak_tilt <= BALANCE_TILT_ON) -> ~0; a near-tip
             # that was held -> full FAC_SURVIVE_BONUS.
@@ -560,6 +630,7 @@ class OpenCatGymEnv(gym.Env):
                 reward = 0
                 terminated = True
                 truncated = False
+                self._record_outcome(0)              # fell
 
         else:
             # Recovery-window behavior. roll/pitch from the clean (un-noised)
@@ -643,6 +714,8 @@ class OpenCatGymEnv(gym.Env):
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
+        self._reflex_timer = 0           # a fresh episode starts with no reflex active
+        self._reflex_dir = 0.0
         self._x_window = []
         self._prev_ang_vel = np.zeros(2)
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)
@@ -722,8 +795,11 @@ class OpenCatGymEnv(gym.Env):
         state_vel = state_vel[0:2]*ANG_FACTOR
         # self._phase is 0 here, so time_obs starts each episode at phase 0.
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
+        _rot = np.asarray(p.getMatrixFromQuaternion(state_ang)).reshape(3, 3)
+        proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)
         self.state_robot = np.concatenate((state_ang,
                                            np.clip(state_vel, -1, 1),
+                                           proj_grav,
                                            [time_obs],
                                            self.tilt_history,      # all zeros at reset (level)
                                            np.zeros(2)))           # ang accel
