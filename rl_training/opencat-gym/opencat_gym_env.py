@@ -899,16 +899,24 @@ class OpenCatGymEnv(gym.Env):
         Deliberately kept passable: scattered (never spanning the lane), short
         along-path, so a decent gait clears most and only clips some -- the
         stumbles that give the FAC_RECOVERY reward its signal."""
+        # Ground plane may be tilted (SLOPE_MAX_DEG). Place each box ON the sloped
+        # surface -- height offset from the plane equation, orientation matched --
+        # so nothing floats or half-buries. slope_rp = (0, 0) -> flat, as before.
+        roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
+        n = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
+                      np.cos(pitch) * np.cos(roll)])
+        box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
         for _ in range(np.random.randint(4, 10)):
             h = np.random.uniform(0.002, max(0.003, max_h))
+            x = np.random.uniform(0.12, 1.3)
+            y = np.random.uniform(-0.06, 0.06)
+            z_ground = -(n[0] * x + n[1] * y) / n[2]   # plane through the origin
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
                 np.random.uniform(0.015, 0.045),  # along-path half-length
                 np.random.uniform(0.04, 0.10),    # across-path half-width
                 h / 2])
-            p.createMultiBody(0, cs, basePosition=[
-                np.random.uniform(0.12, 1.3),
-                np.random.uniform(-0.06, 0.06),
-                h / 2])
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
+                              baseOrientation=box_orn)
 
 
     def render(self, mode='human'):
