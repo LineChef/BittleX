@@ -55,18 +55,24 @@ LADDER = [
         {"SLOPE_FIXED_RP": (D(4), D(9)), "RANDOM_TERRAIN": 0.040,
          "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25}),
 
-    # T6: the hardened tier. Calibrated so scripted wkF + balance 0.5 + payload
-    # lands in a ~15-50% fall band, so the ladder still discriminates once the
-    # payload has removed the easy failures. Each axis pushed past its T3/T4 peak.
-    ("T6.1", 6, "slopes",         "Very steep down  (-18 deg)",
-        {"SLOPE_FIXED_RP": (0.0, D(-18))}),
-    ("T6.2", 6, "obstacles",      "Big obstacles  (65 mm) + push",
-        {"RANDOM_TERRAIN": 0.065, "RANDOM_PUSH": 0.30}),
-    ("T6.3", 6, "stumble-catch",  "Hard shoves  (0.80 @ 0.014)",
-        {"IMPULSE_PUSH": 0.80, "IMPULSE_PUSH_PROB": 0.014, "RANDOM_PUSH": 0.20}),
-    ("T6.4", 6, "everything",     "Hard gauntlet: 15 deg slope + 55 mm + hard shoves",
-        {"SLOPE_FIXED_RP": (D(6), D(15)), "RANDOM_TERRAIN": 0.055,
-         "IMPULSE_PUSH": 0.78, "IMPULSE_PUSH_PROB": 0.014, "RANDOM_PUSH": 0.35}),
+    # T6: the hardened tier. With the payload on, both gaits are essentially
+    # unfallable on terrain/shove stress -- even -24 deg descents and a 20 deg
+    # brutal gauntlet give 0% falls. So T6 is NOT scored on fall rate; it is
+    # scored on COMMANDED PROGRESS + speed retention + heading drift under
+    # extreme stress. T6.1 (steep descent: learned walks down, scripted slides
+    # back) and T6.5 (weak servos: the one failure mode the payload's inertia
+    # cannot mask) are the real discriminators.
+    ("T6.1", 6, "slopes",         "Extreme down  (-24 deg)",
+        {"SLOPE_FIXED_RP": (0.0, D(-24))}),
+    ("T6.2", 6, "obstacles",      "Huge obstacles  (85 mm) + push",
+        {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35}),
+    ("T6.3", 6, "stumble-catch",  "Brutal shoves  (1.00 @ 0.018)",
+        {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25}),
+    ("T6.4", 6, "everything",     "Brutal gauntlet: 20 deg slope + 70 mm + brutal shoves",
+        {"SLOPE_FIXED_RP": (D(8), D(20)), "RANDOM_TERRAIN": 0.070,
+         "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45}),
+    ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg descent",
+        {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))}),
 ]
 
 GIF_CELLS = {"T5.1": "gauntlet"}   # replays: only the everything-at-once course
