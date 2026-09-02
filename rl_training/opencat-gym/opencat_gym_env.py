@@ -89,7 +89,7 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
-FAC_FALL_PENALTY = -15.0    # R-rob: modest terminal penalty for an actual fall (was 0). Isolated test on the current bespoke reward -- S9's -50 was bundled with a whole field-standard recipe.
+FAC_FALL_PENALTY = 0.0      # R-rob REVERTED: -15 + heavier disturbance training made obst-50+push falls 36->54% (worse than scripted), BASE-6 32->21%. Entropy collapsed (-2.4->-1.5); the policy got over-committed and stopped generalising to the obst+push combo. See coverage log.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
 FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
 SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
@@ -113,7 +113,7 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
 IMPULSE_PUSH = 0.55      # m/s kick magnitude. surv_r1: 0.4 -> 0.55 -- the survive-what-scripted-can't loop needs the policy to actually practise big saves; 0.55 = recoverable big wobbles without the 0.7 fall-storm (prior-loop finding).
-IMPULSE_PUSH_PROB = 0.013  # R-rob: 0.006 -> 0.013 (~3x/episode) -- the adaptive curriculum scales shove *magnitude*, not *rate*; more recovery reps per episode.
+IMPULSE_PUSH_PROB = 0.006  # R-rob REVERTED
 
 # --- Adaptive push curriculum (surv_r12, from PA-LOCO) ---------------------
 # Per-env: track the last ADAPT_WINDOW episode outcomes; scale the impulse
@@ -167,8 +167,8 @@ RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat
 RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode. surv_r1: 0.22 -> 0.30.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
-RANDOM_PUSH_PROB = 0.03  # R-rob: 0.02 -> 0.03 (more continuous-nudge practice)
-RANDOM_TERRAIN = 0.055   # R-rob: 0.045 -> 0.055 -- base gait is solid now (cov_r1_slope); more obstacle exposure to close the obstacle-distance gap vs scripted.
+RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
+RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 # --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------

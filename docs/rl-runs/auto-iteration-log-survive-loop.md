@@ -986,3 +986,53 @@ recovery. **If R4 (sustained force) shows the same signature, stop running the
 remaining scenarios as separate continuations** — fold them into one combined
 consolidation run (all knobs on, 4–5M steps) so they're learned jointly instead
 of sequentially eroding each other. Decide after R4.
+
+## R-rob — heavier disturbance training + `FAC_FALL_PENALTY = -15` — **REVERT**
+
+`cov_rrob`, 3M steps from `cov_r1_slope`. Turned UP what was already in the mix
+(`RANDOM_TERRAIN` 0.045->0.055, `IMPULSE_PUSH_PROB` 0.006->0.013,
+`RANDOM_PUSH_PROB` 0.02->0.03) + a -15 terminal fall penalty. Training clean.
+
+| pooled | cov_r1_slope | cov_rrob |
+|---|---|---|
+| BASE-6 conditional survival | 32% (9/28) | **21% (6/28)** |
+| ADDED | 71% (5/7) | 57% (4/7) |
+
+The fall penalty **backfired**: `obst-50+push` learned falls **36% -> 54%**
+(now falls *more* than scripted's 36% there; cond. surv. 40% -> 10%), push-hard
+50->54%, obst-50 11->14%, slip+push 11->14% -- every disturbance cell worse.
+Entropy loss collapsed -2.4 -> -1.5 (much more deterministic). Read: the -15
+penalty + a harsher training distribution pushed the policy into an
+over-committed narrow behaviour that hesitates near obstacles under a shove
+instead of committing to a recovery step -- and a hesitant response falls more
+than a decisive imperfect one. Small upsides (flat 0.091->0.094, slopes a touch
+faster) don't offset a gait that falls 54% of the time when shoved among
+obstacles. Reverted all four knobs.
+
+---
+
+# Coverage loop — conclusion
+
+| round | knob | verdict |
+|---|---|---|
+| **R1** | ground slopes ±10 deg | **KEEP** — walks slopes to ~14 deg; transferred to lower fall rates on push/obstacle cells; ~9% flat-speed cost |
+| R2 | slip patch | revert — a patch on flat ground can't destabilise (0 falls either gait), no signal |
+| R3 | start-pose jitter | revert — softened push cells, no measured gain, low-value scenario |
+| R4 | sustained 1.2 N shove | revert — too weak to destabilise, no signal |
+| R-rob | heavier disturbances + fall penalty | revert — over-committed the policy, push+obstacle cells regressed hard |
+
+**`cov_r1_slope` is the coverage-loop result and the best sim gait of the whole
+effort.** Four straight reverts after R1 say the base is at a local optimum that
+*more of the same* (added perturbations, harsher distribution, fall penalty)
+only moves away from. The remaining planned rounds (R5 speed/yaw, R7
+"all knobs + deform" consolidation) are variations on the approach that stopped
+working -- **not run.**
+
+**Where the real headroom is** (from `docs/research/bittle-rl-projects.md`, the
+survey of other Bittle RL projects): structural changes nobody in this loop
+tried -- **symmetry rewards** (morphological + phase-gated foot contact),
+**matching the 50 Hz real control rate** (we train at 80), a **body-height
+target** reward, **wider residual authority** (11 deg -> ~22), and
+**actuator-delay / joint-offset domain randomization**. That's a fresh effort,
+best done alongside or after the real-hardware RL-vs-scripted head-to-head
+rather than as more blind sim polish.
