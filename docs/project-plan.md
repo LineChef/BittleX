@@ -409,6 +409,13 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Get it moving on stock firmware first, before any custom code.
 - [ ] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
       (headless), confirm SSH access.
+  - **Can start NOW (Pi + PiSugar + card + PSU arrived 2026-09-01; robot/camera
+    not yet).** Full researched runbook + open-question answers in
+    [`docs/research/pi-bring-up.md`](research/pi-bring-up.md): flash Bookworm
+    64-bit Lite, kill Wi-Fi power-save, zram+swapfile, disable-BT for the PL011
+    UART, deploy `pi_pipeline` on ARM, then `benchmark_pi.py` (Vosk / Piper /
+    Claude-API / RAM). PiSugar **S** = dumb UPS: no I²C, no battery %, power-
+    present only.
 - [ ] Mount the Pi; test power and serial **independently** (power can work while
       serial doesn't). Per Petoi's Raspberry Pi serial docs:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
