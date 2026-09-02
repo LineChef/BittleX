@@ -184,6 +184,16 @@ RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. s
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
 RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
+
+# --- gait-refinement G3: sim-to-real domain randomisation -----------------
+PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
+PAYLOAD_MASS_RAND = 0.015  # +/- kg (with/without camera, mount hardware, rough estimate)
+PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only)
+PAYLOAD_PROB = 0.90        # fraction of episodes carrying it (rest bare -> gait not dependent on the payload)
+ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
+ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
+TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
+FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 # --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
@@ -445,8 +455,11 @@ class OpenCatGymEnv(gym.Env):
                                     self.joint_id,
                                     p.POSITION_CONTROL,
                                     joint_angs,
-                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2))
+                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
         p.stepSimulation() # Delay of data transfer
+        # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
+        _js = p.getJointStates(self.robot_id, self.joint_id)
+        power_use = float(sum(abs(j[3]) * abs(j[1]) for j in _js))
 
         # Normalize joint_angs
         joint_angs[0] /= self.bound_ang
@@ -514,7 +527,7 @@ class OpenCatGymEnv(gym.Env):
         obs_ang, obs_vel_clip = state_ang, state_vel_clip
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
         if gyro_n:
-            obs_ang = np.array(state_ang) + np.random.normal(0.0, gyro_n, 4)
+            obs_ang = np.clip(np.array(state_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
             obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
             ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
         # Tilt history (Run 7): last LENGTH_TILT_HISTORY steps of (roll, pitch),
@@ -688,7 +701,8 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_JITTER * jitter_penalty
                     + FAC_HEIGHT * height_penalty
                     + FAC_JOINT_LIMIT * joint_limit_penalty
-                    + FAC_FOOT_PHASE * foot_phase_pen))
+                    + FAC_FOOT_PHASE * foot_phase_pen
+                    + FAC_POWER * power_use))
 
         # Set state of the current state.
         terminated = False
@@ -727,6 +741,7 @@ class OpenCatGymEnv(gym.Env):
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "base_height_m": base_clearance,
+            "r_power": -penalty_scale * FAC_POWER * power_use,
         }
 
         # Stop criteria of current learning episode:
@@ -901,8 +916,26 @@ class OpenCatGymEnv(gym.Env):
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
-        plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
-                              p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+        _rough = (ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+                  and np.random.rand() < ROUGH_TERRAIN_PROB)
+        if _rough:
+            _n = 64
+            _amp = ROUGH_TERRAIN * 0.018 * self._dr
+            _h = np.random.uniform(-1, 1, (_n, _n))
+            for _ in range(2):
+                _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, -1, 0)
+                      + np.roll(_h, 1, 1) + np.roll(_h, -1, 1)) / 5.0
+            _h = (_h - _h.mean()) * _amp
+            _hf = p.createCollisionShape(
+                p.GEOM_HEIGHTFIELD, meshScale=[0.06, 0.06, 1.0],
+                heightfieldData=_h.flatten().astype(np.float64).tolist(),
+                numHeightfieldRows=_n, numHeightfieldColumns=_n)
+            plane_id = p.createMultiBody(0, _hf)
+            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])
+            self._slope_rp = (0.0, 0.0)
+        else:
+            plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
+                                  p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
@@ -933,6 +966,25 @@ class OpenCatGymEnv(gym.Env):
         self.robot_id = p.loadURDF(urdf_path + "bittle_esp32.urdf", 
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
+
+        # gait-refinement G3: welded rear payload (Pi + PiSugar + camera)
+        self._payload_id = None
+        if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
+            pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
+            pj = np.random.uniform(-0.003, 0.003, 3)
+            off = [PAYLOAD_POS[0] + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
+            self._payload_id = p.createMultiBody(
+                baseMass=float(pm), baseCollisionShapeIndex=-1,
+                basePosition=[start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
+            _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
+                                    p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
+            p.changeConstraint(_c, maxForce=5e3)
+
+        # gait-refinement G3: per-joint motor-force scale (overheat cutback)
+        self._torque_scale = np.ones(8)
+        if TORQUE_CUTBACK > 0 and self._dr > 0 and np.random.rand() < 0.4:
+            k = np.random.choice(8, np.random.randint(1, 4), replace=False)
+            self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._dr, 1.0, len(k))
         
         # Initialize urdf links and joints.
         self.joint_id = []
