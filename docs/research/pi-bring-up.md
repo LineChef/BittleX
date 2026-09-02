@@ -208,10 +208,20 @@ PyTorch on the Pi — export the policy to **ONNX** and infer via the
 `onnxruntime` that's already there for Piper. Revisit only if that proves
 insufficient. (Moot until Phase 6 anyway; RL is paused for hardware.)
 
-## 8. Benchmark the real Pi — `benchmark_pi.py` (to build)
+## 8. Benchmark the real Pi — `pi_pipeline/benchmark_pi.py`
 
-One script, run over SSH, prints a table. Measures the things the plan flags as
-untested:
+Built and smoke-tested on the Mac. Run over SSH once `pi_pipeline` is installed:
+
+```
+python -m pi_pipeline.benchmark_pi                 # everything it can
+python -m pi_pipeline.benchmark_pi --all-voices    # + synth-time every Piper voice (low vs medium)
+python -m pi_pipeline.benchmark_pi --skip-api --skip-stress
+```
+
+Every section degrades to `SKIP` on a missing model / API key / non-Linux host.
+Mac baseline (x86, for reference — the Pi will be much slower): Piper+Vosk
+loaded = ~300 MB RSS, Piper synth 0.06x realtime, Vosk transcribe 0.19x,
+Piper→Vosk word recall ~90%. It measures the things the plan flags as untested:
 
 - **RAM baseline**: `free -h` idle after boot; after importing the voice stack;
   during a live STT+TTS exchange. Flag if headroom < ~40 MB.
