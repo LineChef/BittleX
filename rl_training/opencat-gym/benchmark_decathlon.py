@@ -54,12 +54,33 @@ LADDER = [
     ("T5.1", 5, "everything",     "The gauntlet: slope + obstacles + repeated shoves",
         {"SLOPE_FIXED_RP": (D(4), D(9)), "RANDOM_TERRAIN": 0.040,
          "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25}),
+
+    # T6: the hardened tier. Calibrated so scripted wkF + balance 0.5 + payload
+    # lands in a ~15-50% fall band, so the ladder still discriminates once the
+    # payload has removed the easy failures. Each axis pushed past its T3/T4 peak.
+    ("T6.1", 6, "slopes",         "Very steep down  (-18 deg)",
+        {"SLOPE_FIXED_RP": (0.0, D(-18))}),
+    ("T6.2", 6, "obstacles",      "Big obstacles  (65 mm) + push",
+        {"RANDOM_TERRAIN": 0.065, "RANDOM_PUSH": 0.30}),
+    ("T6.3", 6, "stumble-catch",  "Hard shoves  (0.80 @ 0.014)",
+        {"IMPULSE_PUSH": 0.80, "IMPULSE_PUSH_PROB": 0.014, "RANDOM_PUSH": 0.20}),
+    ("T6.4", 6, "everything",     "Hard gauntlet: 15 deg slope + 55 mm + hard shoves",
+        {"SLOPE_FIXED_RP": (D(6), D(15)), "RANDOM_TERRAIN": 0.055,
+         "IMPULSE_PUSH": 0.78, "IMPULSE_PUSH_PROB": 0.014, "RANDOM_PUSH": 0.35}),
 ]
 
-GIF_CELLS = {"T1.1": "easy", "T4.3": "hard", "T5.1": "brutal"}
+GIF_CELLS = {"T5.1": "gauntlet"}   # replays: only the everything-at-once course
 _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean",
             "diagonal_trot_corr_mean", "yaw_rate_rms_deg_mean", "lat_offset_max_m_mean",
             "recovery_events", "recovery_time_steps_mean", "big_stumble_recovery_rate"]
+
+
+# sim2real DR that is NOT part of any cell's declared difficulty. "full" leaves
+# the env module defaults (payload 90%, rough patch 35%, torque cutback 40%);
+# "clean" removes all three so a cell tests exactly its label; "payload" removes
+# rough + cutback but forces the Pi/camera payload on every episode so its cost
+# can be read directly against the "clean" run.
+_EXTRA_DR = "full"
 
 
 def _apply(cell_knobs):
@@ -72,6 +93,14 @@ def _apply(cell_knobs):
     opencat_gym_env.RANDOM_PUSH_PROB = 0.03
     opencat_gym_env.IMPULSE_PUSH_PROB = 0.0
     opencat_gym_env.DR_EVAL_FULL = True
+    if _EXTRA_DR == "clean":
+        opencat_gym_env.PAYLOAD_PROB = 0.0
+        opencat_gym_env.ROUGH_TERRAIN = 0.0
+        opencat_gym_env.TORQUE_CUTBACK = 0.0
+    elif _EXTRA_DR == "payload":
+        opencat_gym_env.PAYLOAD_PROB = 1.0
+        opencat_gym_env.ROUGH_TERRAIN = 0.0
+        opencat_gym_env.TORQUE_CUTBACK = 0.0
     for k, v in cell_knobs.items():
         setattr(opencat_gym_env, k, v)
 
@@ -84,7 +113,13 @@ def main():
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--json-out", required=True)
     ap.add_argument("--gif-dir", default=None)
+    ap.add_argument("--extra-dr", choices=("full", "clean", "payload"), default="full",
+                    help="non-cell DR: full=env defaults, clean=no payload/rough/cutback, "
+                         "payload=payload forced on, rough+cutback off")
     args = ap.parse_args()
+
+    global _EXTRA_DR
+    _EXTRA_DR = args.extra_dr
 
     opencat_gym_env.ADAPTIVE_PUSH = False        # training-time curriculum state -- off for eval
     env = OpenCatGymEnv()
@@ -93,7 +128,8 @@ def main():
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
-    out = {"learned_path": args.learned, "episodes": args.episodes, "cells": []}
+    out = {"learned_path": args.learned, "episodes": args.episodes,
+           "extra_dr": args.extra_dr, "scripted_balance": args.scripted_balance, "cells": []}
     for cid, tier, skill, label, knobs in LADDER:
         _apply(knobs)
         print(f"\n=== {cid}  T{tier}  {label} ===", flush=True)
