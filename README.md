@@ -85,10 +85,6 @@ docs/       # Project plan, run logs, research notes
 
 ## Setup
 
-**Secrets**: managed via environment variables. Copy `.env.example` to `.env` at
-the repo root and fill in real values (`.env` is gitignored and never committed);
-loaded at runtime via `python-dotenv`.
-
 **RL training**: requires Python ≥ 3.10 (macOS ships an EOL 3.8, so this project
 uses a `.venv` built with Homebrew's `python@3.11`). See
 [`rl_training/README.md`](rl_training/README.md) for setup, including a required
