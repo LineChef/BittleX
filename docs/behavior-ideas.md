@@ -32,10 +32,13 @@ turn-in-place, sidestep, slow "sneak", backward. The turn and sidestep gaits
 directly improve later autonomy modes (person-following, obstacle steering,
 go-to-object).
 
-**Update:** for **turning specifically**, the better path is a single
-**command-conditioned policy** (yaw-rate + speed command in the observation,
-reward tracks the command) rather than a separate turn gait — planned as round
-**D4** after the drift-fix loop; see
+**Update:** for **turning specifically**, if we ever train it, the better path
+is a single **command-conditioned policy** (yaw-rate + speed command in the
+observation, reward tracks the command) rather than a separate turn gait. But
+it's **not scheduled** — OpenCat firmware turn gaits (`wkL` etc.) work today and
+the vision pursuit layer can use them. Build the RL version only if firmware
+turns oscillate in visual pursuit or fail on terrain — decision gate after the
+drift-fix loop + Decathlon; see
 `docs/rl-runs/auto-iteration-log-survive-loop.md`. Sidestep / sneak / backward
 still fit the separate-run framing here.
 
