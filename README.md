@@ -3,8 +3,7 @@
 A machine learning project where I teach a quadruped robot to walk via
 reinforcement learning, perceive its environment through an onboard camera, hold
 voice conversations powered by Claude, and build persistent memory of past
-interactions over time. It's a first hardware build from a web-development
-background; the full roadmap and decision log are in
+interactions over time. The full roadmap and decision log are in
 [`docs/project-plan.md`](docs/project-plan.md).
 
 ## Project Goals
