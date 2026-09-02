@@ -32,6 +32,13 @@ turn-in-place, sidestep, slow "sneak", backward. The turn and sidestep gaits
 directly improve later autonomy modes (person-following, obstacle steering,
 go-to-object).
 
+**Update:** for **turning specifically**, the better path is a single
+**command-conditioned policy** (yaw-rate + speed command in the observation,
+reward tracks the command) rather than a separate turn gait — planned as round
+**D4** after the drift-fix loop; see
+`docs/rl-runs/auto-iteration-log-survive-loop.md`. Sidestep / sneak / backward
+still fit the separate-run framing here.
+
 ### B3 — Skill Composer authoring
 Stand up a workflow around **Petoi's Skill Composer** (the no-code desktop tool
 for authoring keyframe skills — puppet the robot over USB, loop/sequence poses,
