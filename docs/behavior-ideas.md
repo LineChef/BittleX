@@ -151,3 +151,18 @@ Conversationally record a joint sequence you puppet ("G2, when I say 'spin', do
 this…"), save it as a new skill in the memory DB, and expose it to
 `perform_skill`. Memory + link + a small authoring flow layered over the Skill
 Composer idea (B3).
+
+---
+
+## Self-awareness
+
+### B12 — "I'm running low" — power awareness
+G2 estimates its own remaining runtime and says so, in character, before it dies.
+The PiSugar S has no battery telemetry (only "external power present"), so this
+is a **timer**, not a gauge: track uptime since last on the charger, warn once it
+passes a threshold learned from real battery-life testing, escalate as it nears
+the empirical limit, reset when placed on the charger. Optional later upgrade:
+an ADC on a BiBoard Grove analog pin (G3/G4) reading pack voltage for a true
+signal. Needs battery-life data first (idle / walking / talking / vision-on runs
+to brown-out, repeated). Software on the voice pipeline + memory.
+See the "Power awareness" note in `docs/project-plan.md`.

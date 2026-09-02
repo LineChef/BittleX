@@ -61,6 +61,26 @@ should we work on next."
 - BiBoard V1's onboard voice-recognition module + speaker: decide whether the
   wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
 
+### Power awareness — G2 warns when it thinks it's running low
+
+The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
+"external power present"), so G2 can't *measure* its charge — it has to
+*estimate* from elapsed run time.
+
+- **Plan:** track uptime since the last time it was on the charger; when it
+  passes a learned threshold, G2 proactively says something in character ("I'm
+  getting tired, might need to rest on the charger soon") via the voice
+  pipeline, and repeats/escalates as it gets closer to the empirical limit. On
+  the charger ("external power present" flips true) it resets and can say it's
+  charging.
+- **Needs first:** real battery-life data — run G2 doing representative work
+  (idle, walking, talking, vision on) on a full charge until the Pi browns out,
+  a few times, to get mean runtime and its spread. Do this early in hardware
+  bring-up.
+- **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
+  Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
+  actual cell state. Optional; the timer is enough to start.
+
 ---
 
 ## Phase 1 — GitHub repo setup ✅
