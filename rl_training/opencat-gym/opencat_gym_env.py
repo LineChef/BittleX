@@ -37,7 +37,7 @@ FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - T
 # learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 (warped wkF to a crawl); resid_r2 used 11. rtune_r3 tried 8 -- fixed heading at 20/35mm but couldn't catch 50mm trips (falls 14->29%). Reverted to 11.
+RESIDUAL_SCALE_DEG = 22   # gait-refinement G1: 11 -> 22. Wider correction authority (URMA/Bittle_Symmetry use ~30 deg). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; paired here with FAC_IMITATION 16 as a stronger anchor.
 FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
 FAC_RESID_SMOOTH = 6.0    # rtune_r4: -mean(|action - prev_action|) * this (ramped). Penalise frame-to-frame jerk in the correction, not its magnitude -- a smoother residual should cut roll oscillation / heading drift without capping the authority needed for a 50mm trip.
 
@@ -70,8 +70,13 @@ FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- w
 PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15mm (was 5mm before that). auto_iter3: 25mm -- after FAC_HEADING=5.0 the policy went front-heavy and let the back feet drag at ~10mm; FAC_CLEARANCE penalizes squared deviation from this target both ways, so raising it pushes the dragging back feet up hard while easing the over-high front feet. Matches what v6 actually achieved (~23mm).
 FAC_JITTER = 0.1          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
+FAC_HEIGHT = 4.0          # gait-refinement G1: ramped penalty on (base_z - HEIGHT_TARGET)^2 -- hold a target ride height, kill the crouch/collapse failure mode (URMA weights this heavily)
+HEIGHT_TARGET = 0.072     # m. Measured from a clean cov_r1_slope walk (mean 0.074, p10 0.070). URDF loads at 0.08.
+FAC_JOINT_LIMIT = 2.0     # gait-refinement G1: ramped soft-barrier penalty as any joint nears +/-BOUND_ANG
+JOINT_LIMIT_MARGIN = 0.20 # rad from the limit where the barrier starts
+FAC_FOOT_PHASE = 1.5      # gait-refinement G1: ramped -- reward a diagonal-pair stance pattern, penalise non-trot contact sets (temporal symmetry, contact-based so it can't be phase-misaligned)
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 10.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 16.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
 IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
@@ -399,6 +404,23 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
+        # gait-refinement G1: hold a target ride height
+        height_penalty = (base_clearance - HEIGHT_TARGET) ** 2
+        # gait-refinement G1: soft barrier as any commanded joint nears its limit
+        _jl = np.maximum(0.0, np.abs(joint_angs) - (self.bound_ang - JOINT_LIMIT_MARGIN))
+        joint_limit_penalty = float(np.sum(_jl ** 2))
+        # gait-refinement G1: diagonal-stance pattern. paw_contact order [LF,RF,RB,LB];
+        # a clean trot has exactly one diagonal down: {RF,LB}=(1,3) or {LF,RB}=(0,2).
+        _down = frozenset(i for i in range(4) if paw_contact[i])
+        if _down in (frozenset((1, 3)), frozenset((0, 2))):
+            foot_phase_pen = 0.0
+        elif len(_down) == 2:            # two down but not a diagonal (e.g. both front)
+            foot_phase_pen = 0.4
+        elif len(_down) in (1, 3):
+            foot_phase_pen = 0.7
+        else:                           # 0 or 4 feet down -- not a trot at all
+            foot_phase_pen = 1.0
+
         # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
         if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
             joint_angs[self._stuck_joint] = self._stuck_angle
@@ -620,7 +642,10 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
-                    + FAC_JITTER * jitter_penalty))
+                    + FAC_JITTER * jitter_penalty
+                    + FAC_HEIGHT * height_penalty
+                    + FAC_JOINT_LIMIT * joint_limit_penalty
+                    + FAC_FOOT_PHASE * foot_phase_pen))
 
         # Set state of the current state.
         terminated = False
@@ -651,6 +676,10 @@ class OpenCatGymEnv(gym.Env):
             "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
             "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
+            "r_height": -penalty_scale * FAC_HEIGHT * height_penalty,
+            "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
+            "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
+            "base_height_m": base_clearance,
         }
 
         # Stop criteria of current learning episode:
