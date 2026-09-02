@@ -1036,3 +1036,40 @@ target** reward, **wider residual authority** (11 deg -> ~22), and
 **actuator-delay / joint-offset domain randomization**. That's a fresh effort,
 best done alongside or after the real-hardware RL-vs-scripted head-to-head
 rather than as more blind sim polish.
+
+---
+
+# drift-fix loop (branch `drift-fix`, off `development`) — in progress
+
+Base: `cov_r1_slope`. The speed sweep showed it holds a straight line only at
+its exact training cadence (see `docs/research/bittle-rl-projects.md` empirical
+note). Two structural fixes, isolated then consolidated:
+
+- **D1 — `FAC_MIRROR`**: unramped penalty on |lateral CoM velocity| (12.0) +
+  left/right stance-fraction imbalance from foot contacts (1.0). 3M steps.
+- **D2 — 50 Hz control rate**: 5 sim substeps instead of 3 (`CONTROL_HZ` ~48, the
+  real BiBoard rate), phase advance rescaled to keep the gait's wall-clock pace.
+  3M steps on D1's result.
+- **D3 — consolidate** both, 4M steps + full cadence-vs-drift benchmark.
+- then **the Decathlon** (`benchmark_decathlon.py`) — graded easy->brutal
+  learned-vs-scripted report on the final gait.
+
+## Planned next — D4: commanded locomotion (speed + yaw / turning)
+
+The deferred coverage-loop "R5" grown up. Turning is not a tweak — it's a
+**command-conditioned policy** (the URMA paradigm):
+
+- obs gains a commanded yaw-rate (+ forward speed) input
+- the yaw terms flip from "penalise all turning" (`FAC_YAW`, `FAC_HEADING`,
+  `FAC_MIRROR_LAT`) to **track the commanded yaw rate**; heading tracks a moving
+  target instead of holding zero
+- a command curriculum: sample yaw commands during training (mostly 0, sometimes ±)
+- optionally blend Bittle's built-in `wkL` turn keyframe into the residual
+  reference for sharper turns
+
+**Sequence: after D3, not folded into the drift-fix loop.** A symmetric,
+non-drifting gait is the prerequisite for clean commanded turns — an
+uncommanded drift corrupts a commanded turn. A command-conditioned policy
+subsumes "walk straight" (yaw_cmd = 0) for free. High value for the autonomy
+phase (B8 go-to-object, person-following, obstacle steering). Supersedes the
+"separate short RL runs per turn gait" framing of behaviour-idea B2.
