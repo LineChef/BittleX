@@ -5,7 +5,7 @@ A robotics project where I teach a quadruped robot to:
 - walk using reinforcement learning
 - perceive its environment through an onboard AI camera that runs vision models on-device (Grove Vision AI V2)
 - hold natural voice conversations powered by Claude
-- build persistent memory of its interactions with me over time
+- build persistent memory of its interactions over time
 
 The full roadmap and decision log are in
 [`docs/project-plan.md`](docs/project-plan.md).
