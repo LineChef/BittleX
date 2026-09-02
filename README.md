@@ -3,7 +3,7 @@
 A robotics project where I teach a quadruped robot to:
 
 - walk using reinforcement learning
-- perceive its environment through onboard computer vision
+- perceive its environment through an onboard AI camera that runs vision models on-device (Grove Vision AI V2)
 - hold natural voice conversations powered by Claude
 - build persistent memory of its interactions with me over time
 
