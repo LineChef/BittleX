@@ -31,9 +31,19 @@ Stage 5 is the honest gate.
 automated sessions. Plus ~1-2 h code each for the Stage 2c and Stage 4
 obs/reward changes.
 
-## The alternative
+## GPU sim port -- DEFERRED (decision 2026-09-02)
 
-Port the env to a GPU sim (Isaac Lab / MJX) first: every stage then runs in
-minutes, the regimen is an afternoon, and the 20M run is ~1 h. Porting +
-re-tuning + re-verifying is a ~1-2-week project of its own -- worth it only if
-sim-side iteration becomes the bottleneck.
+Porting to a GPU sim (MJX best fit for the user's RTX 2080; Isaac Lab is
+minimum-spec on 8 GB) would make every stage run in minutes and the 20M run
+~1 h. **Not doing it now.** It is a full re-implementation, not a translation:
+different contact/friction/actuator physics (so `wkF` and every tuned `FAC_*`
+weight need re-deriving -- `cov_r1_slope` would not exist there), JAX's
+functional/vectorised paradigm (rewrite, not copy), and it trades a *known*
+sim-to-real gap for an unknown one. The CPU compute for this regimen (~15-20 h
+over ~5-6 unattended sessions) is manageable.
+
+Revisit the port only if, after the 20M run, the gait needs dozens more
+iterations, or a 100M-scale run is on the table, or commanded-locomotion +
+vision-conditioned gait becomes a multi-month effort. If we ever do port, this
+PyBullet env stays as the **reference to match** (reproduce these benchmark
+numbers) -- which is what makes that rewrite tractable.
