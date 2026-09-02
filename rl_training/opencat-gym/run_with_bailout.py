@@ -39,11 +39,17 @@ def flat_eval(ckpt, episodes):
     for k in ("SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE",
               "DEFORM_GROUND", "SLIP_PATCH", "RANDOM_TERRAIN", "RANDOM_PUSH", "IMPULSE_PUSH",
               "RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "PHASE_RAND",
-              "PAYLOAD_MASS", "ROUGH_TERRAIN", "TORQUE_CUTBACK"):
+              "ROUGH_TERRAIN", "TORQUE_CUTBACK"):
         if hasattr(E, k):
             setattr(E, k, 0.0)
     if hasattr(E, "SLOPE_FIXED_RP"):
         E.SLOPE_FIXED_RP = (0.0, 0.0)
+    # G4: the payload is bolted on -- the policy only ever trains with it, so the
+    # bailout sanity gate evaluates with it too (nominal mass, no jitter).
+    if hasattr(E, "PAYLOAD_PROB"):
+        E.PAYLOAD_PROB = 1.0
+    if hasattr(E, "PAYLOAD_MASS_RAND"):
+        E.PAYLOAD_MASS_RAND = 0.0
     E.DR_EVAL_FULL = True
     from opencat_gym_env import OpenCatGymEnv, CONTROL_HZ
     import pybullet as p

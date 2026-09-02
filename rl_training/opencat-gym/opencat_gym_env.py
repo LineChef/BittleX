@@ -187,9 +187,12 @@ RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cel
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
-PAYLOAD_MASS_RAND = 0.015  # +/- kg (with/without camera, mount hardware, rough estimate)
+PAYLOAD_MASS_RAND = 0.035  # +/- kg. G4: 0.015 -> 0.035 (40-110 g range). The payload is bolted on so
+                           # PAYLOAD_PROB is now 1.0 -- instead of ever training a bare robot, widen the
+                           # mass so the policy keeps margin for a draining battery / heavier final camera
+                           # without over-fitting to one exact inertia (phase2's failure mode).
 PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only)
-PAYLOAD_PROB = 0.90        # fraction of episodes carrying it (rest bare -> gait not dependent on the payload)
+PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
@@ -650,9 +653,12 @@ class OpenCatGymEnv(gym.Env):
         # stumble must not be punished. Active only when the body is ~upright.
         # gait-refinement G2: track the commanded forward speed (band 0.02 m/s).
         _spd_err = v_fwd - self._cmd_fwd
-        _spd_den = max(0.03, abs(self._cmd_fwd))
+        _spd_den = max(0.02, abs(self._cmd_fwd))   # G4: 0.03 -> 0.02, sharper gradient at low cmd
         speed_reward = FAC_SPEED * np.exp(-SPEED_SHARPNESS * (_spd_err / _spd_den) ** 2)
-        speed_track_penalty = (FAC_SPEED_TRACK * max(0.0, abs(_spd_err) - 0.02)
+        # G4: proportional tracking band (was flat 0.02) -- a 0.02 slop on a 0.04
+        # creep command let the policy walk at cruise for free. 15% of |cmd|, floor 12 mm/s.
+        _spd_band = max(0.012, 0.15 * abs(self._cmd_fwd))
+        speed_track_penalty = (FAC_SPEED_TRACK * max(0.0, abs(_spd_err) - _spd_band)
                                if tilt < BALANCE_TILT_ON else 0.0)
         min_speed_penalty = 0.0        # superseded by speed_track_penalty
         overspeed_penalty = 0.0
@@ -850,22 +856,23 @@ class OpenCatGymEnv(gym.Env):
                 self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
             return
         r = np.random.rand()
-        if r < 0.45:        # cruise
-            self._cmd_fwd = np.random.uniform(0.06, 0.13)
-            self._cmd_yaw = np.random.normal(0.0, 0.05)
-        elif r < 0.65:      # stand
+        # G4: turning dropped from the curriculum. The yaw command trained to zero
+        # effect in phase2 and fought heading-hold. cmd_yaw is now always 0, so the
+        # heading term (FAC_HEADING vs _cmd_heading) rewards holding the launch
+        # heading -- drift-free straight-line walking. Real turns go to firmware.
+        self._cmd_yaw = 0.0
+        # G4: explicit low / mid / top speed bands with heavy weight on the
+        # extremes, so creep and fast stop collapsing toward cruise.
+        if r < 0.32:        # cruise (mid)
+            self._cmd_fwd = np.random.uniform(0.08, 0.12)
+        elif r < 0.52:      # creep (low)
+            self._cmd_fwd = np.random.uniform(0.02, 0.055)
+        elif r < 0.70:      # fast (top)
+            self._cmd_fwd = np.random.uniform(0.115, CMD_FWD_MAX)
+        elif r < 0.87:      # stand
             self._cmd_fwd = np.random.uniform(-0.01, 0.02)
-            self._cmd_yaw = 0.0
-        elif r < 0.80:      # turn while walking
-            self._cmd_fwd = np.random.uniform(0.03, 0.10)
-            self._cmd_yaw = np.random.choice([-1.0, 1.0]) * np.random.uniform(0.15, CMD_YAW_MAX)
-        elif r < 0.90:      # backward
+        else:              # backward
             self._cmd_fwd = np.random.uniform(-0.09, -0.03)
-            self._cmd_yaw = np.random.normal(0.0, 0.04)
-        else:               # slow creep
-            self._cmd_fwd = np.random.uniform(0.02, 0.05)
-            self._cmd_yaw = np.random.normal(0.0, 0.05)
-        self._cmd_yaw = float(np.clip(self._cmd_yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
 
     def reset(self, seed=None, options=None):
         self.step_counter = 0
