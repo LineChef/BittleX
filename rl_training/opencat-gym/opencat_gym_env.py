@@ -108,7 +108,6 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
 PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
-PHASE_RAND = 0.40         # drift-fix D2: per-episode gait-clock multiplier = 1 + U(-PHASE_RAND, PHASE_RAND)*_dr -> stride pace 0.6x-1.4x. Trains cadence-robust straight-line walking; the slow end (~0.6x) matches the real BiBoard's ~48 Hz vs the sim's 80 Hz.
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
@@ -462,7 +461,7 @@ class OpenCatGymEnv(gym.Env):
         # the stride beat and isn't hit by the imitation penalty for stepping
         # off-phase to catch itself -- it re-syncs once level. time_obs and the
         # wkF imitation reference both read self._phase.
-        self._phase += self._phase_scale   # drift-fix D2: per-episode randomised gait-clock pace
+        self._phase += PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
@@ -760,7 +759,6 @@ class OpenCatGymEnv(gym.Env):
         # Run 7 state: gait-phase counter (slows under tilt), speed window,
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
-        self._phase_scale = 1.0 + np.random.uniform(-PHASE_RAND, PHASE_RAND) * self._dr   # drift-fix D2
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
