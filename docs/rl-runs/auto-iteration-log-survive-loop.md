@@ -1054,7 +1054,7 @@ note). Two structural fixes, isolated then consolidated:
 - then **the Decathlon** (`benchmark_decathlon.py`) — graded easy->brutal
   learned-vs-scripted report on the final gait.
 
-## Planned next — D4: commanded locomotion (speed + yaw / turning)
+## D4 candidate — commanded locomotion (speed + yaw / turning) — DECISION GATE, not scheduled
 
 The deferred coverage-loop "R5" grown up. Turning is not a tweak — it's a
 **command-conditioned policy** (the URMA paradigm):
@@ -1067,9 +1067,15 @@ The deferred coverage-loop "R5" grown up. Turning is not a tweak — it's a
 - optionally blend Bittle's built-in `wkL` turn keyframe into the residual
   reference for sharper turns
 
-**Sequence: after D3, not folded into the drift-fix loop.** A symmetric,
-non-drifting gait is the prerequisite for clean commanded turns — an
-uncommanded drift corrupts a commanded turn. A command-conditioned policy
-subsumes "walk straight" (yaw_cmd = 0) for free. High value for the autonomy
-phase (B8 go-to-object, person-following, obstacle steering). Supersedes the
-"separate short RL runs per turn gait" framing of behaviour-idea B2.
+**Not scheduled — gated on hardware data.** OpenCat firmware already has turn
+gaits (`wkL` etc.); the vision pursuit layer can use them today. Firmware
+turning is *bang-bang* (mode switch `wkF`->`wkL`->`wkF`), so visual pursuit may
+overshoot / oscillate around a target where a command-conditioned RL policy
+would give a smooth continuous yaw rate — and firmware turns on a slope / mid-
+shove are untested. **Decision gate:** after D1-D3 + the Decathlon, test the
+firmware turn commands on the real robot (flat + slope), watch how the pursuit
+loop behaves; only build D4 if firmware turns oscillate badly or fail on
+terrain. If they're smooth enough, skip D4 — RL owns the straight walk,
+scripted owns turning. (Supersedes the per-turn-gait framing of behaviour-idea
+B2; a symmetric non-drifting gait from the drift-fix loop is still the
+prerequisite if D4 does happen.)
