@@ -1079,3 +1079,26 @@ terrain. If they're smooth enough, skip D4 — RL owns the straight walk,
 scripted owns turning. (Supersedes the per-turn-gait framing of behaviour-idea
 B2; a symmetric non-drifting gait from the drift-fix loop is still the
 prerequisite if D4 does happen.)
+
+## drift-fix loop — CLOSED, no improvement
+
+| round | approach | result |
+|---|---|---|
+| D1 | `FAC_MIRROR` (lateral-velocity + stance-symmetry penalty) | REVERT — native-cadence drift *worse* 0.004 -> 0.019 m; BASE-6 32 -> 25%. A drift-penalty reward is near-inert when training runs at one fixed cadence (nothing to correct). |
+| D1b | dropped stance term, accumulated-offset penalty | not run — same flaw (no drift to correct at the single training cadence) |
+| D2 | `PHASE_RAND=0.40` per-episode gait-clock 0.6x-1.4x | REVERT — drift *worse* at 1-3x (1x 0.026 vs 0.004; 2x 0.084 vs 0.041; 3x 0.116 vs 0.071), only better at 4x. Traded precision at one pace for mediocrity across the range. |
+| D3 | consolidate D1+D2 | skipped — nothing to consolidate |
+
+**Six straight failed drift/robustness tweaks** (R2, R3, R4, R-rob, D1, D2). The
+off-cadence drift is **structural**: `wkF` has a small built-in left/right
+asymmetry that only a cadence-specific learned correction cancels, and the
+current gait is trained to "walk forward, don't turn" -- it has no heading
+*command* to track, so a reward that just penalises drift has nothing to lock
+onto during training.
+
+**The fix belongs in Stage 4 (commanded locomotion).** With a commanded heading
+in the observation and a reward that tracks it, drift becomes tracking error the
+policy is directly rewarded to zero -- at any cadence. See
+`docs/rl-runs/refinement-regimen.md`.
+
+**`cov_r1_slope` stays the best sim gait.** The Decathlon runs on it.
