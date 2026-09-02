@@ -133,13 +133,6 @@ docs/       # project-plan.md — the living roadmap and decision log
 vision, voice, memory) rather than one unified "brain" — a deliberate design choice
 from the project plan. Avoid coupling them as they're built out.
 
-## Secrets
-
-Never commit API keys/credentials. Per `.gitignore`, secrets live in `.env`,
-`config.local.*`, or files matching `**/secrets.py` / `**/api_keys.py`. Copy
-`.env.example` to `.env` for real values. The Claude/Anthropic API key used in
-`pi_pipeline` is billed usage-based, separate from any Claude subscription.
-
 ## Large / Local Files (gitignored — don't try to commit)
 
 Trained checkpoints (`*.zip`, `*.pkl`, `rl_training/models/`, `rl_training/logs/`,
