@@ -194,7 +194,7 @@ def main():
     # exactly and only the difficulty its own tuple specifies. Slope here is
     # driven solely by SLOPE_FIXED_RP.
     for k in ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN",
-              "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE",
+              "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE", "PHASE_RAND",
               "DEFORM_GROUND", "SLIP_PATCH"):
         if hasattr(opencat_gym_env, k):
             setattr(opencat_gym_env, k, 0.0)

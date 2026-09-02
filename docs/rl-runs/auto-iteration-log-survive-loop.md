@@ -1036,3 +1036,69 @@ target** reward, **wider residual authority** (11 deg -> ~22), and
 **actuator-delay / joint-offset domain randomization**. That's a fresh effort,
 best done alongside or after the real-hardware RL-vs-scripted head-to-head
 rather than as more blind sim polish.
+
+---
+
+# drift-fix loop (branch `drift-fix`, off `development`) — in progress
+
+Base: `cov_r1_slope`. The speed sweep showed it holds a straight line only at
+its exact training cadence (see `docs/research/bittle-rl-projects.md` empirical
+note). Two structural fixes, isolated then consolidated:
+
+- **D1 — `FAC_MIRROR`**: unramped penalty on |lateral CoM velocity| (12.0) +
+  left/right stance-fraction imbalance from foot contacts (1.0). 3M steps.
+- **D2 — 50 Hz control rate**: 5 sim substeps instead of 3 (`CONTROL_HZ` ~48, the
+  real BiBoard rate), phase advance rescaled to keep the gait's wall-clock pace.
+  3M steps on D1's result.
+- **D3 — consolidate** both, 4M steps + full cadence-vs-drift benchmark.
+- then **the Decathlon** (`benchmark_decathlon.py`) — graded easy->brutal
+  learned-vs-scripted report on the final gait.
+
+## D4 candidate — commanded locomotion (speed + yaw / turning) — DECISION GATE, not scheduled
+
+The deferred coverage-loop "R5" grown up. Turning is not a tweak — it's a
+**command-conditioned policy** (the URMA paradigm):
+
+- obs gains a commanded yaw-rate (+ forward speed) input
+- the yaw terms flip from "penalise all turning" (`FAC_YAW`, `FAC_HEADING`,
+  `FAC_MIRROR_LAT`) to **track the commanded yaw rate**; heading tracks a moving
+  target instead of holding zero
+- a command curriculum: sample yaw commands during training (mostly 0, sometimes ±)
+- optionally blend Bittle's built-in `wkL` turn keyframe into the residual
+  reference for sharper turns
+
+**Not scheduled — gated on hardware data.** OpenCat firmware already has turn
+gaits (`wkL` etc.); the vision pursuit layer can use them today. Firmware
+turning is *bang-bang* (mode switch `wkF`->`wkL`->`wkF`), so visual pursuit may
+overshoot / oscillate around a target where a command-conditioned RL policy
+would give a smooth continuous yaw rate — and firmware turns on a slope / mid-
+shove are untested. **Decision gate:** after D1-D3 + the Decathlon, test the
+firmware turn commands on the real robot (flat + slope), watch how the pursuit
+loop behaves; only build D4 if firmware turns oscillate badly or fail on
+terrain. If they're smooth enough, skip D4 — RL owns the straight walk,
+scripted owns turning. (Supersedes the per-turn-gait framing of behaviour-idea
+B2; a symmetric non-drifting gait from the drift-fix loop is still the
+prerequisite if D4 does happen.)
+
+## drift-fix loop — CLOSED, no improvement
+
+| round | approach | result |
+|---|---|---|
+| D1 | `FAC_MIRROR` (lateral-velocity + stance-symmetry penalty) | REVERT — native-cadence drift *worse* 0.004 -> 0.019 m; BASE-6 32 -> 25%. A drift-penalty reward is near-inert when training runs at one fixed cadence (nothing to correct). |
+| D1b | dropped stance term, accumulated-offset penalty | not run — same flaw (no drift to correct at the single training cadence) |
+| D2 | `PHASE_RAND=0.40` per-episode gait-clock 0.6x-1.4x | REVERT — drift *worse* at 1-3x (1x 0.026 vs 0.004; 2x 0.084 vs 0.041; 3x 0.116 vs 0.071), only better at 4x. Traded precision at one pace for mediocrity across the range. |
+| D3 | consolidate D1+D2 | skipped — nothing to consolidate |
+
+**Six straight failed drift/robustness tweaks** (R2, R3, R4, R-rob, D1, D2). The
+off-cadence drift is **structural**: `wkF` has a small built-in left/right
+asymmetry that only a cadence-specific learned correction cancels, and the
+current gait is trained to "walk forward, don't turn" -- it has no heading
+*command* to track, so a reward that just penalises drift has nothing to lock
+onto during training.
+
+**The fix belongs in Stage 4 (commanded locomotion).** With a commanded heading
+in the observation and a reward that tracks it, drift becomes tracking error the
+policy is directly rewarded to zero -- at any cadence. See
+`docs/rl-runs/refinement-regimen.md`.
+
+**`cov_r1_slope` stays the best sim gait.** The Decathlon runs on it.
