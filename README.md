@@ -4,10 +4,24 @@ A Petoi Bittle X quadruped that learns to walk via reinforcement learning, perce
 
 ## Project Goals
 
-- **Locomotion**: train a walking policy via reinforcement learning (simulation → sim-to-real transfer) rather than hand-scripted gaits
-- **Perception**: obstacle avoidance and environment awareness via an onboard AI vision module
-- **Voice**: natural conversation powered by the Claude API (speech-to-text → Claude → text-to-speech)
-- **Memory**: persistent context that carries across conversations
+- **Locomotion**: a *command-following* walking policy trained by reinforcement
+  learning (simulation → sim-to-real), rather than switching between hand-scripted
+  gaits. It takes a speed and heading command and produces the gait — stand,
+  start/stop, forward, backward, turn — and stays upright across slopes,
+  obstacles, rough ground, shoves, and the weight shift from the mounted Pi/camera
+  payload.
+- **Recovery**: detect a fall from the IMU, run the firmware get-up skill for the
+  falls the hardware *can* recover from, and know when it needs a human.
+- **Perception → navigation**: an onboard AI vision module for obstacle detection,
+  and vision-guided movement — pick a visible target, head toward it, and correct
+  course along the way.
+- **Voice**: natural spoken conversation powered by the Claude API (speech-to-text
+  → Claude → text-to-speech), with movement used as body language.
+- **Memory**: persistent context across conversations, and a sense of place
+  (which room it's in) built up over time.
+- **Autonomy**: Claude as a slow deliberative layer on top of the reactive
+  control — deciding where to go, what to look at, and whether to approach
+  something, from what it sees and remembers.
 
 ## Hardware
 
