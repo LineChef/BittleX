@@ -89,6 +89,7 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
+FAC_FALL_PENALTY = -15.0    # R-rob: modest terminal penalty for an actual fall (was 0). Isolated test on the current bespoke reward -- S9's -50 was bundled with a whole field-standard recipe.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
 FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
 SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
@@ -112,7 +113,7 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
 IMPULSE_PUSH = 0.55      # m/s kick magnitude. surv_r1: 0.4 -> 0.55 -- the survive-what-scripted-can't loop needs the policy to actually practise big saves; 0.55 = recoverable big wobbles without the 0.7 fall-storm (prior-loop finding).
-IMPULSE_PUSH_PROB = 0.006  # per-step probability (~1.5x per 250-step episode). surv_r1: 0.003 -> 0.006.
+IMPULSE_PUSH_PROB = 0.013  # R-rob: 0.006 -> 0.013 (~3x/episode) -- the adaptive curriculum scales shove *magnitude*, not *rate*; more recovery reps per episode.
 
 # --- Adaptive push curriculum (surv_r12, from PA-LOCO) ---------------------
 # Per-env: track the last ADAPT_WINDOW episode outcomes; scale the impulse
@@ -166,8 +167,8 @@ RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat
 RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode. surv_r1: 0.22 -> 0.30.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
-RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.045   # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
+RANDOM_PUSH_PROB = 0.03  # R-rob: 0.02 -> 0.03 (more continuous-nudge practice)
+RANDOM_TERRAIN = 0.055   # R-rob: 0.045 -> 0.055 -- base gait is solid now (cov_r1_slope); more obstacle exposure to close the obstacle-distance gap vs scripted.
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 # --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
@@ -179,7 +180,7 @@ SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deter
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
 STUCK_FOOT_STEPS = 12
-SUSTAINED_FORCE = 1.2     # coverage R4: N of held horizontal push (body frame), random dir, over SUSTAINED_FORCE_STEPS (~0.3s). ~4 m/s^2 lateral on G2's ~0.3kg.
+SUSTAINED_FORCE = 0.0     # R4 REVERTED: 1.2 N held / 0.3 s is too weak to destabilise (0 falls either gait in the lean-force benchmark cell) -> no training signal, no measurable gain. See coverage log.
 SUSTAINED_FORCE_PROB = 0.004
 SUSTAINED_FORCE_STEPS = 25
 DEFORM_GROUND = 0.0     # 0..1 randomize ground contact stiffness/damping/restitution. Expensive (soft-contact solver); folded into R7 consolidation at 0.2 only.
@@ -672,7 +673,7 @@ class OpenCatGymEnv(gym.Env):
         elif FAC_RECOVERY <= 0:
             if self.is_fallen():                     # legacy: fall = instant end
                 self.step_counter_session += self.step_counter
-                reward = 0
+                reward = FAC_FALL_PENALTY
                 terminated = True
                 truncated = False
                 self._record_outcome(0)              # fell

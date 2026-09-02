@@ -168,7 +168,10 @@ def main():
         ("slope-up+obst",0.030, 0.15, 0.0,  0.0,   (0.0,  _S(9)),   0.0),
         ("slip-patch",   0.0,   0.0,  0.0,  0.0,   None,          1.0),
         ("slip+push",    0.0,   0.15, 0.55, 0.010, None,          1.0),
+        ("lean-force",   0.0,   0.0,  0.0,  0.0,   None,          0.0, 1.2),
+        ("lean+obst",    0.030, 0.0,  0.0,  0.0,   None,          0.0, 1.0),
     ]
+    course = [c if len(c) == 8 else (*c, 0.0) for c in course]   # 8th field: SUSTAINED_FORCE (N), 0 = off
 
     # Disable the adaptive push curriculum (surv_r12) for benchmarking: it's a
     # per-instance training-time state (self._push_curr) that would otherwise
@@ -197,7 +200,7 @@ def main():
             setattr(opencat_gym_env, k, 0.0)
 
     results = {}
-    for label, terr, push, impulse, impulse_prob, slope_rp, slip in course:
+    for label, terr, push, impulse, impulse_prob, slope_rp, slip, sforce in course:
         opencat_gym_env.RANDOM_TERRAIN = terr
         opencat_gym_env.RANDOM_PUSH = push
         opencat_gym_env.RANDOM_PUSH_PROB = 0.03
@@ -205,6 +208,8 @@ def main():
         opencat_gym_env.IMPULSE_PUSH_PROB = impulse_prob
         opencat_gym_env.SLOPE_FIXED_RP = slope_rp
         opencat_gym_env.SLIP_PATCH = slip
+        opencat_gym_env.SUSTAINED_FORCE = sforce
+        opencat_gym_env.SUSTAINED_FORCE_PROB = 0.02 if sforce else 0.004   # ~5/episode in the lean cells so it reliably fires
         opencat_gym_env.DR_EVAL_FULL = True
 
         _sl = "level" if slope_rp is None else f"tilt r{math.degrees(slope_rp[0]):+.0f} p{math.degrees(slope_rp[1]):+.0f} deg"
@@ -240,6 +245,7 @@ def main():
 
     opencat_gym_env.SLOPE_FIXED_RP = None
     opencat_gym_env.SLIP_PATCH = 0.0
+    opencat_gym_env.SUSTAINED_FORCE = 0.0
     env.close()
     _verdict(results)
     if args.json_out:
