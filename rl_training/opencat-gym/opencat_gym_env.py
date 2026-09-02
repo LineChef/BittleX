@@ -86,7 +86,7 @@ FAC_JOINT_LIMIT = 2.0     # gait-refinement G1: ramped soft-barrier penalty as a
 JOINT_LIMIT_MARGIN = 0.20 # rad from the limit where the barrier starts
 FAC_FOOT_PHASE = 1.5      # gait-refinement G1: ramped -- reward a diagonal-pair stance pattern, penalise non-trot contact sets (temporal symmetry, contact-based so it can't be phase-misaligned)
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 16.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 11.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. G4b: 16 -> 11 -- at 16 it was ~15 pts vs ~4 for speed, drowning the speed command; the phase-rate scaling (PHASE_RATE_NOM_CMD) is the real fix, this just rebalances. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
 IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
@@ -123,6 +123,16 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
 PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
+
+# G4b: the wkF phase advances at a rate PROPORTIONAL to the commanded speed, so
+# the imitation reference itself is a slow gait for a creep command and a fast
+# gait for a fast command. Before this the phase clock was fixed -> "match wkF"
+# meant "walk at wkF's one cadence" and the imitation reward (dominant term)
+# fought the speed-track reward, so speed commands did nothing. NOM_CMD is the
+# cmd_fwd that maps to wkF's native cadence (phase rate 1.0).
+PHASE_RATE_NOM_CMD = 0.10
+PHASE_RATE_MIN = 0.35
+PHASE_RATE_MAX = 1.60
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
@@ -518,7 +528,9 @@ class OpenCatGymEnv(gym.Env):
             pass
         else:
             _pd = 1.0 if self._cmd_fwd >= 0 else -1.0
-            self._phase += _pd * (PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0)
+            _prate = float(np.clip(abs(self._cmd_fwd) / PHASE_RATE_NOM_CMD,
+                                   PHASE_RATE_MIN, PHASE_RATE_MAX))
+            self._phase += _pd * _prate * (PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0)
         # mid-episode command changes -> start/stop/transition practice
         if getattr(self, '_forced_cmd', None) is None and np.random.rand() < CMD_RESAMPLE_PROB:
             self._sample_command()
