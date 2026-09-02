@@ -105,3 +105,35 @@ quadruped meets indoors (bumps, thresholds, slopes, a nudge, a shifting
 payload), and on a bad foot plant *wobbles and usually recovers* rather than
 committing to the topple. Not a crisp capture step -- that needs a free-gait
 architecture and faster hardware, neither required for an indoor companion robot.
+
+### Phase 3 result + Phase 3b (2026-09-02, evening)
+
+**Phase 3** (`phase3_ppo`, G4 recipe, from-scratch 10M, both bailout gates passed) --
+decision packet: artifact "Phase 3 Go / No-Go". **NO-GO for the 20M**, 3 rubric fails:
+
+1. Reward converged at ~3M (1.9k -> 2.35k, then flat for 7M).
+2. Speed modulation still broken -- creep 0.04 and fast 0.13 both walk 0.10,
+   identical to phase2; the G4 proportional-band fix had zero measurable effect.
+3. Root cause: `r_imitation` (FAC_IMITATION=16) is ~+15/step and drowns
+   `r_speed` (+4) and `r_speed_track` (-1). The wkF phase clock ran at a **fixed**
+   rate, so "match wkF" = "walk at wkF's one cadence"; obeying a speed command
+   costs ~15 pts of imitation to save ~2 of speed-track, so the policy ignores it.
+
+Held / not regressed: turning removed cleanly (heading-hold 0.0 deg), nominal
+payload-on walk at parity with phase2 + scripted (0% falls all 15 base cells),
+steep descent slightly faster. Bare-robot canary redistributed rather than
+improved -- wider payload mass fixed bare steep-descent (96% -> 0%) but bare
+shove-recovery got worse; net-neutral 17.6% vs 17.1%. T6 hardened tier still
+can't induce a fall with the payload on even at -24 deg / 20 deg gauntlet;
+discriminates only on commanded progress (T6.1: phase3 descends, scripted slides
+back).
+
+**Phase 3b** (`phase3b`, running, from-scratch 10M): the fix --
+
+- `self._phase += clip(|cmd_fwd| / 0.10, 0.35, 1.60)` per step: the wkF imitation
+  reference cadences **with the speed command** (slow gait for creep, fast for
+  fast), so imitation and speed-track agree instead of fighting.
+- `FAC_IMITATION` 16 -> 11 to rebalance (secondary; phase-rate scaling is the fix).
+- Keeps turning-removed, payload-always-on 40-110 g, G3 DR.
+- Re-judge against the same rubric. If speed modulation tracks + reward still
+  climbing at 3M -> that's the 20M candidate.
