@@ -9,6 +9,7 @@ import pybullet_data
 # reference_gait/build_wkf_reference.py from OpenCatEsp32's InstinctBittleESP.h.
 _WKF_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkf_ref.npy")
 WKF_REF = np.load(_WKF_PATH) if os.path.exists(_WKF_PATH) else None
+STAND_POSE = WKF_REF.mean(axis=0) if WKF_REF is not None else None  # mid-stance-ish, held while standing
 
 
 # Constants to define training and visualisation.
@@ -57,6 +58,15 @@ SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaning
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
 MIN_SPEED = 0.085          # m/s. Hard floor, suspended while wobbling (tilt < BALANCE_TILT_ON). surv_r12 config. gait-polish G1 tried 0.090 to clear the flat-speed gate (0.080->0.085) -- but survival crashed 21%->11% and trot -0.55->-0.43. Not worth 0.005 m/s. The 0.080 flat speed stands as a minor accepted shortfall.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
+
+# --- gait-refinement G2: commanded locomotion (speed + yaw) ----------------
+CMD_FWD_MAX = 0.15         # m/s, forward command clip (also the obs-normaliser); backward goes to -0.10
+CMD_YAW_MAX = 0.45         # rad/s, yaw-rate command clip / obs-normaliser (~26 deg/s)
+STAND_FWD_THRESH = 0.025   # |cmd_fwd| below this = stand: freeze the gait phase, ref = STAND_POSE
+FAC_SPEED_TRACK = 60.0     # linear penalty on |body-fwd speed - cmd_fwd| beyond a 0.02 m/s band (replaces MIN_SPEED+OVERSPEED)
+FAC_YAW_TRACK = 6.0        # penalty on |yaw_rate - cmd_yaw|^2 (replaces the plain yaw-rate penalty in body_stability)
+CMD_RESAMPLE_PROB = 0.009  # per-step prob of drawing a new command mid-episode (~2-3 changes / 250 steps -> start/stop/transition practice)
+
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line. rtune_r2 tried 0.3 with FAC_STABILITY 0.4 -- regressed, reverted.
@@ -198,7 +208,7 @@ LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observa
 # Size of observation space:
 # [ 30*8 joint history | quaternion(4) gyro(2) time_phase(1)
 #   | 12*2 tilt history | roll/pitch angular-accel(2) ]      (Run 7 adds the last two)
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2  # +3 = proj_gravity (surv_r12)
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2 + 2  # +3 proj_gravity (surv_r12); +2 [cmd_fwd,cmd_yaw] (gait-refinement G2)
 
 
 class OpenCatGymEnv(gym.Env):
@@ -312,8 +322,12 @@ class OpenCatGymEnv(gym.Env):
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0].astype(float)
         if RESIDUAL_MODE and WKF_REF is not None:
-            # policy modulates the scripted wkF pose; action=0 -> open-loop wkF
-            ref = WKF_REF[int(self._phase) % len(WKF_REF)]
+            # gait-refinement G2: stand -> hold STAND_POSE; else wkF fwd or reversed
+            self._is_stand = abs(self._cmd_fwd) < STAND_FWD_THRESH
+            if self._is_stand:
+                ref = STAND_POSE
+            else:
+                ref = WKF_REF[int(self._phase) % len(WKF_REF)]
             joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
@@ -483,7 +497,16 @@ class OpenCatGymEnv(gym.Env):
         # the stride beat and isn't hit by the imitation penalty for stepping
         # off-phase to catch itself -- it re-syncs once level. time_obs and the
         # wkF imitation reference both read self._phase.
-        self._phase += PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0
+        # gait-refinement G2: phase runs forward or backward with the command; frozen while standing
+        if getattr(self, '_is_stand', False):
+            pass
+        else:
+            _pd = 1.0 if self._cmd_fwd >= 0 else -1.0
+            self._phase += _pd * (PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0)
+        # mid-episode command changes -> start/stop/transition practice
+        if getattr(self, '_forced_cmd', None) is None and np.random.rand() < CMD_RESAMPLE_PROB:
+            self._sample_command()
+        self._cmd_heading += self._cmd_yaw / CONTROL_HZ
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
@@ -504,7 +527,9 @@ class OpenCatGymEnv(gym.Env):
         _rot = np.asarray(p.getMatrixFromQuaternion(obs_ang)).reshape(3, 3)
         proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)  # gravity in body frame
         self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
-                                           self.tilt_history, ang_acc))
+                                           self.tilt_history, ang_acc,
+                                           [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
         # Penalty and reward
@@ -536,14 +561,17 @@ class OpenCatGymEnv(gym.Env):
 
         z_velocity = p.getBaseVelocity(self.robot_id)[0][2]
 
+        # gait-refinement G2: yaw term tracks the *commanded* yaw rate
         body_stability = (FAC_STABILITY * (state_vel_clip[0]**2
                                           + state_vel_clip[1]**2)
                                           + FAC_Z_VELOCITY * z_velocity**2
-                                          + FAC_YAW * yaw_rate_clip**2)
+                                          + FAC_YAW_TRACK * (state_vel_raw[2] - self._cmd_yaw) ** 2)
 
         # Accumulated-heading penalty -- its own term (not folded into
         # body_stability) so its contribution shows up separately in info.
-        heading_penalty = FAC_HEADING * heading_error_clip**2
+        # gait-refinement G2: track the integrated commanded heading (cmd_yaw=0 -> hold straight)
+        _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+        heading_penalty = FAC_HEADING * _herr ** 2
 
         # Imitation reward: match Bittle's built-in wkF walk at the current gait
         # phase. DeepMimic-style exp(-sharpness * sum sq per-joint error), in
@@ -551,7 +579,8 @@ class OpenCatGymEnv(gym.Env):
         # the reference the same way.
         imitation_reward = 0.0
         if FAC_IMITATION > 0 and WKF_REF is not None:
-            ref = WKF_REF[int(self._phase) % len(WKF_REF)] / self.bound_ang
+            _iref = STAND_POSE if getattr(self, '_is_stand', False) else WKF_REF[int(self._phase) % len(WKF_REF)]
+            ref = _iref / self.bound_ang
             imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
             # R3: fade the imitation reward while stumbling (prev-step tilt over
@@ -594,22 +623,35 @@ class OpenCatGymEnv(gym.Env):
                       / ((len(self._x_window) - 1) / CONTROL_HZ))
         else:
             vx_est = 0.0
+        # gait-refinement G2: body-frame forward speed (correct under a turn), windowed
+        _wv = np.asarray(p.getBaseVelocity(self.robot_id)[0])
+        _yaw_now = p.getEulerFromQuaternion(state_ang)[2]
+        _vf_inst = _wv[0] * np.cos(_yaw_now) + _wv[1] * np.sin(_yaw_now)
+        self._vf_window.append(_vf_inst)
+        if len(self._vf_window) > SPEED_WINDOW:
+            self._vf_window.pop(0)
+        v_fwd = float(np.mean(self._vf_window))
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
         # surv_r5/r12: suspend the speed floor while wobbling -- slowing to catch a
         # stumble must not be punished. Active only when the body is ~upright.
-        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
-                             if tilt < BALANCE_TILT_ON else 0.0)
-        overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
-        speed_reward = FAC_SPEED * np.exp(
-            -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
+        # gait-refinement G2: track the commanded forward speed (band 0.02 m/s).
+        _spd_err = v_fwd - self._cmd_fwd
+        _spd_den = max(0.03, abs(self._cmd_fwd))
+        speed_reward = FAC_SPEED * np.exp(-SPEED_SHARPNESS * (_spd_err / _spd_den) ** 2)
+        speed_track_penalty = (FAC_SPEED_TRACK * max(0.0, abs(_spd_err) - 0.02)
+                               if tilt < BALANCE_TILT_ON else 0.0)
+        min_speed_penalty = 0.0        # superseded by speed_track_penalty
+        overspeed_penalty = 0.0
 
+        # gait-refinement G2: reward progress IN THE COMMANDED DIRECTION, capped at
+        # the commanded per-step displacement. No progress reward while standing.
         movement_forward = current_position - last_position
-        # Forward-progress reward capped at the walk set-point: rewards progress
-        # up to TARGET_SPEED's per-step displacement, nothing above, so it no
-        # longer competes with the speed tracker. Backward motion still stings.
-        capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
-                         if MOVEMENT_CAP_AT_TARGET else movement_forward)
+        if abs(self._cmd_fwd) < STAND_FWD_THRESH:
+            capped_forward = 0.0
+        else:
+            _dir = np.sign(self._cmd_fwd)
+            capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         # Scripted-gait lessons (docs/rl-runs/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
@@ -634,6 +676,7 @@ class OpenCatGymEnv(gym.Env):
                  - residual_cost
                  - min_speed_penalty
                  - overspeed_penalty
+                 - speed_track_penalty
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -667,6 +710,10 @@ class OpenCatGymEnv(gym.Env):
             "r_resid_smooth": -penalty_scale * resid_smooth_cost,
             "r_min_speed": -min_speed_penalty,
             "r_overspeed": -overspeed_penalty,
+            "r_speed_track": -speed_track_penalty,
+            "cmd_fwd": self._cmd_fwd,
+            "cmd_yaw": self._cmd_yaw,
+            "v_fwd_mps": v_fwd,
             "r_survive_step": survive_step_reward,
             "r_survive_bonus": 0.0,
             "r_smooth_movement": -penalty_scale * smooth_movement,
@@ -771,6 +818,40 @@ class OpenCatGymEnv(gym.Env):
                         reward, terminated, truncated, info)
 
 
+    def set_command(self, fwd=None, yaw=None):
+        """Force the locomotion command (eval / deployment). Persists across resets."""
+        self._forced_cmd = (fwd, yaw)
+        if fwd is not None:
+            self._cmd_fwd = float(np.clip(fwd, -0.10, CMD_FWD_MAX))
+        if yaw is not None:
+            self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+
+    def _sample_command(self):
+        if getattr(self, '_forced_cmd', None) is not None:
+            fwd, yaw = self._forced_cmd
+            if fwd is not None:
+                self._cmd_fwd = float(np.clip(fwd, -0.10, CMD_FWD_MAX))
+            if yaw is not None:
+                self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+            return
+        r = np.random.rand()
+        if r < 0.45:        # cruise
+            self._cmd_fwd = np.random.uniform(0.06, 0.13)
+            self._cmd_yaw = np.random.normal(0.0, 0.05)
+        elif r < 0.65:      # stand
+            self._cmd_fwd = np.random.uniform(-0.01, 0.02)
+            self._cmd_yaw = 0.0
+        elif r < 0.80:      # turn while walking
+            self._cmd_fwd = np.random.uniform(0.03, 0.10)
+            self._cmd_yaw = np.random.choice([-1.0, 1.0]) * np.random.uniform(0.15, CMD_YAW_MAX)
+        elif r < 0.90:      # backward
+            self._cmd_fwd = np.random.uniform(-0.09, -0.03)
+            self._cmd_yaw = np.random.normal(0.0, 0.04)
+        else:               # slow creep
+            self._cmd_fwd = np.random.uniform(0.02, 0.05)
+            self._cmd_yaw = np.random.normal(0.0, 0.05)
+        self._cmd_yaw = float(np.clip(self._cmd_yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+
     def reset(self, seed=None, options=None):
         self.step_counter = 0
         self.arm_contact = 0
@@ -789,6 +870,13 @@ class OpenCatGymEnv(gym.Env):
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
+        # gait-refinement G2: locomotion command for this episode
+        self._cmd_fwd = 0.0
+        self._cmd_yaw = 0.0
+        self._cmd_heading = 0.0          # integral of cmd_yaw -- the heading the policy should be holding
+        self._vf_window = []             # body-frame forward-speed estimate window
+        self._forced_cmd = getattr(self, '_forced_cmd', None)
+        self._sample_command()
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
         self._x_window = []
@@ -908,7 +996,9 @@ class OpenCatGymEnv(gym.Env):
                                            proj_grav,
                                            [time_obs],
                                            self.tilt_history,      # all zeros at reset (level)
-                                           np.zeros(2)))           # ang accel
+                                           np.zeros(2),            # ang accel
+                                           [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
 
 
         # Initialize robot state history with reset position
