@@ -61,6 +61,26 @@ should we work on next."
 - BiBoard V1's onboard voice-recognition module + speaker: decide whether the
   wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
 
+### Power awareness — G2 warns when it thinks it's running low
+
+The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
+"external power present"), so G2 can't *measure* its charge — it has to
+*estimate* from elapsed run time.
+
+- **Plan:** track uptime since the last time it was on the charger; when it
+  passes a learned threshold, G2 proactively says something in character ("I'm
+  getting tired, might need to rest on the charger soon") via the voice
+  pipeline, and repeats/escalates as it gets closer to the empirical limit. On
+  the charger ("external power present" flips true) it resets and can say it's
+  charging.
+- **Needs first:** real battery-life data — run G2 doing representative work
+  (idle, walking, talking, vision on) on a full charge until the Pi browns out,
+  a few times, to get mean runtime and its spread. Do this early in hardware
+  bring-up.
+- **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
+  Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
+  actual cell state. Optional; the timer is enough to start.
+
 ---
 
 ## Phase 1 — GitHub repo setup ✅
@@ -409,6 +429,13 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Get it moving on stock firmware first, before any custom code.
 - [ ] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
       (headless), confirm SSH access.
+  - **Can start NOW (Pi + PiSugar + card + PSU arrived 2026-09-01; robot/camera
+    not yet).** Full researched runbook + open-question answers in
+    [`docs/research/pi-bring-up.md`](research/pi-bring-up.md): flash Bookworm
+    64-bit Lite, kill Wi-Fi power-save, zram+swapfile, disable-BT for the PL011
+    UART, deploy `pi_pipeline` on ARM, then `benchmark_pi.py` (Vosk / Piper /
+    Claude-API / RAM). PiSugar **S** = dumb UPS: no I²C, no battery %, power-
+    present only.
 - [ ] Mount the Pi; test power and serial **independently** (power can work while
       serial doesn't). Per Petoi's Raspberry Pi serial docs:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi

@@ -5,7 +5,11 @@
 #   python3.11 -m venv pi_pipeline/.venv
 #   source pi_pipeline/.venv/bin/activate
 #   pip install -r pi_pipeline/requirements.txt
+#
+# Pinned to the versions running green on the dev Mac. All pure-Python, so the
+# Pi install is wheel-only. anthropic is pinned because its API surface shifts
+# between minor versions.
 
-anthropic>=0.40
-python-dotenv>=1.0
-pyserial>=3.5
+anthropic==1.2.0
+python-dotenv>=1.0,<2
+pyserial==3.5

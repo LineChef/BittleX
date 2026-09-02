@@ -55,7 +55,7 @@ TARGET_SPEED = 0.10        # m/s. resid line: match the scripted wkF's own open-
 FAC_SPEED = 5.0            # weight on the speed-tracking bonus. r1: 2.0 was too weak -- the policy stalled the gait to 0.03 m/s (a third of wkF). Back up + a floor penalty below MIN_SPEED so the walk cannot be smothered.
 SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaningful gradient when the policy is slow. Error is relative to TARGET_SPEED, so this is scale-free.
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
-MIN_SPEED = 0.085          # m/s. Hard floor, BUT suspended while wobbling (tilt < BALANCE_TILT_ON) -- surv_r5/surv_r12 config. surv_r14 tried surv_r2's plain 0.07 floor + proj_grav + curriculum and it regressed to 11%; the tilt-gated 0.085 is the better pairing with the adaptive curriculum. Env left at the surv_r12 config (best research-informed gait, 21%).
+MIN_SPEED = 0.085          # m/s. Hard floor, suspended while wobbling (tilt < BALANCE_TILT_ON). surv_r12 config. gait-polish G1 tried 0.090 to clear the flat-speed gate (0.080->0.085) -- but survival crashed 21%->11% and trot -0.55->-0.43. Not worth 0.005 m/s. The 0.080 flat speed stands as a minor accepted shortfall.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
@@ -89,6 +89,7 @@ IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
 # delayed). FAC_RECOVERY = 0 restores the legacy instant-terminate behavior.
 FAC_RECOVERY = 0.0          # post-fall recovery window. R2 & R3 both proved a force-limited flat quadruped CANNOT self-right from >1.3 rad (0% recovered at FAC_RECOVERY 8 and 22, denser reward, eased criteria, pushes off, boosted torque). Disabled from R4 on -> legacy instant-terminate at 1.3. Replaced by FAC_BALANCE (always-on stumble-catch). Window code kept but dormant.
 FAC_BALANCE = 4.0           # dense "fight back toward level" reward while STUMBLING (tilt > BALANCE_TILT_ON but not yet fallen). surv_r1: 2.0 -> 4.0 -- at 2.0 (through rtune_r4) it never produced an active big-stumble save (big_stumble_recovery_rate stuck at 0). The survive-what-scripted-can't loop needs the save to pay.
+FAC_FALL_PENALTY = 0.0      # R-rob REVERTED: -15 + heavier disturbance training made obst-50+push falls 36->54% (worse than scripted), BASE-6 32->21%. Entropy collapsed (-2.4->-1.5); the policy got over-committed and stopped generalising to the obst+push combo. See coverage log.
 FAC_SURVIVE_BONUS = 12.0    # one-shot reward at episode end IF not fallen, scaled by how rough the episode was -- factor = clip((peak_tilt - BALANCE_TILT_ON) / (1.3 - BALANCE_TILT_ON), 0, 1). surv_r2: 40 -> 12 -- this terminal lump gave no gradient for a mid-episode save (paid 0 if the episode ended in a fall); demoted to a small "finished upright after a rough one" cherry. The dense per-step term below carries the load now.
 FAC_SURVIVE_STEP = 6.0     # surv_r2: DENSE per-step reward for a step held upright while near tipping -- continuous "stay up one more step" gradient, the real "reward the save". surv_r3 tried RAMPING it (gutted the magnitude, 25%->11%); surv_r4 tried cutoff 0.7 (no gain). surv_r5: back to surv_r2 exactly -- flat 6.0, cutoff 0.8.
 SURVIVE_BAND_LO = 0.8      # rad; below this = normal wobble (no credit), above = near tipping, every held step pays FAC_SURVIVE_STEP flat up to the 1.3 fall line.
@@ -112,7 +113,7 @@ PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances nor
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
 # phase and direction -- concentrated practice in the big-wobble regime R5 fails.
 IMPULSE_PUSH = 0.55      # m/s kick magnitude. surv_r1: 0.4 -> 0.55 -- the survive-what-scripted-can't loop needs the policy to actually practise big saves; 0.55 = recoverable big wobbles without the 0.7 fall-storm (prior-loop finding).
-IMPULSE_PUSH_PROB = 0.006  # per-step probability (~1.5x per 250-step episode). surv_r1: 0.003 -> 0.006.
+IMPULSE_PUSH_PROB = 0.006  # R-rob REVERTED
 
 # --- Adaptive push curriculum (surv_r12, from PA-LOCO) ---------------------
 # Per-env: track the last ADAPT_WINDOW episode outcomes; scale the impulse
@@ -166,9 +167,24 @@ RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat
 RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode. surv_r1: 0.22 -> 0.30.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
-RANDOM_PUSH_PROB = 0.02  # per-step probability of a shove
-RANDOM_TERRAIN = 0.045   # obstacle max height (m). R2: 0.045 -> 0.03 (back to R5) -- the 45mm plateau + 0.7 impulse gave R1 a 25% FLAT fall rate. Re-raise once the base gait is solid again.
+RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
+RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
+
+# --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
+# Each a DR knob, default 0/off. The loop turns them on one at a time and they
+# accumulate. Scaled by self._dr like the rest. Benchmark cells in
+# benchmark_gaits.py exercise each with the knob forced on.
+SLOPE_MAX_DEG = 10.0      # coverage R1: per-episode ground tilt, random roll & pitch in +/- this (deg), scaled by _dr
+SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
+START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
+STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
+STUCK_FOOT_STEPS = 12
+SUSTAINED_FORCE = 0.0     # R4 REVERTED: 1.2 N held / 0.3 s is too weak to destabilise (0 falls either gait in the lean-force benchmark cell) -> no training signal, no measurable gain. See coverage log.
+SUSTAINED_FORCE_PROB = 0.004
+SUSTAINED_FORCE_STEPS = 25
+DEFORM_GROUND = 0.0     # 0..1 randomize ground contact stiffness/damping/restitution. Expensive (soft-contact solver); folded into R7 consolidation at 0.2 only.
+SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabilise (0 falls either gait); training on it only diluted the useful signal. See coverage log.
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
@@ -193,6 +209,12 @@ class OpenCatGymEnv(gym.Env):
         self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
         self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
         self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
+        self._stuck_joint = -1   # coverage loop: index of a currently-jammed leg joint (-1 = none)
+        self._stuck_timer = 0
+        self._stuck_angle = 0.0
+        self._sforce_timer = 0   # sustained-force perturbation
+        self._sforce_vec = (0.0, 0.0)
+        self._slope_rp = (0.0, 0.0)
         self._reflex_dir = 0.0
         self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
                                                  # sets this so the reflex applies only to the
@@ -262,6 +284,25 @@ class OpenCatGymEnv(gym.Env):
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + mag * np.cos(theta),
                                  lin[1] + mag * np.sin(theta), lin[2]], ang)
+        # Sustained directional force (coverage loop): a held push over a window.
+        if SUSTAINED_FORCE > 0 and self._dr > 0 and not self._in_recovery:
+            if self._sforce_timer == 0 and np.random.rand() < SUSTAINED_FORCE_PROB:
+                a = np.random.uniform(0, 2 * np.pi)
+                self._sforce_vec = (np.cos(a), np.sin(a))
+                self._sforce_timer = SUSTAINED_FORCE_STEPS
+            if self._sforce_timer > 0:
+                f = SUSTAINED_FORCE * self._dr
+                p.applyExternalForce(self.robot_id, -1,
+                                     [self._sforce_vec[0] * f, self._sforce_vec[1] * f, 0.0],
+                                     [0, 0, 0], p.LINK_FRAME)
+                self._sforce_timer -= 1
+        # Stuck foot (coverage loop): jam one leg joint at its current angle.
+        if STUCK_FOOT_PROB > 0 and self._dr > 0 and not self._in_recovery:
+            if self._stuck_timer == 0 and np.random.rand() < STUCK_FOOT_PROB:
+                self._stuck_joint = int(np.random.randint(0, 8))
+                self._stuck_angle = float(p.getJointState(
+                    self.robot_id, self.joint_id[self._stuck_joint])[0])
+                self._stuck_timer = STUCK_FOOT_STEPS
         last_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0].astype(float)
@@ -358,11 +399,16 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
+        # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
+        if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
+            joint_angs[self._stuck_joint] = self._stuck_angle
+            self._stuck_timer -= 1
+
         # Set new joint angles
-        p.setJointMotorControlArray(self.robot_id, 
-                                    self.joint_id, 
-                                    p.POSITION_CONTROL, 
-                                    joint_angs, 
+        p.setJointMotorControlArray(self.robot_id,
+                                    self.joint_id,
+                                    p.POSITION_CONTROL,
+                                    joint_angs,
                                     forces=np.ones(8)*(0.5 if self._in_recovery else 0.2))
         p.stepSimulation() # Delay of data transfer
 
@@ -627,7 +673,7 @@ class OpenCatGymEnv(gym.Env):
         elif FAC_RECOVERY <= 0:
             if self.is_fallen():                     # legacy: fall = instant end
                 self.step_counter_session += self.step_counter
-                reward = 0
+                reward = FAC_FALL_PENALTY
                 terminated = True
                 truncated = False
                 self._record_outcome(0)              # fell
@@ -731,15 +777,40 @@ class OpenCatGymEnv(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
         p.setGravity(0,0,-9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        plane_id = p.loadURDF("plane.urdf")
+        # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
+        self._slope_rp = (0.0, 0.0)
+        if SLOPE_FIXED_RP is not None:
+            self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
+        elif SLOPE_MAX_DEG > 0 and self._dr > 0:
+            m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
+            self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
+        plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
+                              p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
+        if DEFORM_GROUND > 0 and self._dr > 0:
+            k = DEFORM_GROUND * self._dr
+            p.changeDynamics(plane_id, -1,
+                             contactStiffness=float(np.random.uniform(3e4, 1e5) * (1 - 0.7 * k) + 1e5 * (1 - k)),
+                             contactDamping=float(np.random.uniform(500, 3000) * (1 + k)),
+                             restitution=float(np.random.uniform(0.0, 0.15 * k)))
+        if SLIP_PATCH > 0 and self._dr > 0 and np.random.rand() < SLIP_PATCH:
+            sx, sy = np.random.uniform(0.10, 0.45), np.random.uniform(-0.15, 0.15)
+            patch = p.createMultiBody(
+                0, p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.06, 0.09, 0.005]),
+                basePosition=[sx, sy, 0.005])
+            p.changeDynamics(patch, -1, lateralFriction=float(np.random.uniform(0.03, 0.18)))
         if RANDOM_TERRAIN > 0 and self._dr > 0:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
 
-        start_pos = [0,0,0.08]
-        start_orient = p.getQuaternionFromEuler([0,0,0])
+        _pose_tilt = 0.0
+        if START_POSE_JITTER > 0 and self._dr > 0:
+            _pose_tilt = np.deg2rad(0.3 * START_POSE_JITTER) * self._dr
+        start_pos = [0, 0, 0.08]
+        start_orient = p.getQuaternionFromEuler([
+            self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
+            self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
 
         urdf_path = "models/"#"/content/drive/My Drive/opencat-gym-esp32/models/"
         self.robot_id = p.loadURDF(urdf_path + "bittle_esp32.urdf", 
@@ -773,6 +844,12 @@ class OpenCatGymEnv(gym.Env):
 
         # Setting start position. This influences training.
         joint_angs = np.deg2rad(np.array([1, 0, 1, 0, 1, 0, 1, 0])*50)
+        if START_POSE_JITTER > 0 and self._dr > 0:
+            joint_angs = joint_angs + np.random.normal(
+                0.0, np.deg2rad(START_POSE_JITTER) * self._dr, 8)
+        self._stuck_timer = 0
+        self._stuck_joint = -1
+        self._sforce_timer = 0
 
         i = 0
         for j in self.joint_id:
@@ -826,16 +903,24 @@ class OpenCatGymEnv(gym.Env):
         Deliberately kept passable: scattered (never spanning the lane), short
         along-path, so a decent gait clears most and only clips some -- the
         stumbles that give the FAC_RECOVERY reward its signal."""
+        # Ground plane may be tilted (SLOPE_MAX_DEG). Place each box ON the sloped
+        # surface -- height offset from the plane equation, orientation matched --
+        # so nothing floats or half-buries. slope_rp = (0, 0) -> flat, as before.
+        roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
+        n = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
+                      np.cos(pitch) * np.cos(roll)])
+        box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
         for _ in range(np.random.randint(4, 10)):
             h = np.random.uniform(0.002, max(0.003, max_h))
+            x = np.random.uniform(0.12, 1.3)
+            y = np.random.uniform(-0.06, 0.06)
+            z_ground = -(n[0] * x + n[1] * y) / n[2]   # plane through the origin
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
                 np.random.uniform(0.015, 0.045),  # along-path half-length
                 np.random.uniform(0.04, 0.10),    # across-path half-width
                 h / 2])
-            p.createMultiBody(0, cs, basePosition=[
-                np.random.uniform(0.12, 1.3),
-                np.random.uniform(-0.06, 0.06),
-                h / 2])
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
+                              baseOrientation=box_orn)
 
 
     def render(self, mode='human'):

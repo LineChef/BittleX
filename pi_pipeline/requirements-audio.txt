@@ -1,14 +1,24 @@
-# Pi pipeline — optional audio backends for voice mode.
+# Pi pipeline — audio backends for voice mode.
 #   pip install -r pi_pipeline/requirements-audio.txt
 #
-# Then download the models (see pi_pipeline/voice/README.md):
-#   - Vosk small English model  -> models/vosk/
-#   - Piper voice (e.g. en_US-ryan-low) -> models/piper/
+# Pinned to the exact versions running green on the dev Mac (x86). Every compiled
+# dep here was checked to have a Python-3.11 aarch64 wheel on PyPI, so the Pi
+# Zero 2 W install pulls wheels and never compiles from source:
+#   onnxruntime 1.23.2  -> cp311 manylinux_2_27_aarch64   (Bookworm glibc 2.36 OK)
+#   vosk 0.3.44          -> py3-none manylinux2014_aarch64
+#   piper-tts 1.7.0      -> cp39-abi3 manylinux_2_17_aarch64
+#   sounddevice 0.5.6    -> py3-none-any (pure Python)
 #
-# sounddevice needs PortAudio: macOS `brew install portaudio`; Pi
-# `sudo apt install libportaudio2`.
+# sounddevice needs the PortAudio system lib:
+#   macOS  brew install portaudio
+#   Pi     sudo apt install -y libportaudio2
+#
+# Then fetch the models (see pi_pipeline/voice/README.md):
+#   Vosk small English  -> models/vosk/     (~40 MB, ~300 MB RAM at runtime)
+#   Piper voice         -> models/piper/    (start with an x_low / low voice on the Zero 2 W)
 
-vosk>=0.3.42,<0.4
-sounddevice>=0.4.6
-piper-tts>=1.2.0
-numpy>=1.24
+vosk==0.3.44
+sounddevice==0.5.6
+piper-tts==1.7.0
+onnxruntime==1.23.2   # transitively required by piper-tts; pinned to the verified-aarch64 build
+numpy==2.4.6

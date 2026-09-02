@@ -72,7 +72,10 @@ class Settings:
     memory_recall_exchanges: int = field(default_factory=lambda: _env_int("G2_MEMORY_RECALL", 3))
 
     # --- Robot link (used on hardware; ignored by MockActuator) ---
-    serial_port: str = field(default_factory=lambda: _env("G2_SERIAL_PORT", "/dev/ttyS0"))
+    # /dev/serial0 = "the primary UART", whichever physical one it is. On the Pi
+    # Zero 2 W after `dtoverlay=disable-bt` (see setup_pi.sh) that's the stable
+    # PL011 (ttyAMA0), not the clock-dependent mini-UART (ttyS0).
+    serial_port: str = field(default_factory=lambda: _env("G2_SERIAL_PORT", "/dev/serial0"))
     serial_baud: int = field(default_factory=lambda: _env_int("G2_SERIAL_BAUD", 115200))
 
     # --- Vision (Phase 8; used on hardware) ---

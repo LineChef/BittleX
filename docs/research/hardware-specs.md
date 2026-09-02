@@ -174,6 +174,31 @@ servos.
 - → The Pi's CSI connector is unused — the camera goes to the Grove Vision module,
   not the Pi.
 
+**Software-stack expectations (from bring-up research — full runbook +
+open-Q answers in [`pi-bring-up.md`](pi-bring-up.md)):**
+
+- → **Serial to the BiBoard: don't use the default port.** The Zero 2 W's default
+  `/dev/ttyS0` is the mini-UART, whose baud tracks the core clock and gets
+  unreliable at 115200 under load. Add `dtoverlay=disable-bt` to
+  `/boot/firmware/config.txt` to disable onboard Bluetooth and hand GPIO 14/15 to
+  the stable PL011 (`/dev/ttyAMA0`, alias `serial0`). Refines Phase 4's
+  "likely `/dev/ttyS0`" note.
+- → **Vosk** small model ≈ 50 MB disk / **~300 MB RAM at runtime** — the single
+  biggest resident chunk; small-model accuracy is mediocre.
+- → **Piper** is real-time on a Pi 5, lags on a Pi 4 for medium/high voices; **no
+  published Zero 2 W numbers** — assume `x_low` / `low` (16 kHz) voices and
+  benchmark. This is the main open risk for a real-time voice loop.
+- → **onnxruntime** now has `aarch64` manylinux wheels on PyPI *and* piwheels
+  (2025+) — pin a version with a `cp311` aarch64 wheel; it used to be a
+  compile-from-source nightmare.
+- → **PyTorch: don't run it on the Pi.** `import torch` alone is ~150–250 MB
+  resident. The Phase-3 policy is a tiny MLP — export it to **ONNX** and infer
+  via the `onnxruntime` that Piper needs anyway.
+- → **Wi-Fi power-save is ON by default** on Bookworm (`brcmfmac`) and stalls SSH
+  under CPU load — disable via `/etc/NetworkManager/conf.d/` (`wifi.powersave = 2`).
+- → **Swap is mandatory** (small lz4 zram + a 1 GB SD swapfile backstop); voice +
+  vision co-resident is doubtful and must be measured.
+
 ## PiSugar S 1200 mAh
 
 | Spec | Value |
@@ -184,9 +209,14 @@ servos.
 | Pi support | Pi Zero 2 (W/WH) officially listed |
 | Comms | **none — hardware only** |
 
-- → **No I²C, no battery-percentage readout in software.** `pi_pipeline` can only
-  sense "external power present", not battery state or voltage. Battery telemetry
-  would need a PiSugar 3.
+- → **No I²C, no battery-percentage readout, no power query.** Per PiSugar's own
+  docs the **S** series "does not support I²C communication... can only detect
+  whether an external power source is connected... does not support power
+  inquiry." `pi_pipeline` gets *external-power-present* and nothing else — no
+  voltage, no %, no low-battery interrupt. The `pisugar-power-manager` software
+  is built for the 2/3 (fuel gauge at I²C `0x57`/`0x75`) and has nothing to read
+  on the S. Battery telemetry ⇒ external ADC on a Grove analog pin, or time-box
+  sessions.
 - → PiSugar S's auto-boot-on-power and GPIO-button features use the I²C SCL pin —
   **conflict with enabling I²C on the Pi.** If I²C is ever needed on the Pi,
   disable those PiSugar features (it has a switch for the auto-boot one).
