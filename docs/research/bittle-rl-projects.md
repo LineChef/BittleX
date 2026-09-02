@@ -139,3 +139,34 @@ learn to ride the clip. Add a soft penalty as any joint nears its range.
    quality if the ranges are modest).
 5. **`RESIDUAL_SCALE_DEG` 11 → ~22** (quick A/B).
 6. Joint-limit-proximity penalty (polish).
+
+---
+
+## Empirical note — `cov_r1_slope` is a cadence-specific heading corrector (2026-09-01)
+
+Ran `cov_r1_slope` on flat ground with only the gait clock scaled (`_phase`
+advance ×N, no retraining), 20 episodes/rate:
+
+| clock | fwd m/s | lat drift (signed) | yaw | falls |
+|---|---|---|---|---|
+| 1× | 0.091 | +0.004 m | −0.8° | 0/20 |
+| 2× | 0.162 | +0.041 m | +8.5° | 0/20 |
+| 3× | 0.220 | +0.071 m | +11.3° | 0/20 |
+| 4× | 0.227 | +0.069 m | +8.4° | 0/20 |
+
+- **Never falls**, even at 4× cadence — the gait is robust for *staying
+  upright* off-cadence.
+- Drift is a **consistent directional bias** (always +y / left, same-sign yaw)
+  across all seeds — a baked-in `wkF` left/right asymmetry, not wobble.
+- The heading correction **works only at the training cadence**: 0.004 m drift
+  at 1×, 10× worse (0.041 m) the moment you go to 2×, then ~flat. The learned
+  residual is not a general "walk straight" skill, it's a corrector tuned to the
+  exact training stride frequency.
+- Speed saturates: 2× clock → 1.78× speed, 4× clock → only 2.5× (foot slip
+  dominates past ~3×).
+
+**Implications:** (a) direct evidence for the mirror-symmetry reward and
+gait-frequency randomization above; (b) the sim-80 Hz vs real-~50 Hz cadence
+mismatch (0.625×) is a milder version of this same off-cadence condition —
+expect some heading drift on hardware from the rate mismatch alone, fixed by
+training at 50 Hz.
