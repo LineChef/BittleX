@@ -957,3 +957,32 @@ Remaining rounds, base = `cov_r1_slope`:
 
 Then: full 12-cell learned-vs-scripted benchmark + per-cell scripted+ scorecard +
 per-scenario keep/tune analysis + HTML report.
+
+## R3 — `START_POSE_JITTER = 8` (gaussian joint-angle noise + small base tilt at reset) — **REVERT**
+
+`cov_r3_startpose`, 2M steps from `cov_r1_slope`. Training clean (approx_kl
+2.3e-5, explained_var 0.63, ep_len_mean 241).
+
+| pooled | cov_r1_slope | cov_r3_startpose |
+|---|---|---|
+| BASE-6 conditional survival | 32% (9/28) | **21% (6/28)** |
+| ADDED (slopes + slip) | 71% (5/7) | 71% (5/7) |
+
+Push cells softened: push-hard L 50->57%, obst-50+push L 36->**50%** (now falls
+*more* than scripted's 36% there). Obstacle/slope cells held or slightly
+improved; flat speed held (0.30 dist). No measurable capability gain — there is
+no start-pose benchmark cell, and the scenario is low-value anyway: G2 starts a
+walk from a known stand / end-of-recovery pose, not a random joint config.
+Reverted; `START_POSE_JITTER = 0`.
+
+### Pattern: R2 and R3 both softened the push cells
+
+Two different added perturbations (`SLIP_PATCH`, `START_POSE_JITTER`), each a 2–3M
+continuation on `cov_r1_slope`, both regressed push-hard / obst-50+push by
+7–14pp while adding no demonstrated capability. Likely cause: the added
+perturbation episodes displace the impulse-push episodes in the training mix, and
+a 2M continuation (LR decays 3e-4 -> ~0 over the run) doesn't re-consolidate push
+recovery. **If R4 (sustained force) shows the same signature, stop running the
+remaining scenarios as separate continuations** — fold them into one combined
+consolidation run (all knobs on, 4–5M steps) so they're learned jointly instead
+of sequentially eroding each other. Decide after R4.
