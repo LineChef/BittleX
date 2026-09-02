@@ -71,21 +71,28 @@ Current default: **`en_GB-alan-medium`**. Change it by setting `PIPER_MODEL_PATH
 
 ## Models for voice mode
 
-Not committed (large). Download into `models/` at the repo root:
+Not committed (large). One script fetches the decided set into `models/` at the
+repo root, idempotently — run it on the Mac or the Pi:
 
-**Vosk** (STT + wake word), ~40 MB:
 ```bash
-mkdir -p models && cd models
-curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-unzip vosk-model-small-en-us-0.15.zip && mv vosk-model-small-en-us-0.15 vosk
+bash pi_pipeline/fetch_models.sh
 ```
 
-**Piper** (TTS), ~60 MB for a low-quality voice:
-```bash
-mkdir -p models/piper && cd models/piper
-curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/low/en_US-ryan-low.onnx
-curl -LO https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/low/en_US-ryan-low.onnx.json
-```
+**Decided set for the Pi Zero 2 W:**
+
+| role | model | why |
+|---|---|---|
+| STT | `vosk-model-small-en-us-0.15` (~40 MB zip, ~300 MB RAM at runtime) | the only Vosk English model that fits — the others are 1–2 GB |
+| TTS primary | `en_US-ryan-low` (16 kHz) | lightest tier Piper still ships; warm male, fits G2's persona |
+| TTS upgrade | `en_US-ryan-medium` (22 kHz, same voice, cleaner) | switch to it **iff** `benchmark_pi.py --all-voices` shows its synth < ~0.7× real-time with RAM headroom on the actual Pi |
+
+Piper `x_low` voices are gone from the current `rhasspy/piper-voices` repo, so
+`low` is the floor. If `low` still can't hit real-time on the Zero 2 W the
+answer is a longer "thinking" cue over the synth gap / shorter replies /
+pre-synth'd stock phrases — not a lighter model.
+
+The Pi's `.env` should set `PIPER_MODEL_PATH=models/piper/en_US-ryan-low.onnx`
+(the code default `en_GB-alan-medium` is for the dev Mac).
 
 `sounddevice` needs PortAudio — macOS `brew install portaudio`, Pi
 `sudo apt install libportaudio2`.
