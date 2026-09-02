@@ -88,6 +88,8 @@ def main():
 
     opencat_gym_env.ADAPTIVE_PUSH = False        # training-time curriculum state -- off for eval
     env = OpenCatGymEnv()
+    if hasattr(env, 'set_command'):        # gait-refinement: measure on a fixed cruise-forward command
+        env.set_command(fwd=0.10, yaw=0.0)
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
