@@ -1,10 +1,10 @@
 # Machine Learning Project with Bittle X
 
-A machine-learning project: I'm teaching a quadruped robot to walk via
-reinforcement learning, perceive its surroundings through an onboard camera, hold
+A machine learning project where I teach a quadruped robot to walk via
+reinforcement learning, perceive its environment through an onboard camera, hold
 voice conversations powered by Claude, and build persistent memory of past
-interactions over time. It's a first hardware and robotics build, and a first
-Python project, coming from web development — the roadmap and decision log live in
+interactions over time. It's a first hardware build from a web-development
+background; the full roadmap and decision log are in
 [`docs/project-plan.md`](docs/project-plan.md).
 
 ## Project Goals
