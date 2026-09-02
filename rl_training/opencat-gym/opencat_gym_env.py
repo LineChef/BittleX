@@ -70,9 +70,6 @@ FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- w
 PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15mm (was 5mm before that). auto_iter3: 25mm -- after FAC_HEADING=5.0 the policy went front-heavy and let the back feet drag at ~10mm; FAC_CLEARANCE penalizes squared deviation from this target both ways, so raising it pushes the dragging back feet up hard while easing the over-high front feet. Matches what v6 actually achieved (~23mm).
 FAC_JITTER = 0.1          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
-FAC_MIRROR_LAT = 12.0     # drift-fix D1: UNRAMPED penalty on |lateral CoM velocity| -- directly targets the left drift that grows off-cadence (cov_r1_slope: straight at 1x, +0.04-0.07 m/ep at 2-4x)
-FAC_MIRROR_STANCE = 1.0   # drift-fix D1: UNRAMPED penalty on left/right stance-fraction imbalance -- morphological-symmetry proxy from the foot contacts
-FAC_MIRROR_WINDOW = 40    # steps of foot-contact history for the stance-fraction estimate
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
 FAC_IMITATION = 10.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
@@ -111,6 +108,7 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
 PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
+PHASE_RAND = 0.40         # drift-fix D2: per-episode gait-clock multiplier = 1 + U(-PHASE_RAND, PHASE_RAND)*_dr -> stride pace 0.6x-1.4x. Trains cadence-robust straight-line walking; the slow end (~0.6x) matches the real BiBoard's ~48 Hz vs the sim's 80 Hz.
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
@@ -464,7 +462,7 @@ class OpenCatGymEnv(gym.Env):
         # the stride beat and isn't hit by the imitation penalty for stepping
         # off-phase to catch itself -- it re-syncs once level. time_obs and the
         # wkF imitation reference both read self._phase.
-        self._phase += PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0
+        self._phase += self._phase_scale   # drift-fix D2: per-episode randomised gait-clock pace
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
@@ -575,25 +573,6 @@ class OpenCatGymEnv(gym.Env):
                       / ((len(self._x_window) - 1) / CONTROL_HZ))
         else:
             vx_est = 0.0
-
-        # drift-fix D1: lateral drift + left/right stance symmetry, UNRAMPED.
-        current_y = p.getBasePositionAndOrientation(self.robot_id)[0][1]
-        self._y_window.append(current_y)
-        if len(self._y_window) > SPEED_WINDOW + 1:
-            self._y_window.pop(0)
-        vy_est = ((self._y_window[-1] - self._y_window[0])
-                  / ((len(self._y_window) - 1) / CONTROL_HZ)) if len(self._y_window) >= 3 else 0.0
-        lateral_penalty = FAC_MIRROR_LAT * abs(vy_est)
-        # paw_contact order = [LF, RF, RB, LB]
-        self._foot_window.append([bool(c) for c in paw_contact])
-        if len(self._foot_window) > FAC_MIRROR_WINDOW:
-            self._foot_window.pop(0)
-        if len(self._foot_window) >= 8:
-            sf = np.asarray(self._foot_window, dtype=float).mean(axis=0)   # stance frac / foot
-            stance_imbalance = abs(sf[0] - sf[1]) + abs(sf[3] - sf[2])     # |LF-RF| + |LB-RB|
-        else:
-            stance_imbalance = 0.0
-        stance_penalty = FAC_MIRROR_STANCE * stance_imbalance
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
         # surv_r5/r12: suspend the speed floor while wobbling -- slowing to catch a
@@ -634,8 +613,6 @@ class OpenCatGymEnv(gym.Env):
                  - residual_cost
                  - min_speed_penalty
                  - overspeed_penalty
-                 - lateral_penalty
-                 - stance_penalty
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -666,10 +643,6 @@ class OpenCatGymEnv(gym.Env):
             "r_resid_smooth": -penalty_scale * resid_smooth_cost,
             "r_min_speed": -min_speed_penalty,
             "r_overspeed": -overspeed_penalty,
-            "r_mirror_lat": -lateral_penalty,
-            "r_mirror_stance": -stance_penalty,
-            "lat_vel_mps": vy_est,
-            "stance_imbalance": stance_imbalance,
             "r_survive_step": survive_step_reward,
             "r_survive_bonus": 0.0,
             "r_smooth_movement": -penalty_scale * smooth_movement,
@@ -787,12 +760,11 @@ class OpenCatGymEnv(gym.Env):
         # Run 7 state: gait-phase counter (slows under tilt), speed window,
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
+        self._phase_scale = 1.0 + np.random.uniform(-PHASE_RAND, PHASE_RAND) * self._dr   # drift-fix D2
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
         self._x_window = []
-        self._y_window = []          # drift-fix D1: lateral-velocity estimate
-        self._foot_window = []       # drift-fix D1: per-foot stance-fraction estimate
         self._prev_ang_vel = np.zeros(2)
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)
         # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
