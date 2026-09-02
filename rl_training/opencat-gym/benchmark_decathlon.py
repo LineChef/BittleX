@@ -117,8 +117,8 @@ def main():
         if args.gif_dir and cid in GIF_CELLS:
             os.makedirs(args.gif_dir, exist_ok=True)
             tag = GIF_CELLS[cid]
-            _render(env, learned, os.path.join(args.gif_dir, f"{tag}_learned.gif"))
-            _render(env, scripted, os.path.join(args.gif_dir, f"{tag}_scripted.gif"))
+            _render(env, learned, os.path.join(args.gif_dir, f"{tag}_learned.gif"), seed=args.seed)
+            _render(env, scripted, os.path.join(args.gif_dir, f"{tag}_scripted.gif"), seed=args.seed)
 
     env.close()
     with open(args.json_out, "w") as f:

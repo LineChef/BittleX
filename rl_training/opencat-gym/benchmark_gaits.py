@@ -255,8 +255,10 @@ def main():
             json.dump(results, f, indent=2)
 
 
-def _render(env, model, out):
+def _render(env, model, out, seed=None):
     from PIL import Image
+    if seed is not None:
+        np.random.seed(seed)          # same course for learned vs scripted GIF
     obs, _ = env.reset()
     if hasattr(model, "reset"):
         model.reset()
