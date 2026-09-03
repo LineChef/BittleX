@@ -108,9 +108,12 @@ steps by hand from `pi-bring-up.md` — same content.
    It should shuffle forward. If a leg kicks backward / the gait is mirrored,
    flip that servo's sign in `deploy_map.SERVO_SIGN`.
 7. **`run_gait.py --cmd 0.10`** — the learned gait, on the real robot.
-8. **The head-to-head (H1):** `run_gait.py` (learned) vs firmware `kwkF` +
-   gyro-assist, on the same real course. The measurement that decides whether RL
-   locomotion continues.
+8. **The head-to-head (H1):** full methodology in
+   `docs/rl-runs/h1-head-to-head-rubric.md` — contenders, course C1–C6, metrics,
+   decision rule. `run_gait.py --log` records each walk; `h1_score.py` turns the
+   measured numbers into a verdict; `sysid_collect.py` + `sysid_replay.py`
+   measure the sim-to-real gap in the same session and fit the corrected sim
+   actuator model if a retrain is warranted.
 9. `pi_pipeline/benchmark_pi.py` — full voice+API benchmark (audio wheels are the
    fragile part; `pi-bring-up.md` §7). Independent of the gait work.
 
