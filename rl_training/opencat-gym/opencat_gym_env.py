@@ -228,10 +228,10 @@ SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabili
 # area-rug edge, low curb. Unavoidable (unlike _scatter_obstacles, which the gait
 # clears most of). The realistic disturbance the payload's inertia doesn't paper
 # over. LEDGE_HEIGHT scaled by _dr; realistic indoor range ~0.010-0.040 m.
-LEDGE_HEIGHT = 0.0     # m; 0 = off
-LEDGE_PROB = 0.0       # fraction of episodes with a ledge
+LEDGE_HEIGHT = 0.025   # Phase 4a: ledge in training DR (max; per-episode 8-25 mm via RANDOMIZE)
+LEDGE_PROB = 0.30      # Phase 4a: 30% of episodes
 LEDGE_DIR = 0          # 0 = random per episode, +1 = step-up only, -1 = step-down only
-LEDGE_RANDOMIZE = False  # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
+LEDGE_RANDOMIZE = True   # Phase 4a: on. # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
