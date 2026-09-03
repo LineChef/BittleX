@@ -44,7 +44,7 @@ first hardware run. Do those first.
 |---|---|
 | R1 single weak/dead servo | **DROPPED** |
 | R2 IMU bias & mount tilt | **DEFERRED** — decide after seeing how sturdy the real Pi↔PiSugar connector is on hardware (a flaky power/data seat changes whether IMU-bias hardening is the right lever) |
-| R3 pick-up & set-down | not yet triaged — open question to the user |
+| R3 pick-up & set-down | **EXPLORE** (user 2026-09-03) — but test the frozen base first, may be a no-train win |
 | R4 directional terrain catches | **TEST FIRST** — run the `run20m_carpet` checkpoint against a 12–15 mm threshold strip (head-on + angled) before deciding; overlaps carpet + `FAC_BALANCE` |
 | R5 slope transitions | **LATER** |
 | R6 left/right friction asymmetry | **LATER** |
@@ -53,8 +53,9 @@ first hardware run. Do those first.
 | R9 within-episode degradation (battery sag / latency ramp) | **DROPPED** |
 | R10 long-duration drift | **YES — priority** (it's an eval, not training; cheap) |
 | R11 lateral link collision | **DROPPED** |
+| R12 uneven left/right surface (side-hill + stepped split) | **EXPLORE** (user 2026-09-03) |
 
-Next after `run20m_carpet` evals: **R10**, then the R4 threshold test.
+Next after `run20m_carpet` evals: **R10**, the R3 base test, then the R4 threshold test.
 
 ---
 
@@ -182,6 +183,23 @@ the `run20m_carpet` evals.
 ### R11 · Lateral link collision — `DROPPED` (2026-09-03)
 Bumping a chair leg / wall with a shin mid-swing: a short lateral impulse on a
 random lower-leg link (not the base). Distinct from `IMPULSE_PUSH` on the torso.
+
+### R12 · Uneven left/right surface — `EXPLORE` (user 2026-09-03)
+One body side persistently lower/higher than the other. Two sub-cases:
+- **R12a · side-hill / traverse a contour.** A sustained roll tilt (`~8–15°`)
+  held for the whole episode with `cmd_fwd` along the contour, so gravity pulls
+  G2 downhill continuously and it must hold heading. `SLOPE_MAX_DEG` already draws
+  a random per-episode roll, but independently of pitch, so a *pure* sustained
+  side-hill is diluted. Add a mode that forces roll-dominant tilt + a longer
+  episode. **Held-out eval:** downhill drift (m) and heading error over a 60 s
+  contour walk at `±10°` / `±15°`.
+- **R12b · stepped split.** Left legs `~15–25 mm` higher than right — walking with
+  one side up on a rug edge / a low curb / a floor-vent lip. A height
+  discontinuity down the centerline, not a tilt. The height-twin of R6. Reuse a
+  half-width raised slab at `y = uniform(±0.03)`.
+  **Held-out eval:** traverse with the split under the left, then the right.
+- **Timidity check:** same gate as R4 — flat cruise speed / swing height / power
+  must hold within noise of the base.
 
 ---
 
