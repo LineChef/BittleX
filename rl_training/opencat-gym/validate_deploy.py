@@ -26,6 +26,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "pi_pipeline", "gait"))
 sys.path.insert(0, HERE)
+os.chdir(HERE)          # opencat_gym_env loads its URDF by relative path
 
 
 def run_one(cmd_fwd, steps, onnx_path, wkf_path, verbose=False):
