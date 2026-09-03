@@ -155,6 +155,29 @@ Software only; no physical robot needed until Phase 6 deployment.
   *firmware* gait. Next steps are ONNX export + Pi bring-up, then that
   head-to-head. Learned-gait work otherwise resumes only when
   perception-in-the-loop becomes active — see the **Phase 8 Target capability**.
+- **Pre-hardware robustness push — ACTIVE (from 2026-09-03).** While the frame
+  ships (10–25 days out), reopening gait training to harden it for *walk-anywhere*
+  use — G2 will not always be on flat ground. `run20m_ppo` stays the frozen
+  deployment base; these are reversible continuations, kept only if they net
+  capability per the bar (see [`feedback_training_capability_bar`] / the
+  refinement regimen).
+  - **Rough-terrain training.** The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
+    amplitude — cosmetic. Built a proper rough course: `CARPET`, a single
+    `GEOM_HEIGHTFIELD` body (no scattered obstacles), 13 mm multi-octave bumps +
+    a broad ~±11 mm/1.5 m rolling swell, std-normalised so it fills the height
+    range and stays passable (`run20m_ppo` crosses it at ~0.07–0.10 m/s, 0 falls).
+    Earlier iterations: scattered-box `RANDOM_TERRAIN` bump-up, then tumbled
+    "rubble" (`run20m_rough` 3.5 M, `run20m_rough2` stopped ~1.4 M) — both
+    retired; the single heightfield deflects feet instead of catching edges and
+    is one collision body (cheaper sim). Branch `gait-rough`.
+  - **`run20m_carpet`** — continuation from `run20m_ppo`, `CARPET` on for 50 % of
+    DR episodes (rest keep the flat/sloped plane so slope/obstacle DR is
+    unchanged), `--finetune-lr 1e-4 --finetune-target-kl 0.05`, 4 M steps.
+    Launched 2026-09-03. Verdict pending its learned-vs-scripted + decathlon eval.
+  - **Robustness backlog** — the categorised list of real-world scenarios still
+    to train/eval (single-servo failure, IMU bias/mount tilt, pick-up &
+    set-down, directional terrain catches, slope transitions, friction
+    asymmetry, …): [`docs/rl-runs/robustness-backlog.md`](rl-runs/robustness-backlog.md).
 
 ### Environment
 

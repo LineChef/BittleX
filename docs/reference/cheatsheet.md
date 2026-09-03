@@ -39,7 +39,8 @@ or open a new terminal to pick them up. RL commands run from `rl_training/openca
 | `python watch.py --challenge step-down` | 30 mm drop. Also `threshold-up` (15 mm), `step-up` (30 mm), `big-ledge` (45 mm random) |
 | `python watch.py --challenge weak-servos` | 60% torque cutback + a −12° descent |
 | `python watch.py --challenge slope+obstacles` | 9° slope + 30 mm obstacles |
-| `python watch.py --challenge rubble` | **Dense tumbled rubble** — ~260 small randomly-rotated chunks half-sunk in the ground, so feet deflect over rather than catching an edge. `rubble-hard` = bigger/denser. Episodes auto-extend to 2000 steps (~25 s); override with `--steps N` |
+| `python watch.py --challenge carpet` | **The rough-terrain course** (`run20m_carpet` training substrate): one heightfield, 13 mm multi-octave bumps + a broad ~±11 mm/1.5 m rolling swell, floor never shows. `carpet-rough` = 19 mm bumps + bigger swell. Auto-extends to 2000 steps; `--steps N` to override |
+| `python watch.py --challenge rubble` | **Dense tumbled rubble** — hundreds of rounded chunks (spheres / capsule ridges / some angular) half-sunk in the ground so feet deflect over rather than catch an edge, 15 mm exposed-height cap. `rubble-hard` = bigger/denser. *Superseded by `carpet` for training* — kept for viz. Auto-extends to 2000 steps; `--steps N` to override |
 | `python watch.py --challenge gauntlet` | **The hard combined test (T5.1):** 4°/9° slope + 40 mm obstacles + repeated shoves |
 | `python watch.py --challenge brutal-gauntlet` | **The T6.4 hardened tier:** 20° slope + 70 mm + 1.0 shoves |
 | `... --cmd 0.13` | Change the forward-speed command (creep ≈ 0.04, cruise 0.10, fast ≈ 0.14, backward < 0) |
