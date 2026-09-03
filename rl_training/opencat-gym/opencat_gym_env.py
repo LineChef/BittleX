@@ -224,6 +224,14 @@ SUSTAINED_FORCE_STEPS = 25
 DEFORM_GROUND = 0.0     # 0..1 randomize ground contact stiffness/damping/restitution. Expensive (soft-contact solver); folded into R7 consolidation at 0.2 only.
 SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabilise (0 falls either gait); training on it only diluted the useful signal. See coverage log.
 
+# Phase 4: a single sharp step spanning the whole walking lane -- a door sill,
+# area-rug edge, low curb. Unavoidable (unlike _scatter_obstacles, which the gait
+# clears most of). The realistic disturbance the payload's inertia doesn't paper
+# over. LEDGE_HEIGHT scaled by _dr; realistic indoor range ~0.010-0.040 m.
+LEDGE_HEIGHT = 0.0     # m; 0 = off
+LEDGE_PROB = 0.0       # fraction of episodes with a ledge
+LEDGE_DIR = 0          # 0 = random per episode, +1 = step-up only, -1 = step-down only
+
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
 LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observation -- lets the policy see a stumble as a developing trajectory, not a snapshot. IMU-only, transfers to hardware.
@@ -973,10 +981,27 @@ class OpenCatGymEnv(gym.Env):
         if RANDOM_TERRAIN > 0 and self._dr > 0:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
 
+        # Phase 4: sharp step across the whole lane. Flat ground only, not with the
+        # rough heightfield (which replaces the plane). Step-up = raised plateau
+        # ahead; step-down = robot starts on a raised block with a drop ahead.
+        self._ledge_h = 0.0
+        self._ledge_dir = 0
+        if (LEDGE_HEIGHT > 0 and self._dr > 0 and SLOPE_FIXED_RP is None and not _rough
+                and np.random.rand() < LEDGE_PROB):
+            self._ledge_h = float(LEDGE_HEIGHT * self._dr)
+            self._ledge_dir = LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1]))
+            _lw = 0.30                          # across-path half-width: cannot be side-stepped
+            if self._ledge_dir > 0:            # step UP: plateau from x~0.30 forward
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.60, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[0.90, 0.0, self._ledge_h / 2])
+            else:                              # step DOWN: block under the robot, drop past x~0.30
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.55, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[-0.25, 0.0, self._ledge_h / 2])
+
         _pose_tilt = 0.0
         if START_POSE_JITTER > 0 and self._dr > 0:
             _pose_tilt = np.deg2rad(0.3 * START_POSE_JITTER) * self._dr
-        start_pos = [0, 0, 0.08]
+        start_pos = [0, 0, 0.08 + (self._ledge_h if self._ledge_dir < 0 else 0.0)]
         start_orient = p.getQuaternionFromEuler([
             self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])

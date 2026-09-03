@@ -24,7 +24,8 @@ D = math.radians
 # knob keys we reset before every cell so each cell tests only what it declares
 _ZERO = ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN",
          "IMPULSE_PUSH", "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB",
-         "SUSTAINED_FORCE", "DEFORM_GROUND", "SLIP_PATCH")
+         "SUSTAINED_FORCE", "DEFORM_GROUND", "SLIP_PATCH",
+         "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR")
 
 # (id, tier, skill, human label, {env knob overrides})
 LADDER = [
@@ -73,6 +74,20 @@ LADDER = [
          "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45}),
     ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg descent",
         {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))}),
+
+    # T7: ledge / step. A realistic disturbance (door sills, rug edges, low curbs)
+    # the payload's inertia does NOT paper over -- a bad foot plant on an edge
+    # still starts a topple. Score on fall rate AND recovery events / time-to-settle.
+    ("T7.1", 7, "ledge",          "Threshold up  (15 mm)",
+        {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
+    ("T7.2", 7, "ledge",          "Threshold down  (15 mm)",
+        {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}),
+    ("T7.3", 7, "ledge",          "Step up  (30 mm sill)",
+        {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
+    ("T7.4", 7, "ledge",          "Step down  (30 mm drop)",
+        {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}),
+    ("T7.5", 7, "ledge",          "Big ledge  (45 mm, random up/down)",
+        {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
 ]
 
 GIF_CELLS = {"T5.1": "gauntlet"}   # replays: only the everything-at-once course
