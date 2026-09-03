@@ -89,7 +89,7 @@ FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-lef
 FAC_IMITATION = 11.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. G4b: 16 -> 11 -- at 16 it was ~15 pts vs ~4 for speed, drowning the speed command; the phase-rate scaling (PHASE_RATE_NOM_CMD) is the real fix, this just rebalances. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
-IMITATION_FADE_FACTOR = 0.30 # Phase 4b: imitation reward multiplier while stumbling / mid-climb (prev-step tilt over IMITATION_TILT_FADE). 1.0 -> 0.30: cut wkF-match weight ~70% during a wobble so "be on the stride beat" stops fighting an off-phase catch or a step-up. Clock keeps running (PHASE_SLOW_RATE), weight drops -- the gentle version of R1's phase-pause.
+IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling. Phase 4b set this to 0.30 and PPO diverged (approx_kl 40-670): the reward flickering full<->0.3x every few steps as tilt crossed IMITATION_TILT_FADE was unfittable. Reverted; do not re-touch without a hysteresis band + a much lower fixed LR.
 
 # --- Fall recovery / self-righting -------------------------------------------
 # Normally is_fallen() (roll or pitch > 1.3 rad) ends the episode instantly with
@@ -114,6 +114,8 @@ BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 BALANCE_W_ANGLE = 1.0      # weight on frame-to-frame tilt-angle reduction
 BALANCE_W_RATE = 0.6       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
 BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get feet down"
+BALANCE_W_DIAG = 0.20     # Phase 4c: bonus (x FAC_BALANCE) for holding a COMPLETE diagonal support pair (FL+BR or FR+BL) planted during a catch -- rewards re-planting into a stable stance, distinct from BALANCE_W_FEET which just counts any feet down. This is the "wobble -> re-plant -> keep walking" target behaviour.
+RESIDUAL_RECOVER_DEG = 27 # Phase 4c: residual authority (deg) while prev-step tilt > BALANCE_TILT_ON, up from RESIDUAL_SCALE_DEG (22) -- more reach to throw a foot out and re-plant mid-wobble. Snaps back to 22 once level, so the nominal gait mapping is unchanged.
 
 # Phase clock (Run 7): the wkF phase index normally advances one step per control
 # step. While the body is tilted past PHASE_SLOW_TILT it advances at PHASE_SLOW_RATE
@@ -122,7 +124,7 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # off-phase step and re-sync once level. Both time_obs and the imitation reference
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
-PHASE_SLOW_RATE = 0.35     # Phase 4b: RE-ENABLED as a slow, NOT a freeze (R1's freeze fought the catch). While tilted past PHASE_SLOW_TILT the wkF reference advances at 35% rate so a wobbling / mid-climb policy can take a corrective off-beat step and re-sync once level. Paired with IMITATION_FADE_FACTOR below (the "reduced imitation weight" R2 asked for) so the reference doesn't fight the recovery.
+PHASE_SLOW_RATE = 1.0      # DISABLED (1.0 = phase always advances normally). Tried again in Phase 4b paired with an imitation-weight fade -> PPO diverged (approx_kl 40-670, clip_fraction 0.995) because the imitation reward flickered full<->0.3x as tilt crossed this threshold every few steps. Third failure of phase-clock surgery (R1 destabilised, R2 disabled, 4b blew up). Not revisiting -- stance recovery goes through the FAC_BALANCE catch-band shaping instead.
 
 # G4b: the wkF phase advances at a rate PROPORTIONAL to the commanded speed, so
 # the imitation reference itself is a slow gait for a creep command and a fast
@@ -228,10 +230,10 @@ SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabili
 # area-rug edge, low curb. Unavoidable (unlike _scatter_obstacles, which the gait
 # clears most of). The realistic disturbance the payload's inertia doesn't paper
 # over. LEDGE_HEIGHT scaled by _dr; realistic indoor range ~0.010-0.040 m.
-LEDGE_HEIGHT = 0.018   # Phase 4b: dialed back from 4a's 0.025. 4a (25mm max, 30%) made the gait timid -- nominal walk speed HALVED and ledge handling got WORSE (robot backed away). Lesson: ledge exposure only helps if the step is climbable AND the policy has a mechanism to take an off-beat step. So 4b: smaller cap (per-episode 8-18mm), lower prob, PLUS phase-slow + imitation-fade re-enabled below.
-LEDGE_PROB = 0.12      # Phase 4b: 30% -> 12% of episodes
+LEDGE_HEIGHT = 0.0     # Phase 4a/4b OFF. 4a (25mm/30% into DR) halved the nominal walk and made ledge handling WORSE (robot backs away from steps). Kept for eval-only cells (T7, showcase, ledge probe) which set it directly. Folding curbs/sills into the walk policy is B13 tier-2 -- deferred.
+LEDGE_PROB = 0.0
 LEDGE_DIR = 0          # 0 = random per episode, +1 = step-up only, -1 = step-down only
-LEDGE_RANDOMIZE = True   # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
+LEDGE_RANDOMIZE = False  # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
@@ -360,7 +362,11 @@ class OpenCatGymEnv(gym.Env):
                 ref = STAND_POSE
             else:
                 ref = WKF_REF[int(self._phase) % len(WKF_REF)]
-            joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
+            # Phase 4c: widen the residual while the body WAS tilted last step,
+            # so the policy has more reach to re-plant a foot during a catch.
+            _rs = (RESIDUAL_RECOVER_DEG if getattr(self, '_prev_tilt', 0.0) > BALANCE_TILT_ON
+                   else RESIDUAL_SCALE_DEG)
+            joint_angs = ref + action * np.deg2rad(_rs)
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
             joint_angs += action * ds # Change per step including agent action
@@ -642,10 +648,14 @@ class OpenCatGymEnv(gym.Env):
         survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
+            # Phase 4c: a COMPLETE diagonal support pair down (FL+BR or FR+BL).
+            _diag_planted = ((paw_contact[0] and paw_contact[2])
+                             or (paw_contact[1] and paw_contact[3]))
             balance_reward = FAC_BALANCE * (
                 BALANCE_W_ANGLE * max(0.0, self._prev_tilt - tilt)
                 + BALANCE_W_RATE * max(0.0, self._prev_tilt_rate - tilt_rate)
-                + BALANCE_W_FEET * (sum(paw_contact) / 4.0))
+                + BALANCE_W_FEET * (sum(paw_contact) / 4.0)
+                + BALANCE_W_DIAG * (1.0 if _diag_planted else 0.0))
         self._prev_tilt_rate = tilt_rate
         self._prev_tilt = tilt
 
