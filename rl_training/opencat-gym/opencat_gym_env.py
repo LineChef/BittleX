@@ -1207,27 +1207,29 @@ class OpenCatGymEnv(gym.Env):
 
 
     def _scatter_rubble(self, chunk, n):
-        """A dense carpet of tumbled rubble across the forward traverse. Each
-        chunk is a small box with a random full-3D rotation, sunk so ~half is
-        below the surface -- only an angled wedge sticks up, so a foot slides
-        over it instead of catching a vertical edge. 'Very uneven ground to walk
-        over', not trip hazards. Static (mass 0). Sits on the (possibly sloped)
-        plane via its normal."""
+        """A dense carpet of rounded cobbles across the forward traverse: small
+        spheres (and a few side-laid capsules) half-buried in the ground, so
+        only a smooth dome/ridge pokes up. No edges or flat faces -- a foot
+        rolls over rather than catching. 'Very uneven ground to walk over', not
+        trip hazards. Static (mass 0). Sits on the (possibly sloped) plane."""
         roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
-            s = np.random.uniform(0.6, 1.25) * chunk           # this chunk's size (full extent)
-            he = [s * np.random.uniform(0.4, 0.7) for _ in range(3)]     # roughly cubic, varied
+            r = np.random.uniform(0.45, 1.15) * chunk          # cobble radius
             x = np.random.uniform(0.10, 3.4)
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
-            # bury 20-45% of the chunk: enough that the ground-contact face is an
-            # angled wedge (no vertical edge to catch a toe), but most of it shows.
-            sink = np.random.uniform(0.20, 0.45) * s
-            orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
-            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + s * 0.5 - sink],
+            buried = np.random.uniform(0.45, 0.8) * r          # exposed dome = r*(0.2..0.55)
+            if np.random.rand() < 0.25:                        # a rounded ridge
+                cs = p.createCollisionShape(p.GEOM_CAPSULE, radius=r,
+                                            height=float(np.random.uniform(1.5, 3.5) * r))
+                orn = p.getQuaternionFromEuler([np.pi / 2, 0.0,
+                                                float(np.random.uniform(-np.pi, np.pi))])
+            else:                                              # a smooth cobble
+                cs = p.createCollisionShape(p.GEOM_SPHERE, radius=r)
+                orn = [0, 0, 0, 1]
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + r - buried],
                               baseOrientation=orn)
 
 
