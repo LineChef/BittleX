@@ -231,6 +231,7 @@ SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabili
 LEDGE_HEIGHT = 0.0     # m; 0 = off
 LEDGE_PROB = 0.0       # fraction of episodes with a ledge
 LEDGE_DIR = 0          # 0 = random per episode, +1 = step-up only, -1 = step-down only
+LEDGE_RANDOMIZE = False  # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
@@ -988,15 +989,20 @@ class OpenCatGymEnv(gym.Env):
         self._ledge_dir = 0
         if (LEDGE_HEIGHT > 0 and self._dr > 0 and SLOPE_FIXED_RP is None and not _rough
                 and np.random.rand() < LEDGE_PROB):
-            self._ledge_h = float(LEDGE_HEIGHT * self._dr)
+            self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
+                                   else LEDGE_HEIGHT) * self._dr)
             self._ledge_dir = LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1]))
             _lw = 0.30                          # across-path half-width: cannot be side-stepped
-            if self._ledge_dir > 0:            # step UP: plateau from x~0.30 forward
-                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.60, _lw, self._ledge_h / 2])
-                p.createMultiBody(0, _cs, basePosition=[0.90, 0.0, self._ledge_h / 2])
-            else:                              # step DOWN: block under the robot, drop past x~0.30
-                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.55, _lw, self._ledge_h / 2])
-                p.createMultiBody(0, _cs, basePosition=[-0.25, 0.0, self._ledge_h / 2])
+            _edge = 0.11                        # x of the edge -- close, so a ~3 s episode actually
+                                               #  reaches it and has time to attempt the step
+            if self._ledge_dir > 0:            # step UP: plateau from x~_edge forward
+                _hl = 0.70
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[_edge + _hl, 0.0, self._ledge_h / 2])
+            else:                              # step DOWN: block under the robot, drop past x~_edge
+                _hl = 0.60
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[_edge - _hl, 0.0, self._ledge_h / 2])
 
         _pose_tilt = 0.0
         if START_POSE_JITTER > 0 and self._dr > 0:

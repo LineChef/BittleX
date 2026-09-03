@@ -38,7 +38,7 @@ def flat_eval(ckpt, episodes):
     E.GUI_MODE = False
     for k in ("SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE",
               "DEFORM_GROUND", "SLIP_PATCH", "RANDOM_TERRAIN", "RANDOM_PUSH", "IMPULSE_PUSH",
-              "RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "PHASE_RAND",
+              "RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "PHASE_RAND", "LEDGE_HEIGHT", "LEDGE_PROB",
               "ROUGH_TERRAIN", "TORQUE_CUTBACK"):
         if hasattr(E, k):
             setattr(E, k, 0.0)
