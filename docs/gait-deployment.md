@@ -1,4 +1,4 @@
-# Deployment Blueprint — getting run20m_ppo onto G2
+# Gait Deployment — getting run20m_ppo onto G2
 
 The plan and current state for bringing the trained walking policy up on real
 hardware: Pi Zero 2 W bring-up, ONNX deploy, the on-robot control loop, and the
