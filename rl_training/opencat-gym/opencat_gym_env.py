@@ -1217,12 +1217,14 @@ class OpenCatGymEnv(gym.Env):
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
-            s = np.random.uniform(0.6, 1.4) * chunk            # this chunk's size
-            he = [s * np.random.uniform(0.35, 0.65) for _ in range(3)]   # roughly cubic, varied
+            s = np.random.uniform(0.7, 1.5) * chunk            # this chunk's size (full extent)
+            he = [s * np.random.uniform(0.4, 0.7) for _ in range(3)]     # roughly cubic, varied
             x = np.random.uniform(0.10, 3.4)
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
-            sink = np.random.uniform(0.4, 0.75) * s            # how deep it's buried
+            # bury 20-45% of the chunk: enough that the ground-contact face is an
+            # angled wedge (no vertical edge to catch a toe), but most of it shows.
+            sink = np.random.uniform(0.20, 0.45) * s
             orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
             p.createMultiBody(0, cs, basePosition=[x, y, z_ground + s * 0.5 - sink],
