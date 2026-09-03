@@ -1,0 +1,26 @@
+[
+ {
+  "ckpt": "trained/run20m_ppo",
+  "episodes": 64,
+  "falls": 31,
+  "fall_rate": 0.484375,
+  "big_spikes": 42,
+  "recovered": 1,
+  "recover_rate": 0.023809523809523808,
+  "resettle_steps_mean": 20.0,
+  "net_x_mean": 0.16551379609095887,
+  "net_x_min": -0.03997346946720386
+ },
+ {
+  "ckpt": "trained/p4c_ppo",
+  "episodes": 64,
+  "falls": 32,
+  "fall_rate": 0.5,
+  "big_spikes": 39,
+  "recovered": 4,
+  "recover_rate": 0.10256410256410256,
+  "resettle_steps_mean": 22.75,
+  "net_x_mean": 0.16090858074822226,
+  "net_x_min": -0.07693507091311463
+ }
+]
