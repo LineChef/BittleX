@@ -115,6 +115,22 @@ catching a linear edge is a different failure mode than rolling over bumps.
   clearance), absorb a dropped stance foot with the other three legs, reject the
   one-sided yaw kick — without becoming permanently high-stepping.
 
+- **The timidity risk (user, 2026-09-03):** real concern — same ceiling as Phase 4
+  stance-recovery. Design so it stays *reactive*, not prophylactic:
+  - catches in **only ~15–20 %** of episodes, interleaved with clean flat +
+    carpet so flat efficiency stays in every rollout's gradient;
+  - **no clearance bonus** — reward the outcome (no fall, heading held), so
+    high-stepping only survives if it nets fewer falls after the power penalty;
+  - **unanticipatable** — random lip/groove position + heading, catch enabled
+    only after the gait is established, so any high-stepping the policy learns is
+    forced to be permanent-everywhere and the flat eval catches it at once;
+  - the trigger is already in the obs (`tilt_history` / angvel spike on a catch),
+    so a conditioned "lift + shift" response is at least representable.
+  - **Keep/revert gate:** R4 is a keeper only if threshold traversal improves
+    **and** all of these stay within noise of `run20m_ppo` — flat cruise speed,
+    mean swing peak paw-Z, power / cost-of-transport, step cadence, decathlon
+    flat + slope cells. Else: document as a control-setup ceiling, revert.
+
 ---
 
 ## Tier 2 — worth it, a bit more env work
