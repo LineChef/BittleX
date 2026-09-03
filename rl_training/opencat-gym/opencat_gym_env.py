@@ -220,12 +220,20 @@ RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait 
                         # clear. Every chunk is pushed down so its top sits <= ground + this.
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
-PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
-PAYLOAD_MASS_RAND = 0.035  # +/- kg. G4: 0.015 -> 0.035 (40-110 g range). The payload is bolted on so
-                           # PAYLOAD_PROB is now 1.0 -- instead of ever training a bare robot, widen the
-                           # mass so the policy keeps margin for a draining battery / heavier final camera
-                           # without over-fitting to one exact inertia (phase2's failure mode).
-PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only)
+PAYLOAD_MASS_NOM = 0.065   # kg. BOM estimate 2026-09-03 (docs/research/hardware-specs.md "Mounted
+                           # payload weight"): Pi Zero 2 WH + heatsink + SD (~17 g) + PiSugar S w/
+                           # 1200 mAh cell (~33 g) + data-only serial wiring (~4 g) + back-cover mount
+                           # (~10 g) = ~63 g for the gait-bring-up build (NO camera -- camera is Phase 8).
+                           # Full companion w/ camera is ~78 g. Was 0.075 (a wide early guess).
+PAYLOAD_MASS_RAND = 0.025  # +/- kg -> 40-90 g band. Floor = trimmed build (500 mAh cell, minimal
+                           # mount). Ceiling = full stack + camera + draining/heavier battery + beefy
+                           # enclosure. The old 110 g ceiling was not physically reachable.
+                           # PAYLOAD_PROB = 1.0: always mounted, so widen mass rather than train bare.
+                           # Re-set NOM/RAND/POS to the MEASURED stack on assembly (kitchen scale +
+                           # balance-on-an-edge for CoM); that replaces this estimate.
+PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm
+                           # jitter only). z=0.025 is pessimistic-for-tipping -- if the real stack sits
+                           # tighter to the cover it's ~0.015-0.020. MEASURE on assembly.
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane

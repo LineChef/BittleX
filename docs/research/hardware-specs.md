@@ -103,6 +103,48 @@ servos.
   quasi-static **stalled/blocked-joint detection**, and sim-to-real calibration
   spot-checks — all things that tolerate a slow, blocking read.
 
+## Mounted payload weight (BOM estimate, 2026-09-03)
+
+The sim adds a payload body for the Pi stack on the rear spine
+(`opencat_gym_env.py` `PAYLOAD_MASS_*` / `PAYLOAD_POS`). The original 75 g ± 35 g
+(40–110 g) was a wide early guess. This is a component-level estimate — **no
+manufacturer (Raspberry Pi, PiSugar, Seeed/Petoi) publishes a unit weight** for
+these parts, so figures are: measured reference weights where known, LiPo mass
+from energy density, bare-PCB mass from board area. **Re-weigh the real stack on
+assembly and set the sim to that.**
+
+| Component | Est. | Confidence | Basis |
+|---|---|---|---|
+| Raspberry Pi Zero 2 W (bare) | 10 g | high | RPi / vendor listings, 65×30 mm |
+| 40-pin header (WH variant) | 4 g | med | 2×20 male header stock weight |
+| Heatsink (WH kit) | 2 g | med | small alloy Zero heatsink |
+| microSD | 0.4 g | high | — |
+| PiSugar S board (PCB only) | 10 g | low | 65×30 mm 2-layer + pogo pins + charge IC |
+| PiSugar S 1200 mAh LiPo cell | 23 g | med | 4.44 Wh ÷ ~190 Wh/kg |
+| Serial wiring (RX/TX/GND, data-only) | 4 g | low | 3 short Dupont jumpers |
+| Mount — Petoi back-cover-with-Pi-hole (PLA) | 10 g | low | standard Bittle cover mass; design-dependent |
+| **Config A — gait bring-up, no camera** | **~63 g** | | Phase 6, the next hardware milestone |
+| Petoi AI Vision module (Grove Vision AI V2) | 5 g | med | Grove-sized MCU board |
+| OV5647 CSI camera + FPC ribbon | 4 g | high | known RPi-cam-clone weight |
+| Petoi camera case + Grove cable | 6 g | low | 47×31×15 mm ABS shell + cable |
+| **Config B — full companion, camera on** | **~78 g** | | Phase 8+ |
+
+Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
+
+- → **Sim retuned 2026-09-03:** `PAYLOAD_MASS_NOM 0.075 → 0.065`,
+  `PAYLOAD_MASS_RAND 0.035 → 0.025` (40–90 g band). Ceiling 110 g dropped — not
+  physically reachable. `run20m_ppo` (trained at 75 g) is left frozen: training
+  *heavier* than reality is the safe direction (real robot gets more torque +
+  stability margin than it trained with); our sim benchmarks just slightly
+  understate real speed.
+- → **Biggest lever is the battery.** The 1200 mAh cell is ~23 g of the ~33 g
+  PiSugar stack. Gait + serial on a Pi Zero 2 W (no vision / Whisper) sips power;
+  a 500–700 mAh cell (~10–15 g) still gives 2–3 h and cuts ~10–13 g. Decide
+  before committing the build.
+- → **CoM height matters more than mass for tip-over.** `PAYLOAD_POS` z = 2.5 cm
+  above the spine is pessimistic; a stack tucked to the cover is ~1.5–2 cm.
+  Measure (balance the built stack on an edge) and set `PAYLOAD_POS`.
+
 ## Bittle X body + battery
 
 | Spec | Value |
