@@ -235,6 +235,8 @@ ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of 
 # terrain for walk-anywhere training. Value = max bump height (m) above the mean;
 # the field is scaled so the tallest point is exactly this, so it stays passable.
 CARPET = 0.0
+CARPET_SWELL = 0.0         # broad rolling undulation (m) added on top of the CARPET bumps --
+                           # very-low-frequency swells so the ground gently rolls as you walk
 CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
@@ -1019,6 +1021,13 @@ class OpenCatGymEnv(gym.Env):
             _sd = _h.std()
             _h = np.clip(_h / (2.4 * _sd), -1.0, 1.0)      # clip the rare outliers, spread the rest
             _h = _h * (CARPET * self._dr)                  # tallest bump == CARPET; field fills +/-range
+            if CARPET_SWELL > 0:                           # broad rolling swell on top
+                _sw = np.random.uniform(-1, 1, (_n, _n))
+                for _ in range(16):
+                    _sw = (_sw + np.roll(_sw, 1, 0) + np.roll(_sw, -1, 0)
+                           + np.roll(_sw, 1, 1) + np.roll(_sw, -1, 1)) / 5.0
+                _sw = _sw - _sw.mean()
+                _h = _h + _sw / np.abs(_sw).max() * (CARPET_SWELL * self._dr)
             _hf = p.createCollisionShape(
                 p.GEOM_HEIGHTFIELD, meshScale=[0.021, 0.021, 1.0],   # 190*0.021 ~= 4.0 m span, ~21mm cells
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
