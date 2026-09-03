@@ -1001,11 +1001,21 @@ class OpenCatGymEnv(gym.Env):
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
         if _carpet:
             _n = 140                                  # fine grid -> dense bumps, not dunes
-            _h = np.random.uniform(-1, 1, (_n, _n))
-            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, -1, 0)
-                  + np.roll(_h, 1, 1) + np.roll(_h, -1, 1)) / 5.0   # one pass: bumpy, not needle-sharp
+            _raw = np.random.uniform(-1, 1, (_n, _n))
+            # multi-octave: broad swells (heavily smoothed) + medium bumps + a bit
+            # of raw high-freq detail -> uneven, varied heights, not a regular ripple
+            _lo = _raw.copy()
+            for _ in range(6):
+                _lo = (_lo + np.roll(_lo, 1, 0) + np.roll(_lo, -1, 0)
+                       + np.roll(_lo, 1, 1) + np.roll(_lo, -1, 1)) / 5.0
+            _mid = _raw.copy()
+            for _ in range(2):
+                _mid = (_mid + np.roll(_mid, 1, 0) + np.roll(_mid, -1, 0)
+                        + np.roll(_mid, 1, 1) + np.roll(_mid, -1, 1)) / 5.0
+            _h = 1.3 * _lo + 1.0 * _mid + 0.30 * _raw
+            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, 1, 1)) / 3.0   # knock the needle peaks off
             _h = _h - _h.mean()
-            _h = _h / _h.max() * (CARPET * self._dr)   # tallest point == exactly CARPET above mean
+            _h = _h / np.abs(_h).max() * (CARPET * self._dr)   # cap bumps AND dips at +/-CARPET
             _hf = p.createCollisionShape(
                 p.GEOM_HEIGHTFIELD, meshScale=[0.028, 0.028, 1.0],   # 140*0.028 ~= 3.9 m span
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
