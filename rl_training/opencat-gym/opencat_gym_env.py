@@ -9,6 +9,7 @@ import pybullet_data
 # reference_gait/build_wkf_reference.py from OpenCatEsp32's InstinctBittleESP.h.
 _WKF_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkf_ref.npy")
 WKF_REF = np.load(_WKF_PATH) if os.path.exists(_WKF_PATH) else None
+STAND_POSE = WKF_REF.mean(axis=0) if WKF_REF is not None else None  # mid-stance-ish, held while standing
 
 
 # Constants to define training and visualisation.
@@ -37,7 +38,7 @@ FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - T
 # learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 11   # +/- correction the policy may apply. r1 used 18 (warped wkF to a crawl); resid_r2 used 11. rtune_r3 tried 8 -- fixed heading at 20/35mm but couldn't catch 50mm trips (falls 14->29%). Reverted to 11.
+RESIDUAL_SCALE_DEG = 22   # gait-refinement G1: 11 -> 22. Wider correction authority (URMA/Bittle_Symmetry use ~30 deg). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; paired here with FAC_IMITATION 16 as a stronger anchor.
 FAC_RESIDUAL_COST = 1.5   # -mean(action^2) * this -- deviate from the scripted pose only when it helps
 FAC_RESID_SMOOTH = 6.0    # rtune_r4: -mean(|action - prev_action|) * this (ramped). Penalise frame-to-frame jerk in the correction, not its magnitude -- a smoother residual should cut roll oscillation / heading drift without capping the authority needed for a 50mm trip.
 
@@ -57,6 +58,15 @@ SPEED_SHARPNESS = 1.8      # wider capture band so the bonus still has a meaning
 SPEED_WINDOW = 12          # steps to average base-x velocity over for the reward (per-step Δx is too noisy)
 MIN_SPEED = 0.085          # m/s. Hard floor, suspended while wobbling (tilt < BALANCE_TILT_ON). surv_r12 config. gait-polish G1 tried 0.090 to clear the flat-speed gate (0.080->0.085) -- but survival crashed 21%->11% and trot -0.55->-0.43. Not worth 0.005 m/s. The 0.080 flat speed stands as a minor accepted shortfall.
 FAC_MIN_SPEED = 120.0      # weight on the below-MIN_SPEED shortfall
+
+# --- gait-refinement G2: commanded locomotion (speed + yaw) ----------------
+CMD_FWD_MAX = 0.15         # m/s, forward command clip (also the obs-normaliser); backward goes to -0.10
+CMD_YAW_MAX = 0.45         # rad/s, yaw-rate command clip / obs-normaliser (~26 deg/s)
+STAND_FWD_THRESH = 0.025   # |cmd_fwd| below this = stand: freeze the gait phase, ref = STAND_POSE
+FAC_SPEED_TRACK = 60.0     # linear penalty on |body-fwd speed - cmd_fwd| beyond a 0.02 m/s band (replaces MIN_SPEED+OVERSPEED)
+FAC_YAW_TRACK = 6.0        # penalty on |yaw_rate - cmd_yaw|^2 (replaces the plain yaw-rate penalty in body_stability)
+CMD_RESAMPLE_PROB = 0.009  # per-step prob of drawing a new command mid-episode (~2-3 changes / 250 steps -> start/stop/transition practice)
+
 MOVEMENT_CAP_AT_TARGET = True   # surv_r1: back to True. resid_r1's stall was FAC_SPEED=2 + no floor; now FAC_SPEED=5 + MIN_SPEED floor + FAC_OVERSPEED make speed a set-point, so the progress reward should stop paying above TARGET_SPEED.
 FAC_STABILITY = 0.1       # Punish body roll and pitch velocities. rtune_r2 tried 0.4 -- over-damped the correction layer: falls 14->21% at 50mm, yaw 8->13deg. Reverted.
 FAC_YAW = 0.1             # Punish body yaw (turning) velocity -- discourages curving off a straight line. rtune_r2 tried 0.3 with FAC_STABILITY 0.4 -- regressed, reverted.
@@ -70,8 +80,13 @@ FAC_CLEARANCE = 0.1       # Factor to enfore foot clearance to PAW_Z_TARGET -- w
 PAW_Z_TARGET = 0.020      # Target height (m) of paw during swing phase. v6: 15mm (was 5mm before that). auto_iter3: 25mm -- after FAC_HEADING=5.0 the policy went front-heavy and let the back feet drag at ~10mm; FAC_CLEARANCE penalizes squared deviation from this target both ways, so raising it pushes the dragging back feet up hard while easing the over-high front feet. Matches what v6 actually achieved (~23mm).
 FAC_JITTER = 0.1          # Punish joints reversing direction frame-to-frame (adapted from bmabsout/opencat-gym's change_direction idea) -- discourages jittering/shuffling in place instead of real steps
 FAC_STRIDE = 0.0         # Reward per-foot forward distance between consecutive ground contacts (touchdown->touchdown = real stride length). Cannot be gamed by fast air-flicks like Run 4's swing-velocity version. Added in Run 5 iter3 to counter domain randomization's pull toward a timid tiny-step shuffle. First guess -- tune.
+FAC_HEIGHT = 4.0          # gait-refinement G1: ramped penalty on (base_z - HEIGHT_TARGET)^2 -- hold a target ride height, kill the crouch/collapse failure mode (URMA weights this heavily)
+HEIGHT_TARGET = 0.072     # m. Measured from a clean cov_r1_slope walk (mean 0.074, p10 0.070). URDF loads at 0.08.
+FAC_JOINT_LIMIT = 2.0     # gait-refinement G1: ramped soft-barrier penalty as any joint nears +/-BOUND_ANG
+JOINT_LIMIT_MARGIN = 0.20 # rad from the limit where the barrier starts
+FAC_FOOT_PHASE = 1.5      # gait-refinement G1: ramped -- reward a diagonal-pair stance pattern, penalise non-trot contact sets (temporal symmetry, contact-based so it can't be phase-misaligned)
 FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-left swinging together, opposite to front-left+back-right, like a real quadruped. Applied unramped (not scaled by PENALTY_STEPS) so this shapes gait structure from step 1, rather than risking the policy settling into a different pattern early and getting disrupted later (the mechanism behind full_run_v1's late-training collapse). v6 and earlier: 2.0. auto_iter4: raised to 3.5 after auto_iter3 (PAW_Z_TARGET bump) loosened the trot to -0.45 correlation; a crisper diagonal trot is also left/right symmetric, so this should tighten heading drift too.
-FAC_IMITATION = 10.0     # Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
+FAC_IMITATION = 11.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. G4b: 16 -> 11 -- at 16 it was ~15 pts vs ~4 for speed, drowning the speed command; the phase-rate scaling (PHASE_RATE_NOM_CMD) is the real fix, this just rebalances. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
 IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
@@ -108,6 +123,16 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
 PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
+
+# G4b: the wkF phase advances at a rate PROPORTIONAL to the commanded speed, so
+# the imitation reference itself is a slow gait for a creep command and a fast
+# gait for a fast command. Before this the phase clock was fixed -> "match wkF"
+# meant "walk at wkF's one cadence" and the imitation reward (dominant term)
+# fought the speed-track reward, so speed commands did nothing. NOM_CMD is the
+# cmd_fwd that maps to wkF's native cadence (phase rate 1.0).
+PHASE_RATE_NOM_CMD = 0.10
+PHASE_RATE_MIN = 0.35
+PHASE_RATE_MAX = 1.60
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
@@ -169,6 +194,19 @@ RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. s
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
 RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
+
+# --- gait-refinement G3: sim-to-real domain randomisation -----------------
+PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
+PAYLOAD_MASS_RAND = 0.035  # +/- kg. G4: 0.015 -> 0.035 (40-110 g range). The payload is bolted on so
+                           # PAYLOAD_PROB is now 1.0 -- instead of ever training a bare robot, widen the
+                           # mass so the policy keeps margin for a draining battery / heavier final camera
+                           # without over-fitting to one exact inertia (phase2's failure mode).
+PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only)
+PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
+ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
+ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
+TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
+FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 
 # --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
@@ -193,7 +231,7 @@ LENGTH_TILT_HISTORY = 12  # Run 7: steps of (roll, pitch) history in the observa
 # Size of observation space:
 # [ 30*8 joint history | quaternion(4) gyro(2) time_phase(1)
 #   | 12*2 tilt history | roll/pitch angular-accel(2) ]      (Run 7 adds the last two)
-SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2  # +3 = proj_gravity (surv_r12)
+SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 2 + 2 + 2  # +3 proj_gravity (surv_r12); +2 [cmd_fwd,cmd_yaw] (gait-refinement G2)
 
 
 class OpenCatGymEnv(gym.Env):
@@ -307,8 +345,12 @@ class OpenCatGymEnv(gym.Env):
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0].astype(float)
         if RESIDUAL_MODE and WKF_REF is not None:
-            # policy modulates the scripted wkF pose; action=0 -> open-loop wkF
-            ref = WKF_REF[int(self._phase) % len(WKF_REF)]
+            # gait-refinement G2: stand -> hold STAND_POSE; else wkF fwd or reversed
+            self._is_stand = abs(self._cmd_fwd) < STAND_FWD_THRESH
+            if self._is_stand:
+                ref = STAND_POSE
+            else:
+                ref = WKF_REF[int(self._phase) % len(WKF_REF)]
             joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
@@ -399,6 +441,23 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
+        # gait-refinement G1: hold a target ride height
+        height_penalty = (base_clearance - HEIGHT_TARGET) ** 2
+        # gait-refinement G1: soft barrier as any commanded joint nears its limit
+        _jl = np.maximum(0.0, np.abs(joint_angs) - (self.bound_ang - JOINT_LIMIT_MARGIN))
+        joint_limit_penalty = float(np.sum(_jl ** 2))
+        # gait-refinement G1: diagonal-stance pattern. paw_contact order [LF,RF,RB,LB];
+        # a clean trot has exactly one diagonal down: {RF,LB}=(1,3) or {LF,RB}=(0,2).
+        _down = frozenset(i for i in range(4) if paw_contact[i])
+        if _down in (frozenset((1, 3)), frozenset((0, 2))):
+            foot_phase_pen = 0.0
+        elif len(_down) == 2:            # two down but not a diagonal (e.g. both front)
+            foot_phase_pen = 0.4
+        elif len(_down) in (1, 3):
+            foot_phase_pen = 0.7
+        else:                           # 0 or 4 feet down -- not a trot at all
+            foot_phase_pen = 1.0
+
         # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
         if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
             joint_angs[self._stuck_joint] = self._stuck_angle
@@ -409,8 +468,11 @@ class OpenCatGymEnv(gym.Env):
                                     self.joint_id,
                                     p.POSITION_CONTROL,
                                     joint_angs,
-                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2))
+                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
         p.stepSimulation() # Delay of data transfer
+        # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
+        _js = p.getJointStates(self.robot_id, self.joint_id)
+        power_use = float(sum(abs(j[3]) * abs(j[1]) for j in _js))
 
         # Normalize joint_angs
         joint_angs[0] /= self.bound_ang
@@ -461,7 +523,18 @@ class OpenCatGymEnv(gym.Env):
         # the stride beat and isn't hit by the imitation penalty for stepping
         # off-phase to catch itself -- it re-syncs once level. time_obs and the
         # wkF imitation reference both read self._phase.
-        self._phase += PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0
+        # gait-refinement G2: phase runs forward or backward with the command; frozen while standing
+        if getattr(self, '_is_stand', False):
+            pass
+        else:
+            _pd = 1.0 if self._cmd_fwd >= 0 else -1.0
+            _prate = float(np.clip(abs(self._cmd_fwd) / PHASE_RATE_NOM_CMD,
+                                   PHASE_RATE_MIN, PHASE_RATE_MAX))
+            self._phase += _pd * _prate * (PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0)
+        # mid-episode command changes -> start/stop/transition practice
+        if getattr(self, '_forced_cmd', None) is None and np.random.rand() < CMD_RESAMPLE_PROB:
+            self._sample_command()
+        self._cmd_heading += self._cmd_yaw / CONTROL_HZ
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
@@ -469,7 +542,7 @@ class OpenCatGymEnv(gym.Env):
         obs_ang, obs_vel_clip = state_ang, state_vel_clip
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
         if gyro_n:
-            obs_ang = np.array(state_ang) + np.random.normal(0.0, gyro_n, 4)
+            obs_ang = np.clip(np.array(state_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
             obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
             ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
         # Tilt history (Run 7): last LENGTH_TILT_HISTORY steps of (roll, pitch),
@@ -482,7 +555,9 @@ class OpenCatGymEnv(gym.Env):
         _rot = np.asarray(p.getMatrixFromQuaternion(obs_ang)).reshape(3, 3)
         proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)  # gravity in body frame
         self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
-                                           self.tilt_history, ang_acc))
+                                           self.tilt_history, ang_acc,
+                                           [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
         # Penalty and reward
@@ -514,14 +589,17 @@ class OpenCatGymEnv(gym.Env):
 
         z_velocity = p.getBaseVelocity(self.robot_id)[0][2]
 
+        # gait-refinement G2: yaw term tracks the *commanded* yaw rate
         body_stability = (FAC_STABILITY * (state_vel_clip[0]**2
                                           + state_vel_clip[1]**2)
                                           + FAC_Z_VELOCITY * z_velocity**2
-                                          + FAC_YAW * yaw_rate_clip**2)
+                                          + FAC_YAW_TRACK * (state_vel_raw[2] - self._cmd_yaw) ** 2)
 
         # Accumulated-heading penalty -- its own term (not folded into
         # body_stability) so its contribution shows up separately in info.
-        heading_penalty = FAC_HEADING * heading_error_clip**2
+        # gait-refinement G2: track the integrated commanded heading (cmd_yaw=0 -> hold straight)
+        _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+        heading_penalty = FAC_HEADING * _herr ** 2
 
         # Imitation reward: match Bittle's built-in wkF walk at the current gait
         # phase. DeepMimic-style exp(-sharpness * sum sq per-joint error), in
@@ -529,7 +607,8 @@ class OpenCatGymEnv(gym.Env):
         # the reference the same way.
         imitation_reward = 0.0
         if FAC_IMITATION > 0 and WKF_REF is not None:
-            ref = WKF_REF[int(self._phase) % len(WKF_REF)] / self.bound_ang
+            _iref = STAND_POSE if getattr(self, '_is_stand', False) else WKF_REF[int(self._phase) % len(WKF_REF)]
+            ref = _iref / self.bound_ang
             imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
             # R3: fade the imitation reward while stumbling (prev-step tilt over
@@ -572,22 +651,38 @@ class OpenCatGymEnv(gym.Env):
                       / ((len(self._x_window) - 1) / CONTROL_HZ))
         else:
             vx_est = 0.0
+        # gait-refinement G2: body-frame forward speed (correct under a turn), windowed
+        _wv = np.asarray(p.getBaseVelocity(self.robot_id)[0])
+        _yaw_now = p.getEulerFromQuaternion(state_ang)[2]
+        _vf_inst = _wv[0] * np.cos(_yaw_now) + _wv[1] * np.sin(_yaw_now)
+        self._vf_window.append(_vf_inst)
+        if len(self._vf_window) > SPEED_WINDOW:
+            self._vf_window.pop(0)
+        v_fwd = float(np.mean(self._vf_window))
         # Hard floor: below MIN_SPEED, a steep linear penalty so the residual
         # policy cannot learn to stall the wkF walk (r1 failure mode).
         # surv_r5/r12: suspend the speed floor while wobbling -- slowing to catch a
         # stumble must not be punished. Active only when the body is ~upright.
-        min_speed_penalty = (FAC_MIN_SPEED * max(0.0, MIN_SPEED - vx_est)
-                             if tilt < BALANCE_TILT_ON else 0.0)
-        overspeed_penalty = FAC_OVERSPEED * max(0.0, vx_est - TARGET_SPEED)
-        speed_reward = FAC_SPEED * np.exp(
-            -SPEED_SHARPNESS * ((vx_est - TARGET_SPEED) / TARGET_SPEED) ** 2)
+        # gait-refinement G2: track the commanded forward speed (band 0.02 m/s).
+        _spd_err = v_fwd - self._cmd_fwd
+        _spd_den = max(0.02, abs(self._cmd_fwd))   # G4: 0.03 -> 0.02, sharper gradient at low cmd
+        speed_reward = FAC_SPEED * np.exp(-SPEED_SHARPNESS * (_spd_err / _spd_den) ** 2)
+        # G4: proportional tracking band (was flat 0.02) -- a 0.02 slop on a 0.04
+        # creep command let the policy walk at cruise for free. 15% of |cmd|, floor 12 mm/s.
+        _spd_band = max(0.012, 0.15 * abs(self._cmd_fwd))
+        speed_track_penalty = (FAC_SPEED_TRACK * max(0.0, abs(_spd_err) - _spd_band)
+                               if tilt < BALANCE_TILT_ON else 0.0)
+        min_speed_penalty = 0.0        # superseded by speed_track_penalty
+        overspeed_penalty = 0.0
 
+        # gait-refinement G2: reward progress IN THE COMMANDED DIRECTION, capped at
+        # the commanded per-step displacement. No progress reward while standing.
         movement_forward = current_position - last_position
-        # Forward-progress reward capped at the walk set-point: rewards progress
-        # up to TARGET_SPEED's per-step displacement, nothing above, so it no
-        # longer competes with the speed tracker. Backward motion still stings.
-        capped_forward = (min(movement_forward, TARGET_SPEED / CONTROL_HZ)
-                         if MOVEMENT_CAP_AT_TARGET else movement_forward)
+        if abs(self._cmd_fwd) < STAND_FWD_THRESH:
+            capped_forward = 0.0
+        else:
+            _dir = np.sign(self._cmd_fwd)
+            capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
         # Scripted-gait lessons (docs/rl-runs/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
@@ -612,6 +707,7 @@ class OpenCatGymEnv(gym.Env):
                  - residual_cost
                  - min_speed_penalty
                  - overspeed_penalty
+                 - speed_track_penalty
                  - penalty_scale * (
                     smooth_movement + body_stability
                     + heading_penalty
@@ -620,7 +716,11 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
-                    + FAC_JITTER * jitter_penalty))
+                    + FAC_JITTER * jitter_penalty
+                    + FAC_HEIGHT * height_penalty
+                    + FAC_JOINT_LIMIT * joint_limit_penalty
+                    + FAC_FOOT_PHASE * foot_phase_pen
+                    + FAC_POWER * power_use))
 
         # Set state of the current state.
         terminated = False
@@ -642,6 +742,10 @@ class OpenCatGymEnv(gym.Env):
             "r_resid_smooth": -penalty_scale * resid_smooth_cost,
             "r_min_speed": -min_speed_penalty,
             "r_overspeed": -overspeed_penalty,
+            "r_speed_track": -speed_track_penalty,
+            "cmd_fwd": self._cmd_fwd,
+            "cmd_yaw": self._cmd_yaw,
+            "v_fwd_mps": v_fwd,
             "r_survive_step": survive_step_reward,
             "r_survive_bonus": 0.0,
             "r_smooth_movement": -penalty_scale * smooth_movement,
@@ -651,6 +755,11 @@ class OpenCatGymEnv(gym.Env):
             "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
             "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
+            "r_height": -penalty_scale * FAC_HEIGHT * height_penalty,
+            "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
+            "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
+            "base_height_m": base_clearance,
+            "r_power": -penalty_scale * FAC_POWER * power_use,
         }
 
         # Stop criteria of current learning episode:
@@ -742,6 +851,41 @@ class OpenCatGymEnv(gym.Env):
                         reward, terminated, truncated, info)
 
 
+    def set_command(self, fwd=None, yaw=None):
+        """Force the locomotion command (eval / deployment). Persists across resets."""
+        self._forced_cmd = (fwd, yaw)
+        if fwd is not None:
+            self._cmd_fwd = float(np.clip(fwd, -0.10, CMD_FWD_MAX))
+        if yaw is not None:
+            self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+
+    def _sample_command(self):
+        if getattr(self, '_forced_cmd', None) is not None:
+            fwd, yaw = self._forced_cmd
+            if fwd is not None:
+                self._cmd_fwd = float(np.clip(fwd, -0.10, CMD_FWD_MAX))
+            if yaw is not None:
+                self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+            return
+        r = np.random.rand()
+        # G4: turning dropped from the curriculum. The yaw command trained to zero
+        # effect in phase2 and fought heading-hold. cmd_yaw is now always 0, so the
+        # heading term (FAC_HEADING vs _cmd_heading) rewards holding the launch
+        # heading -- drift-free straight-line walking. Real turns go to firmware.
+        self._cmd_yaw = 0.0
+        # G4: explicit low / mid / top speed bands with heavy weight on the
+        # extremes, so creep and fast stop collapsing toward cruise.
+        if r < 0.32:        # cruise (mid)
+            self._cmd_fwd = np.random.uniform(0.08, 0.12)
+        elif r < 0.52:      # creep (low)
+            self._cmd_fwd = np.random.uniform(0.02, 0.055)
+        elif r < 0.70:      # fast (top)
+            self._cmd_fwd = np.random.uniform(0.115, CMD_FWD_MAX)
+        elif r < 0.87:      # stand
+            self._cmd_fwd = np.random.uniform(-0.01, 0.02)
+        else:              # backward
+            self._cmd_fwd = np.random.uniform(-0.09, -0.03)
+
     def reset(self, seed=None, options=None):
         self.step_counter = 0
         self.arm_contact = 0
@@ -760,6 +904,13 @@ class OpenCatGymEnv(gym.Env):
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
         self._prev_action = np.zeros(8)  # rtune_r4: for the residual-smoothness penalty
+        # gait-refinement G2: locomotion command for this episode
+        self._cmd_fwd = 0.0
+        self._cmd_yaw = 0.0
+        self._cmd_heading = 0.0          # integral of cmd_yaw -- the heading the policy should be holding
+        self._vf_window = []             # body-frame forward-speed estimate window
+        self._forced_cmd = getattr(self, '_forced_cmd', None)
+        self._sample_command()
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
         self._x_window = []
@@ -784,8 +935,26 @@ class OpenCatGymEnv(gym.Env):
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
-        plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
-                              p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+        _rough = (ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+                  and np.random.rand() < ROUGH_TERRAIN_PROB)
+        if _rough:
+            _n = 64
+            _amp = ROUGH_TERRAIN * 0.018 * self._dr
+            _h = np.random.uniform(-1, 1, (_n, _n))
+            for _ in range(2):
+                _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, -1, 0)
+                      + np.roll(_h, 1, 1) + np.roll(_h, -1, 1)) / 5.0
+            _h = (_h - _h.mean()) * _amp
+            _hf = p.createCollisionShape(
+                p.GEOM_HEIGHTFIELD, meshScale=[0.06, 0.06, 1.0],
+                heightfieldData=_h.flatten().astype(np.float64).tolist(),
+                numHeightfieldRows=_n, numHeightfieldColumns=_n)
+            plane_id = p.createMultiBody(0, _hf)
+            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])
+            self._slope_rp = (0.0, 0.0)
+        else:
+            plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
+                                  p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
@@ -816,6 +985,25 @@ class OpenCatGymEnv(gym.Env):
         self.robot_id = p.loadURDF(urdf_path + "bittle_esp32.urdf", 
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
+
+        # gait-refinement G3: welded rear payload (Pi + PiSugar + camera)
+        self._payload_id = None
+        if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
+            pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
+            pj = np.random.uniform(-0.003, 0.003, 3)
+            off = [PAYLOAD_POS[0] + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
+            self._payload_id = p.createMultiBody(
+                baseMass=float(pm), baseCollisionShapeIndex=-1,
+                basePosition=[start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
+            _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
+                                    p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
+            p.changeConstraint(_c, maxForce=5e3)
+
+        # gait-refinement G3: per-joint motor-force scale (overheat cutback)
+        self._torque_scale = np.ones(8)
+        if TORQUE_CUTBACK > 0 and self._dr > 0 and np.random.rand() < 0.4:
+            k = np.random.choice(8, np.random.randint(1, 4), replace=False)
+            self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._dr, 1.0, len(k))
         
         # Initialize urdf links and joints.
         self.joint_id = []
@@ -879,7 +1067,9 @@ class OpenCatGymEnv(gym.Env):
                                            proj_grav,
                                            [time_obs],
                                            self.tilt_history,      # all zeros at reset (level)
-                                           np.zeros(2)))           # ang accel
+                                           np.zeros(2),            # ang accel
+                                           [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
 
 
         # Initialize robot state history with reset position

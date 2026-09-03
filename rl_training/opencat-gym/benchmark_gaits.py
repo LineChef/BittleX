@@ -186,6 +186,8 @@ def main():
               " (scripted stays the pure open-loop baseline) ***")
 
     env = OpenCatGymEnv()
+    if hasattr(env, 'set_command'):        # gait-refinement: measure on a fixed cruise-forward command
+        env.set_command(fwd=0.10, yaw=0.0)
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
@@ -253,8 +255,10 @@ def main():
             json.dump(results, f, indent=2)
 
 
-def _render(env, model, out):
+def _render(env, model, out, seed=None):
     from PIL import Image
+    if seed is not None:
+        np.random.seed(seed)          # same course for learned vs scripted GIF
     obs, _ = env.reset()
     if hasattr(model, "reset"):
         model.reset()

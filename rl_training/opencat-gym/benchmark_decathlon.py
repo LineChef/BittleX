@@ -54,12 +54,39 @@ LADDER = [
     ("T5.1", 5, "everything",     "The gauntlet: slope + obstacles + repeated shoves",
         {"SLOPE_FIXED_RP": (D(4), D(9)), "RANDOM_TERRAIN": 0.040,
          "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25}),
+
+    # T6: the hardened tier. With the payload on, both gaits are essentially
+    # unfallable on terrain/shove stress -- even -24 deg descents and a 20 deg
+    # brutal gauntlet give 0% falls. So T6 is NOT scored on fall rate; it is
+    # scored on COMMANDED PROGRESS + speed retention + heading drift under
+    # extreme stress. T6.1 (steep descent: learned walks down, scripted slides
+    # back) and T6.5 (weak servos: the one failure mode the payload's inertia
+    # cannot mask) are the real discriminators.
+    ("T6.1", 6, "slopes",         "Extreme down  (-24 deg)",
+        {"SLOPE_FIXED_RP": (0.0, D(-24))}),
+    ("T6.2", 6, "obstacles",      "Huge obstacles  (85 mm) + push",
+        {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35}),
+    ("T6.3", 6, "stumble-catch",  "Brutal shoves  (1.00 @ 0.018)",
+        {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25}),
+    ("T6.4", 6, "everything",     "Brutal gauntlet: 20 deg slope + 70 mm + brutal shoves",
+        {"SLOPE_FIXED_RP": (D(8), D(20)), "RANDOM_TERRAIN": 0.070,
+         "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45}),
+    ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg descent",
+        {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))}),
 ]
 
-GIF_CELLS = {"T1.1": "easy", "T4.3": "hard", "T5.1": "brutal"}
+GIF_CELLS = {"T5.1": "gauntlet"}   # replays: only the everything-at-once course
 _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean",
             "diagonal_trot_corr_mean", "yaw_rate_rms_deg_mean", "lat_offset_max_m_mean",
             "recovery_events", "recovery_time_steps_mean", "big_stumble_recovery_rate"]
+
+
+# sim2real DR that is NOT part of any cell's declared difficulty. "full" leaves
+# the env module defaults (payload 90%, rough patch 35%, torque cutback 40%);
+# "clean" removes all three so a cell tests exactly its label; "payload" removes
+# rough + cutback but forces the Pi/camera payload on every episode so its cost
+# can be read directly against the "clean" run.
+_EXTRA_DR = "full"
 
 
 def _apply(cell_knobs):
@@ -72,6 +99,14 @@ def _apply(cell_knobs):
     opencat_gym_env.RANDOM_PUSH_PROB = 0.03
     opencat_gym_env.IMPULSE_PUSH_PROB = 0.0
     opencat_gym_env.DR_EVAL_FULL = True
+    if _EXTRA_DR == "clean":
+        opencat_gym_env.PAYLOAD_PROB = 0.0
+        opencat_gym_env.ROUGH_TERRAIN = 0.0
+        opencat_gym_env.TORQUE_CUTBACK = 0.0
+    elif _EXTRA_DR == "payload":
+        opencat_gym_env.PAYLOAD_PROB = 1.0
+        opencat_gym_env.ROUGH_TERRAIN = 0.0
+        opencat_gym_env.TORQUE_CUTBACK = 0.0
     for k, v in cell_knobs.items():
         setattr(opencat_gym_env, k, v)
 
@@ -84,14 +119,23 @@ def main():
     ap.add_argument("--seed", type=int, default=1000)
     ap.add_argument("--json-out", required=True)
     ap.add_argument("--gif-dir", default=None)
+    ap.add_argument("--extra-dr", choices=("full", "clean", "payload"), default="full",
+                    help="non-cell DR: full=env defaults, clean=no payload/rough/cutback, "
+                         "payload=payload forced on, rough+cutback off")
     args = ap.parse_args()
+
+    global _EXTRA_DR
+    _EXTRA_DR = args.extra_dr
 
     opencat_gym_env.ADAPTIVE_PUSH = False        # training-time curriculum state -- off for eval
     env = OpenCatGymEnv()
+    if hasattr(env, 'set_command'):        # gait-refinement: measure on a fixed cruise-forward command
+        env.set_command(fwd=0.10, yaw=0.0)
     learned = _load_learned(args.learned)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
-    out = {"learned_path": args.learned, "episodes": args.episodes, "cells": []}
+    out = {"learned_path": args.learned, "episodes": args.episodes,
+           "extra_dr": args.extra_dr, "scripted_balance": args.scripted_balance, "cells": []}
     for cid, tier, skill, label, knobs in LADDER:
         _apply(knobs)
         print(f"\n=== {cid}  T{tier}  {label} ===", flush=True)
@@ -115,8 +159,8 @@ def main():
         if args.gif_dir and cid in GIF_CELLS:
             os.makedirs(args.gif_dir, exist_ok=True)
             tag = GIF_CELLS[cid]
-            _render(env, learned, os.path.join(args.gif_dir, f"{tag}_learned.gif"))
-            _render(env, scripted, os.path.join(args.gif_dir, f"{tag}_scripted.gif"))
+            _render(env, learned, os.path.join(args.gif_dir, f"{tag}_learned.gif"), seed=args.seed)
+            _render(env, scripted, os.path.join(args.gif_dir, f"{tag}_scripted.gif"), seed=args.seed)
 
     env.close()
     with open(args.json_out, "w") as f:
