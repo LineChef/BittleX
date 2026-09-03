@@ -74,12 +74,13 @@ def main():
     args = ap.parse_args()
 
     if args.latest:
-        import glob
-        cks = sorted(glob.glob("trained/checkpoints/*_steps.zip"),
-                    key=lambda f: int(f.split("_")[-2]))
+        import glob, os
+        cks = glob.glob("trained/checkpoints/*_steps.zip")
         if cks:
-            args.model = cks[-1][:-4]
+            args.model = max(cks, key=os.path.getmtime)[:-4]   # newest file, not highest step number
             print(f"--latest -> {args.model}")
+        else:
+            print("--latest: no checkpoints found, using", args.model)
 
     if args.list:
         print("challenges:")
