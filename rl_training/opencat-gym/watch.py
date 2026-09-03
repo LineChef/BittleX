@@ -57,6 +57,7 @@ CHALLENGES = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="trained/run20m_ppo")
+    ap.add_argument("--latest", action="store_true", help="use the newest trained/checkpoints/*_steps.zip")
     ap.add_argument("--challenge", default="flat", choices=list(CHALLENGES))
     ap.add_argument("--cmd", type=float, default=0.10, help="forward speed command m/s")
     ap.add_argument("--speed", type=float, default=1.0, help="playback speed (1 = ~realtime)")
@@ -71,6 +72,14 @@ def main():
                          "obstacle-course defaults to 2000 so you can watch a long traverse)")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
+
+    if args.latest:
+        import glob
+        cks = sorted(glob.glob("trained/checkpoints/*_steps.zip"),
+                    key=lambda f: int(f.split("_")[-2]))
+        if cks:
+            args.model = cks[-1][:-4]
+            print(f"--latest -> {args.model}")
 
     if args.list:
         print("challenges:")
