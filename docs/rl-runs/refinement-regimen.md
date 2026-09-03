@@ -137,3 +137,27 @@ back).
 - Keeps turning-removed, payload-always-on 40-110 g, G3 DR.
 - Re-judge against the same rubric. If speed modulation tracks + reward still
   climbing at 3M -> that's the 20M candidate.
+
+### Phase 3b result -> 20M GO (2026-09-03, ~00:30)
+
+**Phase 3b** (`phase3b_ppo`, G4b recipe, from-scratch 10M, both gates passed) --
+decision packet: artifact "Phase 3b Go / No-Go". **GO for the 20M.**
+
+The G4b phase-clock fix (`self._phase += clip(|cmd_fwd|/0.10, 0.35, 1.60)` per step;
+`FAC_IMITATION` 16->11) resolved the Phase 3 blocker: speed modulation now tracks
+-- creep 0.04 -> 0.033, cruise 0.10 -> 0.104, fast 0.13 -> 0.123, speed-track err
+0.006 m/s ("good" vs Phase 3's 0.030). Per-term reward is balanced now: imitation
+~10 / speed ~4 / speed_track ~-0.3 (Phase 3 was imitation +15 vs speed +0.8 at
+creep). Rubric: 6/8 PASS, 1 WEAK (T6 can't induce a fall with the payload on --
+known limit), 0 FAIL. Reward plateaus ~3M then flattens as the linear LR schedule
+decays to ~0; the 10M checkpoint benchmarks *better* than 5M, so not capped/
+degrading. Payload-on decathlon: 0% falls on all 15 cells + all 5 T6 cells, beats
+scripted on distance across the obstacle cells.
+
+Concern (not a gate): bare-robot canary regressed vs Phase 3 -- clean gauntlet
+68% -> 89%, weak-servos+descent 0% -> 100%. No deployment impact (payload always
+mounted); near-zero bare-robot margin. Phase 4 to watch it.
+
+**20M run** (`run20m`, from-scratch 20M, G4b recipe frozen) launched 2026-09-03
+00:03. Bailout gates 1M/3M. On completion: mid-run drift check (10M ckpt vs final)
++ full decathlon (payload/clean/T6) + commanded + 14-cell -> final scorecard.
