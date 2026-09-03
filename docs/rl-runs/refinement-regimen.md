@@ -190,3 +190,48 @@ convergence (~3M) instead of drifting for 15M more steps under a still-live LR.
 **Next:** Phase 4 stance-recovery as a reversible continuation on `run20m_ppo`
 (ledge/step-down terrain, re-enabled phase-slow, diagonal-stance-recovery reward),
 tracking bare-robot shove-recovery margin. Then ONNX export + hardware.
+
+---
+
+## Phase 4 -- stance recovery -- COMPLETE (2026-09-03). NO GAIT CHANGE.
+
+Three continuation rounds on `run20m_ppo`, ~3.5M steps each. None produced a
+keeper. `run20m_ppo` is unchanged and remains the hardware base gait. Full log:
+`docs/rl-runs/phase4-decision-log.md`. Report artifact: "Phase 4 Gait Post-Mortem".
+
+| round | change | outcome |
+|---|---|---|
+| 4a | ledge terrain in training DR (25 mm, 30% of eps, up/down) | **revert** -- nominal walk ~50% slower, ledge handling worse (G2 backs away from steps) |
+| 4b | revive tilt phase-slow + fade imitation reward during a wobble | **diverged** -- approx_kl 40-670, auto-bailed at 3M (0.018 m/s). 3rd failure of phase-clock surgery; lever retired |
+| 4c | diagonal-support catch bonus + widen residual 22->27 deg while tilted | **no-op** -- first clean continuation, walk fully preserved, zero measurable recovery gain, reverted |
+
+### The finding that mattered: every `--from` continuation was diverging
+
+`train.py`'s finetune path restarted `linear_schedule(3e-4)` -- the full
+from-scratch LR -- on a converged, `std~0.06` policy. Result: `clip_fraction`
+~0.99, `approx_kl` 70-400 (run20m from-scratch: ~0.01). The converged policy was
+flung into an arbitrary nearby basin every time -- 4a landed timid, 4b landed
+non-walking. **Neither 4a nor 4b was a controlled test of its reward idea.**
+
+Fix (commit `bcf20fd`): `train.py --finetune-lr` (constant, default 3e-5) +
+`--finetune-target-kl` (0.05, SB3 update early-stop); `run_with_bailout.py`
+forwards both. 4c ran at `kl ~0.03` and preserved the walk exactly. Phase 2/3
+continuations used the old path too -- they were kicked but re-converged over
+their length; conclusions stand, but re-run 4a's ledge test cleanly.
+
+### Recovery cannot be measured with the payload on
+
+`recovery_events` logged 0.000 for both gaits on all 25 payload-decathlon cells --
+the 75 g payload keeps the body out of the >0.6 rad catch band. New tool
+`benchmark_recovery.py` (payload off, rough terrain, calibrated shoves) is the
+real instrument. 4c vs run20m on it: fall rate 48% vs 50%, net progress 0.166 vs
+0.161 -- identical. `FAC_BALANCE=4.0` is near the ceiling a residual-gait policy
+reaches; a real recovery gain needs the shaping in a from-scratch run, or the
+hardware-in-the-loop tuning phase.
+
+**Kept:** the finetune fix, `benchmark_recovery.py`, the ledge primitive + T7
+tier + `render_showcase.py` (all inert in training, used by eval/probes/report).
+
+**Next:** (optional) clean re-run of the 4a ledge test at `--finetune-lr 1e-4`,
+smaller ledge. Otherwise -> ONNX export + hardware bring-up. `run20m_ppo` needs
+no re-validation.

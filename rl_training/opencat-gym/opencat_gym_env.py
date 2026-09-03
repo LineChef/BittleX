@@ -89,7 +89,7 @@ FAC_GAIT_SYMMETRY = 3.5   # Reward a diagonal trot pattern: front-right+back-lef
 FAC_IMITATION = 11.0     # gait-refinement G1: 10 -> 16, anchor for the wider residual. G4b: 16 -> 11 -- at 16 it was ~15 pts vs ~4 for speed, drowning the speed command; the phase-rate scaling (PHASE_RATE_NOM_CMD) is the real fix, this just rebalances. Reward matching Bittle's built-in `wkF` walk gait (reference_gait/wkf_ref.npy, 100 phase-frames aligned to TIME_PHASE_PERIOD). DeepMimic-style: exp(-IMITATION_SHARPNESS * sum sq per-joint error), in [0,1]. Dense 8-joint target -- a much stronger, less-gameable gait signal than FAC_GAIT_SYMMETRY / FAC_STRIDE. Default 0; enable HEAVY (~20-40) for imitation runs so the policy mimics wkF while adapting only as much as staying upright forces. Verified: open-loop playback walks the URDF +0.48m without falling, direct joint mapping, no sign flips.
 IMITATION_SHARPNESS = 2.0 # higher = stricter match required for the same reward
 IMITATION_TILT_FADE = 0.6  # rad; above this tilt (prev step) the imitation reward is scaled down so it doesn't fight a recovery
-IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling
+IMITATION_FADE_FACTOR = 1.0 # imitation reward multiplier while stumbling. Phase 4b set this to 0.30 and PPO diverged (approx_kl 40-670): the reward flickering full<->0.3x every few steps as tilt crossed IMITATION_TILT_FADE was unfittable. Reverted; do not re-touch without a hysteresis band + a much lower fixed LR.
 
 # --- Fall recovery / self-righting -------------------------------------------
 # Normally is_fallen() (roll or pitch > 1.3 rad) ends the episode instantly with
@@ -114,6 +114,12 @@ BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 BALANCE_W_ANGLE = 1.0      # weight on frame-to-frame tilt-angle reduction
 BALANCE_W_RATE = 0.6       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
 BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get feet down"
+# Phase 4c tried BALANCE_W_DIAG (bonus for a complete diagonal support pair during
+# a catch) + RESIDUAL_RECOVER_DEG (widen the residual 22->27 while tilted). Clean
+# finetune from run20m_ppo (kl ~0.03), walk fully preserved -- but a bare-robot
+# shove probe showed NO recovery gain: fall rate 48% vs 50%, net progress
+# unchanged. Reverted as a no-op. Stance recovery beyond today's FAC_BALANCE
+# isn't reachable by a conservative continuation of the converged 20M policy.
 
 # Phase clock (Run 7): the wkF phase index normally advances one step per control
 # step. While the body is tilted past PHASE_SLOW_TILT it advances at PHASE_SLOW_RATE
@@ -122,7 +128,7 @@ BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get
 # off-phase step and re-sync once level. Both time_obs and the imitation reference
 # read this same counter.
 PHASE_SLOW_TILT = 0.6      # rad
-PHASE_SLOW_RATE = 1.0      # R2: pause DISABLED (1.0 = phase always advances normally). R1's pause also froze the imitation reference during a wobble, making the imitation reward fight the catch; revisit with a fixed clock + reduced imitation weight instead.
+PHASE_SLOW_RATE = 1.0      # DISABLED (1.0 = phase always advances normally). Tried again in Phase 4b paired with an imitation-weight fade -> PPO diverged (approx_kl 40-670, clip_fraction 0.995) because the imitation reward flickered full<->0.3x as tilt crossed this threshold every few steps. Third failure of phase-clock surgery (R1 destabilised, R2 disabled, 4b blew up). Not revisiting -- stance recovery goes through the FAC_BALANCE catch-band shaping instead.
 
 # G4b: the wkF phase advances at a rate PROPORTIONAL to the commanded speed, so
 # the imitation reference itself is a slow gait for a creep command and a fast
@@ -223,6 +229,15 @@ SUSTAINED_FORCE_PROB = 0.004
 SUSTAINED_FORCE_STEPS = 25
 DEFORM_GROUND = 0.0     # 0..1 randomize ground contact stiffness/damping/restitution. Expensive (soft-contact solver); folded into R7 consolidation at 0.2 only.
 SLIP_PATCH = 0.0        # R2 REVERTED: slip patch on flat ground can't destabilise (0 falls either gait); training on it only diluted the useful signal. See coverage log.
+
+# Phase 4: a single sharp step spanning the whole walking lane -- a door sill,
+# area-rug edge, low curb. Unavoidable (unlike _scatter_obstacles, which the gait
+# clears most of). The realistic disturbance the payload's inertia doesn't paper
+# over. LEDGE_HEIGHT scaled by _dr; realistic indoor range ~0.010-0.040 m.
+LEDGE_HEIGHT = 0.0     # Phase 4a/4b OFF. 4a (25mm/30% into DR) halved the nominal walk and made ledge handling WORSE (robot backs away from steps). Kept for eval-only cells (T7, showcase, ledge probe) which set it directly. Folding curbs/sills into the walk policy is B13 tier-2 -- deferred.
+LEDGE_PROB = 0.0
+LEDGE_DIR = 0          # 0 = random per episode, +1 = step-up only, -1 = step-down only
+LEDGE_RANDOMIZE = False  # training: per-episode uniform height in [8 mm, LEDGE_HEIGHT]; eval leaves this off for an exact height
 
 LENGTH_RECENT_ANGLES = 3  # Buffer to read recent joint angles
 LENGTH_JOINT_HISTORY = 30 # Number of steps to store joint angles.
@@ -973,10 +988,32 @@ class OpenCatGymEnv(gym.Env):
         if RANDOM_TERRAIN > 0 and self._dr > 0:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
 
+        # Phase 4: sharp step across the whole lane. Flat ground only, not with the
+        # rough heightfield (which replaces the plane). Step-up = raised plateau
+        # ahead; step-down = robot starts on a raised block with a drop ahead.
+        self._ledge_h = 0.0
+        self._ledge_dir = 0
+        if (LEDGE_HEIGHT > 0 and self._dr > 0 and SLOPE_FIXED_RP is None and not _rough
+                and np.random.rand() < LEDGE_PROB):
+            self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
+                                   else LEDGE_HEIGHT) * self._dr)
+            self._ledge_dir = LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1]))
+            _lw = 0.30                          # across-path half-width: cannot be side-stepped
+            _edge = 0.11                        # x of the edge -- close, so a ~3 s episode actually
+                                               #  reaches it and has time to attempt the step
+            if self._ledge_dir > 0:            # step UP: plateau from x~_edge forward
+                _hl = 0.70
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[_edge + _hl, 0.0, self._ledge_h / 2])
+            else:                              # step DOWN: block under the robot, drop past x~_edge
+                _hl = 0.60
+                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
+                p.createMultiBody(0, _cs, basePosition=[_edge - _hl, 0.0, self._ledge_h / 2])
+
         _pose_tilt = 0.0
         if START_POSE_JITTER > 0 and self._dr > 0:
             _pose_tilt = np.deg2rad(0.3 * START_POSE_JITTER) * self._dr
-        start_pos = [0, 0, 0.08]
+        start_pos = [0, 0, 0.08 + (self._ledge_h if self._ledge_dir < 0 else 0.0)]
         start_orient = p.getQuaternionFromEuler([
             self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])

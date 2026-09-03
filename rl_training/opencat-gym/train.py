@@ -40,6 +40,14 @@ if __name__ == "__main__":
     parser.add_argument("--from", dest="from_ckpt", default=None,
                         help="finetune from this checkpoint (e.g. trained/auto_gait_final_ppo) "
                              "instead of training a fresh policy")
+    parser.add_argument("--finetune-lr", type=float, default=3e-5,
+                        help="CONSTANT LR for --from finetuning (default 3e-5). The old "
+                             "linear_schedule(3e-4) restart diverged a converged policy every "
+                             "time: approx_kl 70-400, clip_fraction ~0.99 (run20m from-scratch "
+                             "ran at kl ~0.01). Finetuning needs a gentle nudge, not a kick.")
+    parser.add_argument("--finetune-target-kl", type=float, default=0.05,
+                        help="SB3 aborts an update once approx_kl exceeds this (finetune only) -- "
+                             "a hard backstop against the divergence above")
     args = parser.parse_args()
 
     # Set up number of parallel environments
@@ -61,12 +69,16 @@ if __name__ == "__main__":
     )
 
     if args.from_ckpt:
-        # Finetune: load the policy, restart the LR schedule + step count over
-        # this run's --steps so the linear decay spans the finetune window.
-        print(f"finetuning from {args.from_ckpt}")
+        # Finetune: load the policy and nudge it with a low CONSTANT LR plus a
+        # target_kl early-stop. The previous linear_schedule(3e-4) restart on a
+        # converged policy diverged every time (approx_kl 70-400, clip_fraction
+        # ~0.99); see --finetune-lr help.
+        print(f"finetuning from {args.from_ckpt}  "
+              f"(lr={args.finetune_lr}, target_kl={args.finetune_target_kl})")
         model = PPO.load(args.from_ckpt, env=env,
                          n_steps=int(2048*8/parallel_env),
-                         learning_rate=linear_schedule(3e-4),
+                         learning_rate=args.finetune_lr,
+                         target_kl=args.finetune_target_kl,
                          tensorboard_log="trained/tensorboard_logs/")
         model.learn(args.steps, callback=checkpoint_callback,
                     reset_num_timesteps=True)

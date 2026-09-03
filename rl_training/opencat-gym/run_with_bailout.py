@@ -38,7 +38,7 @@ def flat_eval(ckpt, episodes):
     E.GUI_MODE = False
     for k in ("SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB", "SUSTAINED_FORCE",
               "DEFORM_GROUND", "SLIP_PATCH", "RANDOM_TERRAIN", "RANDOM_PUSH", "IMPULSE_PUSH",
-              "RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "PHASE_RAND",
+              "RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "PHASE_RAND", "LEDGE_HEIGHT", "LEDGE_PROB",
               "ROUGH_TERRAIN", "TORQUE_CUTBACK"):
         if hasattr(E, k):
             setattr(E, k, 0.0)
@@ -94,6 +94,8 @@ def main():
     ap.add_argument("--tag", required=True)
     ap.add_argument("--steps", type=float, default=1e7)
     ap.add_argument("--from", dest="from_ckpt", default=None)
+    ap.add_argument("--finetune-lr", type=float, default=None)
+    ap.add_argument("--finetune-target-kl", type=float, default=None)
     args = ap.parse_args()
 
     try:
@@ -104,6 +106,10 @@ def main():
     cmd = [sys.executable, "train.py", "--tag", args.tag, "--steps", str(args.steps)]
     if args.from_ckpt:
         cmd += ["--from", args.from_ckpt]
+    if args.finetune_lr is not None:
+        cmd += ["--finetune-lr", str(args.finetune_lr)]
+    if args.finetune_target_kl is not None:
+        cmd += ["--finetune-target-kl", str(args.finetune_target_kl)]
     print("launch:", " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd)
 
