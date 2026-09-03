@@ -130,6 +130,46 @@ def openloop(lk, cycles, hz):
     print("done (sent rest).")
 
 
+def dry_run(cmd_fwd, seconds, hz):
+    """Full 80 Hz loop with synthetic (near-level) IMU and NO serial -- checks the
+    loop holds rate on this machine before any hardware exists."""
+    pol = ResidualGaitPolicy()
+    pol.set_command(fwd=cmd_fwd, yaw=0.0)
+    rng = np.random.default_rng(0)
+
+    def fake_imu():
+        r, p_, y = rng.normal(0, 0.05, 3)
+        return euler_to_quat(r, p_, y), rng.normal(0, 0.3, 3)
+
+    q, g = fake_imu()
+    pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, g)
+    dt = 1.0 / hz
+    n = int((seconds or 5.0) * hz)
+    step_ms, loop_ms = [], []
+    t_next = time.perf_counter()
+    t_loop = time.perf_counter()
+    print(f"dry-run: {hz} Hz x {n} ticks, cmd_fwd={cmd_fwd}. No serial.")
+    for _ in range(n):
+        q, g = fake_imu()
+        t0 = time.perf_counter()
+        jd = pol.step(q, g)
+        _ = deploy_map.policy_deg_to_move_cmd(jd)          # build the string, don't send
+        step_ms.append((time.perf_counter() - t0) * 1e3)
+        t_next += dt
+        slack = t_next - time.perf_counter()
+        if slack > 0:
+            time.sleep(slack)
+        else:
+            t_next = time.perf_counter()
+        now = time.perf_counter()
+        loop_ms.append((now - t_loop) * 1e3)
+        t_loop = now
+    s = np.array(step_ms); l = np.array(loop_ms[1:])
+    print(f"  policy step : mean {s.mean():.2f} ms  p95 {np.percentile(s,95):.2f}  max {s.max():.2f}")
+    print(f"  loop period : mean {l.mean():.2f} ms  (target {dt*1e3:.2f})  -> {1000/l.mean():.1f} Hz achieved")
+    print(f"  overruns    : {(l > dt*1e3*1.5).sum()} / {len(l)} ticks > 1.5x target")
+
+
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
@@ -219,10 +259,16 @@ def main():
     ap.add_argument("--imu-format", default="auto", choices=("auto", "ypr", "rpy", "6axis"))
     ap.add_argument("--probe-imu", action="store_true")
     ap.add_argument("--openloop", action="store_true")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="full loop with synthetic IMU and no serial -- rate check")
     ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
     ap.add_argument("--keep-firmware-balance", action="store_true",
                     help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
     args = ap.parse_args()
+
+    if args.dry_run:
+        dry_run(args.cmd, args.seconds, args.hz)
+        return
 
     lk = _open_link(args.port, args.baud)
     try:
