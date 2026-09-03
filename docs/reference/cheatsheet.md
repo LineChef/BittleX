@@ -39,6 +39,7 @@ or open a new terminal to pick them up. RL commands run from `rl_training/openca
 | `python watch.py --challenge step-down` | 30 mm drop. Also `threshold-up` (15 mm), `step-up` (30 mm), `big-ledge` (45 mm random) |
 | `python watch.py --challenge weak-servos` | 60% torque cutback + a −12° descent |
 | `python watch.py --challenge slope+obstacles` | 9° slope + 30 mm obstacles |
+| `python watch.py --challenge obstacle-course` | **Dense field of ~90 small step-overable boxes** (≤18 mm) over a long traverse — very uneven ground. `obstacle-course-hard` = ~110 boxes at ≤26 mm (step-over limit). Episodes auto-extend to 2000 steps (~25 s walk); override with `--steps N` |
 | `python watch.py --challenge gauntlet` | **The hard combined test (T5.1):** 4°/9° slope + 40 mm obstacles + repeated shoves |
 | `python watch.py --challenge brutal-gauntlet` | **The T6.4 hardened tier:** 20° slope + 70 mm + 1.0 shoves |
 | `... --cmd 0.13` | Change the forward-speed command (creep ≈ 0.04, cruise 0.10, fast ≈ 0.14, backward < 0) |
