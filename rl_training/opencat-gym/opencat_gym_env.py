@@ -1207,29 +1207,38 @@ class OpenCatGymEnv(gym.Env):
 
 
     def _scatter_rubble(self, chunk, n):
-        """A dense carpet of rounded cobbles across the forward traverse: small
-        spheres (and a few side-laid capsules) half-buried in the ground, so
-        only a smooth dome/ridge pokes up. No edges or flat faces -- a foot
-        rolls over rather than catching. 'Very uneven ground to walk over', not
-        trip hazards. Static (mass 0). Sits on the (possibly sloped) plane."""
+        """A dense carpet of mixed rubble across the forward traverse -- rounded
+        cobbles, a few rounded ridges, and angular chunks, all half-buried so
+        only a low bump/nub pokes up. Not all sharp-edged boxes: mostly smooth
+        so feet roll over, some angular texture. 'Very uneven ground to walk
+        over', not trip hazards. Static (mass 0). Sits on the (possibly sloped)
+        plane."""
         roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
-            r = np.random.uniform(0.45, 1.15) * chunk          # cobble radius
+            r = np.random.uniform(0.45, 1.15) * chunk
             x = np.random.uniform(0.10, 3.4)
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
-            buried = np.random.uniform(0.45, 0.8) * r          # exposed dome = r*(0.2..0.55)
-            if np.random.rand() < 0.25:                        # a rounded ridge
+            k = np.random.rand()
+            if k < 0.20:                                       # rounded ridge
                 cs = p.createCollisionShape(p.GEOM_CAPSULE, radius=r,
                                             height=float(np.random.uniform(1.5, 3.5) * r))
                 orn = p.getQuaternionFromEuler([np.pi / 2, 0.0,
                                                 float(np.random.uniform(-np.pi, np.pi))])
-            else:                                              # a smooth cobble
+                top, buried = r, np.random.uniform(0.45, 0.8) * r
+            elif k < 0.60:                                     # smooth cobble
                 cs = p.createCollisionShape(p.GEOM_SPHERE, radius=r)
                 orn = [0, 0, 0, 1]
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + r - buried],
+                top, buried = r, np.random.uniform(0.45, 0.8) * r
+            else:                                             # angular chunk -- tumbled, mostly buried
+                he = [r * np.random.uniform(0.55, 1.0) for _ in range(3)]
+                cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
+                orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
+                top = max(he) * 1.7                            # ~diagonal reach
+                buried = np.random.uniform(0.55, 0.85) * top
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + top - buried],
                               baseOrientation=orn)
 
 
