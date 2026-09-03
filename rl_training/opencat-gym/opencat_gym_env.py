@@ -234,11 +234,15 @@ ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of 
 # GEOM_HEIGHTFIELD body -- no scattered obstacles). "Floor never shows" rough
 # terrain for walk-anywhere training. Value = max bump height (m) above the mean;
 # the field is scaled so the tallest point is exactly this, so it stays passable.
-CARPET = 0.013            # run20m_carpet baseline: 13 mm max bump above the mean
-CARPET_SWELL = 0.022      # broad rolling undulation (m) added on top of the CARPET bumps --
-                           # very-low-frequency swells so the ground gently rolls as you walk
-CARPET_PROB = 0.5         # half of DR episodes on the carpet; the rest keep the flat/sloped
-                           # plane + old fine heightfield so slope/obstacle DR is unchanged
+CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.013 @ 50% of
+                          # DR episodes, 4M-step continuation from run20m_ppo) was a REVERT:
+                          # no new capability (base already 0% falls on carpet + whole decathlon)
+                          # and ~8-10% forward-speed loss on flat AND carpet. See
+                          # docs/rl-runs/robustness-backlog.md log + the "Carpet Training Verdict"
+                          # report. The course stays defined for eval/viz (watch.py --challenge
+                          # carpet, CHALLENGES dict overrides these).
+CARPET_SWELL = 0.022      # broad rolling undulation (m) on top of the CARPET bumps -- low-freq swell
+CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
