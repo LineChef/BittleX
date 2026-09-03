@@ -1217,7 +1217,7 @@ class OpenCatGymEnv(gym.Env):
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
-            s = np.random.uniform(0.7, 1.5) * chunk            # this chunk's size (full extent)
+            s = np.random.uniform(0.6, 1.25) * chunk           # this chunk's size (full extent)
             he = [s * np.random.uniform(0.4, 0.7) for _ in range(3)]     # roughly cubic, varied
             x = np.random.uniform(0.10, 3.4)
             y = np.random.uniform(-0.14, 0.14)
