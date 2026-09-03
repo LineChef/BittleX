@@ -87,6 +87,19 @@ class SerialLink:
             self.close()
             return ""
 
+    def read_line(self) -> str:
+        """Read one line the board sent unsolicited (e.g. a frame of the `V` IMU
+        stream). Non-blocking-ish: returns '' if nothing is ready within the
+        port's read_timeout. Does not write anything."""
+        if not self.is_connected:
+            return ""
+        try:
+            return self._ser.readline().decode("utf-8", "replace").strip()
+        except Exception as e:  # noqa: BLE001
+            log.warning("serial read failed (%s); marking disconnected", e)
+            self.close()
+            return ""
+
     def drain(self, seconds: float = 0.3) -> str:
         """Read whatever the board has queued for up to `seconds`."""
         if not self.is_connected:

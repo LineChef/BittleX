@@ -1,0 +1,244 @@
+"""On-Pi control loop: run run20m_ppo on the real robot.
+
+    python -m pi_pipeline.gait.run_gait --probe-imu           # see what the BiBoard streams
+    python -m pi_pipeline.gait.run_gait --openloop            # play wkf_ref.npy, no policy (calibration)
+    python -m pi_pipeline.gait.run_gait --cmd 0.10            # walk forward at 0.10 m/s
+    python -m pi_pipeline.gait.run_gait --cmd 0.0 --seconds 5 # stand + hold
+
+Pipeline per tick (~80 Hz):
+    parse IMU line -> (roll,pitch,yaw rad, gyro xyz rad/s)
+    quat = euler_to_quat(rpy)
+    joint_deg_urdf = ResidualGaitPolicy.step(quat, gyro)
+    "m8 <d> 12 <d> ..."  = deploy_map.policy_deg_to_move_cmd(joint_deg_urdf)
+    serial.send(cmd)
+
+The BiBoard streams 6-axis IMU after the `V` token. The exact line format
+differs by firmware build -- run --probe-imu first and, if it doesn't match
+`parse_imu_line` below, adjust that one function (or pass --imu-format).
+
+SAFETY: on any of {IMU parse failures piling up, Ctrl-C, loop overrun}, the loop
+sends `d` (rest, servos relaxed) and exits. deploy_map clamps every command to
++/-120 deg. Start with --openloop on a stand/cradle before trusting the policy.
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import os
+import sys
+import time
+
+import numpy as np
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(_HERE, ".."))          # for `link`
+
+from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
+import deploy_map                                             # noqa: E402
+
+
+# --------------------------------------------------------------------- IMU
+def euler_to_quat(roll, pitch, yaw):
+    """(r,p,y) rad -> quaternion [x,y,z,w], inverse of residual_policy.quat_to_euler."""
+    cr, sr = math.cos(roll / 2), math.sin(roll / 2)
+    cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
+    cy, sy = math.cos(yaw / 2), math.sin(yaw / 2)
+    return np.array([
+        sr * cp * cy - cr * sp * sy,
+        cr * sp * cy + sr * cp * sy,
+        cr * cp * sy - sr * sp * cy,
+        cr * cp * cy + sr * sp * sy,
+    ])
+
+
+def parse_imu_line(line, fmt="auto", deg_in=True):
+    """Return (roll, pitch, yaw [rad], gx, gy, gz [rad/s]) or None if this line
+    isn't an IMU frame.
+
+    Handles the common OpenCat `print6Axis` shapes:
+      - "ypr <yaw> <pitch> <roll>"                (DMP, degrees)
+      - "<ax> <ay> <az> <gx> <gy> <gz>"           (raw 6-axis)
+      - "<yaw> <pitch> <roll> <gx> <gy> <gz>"     (ypr + gyro, if enabled)
+    Adjust here once --probe-imu shows the real format.
+    """
+    s = line.strip().replace(",", " ")
+    if not s:
+        return None
+    toks = s.split()
+    try:
+        if toks and toks[0].lower() in ("ypr", "ang"):
+            nums = [float(x) for x in toks[1:4]]
+            yaw, pitch, roll = nums
+            g = [0.0, 0.0, 0.0]
+        else:
+            nums = [float(x) for x in toks]
+            if len(nums) == 3:                      # roll pitch yaw (or ypr)
+                if fmt == "ypr":
+                    yaw, pitch, roll = nums
+                else:
+                    roll, pitch, yaw = nums
+                g = [0.0, 0.0, 0.0]
+            elif len(nums) >= 6:
+                if fmt == "6axis":                  # ax ay az gx gy gz -> no orientation
+                    return None
+                yaw, pitch, roll = nums[0:3]
+                g = nums[3:6]
+            else:
+                return None
+    except ValueError:
+        return None
+    k = math.pi / 180.0 if deg_in else 1.0
+    return (roll * k, pitch * k, yaw * k, g[0] * k, g[1] * k, g[2] * k)
+
+
+# --------------------------------------------------------------------- loop
+STAND_URDF_DEG = [50, 0, 50, 0, 50, 0, 50, 0]     # matches env.reset() start pose
+
+
+def _open_link(port, baud):
+    from link.serial_link import SerialLink
+    lk = SerialLink(port, baud=baud)
+    if not lk.connect():
+        raise SystemExit(f"could not open {port} @ {baud}")
+    return lk
+
+
+def probe_imu(lk, seconds):
+    print("sending 'V' (toggle IMU stream); printing raw lines for", seconds, "s")
+    _send(lk, "V")
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        line = lk.read_line()
+        if line:
+            print(repr(line))
+    _send(lk, "V")
+    print("stream toggled off. Match parse_imu_line() to the format above.")
+
+
+def openloop(lk, cycles, hz):
+    ref = np.load(os.path.join(_HERE, "wkf_ref.npy"))          # (100,8) rad, URDF order
+    dt = 1.0 / hz
+    print(f"open-loop wkF playback: {cycles} cycles, {hz} Hz. Ctrl-C to stop.")
+    try:
+        for c in range(cycles):
+            for frame in ref:
+                deg = np.rint(np.rad2deg(frame)).astype(int)
+                _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
+                time.sleep(dt)
+    finally:
+        _send(lk, "d")
+    print("done (sent rest).")
+
+
+def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
+    pol = ResidualGaitPolicy()
+    pol.set_command(fwd=cmd_fwd, yaw=0.0)
+
+    if disable_firmware_balance:
+        _send(lk, "g")            # toggle firmware gyro assist OFF -> policy has full control
+        time.sleep(0.2)
+
+    # go to the sim's reset stance, let it settle
+    _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
+    time.sleep(1.0)
+
+    _send(lk, "V")                # start IMU stream
+    time.sleep(0.2)
+
+    # prime: read one good IMU frame for the reset
+    rpy_g = None
+    t0 = time.time()
+    while rpy_g is None and time.time() - t0 < 3.0:
+        line = _readline(lk)
+        if line:
+            rpy_g = parse_imu_line(line, imu_fmt)
+    if rpy_g is None:
+        _send(lk, "d")
+        raise SystemExit("no parseable IMU frame in 3 s -- run --probe-imu and fix parse_imu_line()")
+
+    r, p_, y, gx, gy, gz = rpy_g
+    q = euler_to_quat(r, p_, y)
+    pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
+
+    dt = 1.0 / hz
+    n = int(seconds * hz) if seconds else None
+    miss = 0
+    t_next = time.perf_counter()
+    lat = []
+    print(f"loop: cmd_fwd={cmd_fwd} m/s, {hz} Hz, {'forever' if n is None else str(n)+' ticks'}. Ctrl-C to stop.")
+    try:
+        i = 0
+        while n is None or i < n:
+            line = _readline(lk)
+            parsed = parse_imu_line(line, imu_fmt) if line else None
+            if parsed is None:
+                miss += 1
+                if miss > 20:
+                    print("!! 20 consecutive IMU misses -- stopping"); break
+            else:
+                miss = 0
+                r, p_, y, gx, gy, gz = parsed
+                q = euler_to_quat(r, p_, y)
+                t0 = time.perf_counter()
+                joint_deg = pol.step(q, [gx, gy, gz])
+                lat.append(time.perf_counter() - t0)
+                _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+            t_next += dt
+            slack = t_next - time.perf_counter()
+            if slack > 0:
+                time.sleep(slack)
+            else:
+                t_next = time.perf_counter()     # fell behind; resync
+            i += 1
+    except KeyboardInterrupt:
+        print("\n^C")
+    finally:
+        _send(lk, "V")     # stream off
+        _send(lk, "d")     # rest
+    if lat:
+        a = np.array(lat) * 1e3
+        print(f"policy step: {a.mean():.2f} ms mean, {a.max():.2f} ms max ({len(lat)} ticks)")
+    print("sent rest.")
+
+
+def _readline(lk):
+    return lk.read_line() or None
+
+
+def _send(lk, cmd):
+    lk.send(cmd, read_reply=False, settle=0.0)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", default="/dev/serial0")
+    ap.add_argument("--baud", type=int, default=115200)
+    ap.add_argument("--hz", type=float, default=CONTROL_HZ)
+    ap.add_argument("--cmd", type=float, default=0.10, help="forward speed command, m/s")
+    ap.add_argument("--seconds", type=float, default=0.0, help="0 = run until Ctrl-C")
+    ap.add_argument("--imu-format", default="auto", choices=("auto", "ypr", "rpy", "6axis"))
+    ap.add_argument("--probe-imu", action="store_true")
+    ap.add_argument("--openloop", action="store_true")
+    ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
+    ap.add_argument("--keep-firmware-balance", action="store_true",
+                    help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
+    args = ap.parse_args()
+
+    lk = _open_link(args.port, args.baud)
+    try:
+        if args.probe_imu:
+            probe_imu(lk, 5.0)
+        elif args.openloop:
+            openloop(lk, args.cycles, args.hz)
+        else:
+            run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
+                disable_firmware_balance=not args.keep_firmware_balance)
+    finally:
+        try:
+            lk.close()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    main()

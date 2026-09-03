@@ -222,6 +222,10 @@ ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of 
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
+DEPLOY_DEBUG = False     # validate_deploy.py sets this True -> each step stashes self._deploy_dbg
+                         # (raw quat / ang-vel / euler / obs / rounded joint deg) so the
+                         # deployment mirror (pi_pipeline/gait/residual_policy.py) can be checked
+                         # against the env bit-for-bit. Zero cost when False.
 
 # --- Environment-coverage scenarios (gait-polish "coverage" loop) ----------
 # Each a DR knob, default 0/off. The loop turns them on one at a time and they
@@ -875,6 +879,17 @@ class OpenCatGymEnv(gym.Env):
 
         self.observation = np.hstack((self.state_robot, self.angle_history))
 
+        if DEPLOY_DEBUG:
+            self._deploy_dbg = {
+                "quat": np.array(obs_ang, dtype=float),
+                "angvel_raw": np.array(state_vel_raw, dtype=float),
+                "euler_rp": np.array(state_ang_euler, dtype=float),
+                "obs": self.observation.astype(np.float64).copy(),
+                "joint_deg": joint_angsDegRounded.astype(int).copy(),
+                "phase": float(self._phase),
+                "cmd": (float(self._cmd_fwd), float(self._cmd_yaw)),
+            }
+
         return (np.array(self.observation).astype(np.float32), 
                         reward, terminated, truncated, info)
 
@@ -1136,8 +1151,19 @@ class OpenCatGymEnv(gym.Env):
         
         self.angle_history = np.tile(state_joints, LENGTH_JOINT_HISTORY)
         self.recent_angles = np.tile(state_joints, LENGTH_RECENT_ANGLES)
-        self.observation = np.concatenate((self.state_robot, 
+        self.observation = np.concatenate((self.state_robot,
                                            self.angle_history))
+
+        if DEPLOY_DEBUG:
+            self._deploy_dbg = {
+                "quat": np.array(state_ang, dtype=float),
+                "angvel_raw": np.array(p.getBaseVelocity(self.robot_id)[1], dtype=float),
+                "euler_rp": np.array(p.getEulerFromQuaternion(state_ang)[0:2], dtype=float),
+                "obs": self.observation.astype(np.float64).copy(),
+                "joint_deg": None,
+                "phase": float(self._phase),
+                "cmd": (float(self._cmd_fwd), float(self._cmd_yaw)),
+            }
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
         info = {}
         return np.array(self.observation).astype(np.float32), info
