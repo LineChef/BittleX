@@ -215,7 +215,7 @@ RUBBLE = 0.016         # run20m_rough2: rounded-cobble rubble (spheres/ridges/so
                         # recipe's existing +/-10 deg random incline (SLOPE_MAX_DEG). Base run20m
                         # had this 0; watch.py --challenge rubble overrides for viz.
 RUBBLE_N = 140        # chunks per training episode (viz 'rubble' uses 540)
-RUBBLE_PROB = 0.50    # half of TRAINING episodes get rubble
+RUBBLE_PROB = 0.0     # run20m_carpet: rubble retired -- the single-heightfield CARPET is the rough-terrain substrate now
 RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait clears a 15mm threshold). Rough but not a wall.
                         # clear. Every chunk is pushed down so its top sits <= ground + this.
 
@@ -234,10 +234,11 @@ ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of 
 # GEOM_HEIGHTFIELD body -- no scattered obstacles). "Floor never shows" rough
 # terrain for walk-anywhere training. Value = max bump height (m) above the mean;
 # the field is scaled so the tallest point is exactly this, so it stays passable.
-CARPET = 0.0
-CARPET_SWELL = 0.0         # broad rolling undulation (m) added on top of the CARPET bumps --
+CARPET = 0.013            # run20m_carpet baseline: 13 mm max bump above the mean
+CARPET_SWELL = 0.022      # broad rolling undulation (m) added on top of the CARPET bumps --
                            # very-low-frequency swells so the ground gently rolls as you walk
-CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
+CARPET_PROB = 0.5         # half of DR episodes on the carpet; the rest keep the flat/sloped
+                           # plane + old fine heightfield so slope/obstacle DR is unchanged
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
