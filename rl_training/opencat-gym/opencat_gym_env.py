@@ -216,6 +216,8 @@ RUBBLE = 0.020         # run20m_rough experiment (branch gait-rough): tumbled ru
                         # had this 0; watch.py --challenge rubble overrides for viz.
 RUBBLE_N = 45          # chunks per episode when the rubble field is placed (viz uses 260)
 RUBBLE_PROB = 0.40     # fraction of TRAINING episodes with rubble (viz forces 1.0)
+RUBBLE_MAX_H = 0.020   # hard cap (m) on any chunk's exposed height -- what G2 can realistically
+                        # clear. Every chunk is pushed down so its top sits <= ground + this.
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
@@ -1238,8 +1240,14 @@ class OpenCatGymEnv(gym.Env):
                 orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
                 top = max(he) * 1.7                            # ~diagonal reach
                 buried = np.random.uniform(0.55, 0.85) * top
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + top - buried],
-                              baseOrientation=orn)
+            bid = p.createMultiBody(0, cs, basePosition=[x, y, z_ground + top - buried],
+                                    baseOrientation=orn)
+            # hard cap: push the chunk down so its actual highest point sits no
+            # more than RUBBLE_MAX_H above the ground (shape/orientation agnostic).
+            over = p.getAABB(bid)[1][2] - (z_ground + RUBBLE_MAX_H)
+            if over > 0:
+                bp = p.getBasePositionAndOrientation(bid)[0]
+                p.resetBasePositionAndOrientation(bid, [bp[0], bp[1], bp[2] - over], orn)
 
 
     def render(self, mode='human'):
