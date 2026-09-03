@@ -101,6 +101,7 @@ def main():
     # stable_baselines3/torch is imported, or PyBullet's Metal GUI thread fails
     # silently (sim runs, no window). Same ordering as watch_trained.py.
     env = OpenCatGymEnv()
+    env.reset()                 # materialise the GUI window BEFORE torch loads (macOS)
     import pybullet as p
     import numpy as np
 
