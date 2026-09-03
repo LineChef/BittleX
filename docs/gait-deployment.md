@@ -93,9 +93,12 @@ steps by hand from `pi-bring-up.md` — same content.
 
 1. ~~Export `run20m_ppo` to ONNX + parity check~~ — **done**.
 2. ~~Build + sim-validate the on-robot control loop~~ — **done** (`pi_pipeline/gait/`).
-3. **On the Pi: `git pull`.** The loop code + `.onnx` come with it. Optionally
-   re-time the real `.onnx` (`ResidualGaitPolicy` load + 2000 `.step()` calls) —
-   should match the 0.43 ms synthetic number.
+3. **On the Pi: `git pull`.** The loop code + `.onnx` come with it. Then, in a
+   venv with onnxruntime:
+   - `python pi_pipeline/gait/bench_real.py` — real-policy step time (ONNX +
+     obs build). Expect ~0.5–0.8 ms on the Zero 2 W (Mac x86: 0.098 ms).
+   - `python pi_pipeline/gait/run_gait.py --dry-run --seconds 5` — full 80 Hz
+     loop, synthetic IMU, no serial. Want "80.0 Hz achieved, 0 overruns".
 4. **Wire the BiBoard** to the Pi: RX↔TX crossed, GND↔GND, Pi 5 V pin left
    **unconnected** (PiSugar powers the Pi). Confirm `readlink -f /dev/serial0`
    is `/dev/ttyAMA0`. Test the link (`pi_pipeline/link/check_serial.py`).
