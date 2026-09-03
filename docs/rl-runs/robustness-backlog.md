@@ -207,4 +207,4 @@ One body side persistently lower/higher than the other. Two sub-cases:
 
 | Date | Item | Run | Verdict | Notes |
 |---|---|---|---|---|
-| 2026-09-03 | R0 (baseline: continuous rough terrain) | `run20m_carpet` | RUNNING | `CARPET` 13 mm bumps + 22 mm swell, 50 % of DR episodes; from `run20m_ppo`, 4 M steps, `--finetune-lr 1e-4`. Eval pending. |
+| 2026-09-03 | R0 (baseline: continuous rough terrain) | `run20m_carpet` | **REVERT** | `CARPET` 13 mm bumps + 22 mm swell, 50 % of DR episodes; from `run20m_ppo`, 4 M steps, `--finetune-lr 1e-4`. No new capability — base already 0 % falls on carpet + all 27 decathlon cells — and ~8–10 % forward-speed loss on flat **and** carpet (monotonic with checkpoint; tracks a reward curve that fell 3.32k→2.04k). The constant-LR fine-tune drifted a converged gait downhill with nothing to learn. `CARPET` set back to 0.0; course kept for eval/viz; checkpoints discarded. **Lesson: probe the frozen base against a scenario before training on it — fine-tuning on something it already handles can only erode it.** |
