@@ -208,14 +208,14 @@ RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. s
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
 RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
-RUBBLE = 0.0            # >0 = a dense carpet of small tumbled rubble chunks, ~this size (m).
-                        # Each chunk is a randomly-rotated box half-sunk into the ground, so only
-                        # an angled wedge pokes up -- feet deflect over it rather than catching a
-                        # vertical edge. "Very uneven ground to walk over", not trip hazards.
-                        # 0 by default; watch.py --challenge rubble sets it for viz;
-                        # run20m_rough experiment sets it for training at RUBBLE_PROB.
-RUBBLE_N = 70          # chunks per episode when the rubble field is placed
-RUBBLE_PROB = 1.0      # fraction of episodes with rubble (1.0 for viz; <1 for training)
+RUBBLE = 0.020         # run20m_rough experiment (branch gait-rough): tumbled rubble chunks ~this
+                        # size (m) -> ~10-18 mm exposed after half-sinking. Each chunk is a
+                        # randomly-rotated box buried ~half-deep, so only an angled wedge pokes up --
+                        # feet deflect over rather than catching a vertical edge. Paired with the
+                        # recipe's existing +/-10 deg random incline (SLOPE_MAX_DEG). Base run20m
+                        # had this 0; watch.py --challenge rubble overrides for viz.
+RUBBLE_N = 45          # chunks per episode when the rubble field is placed (viz uses 260)
+RUBBLE_PROB = 0.40     # fraction of TRAINING episodes with rubble (viz forces 1.0)
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
