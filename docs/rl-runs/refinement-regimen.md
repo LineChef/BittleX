@@ -161,3 +161,32 @@ mounted); near-zero bare-robot margin. Phase 4 to watch it.
 **20M run** (`run20m`, from-scratch 20M, G4b recipe frozen) launched 2026-09-03
 00:03. Bailout gates 1M/3M. On completion: mid-run drift check (10M ckpt vs final)
 + full decathlon (payload/clean/T6) + commanded + 14-cell -> final scorecard.
+
+### 20M consolidation -- COMPLETE (2026-09-03 ~07:20)
+
+**`run20m_ppo`** (from-scratch 20M, frozen G4b recipe, both bailout gates passed)
+is the base gait for hardware. Final scorecard: artifact "20M Gait Scorecard".
+
+- **Payload-on (deployment): 0% falls on all 20 cells** (15-cell decathlon + 5
+  hardened T6). Beats scripted on speed/distance on nearly every cell. Walks
+  *down* a -24 deg slope (+0.058 m/s) where scripted slides back.
+- **Speed commands track to 0.007 m/s** (creep 0.033 / cruise 0.092 / fast 0.137
+  / backward -0.060). 14-cell battery: 0% falls, wins distance on ~10/14, scripted
+  wins none outright (reclaimed side-slope-8, which Phase 3b lost).
+- **Bare-robot canary:** the descent cells that regressed in Phase 3b are
+  RECOVERED -- bare -24 deg descent 100% -> 0% falls (saves 100% of scripted's
+  falls), weak-servos+descent 100% -> 0%. Bare shove-recovery still weak (gauntlet
+  79%, brutal shoves 100%) -- Phase 4 target.
+
+**Key gotcha:** the shaped `ep_rew_mean` CRASHED in the back half (~1.15k plateau
+1-7M -> ~290 at 20M) but this was an artifact -- as the policy refined speed
+tracking it deviated from the raw wkF reference and shed imitation reward. The
+checkpoint sweep proved capability climbed monotonically: speed-track err 3M 0.018
+-> 10M 0.009 -> 15M 0.007 -> 20M 0.007. **The final checkpoint is the best of the
+run.** For future long runs on this recipe: benchmark checkpoints, don't trust
+the reward curve; or shorten the LR schedule so the policy freezes near
+convergence (~3M) instead of drifting for 15M more steps under a still-live LR.
+
+**Next:** Phase 4 stance-recovery as a reversible continuation on `run20m_ppo`
+(ledge/step-down terrain, re-enabled phase-slow, diagonal-stance-recovery reward),
+tracking bare-robot shove-recovery margin. Then ONNX export + hardware.
