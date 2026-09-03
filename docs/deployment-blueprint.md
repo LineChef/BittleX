@@ -1,7 +1,10 @@
-# Handoff — G2 Pi bring-up (2026-09-03, ~2 PM Eastern)
+# Deployment Blueprint — getting run20m_ppo onto G2
 
-For a fresh Claude Code instance picking up the hardware bring-up. Written by the
-Mac-side instance, which can no longer reach the Pi (see "Network" below).
+The plan and current state for bringing the trained walking policy up on real
+hardware: Pi Zero 2 W bring-up, ONNX deploy, the on-robot control loop, and the
+learned-vs-scripted head-to-head. Also serves as a cold-start handoff for a fresh
+Claude instance (e.g. one running on the PC, which can reach the Pi when the Mac
+cannot — see "Network").
 
 ---
 
