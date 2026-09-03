@@ -36,7 +36,7 @@ CHALLENGES = {
     "obstacles":         {"RANDOM_TERRAIN": 0.035},
     "obstacles-big":     {"RANDOM_TERRAIN": 0.050, "RANDOM_PUSH": 0.30},
     "obstacles-huge":    {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35},
-    "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 430, "RUBBLE_PROB": 1.0},   # rough but passable -- 15mm cap (550 was a wall)
+    "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 540, "RUBBLE_PROB": 1.0},   # rough, near the passable limit
     "rubble-hard":       {"RUBBLE": 0.020, "RUBBLE_N": 560, "RUBBLE_PROB": 1.0},   # denser + taller, near the passable limit
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
