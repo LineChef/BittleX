@@ -229,6 +229,13 @@ PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back,
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
+
+# CARPET: replace the whole ground with one dense-bump heightfield (a single
+# GEOM_HEIGHTFIELD body -- no scattered obstacles). "Floor never shows" rough
+# terrain for walk-anywhere training. Value = max bump height (m) above the mean;
+# the field is scaled so the tallest point is exactly this, so it stays passable.
+CARPET = 0.0
+CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
@@ -988,9 +995,25 @@ class OpenCatGymEnv(gym.Env):
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
-        _rough = (ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+        _carpet = (CARPET > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+                   and np.random.rand() < CARPET_PROB)
+        _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
-        if _rough:
+        if _carpet:
+            _n = 140                                  # fine grid -> dense bumps, not dunes
+            _h = np.random.uniform(-1, 1, (_n, _n))
+            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, -1, 0)
+                  + np.roll(_h, 1, 1) + np.roll(_h, -1, 1)) / 5.0   # one pass: bumpy, not needle-sharp
+            _h = _h - _h.mean()
+            _h = _h / _h.max() * (CARPET * self._dr)   # tallest point == exactly CARPET above mean
+            _hf = p.createCollisionShape(
+                p.GEOM_HEIGHTFIELD, meshScale=[0.028, 0.028, 1.0],   # 140*0.028 ~= 3.9 m span
+                heightfieldData=_h.flatten().astype(np.float64).tolist(),
+                numHeightfieldRows=_n, numHeightfieldColumns=_n)
+            plane_id = p.createMultiBody(0, _hf)
+            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])
+            self._slope_rp = (0.0, 0.0)
+        elif _rough:
             _n = 64
             _amp = ROUGH_TERRAIN * 0.018 * self._dr
             _h = np.random.uniform(-1, 1, (_n, _n))
