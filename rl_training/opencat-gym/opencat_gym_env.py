@@ -1220,7 +1220,7 @@ class OpenCatGymEnv(gym.Env):
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
             r = np.random.uniform(0.45, 1.15) * chunk
-            x = np.random.uniform(0.10, 3.4)
+            x = np.random.uniform(0.18, 3.4)
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
             k = np.random.rand()
@@ -1231,7 +1231,7 @@ class OpenCatGymEnv(gym.Env):
                                                 float(np.random.uniform(-np.pi, np.pi))])
                 R = np.asarray(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
                 top_off = abs(R[2, 2]) * (h / 2) + r           # exact: axis-z-component*half-len + cap r
-            elif k < 0.60:                                     # smooth cobble (sphere)
+            elif k < 0.75:                                     # smooth cobble (sphere)
                 cs = p.createCollisionShape(p.GEOM_SPHERE, radius=r)
                 orn = [0, 0, 0, 1]
                 top_off = r
