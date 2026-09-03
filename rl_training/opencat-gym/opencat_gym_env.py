@@ -216,7 +216,7 @@ RUBBLE = 0.020         # run20m_rough experiment (branch gait-rough): tumbled ru
                         # had this 0; watch.py --challenge rubble overrides for viz.
 RUBBLE_N = 45          # chunks per episode when the rubble field is placed (viz uses 260)
 RUBBLE_PROB = 0.40     # fraction of TRAINING episodes with rubble (viz forces 1.0)
-RUBBLE_MAX_H = 0.020   # hard cap (m) on any chunk's exposed height -- what G2 can realistically
+RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait clears a 15mm threshold). Rough but not a wall.
                         # clear. Every chunk is pushed down so its top sits <= ground + this.
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
@@ -1224,30 +1224,27 @@ class OpenCatGymEnv(gym.Env):
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
             k = np.random.rand()
-            if k < 0.20:                                       # rounded ridge
-                cs = p.createCollisionShape(p.GEOM_CAPSULE, radius=r,
-                                            height=float(np.random.uniform(1.5, 3.5) * r))
+            if k < 0.20:                                       # rounded ridge (capsule, local Z axis)
+                h = float(np.random.uniform(1.5, 3.5) * r)
+                cs = p.createCollisionShape(p.GEOM_CAPSULE, radius=r, height=h)
                 orn = p.getQuaternionFromEuler([np.pi / 2, 0.0,
                                                 float(np.random.uniform(-np.pi, np.pi))])
-                top, buried = r, np.random.uniform(0.45, 0.8) * r
-            elif k < 0.60:                                     # smooth cobble
+                R = np.asarray(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
+                top_off = abs(R[2, 2]) * (h / 2) + r           # exact: axis-z-component*half-len + cap r
+            elif k < 0.60:                                     # smooth cobble (sphere)
                 cs = p.createCollisionShape(p.GEOM_SPHERE, radius=r)
                 orn = [0, 0, 0, 1]
-                top, buried = r, np.random.uniform(0.45, 0.8) * r
-            else:                                             # angular chunk -- tumbled, mostly buried
-                he = [r * np.random.uniform(0.55, 1.0) for _ in range(3)]
-                cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
+                top_off = r
+            else:                                             # angular chunk (tumbled box)
+                he = np.array([r * np.random.uniform(0.55, 1.0) for _ in range(3)])
+                cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he.tolist())
                 orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
-                top = max(he) * 1.7                            # ~diagonal reach
-                buried = np.random.uniform(0.55, 0.85) * top
-            bid = p.createMultiBody(0, cs, basePosition=[x, y, z_ground + top - buried],
-                                    baseOrientation=orn)
-            # hard cap: push the chunk down so its actual highest point sits no
-            # more than RUBBLE_MAX_H above the ground (shape/orientation agnostic).
-            over = p.getAABB(bid)[1][2] - (z_ground + RUBBLE_MAX_H)
-            if over > 0:
-                bp = p.getBasePositionAndOrientation(bid)[0]
-                p.resetBasePositionAndOrientation(bid, [bp[0], bp[1], bp[2] - over], orn)
+                R = np.abs(np.asarray(p.getMatrixFromQuaternion(orn)).reshape(3, 3))
+                top_off = float(R[2] @ he)                     # exact top of an oriented box above its center
+            expose = np.random.uniform(0.30, 1.0) * RUBBLE_MAX_H
+            # centre placed so the chunk's highest point == z_ground + expose (<= cap)
+            p.createMultiBody(0, cs, baseOrientation=orn,
+                              basePosition=[x, y, z_ground + expose - top_off])
 
 
     def render(self, mode='human'):

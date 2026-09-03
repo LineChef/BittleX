@@ -36,8 +36,8 @@ CHALLENGES = {
     "obstacles":         {"RANDOM_TERRAIN": 0.035},
     "obstacles-big":     {"RANDOM_TERRAIN": 0.050, "RANDOM_PUSH": 0.30},
     "obstacles-huge":    {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35},
-    "rubble":            {"RUBBLE": 0.017, "RUBBLE_N": 240, "RUBBLE_PROB": 1.0},   # dense small step-overable rubble
-    "rubble-hard":       {"RUBBLE": 0.026, "RUBBLE_N": 320, "RUBBLE_PROB": 1.0},   # bigger chunks, at the step-over limit
+    "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 320, "RUBBLE_PROB": 1.0},   # rough but passable -- 15mm cap
+    "rubble-hard":       {"RUBBLE": 0.022, "RUBBLE_N": 400, "RUBBLE_PROB": 1.0},   # denser + bigger chunks
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
     "shoves":            {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20},
