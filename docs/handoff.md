@@ -58,15 +58,27 @@ battery telemetry** — don't chase it.
 If you're driving the Pi over SSH directly, you can skip the script and do the
 steps by hand from `pi-bring-up.md` — same content.
 
+## Status as of 2026-09-03 ~3:30 PM Eastern
+
+- **Pi bring-up: DONE, clean pass.** `pi_setup.sh` ran to completion. Report
+  (paste.rs, captured): kernel 6.12.25 aarch64, swap OK, onnxruntime installs
+  fine, **synthetic policy inference 0.43 ms/call (3% of the 12.5 ms budget)**,
+  no thermal throttling under 2-min load (73.6 °C peak). The Pi Zero 2 W is
+  fast enough to be G2's brain — backlog item **H8 resolved** (no on-MCU route
+  needed). One unconfirmed item: `readlink -f /dev/serial0` should be
+  `/dev/ttyAMA0` — check it when wiring the BiBoard; 2-line fix if not.
+- **ONNX export: DONE.** `trained/run20m_ppo.onnx` (545 KB) is committed on
+  `development`. `export_onnx.py` + `verify_onnx.py` (parity vs torch:
+  worst max|diff| 9.5e-7 across gaussian + a 1500-step real rollout). obs 278,
+  act 8, `Box(-1,1)`, no VecNormalize. The Pi git-pulls the `.onnx`.
+
 ## After bring-up (in order)
 
-1. **Export `run20m_ppo` to ONNX** — needs the repo + the RL env
-   (`stable_baselines3`, `pybullet`), so do it on the **Mac** (ask that instance)
-   or on the PC with a cloned repo + venv. Then **numerical-parity check**: the
-   exported model's actions must match the PyTorch policy's across a rollout.
-   No export tooling exists yet — you may need to write it (`sb3` → `torch.onnx`).
-2. **Get the ONNX file + control code onto the Pi.** Mac can't scp to the Pi
-   directly (isolation) — route Mac → GitHub → Pi pulls, or Mac → PC → Pi.
+1. ~~Export `run20m_ppo` to ONNX + parity check~~ — **done** (see Status above).
+2. **On the Pi: `git pull`, then benchmark the real `.onnx`** — replace the
+   synthetic stub in `pi_setup.sh`'s phase 2 with a load of
+   `rl_training/opencat-gym/trained/run20m_ppo.onnx` and time 2000 `run()` calls.
+   Should match the 0.43 ms stub number.
 3. **Wire the BiBoard** to the Pi: RX↔TX crossed, GND↔GND, Pi 5 V pin left
    **unconnected** (PiSugar powers the Pi). Then test the serial link
    (`pi_pipeline/link/` has `check_serial` / `ping`).
@@ -126,7 +138,8 @@ is the frozen base gait. Do **not** start new gait-training loops.
 
 ## Open threads
 
-- Pi bring-up: not started (or unknown — the script assesses).
-- ONNX export of `run20m_ppo`: not started, no tooling yet.
+- Pi bring-up: DONE (2026-09-03). Serial->ttyAMA0 unconfirmed.
+- ONNX export: DONE, `trained/run20m_ppo.onnx` committed, parity-checked.
+- On-Pi benchmark with the *real* .onnx: not done.
 - Mac↔Pi isolation: unresolved, workaround in place (use the PC).
 - BiBoard not yet wired to the Pi.
