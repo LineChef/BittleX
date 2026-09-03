@@ -77,16 +77,20 @@ def main():
     import opencat_gym_env as E
     E.GUI_MODE = not gif_mode           # GIF path is headless
     E.ADAPTIVE_PUSH = False
-    import benchmark_decathlon as DEC
-    DEC._EXTRA_DR = args.dr
-
     from opencat_gym_env import OpenCatGymEnv
-    from stable_baselines3 import PPO
+
+    # macOS: the env's __init__ calls p.connect(p.GUI). It MUST happen before
+    # stable_baselines3/torch is imported, or PyBullet's Metal GUI thread fails
+    # silently (sim runs, no window). Same ordering as watch_trained.py.
+    env = OpenCatGymEnv()
     import pybullet as p
     import numpy as np
 
+    import benchmark_decathlon as DEC   # noqa: E402  (after env on purpose)
+    DEC._EXTRA_DR = args.dr
+    from stable_baselines3 import PPO    # noqa: E402
+
     knobs = CHALLENGES[args.challenge]
-    env = OpenCatGymEnv()
     model = PPO.load(args.model)
     if not gif_mode:
         p.setRealTimeSimulation(0)
