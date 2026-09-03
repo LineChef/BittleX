@@ -24,20 +24,28 @@ Mac-side instance, which can no longer reach the Pi (see "Network" below).
 
 Everything here is doable **without the robot/BiBoard connected**.
 
-The runbook is codified as a self-resuming script:
+The runbook is codified as a **one-command, hands-off** script:
 
 ```
 # on the Pi (already cloned there, or: git clone -b development https://github.com/LineChef/BittleX)
 bash BittleX/scripts/pi_setup.sh
 ```
 
-Run it, reboot when it says `>>> REBOOT NOW`, run it again — repeat until `DONE`.
-It tracks progress in `~/.g2_pi_stage`. Stages: Wi-Fi power-save off + `apt
-full-upgrade` → swap (zram + 1 GB swapfile) → serial/UART moved to `/dev/ttyAMA0`
-via `dtoverlay=disable-bt` → install `onnxruntime` + run a synthetic
-`[276→256→256→8]` policy-inference benchmark → 2-min thermal/Wi-Fi stress test.
+Phase 1 (interactive, one sudo prompt, ~10–25 min): Wi-Fi power-save off, `apt
+full-upgrade`, base packages, swap (zram + 1 GB swapfile), serial/UART → `/dev/ttyAMA0`
+via `dtoverlay=disable-bt`. Then it installs a `@reboot` crontab hook and reboots
+(SSH drops — expected). Phase 2 runs automatically on next boot (no sudo, ~5–10
+min): verify serial, venv + `onnxruntime`, synthetic `[276→256→256→8]`
+policy-inference benchmark, 2-min thermal/Wi-Fi stress, then writes
+`~/g2_pi_report.txt`, uploads it, writes the URL to `~/g2_report_url.txt`,
+removes its own hook, touches `~/g2_pi_DONE`.
 
-It writes `~/g2_pi_report.txt`. Read it. The numbers that matter:
+After the reboot, wait ~15 min, SSH back in: `cat ~/g2_report_url.txt` (give that
+URL to Claude) or `cat ~/g2_pi_report.txt`. `bash …/pi_setup.sh --status` shows
+progress. Escape hatches: `--manual` (no auto-reboot), `--post-reboot` (run phase
+2 by hand).
+
+The report's numbers that matter:
 - `onnxruntime MLP … ms/call` — must be **well under 12.5 ms** (80 Hz control
   budget). This is the deployment-viability check (backlog item H8).
 - peak temp under stress (< ~80 °C), `throttled` staying `0x0`, SSH not freezing
