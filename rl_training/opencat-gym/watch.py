@@ -36,8 +36,8 @@ CHALLENGES = {
     "obstacles":         {"RANDOM_TERRAIN": 0.035},
     "obstacles-big":     {"RANDOM_TERRAIN": 0.050, "RANDOM_PUSH": 0.30},
     "obstacles-huge":    {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35},
-    "obstacle-course":   {"DENSE_TERRAIN": 0.018, "DENSE_TERRAIN_N": 260},   # dense step-overable field
-    "obstacle-course-hard": {"DENSE_TERRAIN": 0.026, "DENSE_TERRAIN_N": 340},  # denser, at the step-over limit
+    "rubble":            {"RUBBLE": 0.030, "RUBBLE_N": 260},   # dense tumbled rubble, deflects the foot
+    "rubble-hard":       {"RUBBLE": 0.045, "RUBBLE_N": 340},   # bigger, denser chunks
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
     "shoves":            {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20},
@@ -80,7 +80,7 @@ def main():
 
     gif_mode = args.gif is not None
     ep_steps = args.steps if args.steps is not None else (
-        2000 if args.challenge.startswith("obstacle-course") else 250)
+        2000 if args.challenge.startswith("rubble") else 250)
 
     import opencat_gym_env as E
     E.GUI_MODE = not gif_mode           # GIF path is headless

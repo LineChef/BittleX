@@ -208,10 +208,14 @@ RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. s
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
 RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
-DENSE_TERRAIN = 0.0      # eval/viz only (default 0). >0 = a dense carpet of small step-overable
-                         # boxes up to this height (m) over the whole forward traverse -- "very
-                         # uneven ground", not trip hazards. Set via watch.py --challenge obstacle-course.
-DENSE_TERRAIN_N = 70     # number of boxes when DENSE_TERRAIN > 0
+RUBBLE = 0.0            # >0 = a dense carpet of small tumbled rubble chunks, ~this size (m).
+                        # Each chunk is a randomly-rotated box half-sunk into the ground, so only
+                        # an angled wedge pokes up -- feet deflect over it rather than catching a
+                        # vertical edge. "Very uneven ground to walk over", not trip hazards.
+                        # 0 by default; watch.py --challenge rubble sets it for viz;
+                        # run20m_rough experiment sets it for training at RUBBLE_PROB.
+RUBBLE_N = 70          # chunks per episode when the rubble field is placed
+RUBBLE_PROB = 1.0      # fraction of episodes with rubble (1.0 for viz; <1 for training)
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
@@ -1019,8 +1023,8 @@ class OpenCatGymEnv(gym.Env):
             p.changeDynamics(patch, -1, lateralFriction=float(np.random.uniform(0.03, 0.18)))
         if RANDOM_TERRAIN > 0 and self._dr > 0:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
-        if DENSE_TERRAIN > 0 and self._dr > 0:
-            self._scatter_dense(DENSE_TERRAIN * self._dr, DENSE_TERRAIN_N)
+        if RUBBLE > 0 and self._dr > 0 and np.random.rand() < RUBBLE_PROB:
+            self._scatter_rubble(RUBBLE * self._dr, RUBBLE_N)
 
         # Phase 4: sharp step across the whole lane. Flat ground only, not with the
         # rough heightfield (which replaces the plane). Step-up = raised plateau
@@ -1202,26 +1206,27 @@ class OpenCatGymEnv(gym.Env):
                               baseOrientation=box_orn)
 
 
-    def _scatter_dense(self, max_h, n):
-        """A dense carpet of small step-overable boxes across the whole forward
-        traverse -- 'very uneven ground' to walk over, not trip hazards. Small
-        footprints so feet land on and between them. Placed on the (possibly
-        sloped) surface like _scatter_obstacles."""
+    def _scatter_rubble(self, chunk, n):
+        """A dense carpet of tumbled rubble across the forward traverse. Each
+        chunk is a small box with a random full-3D rotation, sunk so ~half is
+        below the surface -- only an angled wedge sticks up, so a foot slides
+        over it instead of catching a vertical edge. 'Very uneven ground to walk
+        over', not trip hazards. Static (mass 0). Sits on the (possibly sloped)
+        plane via its normal."""
         roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
-        box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
         for _ in range(int(n)):
-            h = np.random.uniform(0.003, max(0.004, max_h))
-            x = np.random.uniform(0.10, 3.2)
-            y = np.random.uniform(-0.13, 0.13)
+            s = np.random.uniform(0.6, 1.4) * chunk            # this chunk's size
+            he = [s * np.random.uniform(0.35, 0.65) for _ in range(3)]   # roughly cubic, varied
+            x = np.random.uniform(0.10, 3.4)
+            y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
-            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
-                np.random.uniform(0.012, 0.030),   # along-path half-length
-                np.random.uniform(0.012, 0.038),   # across-path half-width
-                h / 2])
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
-                              baseOrientation=box_orn)
+            sink = np.random.uniform(0.4, 0.75) * s            # how deep it's buried
+            orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
+            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + s * 0.5 - sink],
+                              baseOrientation=orn)
 
 
     def render(self, mode='human'):
