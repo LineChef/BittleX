@@ -45,6 +45,7 @@ or open a new terminal to pick them up. RL commands run from `rl_training/openca
 | `... --speed 0.5` | Slow-mo (0.5×); `--speed 2` = 2× |
 | `... --dr clean` | Drop the non-challenge DR (no payload). Default `payload` = the deployment config; `full` = training DR |
 | `... --model trained/checkpoints/<tag>_<N>_steps` | Watch a mid-training snapshot instead of `run20m_ppo` |
+| `python watch.py --challenge <name> --gif` | **If the GUI window won't open** (Intel Python under Rosetta, headless box): render the challenge to `watch_<name>.gif` instead. `--runs 4` for more episodes. `open watch_<name>.gif` |
 | `pkill -f watch.py` | Close it (or Ctrl-C / close the window) |
 
 **`g2watch` / `watch_trained.py` — quick "just show me the gait" (loops):**
