@@ -195,6 +195,14 @@ DR_RAMP_STEPS = 5e5
 
 RANDOM_JOINT_ANGS = 5     # % noise on the joint-angle *history* buffer (already wired, unchanged)
 RANDOM_GYRO = 0.02       # IMU noise: gaussian std added to the orientation quat + roll/pitch-rate in the OBSERVATION only (reward stays clean). e.g. 0.03
+
+# --- sim-to-real transfer knobs (default 0 = inert; used by robustness_sweep.py
+# and, later, a transfer-hardening DR run). Added 2026-09-03. ---
+CMD_LATENCY_STEPS = 0    # apply the action from N control-steps ago (fixed lag). Models the
+                         # Pi->serial->BiBoard->servo command path, which run20m_ppo never saw.
+JOINT_OFFSET_DEG = 0.0   # per-episode per-joint servo zero-point miscalibration, +/- this many
+                         # deg (uniform), scaled by _dr. Added to the commanded target; the
+                         # encoder read-back carries it too, like a real calibration offset.
 RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode. surv_r1: 0.22 -> 0.30.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
@@ -319,6 +327,11 @@ class OpenCatGymEnv(gym.Env):
 
     def step(self, action):
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
+        # CMD_LATENCY_STEPS: FIFO command buffer -- apply the action from N steps
+        # ago, so the policy runs against the delay the real serial/servo path adds.
+        if CMD_LATENCY_STEPS > 0:
+            self._act_buf.append(np.asarray(action, dtype=float))
+            action = self._act_buf.pop(0)
         # Random horizontal shove (perturbation robustness / balance recovery).
         if (RANDOM_PUSH > 0 and self._dr > 0 and not self._in_recovery
                 and np.random.rand() < RANDOM_PUSH_PROB):
@@ -482,7 +495,7 @@ class OpenCatGymEnv(gym.Env):
         p.setJointMotorControlArray(self.robot_id,
                                     self.joint_id,
                                     p.POSITION_CONTROL,
-                                    joint_angs,
+                                    joint_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
                                     forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
         p.stepSimulation() # Delay of data transfer
         # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
@@ -1041,6 +1054,13 @@ class OpenCatGymEnv(gym.Env):
         if TORQUE_CUTBACK > 0 and self._dr > 0 and np.random.rand() < 0.4:
             k = np.random.choice(8, np.random.randint(1, 4), replace=False)
             self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._dr, 1.0, len(k))
+
+        # sim-to-real transfer knobs (default 0 -> inert)
+        self._act_buf = [np.zeros(8) for _ in range(CMD_LATENCY_STEPS)]
+        self._joint_offset = np.zeros(8)
+        if JOINT_OFFSET_DEG > 0 and self._dr > 0:
+            self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
+                                  * np.deg2rad(1.0) * self._dr)
         
         # Initialize urdf links and joints.
         self.joint_id = []
