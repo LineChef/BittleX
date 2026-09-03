@@ -162,6 +162,24 @@ So:
   I²C **disabled** and the PiSugar's auto-boot / button features work fine.
   Only revisit if a future Grove I²C sensor hangs off the Pi directly.
 
+## 6b. Heatsink — left OFF; install only if it throttles
+
+The WH kit's pin-fin heatsink (small aluminium block, top is a grid of square
+pins) is **not fitted**. There's no screw/clip point — it mounts by peeling the
+thermal-adhesive pad on its base and pressing it onto the SoC (the square
+"Raspberry Pi RP3A0" package in the middle of the board), ~10 s.
+
+**Decision: leave it off.** For G2's workload — ONNX policy inference (~0.43 ms/
+tick) + serial — the Pi barely works; the deployment bench showed **no throttling,
+73.6 °C peak** under a 2-min stress (`docs/gait-deployment.md`). Off saves ~2 g of
+payload and avoids any back-cover / camera-mount clearance fight.
+
+**Install it if we ever see overheating** — i.e. `vcgencmd measure_temp`
+approaching ~80 °C in normal use, or `vcgencmd get_throttled` returning anything
+but `0x0` (bit 0 / 0x1 = under-voltage, bit 3 / 0x8 = currently throttled). Most
+likely trigger is Phase 8 (vision + STT/TTS co-resident on the Pi), not the gait
+loop. 30-second peel-and-stick when needed.
+
 ## 7. Deploy `pi_pipeline` to the Pi
 
 `pi_pipeline/` is already a real codebase (link/ voice/ vision/ memory/ + a test

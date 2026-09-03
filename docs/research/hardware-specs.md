@@ -117,13 +117,13 @@ assembly and set the sim to that.**
 |---|---|---|---|
 | Raspberry Pi Zero 2 W (bare) | 10 g | high | RPi / vendor listings, 65×30 mm |
 | 40-pin header (WH variant) | 4 g | med | 2×20 male header stock weight |
-| Heatsink (WH kit) | 2 g | med | small alloy Zero heatsink |
+| ~~Heatsink (WH kit)~~ | 0 g | — | NOT fitted — see pi-set-up.md §6b; install only if the Pi throttles (likely Phase 8, not the gait loop) |
 | microSD | 0.4 g | high | — |
 | PiSugar S board (PCB only) | 10 g | low | 65×30 mm 2-layer + pogo pins + charge IC |
 | PiSugar S 1200 mAh LiPo cell | 23 g | med | 4.44 Wh ÷ ~190 Wh/kg |
 | Serial wiring (RX/TX/GND, data-only) | 4 g | low | 3 short Dupont jumpers |
 | Mount — Petoi back-cover-with-Pi-hole (PLA) | 10 g | low | standard Bittle cover mass; design-dependent |
-| **Config A — gait bring-up, no camera** | **~63 g** | | Phase 6, the next hardware milestone |
+| **Config A — gait bring-up, no camera** | **~61 g** | | Phase 6, the next hardware milestone |
 | Petoi AI Vision module (Grove Vision AI V2) | 5 g | med | Grove-sized MCU board |
 | OV5647 CSI camera + FPC ribbon | 4 g | high | known RPi-cam-clone weight |
 | Petoi camera case + Grove cable | 6 g | low | 47×31×15 mm ABS shell + cable |
