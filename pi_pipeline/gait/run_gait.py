@@ -170,9 +170,16 @@ def dry_run(cmd_fwd, seconds, hz):
     print(f"  overruns    : {(l > dt*1e3*1.5).sum()} / {len(l)} ticks > 1.5x target")
 
 
-def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
+def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
+
+    logf = None
+    if log_path:
+        logf = open(log_path, "w")
+        logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s\n"
+                   % (cmd_fwd, hz, "off" if disable_firmware_balance else "on"))
+        logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8)) + "\n")
 
     if disable_firmware_balance:
         _send(lk, "g")            # toggle firmware gyro assist OFF -> policy has full control
@@ -204,8 +211,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
     n = int(seconds * hz) if seconds else None
     miss = 0
     t_next = time.perf_counter()
+    t_start = time.perf_counter()
     lat = []
-    print(f"loop: cmd_fwd={cmd_fwd} m/s, {hz} Hz, {'forever' if n is None else str(n)+' ticks'}. Ctrl-C to stop.")
+    print(f"loop: cmd_fwd={cmd_fwd} m/s, {hz} Hz, {'forever' if n is None else str(n)+' ticks'}"
+          + (f", logging -> {log_path}" if log_path else "") + ". Ctrl-C to stop.")
     try:
         i = 0
         while n is None or i < n:
@@ -223,6 +232,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
                 joint_deg = pol.step(q, [gx, gy, gz])
                 lat.append(time.perf_counter() - t0)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+                if logf:
+                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s\n" % (
+                        time.perf_counter() - t_start, r, p_, y, gx, gy, gz,
+                        ",".join(str(int(v)) for v in joint_deg)))
             t_next += dt
             slack = t_next - time.perf_counter()
             if slack > 0:
@@ -235,6 +248,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance):
     finally:
         _send(lk, "V")     # stream off
         _send(lk, "d")     # rest
+        if logf:
+            logf.close()
+            print(f"log written: {log_path}")
     if lat:
         a = np.array(lat) * 1e3
         print(f"policy step: {a.mean():.2f} ms mean, {a.max():.2f} ms max ({len(lat)} ticks)")
@@ -264,6 +280,8 @@ def main():
     ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
     ap.add_argument("--keep-firmware-balance", action="store_true",
                     help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
+    ap.add_argument("--log", default=None,
+                    help="write a per-tick CSV (t, rpy, gyro, 8 joint deg) for real_vs_sim / sysid_replay")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -278,7 +296,7 @@ def main():
             openloop(lk, args.cycles, args.hz)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
-                disable_firmware_balance=not args.keep_firmware_balance)
+                disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log)
     finally:
         try:
             lk.close()
