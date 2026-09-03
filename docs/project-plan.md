@@ -137,12 +137,24 @@ Software only; no physical robot needed until Phase 6 deployment.
   RL earns its place for flat efficiency, not (yet) for obstacle robustness. The
   scripted side is open-loop only here — the firmware's gyro-balance layer would
   widen its obstacle lead — so confirm on hardware.
-- **Phase 3 RL is paused pending hardware.** The open question — is a learned gait
-  actually better than OpenCat's scripted `wkF` for plain walking — has a sim
-  answer above; the real-robot head-to-head confirms it against the *firmware*
-  gait. Learned-gait work resumes if it transfers well and/or when
-  perception-in-the-loop becomes active — see the
-  **Phase 8 Target capability**, the near-term goal for that work.
+- **Refinement regimen + Phase 4 stance-recovery — DONE (2026-09-03).** The
+  pause was lifted 2026-09-02 for a pre-hardware push; the regimen produced
+  **`run20m_ppo`** (20M from-scratch, G4b recipe — command-conditioned residual
+  gait, payload-conditioned, tracks speed commands to 0.007 m/s, walks a −24°
+  descent, 0% falls on the payload-on decathlon). That is now the **frozen base
+  gait for hardware.** Phase 4 then tried three reversible continuations for
+  active stance recovery (ledge terrain in DR / phase-clock revival /
+  diagonal-support catch shaping) — **none was a keeper; no gait change.** Also
+  fixed a silent bug where every `--from` continuation diverged (LR restart at
+  3e-4 on a converged policy). Details:
+  [`docs/rl-runs/refinement-regimen.md`](rl-runs/refinement-regimen.md),
+  [`docs/rl-runs/phase4-decision-log.md`](rl-runs/phase4-decision-log.md).
+- **Sim gait work is now done pending hardware.** The open question — is a
+  learned gait actually better than OpenCat's scripted `wkF` for plain walking —
+  has a sim answer above; the real-robot head-to-head confirms it against the
+  *firmware* gait. Next steps are ONNX export + Pi bring-up, then that
+  head-to-head. Learned-gait work otherwise resumes only when
+  perception-in-the-loop becomes active — see the **Phase 8 Target capability**.
 
 ### Environment
 
