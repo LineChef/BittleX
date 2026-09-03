@@ -1214,11 +1214,11 @@ class OpenCatGymEnv(gym.Env):
         for _ in range(int(n)):
             h = np.random.uniform(0.003, max(0.004, max_h))
             x = np.random.uniform(0.10, 3.2)
-            y = np.random.uniform(-0.11, 0.11)
+            y = np.random.uniform(-0.13, 0.13)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
-                np.random.uniform(0.010, 0.028),   # along-path half-length
-                np.random.uniform(0.010, 0.035),   # across-path half-width
+                np.random.uniform(0.012, 0.030),   # along-path half-length
+                np.random.uniform(0.012, 0.038),   # across-path half-width
                 h / 2])
             p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
                               baseOrientation=box_orn)
