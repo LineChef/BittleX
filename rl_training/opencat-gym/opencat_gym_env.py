@@ -114,8 +114,12 @@ BALANCE_TILT_ON = 0.5       # rad; balance-catch reward active above this tilt
 BALANCE_W_ANGLE = 1.0      # weight on frame-to-frame tilt-angle reduction
 BALANCE_W_RATE = 0.6       # weight on tilt-rate reduction (damping). R3: 0.6 -> 1.0 -- emphasise killing the wobble's velocity, not just leaning back.
 BALANCE_W_FEET = 0.15     # weight on (paws in contact / 4) while tilted -- "get feet down"
-BALANCE_W_DIAG = 0.20     # Phase 4c: bonus (x FAC_BALANCE) for holding a COMPLETE diagonal support pair (FL+BR or FR+BL) planted during a catch -- rewards re-planting into a stable stance, distinct from BALANCE_W_FEET which just counts any feet down. This is the "wobble -> re-plant -> keep walking" target behaviour.
-RESIDUAL_RECOVER_DEG = 27 # Phase 4c: residual authority (deg) while prev-step tilt > BALANCE_TILT_ON, up from RESIDUAL_SCALE_DEG (22) -- more reach to throw a foot out and re-plant mid-wobble. Snaps back to 22 once level, so the nominal gait mapping is unchanged.
+# Phase 4c tried BALANCE_W_DIAG (bonus for a complete diagonal support pair during
+# a catch) + RESIDUAL_RECOVER_DEG (widen the residual 22->27 while tilted). Clean
+# finetune from run20m_ppo (kl ~0.03), walk fully preserved -- but a bare-robot
+# shove probe showed NO recovery gain: fall rate 48% vs 50%, net progress
+# unchanged. Reverted as a no-op. Stance recovery beyond today's FAC_BALANCE
+# isn't reachable by a conservative continuation of the converged 20M policy.
 
 # Phase clock (Run 7): the wkF phase index normally advances one step per control
 # step. While the body is tilted past PHASE_SLOW_TILT it advances at PHASE_SLOW_RATE
@@ -362,11 +366,7 @@ class OpenCatGymEnv(gym.Env):
                 ref = STAND_POSE
             else:
                 ref = WKF_REF[int(self._phase) % len(WKF_REF)]
-            # Phase 4c: widen the residual while the body WAS tilted last step,
-            # so the policy has more reach to re-plant a foot during a catch.
-            _rs = (RESIDUAL_RECOVER_DEG if getattr(self, '_prev_tilt', 0.0) > BALANCE_TILT_ON
-                   else RESIDUAL_SCALE_DEG)
-            joint_angs = ref + action * np.deg2rad(_rs)
+            joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
             joint_angs += action * ds # Change per step including agent action
@@ -648,14 +648,10 @@ class OpenCatGymEnv(gym.Env):
         survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
         if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
-            # Phase 4c: a COMPLETE diagonal support pair down (FL+BR or FR+BL).
-            _diag_planted = ((paw_contact[0] and paw_contact[2])
-                             or (paw_contact[1] and paw_contact[3]))
             balance_reward = FAC_BALANCE * (
                 BALANCE_W_ANGLE * max(0.0, self._prev_tilt - tilt)
                 + BALANCE_W_RATE * max(0.0, self._prev_tilt_rate - tilt_rate)
-                + BALANCE_W_FEET * (sum(paw_contact) / 4.0)
-                + BALANCE_W_DIAG * (1.0 if _diag_planted else 0.0))
+                + BALANCE_W_FEET * (sum(paw_contact) / 4.0))
         self._prev_tilt_rate = tilt_rate
         self._prev_tilt = tilt
 
