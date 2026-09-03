@@ -36,13 +36,31 @@ first hardware run. Do those first.
 
 ## Status legend
 
-`TODO` · `RUNNING` · `KEPT` · `REVERTED` · `DEFERRED`
+`TODO` · `RUNNING` · `KEPT` · `REVERTED` · `DEFERRED` · `LATER` · `DROPPED`
+
+## Triage — 2026-09-03 (user)
+
+| Item | Call |
+|---|---|
+| R1 single weak/dead servo | **DROPPED** |
+| R2 IMU bias & mount tilt | **DEFERRED** — decide after seeing how sturdy the real Pi↔PiSugar connector is on hardware (a flaky power/data seat changes whether IMU-bias hardening is the right lever) |
+| R3 pick-up & set-down | not yet triaged — open question to the user |
+| R4 directional terrain catches | **TEST FIRST** — run the `run20m_carpet` checkpoint against a 12–15 mm threshold strip (head-on + angled) before deciding; overlaps carpet + `FAC_BALANCE` |
+| R5 slope transitions | **LATER** |
+| R6 left/right friction asymmetry | **LATER** |
+| R7 servo backlash / deadband | **DROPPED** |
+| R8 aggressive command dynamics | **DROPPED** |
+| R9 within-episode degradation (battery sag / latency ramp) | **DROPPED** |
+| R10 long-duration drift | **YES — priority** (it's an eval, not training; cheap) |
+| R11 lateral link collision | **DROPPED** |
+
+Next after `run20m_carpet` evals: **R10**, then the R4 threshold test.
 
 ---
 
 ## Tier 1 — high real-world payoff, cheap, de-risks bring-up
 
-### R1 · Single weak / dead servo — `TODO`
+### R1 · Single weak / dead servo — `DROPPED` (2026-09-03)
 One joint (not global `TORQUE_CUTBACK`) at 40–60 % force, or frozen at its last
 command, for a whole episode. Servos fail one at a time — wear, a loose cable, a
 stripped gear. Tests whether G2 can *limp* instead of faceplant.
@@ -53,7 +71,11 @@ stripped gear. Tests whether G2 can *limp* instead of faceplant.
   fall%.
 - **Risk:** policy learns a permanently asymmetric gait. Keep prob low.
 
-### R2 · IMU bias & mount tilt — `TODO`
+### R2 · IMU bias & mount tilt — `DEFERRED` (2026-09-03)
+Gated on a hardware observation: how solid is the real Pi↔PiSugar S connection?
+If the seat is flaky, that's a mechanical fix, not an IMU-bias training target;
+if it's solid, revisit this as a sim-to-real hedge.
+
 Not white noise (`RANDOM_GYRO` already covers that) — a *constant* offset:
 slow-varying gyro bias + a fixed few-degrees error in how the IMU sits in the
 body. Real IMUs have bias and no mount is perfect. This is the single most likely
@@ -65,7 +87,7 @@ reason a sim policy wobbles on real hardware.
 - **Pairs with:** `sysid_replay.py` — once we have a real log, fit the actual
   bias and set these to match.
 
-### R3 · Pick-up & set-down — `TODO`
+### R3 · Pick-up & set-down — `TODO` (not yet triaged)
 Zero all foot contacts for N ticks (robot "held"), optionally reorient, then drop
 from a small height and require the gait to re-acquire. Owners and kids do this
 constantly.
@@ -85,32 +107,39 @@ catching a linear edge is a different failure mode than rolling over bumps.
   onto a "rug". Reuse the retired `LEDGE_*` primitive (currently inert) at low
   height + random heading.
 - **Held-out eval:** approach a threshold strip head-on and at 30° / 60° yaw.
+- **2026-09-03:** `TEST FIRST` — before building this, run the `run20m_carpet`
+  checkpoint against a 12–15 mm threshold strip (`watch.py --challenge step-up` /
+  `threshold-up`, plus angled approaches). If it steps over cleanly the scenario
+  is already covered by carpet + `FAC_BALANCE` and R4 is dropped; if it
+  face-plants, build it. What it teaches: retry a caught swing foot (add
+  clearance), absorb a dropped stance foot with the other three legs, reject the
+  one-sided yaw kick — without becoming permanently high-stepping.
 
 ---
 
 ## Tier 2 — worth it, a bit more env work
 
-### R5 · Slope transitions — `TODO`
+### R5 · Slope transitions — `LATER` (2026-09-03)
 Flat → ramp → flat. The *transition* (breaking over the top of a rise, or the
 ramp meeting the floor at the bottom) is harder than a steady grade. The carpet
 swell is a mild version; make some episodes a real ramp with a defined lip.
 - **Knob sketch:** a `~15–25°` ramp segment starting `x ∈ [0.4, 1.0]` m ahead,
   `~0.5 m` long, then flat again.
 
-### R6 · Left/right friction asymmetry — `TODO`
+### R6 · Left/right friction asymmetry — `LATER` (2026-09-03)
 One body side on tile, the other on carpet → an induced yaw the policy must
 cancel continuously. Different from a uniform low-friction patch.
 - **Knob sketch:** split the ground at `y = uniform(±0.05)`; friction
   `1.0` one side, `uniform(0.3, 0.7)` the other.
 
-### R7 · Servo backlash / deadband — `TODO`
+### R7 · Servo backlash / deadband — `DROPPED` (2026-09-03)
 Cheap servos have slop: a `~1–3°` deadzone around the commanded angle where the
 horn doesn't move, plus hysteresis on direction reversal.
 - **Knob sketch:** before applying the motor command, snap it to the previous
   position if `|Δ| < deadband`; `deadband ~ uniform(0.5°, 3°)` per joint per
   episode. New `SERVO_DEADBAND_DEG`.
 
-### R8 · Aggressive command dynamics — `TODO`
+### R8 · Aggressive command dynamics — `DROPPED` (2026-09-03)
 We train speed *tracking* but not fast *transitions*: full-speed → hard reverse,
 sharp yaw while cruising, repeated stop/start. Also: a long sustained arc
 (`fwd + yaw` held for the whole episode) — does heading spiral or drift?
@@ -120,19 +149,21 @@ sharp yaw while cruising, repeated stop/start. Also: a long sustained arc
 
 ---
 
-## Tier 3 — do if the above pay off
+## Tier 3
 
-### R9 · Within-episode degradation — `TODO`
+### R9 · Within-episode degradation — `DROPPED` (2026-09-03)
 Battery sag / thermal cutback / latency that *ramps during* the episode, not a
 fixed per-episode value. `CMD_LATENCY_STEPS` 0→2 over 60 s; `maxForce` decaying
 10–15 %.
 
-### R10 · Long-duration drift — `TODO` (eval, not train)
-Episodes are 251 steps (~3 s). Run the frozen base for 60 s on flat + carpet and
-check for an accumulating limp, heading creep, or a slow oscillation that a short
-episode never reveals. If it drifts, *then* consider a training fix.
+### R10 · Long-duration drift — `TODO — PRIORITY` (eval, not train) (2026-09-03)
+Episodes are 251 steps (~3 s). Run the frozen base **and** `run20m_carpet` for
+60 s+ on flat + carpet and check for an accumulating limp, heading creep, or a
+slow oscillation that a short episode never reveals. If it drifts, *then* consider
+a training fix (longer `EPISODE_LENGTH`, a drift penalty). First real task after
+the `run20m_carpet` evals.
 
-### R11 · Lateral link collision — `TODO`
+### R11 · Lateral link collision — `DROPPED` (2026-09-03)
 Bumping a chair leg / wall with a shin mid-swing: a short lateral impulse on a
 random lower-leg link (not the base). Distinct from `IMPULSE_PUSH` on the torso.
 
