@@ -70,24 +70,46 @@ steps by hand from `pi-bring-up.md` — same content.
   fast enough to be G2's brain — backlog item **H8 resolved** (no on-MCU route
   needed). One unconfirmed item: `readlink -f /dev/serial0` should be
   `/dev/ttyAMA0` — check it when wiring the BiBoard; 2-line fix if not.
-- **ONNX export: DONE.** `trained/run20m_ppo.onnx` (545 KB) is committed on
-  `development`. `export_onnx.py` + `verify_onnx.py` (parity vs torch:
-  worst max|diff| 9.5e-7 across gaussian + a 1500-step real rollout). obs 278,
-  act 8, `Box(-1,1)`, no VecNormalize. The Pi git-pulls the `.onnx`.
+- **ONNX export: DONE.** `trained/run20m_ppo.onnx` (545 KB) committed.
+  `export_onnx.py` + `verify_onnx.py` (parity vs torch: worst max|diff| 9.5e-7
+  across gaussian + a 1500-step real rollout). obs 278, act 8, `Box(-1,1)`, no
+  VecNormalize. The Pi git-pulls the `.onnx`.
+- **On-robot control loop: BUILT + sim-validated.** `pi_pipeline/gait/`:
+  - `residual_policy.py` — `ResidualGaitPolicy`: exact deployment mirror of the
+    sim's 278-d obs build + phase clock + `wkF(phase) + action·22°` mapping.
+    Pure numpy + onnxruntime.
+  - `deploy_map.py` — URDF joint order → OpenCat servo indices
+    `[8,12,9,13,10,14,11,15]`, with per-servo **sign/offset calibration hooks**
+    (all identity now — MUST verify on hardware via `run_gait.py --openloop`).
+  - `run_gait.py` — 80 Hz loop: parse BiBoard `V` IMU stream → quat →
+    `policy.step` → `m` command. Modes: `--probe-imu`, `--openloop`, `--cmd <spd>`.
+    Sends `d` (rest) on any exit; clamps every command to ±120°.
+  - `validate_deploy.py` (in `rl_training/opencat-gym/`) drives `residual_policy`
+    from the sim in lockstep with `model.predict`: **0 joint-degree cells differ**
+    across stand/creep/cruise/fast/backward × 251 steps, obs matches to 3e-8.
+    The deployment math is verified; the only remaining unknown is the real IMU.
 
 ## After bring-up (in order)
 
-1. ~~Export `run20m_ppo` to ONNX + parity check~~ — **done** (see Status above).
-2. **On the Pi: `git pull`, then benchmark the real `.onnx`** — replace the
-   synthetic stub in `pi_setup.sh`'s phase 2 with a load of
-   `rl_training/opencat-gym/trained/run20m_ppo.onnx` and time 2000 `run()` calls.
-   Should match the 0.43 ms stub number.
-3. **Wire the BiBoard** to the Pi: RX↔TX crossed, GND↔GND, Pi 5 V pin left
-   **unconnected** (PiSugar powers the Pi). Then test the serial link
-   (`pi_pipeline/link/` has `check_serial` / `ping`).
-4. **`pi_pipeline/benchmark_pi.py`** — the full voice+API+serial benchmark
-   (needs `pi_pipeline` deps installed; the audio wheels are the fragile part —
-   see `pi-bring-up.md` §7).
+1. ~~Export `run20m_ppo` to ONNX + parity check~~ — **done**.
+2. ~~Build + sim-validate the on-robot control loop~~ — **done** (`pi_pipeline/gait/`).
+3. **On the Pi: `git pull`.** The loop code + `.onnx` come with it. Optionally
+   re-time the real `.onnx` (`ResidualGaitPolicy` load + 2000 `.step()` calls) —
+   should match the 0.43 ms synthetic number.
+4. **Wire the BiBoard** to the Pi: RX↔TX crossed, GND↔GND, Pi 5 V pin left
+   **unconnected** (PiSugar powers the Pi). Confirm `readlink -f /dev/serial0`
+   is `/dev/ttyAMA0`. Test the link (`pi_pipeline/link/check_serial.py`).
+5. **`run_gait.py --probe-imu`** — see the real IMU line format; if it's not
+   `ypr …` or `r p y gx gy gz`, adjust `parse_imu_line()` (one function).
+6. **`run_gait.py --openloop`** on a stand/cradle — plays `wkf_ref.npy` open-loop.
+   It should shuffle forward. If a leg kicks backward / the gait is mirrored,
+   flip that servo's sign in `deploy_map.SERVO_SIGN`.
+7. **`run_gait.py --cmd 0.10`** — the learned gait, on the real robot.
+8. **The head-to-head (H1):** `run_gait.py` (learned) vs firmware `kwkF` +
+   gyro-assist, on the same real course. The measurement that decides whether RL
+   locomotion continues.
+9. `pi_pipeline/benchmark_pi.py` — full voice+API benchmark (audio wheels are the
+   fragile part; `pi-bring-up.md` §7). Independent of the gait work.
 
 ## Current state — RL side (context, not action)
 
@@ -141,8 +163,9 @@ is the frozen base gait. Do **not** start new gait-training loops.
 
 ## Open threads
 
-- Pi bring-up: DONE (2026-09-03). Serial->ttyAMA0 unconfirmed.
-- ONNX export: DONE, `trained/run20m_ppo.onnx` committed, parity-checked.
-- On-Pi benchmark with the *real* .onnx: not done.
-- Mac↔Pi isolation: unresolved, workaround in place (use the PC).
-- BiBoard not yet wired to the Pi.
+- Pi bring-up: DONE. `serial0 -> ttyAMA0` unconfirmed (check when wiring).
+- ONNX export + parity: DONE.
+- On-robot control loop: BUILT + sim-validated (`pi_pipeline/gait/`).
+- Hardware-gated: wire BiBoard, --probe-imu (fix parse if needed), --openloop
+  (verify servo signs), --cmd (learned gait), then H1 head-to-head.
+- Mac↔Pi isolation: unresolved; workaround = PC, or a USB-C Ethernet adapter.
