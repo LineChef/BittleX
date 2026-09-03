@@ -69,6 +69,38 @@ tradeoff (rejected as a standalone — costs speed/stability every step for an
 occasional benefit) and the front-foot **jam reflex** (feedback-only version of
 the same idea).
 
+### B13 — Climb as a separate skill policy
+Real climbing — surfaces taller than G2's standing height: full stairs, a curb it
+can't walk up, onto a low platform — is **its own RL skill policy**, not part of
+the command-following walk policy. It needs a different motion (rear the front up,
+plant the front feet, shift weight, pull the rear up), a different reward (get
+up-and-over, not maintain a gait), a different terminal condition, and a posture
+repertoire the flat-trot residual can't express. Folding it into the walk policy
+would give a multi-modal policy that's worse at both.
+
+Architecture (matches the rest of the project): a **library of low-level
+policies** — the walk policy plus discrete skills (get-up, climb, later high-step)
+— with **Claude as the selector**. Vision spots a step too tall to walk over →
+Claude decides "invoke climb" → the low-level runs the climb policy → hands back
+to the walk policy. This is the trained version of the "climbing protocol"
+sub-bullet in **B9** (which framed it as a vision-gated reflex without saying
+scripted vs. learned).
+
+Tier split from the 2026-09-03 discussion:
+- **< ~25 mm (slopes, small steps):** already the walk policy's job (rough-terrain
+  DR). Nothing new.
+- **~25–70 mm (curbs, thresholds, single steps, up to leg reach):** an *extension*
+  of the walk policy — add a "terrain difficulty / high-step" conditioning input,
+  same network, wider envelope. The **Phase 4 stance-recovery / ledge work** is
+  the on-ramp (a "step up onto a lip and keep going" is the same primitive,
+  rewarded for progressing over rather than only recovering).
+- **> standing height (this idea, B13):** separate skill policy.
+
+Highest sim2real risk of anything on the roadmap — contact-rich, posture-
+dependent. **Defer until there's a concrete need** (does G2 actually need to
+change floors / get on furniture?). Get Tier 2 for near-free out of Phase 4;
+schedule B13 only when the use case is real. Needs hardware to validate.
+
 ---
 
 ## Expression & personality
