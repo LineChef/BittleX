@@ -490,19 +490,27 @@ through it. Command reference and a hardware bring-up checklist are in
 
 ## Phase 6 — RL sim-to-real deployment
 
-- [ ] Deploy the Phase 3 policy to the real robot. Mechanism:
-      [`ger01d/opencat-gym-sim2real`](https://github.com/ger01d/opencat-gym-sim2real)
-      — flash modified BiBoard firmware
-      ([`ger01d/OpenCatEsp32-sim2real`](https://github.com/ger01d/OpenCatEsp32-sim2real))
-      that takes joint commands over serial, then run an inference loop on a
-      connected computer streaming the policy's output. The author calls this
-      "still highly experimental."
-  - **Open question:** the policy needs PyTorch for inference and was designed to
-    run "on a computer," not the ESP32. The plan has the mounted Pi Zero 2 WH
-    (512 MB RAM, weak quad-core A53) doing this. **Whether a Pi Zero 2 WH can run
-    `model.predict()` fast enough for real-time joint control is untested** —
-    benchmark it (load the policy, time `predict()`) once the Pi is up (Phase 4),
-    before writing it into the runtime.
+**Status (2026-09-03): the deployment stack is BUILT and sim-validated;
+remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`.
+
+- [x] **Pi bring-up** (`scripts/pi_setup.sh`) — Zero 2 W runs the policy-sized
+      net in **0.43 ms** (3% of the 80 Hz budget), no thermal throttling. The
+      "can a Pi Zero 2 W run `predict()` fast enough" open question is **answered
+      yes** — no on-MCU / decision-transformer route needed (backlog H8 closed).
+- [x] **ONNX export + parity check** — `export_onnx.py` / `verify_onnx.py`;
+      `trained/run20m_ppo.onnx` (max|diff| vs torch 9.5e-7). ONNX + `onnxruntime`
+      instead of PyTorch — torch's RAM footprint is the problem, not the math.
+- [x] **On-robot control loop** — `pi_pipeline/gait/`: `residual_policy.py`
+      (exact 278-d obs mirror + phase clock + residual→joint map),
+      `deploy_map.py` (URDF→OpenCat servo indices, sign/offset calibration
+      hooks), `run_gait.py` (80 Hz loop: BiBoard `V` IMU stream → policy → `m`
+      command). `validate_deploy.py` confirms **0 joint-degree cells differ**
+      from `model.predict` across 5 commands × 251 steps.
+- [ ] **On hardware:** wire Pi↔BiBoard, `run_gait.py --probe-imu` (fix
+      `parse_imu_line` if the format differs) → `--openloop` (verify servo
+      signs) → `--cmd` (learned gait) → the H1 head-to-head vs firmware `kwkF`.
+- The older `ger01d/opencat-gym-sim2real` firmware path is **not used** — the
+  stock OpenCat `m` command + `V` IMU stream carry the loop; no firmware flash.
 - [ ] Expect a real sim-to-real performance gap — normal, not failure.
 - [ ] Iterate: adjust the reward and/or retrain in sim based on real-hardware
       behavior, redeploy.
