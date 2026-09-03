@@ -1000,24 +1000,27 @@ class OpenCatGymEnv(gym.Env):
         _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
         if _carpet:
-            _n = 140                                  # fine grid -> dense bumps, not dunes
+            _n = 190                                  # fine grid -> foot-scale bumps
             _raw = np.random.uniform(-1, 1, (_n, _n))
-            # multi-octave: broad swells (heavily smoothed) + medium bumps + a bit
-            # of raw high-freq detail -> uneven, varied heights, not a regular ripple
-            _lo = _raw.copy()
-            for _ in range(6):
-                _lo = (_lo + np.roll(_lo, 1, 0) + np.roll(_lo, -1, 0)
-                       + np.roll(_lo, 1, 1) + np.roll(_lo, -1, 1)) / 5.0
-            _mid = _raw.copy()
+            # multi-octave, weighted toward the MEDIUM and FINE bands so the whole
+            # field is bumpy (not gentle swells with a few tall spots). Heights are
+            # then stretched so the tallest bump == CARPET and it fills the range.
+            _mc = _raw.copy()
+            for _ in range(4):
+                _mc = (_mc + np.roll(_mc, 1, 0) + np.roll(_mc, -1, 0)
+                       + np.roll(_mc, 1, 1) + np.roll(_mc, -1, 1)) / 5.0
+            _md = _raw.copy()
             for _ in range(2):
-                _mid = (_mid + np.roll(_mid, 1, 0) + np.roll(_mid, -1, 0)
-                        + np.roll(_mid, 1, 1) + np.roll(_mid, -1, 1)) / 5.0
-            _h = 1.3 * _lo + 1.0 * _mid + 0.30 * _raw
-            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, 1, 1)) / 3.0   # knock the needle peaks off
+                _md = (_md + np.roll(_md, 1, 0) + np.roll(_md, -1, 0)
+                       + np.roll(_md, 1, 1) + np.roll(_md, -1, 1)) / 5.0
+            _h = 0.55 * _mc + 1.0 * _md + 0.55 * _raw
+            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, 1, 1)) / 3.0    # take the sharpest points off
             _h = _h - _h.mean()
-            _h = _h / np.abs(_h).max() * (CARPET * self._dr)   # cap bumps AND dips at +/-CARPET
+            _sd = _h.std()
+            _h = np.clip(_h / (2.4 * _sd), -1.0, 1.0)      # clip the rare outliers, spread the rest
+            _h = _h * (CARPET * self._dr)                  # tallest bump == CARPET; field fills +/-range
             _hf = p.createCollisionShape(
-                p.GEOM_HEIGHTFIELD, meshScale=[0.028, 0.028, 1.0],   # 140*0.028 ~= 3.9 m span
+                p.GEOM_HEIGHTFIELD, meshScale=[0.021, 0.021, 1.0],   # 190*0.021 ~= 4.0 m span, ~21mm cells
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)

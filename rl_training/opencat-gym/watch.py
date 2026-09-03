@@ -39,8 +39,8 @@ CHALLENGES = {
     "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 540, "RUBBLE_PROB": 1.0},   # rough, near the passable limit
     "rubble-hard":       {"RUBBLE": 0.020, "RUBBLE_N": 560, "RUBBLE_PROB": 1.0},   # denser + taller, near the passable limit
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
-    "carpet":            {"CARPET": 0.011, "CARPET_PROB": 1.0},          # one heightfield, 11mm bumps, floor never shows
-    "carpet-rough":      {"CARPET": 0.016, "CARPET_PROB": 1.0},          # taller bumps, near passable limit
+    "carpet":            {"CARPET": 0.013, "CARPET_PROB": 1.0},          # one heightfield, 13mm max bumps, fills the range, floor never shows
+    "carpet-rough":      {"CARPET": 0.019, "CARPET_PROB": 1.0},          # taller bumps, near the passable limit
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
     "shoves":            {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20},
     "shoves-hard":       {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25},
