@@ -116,7 +116,14 @@ def main():
     model = PPO.load(args.model)
     if not gif_mode:
         p.setRealTimeSimulation(0)
+        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)   # bumps cast shadows -> readable terrain
     dt = 3.0 / 240.0
+
+    import pybullet_data
+    try:
+        _checker = p.loadTexture(pybullet_data.getDataPath() + "/checker_blue.png")
+    except Exception:
+        _checker = -1
 
     W, H, FPS, EVERY = 480, 300, 25, 3
     frames = []
@@ -132,10 +139,14 @@ def main():
             DEC._apply(knobs)
             run += 1
             obs, _ = env.reset()
-            # macOS Metal sometimes fails to load plane.urdf's checkerboard
-            # texture -> black floor. Body 0 is the plane; paint it a solid grey.
+            # Body 0 is the ground (plane or heightfield). Put a checker texture on
+            # it so the grid warps over the height variation -- and it also fixes
+            # the macOS black-floor texture glitch.
             try:
-                p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
+                if _checker >= 0:
+                    p.changeVisualShape(0, -1, rgbaColor=[1, 1, 1, 1], textureUniqueId=_checker)
+                else:
+                    p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
             except Exception:
                 pass
             env.set_command(fwd=args.cmd, yaw=0.0)
