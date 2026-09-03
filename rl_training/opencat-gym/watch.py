@@ -60,6 +60,10 @@ def main():
     ap.add_argument("--speed", type=float, default=1.0, help="playback speed (1 = ~realtime)")
     ap.add_argument("--dr", default="payload", choices=("payload", "clean", "full"),
                     help="non-challenge DR: payload=deploy config (default), clean=none, full=training")
+    ap.add_argument("--gif", nargs="?", const="__auto__", default=None,
+                    help="render to a GIF instead of a live window (headless -- always works). "
+                         "Optional path; default watch_<challenge>.gif")
+    ap.add_argument("--runs", type=int, default=3, help="--gif: episodes to record")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
 
@@ -69,8 +73,9 @@ def main():
             print(f"  {k}")
         return
 
+    gif_mode = args.gif is not None
     import opencat_gym_env as E
-    E.GUI_MODE = True
+    E.GUI_MODE = not gif_mode           # GIF path is headless
     E.ADAPTIVE_PUSH = False
     import benchmark_decathlon as DEC
     DEC._EXTRA_DR = args.dr
@@ -78,18 +83,26 @@ def main():
     from opencat_gym_env import OpenCatGymEnv
     from stable_baselines3 import PPO
     import pybullet as p
+    import numpy as np
 
     knobs = CHALLENGES[args.challenge]
     env = OpenCatGymEnv()
     model = PPO.load(args.model)
-    p.setRealTimeSimulation(0)
+    if not gif_mode:
+        p.setRealTimeSimulation(0)
     dt = 3.0 / 240.0
 
-    print(f"watch  |  {args.model}  |  challenge={args.challenge}  |  cmd_fwd={args.cmd} m/s"
-          f"  |  dr={args.dr}  |  speed x{args.speed}\nclose the window to stop.\n", flush=True)
+    W, H, FPS, EVERY = 480, 300, 25, 3
+    frames = []
+    gif_path = (f"watch_{args.challenge}.gif" if args.gif == "__auto__" else args.gif)
+
+    print(f"watch  |  {args.model}  |  challenge={args.challenge}  |  cmd_fwd={args.cmd} m/s  |  dr={args.dr}"
+          + (f"  |  -> {gif_path} ({args.runs} runs)" if gif_mode
+             else f"  |  speed x{args.speed}   (close the window to stop)") + "\n", flush=True)
+
     run = 0
     try:
-        while p.isConnected():
+        while (gif_mode and run < args.runs) or (not gif_mode and p.isConnected()):
             DEC._apply(knobs)
             run += 1
             obs, _ = env.reset()
@@ -100,12 +113,20 @@ def main():
                 a, _ = model.predict(obs, deterministic=True)
                 obs, _, term, trunc, _ = env.step(a)
                 pos, q = p.getBasePositionAndOrientation(env.robot_id)
-                p.resetDebugVisualizerCamera(0.45, 50, -22, [pos[0], pos[1], pos[2] + 0.05])
+                if gif_mode:
+                    if steps % EVERY == 0:
+                        vm = p.computeViewMatrixFromYawPitchRoll(
+                            [pos[0], pos[1], pos[2] + 0.03], 0.55, 50, -22, 0, 2)
+                        pm = p.computeProjectionMatrixFOV(60, W / H, 0.1, 5)
+                        rgb = p.getCameraImage(W, H, vm, pm, renderer=p.ER_TINY_RENDERER)[2]
+                        frames.append(np.reshape(rgb, (H, W, 4))[:, :, :3].astype(np.uint8))
+                else:
+                    p.resetDebugVisualizerCamera(0.45, 50, -22, [pos[0], pos[1], pos[2] + 0.05])
+                    if args.speed > 0:
+                        time.sleep(dt / args.speed)
                 rp = p.getEulerFromQuaternion(q)
                 peak_tilt = max(peak_tilt, abs(rp[0]), abs(rp[1]))
                 steps += 1
-                if args.speed > 0:
-                    time.sleep(dt / args.speed)
                 if term or trunc:
                     break
             x1 = p.getBasePositionAndOrientation(env.robot_id)[0][0]
@@ -113,7 +134,16 @@ def main():
                   f"peak tilt {peak_tilt:.2f} rad  -> {'FELL' if term else 'survived'}", flush=True)
     except (KeyboardInterrupt, p.error):
         pass
-    print("\nwindow closed.")
+
+    if gif_mode and frames:
+        from PIL import Image
+        imgs = [Image.fromarray(f) for f in frames]
+        imgs[0].save(gif_path, save_all=True, append_images=imgs[1:],
+                     duration=int(1000 / FPS), loop=0, optimize=True)
+        print(f"\nwrote {gif_path}  ({len(imgs)} frames, {__import__('os').path.getsize(gif_path)/1e6:.1f} MB)")
+        print(f"open it:  open {gif_path}")
+    elif not gif_mode:
+        print("\nwindow closed.")
 
 
 if __name__ == "__main__":
