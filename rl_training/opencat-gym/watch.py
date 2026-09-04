@@ -18,6 +18,7 @@ decathlon / showcase uses.
 """
 import argparse
 import math
+import os
 import time
 
 D = math.radians
@@ -56,6 +57,73 @@ CHALLENGES = {
     "brutal-gauntlet":   {"SLOPE_FIXED_RP": (D(8), D(20)), "RANDOM_TERRAIN": 0.070,
                           "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45},
 }
+
+
+_CARPET_PHOTO_CANDIDATES = [
+    os.path.expanduser("~/Downloads/carpet/image1.jpeg"),
+    os.path.expanduser("~/Downloads/carpet/image2.jpeg"),
+    os.path.expanduser("~/Downloads/carpet/image0.jpeg"),
+]
+
+
+def _photo_carpet_texture(path):
+    """Build a tileable texture from an actual photo of the user's carpet
+    (2026-09-04) -- real pile detail instead of synthetic noise. Crops a
+    clean carpet-only region, then mirror-tiles it into a 2x2 block (a flip
+    on each axis makes the edges match by construction, so it repeats across
+    the floor without an obvious seam)."""
+    from PIL import Image
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    crop = im.crop((int(w * 0.03), int(h * 0.04), int(w * 0.97), int(h * 0.73)))  # clean region, no background objects
+    tl = crop
+    tr = crop.transpose(Image.FLIP_LEFT_RIGHT)
+    bl = crop.transpose(Image.FLIP_TOP_BOTTOM)
+    br = crop.transpose(Image.FLIP_LEFT_RIGHT).transpose(Image.FLIP_TOP_BOTTOM)
+    cw, ch = crop.size
+    block = Image.new("RGB", (cw * 2, ch * 2))
+    block.paste(tl, (0, 0)); block.paste(tr, (cw, 0))
+    block.paste(bl, (0, ch)); block.paste(br, (cw, ch))
+    return block
+
+
+def _gen_carpet_texture():
+    """A carpet-like texture for the flat-carpet challenges -- purely visual,
+    never touches physics. Prefers a REAL photo of the user's carpet
+    (mirror-tiled for seamless repeat) if one is found locally; falls back to
+    a synthetic mottled-fleck texture (colour calibrated to the same photos:
+    mean RGB 145,147,143, a neutral light grey) so this still works on a
+    machine without the photos (e.g. the Pi, a fresh clone). Returns a cached
+    file path -- delete rl_training/opencat-gym/.carpet_tex_cache.png to
+    regenerate after changing photos/params."""
+    import os
+    import numpy as np
+    from PIL import Image, ImageFilter
+    path = os.path.join(os.path.dirname(__file__), ".carpet_tex_cache.png")
+    if os.path.exists(path):
+        return path
+    for _src in _CARPET_PHOTO_CANDIDATES:
+        if os.path.exists(_src):
+            _photo_carpet_texture(_src).save(path)
+            return path
+    rng = np.random.default_rng(7)
+    n = 512
+    img = np.tile(np.array([145, 147, 143], dtype=np.float32), (n, n, 1))
+
+    def octave(sz, scale):
+        o = rng.normal(0, 1, (sz, sz))
+        im = Image.fromarray(((o - o.min()) / (o.max() - o.min()) * 255).astype(np.uint8))
+        im = im.resize((n, n), Image.BICUBIC)
+        return (np.asarray(im).astype(np.float32) / 255.0 - 0.5) * scale
+
+    img += octave(320, 22)[..., None]   # fine dense fleck (the pile itself)
+    img += octave(80, 10)[..., None]    # a little mid-scale texture
+    img += octave(24, 16)[..., None]    # broad soft shading patches (sheen/traffic pattern)
+    for c, amt in enumerate((4, 4, 4)):  # low colour-channel variation -- it reads as grey, not tinted
+        img[..., c] += octave(300 + c, amt)
+    img = np.clip(img, 0, 255).astype(np.uint8)
+    Image.fromarray(img).filter(ImageFilter.GaussianBlur(0.5)).save(path)
+    return path
 
 
 def main():
@@ -122,10 +190,15 @@ def main():
     dt = 3.0 / 240.0
 
     import pybullet_data
-    try:
-        _checker = p.loadTexture(pybullet_data.getDataPath() + "/checker_blue.png")
-    except Exception:
-        _checker = -1
+    _checker_path = pybullet_data.getDataPath() + "/checker_blue.png"
+    # Flat carpet (CARPET_SOFT, no heightfield) has no shape for the checker's
+    # grid-warp trick to read -- a mottled fleck texture instead, purely
+    # cosmetic (never touches physics/training), just for "does this look like
+    # carpet" sanity checks. Both are reloaded fresh every run below (right
+    # after env.reset()) -- a texture id loaded before reset() is not reliably
+    # valid after it, even though the plane's own default happens to look
+    # checker-ish and masks the failure for _checker specifically.
+    _carpet_path = _gen_carpet_texture() if args.challenge.startswith("carpet-house") else None
 
     W, H, FPS, EVERY = 480, 300, 25, 3
     frames = []
@@ -141,16 +214,18 @@ def main():
             DEC._apply(knobs)
             run += 1
             obs, _ = env.reset()
-            # Body 0 is the ground (plane or heightfield). Put a checker texture on
-            # it so the grid warps over the height variation -- and it also fixes
-            # the macOS black-floor texture glitch.
+            # Body 0 is the ground (plane or heightfield). Put a texture on it
+            # (checker warps over height variation; a mottled fleck for flat
+            # carpet) so it's readable -- and it fixes the macOS black-floor
+            # glitch. Reloaded fresh here, after THIS reset, every run.
             try:
-                if _checker >= 0:
-                    p.changeVisualShape(0, -1, rgbaColor=[1, 1, 1, 1], textureUniqueId=_checker)
-                else:
-                    p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
+                _tex = p.loadTexture(_carpet_path) if _carpet_path else p.loadTexture(_checker_path)
+                p.changeVisualShape(0, -1, rgbaColor=[1, 1, 1, 1], textureUniqueId=_tex)
             except Exception:
-                pass
+                try:
+                    p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
+                except Exception:
+                    pass
             env.set_command(fwd=args.cmd, yaw=0.0)
             x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0]
             steps, peak_tilt = 0, 0.0
