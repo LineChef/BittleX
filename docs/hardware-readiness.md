@@ -232,38 +232,48 @@ training** (the RL side)
 
 1. Assemble Bittle X V2; check servo calibration (ships calibrated — only
    fine-tune if movement looks off).
-2. **On the calibration stand, before it ever touches the ground:** full
+2. **Weigh the final build** — on a kitchen scale, once the Pi + PiSugar S +
+   camera + mount are actually on the robot: the spine stack (Pi/PiSugar/
+   wiring/cover) and the head/camera cluster **separately**, and balance each
+   on an edge for its CoM (height + fore/aft offset). Then **update the
+   training sim to match**: set `PAYLOAD_MASS_NOM`/`_RAND` and
+   `HEAD_MASS_NOM`/`_RAND` + `PAYLOAD_POS`/`HEAD_MASS_POS` in
+   `opencat_gym_env.py` to the measured values, and retrain (or a
+   `--finetune-lr` continuation) if the delta from the current ~76 g estimate
+   is real. Full detail + trigger: `docs/rl-runs/hardware-gated-training-backlog.md`
+   **H2**.
+3. **On the calibration stand, before it ever touches the ground:** full
    range-of-motion pass (each joint by hand / `check_serial`, watch for binding
    or leg-on-leg collision), firmware `c16` auto joint calibration. This is the
    safe place for first power-on — confirm wiring/polarity, nothing grinds,
    before the robot has to support its own weight. (Detailed steps once the RL
    gait is involved: `docs/gait-deployment.md` step 6.)
-3. Flash the Pi with Raspberry Pi Imager — Wi-Fi + SSH pre-configured (headless).
+4. Flash the Pi with Raspberry Pi Imager — Wi-Fi + SSH pre-configured (headless).
    Confirm SSH.
-4. `sudo raspi-config` → serial: disable the login shell over serial, enable the
+5. `sudo raspi-config` → serial: disable the login shell over serial, enable the
    serial hardware. Disable 1-wire. Disable Wi-Fi power-save
    (`sudo iw wlan0 set power_save off`).
-5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
+6. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover fits.
 
 **Serial link (Phase 5)**
 
-6. `python -m pi_pipeline.link.check_serial ports` → identify the device, set
+7. `python -m pi_pipeline.link.check_serial ports` → identify the device, set
    `G2_SERIAL_PORT` in `.env` (likely `/dev/ttyS0`).
-7. On the BiBoard, enable Serial-2 mode (`XS`, or edit `OpenCat.h` + reflash).
-8. `check_serial ping` → expect a firmware banner. `check_serial send kbalance`
+8. On the BiBoard, enable Serial-2 mode (`XS`, or edit `OpenCat.h` + reflash).
+9. `check_serial ping` → expect a firmware banner. `check_serial send kbalance`
    → robot stands. `check_serial skills` → runs the whole conversational set.
 
 **Voice (Phase 7)**
 
-9. Put a real key in `ANTHROPIC_API_KEY`. `python -m pi_pipeline.voice --mode text`
+10. Put a real key in `ANTHROPIC_API_KEY`. `python -m pi_pipeline.voice --mode text`
     → Claude + memory end-to-end.
-10. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD` and
+11. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD` and
     `G2_STT_SILENCE_S`. `--mode voice --actuator serial` for the full loop.
-11. **Perf on the Pi Zero 2 W:** are Vosk + Piper light enough on 512 MB / a weak
+12. **Perf on the Pi Zero 2 W:** are Vosk + Piper light enough on 512 MB / a weak
     A53? Measure the wake→spoken-reply round trip. If sluggish → shorter
     `CLAUDE_MAX_TOKENS`, streaming TTS, streaming Claude, a "thinking" cue.
-12. Implement the buzzer / posture state cues (`voice/cues.py`) and a thread
+13. Implement the buzzer / posture state cues (`voice/cues.py`) and a thread
     watchdog for the audio + serial threads.
 
 **Vision (Phase 8)** — camera bring-up itself doesn't wait for the body; see the
@@ -275,18 +285,18 @@ exist too: mount the camera on G2 (vs. bench-testing loose on the Pi) and wire
 parity, the on-robot control loop, sim-validated bit-for-bit
 (`docs/gait-deployment.md`). Remaining is hardware-only:
 
-13. `pi_pipeline/gait/bench_real.py` — confirm real-time joint control on the
+14. `pi_pipeline/gait/bench_real.py` — confirm real-time joint control on the
     actual Pi Zero 2 W (sim bench: 0.43 ms/step, well inside budget).
-14. **The H1 head-to-head** on the real robot — full methodology + course +
+15. **The H1 head-to-head** on the real robot — full methodology + course +
     decision rule: `docs/rl-runs/h1-head-to-head-rubric.md`. Measures the
     sim-to-real gap and produces a keep/fall-back/middle verdict on RL
     locomotion; `h1_score.py` turns the numbers into it.
 
 **Integration (Phase 10)**
 
-15. Run voice + vision + memory alongside each other; resolve timing/resource
+16. Run voice + vision + memory alongside each other; resolve timing/resource
     conflicts. Budget real time — this is historically the messiest phase.
-16. Once vision works, revisit locomotion with perception in the loop
+17. Once vision works, revisit locomotion with perception in the loop
     (`TERRAIN_FEATURE`, already plumbed in sim — `docs/project-plan.md` Phase 8),
     toward the Target capability: confident walking over a cluttered floor,
     steps over small objects it sees, slows/stops at big obstacles and edges.
