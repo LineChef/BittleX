@@ -181,15 +181,21 @@ Train the vision model to detect **specific individuals as their own classes** �
 the user, the user's wife, their cat, their dog — not just generic "person" /
 "cat" / "dog". Petoi SenseCraft custom-model pipeline: a few dozen labelled
 photos of each → YOLOv8n → deployed on the Grove Vision module. Then G2:
-- **knows its household by relationship, not just by label.** The user is its
-  best friend — the closest bond it has: lights up on seeing them ("hey Mark!"),
-  seeks them out first when it wanders, notices and comments when they've been
-  gone a while. The user's wife is family too, a high bond of her own. Each pet
-  is named on sight. G2 tells Claude who is present so replies and behaviour are
-  personalised, and pulls that person's memory context. This is a *relationship*
-  model, not a lookup — a natural fit for a `bond` concept in the `personality`
-  layer (a per-individual closeness level that scales warmth, seeking, and
-  greeting intensity); new people and pets slot in at lower levels over time;
+- **knows its household by relationship, not just by label.** A per-individual
+  `bond` in the `personality` layer — a closeness level (and a relationship
+  label) that scales warmth, seeking, greeting intensity, and how much of that
+  person's memory context gets pulled. G2 tells Claude who is present so replies
+  and behaviour are personalised. **Seeded household** (bonds develop from here
+  with interaction; they don't start at zero):
+  - **Mark** — best friend, the primary bond. Lights up on sight, seeks him out
+    first when wandering, notices and comments when he's been gone a while.
+  - **Mark's wife** — G2 *loves* her; his favourite person after Mark. A very
+    high bond of her own — warm greeting, comes over, glad to see her.
+  - **the cat, the dog** — named on sight, their own lower bonds; the wary/
+    affectionate traits colour how G2 acts around each.
+  - new people and pets slot in at a low bond and grow (or not) over time.
+  A `G2_BONDS` config (like `G2_TRAITS`) or a small household file carries the
+  seed names + levels + labels;
 - **logs sightings to memory** ("saw the dog in the kitchen this afternoon",
   "Mark got home ~6pm") — feeds [B11] place memory and a "what did G2 see today"
   recap;
