@@ -131,19 +131,26 @@ assembly and set the sim to that.**
 
 Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
 
-- → **Sim retuned 2026-09-03:** `PAYLOAD_MASS_NOM 0.075 → 0.065`,
-  `PAYLOAD_MASS_RAND 0.035 → 0.025` (40–90 g band). Ceiling 110 g dropped — not
-  physically reachable. `run20m_ppo` (trained at 75 g) is left frozen: training
-  *heavier* than reality is the safe direction (real robot gets more torque +
-  stability margin than it trained with); our sim benchmarks just slightly
-  understate real speed.
-- → **Biggest lever is the battery.** The 1200 mAh cell is ~23 g of the ~33 g
-  PiSugar stack. Gait + serial on a Pi Zero 2 W (no vision / Whisper) sips power;
-  a 500–700 mAh cell (~10–15 g) still gives 2–3 h and cuts ~10–13 g. Decide
-  before committing the build.
+- → **Sim retuned 2026-09-03** to the *fully-loaded* config (camera expected on
+  the bot by the time the frame arrives). Now **two welded bodies** so the
+  fore/aft CoM split is right, not one lumped rear mass:
+  - `PAYLOAD_MASS_NOM 0.061` ± `0.018` — SPINE (Pi + PiSugar S 1200 mAh + wiring +
+    cover) at `PAYLOAD_POS (-0.020, 0, 0.025)`.
+  - `HEAD_MASS_NOM 0.015` ± `0.005` — camera cluster (Grove Vision AI V2 + OV5647
+    + case) at `HEAD_MASS_POS (0.055, 0, 0.020)`, the front mast.
+  - Combined nominal ≈ 76 g; payload CoM ~14 mm forward of spine-only. Old lumped
+    110 g ceiling dropped — not reachable.
+  - `run20m_ppo` is **frozen at the old lumped 75 g rear** — not retrained for
+    this. Training heavier/rear-biased than reality is the safe direction; the
+    next training run uses the two-body model. Re-tune + maybe retrain once the
+    real stack is weighed — see [`hardware-gated-training-backlog.md`](../rl-runs/hardware-gated-training-backlog.md) H2.
+- → **Battery is the biggest single line item** (~33 g with its board). Committed
+  as PiSugar S 1200 mAh and counted above. If runtime is ever traded for weight
+  later, a 500–700 mAh cell is where ~10–15 g would come from — not a change now.
 - → **CoM height matters more than mass for tip-over.** `PAYLOAD_POS` z = 2.5 cm
-  above the spine is pessimistic; a stack tucked to the cover is ~1.5–2 cm.
-  Measure (balance the built stack on an edge) and set `PAYLOAD_POS`.
+  is pessimistic; a stack tucked to the cover is ~1.5–2 cm. **Measure on assembly**
+  — weigh each sub-assembly, balance it on an edge for its CoM — and set
+  `PAYLOAD_*` / `HEAD_*` to the measured values.
 
 ## Bittle X body + battery
 

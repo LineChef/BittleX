@@ -220,20 +220,25 @@ RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait 
                         # clear. Every chunk is pushed down so its top sits <= ground + this.
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
-PAYLOAD_MASS_NOM = 0.065   # kg. BOM estimate 2026-09-03 (docs/research/hardware-specs.md "Mounted
-                           # payload weight"): Pi Zero 2 WH + heatsink + SD (~17 g) + PiSugar S w/
-                           # 1200 mAh cell (~33 g) + data-only serial wiring (~4 g) + back-cover mount
-                           # (~10 g) = ~63 g for the gait-bring-up build (NO camera -- camera is Phase 8).
-                           # Full companion w/ camera is ~78 g. Was 0.075 (a wide early guess).
-PAYLOAD_MASS_RAND = 0.025  # +/- kg -> 40-90 g band. Floor = trimmed build (500 mAh cell, minimal
-                           # mount). Ceiling = full stack + camera + draining/heavier battery + beefy
-                           # enclosure. The old 110 g ceiling was not physically reachable.
-                           # PAYLOAD_PROB = 1.0: always mounted, so widen mass rather than train bare.
-                           # Re-set NOM/RAND/POS to the MEASURED stack on assembly (kitchen scale +
-                           # balance-on-an-edge for CoM); that replaces this estimate.
-PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm
-                           # jitter only). z=0.025 is pessimistic-for-tipping -- if the real stack sits
-                           # tighter to the cover it's ~0.015-0.020. MEASURE on assembly.
+# --- Payload = the mounted Pi companion stack. Modelled as TWO welded bodies so
+# the fore/aft CoM split is right (BOM: docs/research/hardware-specs.md "Mounted
+# payload weight", 2026-09-03). Target config = fully-loaded WITH camera (~76 g),
+# expected to be on the robot by the time the frame arrives.
+#   SPINE  = Pi Zero 2 WH + SD (~14 g) + PiSugar S w/ 1200 mAh cell (~33 g) +
+#            data-only serial wiring (~4 g) + back-cover mount (~10 g) = ~61 g,
+#            ~2 cm behind centre. (Heatsink left off -- pi-set-up.md 6b.)
+#   HEAD   = Grove Vision AI V2 (~5 g) + OV5647 + ribbon (~4 g) + case + Grove
+#            cable (~6 g) = ~15 g, on the front mast ahead of centre.
+# Re-set NOM/RAND/POS for BOTH to the MEASURED stack on assembly (kitchen scale;
+# balance each sub-assembly on an edge for its CoM). This is an estimate until then.
+PAYLOAD_MASS_NOM = 0.061   # kg -- SPINE body only (camera is HEAD_MASS_*, below)
+PAYLOAD_MASS_RAND = 0.018  # +/- kg -> spine 43-79 g (trimmed build .. heavy mount / draining cell)
+PAYLOAD_POS = (-0.020, 0.0, 0.025)   # base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only).
+                           # z=0.025 is pessimistic-for-tipping; a stack tight to the cover is ~0.015-0.020.
+HEAD_MASS_NOM = 0.015     # kg -- camera cluster on the front mast. Mounts whenever the spine payload does.
+HEAD_MASS_RAND = 0.005   # +/- kg -> head 10-20 g (mount variation; low end ~= camera-off early bring-up)
+HEAD_MASS_POS = (0.055, 0.0, 0.020)   # base frame: ~5.5cm fwd (just ahead of the 0.105 m torso), ~2cm up.
+                           # Static -- neck held level for the gait. MEASURE on assembly.
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
@@ -1121,8 +1126,11 @@ class OpenCatGymEnv(gym.Env):
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
 
-        # gait-refinement G3: welded rear payload (Pi + PiSugar + camera)
+        # gait-refinement G3: welded payload. Two bodies -- SPINE (Pi + PiSugar +
+        # wiring + mount, behind centre) and HEAD (camera cluster, front mast) --
+        # so the fore/aft CoM split matches the real fully-loaded robot.
         self._payload_id = None
+        self._head_id = None
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3)
@@ -1133,6 +1141,16 @@ class OpenCatGymEnv(gym.Env):
             _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
                                     p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
             p.changeConstraint(_c, maxForce=5e3)
+            if HEAD_MASS_NOM > 0:
+                hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
+                hj = np.random.uniform(-0.003, 0.003, 3)
+                hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
+                self._head_id = p.createMultiBody(
+                    baseMass=float(hm), baseCollisionShapeIndex=-1,
+                    basePosition=[start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
+                _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
+                                         p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
+                p.changeConstraint(_hc, maxForce=5e3)
 
         # gait-refinement G3: per-joint motor-force scale (overheat cutback)
         self._torque_scale = np.ones(8)
