@@ -101,6 +101,34 @@ dependent. **Defer until there's a concrete need** (does G2 actually need to
 change floors / get on furniture?). Get Tier 2 for near-free out of Phase 4;
 schedule B13 only when the use case is real. Needs hardware to validate.
 
+### B14 — Jump / hop as an on-command skill  🟡  ⚪
+A discrete, deliberately-triggered hop — **never** in the walk policy's action
+space (so the gait can't decide to launch itself and flip over a bump). Fired
+like any OpenCat skill (`k<skill>`) or a `perform_skill` tool call, in a sane
+context (clear floor, not near an edge). Same "library of low-level policies +
+Claude as selector" architecture as [B13].
+
+Two tiers:
+- **Free / now:** expose the firmware's existing scripted `jump` skill as a
+  commandable action in `pi_pipeline`. Zero RL; risk is only what Petoi ships.
+  Modest lurch-hop — sets the baseline for whether more is worth it.
+- **Later, if the scripted hop is too weak:** an RL *jump skill policy*, trained
+  separately (approach → crouch → explode → flight → land → hand back to the walk
+  policy), its own reward / terminal condition, never merged with the gait.
+
+**Hardware is marginal for a useful jump.** P1S alloy servos peak ~0.29 N·m but
+lose most of it at speed (coreless) — jumping needs *power*, not just torque. A
+3–4 cm pop of the ~380 g loaded body is near the ceiling; our ~70 g payload
+(~20 % of body mass) eats directly into it. A leap that reliably clears a
+4–5 cm block is a stretch goal, not a plan.
+
+**Ballistic sim2real is the hard case** — open-loop during flight, high-impact
+landing (repeated hard landings on alloy gears strip servos). Any RL version
+needs careful hardware validation, landing-force limits, and a low rep budget.
+Orthogonal to the "don't-stall / power over a lip" walk-policy work — for
+clearing a small obstacle, muscling the *walk* over it is the higher-percentage
+bet. Do B14 as a fun on-hardware experiment when the gait work is settled.
+
 ---
 
 ## Expression & personality
