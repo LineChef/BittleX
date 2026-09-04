@@ -10,29 +10,29 @@ def _turn(speech, actions=(), facts=()):
 
 def test_store_dedupes_facts(cfg):
     st = Store(cfg.memory_db_path)
-    assert st.add_fact("Their name is Mark.") is True
-    assert st.add_fact("Their name is Mark.") is False
+    assert st.add_fact("Their name is Sam.") is True
+    assert st.add_fact("Their name is Sam.") is False
     assert st.add_fact("  ") is False
 
 
 def test_recall_injects_facts_and_fts_match(cfg):
     mem = Memory(cfg)
-    mem.record("my name is Mark", _turn("Hi Mark.", facts=["Their name is Mark."]))
+    mem.record("my name is Sam", _turn("Hi Sam.", facts=["Their name is Sam."]))
     mem.record("i have a cat named Biscuit", _turn("Cute!", facts=["They have a cat named Biscuit."]))
     mem.record("we went hiking", _turn("Fun."))
     mem.record("it rained later", _turn("Aw."))  # push the cat turn out of the recent window
 
     ctx = mem.recall("tell me about my cat Biscuit")
-    assert "Their name is Mark." in ctx
+    assert "Their name is Sam." in ctx
     assert "cat named Biscuit" in ctx
     assert "earlier they said" in ctx  # FTS pulled the older exchange
 
 
 def test_recall_no_fts_hit_still_injects_facts(cfg):
     mem = Memory(cfg)
-    mem.record("my name is Mark", _turn("Hi.", facts=["Their name is Mark."]))
+    mem.record("my name is Sam", _turn("Hi.", facts=["Their name is Sam."]))
     ctx = mem.recall("completely unrelated zzz")
-    assert "Their name is Mark." in ctx
+    assert "Their name is Sam." in ctx
     assert "Relevant past moments" not in ctx
 
 

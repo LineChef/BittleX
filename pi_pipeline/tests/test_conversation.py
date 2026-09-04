@@ -4,14 +4,14 @@ from pi_pipeline.voice.conversation import Conversation
 
 def test_reply_splits_into_speech_actions_facts(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(
-        Block("text", text="Hi Mark!"),
-        Block("tool_use", name="remember", id="r1", input={"fact": "Their name is Mark."}),
+        Block("text", text="Hi Sam!"),
+        Block("tool_use", name="remember", id="r1", input={"fact": "Their name is Sam."}),
         Block("tool_use", name="perform_skill", id="s1", input={"skill": "wave"}),
     ))
-    turn = Conversation(cfg).send("hi, I'm Mark")
-    assert turn.speech == "Hi Mark!"
+    turn = Conversation(cfg).send("hi, I'm Sam")
+    assert turn.speech == "Hi Sam!"
     assert turn.actions == ["wave"]
-    assert turn.facts == ["Their name is Mark."]
+    assert turn.facts == ["Their name is Sam."]
 
 
 def test_tool_results_flushed_on_next_turn(cfg, fake_anthropic):
@@ -38,10 +38,10 @@ def test_unknown_skill_dropped_but_acknowledged(cfg, fake_anthropic):
 
 def test_memory_context_is_prepended(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(Block("text", text="ok")))
-    Conversation(cfg).send("hello", memory_context="What you know:\n- Their name is Mark.")
+    Conversation(cfg).send("hello", memory_context="What you know:\n- Their name is Sam.")
     blocks = fake_anthropic.calls[-1]["messages"][-1]["content"]
     joined = " ".join(b.get("text", "") for b in blocks)
-    assert "Memory of past conversations" in joined and "Mark" in joined
+    assert "Memory of past conversations" in joined and "Sam" in joined
 
 
 def test_history_trims_to_window(cfg, fake_anthropic):

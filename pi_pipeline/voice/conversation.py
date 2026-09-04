@@ -52,7 +52,7 @@ _REMEMBER_TOOL = {
         "Save one short, durable fact worth keeping across future "
         "conversations -- the person's name, things they like or own, ongoing "
         "situations, stable preferences. Not small talk or one-off details. "
-        "Write it as a standalone sentence (\"Their name is Mark.\", \"They have "
+        "Write it as a standalone sentence (\"Their name is Sam.\", \"They have "
         "a cat named Biscuit.\"). You may reply and call this in the same turn."
     ),
     "input_schema": {

@@ -48,3 +48,7 @@ CLAUDE.local.md
 models/
 rl_training/opencat-gym/*.gif
 rl_training/opencat-gym/benchmark_*.gif
+
+# Pre-commit privacy denylist. Enable the hook per clone:
+#   git config core.hooksPath .githooks
+.gitprivacy-terms

@@ -176,49 +176,39 @@ built-in 80-class COCO classifier) → approach controller (the `Avoider`
 bearing/area math, inverted to close distance instead of open it) → stop when
 close. Ambitious; a headline demo.
 
-### B15 — Recognize the household  🟡  ⚪
-Train the vision model to detect **specific individuals as their own classes** —
-the user, the user's wife, their cat, their dog — not just generic "person" /
-"cat" / "dog". Petoi SenseCraft custom-model pipeline: a few dozen labelled
-photos of each → YOLOv8n → deployed on the Grove Vision module. Then G2:
+### B15 — Recognize household members  🟡  ⚪
+Train the vision model to detect **specific individuals as their own classes**
+(household people and pets), not just generic "person" / "cat" / "dog". Petoi
+SenseCraft custom-model pipeline: a few dozen labelled photos of each → YOLOv8n →
+deployed on the Grove Vision module. Then G2:
 - **knows its household by relationship, not just by label.** A per-individual
-  `bond` in the `personality` layer — a closeness level (and a relationship
-  label) that scales warmth, seeking, greeting intensity, and how much of that
-  person's memory context gets pulled. G2 tells Claude who is present so replies
-  and behaviour are personalised. **Seeded household** (bonds develop from here
-  with interaction; they don't start at zero):
-  - **Mark** — best friend, the primary bond. Lights up on sight, seeks him out
-    first when wandering, notices and comments when he's been gone a while.
-  - **Mark's wife** — G2 *loves* her; his favourite person after Mark. A very
-    high bond of her own — warm greeting, comes over, glad to see her.
-  - **the cat** — G2 is *very* curious about him and wants to play: follows him
-    around, play-bows, tries to engage, watches where he goes. A bond that
-    carries a **playful disposition**, not just a closeness level.
-    Safety still comes first — the obstacle reflex and "don't get stepped on"
-    override the play drive.
-  - **the dog** — G2 is **afraid of him**. On sight it retreats, keeps maximum
-    distance, won't approach or explore toward him, and may freeze or scurry to
-    the user. A **fearful disposition** — the strong end of wary. It can ease
-    over time as nothing bad happens, but the seed is fear.
-  - new people and pets slot in at a low bond and grow (or not) over time.
-  A `G2_BONDS` config (like `G2_TRAITS`) or a small household file carries the
-  seed names + levels + labels;
-- **logs sightings to memory** ("saw the dog in the kitchen this afternoon",
-  "Mark got home ~6pm") — feeds [B11] place memory and a "what did G2 see today"
-  recap;
-- **reacts in character** through the `personality` + `behavior` layers: the
-  bond's disposition steers the `Explorer` — *affectionate* → approach + greet
-  (Mark, his wife), *playful* → follow + engage (the cat), *fearful* → invert the
-  approach math and open distance, suppress explore toward that bearing, head for
-  the user (the dog). `Novelty` already makes a regular face low-interest and one
-  unseen for a while interesting again;
+  **`bond`** in the `personality` layer, with:
+  - a **closeness level** (0..1) that scales warmth, how much G2 seeks that
+    person out, greeting intensity, and how much of their memory context gets
+    pulled;
+  - a **disposition** — `affectionate` / `playful` / `wary` / `fearful` /
+    `neutral` — that steers the `Explorer`: affectionate → approach + greet;
+    playful → follow + try to engage (safety reflex still overrides); wary →
+    keep distance; fearful → invert the approach math to open distance, suppress
+    wandering toward that bearing, head for the closest trusted person.
+  Bonds are **seeded** (they don't start at zero for known members) and drift
+  with interaction over time. G2 tells Claude who is present so replies and
+  behaviour are personalised. `Novelty` already makes a regularly-seen face
+  low-interest and one unseen for a while interesting again.
+- **logs sightings to memory** ("saw the dog in the kitchen this afternoon") —
+  feeds [B11] place memory and a "what did G2 see today" recap;
 - optionally a gentle **follow / keep-an-eye-on** behaviour (composes with [B8]).
 
+> **The household roster — names, which pet, seed closeness + disposition per
+> member — is per-deployment personal data and lives ONLY in gitignored local
+> config** (`G2_BONDS` in `.env`; see `.env.example`). Nothing about a specific
+> real person or pet goes in a tracked file.
+
 **On-device only.** The Grove Vision module runs the model on-chip and sends
-*detections* (label + box) over serial — no images of the user or the home leave
+*detections* (label + box) over serial — no images of anyone or the home leave
 the robot. A 192×192 detector recognising one specific person is coarse
-(lighting- and angle-sensitive); treat a hit as "probably Mark", not proof, and
-let the voice interaction confirm.
+(lighting- and angle-sensitive); treat a hit as a guess, not proof, and let the
+voice interaction confirm.
 
 Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
 model" bullet). The per-individual classes are the only new piece; everything

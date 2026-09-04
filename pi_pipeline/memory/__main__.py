@@ -4,8 +4,8 @@
     python -m pi_pipeline.memory log [N]               # last N exchanges (default 20)
     python -m pi_pipeline.memory search "cat"          # relevance search the log
     python -m pi_pipeline.memory recall "tell me about my cat"   # what recall() would inject
-    python -m pi_pipeline.memory remember "Their name is Mark."  # add a fact by hand
-    python -m pi_pipeline.memory forget "Their name is Mark."    # remove a fact (text or id)
+    python -m pi_pipeline.memory remember "Their name is Sam."  # add a fact by hand
+    python -m pi_pipeline.memory forget "Their name is Sam."    # remove a fact (text or id)
     python -m pi_pipeline.memory wipe --yes            # clear everything
 """
 from __future__ import annotations

@@ -11,7 +11,7 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 | | What | How it's used |
 |---|---|---|
 | **Exchanges** | the full log, one row per turn, mirrored into an FTS5 index | relevance-searched at recall time for *older* turns related to what was just said |
-| **Facts** | short durable notes G2 chose to keep ("Their name is Mark.") | the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn |
+| **Facts** | short durable notes G2 chose to keep ("Their name is Sam.") | the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn |
 
 **Recall** (before each Claude call): `recall(user_text)` returns a context block
 — the current fact set plus up to `G2_MEMORY_RECALL` older exchanges that match
@@ -42,8 +42,8 @@ python -m pi_pipeline.memory facts                 # durable facts
 python -m pi_pipeline.memory log 30                # recent exchanges
 python -m pi_pipeline.memory search "cat"          # relevance search the log
 python -m pi_pipeline.memory recall "my cat"       # exactly what recall() would inject
-python -m pi_pipeline.memory remember "Their name is Mark."
-python -m pi_pipeline.memory forget "Their name is Mark."   # by text or #id
+python -m pi_pipeline.memory remember "Their name is Sam."
+python -m pi_pipeline.memory forget "Their name is Sam."   # by text or #id
 python -m pi_pipeline.memory wipe --yes
 ```
 

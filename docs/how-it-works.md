@@ -85,7 +85,7 @@ blank.
 
 **The fix:** a small local database (SQLite) on the Pi that holds two things —
 the full log of every exchange, and a short list of durable *facts* worth keeping
-("their name is Mark," "they have a cat named Biscuit").
+("their name is Sam," "they have a cat named Biscuit").
 
 **How it's used:** before each message to Claude, the memory system assembles a
 little context block — the current facts, plus any older conversations that look

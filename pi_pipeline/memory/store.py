@@ -3,7 +3,7 @@
 Two tables:
 - `exchanges` -- the full conversation log (one row per user/assistant turn),
   mirrored into an FTS5 index for relevance search.
-- `facts`    -- short durable notes G2 chose to keep ("their name is Mark").
+- `facts`    -- short durable notes G2 chose to keep ("their name is Sam").
   `last_recalled` is bumped whenever a fact is surfaced, so the injected set
   favours recently-relevant facts once it hits the cap (a light decay).
 
