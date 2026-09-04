@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 import anthropic
 
 from ..config import Settings
+from ..personality import Personality
 from . import skills
 
 log = logging.getLogger("g2.conversation")
@@ -72,11 +73,15 @@ class AssistantTurn:
 
 
 class Conversation:
-    def __init__(self, cfg: Settings):
+    def __init__(self, cfg: Settings, personality: Personality | None = None):
         self._cfg = cfg
         self._client = anthropic.Anthropic(
             api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s
         )
+        p = personality or Personality.from_settings(cfg)
+        self._system_prompt = p.system_prompt(cfg.system_prompt)
+        if p.traits:
+            log.info("personality: %s", p.describe())
         self._history: list[dict] = []
         self._pending_tool_results: list[dict] = []
 
@@ -114,7 +119,7 @@ class Conversation:
         resp = self._create(
             model=self._cfg.claude_model,
             max_tokens=self._cfg.claude_max_tokens,
-            system=self._cfg.system_prompt,
+            system=self._system_prompt,
             tools=_TOOLS,
             messages=self._history,
         )

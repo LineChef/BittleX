@@ -137,7 +137,9 @@ bet. Do B14 as a fun on-hardware experiment when the gait work is settled.
 A small set of authored skills for emotion/emphasis — happy wiggle, play-bow,
 nod-yes, shake-no, moonwalk — added to the `perform_skill` catalogue so Claude
 can punctuate spoken replies with body language, not just perform functional
-gaits. Low effort once B3 exists; high payoff for how alive G2 feels.
+gaits. Low effort once B3 exists; high payoff for how alive G2 feels. These are
+the tokens the `personality` `cues()` channel returns — wire them to real skills
+here.
 
 ### B5 — Emotive sound (chirp vocabulary)
 A vocabulary of short buzzer melodies (`b<tone> <ms> …` over the serial link) for
@@ -158,13 +160,53 @@ B4/B5.
 On command ("G2, keep watch"), G2 walks a short loop; on motion or person
 detection it stops, chirps (B5), and describes what it sees via Claude (the
 vision `narrate` path). A "mode" the voice loop can enter and exit. Exercises
-vision + avoidance + voice + link together — a good capstone.
+vision + avoidance + voice + link together — a good capstone. Add it as another
+`Mode` in `pi_pipeline/behavior/mode_controller.py` alongside EXPLORE.
+
+**Explore mode + a curiosity trait are built** (`pi_pipeline/personality/` +
+`pi_pipeline/behavior/`, 2026-09-03): the `ModeController` (CONVERSE / IDLE /
+EXPLORE), the `Explorer` (wander + investigate-novelty intent), `Novelty`
+tracking, and the trait framework that steers them. Pure logic, tested against
+mocks; the runtime loop that drives the actuator + cues + memory logging is the
+Phase 10 integration and needs the camera.
 
 ### B8 — Go-to-object
 "Go to the red cup" → detect the object (a custom SenseCraft model, or the
 built-in 80-class COCO classifier) → approach controller (the `Avoider`
 bearing/area math, inverted to close distance instead of open it) → stop when
 close. Ambitious; a headline demo.
+
+### B15 — Recognize the household (the user + the pets)  🟡  ⚪
+Train the vision model to detect **specific individuals as their own classes** —
+the user, their cat, their dog — not just generic "person" / "cat" / "dog". Petoi
+SenseCraft custom-model pipeline: a few dozen labelled photos of each →
+YOLOv8n → deployed on the Grove Vision module. Then G2:
+- **treats the user as its best friend** — the closest relationship it has.
+  Lights up on seeing them ("hey Mark!"), seeks them out first when it wanders,
+  notices and comments when they've been gone a while, pulls their memory context
+  on sight. Names each pet on sight and tells Claude who is present so replies and
+  behaviour are personalised. This is a *relationship*, not just a label — a
+  natural fit for a `bond` concept in the `personality` layer (a per-individual
+  closeness level that scales warmth, seeking, and greeting intensity), which
+  future people/pets slot into at lower levels;
+- **logs sightings to memory** ("saw the dog in the kitchen this afternoon",
+  "Mark got home ~6pm") — feeds [B11] place memory and a "what did G2 see today"
+  recap;
+- **reacts in character** through the `personality` + `behavior` layers:
+  `Novelty` already makes a regular face low-interest and one unseen for a while
+  interesting again; a future `affectionate` trait → approach + greet the user;
+  a `wary` one → keep distance from the dog;
+- optionally a gentle **follow / keep-an-eye-on** behaviour (composes with [B8]).
+
+**On-device only.** The Grove Vision module runs the model on-chip and sends
+*detections* (label + box) over serial — no images of the user or the home leave
+the robot. A 192×192 detector recognising one specific person is coarse
+(lighting- and angle-sensitive); treat a hit as "probably Mark", not proof, and
+let the voice interaction confirm.
+
+Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
+model" bullet). The per-individual classes are the only new piece; everything
+downstream reuses the personality / behavior / memory layers already built.
 
 ### B11 — Learn its way around the house (topological place memory)
 G2 builds up a sense of *where it is* over time — as **place recognition + a

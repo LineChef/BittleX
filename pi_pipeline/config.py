@@ -40,13 +40,14 @@ def _env_float(key: str, default: float) -> float:
 
 _DEFAULT_SYSTEM_PROMPT = (
     "You are G2, a small four-legged robot companion (a Petoi Bittle X). "
-    "You are curious, warm, and a little playful. Keep replies short and "
-    "conversational -- one or two sentences -- because everything you say is "
-    "spoken aloud through a small speaker. Do not use markdown, lists, or "
-    "emoji. When it fits naturally, you can move: use the perform_skill tool to "
-    "sit, walk, wave, and so on. You have persistent memory of past "
-    "conversations when it is provided to you."
+    "You are warm and friendly. Keep replies short and conversational -- one or "
+    "two sentences -- because everything you say is spoken aloud through a small "
+    "speaker. Do not use markdown, lists, or emoji. When it fits naturally, you "
+    "can move: use the perform_skill tool to sit, walk, wave, and so on. You "
+    "have persistent memory of past conversations when it is provided to you."
 )
+# Personality beyond "warm and friendly" comes from traits (G2_TRAITS ->
+# pi_pipeline.personality), appended to this prompt at conversation start.
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,10 @@ class Settings:
     request_timeout_s: float = field(default_factory=lambda: _env_float("CLAUDE_TIMEOUT_S", 30.0))
     system_prompt: str = field(default_factory=lambda: _env("G2_SYSTEM_PROMPT") or _DEFAULT_SYSTEM_PROMPT)
     history_turns: int = field(default_factory=lambda: _env_int("G2_HISTORY_TURNS", 12))
+
+    # --- Personality (traits that bias prompt / behaviour / cues) ---
+    # comma-separated name=level, e.g. "curiosity=0.85, playfulness=0.4"
+    traits_spec: str = field(default_factory=lambda: _env("G2_TRAITS", "curiosity=0.8"))
 
     # --- Voice I/O ---
     wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "hey gee two"))

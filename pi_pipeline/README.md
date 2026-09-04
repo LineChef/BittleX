@@ -34,9 +34,20 @@ pi_pipeline/
     cues.py            # listening / thinking / speaking state cues
     loop.py            # the orchestrator
     __main__.py        # entrypoint: python -m pi_pipeline.voice
+  personality/         # traits that bias the prompt, behaviour params, and cues
+    traits.py          # Trait base + BehaviorParams + the name→class REGISTRY
+    curiosity.py       # first concrete trait
+    personality.py     # Personality: system_prompt() / behavior_params() / cues()
+  behavior/            # what G2 does on its own between conversations
+    mode_controller.py # CONVERSE / IDLE / EXPLORE state machine
+    explore.py         # wander + investigate-novelty intent (like vision/avoidance)
+    novelty.py         # time-decayed memory of what's been seen
   memory/              # Phase 9 — persistent conversation memory (next)
   vision/              # Phase 8 — camera / obstacle detection (hardware-gated)
 ```
+
+Personality is set via `G2_TRAITS` (e.g. `curiosity=0.85, playfulness=0.4`);
+`python -m pi_pipeline.personality` prints the resolved prompt + behaviour knobs.
 
 ## Setup
 
