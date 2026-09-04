@@ -31,6 +31,18 @@ rl_training/logs/
 pi_pipeline/memory/*.db
 pi_pipeline/memory/data/
 
+# Personal media / training data — photos of people, pets, the home (B15 model
+# training). Put ALL such media under one of these dirs; never commit it.
+training_data/
+datasets/
+**/faces/
+**/household/
+**/media_local/
+*.jpg
+*.jpeg
+*.mp4
+*.mov
+
 # Run console logs
 *.log
 

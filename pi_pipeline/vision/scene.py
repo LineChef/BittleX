@@ -40,7 +40,15 @@ def summarize(frame: Frame, min_confidence: float = 0.4) -> str:
 
 
 def narrate(frame: Frame, ask, min_confidence: float = 0.4) -> str:
-    """`ask(prompt) -> str`. Returns G2's spoken answer."""
+    """`ask(prompt) -> str`. Returns G2's spoken answer.
+
+    Privacy: this sends only the *text* description built from detections
+    (labels + rough positions) to `ask` -- never a raw image. Do not change that
+    without a deliberate opt-in: a photo of the home/people going to a cloud LLM
+    is a different privacy posture. The guard below enforces the text-only path.
+    """
+    if isinstance(frame, (bytes, bytearray, memoryview)):
+        raise TypeError("narrate() takes a detection Frame, not raw image bytes")
     facts = summarize(frame, min_confidence)
     prompt = (
         "This is what your camera sees right now (positions are from your point "

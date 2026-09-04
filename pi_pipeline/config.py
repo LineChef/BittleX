@@ -63,6 +63,9 @@ class Settings:
     # --- Personality (traits that bias prompt / behaviour / cues) ---
     # comma-separated name=level, e.g. "curiosity=0.85, playfulness=0.4"
     traits_spec: str = field(default_factory=lambda: _env("G2_TRAITS", "curiosity=0.8"))
+    # Household roster for B15 -- PERSONAL DATA, real values only in the
+    # gitignored .env. Format: name:closeness:disposition, ';'-separated.
+    bonds_spec: str = field(default_factory=lambda: _env("G2_BONDS", ""))
 
     # --- Voice I/O ---
     wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "hey gee two"))

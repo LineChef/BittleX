@@ -3,7 +3,7 @@ import types
 import pytest
 
 from pi_pipeline.memory.memory import Memory
-from pi_pipeline.memory.store import Store, has_temporal_detail
+from pi_pipeline.memory.store import Store, has_temporal_detail, scrub_text
 
 
 def _turn(speech, actions=(), facts=()):
@@ -54,6 +54,12 @@ def test_exchange_ts_is_date_only(cfg):
     st.log_exchange("hi", "hello", [])
     ts = st.recent_exchanges(1)[0]["ts"]
     assert len(ts) == 10 and ts.count("-") == 2   # YYYY-MM-DD, no clock time
+
+
+def test_scrub_text_redacts_times_and_named_terms():
+    s = scrub_text("Alex gets home at 6pm on Friday", extra_terms=["Alex"])
+    assert "Alex" not in s and "6pm" not in s and "Friday" not in s
+    assert "[name]" in s and "[when]" in s
 
 
 def test_recall_injects_facts_and_fts_match(cfg):

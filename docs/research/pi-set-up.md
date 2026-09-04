@@ -259,6 +259,44 @@ time", and numbers to decide voice-only vs voice+vision co-residency.
 
 ---
 
+## 9. Security hardening — G2 is a mic + camera on the home network
+
+The robot's SD card holds the API key (`.env`), the memory DB (names, prefs,
+conversation history), and the household roster (`.env` `G2_BONDS`). Treat a
+lost/stolen robot as a full disclosure of those. Bring-up checklist:
+
+- [ ] **SSH: key only.** In Raspberry Pi Imager set an SSH *public key*, not a
+      password; then `PasswordAuthentication no` in `/etc/ssh/sshd_config`.
+- [ ] **Change the default `pi` password** anyway (`passwd`).
+- [ ] **Do not port-forward to the Pi.** Reach it over the LAN / a VPN /
+      Tailscale, never an open inbound port.
+- [ ] **Keep it patched:** `sudo apt update && sudo apt full-upgrade` on setup
+      and periodically; enable `unattended-upgrades`.
+- [ ] **Wi-Fi:** on the home network behind the router NAT (not a bridged/guest
+      SSID that can't reach the internet if you need the API). `wifi.powersave 2`
+      is already set in §3.
+- [ ] **The BiBoard has its own Wi-Fi + BLE** (for Petoi's mobile app). If you
+      don't use the app, disable the board's Wi-Fi, or at least change its AP
+      password — otherwise it's a second, open radio into the robot.
+- [ ] **API key is revocable.** Note where to revoke it (Anthropic console) so a
+      lost robot is a 2-minute fix. Consider a dedicated key with a spend cap.
+- [ ] **Memory hygiene:** `python -m pi_pipeline.memory export --scrub` before
+      sharing any logs; `... wipe --yes` to clear it. The `remember` path already
+      refuses dates/times/schedules (`store.has_temporal_detail`).
+- [ ] **Vision stays on-chip.** The Grove module does detection on its own NPU
+      and sends only labels+boxes over serial — raw frames never leave it.
+      `scene.narrate` sends only the *text* summary to Claude; keep it that way
+      (there's a guard in `vision/scene.py`).
+- [ ] **What still goes to the Anthropic API every turn:** the speech
+      transcript, rolling history, and recalled memory facts (which include
+      names). That's inherent to a cloud brain. Ask Anthropic about **Zero Data
+      Retention** if server-side retention matters to you.
+- [ ] **Personal media** (B15 training photos of people/pets/home) lives only in
+      the gitignored `training_data/` etc. — and note that whatever service
+      trains the model (SenseCraft / Roboflow / Colab) receives those images.
+
+---
+
 ## Open questions — status after this research
 
 | question | answer |

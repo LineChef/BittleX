@@ -100,6 +100,18 @@ def has_temporal_detail(text: str) -> bool:
     return bool(_TEMPORAL_RE.search(text))
 
 
+def scrub_text(text: str, extra_terms: list[str] | None = None) -> str:
+    """Redact date/time/schedule spans and any `extra_terms` (whole word,
+    case-insensitive) -- for safely sharing a memory dump. Not a security
+    guarantee, a courtesy filter."""
+    out = _TEMPORAL_RE.sub("[when]", text)
+    for term in extra_terms or []:
+        term = term.strip()
+        if term:
+            out = re.sub(rf"\b{re.escape(term)}\b", "[name]", out, flags=re.IGNORECASE)
+    return out
+
+
 def _fts_query(text: str) -> str:
     """Turn free text into a safe FTS5 OR-query of its content words."""
     words = [w for w in re.findall(r"[a-zA-Z0-9]{3,}", text.lower()) if w not in _STOPWORDS]
