@@ -36,9 +36,11 @@ CHALLENGES = {
     "obstacles":         {"RANDOM_TERRAIN": 0.035},
     "obstacles-big":     {"RANDOM_TERRAIN": 0.050, "RANDOM_PUSH": 0.30},
     "obstacles-huge":    {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35},
-    "rubble":            {"RUBBLE": 0.030, "RUBBLE_N": 260},   # dense tumbled rubble, deflects the foot
-    "rubble-hard":       {"RUBBLE": 0.045, "RUBBLE_N": 340},   # bigger, denser chunks
+    "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 540, "RUBBLE_PROB": 1.0},   # rough, near the passable limit
+    "rubble-hard":       {"RUBBLE": 0.020, "RUBBLE_N": 560, "RUBBLE_PROB": 1.0},   # denser + taller, near the passable limit
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
+    "carpet":            {"CARPET": 0.013, "CARPET_SWELL": 0.022, "CARPET_PROB": 1.0},   # 13mm bumps + broad rolling swell
+    "carpet-rough":      {"CARPET": 0.019, "CARPET_SWELL": 0.030, "CARPET_PROB": 1.0},   # taller bumps + bigger swell
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
     "shoves":            {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20},
     "shoves-hard":       {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25},
@@ -57,6 +59,7 @@ CHALLENGES = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="trained/run20m_ppo")
+    ap.add_argument("--latest", action="store_true", help="use the newest trained/checkpoints/*_steps.zip")
     ap.add_argument("--challenge", default="flat", choices=list(CHALLENGES))
     ap.add_argument("--cmd", type=float, default=0.10, help="forward speed command m/s")
     ap.add_argument("--speed", type=float, default=1.0, help="playback speed (1 = ~realtime)")
@@ -72,6 +75,15 @@ def main():
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args()
 
+    if args.latest:
+        import glob, os
+        cks = glob.glob("trained/checkpoints/*_steps.zip")
+        if cks:
+            args.model = max(cks, key=os.path.getmtime)[:-4]   # newest file, not highest step number
+            print(f"--latest -> {args.model}")
+        else:
+            print("--latest: no checkpoints found, using", args.model)
+
     if args.list:
         print("challenges:")
         for k in CHALLENGES:
@@ -80,7 +92,7 @@ def main():
 
     gif_mode = args.gif is not None
     ep_steps = args.steps if args.steps is not None else (
-        2000 if args.challenge.startswith("rubble") else 250)
+        2000 if args.challenge.startswith(("rubble", "carpet")) else 250)
 
     import opencat_gym_env as E
     E.GUI_MODE = not gif_mode           # GIF path is headless
@@ -92,6 +104,7 @@ def main():
     # stable_baselines3/torch is imported, or PyBullet's Metal GUI thread fails
     # silently (sim runs, no window). Same ordering as watch_trained.py.
     env = OpenCatGymEnv()
+    env.reset()                 # materialise the GUI window BEFORE torch loads (macOS)
     import pybullet as p
     import numpy as np
 
@@ -103,7 +116,14 @@ def main():
     model = PPO.load(args.model)
     if not gif_mode:
         p.setRealTimeSimulation(0)
+        p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)   # bumps cast shadows -> readable terrain
     dt = 3.0 / 240.0
+
+    import pybullet_data
+    try:
+        _checker = p.loadTexture(pybullet_data.getDataPath() + "/checker_blue.png")
+    except Exception:
+        _checker = -1
 
     W, H, FPS, EVERY = 480, 300, 25, 3
     frames = []
@@ -119,6 +139,16 @@ def main():
             DEC._apply(knobs)
             run += 1
             obs, _ = env.reset()
+            # Body 0 is the ground (plane or heightfield). Put a checker texture on
+            # it so the grid warps over the height variation -- and it also fixes
+            # the macOS black-floor texture glitch.
+            try:
+                if _checker >= 0:
+                    p.changeVisualShape(0, -1, rgbaColor=[1, 1, 1, 1], textureUniqueId=_checker)
+                else:
+                    p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
+            except Exception:
+                pass
             env.set_command(fwd=args.cmd, yaw=0.0)
             x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0]
             steps, peak_tilt = 0, 0.0

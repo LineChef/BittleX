@@ -155,6 +155,29 @@ Software only; no physical robot needed until Phase 6 deployment.
   *firmware* gait. Next steps are ONNX export + Pi bring-up, then that
   head-to-head. Learned-gait work otherwise resumes only when
   perception-in-the-loop becomes active — see the **Phase 8 Target capability**.
+- **Pre-hardware robustness push — ACTIVE (from 2026-09-03).** While the frame
+  ships (10–25 days out), reopening gait training to harden it for *walk-anywhere*
+  use — G2 will not always be on flat ground. `run20m_ppo` stays the frozen
+  deployment base; these are reversible continuations, kept only if they net
+  capability per the bar (see [`feedback_training_capability_bar`] / the
+  refinement regimen).
+  - **Rough-terrain training.** The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
+    amplitude — cosmetic. Built a proper rough course: `CARPET`, a single
+    `GEOM_HEIGHTFIELD` body (no scattered obstacles), 13 mm multi-octave bumps +
+    a broad ~±11 mm/1.5 m rolling swell, std-normalised so it fills the height
+    range and stays passable (`run20m_ppo` crosses it at ~0.07–0.10 m/s, 0 falls).
+    Earlier iterations: scattered-box `RANDOM_TERRAIN` bump-up, then tumbled
+    "rubble" (`run20m_rough` 3.5 M, `run20m_rough2` stopped ~1.4 M) — both
+    retired; the single heightfield deflects feet instead of catching edges and
+    is one collision body (cheaper sim). Branch `gait-rough`.
+  - **`run20m_carpet`** — continuation from `run20m_ppo`, `CARPET` on for 50 % of
+    DR episodes (rest keep the flat/sloped plane so slope/obstacle DR is
+    unchanged), `--finetune-lr 1e-4 --finetune-target-kl 0.05`, 4 M steps.
+    Launched 2026-09-03. Verdict pending its learned-vs-scripted + decathlon eval.
+  - **Robustness backlog** — the categorised list of real-world scenarios still
+    to train/eval (single-servo failure, IMU bias/mount tilt, pick-up &
+    set-down, directional terrain catches, slope transitions, friction
+    asymmetry, …): [`docs/rl-runs/robustness-backlog.md`](rl-runs/robustness-backlog.md).
 
 ### Environment
 
@@ -658,15 +681,46 @@ tuning, and the Phase 10 wiring — all hardware-gated.
   - PiDog attaches images to LLM calls only for occasional "what do you see"
     queries, not continuous avoidance — matches the split above.
 - [ ] **After vision works, revisit the locomotion policy with perception in the
-      loop — toward the Target capability above.** Run 5–7 terrain training is
-      reactive and IMU-only, so the policy can't anticipate terrain or
-      deliberately step around an obstacle. Feed forward obstacle/detection
-      information into the policy's observation and retrain (or add a perception
-      front-end that biases the existing gait) for anticipatory foot placement
-      and step-over / go-around / stop decisions. This is what a scripted keyframe
-      gait fundamentally can't do — it has no input to feed vision into — and is
-      the main reason the project uses RL for locomotion. Only possible once
-      perception exists; a distinct effort from the flat-ground gait.
+      loop — toward the Target capability above.** The current gait is reactive
+      and IMU-only, so it can't anticipate terrain or deliberately step around an
+      obstacle — it only learns a lip exists *after* a foot hits it (confirmed by
+      the 2026-09-03 probe batch: it never falls but *stalls* against curbs /
+      lips / on carpet, because it's blind forward). This is what a scripted
+      keyframe gait fundamentally can't fix — it has no input to feed vision into
+      — and is the main reason the project uses RL for locomotion.
+
+      **DECIDED ARCHITECTURE (2026-09-03):** the walk policy gets **its own
+      low-bandwidth forward terrain feature, fed directly into its 278-d
+      observation at control rate**, *separate from* the vision→Claude /
+      vision→`Avoider` command-setting path. Not "vision biases the command" —
+      that keeps the policy blind and caps it at "creep on command"; Claude is
+      also far too slow (seconds/call) for foot-placement timescale. Instead:
+      - An **on-Pi module** turns the camera's detection stream into a compact
+        feature — e.g. "nearest obstacle bearing, distance, approx height" (a
+        handful of floats), refreshed at detection rate (~10–30 Hz), held
+        stale between frames — and appends it to the policy observation.
+      - Claude stays *above* this loop (navigation goals, narration); the
+        `Avoider` reflex may still set coarse speed/yaw commands in parallel.
+        The terrain feature and the command path are independent inputs.
+      - **Sim training:** synthesize that same feature from PyBullet ground-truth
+        obstacle geometry, with realistic detector noise / miss-rate / latency
+        (tuned to the real model's measured stats, `sysid`-style), add it to the
+        observation, and retrain. **Claude does not need to be in the sim** — it
+        isn't in this loop; the loop is camera→feature→policy, all Pi-local, and
+        Claude's high-level commands are already covered by the sim's command
+        randomisation.
+      - Expected payoff: anticipatory slowing / go-around / stop for *large*
+        obstacles and curbs (camera + detector are good at these). Fine
+        foot-placement over a 12–15 mm lip stays marginal — head-height forward
+        camera + 192×192 detector is weak on small low-contrast terrain edges.
+      - The **"don't stall" reward idea** (dense forward-progress term + sparse
+        breakthrough bonus, `robustness-backlog.md` R-NOSTALL) is **deferred to
+        here** — it only makes sense once the policy can see far enough ahead to
+        slow *before* contact; on the blind policy it just produces frantic
+        scrabbling, not intentional stepping.
+
+      Only possible once perception exists; a distinct effort from the
+      flat-ground gait.
 - [ ] (Stretch, with vision + IMU in place) More robust self-righting — flip
       detection from the IMU plus a dedicated recovery policy (or the firmware
       skill for the cases it covers, a learned fallback for the rest). Ruled out

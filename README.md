@@ -50,16 +50,20 @@ X and camera are still a few weeks out. Everything runs software-only or with th
 hardware mocked for now.
 
 - **RL locomotion** (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
-  pipeline. The best sim gait so far is `cov_r1_slope`: a learned *residual* on
-  Bittle's scripted `wkF` walk, IMU-corrected every control step, that also
-  handles slopes. It's currently in a **refinement cycle** — adding
-  command-following locomotion (speed + heading commands; stand, backward, turn),
-  wider correction authority, expanded domain randomization, and a modeled
-  Pi/camera payload — building toward a qualified recipe and one large
-  consolidation training run. History in [`docs/rl-runs/`](docs/rl-runs/); a survey
-  of other Bittle RL projects in
+  pipeline. The gait is a learned *residual* on Bittle's scripted `wkF` walk,
+  IMU-corrected every control step, conditioned on speed/heading commands and the
+  mounted Pi/camera payload. The frozen deployment base is **`run20m_ppo`** (20 M
+  steps from scratch: tracks speed commands to 0.007 m/s, walks a −24° descent,
+  0 % falls on the payload-on decathlon). It's exported to ONNX and sim-validated
+  bit-for-bit against the on-robot control loop. While the frame ships, an active
+  **pre-hardware robustness push** hardens it for walk-anywhere use — rough
+  terrain (a single-heightfield "carpet" course), then the scenario list in
+  [`docs/rl-runs/robustness-backlog.md`](docs/rl-runs/robustness-backlog.md)
+  (single-servo failure, IMU bias, pick-up/set-down, …), each a reversible
+  continuation kept only if it nets capability. History in
+  [`docs/rl-runs/`](docs/rl-runs/); a survey of other Bittle RL projects in
   [`docs/research/bittle-rl-projects.md`](docs/research/bittle-rl-projects.md); the
-  staged plan in
+  original staged plan in
   [`docs/rl-runs/refinement-regimen.md`](docs/rl-runs/refinement-regimen.md).
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent memory,
   vision / obstacle-avoidance, the BiBoard serial link, and a fall-recovery state

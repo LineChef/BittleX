@@ -35,18 +35,29 @@ layer the sim baseline doesn't) for plain walking on real ground?
 
 ## H2 — Payload re-tuning  🟡
 
-`run20m_ppo` is **payload-conditioned** — trained with a 75 g welded rear payload
-present every episode (stand-in for the Pi + camera + wiring). The gait's
-stability leans on that mass.
+`run20m_ppo` is **payload-conditioned** — trained with a single 75 g welded rear
+payload every episode. The gait's stability leans on that mass.
 
-- **Trigger:** the real Pi + camera + battery + mount weighs meaningfully off
-  75 g (measure it), OR the final build puts mass somewhere other than the rear,
-  OR something gets removed from the bot later.
-- **Work:** set `PAYLOAD_MASS_NOM` / `PAYLOAD_MASS_RAND` and the mount position to
-  match the real build, then a from-scratch 20M run (or a clean `--finetune-lr`
-  continuation if the delta is small). Re-run the decathlon payload-on.
-- **Cheap-ish** and high-value if the delta is real — a wrong payload model is a
-  direct sim-to-real error.
+**Sim payload model updated 2026-09-03** (BOM in `docs/research/hardware-specs.md`
+"Mounted payload weight"; user expects the camera on the bot by the time the
+frame arrives, so the target is the *fully-loaded* config). Now **two welded
+bodies** so the fore/aft CoM split is right:
+- `PAYLOAD_MASS_NOM 0.061` ± `0.018` (spine 43–79 g) at `PAYLOAD_POS
+  (-0.020, 0, 0.025)` — Pi Zero 2 WH + SD + PiSugar S 1200 mAh + wiring + cover.
+- `HEAD_MASS_NOM 0.015` ± `0.005` (head 10–20 g) at `HEAD_MASS_POS
+  (0.055, 0, 0.020)` — Grove Vision AI V2 + OV5647 + case, front mast.
+- Combined nominal ≈ 76 g, payload CoM ~14 mm forward of the spine-only point.
+- `run20m_ppo` does **not** have this (still frozen at the old lumped 75 g rear).
+  The next training run picks it up.
+
+- **Trigger:** the real built stack weighs meaningfully off ~76 g combined (weigh
+  it), OR the spine/head mass split or positions differ from the estimate above,
+  OR something is added/removed later (e.g. camera stays off, bigger battery).
+- **Work:** set `PAYLOAD_MASS_*` / `HEAD_MASS_*` / positions to the **measured**
+  values (kitchen scale; balance each sub-assembly on an edge for its CoM), then
+  a from-scratch 20M run — or a clean `--finetune-lr` continuation from
+  `run20m_ppo` if the delta is small. Re-run the decathlon payload-on.
+- **Cheap-ish** and high-value — a wrong payload model is a direct sim-to-real error.
 
 ## H3 — Clean re-run of the 4a ledge test  🟡  ⚪
 

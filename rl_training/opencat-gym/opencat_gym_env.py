@@ -208,25 +208,54 @@ RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. s
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
 RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
-RUBBLE = 0.0            # >0 = a dense carpet of small tumbled rubble chunks, ~this size (m).
-                        # Each chunk is a randomly-rotated box half-sunk into the ground, so only
-                        # an angled wedge pokes up -- feet deflect over it rather than catching a
-                        # vertical edge. "Very uneven ground to walk over", not trip hazards.
-                        # 0 by default; watch.py --challenge rubble sets it for viz;
-                        # run20m_rough experiment sets it for training at RUBBLE_PROB.
-RUBBLE_N = 70          # chunks per episode when the rubble field is placed
-RUBBLE_PROB = 1.0      # fraction of episodes with rubble (1.0 for viz; <1 for training)
+RUBBLE = 0.016         # run20m_rough2: rounded-cobble rubble (spheres/ridges/some angular), 15mm cap
+                        # size (m) -> ~10-18 mm exposed after half-sinking. Each chunk is a
+                        # randomly-rotated box buried ~half-deep, so only an angled wedge pokes up --
+                        # feet deflect over rather than catching a vertical edge. Paired with the
+                        # recipe's existing +/-10 deg random incline (SLOPE_MAX_DEG). Base run20m
+                        # had this 0; watch.py --challenge rubble overrides for viz.
+RUBBLE_N = 140        # chunks per training episode (viz 'rubble' uses 540)
+RUBBLE_PROB = 0.0     # run20m_carpet: rubble retired -- the single-heightfield CARPET is the rough-terrain substrate now
+RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait clears a 15mm threshold). Rough but not a wall.
+                        # clear. Every chunk is pushed down so its top sits <= ground + this.
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
-PAYLOAD_MASS_NOM = 0.075   # kg. Pi Zero 2 + PiSugar S + camera + mount, on the rear spine
-PAYLOAD_MASS_RAND = 0.035  # +/- kg. G4: 0.015 -> 0.035 (40-110 g range). The payload is bolted on so
-                           # PAYLOAD_PROB is now 1.0 -- instead of ever training a bare robot, widen the
-                           # mass so the policy keeps margin for a draining battery / heavier final camera
-                           # without over-fitting to one exact inertia (phase2's failure mode).
-PAYLOAD_POS = (-0.020, 0.0, 0.025)   # mount point in the base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only)
+# --- Payload = the mounted Pi companion stack. Modelled as TWO welded bodies so
+# the fore/aft CoM split is right (BOM: docs/research/hardware-specs.md "Mounted
+# payload weight", 2026-09-03). Target config = fully-loaded WITH camera (~76 g),
+# expected to be on the robot by the time the frame arrives.
+#   SPINE  = Pi Zero 2 WH + SD (~14 g) + PiSugar S w/ 1200 mAh cell (~33 g) +
+#            data-only serial wiring (~4 g) + back-cover mount (~10 g) = ~61 g,
+#            ~2 cm behind centre. (Heatsink left off -- pi-set-up.md 6b.)
+#   HEAD   = Grove Vision AI V2 (~5 g) + OV5647 + ribbon (~4 g) + case + Grove
+#            cable (~6 g) = ~15 g, on the front mast ahead of centre.
+# Re-set NOM/RAND/POS for BOTH to the MEASURED stack on assembly (kitchen scale;
+# balance each sub-assembly on an edge for its CoM). This is an estimate until then.
+PAYLOAD_MASS_NOM = 0.061   # kg -- SPINE body only (camera is HEAD_MASS_*, below)
+PAYLOAD_MASS_RAND = 0.018  # +/- kg -> spine 43-79 g (trimmed build .. heavy mount / draining cell)
+PAYLOAD_POS = (-0.020, 0.0, 0.025)   # base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only).
+                           # z=0.025 is pessimistic-for-tipping; a stack tight to the cover is ~0.015-0.020.
+HEAD_MASS_NOM = 0.015     # kg -- camera cluster on the front mast. Mounts whenever the spine payload does.
+HEAD_MASS_RAND = 0.005   # +/- kg -> head 10-20 g (mount variation; low end ~= camera-off early bring-up)
+HEAD_MASS_POS = (0.055, 0.0, 0.020)   # base frame: ~5.5cm fwd (just ahead of the 0.105 m torso), ~2cm up.
+                           # Static -- neck held level for the gait. MEASURE on assembly.
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
+
+# CARPET: replace the whole ground with one dense-bump heightfield (a single
+# GEOM_HEIGHTFIELD body -- no scattered obstacles). "Floor never shows" rough
+# terrain for walk-anywhere training. Value = max bump height (m) above the mean;
+# the field is scaled so the tallest point is exactly this, so it stays passable.
+CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.013 @ 50% of
+                          # DR episodes, 4M-step continuation from run20m_ppo) was a REVERT:
+                          # no new capability (base already 0% falls on carpet + whole decathlon)
+                          # and ~8-10% forward-speed loss on flat AND carpet. See
+                          # docs/rl-runs/robustness-backlog.md log + the "Carpet Training Verdict"
+                          # report. The course stays defined for eval/viz (watch.py --challenge
+                          # carpet, CHALLENGES dict overrides these).
+CARPET_SWELL = 0.022      # broad rolling undulation (m) on top of the CARPET bumps -- low-freq swell
+CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
@@ -986,9 +1015,45 @@ class OpenCatGymEnv(gym.Env):
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
-        _rough = (ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+        _carpet = (CARPET > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+                   and np.random.rand() < CARPET_PROB)
+        _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
-        if _rough:
+        if _carpet:
+            _n = 190                                  # fine grid -> foot-scale bumps
+            _raw = np.random.uniform(-1, 1, (_n, _n))
+            # multi-octave, weighted toward the MEDIUM and FINE bands so the whole
+            # field is bumpy (not gentle swells with a few tall spots). Heights are
+            # then stretched so the tallest bump == CARPET and it fills the range.
+            _mc = _raw.copy()
+            for _ in range(4):
+                _mc = (_mc + np.roll(_mc, 1, 0) + np.roll(_mc, -1, 0)
+                       + np.roll(_mc, 1, 1) + np.roll(_mc, -1, 1)) / 5.0
+            _md = _raw.copy()
+            for _ in range(2):
+                _md = (_md + np.roll(_md, 1, 0) + np.roll(_md, -1, 0)
+                       + np.roll(_md, 1, 1) + np.roll(_md, -1, 1)) / 5.0
+            _h = 0.55 * _mc + 1.0 * _md + 0.55 * _raw
+            _h = (_h + np.roll(_h, 1, 0) + np.roll(_h, 1, 1)) / 3.0    # take the sharpest points off
+            _h = _h - _h.mean()
+            _sd = _h.std()
+            _h = np.clip(_h / (2.4 * _sd), -1.0, 1.0)      # clip the rare outliers, spread the rest
+            _h = _h * (CARPET * self._dr)                  # tallest bump == CARPET; field fills +/-range
+            if CARPET_SWELL > 0:                           # broad rolling swell on top
+                _sw = np.random.uniform(-1, 1, (_n, _n))
+                for _ in range(16):
+                    _sw = (_sw + np.roll(_sw, 1, 0) + np.roll(_sw, -1, 0)
+                           + np.roll(_sw, 1, 1) + np.roll(_sw, -1, 1)) / 5.0
+                _sw = _sw - _sw.mean()
+                _h = _h + _sw / np.abs(_sw).max() * (CARPET_SWELL * self._dr)
+            _hf = p.createCollisionShape(
+                p.GEOM_HEIGHTFIELD, meshScale=[0.021, 0.021, 1.0],   # 190*0.021 ~= 4.0 m span, ~21mm cells
+                heightfieldData=_h.flatten().astype(np.float64).tolist(),
+                numHeightfieldRows=_n, numHeightfieldColumns=_n)
+            plane_id = p.createMultiBody(0, _hf)
+            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])
+            self._slope_rp = (0.0, 0.0)
+        elif _rough:
             _n = 64
             _amp = ROUGH_TERRAIN * 0.018 * self._dr
             _h = np.random.uniform(-1, 1, (_n, _n))
@@ -1061,8 +1126,11 @@ class OpenCatGymEnv(gym.Env):
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
 
-        # gait-refinement G3: welded rear payload (Pi + PiSugar + camera)
+        # gait-refinement G3: welded payload. Two bodies -- SPINE (Pi + PiSugar +
+        # wiring + mount, behind centre) and HEAD (camera cluster, front mast) --
+        # so the fore/aft CoM split matches the real fully-loaded robot.
         self._payload_id = None
+        self._head_id = None
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3)
@@ -1073,6 +1141,16 @@ class OpenCatGymEnv(gym.Env):
             _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
                                     p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
             p.changeConstraint(_c, maxForce=5e3)
+            if HEAD_MASS_NOM > 0:
+                hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
+                hj = np.random.uniform(-0.003, 0.003, 3)
+                hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
+                self._head_id = p.createMultiBody(
+                    baseMass=float(hm), baseCollisionShapeIndex=-1,
+                    basePosition=[start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
+                _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
+                                         p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
+                p.changeConstraint(_hc, maxForce=5e3)
 
         # gait-refinement G3: per-joint motor-force scale (overheat cutback)
         self._torque_scale = np.ones(8)
@@ -1207,26 +1285,42 @@ class OpenCatGymEnv(gym.Env):
 
 
     def _scatter_rubble(self, chunk, n):
-        """A dense carpet of tumbled rubble across the forward traverse. Each
-        chunk is a small box with a random full-3D rotation, sunk so ~half is
-        below the surface -- only an angled wedge sticks up, so a foot slides
-        over it instead of catching a vertical edge. 'Very uneven ground to walk
+        """A dense carpet of mixed rubble across the forward traverse -- rounded
+        cobbles, a few rounded ridges, and angular chunks, all half-buried so
+        only a low bump/nub pokes up. Not all sharp-edged boxes: mostly smooth
+        so feet roll over, some angular texture. 'Very uneven ground to walk
         over', not trip hazards. Static (mass 0). Sits on the (possibly sloped)
-        plane via its normal."""
+        plane."""
         roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
         nv = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
-            s = np.random.uniform(0.6, 1.4) * chunk            # this chunk's size
-            he = [s * np.random.uniform(0.35, 0.65) for _ in range(3)]   # roughly cubic, varied
-            x = np.random.uniform(0.10, 3.4)
+            r = np.random.uniform(0.45, 1.15) * chunk
+            x = np.random.uniform(0.18, 3.4)
             y = np.random.uniform(-0.14, 0.14)
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
-            sink = np.random.uniform(0.4, 0.75) * s            # how deep it's buried
-            orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
-            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he)
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + s * 0.5 - sink],
-                              baseOrientation=orn)
+            k = np.random.rand()
+            if k < 0.20:                                       # rounded ridge (capsule, local Z axis)
+                h = float(np.random.uniform(1.5, 3.5) * r)
+                cs = p.createCollisionShape(p.GEOM_CAPSULE, radius=r, height=h)
+                orn = p.getQuaternionFromEuler([np.pi / 2, 0.0,
+                                                float(np.random.uniform(-np.pi, np.pi))])
+                R = np.asarray(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
+                top_off = abs(R[2, 2]) * (h / 2) + r           # exact: axis-z-component*half-len + cap r
+            elif k < 0.75:                                     # smooth cobble (sphere)
+                cs = p.createCollisionShape(p.GEOM_SPHERE, radius=r)
+                orn = [0, 0, 0, 1]
+                top_off = r
+            else:                                             # angular chunk (tumbled box)
+                he = np.array([r * np.random.uniform(0.55, 1.0) for _ in range(3)])
+                cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=he.tolist())
+                orn = p.getQuaternionFromEuler(np.random.uniform(-np.pi, np.pi, 3))
+                R = np.abs(np.asarray(p.getMatrixFromQuaternion(orn)).reshape(3, 3))
+                top_off = float(R[2] @ he)                     # exact top of an oriented box above its center
+            expose = np.random.uniform(0.30, 1.0) * RUBBLE_MAX_H
+            # centre placed so the chunk's highest point == z_ground + expose (<= cap)
+            p.createMultiBody(0, cs, baseOrientation=orn,
+                              basePosition=[x, y, z_ground + expose - top_off])
 
 
     def render(self, mode='human'):

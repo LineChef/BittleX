@@ -103,6 +103,55 @@ servos.
   quasi-static **stalled/blocked-joint detection**, and sim-to-real calibration
   spot-checks — all things that tolerate a slow, blocking read.
 
+## Mounted payload weight (BOM estimate, 2026-09-03)
+
+The sim adds a payload body for the Pi stack on the rear spine
+(`opencat_gym_env.py` `PAYLOAD_MASS_*` / `PAYLOAD_POS`). The original 75 g ± 35 g
+(40–110 g) was a wide early guess. This is a component-level estimate — **no
+manufacturer (Raspberry Pi, PiSugar, Seeed/Petoi) publishes a unit weight** for
+these parts, so figures are: measured reference weights where known, LiPo mass
+from energy density, bare-PCB mass from board area. **Re-weigh the real stack on
+assembly and set the sim to that.**
+
+| Component | Est. | Confidence | Basis |
+|---|---|---|---|
+| Raspberry Pi Zero 2 W (bare) | 10 g | high | RPi / vendor listings, 65×30 mm |
+| 40-pin header (WH variant) | 4 g | med | 2×20 male header stock weight |
+| ~~Heatsink (WH kit)~~ | 0 g | — | NOT fitted — see pi-set-up.md §6b; install only if the Pi throttles (likely Phase 8, not the gait loop) |
+| microSD | 0.4 g | high | — |
+| PiSugar S board (PCB only) | 10 g | low | 65×30 mm 2-layer + pogo pins + charge IC |
+| PiSugar S 1200 mAh LiPo cell | 23 g | med | 4.44 Wh ÷ ~190 Wh/kg |
+| Serial wiring (RX/TX/GND, data-only) | 4 g | low | 3 short Dupont jumpers |
+| Mount — Petoi back-cover-with-Pi-hole (PLA) | 10 g | low | standard Bittle cover mass; design-dependent |
+| **Config A — gait bring-up, no camera** | **~61 g** | | Phase 6, the next hardware milestone |
+| Petoi AI Vision module (Grove Vision AI V2) | 5 g | med | Grove-sized MCU board |
+| OV5647 CSI camera + FPC ribbon | 4 g | high | known RPi-cam-clone weight |
+| Petoi camera case + Grove cable | 6 g | low | 47×31×15 mm ABS shell + cable |
+| **Config B — full companion, camera on** | **~78 g** | | Phase 8+ |
+
+Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
+
+- → **Sim retuned 2026-09-03** to the *fully-loaded* config (camera expected on
+  the bot by the time the frame arrives). Now **two welded bodies** so the
+  fore/aft CoM split is right, not one lumped rear mass:
+  - `PAYLOAD_MASS_NOM 0.061` ± `0.018` — SPINE (Pi + PiSugar S 1200 mAh + wiring +
+    cover) at `PAYLOAD_POS (-0.020, 0, 0.025)`.
+  - `HEAD_MASS_NOM 0.015` ± `0.005` — camera cluster (Grove Vision AI V2 + OV5647
+    + case) at `HEAD_MASS_POS (0.055, 0, 0.020)`, the front mast.
+  - Combined nominal ≈ 76 g; payload CoM ~14 mm forward of spine-only. Old lumped
+    110 g ceiling dropped — not reachable.
+  - `run20m_ppo` is **frozen at the old lumped 75 g rear** — not retrained for
+    this. Training heavier/rear-biased than reality is the safe direction; the
+    next training run uses the two-body model. Re-tune + maybe retrain once the
+    real stack is weighed — see [`hardware-gated-training-backlog.md`](../rl-runs/hardware-gated-training-backlog.md) H2.
+- → **Battery is the biggest single line item** (~33 g with its board). Committed
+  as PiSugar S 1200 mAh and counted above. If runtime is ever traded for weight
+  later, a 500–700 mAh cell is where ~10–15 g would come from — not a change now.
+- → **CoM height matters more than mass for tip-over.** `PAYLOAD_POS` z = 2.5 cm
+  is pessimistic; a stack tucked to the cover is ~1.5–2 cm. **Measure on assembly**
+  — weigh each sub-assembly, balance it on an edge for its CoM — and set
+  `PAYLOAD_*` / `HEAD_*` to the measured values.
+
 ## Bittle X body + battery
 
 | Spec | Value |
