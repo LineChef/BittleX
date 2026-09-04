@@ -75,7 +75,10 @@ class Settings:
 
     # --- Memory (Phase 9) ---
     memory_enabled: bool = field(default_factory=lambda: _env("G2_MEMORY", "1") not in ("0", "false", "no"))
-    memory_db_path: str = field(default_factory=lambda: _env("G2_MEMORY_DB", "pi_pipeline/memory/data/g2_memory.db"))
+    # Default is OUTSIDE the repo/synced tree -- G2's memory is personal data and
+    # must not ride along in git or a cloud-synced project folder. '~' expands.
+    memory_db_path: str = field(default_factory=lambda: os.path.expanduser(
+        _env("G2_MEMORY_DB", "~/.local/share/g2/g2_memory.db")))
     memory_max_facts: int = field(default_factory=lambda: _env_int("G2_MEMORY_MAX_FACTS", 30))
     memory_recall_exchanges: int = field(default_factory=lambda: _env_int("G2_MEMORY_RECALL", 3))
 

@@ -27,8 +27,11 @@ rl_training/logs/
 .idea/
 *.swp
 
-# Local data / memory DB (personal conversation history — don't commit)
-pi_pipeline/memory/*.db
+# Local data / memory DB (personal conversation history — don't commit).
+# The DB now defaults to ~/.local/share/g2/ (outside the repo); these are a backstop.
+*.db
+*.sqlite
+*.sqlite3
 pi_pipeline/memory/data/
 
 # Personal media / training data — photos of people, pets, the home (B15 model
