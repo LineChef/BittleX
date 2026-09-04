@@ -186,19 +186,27 @@ deployed on the Grove Vision module. Then G2:
   - a **closeness level** (0..1) that scales warmth, how much G2 seeks that
     person out, greeting intensity, and how much of their memory context gets
     pulled;
-  - a **disposition** — `affectionate` / `playful` / `wary` / `fearful` /
-    `neutral` — that steers the `Explorer`: affectionate → approach + greet;
-    playful → follow + try to engage (safety reflex still overrides); wary →
-    keep distance; **fearful → always avoid, not just react on sight** — invert
-    the approach math to open distance and suppress wandering toward that
-    bearing the instant it's seen, *and* bias wander headings away from its
-    last-known position (the opposite pull from `Novelty`'s curiosity) so
-    exploring routes around where it likely still is, not just flinches away
-    after the fact; heads for the closest trusted person if cornered.
+  - a **disposition** — `affectionate` / `playful` / `curious` / `wary` /
+    `fearful` / `neutral` — that steers the `Explorer`: affectionate → approach
+    + greet; playful → follow + try to engage (safety reflex still overrides);
+    **`curious` → approach and try to interact**; wary → keep distance;
+    **fearful → always avoid, not just react on sight** — invert the approach
+    math to open distance and suppress wandering toward that bearing the
+    instant it's seen, *and* bias wander headings away from its last-known
+    position (the opposite pull from `Novelty`'s curiosity) so exploring routes
+    around where it likely still is, not just flinches away after the fact;
+    heads for the closest trusted person if cornered.
   Bonds are **seeded** (they don't start at zero for known members) and drift
   with interaction over time. G2 tells Claude who is present so replies and
   behaviour are personalised. `Novelty` already makes a regularly-seen face
   low-interest and one unseen for a while interesting again.
+  - **New people default to `curious`, not `neutral`.** A detected person who
+    doesn't match any known bond — a guest, a new face — gets a fresh low bond
+    at `curious`: G2 approaches and tries to interact (greets, asks who they
+    are) rather than staying reserved. New *pets* default to plain `neutral`
+    (curious-about-people is specifically a people thing, not carried over to
+    every new animal). The bond then drifts from that first interaction, same
+    as any other.
 - **notes stable patterns, not a timeline** — "the dog likes the kitchen", not
   "saw the dog at 3pm". No dated/timed logging of who was where when (the memory
   layer rejects temporal detail anyway); feeds [B11] place memory;
