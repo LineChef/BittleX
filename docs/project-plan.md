@@ -696,9 +696,18 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       that keeps the policy blind and caps it at "creep on command"; Claude is
       also far too slow (seconds/call) for foot-placement timescale. Instead:
       - An **on-Pi module** turns the camera's detection stream into a compact
-        feature — e.g. "nearest obstacle bearing, distance, approx height" (a
-        handful of floats), refreshed at detection rate (~10–30 Hz), held
-        stale between frames — and appends it to the policy observation.
+        feature and appends it to the policy observation. **Frozen layout** (4
+        floats, `[-1,1]`), refreshed at detection rate (~10–30 Hz), held stale
+        between frames:
+        `[ present, dist_norm, bearing_norm, tall_flag ]` —
+        seen-or-not, distance/range, angle-off-heading/half-FOV, and
+        low-enough-to-step vs go-around/stop.
+        Sim generator: `opencat_gym_env._scan_terrain` (a forward ray fan, gated
+        by `TERRAIN_FEATURE`, off by default so `run20m_ppo` is unaffected).
+        Pi generator: `pi_pipeline/vision/terrain_feature.py` (`terrain_feature()`
+        + `TerrainFeatureExtractor`), from the detection `Frame`. **Both ends
+        must stay in sync** — the plumbing (both sides + tests) landed
+        2026-09-03; the constants get calibrated on hardware.
       - Claude stays *above* this loop (navigation goals, narration); the
         `Avoider` reflex may still set coarse speed/yaw commands in parallel.
         The terrain feature and the command path are independent inputs.

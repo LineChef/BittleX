@@ -75,3 +75,16 @@ One JSON object per line, **921600 baud**:
   Phase 10 runtime.
 - **After vision works, revisit the locomotion policy** with perception in the
   loop — the Phase 8 "Target capability" in the project plan.
+
+## `terrain_feature.py` — the walk policy's own terrain signal
+
+Separate from the `Avoider` (which sets coarse commands): this converts a
+detection `Frame` into the frozen 4-float vector
+`[present, dist_norm, bearing_norm, tall_flag]` that the RL walk policy takes
+directly in its observation, at control rate. `terrain_feature()` is the pure
+mapping; `TerrainFeatureExtractor` caches the last value between the ~10–30 FPS
+detection frames for the ~48–80 Hz gait loop. The sim mirror is
+`opencat_gym_env._scan_terrain` (gated by `TERRAIN_FEATURE`, off by default).
+**The layout is frozen — change both ends together.** `TerrainFeatureConfig`
+constants (area→distance, box-height→tall) are first guesses; calibrate on
+hardware against known obstacle distances/heights.
