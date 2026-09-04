@@ -681,15 +681,46 @@ tuning, and the Phase 10 wiring — all hardware-gated.
   - PiDog attaches images to LLM calls only for occasional "what do you see"
     queries, not continuous avoidance — matches the split above.
 - [ ] **After vision works, revisit the locomotion policy with perception in the
-      loop — toward the Target capability above.** Run 5–7 terrain training is
-      reactive and IMU-only, so the policy can't anticipate terrain or
-      deliberately step around an obstacle. Feed forward obstacle/detection
-      information into the policy's observation and retrain (or add a perception
-      front-end that biases the existing gait) for anticipatory foot placement
-      and step-over / go-around / stop decisions. This is what a scripted keyframe
-      gait fundamentally can't do — it has no input to feed vision into — and is
-      the main reason the project uses RL for locomotion. Only possible once
-      perception exists; a distinct effort from the flat-ground gait.
+      loop — toward the Target capability above.** The current gait is reactive
+      and IMU-only, so it can't anticipate terrain or deliberately step around an
+      obstacle — it only learns a lip exists *after* a foot hits it (confirmed by
+      the 2026-09-03 probe batch: it never falls but *stalls* against curbs /
+      lips / on carpet, because it's blind forward). This is what a scripted
+      keyframe gait fundamentally can't fix — it has no input to feed vision into
+      — and is the main reason the project uses RL for locomotion.
+
+      **DECIDED ARCHITECTURE (2026-09-03):** the walk policy gets **its own
+      low-bandwidth forward terrain feature, fed directly into its 278-d
+      observation at control rate**, *separate from* the vision→Claude /
+      vision→`Avoider` command-setting path. Not "vision biases the command" —
+      that keeps the policy blind and caps it at "creep on command"; Claude is
+      also far too slow (seconds/call) for foot-placement timescale. Instead:
+      - An **on-Pi module** turns the camera's detection stream into a compact
+        feature — e.g. "nearest obstacle bearing, distance, approx height" (a
+        handful of floats), refreshed at detection rate (~10–30 Hz), held
+        stale between frames — and appends it to the policy observation.
+      - Claude stays *above* this loop (navigation goals, narration); the
+        `Avoider` reflex may still set coarse speed/yaw commands in parallel.
+        The terrain feature and the command path are independent inputs.
+      - **Sim training:** synthesize that same feature from PyBullet ground-truth
+        obstacle geometry, with realistic detector noise / miss-rate / latency
+        (tuned to the real model's measured stats, `sysid`-style), add it to the
+        observation, and retrain. **Claude does not need to be in the sim** — it
+        isn't in this loop; the loop is camera→feature→policy, all Pi-local, and
+        Claude's high-level commands are already covered by the sim's command
+        randomisation.
+      - Expected payoff: anticipatory slowing / go-around / stop for *large*
+        obstacles and curbs (camera + detector are good at these). Fine
+        foot-placement over a 12–15 mm lip stays marginal — head-height forward
+        camera + 192×192 detector is weak on small low-contrast terrain edges.
+      - The **"don't stall" reward idea** (dense forward-progress term + sparse
+        breakthrough bonus, `robustness-backlog.md` R-NOSTALL) is **deferred to
+        here** — it only makes sense once the policy can see far enough ahead to
+        slow *before* contact; on the blind policy it just produces frantic
+        scrabbling, not intentional stepping.
+
+      Only possible once perception exists; a distinct effort from the
+      flat-ground gait.
 - [ ] (Stretch, with vision + IMU in place) More robust self-righting — flip
       detection from the IMU plus a dedicated recovery policy (or the firmware
       skill for the cases it covers, a learned fallback for the rest). Ruled out
