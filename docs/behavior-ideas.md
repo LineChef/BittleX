@@ -176,19 +176,20 @@ built-in 80-class COCO classifier) → approach controller (the `Avoider`
 bearing/area math, inverted to close distance instead of open it) → stop when
 close. Ambitious; a headline demo.
 
-### B15 — Recognize the household (the user + the pets)  🟡  ⚪
+### B15 — Recognize the household  🟡  ⚪
 Train the vision model to detect **specific individuals as their own classes** —
-the user, their cat, their dog — not just generic "person" / "cat" / "dog". Petoi
-SenseCraft custom-model pipeline: a few dozen labelled photos of each →
-YOLOv8n → deployed on the Grove Vision module. Then G2:
-- **treats the user as its best friend** — the closest relationship it has.
-  Lights up on seeing them ("hey Mark!"), seeks them out first when it wanders,
-  notices and comments when they've been gone a while, pulls their memory context
-  on sight. Names each pet on sight and tells Claude who is present so replies and
-  behaviour are personalised. This is a *relationship*, not just a label — a
-  natural fit for a `bond` concept in the `personality` layer (a per-individual
-  closeness level that scales warmth, seeking, and greeting intensity), which
-  future people/pets slot into at lower levels;
+the user, the user's wife, their cat, their dog — not just generic "person" /
+"cat" / "dog". Petoi SenseCraft custom-model pipeline: a few dozen labelled
+photos of each → YOLOv8n → deployed on the Grove Vision module. Then G2:
+- **knows its household by relationship, not just by label.** The user is its
+  best friend — the closest bond it has: lights up on seeing them ("hey Mark!"),
+  seeks them out first when it wanders, notices and comments when they've been
+  gone a while. The user's wife is family too, a high bond of her own. Each pet
+  is named on sight. G2 tells Claude who is present so replies and behaviour are
+  personalised, and pulls that person's memory context. This is a *relationship*
+  model, not a lookup — a natural fit for a `bond` concept in the `personality`
+  layer (a per-individual closeness level that scales warmth, seeking, and
+  greeting intensity); new people and pets slot in at lower levels over time;
 - **logs sightings to memory** ("saw the dog in the kitchen this afternoon",
   "Mark got home ~6pm") — feeds [B11] place memory and a "what did G2 see today"
   recap;
