@@ -1,7 +1,7 @@
 """The Decathlon -- a graded learned-vs-scripted comparison that ramps from
 easy to brutal across every skill G2 has been trained on.
 
-15 cells in 5 tiers; both gaits run every cell on matched per-episode seeds.
+27 cells in 8 tiers; both gaits run every cell on matched per-episode seeds.
 Writes a JSON that build_decathlon_report.py turns into an HTML report.
 
     python benchmark_decathlon.py --learned trained/<tag>_ppo --episodes 28 \
@@ -25,7 +25,7 @@ D = math.radians
 _ZERO = ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN",
          "IMPULSE_PUSH", "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB",
          "SUSTAINED_FORCE", "DEFORM_GROUND", "SLIP_PATCH",
-         "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR", "RUBBLE", "RUBBLE_PROB", "CARPET", "CARPET_SWELL")
+         "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR", "RUBBLE", "RUBBLE_PROB", "CARPET", "CARPET_SWELL", "CARPET_SOFT")
 
 # (id, tier, skill, human label, {env knob overrides})
 LADDER = [
@@ -88,6 +88,19 @@ LADDER = [
         {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}),
     ("T7.5", 7, "ledge",          "Big ledge  (45 mm, random up/down)",
         {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
+
+    # T8: carpet / soft ground. Kept as a PERMANENT benchmark cell regardless of
+    # whether any given checkpoint was trained on it (2026-09-04 decision) --
+    # the point is tracking learned-vs-scripted on real soft/uneven ground over
+    # time, not just when there happens to be a carpet-specific run to grade.
+    # T8.1 is the user's actual carpet (~1/4in / 6.4mm pile, compliance
+    # calibrated mild for G2's light paw-loading -- see opencat_gym_env.py
+    # CARPET_SOFT comment); T8.2 is the harder general rough-carpet stress test
+    # from the earlier robustness push (13 mm bumps + broad swell, rigid).
+    ("T8.1", 8, "carpet",         "House carpet  (flat, mild compliance)",
+        {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.3}),
+    ("T8.2", 8, "carpet",         "Uneven rug / rough floor covering stress test  (13 mm bumps + swell)",
+        {"CARPET": 0.013, "CARPET_SWELL": 0.022, "CARPET_PROB": 1.0}),
 ]
 
 GIF_CELLS = {"T5.1": "gauntlet"}   # replays: only the everything-at-once course

@@ -268,9 +268,12 @@ ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet 
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
 
 # CARPET: replace the whole ground with one dense-bump heightfield (a single
-# GEOM_HEIGHTFIELD body -- no scattered obstacles). "Floor never shows" rough
-# terrain for walk-anywhere training. Value = max bump height (m) above the mean;
-# the field is scaled so the tallest point is exactly this, so it stays passable.
+# GEOM_HEIGHTFIELD body -- no scattered obstacles). This is an UNEVEN floor
+# covering -- a bunched/rumpled rug, a rough mat, a transition edge -- NOT
+# fitted wall-to-wall carpet (2026-09-04 correction: real carpet is flat at the
+# scale that matters for foot placement; see CARPET_SOFT for what actually
+# makes carpet carpet). Value = max bump height (m) above the mean; the field
+# is scaled so the tallest point is exactly this, so it stays passable.
 CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.013 @ 50% of
                           # DR episodes, 4M-step continuation from run20m_ppo) was a REVERT:
                           # no new capability (base already 0% falls on carpet + whole decathlon)
@@ -280,6 +283,20 @@ CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.
                           # carpet, CHALLENGES dict overrides these).
 CARPET_SWELL = 0.022      # broad rolling undulation (m) on top of the CARPET bumps -- low-freq swell
 CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
+# CARPET_SOFT: real fitted carpet, as its own episode type -- FLAT ground
+# (2026-09-04 correction), just compliant + carpet-typical friction. Applied to
+# the flat plane, entirely independent of the CARPET heightfield above -- real
+# carpet's distinguishing property is pile+pad give, not uneven height, and the
+# first carpet-training attempt found nothing to learn because bumps alone are
+# something the base already handles. Deliberately calibrated MILD: carpet pad
+# compliance is pressure-dependent, and
+# G2's paws load the pile at a small fraction of a human footstep's pressure
+# (~a couple hundred grams peak per paw vs body weight through a human foot), so
+# "has some give" to a hand does not translate 1:1 -- a first estimate, meant to
+# be refined once real hardware data exists (docs/rl-runs/robustness-backlog.md
+# style: probe before assuming). restitution is fixed at 0 -- carpet doesn't
+# bounce, no reason to randomise that up.
+CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
@@ -1045,10 +1062,21 @@ class OpenCatGymEnv(gym.Env):
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
+        # CARPET (bump heightfield) is an UNEVEN floor covering -- a bunched rug,
+        # a rough mat, a transition edge -- not fitted wall-to-wall carpet. Real
+        # fitted carpet is flat at the scale that matters for foot placement
+        # (2026-09-04 correction); its floor-covering-ness is CARPET_SOFT
+        # (compliance/friction), applied to the flat plane below, independent of
+        # this heightfield.
         _carpet = (CARPET > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
                    and np.random.rand() < CARPET_PROB)
         _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
+        # A flat episode's floor is "carpeted" (compliant + carpet-typical
+        # friction) independent of any height variation -- decided here so it can
+        # be applied after plane_id is set, whichever branch below builds it.
+        _carpet_floor = (not _carpet and not _rough and CARPET_SOFT > 0 and self._dr > 0
+                         and SLOPE_FIXED_RP is None and np.random.rand() < CARPET_PROB)
         if _carpet:
             _n = 190                                  # fine grid -> foot-scale bumps
             _raw = np.random.uniform(-1, 1, (_n, _n))
@@ -1104,6 +1132,18 @@ class OpenCatGymEnv(gym.Env):
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
+        if _carpet_floor:
+            # Flat, compliant, carpet-typical friction -- overrides the generic
+            # RANDOM_FRICTION draw just above for this episode. Compliance
+            # deliberately mild: carpet pad give is pressure-dependent and G2's
+            # paws load it at a fraction of a human footstep's pressure, so
+            # "has some give" to a hand doesn't translate 1:1 (see CARPET_SOFT).
+            _ck = CARPET_SOFT * self._dr
+            p.changeDynamics(plane_id, -1,
+                contactStiffness=float(np.random.uniform(4e4, 1.2e5) * (1 - 0.4 * _ck)),
+                contactDamping=float(np.random.uniform(300, 1500) * (1 + 0.6 * _ck)),
+                restitution=0.0,   # carpet doesn't bounce
+                lateralFriction=float(np.random.uniform(0.9, 1.3)))  # carpet typically grips a bit more than hardwood
         if DEFORM_GROUND > 0 and self._dr > 0:
             k = DEFORM_GROUND * self._dr
             p.changeDynamics(plane_id, -1,

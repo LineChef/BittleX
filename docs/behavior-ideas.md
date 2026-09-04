@@ -189,8 +189,12 @@ deployed on the Grove Vision module. Then G2:
   - a **disposition** — `affectionate` / `playful` / `wary` / `fearful` /
     `neutral` — that steers the `Explorer`: affectionate → approach + greet;
     playful → follow + try to engage (safety reflex still overrides); wary →
-    keep distance; fearful → invert the approach math to open distance, suppress
-    wandering toward that bearing, head for the closest trusted person.
+    keep distance; **fearful → always avoid, not just react on sight** — invert
+    the approach math to open distance and suppress wandering toward that
+    bearing the instant it's seen, *and* bias wander headings away from its
+    last-known position (the opposite pull from `Novelty`'s curiosity) so
+    exploring routes around where it likely still is, not just flinches away
+    after the fact; heads for the closest trusted person if cornered.
   Bonds are **seeded** (they don't start at zero for known members) and drift
   with interaction over time. G2 tells Claude who is present so replies and
   behaviour are personalised. `Novelty` already makes a regularly-seen face
