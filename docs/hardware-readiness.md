@@ -92,10 +92,11 @@ core / audio / dev. Fully `.env`-driven (`.env.example` documents every setting)
 
 ### Tests
 
-`pi_pipeline/tests/` — **31 pytest tests, all green**, no network / audio / API
+`pi_pipeline/tests/` — **88 pytest tests, all green**, no network / audio / API
 key. Covers the skill catalogue, the conversation parse / tool-ack / retry
-paths (stub Anthropic client), the memory store / recall / decay, the serial
-command builders + safety, and the vision detection model + avoidance reflex.
+paths (stub Anthropic client), the memory store / recall / decay / temporal
+filter, the serial command builders + safety, the vision detection model +
+avoidance reflex + terrain feature, and the personality + behavior layers.
 Run: `pi_pipeline/.venv/bin/pytest`.
 
 ---
@@ -123,8 +124,107 @@ The ones that change plans:
   possible wake trigger / offline-command path that offloads the Pi.
 - **Vision module: detections OR a raw frame, never both at once**; 192×192,
   ~10–30 FPS; model swap takes 1–2 min. Camera toggle over serial: `XC` / `Xc`.
-- **PiSugar S is hardware-only — no battery-% readout.** Battery telemetry must
-  come from the BiBoard firmware (see checklist item 8), not the PiSugar.
+- **PiSugar S is hardware-only — no battery-% readout, no query token to add.**
+  If battery telemetry is ever wanted, it needs an external ADC on a Grove
+  analog pin, or time-boxed sessions (see `docs/behavior-ideas.md` B12).
+
+## Day-1-with-the-camera checklist
+
+The Grove Vision AI V2 module (+ the calibration stand) arrive **before** the
+Bittle body. Everything below only needs the module + a USB-C cable + the Pi (or
+even just a computer for the model workflow) — none of it waits on the body.
+
+**Power-on & the stock demo (no Pi needed)**
+
+1. USB-C to a computer. Seeed ships a pretrained demo model (typically person
+   detection) — confirm it boots and the SenseCraft AI web tool
+   (Seeed's browser-based flasher/monitor) shows live detections. This alone
+   validates the module works before wiring anything.
+2. Familiarise with **SenseCraft AI**: the model-deploy workflow, and the "DIY"
+   COCO-subset picker vs. a fully custom model (Colab → YOLOv8n → quantise →
+   Vela-optimise → deploy) — `docs/project-plan.md` Phase 8 has the reference
+   notes on this pipeline.
+
+**Wire it to the Pi — first real test of `pi_pipeline/vision/`**
+
+3. Connect the module's UART to the Pi (Grove 4-pin → jumper wires to Pi UART —
+   confirm the exact pinout against the current Seeed wiki page; not yet
+   verified against our hardware). 921600 baud.
+4. `python -m pi_pipeline.vision serial <port>` — this is the moment
+   `SerialDetectionFeed` sees a real detection stream for the first time
+   (it's only ever run against `MockDetectionFeed`). Confirm the JSON `INVOKE`
+   shape matches: `{"name":"INVOKE","data":{"boxes":[[x,y,w,h,score,id]]}}`.
+5. **Resolve the two open format questions** (noted since the research phase,
+   never checked against real hardware): is the box `(x,y)` centre or top-left,
+   and what's the actual model input pixel size? Set `VISION_FRAME_PX` /
+   `VISION_LABELS` in `.env` once confirmed. Fix `Detection.from_center_px()` if
+   it's corner, not centre.
+6. **Calibrate the two hardware-first-guess configs** against measured
+   distances/heights (put a known object at a known distance, read the box):
+   - `AvoiderConfig` thresholds (`pi_pipeline/vision/avoidance.py`) vs. the
+     module's real detection range and reliable box-area-to-distance behaviour.
+   - `TerrainFeatureConfig` (`pi_pipeline/vision/terrain_feature.py`) —
+     `s_near`/`s_far` (area→distance), `h_tall` (box height→tall_flag),
+     `fov_scale`. Currently first-guess numbers with an explicit "calibrate on
+     hardware" note.
+
+**Start the custom model (B15) — can run in parallel with the above**
+
+7. Photograph household members + pets for the custom detection classes — save
+   under a gitignored dir (`training_data/`, already in `.gitignore`; see
+   `docs/behavior-ideas.md` B15). A few dozen photos per class, varied angles/
+   lighting.
+8. Label + train in SenseCraft (or the Colab/YOLOv8n path), deploy to the
+   module, and re-run step 4 to confirm it detects the new classes.
+
+None of this needs the Bittle body, the BiBoard, or the calibration stand — it's
+all camera + USB/UART + the Pi (or a laptop). It fully unblocks the "queued /
+camera-gated" list below except the items that also need a moving robot.
+
+---
+
+## Camera-gated backlog — queued up for tomorrow
+
+Everything across the docs that was blocked on "needs the camera," in the order
+it becomes reachable:
+
+**Reachable with just the camera (start tomorrow, per the checklist above)**
+- Verify the live detection format + fix `Detection.from_center_px()` if needed
+  (`pi_pipeline/vision/feed.py`, `vision/README.md` "Still to do")
+- Calibrate `AvoiderConfig` (`vision/avoidance.py`) against real detections
+- Calibrate `TerrainFeatureConfig` (`vision/terrain_feature.py`) — the walk
+  policy's forward-terrain-signal constants
+- Train + deploy the first custom SenseCraft model
+- **B15 — recognize household members**: start photographing + labelling now;
+  the bond/disposition layer in `pi_pipeline/personality/` is already built and
+  waiting for real detections
+
+**Needs the camera mounted ON G2 (body required too)**
+- Wire `Avoider` decisions to the actuator (currently logic-only, tested against
+  mocks) — `vision/README.md`
+- Cliff/edge avoidance — a camera-based "floor vs. edge ahead" classifier
+  (no dedicated sensor slot available); higher stakes, a miss is a fall
+- **B7 — Patrol mode**: walks a loop, stops + narrates on motion/person detection
+- **B8 — Go-to-object**: approach controller inverting the `Avoider` math
+- **B9 / B13 tier 3 — vision-gated obstacle traversal / climb-as-a-skill**:
+  vision spots a step too tall to walk over → invoke a separate climb policy
+- **B11 — place memory**: scene descriptions → a graph of recognized places
+- `scene.narrate` wired into the voice loop (Phase 10)
+
+**Needs the camera + a working detector + hardware validation before it's worth
+training** (the RL side)
+- **Perception-in-the-loop gait retrain** (Phase 8, `docs/project-plan.md`
+  "DECIDED ARCHITECTURE") — flip `TERRAIN_FEATURE = True`, tune the sim
+  generator's noise to the real detector's measured stats, retrain
+- **R-NOSTALL** ("don't stall" reward work, `robustness-backlog.md`) —
+  explicitly deferred to here; a blind policy can't be intentional about an
+  obstacle it can't see
+- (Stretch) more robust self-righting, once vision + IMU are both feeding the
+  policy
+
+**Needs everything (Phase 10 integration)**
+- Voice + vision + memory running concurrently, resource/timing conflicts
+  resolved
 
 ## Day-1-with-hardware checklist
 
@@ -132,28 +232,32 @@ The ones that change plans:
 
 1. Assemble Bittle X V2; check servo calibration (ships calibrated — only
    fine-tune if movement looks off).
-2. Flash the Pi with Raspberry Pi Imager — Wi-Fi + SSH pre-configured (headless).
+2. **On the calibration stand, before it ever touches the ground:** full
+   range-of-motion pass (each joint by hand / `check_serial`, watch for binding
+   or leg-on-leg collision), firmware `c16` auto joint calibration. This is the
+   safe place for first power-on — confirm wiring/polarity, nothing grinds,
+   before the robot has to support its own weight. (Detailed steps once the RL
+   gait is involved: `docs/gait-deployment.md` step 6.)
+3. Flash the Pi with Raspberry Pi Imager — Wi-Fi + SSH pre-configured (headless).
    Confirm SSH.
-3. `sudo raspi-config` → serial: disable the login shell over serial, enable the
+4. `sudo raspi-config` → serial: disable the login shell over serial, enable the
    serial hardware. Disable 1-wire. Disable Wi-Fi power-save
    (`sudo iw wlan0 set power_save off`).
-4. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
+5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover fits.
 
 **Serial link (Phase 5)**
 
-5. `python -m pi_pipeline.link.check_serial ports` → identify the device, set
+6. `python -m pi_pipeline.link.check_serial ports` → identify the device, set
    `G2_SERIAL_PORT` in `.env` (likely `/dev/ttyS0`).
-6. On the BiBoard, enable Serial-2 mode (`XS`, or edit `OpenCat.h` + reflash).
-7. `check_serial ping` → expect a firmware banner. `check_serial send kbalance`
+7. On the BiBoard, enable Serial-2 mode (`XS`, or edit `OpenCat.h` + reflash).
+8. `check_serial ping` → expect a firmware banner. `check_serial send kbalance`
    → robot stands. `check_serial skills` → runs the whole conversational set.
-8. Find the **battery-voltage query token** in the OpenCatEsp32 serial parser
-   (not yet known); add it to `opencat.py`.
 
 **Voice (Phase 7)**
 
 9. Put a real key in `ANTHROPIC_API_KEY`. `python -m pi_pipeline.voice --mode text`
-   → Claude + memory end-to-end.
+    → Claude + memory end-to-end.
 10. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD` and
     `G2_STT_SILENCE_S`. `--mode voice --actuator serial` for the full loop.
 11. **Perf on the Pi Zero 2 W:** are Vosk + Piper light enough on 512 MB / a weak
@@ -162,29 +266,27 @@ The ones that change plans:
 12. Implement the buzzer / posture state cues (`voice/cues.py`) and a thread
     watchdog for the audio + serial threads.
 
-**Vision (Phase 8)**
+**Vision (Phase 8)** — camera bring-up itself doesn't wait for the body; see the
+**Day-1-with-the-camera checklist** below. What's left once the body + BiBoard
+exist too: mount the camera on G2 (vs. bench-testing loose on the Pi) and wire
+`Avoider` decisions to the actuator.
 
-13. Mount the camera to the Grove socket; upload firmware.
-14. `python -m pi_pipeline.vision serial <port>` → verify the SSCMA JSON shape
-    live; confirm centre-vs-corner and the model input pixel size; set
-    `VISION_FRAME_PX` / `VISION_LABELS`.
-15. Train a SenseCraft detection model (cables, small objects, table edges);
-    record its label list + input size and the deploy workflow.
-16. Tune `AvoiderConfig` thresholds against real detections + the robot's actual
-    stopping distance.
+**RL sim-to-real (Phase 6) — DONE**, before hardware even arrived: ONNX export +
+parity, the on-robot control loop, sim-validated bit-for-bit
+(`docs/gait-deployment.md`). Remaining is hardware-only:
 
-**RL sim-to-real (Phase 6)**
-
-17. Benchmark `model.predict()` on the Pi — is real-time joint control feasible
-    on a Pi Zero 2 W? (If not, the RL-deployment path needs rethinking.)
-18. **Gait head-to-head on the real robot:** scripted `wkF` vs `walk-v8-r2` vs
-    `gait-v7-stumble-catch`. Measure the sim-to-real gap. Decide whether to keep
-    building on RL locomotion.
+13. `pi_pipeline/gait/bench_real.py` — confirm real-time joint control on the
+    actual Pi Zero 2 W (sim bench: 0.43 ms/step, well inside budget).
+14. **The H1 head-to-head** on the real robot — full methodology + course +
+    decision rule: `docs/rl-runs/h1-head-to-head-rubric.md`. Measures the
+    sim-to-real gap and produces a keep/fall-back/middle verdict on RL
+    locomotion; `h1_score.py` turns the numbers into it.
 
 **Integration (Phase 10)**
 
-19. Run voice + vision + memory alongside each other; resolve timing/resource
+15. Run voice + vision + memory alongside each other; resolve timing/resource
     conflicts. Budget real time — this is historically the messiest phase.
-20. Once vision works, revisit locomotion with perception in the loop, toward the
-    Phase 8 Target capability (confident walking over a cluttered floor, steps
-    over small objects it sees, slows/stops at big obstacles and edges).
+16. Once vision works, revisit locomotion with perception in the loop
+    (`TERRAIN_FEATURE`, already plumbed in sim — `docs/project-plan.md` Phase 8),
+    toward the Target capability: confident walking over a cluttered floor,
+    steps over small objects it sees, slows/stops at big obstacles and edges.

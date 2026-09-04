@@ -25,6 +25,7 @@ should we work on next."
 | 5 V / 2.5 A micro-USB power supply | $10 |
 | Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
 | PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
+| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/gait-deployment.md` step 6 | — |
 
 ### Resolved
 

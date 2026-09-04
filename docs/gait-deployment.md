@@ -104,10 +104,22 @@ steps by hand from `pi-bring-up.md` — same content.
    is `/dev/ttyAMA0`. Test the link (`pi_pipeline/link/check_serial.py`).
 5. **`run_gait.py --probe-imu`** — see the real IMU line format; if it's not
    `ypr …` or `r p y gx gy gz`, adjust `parse_imu_line()` (one function).
-6. **`run_gait.py --openloop`** on a stand/cradle — plays `wkf_ref.npy` open-loop.
-   It should shuffle forward. If a leg kicks backward / the gait is mirrored,
-   flip that servo's sign in `deploy_map.SERVO_SIGN`.
-7. **`run_gait.py --cmd 0.10`** — the learned gait, on the real robot.
+6. **On the calibration stand** — G2's legs hang free, weight off the ground, so
+   nothing below can go wrong from a bad joint sign or an untrusted policy:
+   - Full range-of-motion pass: command each joint through its range by hand /
+     `check_serial`, watch for binding or leg-on-leg collision.
+   - Firmware `c16` auto joint calibration (needs feedback servos + the robot
+     stationary — this is that).
+   - **`run_gait.py --openloop`** — plays `wkf_ref.npy` open-loop. It should
+     shuffle forward. If a leg kicks backward / the gait is mirrored, flip that
+     servo's sign in `deploy_map.SERVO_SIGN`.
+   - Run the real gait loop (`--cmd 0.10`) *on the stand* first and watch the
+     joint trajectory against the ONNX/sim output before it ever has to hold
+     the robot up — bridges "parity verified in sim" to "verified against real
+     servos" without a fall as the failure mode.
+   - (Optional) a sustained run here gives real servo temperature/current data
+     to calibrate `TORQUE_CUTBACK` against, instead of the simulated random knob.
+7. **`run_gait.py --cmd 0.10`** — the learned gait, on the ground, on the real robot.
 8. **The head-to-head (H1):** full methodology in
    `docs/rl-runs/h1-head-to-head-rubric.md` — contenders, course C1–C6, metrics,
    decision rule. `run_gait.py --log` records each walk; `h1_score.py` turns the
