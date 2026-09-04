@@ -233,15 +233,22 @@ training** (the RL side)
 1. Assemble Bittle X V2; check servo calibration (ships calibrated — only
    fine-tune if movement looks off).
 2. **Weigh the final build** — on a kitchen scale, once the Pi + PiSugar S +
-   camera + mount are actually on the robot: the spine stack (Pi/PiSugar/
-   wiring/cover) and the head/camera cluster **separately**, and balance each
-   on an edge for its CoM (height + fore/aft offset). Then **update the
-   training sim to match**: set `PAYLOAD_MASS_NOM`/`_RAND` and
-   `HEAD_MASS_NOM`/`_RAND` + `PAYLOAD_POS`/`HEAD_MASS_POS` in
-   `opencat_gym_env.py` to the measured values, and retrain (or a
-   `--finetune-lr` continuation) if the delta from the current ~76 g estimate
-   is real. Full detail + trigger: `docs/rl-runs/hardware-gated-training-backlog.md`
-   **H2**.
+   camera + mount are actually on the robot. Don't just weigh two big lumps —
+   weigh the **camera module and the PiSugar S battery separately** (from
+   everything else and from each other), each with its own position/CoM. The
+   battery alone is more than half the current spine-stack estimate, and if it
+   ends up mounted somewhere distinct from the Pi board, lumping it in
+   mislocates the CoM. Then decide the sim body split from what you actually
+   measured — the current model is two bodies (spine = Pi/PiSugar/wiring/cover,
+   head = camera cluster), but if the battery's position is meaningfully
+   different from the rest of the spine stack, give it a **third body** rather
+   than force-averaging it in. Balance each piece on an edge for height +
+   fore/aft offset. Then **update the training sim to match**: set
+   `PAYLOAD_MASS_NOM`/`_RAND` and `HEAD_MASS_NOM`/`_RAND` +
+   `PAYLOAD_POS`/`HEAD_MASS_POS` (and a new battery body/knob if warranted) in
+   `opencat_gym_env.py`, and retrain (or a `--finetune-lr` continuation) if the
+   delta from the current ~76 g estimate is real. Full detail + trigger:
+   `docs/rl-runs/hardware-gated-training-backlog.md` **H2**.
 3. **On the calibration stand, before it ever touches the ground:** full
    range-of-motion pass (each joint by hand / `check_serial`, watch for binding
    or leg-on-leg collision), firmware `c16` auto joint calibration. This is the
