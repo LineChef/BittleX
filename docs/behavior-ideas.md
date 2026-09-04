@@ -194,18 +194,24 @@ photos of each → YOLOv8n → deployed on the Grove Vision module. Then G2:
   - **the cat** — G2 is *very* curious about him and wants to play: follows him
     around, play-bows, tries to engage, watches where he goes. A bond that
     carries a **playful disposition**, not just a closeness level.
-  - **the dog** — named on sight, a calmer bond; a wary disposition (keeps a
-    little distance, gives way) until it learns the dog is safe.
+    Safety still comes first — the obstacle reflex and "don't get stepped on"
+    override the play drive.
+  - **the dog** — G2 is **afraid of him**. On sight it retreats, keeps maximum
+    distance, won't approach or explore toward him, and may freeze or scurry to
+    the user. A **fearful disposition** — the strong end of wary. It can ease
+    over time as nothing bad happens, but the seed is fear.
   - new people and pets slot in at a low bond and grow (or not) over time.
   A `G2_BONDS` config (like `G2_TRAITS`) or a small household file carries the
   seed names + levels + labels;
 - **logs sightings to memory** ("saw the dog in the kitchen this afternoon",
   "Mark got home ~6pm") — feeds [B11] place memory and a "what did G2 see today"
   recap;
-- **reacts in character** through the `personality` + `behavior` layers:
-  `Novelty` already makes a regular face low-interest and one unseen for a while
-  interesting again; a future `affectionate` trait → approach + greet the user;
-  a `wary` one → keep distance from the dog;
+- **reacts in character** through the `personality` + `behavior` layers: the
+  bond's disposition steers the `Explorer` — *affectionate* → approach + greet
+  (Mark, his wife), *playful* → follow + engage (the cat), *fearful* → invert the
+  approach math and open distance, suppress explore toward that bearing, head for
+  the user (the dog). `Novelty` already makes a regular face low-interest and one
+  unseen for a while interesting again;
 - optionally a gentle **follow / keep-an-eye-on** behaviour (composes with [B8]).
 
 **On-device only.** The Grove Vision module runs the model on-chip and sends
