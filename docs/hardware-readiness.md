@@ -195,6 +195,10 @@ it becomes reachable:
 - Calibrate `TerrainFeatureConfig` (`vision/terrain_feature.py`) — the walk
   policy's forward-terrain-signal constants
 - Train + deploy the first custom SenseCraft model
+- **B16 — `CliffGuard` desk-edge classifier — HIGHEST PRIORITY.** Photograph the
+  real desk + its edges (multiple lighting conditions, tricky cases: an object
+  near the edge, glare, shadows) and train the floor-vs-edge classifier before
+  anything else. A miss here is a fall; do this ahead of B15.
 - **B15 — recognize household members**: start photographing + labelling now;
   the bond/disposition layer in `pi_pipeline/personality/` is already built and
   waiting for real detections
@@ -202,8 +206,10 @@ it becomes reachable:
 **Needs the camera mounted ON G2 (body required too)**
 - Wire `Avoider` decisions to the actuator (currently logic-only, tested against
   mocks) — `vision/README.md`
-- Cliff/edge avoidance — a camera-based "floor vs. edge ahead" classifier
-  (no dedicated sensor slot available); higher stakes, a miss is a fall
+- **B16 — `CliffGuard` reflex itself**: build + test the zero-debounce,
+  everything-preempting stop-and-back-away behavior against the trained
+  classifier, on the real robot, before ever trusting autonomous desk
+  exploration unsupervised.
 - **B7 — Patrol mode**: walks a loop, stops + narrates on motion/person detection
 - **B8 — Go-to-object**: approach controller inverting the `Avoider` math
 - **B9 / B13 tier 3 — vision-gated obstacle traversal / climb-as-a-skill**:

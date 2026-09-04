@@ -68,9 +68,11 @@ One JSON object per line, **921600 baud**:
   slightly disagree; the sscma struct says centre).
 - Tune `AvoiderConfig` thresholds against real detections + the robot's stopping
   distance.
-- Cliff/edge avoidance — a "floor vs. edge ahead" classifier (single sensor slot
-  is taken by this camera, so it must be camera-based). Higher stakes: a miss is
-  a fall.
+- **`CliffGuard` — cliff/edge avoidance, highest priority.** A "floor vs. edge
+  ahead" classifier via the `classes()` path (single sensor slot is taken by
+  this camera, so it must be camera-based), zero-debounce, preempts every other
+  behavior. Full design: `docs/behavior-ideas.md` B16. Higher stakes than
+  anything else here: a miss is a fall.
 - Wire `Avoider` decisions to the actuator and `narrate` to the voice loop in the
   Phase 10 runtime.
 - **After vision works, revisit the locomotion policy** with perception in the

@@ -663,12 +663,15 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       the pixel frame size on a live module.
 - [ ] Train a custom SenseCraft detection model (cables, small objects, table
       edges); record its label list + input size and the deploy workflow.
-- [ ] Cliff/edge avoidance (don't walk off a table) — the RL walking policy
-      can't learn this (no forward-looking perception), so it needs forward
-      sensing + a reflexive stop, kept local. Camera-based classification will be
-      less reliable than a physical sensor (lighting/surface sensitive, needs the
-      right camera angle) and a failure means a fall, so approach with caution.
-      Not yet scheduled.
+- [ ] **Cliff/edge avoidance — `CliffGuard`, designed 2026-09-04, HIGHEST
+      PRIORITY once the camera lands** (G2 lives on the user's desk; must never
+      walk off it). Full design: `docs/behavior-ideas.md` **B16**. Confirmed not
+      trainable into the gait (no forward perception, no real foot-force
+      sensing either) — a zero-debounce local reflex that preempts every other
+      behavior, using the light `classes()` floor-vs-edge path, custom-trained
+      on the real desk, biased hard toward false-stops over a missed edge.
+      Physical backstop (a desk-edge lip, supervision-gated autonomy) is the
+      honest answer for a true "never," since vision alone can't promise it.
 - [x] **Scene description path** — `vision/scene.py`: `summarize()` (deterministic
       text from detections) and `narrate(frame, ask)` where `ask` is an injected
       `str -> str` (the voice layer's Claude call, or a dedicated one). Structured

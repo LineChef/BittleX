@@ -215,6 +215,66 @@ Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
 model" bullet). The per-individual classes are the only new piece; everything
 downstream reuses the personality / behavior / memory layers already built.
 
+### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY once the camera lands  ⚪
+G2 spends most of its time on the user's desk. It needs to explore and look
+around up there (curiosity, [B7]-style wandering) but must **never** walk off
+the edge — ranked above general exploring, since it's the precondition for
+ever letting explore mode run near one.
+
+**Not trainable into the gait.** Confirmed architectural fact, not a design
+choice: the walk policy has no forward perception, and the real Bittle has no
+foot-force/torque sensing either, so it can't even feel "no ground" reactively
+the way it feels a stumble. By the time a cliff would show up in the policy's
+own senses it's already committed. So this has to live entirely **above** the
+gait, as a hard reflex that decides whether to command forward motion at all —
+same reasoning as why folding ledges into walk-policy training (Phase 4a)
+just made it timid.
+
+**Design — a new local reflex, stricter than `Avoider`:**
+- **Zero debounce.** `Avoider` waits a couple of consecutive frames before
+  reacting (avoids flinching at noise). One confident "not floor" reading here
+  is an immediate full stop — no waiting for confirmation. Bias entirely toward
+  false stops over a missed edge.
+- **Preempts everything** — explore mode, patrol, go-to-object, even a direct
+  voice command to keep walking. Sits above the personality/behavior layer, not
+  inside it.
+- **The light classification path** (`vision/scene.py`'s `classes()`, floor vs.
+  edge — no box regression) rather than full object detection: faster, simpler,
+  and every frame counts here.
+- **On trigger:** hard stop, back away from the triggering direction, re-orient
+  toward the confirmed-floor side.
+
+**Making the classifier actually reliable:**
+- **Custom-train it on the real desk**, not a generic "table edge" model — the
+  camera's actual mounted height/angle, multiple times of day, and deliberately
+  including tricky cases (an object near the edge, glare, a shadow crossing the
+  boundary).
+- **Calibrate the confidence threshold toward paranoia** — anything not
+  confidently "floor" counts as "edge." This is the one place in the whole
+  project where excess caution is the *correct* failure mode.
+
+**Buying reaction margin, not just accuracy:**
+- **Slow to creep speed specifically during desk exploration** — more frames
+  pass, less distance covered, before reaching wherever a missed frame put it
+  (the detection feed is ~10–30 FPS and holds stale between frames).
+- **Use the neck/head DOF to actively glance down-and-ahead** periodically while
+  exploring — a level gaze mostly just sees "the floor stopped being visible," a
+  weaker cue than actually seeing the drop. Dog-like, in-character for a curious
+  personality too.
+
+**The honest limit — vision alone can't promise "never":**
+- A physical boundary/lip on the desk as a backstop, at least early on.
+- Gate full *unsupervised* desk-roaming to when the primary bond is detected
+  present (ties into the `personality` bond work), building trust in the
+  reflex under supervision before ever leaving it alone.
+- Log every `CliffGuard` trigger, so false-positive rate and any close calls are
+  visible before loosening the leash.
+
+Needs the camera + a custom-trained classifier — fully gated, nothing to build
+or train on the RL/gait side right now. When the camera lands, this is a day-1
+custom-model priority (`hardware-readiness.md` Day-1-with-the-camera checklist),
+ahead of [B15].
+
 ### B11 — Learn its way around the house (topological place memory)
 G2 builds up a sense of *where it is* over time — as **place recognition + a
 graph of places**, never a metric floor plan (no depth/lidar, and monocular
