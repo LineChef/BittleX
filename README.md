@@ -55,20 +55,17 @@ hardware mocked for now.
   mounted Pi/camera payload. The frozen deployment base is **`run20m_ppo`** (20 M
   steps from scratch: tracks speed commands to 0.007 m/s, walks a −24° descent,
   0 % falls on the payload-on decathlon). It's exported to ONNX and sim-validated
-  bit-for-bit against the on-robot control loop. While the frame ships, an active
-  **pre-hardware robustness push** hardens it for walk-anywhere use — rough
-  terrain (a single-heightfield "carpet" course), then the scenario list in
-  [`docs/rl-runs/robustness-backlog.md`](docs/rl-runs/robustness-backlog.md)
-  (single-servo failure, IMU bias, pick-up/set-down, …), each a reversible
-  continuation kept only if it nets capability. History in
-  [`docs/rl-runs/`](docs/rl-runs/); a survey of other Bittle RL projects in
-  [`docs/research/bittle-rl-projects.md`](docs/research/bittle-rl-projects.md); the
-  original staged plan in
-  [`docs/rl-runs/refinement-regimen.md`](docs/rl-runs/refinement-regimen.md).
+  bit-for-bit against the on-robot control loop. A pre-hardware probe batch
+  (2026-09-03) found the gait is *fall-proof but stalls* on terrain it can't
+  perceive — root cause: no forward vision. The next gait training is
+  **perception-in-the-loop** (Phase 8); the sim + Pi plumbing for the policy's
+  own forward terrain feature is now in place. See
+  [`docs/rl-runs/robustness-backlog.md`](docs/rl-runs/robustness-backlog.md) and
+  [`docs/rl-runs/`](docs/rl-runs/) for history.
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent memory,
   vision / obstacle-avoidance, the BiBoard serial link, and a fall-recovery state
   machine are all scaffolded and run on a dev machine with the hardware mocked;
-  **42 tests passing**.
+  **51 tests passing**.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:
@@ -77,6 +74,38 @@ hardware mocked for now.
 For a plain-language tour of how each part works, see
 [`docs/how-it-works.md`](docs/how-it-works.md). For the pre-hardware state and the
 day-1 checklist, see [`docs/hardware-readiness.md`](docs/hardware-readiness.md).
+
+## Walking policy — what it can do
+
+What is actually trained into `run20m_ppo`, the frozen gait. *Kept current as
+abilities land.*
+
+**Trained & verified in sim:**
+
+| Ability | Detail |
+|---|---|
+| Command-following trot | Forward speed on command — creep (~0.04) · cruise (0.10) · fast (~0.15) m/s, and backward to −0.10; tracks the command to ~0.007 m/s |
+| Turn on command | Yaw-rate command; holds a straight heading otherwise (heading drift ~0.1° over 90 s on flat) |
+| Stand | Freezes to a stable stance when the speed command is ≈ 0 |
+| Slopes | Climbs to +15°, descends to −24°, walks across a cross-slope — 0 % falls |
+| Obstacles / rough ground | Scattered terrain + a mild heightfield in training; clears the decathlon obstacle cells (to 85 mm) at 0 % falls |
+| Disturbance recovery | Absorbs random pushes and hard impulse shoves (to 1.0 magnitude), sustained forces, a briefly stuck foot — a stumble-catch balance term fights back toward level |
+| Payload-conditioned | Walks with the ~76 g mounted Pi + PiSugar + camera load (modelled as a rear spine mass + a forward camera mass); tolerates the mass swing of a draining battery |
+| Pick-up / set-down | Re-acquires the gait after being lifted and dropped (emergent — 31/32 in probe testing) |
+| Weak-servo tolerance | Keeps walking under simulated overheated-servo torque cutback |
+| Long-duration stability | 90 s continuous on flat with no drift, limp, or oscillation |
+
+**Not trained — known limits:**
+
+- **No forward perception.** It only reacts *after* a foot makes contact, so it
+  *stalls* (does not fall) against curbs, thin lips, and sustained rough ground.
+  Fixing this is the Phase 8 perception-in-the-loop work — the terrain-feature
+  plumbing is in place, training waits on hardware + a detection model.
+- **No deliberate step-over / go-around.** Needs the forward terrain feature +
+  vision (above).
+- **No self-righting** — the hardware has no roll-axis joint. Stumble-catch only.
+- **No stairs, no jumping.** A jump is planned as a discrete *on-command* skill,
+  never folded into the gait ([`docs/behavior-ideas.md`](docs/behavior-ideas.md) B14).
 
 ## Repo Structure
 
