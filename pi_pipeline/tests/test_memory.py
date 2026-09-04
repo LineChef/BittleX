@@ -1,7 +1,9 @@
 import types
 
+import pytest
+
 from pi_pipeline.memory.memory import Memory
-from pi_pipeline.memory.store import Store
+from pi_pipeline.memory.store import Store, has_temporal_detail
 
 
 def _turn(speech, actions=(), facts=()):
@@ -13,6 +15,45 @@ def test_store_dedupes_facts(cfg):
     assert st.add_fact("Their name is Sam.") is True
     assert st.add_fact("Their name is Sam.") is False
     assert st.add_fact("  ") is False
+
+
+@pytest.mark.parametrize("fact", [
+    "They get home around 6pm.",
+    "They go to the gym every Monday.",
+    "They were away last week.",
+    "Their trip is 2026-09-10.",
+    "They said this tonight.",
+    "They walk the dog daily.",
+    "Their birthday is June 3.",
+    "See you on Friday.",
+    "They left 2 hours ago.",
+])
+def test_facts_with_dates_times_schedules_are_rejected(cfg, fact):
+    st = Store(cfg.memory_db_path)
+    assert has_temporal_detail(fact)
+    assert st.add_fact(fact) is False
+    assert st.list_facts() == []
+
+
+@pytest.mark.parametrize("fact", [
+    "Their name is Sam.",
+    "They have a cat named Biscuit.",
+    "They work in software.",
+    "They prefer tea to coffee.",
+    "Their friend June visits often.",
+    "They may want to learn guitar.",
+])
+def test_stable_facts_still_stored(cfg, fact):
+    st = Store(cfg.memory_db_path)
+    assert not has_temporal_detail(fact)
+    assert st.add_fact(fact) is True
+
+
+def test_exchange_ts_is_date_only(cfg):
+    st = Store(cfg.memory_db_path)
+    st.log_exchange("hi", "hello", [])
+    ts = st.recent_exchanges(1)[0]["ts"]
+    assert len(ts) == 10 and ts.count("-") == 2   # YYYY-MM-DD, no clock time
 
 
 def test_recall_injects_facts_and_fts_match(cfg):

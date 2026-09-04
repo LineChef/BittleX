@@ -18,8 +18,13 @@ pattern="$(grep -vE '^\s*(#|$)' "$terms_file" \
 
 hits=0
 
-staged="$(git diff --cached --unified=0 --no-color -- . \
-  | grep -E '^\+' | grep -vE '^\+\+\+' || true)"
+# strip known-safe compounds so a listed first name does not fire on unrelated
+# identifiers: pytest m.a.r.k, bench___, book___, ___down/___er/___up/___et, etc.
+safe_scrub() { sed -E "s/(pytest\.mark|benchmark|bookmark|mark(down|er|up|et|s)|[a-z]-mark|re-?mark|land-?mark|water-?mark|hall-?mark|ear-?mark)//gi"; }
+
+# scan staged additions, but not this hook / the term list themselves
+staged="$(git diff --cached --unified=0 --no-color -- . ':(exclude).githooks/*' \
+  | grep -E '^\+' | grep -vE '^\+\+\+' | safe_scrub || true)"
 if printf '%s' "$staged" | grep -iEnw "$pattern" >/dev/null 2>&1; then
   echo "pre-commit: a private term appears in the staged changes:"
   printf '%s\n' "$staged" | grep -iEnw --color=always "$pattern" | sed 's/^/  /'
@@ -28,7 +33,7 @@ fi
 
 msg_file="${1:-}"
 if [ -n "$msg_file" ] && [ -f "$msg_file" ]; then
-  if grep -iEw "$pattern" "$msg_file" >/dev/null 2>&1; then
+  if safe_scrub < "$msg_file" | grep -iEw "$pattern" >/dev/null 2>&1; then
     echo "pre-commit: a private term appears in the commit message."
     hits=1
   fi

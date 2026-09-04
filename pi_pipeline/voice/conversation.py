@@ -53,7 +53,11 @@ _REMEMBER_TOOL = {
         "conversations -- the person's name, things they like or own, ongoing "
         "situations, stable preferences. Not small talk or one-off details. "
         "Write it as a standalone sentence (\"Their name is Sam.\", \"They have "
-        "a cat named Biscuit.\"). You may reply and call this in the same turn."
+        "a cat named Biscuit.\"). "
+        "NEVER record dates, clock times, schedules, routines, or anyone's "
+        "comings and goings / whereabouts over time -- keep stable facts about "
+        "people and preferences, not a timeline of their lives. "
+        "You may reply and call this in the same turn."
     ),
     "input_schema": {
         "type": "object",

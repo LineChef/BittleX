@@ -195,8 +195,9 @@ deployed on the Grove Vision module. Then G2:
   with interaction over time. G2 tells Claude who is present so replies and
   behaviour are personalised. `Novelty` already makes a regularly-seen face
   low-interest and one unseen for a while interesting again.
-- **logs sightings to memory** ("saw the dog in the kitchen this afternoon") —
-  feeds [B11] place memory and a "what did G2 see today" recap;
+- **notes stable patterns, not a timeline** — "the dog likes the kitchen", not
+  "saw the dog at 3pm". No dated/timed logging of who was where when (the memory
+  layer rejects temporal detail anyway); feeds [B11] place memory;
 - optionally a gentle **follow / keep-an-eye-on** behaviour (composes with [B8]).
 
 > **The household roster — names, which pet, seed closeness + disposition per

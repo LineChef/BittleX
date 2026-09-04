@@ -4,17 +4,22 @@ Two tables:
 - `exchanges` -- the full conversation log (one row per user/assistant turn),
   mirrored into an FTS5 index for relevance search.
 - `facts`    -- short durable notes G2 chose to keep ("their name is Sam").
-  `last_recalled` is bumped whenever a fact is surfaced, so the injected set
-  favours recently-relevant facts once it hits the cap (a light decay).
+  Facts encoding a date / clock time / schedule / timeline are rejected
+  (`has_temporal_detail`) so the DB never becomes a record of what the household
+  does when. `last_recalled` is bumped on surface, so the injected set favours
+  recently-relevant facts once it hits the cap (a light decay).
 
 Inspect it directly:  sqlite3 pi_pipeline/memory/data/g2_memory.db
 """
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+
+log = logging.getLogger("g2.memory.store")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS exchanges (
@@ -52,8 +57,47 @@ _STOPWORDS = {
 
 
 def _now() -> str:
-    # microsecond precision -- these timestamps order the fact set (recency decay)
+    # microsecond precision -- orders the fact set (recency decay). Row metadata
+    # only; never the *content* of a fact (see _TEMPORAL_RE).
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
+
+
+def _today() -> str:
+    # date only -- the conversation log keeps *when roughly*, not a clock time,
+    # so a leaked DB isn't a minute-by-minute timeline of the household.
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+# A durable fact must not encode dates / clock times / schedules / a timeline of
+# the household's comings and goings -- that turns the memory DB into a
+# surveillance profile. Facts matching this are rejected (add_fact -> False).
+_MONTHS = (r"jan(uary)?|feb(ruary)?|march|april|may|june|july|aug(ust)?|"
+          r"sep(t|tember)?|oct(ober)?|nov(ember)?|dec(ember)?")
+_TEMPORAL_RE = re.compile(
+    rf"""
+      \b\d{{1,2}}:\d{{2}}\b                            # 6:30, 18:05
+    | \b\d{{1,2}}\s?[ap]\.?m\.?\b                      # 6pm, 6 a.m.
+    | \bo['’]?clock\b | \bnoon\b | \bmidnight\b
+    | \b(mon|tue|tues|wed|wednes|thu|thur|thurs|fri|sat|satur|sun)(day)?\b
+    | \b\d{{1,2}}\s+(of\s+)?({_MONTHS})\b             # 3 June  /  3rd of June
+    | \b({_MONTHS})\s+\d{{1,2}}\b                      # June 3
+    | \b\d{{1,2}}/\d{{1,2}}(/\d{{2,4}})?\b            # 9/3, 09/03/2026
+    | \b\d{{4}}-\d{{2}}-\d{{2}}\b                      # 2026-09-03
+    | \b(yester|to)day\b | \btonight\b | \btomorrow\b
+    | \bthis\s+(morning|afternoon|evening|week|month|weekend|year)\b
+    | \b(last|next)\s+(week|month|year|night|
+        mon|tues?|wednes?|thurs?|fri|satur?|sun)(day)?\b
+    | \b\d+\s+(minute|hour|day|week|month|year)s?\s+ago\b
+    | \b(every|each)\s+(day|morning|night|week|weekend|month|
+        mon|tues?|wednes?|thurs?|fri|satur?|sun)(day)?\b
+    | \b(daily|weekly|nightly|weekdays?|weekends?)\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def has_temporal_detail(text: str) -> bool:
+    return bool(_TEMPORAL_RE.search(text))
 
 
 def _fts_query(text: str) -> str:
@@ -79,7 +123,7 @@ class Store:
     def log_exchange(self, user_text: str, assistant_text: str, actions: list[str]) -> int:
         cur = self._db.execute(
             "INSERT INTO exchanges (ts, user_text, assistant_text, actions) VALUES (?, ?, ?, ?)",
-            (_now(), user_text.strip(), assistant_text.strip(), ",".join(actions)),
+            (_today(), user_text.strip(), assistant_text.strip(), ",".join(actions)),
         )
         self._db.commit()
         return int(cur.lastrowid)
@@ -114,6 +158,11 @@ class Store:
     def add_fact(self, fact: str) -> bool:
         fact = fact.strip()
         if not fact:
+            return False
+        if has_temporal_detail(fact):
+            # keep stable facts about people / preferences, never a dated log of
+            # what the household does when.
+            log.info("fact rejected (date/time/schedule detail): %s", fact)
             return False
         cur = self._db.execute(
             "INSERT OR IGNORE INTO facts (ts, fact) VALUES (?, ?)", (_now(), fact)
