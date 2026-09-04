@@ -191,8 +191,11 @@ photos of each → YOLOv8n → deployed on the Grove Vision module. Then G2:
     first when wandering, notices and comments when he's been gone a while.
   - **Mark's wife** — G2 *loves* her; his favourite person after Mark. A very
     high bond of her own — warm greeting, comes over, glad to see her.
-  - **the cat, the dog** — named on sight, their own lower bonds; the wary/
-    affectionate traits colour how G2 acts around each.
+  - **the cat** — G2 is *very* curious about him and wants to play: follows him
+    around, play-bows, tries to engage, watches where he goes. A bond that
+    carries a **playful disposition**, not just a closeness level.
+  - **the dog** — named on sight, a calmer bond; a wary disposition (keeps a
+    little distance, gives way) until it learns the dog is safe.
   - new people and pets slot in at a low bond and grow (or not) over time.
   A `G2_BONDS` config (like `G2_TRAITS`) or a small household file carries the
   seed names + levels + labels;
