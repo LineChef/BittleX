@@ -59,7 +59,9 @@ pip install -r pi_pipeline/requirements-audio.txt    # optional: vosk / piper / 
 pip install -r pi_pipeline/requirements-dev.txt      # optional: pytest
 ```
 
-Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`.
+Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`. Set a
+spend limit on the key before first use — see
+[`docs/reference/api-setup.md`](../docs/reference/api-setup.md).
 
 ## Tests
 
