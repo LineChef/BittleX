@@ -32,10 +32,25 @@ import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))          # for `link`
+sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for `pi_pipeline.diag`
 
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
+
+try:
+    from pi_pipeline.diag import diag, RingBuffer, bridge_stdlib_logging  # noqa: E402
+except Exception:                                             # diag is optional
+    diag = None
+    RingBuffer = None
+    def bridge_stdlib_logging(*_a, **_kw):  # type: ignore
+        pass
+
+_THERMAL_EVENT = {   # guard state -> (event name, level)
+    "warn":     ("servo.thermal_warn", "WARN"),
+    "soft":     ("servo.soft_cutback", "WARN"),
+    "cooldown": ("servo.thermal_cooldown", "ERROR"),
+}
 
 
 def _speak_best_effort(phrase):
@@ -187,6 +202,14 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
+    ring = None
+    if diag is not None:
+        diag.start_session("gait", policy_path=getattr(pol, "onnx_path", None),
+                           extra={"cmd_fwd": cmd_fwd, "hz": hz})
+        bridge_stdlib_logging()
+        ring = diag.attach_ring(RingBuffer(seconds=15, hz=hz))
+    _guard_prev = "ok"
+
     logf = None
     if log_path:
         logf = open(log_path, "w")
@@ -237,7 +260,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             if parsed is None:
                 miss += 1
                 if miss > 20:
-                    print("!! 20 consecutive IMU misses -- stopping"); break
+                    print("!! 20 consecutive IMU misses -- stopping")
+                    if diag is not None:
+                        diag.event("gait", "ERROR", "imu.stale", consecutive_misses=miss)
+                    break
             else:
                 miss = 0
                 r, p_, y, gx, gy, gz = parsed
@@ -249,6 +275,25 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+
+                if ring is not None:
+                    ring.push(t=round(time.perf_counter() - t_start, 3),
+                              roll=round(r, 4), pitch=round(p_, 4), yaw=round(y, 4),
+                              gx=round(gx, 4), gy=round(gy, 4), gz=round(gz, 4),
+                              step_ms=round(lat[-1] * 1e3, 2),
+                              guard=snap.state, hot_j=snap.hottest_j,
+                              hot_frac=round(snap.hottest_frac, 3), duty_s=round(snap.duty_s, 1),
+                              **{f"j{k}": int(v) for k, v in enumerate(joint_deg)})
+                if diag is not None and snap.state != _guard_prev:
+                    if snap.state in _THERMAL_EVENT:
+                        nm, lv = _THERMAL_EVENT[snap.state]
+                        diag.event("gait", lv, nm, reason=snap.tripped_reason,
+                                   hottest_j=snap.hottest_j, hottest_frac=round(snap.hottest_frac, 3),
+                                   duty_s=round(snap.duty_s, 1))
+                    elif snap.state == "ok" and _guard_prev in ("cooldown", "warn", "soft"):
+                        diag.event("gait", "INFO", "servo.thermal_recover",
+                                   hottest_frac=round(snap.hottest_frac, 3))
+                    _guard_prev = snap.state
 
                 if snap.state == "cooldown":
                     # danger zone: lie down, all servos off load, until cooled
@@ -281,12 +326,18 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             i += 1
     except KeyboardInterrupt:
         print("\n^C")
+    except BaseException as e:                       # noqa: BLE001 -- never leave servos loaded
+        if diag is not None:
+            diag.event("gait", "FATAL", "loop.exception", err=repr(e))
+        raise
     finally:
         _send(lk, "V")     # stream off
         _send(lk, "d")     # rest
         if logf:
             logf.close()
             print(f"log written: {log_path}")
+        if diag is not None:
+            diag.close()
     if lat:
         a = np.array(lat) * 1e3
         print(f"policy step: {a.mean():.2f} ms mean, {a.max():.2f} ms max ({len(lat)} ticks)")

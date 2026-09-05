@@ -233,6 +233,18 @@ backstop forces a lie-down on a long run. It has never seen real hardware.
 | `_STAND_DEG` | ±35° | replace with the actual `wkf_ref.npy` mean pose |
 | effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`) | 0.010 / 0.004 / 1.6 | if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead |
 
+**Expected direction of the retune is DOWN (less aggressive).** The placeholders
+err toward safety. If real sessions show it interrupting normal use — `diag
+summarize` reporting COOLDOWNs when the heat estimate was well below the danger
+line, or the WARN speech firing on ordinary walks — dial it back:
+- Fast dial, no code edit: `ThermalGuard(aggressiveness=0.6)` pushes every
+  threshold later (0.5 = roughly half as eager). Plumb it from config when we
+  get there.
+- Slower dial: raise `_H_TRIP`, lower `_K_GEN`, raise `_MAX_CONTINUOUS_S`,
+  widen `_WARN_FRAC`/`_COOLDOWN_FRAC` per the table above.
+The `guard_state` / `hottest_frac` columns in the diag black box and the
+per-session thermal summary are the evidence for which knob and how far.
+
 **Also:** `_speak_best_effort()` in `run_gait.py` currently prints and tries
 `pi_pipeline.voice.tts.speak` — wire it to the real TTS path once the voice
 stack import is settled. And `set_feedback()` is dormant until `run_gait.py`
