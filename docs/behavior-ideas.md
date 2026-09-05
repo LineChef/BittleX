@@ -399,32 +399,61 @@ signal. Needs battery-life data first (idle / walking / talking / vision-on runs
 to brown-out, repeated). Software on the voice pipeline + memory.
 See the "Power awareness" note in `docs/project-plan.md`.
 
-### B18 — Idle power management / sleep mode  🟡
-Runtime-maximising measures. Full analysis + the autonomy-impact table in
+### B18 — Idle power management + "feels alive" idle behaviour  🟡
+Runtime-maximising measures + the lifelike idle layer they hang off. Full
+analysis + the autonomy-impact table in
 [`research/pi-power.md`](research/pi-power.md) "Power-management measures".
 **Principle: these are IDLE-STATE levers** — during active exploration the only
 savings are the clean set (efficient gait, disabled peripherals); you can't
 gate what autonomy depends on (vision, gait).
-- **BUILT (`pi_pipeline.power`):** disable-unused peripherals, Wi-Fi power-save
-  toggle keyed to mode, CPU governor `ondemand` (refuses `powersave`).
-  `python -m pi_pipeline.power status|headless|interactive`; boot-config lines
-  in pi-set-up.md §5.
-- **idle-REST — BUILT** (`behavior/idle_posture.py`, `IdlePosture`). Staged
-  descent `ACTIVE → SIT (alert idle, low holding current) → RESTING (lie down,
-  `d`) → WAKING (head-up → stretch → stand)`. No standing-idle state (a held
-  stand is the servo thermal gap). Gates: entry needs `sit_after_s` then
-  `rest_after_s` of quiet, `safe_to_rest` (level/stable/not held/not
-  recovering) and not told to "stay"; person-present stretches the SIT→REST
-  timer; conversation holds SIT (never lies down); `handled` (picked up) forces
-  a rouse; life signs while RESTING (periodic PEEK + optional breathing bob).
-  Pure FSM + clock, 11 tests. Caller maps `PostureAction` → OpenCat commands
-  and drives `on_activity` / `on_stay_command` / `wake_done`. TODO: personality
-  layer maps traits → `IdlePostureConfig` (lazy rests sooner, alert stays up).
-- **Focused-session TODO (still):** on-demand-vision gate ("scale to activity",
-  off only in sleep); sleep-mode state machine (wake on IMU motion / mic level
-  / wake word / patrol timer) -- builds on `IdlePosture` RESTING.
-- **Hardware-gated:** real per-state power budget from an inline current meter
-  (walking / idle-stand / sit / REST / Pi under vision load / Pi asleep) — tunes
-  the sleep timeout and feeds B12.
-- Rest-pose power order: **REST (`d`) < sit < stand**; REST→walk resume is
-  ~1–2 s so only fold when idle > a few seconds.
+Rest-pose power order: **REST (`d`) < sit < stand**; there is deliberately no
+standing-idle state (a held stand is the servo thermal gap); REST→walk resume
+is ~1–2 s so only fold when idle > a few seconds.
+
+**DONE**
+- [x] `pi_pipeline.power` — disable-unused peripherals, Wi-Fi power-save toggle
+      keyed to mode, CPU governor `ondemand` (refuses `powersave`).
+      `python -m pi_pipeline.power status|headless|interactive`; boot lines in
+      pi-set-up.md §5.
+- [x] **idle-REST decision layer** — `behavior/idle_posture.py` `IdlePosture`.
+      Staged descent `ACTIVE → SIT → RESTING → WAKING`; gates: `sit_after_s`
+      then `rest_after_s` quiet, `safe_to_rest` (level/stable/not held/not
+      recovering), not told to "stay"; person-present stretches the SIT→REST
+      timer; conversation holds SIT; `handled` (picked up) forces a rouse;
+      emits `PEEK` / `LIFE_SIGN` on the right triggers. Pure FSM + clock, 11
+      tests, `last_reason` for diag. **Emits abstract actions only.**
+
+**TODO — the motion / "feels alive" layer (nothing in a live pipeline runs any of this yet)**
+- [ ] **Driver loop** — call `IdlePosture.update()` each tick with the real
+      inputs (last-command time, active-task flag, `Mode`, person-detected,
+      IMU-level/held/recovering), map `PostureAction` → OpenCat command
+      sequences, emit the `posture.transition` diag event with `last_reason`.
+- [ ] **Settle animation** — before `GO_REST`: a look-around (head pan), a
+      weight shift, an optional "sigh" cue. Dog-circling-before-lying-down.
+- [ ] **PEEK choreography** — the head-pan sweep + hold the `PEEK` action stands
+      for (currently a no-op).
+- [ ] **Breathing bob** — the small periodic body-height oscillation for
+      `LIFE_SIGN` (config `breathing`, currently a no-op).
+- [ ] **WAKE choreography** — the timed head-up → stretch (`str`) → stand
+      (`kup`) sequence; call `wake_done()` when it finishes.
+- [ ] **Graduated response motions** — distant sound → head turn only vs. full
+      rouse; picked up → snap to a safe posture. (FSM branches exist; motions
+      don't.)
+- [ ] **Sound / LED life signs** — soft sound in deep rest, eye/status LED
+      flicker while resting.
+- [ ] **Personality → idle timing** — add `idle_sit_secs` / `idle_rest_secs`
+      to `BehaviorParams`, a `Personality.idle_posture_config()` builder, and
+      decide which traits bias them (lazy/calm rests sooner, alert/energetic
+      stays up) — needs the same "which traits, how much" call as the rest of
+      this.
+- [ ] **On-demand vision gate** — "scale to activity" (full rate navigating,
+      low rate stationary-monitoring, off only in sleep); never fully off while
+      G2 could move (CliffGuard reflex needs a feed).
+- [ ] **Sleep-mode state machine** — servos REST + vision off + governor down +
+      Wi-Fi power-save on; wake on IMU motion / mic level / wake word / patrol
+      timer. Builds on `IdlePosture` RESTING.
+
+**Hardware-gated**
+- [ ] Real per-state power budget from an inline current meter (walking / sit /
+      REST / Pi under vision load / Pi asleep) — tunes the sleep timeout, feeds
+      B12.
