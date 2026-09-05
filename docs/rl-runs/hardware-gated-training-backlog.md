@@ -188,6 +188,31 @@ footfall (contact-model stiffness/damping only approximates this).
   vs the same pull on bare floor — not a substitute for sysid, just a check the
   current guess isn't wildly off before hardware exists.
 
+## H11 — Servo thermal management  🟡
+
+The P1S "electronic overheat cutback" is really firmware over-*current*
+protection (no thermistor in a coreless servo). Under a long session of hard
+work — sustained uphill/rough traverse, repeated stumble-catches, payload — an
+individual leg joint near stall can trip protection mid-gait and topple the
+robot, plus cumulative coreless-brush / gear / driver wear. Full write-up,
+mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
+[`../research/servo-thermal.md`](../research/servo-thermal.md).
+
+- **Trigger:** any real-robot session where a servo visibly sags / a joint
+  freezes mid-task, OR the H1 head-to-head runs long enough to matter. Also
+  fires if the long-episode eval (below) shows the base policy doesn't shed
+  effort as joints warm.
+- **Do-now sim work (not gated):** dynamic per-joint thermal model in the env
+  (re-trigger the existing `TORQUE_CUTBACK` from a live `T` state), thermal
+  observation behind a flag, long-episode eval measuring time-to-trip. Then a
+  Stage-2 thermal-aware **residual** finetune off `run20m_ppo` (base frozen) —
+  temps in the obs, heating-rate reward `R_th`.
+- **Deployable without any training:** Layer 1 (I²t sensorless estimator +
+  3-tier per-joint indicator, spoken via the voice pipeline) + Layer 2
+  (behaviour-layer duty-cycle governor + cooldown pose). Ship first.
+- **The one missing number:** real trip time + cooldown rate from a single
+  bench test once hardware is up — calibrates `k_gen`/`k_diss`/`T_trip`.
+
 ---
 
 ## Do-now sim tasks (not hardware-gated)

@@ -52,7 +52,9 @@ open items on the bench once the parts are in hand.
 - → Sim uses ~0.2 N·m effective — reasonable vs the 0.29 N·m peak (peak ≠
   continuous).
 - → **Overheat protection throttles/cuts hot servos.** Long real-robot RL or eval
-  sessions will hit this — build in cooldown breaks.
+  sessions will hit this — build in cooldown breaks. Full analysis + mitigation
+  plan (sensorless I²t estimator, behaviour-layer governor, thermal-aware
+  residual policy): [`servo-thermal.md`](servo-thermal.md); backlog item H11.
 
 ## Servo position feedback (researched 2026-09-01)
 
