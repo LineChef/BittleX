@@ -48,6 +48,11 @@ _COOLDOWN_FRAC = 0.85   # auto-rest at 85% of trip
 _REARM_FRAC    = 0.30   # re-allow a WARN announcement once H falls back under 30%
 _MAX_CONTINUOUS_S = 480.0   # generous backstop: 8 min of continuous locomotion ...
 _COOLDOWN_S       = 20.0    # ... then a 20 s rest. Not a nag; a floor.
+# NB: _MAX_CONTINUOUS_S is NOT a thermal estimate -- it is a blind "take a
+# break" floor in case the heat estimator is miscalibrated. CANDIDATE FOR
+# REMOVAL: once the bench test calibrates the estimator, evaluate raising this
+# a lot or dropping it entirely (set to 0 to disable). See
+# docs/research/servo-thermal.md "Retuning checklist".
 # Dormant stall detector (needs real servo-angle feedback). Petoi-style
 # per-joint reactive cutback: a joint that isn't tracking gets its command
 # pulled toward neutral first (SOFT_JOINT); only a stall that won't settle
@@ -146,7 +151,7 @@ class ThermalGuard:
         state, reason = "ok", ""
         if self._H[hj] >= self._cool_H:
             state, reason = "cooldown", f"joint {hj} heat estimate {hf:.0%} of danger line"
-        elif duty >= _MAX_CONTINUOUS_S:
+        elif _MAX_CONTINUOUS_S > 0 and duty >= _MAX_CONTINUOUS_S:
             state, reason = "cooldown", f"{duty:.0f}s continuous locomotion (backstop)"
         elif self._stalled_joint() >= 0:
             j = self._stalled_joint()

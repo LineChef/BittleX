@@ -227,7 +227,7 @@ backstop forces a lie-down on a long run. It has never seen real hardware.
 | `_K_DISS` | 0.010 (~100 s τ) | measured cooldown curve after releasing a hot servo |
 | `_H_TRIP` | 60 (unitless) | rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold |
 | `_WARN_FRAC` / `_COOLDOWN_FRAC` | 0.45 / 0.85 | how much margin the operator wants before the spoken warning / auto lie-down |
-| `_MAX_CONTINUOUS_S` | 480 s | if real sessions never approach thermal limits in 8 min, raise it; if they do sooner, lower it |
+| `_MAX_CONTINUOUS_S` | 480 s | **NOT a thermal estimate** — a blind "take a break" floor in case the estimator is miscalibrated. **First-class action: once the estimator is bench-calibrated, evaluate raising this a lot or removing it (set to 0 to disable).** If the calibrated heat estimate alone reliably catches the danger case, this rule is redundant and should go. |
 | `_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S` | 18° / 0.4 s / 1.5 s | real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter |
 | `_SOFT_JOINT_SCALE` | 0.35 | how hard to ease a stalling joint toward neutral before giving up on it |
 | `_STAND_DEG` | ±35° | replace with the actual `wkf_ref.npy` mean pose |

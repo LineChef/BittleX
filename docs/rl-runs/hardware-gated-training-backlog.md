@@ -212,6 +212,13 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
   (behaviour-layer duty-cycle governor + cooldown pose). Ship first.
 - **The one missing number:** real trip time + cooldown rate from a single
   bench test once hardware is up — calibrates `k_gen`/`k_diss`/`T_trip`.
+- **Specifically re-evaluate `_MAX_CONTINUOUS_S`** (the 8-min "take a break"
+  backstop in `thermal_guard.py`). It is NOT a thermal estimate — just a blind
+  floor. Once the heat estimator is calibrated, check whether it reliably
+  catches the danger case on its own; if so, **raise `_MAX_CONTINUOUS_S` a lot
+  or set it to 0 (disabled)** — the user wants this rule gone if it isn't
+  needed. Evidence: diag per-session thermal summaries + black-box
+  `guard_state`/`hottest_frac` from real hard sessions.
 
 ---
 
