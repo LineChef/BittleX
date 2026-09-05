@@ -1,10 +1,18 @@
-"""Robustness sweep -- where does run20m_ppo break as we vary the sim-to-real
+"""Robustness sweep -- where does a policy break as we vary the sim-to-real
 axes one at a time? No training. Each axis is swept from its nominal value
-outward; everything else held at nominal, DR eval terrain on, payload on,
-fixed forward command. Reports fall rate + forward speed + body-tilt RMS per
-setting, and flags the value where the gait first degrades.
+outward; everything else held at nominal, DR eval terrain on, fixed forward
+command. Reports fall rate + forward speed + body-tilt RMS per setting, and
+flags the value where the gait first degrades (first_degrade_at).
 
     python robustness_sweep.py --learned trained/run20m_ppo --seeds 16
+    python robustness_sweep.py --learned trained/run20m_newcourse_ppo \
+        --learned-b trained/run20m_ppo --bare --seeds 24
+
+--learned-b overlays a second policy and reports which one holds its margin
+(reaches a higher first-degrade value) longer per axis. --bare drops the
+payload (PAYLOAD_PROB=0) -- the torque-cutback and IMU axes are largely masked
+by the payload's inertia otherwise, same reason the decathlon has bare-robot
+cells.
 
 Purpose: size the bands for a transfer-hardening DR run (or show one isn't
 needed). The cliffs here are sim-model cliffs, not measured-hardware cliffs --
@@ -67,48 +75,77 @@ def rollout(model, seeds, steps=300, cmd=0.10):
     }
 
 
+def _degrades(r, base):
+    dfwd = r["fwd_mps"] - base["fwd_mps"]
+    return (r["fall_rate"] >= 0.15) or (dfwd <= -0.25 * base["fwd_mps"]), dfwd
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--learned", default="trained/run20m_ppo")
+    ap.add_argument("--learned-b", default=None,
+                    help="overlay a second policy; report which holds its margin longer per axis")
+    ap.add_argument("--bare", action="store_true",
+                    help="PAYLOAD_PROB=0 -- torque-cutback / IMU axes are masked by the payload otherwise")
     ap.add_argument("--seeds", type=int, default=16)
     ap.add_argument("--json-out", default=None)
     args = ap.parse_args()
 
     E.DR_EVAL_FULL = True
-    E.PAYLOAD_PROB = 1.0
+    E.PAYLOAD_PROB = 0.0 if args.bare else 1.0
     E.PAYLOAD_MASS_RAND = 0.0
     E.ROUGH_TERRAIN = getattr(E, "ROUGH_TERRAIN", 0.0)
     from stable_baselines3 import PPO
-    model = PPO.load(args.learned)
+    gaits = [("A", args.learned, PPO.load(args.learned))]
+    if args.learned_b:
+        gaits.append(("B", args.learned_b, PPO.load(args.learned_b)))
 
-    # nominal baseline (all axes at nominal)
+    # nominal baseline per gait (all axes at nominal). PAYLOAD_PROB is not in
+    # _NOMINAL, so the per-axis reset loop below never clobbers it.
     for attr, val in _NOMINAL.items():
         setattr(E, attr, val)
-    base = rollout(model, args.seeds)
-    print(f"\nBASELINE (all nominal): fall {base['fall_rate']:.0%} | "
-          f"fwd {base['fwd_mps']:.3f} m/s | tilt_rms {base['tilt_rms']:.3f} rad\n")
+    base = {}
+    for tag, path, m in gaits:
+        base[tag] = rollout(m, args.seeds)
+        print(f"BASELINE {tag} ({path}): fall {base[tag]['fall_rate']:.0%} | "
+              f"fwd {base[tag]['fwd_mps']:.3f} m/s | tilt_rms {base[tag]['tilt_rms']:.3f} rad")
+    print(f"  (payload {'OFF -- bare robot' if args.bare else 'on'})\n")
 
-    out = {"learned": args.learned, "seeds": args.seeds, "baseline": base, "axes": {}}
+    out = {"learned": args.learned, "learned_b": args.learned_b, "bare": args.bare,
+           "seeds": args.seeds, "baseline": base, "axes": {}}
     for axis, (attr, nom, vals, units) in AXES.items():
         print(f"=== {axis}  ({units}, nominal {nom}) ===")
-        print(f"    {'value':>8} {'fall%':>7} {'fwd m/s':>9} {'Δfwd':>7} {'tilt_rms':>9}  flag")
+        cols = "  ".join(f"{t+':fall% fwd Δfwd':>22}" for t, _, _ in gaits)
+        print(f"    {'value':>8}  {cols}")
         rows = []
-        cliff = None
+        cliff = {t: None for t, _, _ in gaits}
         for v in vals:
             for a2, n2 in _NOMINAL.items():
                 setattr(E, a2, n2)
             setattr(E, attr, v)
-            r = rollout(model, args.seeds)
-            dfwd = r["fwd_mps"] - base["fwd_mps"]
-            bad = (r["fall_rate"] >= 0.15) or (dfwd <= -0.25 * base["fwd_mps"])
-            if bad and cliff is None and v != nom:
-                cliff = v
-            flag = "  <-- degrades" if bad else ""
-            print(f"    {v:>8} {r['fall_rate']:>6.0%} {r['fwd_mps']:>9.3f} {dfwd:>+7.3f} {r['tilt_rms']:>9.3f}{flag}")
-            rows.append({"value": v, **r, "d_fwd": dfwd, "degrades": bool(bad)})
+
+            cells, per_gait = [], {}
+            for tag, _, m in gaits:
+                r = rollout(m, args.seeds)
+                bad, dfwd = _degrades(r, base[tag])
+                if bad and cliff[tag] is None and v != nom:
+                    cliff[tag] = v
+                cells.append(f"{r['fall_rate']*100:4.0f} {r['fwd_mps']:.3f} {dfwd:+.3f}"
+                             + ("*" if bad else " "))
+                per_gait[tag] = {**r, "d_fwd": dfwd, "degrades": bool(bad)}
+            print(f"    {v:>8}  " + "  ".join(f"{c:>22}" for c in cells))
+            rows.append({"value": v, "gaits": per_gait})
         out["axes"][axis] = {"attr": attr, "nominal": nom, "units": units,
                              "first_degrade_at": cliff, "rows": rows}
-        print(f"    -> first degradation at {cliff if cliff is not None else 'none in range'}\n")
+        line = "  |  ".join(f"{t}: {cliff[t] if cliff[t] is not None else 'held'}" for t, _, _ in gaits)
+        print(f"    -> first degradation --  {line}")
+        if len(gaits) == 2:
+            def k(x): return 1e9 if x is None else x
+            ca, cb = cliff["A"], cliff["B"]
+            better = "A" if k(ca) > k(cb) else ("B" if k(cb) > k(ca) else "tie")
+            print(f"       margin: {'A' if better=='A' else 'B' if better=='B' else 'neither'} holds longer"
+                  f" ({better})")
+        print()
 
     for a2, n2 in _NOMINAL.items():   # leave the module clean
         setattr(E, a2, n2)
