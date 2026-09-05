@@ -446,12 +446,32 @@ is ~1–2 s so only fold when idle > a few seconds.
       decide which traits bias them (lazy/calm rests sooner, alert/energetic
       stays up) — needs the same "which traits, how much" call as the rest of
       this.
-- [ ] **On-demand vision gate** — "scale to activity" (full rate navigating,
-      low rate stationary-monitoring, off only in sleep); never fully off while
-      G2 could move (CliffGuard reflex needs a feed).
+- [ ] **On-demand vision gate** — **blocked on the camera** (expected
+      ~2026-09-05 evening; confirm in hand). Split into two consumers, not one
+      throttled feed: (a) a lean **edge-safety stream** (small model, low res,
+      "drop-off in the near field?") at a rate set by stop-distance math — at
+      ~0.10 m/s a <5 fps miss is a 50–100 mm blind gap, so ~5–10 fps *whenever
+      forward motion is possible*, and this one is NOT power-gated; (b) the
+      **rich perception stream** (scene / objects / nav) which scales with
+      activity, 1–2 fps or bursts when stationary. When physically stopped
+      (IMU + gait state confirm), even the safety stream can idle — can't walk
+      off a cliff standing still. Calibrate the detectable-range vs fps
+      numbers once the camera is here.
 - [ ] **Sleep-mode state machine** — servos REST + vision off + governor down +
-      Wi-Fi power-save on; wake on IMU motion / mic level / wake word / patrol
-      timer. Builds on `IdlePosture` RESTING.
+      Wi-Fi power-save on. Builds on `IdlePosture` RESTING. Wake trigger =
+      **IMU** (tap/lift — always-on for balance anyway); optionally a
+      loud-sound threshold. See the mic note below re: NOT defaulting to
+      wake-word here.
+- [ ] **Mic privacy — default OFF, physical wake.** The user does not want an
+      always-on / always-listening mic. Plan: mic VCC on a GPIO load switch
+      (electrically off by default, not just software-ignored); wake by IMU
+      tap/lift (double-tap the back, or pick up); a **listening LED** on
+      whenever the mic has power. `wake_word.py` already has the
+      `make_wake_word(mode, …)` factory — add a `tap`/`imu` mode, make it the
+      default, keep `voice` (VoskWakeWord) as an explicit opt-in for
+      across-the-room use with the LED making continuous listening obvious.
+      Tradeoff: physical wake needs proximity; pairs with the WAKE
+      choreography (tap → stir → listening).
 
 **Hardware-gated**
 - [ ] Real per-state power budget from an inline current meter (walking / sit /
