@@ -35,6 +35,17 @@ sys.path.insert(0, os.path.join(_HERE, ".."))          # for `link`
 
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
+from thermal_guard import ThermalGuard                        # noqa: E402
+
+
+def _speak_best_effort(phrase):
+    """Say it through the voice pipeline if that stack is importable, else print."""
+    print(f"[thermal] G2: \"{phrase}\"", flush=True)
+    try:
+        from pi_pipeline.voice.tts import speak     # type: ignore
+        speak(phrase)
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------- IMU
@@ -170,16 +181,19 @@ def dry_run(cmd_fwd, seconds, hz):
     print(f"  overruns    : {(l > dt*1e3*1.5).sum()} / {len(l)} ticks > 1.5x target")
 
 
-def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None):
+def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
+        thermal_guard=True):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
+    guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
     logf = None
     if log_path:
         logf = open(log_path, "w")
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on"))
-        logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8)) + "\n")
+        logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
+                   + ",guard_state,hottest_j,hottest_frac,duty_s\n")
 
     if disable_firmware_balance:
         _send(lk, "g")            # toggle firmware gyro assist OFF -> policy has full control
@@ -231,11 +245,33 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
                 lat.append(time.perf_counter() - t0)
+
+                snap = guard.update(joint_deg, dt)
+                joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+
+                if snap.state == "cooldown":
+                    # danger zone: lie down, all servos off load, until cooled
+                    print(f"!! thermal COOLDOWN: {snap.tripped_reason} -- lying down to cool", flush=True)
+                    _send(lk, "d")
+                    rested = 0.0
+                    while rested < 120.0:
+                        time.sleep(guard.cooldown_seconds)
+                        guard.note_rest(guard.cooldown_seconds)
+                        rested += guard.cooldown_seconds
+                        if guard.is_cool():
+                            break
+                    print(f"   cooled after {rested:.0f}s -- resuming", flush=True)
+                    _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
+                    time.sleep(1.0)
+                    pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
+                    t_next = time.perf_counter()
+
                 if logf:
-                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s\n" % (
+                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s,%s,%d,%.3f,%.0f\n" % (
                         time.perf_counter() - t_start, r, p_, y, gx, gy, gz,
-                        ",".join(str(int(v)) for v in joint_deg)))
+                        ",".join(str(int(v)) for v in joint_deg),
+                        snap.state, snap.hottest_j, snap.hottest_frac, snap.duty_s))
             t_next += dt
             slack = t_next - time.perf_counter()
             if slack > 0:
@@ -282,6 +318,8 @@ def main():
                     help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
     ap.add_argument("--log", default=None,
                     help="write a per-tick CSV (t, rpy, gyro, 8 joint deg) for real_vs_sim / sysid_replay")
+    ap.add_argument("--no-thermal-guard", action="store_true",
+                    help="disable the conservative servo thermal guard (WARN speech + rare auto-cooldown)")
     args = ap.parse_args()
 
     if args.dry_run:
@@ -296,7 +334,8 @@ def main():
             openloop(lk, args.cycles, args.hz)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
-                disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log)
+                disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
+                thermal_guard=not args.no_thermal_guard)
     finally:
         try:
             lk.close()

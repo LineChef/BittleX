@@ -211,6 +211,34 @@ been structured.
 
 ---
 
+## 4b. Retuning checklist — `pi_pipeline/gait/thermal_guard.py`
+
+The guard is **built and wired** (`ThermalGuard` in `run_gait.py`, on by default,
+`--no-thermal-guard` to disable). Every constant in it is a **PLACEHOLDER** tuned
+by feel to be gentle — gentle flat walking never fires it, a sustained hard
+session gets the spoken WARN at ~3 min, and only the 8-minute duty-cycle
+backstop forces a lie-down on a long run. It has never seen real hardware.
+
+**Retune once the bench test (§3.5 / §5.1) gives real numbers:**
+
+| Constant | Now (placeholder) | Calibrate from |
+|---|---|---|
+| `_K_GEN` | 4e-3 | bench trip time — scale so `H` reaches `_H_TRIP` at the measured time-to-protection under a hard hold |
+| `_K_DISS` | 0.010 (~100 s τ) | measured cooldown curve after releasing a hot servo |
+| `_H_TRIP` | 60 (unitless) | rescale `H` to estimated °C once `_K_GEN`/`_K_DISS` are fit; set at the real protection threshold |
+| `_WARN_FRAC` / `_COOLDOWN_FRAC` | 0.45 / 0.85 | how much margin the operator wants before the spoken warning / auto lie-down |
+| `_MAX_CONTINUOUS_S` | 480 s | if real sessions never approach thermal limits in 8 min, raise it; if they do sooner, lower it |
+| `_STALL_ERR_DEG` / `_STALL_SOFT_S` / `_STALL_HOLD_S` | 18° / 0.4 s / 1.5 s | real feedback-servo tracking error under a normal hard push vs an actual stall — set the threshold above the former, below the latter |
+| `_SOFT_JOINT_SCALE` | 0.35 | how hard to ease a stalling joint toward neutral before giving up on it |
+| `_STAND_DEG` | ±35° | replace with the actual `wkf_ref.npy` mean pose |
+| effort proxy (`_K_VEL`, `_K_DEV`, `_GRAV_BOOST`) | 0.010 / 0.004 / 1.6 | if the feedback servos expose position readback, cross-check the proxy against measured tracking error; re-weight if a term is dead |
+
+**Also:** `_speak_best_effort()` in `run_gait.py` currently prints and tries
+`pi_pipeline.voice.tts.speak` — wire it to the real TTS path once the voice
+stack import is settled. And `set_feedback()` is dormant until `run_gait.py`
+actually reads `readAllFeedbackFast()` — the stall detector and the Petoi-style
+soft cutback have no teeth until then.
+
 ## 5. Priority / sequencing
 
 1. **Bench test on hardware** (when bring-up allows) → real trip time +
