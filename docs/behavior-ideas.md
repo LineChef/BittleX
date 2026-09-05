@@ -398,3 +398,22 @@ an ADC on a BiBoard Grove analog pin (G3/G4) reading pack voltage for a true
 signal. Needs battery-life data first (idle / walking / talking / vision-on runs
 to brown-out, repeated). Software on the voice pipeline + memory.
 See the "Power awareness" note in `docs/project-plan.md`.
+
+### B18 — Idle power management / sleep mode  🟡
+Runtime-maximising measures. Full analysis + the autonomy-impact table in
+[`research/pi-power.md`](research/pi-power.md) "Power-management measures".
+**Principle: these are IDLE-STATE levers** — during active exploration the only
+savings are the clean set (efficient gait, disabled peripherals); you can't
+gate what autonomy depends on (vision, gait).
+- **Buildable now, no hardware:** disable-unused peripherals (LEDs/audio-out),
+  Wi-Fi power-save toggle keyed to mode (on when headless — +200 ms/API call,
+  breaks streaming), CPU governor `ondemand` (verify no control-tick jitter via
+  `benchmark_pi.py`), behaviour-aware idle-REST (fold to `d` only from a true
+  "no goals, no stimuli" state, not a mid-task pause), on-demand-vision gate API
+  ("scale to activity", off only in sleep), sleep-mode state-machine skeleton in
+  `behavior/mode_controller.py`.
+- **Hardware-gated:** real per-state power budget from an inline current meter
+  (walking / idle-stand / sit / REST / Pi under vision load / Pi asleep) — tunes
+  the sleep timeout and feeds B12.
+- Rest-pose power order: **REST (`d`) < sit < stand**; REST→walk resume is
+  ~1–2 s so only fold when idle > a few seconds.

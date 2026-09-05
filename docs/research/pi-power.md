@@ -76,6 +76,69 @@ Confirm with Petoi support (or once hardware is in hand) whether BiBoard V2's
 connection to the Pi can be wired data-only, or whether its standard mounting
 inherently ties the 5V line together with the data lines by default.
 
+---
+
+# Power-management measures — maximizing runtime
+
+Drafted 2026-09-05. Two independent budgets:
+
+- **Robot 2S pack (7.4 V, 1000 mAh, 2 A typ / 5 A peak)** — leg servos + BiBoard.
+  Caps *walking time* (~45–60 min active). Relaxed servos draw ≈ 0; any held
+  pose draws continuous holding current.
+- **PiSugar S (1200 mAh)** — Pi Zero 2 W + camera + audio. Runs whether or not
+  the robot moves; caps *awake time*. No battery telemetry on the S.
+
+Guiding principle: **these are IDLE-STATE optimizations.** Active autonomous
+operation (exploring, navigating, reacting) is a *working* state — you can't
+save power there by gating what autonomy depends on. During active autonomy the
+only levers are the clean set (efficient gait, disabled peripherals).
+
+## Rest pose (servo pack)
+
+Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
+- **REST** — legs folded, body on the frame, servos de-energized, ≈ 0 draw.
+- **sit** — partial; some servos still hold. Middle option if it must stay
+  "ready".
+- **stand** — all 8 leg servos fighting gravity at a poor mechanical angle;
+  highest continuous draw.
+
+Resume cost: REST → walking is ~1–2 s + a rebalance; stand → walking is instant.
+So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
+
+## Measures
+
+| Measure | Buildable now? | Autonomy impact | Rule |
+|---|---|---|---|
+| **Disable unused peripherals** (onboard LEDs, audio-out; BT already off for the serial port; Zero 2 has no HDMI) | yes — Pi-setup `config.txt` + systemd | none | just do it |
+| **Wi-Fi power-save when headless** (`iw dev wlan0 set power_save on`) | yes — helper keyed to mode | +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).** | on in autonomous mode; off when a human is actively connected |
+| **idle-REST timeout** — send `d` after N s of no command | yes — behavior/gait, mock-link testable | Must be **behaviour-aware**: laying down during an explore pause (thinking/observing) is slow to resume and looks broken | trigger only from a true "no goals, no stimuli" state; explore mode holds a stand/sit between moves |
+| **On-demand vision** — gate the Grove Vision AI V2 | API now; tuned with the camera | **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move | "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep |
+| **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on | logic partly now (`behavior/mode_controller.py`); wake conditions need hardware | Fine *if* wake triggers are good; risk = sleeping through something it should react to | keep a cheap always-on trigger (IMU motion, mic level, wake word); vision + gait stay down until woken. Desirable "rests when nothing's happening" behaviour for a companion bot |
+| **CPU governor → `ondemand`** | yes — one-liner at setup | Ramp latency could cause one late 80 Hz control tick after idle | use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter |
+| **Camera resolution / fps down** | with hardware | detection may degrade | drop only if detection still passes |
+| **PiSugar low-power mode** | with hardware | — | check if it exists and whether the Pi can trigger it |
+
+## NOT "no performance impact" — real tradeoffs (flagged, not recommended as free)
+
+- Weighting `FAC_POWER` harder in training — trades agility/speed for current.
+- Lower control rate (80 → 50 Hz) — robustness risk.
+- Slower cruise — cost-of-transport curve means *very* slow can be less
+  efficient per metre; `TARGET_SPEED` 0.10 m/s is already near the efficient
+  point.
+- Battery-aware slowdown at low voltage — deliberately sacrifices performance
+  to extend runtime.
+
+## Next
+
+- **Implement now:** disable-unused list, Wi-Fi power-save toggle, CPU-governor
+  script, behaviour-aware idle-REST, on-demand-vision gate API, sleep-mode state
+  machine skeleton.
+- **Hardware-gated:** a real power budget from an inline current meter (the
+  PiSugar S has no telemetry) — active walking, idle-stand, sit, REST, Pi under
+  vision load, Pi asleep. Feeds the sleep-mode timeout tuning.
+
+---
+
 ## Sources
 
 - Petoi FAQ — confirms BiBoard can power + communicate with Pi via the 2×5 socket
