@@ -409,11 +409,20 @@ gate what autonomy depends on (vision, gait).
   toggle keyed to mode, CPU governor `ondemand` (refuses `powersave`).
   `python -m pi_pipeline.power status|headless|interactive`; boot-config lines
   in pi-set-up.md §5.
-- **Focused-session TODO (behaviour-aware design needed):** idle-REST — fold to
-  `d` only from a true "no goals, no stimuli" state, not a mid-task pause —
-  **the priority**; on-demand-vision gate ("scale to activity", off only in
-  sleep); sleep-mode state machine in `behavior/mode_controller.py` (wake on
-  IMU motion / mic level / wake word / patrol timer).
+- **idle-REST — BUILT** (`behavior/idle_posture.py`, `IdlePosture`). Staged
+  descent `ACTIVE → SIT (alert idle, low holding current) → RESTING (lie down,
+  `d`) → WAKING (head-up → stretch → stand)`. No standing-idle state (a held
+  stand is the servo thermal gap). Gates: entry needs `sit_after_s` then
+  `rest_after_s` of quiet, `safe_to_rest` (level/stable/not held/not
+  recovering) and not told to "stay"; person-present stretches the SIT→REST
+  timer; conversation holds SIT (never lies down); `handled` (picked up) forces
+  a rouse; life signs while RESTING (periodic PEEK + optional breathing bob).
+  Pure FSM + clock, 11 tests. Caller maps `PostureAction` → OpenCat commands
+  and drives `on_activity` / `on_stay_command` / `wake_done`. TODO: personality
+  layer maps traits → `IdlePostureConfig` (lazy rests sooner, alert stays up).
+- **Focused-session TODO (still):** on-demand-vision gate ("scale to activity",
+  off only in sleep); sleep-mode state machine (wake on IMU motion / mic level
+  / wake word / patrol timer) -- builds on `IdlePosture` RESTING.
 - **Hardware-gated:** real per-state power budget from an inline current meter
   (walking / idle-stand / sit / REST / Pi under vision load / Pi asleep) — tunes
   the sleep timeout and feeds B12.

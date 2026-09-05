@@ -6,6 +6,7 @@ seen so "curious" pulls toward the unseen. All pure logic, driven by the
 `BehaviorParams` the personality produces.
 """
 from .explore import ExploreAction, ExploreConfig, ExploreDecision, Explorer
+from .idle_posture import IdlePosture, IdlePostureConfig, Posture, PostureAction
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
 
@@ -13,4 +14,5 @@ __all__ = [
     "ModeController", "Mode", "ModeConfig",
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
     "Novelty", "NoveltyConfig",
+    "IdlePosture", "IdlePostureConfig", "Posture", "PostureAction",
 ]
