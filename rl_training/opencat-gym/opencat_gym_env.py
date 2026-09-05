@@ -231,17 +231,46 @@ RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
-RANDOM_TERRAIN = 0.045   # R-rob REVERTED (0.055 regressed the push+obstacle cells)
-RUBBLE = 0.016         # run20m_rough2: rounded-cobble rubble (spheres/ridges/some angular), 15mm cap
-                        # size (m) -> ~10-18 mm exposed after half-sinking. Each chunk is a
-                        # randomly-rotated box buried ~half-deep, so only an angled wedge pokes up --
-                        # feet deflect over rather than catching a vertical edge. Paired with the
-                        # recipe's existing +/-10 deg random incline (SLOPE_MAX_DEG). Base run20m
-                        # had this 0; watch.py --challenge rubble overrides for viz.
-RUBBLE_N = 140        # chunks per training episode (viz 'rubble' uses 540)
-RUBBLE_PROB = 0.0     # run20m_carpet: rubble retired -- the single-heightfield CARPET is the rough-terrain substrate now
-RUBBLE_MAX_H = 0.015   # hard cap (m) on exposed chunk height -- passable (gait clears a 15mm threshold). Rough but not a wall.
-                        # clear. Every chunk is pushed down so its top sits <= ground + this.
+RANDOM_TERRAIN = 0.025   # 2026-09-04: demoted from the always-on hazard to an occasional taller
+                         # box mixed in alongside rubble (below) -- boxes have no independent
+                         # passability cap (unlike RUBBLE_MAX_H) so a high severity here could be
+                         # a literal wall, not a step; kept modest since it's no longer the primary
+                         # discrete-object hazard. Eval's obstacle-progression cells (T2.4/T3.3/
+                         # T4.4/T6.2) set their own severity directly and are unaffected.
+RANDOM_TERRAIN_PROB = 0.35   # NEW -- probabilistic presence (was unconditional every episode).
+                             # benchmark_decathlon._apply() resets this to 1.0 so eval's obstacle
+                             # cells stay deterministic; this default only governs training.
+RANDOM_TERRAIN_X_RANGE = (0.08, 0.45)   # NEW -- applies everywhere, training AND eval:
+                                         # EPISODE_LENGTH=250 steps @ TARGET_SPEED ~0.10 m/s means
+                                         # an episode covers only ~0.3m, and eval uses the same
+                                         # episode length (confirmed against real decathlon output
+                                         # -- every cell's forward_distance_m_mean is ~0.2-0.3m).
+                                         # The old fixed (0.12, 1.3) range put most boxes well past
+                                         # anywhere any episode could ever reach -- pure wasted
+                                         # collision-sim compute, not a harder test.
+RANDOM_TERRAIN_MAX_H = 0.010   # NEW -- hard passability cap (m), training only. Boxes have no
+                                # independent cap otherwise (unlike RUBBLE_MAX_H) -- a "high
+                                # severity" box could be a literal wall. Reset to a high value in
+                                # eval so the deliberate obstacle-progression cells (T4.4/T6.2,
+                                # up to 85mm) are unaffected -- those are meant to probe past
+                                # comfortable, not guarantee passability.
+RUBBLE = 0.012         # 2026-09-04: promoted to the PRIMARY training discrete-object hazard,
+                        # replacing always-on RANDOM_TERRAIN boxes -- varied shapes (rounded +
+                        # some angular) instead of only hard edges, and RUBBLE_MAX_H gives it a
+                        # real passability cap that boxes never had. Sparse on purpose: this is
+                        # everyday training texture, not the eval gauntlet's dense stress test.
+RUBBLE_N = 18         # sparse -- eval's gauntlet cells (T5.1/T6.4) override this to 400-560 for
+                       # their own dense scatter; training just wants occasional varied footing.
+                       # 12 read as "a couple of stray pebbles" rather than an obstacle patch --
+                       # bumped for visibility/density, still nowhere near eval's dense scatter.
+RUBBLE_PROB = 0.80     # NEW default -- present most episodes; ~20% stay fully clean.
+RUBBLE_MAX_H = 0.012   # hard cap (m) on exposed chunk height -- passable (gait clears a 12mm
+                        # threshold). Rough but not a wall. Every chunk is pushed down so its top
+                        # sits <= ground + this.
+RUBBLE_X_RANGE = (0.08, 0.45)   # NEW -- applies everywhere, same reach reasoning as
+                                 # RANDOM_TERRAIN_X_RANGE above (including the T5.1/T6.4
+                                 # gauntlet's dense scatter -- a wider spread there was equally
+                                 # wasted, just diluted across more chunks instead of fewer).
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 # --- Payload = the mounted Pi companion stack. Modelled as TWO welded bodies so
@@ -309,7 +338,10 @@ DEPLOY_DEBUG = False     # validate_deploy.py sets this True -> each step stashe
 # Each a DR knob, default 0/off. The loop turns them on one at a time and they
 # accumulate. Scaled by self._dr like the rest. Benchmark cells in
 # benchmark_gaits.py exercise each with the knob forced on.
-SLOPE_MAX_DEG = 10.0      # coverage R1: per-episode ground tilt, random roll & pitch in +/- this (deg), scaled by _dr
+SLOPE_MAX_DEG = 14.0      # coverage R1: per-episode ground tilt, random roll & pitch in +/- this (deg),
+                          # scaled by _dr. 2026-09-04: raised 10->14 alongside switching the draw to
+                          # triangular (see reset()) -- most episodes still land near-flat, but the
+                          # tail now reaches into "steep" territory instead of capping at "gentle".
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
@@ -1061,16 +1093,27 @@ class OpenCatGymEnv(gym.Env):
             self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
-            self._slope_rp = (np.random.uniform(-m, m), np.random.uniform(-m, m))
+            # 2026-09-04: triangular, not uniform -- most episodes near-flat, with a
+            # real (if less frequent) tail out to the ceiling, rather than every
+            # angle up to SLOPE_MAX_DEG equally likely. Ceiling raised alongside
+            # this (see SLOPE_MAX_DEG) so that tail actually reaches "steep", not
+            # just "gentle".
+            self._slope_rp = (np.random.triangular(-m, 0.0, m), np.random.triangular(-m, 0.0, m))
         # CARPET (bump heightfield) is an UNEVEN floor covering -- a bunched rug,
         # a rough mat, a transition edge -- not fitted wall-to-wall carpet. Real
         # fitted carpet is flat at the scale that matters for foot placement
         # (2026-09-04 correction); its floor-covering-ness is CARPET_SOFT
         # (compliance/friction), applied to the flat plane below, independent of
         # this heightfield.
-        _carpet = (CARPET > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+        # 2026-09-04: _carpet and _rough used to require SLOPE_FIXED_RP is None --
+        # a heightfield could never also carry an overall grade, in training or
+        # eval (e.g. the gauntlet couldn't combine rolling hills with its slope).
+        # Both heightfield branches below now apply self._slope_rp (already
+        # computed above, fixed or random) to the whole field's orientation
+        # instead of discarding it, so this restriction is gone.
+        _carpet = (CARPET > 0 and self._dr > 0
                    and np.random.rand() < CARPET_PROB)
-        _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0 and SLOPE_FIXED_RP is None
+        _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
         # A flat episode's floor is "carpeted" (compliant + carpet-typical
         # friction) independent of any height variation -- decided here so it can
@@ -1109,8 +1152,8 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
-            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])
-            self._slope_rp = (0.0, 0.0)
+            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0],
+                p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         elif _rough:
             _n = 64
             _amp = ROUGH_TERRAIN * 0.018 * self._dr
@@ -1124,8 +1167,8 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
-            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])
-            self._slope_rp = (0.0, 0.0)
+            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0],
+                p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
         else:
             plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
                                   p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
@@ -1156,7 +1199,7 @@ class OpenCatGymEnv(gym.Env):
                 0, p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.06, 0.09, 0.005]),
                 basePosition=[sx, sy, 0.005])
             p.changeDynamics(patch, -1, lateralFriction=float(np.random.uniform(0.03, 0.18)))
-        if RANDOM_TERRAIN > 0 and self._dr > 0:
+        if RANDOM_TERRAIN > 0 and self._dr > 0 and np.random.rand() < RANDOM_TERRAIN_PROB:
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
         if RUBBLE > 0 and self._dr > 0 and np.random.rand() < RUBBLE_PROB:
             self._scatter_rubble(RUBBLE * self._dr, RUBBLE_N)
@@ -1402,10 +1445,14 @@ class OpenCatGymEnv(gym.Env):
         n = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                       np.cos(pitch) * np.cos(roll)])
         box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
+        _cap = min(max_h, RANDOM_TERRAIN_MAX_H)
         for _ in range(np.random.randint(4, 10)):
-            h = np.random.uniform(0.002, max(0.003, max_h))
-            x = np.random.uniform(0.12, 1.3)
-            y = np.random.uniform(-0.06, 0.06)
+            h = np.random.uniform(0.002, max(0.003, _cap))
+            x = np.random.uniform(*RANDOM_TERRAIN_X_RANGE)
+            y = np.random.uniform(-0.03, 0.03)   # 2026-09-04: narrowed from +/-0.06 -- the gait
+                                                   # walks close to dead straight now, rarely drifts
+                                                   # off-line, so a wide lateral spread mostly placed
+                                                   # boxes it would just walk past
             z_ground = -(n[0] * x + n[1] * y) / n[2]   # plane through the origin
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
                 np.random.uniform(0.015, 0.045),  # along-path half-length
@@ -1427,8 +1474,9 @@ class OpenCatGymEnv(gym.Env):
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
             r = np.random.uniform(0.45, 1.15) * chunk
-            x = np.random.uniform(0.18, 3.4)
-            y = np.random.uniform(-0.14, 0.14)
+            x = np.random.uniform(*RUBBLE_X_RANGE)
+            y = np.random.uniform(-0.08, 0.08)   # 2026-09-04: narrowed from +/-0.14, same
+                                                   # straight-walking reasoning as the box scatter
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]
             k = np.random.rand()
             if k < 0.20:                                       # rounded ridge (capsule, local Z axis)

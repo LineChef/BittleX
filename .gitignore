@@ -67,3 +67,6 @@ rl_training/opencat-gym/benchmark_*.gif
 # Pre-commit privacy denylist. Enable the hook per clone:
 #   git config core.hooksPath .githooks
 .gitprivacy-terms
+
+# Generated cosmetic carpet texture (watch.py), not source
+rl_training/opencat-gym/.carpet_tex_cache.png

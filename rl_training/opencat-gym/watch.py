@@ -40,8 +40,8 @@ CHALLENGES = {
     "rubble":            {"RUBBLE": 0.016, "RUBBLE_N": 540, "RUBBLE_PROB": 1.0},   # rough, near the passable limit
     "rubble-hard":       {"RUBBLE": 0.020, "RUBBLE_N": 560, "RUBBLE_PROB": 1.0},   # denser + taller, near the passable limit
     "slope+obstacles":   {"SLOPE_FIXED_RP": (0.0, D(9)), "RANDOM_TERRAIN": 0.030},
-    "carpet":            {"CARPET": 0.013, "CARPET_SWELL": 0.022, "CARPET_PROB": 1.0},   # 13mm bumps + broad rolling swell (general stress test)
-    "carpet-rough":      {"CARPET": 0.019, "CARPET_SWELL": 0.030, "CARPET_PROB": 1.0},   # taller bumps + bigger swell (harder stress test)
+    "carpet":            {"CARPET": 0.019, "CARPET_SWELL": 0.035, "CARPET_PROB": 1.0},   # T8.2 exactly -- dense bumps + rolling-hill swell, combined
+    "carpet-rough":      {"CARPET": 0.024, "CARPET_SWELL": 0.045, "CARPET_PROB": 1.0},   # taller bumps + bigger swell (harder than T8.2)
     "carpet-house":      {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.3},   # the user's actual carpet: FLAT + mild compliance (light-robot-adjusted estimate)
     "carpet-house-soft": {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.6},   # same, more compliant -- probe the other end
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
@@ -52,9 +52,11 @@ CHALLENGES = {
     "step-down":         {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1},
     "big-ledge":         {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0},
     "weak-servos":       {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))},
-    "gauntlet":          {"SLOPE_FIXED_RP": (D(4), D(9)), "RANDOM_TERRAIN": 0.040,
+    "gauntlet":          {"SLOPE_FIXED_RP": (D(4), D(9)), "RUBBLE": 0.016, "RUBBLE_N": 400,
+                          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.015,
                           "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25},
-    "brutal-gauntlet":   {"SLOPE_FIXED_RP": (D(8), D(20)), "RANDOM_TERRAIN": 0.070,
+    "brutal-gauntlet":   {"SLOPE_FIXED_RP": (D(8), D(20)), "RUBBLE": 0.020, "RUBBLE_N": 560,
+                          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.020,
                           "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45},
 }
 
@@ -143,6 +145,9 @@ def main():
                     help="steps per episode before the course resets (default 250; "
                          "obstacle-course defaults to 2000 so you can watch a long traverse)")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--balance", type=float, default=0.0,
+                    help="2026-09-04: apply the same post-hoc tilt correction as "
+                         "benchmark_decathlon.py --learned-balance (no retraining). 0.6 probed well.")
     args = ap.parse_args()
 
     if args.latest:
@@ -184,6 +189,9 @@ def main():
 
     knobs = CHALLENGES[args.challenge]
     model = PPO.load(args.model)
+    if args.balance:
+        from benchmark_gaits import BalancedLearned
+        model = BalancedLearned(model, env, k=args.balance)
     if not gif_mode:
         p.setRealTimeSimulation(0)
         p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)   # bumps cast shadows -> readable terrain

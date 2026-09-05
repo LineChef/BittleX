@@ -149,6 +149,45 @@ no BiBoard-V1 IR trigger.
   RL — plus a fall-orientation classifier to pick the right recovery. Possibly an
   IR-trigger workaround for BiBoard V1.
 
+## H10 — Carpet resistance sysid calibration  🔴
+
+`CARPET_SOFT` (T8.1 house-carpet compliance/friction) is a **guess** — calibrated
+to a verbal description and three photos, never measured. Two resistance
+mechanisms carpet plausibly adds aren't modeled at all yet: fiber drag on the
+foot during low-clearance swing (nothing above the flat floor plane to catch a
+foot), and extra resistance planting into / lifting out of the pile bed at each
+footfall (contact-model stiffness/damping only approximates this).
+
+- **Trigger:** hardware assembled, ONNX policy deployed, real carpet available
+  (already true today).
+- **Work:** `pi_pipeline/gait/sysid_collect.py` on hard floor, then the same
+  fixed sequence on the real carpet — matched commands, so it's a clean A/B.
+  `sysid_collect.py` currently only logs *commanded* joint angles; extend it to
+  also log the servo **position feedback readback** (`readAllFeedbackFast()` —
+  confirmed to exist on our alloy servos, slow but fine for offline sysid, see
+  `docs/research/hardware-specs.md`) so tracking-error (commanded vs actual
+  angle) is available, not just IMU tilt/rate. No torque/current feedback exists
+  on these servos — resistance has to be inferred from tracking-error + IMU
+  residual, not read directly as a force.
+- **Fit in two passes, not one:** first fit motor `max_force`/`kp`/`kd`/latency
+  against the **hard-floor** log only (today's `sysid_replay.py --fit`, no
+  changes needed) to lock the actuator model. Then, holding those fixed, fit
+  `CARPET_SOFT` + friction (currently not exposed to `sysid_replay.py` at all —
+  its sim only loads a bare rigid `plane.urdf`) against the **carpet** log's
+  residual gap. Fitting everything at once would let carpet resistance leak into
+  the wrong parameters (e.g. inflate `max_force` to compensate for foot drag).
+- **Diagnostic for which mechanism is real:** condition the real-vs-sim residual
+  (tracking-error and IMU tilt/rate) on the log's existing gait-phase tag. A
+  residual concentrated at plant/liftoff phase points at the contact model
+  (stiffness/damping term); one spread across the swing-phase window instead
+  points at fiber drag on a foot moving through pile above the floor plane — a
+  mechanism nothing in the sim currently represents and would need a new term,
+  not just a `CARPET_SOFT` refit.
+- Cheap sanity check obtainable **today**, no hardware needed: ruler for real
+  pile height, rough drag-force reading (paw-sized weight + fish/luggage scale)
+  vs the same pull on bare floor — not a substitute for sysid, just a check the
+  current guess isn't wildly off before hardware exists.
+
 ---
 
 ## Do-now sim tasks (not hardware-gated)

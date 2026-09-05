@@ -131,6 +131,47 @@ bet. Do B14 as a fun on-hardware experiment when the gait work is settled.
 
 ---
 
+### B17 — House-room scene generator, for vision detectors + reflex rules (vision-gated)  🔴 ⚪
+A room-like sim scene: walls, floor-material transitions, toys/clutter on the
+floor, ledges — the actual shape of the place G2 will live in. **Not an RL
+training ground for the gait** (see below for why) — its job is generating
+varied synthetic scenes to train and test the **vision detectors and reflex
+rules** that B9 and `CliffGuard` (B16) already call for: "this is what a rug
+edge / step / obstacle looks like, here's the rule that fires when you see it."
+That's a deterministic reflex layer outside the walk policy, not something the
+gait itself needs to learn.
+
+**Why not RL-train the gait in it:** camera-pixels-to-action RL is a much
+heavier, different paradigm than anything this project has done — needs a
+vision encoder in the policy, and the sim-to-real gap for *vision* (PyBullet's
+renderer is crude, nothing like real camera imagery) is notoriously worse than
+the physics sim-to-real gap already being fought all through the 2026-09-04
+terrain-ground work. Also a poor fit for a Pi Zero 2W with no GPU and an
+already-tight inference budget. The walk policy doesn't need to see a wall to
+avoid it — a scripted reflex (B9-style) does that job far more cheaply and
+safely than teaching a whole new perception-conditioned gait behavior.
+
+**Most of the physical texture already exists as a locomotion mechanic, just
+not assembled into a "room":** tiled floors ≈ friction variation
+(`RANDOM_FRICTION`), toys on the floor ≈ scattered discrete obstacles
+(`RANDOM_TERRAIN`/`RUBBLE`, see the 2026-09-04 training-ground redesign),
+ledges ≈ `LEDGE_HEIGHT`. The genuinely new pieces for the scene generator are
+walls and room layout — needed for realistic detector training data, not for
+gait practice.
+
+**One piece is worth pulling into the actual gait training separately, no
+vision needed:** floor-material **transitions within a single episode** — tile
+onto carpet onto a rug edge, mid-walk — is a real locomotion question
+(different feet hitting different physics mid-stride) distinct from the
+vision/detector question above. The current sim picks one ground type per
+episode; multi-surface episodes would be a natural extension of the
+2026-09-04 terrain-ground redesign once that settles.
+
+**Trigger:** the vision module is installed. Before that, there's no detector
+to train scenes for, and no reflex layer to validate against them.
+
+---
+
 ## Expression & personality
 
 ### B4 — Expressive body language

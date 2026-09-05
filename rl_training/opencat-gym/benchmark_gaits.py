@@ -68,6 +68,48 @@ class ScriptedGait:
         return np.clip((target - cur) / _DS, -1.0, 1.0), None
 
 
+class BalancedLearned:
+    """Wraps a trained policy's action with the SAME proportional tilt
+    correction ScriptedGait uses (see its balance_k) -- applied to the
+    ALREADY-TRAINED policy's output at deployment/eval time, never touching
+    training. 2026-09-04: this is deliberately NOT trained in, unlike the
+    rejected MIDWALK_PUSH_REFLEX ("trained-in it was a wash and dropped trot
+    below the gate") -- a correction baked into training distorts what the
+    policy learns; one applied outside a frozen policy's output does not, and
+    is exactly how the real firmware's own gyro-balance sits outside its base
+    gait, not learned into it. Probed against the bare-robot brutal cells:
+    k=0.6 took T6.2b from 17% fell to 0% and T6.3b from 80% to 40%, both
+    matching or beating scripted's own bare fall rate on the same cells with
+    zero retraining. See docs/rl-runs/ for the full probe.
+
+    KEEP THIS OUT OF TRAINING. If a policy ever trains WITH this correction
+    active, the reward signal gets muddied the same way MIDWALK_PUSH_REFLEX's
+    trained-in version was -- the policy stops experiencing the full
+    consequence of bad tilt (something else is already partly fixing it),
+    weakening its own incentive to learn balance. Currently safe by
+    construction: this class lives in benchmark_gaits.py, which none of
+    train.py / continue_train.py / smoke_train.py import. Keep it that way --
+    don't wire this into the training env, only into eval/deploy wrappers."""
+    def __init__(self, model, env, k=0.6):
+        self.model = model
+        self.env = env
+        self.k = k
+
+    def reset(self):
+        if hasattr(self.model, "reset"):
+            self.model.reset()
+
+    def predict(self, obs, deterministic=True):
+        a, state = self.model.predict(obs, deterministic=deterministic)
+        if self.k:
+            rid = self.env.robot_id
+            roll, pitch, _ = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(rid)[1])
+            corr = np.array([-pitch, -pitch, -pitch, -pitch, pitch, pitch, pitch, pitch]) \
+                 + np.array([-roll, -roll, roll, roll, roll, roll, -roll, -roll])
+            a = np.clip(a + self.k * corr, -1.0, 1.0)
+        return a, state
+
+
 def _load_learned(path):
     from stable_baselines3 import PPO
     return PPO.load(path)
