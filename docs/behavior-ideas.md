@@ -405,13 +405,15 @@ Runtime-maximising measures. Full analysis + the autonomy-impact table in
 **Principle: these are IDLE-STATE levers** — during active exploration the only
 savings are the clean set (efficient gait, disabled peripherals); you can't
 gate what autonomy depends on (vision, gait).
-- **Buildable now, no hardware:** disable-unused peripherals (LEDs/audio-out),
-  Wi-Fi power-save toggle keyed to mode (on when headless — +200 ms/API call,
-  breaks streaming), CPU governor `ondemand` (verify no control-tick jitter via
-  `benchmark_pi.py`), behaviour-aware idle-REST (fold to `d` only from a true
-  "no goals, no stimuli" state, not a mid-task pause), on-demand-vision gate API
-  ("scale to activity", off only in sleep), sleep-mode state-machine skeleton in
-  `behavior/mode_controller.py`.
+- **BUILT (`pi_pipeline.power`):** disable-unused peripherals, Wi-Fi power-save
+  toggle keyed to mode, CPU governor `ondemand` (refuses `powersave`).
+  `python -m pi_pipeline.power status|headless|interactive`; boot-config lines
+  in pi-set-up.md §5.
+- **Focused-session TODO (behaviour-aware design needed):** idle-REST — fold to
+  `d` only from a true "no goals, no stimuli" state, not a mid-task pause —
+  **the priority**; on-demand-vision gate ("scale to activity", off only in
+  sleep); sleep-mode state machine in `behavior/mode_controller.py` (wake on
+  IMU motion / mic level / wake word / patrol timer).
 - **Hardware-gated:** real per-state power budget from an inline current meter
   (walking / idle-stand / sit / REST / Pi under vision load / Pi asleep) — tunes
   the sleep timeout and feeds B12.

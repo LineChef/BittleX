@@ -128,11 +128,24 @@ sudo raspi-config    # Interface Options → Serial Port:
 # then, in /boot/firmware/config.txt add:
 #   enable_uart=1
 #   dtoverlay=disable-bt
+#   --- power-saving (docs/research/pi-power.md; pi_pipeline.power.BOOT_CONFIG_LINES) ---
+#   dtparam=audio=off              # no 3.5mm/HDMI audio in use
+#   disable_splash=1
+#   dtparam=act_led_trigger=none   # onboard ACT LED off
+#   dtparam=act_led_activelow=off
 sudo systemctl disable serial-getty@ttyAMA0.service
 sudo systemctl disable hciuart      # BT UART service, now unused
 sudo reboot
 # after reboot: /dev/ttyAMA0 (alias /dev/serial0) is now on GPIO 14/15 at a stable clock
 ```
+
+Runtime power levers (CPU governor, Wi-Fi power-save, onboard LEDs) live in
+`pi_pipeline.power` — `python -m pi_pipeline.power status | headless | interactive`.
+Note the Wi-Fi interaction: §3 forces power-save **off** via NetworkManager
+(`wifi.powersave = 2`) for a stable interactive link. For headless autonomous
+runtime to actually save Wi-Fi power, relax that to `0` (or `1`) so the
+`apply_headless_profile()` `iw` toggle takes effect — a mode decision, not a
+one-time setting.
 
 Nothing to test until the BiBoard is wired (RX↔TX crossed, GND↔GND, and per the
 plan the Pi's 5 V pin stays **unconnected** — it's powered from the PiSugar).
