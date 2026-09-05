@@ -1128,6 +1128,16 @@ class OpenCatGymEnv(gym.Env):
                    and np.random.rand() < CARPET_PROB)
         _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
+        # 2026-09-05 slope-collapse fix: a heightfield body is placed at x=1.4/1.6,
+        # so rotating it by the slope quaternion pivots ~1.5 m from the robot and
+        # (a) lifts the surface under the spawn point by ~1.4*sin(pitch) -- >=9 cm
+        # at pitch>=4deg, robot spawns embedded -- and (b) desyncs obstacle-Z
+        # (origin-plane math) from the real surface by 10-14 cm, burying boxes.
+        # Root cause of the ~1.1M-step ep_rew_mean collapse on every new-sim run.
+        # Heightfields carry bumps only, no grade (pre-2026-09-04 behavior); the
+        # flat-plane branch below still tilts for slope episodes.
+        if _carpet or _rough:
+            self._slope_rp = (0.0, 0.0)
         # A flat episode's floor is "carpeted" (compliant + carpet-typical
         # friction) independent of any height variation -- decided here so it can
         # be applied after plane_id is set, whichever branch below builds it.
@@ -1171,8 +1181,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
-            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0],
-                p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+            p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _rough:
             _n = 64
             _amp = ROUGH_TERRAIN * 0.018 * self._dr
@@ -1186,8 +1195,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
-            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0],
-                p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+            p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _surface_transition:
             # Two coplanar finite slabs (same tilt as the flat-plane branch, via
             # the same quaternion) instead of the infinite plane -- thin (4cm),
