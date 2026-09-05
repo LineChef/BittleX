@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Block a commit whose staged changes or commit message contain a private term.
 # Term list: .gitprivacy-terms (gitignored -- one whole-word term per line,
-# '#' comments, case-insensitive). See docs/reference/repo-privacy.md.
-# Activate once per clone:  git config core.hooksPath .githooks
+# '#' comments, case-insensitive).
+# Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
 
@@ -23,7 +23,7 @@ hits=0
 safe_scrub() { sed -E "s/(pytest\.mark|benchmark|bookmark|mark(down|er|up|et|s)|[a-z]-mark|re-?mark|land-?mark|water-?mark|hall-?mark|ear-?mark)//gi"; }
 
 # scan staged additions, but not this hook / the term list themselves
-staged="$(git diff --cached --unified=0 --no-color -- . ':(exclude).githooks/*' \
+staged="$(git diff --cached --unified=0 --no-color -- . ':(exclude)tools/githooks/*' \
   | grep -E '^\+' | grep -vE '^\+\+\+' | safe_scrub || true)"
 if printf '%s' "$staged" | grep -iEnw "$pattern" >/dev/null 2>&1; then
   echo "pre-commit: a private term appears in the staged changes:"
@@ -42,7 +42,6 @@ fi
 if [ "$hits" -ne 0 ]; then
   echo
   echo "Reword to a role/placeholder, or --no-verify if it is truly a false positive."
-  echo "See docs/reference/repo-privacy.md"
   exit 1
 fi
 exit 0
