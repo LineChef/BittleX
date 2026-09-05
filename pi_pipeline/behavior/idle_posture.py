@@ -62,10 +62,20 @@ class IdlePosture:
         self._wake_started: float | None = None
         self._last_peek = 0.0
         self._last_bob = 0.0
+        self._reason = "init"
 
     @property
     def posture(self) -> Posture:
         return self._posture
+
+    @property
+    def last_reason(self) -> str:
+        """Why the most recent update() returned what it did -- for diag logging."""
+        return self._reason
+
+    def _out(self, action: "PostureAction", reason: str):
+        self._reason = reason
+        return self._posture, action
 
     def _enter(self, p: Posture, now: float) -> None:
         if p is not self._posture:
@@ -108,61 +118,69 @@ class IdlePosture:
         if handled:  # picked up / moved -- rouse to a safe pose immediately
             if self._posture is not Posture.WAKING:
                 self._enter(Posture.WAKING, now)
-                return self._posture, PostureAction.WAKE
-            return self._posture, PostureAction.NONE
+                return self._out(PostureAction.WAKE, "handled=True (picked up / moved) -> rouse")
+            return self._out(PostureAction.NONE, "handled, already waking")
 
         if self._posture is Posture.WAKING:
             if now - (self._wake_started or now) >= self.cfg.wake_timeout_s:
                 self._enter(Posture.ACTIVE, now)
                 self._last_activity = now
-            return self._posture, PostureAction.NONE
+                return self._out(PostureAction.NONE, f"wake timed out after {self.cfg.wake_timeout_s}s -> active")
+            return self._out(PostureAction.NONE, "waking, caller choreographing")
 
         if exploring:  # the explore layer drives walking; no descent
             self._last_activity = now
             if self._posture is not Posture.ACTIVE:
                 self._enter(Posture.ACTIVE, now)
-            return self._posture, PostureAction.NONE
+            return self._out(PostureAction.NONE, "exploring -> hold active, no descent")
 
         quiet = now - self._last_activity
 
         if in_conversation:  # attentive: hold SIT, never lie down
             if self._posture is Posture.RESTING:
                 self._enter(Posture.WAKING, now)
-                return self._posture, PostureAction.WAKE
+                return self._out(PostureAction.WAKE, "conversation started while resting -> rouse to sit")
             if self._posture is Posture.ACTIVE and quiet >= self.cfg.sit_after_s:
                 self._enter(Posture.SIT, now)
-                return self._posture, PostureAction.GO_SIT
-            return self._posture, PostureAction.NONE
+                return self._out(PostureAction.GO_SIT, f"in conversation, {quiet:.0f}s quiet -> attentive sit")
+            return self._out(PostureAction.NONE, "in conversation, holding pose")
 
         # normal idle descent
         if self._posture is Posture.ACTIVE:
             if quiet >= self.cfg.sit_after_s:
                 self._enter(Posture.SIT, now)
-                return self._posture, PostureAction.GO_SIT
-            return self._posture, PostureAction.NONE
+                return self._out(PostureAction.GO_SIT, f"{quiet:.0f}s quiet >= sit_after_s({self.cfg.sit_after_s:.0f})")
+            return self._out(PostureAction.NONE, f"active, only {quiet:.0f}s quiet")
 
         if self._posture is Posture.SIT:
             rest_delay = self.cfg.rest_after_s * (
                 self.cfg.person_rest_multiplier if person_present else 1.0)
-            if (not self._stay and safe_to_rest
-                    and now - self._since >= rest_delay):
+            sat = now - self._since
+            if self._stay:
+                return self._out(PostureAction.NONE, "told to 'stay' -> hold sit")
+            if not safe_to_rest:
+                return self._out(PostureAction.NONE, "sit: not safe_to_rest (unlevel/held/recovering)")
+            if sat >= rest_delay:
                 self._enter(Posture.RESTING, now)
-                return self._posture, PostureAction.GO_REST
-            return self._posture, PostureAction.NONE
+                why = f"{sat:.0f}s sat >= {rest_delay:.0f}s"
+                if person_present:
+                    why += f" (x{self.cfg.person_rest_multiplier:g} person-present)"
+                return self._out(PostureAction.GO_REST, why)
+            return self._out(PostureAction.NONE, f"sit, {sat:.0f}s / {rest_delay:.0f}s to rest")
 
         if self._posture is Posture.RESTING:
             if nudge:  # a nearby sound/motion -- look, don't get up
                 self._last_peek = now
-                return self._posture, PostureAction.PEEK
+                return self._out(PostureAction.PEEK, "nudge (nearby sound/motion) -> peek, stay down")
             if now - self._last_peek >= self.cfg.peek_s:
                 self._last_peek = now
-                return self._posture, PostureAction.PEEK
+                return self._out(PostureAction.PEEK, f"periodic life-sign peek ({self.cfg.peek_s:.0f}s)")
             if self.cfg.breathing and now - self._last_bob >= self.cfg.breathing_period_s:
                 self._last_bob = now
-                return self._posture, PostureAction.LIFE_SIGN
-            return self._posture, PostureAction.NONE
+                return self._out(PostureAction.LIFE_SIGN, "breathing bob")
+            return self._out(PostureAction.NONE, "resting")
 
-        return self._posture, PostureAction.NONE
+        return self._out(PostureAction.NONE, "no-op")
 
 
 # caller maps these onto OpenCat commands (SIT/REST/STRETCH keyframes, head moves)

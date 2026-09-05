@@ -40,27 +40,34 @@ class ModeController:
         self._mode = Mode.IDLE
         self._since = clock()          # when the current mode started
         self._last_activity = clock()  # last time something happened
+        self._reason = "init"
 
     @property
     def mode(self) -> Mode:
         return self._mode
 
-    def _enter(self, m: Mode, now: float) -> None:
+    @property
+    def last_reason(self) -> str:
+        """Why the mode is what it is -- for diag logging."""
+        return self._reason
+
+    def _enter(self, m: Mode, now: float, reason: str) -> None:
         if m is not self._mode:
             self._mode = m
             self._since = now
+        self._reason = reason
 
     # --- events ---
 
     def on_conversation_start(self) -> None:
         now = self._clock()
         self._last_activity = now
-        self._enter(Mode.CONVERSE, now)
+        self._enter(Mode.CONVERSE, now, "conversation started (wake word / addressed)")
 
     def on_conversation_end(self) -> None:
         now = self._clock()
         self._last_activity = now
-        self._enter(Mode.IDLE, now)
+        self._enter(Mode.IDLE, now, "conversation ended")
 
     def on_activity(self) -> None:
         """Anything that should stop autonomous roaming: picked up, addressed,
@@ -68,7 +75,7 @@ class ModeController:
         now = self._clock()
         self._last_activity = now
         if self._mode is Mode.EXPLORE:
-            self._enter(Mode.IDLE, now)
+            self._enter(Mode.IDLE, now, "activity during explore (picked up / addressed / stop / noise)")
 
     # --- tick ---
 
@@ -78,10 +85,11 @@ class ModeController:
             return self._mode
         if self._mode is Mode.EXPLORE:
             if now - self._since >= self.cfg.explore_max_secs:
-                self._enter(Mode.IDLE, now)
+                self._enter(Mode.IDLE, now, f"explore bout hit cap ({self.cfg.explore_max_secs:.0f}s)")
             return self._mode
         # IDLE -> EXPLORE once it's been quiet long enough
         quiet = now - self._last_activity
         if quiet >= self.cfg.settle_secs and quiet >= self.p.idle_secs_before_explore:
-            self._enter(Mode.EXPLORE, now)
+            self._enter(Mode.EXPLORE, now,
+                        f"{quiet:.0f}s quiet >= idle_secs_before_explore({self.p.idle_secs_before_explore:.0f})")
         return self._mode

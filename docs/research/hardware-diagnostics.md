@@ -108,6 +108,34 @@ gives you the event *and* the black box:
 
 ---
 
+## Decision events — *why* G2 did something
+
+Debugging behaviour needs the *reason*, not just the action. Convention:
+
+- **State machines stay pure** (no `diag` import — keeps them unit-testable) but
+  each exposes a `last_reason: str` explaining its most recent `update()`.
+  Implemented: `behavior/idle_posture.py` (`IdlePosture`),
+  `behavior/mode_controller.py` (`ModeController`). To add: `Explorer`,
+  `RecoveryFSM`, vision `avoidance`.
+- **The driving loop logs the transition** with the reason + the inputs that
+  produced it, only when something actually changes:
+
+  ```python
+  new = ip.update(person_present=seen, safe_to_rest=level)
+  if new != prev:
+      diag.event("behavior", "INFO", "posture.transition",
+                 **{"from": prev[0].value, "to": new[0].value,
+                    "action": new[1].value, "because": ip.last_reason})
+  ```
+
+Reads back as a timeline: `posture sit→resting because "160s sat >= 90s"` ·
+`mode idle→explore because "45s quiet >= idle_secs_before_explore(45)"` ·
+`reflex cliff_stop because "edge at 0.18 m"`. `diag summarize` already lists
+every WARN+ event; INFO-level decision events show in `diag tail` and full
+`replay`, and can be promoted to WARN for a noisy debugging session.
+
+---
+
 ## Post-hoc tooling — `python -m pi_pipeline.diag`
 
 - `diag summarize <session>` — timeline of WARN+ events, duration, incident
