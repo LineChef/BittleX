@@ -118,14 +118,19 @@ LADDER = [
     # T7: ledge / step. A realistic disturbance (door sills, rug edges, low curbs)
     # the payload's inertia does NOT paper over -- a bad foot plant on an edge
     # still starts a topple. Score on fall rate AND recovery events / time-to-settle.
-    # 2026-09-04: cut both "step down" cells (T7.2/T7.4) -- stepping down
-    # consistently read near-identical to flat baseline, not much of a
-    # challenge; T7.5's random up/down still exercises "down" at the more
-    # informative (highest) severity.
+    # 2026-09-05: 30 mm reads as a near-limit stress for a blind low-clearance
+    # trot (belly clearance ~40-60 mm, swing height much less) -- realistic sills
+    # are 10-20 mm. Primary cells now 15/20 mm; 30 mm kept as an explicit
+    # past-comfortable stress rung. Step-down (T7.4) restored at the realistic
+    # height so both directions are visible even if "down" reads easy.
     ("T7.1", 7, "ledge",          "Threshold up  (15 mm)",
         {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
-    ("T7.3", 7, "ledge",          "Step up  (30 mm sill)",
+    ("T7.2", 7, "ledge",          "Step up  (20 mm sill)",
+        {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
+    ("T7.3", 7, "ledge",          "Step up  (30 mm) -- past-comfortable stress",
         {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
+    ("T7.4", 7, "ledge",          "Step down  (20 mm sill)",
+        {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}),
     ("T7.5", 7, "ledge",          "Big ledge  (45 mm, random up/down)",
         {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
 

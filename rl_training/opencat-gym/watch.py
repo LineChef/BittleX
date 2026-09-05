@@ -47,9 +47,14 @@ CHALLENGES = {
     "one-shove":         {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004},
     "shoves":            {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20},
     "shoves-hard":       {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25},
+    # Ledges: 30 mm reads as a near-limit stress for a blind low-clearance trot
+    # (belly clearance ~40-60 mm, swing height much less); realistic sills are
+    # 10-20 mm. Primary cells at 15/20 mm, the -hard pair kept at 30 mm.
     "threshold-up":      {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1},
-    "step-up":           {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1},
-    "step-down":         {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1},
+    "step-up":           {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1},
+    "step-down":         {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1},
+    "step-up-hard":      {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1},
+    "step-down-hard":    {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1},
     "big-ledge":         {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0},
     "weak-servos":       {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))},
     "gauntlet":          {"SLOPE_FIXED_RP": (D(4), D(9)), "RUBBLE": 0.016, "RUBBLE_N": 400,
