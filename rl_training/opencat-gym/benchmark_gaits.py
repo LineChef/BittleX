@@ -129,6 +129,12 @@ def _bench(env, model, episodes, seed0, reflex=False):
         yr = np.asarray(rec["yaw_rate"], dtype=float)
         tilt = np.maximum(np.abs(rec["roll"]), np.abs(rec["pitch"]))   # per-step body tilt (rad)
         lat = np.abs(np.asarray(rec["y"], dtype=float))                # |lateral offset| from the start line
+        # command-following: cmd_yaw is always 0, so any net heading change is
+        # drift; speed error skips the first 32 steps (accel from stand).
+        cf = np.asarray(per_term.get("cmd_fwd", []), dtype=float)
+        vf = np.asarray(per_term.get("v_fwd_mps", []), dtype=float)
+        st = min(32, len(cf))
+        yaw_arr = np.asarray(rec["yaw"], dtype=float)
         per_ep.append({
             "fell": bool(fell),
             "yaw_rate_rms_deg": float(np.degrees(np.sqrt(np.mean(yr ** 2)))) if yr.size else 0.0,
@@ -136,6 +142,9 @@ def _bench(env, model, episodes, seed0, reflex=False):
             # recovery time: for each tilt spike above 0.6 rad, steps until tilt
             # falls back below 0.35 (only counts spikes that actually recovered).
             "recovery_times": _recovery_times(tilt),
+            "speed_track_err": float(np.mean(np.abs(vf[st:] - cf[st:]))) if len(cf) > st else 0.0,
+            "heading_drift_deg": float(np.degrees(abs(yaw_arr[-1] - yaw_arr[0]))) if yaw_arr.size else 0.0,
+            "fwd_dist_m": float(rec["x"][-1]) if rec["x"] else 0.0,
         })
     s = summarize(eps)
     s["yaw_rate_rms_deg_mean"] = float(np.mean([d["yaw_rate_rms_deg"] for d in per_ep]))
@@ -143,6 +152,14 @@ def _bench(env, model, episodes, seed0, reflex=False):
     all_rt = [t for d in per_ep for t in d["recovery_times"]]
     s["recovery_time_steps_mean"] = float(np.mean(all_rt)) if all_rt else None
     s["recovery_events"] = len(all_rt)
+    # command-following + tail stats (cheap: post-hoc on data already recorded)
+    s["speed_track_err_mean"] = float(np.mean([d["speed_track_err"] for d in per_ep]))
+    s["heading_drift_deg_mean"] = float(np.mean([d["heading_drift_deg"] for d in per_ep]))
+    _dists = sorted(d["fwd_dist_m"] for d in per_ep)
+    s["worst_ep_fwd_dist_m"] = _dists[0] if _dists else None
+    s["p10_ep_fwd_dist_m"] = _dists[max(0, len(_dists) // 10 - 1)] if _dists else None
+    s["n_episodes"] = len(per_ep)
+    s["fell_episodes"] = int(sum(d["fell"] for d in per_ep))
     return s, per_ep
 
 

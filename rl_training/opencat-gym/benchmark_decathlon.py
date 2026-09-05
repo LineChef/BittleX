@@ -145,6 +145,21 @@ LADDER = [
         {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.3}),
     ("T8.2", 8, "carpet",         "Rough, uneven ground: dense bumps + rolling swell  (19 mm bumps + 35 mm swell)",
         {"CARPET": 0.019, "CARPET_SWELL": 0.035, "CARPET_PROB": 1.0}),
+
+    # T9: HELD-OUT generalization tier (2026-09-05). Conditions deliberately
+    # OUTSIDE the training distribution -- the policy never trains on these
+    # regimes. A policy that learned a robust gait holds up; one that overfit
+    # the training course degrades sharply. All fast (250-step) cells, kept to
+    # four so the tier stays cheap (~3 min/gait).
+    ("T9.1", 9, "held-out",       "Slope 18 deg up (beyond training's 14 deg ceiling)",
+        {"SLOPE_FIXED_RP": (0.0, D(18)), "_episodes": 40}),
+    ("T9.2", 9, "held-out",       "Slope 20 deg down (beyond training; descent is harder)",
+        {"SLOPE_FIXED_RP": (0.0, D(-20)), "_episodes": 40}),
+    ("T9.3", 9, "held-out",       "Rubble denser + taller than anything in training",
+        {"RUBBLE": 0.024, "RUBBLE_N": 680, "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.026,
+         "_episodes": 40}),
+    ("T9.4", 9, "held-out",       "Slippery incline: 6 deg + heavy friction randomization (wet-ramp analog)",
+        {"SLOPE_FIXED_RP": (0.0, D(6)), "RANDOM_FRICTION": 0.6, "_episodes": 40}),
 ]
 
 GIF_CELLS = {                      # one representative cell per report category
@@ -156,7 +171,10 @@ GIF_CELLS = {                      # one representative cell per report category
 }
 _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean",
             "diagonal_trot_corr_mean", "yaw_rate_rms_deg_mean", "lat_offset_max_m_mean",
-            "recovery_events", "recovery_time_steps_mean", "big_stumble_recovery_rate"]
+            "recovery_events", "recovery_time_steps_mean", "big_stumble_recovery_rate",
+            # command-following + tail (2026-09-05): cheap post-hoc adds
+            "speed_track_err_mean", "heading_drift_deg_mean",
+            "worst_ep_fwd_dist_m", "p10_ep_fwd_dist_m", "n_episodes", "fell_episodes"]
 
 
 # sim2real DR that is NOT part of any cell's declared difficulty. "full" leaves
