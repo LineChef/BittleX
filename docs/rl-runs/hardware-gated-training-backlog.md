@@ -220,3 +220,7 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
 - **Get-up sim replay** (H9) — watch the existing scripts in PyBullet.
 - **ONNX export + numerical-parity check** — export `run20m_ppo`, confirm the
   exported policy matches the PyTorch one step-for-step before the Pi arrives.
+- **Diagnostics / black-box logging — Phase 1** (`pi_pipeline/diag/`) — structured
+  session log + ring buffer + manifest + summarize/replay tooling so hardware
+  failures are debuggable. Plan: [`../research/hardware-diagnostics.md`](../research/hardware-diagnostics.md).
+  Not hardware-gated; pairs with the ONNX/bring-up work.

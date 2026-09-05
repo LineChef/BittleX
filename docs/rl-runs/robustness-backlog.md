@@ -168,10 +168,30 @@ sharp yaw while cruising, repeated stop/start. Also: a long sustained arc
 
 ## Tier 3
 
-### R9 · Within-episode degradation — `DROPPED` (2026-09-03)
+### R9 · Within-episode degradation — `REVISIT after the 20M run` (user, 2026-09-05)
 Battery sag / thermal cutback / latency that *ramps during* the episode, not a
 fixed per-episode value. `CMD_LATENCY_STEPS` 0→2 over 60 s; `maxForce` decaying
 10–15 %.
+
+**Un-dropped 2026-09-05.** Training only sees `TORQUE_CUTBACK` as a static
+per-episode draw ("this joint is weak all episode"); R9 is a joint that *fades
+as it heats mid-episode* — the real thermal-cliff dynamic. The policy needs to
+shed effort / redistribute load as a joint fades rather than topple when it
+cuts. This is the training-side complement to `pi_pipeline/gait/thermal_guard.py`
+and the H11 thermal work (`docs/research/servo-thermal.md`); R9 is the light
+version (robust to fade, no temp observation), H11 the full one (temp in obs +
+heating-rate reward).
+
+- **Why now:** thermal risk is real with hardware imminent, and there's a fresh
+  20M run in flight — so this can be **baked into a fresh run's DR**, not added
+  as an erosion-prone finetune on a converged base (the R0/carpet lesson).
+- **Plan:** after `run20m_newcourse` finishes and is evaluated, add a
+  within-episode ramp mode to DR (per-episode: pick a subset of joints, ramp
+  their `_torque_scale` down over `uniform(30, 90) s`; optionally sag `maxForce`
+  10–15 % and step `CMD_LATENCY_STEPS` 0→2 on the same clock) and include it in
+  the *next* fresh run's DR bundle, or a DR-expansion re-run. Held-out eval:
+  a 60 s+ episode with a mid-run fade injected — does forward speed degrade
+  gracefully or does it fall.
 
 ### R10 · Long-duration drift — `TODO — PRIORITY` (eval, not train) (2026-09-03)
 Episodes are 251 steps (~3 s). Run the frozen base **and** `run20m_carpet` for
