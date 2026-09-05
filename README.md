@@ -54,18 +54,24 @@ hardware mocked for now.
   IMU-corrected every control step, conditioned on speed/heading commands and the
   mounted Pi/camera payload. The frozen deployment base is **`run20m_ppo`** (20 M
   steps from scratch: tracks speed commands to 0.007 m/s, walks a −24° descent,
-  0 % falls on the payload-on decathlon). It's exported to ONNX and sim-validated
-  bit-for-bit against the on-robot control loop. A pre-hardware probe batch
-  (2026-09-03) found the gait is *fall-proof but stalls* on terrain it can't
-  perceive — root cause: no forward vision. The next gait training is
-  **perception-in-the-loop** (Phase 8); the sim + Pi plumbing for the policy's
-  own forward terrain feature is now in place. See
-  [`docs/rl-runs/robustness-backlog.md`](docs/rl-runs/robustness-backlog.md) and
+  0 % falls on the payload-on decathlon), exported to ONNX and sim-validated
+  bit-for-bit against the on-robot control loop. **2026-09-05:** the training
+  ground was redesigned (rubble-primary, wider slopes); a heightfield-tilt
+  geometry bug then collapsed `ep_rew_mean` at ~1.1 M steps on every
+  new-course finetune (fixed, commit `01cf87e`; the tilted heightfield spawned
+  the robot embedded in the terrain → runaway `r_height` penalty → critic
+  divergence). A fresh 20 M run (`run20m_newcourse`) on the fixed course is
+  underway to decide whether the redesigned course produces a better policy or
+  `run20m_ppo` stays the base. Benchmark upgraded with a held-out
+  generalization tier, command-following + tail metrics, and Wilson-CI
+  comparison. The eventual perception-in-the-loop gait is Phase 8. See
   [`docs/rl-runs/`](docs/rl-runs/) for history.
-- **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent memory,
-  vision / obstacle-avoidance, the BiBoard serial link, and a fall-recovery state
-  machine are all scaffolded and run on a dev machine with the hardware mocked;
-  **51 tests passing**.
+- **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
+  memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
+  state machine, the on-robot gait loop, the autonomous behaviour layer
+  (explore mode, idle-REST staged descent), a servo thermal guard, a
+  black-box diagnostics logger, and Pi power-management helpers — all scaffolded
+  and running on a dev machine with the hardware mocked; **110 tests passing**.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:
@@ -198,10 +204,15 @@ on-command skill, [`docs/behavior-ideas.md`](docs/behavior-ideas.md) B14).
 ```
 rl_training/opencat-gym/   # Simulation-based RL training (based on ger01d/opencat-gym)
 pi_pipeline/
-  voice/    # Speech-to-text, Claude API integration, text-to-speech
-  memory/   # Persistent conversation memory / retrieval
-  vision/   # Camera integration, obstacle avoidance, scene description
-  link/     # BiBoard serial link + fall-recovery state machine
+  voice/       # Speech-to-text, Claude API integration, text-to-speech
+  memory/      # Persistent conversation memory / retrieval
+  vision/      # Camera integration, obstacle avoidance, scene description
+  link/        # BiBoard serial link + fall-recovery state machine
+  gait/        # On-robot policy loop, deploy map, servo thermal guard
+  behavior/    # Autonomous layer: mode controller, explore, idle-REST posture
+  personality/ # Composable traits -> BehaviorParams
+  diag/        # Black-box session logger + ring buffer (hardware debugging)
+  power/       # Pi power-management helpers (governor, Wi-Fi, peripherals)
 tools/      # Report generators and other standalone utilities
 docs/       # Project plan, run logs, research notes
 ```

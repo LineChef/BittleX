@@ -78,6 +78,12 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
   (idle, walking, talking, vision on) on a full charge until the Pi browns out,
   a few times, to get mean runtime and its spread. Do this early in hardware
   bring-up.
+- **Built 2026-09-05:** `pi_pipeline/power/` (CPU governor / Wi-Fi power-save
+  toggle / disable-unused peripherals) and `behavior/idle_posture.py` (idle-REST
+  staged descent — sit, then lie down, with life signs). Battery-*aware*
+  behaviour (rest sooner on low charge) is blocked on the estimate above.
+  On-demand vision + full sleep mode are queued for a focused design session
+  (B18). Full analysis: [`research/pi-power.md`](research/pi-power.md).
 - **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
   Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
   actual cell state. Optional; the timer is enough to start.
@@ -179,6 +185,24 @@ Software only; no physical robot needed until Phase 6 deployment.
     to train/eval (single-servo failure, IMU bias/mount tilt, pick-up &
     set-down, directional terrain catches, slope transitions, friction
     asymmetry, …): [`docs/rl-runs/robustness-backlog.md`](rl-runs/robustness-backlog.md).
+
+  **Update 2026-09-05 — the training collapse + fresh retrain.** `run20m_carpet`
+  was reverted (no capability gain, eroded flat speed — R0 in the robustness
+  log). The training ground was then redesigned (rubble-primary, wider slopes,
+  placement tuning) — and **every** finetune-continuation on the new course
+  collapsed `ep_rew_mean` at ~1.1 M steps (6/6). Isolated to one geometry bug
+  (commit `01cf87e`): the 2026-09-04 "hills can carry a slope grade" change
+  rotated the `_rough`/`_carpet` heightfield about its placement centre (x≈1.5 m
+  from the robot), so at pitch ≳ 3.4° the terrain rose 8–12 cm under the spawn
+  point → robot embedded in the mesh → runaway `r_height` penalty (−100 k
+  episodes, no visible fall) → PPO critic divergence. Fix: heightfields carry no
+  overall grade (pre-2026-09-04 behaviour); everything else in the redesign
+  kept. Confirmed 4 ways; validated by two clean 3 M continuations + a
+  rough+pitch 0–14° sweep. **Now running:** `run20m_newcourse` — a fresh 20 M
+  from-scratch run on the fixed course, to answer whether the redesigned course
+  produces a better policy or `run20m_ppo` stays the base. Benchmark upgraded:
+  T9 held-out generalization tier, per-cell command-following + tail stats,
+  Wilson-CI comparison, ledge cells lowered to 15–20 mm + step-down restored.
 
 ### Environment
 
@@ -530,6 +554,21 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
       hooks), `run_gait.py` (80 Hz loop: BiBoard `V` IMU stream → policy → `m`
       command). `validate_deploy.py` confirms **0 joint-degree cells differ**
       from `model.predict` across 5 commands × 251 steps.
+- [x] **Deployment-safety infrastructure (2026-09-05), built + unit-tested,
+      hardware-validation pending:**
+  - `pi_pipeline/gait/thermal_guard.py` — conservative servo thermal guard on
+    `run_gait.py`. Estimates per-joint heat from commanded motion (no P1S
+    sensor), staged: WARN speech ("I'm getting kinda tired…") → Petoi-style
+    per-joint soft cutback → lie-down-until-cool. All constants placeholders;
+    [`research/servo-thermal.md`](research/servo-thermal.md) "Retuning checklist".
+  - `pi_pipeline/diag/` — per-session JSONL event log + a ~15 s black-box ring
+    buffer flushed on any incident + session manifest + `summarize/replay/tail`.
+    Behaviour state machines expose `last_reason` so decisions log *why*.
+    [`research/hardware-diagnostics.md`](research/hardware-diagnostics.md).
+  - `pi_pipeline/power/` — the zero-risk power levers (CPU governor, Wi-Fi
+    power-save toggle, disable-unused peripherals). idle-REST built
+    (`behavior/idle_posture.py`); on-demand vision + sleep mode pending a
+    focused session. [`research/pi-power.md`](research/pi-power.md).
 - [ ] **On hardware:** wire Pi↔BiBoard, `run_gait.py --probe-imu` (fix
       `parse_imu_line` if the format differs) → `--openloop` (verify servo
       signs) → `--cmd` (learned gait) → the H1 head-to-head vs firmware `kwkF`.
