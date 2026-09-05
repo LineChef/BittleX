@@ -51,9 +51,11 @@ also able to move in response.
 
 **One conversation turn, start to finish:**
 
-1. **Wake word** — G2 listens locally and cheaply for "hey gee two." Nothing else
-   happens until it hears that, so it isn't constantly recording or calling the
-   network.
+1. **Wake word** — G2 listens locally and cheaply for its name ("G2"). Nothing
+   else happens until it hears that, so it isn't constantly recording or calling
+   the network. For about a minute after each reply it stays open for a
+   follow-up so you don't repeat the name every turn; "go to sleep" closes that
+   window on demand.
 2. **Listen** — it records what you say and transcribes it to text on-device
    (Vosk).
 3. **Think** — the text goes to Claude via the API, together with any relevant

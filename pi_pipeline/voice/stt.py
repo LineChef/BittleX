@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import time
 from pathlib import Path
 from typing import Protocol
 
@@ -17,13 +18,15 @@ log = logging.getLogger("g2.stt")
 
 
 class STT(Protocol):
-    def listen(self) -> str:
-        """Block until the user has said something, return the transcript ('' if nothing)."""
+    def listen(self, timeout_s: float | None = None) -> str:
+        """Block until the user has said something, return the transcript ('' if
+        nothing). If `timeout_s` is set and no speech has *started* within that
+        many seconds, give up and return '' (used for the follow-up window)."""
         ...
 
 
 class TextSTT:
-    def listen(self) -> str:
+    def listen(self, timeout_s: float | None = None) -> str:
         try:
             return input("  you> ").strip()
         except EOFError:
@@ -46,7 +49,7 @@ class VoskSTT:
         self._model = Model(str(p))
         self._Recognizer = KaldiRecognizer
 
-    def listen(self) -> str:
+    def listen(self, timeout_s: float | None = None) -> str:
         rec = self._Recognizer(self._model, self._rate)
         q: "queue.Queue[bytes]" = queue.Queue()
 
@@ -57,23 +60,31 @@ class VoskSTT:
 
         said_anything = False
         trailing_silence = 0
+        t_start = time.monotonic()
         with self._sd.RawInputStream(
             samplerate=self._rate, blocksize=4000, dtype="int16",
             channels=1, callback=cb,
         ):
             while True:
-                data = q.get()
-                if rec.AcceptWaveform(data):
-                    text = json.loads(rec.Result()).get("text", "").strip()
-                    if text:
-                        return text
-                partial = json.loads(rec.PartialResult()).get("partial", "").strip()
-                if partial:
-                    said_anything, trailing_silence = True, 0
-                elif said_anything:
-                    trailing_silence += 1
-                    if trailing_silence >= self._silence_blocks:
-                        return json.loads(rec.FinalResult()).get("text", "").strip()
+                try:
+                    data = q.get(timeout=0.5)
+                except queue.Empty:
+                    data = None
+                if data is not None:
+                    if rec.AcceptWaveform(data):
+                        text = json.loads(rec.Result()).get("text", "").strip()
+                        if text:
+                            return text
+                    partial = json.loads(rec.PartialResult()).get("partial", "").strip()
+                    if partial:
+                        said_anything, trailing_silence = True, 0
+                    elif said_anything:
+                        trailing_silence += 1
+                        if trailing_silence >= self._silence_blocks:
+                            return json.loads(rec.FinalResult()).get("text", "").strip()
+                if (not said_anything and timeout_s is not None
+                        and time.monotonic() - t_start > timeout_s):
+                    return ""
 
 
 def make_stt(mode: str, *, vosk_model_path: str, silence_s: float) -> STT:

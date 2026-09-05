@@ -49,6 +49,10 @@ python -m pi_pipeline.memory wipe --yes
 
 Or open it directly: `sqlite3 pi_pipeline/memory/data/g2_memory.db`.
 
+**In conversation:** saying **"forget that"** deletes everything recorded since
+the wake word (`Memory.mark_session_start` / `forget_session`, driven by
+`voice/loop.py`). Nothing is stored until the wake word fires in the first place.
+
 ## Later
 
 - Semantic recall (embeddings) if FTS keyword matching feels too literal —

@@ -460,18 +460,19 @@ is ~1–2 s so only fold when idle > a few seconds.
 - [ ] **Sleep-mode state machine** — servos REST + vision off + governor down +
       Wi-Fi power-save on. Builds on `IdlePosture` RESTING. Wake trigger =
       **IMU** (tap/lift — always-on for balance anyway); optionally a
-      loud-sound threshold. See the mic note below re: NOT defaulting to
-      wake-word here.
-- [ ] **Mic privacy — default OFF, physical wake.** The user does not want an
-      always-on / always-listening mic. Plan: mic VCC on a GPIO load switch
-      (electrically off by default, not just software-ignored); wake by IMU
-      tap/lift (double-tap the back, or pick up); a **listening LED** on
-      whenever the mic has power. `wake_word.py` already has the
-      `make_wake_word(mode, …)` factory — add a `tap`/`imu` mode, make it the
-      default, keep `voice` (VoskWakeWord) as an explicit opt-in for
-      across-the-room use with the LED making continuous listening obvious.
-      Tradeoff: physical wake needs proximity; pairs with the WAKE
-      choreography (tap → stir → listening).
+      loud-sound threshold, or the wake word itself.
+- [x] **Mic privacy — DONE (decision + build, 2026-09-05).** The user weighed
+      the always-on options and chose a **continuous wake word while G2 is
+      powered on** — G2 is session-powered, not a 24/7 fixture, so the exposure
+      is bounded to "on and in `--mode voice`". Built (`voice/loop.py`,
+      `voice/commands.py`): wake phrase **"G2"** (`G2_WAKE_WORD=gee two`); a
+      ~60 s follow-up window (`G2_FOLLOW_UP_S`, resets each exchange, `0`
+      disables) so a conversation doesn't need the name every turn; **"go to
+      sleep"** ends the window; **"forget that"** deletes everything recorded
+      since the wake word (`Memory.forget_session`); nothing is stored until the
+      wake word fires. Still TODO on hardware: a **listening LED** lit whenever
+      the mic stream is open. Parked (future hardening, not now): mic VCC on a
+      GPIO load switch + IMU-tap wake + capacitive "pet to wake" pad.
 
 **Hardware-gated**
 - [ ] Real per-state power budget from an inline current meter (walking / sit /

@@ -298,14 +298,16 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
       refuses dates/times/schedules (`store.has_temporal_detail`).
 - [ ] **Vision stays on-chip.** The Grove module does detection on its own NPU
       and sends only labels+boxes over serial — raw frames never leave it.
-- [ ] **Mic: default OFF, physical wake (user requirement, no always-on
-      listening).** Put the mic's VCC on a GPIO load switch so "off" is
-      electrically off, not software-ignored — survives a bug or a compromised
-      Pi. Wake by IMU tap/lift (already-on balance sensor), not a continuously
-      running wake-word model. A **listening LED** must be on whenever the mic
-      has power. `wake_word.py` `make_wake_word(mode, …)`: add `tap`/`imu` as
-      the default; `voice` (continuous VoskWakeWord) is an explicit opt-in only.
-      Design detail in `docs/behavior-ideas.md` B18.
+- [ ] **Mic: continuous wake word while powered on (user decision, 2026-09-05).**
+      G2 is session-powered, not a 24/7 fixture, so the exposure window is "on
+      and started in `--mode voice`" (`--mode text` never opens the mic). Wake
+      phrase is **"G2"** (`G2_WAKE_WORD=gee two`). After each reply a ~60 s
+      follow-up window (`G2_FOLLOW_UP_S`, resets per exchange) keeps a
+      conversation flowing without repeating the name; **"go to sleep"** closes
+      it, **"forget that"** drops the session's memory. A **listening LED**
+      should be lit whenever the mic stream is open. The GPIO-load-switch +
+      IMU-tap-wake design is parked as a future hardening option, not the
+      default. Detail in `docs/behavior-ideas.md` B18.
       `scene.narrate` sends only the *text* summary to Claude; keep it that way
       (there's a guard in `vision/scene.py`).
 - [ ] **What still goes to the Anthropic API every turn:** the speech

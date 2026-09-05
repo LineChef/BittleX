@@ -145,6 +145,18 @@ class Store:
             "SELECT * FROM exchanges ORDER BY id DESC LIMIT ?", (n,)
         ))
 
+    def max_exchange_id(self) -> int:
+        return int(self._db.execute(
+            "SELECT COALESCE(MAX(id), 0) FROM exchanges").fetchone()[0])
+
+    def delete_exchanges_after(self, exchange_id: int) -> int:
+        """Delete exchanges with id > `exchange_id` (the FTS mirror follows via
+        the AFTER DELETE trigger). Used by the spoken "forget that" command."""
+        cur = self._db.execute(
+            "DELETE FROM exchanges WHERE id > ?", (exchange_id,))
+        self._db.commit()
+        return cur.rowcount
+
     def search_exchanges(self, text: str, limit: int, exclude_last: int = 0) -> list[sqlite3.Row]:
         q = _fts_query(text)
         if not q:
@@ -181,6 +193,16 @@ class Store:
         )
         self._db.commit()
         return cur.rowcount > 0
+
+    def max_fact_id(self) -> int:
+        return int(self._db.execute(
+            "SELECT COALESCE(MAX(id), 0) FROM facts").fetchone()[0])
+
+    def delete_facts_after(self, fact_id: int) -> int:
+        """Delete facts with id > `fact_id`. Used by "forget that"."""
+        cur = self._db.execute("DELETE FROM facts WHERE id > ?", (fact_id,))
+        self._db.commit()
+        return cur.rowcount
 
     def list_facts(self, limit: int | None = None) -> list[sqlite3.Row]:
         sql = "SELECT * FROM facts ORDER BY COALESCE(last_recalled, ts) DESC"

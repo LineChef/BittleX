@@ -95,6 +95,32 @@ def test_fact_cap_and_decay_ordering(cfg):
     assert any(r["id"] == old_id for r in st.list_facts(limit=cfg.memory_max_facts))
 
 
+def test_forget_session_drops_only_session_rows(cfg):
+    mem = Memory(cfg)
+    mem.record("old thing", _turn("noted", facts=["An old fact."]))
+    mem.mark_session_start()
+    mem.record("secret one", _turn("ok", facts=["A session fact."]))
+    mem.record("secret two", _turn("ok"))
+
+    assert mem.forget_session() == (2, 1)
+
+    kept = [r["user_text"] for r in mem.store.recent_exchanges(10)]
+    assert kept == ["old thing"]
+    assert [r["fact"] for r in mem.store.list_facts()] == ["An old fact."]
+    # the FTS mirror dropped the forgotten turns too
+    assert mem.store.search_exchanges("secret", limit=5) == []
+    # a second forget in the same session is a no-op
+    assert mem.forget_session() == (0, 0)
+
+
+def test_forget_session_noop_when_nothing_recorded(cfg):
+    mem = Memory(cfg)
+    mem.record("hi", _turn("hey"))
+    mem.mark_session_start()
+    assert mem.forget_session() == (0, 0)
+    assert mem.store.exchange_count() == 1
+
+
 def test_wipe(cfg):
     mem = Memory(cfg)
     mem.record("hi", _turn("hey", facts=["A fact."]))

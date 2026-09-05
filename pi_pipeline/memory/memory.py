@@ -28,9 +28,31 @@ class Memory:
         # roughly how many recent turns conversation.py keeps in-context, so we
         # don't re-surface them here
         self._recent_window = cfg.history_turns
+        # high-water marks captured at wake, so "forget that" can drop exactly
+        # what this session recorded
+        self._session_from_ex = 0
+        self._session_from_fact = 0
 
     def close(self) -> None:
         self._store.close()
+
+    def mark_session_start(self) -> None:
+        """Call once when the wake word fires. Records where the log stands so a
+        later `forget_session()` removes only what this session added."""
+        self._session_from_ex = self._store.max_exchange_id()
+        self._session_from_fact = self._store.max_fact_id()
+
+    def forget_session(self) -> tuple[int, int]:
+        """Delete every exchange and fact recorded since `mark_session_start()`.
+        Returns (exchanges_deleted, facts_deleted)."""
+        n_ex = self._store.delete_exchanges_after(self._session_from_ex)
+        n_fa = self._store.delete_facts_after(self._session_from_fact)
+        # a second "forget that" in the same session is then a no-op
+        self._session_from_ex = self._store.max_exchange_id()
+        self._session_from_fact = self._store.max_fact_id()
+        if n_ex or n_fa:
+            log.info("forgot session: %d exchange(s), %d fact(s)", n_ex, n_fa)
+        return n_ex, n_fa
 
     def recall(self, user_text: str) -> str:
         parts: list[str] = []

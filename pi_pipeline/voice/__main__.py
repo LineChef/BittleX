@@ -62,6 +62,7 @@ def main() -> None:
         ),
         cue=LogCue(),
         memory=memory,
+        follow_up_s=settings.follow_up_s if voice else 0.0,
     )
     try:
         loop.run_forever()

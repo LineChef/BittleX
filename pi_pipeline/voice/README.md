@@ -16,6 +16,7 @@ Every stage is an interface with a dev implementation and a robot implementation
 | `tts.py` | `MacTTS` (`say`) / `PiperTTS` / `PrintTTS`. |
 | `stt.py` | `TextSTT` (stdin) / `VoskSTT` (mic). |
 | `wake_word.py` | `AlwaysAwake` / `VoskWakeWord`. |
+| `commands.py` | spoken session/privacy commands the loop handles itself (no Claude call): "forget that", "go to sleep". |
 | `cues.py` | listening / thinking / speaking indicator (log now; buzzer/posture later). |
 | `loop.py` | the orchestrator. |
 | `__main__.py` | CLI entrypoint. |
@@ -35,6 +36,20 @@ python -m pi_pipeline.voice --mode voice
 `--actuator mock` (default) logs skill commands; `--actuator serial` sends them
 (hardware only). Say "goodbye g2" or Ctrl+C to stop.
 
+## Session & privacy behaviour (voice mode)
+
+The mic is only live while G2 is powered on and started in `--mode voice`
+(`--mode text` never opens it). Within voice mode:
+
+| Behaviour | Control |
+|---|---|
+| **Follow-up window.** After a reply G2 keeps listening for `G2_FOLLOW_UP_S` seconds (default 60, reset on every exchange) so a normal conversation never re-triggers the wake word. Only a real lull closes it. | Large value ≈ "awake until I say 'go to sleep'". `G2_FOLLOW_UP_S=0` -> every turn needs the wake word (most private). |
+| **"go to sleep"** — ends the follow-up window immediately; the next turn needs the wake word. | `commands.py` |
+| **"forget that"** (also "scratch that", "don't remember that", …) — deletes every exchange and fact recorded since the wake word, and is never sent to Claude. | `commands.py` + `Memory.forget_session` |
+
+Speech that never triggers the wake word is never transcribed or stored — the
+Vosk wake grammar only matches the wake phrase.
+
 ## Audio diagnostics (no API key)
 
 ```bash
@@ -45,9 +60,11 @@ python -m pi_pipeline.voice.check_audio tts "text"  # speak with the current voi
 python -m pi_pipeline.voice.check_audio tts "text" --model models/piper/en_US-amy-medium.onnx
 ```
 
-Use `wake` to tune the wake phrase: if "hey gee two" mis-triggers or won't catch,
-set `G2_WAKE_WORD` in `.env` to something more distinct. Use `stt` to tune
-`G2_STT_SILENCE_S` (the pause that ends a phrase).
+Use `wake` to tune the wake phrase. Default is `gee two` (spelled the way Vosk
+transcribes "G2"). A two-syllable phrase is convenient but false-triggers more
+than a longer one — if it mis-fires on TV/background speech, set `G2_WAKE_WORD`
+in `.env` to something more distinct. Use `stt` to tune `G2_STT_SILENCE_S` (the
+pause that ends a phrase).
 
 ## Voices
 
