@@ -326,6 +326,19 @@ CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 # style: probe before assuming). restitution is fixed at 0 -- carpet doesn't
 # bounce, no reason to randomise that up.
 CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
+
+# SURFACE_TRANSITION (2026-09-04, B17 follow-up): a floor-material change
+# WITHIN a single episode -- hard floor for the first stretch, carpet-like
+# compliance/friction for the rest, transition at a fixed x. Distinct from
+# every other ground knob above, which each pick ONE surface for the whole
+# episode: this tests a foot hitting different physics mid-stride, the one
+# piece of the "house rooms" idea (see behavior-ideas.md B17) that doesn't
+# need vision to be worth training on. OFF by default (inert) -- probe before
+# enabling for real; two finite floor segments, not the infinite plane.py, so
+# doesn't compose with _carpet/_rough (those replace the whole ground already).
+SURFACE_TRANSITION_PROB = 0.0
+SURFACE_TRANSITION_X = 0.18      # where it changes underfoot -- within a 250-step
+                                   # episode's actual ~0.3m reach, so it's actually crossed
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
@@ -1118,7 +1131,13 @@ class OpenCatGymEnv(gym.Env):
         # A flat episode's floor is "carpeted" (compliant + carpet-typical
         # friction) independent of any height variation -- decided here so it can
         # be applied after plane_id is set, whichever branch below builds it.
-        _carpet_floor = (not _carpet and not _rough and CARPET_SOFT > 0 and self._dr > 0
+        # SURFACE_TRANSITION: hard floor then carpet-like, transition at a fixed
+        # x -- a foot hitting different physics mid-stride, not a whole-episode
+        # surface choice like everything else here. See B17 in behavior-ideas.md.
+        _surface_transition = (not _carpet and not _rough and self._dr > 0
+                               and np.random.rand() < SURFACE_TRANSITION_PROB)
+        _carpet_floor = (not _carpet and not _rough and not _surface_transition
+                         and CARPET_SOFT > 0 and self._dr > 0
                          and SLOPE_FIXED_RP is None and np.random.rand() < CARPET_PROB)
         if _carpet:
             _n = 190                                  # fine grid -> foot-scale bumps
@@ -1169,6 +1188,21 @@ class OpenCatGymEnv(gym.Env):
             plane_id = p.createMultiBody(0, _hf)
             p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0],
                 p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+        elif _surface_transition:
+            # Two coplanar finite slabs (same tilt as the flat-plane branch, via
+            # the same quaternion) instead of the infinite plane -- thin (4cm),
+            # top surface at z=0, so _scatter_obstacles/_scatter_rubble's
+            # plane-through-origin z_ground math is unaffected either way.
+            _tx = SURFACE_TRANSITION_X
+            _quat = p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0])
+            _a_lo, _a_hi = -1.0, _tx           # hard floor: well behind start -> the transition
+            _b_lo, _b_hi = _tx, 3.0            # carpet-like: the transition -> well past any episode's reach
+            _cs_a = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_a_hi - _a_lo) / 2, 0.4, 0.02])
+            plane_id = p.createMultiBody(0, _cs_a, basePosition=[(_a_hi + _a_lo) / 2, 0, -0.02], baseOrientation=_quat)
+            _cs_b = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_b_hi - _b_lo) / 2, 0.4, 0.02])
+            _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02], baseOrientation=_quat)
+            p.changeDynamics(_seg_b, -1, contactStiffness=6e4, contactDamping=900,
+                             restitution=0.0, lateralFriction=1.1)   # carpet-typical, same spirit as CARPET_SOFT
         else:
             plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
                                   p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
