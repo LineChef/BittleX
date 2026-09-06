@@ -11,6 +11,7 @@ import argparse
 import logging
 
 from ..config import settings
+from ..features import features, log_summary
 from ..memory.memory import Memory
 from .actuator import make_actuator
 from .conversation import Conversation
@@ -36,17 +37,26 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
+    log_summary()
+
     voice = args.mode == "voice"
+    if voice and not features.mic:
+        logging.getLogger("g2.voice").warning(
+            "features: mic is off -- falling back to --mode text")
+        voice = False
     tts_mode = {"auto": "piper" if voice else "mac", "mac": "mac",
                 "piper": "piper", "print": "print"}[args.tts]
+    if not features.tts:
+        tts_mode = "print"
+    use_wake = voice and features.wake_word
 
     memory = None
-    if settings.memory_enabled and not args.no_memory:
+    if settings.memory_enabled and not args.no_memory and features.memory:
         memory = Memory(settings)
 
     loop = VoiceLoop(
         wake_word=make_wake_word(
-            "vosk" if voice else "none",
+            "vosk" if use_wake else "none",
             vosk_model_path=settings.vosk_model_path,
             phrase=settings.wake_word,
         ),

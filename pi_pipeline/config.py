@@ -60,6 +60,11 @@ class Settings:
     system_prompt: str = field(default_factory=lambda: _env("G2_SYSTEM_PROMPT") or _DEFAULT_SYSTEM_PROMPT)
     history_turns: int = field(default_factory=lambda: _env_int("G2_HISTORY_TURNS", 12))
 
+    # --- Feature flags (staged bring-up) ---
+    # empty = everything on. e.g. "profile:p2-gait" or "-explore, gait:scripted".
+    # Parsed by pi_pipeline.features; run `python -m pi_pipeline.features` to check.
+    features_spec: str = field(default_factory=lambda: _env("G2_FEATURES", ""))
+
     # --- Personality (traits that bias prompt / behaviour / cues) ---
     # comma-separated name=level, e.g. "curiosity=0.85, playfulness=0.4"
     traits_spec: str = field(default_factory=lambda: _env("G2_TRAITS", "curiosity=0.8"))

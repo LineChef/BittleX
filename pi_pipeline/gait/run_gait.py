@@ -371,7 +371,22 @@ def main():
                     help="write a per-tick CSV (t, rpy, gyro, 8 joint deg) for real_vs_sim / sysid_replay")
     ap.add_argument("--no-thermal-guard", action="store_true",
                     help="disable the conservative servo thermal guard (WARN speech + rare auto-cooldown)")
+    ap.add_argument("--ignore-features", action="store_true",
+                    help="don't consult G2_FEATURES (run even if gait is flagged off)")
     args = ap.parse_args()
+
+    thermal_on = not args.no_thermal_guard
+    if not args.ignore_features:
+        try:
+            from pi_pipeline.features import features, log_summary
+            log_summary()
+            if features.gait == "off":
+                print("features: gait is flagged off (G2_FEATURES). "
+                      "Use --ignore-features to run anyway.")
+                return
+            thermal_on = thermal_on and features.thermal_guard
+        except Exception as e:  # noqa: BLE001
+            print(f"features: not consulted ({e!r})")
 
     if args.dry_run:
         dry_run(args.cmd, args.seconds, args.hz)
@@ -386,7 +401,7 @@ def main():
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
-                thermal_guard=not args.no_thermal_guard)
+                thermal_guard=thermal_on)
     finally:
         try:
             lk.close()
