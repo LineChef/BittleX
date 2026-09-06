@@ -193,6 +193,17 @@ long silence → G2 does an attention-seeking wander and delivers a wistful line
 when next spoken to. Pure software on top of `pi_pipeline/memory/`; composes with
 B4/B5.
 
+### B19 — Stylised robot-voice presets (TTS effects chain)  ⚪
+A `voice_fx` post-processing stage on Piper's audio output, selected by env var
+(`G2_VOICE_FX=gir|irken-computer|…`), giving G2 a themed synthetic voice without
+training or cloning any real actor. GIR ≈ pitch way up + robotic artifacts +
+erratic timing; the Irken computer ≈ flat monotone + vocoder. Implement as a
+`sox` / `ffmpeg` filter chain (`asetrate` pitch shift, formant shift, ring-mod
+or light bitcrush, metallic comb filter, mild distortion) applied to the WAV
+before playback — runs fine on the Pi, no model. Named presets in a small table
+so more can be added. Software only; slots into the `voice/` TTS path next to
+Piper. *(User ask 2026-09-06 — Invader Zim voice.)*
+
 ---
 
 ## Autonomy modes
