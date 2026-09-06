@@ -106,6 +106,14 @@ class Settings:
     vision_serial_port: str = field(default_factory=lambda: _env("VISION_SERIAL_PORT", "/dev/ttyAMA1"))
     vision_serial_baud: int = field(default_factory=lambda: _env_int("VISION_SERIAL_BAUD", 921600))
     vision_frame_px: int = field(default_factory=lambda: _env_int("VISION_FRAME_PX", 240))
+    # sensor capture option: 0=240x240, 1=480x480, 2=640x480. 1 gives a cleaner
+    # downscale to the model input at no serial cost. Boxes then come in that
+    # frame; SerialDetectionFeed reads the per-message `resolution`.
+    vision_sensor_opt: int = field(default_factory=lambda: _env_int("VISION_SENSOR_OPT", 1))
+    # OV5647 auto-exposure lift for dim rooms (0 = off; ~32 helps a lot, ~48 is
+    # aggressive). Runtime-only, re-applied on every open. TUNE on the mounted
+    # camera under real lighting -- a fixed lift over-exposes bright scenes.
+    vision_ae_bump: int = field(default_factory=lambda: _env_int("VISION_AE_BUMP", 32))
     vision_labels: list[str] = field(default_factory=lambda: [
         s.strip() for s in _env("VISION_LABELS").split(",") if s.strip()
     ])  # deployed model's class names, in id order; empty -> "obj<id>"

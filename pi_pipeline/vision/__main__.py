@@ -49,6 +49,7 @@ def main() -> None:
         _run(SerialDetectionFeed(
             args.port, settings.vision_serial_baud,
             frame_px=settings.vision_frame_px, labels=settings.vision_labels,
+            sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump,
         ))
 
 

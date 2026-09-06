@@ -60,3 +60,24 @@ should reproduce, at minimum:
   `terrain_feature.py` `fov_scale` / `s_near` / `s_far` / `h_tall` constants.
 - Motion blur / vibration effect while walking.
 - Low-light and backlit behaviour in the real room.
+
+## Low-light: auto-exposure lift (bench, 2026-09-06)
+
+Stock Himax tuning aims the OV5647 auto-exposure **dim** -- WPT/BPT target
+regs `0x3A0F`/`0x3A10`/`0x3A1B`/`0x3A1E` default `~0x32`/`0x24`. In a dim
+room that gave dark, low-signal frames and a poor detection hit-rate.
+Adding **+0x20..0x30** to those four regs via `AT+SETREG` lifted mean
+frame brightness ~108 -> ~166 and **markedly raised the person-detection
+hit-rate** (user-confirmed on the live feed). Runtime-only -- lost on
+power-cycle, so re-applied on every open.
+
+Wired: `SerialDetectionFeed(sensor_opt=, ae_bump=)`, config
+`VISION_SENSOR_OPT` (default 1 = 480 capture, cleaner downscale, boxes
+come in that frame -- feed reads the per-message `resolution`) and
+`VISION_AE_BUMP` (default 32).
+
+**TUNE on the mounted camera** under real on-robot lighting: a fixed lift
+over-exposes a bright scene, and it trades against motion blur (longer
+exposure). Options if a fixed value isn't good enough: adaptive (read
+frame brightness, adjust), or gain instead of exposure (brighter without
+blur, noisier). Hardware-gated.

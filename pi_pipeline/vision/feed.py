@@ -120,6 +120,11 @@ class SerialDetectionFeed:
 
     _START_CMD = b"AT+INVOKE=-1,0,1\r\n"
     _STOP_CMD = b"AT+BREAK\r\n"
+    # OV5647 auto-exposure target regs (WPT/BPT enter + go-out). Stock Himax
+    # tuning aims dim (~0x32/0x24); adding `ae_bump` lifts the whole image so
+    # faces/obstacles are visible in a low-light room. Runtime-only -- must be
+    # re-applied every power-up (this class does, on open).
+    _AE_REGS = (("3A0F", 0x32), ("3A10", 0x24), ("3A1B", 0x32), ("3A1E", 0x24))
 
     def __init__(
         self,
@@ -130,6 +135,8 @@ class SerialDetectionFeed:
         labels: list[str] | None = None,
         min_score: int = 0,
         auto_start: bool = True,
+        sensor_opt: int | None = None,   # 0=240 1=480 2=640x480; None = leave as-is
+        ae_bump: int = 0,               # 0 = off; ~0x20 helps a dim room, over-exposes a bright one
     ):
         import serial
 
@@ -143,9 +150,21 @@ class SerialDetectionFeed:
             self._ser.reset_input_buffer()
             self._ser.write(self._STOP_CMD)     # clear any prior INVOKE loop
             time.sleep(0.2)
+            self._apply_sensor(sensor_opt, ae_bump)
             self._ser.reset_input_buffer()
             self._ser.write(self._START_CMD)
-        log.info("vision serial on %s @ %d (frame %dpx)", port, baud, frame_px)
+        log.info("vision serial on %s @ %d (frame %dpx, sensor_opt=%s, ae_bump=%s)",
+                 port, baud, frame_px, sensor_opt, ae_bump)
+
+    def _apply_sensor(self, sensor_opt: int | None, ae_bump: int) -> None:
+        if sensor_opt in (0, 1, 2):
+            self._ser.write(f"AT+SENSOR=1,1,{sensor_opt}\r\n".encode())
+            time.sleep(0.8)
+        if ae_bump:
+            for a, v in self._AE_REGS:
+                self._ser.write(
+                    f'AT+SETREG="0x{a}","0x{min(0xF0, v + ae_bump):02X}"\r\n'.encode())
+                time.sleep(0.25)
 
     def _label(self, target_id: int) -> str:
         if 0 <= target_id < len(self._labels):
@@ -165,15 +184,20 @@ class SerialDetectionFeed:
             if msg.get("name") != "INVOKE" or msg.get("type") != 1:
                 continue
             self._t += 1.0
+            data = msg.get("data", {})
+            # boxes are in the frame the message reports (240 or 480 depending
+            # on the sensor option) -- trust it over the constructor default
+            res = data.get("resolution") or [self._frame_px]
+            frame_px = res[0] or self._frame_px
             frame: Frame = []
-            for b in msg.get("data", {}).get("boxes", []):
+            for b in data.get("boxes", []):
                 try:
                     x, y, w, h, score, tid = b[:6]
                     if score < self._min_score:
                         continue
                     frame.append(Detection.from_center_px(
                         self._label(int(tid)), float(score) / 100.0,
-                        float(x), float(y), float(w), float(h), self._frame_px, self._t,
+                        float(x), float(y), float(w), float(h), frame_px, self._t,
                     ))
                 except (ValueError, TypeError):
                     continue
