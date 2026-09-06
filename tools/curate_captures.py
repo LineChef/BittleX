@@ -290,6 +290,7 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
         if c.rotate:
             im = im.rotate(-c.rotate, expand=True)
         im.save(os.path.join(out_dir, f"neg_{i:04d}.jpg"), quality=92)
+        im.save(os.path.join(imgs_only, f"neg_{i:04d}.jpg"), quality=92)
 
     rej: dict[str, int] = {}
     for f in frames:

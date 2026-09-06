@@ -82,12 +82,13 @@ g2curate() {
 g2combine() {
   local name="${1:?usage: g2combine <name>}"
   local u="$G2_CAP_ROOT/$name/upload" ui="$G2_CAP_ROOT/$name/upload_images"
-  ( mkdir -p "$u"; rm -rf "$ui"; mkdir -p "$ui"; local k=0
+  ( mkdir -p "$u"; rm -rf "$ui"; mkdir -p "$ui"; local k=0 m=0
     for s in "$G2_CAP_ROOT/$name"/session_*/curated; do
       [ -d "$s" ] || continue
       local n; n="$(basename "$(dirname "$s")")"
       mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
       for f in "$s"/pos_*.jpg; do [ -e "$f" ] || continue; k=$((k+1)); cp "$f" "$ui/$(printf '%s_%03d.jpg' "$name" $k)"; done
+      for f in "$s"/neg_*.jpg; do [ -e "$f" ] || continue; m=$((m+1)); cp "$f" "$ui/$(printf '%s_neg_%03d.jpg' "$name" $m)"; done
     done
   )
   echo "upload (Roboflow/Colab, per-session + .txt) -> $u"
