@@ -71,3 +71,8 @@ Combine all `session_*/curated/` → upload to SenseCraft (multi-class: add this
 person to the existing interaction dataset) → the YOLO `.txt` pre-labels mean
 you mostly assign the class name → train → deploy → add to `VISION_LABELS` +
 `G2_BONDS`. Full detail in `person-recognition.md`.
+
+## Notes
+
+- **Pre-label region:** `--label-region face` tightens the YOLO pre-label box to the face (from the Person box) -- the *image stays full-frame*. Do NOT crop the training images: an object detector must see faces *within* a scene to learn to localise them. `--face-crops` writes face crops to `crops/` only for a possible future classifier/embedder.
+- **Resolution ceiling:** frames pulled over serial (`AT+INVOKE`) are the model-input frame, ~240 px max -- no raw high-res JPEG this way. Set sensor capture to 480 (`G2_CAM_RES=1` for `face_preview.py`) for a cleaner 240 downscale. Graininess past that is low light, not resolution; the detector runs at 192 px regardless.

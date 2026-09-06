@@ -93,6 +93,8 @@ class Config:
     positives: int = 80
     negatives: int = 12
     rotate: int = 270                  # 0 | 90 | 180 | 270 (degrees clockwise)
+    label_region: str = "person"      # "person" (box as-is) | "face" (tighten to face)
+    face_crops: bool = False          # also write face-crop JPEGs to crops/ (NOT for detection)
     min_brightness: float = 22.0
     max_brightness: float = 245.0
     min_sharpness: float = 8.0
@@ -186,6 +188,24 @@ def _spread_select(pool: list[Frame], n: int, buckets: int, total: int) -> list[
     return sorted(out, key=lambda f: f.idx)
 
 
+def _face_from_person(box: list[float]) -> list[float]:
+    """Rough face box from a Person-Detection (head+torso) box: top-centre chunk.
+    It's a pre-label -- tighten at upload. If `box` already looks face-sized
+    (small), it's returned unchanged."""
+    cx, cy, w, h = box
+    fw, fh = 0.62 * w, 0.42 * h
+    fcy = (cy - h / 2) + 0.24 * h
+    return [cx, fcy, fw, fh]
+
+
+def _maybe_face(box: list[float], px: int, region: str) -> list[float]:
+    if region != "face" or box is None:
+        return box
+    if (box[2] * box[3]) / (px ** 2) <= 0.16:      # already face-sized (Face Detection)
+        return box
+    return _face_from_person(box)
+
+
 def _rot_box(box: list[float], px: int, deg: int) -> list[float]:
     cx, cy, w, h = box
     if deg == 90:
@@ -226,6 +246,9 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
         if os.path.isfile(old):
             os.remove(old)
 
+    crops_dir = os.path.join(out_dir, "crops")
+    if c.face_crops:
+        os.makedirs(crops_dir, exist_ok=True)
     for i, f in enumerate(sel_pos, 1):
         im = Image.open(f.path).convert("RGB")
         if c.rotate:
@@ -233,11 +256,21 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
         stem = os.path.join(out_dir, f"pos_{i:04d}")
         im.save(stem + ".jpg", quality=92)
         if have_boxes and f.box is not None:
-            bx = _rot_box(f.box, f.frame_px, c.rotate)
+            lbl = _maybe_face(f.box, f.frame_px, c.label_region)
+            bx = _rot_box(lbl, f.frame_px, c.rotate)
             p = f.frame_px
             with open(stem + ".txt", "w") as fh:
                 fh.write(f"{c.class_id} {bx[0]/p:.6f} {bx[1]/p:.6f} "
                          f"{bx[2]/p:.6f} {bx[3]/p:.6f}\n")
+            if c.face_crops:
+                fb = _maybe_face(f.box, f.frame_px, "face")
+                rb = _rot_box(fb, f.frame_px, c.rotate)
+                W, H = im.size
+                x0 = max(0, int(rb[0] - rb[2] / 2)); y0 = max(0, int(rb[1] - rb[3] / 2))
+                x1 = min(W, int(rb[0] + rb[2] / 2)); y1 = min(H, int(rb[1] + rb[3] / 2))
+                if x1 > x0 and y1 > y0:
+                    im.crop((x0, y0, x1, y1)).save(
+                        os.path.join(crops_dir, f"pos_{i:04d}.jpg"), quality=92)
     for i, f in enumerate(sel_neg, 1):
         im = Image.open(f.path).convert("RGB")
         if c.rotate:
@@ -347,6 +380,10 @@ def main() -> None:
     ap.add_argument("--min-box-frac", type=float, default=0.03)
     ap.add_argument("--hash-thresh", type=int, default=6)
     ap.add_argument("--class-id", type=int, default=0)
+    ap.add_argument("--label-region", choices=("person", "face"), default="person",
+                    help="'face' tightens the pre-label box to the face (image stays full-frame)")
+    ap.add_argument("--face-crops", action="store_true",
+                    help="also write face-crop JPEGs to crops/ (for a future classifier/embedder, NOT the detector)")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
@@ -358,7 +395,7 @@ def main() -> None:
                min_brightness=a.min_brightness, max_brightness=a.max_brightness,
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,
                min_box_frac=a.min_box_frac, hash_thresh=a.hash_thresh,
-               class_id=a.class_id)
+               class_id=a.class_id, label_region=a.label_region, face_crops=a.face_crops)
     curate(a.in_dir, a.out_dir, c)
 
 
