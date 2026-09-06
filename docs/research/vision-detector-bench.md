@@ -81,3 +81,16 @@ over-exposes a bright scene, and it trades against motion blur (longer
 exposure). Options if a fixed value isn't good enough: adaptive (read
 frame brightness, adjust), or gain instead of exposure (brighter without
 blur, noisier). Hardware-gated.
+
+## Camera orientation vs. detection (2026-09-06)
+
+The OV5647's native readout is fixed; **physically rotating the module
+rotates the scene within the frame.** With the module in one orientation
+the person came out sideways and the *library* Person-Detection model
+(trained on upright people) hit only **~13%** of frames -> few pre-labels.
+Rotating the module so the raw feed is **upright** took the hit-rate to
+**100%** (score ~87). Lesson: mount the camera so its *raw* output is
+upright, and use that as G2's mount orientation. A custom model trained on
+either orientation works (train == infer), but upright lets you use
+pretrained upright models and get clean pre-labels. Curate then needs
+`--rotate 0`.

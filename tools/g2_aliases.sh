@@ -43,13 +43,14 @@ g2cam() {
 g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped"; }  # stop the preview
 g2cam-info() { _g2py tools/camera_preview.py --info; }   # which serial port + which model is on the module
 
-# g2curate <name> [session]  -- filter a raw capture into a training-ready set
-#                               (scores, de-dups, rotates upright, YOLO pre-labels)
+# g2curate <name> [session] [rotate]  -- filter a raw capture into a training-ready set
+#   (scores, de-dups, rotates upright, YOLO pre-labels). rotate default 0 (camera
+#   is mounted upright); use 90/180/270 if the contact sheet comes out rotated.
 g2curate() {
-  local name="${1:?usage: g2curate <name> [session]}" sess="${2:-1}"
+  local name="${1:?usage: g2curate <name> [session] [rotate]}" sess="${2:-1}" rot="${3:-0}"
   local d="$G2_CAP_ROOT/$name/session_$sess"
-  _g2py tools/curate_captures.py "$d" "$d/curated" \
-    --positives 100 --negatives 15 --class-id 0 --label-region face --rotate 90
+  _g2py tools/curate_captures.py "$d" \
+    --positives 100 --negatives 15 --class-id 0 --label-region face --rotate "$rot"
   open "$d/curated/_contact_sheet.png" 2>/dev/null
 }
 # g2combine <name>  -- gather every session's curated set into <name>/upload/ (per-session subdirs)

@@ -64,7 +64,7 @@ The sensor outputs its native orientation — often **90° rotated**. That matte
 So **physically rotate the camera module 90°** until its raw feed is upright
 (check the preview *before* pressing "rotate view"). Note which way — that's the
 orientation you'll mount it on G2, and it must match for all sessions. Then note
-the `--rotate` value curate needs for that orientation (try 90 / 270; the
+the `--rotate` value curate needs for that orientation (try 0 first; 90/180/270 if rotated; the
 contact sheet tells you if it's upside-down).
 
 ---
@@ -107,7 +107,7 @@ one look, e.g. hair up; 2–3 the normal look).
 python tools/curate_captures.py \
     ~/Desktop/g2_face_capture/alex/session_1 \
     ~/Desktop/g2_face_capture/alex/session_1/curated \
-    --positives 100 --negatives 15 --class-id 0 --label-region face --rotate 90
+    --positives 100 --negatives 15 --class-id 0 --label-region face --rotate 0
 ```
 
 - Scores every frame (brightness / contrast / sharpness), drops rejects,
