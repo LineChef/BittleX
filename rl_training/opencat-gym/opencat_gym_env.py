@@ -388,6 +388,34 @@ SIZE_OBSERVATION = LENGTH_JOINT_HISTORY * 8 + 6 + 3 + 1 + LENGTH_TILT_HISTORY * 
 # true size; SIZE_OBSERVATION alone is the no-terrain base.
 
 
+# --- Env-var overrides for parametrised smoke runs --------------------------
+# Each G2E_<STEM> var, when set, replaces the module constant of that stem
+# above. Unset => the committed defaults, so an ordinary train.py / watch_*
+# run is byte-identical to before. train_vision_smoke.py uses these to sweep
+# course variants without editing this file.
+def _g2e(name, default):
+    raw = os.environ.get("G2E_" + name)
+    if raw is None or raw == "":
+        return default
+    if isinstance(default, bool):
+        return raw not in ("0", "false", "False", "no")
+    return type(default)(raw)
+
+TERRAIN_FEATURE      = _g2e("TERRAIN_FEATURE", bool(TERRAIN_FEATURE))
+RANDOM_TERRAIN       = _g2e("RANDOM_TERRAIN", RANDOM_TERRAIN)
+RANDOM_TERRAIN_PROB  = _g2e("RANDOM_TERRAIN_PROB", RANDOM_TERRAIN_PROB)
+RANDOM_TERRAIN_MAX_H = _g2e("RANDOM_TERRAIN_MAX_H", RANDOM_TERRAIN_MAX_H)
+RUBBLE_PROB          = _g2e("RUBBLE_PROB", RUBBLE_PROB)
+LEDGE_HEIGHT         = _g2e("LEDGE_HEIGHT", LEDGE_HEIGHT)
+LEDGE_PROB           = _g2e("LEDGE_PROB", LEDGE_PROB)
+LEDGE_RANDOMIZE      = _g2e("LEDGE_RANDOMIZE", LEDGE_RANDOMIZE)
+SLOPE_MAX_DEG        = _g2e("SLOPE_MAX_DEG", SLOPE_MAX_DEG)
+# NEW knobs -- only consulted by _scatter_obstacles; default 0.0 => old behaviour.
+OBSTACLE_TALL_FRAC = _g2e("OBSTACLE_TALL_FRAC", 0.0)  # frac of scattered boxes forced tall (30-55mm -> trips tall_flag, "go around")
+OBSTACLE_SPAN_FRAC = _g2e("OBSTACLE_SPAN_FRAC", 0.0)  # frac forced to span the lane (wide, y~0 -> unavoidable, must steer/slow)
+OBSTACLE_COUNT     = _g2e("OBSTACLE_COUNT", 0)         # >0 => fixed box count per episode instead of randint(4,10)
+
+
 class OpenCatGymEnv(gym.Env):
     """ Gymnasium environment (stable baselines 3) for OpenCat robots.
     """
@@ -1479,7 +1507,12 @@ class OpenCatGymEnv(gym.Env):
         by the caller (dr ramp); the recovery loop raises it slowly per round.
         Deliberately kept passable: scattered (never spanning the lane), short
         along-path, so a decent gait clears most and only clips some -- the
-        stumbles that give the FAC_RECOVERY reward its signal."""
+        stumbles that give the FAC_RECOVERY reward its signal.
+
+        OBSTACLE_TALL_FRAC / OBSTACLE_SPAN_FRAC (env-var, default 0) override
+        this per box: a tall box (30-55mm) trips the vision tall_flag, a
+        spanning box blocks the lane so the policy must actually use the
+        forward terrain feature to steer/slow rather than walk through."""
         # Ground plane may be tilted (SLOPE_MAX_DEG). Place each box ON the sloped
         # surface -- height offset from the plane equation, orientation matched --
         # so nothing floats or half-buries. slope_rp = (0, 0) -> flat, as before.
@@ -1488,17 +1521,26 @@ class OpenCatGymEnv(gym.Env):
                       np.cos(pitch) * np.cos(roll)])
         box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
         _cap = min(max_h, RANDOM_TERRAIN_MAX_H)
-        for _ in range(np.random.randint(4, 10)):
-            h = np.random.uniform(0.002, max(0.003, _cap))
+        _n_boxes = OBSTACLE_COUNT if OBSTACLE_COUNT > 0 else np.random.randint(4, 10)
+        for _ in range(_n_boxes):
+            if np.random.rand() < OBSTACLE_TALL_FRAC:
+                h = np.random.uniform(0.058, 0.085)   # "go around" height -- clears TERRAIN_TALL_Z (0.055) so vision tall_flag fires
+            else:
+                h = np.random.uniform(0.002, max(0.003, _cap))
             x = np.random.uniform(*RANDOM_TERRAIN_X_RANGE)
-            y = np.random.uniform(-0.03, 0.03)   # 2026-09-04: narrowed from +/-0.06 -- the gait
-                                                   # walks close to dead straight now, rarely drifts
-                                                   # off-line, so a wide lateral spread mostly placed
-                                                   # boxes it would just walk past
+            if np.random.rand() < OBSTACLE_SPAN_FRAC:
+                y = np.random.uniform(-0.02, 0.02)          # centred -> blocks the lane
+                across = np.random.uniform(0.18, 0.30)      # wide enough to span it
+            else:
+                y = np.random.uniform(-0.03, 0.03)   # 2026-09-04: narrowed from +/-0.06 -- the gait
+                                                       # walks close to dead straight now, rarely drifts
+                                                       # off-line, so a wide lateral spread mostly placed
+                                                       # boxes it would just walk past
+                across = np.random.uniform(0.04, 0.10)
             z_ground = -(n[0] * x + n[1] * y) / n[2]   # plane through the origin
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
                 np.random.uniform(0.015, 0.045),  # along-path half-length
-                np.random.uniform(0.04, 0.10),    # across-path half-width
+                across,                           # across-path half-width
                 h / 2])
             p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
                               baseOrientation=box_orn)
