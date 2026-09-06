@@ -5,6 +5,10 @@ decides wander/investigate intent during EXPLORE; `Novelty` tracks what's been
 seen so "curious" pulls toward the unseen. All pure logic, driven by the
 `BehaviorParams` the personality produces.
 """
+from .enrollment import (
+    Enrollment, EnrollmentConfig, EnrollAction, EnrollState, EnrollTick,
+    build_script, count_completed_sessions, new_session_dir, mark_session_done,
+)
 from .explore import ExploreAction, ExploreConfig, ExploreDecision, Explorer
 from .idle_posture import IdlePosture, IdlePostureConfig, Posture, PostureAction
 from .mode_controller import Mode, ModeConfig, ModeController
@@ -15,4 +19,6 @@ __all__ = [
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
     "Novelty", "NoveltyConfig",
     "IdlePosture", "IdlePostureConfig", "Posture", "PostureAction",
+    "Enrollment", "EnrollmentConfig", "EnrollAction", "EnrollState", "EnrollTick",
+    "build_script", "count_completed_sessions", "new_session_dir", "mark_session_done",
 ]

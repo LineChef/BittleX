@@ -284,6 +284,13 @@ person-aware Swift-YOLO checkpoint (SSCMA/Colab), (c) multi-class `person` +
 "Person Detection" from the library to get real detections back.
 Measured detector behaviour + firmware facts: `docs/research/vision-detector-bench.md`.
 
+**Implementation plans (2026-09-06):**
+- Person recognition + **enrollment mode** ("G2, meet X"): the enrollment FSM is
+  built (`behavior/enrollment.py`, 15 tests); full design + what the driver still
+  needs is in `docs/research/person-recognition.md`.
+- The multi-model **detection layer** (safety / interaction / objects models +
+  a model-manager that swaps by mode): `docs/research/detection-layer.md`.
+
 ### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
 G2 spends most of its time on the user's desk. It needs to explore and look
 around up there (curiosity, [B7]-style wandering) but must **never** walk off
