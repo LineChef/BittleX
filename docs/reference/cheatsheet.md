@@ -1,11 +1,13 @@
 # Command Cheat Sheet
 
-Curated quick-reference. Add to it by telling me "add this to the cheat sheet".
-For the exhaustive reference (every script, all flags, setup), see
-[`docs/reference/commands.md`](commands.md).
+The single command reference for the project — quick tables **and** the full
+step sequences (RL runs by hand, env setup, …). Add to it by telling me
+"add this to the cheat sheet".
 
-Shell helpers (`g2train`, `g2watch`) live in `~/.bash_profile` — `source ~/.bash_profile`
-or open a new terminal to pick them up. RL commands run from `rl_training/opencat-gym/`.
+Shell helpers: RL (`g2train`, `g2watch`) in `~/.bash_profile`; companion +
+camera (`g2cam`, `g2curate`, …) in `tools/g2_aliases.sh` — `source` it (see
+"Companion pipeline & camera" below). RL commands run from
+`rl_training/opencat-gym/`.
 
 ---
 
