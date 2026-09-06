@@ -213,6 +213,10 @@ Three independent components, each usable alone:
 Build as a **toggleable mode with a 0–1 intensity dial** (a full persona tanks
 task usefulness — GIR doesn't follow instructions). Composes with existing
 traits. Software only; slots into `voice/` + `personality/`.
+
+**MVP (user call 2026-09-06):** ship the **manner** component only — a prompt
+persona block, no custom voice FX. Timbre/cadence are a later nice-to-have, not
+worth the assistant-usefulness cost up front.
 *(User ask 2026-09-06 — Invader Zim / GIR.)*
 
 ---
