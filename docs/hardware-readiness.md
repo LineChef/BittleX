@@ -250,7 +250,11 @@ collection / training / build until the camera's on G2.
 training** (the RL side)
 - **Perception-in-the-loop gait retrain** (Phase 8, `docs/project-plan.md`
   "DECIDED ARCHITECTURE") — flip `TERRAIN_FEATURE = True`, tune the sim
-  generator's noise to the real detector's measured stats, retrain
+  generator's noise to the real detector's measured stats, retrain. First
+  bench numbers (mount-independent) are captured:
+  `docs/research/vision-detector-bench.md` (~15 Hz, ~50 ms, ~17 % dropout,
+  bearing σ ~2 % / size σ ~8 % of frame, 0 FP on a clean scene). The
+  distance-vs-confidence curve + geometry still need the camera on G2.
 - **R-NOSTALL** ("don't stall" reward work, `robustness-backlog.md`) —
   explicitly deferred to here; a blind policy can't be intentional about an
   obstacle it can't see
