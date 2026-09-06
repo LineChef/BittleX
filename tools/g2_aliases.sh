@@ -45,7 +45,25 @@ g2cam() {
     cd "$G2_ROOT" && G2_CAP_OUT="$out" G2_CAP_LABEL="$name" G2_CAM_RES=1 \
       nohup "$_G2_PY" tools/camera_preview.py > /tmp/g2cam.log 2>&1 & )
   sleep 5; open http://localhost:8080
-  echo "capturing -> $out    (stop: g2cam-stop)"
+  cat <<EOF
+
+  capturing -> $out
+  preview   -> http://localhost:8080   (click "Start capturing" for each pose)
+  stop      -> g2cam-stop     then:  g2curate $name $sess
+
+  STANDARD POSE SET  (docs/research/capture-session-checklist.md)
+   1. Close (~1.5 ft), straight on, neutral -- small head movement   ~8s
+   2. Close, talking + a smile                                       ~6s
+   3. Mid (~3 ft), straight on, neutral                              ~8s
+   4. Mid -- slow head turn: full left -> full right -> back         ~10s
+   5. Mid -- chin up (hold), then chin down (hold)                   ~8s
+   6. Mid -- look away: left, right, up (not at the lens)            ~6s
+   7. Mid -- hand near face / push hair back                         ~6s
+   8. Far (~5-6 ft), straight on                                     ~6s
+   9. Move to a 2nd spot / different light -- repeat 1 + 3           ~10s
+   N. NEGATIVES -- step out of frame / point at a wall, ~12s
+  Aim ~150-200 saved.  Vary room/light/hair between the 3 sessions.
+EOF
 }
 g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped" || echo "nothing running"; }
 g2cam-info() { _g2py tools/camera_preview.py --info; }   # serial port + which model is on the module
