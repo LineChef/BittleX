@@ -114,6 +114,9 @@ class Settings:
     # aggressive). Runtime-only, re-applied on every open. TUNE on the mounted
     # camera under real lighting -- a fixed lift over-exposes bright scenes.
     vision_ae_bump: int = field(default_factory=lambda: _env_int("VISION_AE_BUMP", 32))
+    # drop detections scoring below this (0-100). Raise if a model over-
+    # fires (e.g. a single-class model trained without negatives). 0 = off.
+    vision_min_score: int = field(default_factory=lambda: _env_int("VISION_MIN_SCORE", 0))
     vision_labels: list[str] = field(default_factory=lambda: [
         s.strip() for s in _env("VISION_LABELS").split(",") if s.strip()
     ])  # deployed model's class names, in id order; empty -> "obj<id>"
