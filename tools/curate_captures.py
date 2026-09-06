@@ -256,12 +256,19 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     crops_dir = os.path.join(out_dir, "crops")
     if c.face_crops:
         os.makedirs(crops_dir, exist_ok=True)
+    # images_only/ = just the positive JPEGs, nothing else -- point the SenseCraft
+    # browser upload at this folder (Cmd+A, no clutter to skip).
+    imgs_only = os.path.join(out_dir, "images_only")
+    os.makedirs(imgs_only, exist_ok=True)
+    for old in glob.glob(os.path.join(imgs_only, "*")):
+        os.remove(old)
     for i, f in enumerate(sel_pos, 1):
         im = Image.open(f.path).convert("RGB")
         if c.rotate:
             im = im.rotate(-c.rotate, expand=True)      # PIL rotate is CCW
         stem = os.path.join(out_dir, f"pos_{i:04d}")
         im.save(stem + ".jpg", quality=92)
+        im.save(os.path.join(imgs_only, f"img_{i:04d}.jpg"), quality=92)
         if have_boxes and f.box is not None:
             lbl = _maybe_face(f.box, f.frame_px, c.label_region)
             bx = _rot_box(lbl, f.frame_px, c.rotate)
@@ -346,6 +353,7 @@ def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
     L = []
     L.append(f"curated {len(frames)} frames  ->  {len(pos)} positives, {len(neg)} negatives")
     L.append(f"pre-labels: {'YES (from detection boxes)' if have_boxes else 'NO (no sidecars) -- label at upload'}")
+    L.append("browser upload: point SenseCraft at  " + os.path.join("<session>", "curated", "images_only") + "  (JPEGs only, Cmd+A)")
     L.append(f"rotate: {c.rotate} deg CW   class_id: {c.class_id}")
     if rej:
         L.append("rejected: " + ", ".join(f"{k}={v}" for k, v in sorted(rej.items())))

@@ -80,14 +80,18 @@ g2curate() {
 }
 # g2combine <name>  -- gather every session's curated set into <name>/upload/ (per-session subdirs)
 g2combine() {
-  local name="${1:?usage: g2combine <name>}" u="$G2_CAP_ROOT/$1/upload"
-  ( mkdir -p "$u"
+  local name="${1:?usage: g2combine <name>}"
+  local u="$G2_CAP_ROOT/$name/upload" ui="$G2_CAP_ROOT/$name/upload_images"
+  ( mkdir -p "$u"; rm -rf "$ui"; mkdir -p "$ui"; local k=0
     for s in "$G2_CAP_ROOT/$name"/session_*/curated; do
       [ -d "$s" ] || continue
       local n; n="$(basename "$(dirname "$s")")"
       mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
-    done )
-  echo "combined -> $u"; ls "$u"
+      for f in "$s"/pos_*.jpg; do [ -e "$f" ] || continue; k=$((k+1)); cp "$f" "$ui/$(printf '%s_%03d.jpg' "$name" $k)"; done
+    done
+    echo "$k images" > "$ui/.count" )
+  echo "upload (Roboflow/Colab, per-session + .txt) -> $u"
+  echo "upload_images ($(ls "$ui"/*.jpg 2>/dev/null|wc -l|tr -d ' ') JPEGs only, for the SenseCraft browser) -> $ui"
 }
 
 # ------------------------------------------------------------- vision runtime
