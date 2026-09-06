@@ -98,10 +98,13 @@ g2combine() {
 # ------------------------------------------------------------- vision runtime
 
 # g2vision [labels]  -- run the detection pipeline over serial, print live detections
-#                       e.g. g2vision person     or    g2vision person,alex
+#   no arg  -> uses VISION_LABELS / VISION_MIN_SCORE from .env (the deployed model)
+#   with arg -> overrides the label(s) for this run, e.g. g2vision person
 g2vision() {
   local port; port="$(ls /dev/cu.usbmodem* 2>/dev/null | head -1)"
-  ( cd "$G2_ROOT" && VISION_LABELS="${1:-person}" "$_G2_PY" -m pi_pipeline.vision serial "${port:-/dev/cu.usbmodem58FA1045341}" )
+  ( cd "$G2_ROOT"
+    [ -n "$1" ] && export VISION_LABELS="$1"
+    "$_G2_PY" -m pi_pipeline.vision serial "${port:-/dev/cu.usbmodem58FA1045341}" )
 }
 g2vision-demo() { _g2py -m pi_pipeline.vision demo; }    # mock feed, no hardware
 
