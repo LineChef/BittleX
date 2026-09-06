@@ -9,7 +9,7 @@ import sys
 from dataclasses import asdict
 
 from ..config import settings
-from . import Personality
+from . import Bonds, Personality
 
 spec = sys.argv[1] if len(sys.argv) > 1 else getattr(settings, "traits_spec", "")
 p = Personality.from_spec(spec)
@@ -29,3 +29,9 @@ for k, v in asdict(p.behavior_params()).items():
 print("\n--- cues ---")
 for ev in ("novelty", "explore_start", "greet"):
     print(f"  {ev:14} {p.cues(ev)}")
+
+bonds = Bonds.from_settings(settings)
+print(f"\n--- bonds (G2_BONDS) ---\n  {bonds.describe()}")
+for b in bonds:
+    print(f"  {b.label:12} seek_bias={b.seek_bias:+.2f}"
+          f"  avoids_on_sight={b.disposition.avoids_on_sight}")

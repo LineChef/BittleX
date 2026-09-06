@@ -5,7 +5,11 @@
     system = p.system_prompt(base_prompt)
     params = p.behavior_params()
 """
+from .bonds import Bond, Bonds, Disposition, parse_bonds
 from .personality import Personality, parse_traits
 from .traits import REGISTRY, BehaviorParams, Trait
 
-__all__ = ["Personality", "parse_traits", "REGISTRY", "BehaviorParams", "Trait"]
+__all__ = [
+    "Personality", "parse_traits", "REGISTRY", "BehaviorParams", "Trait",
+    "Bonds", "Bond", "Disposition", "parse_bonds",
+]

@@ -64,7 +64,9 @@ class Settings:
     # comma-separated name=level, e.g. "curiosity=0.85, playfulness=0.4"
     traits_spec: str = field(default_factory=lambda: _env("G2_TRAITS", "curiosity=0.8"))
     # Household roster for B15 -- PERSONAL DATA, real values only in the
-    # gitignored .env. Format: name:closeness:disposition, ';'-separated.
+    # gitignored .env. Format: name:closeness:disposition[:kind], ';'-separated.
+    # disposition = affectionate|playful|curious|wary|fearful|neutral; kind =
+    # person|pet (default person). Parsed by personality.bonds.
     bonds_spec: str = field(default_factory=lambda: _env("G2_BONDS", ""))
 
     # --- Voice I/O ---

@@ -42,6 +42,43 @@ cues   = p.cues("novelty")                      # -> ["head_tilt", "chirp_rising
 
 `voice/conversation.py` already calls `system_prompt()` at construction.
 
+## Bonds (B15) — per-individual relationships
+
+`bonds.py` is a separate, self-contained piece: how G2 relates to **specific**
+recognised people and pets, keyed by the vision model's per-individual class
+labels. Not traits — traits are G2's disposition toward the world in general;
+bonds are toward one named individual.
+
+Each `Bond` carries a **disposition** (one of `affectionate`, `playful`,
+`curious`, `wary`, `fearful`, `neutral`) and a **closeness** in `[0, 1]`. The
+disposition sets an approach bias (`+1` seek out, `0` hold, `-1` avoid);
+closeness scales how hard a warm disposition pulls and drifts a little with
+interaction (`note_interaction(label, valence)`), **in-session only for now** —
+persistence is a follow-up.
+
+```
+# .env  (gitignored — the roster is personal data, never in a tracked file)
+G2_BONDS=self:1.0:affectionate; kiddo:0.9:playful; rex:0.5:wary:pet
+#        name : closeness : disposition [ : kind ]      kind = person|pet
+```
+
+```python
+from pi_pipeline.personality import Bonds
+
+bonds = Bonds.from_settings(settings)
+bonds.seek_bias_for("kiddo")      # -> +0.66   (the number the Explorer will read)
+bonds.disposition_for("person")   # -> Disposition.CURIOUS  (unknown person default)
+bonds.avoids_on_sight("rex")      # -> False   (True only for `fearful`)
+bonds.note_interaction("kiddo", valence=0.8)   # nudge closeness up
+```
+
+Unknown *person* detections default to `curious` at low closeness (G2 approaches
+a new face rather than staying reserved); unknown non-person → `neutral`.
+`python -m pi_pipeline.personality` prints the resolved bonds too.
+
+**API only.** Nothing here touches `behavior/` — wiring `seek_bias` into the
+Explorer / greeting layer is a separate reviewed change.
+
 ## Adding a trait
 
 1. New file, subclass `Trait`, set `name`, implement the channels it affects
