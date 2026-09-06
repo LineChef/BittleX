@@ -141,6 +141,31 @@ Trigger: voice command `"(hey )?g2,? meet (<name>)"` in the voice loop's local
 command matcher (sibling of `voice/commands.py` "forget that" / "go to sleep").
 Also a manual CLI entry for bench testing.
 
+### Curating a raw batch — `tools/curate_captures.py` (BUILT)
+
+Repeatable post-processing so you don't hand-sift hundreds of frames. Run it on
+any capture folder:
+
+```
+python tools/curate_captures.py IN_DIR OUT_DIR --positives 80 --negatives 15
+```
+
+It scores every frame (brightness / contrast / sharpness), drops rejects
+(too dark / blown / blurry / low-contrast, with a count of each), de-duplicates
+near-identical frames (average-hash), **spread-samples** the requested positives
+across the capture timeline so poses/distances/lighting are covered not clumped,
+picks a few clean negatives, rotates everything upright (`--rotate`, default
+270° CW), and writes a contact sheet + a summary with balance hints
+("narrow brightness range", "all faces the same size — vary distance").
+
+**Pre-labels:** if the capture ran with a detection model loaded, each frame has
+a `<name>.json` sidecar with the module's boxes (`face_preview.py` writes these).
+`curate` then splits positives (box present) from negatives (none) automatically
+and writes a **YOLO `.txt` per positive** (`<class_id> cx cy w h` normalised,
+rotated to match) — upload-ready, you just assign the class name. Capture with
+**Face Detection** loaded for tight face boxes; Person Detection boxes work but
+are larger (head+torso), so you'd tighten them at upload.
+
 ### Handoff to training
 
 1. `python -m pi_pipeline ... sync-faces <dest>` (or scp) — pull
