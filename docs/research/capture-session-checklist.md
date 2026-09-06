@@ -56,6 +56,7 @@ python tools/curate_captures.py <session_dir> <session_dir>/curated \
   hints. If good frames are tossed as "blurry", lower `--min-sharpness`.
 - Check `_contact_sheet.png`: faces **upright**? if not, re-run with a different
   `--rotate` (0/90/180/270). Poses/lighting varied, not clumped?
+- **Report the count:** curate prints *usable positives + negatives this session* and the *running total toward ~100* across the person's curated sessions -- always call that out so we know where we stand.
 - Re-run with tweaked flags as needed — it's non-destructive (raw frames kept).
 
 ## 5 · Iterate / accumulate

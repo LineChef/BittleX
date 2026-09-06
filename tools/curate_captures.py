@@ -55,7 +55,7 @@ def sharpness(im: Image.Image) -> float:
     return float(lap.var())
 
 
-def ahash(im: Image.Image, side: int = 8) -> int:
+def ahash(im: Image.Image, side: int = 12) -> int:
     g = np.asarray(im.convert("L").resize((side, side), Image.BILINEAR), float)
     bits = (g > g.mean()).flatten()
     out = 0
@@ -160,15 +160,18 @@ def _quality(f: Frame, c: Config) -> float:
     return 0.40 * s_sharp + 0.25 * s_bright + 0.15 * s_contrast + 0.20 * s_box
 
 
-def _dedup(frames: list[Frame], thresh: int) -> list[Frame]:
-    """Keep the best-scoring frame from each run of near-identical frames."""
+def _dedup(frames: list[Frame], thresh: int, gap: int = 12) -> list[Frame]:
+    """Collapse *consecutive* runs of near-identical frames (holding a pose) --
+    keep the sharpest of each run. Frames far apart in the capture are distinct
+    poses even if their coarse hash matches, so they're never merged."""
+    frames = sorted(frames, key=lambda f: f.idx)
     kept: list[Frame] = []
     for f in frames:
-        dup_of = next((k for k in kept if hamming(k.hash, f.hash) <= thresh), None)
-        if dup_of is None:
+        if kept and (f.idx - kept[-1].idx) <= gap and hamming(kept[-1].hash, f.hash) <= thresh:
+            if f.sharp > kept[-1].sharp:
+                kept[-1] = f            # swap in the sharper frame of this run
+        else:
             kept.append(f)
-        elif f.score > dup_of.score:
-            kept[kept.index(dup_of)] = f
     return kept
 
 
@@ -236,8 +239,12 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     else:
         pos, neg = survivors, []
 
-    pos = _dedup(pos, c.hash_thresh)
-    neg = _dedup(neg, c.hash_thresh)
+    # only thin a pool that's comfortably bigger than the target -- otherwise
+    # every frame is worth keeping (natural micro-variation is good training data)
+    if len(pos) > int(1.6 * c.positives):
+        pos = _dedup(pos, c.hash_thresh)
+    if len(neg) > int(1.6 * c.negatives):
+        neg = _dedup(neg, c.hash_thresh)
     sel_pos = _spread_select(pos, c.positives, c.n_buckets, len(frames))
     sel_neg = sorted(neg, key=lambda f: -f.score)[:c.negatives]
 
@@ -284,6 +291,7 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
 
     _contact_sheet(sel_pos, sel_neg, c, os.path.join(out_dir, "_contact_sheet.png"))
     summary = _summary(frames, sel_pos, sel_neg, rej, have_boxes, c)
+    summary += _session_tally(out_dir, len(sel_pos), len(sel_neg))
     open(os.path.join(out_dir, "_summary.txt"), "w").write(summary)
     print(summary)
     return {"positives": len(sel_pos), "negatives": len(sel_neg),
@@ -308,6 +316,30 @@ def _contact_sheet(pos, neg, c: Config, path: str) -> None:
         col = (90, 210, 120) if kind == "pos" else (210, 110, 100)
         d.text((x + 2, y + th + 1), f"{kind} b{f.bright:.0f} s{f.sharp:.0f}", fill=col)
     sheet.save(path)
+
+
+def _session_tally(out_dir: str, n_pos: int, n_neg: int, target: int = 100) -> str:
+    """If out_dir is `.../<name>/session_<k>/curated`, tally usable positives
+    across all that person's curated sessions and show progress to `target`."""
+    parts = os.path.normpath(out_dir).split(os.sep)
+    try:
+        si = next(i for i, p in enumerate(parts) if p.startswith("session_"))
+    except StopIteration:
+        return f"\nTHIS SESSION: {n_pos} usable positives, {n_neg} negatives\n"
+    person_root = os.sep.join(parts[:si])
+    total_pos = total_neg = 0
+    done = []
+    for d in sorted(glob.glob(os.path.join(person_root, "session_*", "curated"))):
+        p = len(glob.glob(os.path.join(d, "pos_*.jpg")))
+        n = len(glob.glob(os.path.join(d, "neg_*.jpg")))
+        total_pos += p; total_neg += n
+        done.append(f"{os.path.basename(os.path.dirname(d))}: {p} pos / {n} neg")
+    name = parts[si - 1] if si else "?"
+    return ("\n" + f"THIS SESSION: {n_pos} usable positives, {n_neg} negatives\n"
+            + f"{name.upper()} TOTAL so far: {total_pos} positives, {total_neg} negatives"
+            + f"  ({'; '.join(done)})\n"
+            + f"  target ~{target} pre-labeled positives across 3 sessions -- "
+            + ("ON TRACK" if total_pos >= target else f"{target - total_pos} to go") + "\n")
 
 
 def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
