@@ -1,51 +1,58 @@
 # =============================================================================
 # G2 project shell helpers  --  companion pipeline, camera, vision-model training
 # =============================================================================
-# Add to ~/.zshrc (or ~/.bash_profile):
+# Load once:
 #     source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh
-# then `source ~/.zshrc` or open a new terminal.
+# Add that line to ~/.zshrc to make it permanent.
 #
-# RL/gait helpers (g2train, g2watch) already live in ~/.bash_profile and are
-# unchanged. Everything here is the pi_pipeline / camera side.
-# Run `g2help` for a printed list.
+# Every command below EXCEPT `g2` / `g2rl` runs in a subshell -- it works from
+# any directory and leaves you exactly where you were. `g2` / `g2rl` cd on
+# purpose (that's their job); `g2back` returns you.
+#
+# RL/gait helpers (g2train, g2watch) live in ~/.bash_profile, unchanged.
+# `g2help` prints this list.  `docs/reference/cheatsheet.md` is the reference.
 # =============================================================================
 
-export G2_ROOT="${G2_ROOT:-/Users/markjohnson/Desktop/OneFolder/projects/bittleX}"
+# G2_ROOT: honour an existing value, else the location of this file.
+if [ -z "$G2_ROOT" ] || [ ! -d "$G2_ROOT/pi_pipeline" ]; then
+  _g2_self="${BASH_SOURCE[0]:-${(%):-%x}}"                 # bash or zsh
+  export G2_ROOT="$(cd "$(dirname "$_g2_self")/.." && pwd)"
+  unset _g2_self
+fi
 export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/g2_face_capture}"
-_G2_PY="$G2_ROOT/pi_pipeline/.venv/bin/python"        # companion-pipeline venv
-_G2_RLPY="$G2_ROOT/.venv/bin/python"                  # RL/sim venv
+_G2_PY="$G2_ROOT/pi_pipeline/.venv/bin/python"            # companion-pipeline venv
 
-# run a python module/script inside the repo with the pipeline venv
+# run a python module/script from the repo, pipeline venv, WITHOUT moving the caller
 _g2py() { ( cd "$G2_ROOT" && "$_G2_PY" "$@" ); }
 
 # ---------------------------------------------------------------- environment
 
-g2()   { cd "$G2_ROOT" && source pi_pipeline/.venv/bin/activate; }   # cd repo + pipeline venv
-g2rl() { cd "$G2_ROOT/rl_training/opencat-gym" && source "$G2_ROOT/.venv/bin/activate"; }  # cd RL dir + RL venv
-g2test() { ( cd "$G2_ROOT" && "$_G2_PY" -m pytest pi_pipeline/tests/ -q ); }   # run the pipeline test suite
+g2()     { cd "$G2_ROOT" && source pi_pipeline/.venv/bin/activate; }              # cd repo + pipeline venv
+g2rl()   { cd "$G2_ROOT/rl_training/opencat-gym" && source "$G2_ROOT/.venv/bin/activate"; }  # cd RL dir + RL venv
+g2back() { cd - >/dev/null && pwd; }                                             # return to the dir before g2/g2rl
+g2test() { ( cd "$G2_ROOT" && "$_G2_PY" -m pytest pi_pipeline/tests/ -q ); }     # run the pipeline test suite
 
 # ------------------------------------------------- camera capture + model train
-# Full walkthrough: docs/train-a-visual-model.md   Routine: docs/research/capture-session-checklist.md
+# Walkthrough: docs/train-a-visual-model.md   Routine + poses: docs/research/capture-session-checklist.md
 
 # g2cam <name> [session]  -- start the live capture preview at localhost:8080,
 #                            saving to ~/Desktop/g2_face_capture/<name>/session_<n>/
 g2cam() {
-  local name="${1:?usage: g2cam <name> [session]   e.g. g2cam alex 1}"
-  local sess="${2:-1}"
-  export G2_CAP_OUT="$G2_CAP_ROOT/$name/session_$sess"
-  export G2_CAP_LABEL="$name" G2_CAM_RES=1
-  mkdir -p "$G2_CAP_OUT"
-  pkill -f "camera_preview.py|face_preview.py" 2>/dev/null; sleep 1
-  ( cd "$G2_ROOT" && nohup "$_G2_PY" tools/camera_preview.py > /tmp/g2cam.log 2>&1 & )
+  local name="${1:?usage: g2cam <name> [session]   e.g. g2cam alex 1}" sess="${2:-1}"
+  local out="$G2_CAP_ROOT/$name/session_$sess"
+  ( pkill -f "camera_preview.py|face_preview.py" 2>/dev/null; sleep 1
+    mkdir -p "$out"
+    cd "$G2_ROOT" && G2_CAP_OUT="$out" G2_CAP_LABEL="$name" G2_CAM_RES=1 \
+      nohup "$_G2_PY" tools/camera_preview.py > /tmp/g2cam.log 2>&1 & )
   sleep 5; open http://localhost:8080
-  echo "capturing -> $G2_CAP_OUT    (stop: g2cam-stop)"
+  echo "capturing -> $out    (stop: g2cam-stop)"
 }
-g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped"; }  # stop the preview
-g2cam-info() { _g2py tools/camera_preview.py --info; }   # which serial port + which model is on the module
+g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped" || echo "nothing running"; }
+g2cam-info() { _g2py tools/camera_preview.py --info; }   # serial port + which model is on the module
 
-# g2curate <name> [session] [rotate]  -- filter a raw capture into a training-ready set
-#   (scores, de-dups, rotates upright, YOLO pre-labels). rotate default 0 (camera
-#   is mounted upright); use 90/180/270 if the contact sheet comes out rotated.
+# g2curate <name> [session] [rotate]  -- filter a raw capture -> <session>/curated/
+#   (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera
+#   mounted upright); use 90/180/270 if the contact sheet comes out rotated.
 g2curate() {
   local name="${1:?usage: g2curate <name> [session] [rotate]}" sess="${2:-1}" rot="${3:-0}"
   local d="$G2_CAP_ROOT/$name/session_$sess"
@@ -56,19 +63,19 @@ g2curate() {
 # g2combine <name>  -- gather every session's curated set into <name>/upload/ (per-session subdirs)
 g2combine() {
   local name="${1:?usage: g2combine <name>}" u="$G2_CAP_ROOT/$1/upload"
-  mkdir -p "$u"
-  for s in "$G2_CAP_ROOT/$name"/session_*/curated; do
-    [ -d "$s" ] || continue
-    local n; n="$(basename "$(dirname "$s")")"
-    mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
-  done
+  ( mkdir -p "$u"
+    for s in "$G2_CAP_ROOT/$name"/session_*/curated; do
+      [ -d "$s" ] || continue
+      local n; n="$(basename "$(dirname "$s")")"
+      mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
+    done )
   echo "combined -> $u"; ls "$u"
 }
 
 # ------------------------------------------------------------- vision runtime
 
-# g2vision [labels]  -- run the detection pipeline over serial and print live detections.
-#                       e.g. g2vision person      or   g2vision person,alex
+# g2vision [labels]  -- run the detection pipeline over serial, print live detections
+#                       e.g. g2vision person     or    g2vision person,alex
 g2vision() {
   local port; port="$(ls /dev/cu.usbmodem* 2>/dev/null | head -1)"
   ( cd "$G2_ROOT" && VISION_LABELS="${1:-person}" "$_G2_PY" -m pi_pipeline.vision serial "${port:-/dev/cu.usbmodem58FA1045341}" )
@@ -83,39 +90,36 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # ------------------------------------------------------------------- memory
 
-# g2mem [facts|log [N]|search <q>|recall <q>|export [--scrub]|wipe --yes]
+# g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]
 g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
 
 # --------------------------------------------------------- config introspection
 
 g2feat()   { _g2py -m pi_pipeline "${@:---profiles}"; }         # resolve G2_FEATURES; `g2feat --profiles` lists bring-up stages
-g2traits() { _g2py -m pi_pipeline.personality "$@"; }           # resolve G2_TRAITS -> prompt/behaviour/bonds
+g2traits() { _g2py -m pi_pipeline.personality "$@"; }           # resolve G2_TRAITS -> prompt / behaviour / bonds
 g2diag()   { _g2py -m pi_pipeline.diag "${@:-list}"; }          # list | summarize [sid] | tail [sid] | replay <sid>
 
 # ------------------------------------------------------- robot serial link (HW)
 
-# g2serial [ports|ping|send <cmd>|skills|rest]
-g2serial() { _g2py -m pi_pipeline.link.check_serial "${@:-ports}"; }
-g2gait()   { _g2py pi_pipeline/gait/run_gait.py "$@"; }         # on-robot gait loop (flags: --dry-run, --openloop, ...)
-g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }        # status | headless | interactive | governor <n>
+g2serial() { _g2py -m pi_pipeline.link.check_serial "${@:-ports}"; }   # ports | ping | send <cmd> | skills | rest
+g2gait()   { _g2py pi_pipeline/gait/run_gait.py "$@"; }               # on-robot gait loop (--dry-run, --openloop, ...)
+g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status | headless | interactive | governor <n>
 
 # --------------------------------------------------------------------- docs
 
-g2docs() {   # print the key how-to docs
+g2docs() {
   cat <<'EOF'
 Key docs (in docs/):
   SOLO.md                              start here if carrying on without Claude
   train-a-visual-model.md              full camera-model walkthrough
-  research/capture-session-checklist.md   the capture routine (per session)
+  research/capture-session-checklist.md   the capture routine + standard pose set
   research/person-recognition.md       recognition design + "G2, meet X" enrollment
   research/detection-layer.md          one-model-slot / multi-model architecture
-  research/vision-detector-bench.md    measured module behaviour + the AE-lift finding
+  research/vision-detector-bench.md    measured module behaviour + AE-lift + orientation
   feature-flags.md                     staged bring-up (g2feat --profiles)
   hardware-readiness.md                day-1 checklists
-  reference/cheatsheet.md              this + the RL commands
+  reference/cheatsheet.md              the command reference (this + RL commands)
 EOF
 }
 
-g2help() {   # list these helpers
-  grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | sed 's/() {.*# / -- /; s/() {.*//'
-}
+g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | sed 's/() *{.*# */\t/; s/() *{.*//'; }

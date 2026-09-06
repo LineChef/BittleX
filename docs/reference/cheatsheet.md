@@ -6,8 +6,9 @@ step sequences (RL runs by hand, env setup, …). Add to it by telling me
 
 Shell helpers: RL (`g2train`, `g2watch`) in `~/.bash_profile`; companion +
 camera (`g2cam`, `g2curate`, …) in `tools/g2_aliases.sh` — `source` it (see
-"Companion pipeline & camera" below). RL commands run from
-`rl_training/opencat-gym/`.
+"Companion pipeline & camera" below). Every companion alias except `g2` /
+`g2rl` runs from any directory and leaves your cwd unchanged. RL commands run
+from `rl_training/opencat-gym/`.
 
 ---
 
@@ -162,6 +163,7 @@ standard pose set.
 | `g2` | cd repo + activate `pi_pipeline/.venv` |
 | `g2rl` | cd `rl_training/opencat-gym/` + activate the RL `.venv` |
 | `g2test` | run the `pi_pipeline` test suite |
+| `g2back` | return to the directory you were in before `g2` / `g2rl` |
 | `g2help` | list these helpers · `g2docs` list the key docs |
 
 **Camera capture + model training** (`docs/train-a-visual-model.md`)
