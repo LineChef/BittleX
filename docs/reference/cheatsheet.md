@@ -142,25 +142,75 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 
 ## Companion pipeline & camera (`pi_pipeline/`)
 
-Helpers in `tools/g2_aliases.sh` -- add `source .../tools/g2_aliases.sh` to
-`~/.zshrc`. `g2help` lists them; `docs/SOLO.md` is the solo-operation guide;
-`docs/train-a-visual-model.md` is the full camera-model walkthrough.
+Shell helpers: `tools/g2_aliases.sh`. Load with
+`source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh`
+(add to `~/.zshrc` to make permanent). `g2help` prints the list; `docs/SOLO.md`
+is the solo-operation guide; `docs/train-a-visual-model.md` is the full
+camera-model walkthrough; `docs/research/capture-session-checklist.md` has the
+standard pose set.
+
+> The `!` prefix in Claude Code runs each line in a fresh shell, so `source` +
+> `g2*` on separate lines won't work — use one line
+> (`source ...g2_aliases.sh && g2cam alex 1`) or your own Terminal.
+
+**Environment**
 
 | Command | Does |
 |---|---|
-| `g2` / `g2rl` | cd + activate the pipeline venv / the RL venv |
-| `g2test` | run the pi_pipeline test suite |
-| `g2cam <name> [session]` | start the live capture preview at localhost:8080, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
-| `g2cam-stop` / `g2cam-info` | stop the preview / print serial port + loaded model |
-| `g2curate <name> [session]` | filter a raw capture -> `<session>/curated/` (scores, de-dups, rotates upright, YOLO pre-labels); prints the usable count |
-| `g2combine <name>` | gather every session's curated set into `<name>/upload/` |
-| `g2vision [labels]` | run the detection pipeline over serial, print live detections |
-| `g2chat` / `g2voice` | text / full-voice conversation loop |
-| `g2mem [facts\|log N\|search q\|wipe --yes]` | inspect / edit G2's memory |
-| `g2feat [--profiles]` | resolve `G2_FEATURES` / list bring-up stages |
-| `g2traits` / `g2diag` / `g2serial` / `g2power` | personality · diagnostics · BiBoard link · Pi power |
+| `g2` | cd repo + activate `pi_pipeline/.venv` |
+| `g2rl` | cd `rl_training/opencat-gym/` + activate the RL `.venv` |
+| `g2test` | run the `pi_pipeline` test suite |
+| `g2help` | list these helpers · `g2docs` list the key docs |
+
+**Camera capture + model training** (`docs/train-a-visual-model.md`)
+
+| Command | Does |
+|---|---|
+| `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
+| `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
+| `g2cam-info` | print the serial port + which model is on the module |
+| `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
+| `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
+
+**Vision runtime**
+
+| Command | Does |
+|---|---|
+| `g2vision [labels]` | run the detection pipeline over serial, print live detections. e.g. `g2vision person,alex` |
+| `g2vision-demo` | mock detection feed, no hardware |
+
+**Voice / conversation**
+
+| Command | Does |
+|---|---|
+| `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
+| `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
+| `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
+
+**Memory / config / diagnostics**
+
+| Command | Does |
+|---|---|
+| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory |
+| `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
+| `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |
+| `g2diag [list\|summarize sid\|tail sid\|replay sid]` | read a diagnostics session |
+
+**Robot (on hardware)**
+
+| Command | Does |
+|---|---|
+| `g2serial [ports\|ping\|send <cmd>\|skills\|rest]` | BiBoard serial link checks |
+| `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |
+| `g2power [status\|headless\|interactive\|governor <n>]` | Pi power-management helpers |
+
+**Raw (no alias)**
+
+| Command | Does |
+|---|---|
 | `python tools/curate_captures.py --help` | all curate flags |
 | `python tools/camera_preview.py --info` | port + loaded model, no server |
+| `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
 
 ## Git landmarks
 
