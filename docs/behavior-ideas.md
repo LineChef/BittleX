@@ -193,16 +193,27 @@ long silence → G2 does an attention-seeking wander and delivers a wistful line
 when next spoken to. Pure software on top of `pi_pipeline/memory/`; composes with
 B4/B5.
 
-### B19 — Stylised robot-voice presets (TTS effects chain)  ⚪
-A `voice_fx` post-processing stage on Piper's audio output, selected by env var
-(`G2_VOICE_FX=gir|irken-computer|…`), giving G2 a themed synthetic voice without
-training or cloning any real actor. GIR ≈ pitch way up + robotic artifacts +
-erratic timing; the Irken computer ≈ flat monotone + vocoder. Implement as a
-`sox` / `ffmpeg` filter chain (`asetrate` pitch shift, formant shift, ring-mod
-or light bitcrush, metallic comb filter, mild distortion) applied to the WAV
-before playback — runs fine on the Pi, no model. Named presets in a small table
-so more can be added. Software only; slots into the `voice/` TTS path next to
-Piper. *(User ask 2026-09-06 — Invader Zim voice.)*
+### B19 — Stylised character voice/persona presets  ⚪
+A themed "character mode" for G2, selectable by env var
+(`G2_CHARACTER=gir|irken-computer|…`), no model training or actor cloning.
+Three independent components, each usable alone:
+
+1. **Timbre** — a `voice_fx` post-processing stage on Piper's WAV output:
+   `sox` / `ffmpeg` chain (`asetrate` pitch shift, formant shift, ring-mod or
+   light bitcrush, metallic comb filter, mild distortion). GIR ≈ pitch way up +
+   robotic artifacts; Irken computer ≈ flat monotone + vocoder. Runs on the Pi.
+2. **Manner** — a persona block appended to the system prompt via the existing
+   `pi_pipeline/personality/` trait mechanism: erratic, childlike, distractible,
+   topic-jumps, sudden enthusiasm, short outbursts (+ text tics: caps for
+   outbursts, stray interjections, an occasional `♪…♪`). Style pastiche only —
+   no verbatim show dialogue.
+3. **Cadence** — per-utterance random pitch/tempo jitter in the FX chain +
+   text-layer pauses/emphasis, for GIR's lurching pacing.
+
+Build as a **toggleable mode with a 0–1 intensity dial** (a full persona tanks
+task usefulness — GIR doesn't follow instructions). Composes with existing
+traits. Software only; slots into `voice/` + `personality/`.
+*(User ask 2026-09-06 — Invader Zim / GIR.)*
 
 ---
 
