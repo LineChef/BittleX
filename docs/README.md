@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| [`commands.md`](reference/commands.md) | Every runnable command, full step sequences. |
+| [`cheatsheet.md`](reference/cheatsheet.md) | Every command -- quick tables + full step sequences. |
 | [`cheatsheet.md`](reference/cheatsheet.md) | Short curated quick-reference. |
 | [`automated-testing-loop.md`](reference/automated-testing-loop.md) | Runbook for unattended RL reward iteration. |
 

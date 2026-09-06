@@ -127,4 +127,4 @@ nothing.
 | Day-1 hardware checklists | `docs/hardware-readiness.md` |
 | RL/gait history + backlog | `docs/rl-runs/` |
 | Everything else | `docs/project-plan.md`, `docs/how-it-works.md` |
-| All commands | `docs/reference/cheatsheet.md`, `docs/reference/commands.md` |
+| All commands | `docs/reference/cheatsheet.md` |

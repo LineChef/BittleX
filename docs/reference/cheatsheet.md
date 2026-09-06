@@ -212,6 +212,65 @@ standard pose set.
 | `python tools/camera_preview.py --info` | port + loaded model, no server |
 | `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
 
+
+## RL training — detail
+
+### Common rules for `rl_training/opencat-gym/`
+
+- **Run from that directory** (scripts import `opencat_gym_env` locally, load `models/` by relative path).
+- **Use the RL venv**: `source .venv/bin/activate` from the repo root, or call `../../.venv/bin/python`.
+- **Every run needs a unique `<tag>`** — it names `trained/<tag>_ppo.zip`, `trained/checkpoints/<tag>_<steps>_steps.zip`, `trained/<tag>_console.log`. Reusing a tag overwrites. Convention: `v6`, `v7`, ….
+
+### Start a run by hand (when `g2train` isn't available)
+
+```bash
+cd rl_training/opencat-gym
+ls trained/ | grep <tag>                         # 1. tag unused? expect no output
+pgrep -fl train.py                               # 2. no run active
+pkill -f "watch_trained.py|view_sim.py"          # 3. close sim viewers (they steal CPU)
+../../.venv/bin/python smoke_train.py            # 4. if you edited the env/train.py (~90s, reward in-range, no nan)
+pgrep -f "tensorboard.*tensorboard_logs" || nohup ../../.venv/bin/tensorboard   --logdir trained/tensorboard_logs/ --port 6006 > trained/tensorboard.log 2>&1 &   # 5.
+nohup ../../.venv/bin/python train.py --tag <tag> > trained/<tag>_console.log 2>&1 &  # 6. launch
+echo "PID $!"                                    #    write this down
+tail -n 20 trained/<tag>_console.log             # 7. verify: "Logging to ...PPO_N", ep_rew_mean a real number, fps in the hundreds
+```
+When it finishes: `g2watch`, then record the result under Phase 3 in `docs/project-plan.md`.
+
+### `start_run.sh` flags (from `rl_training/opencat-gym/`)
+
+| Command | Effect |
+|---|---|
+| `./start_run.sh v8` | normal run |
+| `./start_run.sh v8 --steps 20000` | short run — extra args pass to `train.py` |
+| `./start_run.sh v8 --force` | allow a tag whose files already exist (overwrites) |
+
+### Continue a run (reward function UNCHANGED)
+
+```bash
+cd rl_training/opencat-gym
+# edit continue_train.py first — source checkpoint + output name are hardcoded near the top, NO cli args
+pgrep -fl train.py                               # no run active
+nohup ../../.venv/bin/python continue_train.py > trained/<name>_console.log 2>&1 &
+```
+2M more steps with `reset_num_timesteps=False`. Reward change -> fresh `g2train` instead.
+
+### RL "tests" (no pytest on the RL side)
+
+| Command (from `rl_training/opencat-gym/`) | Verifies |
+|---|---|
+| `../../.venv/bin/python smoke_train.py` | whole pipeline at 20K steps (~90s): env, PPO loop, logging, checkpoint |
+| `../../.venv/bin/python -c "from stable_baselines3.common.env_checker import check_env; from opencat_gym_env import OpenCatGymEnv; check_env(OpenCatGymEnv()); print('OK')"` | env spaces / shapes / return types |
+
+### One-time env setup
+
+```bash
+# RL venv (repo root) — Homebrew python@3.11; macOS system Python too old
+python3.11 -m venv .venv && source .venv/bin/activate
+CPPFLAGS="-Dfdopen=fdopen" pip install -r requirements.txt   # CPPFLAGS mandatory on macOS (pybullet zlib build bug)
+# companion pipeline venv
+python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_pipeline/requirements.txt
+```
+
 ## Git landmarks
 
 | Command | Does |
