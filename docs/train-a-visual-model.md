@@ -71,7 +71,7 @@ contact sheet tells you if it's upside-down).
 
 ## 3 · Capture a session
 
-Full detail: `research/capture-session-checklist.md`. Short form:
+Full detail incl. the **standard pose set** (run it every session): `research/capture-session-checklist.md`. Short form:
 
 1. Ask yourself: **tag name** (`alex`), **which session** (1, 2, or 3).
 2. Room as bright as reasonable (the `--rotate`/AE settings help, but light is

@@ -34,16 +34,40 @@ quick one-off). Clear any stale `*.jpg`/`*.json` first.
 
 ## 3 · Capture (live preview)
 
-- Launch `scratchpad/face_preview.py`, open `http://localhost:8080`.
-- It saves `<name>_NNNN.jpg` + `<name>_NNNN.json` (the detection boxes — the
-  sidecar `curate` needs for pre-labels). Clean frames, no overlay burned in.
-- Camera **fixed orientation** the whole session, desk height, angled up.
-- Pose sequence, ~60–100 keepers, hit "Start"/"Stop" between changes:
-  - distances: close (~1.5 ft) / mid (~3 ft) / far (~5–6 ft)
-  - angles: straight on / both 3/4 profiles / chin up / chin down
-  - lighting: 2–3 spots (near window / away / lamp on-off)
-  - hair up **and** down per how the person normally wears it (bulk = normal)
-- Then ~15 **negatives**: step fully out of frame / point at an empty wall.
+- `g2cam <name> <session>` (or `python tools/camera_preview.py`), open
+  `http://localhost:8080`. Saves `<name>_NNNN.jpg` + `<name>_NNNN.json` (the
+  detection boxes `curate` uses for pre-labels). Clean frames, no overlay.
+- Camera **fixed orientation** the whole session, desk height, angled up. Make
+  sure the **raw** feed is upright (rotate the module until it is) — that's the
+  mount orientation, and it takes the detection hit-rate to ~100%.
+- Watch the **hit-rate** on the page — if it's not near 100%, the framing/
+  orientation/light is off; fix it before capturing a lot.
+
+### Standard pose set — run this every session
+
+Same poses every time; the *variation* comes from a different room / lighting /
+clothes / hair per session, not different poses. Hit **Start**, hold, **Stop**,
+reposition, repeat. ~4 frames/sec.
+
+| # | Pose | Hold | Notes |
+|---|---|---|---|
+| 1 | **Close** (~1.5 ft), straight on, neutral | ~8 s | small natural head movement |
+| 2 | Close, talking + a smile | ~6 s | |
+| 3 | **Mid** (~3 ft), straight on, neutral | ~8 s | |
+| 4 | Mid — slow head turn: full left → full right → back | ~10 s | both 3/4 profiles |
+| 5 | Mid — chin up (hold), then chin down (hold) | ~8 s | |
+| 6 | Mid — look away: left, right, up (not at the lens) | ~6 s | |
+| 7 | Mid — hand near face / push hair back | ~6 s | a little natural occlusion |
+| 8 | **Far** (~5–6 ft), straight on | ~6 s | |
+| 9 | **Second spot / different light** — repeat 1 + 3 (close + mid, straight on) | ~10 s | move near a window, or change which lamps are on |
+| N | **Negatives** — step fully out of frame / point at an empty wall | ~12 s | ~50 empty frames |
+
+≈ 250 raw frames → `curate` keeps ~80–120 usable. Aim for **~100 usable
+positives per person across the 3 sessions**.
+
+**Per-session variation:** session 1 can be one look (e.g. hair up); sessions
+2–3 the person's normal look. Each session in a different room / lighting if you
+can.
 
 ## 4 · Curate
 
