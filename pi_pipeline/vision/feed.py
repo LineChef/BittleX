@@ -92,22 +92,34 @@ class MockDetectionFeed:
 
 class SerialDetectionFeed:
     """Parses object-detection events from the Grove Vision AI V2 (SenseCraft /
-    SSCMA firmware) over UART.
+    SSCMA firmware) over a serial link -- USB-C to the Pi's USB data port
+    (`/dev/ttyACM0`), which is how SenseCraft talks to it too. (The Grove 4-pin
+    connector is I2C, addr 0x62, not a UART.)
 
-    Message format (one JSON object per line, default 921600 baud):
+    The module does NOT stream on its own -- a client has to start inference.
+    On open we send ``AT+INVOKE=-1,0,1`` (loop forever, results only, no JPEG);
+    on close, ``AT+BREAK``. Verified against real hardware 2026-09-05.
+
+    Message format (one JSON object per line, 921600 baud):
 
         {"type":1,"name":"INVOKE","code":0,
-         "data":{"count":8,"perf":[8,365,0],
+         "data":{"count":8,"perf":[7,50,0],"resolution":[240,240],
                  "boxes":[[x, y, w, h, score, target_id], ...]}}
 
-    `boxes` values are integers: box centre (x, y) and size (w, h) in
-    model-input pixels, `score` 0-100, `target_id` a class index. Labels aren't
-    in the message -- they come from `labels` (the deployed model's class list,
-    in id order). `perf` lines and other events are ignored.
+    `boxes` values are integers: box **centre** (x, y) and size (w, h) in
+    model-input pixels (confirmed centre, not top-left, on hardware), `score`
+    0-100, `target_id` a class index. Only `type == 1` messages carry results
+    (`type == 0` is the command ack). Labels aren't in the message -- they come
+    from `labels` (the deployed model's class list, in id order). `perf` lines,
+    the boot banner, and other events are ignored.
 
-    `frame_px` is the model input size used to normalise coordinates (192 or 240
-    for the common pretrained models). `pyserial` is imported lazily.
+    `frame_px` is the model input size used to normalise coordinates; the
+    `resolution` field in each message reports it (240 for the common
+    pretrained models). `pyserial` is imported lazily.
     """
+
+    _START_CMD = b"AT+INVOKE=-1,0,1\r\n"
+    _STOP_CMD = b"AT+BREAK\r\n"
 
     def __init__(
         self,
@@ -117,6 +129,7 @@ class SerialDetectionFeed:
         frame_px: int = 240,
         labels: list[str] | None = None,
         min_score: int = 0,
+        auto_start: bool = True,
     ):
         import serial
 
@@ -125,6 +138,13 @@ class SerialDetectionFeed:
         self._labels = labels or []
         self._min_score = min_score
         self._t = 0.0
+        if auto_start:
+            time.sleep(2.5)              # let the module boot (port open resets it)
+            self._ser.reset_input_buffer()
+            self._ser.write(self._STOP_CMD)     # clear any prior INVOKE loop
+            time.sleep(0.2)
+            self._ser.reset_input_buffer()
+            self._ser.write(self._START_CMD)
         log.info("vision serial on %s @ %d (frame %dpx)", port, baud, frame_px)
 
     def _label(self, target_id: int) -> str:
@@ -142,7 +162,7 @@ class SerialDetectionFeed:
             except json.JSONDecodeError:
                 log.debug("unparseable vision line: %r", raw[:120])
                 continue
-            if msg.get("name") != "INVOKE":
+            if msg.get("name") != "INVOKE" or msg.get("type") != 1:
                 continue
             self._t += 1.0
             frame: Frame = []
@@ -160,6 +180,10 @@ class SerialDetectionFeed:
             yield frame
 
     def close(self) -> None:
+        try:
+            self._ser.write(self._STOP_CMD)
+        except Exception:  # noqa: BLE001
+            pass
         try:
             self._ser.close()
         except Exception:  # noqa: BLE001

@@ -703,8 +703,11 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       (labels set out-of-band via `VISION_LABELS`). `SerialDetectionFeed` parses
       it; `Detection.from_center_px()` normalises. Link is **USB** (module USB-C
       → Pi USB data port, `/dev/ttyACM0`), not the Grove connector — that's I²C
-      (`0x62`), not UART. Verify centre-vs-corner and
-      the pixel frame size on a live module.
+      (`0x62`), not UART. **Verified on real hardware 2026-09-05**: box `(x,y)`
+      IS the centre (`from_center_px` correct as-is), input size IS 240 px
+      (`resolution` field says so). `feed.py` fixed to send `AT+INVOKE=-1,0,1`
+      on open (module doesn't self-stream) and `AT+BREAK` on close; only
+      `type==1` messages carry results.
 - [ ] Train a custom SenseCraft detection model (cables, small objects, table
       edges); record its label list + input size and the deploy workflow.
 - [ ] **Cliff/edge avoidance — `CliffGuard`, designed 2026-09-04, HIGHEST

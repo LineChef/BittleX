@@ -160,15 +160,24 @@ even just a computer for the model workflow) — none of it waits on the body.
    unplugged). Same SSCMA AT/JSON protocol, `VISION_SERIAL_BAUD` 921600 (the
    SenseCraft-over-USB rate; confirm against live output). The I²C/GPIO route
    stays available later if the robot needs that USB port back.
-4. `python -m pi_pipeline.vision serial <port>` — this is the moment
-   `SerialDetectionFeed` sees a real detection stream for the first time
-   (it's only ever run against `MockDetectionFeed`). Confirm the JSON `INVOKE`
-   shape matches: `{"name":"INVOKE","data":{"boxes":[[x,y,w,h,score,id]]}}`.
-5. **Resolve the two open format questions** (noted since the research phase,
-   never checked against real hardware): is the box `(x,y)` centre or top-left,
-   and what's the actual model input pixel size? Set `VISION_FRAME_PX` /
-   `VISION_LABELS` in `.env` once confirmed. Fix `Detection.from_center_px()` if
-   it's corner, not centre.
+4. [x] **Done 2026-09-05, from the Mac** (camera USB-C → Mac, `/dev/cu.usbmodem*`
+   — same test, no Pi needed yet). `SerialDetectionFeed` saw a real stream for
+   the first time. Found + fixed a bug: the module doesn't stream on its own,
+   the feed has to send `AT+INVOKE=-1,0,1` (loop, results-only, no JPEG) on
+   open and `AT+BREAK` on close — `feed.py` now does this. Confirmed shape:
+   `{"type":1,"name":"INVOKE","code":0,"data":{"count":N,"perf":[7,50,0],`
+   `"resolution":[240,240],"boxes":[[x,y,w,h,score,id]]}}`; only `type==1`
+   carries results. `python -m pi_pipeline.vision serial <port>` runs
+   end-to-end (frames → `Avoider`). ~12–16 fps, ~50 ms inference.
+5. [x] **Both open format questions resolved 2026-09-05:**
+   - Box `(x, y)` is the **centre**, not top-left — verified by overlaying the
+     box on the module's own JPEG frame (the centre interpretation lands on the
+     object, corner is offset). `Detection.from_center_px()` was already
+     correct — no change.
+   - Model input size is **240 px** — the `resolution` field in every message
+     reports `[240, 240]`. `VISION_FRAME_PX` default of 240 is right.
+   - Still TODO: set `VISION_LABELS` in `.env` once a model with known classes
+     is deployed (the stock model here is a face detector — one class, id 1).
 6. **Calibrate the two hardware-first-guess configs** against measured
    distances/heights (put a known object at a known distance, read the box):
    - `AvoiderConfig` thresholds (`pi_pipeline/vision/avoidance.py`) vs. the
