@@ -268,11 +268,19 @@ Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
 model" bullet). The per-individual classes are the only new piece; everything
 downstream reuses the personality / behavior / memory layers already built.
 
-### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY once the camera lands  ⚪
+### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
 G2 spends most of its time on the user's desk. It needs to explore and look
 around up there (curiosity, [B7]-style wandering) but must **never** walk off
 the edge — ranked above general exploring, since it's the precondition for
 ever letting explore mode run near one.
+
+**Deferred by the user 2026-09-05 until the camera is physically mounted on
+the Bittle frame.** The floor-vs-edge classifier has to be trained on frames
+from the real mounted POV (camera height ~9 cm, angled down, its actual FOV/
+distortion, walking motion blur) — hand-held photos won't transfer, and a
+classifier that's confident but wrong near a real edge is worse than none.
+So: no data collection, no training, no `CliffGuard` build until the camera
+is on G2. Still the #1 job the moment it is.
 
 **Not trainable into the gait.** Confirmed architectural fact, not a design
 choice: the walk policy has no forward perception, and the real Bittle has no

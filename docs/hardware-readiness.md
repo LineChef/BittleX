@@ -215,19 +215,22 @@ Everything across the docs that was blocked on "needs the camera," in the order
 it becomes reachable:
 
 **Reachable with just the camera (start tomorrow, per the checklist above)**
-- Verify the live detection format + fix `Detection.from_center_px()` if needed
-  (`pi_pipeline/vision/feed.py`, `vision/README.md` "Still to do")
+- [x] Verify the live detection format — done 2026-09-05 (centre coords, 240 px;
+  `feed.py` auto-starts inference now). See the checklist above.
 - Calibrate `AvoiderConfig` (`vision/avoidance.py`) against real detections
 - Calibrate `TerrainFeatureConfig` (`vision/terrain_feature.py`) — the walk
   policy's forward-terrain-signal constants
 - Train + deploy the first custom SenseCraft model
-- **B16 — `CliffGuard` desk-edge classifier — HIGHEST PRIORITY.** Photograph the
-  real desk + its edges (multiple lighting conditions, tricky cases: an object
-  near the edge, glare, shadows) and train the floor-vs-edge classifier before
-  anything else. A miss here is a fall; do this ahead of B15.
 - **B15 — recognize household members**: start photographing + labelling now;
   the bond/disposition layer in `pi_pipeline/personality/` is already built and
   waiting for real detections
+
+**B16 — `CliffGuard` desk-edge classifier — DEFERRED by the user 2026-09-05
+until the camera is mounted on the Bittle frame.** Still #1 priority the moment
+it is, but the classifier must be trained on frames from the real mounted POV
+(height, down-angle, FOV, walking blur) — hand-held photos won't transfer and a
+confidently-wrong classifier near an edge is worse than none. No data
+collection / training / build until the camera's on G2.
 
 **Needs the camera mounted ON G2 (body required too)**
 - Wire `Avoider` decisions to the actuator (currently logic-only, tested against
