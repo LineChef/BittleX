@@ -533,8 +533,11 @@ through it. Command reference and a hardware bring-up checklist are in
       serial parser.
 - [ ] Hardware bring-up: `check_serial ports` → set `G2_SERIAL_PORT`; enable
       Serial-2 on the BiBoard; `check_serial ping` / `skills` to confirm.
-- [ ] Test the vision module's on-device detection via the SenseCraft AI Model
-      Assistant web debug GUI.
+- [x] Test the vision module's on-device detection via the SenseCraft AI Model
+      Assistant web debug GUI. **Done 2026-09-05** — stock classification model
+      deployed, live feed + labels confirmed. Next: camera→Pi over **USB**
+      (`/dev/ttyACM0`), not the Grove/GPIO pins — see `docs/hardware-readiness.md`
+      "Day-1-with-the-camera checklist" step 3.
 
 ## Phase 6 — RL sim-to-real deployment
 
@@ -698,7 +701,9 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       921600 baud, `{"name":"INVOKE","data":{"boxes":[[x,y,w,h,score,target_id]]}}`
       — box centre + size in model-input pixels, score 0–100, numeric class id
       (labels set out-of-band via `VISION_LABELS`). `SerialDetectionFeed` parses
-      it; `Detection.from_center_px()` normalises. Verify centre-vs-corner and
+      it; `Detection.from_center_px()` normalises. Link is **USB** (module USB-C
+      → Pi USB data port, `/dev/ttyACM0`), not the Grove connector — that's I²C
+      (`0x62`), not UART. Verify centre-vs-corner and
       the pixel frame size on a live module.
 - [ ] Train a custom SenseCraft detection model (cables, small objects, table
       edges); record its label list + input size and the deploy workflow.

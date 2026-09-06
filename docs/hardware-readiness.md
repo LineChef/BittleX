@@ -136,10 +136,12 @@ even just a computer for the model workflow) — none of it waits on the body.
 
 **Power-on & the stock demo (no Pi needed)**
 
-1. USB-C to a computer. Seeed ships a pretrained demo model (typically person
-   detection) — confirm it boots and the SenseCraft AI web tool
-   (Seeed's browser-based flasher/monitor) shows live detections. This alone
-   validates the module works before wiring anything.
+1. [x] **Done 2026-09-05.** USB-C to a Mac, SenseCraft AI (Chrome) → "deploy a
+   pretrained model". The quick-deploy landed a **classification** model (flashed
+   fine, ~30–60 s), live feed works, whole-frame label + confidence streams
+   (e.g. "rock 78", jittering frame to frame — normal). Module confirmed
+   healthy: camera + on-chip inference + labeled output over the USB serial
+   bridge (CH343, VID 1a86 / PID 55d3). Person/face/custom models come later.
 2. Familiarise with **SenseCraft AI**: the model-deploy workflow, and the "DIY"
    COCO-subset picker vs. a fully custom model (Colab → YOLOv8n → quantise →
    Vela-optimise → deploy) — `docs/project-plan.md` Phase 8 has the reference
@@ -147,9 +149,17 @@ even just a computer for the model workflow) — none of it waits on the body.
 
 **Wire it to the Pi — first real test of `pi_pipeline/vision/`**
 
-3. Connect the module's UART to the Pi (Grove 4-pin → jumper wires to Pi UART —
-   confirm the exact pinout against the current Seeed wiki page; not yet
-   verified against our hardware). 921600 baud.
+3. **Connect over USB, not the GPIO pins** (decided 2026-09-05 after checking
+   the Seeed wiki): the Grove 4-pin connector on the Vision AI V2 is **I²C**
+   (addr `0x62`, 400 kHz, 3.3 V) — *not* UART. UART is a secondary interface on
+   separate header pads at 115200 baud. The simplest host link is the same one
+   SenseCraft already uses: **module USB-C → the Pi's USB *data* port** (Pi
+   Zero 2 W: the *inner* micro-USB; the outer is power-only). Needs a USB-C ↔
+   micro-USB cable, or USB-C→USB-A + a micro-USB OTG adapter. It enumerates as
+   `/dev/ttyACM0` (check `ls /dev/ttyACM* /dev/ttyUSB*` with it plugged/
+   unplugged). Same SSCMA AT/JSON protocol, `VISION_SERIAL_BAUD` 921600 (the
+   SenseCraft-over-USB rate; confirm against live output). The I²C/GPIO route
+   stays available later if the robot needs that USB port back.
 4. `python -m pi_pipeline.vision serial <port>` — this is the moment
    `SerialDetectionFeed` sees a real detection stream for the first time
    (it's only ever run against `MockDetectionFeed`). Confirm the JSON `INVOKE`
@@ -178,8 +188,15 @@ even just a computer for the model workflow) — none of it waits on the body.
    module, and re-run step 4 to confirm it detects the new classes.
 
 None of this needs the Bittle body, the BiBoard, or the calibration stand — it's
-all camera + USB/UART + the Pi (or a laptop). It fully unblocks the "queued /
+all camera + USB + the Pi (or a laptop). It fully unblocks the "queued /
 camera-gated" list below except the items that also need a moving robot.
+
+**Working setup note (2026-09-05):** SenseCraft AI needs Chrome/Edge + WebSerial
+and can't run through browser automation (the serial-port grant is a native
+dialog), so the SenseCraft steps are hands-on at the machine with the camera.
+The Pi is flashed and reachable by SSH, but **not from the dev Mac** — Pi-side
+steps (3–8) run from the other computer, or on the Pi directly. Keep the repo in
+sync on the Pi (`git pull`).
 
 ---
 
