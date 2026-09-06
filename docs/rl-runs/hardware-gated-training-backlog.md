@@ -220,6 +220,29 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
   needed. Evidence: diag per-session thermal summaries + black-box
   `guard_state`/`hottest_frac` from real hard sessions.
 
+## H12 — Training-course redesign  🟡  ⚪
+
+The redesigned rubble-primary / wider-slope course was tested head-to-head as a
+fresh 20M (`run20m_newcourse`, 2026-09-05). **Negative result** — equivalent on
+the core payload-on ladder, but large clean regressions on bare-robot, ledges/
+steps, carpet, rough ground, and OOD slopes (decathlon report + artifact
+"New-Course Gait Decathlon"). Root cause read: the old course's sharp-edged
+`GEOM_BOX` scatter taught an incidental edge/trip-catch robustness that
+generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
+0.80) removed it by subtraction.
+
+- **Keep from the new course:** the heightfield slope-geometry bug fix
+  (`01cf87e`), the wider slope range, the richer rubble variety. Parked as the
+  `run20m_newcourse` env diff.
+- **The redesign hypothesis, untested:** old-course sharp obstacles back in +
+  `RUBBLE_PROB` down + ledge/step and bare-robot episodes as an *explicit*
+  curriculum (not incidental). Could beat the old course; unproven.
+- **Trigger:** a green-lit ~20M run is happening anyway (post-hardware, per the
+  [[project_longrun_trigger]] checklist). Fold the redesign into that run's
+  final env — don't spend a standalone 20M just to test the course.
+- **User intent (2026-09-05):** wants to revisit building a better course
+  eventually; tabled while gait training is paused pre-hardware.
+
 ---
 
 ## Do-now sim tasks (not hardware-gated)
