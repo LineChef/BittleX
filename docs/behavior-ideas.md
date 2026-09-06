@@ -265,8 +265,24 @@ the robot. A 192×192 detector recognising one specific person is coarse
 voice interaction confirm.
 
 Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
-model" bullet). The per-individual classes are the only new piece; everything
-downstream reuses the personality / behavior / memory layers already built.
+model" bullet). The per-individual classes are the only new piece; downstream
+reuses the personality / behavior / memory layers (the `Bonds` layer is now
+built — `personality/bonds.py`; the "feels alive" motion layer still isn't).
+
+**Practice run 2026-09-06 (~1 AM):** ran the full SenseCraft loop end to end —
+Image Object Detection → Image Collection Training → import 40 frames → label →
+train (Grove Vision AI V2) → deploy. **Model was a dud: 0 detections / 1403
+frames.** Cause = the dataset, not the flow: ~37 frames, very dark (some
+near-black), one background, one lighting, one distance, sensor-rotated, nano
+YOLO from scratch. The toolchain works; the data was below the floor.
+**Next attempt (daylight):** camera propped up (hand out of frame), fixed
+orientation, 80-120+ images per person, genuinely varied lighting (window /
+lamp / overhead) + 3-4 spots + distance 1.5-6 ft + head turns + ~15 negatives.
+Then compare training paths: (a) fresh SenseCraft, (b) fine-tune from a
+person-aware Swift-YOLO checkpoint (SSCMA/Colab), (c) multi-class `person` +
+`self` SenseCraft project. Module currently holds the dud model — redeploy
+"Person Detection" from the library to get real detections back.
+Measured detector behaviour + firmware facts: `docs/research/vision-detector-bench.md`.
 
 ### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
 G2 spends most of its time on the user's desk. It needs to explore and look
