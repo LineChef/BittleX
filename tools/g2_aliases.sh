@@ -89,7 +89,7 @@ g2combine() {
       mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
       for f in "$s"/pos_*.jpg; do [ -e "$f" ] || continue; k=$((k+1)); cp "$f" "$ui/$(printf '%s_%03d.jpg' "$name" $k)"; done
     done
-    echo "$k images" > "$ui/.count" )
+  )
   echo "upload (Roboflow/Colab, per-session + .txt) -> $u"
   echo "upload_images ($(ls "$ui"/*.jpg 2>/dev/null|wc -l|tr -d ' ') JPEGs only, for the SenseCraft browser) -> $ui"
 }
