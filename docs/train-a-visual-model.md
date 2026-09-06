@@ -160,9 +160,31 @@ per-session subdirs the importer can walk.)
 5. **Step 4** — target device **Grove Vision AI V2** → **Start Training**
    (~10–30 min, cloud).
 
-**Multi-class model** (`person` + `alex` + household + pets): add each person as
-its own class in the same project, and include a batch of generic-person images
-for the `person` class — see `research/person-recognition.md`.
+### Multi-class -- training ON TOP OF person detection
+
+To get one model that does person detection AND recognises individuals
+(`person` + `alex` + household + pets), instead of a single-class model that
+replaces it:
+
+1. **Try "Retrain" on the library person model first.** Model Library ->
+   "Person Detection--Swift YOLO" -> look for **Retrain / Train your own /
+   Clone to project / Edit dataset**. If present, it opens that model's dataset
+   (thousands of person images) in Training -- add a class `alex`, import your
+   `alex/upload/`, assign the boxes to `alex`, train. That's literally on top of
+   it: keeps the big `person` class, adds yours.
+2. **No retrain option -> a 2-class project.** Training -> a project / multi-class
+   object-detection flow (NOT the single-object "Image Collection Training").
+   Classes `person` + `alex`. Import `alex/upload/` as `alex`; add a few hundred
+   varied generic-person images (Roboflow Universe "person detection" dataset, or
+   the COCO `person` subset) as `person` so it still detects strangers. Train.
+3. **Class ids:** curate writes class `0`. For `[person=0, alex=1]` re-run
+   `curate_captures.py <session> --class-id 1 ...`, or just pick the class in
+   SenseCraft's labeller (box already drawn).
+4. **`.env`:** `VISION_LABELS=person,alex` (class-id order) +
+   `G2_BONDS=alex:1.0:affectionate`.
+
+This is the "interaction model" in `research/detection-layer.md` -- add each
+household member / pet as another class in the same project over time.
 
 ---
 
