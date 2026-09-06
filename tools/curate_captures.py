@@ -400,7 +400,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("in_dir", nargs="?", help="folder of raw *.jpg (+ optional *.json sidecars)")
-    ap.add_argument("out_dir", nargs="?", help="curated output folder")
+    ap.add_argument("out_dir", nargs="?",
+                    help="curated output folder (default: <in_dir>/curated -- kept alongside the raw capture)")
     ap.add_argument("--positives", type=int, default=80)
     ap.add_argument("--negatives", type=int, default=12)
     ap.add_argument("--rotate", type=int, default=270, choices=(0, 90, 180, 270),
@@ -421,8 +422,10 @@ def main() -> None:
     if a.selftest:
         _selftest()
         return
-    if not a.in_dir or not a.out_dir:
-        ap.error("in_dir and out_dir required (or --selftest)")
+    if not a.in_dir:
+        ap.error("in_dir required (or --selftest)")
+    if not a.out_dir:
+        a.out_dir = os.path.join(a.in_dir, "curated")   # keep it next to the raw capture
     c = Config(positives=a.positives, negatives=a.negatives, rotate=a.rotate,
                min_brightness=a.min_brightness, max_brightness=a.max_brightness,
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,

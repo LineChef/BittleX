@@ -81,7 +81,7 @@ Full detail: `research/capture-session-checklist.md`. Short form:
    export G2_CAP_OUT=~/Desktop/g2_face_capture/alex/session_1
    export G2_CAP_LABEL=alex G2_CAM_RES=1
    mkdir -p "$G2_CAP_OUT"; rm -f "$G2_CAP_OUT"/*.jpg "$G2_CAP_OUT"/*.json
-   python /path/to/scratchpad/face_preview.py &
+   python tools/camera_preview.py &
    open http://localhost:8080
    ```
    It sets the sensor to 480 + an auto-exposure lift, streams the feed with the
@@ -94,7 +94,7 @@ Full detail: `research/capture-session-checklist.md`. Short form:
    - **occlusion:** hand near face, push hair back
    - **second spot / light:** repeat close + mid
    - Aim for **~90–120 saved**, then ~12 s **negatives** (step out of frame).
-5. Stop the preview: `pkill -f face_preview.py`.
+5. Stop the preview: `pkill -f camera_preview.py`.
 
 **3 sessions per person**, different rooms / lighting / clothes (session 1 can be
 one look, e.g. hair up; 2–3 the normal look).
@@ -203,7 +203,7 @@ unrecognised person defaulted to `curious`.
 | "Resource busy" opening the serial port | SenseCraft/Chrome tab still holds WebSerial — **close the tab** (or unplug/replug USB). |
 | Few pre-labels (`raw pos` low in curate) | Feed is sideways → Person Detection misses you. **Rotate the camera 90°** (step 2). Also: far / backlit / heavy-occlusion poses just won't get a person box — hand-label those. |
 | Curated images upside-down / sideways | Wrong `--rotate` — try 90 / 180 / 270; the contact sheet shows it. |
-| Dark / grainy frames | `G2_CAM_RES=1` + the AE lift are on by default in `face_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses. |
+| Dark / grainy frames | `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses. |
 | Only a handful of positives after curate | De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames. |
 | Trained model detects nothing | Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain. |
 | Model confuses two people | Coarse at 192 px — more data per person, or move to face-embedding recognition (`research/person-recognition.md` "upgrade path"). |

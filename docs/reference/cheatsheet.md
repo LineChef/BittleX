@@ -139,6 +139,29 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python reference_gait/verify_wkf_reference.py` | Score sign/mirroring variants by open-loop forward walk |
 | `python reference_gait/verify_wkf_reference.py identity --render` | Render the open-loop reference playback to a GIF |
 
+
+## Companion pipeline & camera (`pi_pipeline/`)
+
+Helpers in `tools/g2_aliases.sh` -- add `source .../tools/g2_aliases.sh` to
+`~/.zshrc`. `g2help` lists them; `docs/SOLO.md` is the solo-operation guide;
+`docs/train-a-visual-model.md` is the full camera-model walkthrough.
+
+| Command | Does |
+|---|---|
+| `g2` / `g2rl` | cd + activate the pipeline venv / the RL venv |
+| `g2test` | run the pi_pipeline test suite |
+| `g2cam <name> [session]` | start the live capture preview at localhost:8080, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
+| `g2cam-stop` / `g2cam-info` | stop the preview / print serial port + loaded model |
+| `g2curate <name> [session]` | filter a raw capture -> `<session>/curated/` (scores, de-dups, rotates upright, YOLO pre-labels); prints the usable count |
+| `g2combine <name>` | gather every session's curated set into `<name>/upload/` |
+| `g2vision [labels]` | run the detection pipeline over serial, print live detections |
+| `g2chat` / `g2voice` | text / full-voice conversation loop |
+| `g2mem [facts\|log N\|search q\|wipe --yes]` | inspect / edit G2's memory |
+| `g2feat [--profiles]` | resolve `G2_FEATURES` / list bring-up stages |
+| `g2traits` / `g2diag` / `g2serial` / `g2power` | personality · diagnostics · BiBoard link · Pi power |
+| `python tools/curate_captures.py --help` | all curate flags |
+| `python tools/camera_preview.py --info` | port + loaded model, no server |
+
 ## Git landmarks
 
 | Command | Does |
