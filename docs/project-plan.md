@@ -708,8 +708,20 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       (`resolution` field says so). `feed.py` fixed to send `AT+INVOKE=-1,0,1`
       on open (module doesn't self-stream) and `AT+BREAK` on close; only
       `type==1` messages carry results.
+- [x] **First custom model trained + deployed + pipeline-validated (2026-09-06):**
+      a single-class face detector (B15, one household member). SenseCraft "Image
+      Collection Training" → Grove Vision AI V2. 161 daylight positive frames + 12
+      empty-room negatives (added with **no box** — that's how the flow learns the
+      negative class). Positives-only first cut over-fired confidently on a bare
+      wall; the negatives killed it. Runs through `g2vision` (`SerialDetectionFeed`
+      → `scene` → `Avoider`), acquires/drops the subject instantly, scores ~60–80.
+      Wired into `.env` (`VISION_LABELS` / `VISION_MIN_SCORE=45`). Full workflow:
+      `docs/train-a-visual-model.md`.
 - [ ] Train a custom SenseCraft detection model (cables, small objects, table
       edges); record its label list + input size and the deploy workflow.
+- [ ] Multi-class `person` + face model — SenseCraft browser is single-class
+      only; needs Roboflow + SSCMA Colab (`swift_yolo`, export
+      `*_int8_vela.tflite`). Parked; see `docs/train-a-visual-model.md`.
 - [ ] **Cliff/edge avoidance — `CliffGuard`, designed 2026-09-04, HIGHEST
       PRIORITY once the camera lands** (G2 lives on the user's desk; must never
       walk off it). Full design: `docs/behavior-ideas.md` **B16**. Confirmed not
