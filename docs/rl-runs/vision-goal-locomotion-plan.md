@@ -1,10 +1,11 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
-**Status:** STREAMLINED + running autonomously (2026-09-06 night). User authorised
-Claude to run all phases nonstop, decide gates by the rules below, launch the
-Phase B 20M only on a clean checklist (hold + recommend if marginal), and
-document outcomes. Phases 2+3 collapsed into **Phase A**; extended runs dropped;
-smokes cut to 2M / 1 seed (2nd seed only if near threshold).
+**Status:** ⛔ **STOPPED 2026-09-07 02:09** — Phase A failed its gate twice
+(smoke + the one budgeted retune). Goal-directed turning was not achieved;
+`RESIDUAL_MODE` on a forward-only reference gait looks architecturally unable to
+produce a turn. Phase B / the 20M did NOT run. See **Conclusion & recommendation**
+below. Autonomous run per user authorisation 2026-09-06; `run20m_ppo` untouched
+and still the frozen base.
 
 ## Gate decision rules (locked 2026-09-06 — Claude decides against these)
 
@@ -84,6 +85,70 @@ old capability (Wilson CIs) AND adds goal/avoidance; else keep `run20m_ppo`.
   finetune `--finetune-lr 1e-4 --finetune-target-kl 0.15`, 3M steps, from
   `run20m_graft285`. If this also fails the gate → STOP, Phase B does not run,
   write the recommendation.
+
+- **2026-09-07 02:09** — **Phase A retune (`phaseA_s2`): FAIL. Campaign STOPPED
+  (retune budget exhausted). Phase B / the 20M did NOT run.**
+  `benchmark_goal`: goal-reach still **0% at every bearing**; no-goal heading
+  drift **37.3°** (worse than s1's 34.7°); `ep_rew_mean` 15214 → 8792 (−42%).
+  Adding `G2E_TRAIN_YAW=0.4` + narrower goal cone + rebalanced goal rewards +
+  a less-gentle finetune produced **no goal-directed turning whatsoever** — the
+  policy still just walks straight (dead-ahead goal: closes 1.5→0.83 m by
+  walking forward; side/behind goals: ends farther away).
+
+## Conclusion & recommendation (2026-09-07)
+
+**The streamlined plan's core bet — "graft `run20m_ppo` + finetune teaches
+goal-directed turning" — is disproven.** Two finetunes (gentle 2M; less-gentle
+3M with a yaw curriculum), zero turning both times, heading control *degraded*
+both times.
+
+**Why (best read):** `RESIDUAL_MODE = True` with `RESIDUAL_SCALE_DEG = 22` and
+`FAC_IMITATION = 16`. The policy outputs a bounded ±22° correction on the
+scripted **`wkF` forward-walk** keyframes, anchored to them by a strong
+imitation reward. A turn is a sustained *asymmetric* gait (the firmware turns
+with entirely different keyframe tables, `kbk`, not by perturbing `wkF`). A
+±22° residual on a symmetric forward reference almost certainly **cannot express
+a turning gait**, so no reward or curriculum at this layer will produce one.
+This matches the historical note that turning "trained to zero effect in phase 2
+and fought heading-hold" — same symptom, now with a mechanism. A gentle finetune
+from a 20M-converged policy also can't add a limb-coordination pattern it never
+had; both runs just added heading noise.
+
+The **vision obstacle-response** side is separable and roughly neutral: package
+v2 (`FAC_OBS_STOP=0`, `FAC_OBS_BUMP` halved, 18 mm ledges) on `phaseA_s2` gave
+peak contact 2.7 N / clip 0.69 vs base 2.6 N / 0.66 — not harmful, not buying
+much either. 0 falls throughout. The terrain feature + a light bump penalty are
+safe to carry into a future run but don't justify one alone.
+
+**Recommendation, in order:**
+
+1. **Ship what works now (low risk):** keep `run20m_ppo` for straight-line
+   locomotion; do heading changes with the **firmware's scripted turn gaits**
+   (`kbk` etc.), switched by a higher layer. Use the RL policy for forward walk
+   + vision-driven *slow-down* near obstacles (not detour). This is a real,
+   shippable capability and matches the original project stance ("real turns go
+   to firmware"). No 20M needed.
+
+2. **If a proper learned turning gait is wanted — it's a fresh run, not a
+   finetune, and needs an architecture change first:**
+   - **2a (preferred):** add turn-gait references (`wkL`/`wkR` from
+     OpenCatEsp32, or build them) and make `RESIDUAL_MODE` blend
+     `wkF`→`wkL`/`wkR` by the yaw command, policy residual on top. Then a
+     **fresh ~15–20M** run with the yaw + goal curriculum from step 0. Keeps
+     the residual's transfer robustness. ~1 build session + one 20M.
+   - **2b:** drop `RESIDUAL_MODE` for the goal-directed policy, learn the gait
+     from scratch with yaw + goal curriculum, ~20M. Cleanest, but loses the
+     residual robustness and re-opens sim-to-real risk.
+   Either is gated on the [[project_longrun_trigger]] checklist and should wait
+   until hardware validates the forward gait.
+
+3. **Defer entirely** until hardware, when real servo turn authority is known —
+   a learned turning gait tuned in sim may not transfer.
+
+**Not carried forward:** Phase B, the 20M, `phaseA_s1/s2` checkpoints (throwaway).
+**Kept:** `run20m_graft282` / `run20m_graft285` (grafts, reusable), the
+`G2E_GOAL_MODE` / `G2E_TRAIN_YAW` / goal-reward / `benchmark_goal.py`
+infrastructure (all committed, dormant by default, ready for a proper run).
 
 ### Phase A course config (`phaseA_s1`)
 `TERRAIN_FEATURE=1 GOAL_MODE=1 OBSTACLE_REWARD=1 EPISODE_LENGTH=1200`
