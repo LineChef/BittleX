@@ -1,5 +1,10 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
+> **Queued next (post-Phase-D):** adapter skill probe — test "freeze the base,
+> train only a small adapter" vs the full-finetune recipe that failed in A/C.
+> Full spec + resume checklist: `docs/rl-runs/adapter-skill-probe-spec.md`
+> (branch `adapter-skill-probe`, specced not built).
+
 ---
 ## START HERE (fresh-session handoff, 2026-09-07 ~12:30 PM ET)
 
