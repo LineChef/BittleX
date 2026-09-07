@@ -1,11 +1,12 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
-**Status:** ⛔ **STOPPED 2026-09-07 02:09** — Phase A failed its gate twice
-(smoke + the one budgeted retune). Goal-directed turning was not achieved;
-`RESIDUAL_MODE` on a forward-only reference gait looks architecturally unable to
-produce a turn. Phase B / the 20M did NOT run. See **Conclusion & recommendation**
-below. Autonomous run per user authorisation 2026-09-06; `run20m_ppo` untouched
-and still the frozen base.
+**Status:** ⛔ **STOPPED 2026-09-07 10:02 (Phase C).** Three campaigns
+(A / A-retune / C), zero turning each. **Diagnosis complete:** the scripted
+OpenCat turn gaits (`wkL`/`wkR`) do not turn the robot in this sim/URDF, even
+open-loop — so no RL at the residual layer can learn a turn. It's a sim-physics
+limit, not a reward/architecture problem. Recommendation: **turning goes to
+firmware** (see the updated recommendation in **Phase C RESULT** below).
+`run20m_ppo` untouched throughout, still the frozen base. No 20M ever ran.
 
 ## Gate decision rules (locked 2026-09-06 — Claude decides against these)
 
@@ -131,6 +132,59 @@ pull, `FAC_IMITATION` 7->4) / **STOP**. All steps run detached; progress to
 **Gate rule (locked):** GO_20M iff reach >=60% at 0/45/90deg, >=40% at
 135/180deg, no-goal drift <15deg, cruise fall <=8%, reward not collapsed
 (final >= 55% of peak). STOP iff reach <30% at 0deg. Else RETUNE (once).
+
+### Phase C RESULT (2026-09-07 10:02): STOPPED at the smoke gate.
+`phaseC_s1` (finetune from `run20m_graft289`, full stack): goal-reach **0% at
+every bearing**, no-goal heading drift **46.2°** (worse than A: 34.7 -> 37.3 ->
+46.2), `ep_rew_mean` 9953 -> 2750 (-72%). No 20M.
+
+**Root cause found (the diagnostic that should have run first).** Open-loop, pure
+scripted (`action = 0`, `TURN_BLEND` on):
+
+| command | heading change over 250 steps | fwd |
+|---|---|---|
+| `wkF` (straight) | −0.4° | +0.30 m |
+| `wkL` (full left) | **−0.3°** | +0.17 m |
+| `wkR` (full right) | **+0.3°** | +0.17 m |
+
+**The scripted OpenCat turn gaits do not turn the robot in this sim/URDF.** They
+just slow the forward walk. So all three campaigns failed for the same reason —
+there is no motor pattern available (scripted or blended) that produces a turn,
+so no reward/curriculum/architecture at the residual layer can learn one.
+A *strong hand-built* asymmetry (one side's stride reversed) does yaw the sim
+robot ~12°/episode — but forward progress collapses to ~0 (spin-in-place, not
+walk-and-turn). Likely cause: real Bittle turning leans on foot-slip + the
+firmware gyro turn-assist, which PyBullet's contact model + this URDF don't
+reproduce.
+
+**Recommendation (updated — turning is not a reward problem, it's a sim-physics
+one):**
+
+1. **Turning goes to firmware, permanently** *(recommended, low risk)*. On
+   hardware the scripted `kbk`/`wkL` turn the real robot fine. RL policy =
+   straight-line walk + vision-driven slow/brace/step-over + cliff-edge slowing.
+   A behavior-layer layer calls firmware turn gaits for heading changes, feeding
+   the goal bearing. "Detour + return" becomes: RL walks & slows, behavior layer
+   steers via firmware. Matches the original project stance.
+2. **From-scratch residual-OFF ~20M** — the policy would have to *discover* the
+   progress-killing asymmetry that the sim can yaw with, then balance it against
+   forward motion. High cost, high risk (residual-off lost transfer robustness
+   before), and if sim turning is unphysical it may not transfer to hardware.
+3. **Separate learned turn-in-place sub-skill** — train a small policy for the
+   ~12°/episode stationary spin, behavior layer invokes it then hands back to
+   the walk policy. Modular, lower risk than (2), but stop-and-turn not smooth.
+
+**Open sub-decision (smaller, after the turning fork):** the vision features that
+DON'T need turning — terrain slow/step-over, cliff-edge slowing — are built and
+verified. They could go into a narrower fresh 20M (no turn blend, no goal
+command) OR stay as behavior-layer slowdown on `run20m_ppo`. The 3× finetune
+failures argue against a finetune; a from-scratch run for *just* those may not
+be worth an 8-hour run given how modest the effect measured (~neutral in Phase 0).
+
+**Kept (committed, dormant):** `run20m_graft282/285/289`, `TURN_BLEND` +
+`wkl_ref`/`wkr_ref`, `GOAL_MODE` (+ polarity), `CLIFF` feature, `G2E_TRAIN_YAW`,
+`benchmark_goal.py`, `gate_check.py`, `run_vision_goal_campaign.sh`. Thrown away:
+`phaseA_s1/s2`, `phaseC_s1`. `run20m_ppo` untouched.
 
 ### >>> RESUME HERE if a session died mid-campaign <<<
 1. `tail -40 rl_training/opencat-gym/trained/campaign_results.log` -- shows the

@@ -1,0 +1,13 @@
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/phaseC_s1_ppo   (12 ep/cell, goal dist 1.5 m)
+ bearing   reach   steps  final_m path_eff   fell
+      0d     0.0    None    0.953     None    0.0
+     45d     0.0    None    1.334     None    0.0
+     90d     0.0    None    1.789     None    0.0
+    135d     0.0    None    1.858     None    0.0
+    180d     0.0    None    2.071     None    0.0
+
+  no-goal cruise:  heading drift 46.2 deg   fwd 0.08 m/s   fell 0.0
+
+wrote trained/phaseC_s1_goal.json
