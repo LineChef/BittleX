@@ -440,6 +440,18 @@ GOAL_DIST_MIN      = _g2e("GOAL_DIST_MIN", 0.5)      # m; spawn floor
 GOAL_BEARING_MAX   = _g2e("GOAL_BEARING_MAX", np.pi) # rad; cap |initial goal bearing| -- start narrow (e.g. 1.4) while turning is still being learned, widen later
 TURN_BLEND         = _g2e("TURN_BLEND", False)       # residual base blends wkF -> wkL/wkR by cmd_yaw (needs wkl_ref.npy / wkr_ref.npy); off => pure wkF, byte-identical
 GOAL_AVOID_FRAC    = _g2e("GOAL_AVOID_FRAC", 0.0)    # frac of goal episodes with polarity = -1 (flee / keep-away instead of approach)
+# --- Cliff / desk-edge feature (Phase B: never walk off the desk) -----------
+# CLIFF on => 3 floats appended (after goal): [edge_present, edge_dist_norm,
+# edge_bearing_norm] from a forward "is there floor ahead" ray fan. A fraction
+# of episodes (CLIFF_PROB) run on a finite platform so the robot meets an edge.
+# Falling off terminates with FAC_CLIFF_FALL. Off (default) => obs unchanged.
+CLIFF              = _g2e("CLIFF", False)
+CLIFF_PROB         = _g2e("CLIFF_PROB", 0.0)         # frac of episodes on a finite platform
+CLIFF_RANGE        = _g2e("CLIFF_RANGE", 0.5)        # m; edge-scan reach / normaliser
+CLIFF_PLATFORM_HW  = _g2e("CLIFF_PLATFORM_HW", 0.7)  # m; platform half-width (edge ~this far from spawn)
+FAC_CLIFF_FALL     = _g2e("FAC_CLIFF_FALL", 80.0)    # one-shot penalty for the CoM leaving the platform
+FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when an edge is RIGHT there (tight gate, small)
+CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
 GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
 GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)
@@ -522,7 +534,7 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0)
+        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0) + (3 if CLIFF else 0)
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
 
@@ -993,6 +1005,15 @@ class OpenCatGymEnv(gym.Env):
 
         # --- Goal-directed terms (GOAL_MODE; else all 0.0) ---
         r_goal_progress = r_goal_reached = obs_swerve_rew = 0.0
+        # --- Cliff: tight-gated slow reward + fall-off penalty (CLIFF) ---
+        r_cliff_slow = 0.0
+        cliff_fell_off = False
+        if CLIFF and getattr(self, "_cliff_this_ep", False):
+            _er = self._cliff_scan()
+            if _er[0] > 0.5 and _er[1] < CLIFF_SLOW_DIST:
+                r_cliff_slow = FAC_CLIFF_SLOW * float(np.exp(-(v_fwd / 0.05) ** 2))
+            if base_clearance < -0.25:
+                cliff_fell_off = True
         goal_reached_now = False
         if GOAL_MODE and _gv is not None:
             _gb, _gd = _gv
@@ -1024,6 +1045,8 @@ class OpenCatGymEnv(gym.Env):
                  + r_goal_progress
                  + r_goal_reached
                  + obs_swerve_rew
+                 + r_cliff_slow
+                 - (FAC_CLIFF_FALL if cliff_fell_off else 0.0)
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
@@ -1096,14 +1119,21 @@ class OpenCatGymEnv(gym.Env):
             "r_goal_progress": r_goal_progress,
             "r_goal_reached": r_goal_reached,
             "r_obs_swerve": obs_swerve_rew,
+            "r_cliff_slow": r_cliff_slow,
+            "r_cliff_fall": -(FAC_CLIFF_FALL if cliff_fell_off else 0.0),
             "goal_dist_m": (self._goal_vector()[1] if (GOAL_MODE and self._goal_vector()) else 0.0),
         }
 
         # Stop criteria of current learning episode:
-        # step budget, goal reached, or the robot fell (-> recovery window).
+        # step budget, goal reached, fell off the platform, or the robot fell.
         self.step_counter += 1
         recovery_reward = 0.0
-        if goal_reached_now:
+        if cliff_fell_off:
+            self.step_counter_session += self.step_counter
+            terminated = True
+            truncated = False
+            self._record_outcome(0)                  # walked off the edge = failure
+        elif goal_reached_now:
             self.step_counter_session += self.step_counter
             terminated = False
             truncated = True
@@ -1188,7 +1218,8 @@ class OpenCatGymEnv(gym.Env):
                 info[_k] = 0.0
 
         self.observation = np.hstack((self.state_robot, self.angle_history,
-                                      self._terrain_obs(), self._goal_obs()))
+                                      self._terrain_obs(), self._goal_obs(),
+                                      self._cliff_obs()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -1299,6 +1330,8 @@ class OpenCatGymEnv(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
         p.setGravity(0,0,-9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        # Cliff episode: finite platform, robot meets an edge (see the plane branch).
+        self._cliff_this_ep = bool(CLIFF and self._dr > 0 and np.random.rand() < CLIFF_PROB)
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
         if SLOPE_FIXED_RP is not None:
@@ -1410,6 +1443,14 @@ class OpenCatGymEnv(gym.Env):
             _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02], baseOrientation=_quat)
             p.changeDynamics(_seg_b, -1, contactStiffness=6e4, contactDamping=900,
                              restitution=0.0, lateralFriction=1.1)   # carpet-typical, same spirit as CARPET_SOFT
+        elif self._cliff_this_ep:
+            # finite platform, top at z=0, so the robot meets an edge ~CLIFF_
+            # PLATFORM_HW out in any direction from the central spawn.
+            _cs = p.createCollisionShape(p.GEOM_BOX,
+                    halfExtents=[CLIFF_PLATFORM_HW, CLIFF_PLATFORM_HW, 0.1])
+            plane_id = p.createMultiBody(0, _cs, basePosition=[0, 0, -0.1],
+                    baseOrientation=p.getQuaternionFromEuler(
+                        [self._slope_rp[0], self._slope_rp[1], 0]))
         else:
             plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
                                   p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
@@ -1599,7 +1640,8 @@ class OpenCatGymEnv(gym.Env):
         self.observation = np.concatenate((self.state_robot,
                                            self.angle_history,
                                            self._terrain_obs(),
-                                           self._goal_obs()))
+                                           self._goal_obs(),
+                                           self._cliff_obs()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -1685,6 +1727,37 @@ class OpenCatGymEnv(gym.Env):
             return base
         turn = WKL_REF if w > 0 else WKR_REF
         return base + abs(w) * (turn[phase_idx % len(turn)] - base)
+
+    def _cliff_scan(self):
+        """Forward 'is there floor ahead' fan. Cast rays just below the walking
+        surface (z=-0.03): on a finite platform they exit at the edge, giving the
+        distance to the drop; on continuous floor they hit nothing. Returns raw
+        [edge_present, edge_dist_norm, edge_bearing_norm]."""
+        base_pos, base_orn = p.getBasePositionAndOrientation(self.robot_id)
+        yaw = p.getEulerFromQuaternion(base_orn)[2]
+        fov = np.deg2rad(30.0)
+        bearings = np.linspace(-fov, fov, 7)
+        froms = [[base_pos[0], base_pos[1], -0.03]] * 7
+        tos = [[base_pos[0] + CLIFF_RANGE * np.cos(yaw + b),
+                base_pos[1] + CLIFF_RANGE * np.sin(yaw + b), -0.03] for b in bearings]
+        best = None
+        for k, hit in enumerate(p.rayTestBatch(froms, tos)):
+            if hit[0] < 0 or hit[0] == self.robot_id:
+                continue                              # floor continues past range
+            d = hit[2] * CLIFF_RANGE                  # exit point = the edge
+            if best is None or d < best[0]:
+                best = (d, bearings[k])
+        if best is None:
+            return np.zeros(3)
+        d, b = best
+        return np.array([1.0, float(np.clip(d / CLIFF_RANGE, 0.0, 1.0)),
+                         float(np.clip(b / fov, -1.0, 1.0))])
+
+    def _cliff_obs(self):
+        """[edge_present, edge_dist_norm, edge_bearing_norm]; empty when CLIFF off."""
+        if not CLIFF:
+            return np.zeros(0)
+        return self._cliff_scan()
 
     def _spawn_goal(self):
         """Pick this episode's goal: a point in the ground plane at a random
