@@ -95,7 +95,63 @@ old capability (Wilson CIs) AND adds goal/avoidance; else keep `run20m_ppo`.
   policy still just walks straight (dead-ahead goal: closes 1.5→0.83 m by
   walking forward; side/behind goals: ends farther away).
 
-## Conclusion & recommendation (2026-09-07)
+## Phase C — turn-blend + full vision stack (2026-09-07, autonomous, rate-limit-safe)
+
+After Phase A's finding (residual-on-`wkF` can't turn), the user approved:
+fold `wkL`/`wkR` scripted turn gaits into the residual base, bake **all**
+vision-derived gait inputs into ONE fresh run, and run it hands-off.
+
+**Built (2026-09-07 AM, committed `04fd747`/`6079b2d`):**
+- `wkL` parsed from `InstinctBittleESP.h` -> `wkl_ref.npy`; `wkr_ref.npy` = its
+  L/R mirror (`reference_gait/build_turn_references.py`). `TURN_BLEND` (`G2E`):
+  residual base = `wkF + |w|*(wkL_or_R - wkF)`, `w = cmd_yaw/CMD_YAW_MAX`.
+  Verified: `w=0` -> pure `wkF`; `w=+-max` -> 28-44 deg of turn-shaped deviation.
+- Goal feature gains a **polarity** dim `[bearing, dist, active, polarity]`
+  (+1 approach / -1 flee) -> `GOAL_AVOID_FRAC`. Reward + heading retarget flip
+  with polarity.
+- **Cliff feature** `[edge_present, edge_dist, edge_bearing]` (`G2E_CLIFF`):
+  finite platform on `CLIFF_PROB` episodes, forward floor-scan, `FAC_CLIFF_FALL`
+  penalty + terminate on CoM off-platform, tight (`< CLIFF_SLOW_DIST`) slow
+  reward. No general caution reward -> not timid.
+- obs 278 -> **289** with full config (4 terrain + 4 goal + 3 cliff); default
+  every flag off => byte-identical (verified obs 278, reward 8224.909).
+- `run20m_graft289` (278->289 zero-init graft, parity 1.2e-7).
+- `FAC_IMITATION` now `G2E`-overridable (loosen the anchor for turning).
+- **Deferred** (note for the 20M, not blocking): terrain `spanning` bit
+  (wall-vs-around stays emergent for now).
+
+**Autonomous driver:** `run_vision_goal_campaign.sh` + `gate_check.py`
+(deterministic). Flow: 3M smoke (finetune from `run20m_graft289`, full config)
+-> `benchmark_goal` -> `gate_check` -> **GO_20M** (fresh 20M, same config,
+`--tag phaseC_20m`) / **RETUNE** (one pass: narrower goal cone, stronger facing
+pull, `FAC_IMITATION` 7->4) / **STOP**. All steps run detached; progress to
+`trained/campaign_results.log`, final line `CAMPAIGN COMPLETE` or
+`CAMPAIGN STOPPED`.
+
+**Gate rule (locked):** GO_20M iff reach >=60% at 0/45/90deg, >=40% at
+135/180deg, no-goal drift <15deg, cruise fall <=8%, reward not collapsed
+(final >= 55% of peak). STOP iff reach <30% at 0deg. Else RETUNE (once).
+
+### >>> RESUME HERE if a session died mid-campaign <<<
+1. `tail -40 rl_training/opencat-gym/trained/campaign_results.log` -- shows the
+   last stage + gate decisions.
+2. If it ends with `CAMPAIGN COMPLETE`: read `trained/phaseC_20m_eval.txt`,
+   `phaseC_20m_goal.json`, `phaseC_20m_commanded.json`,
+   `phaseC_20m_decathlon.json`. Compare `phaseC_20m_ppo` vs `run20m_ppo` on the
+   decathlon; adopt as new base only if it holds every old cell AND adds
+   turning/goal. Then write the HTML report + update this doc + memory.
+3. If it ends with `CAMPAIGN STOPPED`: read the smoke `*_goal.json` +
+   `*_eval.txt`, diagnose, write the recommendation. Do NOT relaunch a 20M
+   without a fresh design pass.
+4. If it's mid-run (no final line) and `pgrep -f 'run_vision_goal_campaign|train.py'`
+   shows it alive: let it finish, re-arm a watcher on `campaign_results.log`.
+5. If the process died but training didn't finish: the last `trained/phaseC_*_console.log`
+   + its checkpoint show where it stopped; re-run `run_vision_goal_campaign.sh`
+   (it will overwrite tags) or resume the specific `train.py` with `--from` the
+   last `trained/checkpoints/phaseC_*_<steps>_steps.zip`.
+6. `run20m_ppo` is untouched throughout -- it is always the safe fallback base.
+
+## Conclusion & recommendation (2026-09-07) — supersedes for Phase A only
 
 **The streamlined plan's core bet — "graft `run20m_ppo` + finetune teaches
 goal-directed turning" — is disproven.** Two finetunes (gentle 2M; less-gentle

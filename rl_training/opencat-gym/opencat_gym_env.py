@@ -452,6 +452,7 @@ CLIFF_PLATFORM_HW  = _g2e("CLIFF_PLATFORM_HW", 0.7)  # m; platform half-width (e
 FAC_CLIFF_FALL     = _g2e("FAC_CLIFF_FALL", 80.0)    # one-shot penalty for the CoM leaving the platform
 FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when an edge is RIGHT there (tight gate, small)
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
+FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
 GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
 GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
 GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)

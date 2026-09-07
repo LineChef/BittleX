@@ -39,7 +39,7 @@ env = make_vec_env(OpenCatGymEnv, n_envs=1, vec_env_cls=DummyVecEnv)
 dst_dim = env.observation_space.shape[0]
 n_new = dst_dim - src_dim
 print(f"src obs dim {src_dim}   dst obs dim {dst_dim}   (+{n_new} new cols)   (SIZE_OBSERVATION={SIZE_OBSERVATION})")
-assert 0 < n_new <= 8, f"expected dst = src + a few, got {src_dim} -> {dst_dim}"
+assert 0 < n_new <= 16, f"expected dst = src + a few, got {src_dim} -> {dst_dim}"
 
 dst = PPO("MlpPolicy", env, seed=42, policy_kwargs=dict(net_arch=[256, 256]), device="cpu")
 
