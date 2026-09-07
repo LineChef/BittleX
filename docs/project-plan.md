@@ -743,16 +743,45 @@ tuning, and the Phase 10 wiring — all hardware-gated.
     Confirms cloud reasoning is the right call.
   - PiDog attaches images to LLM calls only for occasional "what do you see"
     queries, not continuous avoidance — matches the split above.
-- [ ] **After vision works, revisit the locomotion policy with perception in the
-      loop — toward the Target capability above.** The current gait is reactive
-      and IMU-only, so it can't anticipate terrain or deliberately step around an
-      obstacle — it only learns a lip exists *after* a foot hits it (confirmed by
-      the 2026-09-03 probe batch: it never falls but *stalls* against curbs /
-      lips / on carpet, because it's blind forward). This is what a scripted
-      keyframe gait fundamentally can't fix — it has no input to feed vision into
-      — and is the main reason the project uses RL for locomotion.
+- [~] **Perception-in-the-loop locomotion — RL approach CLOSED 2026-09-07; now a
+      behaviour-layer reflex.** A 3-campaign autonomous investigation
+      (`docs/rl-runs/vision-goal-locomotion-plan.md`) tried to bake a
+      forward-terrain feature + goal-bearing command + cliff feature into the
+      gait policy so it could slow / step-over / detour / halt from vision.
+      **Result: goal-directed turning is not achievable in this sim** — an
+      open-loop test showed the firmware scripted turn gaits (`wkL`/`wkR`)
+      produce ~0° of yaw in PyBullet with this URDF (real Bittle turning leans on
+      foot-slip + the firmware gyro turn-assist the sim doesn't model). No 20M
+      ever ran; `run20m_ppo` untouched.
+      **New plan:**
+      - **Turning → firmware.** Heading changes use the scripted `kbk`/`wkL`
+        turn gaits (they work on the real robot), triggered by the behaviour
+        layer. `AvoidanceAction.TURN_*` map to these.
+      - **Vision-while-walking → the `Avoider` reflex** (`pi_pipeline/vision/
+        avoidance.py`), which sets the *speed command* the RL walk policy already
+        tracks. Added 2026-09-07: `AvoidanceAction.SLOW` (obstacle ahead but not
+        near → `ACTION_SPEED_SCALE` 0.4) for anticipatory slowing. Sequence as an
+        obstacle nears: NONE → SLOW → STOP / BACK_UP (dead ahead) or TURN
+        (firmware, to a side). Calibrate the area→speed thresholds on hardware.
+      - **Cliff/edge stop** — the `CLIFF` sim feature is built; the real-robot
+        path needs the vision model trained to detect a desk edge (hardware-
+        gated). Until then `CliffGuard` stays a hard reflex spec (B16).
+      - **Tier B (a fresh vision-baked ~20M) is reserved** for *if* hardware
+        shows the command-level reflex isn't fine enough — i.e. the robot still
+        clips cables it can see, or the decel is too abrupt (within-stride,
+        sub-command-timescale things a speed command can't express). Not
+        justified pre-hardware: the obstacle-reward package measured ~neutral in
+        isolation (Phase 0 of the investigation).
+      - Built + kept dormant for a future Tier B run: `G2E_TERRAIN_FEATURE` /
+        `GOAL_MODE` / `CLIFF` / `TURN_BLEND`, `run20m_graft28x`, `benchmark_goal.py`.
 
-      **DECIDED ARCHITECTURE (2026-09-03):** the walk policy gets **its own
+      --- superseded plan (2026-09-03), kept for context ---
+      The current gait is reactive and IMU-only, so it can't anticipate terrain
+      or deliberately step around an obstacle — it only learns a lip exists
+      *after* a foot hits it (2026-09-03 probe batch: never falls but *stalls*
+      against curbs / lips / on carpet, blind forward).
+
+      **DECIDED ARCHITECTURE (2026-09-03) — NOT ADOPTED:** the walk policy gets **its own
       low-bandwidth forward terrain feature, fed directly into its 278-d
       observation at control rate**, *separate from* the vision→Claude /
       vision→`Avoider` command-setting path. Not "vision biases the command" —
