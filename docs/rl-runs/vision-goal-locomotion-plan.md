@@ -1,5 +1,38 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
+---
+## START HERE (fresh-session handoff, 2026-09-07 ~12:30 PM ET)
+
+**Right now:** Phase D A/B is running (`run_ab_vision.sh`, PID in
+`/tmp/g2_ab.pid`). Two fresh 20M runs — `abD_vision` (terrain feature ON) then
+`abD_blind` (OFF), identical course/reward otherwise. Progress:
+`rl_training/opencat-gym/trained/ab_vision_results.log`. **Finishes ~7 AM ET
+Tue 2026-09-08.** Final line will be `A/B COMPLETE`.
+
+**Your job when it lands:** follow **`### >>> RESUME (Phase D) <<<`** further down
+this file. Read the eval per that section's rules (regression = obstacle-FREE
+decathlon cells only; obstacle cells = traverse/clear/fall not speed; `tall` vs
+`low` split). Verdict → write the HTML report, update `docs/project-plan.md`
+Phase 8 + memory. If vision clearly wins → Tier B proper. If ~wash → ship the
+`Avoider` reflex (Phase 8 plan) and rule vision-in-the-loop out.
+
+**Settled — do NOT re-derive:**
+- Turning is not achievable in this sim (scripted `wkL`/`wkR` yaw ~0° open-loop).
+  Turning → firmware. Not a reward/architecture problem. (Phases A/C.)
+- No finetunes on `run20m_ppo` — they fail here. Candidates are fresh runs.
+- `run20m_ppo` is the frozen fallback; it's never touched. Every `G2E_*` flag is
+  default-off = byte-identical.
+- Phase D is residual-ON (isolates *vision*, not architecture) + R-NOSTALL
+  reward + `FAC_IMITATION` 11→5 (loosen the `wkF` anchor). Residual-OFF from
+  scratch is the *follow-up* only if D is inconclusive.
+- Don't open TensorBoard for the user (read tfevents yourself if needed).
+
+**Key files:** this doc (full history + RESUME), `opencat_gym_env.py` (`_g2e`
+override block ~line 390 — every knob), `run_ab_vision.sh`, `gate_check.py`,
+`watch_trained.py <tag>` (generic replay, auto-detects vision). Memory:
+`feedback_deployment_candidate_model`, `project_rl_paused_for_hardware`.
+---
+
 **Status:** ⛔ **STOPPED 2026-09-07 10:02 (Phase C).** Three campaigns
 (A / A-retune / C), zero turning each. **Diagnosis complete:** the scripted
 OpenCat turn gaits (`wkL`/`wkR`) do not turn the robot in this sim/URDF, even
