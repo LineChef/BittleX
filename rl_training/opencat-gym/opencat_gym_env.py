@@ -431,6 +431,7 @@ TRAIN_YAW_RANGE      = _g2e("TRAIN_YAW", 0.0)
 GOAL_MODE          = _g2e("GOAL_MODE", False)
 GOAL_DIST_MAX      = _g2e("GOAL_DIST_MAX", 2.5)      # m; obs distance normaliser + spawn ceiling
 GOAL_DIST_MIN      = _g2e("GOAL_DIST_MIN", 0.5)      # m; spawn floor
+GOAL_BEARING_MAX   = _g2e("GOAL_BEARING_MAX", np.pi) # rad; cap |initial goal bearing| -- start narrow (e.g. 1.4) while turning is still being learned, widen later
 GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
 GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
 GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)
@@ -986,7 +987,10 @@ class OpenCatGymEnv(gym.Env):
             _gb, _gd = _gv
             _pgd = self._prev_goal_dist if self._prev_goal_dist is not None else _gd
             _pgb = self._prev_goal_bearing if self._prev_goal_bearing is not None else _gb
-            r_goal_progress = (FAC_GOAL_PROGRESS * (_pgd - _gd)
+            # clamp the per-step delta so a policy that can't yet turn toward an
+            # off-axis goal isn't buried under unbounded negative reward
+            _dprog = float(np.clip(_pgd - _gd, -0.02, 0.02))
+            r_goal_progress = (FAC_GOAL_PROGRESS * _dprog
                                + FAC_GOAL_FACE * (abs(_pgb) - abs(_gb)))
             self._prev_goal_dist, self._prev_goal_bearing = _gd, _gb
             if _gd < GOAL_STANDOFF and not self._goal_reached:
@@ -1670,7 +1674,7 @@ class OpenCatGymEnv(gym.Env):
             return
         if not GOAL_MODE or np.random.rand() < GOAL_NONE_FRAC:
             return
-        th = np.random.uniform(-np.pi, np.pi)
+        th = np.random.uniform(-GOAL_BEARING_MAX, GOAL_BEARING_MAX)
         d = np.random.uniform(GOAL_DIST_MIN, GOAL_DIST_MAX)
         # robot spawns near origin facing +x
         self._goal_xy = np.array([d * np.cos(th), d * np.sin(th)])
