@@ -410,6 +410,11 @@ LEDGE_HEIGHT         = _g2e("LEDGE_HEIGHT", LEDGE_HEIGHT)
 LEDGE_PROB           = _g2e("LEDGE_PROB", LEDGE_PROB)
 LEDGE_RANDOMIZE      = _g2e("LEDGE_RANDOMIZE", LEDGE_RANDOMIZE)
 SLOPE_MAX_DEG        = _g2e("SLOPE_MAX_DEG", SLOPE_MAX_DEG)
+EPISODE_LENGTH       = _g2e("EPISODE_LENGTH", EPISODE_LENGTH)   # longer episodes for goal-reach / detour maneuvers
+# Turn curriculum: when > 0, _sample_command draws cmd_yaw in +/- this (rad/s) on
+# ~half of episodes instead of forcing 0 (which is the G4 default -- see the
+# comment there). Re-enables turning for the goal-directed locomotion work.
+TRAIN_YAW_RANGE      = _g2e("TRAIN_YAW", 0.0)
 # NEW knobs -- only consulted by _scatter_obstacles; default 0.0 => old behaviour.
 OBSTACLE_TALL_FRAC = _g2e("OBSTACLE_TALL_FRAC", 0.0)  # frac of scattered boxes forced tall (30-55mm -> trips tall_flag, "go around")
 OBSTACLE_SPAN_FRAC = _g2e("OBSTACLE_SPAN_FRAC", 0.0)  # frac forced to span the lane (wide, y~0 -> unavoidable, must steer/slow)
@@ -1124,11 +1129,16 @@ class OpenCatGymEnv(gym.Env):
                 self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
             return
         r = np.random.rand()
-        # G4: turning dropped from the curriculum. The yaw command trained to zero
-        # effect in phase2 and fought heading-hold. cmd_yaw is now always 0, so the
-        # heading term (FAC_HEADING vs _cmd_heading) rewards holding the launch
-        # heading -- drift-free straight-line walking. Real turns go to firmware.
-        self._cmd_yaw = 0.0
+        # G4: turning was dropped from the curriculum -- the yaw command trained to
+        # zero effect in phase2 and fought heading-hold, so cmd_yaw was forced to 0
+        # (drift-free straight-line walking, heading held to the launch heading).
+        # TRAIN_YAW (G2E) re-enables it for the goal-directed locomotion work: a
+        # turn command on ~half of episodes, straight on the rest so heading-hold
+        # is still trained. 0 (default) => the G4 behaviour, byte-identical.
+        if TRAIN_YAW_RANGE > 0 and np.random.rand() < 0.5:
+            self._cmd_yaw = float(np.random.uniform(-TRAIN_YAW_RANGE, TRAIN_YAW_RANGE))
+        else:
+            self._cmd_yaw = 0.0
         # G4: explicit low / mid / top speed bands with heavy weight on the
         # extremes, so creep and fast stop collapsing toward cruise.
         if r < 0.32:        # cruise (mid)
