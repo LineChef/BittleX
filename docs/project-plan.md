@@ -116,6 +116,23 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
 
 Software only; no physical robot needed until Phase 6 deployment.
 
+### Operating model (pre-hardware, 2026-09-07)
+
+Everything we train now is a **deployment candidate**. `run20m_ppo` is already a
+deployment-quality policy and stays frozen and untouched, so no experiment can
+leave us without a shippable gait — worst case is a wasted overnight.
+- Fresh tagged runs against deliberately-designed envs, **not serial finetunes**
+  on the frozen base (history: finetunes erode more than they add).
+- A candidate is promoted only if it (1) holds the decathlon's **obstacle-free /
+  cruise / commanded cells** at ≥ `run20m_ppo` — no base-walking regression;
+  (2) adds a capability or robustness `run20m_ppo` lacks; (3) clears the
+  sim→real path (ONNX + parity + Pi budget, already built for `run20m_ppo`).
+- **Eval caveat:** a vision policy that correctly slows/stops at obstacles will
+  score lower mean speed on an obstacle course — that is not a regression. Judge
+  base capability on obstacle-free cells; judge obstacle cells on
+  traverse-success / cleared count / fall rate, not speed. See
+  [[feedback_deployment_candidate_model]].
+
 ### Current state
 
 - **Phase 3 gait locked:** `auto_gait_final`, tag `phase3-gait`. Straight

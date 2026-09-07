@@ -165,10 +165,20 @@ rule it out, ship the behaviour-layer `Avoider` reflex (Phase 8 plan).
 ### >>> RESUME (Phase D) <<<
 1. `tail -40 rl_training/opencat-gym/trained/ab_vision_results.log`.
 2. Ends with `A/B COMPLETE`: read `trained/abD_eval.txt`,
-   `abD_vision_obs.json` vs `abD_blind_obs.json` (forward distance / stall /
-   clip / fall on the obstacle course), `abD_*_deca.json` (regression check).
-   Verdict: vision "significantly better" = clearly more forward distance / less
-   stall on the cluttered course AND no decathlon regression.
+   `abD_vision_obs.json` vs `abD_blind_obs.json`, `abD_*_deca.json`.
+   **Read it right (user 2026-09-07):** a vision policy that correctly slows at
+   obstacles scores LOWER mean speed on an obstacle course — that is NOT a
+   walking regression. So:
+   - **Regression check = the decathlon's obstacle-FREE / cruise / commanded
+     cells only.** Vision must hold those at >= `abD_blind` (and ~`run20m_ppo`).
+   - **Obstacle cells:** compare on traverse-success / cleared-obstacle count /
+     fall rate, NOT mean speed/distance. In `eval_obstacle_response.py` read the
+     `tall` vs `low` split — slowed/stopped on `tall` = correct; on `low` the
+     target is *cleared* (if it backs off `low` obstacles at 20M -> a targeted
+     follow-up with `r_obs_clear`, not a fail of the whole idea).
+   - Verdict "vision significantly better" = clearly better obstacle-cell
+     traverse/clear/fall vs `abD_blind` AND no regression on the obstacle-free
+     cells.
    Then write the report + update `docs/project-plan.md` Phase 8 + memory.
 3. Mid-run (no final line) + `pgrep -f 'run_ab_vision|train.py'` alive: let it
    finish, re-arm a watcher on `ab_vision_results.log`.
