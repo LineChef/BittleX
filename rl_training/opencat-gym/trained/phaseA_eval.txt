@@ -1,0 +1,28 @@
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/phaseA_s1_ppo   (12 ep/cell, goal dist 1.5 m)
+ bearing   reach   steps  final_m path_eff   fell
+      0d     0.0    None    0.884     None    0.0
+     45d     0.0    None    1.294     None    0.0
+     90d     0.0    None    1.836     None    0.0
+    135d     0.0    None    2.085     None    0.0
+    180d     0.0    None    2.243     None    0.0
+
+  no-goal cruise:  heading drift 34.7 deg   fwd 0.08 m/s   fell 0.0
+
+wrote trained/phaseA_goal.json
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/phaseA_s1_ppo   obs=285  vision_policy=True
+    episode fall rate 0.0   encounters 377
+    all  n=377  decel=0.515  peakF=2.5N  pitchStd=0.03deg  clip=0.65  fall=0.0
+    tall n=261  decel=0.504  peakF=2.4N  pitchStd=0.03deg  clip=0.613  fall=0.0
+    low  n=116  decel=0.54  peakF=2.8N  pitchStd=0.03deg  clip=0.733  fall=0.0
+
+### trained/run20m_graft285   obs=285  vision_policy=True
+    episode fall rate 0.0   encounters 378
+    all  n=378  decel=0.597  peakF=2.6N  pitchStd=0.03deg  clip=0.656  fall=0.0
+    tall n=269  decel=0.505  peakF=2.4N  pitchStd=0.02deg  clip=0.625  fall=0.0
+    low  n=109  decel=0.825  peakF=3.1N  pitchStd=0.04deg  clip=0.734  fall=0.0
+
+=== phaseA_s1_ppo  vs  run20m_graft285 (near-obstacle) ===

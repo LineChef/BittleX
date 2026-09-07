@@ -1,0 +1,70 @@
+[
+  {
+    "checkpoint": "trained/run20m_graft282",
+    "obs_dim": 282,
+    "vision_policy": true,
+    "episodes": 20,
+    "ep_fall_rate": 0.0,
+    "n_encounters": 80,
+    "all": {
+      "n": 80,
+      "decel_ratio": 2.576,
+      "peak_force_N": 2.4,
+      "pitch_std_deg": 0.06,
+      "clip_rate": 0.688,
+      "fall_rate": 0.0
+    },
+    "tall": {
+      "n": 66,
+      "decel_ratio": 1.619,
+      "peak_force_N": 2.5,
+      "pitch_std_deg": 0.06,
+      "clip_rate": 0.712,
+      "fall_rate": 0.0
+    },
+    "low": {
+      "n": 14,
+      "decel_ratio": 7.089,
+      "peak_force_N": 2.2,
+      "pitch_std_deg": 0.07,
+      "clip_rate": 0.571,
+      "fall_rate": 0.0
+    },
+    "reward_near": {
+      "r_arm_contact": -0.0,
+      "r_balance": 0.0,
+      "r_body_stability": -0.0,
+      "r_duty": 0.0,
+      "r_foot_phase": -0.0,
+      "r_gait_symmetry": 0.0,
+      "r_goal_progress": 0.0,
+      "r_goal_reached": 0.0,
+      "r_heading": -0.0,
+      "r_height": -0.0,
+      "r_imitation": 10.09,
+      "r_jitter": -0.0,
+      "r_joint_limit": 0.0,
+      "r_min_speed": 0.0,
+      "r_movement": 0.03,
+      "r_obs_bump": 0.0,
+      "r_obs_clear": 0.0,
+      "r_obs_stop": 0.0,
+      "r_obs_swerve": 0.0,
+      "r_overspeed": 0.0,
+      "r_paw_clearance": -0.0,
+      "r_paw_slip": -0.0,
+      "r_power": -0.0,
+      "r_recovery": 0.0,
+      "r_resid_smooth": -0.0,
+      "r_residual_cost": -0.2,
+      "r_smooth_movement": -0.0,
+      "r_speed": 2.61,
+      "r_speed_track": -2.99,
+      "r_stride": 0.0,
+      "r_survive_bonus": 0.0,
+      "r_survive_step": 0.0,
+      "r_upright": -0.0
+    },
+    "reward_clear": {}
+  }
+]

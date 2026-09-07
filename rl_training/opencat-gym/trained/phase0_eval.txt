@@ -1,0 +1,26 @@
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/graft_A_obsrw_ppo   obs=282  vision_policy=True
+    episode fall rate 0.0   encounters 80
+    all  n= 80  decel=2.248  peakF=2.8N  pitchStd=0.06deg  clip=0.75  fall=0.0
+    tall n= 67  decel=1.774  peakF=2.9N  pitchStd=0.06deg  clip=0.761  fall=0.0
+    low  n= 13  decel=4.688  peakF=2.3N  pitchStd=0.07deg  clip=0.692  fall=0.0
+
+### trained/graft_A_plain_ppo   obs=282  vision_policy=True
+    episode fall rate 0.0   encounters 80
+    all  n= 80  decel=1.309  peakF=2.7N  pitchStd=0.06deg  clip=0.7  fall=0.0
+    tall n= 67  decel=1.4  peakF=2.8N  pitchStd=0.06deg  clip=0.701  fall=0.0
+    low  n= 13  decel=0.835  peakF=2.1N  pitchStd=0.07deg  clip=0.692  fall=0.0
+
+=== graft_A_obsrw_ppo  vs  graft_A_plain_ppo (near-obstacle) ===
+
+wrote trained/phase0_ab.json
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/run20m_graft282   obs=282  vision_policy=True
+    episode fall rate 0.0   encounters 80
+    all  n= 80  decel=2.576  peakF=2.4N  pitchStd=0.06deg  clip=0.688  fall=0.0
+    tall n= 66  decel=1.619  peakF=2.5N  pitchStd=0.06deg  clip=0.712  fall=0.0
+    low  n= 14  decel=7.089  peakF=2.2N  pitchStd=0.07deg  clip=0.571  fall=0.0
+
+wrote trained/phase0_graft282.json
