@@ -78,7 +78,9 @@ def run(checkpoint, want_terrain):
     from stable_baselines3 import PPO
     model = PPO.load(checkpoint)
     obs_dim = model.observation_space.shape[0]
-    opencat_gym_env.TERRAIN_FEATURE = (obs_dim > opencat_gym_env.SIZE_OBSERVATION)
+    _extra = obs_dim - opencat_gym_env.SIZE_OBSERVATION
+    opencat_gym_env.TERRAIN_FEATURE = (_extra >= 4)
+    opencat_gym_env.GOAL_MODE = (_extra >= 7)   # 4 terrain + 3 goal
     from opencat_gym_env import OpenCatGymEnv
     env = OpenCatGymEnv()
 

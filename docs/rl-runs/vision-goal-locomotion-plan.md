@@ -40,9 +40,28 @@ old capability (Wilson CIs) AND adds goal/avoidance; else keep `run20m_ppo`.
 
 - **2026-09-06 23:10** — `graft_A_obsrw` done: `ep_rew_mean` 2986 -> 2210 (-26%)
   over 3M. Policy visibly learned to back away from walls (replay). `graft_A_plain`
-  (vision finetune, no reward terms) running, 2888 -> 2753 at 311k (-5%) — the
-  reward terms, not vision itself, drove the big drop. Full eval pending
-  `graft_A_plain` completion (~12:10 AM).
+  (vision finetune, no reward terms): 2888 -> 2753 at 311k (-5%) — the reward
+  terms, not vision itself, drove the big drop.
+
+- **2026-09-06 23:22** — Phase A infra built + committed (`48c2b42`, `1225344`):
+  `G2E_GOAL_MODE` (obs -> 285), `r_goal_progress` / `r_goal_reached` /
+  `r_obs_swerve`, heading retarget, moving goals, `GOAL_STANDOFF`,
+  `set_goal()`; `benchmark_goal.py`; `graft_terrain_policy.py` generalised to +N;
+  `G2E_OBSTACLE_X_HI` / `OBSTACLE_Y_SPREAD` (spread obstacles along a goal path).
+  Default byte-identical (obs 278, reward 8224.909). `run20m_graft285` built,
+  parity 1.2e-7. **Autonomous driver launched** (`/tmp/g2_phaseA_driver.sh`,
+  PID 73021): waits for `graft_A_plain` -> Phase 0 eval -> Phase A 2M smoke
+  (`phaseA_s1`, from `run20m_graft285`, GOAL+TERRAIN+OBSTACLE_REWARD v2:
+  `FAC_OBS_STOP=0`, `FAC_OBS_BUMP=0.015`, ledges 18mm, obstacles to x=1.1 /
+  y=+-0.12) -> Phase A eval -> stops for the gate decision. Expected complete
+  ~1:25 AM 2026-09-07.
+
+### Phase A course config (`phaseA_s1`)
+`TERRAIN_FEATURE=1 GOAL_MODE=1 OBSTACLE_REWARD=1 EPISODE_LENGTH=1200`
+`RANDOM_TERRAIN=0.06 PROB=0.8 MAX_H=0.09  OBSTACLE_COUNT=5 TALL_FRAC=0.3 SPAN_FRAC=0.1`
+`OBSTACLE_X_HI=1.1 OBSTACLE_Y_SPREAD=0.12  LEDGE_HEIGHT=0.018 LEDGE_PROB=0.35`
+`RUBBLE_PROB=0.3 SLOPE_MAX_DEG=8  FAC_OBS_STOP=0 FAC_OBS_BUMP=0.015`
+from `trained/run20m_graft285`, `train.py --steps 2e6` (finetune lr 3e-5, target_kl 0.05).
 
 ## The idea
 
