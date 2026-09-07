@@ -113,6 +113,22 @@ Log → `trained/adapter_probe_results.log`. Milestone lines: `probe_ref done`,
 Run A must ALSO show ~0 regression on the obstacle-free cells (expected by
 construction with a frozen base — confirm it).
 
+## Relationship to Phase D and the planned Tier-B 20M
+
+Deferring this probe costs nothing from Phase D. `abD_vision` / `abD_blind` are
+durable checkpoints; they wait. When the probe is built:
+- **Frozen base:** prefer `abD_blind` over `run20m_ppo` if Phase D shows it is a
+  strong cluttered-course walker with no obstacle-free regression — it has already
+  seen ledges/rubble/slopes/tall obstacles and carries the anti-stall behaviour.
+- **Test skill:** let the Phase D result pick it — `high-step` if low obstacles
+  are the gap, `brace/slow` if tall ones are.
+
+**Downstream payoff:** if this probe says adapters are viable AND Phase D says
+vision wins, design Tier B's fresh ~20M as the **multi-skill base** from step 0
+(skill-code input + skill distribution). The base gets built for the cost of a run
+already planned, instead of a separate 20M later. Requires the cheap probe to run
+first — which is this plan.
+
 ## Report
 
 ONE HTML artifact covering **both** Phase D and the adapter probe. Reuse
