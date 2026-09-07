@@ -415,6 +415,22 @@ OBSTACLE_TALL_FRAC = _g2e("OBSTACLE_TALL_FRAC", 0.0)  # frac of scattered boxes 
 OBSTACLE_SPAN_FRAC = _g2e("OBSTACLE_SPAN_FRAC", 0.0)  # frac forced to span the lane (wide, y~0 -> unavoidable, must steer/slow)
 OBSTACLE_COUNT     = _g2e("OBSTACLE_COUNT", 0)         # >0 => fixed box count per episode instead of randint(4,10)
 
+# --- Gated obstacle-response reward (Phase 8 perception-in-the-loop) ---------
+# The current gait already SURVIVES obstacles; nothing in the reward measures
+# the QUALITY of an encounter, so a vision policy has no gradient toward using
+# the forward terrain feature. These terms add that -- each GATED on the raw
+# _scan_terrain read so they never touch open-ground walking, and OFF unless
+# OBSTACLE_REWARD is set (run20m_ppo and every prior run byte-identical).
+# Magnitudes are first guesses -- tune against eval_obstacle_response.py.
+OBSTACLE_REWARD   = _g2e("OBSTACLE_REWARD", False)
+FAC_OBS_BUMP      = _g2e("FAC_OBS_BUMP", 0.025)      # penalty per N of HORIZONTAL contact force (ran into a vertical face); ramped
+OBS_BUMP_CAP      = _g2e("OBS_BUMP_CAP", 60.0)       # N; clamp so one spike can't dominate
+FAC_OBS_CLEAR     = _g2e("FAC_OBS_CLEAR", 12.0)      # reward per m of swing-foot lift above nominal, WHEN a low obstacle is seen close
+FAC_OBS_STOP      = _g2e("FAC_OBS_STOP", 1.5)        # reward for a level, near-stopped stance AFTER approaching a tall obstacle
+OBS_REWARD_DIST   = _g2e("OBS_REWARD_DIST", 0.28)    # dist_norm gate: below this = "obstacle is close"
+OBS_STOP_DIST     = _g2e("OBS_STOP_DIST", 0.15)      # dist_norm: this close to a tall obstacle before a stop is rewarded
+OBS_SWING_NOMINAL = _g2e("OBS_SWING_NOMINAL", 0.018) # m; swing-foot height treated as normal -- lift above it is what's rewarded
+
 
 class OpenCatGymEnv(gym.Env):
     """ Gymnasium environment (stable baselines 3) for OpenCat robots.
@@ -884,6 +900,40 @@ class OpenCatGymEnv(gym.Env):
         else:
             resid_smooth_cost = 0.0
         self._prev_action = np.asarray(action, dtype=float)
+
+        # --- Gated obstacle-response terms (OBSTACLE_REWARD; else all 0.0) ---
+        obs_bump_pen = obs_clear_rew = obs_stop_rew = 0.0
+        if OBSTACLE_REWARD:
+            _pr, _pd, _pb, _pt = self._scan_terrain()          # raw, un-noised
+            _near = _pr > 0.5 and _pd < OBS_REWARD_DIST
+            # 1) horizontal contact force = "ran into a vertical face". Flat/
+            #    sloped ground contact normals are ~vertical -> ~0; a box or
+            #    ledge side gives a horizontal normal. No obstacle-id bookkeeping.
+            _hforce = 0.0
+            for _c in p.getContactPoints(bodyA=self.robot_id):
+                _n = _c[7]
+                _hforce += _c[9] * float((_n[0] * _n[0] + _n[1] * _n[1]) ** 0.5)
+            obs_bump_pen = FAC_OBS_BUMP * min(_hforce, OBS_BUMP_CAP)
+            # 2) low obstacle seen close -> reward lifting the SWING feet above
+            #    their normal height (a deliberate high-step). Gated, so it never
+            #    raises clearance on open ground (the Phase 4a failure mode).
+            if _near and _pt < 0.5:
+                _sw = [p.getLinkState(self.robot_id, _i)[0][2]
+                       for _i, _dn in zip(paw_idx, paw_contact) if not _dn]
+                if _sw:
+                    obs_clear_rew = FAC_OBS_CLEAR * float(
+                        np.clip(max(_sw) - OBS_SWING_NOMINAL, 0.0, 0.05))
+            # 3) tall / lane-spanning obstacle: reward a level, near-stopped
+            #    stance -- but ONLY after actually approaching one at speed, so
+            #    it can't be farmed by spawning near a wall and standing still.
+            if _pr > 0.5 and _pt >= 0.5 and _pd < OBS_REWARD_DIST and v_fwd > 0.03:
+                self._approached_tall = True
+            if getattr(self, "_approached_tall", False) and _pr > 0.5 and _pt >= 0.5 \
+                    and _pd < OBS_STOP_DIST:
+                _level = max(0.0, 1.0 - tilt / max(1e-3, BALANCE_TILT_ON))
+                _slow = float(np.exp(-(v_fwd / 0.05) ** 2))
+                obs_stop_rew = FAC_OBS_STOP * _level * _slow
+
         reward = (FAC_MOVEMENT * capped_forward
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
@@ -892,6 +942,8 @@ class OpenCatGymEnv(gym.Env):
                  + balance_reward
                  + survive_step_reward
                  + duty_reward
+                 + obs_clear_rew
+                 + obs_stop_rew
                  - residual_cost
                  - min_speed_penalty
                  - overspeed_penalty
@@ -908,6 +960,7 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_HEIGHT * height_penalty
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
+                    + obs_bump_pen
                     + FAC_POWER * power_use))
 
         # Set state of the current state.
@@ -948,6 +1001,9 @@ class OpenCatGymEnv(gym.Env):
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "base_height_m": base_clearance,
             "r_power": -penalty_scale * FAC_POWER * power_use,
+            "r_obs_bump": -penalty_scale * obs_bump_pen,
+            "r_obs_clear": obs_clear_rew,
+            "r_obs_stop": obs_stop_rew,
         }
 
         # Stop criteria of current learning episode:
@@ -1100,6 +1156,7 @@ class OpenCatGymEnv(gym.Env):
         self._prev_tilt_rate = 0.0
         self._peak_tilt = 0.0            # surv_r1: roughest moment survived, for FAC_SURVIVE_BONUS
         self._recovered_count = 0
+        self._approached_tall = False    # OBSTACLE_REWARD: walked up to a tall obstacle this episode
         # Run 7 state: gait-phase counter (slows under tilt), speed window,
         # tilt history, previous angular velocity for the accel observation.
         self._phase = 0.0
