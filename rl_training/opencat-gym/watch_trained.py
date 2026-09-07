@@ -28,8 +28,8 @@ ap.add_argument("--dr-mass", type=float, default=None)
 ap.add_argument("--dr-gyro", type=float, default=None)
 ap.add_argument("--dr-push", type=float, default=None)
 ap.add_argument("--dr-terrain", type=float, default=None)
-ap.add_argument("--show-vision", action="store_true",
-                help="draw the _scan_terrain ray fan (green=clear, red=hit) for a vision checkpoint")
+ap.add_argument("--hide-vision", action="store_true",
+                help="don't draw the _scan_terrain ray fan (it's on by default for a vision checkpoint)")
 args = ap.parse_args()
 
 
@@ -73,6 +73,14 @@ if _od:
     opencat_gym_env.GOAL_MODE = bool(_g)
     opencat_gym_env.CLIFF = bool(_c)
     print(f"obs {_od} (+{_extra}) -> TERRAIN_FEATURE={bool(_t)} GOAL_MODE={bool(_g)} CLIFF={bool(_c)}")
+
+_show_vis = (not args.hide_vision) and getattr(opencat_gym_env, "TERRAIN_FEATURE", False)
+if _show_vis and args.dr_terrain is None:
+    # no obstacles spawn without a --dr-* flag; force the course so the fan has
+    # something to hit (otherwise every ray is green and there's nothing to see)
+    args.dr_terrain = 0.06
+    print("vision overlay on -> forcing the obstacle course (--dr-terrain 0.06)")
+
 _dr = {"RANDOM_FRICTION": args.dr_friction, "RANDOM_MASS": args.dr_mass,
        "RANDOM_GYRO": args.dr_gyro, "RANDOM_PUSH": args.dr_push,
        "RANDOM_TERRAIN": args.dr_terrain}
@@ -97,7 +105,6 @@ import numpy as np
 import pybullet
 import pybullet as p
 
-_show_vis = args.show_vision and getattr(opencat_gym_env, "TERRAIN_FEATURE", False)
 _TR = opencat_gym_env.TERRAIN_RANGE
 _FOV = np.deg2rad(opencat_gym_env.TERRAIN_FOV_DEG)
 _BRG = np.linspace(-_FOV, _FOV, 9)
