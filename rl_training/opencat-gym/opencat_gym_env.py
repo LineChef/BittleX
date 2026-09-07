@@ -453,6 +453,15 @@ FAC_CLIFF_FALL     = _g2e("FAC_CLIFF_FALL", 80.0)    # one-shot penalty for the 
 FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when an edge is RIGHT there (tight gate, small)
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
+# --- Anti-stall (R-NOSTALL, docs/rl-runs/robustness-backlog.md) -------------
+# Dense: bleed when the ~1 s forward window drops under a fraction of the
+# commanded speed while a move command is active. Sparse: a bonus each ~0.15 m
+# of net progress cleared *while an obstacle was recently in view*. Designed to
+# be trained WITH the terrain feature -- gives vision something to leverage
+# ("saw it, slowed, stepped over, kept going" > "walked into it and scrabbled").
+FAC_NOSTALL        = _g2e("FAC_NOSTALL", 0.0)        # dense bleed weight; 0 = off
+FAC_NOSTALL_BONUS  = _g2e("FAC_NOSTALL_BONUS", 8.0)  # per-0.15 m breakthrough bonus (only while resisted)
+NOSTALL_FLOOR_FRAC = _g2e("NOSTALL_FLOOR", 0.4)      # window speed below this * |cmd_fwd| -> bleed
 GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
 GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
 GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)
@@ -941,6 +950,30 @@ class OpenCatGymEnv(gym.Env):
         _spd_err = v_fwd - self._cmd_fwd
         _spd_den = max(0.02, abs(self._cmd_fwd))   # G4: 0.03 -> 0.02, sharper gradient at low cmd
         speed_reward = FAC_SPEED * np.exp(-SPEED_SHARPNESS * (_spd_err / _spd_den) ** 2)
+
+        # --- Anti-stall (FAC_NOSTALL; else 0) ---
+        r_nostall = 0.0
+        if FAC_NOSTALL > 0 and abs(self._cmd_fwd) > STAND_FWD_THRESH and self.step_counter > 40:
+            self._x1s = getattr(self, "_x1s", [])
+            self._x1s.append(current_position)
+            if len(self._x1s) > 80:
+                self._x1s.pop(0)
+            if len(self._x1s) >= 40:
+                _win_mps = ((self._x1s[-1] - self._x1s[0])
+                            / (len(self._x1s) / CONTROL_HZ) * np.sign(self._cmd_fwd))
+                _floor = NOSTALL_FLOOR_FRAC * abs(self._cmd_fwd)
+                if _win_mps < _floor:
+                    r_nostall = -FAC_NOSTALL * (_floor - _win_mps)
+            self._obs_recent = max(0, getattr(self, "_obs_recent", 0) - 1)
+            if TERRAIN_FEATURE and getattr(self, "_terrain_feat", np.zeros(4))[0] > 0.5:
+                self._obs_recent = 30
+            if getattr(self, "_prog_ref", None) is None:
+                self._prog_ref = current_position
+            _adv = (current_position - self._prog_ref) * np.sign(self._cmd_fwd)
+            if _adv >= 0.15:
+                self._prog_ref = current_position
+                if self._obs_recent > 0:
+                    r_nostall += FAC_NOSTALL_BONUS
         # G4: proportional tracking band (was flat 0.02) -- a 0.02 slop on a 0.04
         # creep command let the policy walk at cruise for free. 15% of |cmd|, floor 12 mm/s.
         _spd_band = max(0.012, 0.15 * abs(self._cmd_fwd))
@@ -1047,6 +1080,7 @@ class OpenCatGymEnv(gym.Env):
                  + r_goal_reached
                  + obs_swerve_rew
                  + r_cliff_slow
+                 + r_nostall
                  - (FAC_CLIFF_FALL if cliff_fell_off else 0.0)
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
@@ -1121,6 +1155,7 @@ class OpenCatGymEnv(gym.Env):
             "r_goal_reached": r_goal_reached,
             "r_obs_swerve": obs_swerve_rew,
             "r_cliff_slow": r_cliff_slow,
+            "r_nostall": r_nostall,
             "r_cliff_fall": -(FAC_CLIFF_FALL if cliff_fell_off else 0.0),
             "goal_dist_m": (self._goal_vector()[1] if (GOAL_MODE and self._goal_vector()) else 0.0),
         }
@@ -1317,6 +1352,9 @@ class OpenCatGymEnv(gym.Env):
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
         self._x_window = []
+        self._x1s = []                   # anti-stall 1 s forward-position window
+        self._prog_ref = None            # anti-stall milestone anchor
+        self._obs_recent = 0             # steps since an obstacle was last in view
         self._prev_ang_vel = np.zeros(2)
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)
         # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
