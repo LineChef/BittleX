@@ -1,6 +1,50 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
-**Status:** Phase 0 running (2026-09-06 night). Plan agreed with the user.
+**Status:** STREAMLINED + running autonomously (2026-09-06 night). User authorised
+Claude to run all phases nonstop, decide gates by the rules below, launch the
+Phase B 20M only on a clean checklist (hold + recommend if marginal), and
+document outcomes. Phases 2+3 collapsed into **Phase A**; extended runs dropped;
+smokes cut to 2M / 1 seed (2nd seed only if near threshold).
+
+## Gate decision rules (locked 2026-09-06 — Claude decides against these)
+
+**Phase 0** (graft obstacle-reward eval): the reward-shaped approach is KEPT only
+if `graft_A_obsrw` shows lower peak contact force AND lower clip rate than
+`graft_A_plain`, forward-distance/episode >= 70% of `run20m_graft282`, and fall
+rate no worse. Otherwise the package is REWORKED for Phase A: drop `r_obs_stop`,
+ledges 15-20 mm, `FAC_OBS_BUMP` halved. (The -26% reward on `graft_A_obsrw`
+already makes rework the likely call.)
+
+**Phase A** (goal command + vision avoidance, one 2M smoke):
+- PASS -> Phase B if ALL: (1) goal-reach >= 80% at bearings 0/45/90/135deg, >=
+  60% at 180deg; (2) no-goal heading drift < 10deg/episode; (3) no-goal cruise
+  fall rate <= 5% and forward speed within 15% of `run20m_ppo`; (4) obstacle-course
+  peak contact force AND clip rate <= the graft baseline.
+- MARGINAL -> retune once if goal-reach 50-80%, OR drift 10-20deg, OR one gait
+  metric 15-25% off.
+- FAIL -> stop, document, recommend if goal-reach < 50%, OR drift > 20deg, OR
+  fall rate > 15%, OR gait visibly broken.
+- Retune budget: ONE iteration, adjusting the 1-2 terms implicated by the failed
+  metric, then re-smoke and re-apply this gate.
+
+**Phase B checklist** (3M smoke on the frozen final env) — 20M launches only if
+ALL: (1) `ep_rew_mean` still climbing at 3M (last 500k slope > 0); (2) reward >=
+Phase A smoke level (robustness DR added no regression); (3) no-goal cruise fall
+rate <= 5%; (4) goal-reach >= Phase A level; (5) `explained_variance` > 0.3
+(critic healthy — not the 1.1M-collapse signature). Any one borderline -> HOLD,
+document, recommend. The 20M is adopted as the new base only if the full
+decathlon + `benchmark_commanded` + `benchmark_goal` vs `run20m_ppo` holds every
+old capability (Wilson CIs) AND adds goal/avoidance; else keep `run20m_ppo`.
+
+## Results log
+
+- **2026-09-06 23:10** — `graft_A_obsrw` done: `ep_rew_mean` 2986 -> 2210 (-26%)
+  over 3M. Policy visibly learned to back away from walls (replay). `graft_A_plain`
+  (vision finetune, no reward terms) running, 2888 -> 2753 at 311k (-5%) — the
+  reward terms, not vision itself, drove the big drop. Full eval pending
+  `graft_A_plain` completion (~12:10 AM).
+
+## The idea
 
 ## The idea
 
@@ -30,94 +74,65 @@ short dead-reckoned vector — never "navigate to a point 3 m away". Policy lean
 - Every new obs input follows the terrain-feature pattern: frozen index layout,
   `G2E_*`-gated, Pi-side mirror module, zero-init graft, parity test.
 - `run20m_ppo` stays the frozen deployment base through every phase.
-- **No 20M before Phase 4.** Phases 0–3 are ≤10M smokes whose only job is to
-  de-risk and freeze the env design. The ONE 20M (Phase 4) bakes in everything.
-- Phase 2 onward: **2–3 seeds per gate decision** — single runs misled us badly
-  on 2026-09-06 (course A vision -10%, course B vision +16%, both n=1).
+- **No 20M before Phase B.** Phases 0/A are de-risking smokes; the ONE 20M bakes
+  in everything frozen.
+- 1 seed per smoke; a 2nd seed only if the result lands near a gate threshold.
 
-## Phases
+## Phases (streamlined)
 
-### Phase 0 — finish the vision-reward runs *(in flight)*
-`graft_A_obsrw` (grafted `run20m_ppo` + `TERRAIN_FEATURE` + the 3 gated
-obstacle-response reward terms, course A) and `graft_A_plain` (same, no reward
-terms) → `eval_obstacle_response.py` vs `run20m_graft282`.
+### Phase 0 — vision-reward graft eval *(in flight)*
+`graft_A_obsrw` (grafted `run20m_ppo` + `TERRAIN_FEATURE` + the 3 obstacle-
+response reward terms, course A) and `graft_A_plain` (same, no reward terms) →
+`eval_obstacle_response.py` (20 ep) vs `run20m_graft282`. Decides which reward
+terms survive into Phase A (see Phase 0 gate rule above).
 
-**Gate Q:** Does the grafted deployment gait's obstacle behaviour change with
-vision, and does the reward package help (bump force down, forward distance
-holds) or just cause timidity (forward distance craters)?
-→ Decides whether reward-shaped vision-on-the-gait is viable, and which terms to
-keep. Early signal: `graft_A_obsrw` reward drifted 2990 → 2790 over 1.1M steps
-while the policy visibly learned to back away from walls — likely `r_obs_stop` +
-the too-tall (30 mm, un-steppable, un-turnable) ledges over-driving avoidance.
-
-### Phase 1 — raw yaw *(SKIPPED — folded into Phase 2)*
-Was a debugging-isolation step. Since goal-directed is the committed approach,
-`FAC_HEADING` gets retuned in Phase 2 regardless. Kept only as a fallback
-diagnostic if the Phase 2 smoke fails ambiguously. `G2E_TRAIN_YAW` (built
-2026-09-06) re-enables `cmd_yaw` sampling if we need it.
-
-### Phase 2 — goal-bearing command
-**Build:**
+### Phase A — goal-bearing command + vision avoidance *(2+3 collapsed)*
+**Build (one batch):**
 - Obs: append `[goal_bearing_norm, goal_dist_norm, goal_active]` — frozen layout,
-  `G2E_GOAL_MODE`-gated, Pi-side mirror, zero-init graft.
+  `G2E_GOAL_MODE`-gated, zero-init graft (`run20m_graft282` → `run20m_graft285`).
+  Pi-side `goal_feature.py` mirror + parity test.
 - Reward: `r_goal_progress` (angle-to-goal reduction + distance closing),
-  `r_goal_reached` (bonus, episode may end). When a goal is active, `FAC_HEADING`
-  retargets from "hold launch heading" to "align to goal".
-- Curriculum: goal at random bearing incl. behind (±180°), distance 0.5–2.5 m;
-  ~20% no-goal episodes (velocity fallback preserved).
-- `G2E_EPISODE_LENGTH` → ~1200 (built 2026-09-06). Widen the reset area.
-- `benchmark_goal.py` — goals at 0/45/90/135/180°: time-to-reach, final distance,
-  path efficiency, fell; heading-hold on no-goal episodes; gait-quality vs
-  `run20m_ppo`.
+  `r_goal_reached` (bonus + standoff distance so it stops short of the target,
+  episode may end). Goal active → `FAC_HEADING` retargets from launch heading to
+  goal heading.
+- Reward package v2 (per Phase 0 outcome): keep `r_obs_bump`; ledges 15–20 mm;
+  likely drop `r_obs_stop`; add `r_obs_swerve` (reward lateral deviation toward
+  the open side when a close obstacle blocks the goal line — re-convergence is
+  free from `r_goal_progress`).
+- Curriculum: goal at random bearing incl. ±180°, distance 0.5–2.5 m, ~15%
+  moving goals, ~20% no-goal (velocity fallback). `G2E_EPISODE_LENGTH` ~1200.
+  Widen lane + obstacle lateral spawn so a detour fits; obstacles on the goal line.
+- `benchmark_goal.py` — goals at 0/45/90/135/180°: reach rate, time-to-reach,
+  path efficiency, fell; no-goal heading drift; gait-quality vs `run20m_ppo`.
+  `eval_obstacle_response.py` for the collision metrics.
 
-**Run:** graft `run20m_ppo` + goal block → 3M smoke × 2 seeds; if learning, extend
-to ~12M × 1.
+**Run:** `run20m_graft285` → **2M smoke, 1 seed**. Gate by the Phase A rule above
+(PASS / MARGINAL→retune once / FAIL→stop).
 
-**Gate Q:** Reliably turns to face and reaches goals at every bearing, without
-losing straight-line walking (no-goal drift < 8°) or gait quality.
+### Phase B — freeze → 3M smoke → 20M
+Freeze one final env: terrain feature + obstacle rewards v2 + goal-bearing
+command + goal/avoidance rewards + robustness DR (slopes, rubble, H2/H3 backlog).
+**3M smoke**, apply the Phase B checklist above. Clean → launch the **20M**
+(one seed, ~8.5 h). Marginal → HOLD + write a recommendation.
 
-### Phase 3 — vision-driven local avoidance on the goal-seeker
-**Build:**
-- Widen lane + obstacle lateral spawn so a detour fits; place obstacles ON the
-  goal line so avoidance is necessary.
-- Reward package v2: **drop `r_obs_stop`**; keep `r_obs_bump` (horizontal-contact
-  penalty) + `r_obs_clear` (step over low, ledges at 15–20 mm now); add
-  `r_obs_swerve` — reward lateral deviation toward the open side (`bearing_norm`)
-  when a close obstacle blocks the goal line. Re-convergence is rewarded for free
-  by `r_goal_progress`.
-- `eval_obstacle_response.py` v2 (+ detour success rate, deviation-and-recovery,
-  goal-still-reached).
+**Adoption:** full decathlon + `benchmark_commanded` + `benchmark_goal` vs
+`run20m_ppo`. New base only if it holds every old capability (Wilson CIs) AND adds
+goal/avoidance. Else keep `run20m_ppo`, document the gap.
 
-**Run:** finetune from the Phase 2 policy, 5M × 2 seeds; if passes, 10M × 1.
+## Timing (measured: ~800 steps/s plain, ~690 + obstacle rewards, ~700 + goal/long episodes)
 
-**Gate Q:** Detours around blocking obstacles and re-converges on the goal, with
-fewer collisions than the goal-only policy, without tanking goal-reach rate.
+| step | training | eval | 
+|---|---|---|
+| Phase 0 *(running)* | 3M + 3M ≈ 2.4 h | 15 min |
+| Phase A build | — | — |
+| Phase A smoke | 2M ≈ 0.8 h (×2 if near threshold) | 20 min |
+| Phase A retune (budget 1) | 2M ≈ 0.8 h | 20 min |
+| Phase B build/freeze | — | — |
+| Phase B 3M smoke | 3M ≈ 1.3 h | 20 min |
+| Phase B 20M | 20M ≈ 8.5 h | decathlon+commanded+goal ≈ 1.5 h |
 
-### Phase 4 — consolidate → the 20M
-Freeze one final env: terrain feature + obstacle-response rewards (v2) +
-goal-bearing command + goal/avoidance rewards + robustness DR (slopes, rubble,
-H2/H3 backlog). 3M smoke to confirm reward still climbing at 3M. Then the
-[[project_longrun_trigger]] checklist gates a fresh ~20M.
-
-**Gate Q (adoption):** A/B vs `run20m_ppo` on the full decathlon + commanded +
-goal benchmarks. Adopt only if it holds every old capability AND adds the new
-ones. (This is where the H12 new-course attempt failed — regressions on
-bare-robot / ledges / carpet.)
-
-## Timing (measured 2026-09-06: ~800 steps/s plain, ~690 + obstacle rewards, ~700 + goal/long episodes)
-
-| phase | training wall-clock | eval | notes |
-|---|---|---|---|
-| 0 | 3M + 3M ≈ 2.4 h | 15 min | results ~12:20 AM 2026-09-07 |
-| 2 smoke | 3M × 2 ≈ 2.4 h | 20 min | + build |
-| 2 extended | 12M × 1 ≈ 4.8 h | 30 min | if smoke passes |
-| 3 smoke | 5M × 2 ≈ 4 h | 40 min | + build |
-| 3 extended | 10M × 1 ≈ 4 h | 40 min | if smoke passes |
-| 4 smoke | 3M ≈ 1.3 h | 20 min | full final env |
-| 4 the 20M | 20M × 1 ≈ 8.5 h | decathlon+commanded+goal ≈ 1.5 h | one overnight |
-
-**Compute: ~34 h training + ~5 h eval.** Calendar ~1–2 weeks with build work,
-seed reruns, and iterating on failures between phases.
+**Compute: ~16 h training + ~2.5 h eval.** ~16–20 h elapsed if run nonstop with
+≤1 retune; longer if Phase A needs rework or a run diverges.
 
 ## Built so far (2026-09-06)
 
