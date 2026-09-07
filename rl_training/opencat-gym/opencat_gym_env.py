@@ -1484,6 +1484,8 @@ class OpenCatGymEnv(gym.Env):
             _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02], baseOrientation=_quat)
             p.changeDynamics(_seg_b, -1, contactStiffness=6e4, contactDamping=900,
                              restitution=0.0, lateralFriction=1.1)   # carpet-typical, same spirit as CARPET_SOFT
+            p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])   # box floors render near-black in the GUI otherwise
+            p.changeVisualShape(_seg_b, -1, rgbaColor=[0.55, 0.55, 0.58, 1])
         elif self._cliff_this_ep:
             # finite platform, top at z=0, so the robot meets an edge ~CLIFF_
             # PLATFORM_HW out in any direction from the central spawn.
@@ -1492,6 +1494,7 @@ class OpenCatGymEnv(gym.Env):
             plane_id = p.createMultiBody(0, _cs, basePosition=[0, 0, -0.1],
                     baseOrientation=p.getQuaternionFromEuler(
                         [self._slope_rp[0], self._slope_rp[1], 0]))
+            p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])   # box platform renders near-black in the GUI otherwise
         else:
             plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
                                   p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
@@ -1543,11 +1546,12 @@ class OpenCatGymEnv(gym.Env):
             if self._ledge_dir > 0:            # step UP: plateau from x~_edge forward
                 _hl = 0.70
                 _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
-                p.createMultiBody(0, _cs, basePosition=[_edge + _hl, 0.0, self._ledge_h / 2])
+                _lid = p.createMultiBody(0, _cs, basePosition=[_edge + _hl, 0.0, self._ledge_h / 2])
             else:                              # step DOWN: block under the robot, drop past x~_edge
                 _hl = 0.60
                 _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
-                p.createMultiBody(0, _cs, basePosition=[_edge - _hl, 0.0, self._ledge_h / 2])
+                _lid = p.createMultiBody(0, _cs, basePosition=[_edge - _hl, 0.0, self._ledge_h / 2])
+            p.changeVisualShape(_lid, -1, rgbaColor=[0.62, 0.62, 0.66, 1])   # a touch lighter than the ground so the step edge still reads
 
         _pose_tilt = 0.0
         if START_POSE_JITTER > 0 and self._dr > 0:
