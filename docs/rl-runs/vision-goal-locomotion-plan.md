@@ -56,6 +56,35 @@ old capability (Wilson CIs) AND adds goal/avoidance; else keep `run20m_ppo`.
   y=+-0.12) -> Phase A eval -> stops for the gate decision. Expected complete
   ~1:25 AM 2026-09-07.
 
+- **2026-09-07 00:56** — **Phase 0 verdict: REWORK** (as anticipated).
+  `eval_obstacle_response` (20 ep): `graft_A_obsrw` peakF 2.8 N / clip 0.75 vs
+  base `run20m_graft282` 2.4 N / 0.69 — the reward package made contact *worse*,
+  plus −26% reward and visible backing-away. Gate rule (keep only if force AND
+  clip both drop) fails → package v2 for Phase A: `FAC_OBS_STOP=0`,
+  `FAC_OBS_BUMP` halved, ledges 18 mm. (0 falls for all three — survival was
+  never the issue.)
+
+- **2026-09-07 00:56** — **Phase A (`phaseA_s1`) verdict: FAIL.**
+  `benchmark_goal`: goal-reach **0% at every bearing** (0/45/90/135/180°);
+  the policy ignored the goal and walked straight (closed 1.5→0.88 m for a
+  dead-ahead goal, ended *farther* for side/behind goals). No-goal heading
+  drift **34.7°** (gate wants <10°). `ep_rew_mean` (1200-step episodes)
+  15129 → 7944 (−47%), min −2767, `explained_variance` 0.81.
+  **Root cause:** `phaseA_s1` ran with `GOAL_MODE` but NOT `G2E_TRAIN_YAW` —
+  the policy has never learned to turn, so no goal reward could produce turning,
+  and `r_goal_progress` buried it under unescapable negative reward for
+  off-axis goals → destabilised the finetune. The Phase-1 turning question,
+  folded into Phase A, is now unavoidable.
+
+- **2026-09-07 01:00** — **Retune (`phaseA_s2`), the one budgeted iteration:**
+  add `G2E_TRAIN_YAW=0.4` (yaw command in the curriculum — teaches turning);
+  `G2E_GOAL_BEARING_MAX=1.4` (~80°, narrow cone while turning is learned);
+  `FAC_GOAL_PROGRESS 320→140`, `FAC_GOAL_FACE 8→22` (facing is the primary early
+  signal); `r_goal_progress` per-step delta clamped ±0.02 m; less-gentle
+  finetune `--finetune-lr 1e-4 --finetune-target-kl 0.15`, 3M steps, from
+  `run20m_graft285`. If this also fails the gate → STOP, Phase B does not run,
+  write the recommendation.
+
 ### Phase A course config (`phaseA_s1`)
 `TERRAIN_FEATURE=1 GOAL_MODE=1 OBSTACLE_REWARD=1 EPISODE_LENGTH=1200`
 `RANDOM_TERRAIN=0.06 PROB=0.8 MAX_H=0.09  OBSTACLE_COUNT=5 TALL_FRAC=0.3 SPAN_FRAC=0.1`
