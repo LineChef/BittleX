@@ -40,16 +40,20 @@ COURSES = {
 }
 
 
-def run(course, vision, steps):
-    tag = f"vis_{course}_{vision}"
+def run(course, vision, steps, obs_reward=False, from_ckpt=None, tag=None):
+    tag = tag or f"vis_{course}_{vision}"
     env = dict(os.environ)
     for k, v in COURSES[course].items():
         env["G2E_" + k] = v
     env["G2E_TERRAIN_FEATURE"] = "1" if vision == "on" else "0"
+    if obs_reward:
+        env["G2E_OBSTACLE_REWARD"] = "1"
     shown = "  ".join(f"{k}={v}" for k, v in sorted(env.items()) if k.startswith("G2E_"))
-    print(f"\n=== {tag}   steps={steps} ===\n  {shown}\n", flush=True)
-    subprocess.run([PY, os.path.join(HERE, "train.py"), "--tag", tag, "--steps", str(steps)],
-                   cwd=HERE, env=env, check=True)
+    cmd = [PY, os.path.join(HERE, "train.py"), "--tag", tag, "--steps", str(steps)]
+    if from_ckpt:
+        cmd += ["--from", from_ckpt]
+    print(f"\n=== {tag}   steps={steps}   from={from_ckpt or 'scratch'} ===\n  {shown}\n", flush=True)
+    subprocess.run(cmd, cwd=HERE, env=env, check=True)
 
 
 def main():
@@ -58,6 +62,9 @@ def main():
     ap.add_argument("--vision", choices=["on", "off"])
     ap.add_argument("--steps", type=float, default=3e6)
     ap.add_argument("--all", action="store_true", help="all 3 courses x on/off, sequential")
+    ap.add_argument("--obs-reward", action="store_true", help="enable G2E_OBSTACLE_REWARD (gated obstacle-response terms)")
+    ap.add_argument("--from", dest="from_ckpt", default=None, help="finetune from this checkpoint (e.g. the grafted 282-d policy)")
+    ap.add_argument("--tag", default=None, help="override the auto tag")
     a = ap.parse_args()
     steps = int(a.steps)
     if a.all:
@@ -65,7 +72,8 @@ def main():
             for v in ("off", "on"):
                 run(c, v, steps)
     elif a.course and a.vision:
-        run(a.course, a.vision, steps)
+        run(a.course, a.vision, steps, obs_reward=a.obs_reward,
+            from_ckpt=a.from_ckpt, tag=a.tag)
     else:
         ap.error("give --course and --vision, or --all")
 
