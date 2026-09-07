@@ -31,6 +31,11 @@ Phase 8 + memory. If vision clearly wins → Tier B proper. If ~wash → ship th
 override block ~line 390 — every knob), `run_ab_vision.sh`, `gate_check.py`,
 `watch_trained.py <tag>` (generic replay, auto-detects vision). Memory:
 `feedback_deployment_candidate_model`, `project_rl_paused_for_hardware`.
+
+**When a fresh session has picked this up and confirmed it's oriented: delete
+this whole `## START HERE` block** (down to the `---` above `**Status:**`). It's
+scaffolding — once you've read it and the Phase D result is in hand, the rest of
+this doc + the memory entries are the durable record. Commit the deletion.
 ---
 
 **Status:** ⛔ **STOPPED 2026-09-07 10:02 (Phase C).** Three campaigns
