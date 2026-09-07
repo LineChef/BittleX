@@ -1452,6 +1452,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
+            p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])
             p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _rough:
             _n = 64
@@ -1466,6 +1467,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
+            p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])
             p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _surface_transition:
             # Two coplanar finite slabs (same tilt as the flat-plane branch, via

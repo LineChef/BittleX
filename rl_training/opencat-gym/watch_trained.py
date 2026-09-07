@@ -28,6 +28,8 @@ ap.add_argument("--dr-mass", type=float, default=None)
 ap.add_argument("--dr-gyro", type=float, default=None)
 ap.add_argument("--dr-push", type=float, default=None)
 ap.add_argument("--dr-terrain", type=float, default=None)
+ap.add_argument("--show-vision", action="store_true",
+                help="draw the _scan_terrain ray fan (green=clear, red=hit) for a vision checkpoint")
 args = ap.parse_args()
 
 
@@ -91,12 +93,41 @@ obs, info = env.reset()
 from stable_baselines3 import PPO
 model = PPO.load(args.checkpoint)
 
+import numpy as np
 import pybullet
+import pybullet as p
+
+_show_vis = args.show_vision and getattr(opencat_gym_env, "TERRAIN_FEATURE", False)
+_TR = opencat_gym_env.TERRAIN_RANGE
+_FOV = np.deg2rad(opencat_gym_env.TERRAIN_FOV_DEG)
+_BRG = np.linspace(-_FOV, _FOV, 9)
+_lines = [None] * 9
+
+
+def _draw_scan():
+    bp, bo = p.getBasePositionAndOrientation(env.robot_id)
+    yaw = p.getEulerFromQuaternion(bo)[2]
+    z = bp[2] - 0.08 + 0.02
+    cx, cy = bp[0] + 0.05 * np.cos(yaw), bp[1] + 0.05 * np.sin(yaw)
+    ignore = {0, env.robot_id, getattr(env, "_payload_id", -1), getattr(env, "_head_id", -1)}
+    froms = [[cx, cy, z]] * 9
+    tos = [[cx + _TR * np.cos(yaw + b), cy + _TR * np.sin(yaw + b), z] for b in _BRG]
+    for k, hit in enumerate(p.rayTestBatch(froms, tos)):
+        blocked = hit[0] >= 0 and hit[0] not in ignore
+        end = list(hit[3]) if blocked else tos[k]
+        col = [1, 0, 0] if blocked else [0, 0.9, 0]
+        _lines[k] = p.addUserDebugLine(froms[k], end, lineColorRGB=col, lineWidth=2,
+                                       replaceItemUniqueId=(_lines[k] if _lines[k] is not None else -1))
+    pr, pd, pb, pt = env._scan_terrain()
+    p.resetDebugVisualizerCamera(0.7, 50, -28, bp)
+
 
 try:
     while True:
         action, _state = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
+        if _show_vis:
+            _draw_scan()
         time.sleep(1 / 60)
         if terminated or truncated:
             obs, info = env.reset()
