@@ -23,6 +23,7 @@ log = logging.getLogger("g2.vision.avoid")
 
 class AvoidanceAction(Enum):
     NONE = "none"          # clear -- carry on
+    SLOW = "slow"          # something ahead, not near yet -- ease off the throttle
     STOP = "stop"          # something close, dead ahead
     BACK_UP = "back_up"    # very close, dead ahead
     TURN_LEFT = "turn_left"
@@ -32,15 +33,17 @@ class AvoidanceAction(Enum):
 # higher = more urgent; an urgent action preempts a cooldown
 _URGENCY = {
     AvoidanceAction.NONE: 0,
-    AvoidanceAction.TURN_LEFT: 1,
-    AvoidanceAction.TURN_RIGHT: 1,
-    AvoidanceAction.STOP: 2,
-    AvoidanceAction.BACK_UP: 3,
+    AvoidanceAction.SLOW: 1,
+    AvoidanceAction.TURN_LEFT: 2,
+    AvoidanceAction.TURN_RIGHT: 2,
+    AvoidanceAction.STOP: 3,
+    AvoidanceAction.BACK_UP: 4,
 }
 
 
 @dataclass
 class AvoiderConfig:
+    slow_area: float = 0.07     # box area (ahead) that triggers an anticipatory SLOW
     near_area: float = 0.14      # box area that counts as "near"
     stop_area: float = 0.22      # near + ahead past this -> STOP
     backup_area: float = 0.38    # ...past this -> BACK_UP
@@ -75,8 +78,10 @@ class Avoider:
             return AvoidanceAction.NONE
 
         self._streak += 1
-        # an immediate danger (stop / back up) skips the debounce
-        if raw in (AvoidanceAction.STOP, AvoidanceAction.BACK_UP) or self._streak >= self._cfg.consecutive:
+        # SLOW is cheap + reversible -- act on it immediately (anticipatory);
+        # an immediate danger (stop / back up) also skips the debounce
+        if raw in (AvoidanceAction.SLOW, AvoidanceAction.STOP, AvoidanceAction.BACK_UP) \
+                or self._streak >= self._cfg.consecutive:
             self._streak = 0
             self._cooldown = self._cfg.cooldown_frames
             self._last = raw
@@ -86,9 +91,12 @@ class Avoider:
 
     def _raw_decision(self, frame: Frame) -> AvoidanceAction:
         c = self._cfg
-        hazards = [d for d in frame if d.confidence >= c.min_confidence and d.area >= c.near_area]
+        seen = [d for d in frame if d.confidence >= c.min_confidence]
+        hazards = [d for d in seen if d.area >= c.near_area]
         if not hazards:
-            return AvoidanceAction.NONE
+            # nothing near yet -- but an obstacle coming up dead ahead -> SLOW
+            far_ahead = [d for d in seen if d.bearing == "ahead" and d.area >= c.slow_area]
+            return AvoidanceAction.SLOW if far_ahead else AvoidanceAction.NONE
 
         ahead = [d for d in hazards if d.bearing == "ahead"]
         if ahead:
@@ -112,9 +120,20 @@ class Avoider:
 
 
 # How the reflex maps to robot skills (the caller wires this to the actuator).
+# SLOW has no skill -- the caller should instead scale the forward speed command
+# down (e.g. to ~40%) while it's active, since the RL walk policy tracks a speed
+# command directly. TURN_* trigger the firmware scripted turn gaits (RL turning
+# is not available -- see docs/rl-runs/vision-goal-locomotion-plan.md).
 ACTION_SKILL = {
     AvoidanceAction.STOP: "stand",
     AvoidanceAction.BACK_UP: "walk_backward",
     AvoidanceAction.TURN_LEFT: "walk_left",
     AvoidanceAction.TURN_RIGHT: "walk_right",
+}
+
+# Forward-speed multiplier the caller should apply for each action (for the ones
+# that stay walking). Actions absent here are handled via ACTION_SKILL.
+ACTION_SPEED_SCALE = {
+    AvoidanceAction.NONE: 1.0,
+    AvoidanceAction.SLOW: 0.4,
 }

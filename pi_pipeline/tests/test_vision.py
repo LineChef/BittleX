@@ -41,6 +41,15 @@ def test_avoider_clear_view_is_none():
     assert av.decide([det(0.05)]) is AvoidanceAction.NONE  # tiny box, far
 
 
+def test_avoider_slow_before_stop():
+    # sqrt(0.10) ~= 0.316 side -> area 0.10: between slow_area (0.07) and near_area
+    # (0.14), dead ahead -> anticipatory SLOW, no debounce
+    av = Avoider()
+    assert av.decide([det(0.316, bearing=0.5)]) is AvoidanceAction.SLOW
+    # then it gets close -> STOP
+    assert av.decide([det(0.5, bearing=0.5)]) is AvoidanceAction.STOP
+
+
 def test_approaching_scenario_escalates():
     frames = MockDetectionFeed.approaching(steps=16)
     seen = [Avoider().decide(f) for f in frames]  # fresh avoider each step? no -> one avoider
