@@ -10,6 +10,12 @@ import pybullet_data
 _WKF_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkf_ref.npy")
 WKF_REF = np.load(_WKF_PATH) if os.path.exists(_WKF_PATH) else None
 STAND_POSE = WKF_REF.mean(axis=0) if WKF_REF is not None else None  # mid-stance-ish, held while standing
+# Scripted turn gaits (wkL from firmware, wkR = its L/R mirror) -- the residual
+# base blends wkF -> wkL/wkR by the yaw command when TURN_BLEND is set.
+_WKL_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkl_ref.npy")
+_WKR_PATH = os.path.join(os.path.dirname(__file__), "reference_gait", "wkr_ref.npy")
+WKL_REF = np.load(_WKL_PATH) if os.path.exists(_WKL_PATH) else None
+WKR_REF = np.load(_WKR_PATH) if os.path.exists(_WKR_PATH) else None
 
 
 # Constants to define training and visualisation.
@@ -432,6 +438,8 @@ GOAL_MODE          = _g2e("GOAL_MODE", False)
 GOAL_DIST_MAX      = _g2e("GOAL_DIST_MAX", 2.5)      # m; obs distance normaliser + spawn ceiling
 GOAL_DIST_MIN      = _g2e("GOAL_DIST_MIN", 0.5)      # m; spawn floor
 GOAL_BEARING_MAX   = _g2e("GOAL_BEARING_MAX", np.pi) # rad; cap |initial goal bearing| -- start narrow (e.g. 1.4) while turning is still being learned, widen later
+TURN_BLEND         = _g2e("TURN_BLEND", False)       # residual base blends wkF -> wkL/wkR by cmd_yaw (needs wkl_ref.npy / wkr_ref.npy); off => pure wkF, byte-identical
+GOAL_AVOID_FRAC    = _g2e("GOAL_AVOID_FRAC", 0.0)    # frac of goal episodes with polarity = -1 (flee / keep-away instead of approach)
 GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
 GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
 GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)
@@ -514,7 +522,7 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (3 if GOAL_MODE else 0)
+        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0)
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
 
@@ -582,12 +590,13 @@ class OpenCatGymEnv(gym.Env):
         joint_angs = np.asarray(p.getJointStates(self.robot_id, self.joint_id),
                                                    dtype=object)[:,0].astype(float)
         if RESIDUAL_MODE and WKF_REF is not None:
-            # gait-refinement G2: stand -> hold STAND_POSE; else wkF fwd or reversed
+            # gait-refinement G2: stand -> hold STAND_POSE; else wkF fwd or reversed.
+            # TURN_BLEND: base blends wkF -> wkL/wkR by the yaw command.
             self._is_stand = abs(self._cmd_fwd) < STAND_FWD_THRESH
             if self._is_stand:
                 ref = STAND_POSE
             else:
-                ref = WKF_REF[int(self._phase) % len(WKF_REF)]
+                ref = self._ref_pose(int(self._phase))
             joint_angs = ref + action * np.deg2rad(RESIDUAL_SCALE_DEG)
         else:
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
@@ -845,7 +854,9 @@ class OpenCatGymEnv(gym.Env):
                 self._goal_xy = self._goal_xy + self._goal_vel / CONTROL_HZ
             _gv = self._goal_vector()
         if _gv is not None:
-            _herr = _gv[0]
+            # approach: face the goal; flee: face directly away from it
+            _tgt = _gv[0] if self._goal_polarity > 0 else _gv[0] - np.pi
+            _herr = (_tgt + np.pi) % (2 * np.pi) - np.pi
             heading_penalty = FAC_HEADING_GOAL * _herr ** 2
         else:
             _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
@@ -857,7 +868,7 @@ class OpenCatGymEnv(gym.Env):
         # the reference the same way.
         imitation_reward = 0.0
         if FAC_IMITATION > 0 and WKF_REF is not None:
-            _iref = STAND_POSE if getattr(self, '_is_stand', False) else WKF_REF[int(self._phase) % len(WKF_REF)]
+            _iref = STAND_POSE if getattr(self, '_is_stand', False) else self._ref_pose(int(self._phase))
             ref = _iref / self.bound_ang
             imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
@@ -989,12 +1000,17 @@ class OpenCatGymEnv(gym.Env):
             _pgb = self._prev_goal_bearing if self._prev_goal_bearing is not None else _gb
             # clamp the per-step delta so a policy that can't yet turn toward an
             # off-axis goal isn't buried under unbounded negative reward
-            _dprog = float(np.clip(_pgd - _gd, -0.02, 0.02))
-            r_goal_progress = (FAC_GOAL_PROGRESS * _dprog
-                               + FAC_GOAL_FACE * (abs(_pgb) - abs(_gb)))
+            _pol = self._goal_polarity        # +1 approach, -1 flee
+            _dprog = float(np.clip((_pgd - _gd) * _pol, -0.02, 0.02))
+            _dface = (abs(_pgb) - abs(_gb)) * _pol
+            r_goal_progress = FAC_GOAL_PROGRESS * _dprog + FAC_GOAL_FACE * _dface
             self._prev_goal_dist, self._prev_goal_bearing = _gd, _gb
-            if _gd < GOAL_STANDOFF and not self._goal_reached:
+            if _pol > 0 and _gd < GOAL_STANDOFF and not self._goal_reached:
                 self._goal_reached = True
+                goal_reached_now = True
+                r_goal_reached = FAC_GOAL_REACHED
+            elif _pol < 0 and _gd > GOAL_DIST_MAX and not self._goal_reached:
+                self._goal_reached = True        # fled far enough
                 goal_reached_now = True
                 r_goal_reached = FAC_GOAL_REACHED
             # swerve: obstacle seen close -> reward body-frame lateral velocity
@@ -1658,6 +1674,18 @@ class OpenCatGymEnv(gym.Env):
             self._terrain_feat = raw
         return getattr(self, "_terrain_feat", np.zeros(4))
 
+    def _ref_pose(self, phase_idx):
+        """Residual base pose for this phase: wkF, or blended toward wkL / wkR by
+        the yaw command when TURN_BLEND is on. cmd_yaw=0 => pure wkF."""
+        base = WKF_REF[phase_idx % len(WKF_REF)]
+        if not TURN_BLEND or WKL_REF is None:
+            return base
+        w = float(np.clip(self._cmd_yaw / CMD_YAW_MAX, -1.0, 1.0))
+        if abs(w) < 1e-3:
+            return base
+        turn = WKL_REF if w > 0 else WKR_REF
+        return base + abs(w) * (turn[phase_idx % len(turn)] - base)
+
     def _spawn_goal(self):
         """Pick this episode's goal: a point in the ground plane at a random
         bearing (incl. behind) and distance, or no goal (velocity fallback)."""
@@ -1666,6 +1694,7 @@ class OpenCatGymEnv(gym.Env):
         self._goal_reached = False
         self._prev_goal_dist = None
         self._prev_goal_bearing = None
+        self._goal_polarity = 1.0        # +1 approach, -1 flee / keep-away
         _fg = getattr(self, "_forced_goal", None)   # (bearing_rad, dist_m) or "none" -- eval hook
         if _fg == "none":
             return
@@ -1678,6 +1707,8 @@ class OpenCatGymEnv(gym.Env):
         d = np.random.uniform(GOAL_DIST_MIN, GOAL_DIST_MAX)
         # robot spawns near origin facing +x
         self._goal_xy = np.array([d * np.cos(th), d * np.sin(th)])
+        if np.random.rand() < GOAL_AVOID_FRAC:
+            self._goal_polarity = -1.0        # flee: reward increasing distance
         if np.random.rand() < GOAL_MOVING_FRAC:
             mth = np.random.uniform(-np.pi, np.pi)
             self._goal_vel = GOAL_MOVE_SPEED * np.array([np.cos(mth), np.sin(mth)])
@@ -1695,16 +1726,18 @@ class OpenCatGymEnv(gym.Env):
         return float(bearing), dist
 
     def _goal_obs(self):
-        """[goal_bearing_norm, goal_dist_norm, goal_active]; empty when GOAL_MODE
-        off so it hstacks without changing observation size."""
+        """[goal_bearing_norm, goal_dist_norm, goal_active, goal_polarity];
+        empty when GOAL_MODE off so it hstacks without changing obs size.
+        polarity +1 = approach, -1 = flee, 0 = no goal."""
         if not GOAL_MODE:
             return np.zeros(0)
         gv = self._goal_vector()
         if gv is None:
-            return np.zeros(3)
+            return np.zeros(4)
         bearing, dist = gv
         return np.array([np.clip(bearing / np.pi, -1.0, 1.0),
-                        np.clip(dist / GOAL_DIST_MAX, 0.0, 1.0), 1.0])
+                        np.clip(dist / GOAL_DIST_MAX, 0.0, 1.0), 1.0,
+                        self._goal_polarity])
 
     def _scatter_obstacles(self, max_h):
         """Small static boxes/steps scattered in the robot's forward path --
