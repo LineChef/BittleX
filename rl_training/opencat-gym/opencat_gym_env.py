@@ -415,6 +415,31 @@ EPISODE_LENGTH       = _g2e("EPISODE_LENGTH", EPISODE_LENGTH)   # longer episode
 # ~half of episodes instead of forcing 0 (which is the G4 default -- see the
 # comment there). Re-enables turning for the goal-directed locomotion work.
 TRAIN_YAW_RANGE      = _g2e("TRAIN_YAW", 0.0)
+
+# --- Goal-bearing command (Phase A: goal-directed locomotion) ---------------
+# When GOAL_MODE is on, 3 floats are appended to the observation (AFTER the
+# terrain feature, so [.. | terrain(4) | goal(3)]):
+#     [ goal_bearing_norm, goal_dist_norm, goal_active ]
+#   goal_bearing_norm  angle from body heading to the goal / pi, in [-1, 1]
+#   goal_dist_norm     distance to goal / GOAL_DIST_MAX, clipped [0, 1]
+#   goal_active        1.0 if a goal is set this episode, else 0.0
+# A goal is a point in the ground plane. The policy is rewarded for closing
+# distance (r_goal_progress) and for reaching it (r_goal_reached, within
+# GOAL_STANDOFF). When a goal is active, FAC_HEADING retargets from "hold launch
+# heading" to "face the goal" at the gentler FAC_HEADING_GOAL (room to detour).
+# GOAL_MODE off (default) => obs unchanged, run20m_ppo byte-identical.
+GOAL_MODE          = _g2e("GOAL_MODE", False)
+GOAL_DIST_MAX      = _g2e("GOAL_DIST_MAX", 2.5)      # m; obs distance normaliser + spawn ceiling
+GOAL_DIST_MIN      = _g2e("GOAL_DIST_MIN", 0.5)      # m; spawn floor
+GOAL_STANDOFF      = _g2e("GOAL_STANDOFF", 0.20)     # m; "reached" when within this (stop short of a person)
+GOAL_NONE_FRAC     = _g2e("GOAL_NONE_FRAC", 0.20)    # frac of episodes with NO goal (velocity fallback preserved)
+GOAL_MOVING_FRAC   = _g2e("GOAL_MOVING_FRAC", 0.15)  # frac of goal episodes where the goal drifts (follow behaviour)
+GOAL_MOVE_SPEED    = _g2e("GOAL_MOVE_SPEED", 0.04)   # m/s drift speed for a moving goal
+FAC_GOAL_PROGRESS  = _g2e("FAC_GOAL_PROGRESS", 320.0)  # reward per m of distance closed to the goal (mirrors FAC_MOVEMENT scale)
+FAC_GOAL_FACE      = _g2e("FAC_GOAL_FACE", 8.0)        # small reward per rad of |bearing-to-goal| reduced -- gradient when the goal is ~behind
+FAC_GOAL_REACHED   = _g2e("FAC_GOAL_REACHED", 60.0)    # one-shot bonus on reaching the goal (episode then ends)
+FAC_HEADING_GOAL   = _g2e("FAC_HEADING_GOAL", 1.5)     # heading penalty factor while a goal is active (vs FAC_HEADING=5.0 straight-hold)
+FAC_OBS_SWERVE     = _g2e("FAC_OBS_SWERVE", 6.0)       # reward lateral velocity AWAY from a close obstacle's bearing (needs GOAL_MODE + TERRAIN_FEATURE)
 # NEW knobs -- only consulted by _scatter_obstacles; default 0.0 => old behaviour.
 OBSTACLE_TALL_FRAC = _g2e("OBSTACLE_TALL_FRAC", 0.0)  # frac of scattered boxes forced tall (30-55mm -> trips tall_flag, "go around")
 OBSTACLE_SPAN_FRAC = _g2e("OBSTACLE_SPAN_FRAC", 0.0)  # frac forced to span the lane (wide, y~0 -> unavoidable, must steer/slow)
@@ -486,7 +511,7 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0)
+        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (3 if GOAL_MODE else 0)
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
 
@@ -807,8 +832,21 @@ class OpenCatGymEnv(gym.Env):
         # Accumulated-heading penalty -- its own term (not folded into
         # body_stability) so its contribution shows up separately in info.
         # gait-refinement G2: track the integrated commanded heading (cmd_yaw=0 -> hold straight)
-        _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
-        heading_penalty = FAC_HEADING * _herr ** 2
+        # GOAL_MODE: advance a moving goal, then (if a goal is active) retarget
+        # the heading penalty from "hold launch heading" to "face the goal" at
+        # the gentler FAC_HEADING_GOAL -- leaves room to detour around obstacles.
+        _gv = None
+        if GOAL_MODE:
+            if getattr(self, "_goal_xy", None) is not None and not self._goal_reached \
+                    and np.any(self._goal_vel):
+                self._goal_xy = self._goal_xy + self._goal_vel / CONTROL_HZ
+            _gv = self._goal_vector()
+        if _gv is not None:
+            _herr = _gv[0]
+            heading_penalty = FAC_HEADING_GOAL * _herr ** 2
+        else:
+            _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+            heading_penalty = FAC_HEADING * _herr ** 2
 
         # Imitation reward: match Bittle's built-in wkF walk at the current gait
         # phase. DeepMimic-style exp(-sharpness * sum sq per-joint error), in
@@ -939,7 +977,31 @@ class OpenCatGymEnv(gym.Env):
                 _slow = float(np.exp(-(v_fwd / 0.05) ** 2))
                 obs_stop_rew = FAC_OBS_STOP * _level * _slow
 
+        # --- Goal-directed terms (GOAL_MODE; else all 0.0) ---
+        r_goal_progress = r_goal_reached = obs_swerve_rew = 0.0
+        goal_reached_now = False
+        if GOAL_MODE and _gv is not None:
+            _gb, _gd = _gv
+            _pgd = self._prev_goal_dist if self._prev_goal_dist is not None else _gd
+            _pgb = self._prev_goal_bearing if self._prev_goal_bearing is not None else _gb
+            r_goal_progress = (FAC_GOAL_PROGRESS * (_pgd - _gd)
+                               + FAC_GOAL_FACE * (abs(_pgb) - abs(_gb)))
+            self._prev_goal_dist, self._prev_goal_bearing = _gd, _gb
+            if _gd < GOAL_STANDOFF and not self._goal_reached:
+                self._goal_reached = True
+                goal_reached_now = True
+                r_goal_reached = FAC_GOAL_REACHED
+            # swerve: obstacle seen close -> reward body-frame lateral velocity
+            # AWAY from its bearing (steer past instead of into it).
+            if TERRAIN_FEATURE and OBSTACLE_REWARD and _pr > 0.5 and _pd < OBS_REWARD_DIST \
+                    and abs(_pb) > 0.05:
+                _vlat = -_wv[0] * np.sin(_yaw_now) + _wv[1] * np.cos(_yaw_now)
+                obs_swerve_rew = FAC_OBS_SWERVE * max(0.0, -np.sign(_pb) * _vlat)
+
         reward = (FAC_MOVEMENT * capped_forward
+                 + r_goal_progress
+                 + r_goal_reached
+                 + obs_swerve_rew
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
@@ -1009,13 +1071,22 @@ class OpenCatGymEnv(gym.Env):
             "r_obs_bump": -penalty_scale * obs_bump_pen,
             "r_obs_clear": obs_clear_rew,
             "r_obs_stop": obs_stop_rew,
+            "r_goal_progress": r_goal_progress,
+            "r_goal_reached": r_goal_reached,
+            "r_obs_swerve": obs_swerve_rew,
+            "goal_dist_m": (self._goal_vector()[1] if (GOAL_MODE and self._goal_vector()) else 0.0),
         }
 
         # Stop criteria of current learning episode:
-        # step budget, or the robot fell (-> recovery window if FAC_RECOVERY > 0).
+        # step budget, goal reached, or the robot fell (-> recovery window).
         self.step_counter += 1
         recovery_reward = 0.0
-        if self.step_counter > self._step_budget:
+        if goal_reached_now:
+            self.step_counter_session += self.step_counter
+            terminated = False
+            truncated = True
+            self._record_outcome(1)                  # reached the goal = success
+        elif self.step_counter > self._step_budget:
             self.step_counter_session += self.step_counter
             terminated = False
             truncated = True
@@ -1095,7 +1166,7 @@ class OpenCatGymEnv(gym.Env):
                 info[_k] = 0.0
 
         self.observation = np.hstack((self.state_robot, self.angle_history,
-                                      self._terrain_obs()))
+                                      self._terrain_obs(), self._goal_obs()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -1119,6 +1190,17 @@ class OpenCatGymEnv(gym.Env):
             self._cmd_fwd = float(np.clip(fwd, -0.10, CMD_FWD_MAX))
         if yaw is not None:
             self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
+
+    def set_goal(self, bearing=None, dist=None):
+        """Force this episode's goal (eval). bearing rad (0=ahead, +=left), dist m.
+        set_goal(None, None) clears the forced goal; pass bearing='none' for a
+        deliberate no-goal episode. Persists across resets; applied on next reset."""
+        if bearing == "none":
+            self._forced_goal = "none"
+        elif bearing is None:
+            self._forced_goal = None
+        else:
+            self._forced_goal = (float(bearing), float(dist if dist is not None else 1.5))
 
     def _sample_command(self):
         if getattr(self, '_forced_cmd', None) is not None:
@@ -1491,9 +1573,11 @@ class OpenCatGymEnv(gym.Env):
         self.recent_angles = np.tile(state_joints, LENGTH_RECENT_ANGLES)
         self._terrain_age = TERRAIN_REFRESH        # force a scan on the first step
         self._terrain_feat = np.zeros(4)
+        self._spawn_goal()
         self.observation = np.concatenate((self.state_robot,
                                            self.angle_history,
-                                           self._terrain_obs()))
+                                           self._terrain_obs(),
+                                           self._goal_obs()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -1567,6 +1651,54 @@ class OpenCatGymEnv(gym.Env):
                 raw[2] = np.clip(raw[2] + np.random.normal(0.0, TERRAIN_JITTER), -1.0, 1.0)
             self._terrain_feat = raw
         return getattr(self, "_terrain_feat", np.zeros(4))
+
+    def _spawn_goal(self):
+        """Pick this episode's goal: a point in the ground plane at a random
+        bearing (incl. behind) and distance, or no goal (velocity fallback)."""
+        self._goal_xy = None
+        self._goal_vel = np.zeros(2)
+        self._goal_reached = False
+        self._prev_goal_dist = None
+        self._prev_goal_bearing = None
+        _fg = getattr(self, "_forced_goal", None)   # (bearing_rad, dist_m) or "none" -- eval hook
+        if _fg == "none":
+            return
+        if _fg is not None:
+            self._goal_xy = np.array([_fg[1] * np.cos(_fg[0]), _fg[1] * np.sin(_fg[0])])
+            return
+        if not GOAL_MODE or np.random.rand() < GOAL_NONE_FRAC:
+            return
+        th = np.random.uniform(-np.pi, np.pi)
+        d = np.random.uniform(GOAL_DIST_MIN, GOAL_DIST_MAX)
+        # robot spawns near origin facing +x
+        self._goal_xy = np.array([d * np.cos(th), d * np.sin(th)])
+        if np.random.rand() < GOAL_MOVING_FRAC:
+            mth = np.random.uniform(-np.pi, np.pi)
+            self._goal_vel = GOAL_MOVE_SPEED * np.array([np.cos(mth), np.sin(mth)])
+
+    def _goal_vector(self):
+        """(bearing_rad, dist_m) from the robot's current pose to the goal, or
+        None if no active goal. bearing 0 = straight ahead, + = goal to the left."""
+        if getattr(self, "_goal_xy", None) is None or getattr(self, "_goal_reached", False):
+            return None
+        pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+        yaw = p.getEulerFromQuaternion(orn)[2]
+        dx, dy = self._goal_xy[0] - pos[0], self._goal_xy[1] - pos[1]
+        dist = float(np.hypot(dx, dy))
+        bearing = (np.arctan2(dy, dx) - yaw + np.pi) % (2 * np.pi) - np.pi
+        return float(bearing), dist
+
+    def _goal_obs(self):
+        """[goal_bearing_norm, goal_dist_norm, goal_active]; empty when GOAL_MODE
+        off so it hstacks without changing observation size."""
+        if not GOAL_MODE:
+            return np.zeros(0)
+        gv = self._goal_vector()
+        if gv is None:
+            return np.zeros(3)
+        bearing, dist = gv
+        return np.array([np.clip(bearing / np.pi, -1.0, 1.0),
+                        np.clip(dist / GOAL_DIST_MAX, 0.0, 1.0), 1.0])
 
     def _scatter_obstacles(self, max_h):
         """Small static boxes/steps scattered in the robot's forward path --

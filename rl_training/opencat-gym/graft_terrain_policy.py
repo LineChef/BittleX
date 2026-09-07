@@ -1,22 +1,22 @@
-"""Graft a vision-blind (278-d) policy into a vision (282-d) network.
+"""Graft a smaller-observation policy into a wider network (new zero-init cols).
 
-The forward terrain feature adds 4 observation dims. To finetune ON TOP OF the
-existing gait rather than from scratch, copy every weight of the source policy
-into a fresh 282-d network, and ZERO the 4 new input columns of each obs-facing
-layer -- so at step 0 the terrain inputs contribute nothing and the grafted
-policy reproduces the source gait exactly. Training can then only ADD a learned
-response to the feature; it starts as the existing gait, so it can't "fight" it.
+To finetune ON TOP OF the existing gait rather than from scratch, copy every
+weight of the source policy into a fresh network sized for the current env, and
+ZERO the new input columns of each obs-facing layer -- so at step 0 the new
+inputs contribute nothing and the grafted policy reproduces the source gait
+exactly. Training can then only ADD a learned response; it starts as the
+existing gait, so it can't "fight" it.
 
-    python graft_terrain_policy.py                       # run20m_ppo -> run20m_graft282
-    python graft_terrain_policy.py --src trained/foo_ppo --dst trained/foo_graft282
+The target width comes from whatever G2E_* flags are set when this runs:
+    G2E_TERRAIN_FEATURE=1 python graft_terrain_policy.py \
+        --src trained/run20m_ppo --dst trained/run20m_graft282     # 278 -> 282
+    G2E_TERRAIN_FEATURE=1 G2E_GOAL_MODE=1 python graft_terrain_policy.py \
+        --src trained/run20m_ppo --dst trained/run20m_graft285     # 278 -> 285
 
-Then:  G2E_TERRAIN_FEATURE=1 G2E_OBSTACLE_REWARD=1 ... \
-       python train.py --from trained/run20m_graft282 --tag <tag> --steps 3e6
+Then:  <same G2E_* flags> python train.py --from <dst> --tag <tag> --steps <N>
 """
 import argparse
 import os
-
-os.environ["G2E_TERRAIN_FEATURE"] = "1"           # target env must be 282-d
 
 import numpy as np
 import torch
@@ -37,8 +37,9 @@ src_dim = src.observation_space.shape[0]
 
 env = make_vec_env(OpenCatGymEnv, n_envs=1, vec_env_cls=DummyVecEnv)
 dst_dim = env.observation_space.shape[0]
-print(f"src obs dim {src_dim}   dst obs dim {dst_dim}   (SIZE_OBSERVATION={SIZE_OBSERVATION})")
-assert dst_dim == src_dim + 4, f"expected dst = src + 4, got {src_dim} -> {dst_dim}"
+n_new = dst_dim - src_dim
+print(f"src obs dim {src_dim}   dst obs dim {dst_dim}   (+{n_new} new cols)   (SIZE_OBSERVATION={SIZE_OBSERVATION})")
+assert 0 < n_new <= 8, f"expected dst = src + a few, got {src_dim} -> {dst_dim}"
 
 dst = PPO("MlpPolicy", env, seed=42, policy_kwargs=dict(net_arch=[256, 256]), device="cpu")
 
@@ -53,11 +54,11 @@ for k, dst_t in dst.policy.state_dict().items():
         new_sd[k] = src_t.clone()
         print(f"  {k:44s} copied {tuple(src_t.shape)}")
     elif (src_t.dim() == 2 and dst_t.shape[0] == src_t.shape[0]
-          and dst_t.shape[1] == src_t.shape[1] + 4):
+          and dst_t.shape[1] == src_t.shape[1] + n_new):
         g = torch.zeros_like(dst_t)
-        g[:, :src_t.shape[1]] = src_t            # old obs columns; new 4 stay 0
+        g[:, :src_t.shape[1]] = src_t            # old obs columns; new cols stay 0
         new_sd[k] = g
-        print(f"  {k:44s} GRAFTED {tuple(src_t.shape)} -> {tuple(dst_t.shape)}  (+4 cols = 0)")
+        print(f"  {k:44s} GRAFTED {tuple(src_t.shape)} -> {tuple(dst_t.shape)}  (+{n_new} cols = 0)")
     else:
         new_sd[k] = dst_t.clone()
         print(f"  {k:44s} SHAPE MISMATCH src{tuple(src_t.shape)} dst{tuple(dst_t.shape)} -> left fresh")
