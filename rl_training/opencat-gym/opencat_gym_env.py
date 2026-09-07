@@ -444,6 +444,8 @@ FAC_OBS_SWERVE     = _g2e("FAC_OBS_SWERVE", 6.0)       # reward lateral velocity
 OBSTACLE_TALL_FRAC = _g2e("OBSTACLE_TALL_FRAC", 0.0)  # frac of scattered boxes forced tall (30-55mm -> trips tall_flag, "go around")
 OBSTACLE_SPAN_FRAC = _g2e("OBSTACLE_SPAN_FRAC", 0.0)  # frac forced to span the lane (wide, y~0 -> unavoidable, must steer/slow)
 OBSTACLE_COUNT     = _g2e("OBSTACLE_COUNT", 0)         # >0 => fixed box count per episode instead of randint(4,10)
+OBSTACLE_X_HI      = _g2e("OBSTACLE_X_HI", 0.0)        # >0 => spread scattered boxes out to this x (m) instead of RANDOM_TERRAIN_X_RANGE[1] -- for goal-path courses where the robot travels >1 m
+OBSTACLE_Y_SPREAD  = _g2e("OBSTACLE_Y_SPREAD", 0.0)   # >0 => non-spanning box lateral half-range (m) instead of 0.03 -- detour room
 
 # --- Gated obstacle-response reward (Phase 8 perception-in-the-loop) ---------
 # The current gait already SURVIVES obstacles; nothing in the reward measures
@@ -1726,15 +1728,16 @@ class OpenCatGymEnv(gym.Env):
                 h = np.random.uniform(0.058, 0.085)   # "go around" height -- clears TERRAIN_TALL_Z (0.055) so vision tall_flag fires
             else:
                 h = np.random.uniform(0.002, max(0.003, _cap))
-            x = np.random.uniform(*RANDOM_TERRAIN_X_RANGE)
+            _x_hi = OBSTACLE_X_HI if OBSTACLE_X_HI > 0 else RANDOM_TERRAIN_X_RANGE[1]
+            x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], _x_hi)
+            _y_hw = OBSTACLE_Y_SPREAD if OBSTACLE_Y_SPREAD > 0 else 0.03
             if np.random.rand() < OBSTACLE_SPAN_FRAC:
                 y = np.random.uniform(-0.02, 0.02)          # centred -> blocks the lane
                 across = np.random.uniform(0.18, 0.30)      # wide enough to span it
             else:
-                y = np.random.uniform(-0.03, 0.03)   # 2026-09-04: narrowed from +/-0.06 -- the gait
-                                                       # walks close to dead straight now, rarely drifts
-                                                       # off-line, so a wide lateral spread mostly placed
-                                                       # boxes it would just walk past
+                y = np.random.uniform(-_y_hw, _y_hw)  # 2026-09-04: narrowed to +/-0.03 for the
+                                                       # straight walker; OBSTACLE_Y_SPREAD widens
+                                                       # it back for goal-path courses (detour room)
                 across = np.random.uniform(0.04, 0.10)
             z_ground = -(n[0] * x + n[1] * y) / n[2]   # plane through the origin
             cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
