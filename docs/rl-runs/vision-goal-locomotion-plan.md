@@ -133,6 +133,50 @@ pull, `FAC_IMITATION` 7->4) / **STOP**. All steps run detached; progress to
 135/180deg, no-goal drift <15deg, cruise fall <=8%, reward not collapsed
 (final >= 55% of peak). STOP iff reach <30% at 0deg. Else RETUNE (once).
 
+## Phase D — the A/B we never ran: from-scratch, vision vs blind (2026-09-07)
+
+Phase A–C all tested vision as a *finetune*, and finetunes fail here. Phase D is
+the clean test the user asked for: **two fresh 20M runs, identical course /
+rewards / anchor, the only difference is whether the policy can see forward.**
+
+**Design (committed `ba77f13`, driver `run_ab_vision.sh`):**
+- `abD_vision` — fresh 20M, `G2E_TERRAIN_FEATURE=1` (obs 282).
+- `abD_blind` — fresh 20M, `TERRAIN_FEATURE` off (obs 278). Identical everything else.
+- Shared: cluttered course (`OBSTACLE_COUNT=5`, 30% tall, spread to 1.0 m,
+  18 mm ledges, rubble 0.35, slopes 10°); **R-NOSTALL** anti-stall reward
+  (`FAC_NOSTALL=22`: dense window-speed bleed under 40% of cmd + `+8` per 0.15 m
+  cleared *while an obstacle was in view*) — the term that gives vision leverage;
+  **`FAC_IMITATION` 11 -> 5** (loosen the `wkF` anchor so the gait is free to
+  adapt — the user's concern that the anchor has been fighting a vision response).
+- `RESIDUAL_MODE` stays ON (isolates *vision*, not architecture; 20M is proven
+  sufficient for residual-from-scratch). No turning, no goal, no cliff — this run
+  is only about "does seeing forward help obstacle walking."
+- Eval: `eval_obstacle_response.py` on both (matched seeds, 40 ep) + decathlon
+  each (base-capability regression check).
+
+**Question:** does `abD_vision` make significantly more forward progress / stall
+less on the cluttered course than `abD_blind`, without a decathlon regression?
+If yes -> vision-in-the-loop is worth pursuing (Tier B proper). If ~equal ->
+rule it out, ship the behaviour-layer `Avoider` reflex (Phase 8 plan).
+
+**Timing:** ~9.3 h + ~8.5 h + ~2 h eval ≈ **20 h**. Started 2026-09-07 ~11 AM ET
+-> complete **~7 AM ET 2026-09-08** (well before the Tue 1 PM quota rollover).
+
+### >>> RESUME (Phase D) <<<
+1. `tail -40 rl_training/opencat-gym/trained/ab_vision_results.log`.
+2. Ends with `A/B COMPLETE`: read `trained/abD_eval.txt`,
+   `abD_vision_obs.json` vs `abD_blind_obs.json` (forward distance / stall /
+   clip / fall on the obstacle course), `abD_*_deca.json` (regression check).
+   Verdict: vision "significantly better" = clearly more forward distance / less
+   stall on the cluttered course AND no decathlon regression.
+   Then write the report + update `docs/project-plan.md` Phase 8 + memory.
+3. Mid-run (no final line) + `pgrep -f 'run_ab_vision|train.py'` alive: let it
+   finish, re-arm a watcher on `ab_vision_results.log`.
+4. Process died mid-train: last `trained/abD_*_console.log` + checkpoint show
+   where; re-run `run_ab_vision.sh` or resume the `train.py` with `--from` the
+   last `trained/checkpoints/abD_*_<steps>_steps.zip`.
+5. `run20m_ppo` untouched -- always the fallback.
+
 ### Phase C RESULT (2026-09-07 10:02): STOPPED at the smoke gate.
 `phaseC_s1` (finetune from `run20m_graft289`, full stack): goal-reach **0% at
 every bearing**, no-goal heading drift **46.2°** (worse than A: 34.7 -> 37.3 ->
