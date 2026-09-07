@@ -108,6 +108,10 @@ g2vision() {
 }
 g2vision-demo() { _g2py -m pi_pipeline.vision demo; }    # mock feed, no hardware
 
+# g2watchab [vision|blind] [latest|final]  -- replay the Phase D A/B run in the
+#   PyBullet GUI (latest checkpoint while training, or the final policy).
+g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" ); }
+
 # --------------------------------------------------------- voice / conversation
 
 g2chat()  { _g2py -m pi_pipeline.voice --mode text; }    # type to Claude, replies via `say` (needs ANTHROPIC_API_KEY)
