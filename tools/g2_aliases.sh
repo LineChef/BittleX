@@ -112,6 +112,12 @@ g2vision-demo() { _g2py -m pi_pipeline.vision demo; }    # mock feed, no hardwar
 #   PyBullet GUI (latest checkpoint while training, or the final policy).
 g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" ); }
 
+# g2climbwatch [episodes] [ledge-lo] [ledge-hi] [pin-tag]  -- replay the NEWEST
+#   climb_* checkpoint in the PyBullet GUI. Auto-follows the current Phase F
+#   climb run (picks the most-recently-written trained/climb_*.zip, incl mid-run
+#   _steps checkpoints). Defaults: 8 eps, ledge 2.5-5 cm.
+g2climbwatch() { ( "$G2_ROOT/rl_training/opencat-gym/climbwatch" "$@" ); }
+
 # --------------------------------------------------------- voice / conversation
 
 g2chat()  { _g2py -m pi_pipeline.voice --mode text; }    # type to Claude, replies via `say` (needs ANTHROPIC_API_KEY)
