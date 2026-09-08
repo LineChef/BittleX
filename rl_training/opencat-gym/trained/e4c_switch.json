@@ -1,21 +1,27 @@
 {
   "tag": "SWITCH",
-  "episodes_per_seed": 20,
+  "episodes_per_seed": 14,
   "seed_offsets": [
-    0
+    0,
+    10,
+    20,
+    30,
+    40
   ],
-  "n_episodes": 20,
-  "fall_rate": 0.2,
-  "cliff_episodes": 20,
-  "edge_falls": 7,
-  "edge_fall_rate": 0.35,
-  "wall_stops": 0,
-  "fwd_walked_mean": 0.34588503021605443,
-  "fwd_walked_std": 0.08073073393742893,
-  "n_walked": 20,
-  "fwd_all_mean": 0.34588503021605443,
+  "n_episodes": 70,
+  "fall_rate": 0.0,
+  "cliff_episodes": 70,
+  "edge_falls": 0,
+  "edge_fall_rate": 0.0,
+  "wall_stops": 31,
+  "fwd_walked_mean": 0.29526306452445933,
+  "fwd_walked_std": 0.2008223189701366,
+  "n_walked": 39,
+  "fwd_all_mean": 0.170473398821587,
   "mode_mix": {
-    "cruise": 4875
+    "cruise": 6777,
+    "careful": 3781,
+    "halt": 7012
   },
   "encounter_passed_m_with_stepover": [
     null,
@@ -28,9 +34,13 @@
   "n_enc_stepover": 0,
   "n_enc_nostep": 0,
   "body_z_mean_by_source": {
-    "rl": 0.06643748085202537
+    "rl": 0.07349109914479764,
+    "blend": 0.07793439953013237,
+    "scripted": 0.07988950825881128
   },
   "body_pitch_mean_by_source": {
-    "rl": 1.753487185188832e-05
+    "rl": -8.487289466038315e-05,
+    "blend": -6.963692655105411e-05,
+    "scripted": -4.4942723161962216e-05
   }
 }

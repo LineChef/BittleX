@@ -1,21 +1,25 @@
 {
   "tag": "BASELINE",
-  "episodes_per_seed": 20,
+  "episodes_per_seed": 14,
   "seed_offsets": [
-    0
+    0,
+    10,
+    20,
+    30,
+    40
   ],
-  "n_episodes": 20,
-  "fall_rate": 0.2,
-  "cliff_episodes": 20,
-  "edge_falls": 7,
-  "edge_fall_rate": 0.35,
+  "n_episodes": 70,
+  "fall_rate": 0.22857142857142856,
+  "cliff_episodes": 70,
+  "edge_falls": 24,
+  "edge_fall_rate": 0.34285714285714286,
   "wall_stops": 0,
-  "fwd_walked_mean": 0.34588503021605443,
-  "fwd_walked_std": 0.08073073393742893,
-  "n_walked": 20,
-  "fwd_all_mean": 0.34588503021605443,
+  "fwd_walked_mean": 0.35028557937228205,
+  "fwd_walked_std": 0.07813982568212421,
+  "n_walked": 70,
+  "fwd_all_mean": 0.35028557937228205,
   "mode_mix": {
-    "cruise": 4875
+    "cruise": 17002
   },
   "encounter_passed_m_with_stepover": [
     null,
@@ -28,9 +32,9 @@
   "n_enc_stepover": 0,
   "n_enc_nostep": 0,
   "body_z_mean_by_source": {
-    "rl": 0.06643748085202537
+    "rl": 0.06645710232048106
   },
   "body_pitch_mean_by_source": {
-    "rl": 1.753487185188832e-05
+    "rl": -2.7843313899892283e-05
   }
 }

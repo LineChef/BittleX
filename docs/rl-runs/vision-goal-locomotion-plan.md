@@ -344,10 +344,49 @@ Firmware refs already extracted: `wkF/wkL/wkR/cr/tr/vt/bk/rc`.
 Priority: step-over (refine) → inspect → brace → back-out → crouch-walk →
 high-step-up/step-down → sidestep.
 
-**Next:** E-4c = fall-hazard course (drop-offs where blind = fall) + `CliffGuard`
-wired in — the decisive test. E-4b (reward) deferred (training-only). When the
-skill set is frozen and holds on the hazard course → that's the "design frozen"
-gate for one consolidation ~20M (Tier B).
+### E-4c done (2026-09-08): the fall-hazard test — DECISIVE
+
+Pure drop-off course (`CLIFF_PROB=1`, `CLIFF_PLATFORM_HW=0.18`, obstacles off),
+robot marches at a fixed command, `DR_EVAL_FULL`. Switch arm runs `CliffGuard`
+on downward "is there floor ahead" probes (`edge_reading()` — more robust than
+the env's in-box horizontal `_cliff_scan`), forcing `HALT` before the edge.
+`CLIFF_PROB > 0` alone now builds the platform + fall-detection, decoupled from
+the `CLIFF` obs flag, so the blind 278-d policy runs unchanged.
+
+**70 episodes / 5 seed offsets, all drop-off:**
+
+| | walked off the edge | fall rate | halted at edge |
+|---|---|---|---|
+| baseline (blind) | **24/70 (34%)** | 23% | 0 |
+| + `CliffGuard` | **0/70 (0%)** | 0% | 31/70 |
+
+The blind gait walks off a drop-off a third of the time; the vision layer never
+does. This is the "vision or die" result Phases D / E-4 were missing. Cost: on
+the 39 eps it still walked, 0.30 vs 0.35 m forward — the correct trade near a
+cliff. GIFs (blind walks off / CliffGuard halts) in the report.
+
+**Watch it:** `G2E_RANDOM_TERRAIN_PROB=0 G2E_RUBBLE_PROB=0 G2E_LEDGE_PROB=0
+G2E_CLIFF_PLATFORM_HW=0.18 python eval_skill_switch.py --render --episodes 6
+--cliff-prob 1.0 --fwd-cmd 0.14 --max-steps 300` (add `--no-switch` for blind).
+
+### Where Phase E stands
+
+Two clean wins now: **+48%** through low obstacles (E-3 sweep, step-over
+attributed) and **0% vs 34%** edge-falls on drop-offs (E-4c). Both with the
+frozen `run20m_ppo`, 0 training. Skills exercised so far: `STEP_OVER` (trot),
+`HALT`, `CAREFUL`; `CliffGuard` `STOP`/`SLOW`.
+
+**Next:**
+- **E-5 — INSPECT** (peer-down). Needs a sim change first: a near blind zone in
+  `_scan_terrain` (don't report obstacles within ~15 cm / unreliable `tall_flag`
+  up close) *unless* a look-down flag is set. Then INSPECT re-acquires
+  close/stalled obstacles (the E-3 "STEP_OVER didn't fire → stuck" 23 encounters)
+  and enables a graded step-over height.
+- Build out the rest of the skill backlog (brace, back-out, crouch-walk,
+  high-step-up/step-down, sidestep).
+- **E-4b (reward)** deferred — training-only.
+- When the skill set is frozen and holds on a mixed hazard+obstacle course →
+  that's the "design frozen" gate for one consolidation ~20M (Tier B).
 
 **Longer horizon (user, 2026-09-08):** the real answer to "don't plow into
 walls" is *intentional* navigation — always moving toward a chosen destination
