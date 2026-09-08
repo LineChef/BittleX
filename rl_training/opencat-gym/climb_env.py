@@ -34,8 +34,38 @@ WKF_REF = np.load(__file__.replace("climb_env.py", "reference_gait/wkf_ref.npy")
 STANCE = WKF_REF.mean(axis=0)                         # (8,) rad, neutral four-foot pose
 REV = [1, 2, 4, 5, 7, 8, 10, 11]                     # revolute joints, URDF keyframe order
 PAW = [3, 6, 9, 12]                                  # FL FR BR BL paw links
+FRONT_PAW = [3, 6]
 BOUND = np.deg2rad(110.0)
-RES_DEG = 42.0                                        # residual scale -- climb needs big moves
+RES_DEG = 32.0                                        # RESIDUAL scale on top of the scripted base
+
+# --- scripted base: the working part of climb_test.py -- front feet tuck up ->
+# reach forward -> plant on the ledge, body pulls forward staying LEVEL. The
+# policy learns a residual on top; its job is the hard part the script can't do
+# (bring the rear legs up without tipping -- needs IMU feedback). Deltas in DEG
+# from STANCE, URDF order [FLsh FLkn FRsh FRkn  BRhip BRkn BLhip BLkn].
+_BASE_POSES = np.array([
+    [0,   0,   0,   0,   0, 0, 0, 0],       # stance
+    [38, -32,  38, -32,   0, 0, 0, 0],      # front tuck UP
+    [-12, 34, -12,  34,   0, 0, 0, 0],      # front reach fwd + plant on the top
+    [16,  28,  16,  28,   4, 6, 4, 6],      # gentle body pull, front stays planted
+], dtype=float)
+_BASE_SEGS = [14, 20, 24]                             # env-steps per leg of the base motion
+
+
+def _build_base():
+    out = []
+    for a, b, n in zip(_BASE_POSES[:-1], _BASE_POSES[1:], _BASE_SEGS):
+        for t in range(n):
+            w = 0.5 - 0.5 * np.cos(np.pi * (t + 1) / n)
+            out.append(a * (1 - w) + b * w)
+    return np.deg2rad(np.rad2deg(STANCE) + np.array(out))   # (58, 8) rad
+
+
+_BASE = _build_base()
+
+
+def _base_pose(t):
+    return _BASE[min(int(t), len(_BASE) - 1)]
 CTRL_HZ = 60.0
 FRAME_SKIP = 4                                        # 240 Hz sim / 4 = 60 Hz control
 MAX_STEPS = 200                                       # ~3.3 s
@@ -45,10 +75,20 @@ LEDGE_FRONT_X = 0.085                                 # ledge near face, just ah
 LEDGE_LEN = 0.40
 PROFILE_X = np.linspace(0.03, 0.18, 6)                # fwd sample offsets for the height profile
 
-# reward weights (module-level so runs can tune them)
-W_PROG, W_CLIMB, W_HEIGHT = 12.0, 20.0, 6.0
-W_PITCH, W_ROLL, W_JERK, W_ALIVE = 26.0, 14.0, 0.5, 0.2
-BONUS_TOP, PEN_FLIP = 200.0, 100.0
+# reward weights (module-level so runs can tune them). Run 2: pull the policy out
+# of the "stand still, stay level" local optimum found in run 1.
+GOAL_DX = 0.10                      # goal point: this far past the ledge face, at stand height
+SHAPE_SCALE = 42.0                 # potential-based shaping toward that goal (the main driver)
+PHI_W_X, PHI_W_Z = 2.5, 6.0        # potential: horizontal vs vertical distance-to-goal weights
+W_PROG = 6.0                       # small raw forward-progress term on top of the shaping
+W_ROLL = 10.0                      # roll is never wanted
+PEN_PITCH_HARD = 30.0             # penalty ONLY for pitch past PITCH_FREE (approaching a flip)
+PITCH_FREE = 0.80                  # rad (~46 deg): lean up to here is free -- a climb needs it
+W_JERK, W_ALIVE = 0.3, 0.1
+W_FRONT_ON = 4.0                   # per front paw on the ledge top -- gradient at a reachable state
+STALL_PEN, STALL_WIN, STALL_EPS = 2.0, 25, 0.008   # no >8mm gain over 25 steps past step 25 -> stalled
+STALL_KILL = 50                    # stalled this many steps -> end the episode (-20)
+BONUS_TOP, PEN_FLIP = 250.0, 100.0
 FLIP_RAD = 1.2
 
 
@@ -65,8 +105,11 @@ class ClimbEnv(gym.Env):
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(1.0 / 240.0)
         self.action_space = spaces.Box(-1.0, 1.0, (8,), np.float32)
-        self.observation_space = spaces.Box(-np.inf, np.inf, (33,), np.float32)
+        self.observation_space = spaces.Box(-np.inf, np.inf, (34,), np.float32)
         self._robot = None
+
+    def set_ledge(self, lo, hi):                     # curriculum callback hook
+        self.ledge_lo, self.ledge_hi = float(lo), float(hi)
 
     # -- helpers --------------------------------------------------------
     def _proj_gravity(self, quat):
@@ -89,6 +132,7 @@ class ClimbEnv(gym.Env):
         _, ang = p.getBaseVelocity(self._robot)
         js = [p.getJointState(self._robot, j)[0] for j in REV]
         prog = np.clip((bx - LEDGE_FRONT_X) / 0.20, -1.0, 1.5)
+        base_phase = min(1.0, self._t / len(_BASE))       # where we are in the scripted base motion
         return np.concatenate([
             quat,
             np.clip(np.array(ang) * 0.1, -1, 1),
@@ -96,7 +140,7 @@ class ClimbEnv(gym.Env):
             np.array(js) / BOUND,
             action,
             self._height_profile(bx),
-            [prog],
+            [prog, base_phase],
         ]).astype(np.float32)
 
     def _state(self):
@@ -134,11 +178,19 @@ class ClimbEnv(gym.Env):
         self._last_action = np.zeros(8, np.float32)
         self._prev_x, self._prev_z = self._state()[0], self._state()[1]
         self._top_streak = 0
+        self._xhist = [self._prev_x]
+        self._stall_streak = 0
+        self._goal = (LEDGE_FRONT_X + GOAL_DX, self._ledge_h + STAND_Z)
+        self._prev_phi = self._phi(self._prev_x, self._prev_z)
         return self._obs(self._last_action), {}
+
+    def _phi(self, bx, bz):
+        gx, gz = self._goal
+        return -(PHI_W_X * max(0.0, gx - bx) + PHI_W_Z * abs(gz - bz))
 
     def step(self, action):
         action = np.clip(np.asarray(action, np.float32), -1.0, 1.0)
-        tgt = np.clip(STANCE + action * np.deg2rad(RES_DEG), -BOUND, BOUND)
+        tgt = np.clip(_base_pose(self._t) + action * np.deg2rad(RES_DEG), -BOUND, BOUND)
         for _ in range(FRAME_SKIP):
             p.setJointMotorControlArray(self._robot, REV, p.POSITION_CONTROL,
                                         targetPositions=tgt.tolist(), forces=[2.6] * 8)
@@ -146,17 +198,34 @@ class ClimbEnv(gym.Env):
         self._t += 1
 
         bx, bz, roll, pitch, on_top = self._state()
-        d_x, d_z = bx - self._prev_x, bz - self._prev_z
+        d_x = bx - self._prev_x
         self._prev_x, self._prev_z = bx, bz
-
         tgt_z = self._ledge_h + STAND_Z
-        r = (W_PROG * np.clip(d_x / 0.01, -1.0, 1.5)
-             + W_CLIMB * np.clip(d_z / 0.01, 0.0, 1.5)
-             + W_HEIGHT * (1.0 - min(1.0, abs(bz - tgt_z) / 0.06))
-             - W_PITCH * min(1.0, abs(pitch) / 1.0)
+
+        # potential-based shaping toward the on-top goal (the main driver)
+        phi = self._phi(bx, bz)
+        r_shape = SHAPE_SCALE * (phi - self._prev_phi)
+        self._prev_phi = phi
+
+        # stall detection -- kills the "stand still" optimum
+        self._xhist.append(bx)
+        stalled = (self._t > STALL_WIN
+                   and bx - self._xhist[-STALL_WIN - 1] < STALL_EPS)
+        self._stall_streak = self._stall_streak + 1 if stalled else 0
+
+        fp = [p.getLinkState(self._robot, j)[0] for j in FRONT_PAW]
+        front_on = sum(1 for (px, _py, pz) in fp
+                       if pz > self._ledge_h - 0.015 and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
+
+        pitch_over = max(0.0, abs(pitch) - PITCH_FREE)
+        r = (r_shape
+             + W_PROG * np.clip(d_x / 0.01, -1.0, 1.5)
+             + W_FRONT_ON * front_on
              - W_ROLL * min(1.0, abs(roll) / 1.0)
+             - PEN_PITCH_HARD * pitch_over
              - W_JERK * float(np.mean((action - self._last_action) ** 2))
-             + W_ALIVE)
+             + W_ALIVE
+             - (STALL_PEN if stalled else 0.0))
         self._last_action = action
 
         flipped = abs(pitch) > FLIP_RAD or abs(roll) > FLIP_RAD
@@ -170,6 +239,9 @@ class ClimbEnv(gym.Env):
             terminated = True
         elif self._top_streak >= 12:
             r += BONUS_TOP
+            terminated = True
+        elif self._stall_streak >= STALL_KILL:
+            r -= 20.0
             terminated = True
         truncated = self._t >= MAX_STEPS
         return self._obs(action), float(r), terminated, truncated, {

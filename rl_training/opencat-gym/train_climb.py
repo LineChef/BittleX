@@ -56,23 +56,39 @@ def watch(path, ledge_lo, ledge_hi, episodes):
     env.close()
 
 
-def train(steps, ledge_lo, ledge_hi, n_envs, tag):
+def train(steps, ledge_lo, ledge_hi, n_envs, tag, curr_end=0.0):
     from stable_baselines3 import PPO
     from stable_baselines3.common.env_util import make_vec_env
     from stable_baselines3.common.vec_env import SubprocVecEnv
-    from stable_baselines3.common.callbacks import CheckpointCallback
+    from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
     from climb_env import ClimbEnv
 
     env = make_vec_env(lambda: ClimbEnv(ledge_lo=ledge_lo, ledge_hi=ledge_hi),
                        n_envs=n_envs, vec_env_cls=SubprocVecEnv)
     ckpt = CheckpointCallback(save_freq=max(100_000 // n_envs, 1),
                               save_path="trained/", name_prefix=tag)
+    cbs = [ckpt]
+
+    if curr_end > 0:
+        # linear height curriculum: (0.010, 0.020) -> (ledge_lo, ledge_hi) over
+        # `curr_end` fraction of training, then hold at full range.
+        class Curriculum(BaseCallback):
+            def _on_step(self):
+                f = min(1.0, self.num_timesteps / (curr_end * steps))
+                lo = 0.010 + f * (ledge_lo - 0.010)
+                hi = 0.020 + f * (ledge_hi - 0.020)
+                self.training_env.env_method("set_ledge", lo, hi)
+                return True
+        cbs.append(Curriculum())
+        print(f"curriculum: ledge (0.010,0.020) -> ({ledge_lo},{ledge_hi}) over "
+              f"{curr_end:.0%} of {steps} steps")
+
     model = PPO("MlpPolicy", env, seed=42,
                 policy_kwargs=dict(net_arch=[256, 256]),
                 n_steps=int(2048 * 4 / n_envs), batch_size=256,
-                gamma=0.99, ent_coef=0.004, learning_rate=3e-4,
+                gamma=0.99, ent_coef=0.012, learning_rate=3e-4,
                 verbose=1, tensorboard_log="trained/tensorboard_logs/")
-    model.learn(int(steps), callback=ckpt, tb_log_name=tag)
+    model.learn(int(steps), callback=cbs, tb_log_name=tag)
     out = f"trained/{tag}"
     model.save(out)
     print(f"saved {out}.zip")
@@ -84,6 +100,9 @@ if __name__ == "__main__":
     ap.add_argument("--ledge-lo", type=float, default=0.04)
     ap.add_argument("--ledge-hi", type=float, default=0.04)
     ap.add_argument("--n-envs", type=int, default=6)
+    ap.add_argument("--curr-end", type=float, default=0.0,
+                    help="fraction of training over which to ramp ledge height from "
+                         "(1,2 cm) to (--ledge-lo,--ledge-hi); 0 = no curriculum")
     ap.add_argument("--tag", default="climb_smoke")
     ap.add_argument("--watch", default=None, help="checkpoint path to replay")
     ap.add_argument("--episodes", type=int, default=4)
@@ -95,4 +114,4 @@ if __name__ == "__main__":
     elif a.watch:
         watch(a.watch, a.ledge_lo, a.ledge_hi, a.episodes)
     else:
-        train(a.steps, a.ledge_lo, a.ledge_hi, a.n_envs, a.tag)
+        train(a.steps, a.ledge_lo, a.ledge_hi, a.n_envs, a.tag, a.curr_end)
