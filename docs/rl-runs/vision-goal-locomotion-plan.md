@@ -406,38 +406,71 @@ Individually: **+48%** through low obstacles (E-3, step-over attributed) and
 has no turn layer). Skills built: `STEP_OVER` (trot), `BACK_OUT` (`bk`), `HALT`,
 `CAREFUL`; `CliffGuard` `STOP`/`SLOW`. Defined-not-triggered: `INSPECT`.
 
+### `smoke_vfix3` RESULT (2026-09-08): learned-vision-in-the-policy CLOSED
+
+3M from-scratch vision-conditioned run, all E-2 + slope fixes active
+(scan pinned to ground, slope-following, `OBSTACLE_REWARD=1`, `FAC_SPEED_TRACK`
+60→25, `FAC_OBS_STOP=0`). `ep_rew_mean` 524 → 193, declining the whole way.
+
+3-way obstacle-response eval (`resp_3way.json`, 40 ep) vs Phase D's
+`abD_vision` / `abD_blind`:
+
+| | fwd speed | clip (all) | peakF (all) | r_imitation | decel |
+|---|---|---|---|---|---|
+| `smoke_vfix3` | **0.025 m/s** (crawl) | 0.686 | 2.5 N | 9.9 (glued to wkF) | None (no cruise) |
+| `abD_vision` | ~0.11 | 0.788 | 3.1 N | 7.4 | 0.36 |
+| `abD_blind` | ~0.11 | 0.803 | 2.9 N | 7.5 | 1.15 |
+
+**It learned to creep (0.025 m/s ≈ standstill), not to step over.** Lower
+contact force / clip only because it barely moves. No step-over motion —
+imitation reward *higher* than Phase D (stayed on the normal walk). `r_obs_clear`
+had the opportunity (low obstacle in range 53% of steps) and the policy didn't
+take it. `r_speed` NEAR 2.06 vs CLEAR 3.02 → the feature *does* reach the policy
+and modulate speed by obstacle proximity, but softening `FAC_SPEED_TRACK`
+removed the thing forcing forward motion → global stall.
+
+**Two data points now: plow (Phase D, speed-track 60) or stall (this,
+speed-track 25). Both dead ends.** Reward-shaping emergent "see it → step over
+it" into a bounded-residual policy at 3M does not work. **The learned
+vision-in-the-policy thread is closed.** Don't reopen it with more reward tuning.
+`smoke_vfix*` checkpoints kept for the record; not adopted.
+
 ### >>> RESUME (Phase E) <<<
 
 State: all committed + pushed on `development`. Report:
-`claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
-
-**Running (relaunched 2026-09-08, ~30 min, tb `PPO_118`):** `smoke_vfix3` — a 3M
-from-scratch vision-conditioned smoke with **all the E-2 + slope fixes active**:
-scan pinned to true ground AND slope-following (commit `ede5fa2` — a rising slope
-no longer reads as an obstacle), `OBSTACLE_REWARD=1` (turns on `r_obs_clear`,
-which read 0.0 in Phase D), `FAC_SPEED_TRACK=25` (down from 60), `FAC_OBS_STOP=0`.
-(An earlier `smoke_vfix` without the slope fix was killed and replaced.)
-**Question:** with the sensor exploits gone and the reward no longer fighting a
-slowdown, does the vision policy adapt its footfalls to obstacles, or still plow
-like Phase D? When done: `g2watch smoke_vfix3`; read `trained/smoke_vfix3.log`
-reward curve + `tail trained/tensorboard_logs/PPO_118`. Adapts → learned path
-revived, a full run is worth it. Plows → scripted-skills approach confirmed as
-*the* path. Full env config: this file's git history around commit `ede5fa2`.
+`claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`. Nothing running.
+**Scripted-skills (Phase E) is confirmed as THE vision-for-walking path.**
 
 Next, in order:
-1. **E-5 — INSPECT.** Env change first: a near blind zone in `_scan_terrain`
+1. **Authored `STEP_OVER` keyframe.** Trot (`tr_ref`) is what's wired and it's a
+   *walk* gait, not a lift-and-clear. Hand-author a real high-step (front feet
+   lift ~5–6 cm, weight shift, back feet follow) — or extract/blend from `vt`
+   (march) — and A/B it vs trot on the E-3 low-obstacle course. This is the
+   single biggest lever on the +48%.
+2. **E-5 — INSPECT.** Env change first: a near blind zone in `_scan_terrain`
    (don't report obstacles within ~0.15 m; `tall_flag` unreliable up close)
    *unless* a look-down flag is set. Then `GaitSelector` triggers `INSPECT` on
-   "close + unresolved" or after a `BACK_OUT`, and it re-acquires the obstacle /
-   picks a step height. `SkillSwitch` already has the `INSPECT` mode (held
-   crouch, `cr_ref`).
-2. **More skills** (sandbox backlog table above): brace, crouch-walk,
-   high-step-up / step-down, sidestep (needs authoring).
-3. **E-4b — reward rework** (deferred, training-only): detected-and-cleared ≥
-   never-detected; don't punish slowing while an obstacle is in view.
-4. When the skill set is frozen → the "design frozen" gate for one
-   consolidation ~20M (Tier B). Not before hardware confirms the scripted layer's
-   limits (open-loop fragility, blend transients) actually bite.
+   "close + unresolved" or after a `BACK_OUT`; it re-acquires the obstacle and
+   picks a step height. `SkillSwitch` already has the `INSPECT` mode (`cr_ref`).
+3. **Per-ray endpoint grounding** for `_scan_terrain` (the deferred slope polish):
+   probe the ground at each of the 9 ray endpoints, aim each ray at its own
+   endpoint (clamp the lift), so the fan drapes over curved / transitioning
+   terrain instead of a single straight beam.
+4. **More skills** (sandbox backlog table above): brace, crouch-walk,
+   high-step-up / step-down, sidestep (needs authoring — the "go around" that
+   doesn't need turning).
+5. **Mixed-course HALT density** — E-5's mixed test halted 40% of ticks because
+   sim `HALT` = frozen (no turn layer). This resolves when goal-directed nav +
+   firmware turning land (the behaviour layer, not here). Don't over-tune the
+   sim course for it.
+
+**No more learned vision-in-the-policy training.** A consolidation ~20M is
+back on the table *only* with the skill code baked into the observation (vision
+selects a mode the policy is trained to execute per-mode) — and only after
+hardware shows the scripted layer's limits (open-loop fragility mid-skill, blend
+transients) actually bite. Reward-shaping is off the table (Phase D + `smoke_vfix3`).
+The adapter probe (`adapter-skill-probe-spec.md`) stays the route for *one*
+genuinely-learned skill if a scripted one proves too fragile.
 
 Key files: `pi_pipeline/gait/skill_switch.py`, `pi_pipeline/vision/gait_selector.py`,
 `pi_pipeline/vision/cliff_guard.py`, `rl_training/opencat-gym/eval_skill_switch.py`,
