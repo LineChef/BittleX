@@ -411,7 +411,7 @@ has no turn layer). Skills built: `STEP_OVER` (trot), `BACK_OUT` (`bk`), `HALT`,
 State: all committed + pushed on `development`. Report:
 `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
 
-**Running (relaunched 2026-09-08, ~30 min, tb `PPO_117`):** `smoke_vfix2` — a 3M
+**Running (relaunched 2026-09-08, ~30 min, tb `PPO_118`):** `smoke_vfix3` — a 3M
 from-scratch vision-conditioned smoke with **all the E-2 + slope fixes active**:
 scan pinned to true ground AND slope-following (commit `ede5fa2` — a rising slope
 no longer reads as an obstacle), `OBSTACLE_REWARD=1` (turns on `r_obs_clear`,
@@ -419,8 +419,8 @@ which read 0.0 in Phase D), `FAC_SPEED_TRACK=25` (down from 60), `FAC_OBS_STOP=0
 (An earlier `smoke_vfix` without the slope fix was killed and replaced.)
 **Question:** with the sensor exploits gone and the reward no longer fighting a
 slowdown, does the vision policy adapt its footfalls to obstacles, or still plow
-like Phase D? When done: `g2watch smoke_vfix2`; read `trained/smoke_vfix2.log`
-reward curve + `tail trained/tensorboard_logs/PPO_117`. Adapts → learned path
+like Phase D? When done: `g2watch smoke_vfix3`; read `trained/smoke_vfix3.log`
+reward curve + `tail trained/tensorboard_logs/PPO_118`. Adapts → learned path
 revived, a full run is worth it. Plows → scripted-skills approach confirmed as
 *the* path. Full env config: this file's git history around commit `ede5fa2`.
 
