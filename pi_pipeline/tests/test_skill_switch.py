@@ -72,13 +72,50 @@ def test_step_over_full_lifecycle():
     assert seq[-1] is Source.RL                       # ended back on the learned walk
 
 
-def test_blend_in_interpolates_rl_to_skill_frame0():
-    s = sw()
-    first, _ = s.update(GaitMode.STEP_OVER, RL)       # t=0 -> == RL pose
+def test_blend_in_goes_via_stance():
+    stance = np.full(8, 2.0)                          # rad
+    step = np.full((4, 8), 0.7)                       # rad, frame 0 = 0.7
+    s = SkillSwitch(SkillRefs(step_over=step, inspect=INSPECT, stance=stance), CFG)
+    first, _ = s.update(GaitMode.STEP_OVER, RL)       # begin -> from_pose == RL
     assert np.allclose(first, RL)
-    mid, src = s.update(GaitMode.CRUISE, RL)          # t=1/2 -> halfway to frame0 (=0 deg)
+    mid, src = s.update(GaitMode.CRUISE, RL)          # t=1/2 -> AT the stance waypoint
     assert src is Source.BLEND
-    assert np.allclose(mid, RL * 0.5, atol=1e-6)      # halfway between 10 and 0
+    assert np.allclose(mid, np.rad2deg(2.0), atol=1e-6)
+    end, src = s.update(GaitMode.CRUISE, RL)          # t=1 -> at skill frame 0
+    assert src is Source.SCRIPTED
+    assert np.allclose(end, np.rad2deg(0.7), atol=1e-6)
+
+
+def test_phase_gate_waits_for_stance_window():
+    s = sw()   # default windows ((0,.15),(.5,.65))
+    out, src = s.update(GaitMode.STEP_OVER, RL, gait_phase=0.30)
+    assert src is Source.RL and np.allclose(out, RL)          # pending, RL still drives
+    for gp in (0.33, 0.38, 0.45):
+        out, src = s.update(GaitMode.STEP_OVER, RL, gait_phase=gp)
+        assert src is Source.RL                               # still waiting
+    out, src = s.update(GaitMode.STEP_OVER, RL, gait_phase=0.52)  # enters a stance window
+    assert src is Source.BLEND
+    assert s.active_skill is GaitMode.STEP_OVER
+
+
+def test_phase_gate_times_out():
+    s = SkillSwitch(REFS, SkillSwitchConfig(blend_in_steps=2, max_pending_ticks=3))
+    for _ in range(3):
+        assert s.update(GaitMode.STEP_OVER, RL, gait_phase=0.30)[1] is Source.RL
+    assert s.update(GaitMode.STEP_OVER, RL, gait_phase=0.30)[1] is Source.BLEND  # gave up waiting
+
+
+def test_halt_ignores_phase_gate():
+    s = sw()
+    out, src = s.update(GaitMode.HALT, RL, gait_phase=0.30)   # bad phase, HALT is immediate
+    assert src is Source.BLEND and s.active_skill is GaitMode.HALT
+
+
+def test_pending_aborts_if_request_drops():
+    s = sw()
+    s.update(GaitMode.STEP_OVER, RL, gait_phase=0.30)         # pending
+    out, src = s.update(GaitMode.CRUISE, RL, gait_phase=0.30)  # request withdrawn
+    assert src is Source.RL and s.active_skill is None
 
 
 def test_inspect_holds_until_cruise_requested():
