@@ -1,0 +1,47 @@
+{
+  "tag": "SWITCH",
+  "episodes_per_seed": 12,
+  "seed_offsets": [
+    0,
+    10,
+    20,
+    30
+  ],
+  "n_episodes": 48,
+  "fall_rate": 0.0,
+  "cliff_episodes": 0,
+  "edge_falls": 0,
+  "edge_fall_rate": null,
+  "wall_stops": 9,
+  "fwd_walked_mean": 0.08962456902277312,
+  "fwd_walked_std": 0.1276303045398855,
+  "n_walked": 39,
+  "fwd_all_mean": 0.08015465208357397,
+  "mode_mix": {
+    "cruise": 5755,
+    "careful": 634,
+    "step_over": 3489,
+    "back_out": 101,
+    "halt": 2069
+  },
+  "encounter_passed_m_with_stepover": [
+    0.05318545381956314,
+    0.08084397597771702
+  ],
+  "encounter_passed_m_no_stepover": [
+    -0.005168254800560848,
+    0.047679001956117704
+  ],
+  "n_enc_stepover": 29,
+  "n_enc_nostep": 24,
+  "body_z_mean_by_source": {
+    "rl": 0.07688935279580589,
+    "blend": 0.07930297178197082,
+    "scripted": 0.08194476950118162
+  },
+  "body_pitch_mean_by_source": {
+    "rl": -4.461278877544669e-05,
+    "blend": 0.00014096055616106144,
+    "scripted": -2.1173394630175447e-05
+  }
+}

@@ -80,9 +80,9 @@ def _load(name):
     return np.load(os.path.join(REF_DIR, name))
 
 
-def make_switch():
+def make_switch(step_over_ref="tr_ref.npy"):
     refs = SkillRefs(
-        step_over=_load("tr_ref.npy"),          # trot -- widest foot lift of the built-ins
+        step_over=_load(step_over_ref),         # trot (default -- beat the authored high-step in A/B) or highstep_ref
         inspect=_load("cr_ref.npy"),            # crouch -- pitches the mast down
         back_out=_load("bk_ref.npy"),           # walk backward
         stance=WKF_REF.mean(axis=0),            # neutral four-foot pose
@@ -255,6 +255,8 @@ def main():
                     help="force a fixed forward command each tick (e.g. 0.12) instead of "
                          "the env's sampled/resampled command -- for E-4c, march at the edge")
     ap.add_argument("--max-steps", type=int, default=260)
+    ap.add_argument("--step-over-ref", default="tr_ref.npy",
+                    help="keyframe ref for STEP_OVER (highstep_ref.npy | tr_ref.npy)")
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
     ap.add_argument("--gif-stride", type=int, default=3)
@@ -267,7 +269,7 @@ def main():
                                           # slopes) from episode 0 -- not a training ramp
     env = OpenCatGymEnv()
     model = PPO.load(args.model, device="cpu")
-    switch = None if args.no_switch else make_switch()
+    switch = None if args.no_switch else make_switch(args.step_over_ref)
     selector = None if args.no_switch else GaitSelector()
     cliff = CliffGuard() if (switch and float(args.cliff_prob) > 0) else None
 
