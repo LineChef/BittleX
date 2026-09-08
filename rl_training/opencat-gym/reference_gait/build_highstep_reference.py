@@ -24,8 +24,11 @@ SH = [0, 2, 4, 6]
 KN = [1, 3, 5, 7]
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--shoulder", type=float, default=12.0, help="extra shoulder lift, deg (peak of swing)")
-ap.add_argument("--knee", type=float, default=20.0, help="extra knee flex, deg (peak of swing) -- foot tucks up")
+ap.add_argument("--shoulder", type=float, default=14.0, help="extra FRONT shoulder lift, deg (peak of swing)")
+ap.add_argument("--knee", type=float, default=22.0, help="extra FRONT knee flex, deg (peak of swing) -- foot tucks up")
+ap.add_argument("--rear", type=float, default=1.35,
+                help="rear hip/knee lift = front * rear (rear swing is smaller in wkF, so it "
+                     "needs a boost to clear the same height -- but too much sits the robot back)")
 ap.add_argument("--src", default="wkf_ref.npy")
 ap.add_argument("--out", default="highstep_ref.npy")
 args = ap.parse_args()
@@ -35,19 +38,20 @@ deg = np.rad2deg(base)
 out = deg.copy()
 
 for sh_j, kn_j in zip(SH, KN):
+    rear = args.rear if sh_j in (4, 6) else 1.0     # joints 4, 6 are the back hips
     s = deg[:, sh_j]
     lo, hi = s.min(), s.max()
     # swing weight: 0 at the bottom of the shoulder cycle, 1 at the top, smooth
     w = np.clip((s - lo) / max(1e-6, hi - lo), 0.0, 1.0)
     w = 0.5 - 0.5 * np.cos(np.pi * w)           # raised cosine -> gentle onset/return
-    out[:, sh_j] = s + args.shoulder * w
+    out[:, sh_j] = s + args.shoulder * rear * w
     # knee: subtract (more negative = more flexed = foot up), based on this leg's
     # sign of "flex". wkF knee mean ~ +12; below mean = flexing -> push it further.
     k = deg[:, kn_j]
     km = k.mean()
     flexing = np.clip((km - k) / max(1e-6, km - k.min()), 0.0, 1.0)
     kw = w * (0.4 + 0.6 * flexing)              # lift-gated, deepest where it's already flexing
-    out[:, kn_j] = k - args.knee * kw
+    out[:, kn_j] = k - args.knee * rear * kw
 
 out = np.clip(out, -100.0, 100.0)
 ref = np.deg2rad(out)

@@ -468,6 +468,104 @@ firmware turns to arc around it → resume the original heading. That's the
 for a modulated-trajectory go-around. The gait layer's job stays: step over the
 small stuff, HALT/BRACE for the rest, and let nav route around it.
 
+---
+
+## Phase F — learned CLIMB / traverse skill (design 2026-09-08)
+
+**Why.** The authored high-step (`highstep_ref.npy`) lost the E-3 A/B to trot,
+and a from-scratch iteration to build a *step-UP / mount* keyframe
+(`climb_test.py`, ~7 param sweeps) hit a hard wall: phases 1–3 work (front feet
+tuck up → reach forward → plant on the ledge → body pulls forward while staying
+**level**, pitch 0°), but the moment the rear legs do anything (lift, push,
+shuffle) the body pitches nose-down 40–70° and faceplants — at *any* ledge
+height, even 1 cm. Once the front feet are on the ledge edge the contact line is
+at the body's front, the CoM is ahead of the rear feet, and any rear motion
+rotates the body forward over that line with nothing behind the CoM to catch it.
+**A balance problem, not a keyframe-tuning problem** — an open-loop
+position-controlled trajectory can't keep the body from tipping mid-climb. Same
+wall the high-step hit. This is the case the plan reserves the learned-skill
+path for.
+
+**Architecture — a separate specialist policy, switched in like a scripted skill.**
+`run20m_ppo` (the walk) is never retrained or involved. Add `GaitMode.CLIMB`;
+when entered, `climb_policy.predict(obs)` drives the servos each tick instead of
+the walk (or a keyframe), via-stance blend in/out, walk paused ~1–2 s and
+resumes after. On the Pi it's a second ONNX file loaded alongside the walk; the
+switch picks which net feeds the servos (sub-ms either way). Same `SkillSwitch`
+machinery, neural-net payload instead of a keyframe array — and the net takes the
+**IMU** every tick, so it can *catch* the forward pitch the keyframe can't.
+
+**A general "traverse the obstacle ahead" skill, not a single-height mount.**
+Train with domain randomisation over the obstacle: height 0–8 cm, lip / block /
+curb / ramp / short stairs, varied depth + friction, small approach offset.
+Generic reward: get the body up and over/onto the thing ahead, stay upright, keep
+moving forward. The policy learns a repertoire — low lip → step over (like trot
+but with balance so it doesn't tip); tall ledge → reach-plant-pull-mount; ramp →
+climb. **This collapses `STEP_OVER` + `CLIMB` into one learned policy** at
+different obstacle scales — fewer things to maintain than the keyframe zoo, and
+it generalises to sizes we didn't hand-author. `HALT` stays separate (wall =
+don't try); `BRACE` / `BACK_OUT` stay separate (reflexes).
+
+**Vision is load-bearing here (unlike the walk).** Phase D / smoke_vfix3 killed
+vision-in-the-*walk* because terrain was a marginal add-on to a 20 M cruise task
+with a commanded speed to plow through. The climb policy is the opposite: the
+obstacle *is* the task, short horizon, no cruise speed to plow. It cannot scale
+the motion blind (a 2 cm lip and a 6 cm ledge need very different reach/pull). So
+its observation includes a forward **height profile** of the next ~15 cm (a few
+points — not just height+distance; shape matters: ramp vs curb vs wall-ledge need
+different motions). In sim this is `_scan_terrain`'s forward ray-fan; on hardware
+it's a real perception ask (depth/profile estimate, more than a bounding box).
+
+**Selector: trot-over vs climb vs wall — two layers of protection.**
+1. Height bands off the obstacle read (hysteresis + debounce; ambiguous edges →
+   INSPECT): `< ~2 cm` walk handles it · `~2–3 cm` STEP_OVER (trot) · `~3–7 cm`
+   CLIMB · `> ~7 cm` HALT.
+2. The climb policy is **only trained on the climb band (~3–7 cm)** — it never
+   sees a 1 cm lip in training, so a selector misfire can't make it do something
+   dramatic on something trivial.
+
+**INSPECT — scripted up-and-down sweep, deferred until CLIMB is proven.** A fixed
+keyframe that tilts the body/camera through a vertical range (nose-up → nose-down)
+so the detector reads the obstacle's full profile in one pass. Whatever view the
+sim physics gives is what we get — no fighting to hold a static bow (the sim
+won't; `build_inspect_peer.py` search maxed at ~0.5° vs a ~13° target). Hardware
+sequence: forward scan says "climbable" → if the profile is unclear (near blind
+zone) → INSPECT sweep → feed profile to CLIMB → CLIMB runs, IMU closes the loop.
+The obstacle isn't moving, so a good read *going in* is enough; no continuous
+vision needed *during* the climb. **A/B after CLIMB works:** does a swept profile
+beat a plain forward scan?
+
+**Discipline for the smoke test — don't stack two unsolved problems.** First run
+hands the climb policy the **ground-truth height profile straight from the sim**
+(no detector, no INSPECT). Decouple "can it learn to climb given good perception"
+from "can perception feed it". Only after the climb learns do we wire INSPECT +
+the detector.
+
+### Phase F execution plan
+
+1. **`climb_env.py`** (grows from `climb_test.py`): Gym env — robot spawned ~4 cm
+   in front of a ledge in a walk-like start pose, ledge height randomised;
+   obs = IMU (quat, gyro, projected gravity) + joint history (walk-style) +
+   ground-truth height profile of the next ~15 cm; action = 8 joint targets
+   (or residuals on a stance pose); reward = forward progress onto the block +
+   height toward `ledge + stand` + all-four-feet-on-top + upright (heavy penalty
+   for the pitch-over) + smoothness + time. Terminate: on-top-and-stable
+   (success) / flipped / timeout. Reuse `climb_test.py`'s ledge setup + score.
+2. **Smoke run** — fixed ~4 cm ledge, ~300–500 k PPO steps. **One question: does
+   it learn to get up at all without faceplanting?** Watch replay + `ep_rew_mean`.
+3. If it learns → widen the DR (height 0–8 cm, obstacle types) toward the general
+   traverse skill; longer run; A/B the low end vs the trot `STEP_OVER` keyframe.
+4. If it does not learn → the sim's contact fidelity can't support a small-foot
+   ledge climb; park it as hardware-gated like the rest of the RL backlog.
+5. Then: author the INSPECT sweep keyframe, wire the (sim) profile through it,
+   A/B swept-profile vs plain-scan into the climb policy.
+6. Deployment (post-hardware): export `climb_policy.onnx`, add `GaitMode.CLIMB`
+   to `SkillSwitch` running the net, wire into `run_gait.py --skills`.
+
+Harness built: `rl_training/opencat-gym/climb_test.py` (phased-keyframe motion
+builder + ledge + score + side-view GIF). `build_highstep_reference.py` extended
+with `--rear` (front/rear lift split) during the failed keyframe attempt.
+
 Next, in order:
 1. **Authored `STEP_OVER` keyframe.** Trot (`tr_ref`) is what's wired and it's a
    *walk* gait, not a lift-and-clear. Hand-author a real high-step (front feet
