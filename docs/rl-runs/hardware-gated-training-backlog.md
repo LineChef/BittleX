@@ -133,8 +133,8 @@ designs, not from-scratch RL, not **Petoi's own `cmh` keyframe**
 Measured: front paw can't reach forward *and* up; body can't rear >~13°; `cmh`
 needs real foot-grip + a human in the loop. **Sim-fidelity wall, not a design
 gap.** On-hardware path: port `cmh`, tune approach distance + keyframe on a real
-step, then residual policy on real IMU. Details:
-`docs/rl-runs/behaviors-not-working.md`. The reusable output is the method
+step, then residual policy on real IMU. Details in the Phase F RESULT block of
+`vision-goal-locomotion-plan.md`. The reusable output is the method
 (`docs/rl-runs/skill-learning-method.md`), not a climb.
 
 ## H8 — On-MCU gait policy (Decision Transformer)  🔴

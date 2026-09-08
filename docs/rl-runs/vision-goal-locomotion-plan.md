@@ -568,12 +568,13 @@ Ran the full plan below plus more. **Nothing climbs a ≥ 2.5 cm ledge in PyBull
   instead of rearing; pawing the face nets a backward push. `cmh` works on the
   real robot via foot-rubber grip + servo compliance + a human sending realtime
   nudges — the sim's box contact doesn't reproduce that ("not robust to
-  configuration" per Petoi's own forum).
+  configuration" per Petoi's own forum). Details in this section + the H7 backlog
+  entry.
 
 **Verdict:** hardware-gated. Path on real hardware: port `cmh`, tune the approach
 distance + keyframe against a real step, *then* a residual policy on real IMU. A
 dynamic hop (`jpF`) is the other untested avenue (needs impulse/torque control,
-not position keyframes). Full write-up: `docs/rl-runs/behaviors-not-working.md`.
+not position keyframes).
 
 **Kept:** `climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`
 (reusable harness + the `cmh` decoder in `climb_env._load_cmh_base`),
