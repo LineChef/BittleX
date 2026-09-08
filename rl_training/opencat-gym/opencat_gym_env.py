@@ -1797,24 +1797,35 @@ class OpenCatGymEnv(gym.Env):
         ground_z = _ground(cx, cy, base_pos[2] - 0.05)
         if ground_z is None:
             ground_z = base_pos[2] - 0.09
-        # 2026-09-08: SLOPE-FOLLOWING. A forward-cast fan reads a rising slope as
-        # an obstacle (the ground climbs into the beam). Probe the ground a short
-        # way ahead, get the fore-aft grade, and aim the whole fan PARALLEL to
-        # the local ground -- so only something protruding ABOVE the slope
-        # surface registers. Re-measured every scan (TERRAIN_REFRESH steps), so a
-        # changing grade re-tilts the beam within ~0.3 s.
-        # slope baseline ~= 60% of the beam length -> the straight beam matches
-        # the average grade it actually spans (short baselines over-extrapolate).
+        # 2026-09-08: SLOPE-FOLLOWING, per-ray. A forward-cast fan reads a rising
+        # slope as an obstacle (the ground climbs into the beam). PROBE THE GROUND
+        # AT EACH RAY ENDPOINT and aim that ray at its own endpoint, so the fan
+        # DRAPES over the actual surface -- slopes, cross-slope, curves, grade
+        # transitions -- and only something protruding ABOVE it registers. The
+        # endpoint lift is clamped (a probe that lands on a tall obstacle can't
+        # tilt the ray up more than a ~31 deg grade would). Re-measured every scan
+        # (TERRAIN_REFRESH steps) -> a changing grade re-drapes within ~0.3 s.
+        _max_rise = 0.6 * TERRAIN_RANGE                 # cap: ~31 deg grade
+        # coarse fore-aft grade from one forward probe -> gives each per-endpoint
+        # probe a seed height just above the EXPECTED ground (on a slope) but
+        # below any real obstacle, so the endpoint probe can't perch on an
+        # obstacle top and tilt the ray over a shorter one in front.
         _pd = 0.35
         _gzm = _ground(cx + _pd * np.cos(yaw), cy + _pd * np.sin(yaw), ground_z + 0.20)
-        slope_pm = float(np.clip((_gzm - ground_z) / _pd, -0.6, 0.6)) if _gzm is not None else 0.0
-        _rise = slope_pm * TERRAIN_RANGE               # beam is now exactly parallel to the measured grade
+        _grade = float(np.clip((_gzm - ground_z) / _pd, -0.6, 0.6)) if _gzm is not None else 0.0
+        end_xy = [(cx + TERRAIN_RANGE * np.cos(yaw + b),
+                   cy + TERRAIN_RANGE * np.sin(yaw + b)) for b in bearings]
+        gz_end = []
+        for ex, ey in end_xy:
+            _exp = ground_z + _grade * TERRAIN_RANGE   # expected ground at this endpoint
+            g = _ground(ex, ey, _exp + 0.07)
+            if g is None:                              # no floor / probe above the ground -> use the
+                g = _exp                              #   coarse grade; drop-offs are the CLIFF scan's job
+            gz_end.append(float(np.clip(g, ground_z - _max_rise, ground_z + _max_rise)))
         best = None                                    # (dist_m, bearing_rad, tall)
         for z_off, is_hi in ((0.02, False), (TERRAIN_TALL_Z, True)):
-            z = ground_z + z_off
-            froms = [[cx, cy, z]] * 9
-            tos = [[cx + TERRAIN_RANGE * np.cos(yaw + b),
-                    cy + TERRAIN_RANGE * np.sin(yaw + b), z + _rise] for b in bearings]
+            froms = [[cx, cy, ground_z + z_off]] * 9
+            tos = [[ex, ey, gze + z_off] for (ex, ey), gze in zip(end_xy, gz_end)]
             for k, hit in enumerate(p.rayTestBatch(froms, tos)):
                 if hit[0] < 0 or hit[0] in ignore:
                     continue
