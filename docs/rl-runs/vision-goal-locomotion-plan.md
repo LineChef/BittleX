@@ -472,6 +472,11 @@ small stuff, HALT/BRACE for the rest, and let nav route around it.
 
 ## Phase F — learned CLIMB / traverse skill (design 2026-09-08)
 
+> The general recipe distilled from Phase F's runs is now
+> **`docs/rl-runs/skill-learning-method.md`** — scripted base + bounded residual +
+> curriculum + reward iteration. Use it for every new motor skill (get-up,
+> special moves). Phase F below is the worked example.
+
 **Why.** The authored high-step (`highstep_ref.npy`) lost the E-3 A/B to trot,
 and a from-scratch iteration to build a *step-UP / mount* keyframe
 (`climb_test.py`, ~7 param sweeps) hit a hard wall: phases 1–3 work (front feet
