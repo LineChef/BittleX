@@ -87,24 +87,42 @@ def _grab(env, w, h):
     return np.reshape(rgb, (h, w, 4))[:, :, :3].astype(np.uint8)
 
 
-def run_episode(env, model, switch, selector, max_steps=260, cap=None):
+def _body_xz(env):
+    pos = p.getBasePositionAndOrientation(env.robot_id)[0]
+    return pos[0], pos[2]
+
+
+def _body_pitch(env):
+    q = p.getBasePositionAndOrientation(env.robot_id)[1]
+    return p.getEulerFromQuaternion(q)[1]        # +ve = nose down (this URDF)
+
+
+def run_episode(env, model, switch, selector, max_steps=260, cap=None, careful_scale=True):
     obs, _ = env.reset()
     if switch is not None:
         switch.reset()
         selector.reset()
-    x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0]
+    base_cmd = float(env._cmd_fwd)                 # hold the episode's command; scale it for CAREFUL
+    x0, _ = _body_xz(env)
     counts = {m: 0 for m in GaitMode}
     src_counts = {s: 0 for s in Source}
+    z_by_src = {s: [] for s in Source}             # body height while each source drives
+    pitch_by_src = {s: [] for s in Source}         # body pitch (nose-down +) per source
+    enc = []                                       # per obstacle encounter
+    cur = None
     fell = False
     for k in range(max_steps):
         action, _ = model.predict(obs, deterministic=True)
         mode, src = GaitMode.CRUISE, Source.RL
+        rd = terrain_reading(env) if switch is not None else None
         if switch is not None:
-            mode = selector.update(terrain_reading(env))
+            mode = selector.update(rd)
             gp = (env._phase / TIME_PHASE_PERIOD) % 1.0
             joints, src = switch.update(mode, rl_joint_deg(env, action), gait_phase=gp)
             counts[mode] += 1
             src_counts[src] += 1
+            if careful_scale:
+                env._cmd_fwd = base_cmd * switch.speed_scale
             if src is Source.RL:
                 obs, _, term, trunc, info = env.step(action)
             else:
@@ -114,14 +132,37 @@ def run_episode(env, model, switch, selector, max_steps=260, cap=None):
         else:
             counts[GaitMode.CRUISE] += 1
             obs, _, term, trunc, info = env.step(action)
+
+        bx, bz = _body_xz(env)
+        z_by_src[src].append(bz)
+        pitch_by_src[src].append(_body_pitch(env))
+
+        # obstacle-encounter tracking (switch runs only; needs the scan reading)
+        if rd is not None:
+            if rd.present and cur is None:
+                cur = {"x0": bx, "tall": rd.tall, "modes": {m: 0 for m in GaitMode},
+                       "zmin": bz, "zmax": bz, "steps": 0}
+            if cur is not None:
+                cur["modes"][mode] += 1
+                cur["zmin"] = min(cur["zmin"], bz)
+                cur["zmax"] = max(cur["zmax"], bz)
+                cur["steps"] += 1
+                if not rd.present:
+                    cur["passed_m"] = bx - cur["x0"]
+                    enc.append(cur)
+                    cur = None
         if cap is not None and k % cap["stride"] == 0:
             cap["frames"].append(_grab(env, cap["w"], cap["h"]))
             cap["labels"].append((mode.value, src.value))
         if term or trunc:
             fell = bool(term)
             break
-    x1 = p.getBasePositionAndOrientation(env.robot_id)[0][0]
-    return {"fell": fell, "fwd_m": x1 - x0, "modes": counts, "srcs": src_counts}
+    if cur is not None:
+        cur["passed_m"] = _body_xz(env)[0] - cur["x0"]
+        enc.append(cur)
+    x1, _ = _body_xz(env)
+    return {"fell": fell, "fwd_m": x1 - x0, "modes": counts, "srcs": src_counts,
+            "z_by_src": z_by_src, "pitch_by_src": pitch_by_src, "encounters": enc}
 
 
 def main():
@@ -130,6 +171,8 @@ def main():
     ap.add_argument("--no-switch", action="store_true", help="baseline: run20m_ppo alone")
     ap.add_argument("--render", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--seeds", default=None,
+                    help="comma list of seed offsets to pool, e.g. 0,10,20,30,40 (sweep)")
     ap.add_argument("--model", default="trained/run20m_ppo")
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
@@ -147,41 +190,71 @@ def main():
     tag = "SWITCH" if switch else "BASELINE"
     cap = {"frames": [], "labels": [], "stride": args.gif_stride,
            "w": args.gif_w, "h": args.gif_h} if args.gif else None
+    offsets = [int(s) for s in args.seeds.split(",")] if args.seeds else [0]
+
     fell = 0
-    fwd, wall_stop = [], []          # wall_stop[e] True if HALT dominated the episode
+    fwd, wall_stop = [], []
     agg_modes = {m: 0 for m in GaitMode}
-    for e in range(args.episodes):
-        np.random.seed(args.seed + e)
-        r = run_episode(env, model, switch, selector, cap=cap)
-        fell += r["fell"]
-        fwd.append(r["fwd_m"])
-        halt_frac = (r["modes"][GaitMode.HALT] / max(1, sum(r["modes"].values()))) if switch else 0.0
-        wall_stop.append(halt_frac > 0.5)
-        for m, c in r["modes"].items():
-            agg_modes[m] += c
-        print(f"[{tag} ep {e:2d}] fell={r['fell']!s:5s} fwd={r['fwd_m']:+.2f} m"
-              + ("" if switch is None else
-                 f"  modes={{ {', '.join(f'{m.value}:{c}' for m,c in r['modes'].items() if c)} }}"))
+    z_src = {s: [] for s in Source}
+    pitch_src = {s: [] for s in Source}
+    enc_step, enc_nostep = [], []        # per-encounter passed_m, split by whether STEP_OVER fired
+    enc_cross = []                        # (zmin, zmax) per non-wall encounter -- the crouch question
+    for base in offsets:
+        for e in range(args.episodes):
+            np.random.seed(args.seed + base + e)
+            r = run_episode(env, model, switch, selector, cap=cap)
+            fell += r["fell"]
+            fwd.append(r["fwd_m"])
+            halt_frac = (r["modes"][GaitMode.HALT] / max(1, sum(r["modes"].values()))) if switch else 0.0
+            wall_stop.append(halt_frac > 0.5)
+            for m, c in r["modes"].items():
+                agg_modes[m] += c
+            for s in Source:
+                z_src[s].extend(r.get("z_by_src", {}).get(s, []))
+                pitch_src[s].extend(r.get("pitch_by_src", {}).get(s, []))
+            for en in r.get("encounters", []):
+                if en["modes"][GaitMode.HALT] > 0.5 * en["steps"]:
+                    continue                      # wall stop -- not a traverse
+                (enc_step if en["modes"][GaitMode.STEP_OVER] > 0 else enc_nostep).append(en["passed_m"])
+                enc_cross.append((en["zmin"], en["zmax"]))
+            print(f"[{tag} s{args.seed+base}+{e:2d}] fell={r['fell']!s:5s} fwd={r['fwd_m']:+.2f} m"
+                  + ("" if switch is None else
+                     f"  {', '.join(f'{m.value}:{c}' for m,c in r['modes'].items() if c)}"))
     env.close()
 
+    n = len(fwd)
     walked = [d for d, w in zip(fwd, wall_stop) if not w]
+    def _ms(a): return (float(np.mean(a)), float(np.std(a))) if a else (None, None)
+    fw_m, fw_s = _ms(walked)
     out = {
-        "tag": tag, "episodes": args.episodes, "seed": args.seed,
-        "fall_rate": fell / args.episodes,
-        "fwd_mean_all": float(np.mean(fwd)),
+        "tag": tag, "episodes_per_seed": args.episodes, "seed_offsets": offsets, "n_episodes": n,
+        "fall_rate": fell / n,
         "wall_stops": int(sum(wall_stop)),
-        "fwd_mean_walked": float(np.mean(walked)) if walked else None,
-        "n_walked": len(walked),
+        "fwd_walked_mean": fw_m, "fwd_walked_std": fw_s, "n_walked": len(walked),
+        "fwd_all_mean": float(np.mean(fwd)),
         "mode_mix": {m.value: agg_modes[m] for m in GaitMode if agg_modes[m]},
+        "encounter_passed_m_with_stepover": _ms(enc_step),
+        "encounter_passed_m_no_stepover": _ms(enc_nostep),
+        "n_enc_stepover": len(enc_step), "n_enc_nostep": len(enc_nostep),
+        "body_z_mean_by_source": {s.value: (_ms(z_src[s])[0]) for s in Source if z_src[s]},
+        "body_pitch_mean_by_source": {s.value: (_ms(pitch_src[s])[0]) for s in Source if pitch_src[s]},
     }
-    print(f"\n=== {tag}  {args.episodes} eps ===")
-    print(f"fall rate         {out['fall_rate']:.0%}  ({fell}/{args.episodes})")
-    print(f"wall-stops        {out['wall_stops']}  (HALT dominated -- correctly refused a wall)")
-    print(f"fwd, walked eps   mean {out['fwd_mean_walked']}   (n={out['n_walked']})")
-    print(f"fwd, all eps      mean {out['fwd_mean_all']:+.2f} m")
+    print(f"\n=== {tag}  {n} eps ({len(offsets)} seed offsets x {args.episodes}) ===")
+    print(f"fall rate            {out['fall_rate']:.0%}  ({fell}/{n})")
+    print(f"wall-stops           {out['wall_stops']}/{n}")
+    print(f"fwd, walked eps      {fw_m:.3f} +/- {fw_s:.3f} m  (n={len(walked)})")
     if switch is not None:
         tot = sum(agg_modes.values()) or 1
-        print("mode mix          " + "  ".join(f"{m.value} {c/tot:.0%}" for m, c in agg_modes.items() if c))
+        print("mode mix             " + "  ".join(f"{m.value} {c/tot:.0%}" for m, c in agg_modes.items() if c))
+        es_m, es_s = _ms(enc_step); en_m, en_s = _ms(enc_nostep)
+        print(f"encounter passed_m   with STEP_OVER: {es_m} +/-{es_s} (n={len(enc_step)})   "
+              f"without: {en_m} +/-{en_s} (n={len(enc_nostep)})")
+        print("body-z by source     " + "  ".join(
+            f"{s.value} {out['body_z_mean_by_source'][s.value]:.3f}"
+            for s in Source if s.value in out["body_z_mean_by_source"]))
+        print("body-pitch by source " + "  ".join(
+            f"{s.value} {out['body_pitch_mean_by_source'][s.value]:+.3f}"
+            for s in Source if s.value in out["body_pitch_mean_by_source"]))
     if args.json_out:
         json.dump(out, open(args.json_out, "w"), indent=2)
         print(f"wrote {args.json_out}")

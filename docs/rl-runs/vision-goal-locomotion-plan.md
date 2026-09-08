@@ -301,11 +301,53 @@ ledges. 24 eps, matched seeds.
   can't" isn't shown; and the +68% isn't fully attributed to `STEP_OVER` vs the
   careful/handoff dynamics. Small n, one seed offset, favourable course.
 
-**Next:** E-3 = seed sweep + per-encounter attribution + deliberate skill choice.
-**E-4c = a fall-hazard course** (drop-offs where blind = fall) + `CliffGuard`
-wired in — the test that makes the result decisive. E-4b (reward) still deferred
-(training-only). A clean hazard-course win puts a fresh vision-baked ~20M (Tier
-B) back on the table.
+### E-3 done (2026-09-08): seed sweep + attribution + crouch ruled out
+
+5 seed offsets × 12 eps = 60 per arm. `CAREFUL` now scales `cmd_fwd` 0.6× (was a
+harness no-op). Report updated (same URL).
+
+| | walked fwd (mean ± sd) | wall-stops | falls |
+|---|---|---|---|
+| baseline | 0.152 ± 0.166 m | 0/60 | 0% |
+| + switch | **0.225 ± 0.166 m (+48%)** | 11/60 | 0% |
+
+- **Step-over IS the mechanism.** Per obstacle encounter: `STEP_OVER` fired →
+  passed 0.075 ± 0.094 m (n=84); didn't fire → 0.012 ± 0.023 m (n=23, stuck).
+  ~6× traversal. The gain isn't a handoff artifact. (Some selection — it fires
+  when the obstacle looks clearable.)
+- **The replay "crouch" is nothing.** Body-z by control source: RL 0.074, blend
+  0.076, scripted 0.078 m (higher, not lower); pitch flat ±0.002 rad. What looked
+  like a crouch on approach is the `CAREFUL` slowdown, not a posture change.
+- Wide per-episode spread (σ 0.17 m both arms) — a consistent lean, not a
+  landslide. Still 0 falls; stops at walls where blind (0/60) never does.
+
+**Still open in E-3:** pick the step-over skill deliberately — `tr` (trot) vs an
+authored high-step.
+
+### Proposed skill set for obstacle navigation (sandbox backlog)
+
+Firmware refs already extracted: `wkF/wkL/wkR/cr/tr/vt/bk/rc`.
+
+| skill | situation | ref | status |
+|---|---|---|---|
+| **step-over** | low obstacle in path | `tr` (or authored high-step) | HAVE |
+| **halt** | wall / impassable → stop, hand to nav | stance | HAVE |
+| **inspect / peer-down** | pitch mast down to see near-ground | `cr` held | defined, not triggered |
+| **brace** | anticipated unavoidable bump — widen/lower/stiffen 1 beat | authored posture | — |
+| **back-out** | too close to step over / wedged | `bk` | — |
+| **crouch-walk** | pass under an overhang | `cr` looped | — |
+| **high-step-up / mount** | climb *onto* a raised surface | `vt` or authored | — |
+| **step-down** | controlled descent off a ledge | authored | — |
+| **sidestep / strafe** | pass a wide obstacle at its edge; move off a drop-off without turning | **needs authoring** (no lateral gait) | — the big one |
+| **pivot** | reorient to a gap / away from hazard | firmware `kang`+IMU (not a sim keyframe) | firmware |
+
+Priority: step-over (refine) → inspect → brace → back-out → crouch-walk →
+high-step-up/step-down → sidestep.
+
+**Next:** E-4c = fall-hazard course (drop-offs where blind = fall) + `CliffGuard`
+wired in — the decisive test. E-4b (reward) deferred (training-only). When the
+skill set is frozen and holds on the hazard course → that's the "design frozen"
+gate for one consolidation ~20M (Tier B).
 
 **Longer horizon (user, 2026-09-08):** the real answer to "don't plow into
 walls" is *intentional* navigation — always moving toward a chosen destination
