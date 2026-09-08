@@ -37,22 +37,33 @@ def sanity(ledge_lo, ledge_hi):
 
 
 def watch(path, ledge_lo, ledge_hi, episodes):
+    """episodes <= 0 -> loop forever (Ctrl-C to stop)."""
+    import time
     from stable_baselines3 import PPO
     from climb_env import ClimbEnv
     model = PPO.load(path, device="cpu")
     env = ClimbEnv(render_mode="human", ledge_lo=ledge_lo, ledge_hi=ledge_hi)
-    for e in range(episodes):
-        obs, _ = env.reset()
-        tot = 0.0
-        while True:
-            a, _ = model.predict(obs, deterministic=True)
-            obs, r, term, trunc, info = env.step(a)
-            tot += r
-            if term or trunc:
-                print(f"ep {e}: return {tot:.1f}  end bz {info['bz']:.3f}  "
-                      f"pitch {np.degrees(info['pitch']):+.0f}  on_top {info['on_top']}/4  "
-                      f"{'SUCCESS' if info['success'] else ''}")
-                break
+    print(f"watching {path}   ledge {ledge_lo*100:.1f}-{ledge_hi*100:.1f} cm   "
+          f"({'looping, Ctrl-C to stop' if episodes <= 0 else str(episodes)+' episodes'})")
+    e = 0
+    try:
+        while episodes <= 0 or e < episodes:
+            obs, _ = env.reset()
+            tot = 0.0
+            while True:
+                a, _ = model.predict(obs, deterministic=True)
+                obs, r, term, trunc, info = env.step(a)
+                tot += r
+                if term or trunc:
+                    print(f"  ep {e + 1:3d}: ledge {env._ledge_h*100:.1f}cm  return {tot:7.1f}  "
+                          f"end bz {info['bz']:.3f}  pitch {np.degrees(info['pitch']):+.0f}  "
+                          f"feet-on-top {info['on_top']}/4  "
+                          f"{'SUCCESS' if info['success'] else ''}")
+                    break
+            e += 1
+            time.sleep(1.1)                       # beat between episodes so it doesn't look glitchy
+    except KeyboardInterrupt:
+        print("\nstopped.")
     env.close()
 
 

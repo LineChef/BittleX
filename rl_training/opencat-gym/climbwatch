@@ -5,15 +5,16 @@
 #
 #   climbwatch                       # 8 episodes, ledge 2.5-5 cm
 #   climbwatch 12                    # 12 episodes
-#   climbwatch 12 0.02 0.03          # 12 episodes, ledge 2-3 cm
-#   climbwatch 8 0.04 0.04 climb_r3_400000_steps   # 4th arg = pin a specific tag
+#   climbwatch                       # loop forever (Ctrl-C to stop), ledge 2.5-5 cm
+#   climbwatch 12 0.02 0.03          # 12 episodes then exit, ledge 2-3 cm
+#   climbwatch 0 0.04 0.04 climb_r3_400000_steps   # 4th arg = pin a checkpoint
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)          # .../rl_training/opencat-gym
 ROOT=$(cd "$HERE/../.." && pwd)                             # repo root
 PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY=python3
 cd "$HERE"
 
-EP="${1:-8}"; LO="${2:-0.025}"; HI="${3:-0.05}"; PIN="${4:-}"
+EP="${1:-0}"; LO="${2:-0.025}"; HI="${3:-0.05}"; PIN="${4:-}"
 if [ -n "$PIN" ]; then
   CKPT="trained/${PIN%.zip}.zip"
 else
