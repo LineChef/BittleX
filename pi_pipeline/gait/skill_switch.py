@@ -44,6 +44,7 @@ class GaitMode(Enum):
     CAREFUL = "careful"        # learned walk drives, but at reduced speed
     STEP_OVER = "step_over"    # scripted high-step / trot keyframes, then hand back
     BACK_OUT = "back_out"      # scripted walk-backward for a cycle, then hand back
+    BRACE = "brace"            # brief lowered/planted crouch to absorb an unavoidable bump
     INSPECT = "inspect"        # scripted crouch, held, so the mast pitches down
     HALT = "halt"              # scripted neutral stance, held (preempts everything)
 
@@ -54,8 +55,10 @@ class Source(Enum):
     SCRIPTED = "scripted"      # joints came from a keyframe skill
 
 
-_SKILL_MODES = (GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.INSPECT, GaitMode.HALT)
-_TIMED_SKILLS = (GaitMode.STEP_OVER, GaitMode.BACK_OUT)   # play a cycle then auto-release
+_SKILL_MODES = (GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.BRACE,
+                GaitMode.INSPECT, GaitMode.HALT)
+_TIMED_SKILLS = (GaitMode.STEP_OVER, GaitMode.BACK_OUT)   # play a full cycle then auto-release
+# BRACE is HELD (like INSPECT/HALT) but auto-releases after cfg.brace_ticks.
 
 
 @dataclass
@@ -65,6 +68,7 @@ class SkillSwitchConfig:
     step_over_cycles: float = 1.0   # full keyframe loops a STEP_OVER plays
     play_ticks_per_cycle: int = 60  # control ticks to play one ref cycle
     latch_skill: bool = True        # ignore new non-HALT requests while a skill runs
+    brace_ticks: int = 6            # BRACE holds the planted crouch this long, then auto-releases
     # phase-gated start (tune the windows against wkf_ref's real contact pattern)
     stance_phase_windows: tuple = ((0.0, 0.15), (0.5, 0.65))  # wkF phase, 0..1
     max_pending_ticks: int = 25     # start anyway after this many ticks waiting
@@ -80,6 +84,7 @@ class SkillRefs:
     inspect: np.ndarray                         # e.g. cr_ref.npy (crouch)
     back_out: np.ndarray = field(               # e.g. bk_ref.npy (walk backward)
         default_factory=lambda: np.zeros((1, 8)))
+    brace: np.ndarray | None = None             # 1-frame planted crouch; None -> derived from stance
     stance: np.ndarray = field(
         default_factory=lambda: np.zeros(8))
 
@@ -102,12 +107,21 @@ class SkillSwitch:
         self._cfg = cfg or SkillSwitchConfig()
         self._src_refs = refs
         # internal units: DEGREES, to match the deployment joint interface
+        self._stance = np.rad2deg(np.asarray(refs.stance, float)).reshape(8)
+        # brace = a planted crouch: stance with the knees flexed ~14 deg more (URDF
+        # knee idx 1,3,5,7). Lowers the CoM to absorb a bump. Derived if not given.
+        if refs.brace is not None:
+            _brace = np.rad2deg(np.atleast_2d(np.asarray(refs.brace, float)))
+        else:
+            _brace = self._stance.copy()
+            _brace[[1, 3, 5, 7]] -= 14.0
+            _brace = _brace.reshape(1, 8)
         self._ref = {
             GaitMode.STEP_OVER: np.rad2deg(np.atleast_2d(np.asarray(refs.step_over, float))),
             GaitMode.BACK_OUT: np.rad2deg(np.atleast_2d(np.asarray(refs.back_out, float))),
+            GaitMode.BRACE: _brace,
             GaitMode.INSPECT: np.rad2deg(np.atleast_2d(np.asarray(refs.inspect, float))),
         }
-        self._stance = np.rad2deg(np.asarray(refs.stance, float)).reshape(8)
         self._careful = False
         self._state = "cruise"    # cruise | pending | blend_in | playing | holding | blend_out
         self._skill: str | None = None
@@ -224,9 +238,17 @@ class SkillSwitch:
             self._say(f"{self._skill}: playing {self._skill_phase:.0f}/{n * c.step_over_cycles:.0f}")
             return self._frame(self._skill, self._skill_phase), Source.SCRIPTED
 
-        # ---- HOLDING : INSPECT / HALT pose, until released ------
+        # ---- HOLDING : BRACE / INSPECT / HALT pose ------
         if self._state == "holding":
-            if mode in (GaitMode.CRUISE, GaitMode.CAREFUL):
+            # BRACE auto-releases after brace_ticks
+            if self._skill == GaitMode.BRACE:
+                self._skill_phase += 1
+                if self._skill_phase >= c.brace_ticks:
+                    self._from_pose = self._skill_start_pose(self._skill)
+                    self._state, self._blend_t = "blend_out", 0
+                    self._say("brace: done, blending out")
+                    return self._from_pose, Source.SCRIPTED
+            if mode in (GaitMode.CRUISE, GaitMode.CAREFUL) and self._skill != GaitMode.BRACE:
                 self._from_pose = self._skill_start_pose(self._skill)
                 self._state, self._blend_t = "blend_out", 0
                 self._say(f"{self._skill}: released, blending out")

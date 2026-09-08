@@ -139,3 +139,15 @@ def test_inspect_has_a_cooldown():
 def test_inspect_ignores_a_side_unresolved_read():
     sel = GaitSelector()
     assert sel.update(_unres(0.15, bearing=0.9)) is GaitMode.CRUISE  # not in our path
+
+
+def test_imminent_low_obstacle_braces():
+    sel = GaitSelector()
+    assert sel.update(obst(0.20)) is GaitMode.STEP_OVER     # close -> step over
+    sel.reset()
+    assert sel.update(obst(0.08)) is GaitMode.BRACE         # too close -> brace, immediate
+
+
+def test_brace_yields_to_a_wall():
+    sel = GaitSelector()
+    assert sel.update(obst(0.08, tall=True)) is GaitMode.HALT

@@ -59,6 +59,8 @@ class GaitSelectorConfig:
     inspect_on_unresolved: bool = True  # close + can't classify -> INSPECT (peer down) first
     inspect_hold_ticks: int = 16     # hold the crouch this long (look-down resolves the scan)
     inspect_cooldown: int = 60       # ticks after an INSPECT before it can fire again
+    brace_on_imminent: bool = True   # obstacle too close to step over -> BRACE (hunker for the bump)
+    brace_dist: float = 0.12         # dist_norm below this (and below close_dist) -> BRACE not STEP_OVER
 
 
 class GaitSelector:
@@ -125,9 +127,13 @@ class GaitSelector:
             self._want, self._want_streak, self._clear_streak = GaitMode.BACK_OUT, 0, 0
             return self._mode
 
-        # HALT is immediate, no debounce
+        # HALT / BRACE are immediate, no debounce (no time to)
         if raw is GaitMode.HALT:
             self._commit(GaitMode.HALT, "tall obstacle close ahead -- halt")
+            self._want, self._want_streak, self._clear_streak = raw, 0, 0
+            return self._mode
+        if raw is GaitMode.BRACE:
+            self._commit(GaitMode.BRACE, "obstacle imminent -- brace for the bump")
             self._want, self._want_streak, self._clear_streak = raw, 0, 0
             return self._mode
 
@@ -171,7 +177,11 @@ class GaitSelector:
             return GaitMode.CRUISE
         if r.dist_norm >= c.mid_dist:
             return GaitMode.CAREFUL
-        return GaitMode.HALT if r.tall else GaitMode.STEP_OVER
+        if r.tall:
+            return GaitMode.HALT
+        if c.brace_on_imminent and r.dist_norm < c.brace_dist:
+            return GaitMode.BRACE            # too close to step over -- hunker and take the bump
+        return GaitMode.STEP_OVER
 
     def _commit(self, mode: GaitMode, reason: str) -> None:
         self._mode = mode
