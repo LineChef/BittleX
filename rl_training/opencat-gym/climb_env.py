@@ -41,8 +41,9 @@ STANCE = WKF_REF.mean(axis=0)                         # (8,) rad, neutral four-f
 REV = [1, 2, 4, 5, 7, 8, 10, 11]                     # revolute joints, URDF keyframe order
 PAW = [3, 6, 9, 12]                                  # FL FR BR BL paw links
 FRONT_PAW = [3, 6]
+REAR_PAW = [9, 12]
 BOUND = np.deg2rad(110.0)
-RES_DEG = 32.0                                        # RESIDUAL scale on top of the scripted base
+RES_DEG = 36.0                                        # RESIDUAL scale on top of the scripted base
 
 # --- scripted base: the working part of climb_test.py -- front feet tuck up ->
 # reach forward -> plant on the ledge, body pulls forward staying LEVEL. The
@@ -50,12 +51,14 @@ RES_DEG = 32.0                                        # RESIDUAL scale on top of
 # (bring the rear legs up without tipping -- needs IMU feedback). Deltas in DEG
 # from STANCE, URDF order [FLsh FLkn FRsh FRkn  BRhip BRkn BLhip BLkn].
 _BASE_POSES = np.array([
-    [0,   0,   0,   0,   0, 0, 0, 0],       # stance
-    [38, -32,  38, -32,   0, 0, 0, 0],      # front tuck UP
-    [-12, 34, -12,  34,   0, 0, 0, 0],      # front reach fwd + plant on the top
-    [16,  28,  16,  28,   4, 6, 4, 6],      # gentle body pull, front stays planted
+    [0,   0,   0,   0,   0,   0,   0,   0],   # stance
+    [38, -32,  38, -32,   0,   0,   0,   0],  # front tuck UP
+    [-12, 34, -12,  34,   0,   0,   0,   0],  # front reach fwd + plant on the top
+    [16,  28,  16,  28,   4,   6,   4,   6],  # body pull, front planted
+    [16,  28,  16,  28,  24, -18,  24, -18],  # REAR tuck up (front holds on the ledge)
+    [10,  20,  10,  20,  -8,  22,  -8,  22],  # REAR reach fwd + plant on the ledge, settle
 ], dtype=float)
-_BASE_SEGS = [14, 20, 24]                             # env-steps per leg of the base motion
+_BASE_SEGS = [14, 20, 24, 18, 24]                     # env-steps per leg of the base motion
 
 
 def _build_base():
@@ -93,7 +96,10 @@ W_ROLL = 10.0                      # roll is never wanted
 PEN_PITCH_HARD = 30.0             # penalty ONLY for pitch past PITCH_FREE (approaching a flip)
 PITCH_FREE = 0.80                  # rad (~46 deg): lean up to here is free -- a climb needs it
 W_JERK, W_ALIVE = 0.3, 0.1
-W_FRONT_ON = 4.0                   # per front paw on the ledge top -- gradient at a reachable state
+W_FRONT_ON = 4.0                   # per front paw on the ledge -- but worth only 0.4x while the
+                                  # rear is still down (stops "park with the front up" being cosy)
+W_REAR_ON = 11.0                  # per REAR paw on the ledge -- the actual completion, paid big
+W_REAR_LIFT = 60.0               # reward rear-paw mean height GAIN toward the ledge
 STALL_PEN, STALL_WIN, STALL_EPS = 2.0, 25, 0.008   # no >8mm gain over 25 steps past step 25 -> stalled
 STALL_KILL = 50                    # stalled this many steps -> end the episode (-20)
 BONUS_TOP, PEN_FLIP = 250.0, 100.0
@@ -197,6 +203,7 @@ class ClimbEnv(gym.Env):
         self._stall_streak = 0
         self._goal = (LEDGE_FRONT_X + GOAL_DX, self._ledge_h + STAND_Z)
         self._prev_phi = self._phi(self._prev_x, self._prev_z)
+        self._prev_rear_z = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
         return self._obs(self._last_action), {}
 
     def _phi(self, bx, bz):
@@ -231,14 +238,21 @@ class ClimbEnv(gym.Env):
                    and bx - self._xhist[-STALL_WIN - 1] < STALL_EPS)
         self._stall_streak = self._stall_streak + 1 if stalled else 0
 
-        fp = [p.getLinkState(self._robot, j)[0] for j in FRONT_PAW]
-        front_on = sum(1 for (px, _py, pz) in fp
-                       if pz > self._ledge_h - 0.015 and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
+        def _on(links):
+            return sum(1 for (px, _py, pz) in (p.getLinkState(self._robot, j)[0] for j in links)
+                       if pz > self._ledge_h - 0.015
+                       and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
+        front_on, rear_on = _on(FRONT_PAW), _on(REAR_PAW)
+        rear_z = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
+        d_rear_z = rear_z - self._prev_rear_z
+        self._prev_rear_z = rear_z
 
         pitch_over = max(0.0, abs(pitch) - PITCH_FREE)
         r = (r_shape
              + W_PROG * np.clip(d_x / 0.01, -1.0, 1.5)
-             + W_FRONT_ON * front_on
+             + W_FRONT_ON * front_on * (0.4 if rear_on == 0 else 1.0)   # front-only parking worth less
+             + W_REAR_ON * rear_on                                       # the actual completion
+             + W_REAR_LIFT * np.clip(d_rear_z / 0.01, -0.5, 1.0)         # reward rear-paw height gain
              - W_ROLL * min(1.0, abs(roll) / 1.0)
              - PEN_PITCH_HARD * pitch_over
              - W_JERK * float(np.mean((action - self._last_action) ** 2))

@@ -38,30 +38,43 @@ def main():
     ap.add_argument("--episodes", type=int, default=20)
     ap.add_argument("--ledge-lo", type=float, default=0.04)
     ap.add_argument("--ledge-hi", type=float, default=0.04)
-    ap.add_argument("--gif", default=None)
-    ap.add_argument("--gif-episodes", type=int, default=3)
+    ap.add_argument("--gif", default=None, help="write a GIF of the BEST episode here")
+    ap.add_argument("--gif-episodes", type=int, default=0, help="0 = best episode only; N = first N")
+    ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
     from stable_baselines3 import PPO
     model = PPO.load(a.model, device="cpu")
-    env = ClimbEnv(ledge_lo=a.ledge_lo, ledge_hi=a.ledge_hi)
+    env = ClimbEnv(ledge_lo=a.ledge_lo, ledge_hi=a.ledge_hi, seed=a.seed)
 
     succ = flip = 0
     end_pitch, end_dz, end_top, ret = [], [], [], []
+    best = {"score": -1e9, "frames": None, "e": -1}
     frames, labels = [], []
     for e in range(a.episodes):
         obs, _ = env.reset()
         tot = 0.0
-        grab_this = a.gif and e < a.gif_episodes
+        ep_frames = []
+        grab_this = bool(a.gif)                       # always grab; keep the best afterwards
         while True:
             act, _ = model.predict(obs, deterministic=True)
             obs, r, term, trunc, info = env.step(act)
             tot += r
             if grab_this and env._t % 2 == 0:
-                frames.append(_grab(env))
-                labels.append((e, info["pitch"], info["on_top"], info["success"]))
+                fr = _grab(env)
+                ep_frames.append((fr, (e, info["pitch"], info["on_top"], info["success"])))
+                if a.gif_episodes and e < a.gif_episodes:
+                    frames.append(fr)
+                    labels.append((e, info["pitch"], info["on_top"], info["success"]))
             if term or trunc:
                 break
+        if a.gif:
+            tgt_z0 = env._ledge_h + STAND_Z
+            climb_score = info["on_top"] * 10 - abs(info["bz"] - tgt_z0) * 200 + (300 if info["success"] else 0)
+            if climb_score > best["score"]:
+                best = {"score": climb_score, "frames": ep_frames, "e": e,
+                        "ledge": env._ledge_h, "on_top": info["on_top"],
+                        "bz": info["bz"], "success": info["success"]}
         tgt_z = env._ledge_h + STAND_Z
         end_pitch.append(np.degrees(info["pitch"]))
         end_dz.append(info["bz"] - tgt_z)
@@ -86,18 +99,25 @@ def main():
     print(f"feet on ledge at end   : mean {np.mean(end_top):.1f}/4")
     print(f"return mean {np.mean(ret):.1f}")
 
-    if a.gif and frames:
+    if a.gif:
         from PIL import Image, ImageDraw
+        seq = frames and list(zip(frames, labels))
+        if not seq and best["frames"]:
+            seq = best["frames"]
+            print(f"\nBEST episode: ep{best['e']}  ledge {best['ledge']*100:.1f} cm  "
+                  f"feet-on-top {best['on_top']}/4  bz {best['bz']:.3f}  "
+                  f"{'SUCCESS' if best['success'] else 'partial'}")
         imgs = []
-        for fr, (e, pit, top, sc) in zip(frames, labels):
+        for fr, (e, pit, top, sc) in (seq or []):
             im = Image.fromarray(fr)
             d = ImageDraw.Draw(im)
             d.rectangle([0, 0, im.width, 16], fill=(20, 20, 24))
             d.text((5, 3), f"ep{e}  pitch {np.degrees(pit):+.0f}  feet {top}/4"
                            + ("  SUCCESS" if sc else ""), fill=(235, 235, 235))
             imgs.append(im)
-        imgs[0].save(a.gif, save_all=True, append_images=imgs[1:], duration=60, loop=0, disposal=2)
-        print(f"wrote {a.gif}  ({len(imgs)} frames)")
+        if imgs:
+            imgs[0].save(a.gif, save_all=True, append_images=imgs[1:], duration=55, loop=0, disposal=2)
+            print(f"wrote {a.gif}  ({len(imgs)} frames)")
 
 
 if __name__ == "__main__":
