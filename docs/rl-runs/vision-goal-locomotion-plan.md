@@ -369,12 +369,67 @@ cliff. GIFs (blind walks off / CliffGuard halts) in the report.
 G2E_CLIFF_PLATFORM_HW=0.18 python eval_skill_switch.py --render --episodes 6
 --cliff-prob 1.0 --fwd-cmd 0.14 --max-steps 300` (add `--no-switch` for blind).
 
+### BACK_OUT skill + mixed course (2026-09-08)
+
+**BACK_OUT** (commit `4f17f93`): `GaitMode.BACK_OUT` plays `bk_ref` for a cycle
+then auto-releases. `GaitSelector.update(reading, stalled=...)` fires it when the
+robot is stalled against something (no forward progress + obstacle in view),
+with a cooldown. Harness computes `stalled` from body-x history.
+
+**Mixed course** (obstacles + 40% drop-offs on one course, platform HW 0.28 =
+mostly unreached, 70 eps/5 seeds):
+
+| | falls | edge falls | wall-stops | fwd (walked) |
+|---|---|---|---|---|
+| baseline | 0% | 1/22 | 0 | 0.239 m |
+| + switch | 0% | 0/22 | 27 | 0.169 m |
+
+- **Safety fully holds** — 0 falls, 0 edge falls.
+- **But forward progress drops ~29%** (0.169 vs 0.239): `HALT` is 40% of ticks,
+  27/70 eps wall-stop-dominated. On a course dense with tall obstacles + edges
+  the switch halts a lot — and in sim `HALT` = frozen for the episode (no
+  turn/nav layer to route around). In the real system a wall-`HALT` hands to
+  firmware turning; here it over-penalises forward distance.
+- **BACK_OUT is helping**: "STEP_OVER didn't fire" encounters now advance
+  0.05–0.07 m (vs 0.012 m in E-3, no back-out).
+
+**Read:** the pieces compose and safety is airtight, but a mixed course is not a
+clean forward-progress win *without a turn/nav layer* — `HALT`-forever in sim
+reads as a regression it wouldn't be on hardware. Don't over-tune the sim course
+to fix this; it's a known sim limitation (turning → firmware).
+
 ### Where Phase E stands
 
-Two clean wins now: **+48%** through low obstacles (E-3 sweep, step-over
-attributed) and **0% vs 34%** edge-falls on drop-offs (E-4c). Both with the
-frozen `run20m_ppo`, 0 training. Skills exercised so far: `STEP_OVER` (trot),
-`HALT`, `CAREFUL`; `CliffGuard` `STOP`/`SLOW`.
+Individually: **+48%** through low obstacles (E-3, step-over attributed) and
+**0% vs 34%** edge-falls on drop-offs (E-4c) — both with frozen `run20m_ppo`,
+0 training. Mixed: safety holds, forward traded down by frequent halting (sim
+has no turn layer). Skills built: `STEP_OVER` (trot), `BACK_OUT` (`bk`), `HALT`,
+`CAREFUL`; `CliffGuard` `STOP`/`SLOW`. Defined-not-triggered: `INSPECT`.
+
+### >>> RESUME (Phase E) <<<
+
+State: all committed + pushed on `development` through `4f17f93`. Report:
+`claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`. Nothing running.
+
+Next, in order:
+1. **E-5 — INSPECT.** Env change first: a near blind zone in `_scan_terrain`
+   (don't report obstacles within ~0.15 m; `tall_flag` unreliable up close)
+   *unless* a look-down flag is set. Then `GaitSelector` triggers `INSPECT` on
+   "close + unresolved" or after a `BACK_OUT`, and it re-acquires the obstacle /
+   picks a step height. `SkillSwitch` already has the `INSPECT` mode (held
+   crouch, `cr_ref`).
+2. **More skills** (sandbox backlog table above): brace, crouch-walk,
+   high-step-up / step-down, sidestep (needs authoring).
+3. **E-4b — reward rework** (deferred, training-only): detected-and-cleared ≥
+   never-detected; don't punish slowing while an obstacle is in view.
+4. When the skill set is frozen → the "design frozen" gate for one
+   consolidation ~20M (Tier B). Not before hardware confirms the scripted layer's
+   limits (open-loop fragility, blend transients) actually bite.
+
+Key files: `pi_pipeline/gait/skill_switch.py`, `pi_pipeline/vision/gait_selector.py`,
+`pi_pipeline/vision/cliff_guard.py`, `rl_training/opencat-gym/eval_skill_switch.py`,
+`opencat_gym_env.py` (`_scan_terrain` ~line 1728, `_recolor_scene`, the
+`CLIFF_PROB` decouple, `_abs_joint_override` hook).
 
 **Next:**
 - **E-5 — INSPECT** (peer-down). Needs a sim change first: a near blind zone in
