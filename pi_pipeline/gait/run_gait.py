@@ -41,7 +41,7 @@ from thermal_guard import ThermalGuard                        # noqa: E402
 try:                                                          # Phase E vision-skill layer (optional)
     from pi_pipeline.gait.skill_layer import SkillLayer       # noqa: E402
     from pi_pipeline.gait.skill_switch import SkillRefs       # noqa: E402
-    from pi_pipeline.vision.cliff_guard import CliffGuard     # noqa: E402
+    from pi_pipeline.vision.cliff_guard import CliffAction, CliffGuard, action_commands  # noqa: E402
     from pi_pipeline.vision.gait_selector import detections_to_terrain_reading  # noqa: E402
 except Exception:                                             # noqa: BLE001 -- runs blind without it
     SkillLayer = None
@@ -298,6 +298,23 @@ class _LatestFrame:
             pass
 
 
+def _cliff_firmware_action(lk, cliff_action, turn_burst_s):
+    """The gait layer can only HALT for an edge -- turning is a firmware job.
+    When CliffGuard asks to turn away / back up, hand off to the OpenCat scripted
+    turn gait for a short burst, then let the policy loop resume and CliffGuard
+    re-evaluate the next edge read. Returns True if it drove the servos this tick
+    (caller skips its normal move send). FREEZE is handled by the caller."""
+    if SkillLayer is None or cliff_action is None:
+        return False
+    if cliff_action in (CliffAction.TURN_AWAY_LEFT, CliffAction.TURN_AWAY_RIGHT,
+                        CliffAction.BACK_UP):
+        for tok in action_commands(cliff_action):
+            _send(lk, tok)
+        time.sleep(max(0.0, turn_burst_s))
+        return True
+    return False
+
+
 def _make_vision_feed(kind, port, baud):
     """kind: 'serial' (Grove Vision AI on its own USB port) or 'mock:approach'
     (a scripted box growing in the path, loops -- bench check without the camera)."""
@@ -314,7 +331,8 @@ def _make_vision_feed(kind, port, baud):
 
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
-        thermal_guard=True, skill_layer=None, vision=None, skill_labels=None):
+        thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
+        turn_burst_s=1.0):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
@@ -406,12 +424,31 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         vision.set_look_down(skill_layer.looking_down)
                     if sinfo.mode.value != _skill_prev:
                         print(f"[skills] {_skill_prev} -> {sinfo.mode.value} "
-                              f"(src={sinfo.source.value}, spd x{sinfo.speed_scale:.2f})",
-                              flush=True)
+                              f"(src={sinfo.source.value}, spd x{sinfo.speed_scale:.2f}"
+                              + (f", cliff={sinfo.cliff_action.value}" if sinfo.cliff_action
+                                 and sinfo.cliff_action is not CliffAction.NONE else "")
+                              + ")", flush=True)
                         if diag is not None:
                             diag.event("gait", "INFO", "skill.mode",
                                        mode=sinfo.mode.value, source=sinfo.source.value)
                         _skill_prev = sinfo.mode.value
+
+                    # edge -> stop is handled by the HALT mode above; edge -> turn
+                    # away / back up needs the firmware scripted turn gait.
+                    if sinfo.frozen:
+                        print(f"!! CliffGuard FROZEN: {skill_layer._cliff.last_reason} "
+                              "-- stopping, needs a human", flush=True)
+                        if diag is not None:
+                            diag.event("gait", "ERROR", "cliff.frozen",
+                                       reason=skill_layer._cliff.last_reason)
+                        _speak_best_effort("I'm at an edge I can't get around. Come help me.")
+                        _send(lk, "kbalance")
+                        break
+                    if _cliff_firmware_action(lk, sinfo.cliff_action, turn_burst_s):
+                        pol.set_command(fwd=cmd_fwd)     # restore after the scaled/held cmd
+                        t_next = time.perf_counter()     # the burst blocked; resync the clock
+                        i += 1
+                        continue
 
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
@@ -527,6 +564,9 @@ def main():
     ap.add_argument("--skills-vision-baud", type=int, default=921600)
     ap.add_argument("--no-cliff-guard", action="store_true",
                     help="--skills: drop the CliffGuard edge reflex (no downward sensor wired)")
+    ap.add_argument("--skills-turn-burst", type=float, default=1.0,
+                    help="--skills: seconds to run the firmware turn gait when CliffGuard "
+                         "asks to turn away from an edge (then the policy loop resumes)")
     args = ap.parse_args()
 
     thermal_on = not args.no_thermal_guard
@@ -571,7 +611,8 @@ def main():
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
-                thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision)
+                thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
+                turn_burst_s=args.skills_turn_burst)
     finally:
         try:
             lk.close()
