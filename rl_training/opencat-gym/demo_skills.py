@@ -49,16 +49,17 @@ from eval_skill_switch import make_switch, rl_joint_deg               # noqa: E4
 # are added around it).
 SKILLS = [
     dict(mode=GaitMode.CRUISE,   ticks=90,  name="CRUISE",   col=(70, 132, 200),
-         desc="the learned run20m_ppo walk drives"),
+         desc="the learned run20m_ppo walk at top speed (0.15 m/s)"),
     dict(mode=GaitMode.CAREFUL,  ticks=80,  name="CAREFUL",  col=(38, 176, 168),
-         desc="obstacle mid-distance -- RL still drives, speed x0.6"),
+         desc="obstacle mid-distance -- same walk, speed x0.6 (0.09 m/s)"),
     dict(mode=GaitMode.STEP_OVER, ticks=140, name="STEP OVER", col=(83, 176, 74),
-         cam="side",
+         play_scale=3.0,
          desc="low obstacle -- scripted TROT keyframe (this is what's wired), blended in and out"),
     dict(mode=GaitMode.STEP_OVER, ticks=140, name="HIGH-STEP", col=(120, 196, 96),
-         ref="highstep_ref.npy", cam="side",
+         ref="highstep_ref.npy", play_scale=3.0,
          desc="the authored higher-lift keyframe -- more foot clearance, but it LOST the A/B to trot"),
     dict(mode=GaitMode.INSPECT,  ticks=110, name="INSPECT",  col=(140, 104, 214),
+         blend_scale=3.0,
          desc="close & can't classify -- crouch, camera mast pitches down"),
     dict(mode=GaitMode.BRACE,    ticks=90,  name="BRACE",    col=(226, 146, 44),
          desc="impact imminent -- planted crouch, knees flexed, take the bump"),
@@ -68,8 +69,8 @@ SKILLS = [
          desc="wall ahead -- hold neutral stance (nav / turn layer takes over)"),
 ]
 
-WALK_CMD = 0.09         # a middle pace -- clearly walking, but the learned gait
-                        # pitches / bounces less than it does near its 0.15 m/s max
+WALK_CMD = 0.15         # the policy's top forward speed on flat ground (CMD_FWD_MAX).
+                        # CAREFUL runs this x0.6, so the two are a real speed contrast.
 SKILL_LEN_SCALE = 3.0   # multiplies every SKILLS `ticks` -- bump for longer demos
 
 # these auto-release after ~one play, so a HELD command re-triggers them over and
@@ -82,16 +83,16 @@ FRAME_MS = 95           # uniform per-frame GIF duration
 
 
 # --------------------------------------------------------------------- render
-def _grab(env, w, h, cam="chase"):
-    """`chase` (default): pitched well down so flat ground fills the frame.
-    `side`: a low, near-side-on angle so foot lift / body pitch reads (STEP OVER,
-    HIGH-STEP). Both grab tall and crop the sky band off the top."""
+def _grab(env, w, h, cam="side"):
+    """`side` (default): a low near-profile angle so foot lift / body pitch / bob
+    read. `chase`: pitched well down so flat ground fills the frame. Both grab
+    tall and crop the sky band off the top."""
     pos = p.getBasePositionAndOrientation(env.robot_id)[0]
-    gh = h + 110
-    if cam == "side":
-        yaw, pitch, dist, tz, crop = 14, -24, 0.66, 0.10, 92
+    gh = h + 150
+    if cam == "chase":
+        yaw, pitch, dist, tz, crop = 52, -52, 0.70, 0.05, 150
     else:
-        yaw, pitch, dist, tz, crop = 52, -52, 0.70, 0.05, 110
+        yaw, pitch, dist, tz, crop = 78, -20, 0.60, 0.09, 118
     _, _, rgb, _, _ = p.getCameraImage(
         w, gh,
         viewMatrix=p.computeViewMatrixFromYawPitchRoll(
@@ -258,6 +259,14 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
     for idx, sk in enumerate(SKILLS):
         sw = _get_switch(sk.get("ref"))
         sw.reset()
+        # per-skill slow-mo: `play_scale` stretches the keyframe playback,
+        # `blend_scale` slows the ease in/out -- so a quick scripted motion is
+        # watchable. Base values match eval_skill_switch.make_switch().
+        ps = sk.get("play_scale", 1.0)
+        bs = sk.get("blend_scale", 1.0)
+        sw._cfg.play_ticks_per_cycle = int(48 * ps)
+        sw._cfg.blend_in_steps = int(6 * bs)
+        sw._cfg.blend_out_steps = int(6 * bs)
         # recenter over the origin so every skill plays in the same spot on floor.
         # This is the ONLY teleport, and it lands on a non-captured frame (behind
         # the title card) so it's never visible.
