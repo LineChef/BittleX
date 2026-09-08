@@ -794,10 +794,28 @@ tuning, and the Phase 10 wiring — all hardware-gated.
         anticipation, no regression). Vision-in-the-loop ruled out; the `Avoider`
         speed reflex is the path. Report:
         `claude.ai/code/artifact/bfb58d90-71ca-4681-9c72-d14e15e56b7a`.
-        Next architecture bet: the adapter skill probe
-        (`docs/rl-runs/adapter-skill-probe-spec.md`).
       - Built + kept dormant for a future Tier B run: `G2E_TERRAIN_FEATURE` /
         `GOAL_MODE` / `CLIFF` / `TURN_BLEND`, `run20m_graft28x`, `benchmark_goal.py`.
+      - **Phase E (2026-09-08) — vision picks a SCRIPTED skill on the frozen
+        walk. IMPLEMENTED, hardware-gated.** No training: `run20m_ppo` stays
+        frozen; a vision reading selects a `GaitMode` (cruise / careful /
+        step-over / back-out / brace / inspect / halt) and `SkillSwitch` plays a
+        scripted OpenCat keyframe with a phase-gated via-stance blend. Sim
+        results (0 training): +48% through low obstacles (step-over attributed),
+        0% vs 34% edge-falls with `CliffGuard`. `smoke_vfix3` (a fresh 3M
+        vision-conditioned run with the Phase D fixes) confirmed learned
+        vision-in-the-policy is a dead end a second way (it stalls). next-1..5
+        done: high-step A/B (trot kept), `INSPECT` + near blind zone, per-ray
+        slope grounding, `BRACE`, deployment wiring. Stack:
+        `pi_pipeline/gait/skill_layer.py` (`SkillLayer` = `GaitSelector` +
+        `SkillSwitch` + `CliffGuard`), `run_gait.py --skills` (serial Grove
+        Vision AI feed or mock). Walk-around maneuver **can't be scripted** —
+        no lateral leg DOF; a detour needs a firmware turn (nav-layer decision).
+        Report: `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
+        Plan: `docs/rl-runs/vision-goal-locomotion-plan.md` (`>>> RESUME (Phase E)`).
+        The adapter skill probe (`docs/rl-runs/adapter-skill-probe-spec.md`)
+        stays the route for *one* genuinely-learned skill if a scripted one
+        proves too fragile on hardware.
 
       --- superseded plan (2026-09-03), kept for context ---
       The current gait is reactive and IMU-only, so it can't anticipate terrain
