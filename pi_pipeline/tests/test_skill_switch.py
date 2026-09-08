@@ -11,7 +11,8 @@ from pi_pipeline.gait.skill_switch import (
 # synthetic refs (RADIANS, URDF order) -- distinct, easy to recognise in degrees
 STEP = np.tile(np.linspace(0.0, 0.4, 4)[:, None], (1, 8))   # (4,8) ramp 0..~23deg
 INSPECT = np.full((2, 8), -0.5)                             # (2,8) ~ -28.6 deg (crouch)
-REFS = SkillRefs(step_over=STEP, inspect=INSPECT)           # stand defaults to zeros (1,8)
+BACK = np.full((4, 8), 0.2)                                 # (4,8) ~ 11.5 deg
+REFS = SkillRefs(step_over=STEP, inspect=INSPECT, back_out=BACK)
 CFG = SkillSwitchConfig(blend_in_steps=2, blend_out_steps=2, play_ticks_per_cycle=4)
 
 RL = np.full(8, 10.0)   # a fixed RL joint output, degrees
@@ -156,4 +157,15 @@ def test_reset_returns_to_cruise():
     s.reset()
     out, src = s.update(GaitMode.CRUISE, RL)
     assert src is Source.RL and np.allclose(out, RL)
+    assert s.active_skill is None
+
+
+def test_back_out_is_a_timed_skill_that_auto_releases():
+    s = sw()
+    out, src = _reach_skill(s, GaitMode.BACK_OUT)        # blend in -> playing
+    assert src is Source.SCRIPTED and s.active_skill is GaitMode.BACK_OUT
+    assert np.allclose(out, np.rad2deg(0.2), atol=1e-6)  # BACK ref frame 0
+    srcs = [s.update(GaitMode.CRUISE, RL)[1]
+            for _ in range(CFG.play_ticks_per_cycle + CFG.blend_out_steps + 1)]
+    assert srcs[-1] is Source.RL                         # played its cycle, handed back
     assert s.active_skill is None

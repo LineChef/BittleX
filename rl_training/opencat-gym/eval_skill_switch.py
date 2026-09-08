@@ -84,6 +84,7 @@ def make_switch():
     refs = SkillRefs(
         step_over=_load("tr_ref.npy"),          # trot -- widest foot lift of the built-ins
         inspect=_load("cr_ref.npy"),            # crouch -- pitches the mast down
+        back_out=_load("bk_ref.npy"),           # walk backward
         stance=WKF_REF.mean(axis=0),            # neutral four-foot pose
     )
     return SkillSwitch(refs, SkillSwitchConfig(
@@ -166,6 +167,7 @@ def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=Non
     enc = []                                       # per obstacle encounter
     cur = None
     fell = False
+    xhist = []                                      # recent body-x, for stall detection
     for k in range(max_steps):
         if fwd_cmd is not None:
             env._cmd_fwd = base_cmd                  # hold a fixed march command (E-4c)
@@ -174,7 +176,11 @@ def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=Non
         rd = terrain_reading(env) if switch is not None else None
         cliff_act = None
         if switch is not None:
-            mode = selector.update(rd)
+            # stalled = an obstacle in view + a move command + ~no forward progress
+            # over the last ~24 ticks
+            stalled = (rd.present and base_cmd > 0.03 and len(xhist) >= 24
+                       and (xhist[-1] - xhist[-24]) < 0.008)   # ~no forward progress
+            mode = selector.update(rd, stalled=bool(stalled))
             if cliff is not None:                        # cliff reflex preempts the terrain selector
                 cliff_act = cliff.update(edge_reading(env))
                 forced = _CLIFF_TO_MODE.get(cliff_act)
@@ -197,6 +203,7 @@ def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=Non
             obs, _, term, trunc, info = env.step(action)
 
         bx, bz = _body_xz(env)
+        xhist.append(bx)
         z_by_src[src].append(bz)
         pitch_by_src[src].append(_body_pitch(env))
 

@@ -51,6 +51,8 @@ class GaitSelectorConfig:
     min_confidence: float = 0.60  # a not-present read below this -> CAREFUL (hedge)
     into_skill_debounce: int = 1  # consecutive frames before switching INTO STEP_OVER/CAREFUL
     clear_to_cruise: int = 3      # consecutive clear frames before returning to CRUISE
+    backout_on_stall: bool = True    # stalled against something -> BACK_OUT to re-approach
+    backout_cooldown: int = 40       # ticks after a BACK_OUT before it can fire again
 
 
 class GaitSelector:
@@ -60,6 +62,7 @@ class GaitSelector:
         self._want = GaitMode.CRUISE      # candidate mode, pending debounce
         self._want_streak = 0
         self._clear_streak = 0
+        self._backout_cd = 0             # cooldown ticks left after a BACK_OUT
         self._last_reason = ""
 
     @property
@@ -73,9 +76,22 @@ class GaitSelector:
     def reset(self) -> None:
         self.__init__(self._cfg)
 
-    def update(self, r: TerrainReading) -> GaitMode:
+    def update(self, r: TerrainReading, stalled: bool = False) -> GaitMode:
         c = self._cfg
+        cooling = self._backout_cd > 0
+        if cooling:
+            self._backout_cd -= 1
         raw = self._raw_mode(r)
+
+        # stalled against something (no forward progress despite a move command)
+        # -> BACK_OUT to re-approach, unless just backed out. Beats everything but
+        # a fresh HALT (a wall/edge stop stays).
+        if (c.backout_on_stall and stalled and not cooling
+                and raw is not GaitMode.HALT):
+            self._backout_cd = c.backout_cooldown
+            self._commit(GaitMode.BACK_OUT, "stalled -- back out and re-approach")
+            self._want, self._want_streak, self._clear_streak = GaitMode.BACK_OUT, 0, 0
+            return self._mode
 
         # HALT is immediate, no debounce
         if raw is GaitMode.HALT:

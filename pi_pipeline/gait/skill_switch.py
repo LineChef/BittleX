@@ -43,6 +43,7 @@ class GaitMode(Enum):
     CRUISE = "cruise"          # the learned walk drives
     CAREFUL = "careful"        # learned walk drives, but at reduced speed
     STEP_OVER = "step_over"    # scripted high-step / trot keyframes, then hand back
+    BACK_OUT = "back_out"      # scripted walk-backward for a cycle, then hand back
     INSPECT = "inspect"        # scripted crouch, held, so the mast pitches down
     HALT = "halt"              # scripted neutral stance, held (preempts everything)
 
@@ -53,7 +54,8 @@ class Source(Enum):
     SCRIPTED = "scripted"      # joints came from a keyframe skill
 
 
-_SKILL_MODES = (GaitMode.STEP_OVER, GaitMode.INSPECT, GaitMode.HALT)
+_SKILL_MODES = (GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.INSPECT, GaitMode.HALT)
+_TIMED_SKILLS = (GaitMode.STEP_OVER, GaitMode.BACK_OUT)   # play a cycle then auto-release
 
 
 @dataclass
@@ -76,6 +78,8 @@ class SkillRefs:
     blend."""
     step_over: np.ndarray                       # e.g. tr_ref.npy or an authored high-step
     inspect: np.ndarray                         # e.g. cr_ref.npy (crouch)
+    back_out: np.ndarray = field(               # e.g. bk_ref.npy (walk backward)
+        default_factory=lambda: np.zeros((1, 8)))
     stance: np.ndarray = field(
         default_factory=lambda: np.zeros(8))
 
@@ -100,6 +104,7 @@ class SkillSwitch:
         # internal units: DEGREES, to match the deployment joint interface
         self._ref = {
             GaitMode.STEP_OVER: np.rad2deg(np.atleast_2d(np.asarray(refs.step_over, float))),
+            GaitMode.BACK_OUT: np.rad2deg(np.atleast_2d(np.asarray(refs.back_out, float))),
             GaitMode.INSPECT: np.rad2deg(np.atleast_2d(np.asarray(refs.inspect, float))),
         }
         self._stance = np.rad2deg(np.asarray(refs.stance, float)).reshape(8)
@@ -198,7 +203,7 @@ class SkillSwitch:
             t = self._blend_t / max(1, c.blend_in_steps)
             out = _via(self._from_pose, self._stance, self._skill_start_pose(self._skill), t)
             if self._blend_t >= c.blend_in_steps:
-                self._state = "playing" if self._skill == GaitMode.STEP_OVER else "holding"
+                self._state = "playing" if self._skill in _TIMED_SKILLS else "holding"
                 self._skill_phase = 0.0
                 self._say(f"{self._skill}: blended in")
                 return out, Source.SCRIPTED
@@ -228,7 +233,7 @@ class SkillSwitch:
                 return self._from_pose, Source.SCRIPTED
             if mode == GaitMode.HALT and self._skill != GaitMode.HALT:
                 return self._begin(GaitMode.HALT, self._skill_start_pose(self._skill))
-            if (mode in (GaitMode.STEP_OVER, GaitMode.INSPECT)
+            if (mode in (GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.INSPECT)
                     and mode != self._skill and not c.latch_skill):
                 return self._begin(mode, self._skill_start_pose(self._skill))
             self._say(f"{self._skill}: holding")

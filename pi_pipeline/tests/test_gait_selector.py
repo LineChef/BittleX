@@ -91,3 +91,22 @@ def test_reset():
     sel.reset()
     assert sel.mode is GaitMode.CRUISE
     assert sel.update(CLEAR) is GaitMode.CRUISE
+
+
+def test_stall_triggers_back_out():
+    sel = GaitSelector(GaitSelectorConfig(backout_cooldown=5))
+    assert sel.update(obst(0.2), stalled=False) is GaitMode.STEP_OVER   # not stalled -> step
+    assert sel.update(obst(0.2), stalled=True) is GaitMode.BACK_OUT     # stalled -> back out
+
+
+def test_back_out_has_a_cooldown():
+    sel = GaitSelector(GaitSelectorConfig(backout_cooldown=3))
+    assert sel.update(obst(0.2), stalled=True) is GaitMode.BACK_OUT
+    for _ in range(3):                                  # cooldown ticking -- no re-fire
+        assert sel.update(obst(0.2), stalled=True) is not GaitMode.BACK_OUT
+    assert sel.update(obst(0.2), stalled=True) is GaitMode.BACK_OUT     # cooldown elapsed
+
+
+def test_stall_does_not_override_a_wall_halt():
+    sel = GaitSelector()
+    assert sel.update(obst(0.15, tall=True), stalled=True) is GaitMode.HALT
