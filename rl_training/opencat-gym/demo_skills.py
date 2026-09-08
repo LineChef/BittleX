@@ -95,8 +95,8 @@ def _grab(env, w, h, cam="side"):
     pos = np.array(pos)
     if cam == "chase":
         eye_local, look_dz, fov = np.array([-0.45, -0.30, 0.32]), 0.02, 52
-    else:                                        # true lateral profile, low angle
-        eye_local, look_dz, fov = np.array([0.02, -0.62, 0.10]), 0.03, 44
+    else:                                        # broadside profile w/ a touch of
+        eye_local, look_dz, fov = np.array([0.12, 0.60, 0.22]), 0.04, 46   # front-quarter -- body across the frame, all 4 legs splayed
     eye = pos + R @ eye_local
     target = pos + np.array([0.0, 0.0, look_dz])
     _, _, rgb, _, _ = p.getCameraImage(
