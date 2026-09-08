@@ -18,7 +18,13 @@ once it does.
 """
 from __future__ import annotations
 
+import os
+import time
+
 import numpy as np
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_URDF = os.path.join(_HERE, "models", "bittle_esp32.urdf")   # absolute -> cwd-independent
 
 try:
     import gymnasium as gym
@@ -30,7 +36,7 @@ except Exception:                                    # SB3 may still be on class
 import pybullet as p
 import pybullet_data
 
-WKF_REF = np.load(__file__.replace("climb_env.py", "reference_gait/wkf_ref.npy"))
+WKF_REF = np.load(os.path.join(_HERE, "reference_gait", "wkf_ref.npy"))
 STANCE = WKF_REF.mean(axis=0)                         # (8,) rad, neutral four-foot pose
 REV = [1, 2, 4, 5, 7, 8, 10, 11]                     # revolute joints, URDF keyframe order
 PAW = [3, 6, 9, 12]                                  # FL FR BR BL paw links
@@ -66,6 +72,8 @@ _BASE = _build_base()
 
 def _base_pose(t):
     return _BASE[min(int(t), len(_BASE) - 1)]
+
+
 CTRL_HZ = 60.0
 FRAME_SKIP = 4                                        # 240 Hz sim / 4 = 60 Hz control
 MAX_STEPS = 200                                       # ~3.3 s
@@ -104,6 +112,13 @@ class ClimbEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(1.0 / 240.0)
+        if render_mode == "human":                    # clean, close-in replay window
+            p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_RGB_BUFFER_PREVIEW, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_DEPTH_BUFFER_PREVIEW, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_SEGMENTATION_MARK_PREVIEW, 0)
+            p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
+            p.resetDebugVisualizerCamera(0.55, 55, -22, [0.10, 0.0, 0.05])
         self.action_space = spaces.Box(-1.0, 1.0, (8,), np.float32)
         self.observation_space = spaces.Box(-np.inf, np.inf, (34,), np.float32)
         self._robot = None
@@ -165,7 +180,7 @@ class ClimbEnv(gym.Env):
                                  rgbaColor=[0.55, 0.45, 0.35, 1])
         p.createMultiBody(0, cs, vs, [LEDGE_FRONT_X + LEDGE_LEN / 2, 0.0, self._ledge_h / 2])
 
-        self._robot = p.loadURDF("models/bittle_esp32.urdf", [0, 0, 0.08],
+        self._robot = p.loadURDF(_URDF, [0, 0, 0.08],
                                  p.getQuaternionFromEuler([0, 0, 0]),
                                  flags=p.URDF_USE_SELF_COLLISION)
         for j, a in zip(REV, STANCE):
@@ -198,6 +213,9 @@ class ClimbEnv(gym.Env):
         self._t += 1
 
         bx, bz, roll, pitch, on_top = self._state()
+        if self.render_mode == "human":               # chase the robot, real-time
+            p.resetDebugVisualizerCamera(0.55, 55, -22, [bx, 0.0, bz])
+            time.sleep(1.0 / CTRL_HZ)
         d_x = bx - self._prev_x
         self._prev_x, self._prev_z = bx, bz
         tgt_z = self._ledge_h + STAND_Z

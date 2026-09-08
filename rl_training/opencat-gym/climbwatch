@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# climbwatch -- replay the NEWEST climb checkpoint in the PyBullet GUI, from any
+# directory. Auto-follows whatever climb_* run is current (picks the most
+# recently written trained/climb_*.zip, including mid-run *_steps checkpoints).
+#
+#   climbwatch                       # 8 episodes, ledge 2.5-5 cm
+#   climbwatch 12                    # 12 episodes
+#   climbwatch 12 0.02 0.03          # 12 episodes, ledge 2-3 cm
+#   climbwatch 8 0.04 0.04 climb_r3_400000_steps   # 4th arg = pin a specific tag
+set -euo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)          # .../rl_training/opencat-gym
+ROOT=$(cd "$HERE/../.." && pwd)                             # repo root
+PY="$ROOT/.venv/bin/python"; [ -x "$PY" ] || PY=python3
+cd "$HERE"
+
+EP="${1:-8}"; LO="${2:-0.025}"; HI="${3:-0.05}"; PIN="${4:-}"
+if [ -n "$PIN" ]; then
+  CKPT="trained/${PIN%.zip}.zip"
+else
+  CKPT=$(ls -t trained/climb_*.zip 2>/dev/null | head -1 || true)
+fi
+[ -n "${CKPT:-}" ] && [ -f "$CKPT" ] || { echo "no matching checkpoint under $HERE/trained/"; exit 1; }
+
+echo "climbwatch: $CKPT   ($EP eps, ledge ${LO}-${HI} m)"
+exec "$PY" train_climb.py --watch "${CKPT%.zip}" --episodes "$EP" --ledge-lo "$LO" --ledge-hi "$HI"
