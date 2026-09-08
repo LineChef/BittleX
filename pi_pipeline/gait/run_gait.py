@@ -38,6 +38,14 @@ from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
 
+try:                                                          # Phase E vision-skill layer (optional)
+    from pi_pipeline.gait.skill_layer import SkillLayer       # noqa: E402
+    from pi_pipeline.gait.skill_switch import SkillRefs       # noqa: E402
+    from pi_pipeline.vision.cliff_guard import CliffGuard     # noqa: E402
+    from pi_pipeline.vision.gait_selector import detections_to_terrain_reading  # noqa: E402
+except Exception:                                             # noqa: BLE001 -- runs blind without it
+    SkillLayer = None
+
 try:
     from pi_pipeline.diag import diag, RingBuffer, bridge_stdlib_logging  # noqa: E402
 except Exception:                                             # diag is optional
@@ -156,9 +164,11 @@ def openloop(lk, cycles, hz):
     print("done (sent rest).")
 
 
-def dry_run(cmd_fwd, seconds, hz):
+def dry_run(cmd_fwd, seconds, hz, skill_layer=None, vision=None):
     """Full 80 Hz loop with synthetic (near-level) IMU and NO serial -- checks the
-    loop holds rate on this machine before any hardware exists."""
+    loop holds rate on this machine before any hardware exists. With --skills it
+    also drives the vision-skill layer (mock feed) so the whole path is exercised
+    without a robot."""
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     rng = np.random.default_rng(0)
@@ -169,16 +179,32 @@ def dry_run(cmd_fwd, seconds, hz):
 
     q, g = fake_imu()
     pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, g)
+    if skill_layer is not None:
+        skill_layer.reset()
+    _skill_prev = "cruise"
+    modes_seen = {}
     dt = 1.0 / hz
     n = int((seconds or 5.0) * hz)
     step_ms, loop_ms = [], []
     t_next = time.perf_counter()
     t_loop = time.perf_counter()
-    print(f"dry-run: {hz} Hz x {n} ticks, cmd_fwd={cmd_fwd}. No serial.")
+    print(f"dry-run: {hz} Hz x {n} ticks, cmd_fwd={cmd_fwd}. No serial."
+          + ("  [skills ON]" if skill_layer is not None else ""))
     for _ in range(n):
         q, g = fake_imu()
         t0 = time.perf_counter()
         jd = pol.step(q, g)
+        if skill_layer is not None:
+            frame = vision.latest() if vision is not None else []
+            terr = detections_to_terrain_reading(frame)
+            jd, sinfo = skill_layer.step(jd, gait_phase=pol.phase_frac(), terrain=terr)
+            pol.set_command(fwd=cmd_fwd * sinfo.speed_scale)
+            if vision is not None:
+                vision.set_look_down(skill_layer.looking_down)
+            modes_seen[sinfo.mode.value] = modes_seen.get(sinfo.mode.value, 0) + 1
+            if sinfo.mode.value != _skill_prev:
+                print(f"  [skills] {_skill_prev} -> {sinfo.mode.value} (src={sinfo.source.value})")
+                _skill_prev = sinfo.mode.value
         _ = deploy_map.policy_deg_to_move_cmd(jd)          # build the string, don't send
         step_ms.append((time.perf_counter() - t0) * 1e3)
         t_next += dt
@@ -194,10 +220,101 @@ def dry_run(cmd_fwd, seconds, hz):
     print(f"  policy step : mean {s.mean():.2f} ms  p95 {np.percentile(s,95):.2f}  max {s.max():.2f}")
     print(f"  loop period : mean {l.mean():.2f} ms  (target {dt*1e3:.2f})  -> {1000/l.mean():.1f} Hz achieved")
     print(f"  overruns    : {(l > dt*1e3*1.5).sum()} / {len(l)} ticks > 1.5x target")
+    if skill_layer is not None:
+        print(f"  skill modes : {modes_seen}")
 
 
+# --------------------------------------------------------------- vision skills
+_REF_DIRS = (_HERE, os.path.join(_HERE, "..", "..", "rl_training", "opencat-gym",
+                                 "reference_gait"))
+
+
+def _load_ref(name):
+    """(N,8) rad keyframe array from pi_pipeline/gait/ or the training reference_gait/."""
+    for d in _REF_DIRS:
+        p = os.path.join(d, name)
+        if os.path.exists(p):
+            return np.load(p).astype(np.float64)
+    raise FileNotFoundError(f"{name} not found in {[os.path.normpath(d) for d in _REF_DIRS]}")
+
+
+def build_skill_layer(*, with_cliff_guard=True):
+    """Assemble the Phase E SkillLayer from the shipped keyframe references.
+    step_over -> trot (tr_ref, won the item-1 A/B), inspect -> crouch, back_out ->
+    walk-backward, brace -> derived from stance, stance -> wkF mean pose."""
+    if SkillLayer is None:
+        raise RuntimeError("skill layer deps missing (pi_pipeline.vision / .gait import failed)")
+    refs = SkillRefs(
+        step_over=_load_ref("tr_ref.npy"),
+        inspect=_load_ref("cr_ref.npy"),
+        back_out=_load_ref("bk_ref.npy"),
+        brace=None,                                   # derived: stance + knee flex
+        stance=_load_ref("wkf_ref.npy").mean(axis=0),
+    )
+    return SkillLayer(refs, cliff_guard=CliffGuard() if with_cliff_guard else None)
+
+
+class _LatestFrame:
+    """Pull `feed.frames()` in a daemon thread; expose the newest frame without
+    blocking the 80 Hz loop. `latest()` returns [] once a frame is older than
+    `stale_after` s (detector dropped out -> treat as 'nothing seen')."""
+
+    def __init__(self, feed, stale_after=0.6):
+        import threading
+        self._feed = feed
+        self._stale = float(stale_after)
+        self._frame = []
+        self._stamp = 0.0
+        self._stop = threading.Event()
+        self._look_down = False
+        self._th = threading.Thread(target=self._pump, name="vision-feed", daemon=True)
+
+    def start(self):
+        self._th.start()
+        return self
+
+    def _pump(self):
+        try:
+            for fr in self._feed.frames():
+                if self._stop.is_set():
+                    break
+                self._frame, self._stamp = fr, time.time()
+        except Exception as e:  # noqa: BLE001 -- a dead feed must not kill the gait
+            print(f"[skills] vision feed stopped: {e!r}", flush=True)
+
+    def latest(self):
+        if time.time() - self._stamp > self._stale:
+            return []
+        return self._frame
+
+    def set_look_down(self, v):
+        self._look_down = bool(v)
+
+    def close(self):
+        self._stop.set()
+        try:
+            self._feed.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _make_vision_feed(kind, port, baud):
+    """kind: 'serial' (Grove Vision AI on its own USB port) or 'mock:approach'
+    (a scripted box growing in the path, loops -- bench check without the camera)."""
+    from pi_pipeline.vision.feed import MockDetectionFeed, SerialDetectionFeed
+    if kind == "serial":
+        labels = [s for s in os.environ.get("VISION_LABELS", "").split(",") if s]
+        return SerialDetectionFeed(port, baud, labels=labels or None,
+                                   min_score=int(os.environ.get("VISION_MIN_SCORE", "40")))
+    if kind.startswith("mock"):
+        script = MockDetectionFeed.approaching(steps=10, bearing=0.5)
+        return MockDetectionFeed(script * 1000, interval=0.4)
+    raise SystemExit(f"unknown --skills-feed {kind!r} (want 'serial' or 'mock')")
+
+
+# --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
-        thermal_guard=True):
+        thermal_guard=True, skill_layer=None, vision=None, skill_labels=None):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
@@ -209,6 +326,12 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         bridge_stdlib_logging()
         ring = diag.attach_ring(RingBuffer(seconds=15, hz=hz))
     _guard_prev = "ok"
+    _skill_prev = "cruise"
+    if skill_layer is not None:
+        skill_layer.reset()
+        print("[skills] vision-skill layer ACTIVE"
+              + ("" if vision is not None else " (no feed -- terrain always clear)"),
+              flush=True)
 
     logf = None
     if log_path:
@@ -272,6 +395,24 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 joint_deg = pol.step(q, [gx, gy, gz])
                 lat.append(time.perf_counter() - t0)
 
+                if skill_layer is not None:
+                    frame = vision.latest() if vision is not None else []
+                    terrain = detections_to_terrain_reading(
+                        frame, obstacle_labels=skill_labels)
+                    joint_deg, sinfo = skill_layer.step(
+                        joint_deg, gait_phase=pol.phase_frac(), terrain=terrain)
+                    pol.set_command(fwd=cmd_fwd * sinfo.speed_scale)
+                    if vision is not None:
+                        vision.set_look_down(skill_layer.looking_down)
+                    if sinfo.mode.value != _skill_prev:
+                        print(f"[skills] {_skill_prev} -> {sinfo.mode.value} "
+                              f"(src={sinfo.source.value}, spd x{sinfo.speed_scale:.2f})",
+                              flush=True)
+                        if diag is not None:
+                            diag.event("gait", "INFO", "skill.mode",
+                                       mode=sinfo.mode.value, source=sinfo.source.value)
+                        _skill_prev = sinfo.mode.value
+
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
@@ -333,6 +474,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     finally:
         _send(lk, "V")     # stream off
         _send(lk, "d")     # rest
+        if vision is not None:
+            vision.close()
         if logf:
             logf.close()
             print(f"log written: {log_path}")
@@ -373,6 +516,17 @@ def main():
                     help="disable the conservative servo thermal guard (WARN speech + rare auto-cooldown)")
     ap.add_argument("--ignore-features", action="store_true",
                     help="don't consult G2_FEATURES (run even if gait is flagged off)")
+    ap.add_argument("--skills", action="store_true",
+                    help="run the Phase E vision-skill layer over the walk "
+                         "(GaitSelector + SkillSwitch + CliffGuard)")
+    ap.add_argument("--skills-feed", default="serial", choices=("serial", "mock"),
+                    help="--skills detection source: 'serial' (Grove Vision AI on its own "
+                         "USB port) or 'mock' (a scripted approaching box, bench check)")
+    ap.add_argument("--skills-vision-port", default="/dev/ttyACM0",
+                    help="--skills-feed serial: the vision module's serial port")
+    ap.add_argument("--skills-vision-baud", type=int, default=921600)
+    ap.add_argument("--no-cliff-guard", action="store_true",
+                    help="--skills: drop the CliffGuard edge reflex (no downward sensor wired)")
     args = ap.parse_args()
 
     thermal_on = not args.no_thermal_guard
@@ -388,8 +542,24 @@ def main():
         except Exception as e:  # noqa: BLE001
             print(f"features: not consulted ({e!r})")
 
+    skill_layer = vision = None
+    if args.skills:
+        if SkillLayer is None:
+            raise SystemExit("--skills: pi_pipeline.vision / .gait imports failed "
+                             "(missing deps?) -- can't build the skill layer")
+        skill_layer = build_skill_layer(with_cliff_guard=not args.no_cliff_guard)
+        # dry-run always uses the mock feed (no camera on a dev box)
+        feed_kind = "mock" if args.dry_run else args.skills_feed
+        feed = _make_vision_feed(feed_kind, args.skills_vision_port,
+                                 args.skills_vision_baud)
+        vision = _LatestFrame(feed).start()
+
     if args.dry_run:
-        dry_run(args.cmd, args.seconds, args.hz)
+        try:
+            dry_run(args.cmd, args.seconds, args.hz, skill_layer=skill_layer, vision=vision)
+        finally:
+            if vision is not None:
+                vision.close()
         return
 
     lk = _open_link(args.port, args.baud)
@@ -401,12 +571,14 @@ def main():
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
-                thermal_guard=thermal_on)
+                thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision)
     finally:
         try:
             lk.close()
         except Exception:
             pass
+        if vision is not None:
+            vision.close()
 
 
 if __name__ == "__main__":

@@ -190,3 +190,31 @@ class GaitSelector:
     def _say(self, reason: str) -> None:
         self._last_reason = reason
         log.info("gaitselect: %s", reason)
+
+
+def detections_to_terrain_reading(frame, *, obstacle_labels=None,
+                                  near_area=0.34, ahead_band=0.42):
+    """Camera detection `Frame` (list of `feed.Detection`) -> `TerrainReading`,
+    the on-hardware counterpart of sim `_scan_terrain()`. Picks the nearest
+    in-path box.  APPROXIMATE -- box area <-> distance and aspect <-> tall need
+    tuning against the real mounted camera; obstacle_labels filters which classes
+    count (None = every detection).
+
+      dist_norm   from box area:  small area -> ~1 (far), area>=near_area -> ~0
+      bearing_norm (center_x - 0.5) * 2, clipped [-1, 1]
+      tall        box taller than wide, or its top near the frame top (a wall)
+      unresolved  box fills the frame -- too close/large to classify
+    """
+    cand = [d for d in (frame or [])
+            if (obstacle_labels is None or d.label in obstacle_labels)]
+    cand = [d for d in cand if abs(d.center_x - 0.5) * 2 <= ahead_band]
+    if not cand:
+        return TerrainReading(present=False)
+    d = max(cand, key=lambda x: x.area)                 # nearest = biggest box
+    dist_norm = float(max(0.0, min(1.0, 1.0 - (d.area / near_area) ** 0.5)))
+    bearing = float(max(-1.0, min(1.0, (d.center_x - 0.5) * 2.0)))
+    tall = (d.h > 1.3 * d.w) or (d.y < 0.12)
+    unresolved = d.area > 0.42 and d.y < 0.06
+    return TerrainReading(present=True, dist_norm=dist_norm, bearing_norm=bearing,
+                          tall=bool(tall and not unresolved), unresolved=unresolved,
+                          confidence=float(d.confidence))

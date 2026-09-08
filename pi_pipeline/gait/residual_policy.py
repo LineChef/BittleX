@@ -117,6 +117,10 @@ class ResidualGaitPolicy:
         if yaw is not None:
             self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
 
+    def phase_frac(self) -> float:
+        """wkF cycle position in [0, 1) -- for SkillSwitch's phase-gated handoff."""
+        return float(np.fmod(getattr(self, "_phase", 0.0) / TIME_PHASE_PERIOD, 1.0))
+
     def _cmd_obs(self):
         return np.array([np.clip(self._cmd_fwd / CMD_FWD_MAX, -1.0, 1.0),
                          np.clip(self._cmd_yaw / CMD_YAW_MAX, -1.0, 1.0)])
