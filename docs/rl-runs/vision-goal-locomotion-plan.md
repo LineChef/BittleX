@@ -441,6 +441,33 @@ State: all committed + pushed on `development`. Report:
 `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`. Nothing running.
 **Scripted-skills (Phase E) is confirmed as THE vision-for-walking path.**
 
+#### Phase E next-1..5 — DONE (2026-09-08)
+
+The five-item list below is fully implemented and unit-tested; the stack is
+ready for hardware bring-up. Commits `4bc9b80` (1), `301376c` (3), `2bc6598`
+(2/INSPECT), `60be934` (4/BRACE + walk-around eval), `b39eb1c` (5/wiring).
+
+| # | item | outcome |
+|---|---|---|
+| 1 | authored high-step `STEP_OVER` keyframe | Built `reference_gait/build_highstep_reference.py` → `highstep_ref.npy` (wkF swing amplified, `--shoulder 16 --knee 30`). **A/B on the E-3 course: trot still wins** — the authored lift didn't clear more obstacles and cost stability. **Trot (`tr_ref`) kept** as `STEP_OVER`. |
+| 2 | INSPECT (peer-down) + near blind zone | `_scan_terrain` near blind zone (`TERRAIN_BLIND_NEAR`, `_g2e` override; shrinks ×0.4 when `_look_down`), `tall_flag == -1` → `TerrainReading.unresolved`. `GaitSelector` fires `INSPECT` on close+unresolved, holds `inspect_hold_ticks`, cools down, then re-decides on the resolved scan. Wired end-to-end through `eval_skill_switch.py` (`env._look_down` set from `switch.active_skill`). |
+| 3 | per-ray endpoint grounding for the scan | `_scan_terrain` now probes ground at each of the 9 ray endpoints (coarse forward `_grade` seeds each probe height), aims each ray at its own endpoint with a lift clamp — the fan drapes over curved / transitioning terrain instead of one straight beam. Fixes rising slopes read as obstacles. |
+| 4 | rest of the skill backlog | **BRACE** built (planted crouch, knees flexed −14°, auto-releases after `brace_ticks`; `GaitSelector` fires it when `dist_norm < brace_dist` and not a wall). **BACK_OUT** already had (`bk_ref`). **crouch-walk / high-step-up / step-down** intentionally skipped — no sim trigger for them and marginal vs step-over/brace; revisit only if hardware shows a gap. **sidestep — not possible** (see walk-around eval below). |
+| 5 | deployment wiring | `pi_pipeline/gait/skill_layer.py` — `SkillLayer` = `GaitSelector` + `SkillSwitch` + `CliffGuard` behind one `.step()`/tick, `StepInfo(mode, source, speed_scale, cliff_action, frozen)`. `run_gait.py --skills` (feed `serial` = Grove Vision AI on its own USB port, or `mock`), daemon-thread latest-frame puller (never blocks the 80 Hz loop, returns `[]` when the detector drops out), `build_skill_layer()` loads `tr`/`cr`/`bk` keyframes. Layer runs between `pol.step()` and the thermal guard; `speed_scale` feeds back via `pol.set_command()`. `residual_policy.phase_frac()` exposes wkF phase for the handoff. `detections_to_terrain_reading()` = the on-hardware counterpart of sim `_scan_terrain`. `--dry-run --skills` exercises the whole path on a dev box (mock feed): holds 80 Hz, 0 overruns, modes cycle cruise/careful/step_over/brace. 245 pi_pipeline tests pass (+5 run_gait-skills, +12 skill_layer). |
+
+**"Script a walk-around maneuver" (user Q, 2026-09-08) — NOT possible on this
+hardware.** Every Bittle X leg joint is axis `(0, 1, 0)` — purely sagittal
+(shoulder + knee, fore/aft). There is no hip abduction / lateral DOF, so a
+crab / sidestep keyframe cannot be authored: the servos physically can't push
+the body sideways. A detour therefore *requires a heading change* — a firmware
+turn (`WALK_LEFT` / `WALK_RIGHT` / yaw command), not a keyframe. What *is*
+buildable (and belongs in the behaviour/nav layer, not here): the **decision**
+— vision sees a too-wide / too-tall obstacle → pick a detour bearing → issue
+firmware turns to arc around it → resume the original heading. That's the
+"intentional navigation" longer-horizon item below, and it's the right place
+for a modulated-trajectory go-around. The gait layer's job stays: step over the
+small stuff, HALT/BRACE for the rest, and let nav route around it.
+
 Next, in order:
 1. **Authored `STEP_OVER` keyframe.** Trot (`tr_ref`) is what's wired and it's a
    *walk* gait, not a lift-and-clear. Hand-author a real high-step (front feet
