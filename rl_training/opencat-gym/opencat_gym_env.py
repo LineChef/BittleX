@@ -637,6 +637,15 @@ class OpenCatGymEnv(gym.Env):
             ds = np.deg2rad(STEP_ANGLE) # Maximum change of angle per step
             joint_angs += action * ds # Change per step including agent action
 
+        # Absolute-joint override (Phase E skill-switch eval harness): when
+        # `_abs_joint_override` is set to 8 target degrees (URDF order) the env
+        # commands THOSE this step instead of the residual/action result -- so a
+        # scripted keyframe skill can drive the sim while the env's obs / physics
+        # / reward loop stays intact. Never set by the env itself -> inert,
+        # byte-identical, for training. Cleared each step by the setter's caller.
+        if getattr(self, "_abs_joint_override", None) is not None:
+            joint_angs = np.deg2rad(np.asarray(self._abs_joint_override, dtype=float))
+
         # Scripted mid-walk push reflex (surv_r13): trigger on a roll spike, then
         # blend a brace-and-lean bias under the policy for REFLEX_WINDOW steps.
         if self._reflex_on and not self._in_recovery:
