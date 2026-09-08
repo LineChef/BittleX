@@ -6,9 +6,9 @@ sequence (unlike `eval_skill_switch.py`, which triggers skills from terrain and
 reports A/B stats). Each skill gets:
   * a full-screen TITLE CARD in that skill's colour (name + one-line what/why),
   * a brief STAND still so motions don't blur into each other,
-  * the skill itself, wrapped in a thick border of the skill's colour that
-    FLASHES on entry -- so you can read the skill at a glance from the colour,
-    not the text. A progress strip along the bottom shows which of N you're on.
+  * the skill itself, wrapped in a steady thick border of the skill's colour --
+    read the skill at a glance from the colour, not the text. Nothing flashes or
+    teleports. A progress strip along the bottom shows which of N you're on.
 
     python demo_skills.py --render                 # watch it live in the GUI
     python demo_skills.py --gif demo_skills.gif    # just write the GIF
@@ -62,14 +62,15 @@ SKILLS = [
          desc="stalled -- walk backward one cycle, then re-approach"),
     dict(mode=GaitMode.HALT,     ticks=110, name="HALT",     col=(196, 62, 62),
          desc="wall ahead -- hold neutral stance (nav / turn layer takes over)"),
-    dict(mode=GaitMode.CRUISE,   ticks=80,  name="RELEASE",  col=(70, 132, 200),
-         desc="hand back to the walk"),
+    dict(mode=GaitMode.CRUISE,   ticks=80,  name="HAND BACK", col=(70, 132, 200),
+         desc="not a skill -- the via-stance blend back to the learned walk that ends every skill"),
 ]
 
-WALK_CMD = 0.065        # gentle -- keeps the robot near origin so the cam stays on floor
-STAND_TICKS = 30        # brief stand still before each skill
-CARD_FRAMES = 11        # held frames of the title card
-FLASH_FRAMES = 7        # captured skill frames the entry flash lasts
+WALK_CMD = 0.04         # slow -- gait cycles visibly but barely translates, so the
+                        # chase cam never has to jump the robot back into frame
+SKILL_LEN_SCALE = 3.0   # multiplies every SKILLS `ticks` -- bump for longer demos
+STAND_TICKS = 32        # brief stand still before each skill
+CARD_FRAMES = 12        # held frames of the title card
 FRAME_MS = 105          # per-frame GIF duration
 CARD_MS = 150
 
@@ -79,15 +80,15 @@ def _grab(env, w, h):
     """Chase cam pitched well down so flat ground fills the frame; grab tall and
     crop the thin sky band off the top."""
     pos = p.getBasePositionAndOrientation(env.robot_id)[0]
-    gh = h + 70
+    gh = h + 110
     _, _, rgb, _, _ = p.getCameraImage(
         w, gh,
         viewMatrix=p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=[pos[0], pos[1], 0.05], distance=0.70,
-            yaw=52, pitch=-50, roll=0, upAxisIndex=2),
+            yaw=52, pitch=-52, roll=0, upAxisIndex=2),
         projectionMatrix=p.computeProjectionMatrixFOV(52, w / gh, 0.1, 6),
         renderer=p.ER_TINY_RENDERER)
-    return np.reshape(rgb, (gh, w, 4))[70:, :, :3].astype(np.uint8)
+    return np.reshape(rgb, (gh, w, 4))[110:, :, :3].astype(np.uint8)
 
 
 _FONT_CACHE = {}
@@ -136,41 +137,41 @@ def _centre(d, text, font, y, w, fill):
     d.text(((w - (bb[2] - bb[0])) // 2, y), text, font=font, fill=fill)
 
 
+BORDER_W = 8              # steady skill-colour border thickness
+
+
 def _title_card(sk, w, h, idx, n):
     from PIL import Image, ImageDraw
     r, g, b = sk["col"]
-    bg = (int(r * 0.30) + 12, int(g * 0.30) + 12, int(b * 0.30) + 14)
+    bg = (int(r * 0.42) + 26, int(g * 0.42) + 26, int(b * 0.42) + 28)   # muted skill hue
     im = Image.new("RGB", (w, h), bg)
     d = ImageDraw.Draw(im)
-    d.rectangle([0, 0, w, 8], fill=sk["col"])
-    d.rectangle([0, h - 8, w, h], fill=sk["col"])
-    _centre(d, f"SKILL {idx + 1} / {n}", _font(15), int(h * 0.24), w, (200, 204, 210))
-    _centre(d, sk["name"], _font(46), int(h * 0.34), w, (245, 246, 248))
-    _centre(d, sk["desc"], _font(15), int(h * 0.60), w, (206, 210, 216))
+    d.rectangle([0, 0, w, 10], fill=sk["col"])
+    d.rectangle([0, h - 10, w, h], fill=sk["col"])
+    _centre(d, f"SKILL {idx + 1} / {n}", _font(15), int(h * 0.24), w, (225, 228, 232))
+    _centre(d, sk["name"], _font(46), int(h * 0.34), w, (250, 250, 251))
+    _centre(d, sk["desc"], _font(15), int(h * 0.60), w, (228, 231, 235))
     _pips(d, w, h, idx, n, sk["col"])
     return im
 
 
 def _decorate(frame, sk, idx, n, src, k_in_skill):
-    """thick skill-colour border (flashing on entry) + name plate + pips."""
+    """steady skill-colour border + name plate + progress pips. No animation --
+    the colour alone reads the skill; nothing flashes."""
     from PIL import Image, ImageDraw
     im = Image.fromarray(frame)
-    # entry flash: a colour wash that fades over the first few skill frames
-    if k_in_skill < 6:
-        a = 0.34 * (1.0 - k_in_skill / 6.0)
-        im = Image.blend(im, Image.new("RGB", im.size, sk["col"]), a)
     d = ImageDraw.Draw(im)
     w, h = im.size
-    bw = 7 + max(0, FLASH_FRAMES - k_in_skill)          # fat border, thins as flash ends
-    for i in range(bw):
+    for i in range(BORDER_W):
         d.rectangle([i, i, w - 1 - i, h - 1 - i], outline=sk["col"])
-    # name plate, top-left
+    b = BORDER_W
     plate_w = max(120, 14 + int(d.textlength(sk["name"], font=_font(24))))
-    d.rectangle([bw, bw, bw + plate_w, bw + 30], fill=(18, 19, 23))
-    d.text((bw + 8, bw + 3), sk["name"], font=_font(24), fill=sk["col"])
+    d.rectangle([b, b, b + plate_w, b + 30], fill=(18, 19, 23))
+    d.text((b + 8, b + 3), sk["name"], font=_font(24), fill=sk["col"])
     _dot = {"rl": (90, 170, 240), "blend": (240, 200, 90), "scripted": (240, 120, 90)}
-    d.ellipse([bw + 8, bw + 34, bw + 16, bw + 42], fill=_dot.get(src, (200, 200, 200)))
-    d.text((bw + 22, bw + 32), src.upper(), font=_font(12), fill=(220, 222, 226))
+    d.rectangle([b, b + 30, b + 120, b + 48], fill=(18, 19, 23))
+    d.ellipse([b + 8, b + 35, b + 16, b + 43], fill=_dot.get(src, (200, 200, 200)))
+    d.text((b + 22, b + 33), src.upper(), font=_font(12), fill=(224, 226, 230))
     _pips(d, w, h, idx, n, sk["col"])
     return im
 
@@ -234,7 +235,8 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
             imgs += [card] * CARD_FRAMES
             durs += [CARD_MS] * CARD_FRAMES
         k = _sim(GaitMode.CRUISE, STAND_TICKS, 0.0, sk, idx, 0)     # stand still
-        _sim(sk["mode"], sk["ticks"], WALK_CMD, sk, idx, k)         # the skill
+        _sim(sk["mode"], int(sk["ticks"] * SKILL_LEN_SCALE),        # the skill
+             WALK_CMD, sk, idx, k)
     env.close()
     print(f"parade done: {len(SKILLS)} skills")
     if gif and imgs:
