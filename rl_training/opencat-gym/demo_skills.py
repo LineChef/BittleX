@@ -53,7 +53,10 @@ SKILLS = [
     dict(mode=GaitMode.CAREFUL,  ticks=80,  name="CAREFUL",  col=(38, 176, 168),
          desc="obstacle mid-distance -- RL still drives, speed x0.6"),
     dict(mode=GaitMode.STEP_OVER, ticks=140, name="STEP OVER", col=(83, 176, 74),
-         desc="low obstacle -- scripted trot keyframe, blended in and out"),
+         desc="low obstacle -- scripted TROT keyframe (this is what's wired), blended in and out"),
+    dict(mode=GaitMode.STEP_OVER, ticks=140, name="HIGH-STEP", col=(120, 196, 96),
+         ref="highstep_ref.npy",
+         desc="the authored higher-lift keyframe -- more foot clearance, but it LOST the A/B to trot"),
     dict(mode=GaitMode.INSPECT,  ticks=110, name="INSPECT",  col=(140, 104, 214),
          desc="close & can't classify -- crouch, camera mast pitches down"),
     dict(mode=GaitMode.BRACE,    ticks=90,  name="BRACE",    col=(226, 146, 44),
@@ -66,13 +69,17 @@ SKILLS = [
          desc="not a skill -- the via-stance blend back to the learned walk that ends every skill"),
 ]
 
-WALK_CMD = 0.04         # slow -- gait cycles visibly but barely translates, so the
-                        # chase cam never has to jump the robot back into frame
+WALK_CMD = 0.12         # ~80% of the policy's max (0.15 m/s) -- a natural walk pace.
+                        # The chase cam tracks the robot, so pace doesn't unframe it.
 SKILL_LEN_SCALE = 3.0   # multiplies every SKILLS `ticks` -- bump for longer demos
+
+# these auto-release after ~one play, so a HELD command re-triggers them over and
+# over (looks like the animation stutters back and forth). In the demo, play them
+# ONCE cleanly, then stand for the rest of the segment.
+_ONE_SHOT = {GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.BRACE}
 STAND_TICKS = 32        # brief stand still before each skill
-CARD_FRAMES = 12        # held frames of the title card
-FRAME_MS = 105          # per-frame GIF duration
-CARD_MS = 150
+CARD_FRAMES = 16        # held frames of the title card (~1.5 s at FRAME_MS)
+FRAME_MS = 95           # uniform per-frame GIF duration
 
 
 # --------------------------------------------------------------------- render
@@ -177,15 +184,24 @@ def _decorate(frame, sk, idx, n, src, k_in_skill):
 
 
 # --------------------------------------------------------------------- run
-def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run20m_ppo"):
+def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run20m_ppo",
+        step_over_ref="tr_ref.npy"):
     opencat_gym_env.GUI_MODE = render
     opencat_gym_env.DR_EVAL_FULL = False
     env = OpenCatGymEnv()
     model = PPO.load(model_path, device="cpu")
-    switch = make_switch()
+
+    # one SkillSwitch per distinct STEP_OVER keyframe used in SKILLS (default +
+    # any `ref` override), built lazily and cached
+    _sw_cache = {}
+
+    def _get_switch(ref):
+        key = ref or step_over_ref
+        if key not in _sw_cache:
+            _sw_cache[key] = make_switch(step_over_ref=key)
+        return _sw_cache[key]
 
     obs, _ = env.reset()
-    switch.reset()
     # floor slab under the sim's finite ground plane so the chase cam never sees
     # past its edge (needs a collision shape or TINY_RENDERER skips it; below z=0
     # so physics is unchanged)
@@ -195,20 +211,24 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
     p.createMultiBody(baseMass=0, baseCollisionShapeIndex=_cs,
                       baseVisualShapeIndex=_vs, basePosition=[0, 0, -0.03])
 
-    imgs, durs = [], []
+    imgs = []
     n = len(SKILLS)
 
-    def _sim(mode, ticks, cmd, sk, idx, k0):
-        """step the env `ticks` times at forward speed `cmd`; capture every
-        `stride`th frame decorated for skill `sk`. returns frames captured."""
+    def _sim(sw, mode, ticks, cmd, sk, idx, k0, stop_when_released=False):
+        """step the env up to `ticks` times at forward speed `cmd`, driving
+        SkillSwitch `sw`; capture every `stride`th frame decorated for skill `sk`.
+        `stop_when_released`: return early once the switch has played one skill and
+        handed back to the walk (so one-shot skills show a single clean rep)."""
         nonlocal obs
         k = k0
+        seen_active = False
         for _ in range(ticks):
             env._cmd_fwd = cmd
-            env._look_down = switch.active_skill is GaitMode.INSPECT
+            env._look_down = sw.active_skill is GaitMode.INSPECT
             action, _ = model.predict(obs, deterministic=True)
             gp = (env._phase / TIME_PHASE_PERIOD) % 1.0
-            joints, src = switch.update(mode, rl_joint_deg(env, action), gait_phase=gp)
+            joints, src = sw.update(mode, rl_joint_deg(env, action), gait_phase=gp)
+            env._cmd_fwd = cmd * sw.speed_scale     # CAREFUL -> 0.6x, visibly slower than CRUISE
             if src is Source.RL:
                 obs, _, term, trunc, _ = env.step(action)
             else:
@@ -218,31 +238,43 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
             if gif and k % stride == 0:
                 imgs.append(_decorate(_grab(env, w, h), sk, idx, n, src.value,
                                       (k - k0) // stride))
-                durs.append(FRAME_MS)
             k += 1
             if term or trunc:                       # stumble on flat ground -- reset, carry on
                 obs, _ = env.reset()
-                switch.reset()
+                sw.reset()
+            seen_active = seen_active or sw.active_skill is not None
+            if stop_when_released and seen_active and sw.active_skill is None:
+                break
         return k
 
     for idx, sk in enumerate(SKILLS):
-        # recenter over the origin so every skill plays in the same spot on floor
+        sw = _get_switch(sk.get("ref"))
+        sw.reset()
+        # recenter over the origin so every skill plays in the same spot on floor.
+        # This is the ONLY teleport, and it lands on a non-captured frame (behind
+        # the title card) so it's never visible.
         (_, _, bz), born = p.getBasePositionAndOrientation(env.robot_id)
         p.resetBasePositionAndOrientation(env.robot_id, [0.0, 0.0, bz], born)
         p.resetBaseVelocity(env.robot_id, [0, 0, 0], [0, 0, 0])
         if gif:
             card = _title_card(sk, w, h, idx, n)
             imgs += [card] * CARD_FRAMES
-            durs += [CARD_MS] * CARD_FRAMES
-        k = _sim(GaitMode.CRUISE, STAND_TICKS, 0.0, sk, idx, 0)     # stand still
-        _sim(sk["mode"], int(sk["ticks"] * SKILL_LEN_SCALE),        # the skill
-             WALK_CMD, sk, idx, k)
+        k = _sim(sw, GaitMode.CRUISE, STAND_TICKS, 0.0, sk, idx, 0)     # stand still
+        total = int(sk["ticks"] * SKILL_LEN_SCALE)
+        if sk["mode"] in _ONE_SHOT:
+            # ONE clean rep (a held command would re-trigger it into a stutter),
+            # then a short stand tail. These motions are quick -- they don't need
+            # the full tripled length the held / continuous skills use.
+            k2 = _sim(sw, sk["mode"], total, WALK_CMD, sk, idx, k, stop_when_released=True)
+            _sim(sw, GaitMode.CRUISE, STAND_TICKS + STAND_TICKS, 0.0, sk, idx, k2)
+        else:
+            _sim(sw, sk["mode"], total, WALK_CMD, sk, idx, k)
     env.close()
     print(f"parade done: {len(SKILLS)} skills")
     if gif and imgs:
         imgs[0].save(gif, save_all=True, append_images=imgs[1:],
-                     duration=durs, loop=0, optimize=True)
-        print(f"wrote {gif}  ({len(imgs)} frames)")
+                     duration=FRAME_MS, loop=0, optimize=True, disposal=2)
+        print(f"wrote {gif}  ({len(imgs)} frames, {FRAME_MS} ms/frame)")
 
 
 if __name__ == "__main__":
@@ -253,6 +285,10 @@ if __name__ == "__main__":
     ap.add_argument("--gif-w", type=int, default=470)
     ap.add_argument("--gif-h", type=int, default=310)
     ap.add_argument("--model", default="trained/run20m_ppo")
+    ap.add_argument("--step-over-ref", default="tr_ref.npy",
+                    help="keyframe for the main STEP OVER segment "
+                         "(tr_ref.npy | highstep_ref.npy). The HIGH-STEP segment "
+                         "always shows highstep_ref.npy.")
     a = ap.parse_args()
     run(render=a.render, gif=a.gif, stride=a.gif_stride, w=a.gif_w, h=a.gif_h,
-        model_path=a.model)
+        model_path=a.model, step_over_ref=a.step_over_ref)
