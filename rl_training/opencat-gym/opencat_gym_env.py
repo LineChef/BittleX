@@ -1524,6 +1524,7 @@ class OpenCatGymEnv(gym.Env):
         else:
             plane_id = p.loadURDF("plane.urdf", [0, 0, 0],
                                   p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0]))
+        self._plane_id = plane_id            # for _recolor_scene (GUI black-floor fix)
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
                 1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
@@ -1724,9 +1725,36 @@ class OpenCatGymEnv(gym.Env):
                 "phase": float(self._phase),
                 "cmd": (float(self._cmd_fwd), float(self._cmd_yaw)),
             }
+        if GUI_MODE:
+            self._recolor_scene()
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
         info = {}
         return np.array(self.observation).astype(np.float32), info
+
+    def _recolor_scene(self):
+        """PERMANENT black-floor fix: after reset() builds every body, give each
+        non-robot body a deliberate colour. This is a blanket sweep over
+        p.getNumBodies(), NOT a hand-maintained list of createMultiBody / loadURDF
+        / heightfield call sites -- so ANY geometry, current or future, is
+        covered and can never render black again. GUI-only, cosmetic
+        (changeVisualShape touches nothing in physics / obs / reward), so
+        training is unaffected. The scattered obstacles get a warmer tone than
+        the ground so they read as obstacles in a replay."""
+        skip = {self.robot_id}
+        for _a in ("_payload_id", "_head_id"):
+            _v = getattr(self, _a, None)
+            if _v is not None:
+                skip.add(_v)
+        ground = {getattr(self, "_plane_id", -999)}
+        for _i in range(p.getNumBodies()):
+            bid = p.getBodyUniqueId(_i)
+            if bid in skip:
+                continue
+            rgba = [0.55, 0.55, 0.58, 1.0] if bid in ground else [0.66, 0.58, 0.50, 1.0]
+            try:
+                p.changeVisualShape(bid, -1, rgbaColor=rgba)
+            except Exception:
+                pass
 
 
     def _scan_terrain(self):
