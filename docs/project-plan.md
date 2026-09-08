@@ -788,7 +788,14 @@ tuning, and the Phase 10 wiring — all hardware-gated.
         clips cables it can see, or the decel is too abrupt (within-stride,
         sub-command-timescale things a speed command can't express). Not
         justified pre-hardware: the obstacle-reward package measured ~neutral in
-        isolation (Phase 0 of the investigation).
+        isolation (Phase 0), and **Phase D (2026-09-08) confirmed it directly** —
+        a from-scratch 20M with the terrain feature in the observation was no
+        more capable than an identical blind 20M (same 0% falls, less obstacle
+        anticipation, no regression). Vision-in-the-loop ruled out; the `Avoider`
+        speed reflex is the path. Report:
+        `claude.ai/code/artifact/bfb58d90-71ca-4681-9c72-d14e15e56b7a`.
+        Next architecture bet: the adapter skill probe
+        (`docs/rl-runs/adapter-skill-probe-spec.md`).
       - Built + kept dormant for a future Tier B run: `G2E_TERRAIN_FEATURE` /
         `GOAL_MODE` / `CLIFF` / `TURN_BLEND`, `run20m_graft28x`, `benchmark_goal.py`.
 

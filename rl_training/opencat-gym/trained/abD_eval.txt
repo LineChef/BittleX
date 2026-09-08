@@ -1,0 +1,141 @@
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/abD_vision_ppo   obs=282  vision_policy=True
+    episode fall rate 0.0   encounters 147
+    all  n=147  decel=1.137  peakF=2.2N  pitchStd=0.06deg  clip=0.578  fall=0.0
+    tall n= 80  decel=0.828  peakF=1.9N  pitchStd=0.05deg  clip=0.5  fall=0.0
+    low  n= 67  decel=1.505  peakF=2.6N  pitchStd=0.07deg  clip=0.672  fall=0.0
+
+wrote trained/abD_vision_obs.json
+pybullet build time: Aug 29 2026 21:14:04
+
+### trained/abD_blind_ppo   obs=278  vision_policy=False
+    episode fall rate 0.0   encounters 141
+    all  n=141  decel=1.723  peakF=2.1N  pitchStd=0.06deg  clip=0.574  fall=0.0
+    tall n= 71  decel=1.888  peakF=2.0N  pitchStd=0.06deg  clip=0.563  fall=0.0
+    low  n= 70  decel=1.556  peakF=2.2N  pitchStd=0.07deg  clip=0.586  fall=0.0
+
+wrote trained/abD_blind_obs.json
+pybullet build time: Aug 29 2026 21:14:04
+
+=== T1.1  T1  Flat, calm  (24 eps) ===
+Traceback (most recent call last):
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/rl_training/opencat-gym/benchmark_decathlon.py", line 303, in <module>
+    main()
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/rl_training/opencat-gym/benchmark_decathlon.py", line 273, in main
+    rl, rl_eps = _bench(env, learned, cell_episodes, args.seed, reflex=False)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/rl_training/opencat-gym/benchmark_gaits.py", line 127, in _bench
+    rec, per_term, steps, fell, recovered = run_episode(env, model)
+                                            ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/rl_training/opencat-gym/evaluate_policy.py", line 45, in run_episode
+    action, _ = model.predict(obs, deterministic=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/.venv/lib/python3.11/site-packages/stable_baselines3/common/base_class.py", line 556, in predict
+    return self.policy.predict(observation, state, episode_start, deterministic)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/.venv/lib/python3.11/site-packages/stable_baselines3/common/policies.py", line 365, in predict
+    obs_tensor, vectorized_env = self.obs_to_tensor(observation)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/.venv/lib/python3.11/site-packages/stable_baselines3/common/policies.py", line 272, in obs_to_tensor
+    vectorized_env = is_vectorized_observation(observation, self.observation_space)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/.venv/lib/python3.11/site-packages/stable_baselines3/common/utils.py", line 401, in is_vectorized_observation
+    return is_vec_obs_func(observation, observation_space)  # type: ignore[operator]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/markjohnson/Desktop/OneFolder/projects/bittleX/.venv/lib/python3.11/site-packages/stable_baselines3/common/utils.py", line 268, in is_vectorized_box_observation
+    raise ValueError(
+ValueError: Error: Unexpected observation shape (278,) for Box environment, please use (282,) or (n_env, 282) for the observation shape.
+pybullet build time: Aug 29 2026 21:14:04
+
+=== T1.1  T1  Flat, calm  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.084 m/s vs 0.099
+
+=== T1.2  T1  Flat + gentle nudges  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.084 m/s vs 0.099
+
+=== T2.3  T2  Cross-slope  (5 deg roll)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.085 m/s vs 0.098
+
+=== T2.4  T2  Small obstacles  (20 mm)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.042 m/s vs 0.016
+
+=== T3.1  T3  Steep up  (12 deg)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.074 m/s vs 0.097
+
+=== T3.2  T3  Steep down  (-12 deg)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.070 m/s vs 0.079
+
+=== T4.1  T4  One hard shove  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.084 m/s vs 0.098
+
+=== T4.2  T4  Repeated shoves  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.082 m/s vs 0.098
+
+=== T5.1  T5  The gauntlet: slope + rubble + repeated shoves  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.054 m/s vs 0.054
+
+=== T6.1  T6  Extreme down  (-24 deg)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.048 m/s vs 0.034
+
+=== T6.2  T6  Huge obstacles  (85 mm) + push  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.007 m/s vs 0.006
+
+=== T6.3  T6  Brutal shoves  (1.00 @ 0.018)  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.082 m/s vs 0.096
+
+=== T6.4  T6  Brutal gauntlet: 20 deg slope + dense rubble + brutal shoves  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.075 m/s vs 0.079
+
+=== T6.5  T6  Overheated servos (60% cutback) + 12 deg descent  (24 eps) ===
+  learned fell 0%  |  scripted fell 0%  |  learned 0.063 m/s vs 0.062
+
+=== T5.1b  T5  The gauntlet -- bare robot  (60 eps) ===
+  learned fell 72%  |  scripted fell 33%  |  learned 0.058 m/s vs 0.069  |  cond.surv 10% of 20
+
+=== T6.2b  T6  Huge obstacles (85 mm) + push -- bare robot  (60 eps) ===
+  learned fell 78%  |  scripted fell 8%  |  learned 0.003 m/s vs 0.000  |  cond.surv 20% of 5
+
+=== T6.3b  T6  Brutal shoves (0.70 @ 0.012) -- bare robot  (60 eps) ===
+  learned fell 90%  |  scripted fell 53%  |  learned 0.051 m/s vs 0.074  |  cond.surv 6% of 32
+
+=== T6.4b  T6  Brutal gauntlet: 14 deg slope + dense rubble + brutal shoves -- bare robot  (60 eps) ===
+  learned fell 80%  |  scripted fell 50%  |  learned 0.066 m/s vs 0.041  |  cond.surv 17% of 30
+
+=== T6.5b  T6  Overheated servos (60% cutback) + 12 deg descent -- bare robot  (60 eps) ===
+  learned fell 85%  |  scripted fell 0%  |  learned -0.063 m/s vs 0.065
+
+=== T7.1  T7  Threshold up  (15 mm)  (24 eps) ===
+  learned fell 75%  |  scripted fell 0%  |  learned 0.002 m/s vs 0.062
+
+=== T7.2  T7  Step up  (20 mm sill)  (24 eps) ===
+  learned fell 62%  |  scripted fell 0%  |  learned 0.008 m/s vs 0.036
+
+=== T7.3  T7  Step up  (30 mm) -- past-comfortable stress  (24 eps) ===
+  learned fell 75%  |  scripted fell 0%  |  learned 0.013 m/s vs 0.037
+
+=== T7.4  T7  Step down  (20 mm sill)  (24 eps) ===
+  learned fell 79%  |  scripted fell 0%  |  learned 0.005 m/s vs 0.078
+
+=== T7.5  T7  Big ledge  (45 mm, random up/down)  (24 eps) ===
+  learned fell 75%  |  scripted fell 42%  |  learned 0.009 m/s vs 0.079  |  cond.surv 0% of 10
+
+=== T8.1  T8  House carpet  (flat, mild compliance)  (24 eps) ===
+  learned fell 67%  |  scripted fell 0%  |  learned 0.019 m/s vs 0.090
+
+=== T8.2  T8  Rough, uneven ground: dense bumps + rolling swell  (19 mm bumps + 35 mm swell)  (24 eps) ===
+  learned fell 42%  |  scripted fell 12%  |  learned 0.016 m/s vs 0.018  |  cond.surv 33% of 3
+
+=== T9.1  T9  Slope 18 deg up (beyond training's 14 deg ceiling)  (40 eps) ===
+  learned fell 85%  |  scripted fell 0%  |  learned 0.147 m/s vs 0.093
+
+=== T9.2  T9  Slope 20 deg down (beyond training; descent is harder)  (40 eps) ===
+  learned fell 85%  |  scripted fell 0%  |  learned -0.126 m/s vs 0.044
+
+=== T9.3  T9  Rubble denser + taller than anything in training  (40 eps) ===
+  learned fell 88%  |  scripted fell 25%  |  learned -0.001 m/s vs -0.005  |  cond.surv 10% of 10
+
+=== T9.4  T9  Slippery incline: 6 deg + heavy friction randomization (wet-ramp analog)  (40 eps) ===
+  learned fell 80%  |  scripted fell 0%  |  learned 0.126 m/s vs 0.096
+
+wrote trained/abD_blind_deca.json

@@ -32,8 +32,11 @@ say "--- eval: obstacle-course behaviour, matched seeds ---"
 eval "env $CFG G2E_TERRAIN_FEATURE=1 $PY eval_obstacle_response.py trained/abD_vision_ppo --episodes 40 --json-out trained/abD_vision_obs.json" > trained/abD_eval.txt 2>&1
 eval "env $CFG G2E_TERRAIN_FEATURE=0 $PY eval_obstacle_response.py trained/abD_blind_ppo  --episodes 40 --json-out trained/abD_blind_obs.json" >> trained/abD_eval.txt 2>&1
 say "--- eval: decathlon (base-capability regression check) ---"
-$PY benchmark_decathlon.py --learned trained/abD_vision_ppo --episodes 24 --json-out trained/abD_vision_deca.json >> trained/abD_eval.txt 2>&1
-$PY benchmark_decathlon.py --learned trained/abD_blind_ppo  --episodes 24 --json-out trained/abD_blind_deca.json  >> trained/abD_eval.txt 2>&1
+# the vision policy is obs-282; the decathlon env must build 282-d obs too, so it
+# needs G2E_TERRAIN_FEATURE=1 (missing here on the first Phase D run -> obs-shape
+# crash, no abD_vision_deca.json).
+eval "env $CFG G2E_TERRAIN_FEATURE=1 $PY benchmark_decathlon.py --learned trained/abD_vision_ppo --episodes 24 --json-out trained/abD_vision_deca.json" >> trained/abD_eval.txt 2>&1
+eval "env $CFG G2E_TERRAIN_FEATURE=0 $PY benchmark_decathlon.py --learned trained/abD_blind_ppo  --episodes 24 --json-out trained/abD_blind_deca.json"  >> trained/abD_eval.txt 2>&1
 
 say "--- reward curves ---"
 $PY - <<'EOF' 2>/dev/null | tee -a "$LOG"

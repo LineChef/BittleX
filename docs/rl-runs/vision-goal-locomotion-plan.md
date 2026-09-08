@@ -1,46 +1,13 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
-> **Queued next (post-Phase-D):** adapter skill probe — test "freeze the base,
-> train only a small adapter" vs the full-finetune recipe that failed in A/C.
-> Full spec + resume checklist: `docs/rl-runs/adapter-skill-probe-spec.md`
-> (on `development`, specced not built; skill refs + `G2E_SKILL_REF` hook done).
+> **Campaign closed 2026-09-08.** Phases A/C: turning not achievable in this sim
+> (→ firmware). **Phase D: vision-in-the-loop ruled out** — a forward terrain
+> feature made no more capable a gait than the blind policy (report:
+> `claude.ai/code/artifact/bfb58d90-71ca-4681-9c72-d14e15e56b7a`; result section
+> below). Ship the `Avoider` speed reflex on the frozen `run20m_ppo`. **Next:**
+> adapter skill probe — `docs/rl-runs/adapter-skill-probe-spec.md` (specced,
+> deferred; skill refs + `G2E_SKILL_REF` hook already on `development`).
 
----
-## START HERE (fresh-session handoff, 2026-09-07 ~12:30 PM ET)
-
-**Right now:** Phase D A/B is running (`run_ab_vision.sh`, PID in
-`/tmp/g2_ab.pid`). Two fresh 20M runs — `abD_vision` (terrain feature ON) then
-`abD_blind` (OFF), identical course/reward otherwise. Progress:
-`rl_training/opencat-gym/trained/ab_vision_results.log`. **Finishes ~7 AM ET
-Tue 2026-09-08.** Final line will be `A/B COMPLETE`.
-
-**Your job when it lands:** follow **`### >>> RESUME (Phase D) <<<`** further down
-this file. Read the eval per that section's rules (regression = obstacle-FREE
-decathlon cells only; obstacle cells = traverse/clear/fall not speed; `tall` vs
-`low` split). Verdict → write the HTML report, update `docs/project-plan.md`
-Phase 8 + memory. If vision clearly wins → Tier B proper. If ~wash → ship the
-`Avoider` reflex (Phase 8 plan) and rule vision-in-the-loop out.
-
-**Settled — do NOT re-derive:**
-- Turning is not achievable in this sim (scripted `wkL`/`wkR` yaw ~0° open-loop).
-  Turning → firmware. Not a reward/architecture problem. (Phases A/C.)
-- No finetunes on `run20m_ppo` — they fail here. Candidates are fresh runs.
-- `run20m_ppo` is the frozen fallback; it's never touched. Every `G2E_*` flag is
-  default-off = byte-identical.
-- Phase D is residual-ON (isolates *vision*, not architecture) + R-NOSTALL
-  reward + `FAC_IMITATION` 11→5 (loosen the `wkF` anchor). Residual-OFF from
-  scratch is the *follow-up* only if D is inconclusive.
-- Don't open TensorBoard for the user (read tfevents yourself if needed).
-
-**Key files:** this doc (full history + RESUME), `opencat_gym_env.py` (`_g2e`
-override block ~line 390 — every knob), `run_ab_vision.sh`, `gate_check.py`,
-`watch_trained.py <tag>` (generic replay, auto-detects vision). Memory:
-`feedback_deployment_candidate_model`, `project_rl_paused_for_hardware`.
-
-**When a fresh session has picked this up and confirmed it's oriented: delete
-this whole `## START HERE` block** (down to the `---` above `**Status:**`). It's
-scaffolding — once you've read it and the Phase D result is in hand, the rest of
-this doc + the memory entries are the durable record. Commit the deletion.
 ---
 
 **Status:** ⛔ **STOPPED 2026-09-07 10:02 (Phase C).** Three campaigns
@@ -205,7 +172,47 @@ rule it out, ship the behaviour-layer `Avoider` reflex (Phase 8 plan).
 **Timing:** ~9.3 h + ~8.5 h + ~2 h eval ≈ **20 h**. Started 2026-09-07 ~11 AM ET
 -> complete **~7 AM ET 2026-09-08** (well before the Tue 1 PM quota rollover).
 
-### >>> RESUME (Phase D) <<<
+### Phase D RESULT (2026-09-08 01:19 — `A/B COMPLETE`): vision ruled out.
+
+Report artifact: `claude.ai/code/artifact/bfb58d90-71ca-4681-9c72-d14e15e56b7a`.
+
+Both runs trained cleanly (EV ~0.82, KL <0.004, std ~0.11, 0 training falls),
+converged. `ep_rew_mean` blind ~−1650 vs vision ~−1800 (vision pays into the +8
+breakthrough channel; absolute reward not the verdict).
+
+**`eval_obstacle_response` (40 ep, matched seeds, 147/141 encounters):**
+| | vision decel | blind decel | vision peakF | blind peakF | fall (both) |
+|---|---|---|---|---|---|
+| tall | 0.83 | 1.89 | 1.9 N | 2.0 N | 0.0 |
+| low | 1.51 | 1.56 | 2.6 N | 2.2 N | 0.0 |
+| all | 1.14 | 1.72 | 2.2 N | 2.1 N | 0.0 |
+
+- Falls: tie at zero, every cell.
+- The seeing policy slows **less** on tall obstacles (0.83 vs 1.89) — the
+  opposite of the intended "see it, brace". It ignored the feature and walked
+  through at commanded speed.
+- Low obstacles: vision slightly rougher (2.6 N vs 2.2 N, clip 0.67 vs 0.59).
+- Per-term reward near an obstacle: `r_obs_clear/stop/swerve` all 0.0,
+  `r_nostall` nets −0.2. The dense speed-track penalty rewards *holding*
+  commanded speed; the breakthrough bonus fired too rarely to shape anything.
+
+**Regression check (decathlon, obstacle-free cells, `abD_vision` re-run WITH
+`G2E_TERRAIN_FEATURE=1`):** vision holds — flat 0.092 vs blind 0.084, both 0%
+fall on every base-tier cell T1–T6.5. The feature cost nothing on plain walking;
+it just bought nothing.
+
+**Verdict:** not a vision win → rule vision-in-the-loop out. Ship the `Avoider`
+speed reflex on the frozen `run20m_ppo`. `abD_vision`/`abD_blind` kept as
+checkpoints, not adopted (no capability gain; fresh-20M trades some robustness on
+the hardened stress tiers). Next: the adapter skill probe.
+
+**Driver bug:** `run_ab_vision.sh` ran `benchmark_decathlon.py` for `abD_vision`
+without `G2E_TERRAIN_FEATURE=1` → obs-shape crash, no `abD_vision_deca.json` from
+the driver. Fixed: decathlon lines now prefixed with the feature flag.
+
+---
+
+### >>> RESUME (Phase D) <<<  *(done — kept for provenance)*
 1. `tail -40 rl_training/opencat-gym/trained/ab_vision_results.log`.
 2. Ends with `A/B COMPLETE`: read `trained/abD_eval.txt`,
    `abD_vision_obs.json` vs `abD_blind_obs.json`, `abD_*_deca.json`.
