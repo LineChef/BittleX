@@ -53,9 +53,10 @@ SKILLS = [
     dict(mode=GaitMode.CAREFUL,  ticks=80,  name="CAREFUL",  col=(38, 176, 168),
          desc="obstacle mid-distance -- RL still drives, speed x0.6"),
     dict(mode=GaitMode.STEP_OVER, ticks=140, name="STEP OVER", col=(83, 176, 74),
+         cam="side",
          desc="low obstacle -- scripted TROT keyframe (this is what's wired), blended in and out"),
     dict(mode=GaitMode.STEP_OVER, ticks=140, name="HIGH-STEP", col=(120, 196, 96),
-         ref="highstep_ref.npy",
+         ref="highstep_ref.npy", cam="side",
          desc="the authored higher-lift keyframe -- more foot clearance, but it LOST the A/B to trot"),
     dict(mode=GaitMode.INSPECT,  ticks=110, name="INSPECT",  col=(140, 104, 214),
          desc="close & can't classify -- crouch, camera mast pitches down"),
@@ -65,12 +66,10 @@ SKILLS = [
          desc="stalled -- walk backward one cycle, then re-approach"),
     dict(mode=GaitMode.HALT,     ticks=110, name="HALT",     col=(196, 62, 62),
          desc="wall ahead -- hold neutral stance (nav / turn layer takes over)"),
-    dict(mode=GaitMode.CRUISE,   ticks=80,  name="HAND BACK", col=(70, 132, 200),
-         desc="not a skill -- the via-stance blend back to the learned walk that ends every skill"),
 ]
 
-WALK_CMD = 0.12         # ~80% of the policy's max (0.15 m/s) -- a natural walk pace.
-                        # The chase cam tracks the robot, so pace doesn't unframe it.
+WALK_CMD = 0.09         # a middle pace -- clearly walking, but the learned gait
+                        # pitches / bounces less than it does near its 0.15 m/s max
 SKILL_LEN_SCALE = 3.0   # multiplies every SKILLS `ticks` -- bump for longer demos
 
 # these auto-release after ~one play, so a HELD command re-triggers them over and
@@ -83,19 +82,24 @@ FRAME_MS = 95           # uniform per-frame GIF duration
 
 
 # --------------------------------------------------------------------- render
-def _grab(env, w, h):
-    """Chase cam pitched well down so flat ground fills the frame; grab tall and
-    crop the thin sky band off the top."""
+def _grab(env, w, h, cam="chase"):
+    """`chase` (default): pitched well down so flat ground fills the frame.
+    `side`: a low, near-side-on angle so foot lift / body pitch reads (STEP OVER,
+    HIGH-STEP). Both grab tall and crop the sky band off the top."""
     pos = p.getBasePositionAndOrientation(env.robot_id)[0]
     gh = h + 110
+    if cam == "side":
+        yaw, pitch, dist, tz, crop = 14, -24, 0.66, 0.10, 92
+    else:
+        yaw, pitch, dist, tz, crop = 52, -52, 0.70, 0.05, 110
     _, _, rgb, _, _ = p.getCameraImage(
         w, gh,
         viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-            cameraTargetPosition=[pos[0], pos[1], 0.05], distance=0.70,
-            yaw=52, pitch=-52, roll=0, upAxisIndex=2),
+            cameraTargetPosition=[pos[0], pos[1], tz], distance=dist,
+            yaw=yaw, pitch=pitch, roll=0, upAxisIndex=2),
         projectionMatrix=p.computeProjectionMatrixFOV(52, w / gh, 0.1, 6),
         renderer=p.ER_TINY_RENDERER)
-    return np.reshape(rgb, (gh, w, 4))[110:, :, :3].astype(np.uint8)
+    return np.reshape(rgb, (gh, w, 4))[crop:crop + h, :, :3].astype(np.uint8)
 
 
 _FONT_CACHE = {}
@@ -236,12 +240,16 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
                 obs, _, term, trunc, _ = env.step(np.zeros(8, dtype=np.float32))
                 env._abs_joint_override = None
             if gif and k % stride == 0:
-                imgs.append(_decorate(_grab(env, w, h), sk, idx, n, src.value,
-                                      (k - k0) // stride))
+                imgs.append(_decorate(_grab(env, w, h, sk.get("cam", "chase")),
+                                      sk, idx, n, src.value, (k - k0) // stride))
             k += 1
-            if term or trunc:                       # stumble on flat ground -- reset, carry on
+            if term or trunc:
+                # a stumble on flat ground -- reset the env so the next segment is
+                # usable, but STOP this one (re-forcing the mode would re-trigger
+                # the skill and read as a rewind / double-crouch)
                 obs, _ = env.reset()
                 sw.reset()
+                break
             seen_active = seen_active or sw.active_skill is not None
             if stop_when_released and seen_active and sw.active_skill is None:
                 break
