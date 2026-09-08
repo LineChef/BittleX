@@ -125,6 +125,18 @@ onto a low platform). Its own motion, reward, terminal condition.
   rather than a separate policy — the Phase 4 ledge primitive is the on-ramp.
 - Needs hardware to validate at all.
 
+**Phase F (2026-09-08) attempted this in sim and hit a wall.** Full harness built
+(`rl_training/opencat-gym/climb_env.py` / `train_climb.py` / `eval_climb.py` /
+`climbwatch`). Nothing climbs a ≥ 2.5 cm ledge in PyBullet — not 6 scripted-base
+designs, not from-scratch RL, not **Petoi's own `cmh` keyframe**
+(`reference_gait/cmh_ref.npy`), across standoff / torque / friction sweeps.
+Measured: front paw can't reach forward *and* up; body can't rear >~13°; `cmh`
+needs real foot-grip + a human in the loop. **Sim-fidelity wall, not a design
+gap.** On-hardware path: port `cmh`, tune approach distance + keyframe on a real
+step, then residual policy on real IMU. Details:
+`docs/rl-runs/behaviors-not-working.md`. The reusable output is the method
+(`docs/rl-runs/skill-learning-method.md`), not a climb.
+
 ## H8 — On-MCU gait policy (Decision Transformer)  🔴
 
 B1. Shrink the policy to run on Bittle's own ESP32 (BiBoard V1) instead of the

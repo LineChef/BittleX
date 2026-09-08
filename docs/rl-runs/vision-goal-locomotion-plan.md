@@ -546,7 +546,40 @@ hands the climb policy the **ground-truth height profile straight from the sim**
 from "can perception feed it". Only after the climb learns do we wire INSPECT +
 the detector.
 
-### Phase F execution plan
+### >>> Phase F RESULT (2026-09-08): CLIMB is a sim-fidelity wall — CLOSED, hardware-gated
+
+Ran the full plan below plus more. **Nothing climbs a ≥ 2.5 cm ledge in PyBullet.**
+
+- **Method worked; the climb didn't.** The scripted-base + bounded-residual recipe
+  (now `docs/rl-runs/skill-learning-method.md`) broke the "do-nothing" and
+  reward-hacking optima cleanly — Runs 1→5 progressed from "stand still" to "front
+  half onto a low ledge, level". But no run completes: the **rear legs never make
+  it up** on a 3 cm+ ledge.
+- **Six base designs** tried (front reach-and-plant, rear-up-then-push,
+  scrabble/claw-and-mantle, "rear up like a horse") — all under-reach or push the
+  robot backward off the ledge.
+- **Petoi's own `cmh` (climb) keyframe** decoded from OpenCat
+  (`reference_gait/cmh_ref.npy`, 22 kf, 3× crawl loop) and played open-loop —
+  **also fails**: body rises ≤ 1.1 cm, drifts backward.
+- Sweeps that changed nothing: approach standoff 0.3–4.3 cm, ledge 2.5–4.5 cm,
+  joint torque 2.6→6.5, paw/ledge friction 0.5→2.0.
+- **Measured why:** front paw reaches ~7 cm forward but only at z ≈ 0.8 cm (can't
+  get *up* onto the edge); max nose-up "rear" is ~10–13° and the body *crouches*
+  instead of rearing; pawing the face nets a backward push. `cmh` works on the
+  real robot via foot-rubber grip + servo compliance + a human sending realtime
+  nudges — the sim's box contact doesn't reproduce that ("not robust to
+  configuration" per Petoi's own forum).
+
+**Verdict:** hardware-gated. Path on real hardware: port `cmh`, tune the approach
+distance + keyframe against a real step, *then* a residual policy on real IMU. A
+dynamic hop (`jpF`) is the other untested avenue (needs impulse/torque control,
+not position keyframes). Full write-up: `docs/rl-runs/behaviors-not-working.md`.
+
+**Kept:** `climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`
+(reusable harness + the `cmh` decoder in `climb_env._load_cmh_base`),
+`cmh_ref.npy`. **The reusable win is the method doc**, not the climb.
+
+### Phase F execution plan (as originally written — superseded by the RESULT above)
 
 1. **`climb_env.py`** (grows from `climb_test.py`): Gym env — robot spawned ~4 cm
    in front of a ledge in a walk-like start pose, ledge height randomised;

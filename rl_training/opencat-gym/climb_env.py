@@ -43,42 +43,49 @@ PAW = [3, 6, 9, 12]                                  # FL FR BR BL paw links
 FRONT_PAW = [3, 6]
 REAR_PAW = [9, 12]
 BOUND = np.deg2rad(110.0)
+JOINT_FORCE = 3.2          # position-control torque limit (per joint). Bumped from 2.6 to buy
+PUSH_FORCE = 6.5           # rear legs get this during the PUSH phases -- more lift onto the ledge
 RES_DEG = 24.0                                        # RESIDUAL scale on top of the scripted base
                                                      # (small -- the base does most of it, policy nudges)
 
-# --- scripted base: "rear up like a horse, then push". The policy learns a small
-# residual on top (RES_DEG); its job is to keep balance + finish the rear plant
-# with the IMU in the loop. Deltas in DEG from STANCE, URDF order
-# [FLsh FLkn FRsh FRkn  BRhip BRkn BLhip BLkn].
-#   1 REAR-UP    front feet fold up + reach high; rear legs extend -> the front
-#               unloads and the body rocks BACK, NOSE-UP, onto the rear support
-#               (nose-up is stable -- the faceplant only ever came from nose-down)
-#   2 FRONT PLANT front feet reach fwd + down onto the ledge top
-#   3 REAR PUSH  rear hips + knees extend HARD, front feet anchored on the ledge
-#               as the pivot -> drives the body fwd + up onto the surface
-#   4 REAR STEP  rear hips flex, rear feet lift fwd off the ground
-#   5 SETTLE     rear feet plant on the ledge, ease toward stance
-_BASE_POSES = np.array([
-    [0,    0,    0,    0,    0,    0,    0,    0],   # 0 stance
-    [32, -42,   32,  -42,    0,   12,    0,   12],   # 1 REAR-UP (nose-up, front reaches high)
-    [-14, 32,  -14,   32,    0,   12,    0,   12],   # 2 FRONT PLANT on the ledge top
-    [-10, 22,  -10,   22,   22,   30,   22,   30],   # 3 REAR PUSH (hips+knees extend, front anchored)
-    [10,  20,   10,   20,   30,  -18,   30,  -18],   # 4 REAR STEP (hips flex, rear feet come fwd/up)
-    [8,   16,    8,   16,   -6,   22,   -6,   22],   # 5 SETTLE (rear feet plant, ease to stance)
-], dtype=float)
-_BASE_SEGS = [22, 20, 24, 18, 24]                     # env-steps per leg of the base motion
+# --- scripted base: Petoi's own `cmh` (climb) keyframe from OpenCat
+# InstinctBittleESP.h -- a hand-authored crawl-up-and-mantle. Decoded here (raw
+# keyframes, loop-expanded per the behaviour header) and interpolated per tick.
+# The policy learns a small residual on top for balance + finishing. Petoi's
+# `stp`/`cmh` were tuned for one step height + approach distance and are "not
+# robust to configuration" -- the residual + DR is meant to fix exactly that.
+_PETOI_TO_URDF = [0, 4, 1, 5, 2, 6, 3, 7]        # Petoi leg-col order -> URDF joint order
+_TICKS_PER_KF = 3                                # control ticks to interpolate between keyframes
 
 
-def _build_base():
-    out = []
-    for a, b, n in zip(_BASE_POSES[:-1], _BASE_POSES[1:], _BASE_SEGS):
-        for t in range(n):
-            w = 0.5 - 0.5 * np.cos(np.pi * (t + 1) / n)
+def _load_cmh_base():
+    import re
+    src = (_HERE and os.path.join(_HERE, "reference_gait", "InstinctBittleESP.h"))
+    txt = open(src).read()
+    m = re.search(r"const int8_t cmh\[\] PROGMEM = \{(.*?)\};", txt, re.S)
+    nums = [int(x) for x in re.findall(r"-?\d+", m.group(1))]
+    period, ratio = nums[0], nums[3]
+    n = abs(period)                               # 22 frames
+    loop_lo, loop_hi, loop_n = nums[4], nums[5], nums[6]   # 2, 19, 3
+    stride = 16 + 4
+    body = np.array(nums[7:7 + n * stride], float).reshape(n, stride) * ratio
+    legs_petoi = body[:, 8:16]                    # 8 leg joints per frame
+    kf = np.deg2rad(legs_petoi[:, _PETOI_TO_URDF])  # (22, 8) rad, URDF order
+    # expand the loop: [0..loop_lo-1] + [loop_lo..loop_hi]*loop_n + [loop_hi+1..n-1]
+    seq = (list(range(0, loop_lo))
+           + list(range(loop_lo, loop_hi + 1)) * loop_n
+           + list(range(loop_hi + 1, n)))
+    keyframes = kf[seq]                           # (~58, 8)
+    # cosine-interpolate between consecutive keyframes
+    out = [keyframes[0]]
+    for a, b in zip(keyframes[:-1], keyframes[1:]):
+        for t in range(1, _TICKS_PER_KF + 1):
+            w = 0.5 - 0.5 * np.cos(np.pi * t / _TICKS_PER_KF)
             out.append(a * (1 - w) + b * w)
-    return np.deg2rad(np.rad2deg(STANCE) + np.array(out))   # (58, 8) rad
+    return np.array(out)                          # (~172, 8) rad, per control tick
 
 
-_BASE = _build_base()
+_BASE = _load_cmh_base()
 
 
 def _base_pose(t):
@@ -87,10 +94,12 @@ def _base_pose(t):
 
 CTRL_HZ = 60.0
 FRAME_SKIP = 4                                        # 240 Hz sim / 4 = 60 Hz control
-MAX_STEPS = 200                                       # ~3.3 s
+MAX_STEPS = 260                                       # cmh base is ~172 ticks + a settle window
 STAND_Z = 0.065                                       # body height above its support
 
-LEDGE_FRONT_X = 0.085                                 # ledge near face, just ahead of the front paws
+LEDGE_FRONT_X = 0.078                                 # NOMINAL ledge near face -- CLOSE, so the body can
+                                                     # wedge against the face for the scrabble/mantle
+LEDGE_STANDOFF_RAND = 0.012                           # +/- standoff -> robust to approach distance
 LEDGE_LEN = 0.40
 PROFILE_X = np.linspace(0.03, 0.18, 6)                # fwd sample offsets for the height profile
 
@@ -161,7 +170,7 @@ class ClimbEnv(gym.Env):
         (bx, by, bz), quat = p.getBasePositionAndOrientation(self._robot)
         _, ang = p.getBaseVelocity(self._robot)
         js = [p.getJointState(self._robot, j)[0] for j in REV]
-        prog = np.clip((bx - LEDGE_FRONT_X) / 0.20, -1.0, 1.5)
+        prog = np.clip((bx - self._lf) / 0.20, -1.0, 1.5)
         base_phase = min(1.0, self._t / len(_BASE))       # where we are in the scripted base motion
         return np.concatenate([
             quat,
@@ -178,7 +187,7 @@ class ClimbEnv(gym.Env):
         roll, pitch, _ = p.getEulerFromQuaternion(quat)
         paws = [p.getLinkState(self._robot, j)[0] for j in PAW]
         on_top = sum(1 for (px, _py, pz) in paws
-                     if pz > self._ledge_h - 0.02 and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
+                     if pz > self._ledge_h - 0.02 and self._lf - 0.02 < px < self._lf + LEDGE_LEN)
         return bx, bz, roll, pitch, on_top
 
     # -- gym API ------------------------------------------------------
@@ -190,10 +199,11 @@ class ClimbEnv(gym.Env):
         p.setTimeStep(1.0 / 240.0)
         p.loadURDF("plane.urdf", [0, 0, 0])
         self._ledge_h = float(self._rng.uniform(self.ledge_lo, self.ledge_hi))
+        self._lf = LEDGE_FRONT_X + float(self._rng.uniform(-LEDGE_STANDOFF_RAND, LEDGE_STANDOFF_RAND))
         cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[LEDGE_LEN / 2, 0.25, self._ledge_h / 2])
         vs = p.createVisualShape(p.GEOM_BOX, halfExtents=[LEDGE_LEN / 2, 0.25, self._ledge_h / 2],
                                  rgbaColor=[0.55, 0.45, 0.35, 1])
-        p.createMultiBody(0, cs, vs, [LEDGE_FRONT_X + LEDGE_LEN / 2, 0.0, self._ledge_h / 2])
+        p.createMultiBody(0, cs, vs, [self._lf + LEDGE_LEN / 2, 0.0, self._ledge_h / 2])
 
         self._robot = p.loadURDF(_URDF, [0, 0, 0.08],
                                  p.getQuaternionFromEuler([0, 0, 0]),
@@ -210,7 +220,7 @@ class ClimbEnv(gym.Env):
         self._top_streak = 0
         self._xhist = [self._prev_x]
         self._stall_streak = 0
-        self._goal = (LEDGE_FRONT_X + GOAL_DX, self._ledge_h + STAND_Z)
+        self._goal = (self._lf + GOAL_DX, self._ledge_h + STAND_Z)
         self._prev_phi = self._phi(self._prev_x, self._prev_z)
         rz = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
         self._prev_rear_phi = -max(0.0, self._ledge_h - rz)    # 0 when rear paws are at ledge height
@@ -223,9 +233,10 @@ class ClimbEnv(gym.Env):
     def step(self, action):
         action = np.clip(np.asarray(action, np.float32), -1.0, 1.0)
         tgt = np.clip(_base_pose(self._t) + action * np.deg2rad(RES_DEG), -BOUND, BOUND)
+        f = [JOINT_FORCE] * 8
         for _ in range(FRAME_SKIP):
             p.setJointMotorControlArray(self._robot, REV, p.POSITION_CONTROL,
-                                        targetPositions=tgt.tolist(), forces=[2.6] * 8)
+                                        targetPositions=tgt.tolist(), forces=f)
             p.stepSimulation()
         self._t += 1
 
@@ -251,7 +262,7 @@ class ClimbEnv(gym.Env):
         def _on(links):
             return sum(1 for (px, _py, pz) in (p.getLinkState(self._robot, j)[0] for j in links)
                        if pz > self._ledge_h - 0.015
-                       and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
+                       and self._lf - 0.02 < px < self._lf + LEDGE_LEN)
         front_on, rear_on = _on(FRONT_PAW), _on(REAR_PAW)
         rear_z = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
         rear_phi = -max(0.0, self._ledge_h - rear_z)                     # 0 at ledge height
@@ -272,7 +283,7 @@ class ClimbEnv(gym.Env):
         self._last_action = action
 
         flipped = abs(pitch) > FLIP_RAD or abs(roll) > FLIP_RAD
-        on_top_stable = (abs(bz - tgt_z) < 0.03 and bx > LEDGE_FRONT_X + 0.03
+        on_top_stable = (abs(bz - tgt_z) < 0.03 and bx > self._lf + 0.03
                          and on_top >= 3 and abs(pitch) < 0.4 and abs(roll) < 0.4)
         self._top_streak = self._top_streak + 1 if on_top_stable else 0
 
