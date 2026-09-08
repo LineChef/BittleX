@@ -32,11 +32,26 @@ either way.
 head-to-head is NOT a controlled comparison — different init/params/budget — and
 was never meant to be; each run's binary yes/no is what feeds the 2×2).
 
-## Skill = high-step (raised swing-foot clearance)
+## Skill = crouch-walk (anchored to the firmware `cr` gait)
 
-Chosen because it's a clear limb-coordination change (good architecture test) AND
-directly useful for stepping over low obstacles, AND it reuses the existing
-`FAC_CLEARANCE` / `PAW_Z_TARGET` reward machinery — no new reward term.
+**Updated 2026-09-07:** use the built-in OpenCat `crF` (crawl) trajectory as the
+skill target, not a hand-tuned `PAW_Z_TARGET` high-step. Reasons:
+- `cr_ref.npy` (from `reference_gait/build_skill_reference.py crF`) is a real
+  firmware trajectory with the **largest limb-coordination difference from wkF**
+  of any built-in gait (mean 34.8° / joint; knees held flexed −52…−29° the whole
+  cycle) — the clearest possible yes/no on "can a frozen base + adapter acquire a
+  genuinely different gait."
+- No new reward term: it's a drop-in `FAC_IMITATION` anchor via `G2E_SKILL_REF=cr`
+  (the env re-loads `WKF_REF`/`STAND_POSE`; unset = wkF, byte-identical).
+- `tr` (trot, `tr_ref.npy`, widest foot lift) is the natural **second** skill for
+  the 2-skill control run.
+- The earlier "high-step" pick was based on `vt` — but extraction showed `vtF` is
+  a stiff *marching* step with a *smaller* knee swing than wkF, not a high-step.
+  See `docs/research/petoi-firmware-reference.md`.
+
+Mechanism: `SKILL_MODE` appends one obs float `skill ∈ {0,1}` (per-episode). When
+`skill == 1`, the imitation anchor is `cr_ref.npy` and `STAND_POSE` follows it;
+when 0, it's `wkF`. The policy learns to switch gait on the bit.
 
 ### Env changes (`opencat_gym_env.py`) — follow the `_g2e` pattern, all default-off = byte-identical
 

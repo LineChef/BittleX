@@ -407,6 +407,19 @@ def _g2e(name, default):
         return raw not in ("0", "false", "False", "no")
     return type(default)(raw)
 
+# G2E_SKILL_REF: swap the FAC_IMITATION anchor from wkF to another built-in
+# OpenCat skill's reference (e.g. "cr" -> reference_gait/cr_ref.npy, a crouch
+# walk; "tr" -> trot; "bk" -> backward). Built by build_skill_reference.py.
+# Unset => wkF, byte-identical to every prior run.
+_SKILL_REF = os.environ.get("G2E_SKILL_REF", "").strip()
+if _SKILL_REF:
+    _skp = os.path.join(os.path.dirname(__file__), "reference_gait", f"{_SKILL_REF}_ref.npy")
+    if not os.path.exists(_skp):
+        raise SystemExit(f"G2E_SKILL_REF={_SKILL_REF}: {_skp} not found "
+                         f"(run reference_gait/build_skill_reference.py {_SKILL_REF}F)")
+    WKF_REF = np.load(_skp)
+    STAND_POSE = WKF_REF.mean(axis=0)
+
 TERRAIN_FEATURE      = _g2e("TERRAIN_FEATURE", bool(TERRAIN_FEATURE))
 RANDOM_TERRAIN       = _g2e("RANDOM_TERRAIN", RANDOM_TERRAIN)
 RANDOM_TERRAIN_PROB  = _g2e("RANDOM_TERRAIN_PROB", RANDOM_TERRAIN_PROB)

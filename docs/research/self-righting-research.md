@@ -1,12 +1,25 @@
 # Self-Righting After a Fall — Research Notes
 
+> **CORRECTION 2026-09-07:** the real Bittle X **can flip itself back over from
+> fully on its back** — directly observed. Earlier framing in this doc that it
+> "cannot right the robot from a full tip-over" was over-generalised from a *sim*
+> result. Self-righting is a **sim-fidelity gap, not a physical limit** — see
+> `docs/research/petoi-firmware-reference.md` (firmware self-right path + the
+> specific reasons the sim can't reproduce it) and memory
+> `project_g2_no_self_righting`.
+
 How this relates to what the project has already found: **Run 6 (RL, in sim)
-showed that a policy driving only the 8 walking joints cannot right the robot
-from a full tip-over** — no roll-axis actuation, a missing degree of freedom.
-This note is about the *separate* thing: OpenCat's **firmware** has a built-in,
-scripted self-right skill. It works, but narrowly, and its limitations line up
-almost exactly with the fall types RL training produces. Revisit this once the
-vision module (and a proper IMU-fed recovery layer) is in place.
+showed that a policy driving only the 8 walking joints, in *our current sim*,
+did not learn to right the robot from a full tip-over** — 0% recovered across
+R2/R3. That is a sim result: the episode terminates at 1.3 rad ≈ 74° tilt
+(*below* the firmware's 85° FLIPPED line), so the policy never sees the flipped
+state, and the scripted `rc` keyframes were never an available action. It is
+**not** evidence the hardware can't — it demonstrably does. This note also covers
+the *separate* thing: OpenCat's **firmware** has a built-in scripted self-right
+skill (`rc`), auto-fired on an IMU-detected flip when gyro assist is on. Revisit
+once the vision module (and a proper IMU-fed recovery layer) is in place; if it
+doesn't work immediately, dig into the sim-fidelity gap rather than reconcluding
+"impossible".
 
 ---
 
