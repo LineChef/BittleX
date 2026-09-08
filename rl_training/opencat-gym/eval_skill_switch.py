@@ -75,7 +75,19 @@ def terrain_reading(env):
                           bearing_norm=float(raw[2]), tall=raw[3] > 0.5)
 
 
-def run_episode(env, model, switch, selector, max_steps=260):
+def _grab(env, w, h):
+    pos = p.getBasePositionAndOrientation(env.robot_id)[0]
+    _, _, rgb, _, _ = p.getCameraImage(
+        w, h,
+        viewMatrix=p.computeViewMatrixFromYawPitchRoll(
+            cameraTargetPosition=[pos[0], pos[1], 0.05], distance=0.55,
+            yaw=50, pitch=-28, roll=0, upAxisIndex=2),
+        projectionMatrix=p.computeProjectionMatrixFOV(60, w / h, 0.1, 5),
+        renderer=p.ER_TINY_RENDERER)
+    return np.reshape(rgb, (h, w, 4))[:, :, :3].astype(np.uint8)
+
+
+def run_episode(env, model, switch, selector, max_steps=260, cap=None):
     obs, _ = env.reset()
     if switch is not None:
         switch.reset()
@@ -84,8 +96,9 @@ def run_episode(env, model, switch, selector, max_steps=260):
     counts = {m: 0 for m in GaitMode}
     src_counts = {s: 0 for s in Source}
     fell = False
-    for _ in range(max_steps):
+    for k in range(max_steps):
         action, _ = model.predict(obs, deterministic=True)
+        mode, src = GaitMode.CRUISE, Source.RL
         if switch is not None:
             mode = selector.update(terrain_reading(env))
             gp = (env._phase / TIME_PHASE_PERIOD) % 1.0
@@ -99,7 +112,11 @@ def run_episode(env, model, switch, selector, max_steps=260):
                 obs, _, term, trunc, info = env.step(np.zeros(8, dtype=np.float32))
                 env._abs_joint_override = None
         else:
+            counts[GaitMode.CRUISE] += 1
             obs, _, term, trunc, info = env.step(action)
+        if cap is not None and k % cap["stride"] == 0:
+            cap["frames"].append(_grab(env, cap["w"], cap["h"]))
+            cap["labels"].append((mode.value, src.value))
         if term or trunc:
             fell = bool(term)
             break
@@ -115,6 +132,10 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--model", default="trained/run20m_ppo")
     ap.add_argument("--json-out", default=None)
+    ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
+    ap.add_argument("--gif-stride", type=int, default=3)
+    ap.add_argument("--gif-w", type=int, default=440)
+    ap.add_argument("--gif-h", type=int, default=300)
     args = ap.parse_args()
 
     opencat_gym_env.GUI_MODE = args.render
@@ -124,12 +145,14 @@ def main():
     selector = None if args.no_switch else GaitSelector()
 
     tag = "SWITCH" if switch else "BASELINE"
+    cap = {"frames": [], "labels": [], "stride": args.gif_stride,
+           "w": args.gif_w, "h": args.gif_h} if args.gif else None
     fell = 0
     fwd, wall_stop = [], []          # wall_stop[e] True if HALT dominated the episode
     agg_modes = {m: 0 for m in GaitMode}
     for e in range(args.episodes):
         np.random.seed(args.seed + e)
-        r = run_episode(env, model, switch, selector)
+        r = run_episode(env, model, switch, selector, cap=cap)
         fell += r["fell"]
         fwd.append(r["fwd_m"])
         halt_frac = (r["modes"][GaitMode.HALT] / max(1, sum(r["modes"].values()))) if switch else 0.0
@@ -162,6 +185,27 @@ def main():
     if args.json_out:
         json.dump(out, open(args.json_out, "w"), indent=2)
         print(f"wrote {args.json_out}")
+
+    if cap and cap["frames"]:
+        _write_gif(cap, args.gif)
+
+
+_SRC_DOT = {"rl": (90, 170, 240), "blend": (240, 200, 90), "scripted": (240, 120, 90)}
+
+
+def _write_gif(cap, path):
+    from PIL import Image, ImageDraw
+    imgs = []
+    for frame, (mode, src) in zip(cap["frames"], cap["labels"]):
+        im = Image.fromarray(frame)
+        d = ImageDraw.Draw(im)
+        d.rectangle([0, 0, im.width, 18], fill=(20, 20, 24))
+        d.ellipse([5, 5, 13, 13], fill=_SRC_DOT.get(src, (200, 200, 200)))
+        d.text((18, 4), f"{src.upper():8s} {mode}", fill=(235, 235, 235))
+        imgs.append(im)
+    imgs[0].save(path, save_all=True, append_images=imgs[1:],
+                 duration=int(1000 * cap["stride"] / 50), loop=0, optimize=True)
+    print(f"wrote {path}  ({len(imgs)} frames)")
 
 
 if __name__ == "__main__":

@@ -1725,8 +1725,7 @@ class OpenCatGymEnv(gym.Env):
                 "phase": float(self._phase),
                 "cmd": (float(self._cmd_fwd), float(self._cmd_yaw)),
             }
-        if GUI_MODE:
-            self._recolor_scene()
+        self._recolor_scene()
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
         info = {}
         return np.array(self.observation).astype(np.float32), info
@@ -1736,10 +1735,11 @@ class OpenCatGymEnv(gym.Env):
         non-robot body a deliberate colour. This is a blanket sweep over
         p.getNumBodies(), NOT a hand-maintained list of createMultiBody / loadURDF
         / heightfield call sites -- so ANY geometry, current or future, is
-        covered and can never render black again. GUI-only, cosmetic
-        (changeVisualShape touches nothing in physics / obs / reward), so
-        training is unaffected. The scattered obstacles get a warmer tone than
-        the ground so they read as obstacles in a replay."""
+        covered and can never render black again, in the GUI OR in an offscreen
+        getCameraImage capture (GIFs). Cosmetic only -- changeVisualShape touches
+        nothing in physics / obs / reward, and ~15 lightweight calls per reset is
+        negligible even over a 20M run -- so it always runs. Scattered obstacles
+        get a warmer tone than the ground so they read as obstacles in a replay."""
         skip = {self.robot_id}
         for _a in ("_payload_id", "_head_id"):
             _v = getattr(self, _a, None)
