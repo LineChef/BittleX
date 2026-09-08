@@ -43,7 +43,8 @@ PAW = [3, 6, 9, 12]                                  # FL FR BR BL paw links
 FRONT_PAW = [3, 6]
 REAR_PAW = [9, 12]
 BOUND = np.deg2rad(110.0)
-RES_DEG = 36.0                                        # RESIDUAL scale on top of the scripted base
+RES_DEG = 24.0                                        # RESIDUAL scale on top of the scripted base
+                                                     # (small -- the base does most of it, policy nudges)
 
 # --- scripted base: the working part of climb_test.py -- front feet tuck up ->
 # reach forward -> plant on the ledge, body pulls forward staying LEVEL. The
@@ -99,7 +100,8 @@ W_JERK, W_ALIVE = 0.3, 0.1
 W_FRONT_ON = 4.0                   # per front paw on the ledge -- but worth only 0.4x while the
                                   # rear is still down (stops "park with the front up" being cosy)
 W_REAR_ON = 11.0                  # per REAR paw on the ledge -- the actual completion, paid big
-W_REAR_LIFT = 60.0               # reward rear-paw mean height GAIN toward the ledge
+W_REAR_SHAPE = 34.0              # POTENTIAL-based on rear-paw height toward the ledge (telescopes
+                                # over the episode -> per-step up/down bouncing cancels, can't farm)
 STALL_PEN, STALL_WIN, STALL_EPS = 2.0, 25, 0.008   # no >8mm gain over 25 steps past step 25 -> stalled
 STALL_KILL = 50                    # stalled this many steps -> end the episode (-20)
 BONUS_TOP, PEN_FLIP = 250.0, 100.0
@@ -203,7 +205,8 @@ class ClimbEnv(gym.Env):
         self._stall_streak = 0
         self._goal = (LEDGE_FRONT_X + GOAL_DX, self._ledge_h + STAND_Z)
         self._prev_phi = self._phi(self._prev_x, self._prev_z)
-        self._prev_rear_z = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
+        rz = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
+        self._prev_rear_phi = -max(0.0, self._ledge_h - rz)    # 0 when rear paws are at ledge height
         return self._obs(self._last_action), {}
 
     def _phi(self, bx, bz):
@@ -244,15 +247,16 @@ class ClimbEnv(gym.Env):
                        and LEDGE_FRONT_X - 0.02 < px < LEDGE_FRONT_X + LEDGE_LEN)
         front_on, rear_on = _on(FRONT_PAW), _on(REAR_PAW)
         rear_z = np.mean([p.getLinkState(self._robot, j)[0][2] for j in REAR_PAW])
-        d_rear_z = rear_z - self._prev_rear_z
-        self._prev_rear_z = rear_z
+        rear_phi = -max(0.0, self._ledge_h - rear_z)                     # 0 at ledge height
+        r_rear = W_REAR_SHAPE * (rear_phi - self._prev_rear_phi)         # telescopes -> unfarmnable
+        self._prev_rear_phi = rear_phi
 
         pitch_over = max(0.0, abs(pitch) - PITCH_FREE)
         r = (r_shape
              + W_PROG * np.clip(d_x / 0.01, -1.0, 1.5)
              + W_FRONT_ON * front_on * (0.4 if rear_on == 0 else 1.0)   # front-only parking worth less
              + W_REAR_ON * rear_on                                       # the actual completion
-             + W_REAR_LIFT * np.clip(d_rear_z / 0.01, -0.5, 1.0)         # reward rear-paw height gain
+             + r_rear                                                    # potential-based rear-height
              - W_ROLL * min(1.0, abs(roll) / 1.0)
              - PEN_PITCH_HARD * pitch_over
              - W_JERK * float(np.mean((action - self._last_action) ** 2))

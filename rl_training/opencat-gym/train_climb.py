@@ -95,9 +95,9 @@ def train(steps, ledge_lo, ledge_hi, n_envs, tag, curr_end=0.0):
               f"{curr_end:.0%} of {steps} steps")
 
     model = PPO("MlpPolicy", env, seed=42,
-                policy_kwargs=dict(net_arch=[256, 256]),
-                n_steps=int(2048 * 4 / n_envs), batch_size=256,
-                gamma=0.99, ent_coef=0.012, learning_rate=3e-4,
+                policy_kwargs=dict(net_arch=[256, 256], log_std_init=-1.4),  # start with small
+                n_steps=int(2048 * 4 / n_envs), batch_size=256,              # residuals -> base
+                gamma=0.99, ent_coef=0.006, learning_rate=3e-4,              # executes cleanly
                 verbose=1, tensorboard_log="trained/tensorboard_logs/")
     model.learn(int(steps), callback=cbs, tb_log_name=tag)
     out = f"trained/{tag}"
