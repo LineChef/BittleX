@@ -1,9 +1,14 @@
 # Adapter skill probe — implementation spec
 
-**Status:** SPECCED, NOT BUILT. Branch `adapter-skill-probe` created 2026-09-07 ~1 PM ET
-(nothing on it yet but this doc). Deferred: user hit <10% weekly Claude usage;
-build resumes on quota reset or in a fresh session. Phase D A/B still running
-(see `vision-goal-locomotion-plan.md` START HERE) and is unaffected.
+**Status:** SPECCED, NOT BUILT. Lives on `development` (this doc only, no code).
+The throwaway `adapter-skill-probe` branch was deleted 2026-09-07 — it only ever
+held an older copy of this spec. Deferred: user hit <10% weekly Claude usage;
+build resumes on quota reset or in a fresh session, branching fresh from
+`development`. Phase D A/B still running (see `vision-goal-locomotion-plan.md`
+START HERE) and is unaffected.
+
+Note: `cr_ref.npy` / `tr_ref.npy` and the `G2E_SKILL_REF` env hook this spec
+needs are already committed on `development` (commit b45b726).
 
 ---
 
@@ -153,7 +158,7 @@ embedded GIFs). Sections: (1) Phase D vision-vs-blind verdict, (2) adapter probe
 
 ## Resume checklist
 
-1. `git checkout adapter-skill-probe`
+1. `git checkout development && git pull && git checkout -b adapter-skill-probe`
 2. Env knobs per "Env changes" above; grep-verify both obs assembly points.
 3. `adapter_policy.py` + `train_adapter.py`; parity check → smoke → **commit**.
 4. `run_adapter_probe.sh`; run only after Phase D compute is free; arm a Monitor on
@@ -161,8 +166,11 @@ embedded GIFs). Sections: (1) Phase D vision-vs-blind verdict, (2) adapter probe
 5. On `ADAPTER PROBE COMPLETE`: build the combined report; update
    `docs/project-plan.md` + memory; decide architecture per the 2×2.
 
-## State at spec time (2026-09-07 ~1 PM ET)
+## State at spec time (2026-09-07, updated ~11 PM ET)
 
-Branch `adapter-skill-probe` created, contains only this doc. No env or policy
-code written. Phase D A/B running (`run_ab_vision.sh`, ETA ~7 AM ET Tue 09-08).
+No adapter policy / training code written. Prereqs that ARE done on `development`
+(commit b45b726): `reference_gait/build_skill_reference.py`, `cr_ref.npy` /
+`tr_ref.npy` / `vt_ref.npy` / `bk_ref.npy` / `rc_ref.npy`, and the
+`G2E_SKILL_REF` env hook (swaps the `FAC_IMITATION` anchor; unset = wkF,
+byte-identical). Phase D A/B running (`run_ab_vision.sh`, ETA early Tue 09-08).
 `run20m_ppo` frozen fallback untouched.
