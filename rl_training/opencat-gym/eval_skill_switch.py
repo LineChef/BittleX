@@ -30,9 +30,24 @@ _DEFAULTS = {
     "G2E_OBSTACLE_SPAN_FRAC": "0.0", "G2E_OBSTACLE_X_HI": "1.0", "G2E_OBSTACLE_Y_SPREAD": "0.12",
     "G2E_LEDGE_HEIGHT": "0.022", "G2E_LEDGE_PROB": "0.45", "G2E_LEDGE_RANDOMIZE": "1",
     "G2E_RUBBLE_PROB": "0.30", "G2E_SLOPE_MAX_DEG": "8",
+    "G2E_CLIFF_PLATFORM_HW": "0.28",   # edge ~0.28 m ahead -- reachable within an episode
 }
 for k, v in _DEFAULTS.items():
     os.environ.setdefault(k, v)
+
+
+def _argv_val(flag, default):
+    for i, a in enumerate(sys.argv):
+        if a == flag and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if a.startswith(flag + "="):
+            return a.split("=", 1)[1]
+    return default
+
+
+# --cliff-prob has to reach the env module BEFORE it's imported (it reads _g2e
+# at import). Peek argv here; argparse registers it too for --help / validation.
+os.environ.setdefault("G2E_CLIFF_PROB", _argv_val("--cliff-prob", "0.0"))
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -44,6 +59,19 @@ from opencat_gym_env import (OpenCatGymEnv, RESIDUAL_SCALE_DEG, WKF_REF,  # noqa
 from pi_pipeline.gait.skill_switch import (SkillSwitch, SkillSwitchConfig,  # noqa: E402
                                           SkillRefs, GaitMode, Source)
 from pi_pipeline.vision.gait_selector import GaitSelector, TerrainReading  # noqa: E402
+from pi_pipeline.vision.cliff_guard import CliffGuard, CliffAction, EdgeReading  # noqa: E402
+
+# CliffGuard action -> which GaitMode it forces (no turning in this sim, so
+# TURN_AWAY / BACK_UP fall back to HALT -- the safe stop).
+_CLIFF_TO_MODE = {
+    CliffAction.NONE: None,
+    CliffAction.SLOW: GaitMode.CAREFUL,
+    CliffAction.STOP: GaitMode.HALT,
+    CliffAction.BACK_UP: GaitMode.HALT,
+    CliffAction.TURN_AWAY_LEFT: GaitMode.HALT,
+    CliffAction.TURN_AWAY_RIGHT: GaitMode.HALT,
+    CliffAction.FREEZE: GaitMode.HALT,
+}
 
 REF_DIR = os.path.join(os.path.dirname(__file__), "reference_gait")
 
@@ -75,6 +103,29 @@ def terrain_reading(env):
                           bearing_norm=float(raw[2]), tall=raw[3] > 0.5)
 
 
+_EDGE_RANGE = 0.35        # m look-ahead for the "is there floor?" probes
+
+
+def edge_reading(env):
+    """Downward probe rays ahead of the robot -- more robust than an in-box
+    horizontal scan. A probe that finds no floor near the walking surface = a
+    drop-off at that point. Mirrors a real camera 'floor vs edge' check."""
+    (x, y, z), orn = p.getBasePositionAndOrientation(env.robot_id)
+    yaw = p.getEulerFromQuaternion(orn)[2]
+    nearest, bearing, present = 1.0, 0.0, False
+    for frac in np.linspace(0.06, _EDGE_RANGE, 6):
+        for b in (-0.3, 0.0, 0.3):
+            px, py = x + frac * np.cos(yaw + b), y + frac * np.sin(yaw + b)
+            hit = p.rayTest([px, py, z + 0.05], [px, py, z - 0.40])[0]
+            floor = hit[0] >= 0 and hit[0] != env.robot_id and hit[3][2] > z - 0.15
+            if not floor:
+                present = True
+                if frac / _EDGE_RANGE < nearest:
+                    nearest, bearing = frac / _EDGE_RANGE, b / 0.5
+    return EdgeReading(present=present, dist_norm=nearest, bearing_norm=bearing,
+                       confidence=1.0)
+
+
 def _grab(env, w, h):
     pos = p.getBasePositionAndOrientation(env.robot_id)[0]
     _, _, rgb, _, _ = p.getCameraImage(
@@ -97,12 +148,16 @@ def _body_pitch(env):
     return p.getEulerFromQuaternion(q)[1]        # +ve = nose down (this URDF)
 
 
-def run_episode(env, model, switch, selector, max_steps=260, cap=None, careful_scale=True):
+def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=None,
+                careful_scale=True, fwd_cmd=None):
     obs, _ = env.reset()
     if switch is not None:
         switch.reset()
         selector.reset()
-    base_cmd = float(env._cmd_fwd)                 # hold the episode's command; scale it for CAREFUL
+    if cliff is not None:
+        cliff.reset()
+    cliff_ep = bool(getattr(env, "_cliff_this_ep", False))
+    base_cmd = float(fwd_cmd) if fwd_cmd is not None else float(env._cmd_fwd)
     x0, _ = _body_xz(env)
     counts = {m: 0 for m in GaitMode}
     src_counts = {s: 0 for s in Source}
@@ -112,11 +167,19 @@ def run_episode(env, model, switch, selector, max_steps=260, cap=None, careful_s
     cur = None
     fell = False
     for k in range(max_steps):
+        if fwd_cmd is not None:
+            env._cmd_fwd = base_cmd                  # hold a fixed march command (E-4c)
         action, _ = model.predict(obs, deterministic=True)
         mode, src = GaitMode.CRUISE, Source.RL
         rd = terrain_reading(env) if switch is not None else None
+        cliff_act = None
         if switch is not None:
             mode = selector.update(rd)
+            if cliff is not None:                        # cliff reflex preempts the terrain selector
+                cliff_act = cliff.update(edge_reading(env))
+                forced = _CLIFF_TO_MODE.get(cliff_act)
+                if forced is not None:
+                    mode = forced
             gp = (env._phase / TIME_PHASE_PERIOD) % 1.0
             joints, src = switch.update(mode, rl_joint_deg(env, action), gait_phase=gp)
             counts[mode] += 1
@@ -160,9 +223,13 @@ def run_episode(env, model, switch, selector, max_steps=260, cap=None, careful_s
     if cur is not None:
         cur["passed_m"] = _body_xz(env)[0] - cur["x0"]
         enc.append(cur)
-    x1, _ = _body_xz(env)
+    x1, bz = _body_xz(env)
+    # went off the drop-off = terminated by the platform-fall check, OR ended the
+    # episode with the body at/below the platform surface (dangling half-off).
+    fell_at_edge = bool(cliff_ep and (fell or bz < 0.03))
     return {"fell": fell, "fwd_m": x1 - x0, "modes": counts, "srcs": src_counts,
-            "z_by_src": z_by_src, "pitch_by_src": pitch_by_src, "encounters": enc}
+            "z_by_src": z_by_src, "pitch_by_src": pitch_by_src, "encounters": enc,
+            "cliff_ep": cliff_ep, "fell_at_edge": fell_at_edge}
 
 
 def main():
@@ -174,6 +241,13 @@ def main():
     ap.add_argument("--seeds", default=None,
                     help="comma list of seed offsets to pool, e.g. 0,10,20,30,40 (sweep)")
     ap.add_argument("--model", default="trained/run20m_ppo")
+    ap.add_argument("--cliff-prob", default="0.0",
+                    help="frac of episodes on a finite platform (drop-off). Switch arm "
+                         "runs CliffGuard on the edge scan; baseline is blind to it.")
+    ap.add_argument("--fwd-cmd", type=float, default=None,
+                    help="force a fixed forward command each tick (e.g. 0.12) instead of "
+                         "the env's sampled/resampled command -- for E-4c, march at the edge")
+    ap.add_argument("--max-steps", type=int, default=260)
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
     ap.add_argument("--gif-stride", type=int, default=3)
@@ -182,10 +256,13 @@ def main():
     args = ap.parse_args()
 
     opencat_gym_env.GUI_MODE = args.render
+    opencat_gym_env.DR_EVAL_FULL = True    # every episode at full DR (obstacles, cliff,
+                                          # slopes) from episode 0 -- not a training ramp
     env = OpenCatGymEnv()
     model = PPO.load(args.model, device="cpu")
     switch = None if args.no_switch else make_switch()
     selector = None if args.no_switch else GaitSelector()
+    cliff = CliffGuard() if (switch and float(args.cliff_prob) > 0) else None
 
     tag = "SWITCH" if switch else "BASELINE"
     cap = {"frames": [], "labels": [], "stride": args.gif_stride,
@@ -198,12 +275,15 @@ def main():
     z_src = {s: [] for s in Source}
     pitch_src = {s: [] for s in Source}
     enc_step, enc_nostep = [], []        # per-encounter passed_m, split by whether STEP_OVER fired
-    enc_cross = []                        # (zmin, zmax) per non-wall encounter -- the crouch question
+    cliff_eps = edge_falls = 0
     for base in offsets:
         for e in range(args.episodes):
             np.random.seed(args.seed + base + e)
-            r = run_episode(env, model, switch, selector, cap=cap)
+            r = run_episode(env, model, switch, selector, cliff=cliff, cap=cap,
+                            max_steps=args.max_steps, fwd_cmd=args.fwd_cmd)
             fell += r["fell"]
+            cliff_eps += r["cliff_ep"]
+            edge_falls += r["fell_at_edge"]
             fwd.append(r["fwd_m"])
             halt_frac = (r["modes"][GaitMode.HALT] / max(1, sum(r["modes"].values()))) if switch else 0.0
             wall_stop.append(halt_frac > 0.5)
@@ -216,7 +296,6 @@ def main():
                 if en["modes"][GaitMode.HALT] > 0.5 * en["steps"]:
                     continue                      # wall stop -- not a traverse
                 (enc_step if en["modes"][GaitMode.STEP_OVER] > 0 else enc_nostep).append(en["passed_m"])
-                enc_cross.append((en["zmin"], en["zmax"]))
             print(f"[{tag} s{args.seed+base}+{e:2d}] fell={r['fell']!s:5s} fwd={r['fwd_m']:+.2f} m"
                   + ("" if switch is None else
                      f"  {', '.join(f'{m.value}:{c}' for m,c in r['modes'].items() if c)}"))
@@ -229,6 +308,9 @@ def main():
     out = {
         "tag": tag, "episodes_per_seed": args.episodes, "seed_offsets": offsets, "n_episodes": n,
         "fall_rate": fell / n,
+        "cliff_episodes": cliff_eps,
+        "edge_falls": edge_falls,
+        "edge_fall_rate": (edge_falls / cliff_eps) if cliff_eps else None,
         "wall_stops": int(sum(wall_stop)),
         "fwd_walked_mean": fw_m, "fwd_walked_std": fw_s, "n_walked": len(walked),
         "fwd_all_mean": float(np.mean(fwd)),
@@ -241,6 +323,9 @@ def main():
     }
     print(f"\n=== {tag}  {n} eps ({len(offsets)} seed offsets x {args.episodes}) ===")
     print(f"fall rate            {out['fall_rate']:.0%}  ({fell}/{n})")
+    if cliff_eps:
+        print(f"EDGE falls           {edge_falls}/{cliff_eps} drop-off episodes"
+              f"  ({out['edge_fall_rate']:.0%})")
     print(f"wall-stops           {out['wall_stops']}/{n}")
     print(f"fwd, walked eps      {fw_m:.3f} +/- {fw_s:.3f} m  (n={len(walked)})")
     if switch is not None:

@@ -1065,12 +1065,17 @@ class OpenCatGymEnv(gym.Env):
 
         # --- Goal-directed terms (GOAL_MODE; else all 0.0) ---
         r_goal_progress = r_goal_reached = obs_swerve_rew = 0.0
-        # --- Cliff: tight-gated slow reward + fall-off penalty (CLIFF) ---
+        # --- Cliff: tight-gated slow reward + fall-off penalty ---
+        # The finite platform + fall-off detection now respond to CLIFF_PROB > 0
+        # ALONE (see reset()), so a blind 278-d policy can be evaluated on a
+        # drop-off course with the edge scan read externally -- CLIFF only still
+        # controls whether the 3 edge floats go in the observation. r_cliff_slow
+        # still needs CLIFF (it's a training term).
         r_cliff_slow = 0.0
         cliff_fell_off = False
-        if CLIFF and getattr(self, "_cliff_this_ep", False):
+        if getattr(self, "_cliff_this_ep", False):
             _er = self._cliff_scan()
-            if _er[0] > 0.5 and _er[1] < CLIFF_SLOW_DIST:
+            if CLIFF and _er[0] > 0.5 and _er[1] < CLIFF_SLOW_DIST:
                 r_cliff_slow = FAC_CLIFF_SLOW * float(np.exp(-(v_fwd / 0.05) ** 2))
             if base_clearance < -0.25:
                 cliff_fell_off = True
@@ -1396,7 +1401,10 @@ class OpenCatGymEnv(gym.Env):
         p.setGravity(0,0,-9.81)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         # Cliff episode: finite platform, robot meets an edge (see the plane branch).
-        self._cliff_this_ep = bool(CLIFF and self._dr > 0 and np.random.rand() < CLIFF_PROB)
+        # CLIFF_PROB > 0 alone triggers it -- decoupled from the CLIFF obs flag so
+        # a blind policy can be run on a drop-off course (Phase E-4c), the edge
+        # scan read externally via env._cliff_scan(). CLIFF_PROB defaults 0 -> inert.
+        self._cliff_this_ep = bool(CLIFF_PROB > 0 and self._dr > 0 and np.random.rand() < CLIFF_PROB)
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
         if SLOPE_FIXED_RP is not None:
