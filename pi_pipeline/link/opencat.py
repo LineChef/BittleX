@@ -49,6 +49,7 @@ QUERY = "?"                      # help/status -- not seen in the partial OpenCa
 # body over using the legs) are the recovery path -- not a learned policy.
 RECOVER = "krc"                  # self-right / get-up from a side or forward fall
 ROLL_OVER = "krl"               # roll from supine (on its back) toward prone
+DROP_RECOVER = "kdropRec"       # last-ditch scripted flail-to-upright (firmware `dropRec`)
 BALANCE = "kbalance"            # settle into a balanced stand (used after a get-up)
 STAND = "kup"                   # neutral standing posture
 

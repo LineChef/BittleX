@@ -11,7 +11,7 @@ joint commands over it.
 |---|---|
 | `serial_link.py` | `SerialLink` — lazy open, auto-reconnect on drop, `send()` never raises (logs + returns `""`). `list_ports()`. |
 | `opencat.py` | Command-string builders (`skill`, `move_joints`, `beep`), constants (`REST`, `ENTER_SERIAL2_MODE`, `RECOVER`/`ROLL_OVER`/`BALANCE`/`STAND`), and `is_safe()` (blocks calibration). No I/O. |
-| `recovery.py` | `RecoveryFSM` — the walk / catch / get-up switch. IMU roll+pitch in, a `RecoveryAction` out (`NONE` / `RECOVER` / `ROLL_THEN_RECOVER` / `SETTLE` / `GIVE_UP`). Pure logic, no serial I/O; `ACTION_COMMANDS` maps actions to `k…` strings. Fires the scripted `rc`/`rl` get-up skills once the robot is actually down; bounded retries then gives up. |
+| `recovery.py` | `RecoveryFSM` — the walk / catch / get-up switch. IMU roll+pitch in, a `RecoveryAction` out (`NONE` / `RECOVER` / `ROLL_THEN_RECOVER` / `DROP_RECOVER` / `SETTLE` / `GIVE_UP`). Pure logic, no serial I/O; `ACTION_COMMANDS` maps actions to `k…` strings. Once down, classifies the **fall pose** (`FallPose`: nose-down / tail-down / left / right side / back — `fsm.pose`) and fires the maneuver for it; on failure **escalates** `pose skill → roll+recover → dropRec → give up`. HW-gated bits (roll/pitch sign, one-sided `rc`, firmware auto-recover conflict) are `RecoveryConfig` flags with safe defaults + `HARDWARE-GATED` comments. |
 | `check_serial.py` | Diagnostics CLI. |
 
 ## Diagnostics
