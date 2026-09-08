@@ -470,6 +470,7 @@ FAC_CLIFF_FALL     = _g2e("FAC_CLIFF_FALL", 80.0)    # one-shot penalty for the 
 FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when an edge is RIGHT there (tight gate, small)
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
+FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
 # --- Anti-stall (R-NOSTALL, docs/rl-runs/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
 # commanded speed while a move command is active. Sparse: a bonus each ~0.15 m
