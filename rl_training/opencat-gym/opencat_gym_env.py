@@ -229,10 +229,11 @@ TERRAIN_FEATURE = False   # master switch. Off => obs is 278-d, run20m_ppo unaff
 TERRAIN_RANGE = 0.60      # m; nothing reported past this (a 192-px detector has short range)
 TERRAIN_FOV_DEG = 35.0    # half-angle of the forward cone scanned
 TERRAIN_TALL_Z = 0.055    # m; obstacle top above local ground >= this => tall_flag = 1
-TERRAIN_SCAN_DOWN_DEG = 4.0  # Phase E: forward rays angle down this much over their length,
-                         #   so the fan sweeps the ground ahead rather than grazing it. The
-                         #   scan height is pinned to true ground (down-raycast), NOT
-                         #   base_pos[2] -- standing taller no longer blinds the sensor.
+TERRAIN_SCAN_DOWN_DEG = 1.5  # Phase E: SMALL residual descent on top of slope-following
+                         #   (see _scan_terrain). The fan is aimed parallel to the measured
+                         #   local ground so a rising slope isn't read as an obstacle; this
+                         #   extra ~1.5 deg is just insurance against under-estimating the
+                         #   grade. Scan height is pinned to true ground, not base_pos[2].
 TERRAIN_REFRESH = 5       # recompute every N control steps (~16 Hz @ 80 Hz); held between
                          #   -> stale-between-frames, like the real ~10-30 FPS detection feed
 TERRAIN_MISS_PROB = 0.10  # per-refresh chance the detection is dropped though something is there
@@ -1789,20 +1790,35 @@ class OpenCatGymEnv(gym.Env):
         fov = np.deg2rad(TERRAIN_FOV_DEG)
         bearings = np.linspace(-fov, fov, 9)
         cx, cy = base_pos[0] + 0.05 * np.cos(yaw), base_pos[1] + 0.05 * np.sin(yaw)
-        # true ground under the scan origin (body-height-independent)
-        ground_z = base_pos[2] - 0.09                 # fallback
-        for _z0 in (base_pos[2] - 0.05, base_pos[2] - 0.12):
-            _h = p.rayTest([cx, cy, _z0], [cx, cy, _z0 - 0.6])[0]
-            if _h[0] >= 0 and _h[0] not in _self:
-                ground_z = _h[3][2]
-                break
-        _drop = np.tan(np.deg2rad(TERRAIN_SCAN_DOWN_DEG)) * TERRAIN_RANGE  # rays angle down a touch
+
+        def _ground(x, y, z_seed):
+            for _z0 in (z_seed, z_seed - 0.08, z_seed - 0.20):
+                _h = p.rayTest([x, y, _z0], [x, y, _z0 - 0.6])[0]
+                if _h[0] >= 0 and _h[0] not in _self:
+                    return _h[3][2]
+            return None
+
+        # ground under the scan origin (body-height-independent -- see docstring)
+        ground_z = _ground(cx, cy, base_pos[2] - 0.05)
+        if ground_z is None:
+            ground_z = base_pos[2] - 0.09
+        # 2026-09-08: SLOPE-FOLLOWING. A forward-cast fan reads a rising slope as
+        # an obstacle (the ground climbs into the beam). Probe the ground a short
+        # way ahead, get the fore-aft grade, and aim the whole fan PARALLEL to
+        # the local ground -- so only something protruding ABOVE the slope
+        # surface registers. Re-measured every scan (TERRAIN_REFRESH steps), so a
+        # changing grade re-tilts the beam within ~0.3 s.
+        _pd = 0.22
+        _gzf = _ground(cx + _pd * np.cos(yaw), cy + _pd * np.sin(yaw), ground_z + 0.12)
+        slope_pm = float(np.clip((_gzf - ground_z) / _pd, -0.6, 0.6)) if _gzf is not None else 0.0
+        _rise = slope_pm * TERRAIN_RANGE
+        _drop = np.tan(np.deg2rad(TERRAIN_SCAN_DOWN_DEG)) * TERRAIN_RANGE  # small residual descent, slope-noise insurance
         best = None                                    # (dist_m, bearing_rad, tall)
         for z_off, is_hi in ((0.02, False), (TERRAIN_TALL_Z, True)):
             z = ground_z + z_off
             froms = [[cx, cy, z]] * 9
             tos = [[cx + TERRAIN_RANGE * np.cos(yaw + b),
-                    cy + TERRAIN_RANGE * np.sin(yaw + b), z - _drop] for b in bearings]
+                    cy + TERRAIN_RANGE * np.sin(yaw + b), z + _rise - _drop] for b in bearings]
             for k, hit in enumerate(p.rayTestBatch(froms, tos)):
                 if hit[0] < 0 or hit[0] in ignore:
                     continue
