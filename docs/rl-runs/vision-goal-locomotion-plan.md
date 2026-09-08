@@ -273,6 +273,40 @@ parallel, then E-3/E-4. The adapter probe (`adapter-skill-probe-spec.md`) is
 **shelved** — only revisited if a scripted `STEP_OVER` proves too fragile
 open-loop, in which case that one skill becomes a learned module.
 
+### E-4 FIRST RUN (2026-09-08): promising, not yet proven
+
+Report: `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
+
+Built + committed: `SkillSwitch` (via-stance blend + phase-gated start, 13
+tests), `GaitSelector` (terrain reading → `GaitMode`, 11 tests), `_scan_terrain`
+pinned to true ground via a down-raycast (kills the D self-blinding exploit),
+inert `_abs_joint_override` env hook, and `eval_skill_switch.py` — a **no-training**
+A/B harness (frozen `run20m_ppo` + `GaitSelector`→`SkillSwitch` vs the policy
+alone). Course: 5 obstacles, mostly ≤55 mm (step-over), 15% tall (walls), 22 mm
+ledges. 24 eps, matched seeds.
+
+| run | falls | wall-stops | walked fwd | step% | halt% |
+|---|---|---|---|---|---|
+| baseline (`run20m_ppo` alone) | 0% | 0/24 | 0.116 m | — | — |
+| + switch, conservative trigger | 0% | 5/24 | 0.148 m | 1% | 18% |
+| + switch, **eager trigger** | 0% | 4/24 | **0.195 m** | 16% | 22% |
+
+- Infra works end-to-end, 0 crashes / 0 falls in 72 eps, policy never modified.
+- The switch **stops at walls** (4–5/24 `HALT`) where the blind gait plows in.
+- Conservative trigger under-fired `STEP_OVER` (1%) — stale ~16 Hz scan + 0.1 m/s
+  creep means it must commit early. `GaitSelector` defaults retuned eager
+  (`far/mid/close` 0.62/0.50/0.50, `debounce` 1) → `STEP_OVER` 16%, walked
+  distance **+68% vs blind**.
+- **Not a clean win yet:** blind never falls here either, so "clears what blind
+  can't" isn't shown; and the +68% isn't fully attributed to `STEP_OVER` vs the
+  careful/handoff dynamics. Small n, one seed offset, favourable course.
+
+**Next:** E-3 = seed sweep + per-encounter attribution + deliberate skill choice.
+**E-4c = a fall-hazard course** (drop-offs where blind = fall) + `CliffGuard`
+wired in — the test that makes the result decisive. E-4b (reward) still deferred
+(training-only). A clean hazard-course win puts a fresh vision-baked ~20M (Tier
+B) back on the table.
+
 **Longer horizon (user, 2026-09-08):** the real answer to "don't plow into
 walls" is *intentional* navigation — always moving toward a chosen destination
 along a planned path that routes around large obstacles, so the gait only ever

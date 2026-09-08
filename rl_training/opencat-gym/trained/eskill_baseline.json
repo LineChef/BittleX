@@ -1,0 +1,11 @@
+{
+  "tag": "BASELINE",
+  "episodes": 24,
+  "seed": 0,
+  "fall_rate": 0.0,
+  "fwd_mean_all": 0.11601069241163982,
+  "wall_stops": 0,
+  "fwd_mean_walked": 0.11601069241163982,
+  "n_walked": 24,
+  "mode_mix": {}
+}

@@ -38,8 +38,8 @@ def test_obstacle_off_to_the_side_ignored():
 
 def test_mid_distance_obstacle_is_careful_after_debounce():
     sel = GaitSelector(GaitSelectorConfig(into_skill_debounce=2))
-    assert sel.update(obst(0.4)) is GaitMode.CRUISE      # frame 1: pending
-    assert sel.update(obst(0.4)) is GaitMode.CAREFUL     # frame 2: confirmed
+    assert sel.update(obst(0.55)) is GaitMode.CRUISE     # frame 1: pending
+    assert sel.update(obst(0.55)) is GaitMode.CAREFUL    # frame 2: confirmed
 
 
 def test_low_close_obstacle_triggers_step_over():
@@ -77,7 +77,7 @@ def test_clear_streak_resets_on_a_reappearing_obstacle():
 
 def test_debounce_resets_if_candidate_changes():
     sel = GaitSelector(GaitSelectorConfig(into_skill_debounce=3))
-    sel.update(obst(0.4))                                # CAREFUL candidate, streak 1
+    sel.update(obst(0.55))                               # CAREFUL candidate, streak 1
     sel.update(obst(0.15))                               # STEP_OVER candidate, streak resets to 1
     assert sel.mode is GaitMode.CRUISE                   # neither confirmed yet
     sel.update(obst(0.15))                               # streak 2

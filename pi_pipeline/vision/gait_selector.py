@@ -41,12 +41,15 @@ class TerrainReading:
 
 @dataclass
 class GaitSelectorConfig:
-    far_dist: float = 0.55        # dist_norm >= this: obstacle in view but ignore it
-    mid_dist: float = 0.32        # far..mid -> CAREFUL
-    close_dist: float = 0.32      # < this -> act (STEP_OVER / HALT)
+    # dist_norm = obstacle distance / TERRAIN_RANGE (0.60 m). The detector scan is
+    # stale between refreshes and the robot creeps ~0.1 m/s, so trigger EARLY:
+    # a low obstacle needs the step-over committed well before a foot reaches it.
+    far_dist: float = 0.62        # dist_norm >= this: obstacle in view but ignore it
+    mid_dist: float = 0.50        # far..mid -> CAREFUL
+    close_dist: float = 0.50      # < this -> act (STEP_OVER for low / HALT for tall)
     ahead_bearing: float = 0.55   # |bearing_norm| within this = in our path
     min_confidence: float = 0.60  # a not-present read below this -> CAREFUL (hedge)
-    into_skill_debounce: int = 2  # consecutive frames before switching INTO STEP_OVER/CAREFUL
+    into_skill_debounce: int = 1  # consecutive frames before switching INTO STEP_OVER/CAREFUL
     clear_to_cruise: int = 3      # consecutive clear frames before returning to CRUISE
 
 

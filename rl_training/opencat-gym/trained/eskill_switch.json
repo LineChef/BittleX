@@ -1,0 +1,16 @@
+{
+  "tag": "SWITCH",
+  "episodes": 24,
+  "seed": 0,
+  "fall_rate": 0.0,
+  "fwd_mean_all": 0.12409666835255269,
+  "wall_stops": 5,
+  "fwd_mean_walked": 0.14755059766409548,
+  "n_walked": 19,
+  "mode_mix": {
+    "cruise": 3377,
+    "careful": 1509,
+    "step_over": 79,
+    "halt": 1059
+  }
+}
