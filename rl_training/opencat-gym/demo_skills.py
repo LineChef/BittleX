@@ -91,13 +91,14 @@ def _grab(env, w, h, cam="side"):
     (sky / the finite-plane void) are recoloured to a muted slate so nothing
     reads as a blown-out gap."""
     pos, orn = p.getBasePositionAndOrientation(env.robot_id)
-    R = np.array(p.getMatrixFromQuaternion(orn)).reshape(3, 3)   # robot -> world
     pos = np.array(pos)
+    ryaw = p.getEulerFromQuaternion(orn)[2]      # follow HEADING only -- not the
+    c, s = np.cos(ryaw), np.sin(ryaw)            # gait's roll/pitch (would wobble the cam)
     if cam == "chase":
-        eye_local, look_dz, fov = np.array([-0.45, -0.30, 0.32]), 0.02, 52
-    else:                                        # broadside profile w/ a touch of
-        eye_local, look_dz, fov = np.array([0.12, 0.60, 0.22]), 0.04, 46   # front-quarter -- body across the frame, all 4 legs splayed
-    eye = pos + R @ eye_local
+        ox, oy, oz, look_dz, fov = -0.45, -0.30, 0.32, 0.02, 52
+    else:                                        # straight low broadside profile
+        ox, oy, oz, look_dz, fov = 0.0, 0.68, 0.12, 0.05, 46
+    eye = pos + np.array([c * ox - s * oy, s * ox + c * oy, oz])
     target = pos + np.array([0.0, 0.0, look_dz])
     _, _, rgb, _, _ = p.getCameraImage(
         w, h,
@@ -247,7 +248,7 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
                 obs, _, term, trunc, _ = env.step(np.zeros(8, dtype=np.float32))
                 env._abs_joint_override = None
             if gif and k % stride == 0:
-                imgs.append(_decorate(_grab(env, w, h, sk.get("cam", "chase")),
+                imgs.append(_decorate(_grab(env, w, h, sk.get("cam", "side")),
                                       sk, idx, n, src.value, (k - k0) // stride))
             k += 1
             if term or trunc:
