@@ -212,6 +212,77 @@ the driver. Fixed: decathlon lines now prefixed with the feature flag.
 
 ---
 
+## Phase E — vision-triggered SCRIPTED skills (planned 2026-09-08)
+
+**User's decision after Phase D:** vision-in-the-loop *did* alter behaviour (the
+vision policy tried to high-step — but only one front arm, "feeling" for the
+ledge; a bounded residual on `wkF` can't coordinate a whole-gait step-over). So:
+**the main walk stays learned (`run20m_ppo`, untouched); the extra skills are
+SCRIPTED keyframe movements**, and vision selects which one to run. No adapter, no
+fresh base — `run20m_ppo` is never modified. Cheaper than teaching the skills;
+the open question is how well scripted (open-loop) skills actually clear
+obstacles and survive a disturbance mid-skill.
+
+**Also settled:** the obstacle `Avoider`'s slow/stop logic **moves out of the
+walking layer into `CliffGuard`** — anticipatory slowing only has a safety
+rationale at a drop-off, not for obstacles G2 never falls on. Obstacle `Avoider`
+→ `STOP`/`BACK_UP`/`TURN` only, or shelved until hardware.
+
+**Why Phase D failed (design inputs for the next test):**
+- `_scan_terrain()` casts a *horizontal* ray fan pegged to `base_pos[2] − 0.08`.
+  The policy learned to **stand ~3 cm taller so the low rays pass over short
+  obstacles** → feature reads "clear" → keep walking. It blinded its own sensor.
+- Reward made *being near an obstacle* net-negative (`r_speed` 2.4 vs 3.0 clear,
+  `r_speed_track` −2.8 vs −2.4). "Don't detect obstacles" was optimal.
+- `r_obs_clear/stop/swerve` were all inactive (config never enabled them).
+
+### Plan
+
+**E-1 — skill-switch layer.** DONE (`pi_pipeline/gait/skill_switch.py` +
+`test_skill_switch.py`, 9 green). `SkillSwitch.update(GaitMode, rl_joint_deg) ->
+(joint_deg, Source)`. Modes `CRUISE` / `CAREFUL` (RL drives, `speed_scale` 0.6) /
+`STEP_OVER` / `INSPECT` (crouch → mast pitches down) / `HALT` (preempts). Blended
+handoff: lerp RL pose → skill frame 0 over `blend_in_steps`, play the keyframe
+loop, lerp back. Pure logic + keyframe interpolator; refs are the
+`reference_gait/*_ref.npy` (rad, URDF order), converted to deg internally. Still
+to wire: a `run20m_ppo`-driver → `SkillSwitch` → `deploy_map` loop, and the
+vision→`GaitMode` selector (rule-based on the terrain feature to start).
+
+**E-2 — env fixes** (env changes, small-scale testable, gate everything):
+- Anchor the terrain scan to the **camera pose** (fixed mast height, angled
+  slightly down), not body height — kills the "stand tall to go blind" exploit.
+- Course with **real fall hazards** (drop-offs / gaps: blind = fall) so vision
+  has something to prove; tighten obstacle difficulty so "barge through" isn't
+  free.
+- Reward: detected-and-cleared ≥ never-detected; don't punish slowing while an
+  obstacle is in view; enable `r_obs_clear`.
+- Optional: replace the 4-float terrain summary with an 8–16-cell height-map
+  strip for a cleaner trigger.
+
+**E-3 — tune:** which scripted skill (`tr_ref` trot has the widest foot lift;
+`cr_ref` = inspect crouch; author a high-step if `tr` isn't enough) for which
+situation; trigger thresholds; strides per skill; blend timing.
+
+**E-4 — eval:** `run20m_ppo` alone vs `run20m_ppo` + skill-switch on the hazard
+course — clears obstacles the blind gait stumbles on / fewer falls at gaps,
+**no** open-ground regression. A clean win here is what finally justifies a
+fresh vision-baked ~20M (Tier B).
+
+**Order:** E-2's scan + reward fixes first (they're why D failed), E-1 wiring in
+parallel, then E-3/E-4. The adapter probe (`adapter-skill-probe-spec.md`) is
+**shelved** — only revisited if a scripted `STEP_OVER` proves too fragile
+open-loop, in which case that one skill becomes a learned module.
+
+**Longer horizon (user, 2026-09-08):** the real answer to "don't plow into
+walls" is *intentional* navigation — always moving toward a chosen destination
+along a planned path that routes around large obstacles, so the gait only ever
+meets small step-over-able things. That needs turning (firmware) + localisation /
+place memory (B11, hard on the Pi) and sits in the behaviour layer above E.
+Near-term = E's scripted step-over for the small stuff; goal-nav is the layer on
+top, later.
+
+---
+
 ### >>> RESUME (Phase D) <<<  *(done — kept for provenance)*
 1. `tail -40 rl_training/opencat-gym/trained/ab_vision_results.log`.
 2. Ends with `A/B COMPLETE`: read `trained/abD_eval.txt`,
