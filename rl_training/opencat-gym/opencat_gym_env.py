@@ -229,6 +229,10 @@ TERRAIN_FEATURE = False   # master switch. Off => obs is 278-d, run20m_ppo unaff
 TERRAIN_RANGE = 0.60      # m; nothing reported past this (a 192-px detector has short range)
 TERRAIN_FOV_DEG = 35.0    # half-angle of the forward cone scanned
 TERRAIN_TALL_Z = 0.055    # m; obstacle top above local ground >= this => tall_flag = 1
+TERRAIN_SCAN_DOWN_DEG = 4.0  # Phase E: forward rays angle down this much over their length,
+                         #   so the fan sweeps the ground ahead rather than grazing it. The
+                         #   scan height is pinned to true ground (down-raycast), NOT
+                         #   base_pos[2] -- standing taller no longer blinds the sensor.
 TERRAIN_REFRESH = 5       # recompute every N control steps (~16 Hz @ 80 Hz); held between
                          #   -> stale-between-frames, like the real ~10-30 FPS detection feed
 TERRAIN_MISS_PROB = 0.10  # per-refresh chance the detection is dropped though something is there
@@ -1730,7 +1734,13 @@ class OpenCatGymEnv(gym.Env):
         scene's collision geometry -> nearest obstacle in a cone ahead. Returns
         the raw (un-noised) [present, dist_norm, bearing_norm, tall_flag], each
         in [-1, 1]. Ground plane / robot / payload / head-mass are ignored.
-        pi_pipeline/vision/terrain_feature.py must mirror this output layout."""
+        pi_pipeline/vision/terrain_feature.py must mirror this output layout.
+
+        2026-09-08 (Phase E): the scan height is pinned to the TRUE local ground
+        (a downward raycast), not `base_pos[2] - offset`. Previously it tracked
+        body height, so the policy learned to stand ~3 cm taller and let the low
+        rays pass clean over short obstacles -- blinding its own sensor. That was
+        the core Phase D failure."""
         base_pos, base_orn = p.getBasePositionAndOrientation(self.robot_id)
         yaw = p.getEulerFromQuaternion(base_orn)[2]
         ignore = {0, self.robot_id}
@@ -1738,16 +1748,24 @@ class OpenCatGymEnv(gym.Env):
             ignore.add(self._payload_id)
         if getattr(self, "_head_id", None) is not None:
             ignore.add(self._head_id)
-        ground_z = base_pos[2] - 0.08                 # ~stance height below the base
+        _self = ignore - {0}                          # everything but the ground plane
         fov = np.deg2rad(TERRAIN_FOV_DEG)
         bearings = np.linspace(-fov, fov, 9)
         cx, cy = base_pos[0] + 0.05 * np.cos(yaw), base_pos[1] + 0.05 * np.sin(yaw)
+        # true ground under the scan origin (body-height-independent)
+        ground_z = base_pos[2] - 0.09                 # fallback
+        for _z0 in (base_pos[2] - 0.05, base_pos[2] - 0.12):
+            _h = p.rayTest([cx, cy, _z0], [cx, cy, _z0 - 0.6])[0]
+            if _h[0] >= 0 and _h[0] not in _self:
+                ground_z = _h[3][2]
+                break
+        _drop = np.tan(np.deg2rad(TERRAIN_SCAN_DOWN_DEG)) * TERRAIN_RANGE  # rays angle down a touch
         best = None                                    # (dist_m, bearing_rad, tall)
         for z_off, is_hi in ((0.02, False), (TERRAIN_TALL_Z, True)):
             z = ground_z + z_off
             froms = [[cx, cy, z]] * 9
             tos = [[cx + TERRAIN_RANGE * np.cos(yaw + b),
-                    cy + TERRAIN_RANGE * np.sin(yaw + b), z] for b in bearings]
+                    cy + TERRAIN_RANGE * np.sin(yaw + b), z - _drop] for b in bearings]
             for k, hit in enumerate(p.rayTestBatch(froms, tos)):
                 if hit[0] < 0 or hit[0] in ignore:
                     continue
