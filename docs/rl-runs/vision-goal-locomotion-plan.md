@@ -408,8 +408,19 @@ has no turn layer). Skills built: `STEP_OVER` (trot), `BACK_OUT` (`bk`), `HALT`,
 
 ### >>> RESUME (Phase E) <<<
 
-State: all committed + pushed on `development` through `4f17f93`. Report:
-`claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`. Nothing running.
+State: all committed + pushed on `development`. Report:
+`claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
+
+**Running (launched 2026-09-08, ~30–45 min):** `smoke_vfix` — a 3M from-scratch
+vision-conditioned smoke with **the E-2 fixes active**: scan pinned to true
+ground (code), `OBSTACLE_REWARD=1` (turns on `r_obs_clear`, which read 0.0 in
+Phase D), `FAC_SPEED_TRACK=25` (down from 60), `FAC_OBS_STOP=0`. **Question:**
+with the sensor exploit gone and the reward no longer fighting a slowdown, does
+the vision policy adapt its footfalls to obstacles, or still plow like Phase D?
+When done: `g2watch smoke_vfix`; read `trained/smoke_vfix.log` reward curve +
+`tail trained/tensorboard_logs/PPO_116`. Adapts → learned path revived, full run
+worth it. Plows → scripted-skills approach confirmed as *the* path. Config is in
+the git log for commit `11668cf`'s neighbourhood / this file.
 
 Next, in order:
 1. **E-5 — INSPECT.** Env change first: a near blind zone in `_scan_terrain`
