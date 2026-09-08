@@ -52,14 +52,13 @@ SKILLS = [
          desc="the learned run20m_ppo walk at top speed (0.15 m/s)"),
     dict(mode=GaitMode.CAREFUL,  ticks=80,  name="CAREFUL",  col=(38, 176, 168),
          desc="obstacle mid-distance -- same walk, speed x0.6 (0.09 m/s)"),
-    dict(mode=GaitMode.STEP_OVER, ticks=140, name="STEP OVER", col=(83, 176, 74),
-         play_scale=3.0,
+    dict(mode=GaitMode.STEP_OVER, ticks=160, name="STEP OVER", col=(83, 176, 74),
+         cycles=5.0,
          desc="low obstacle -- scripted TROT keyframe (this is what's wired), blended in and out"),
-    dict(mode=GaitMode.STEP_OVER, ticks=140, name="HIGH-STEP", col=(120, 196, 96),
-         ref="highstep_ref.npy", play_scale=3.0,
+    dict(mode=GaitMode.STEP_OVER, ticks=160, name="HIGH-STEP", col=(120, 196, 96),
+         ref="highstep_ref.npy", cycles=5.0,
          desc="the authored higher-lift keyframe -- more foot clearance, but it LOST the A/B to trot"),
     dict(mode=GaitMode.INSPECT,  ticks=110, name="INSPECT",  col=(140, 104, 214),
-         blend_scale=3.0,
          desc="close & can't classify -- crouch, camera mast pitches down"),
     dict(mode=GaitMode.BRACE,    ticks=90,  name="BRACE",    col=(226, 146, 44),
          desc="impact imminent -- planted crouch, knees flexed, take the bump"),
@@ -83,24 +82,31 @@ FRAME_MS = 95           # uniform per-frame GIF duration
 
 
 # --------------------------------------------------------------------- render
+_SKY = np.array([120, 131, 148], np.uint8)     # replaces the renderer's blown-out white
+
+
 def _grab(env, w, h, cam="side"):
-    """`side` (default): a low near-profile angle so foot lift / body pitch / bob
-    read. `chase`: pitched well down so flat ground fills the frame. Both grab
-    tall and crop the sky band off the top."""
-    pos = p.getBasePositionAndOrientation(env.robot_id)[0]
-    gh = h + 150
+    """`side` (default): a low lateral profile so foot lift / body pitch / bob
+    read. `chase`: steep top-down, flat ground fills the frame. Near-white pixels
+    (sky / the finite-plane void) are recoloured to a muted slate so nothing
+    reads as a blown-out gap."""
+    pos, orn = p.getBasePositionAndOrientation(env.robot_id)
+    R = np.array(p.getMatrixFromQuaternion(orn)).reshape(3, 3)   # robot -> world
+    pos = np.array(pos)
     if cam == "chase":
-        yaw, pitch, dist, tz, crop = 52, -52, 0.70, 0.05, 150
-    else:
-        yaw, pitch, dist, tz, crop = 78, -20, 0.60, 0.09, 118
+        eye_local, look_dz, fov = np.array([-0.45, -0.30, 0.32]), 0.02, 52
+    else:                                        # true lateral profile, low angle
+        eye_local, look_dz, fov = np.array([0.02, -0.62, 0.10]), 0.03, 44
+    eye = pos + R @ eye_local
+    target = pos + np.array([0.0, 0.0, look_dz])
     _, _, rgb, _, _ = p.getCameraImage(
-        w, gh,
-        viewMatrix=p.computeViewMatrixFromYawPitchRoll(
-            cameraTargetPosition=[pos[0], pos[1], tz], distance=dist,
-            yaw=yaw, pitch=pitch, roll=0, upAxisIndex=2),
-        projectionMatrix=p.computeProjectionMatrixFOV(52, w / gh, 0.1, 6),
+        w, h,
+        viewMatrix=p.computeViewMatrix(eye.tolist(), target.tolist(), [0, 0, 1]),
+        projectionMatrix=p.computeProjectionMatrixFOV(fov, w / h, 0.1, 6),
         renderer=p.ER_TINY_RENDERER)
-    return np.reshape(rgb, (gh, w, 4))[crop:crop + h, :, :3].astype(np.uint8)
+    img = np.reshape(rgb, (h, w, 4))[:, :, :3].astype(np.uint8)
+    img[(img > 243).all(axis=2)] = _SKY      # kill blown-out sky / plane-edge void
+    return img
 
 
 _FONT_CACHE = {}
@@ -259,14 +265,10 @@ def run(render=False, gif=None, stride=4, w=470, h=310, model_path="trained/run2
     for idx, sk in enumerate(SKILLS):
         sw = _get_switch(sk.get("ref"))
         sw.reset()
-        # per-skill slow-mo: `play_scale` stretches the keyframe playback,
-        # `blend_scale` slows the ease in/out -- so a quick scripted motion is
-        # watchable. Base values match eval_skill_switch.make_switch().
-        ps = sk.get("play_scale", 1.0)
-        bs = sk.get("blend_scale", 1.0)
-        sw._cfg.play_ticks_per_cycle = int(48 * ps)
-        sw._cfg.blend_in_steps = int(6 * bs)
-        sw._cfg.blend_out_steps = int(6 * bs)
+        # everything plays at normal speed. `cycles` just makes a one-shot
+        # keyframe skill LOOP more times in a single continuous play (longer on
+        # screen, no stutter) before it hands back. Base = 1.0 (one loop).
+        sw._cfg.step_over_cycles = sk.get("cycles", 1.0)
         # recenter over the origin so every skill plays in the same spot on floor.
         # This is the ONLY teleport, and it lands on a non-captured frame (behind
         # the title card) so it's never visible.
