@@ -110,3 +110,32 @@ def test_back_out_has_a_cooldown():
 def test_stall_does_not_override_a_wall_halt():
     sel = GaitSelector()
     assert sel.update(obst(0.15, tall=True), stalled=True) is GaitMode.HALT
+
+
+def _unres(dist, bearing=0.0):
+    return TerrainReading(present=True, dist_norm=dist, bearing_norm=bearing,
+                          tall=False, unresolved=True)
+
+
+def test_unresolved_close_obstacle_triggers_inspect_hold():
+    sel = GaitSelector(GaitSelectorConfig(inspect_hold_ticks=5))
+    assert sel.update(_unres(0.15)) is GaitMode.INSPECT          # commit
+    for _ in range(4):                                           # holds the crouch
+        assert sel.update(_unres(0.15)) is GaitMode.INSPECT
+    # hold elapsed -> now the (say, resolved) reading decides
+    m = sel.update(obst(0.15, tall=False))
+    assert m is GaitMode.STEP_OVER
+
+
+def test_inspect_has_a_cooldown():
+    sel = GaitSelector(GaitSelectorConfig(inspect_hold_ticks=1, inspect_cooldown=4))
+    sel.update(_unres(0.15))                                     # inspect
+    sel.update(obst(0.15))                                       # hold elapses, cd set
+    for _ in range(4):
+        assert sel.update(_unres(0.15)) is not GaitMode.INSPECT  # cooling down
+    assert sel.update(_unres(0.15)) is GaitMode.INSPECT          # cd elapsed
+
+
+def test_inspect_ignores_a_side_unresolved_read():
+    sel = GaitSelector()
+    assert sel.update(_unres(0.15, bearing=0.9)) is GaitMode.CRUISE  # not in our path

@@ -31,12 +31,15 @@ log = logging.getLogger("g2.vision.gaitselect")
 @dataclass
 class TerrainReading:
     """One forward scan. Mirrors sim `_scan_terrain`:
-    [present, dist_norm 0..1, bearing_norm -1..1, tall]."""
+    [present, dist_norm 0..1, bearing_norm -1..1, tall]. `unresolved` = something
+    is close but inside the near blind zone and can't be classified (sim
+    `tall_flag == -1`; on hardware, a box too close/large to read a height from)."""
     present: bool
     dist_norm: float = 1.0
     bearing_norm: float = 0.0
     tall: bool = False
     confidence: float = 1.0
+    unresolved: bool = False
 
 
 @dataclass
@@ -53,6 +56,9 @@ class GaitSelectorConfig:
     clear_to_cruise: int = 3      # consecutive clear frames before returning to CRUISE
     backout_on_stall: bool = True    # stalled against something -> BACK_OUT to re-approach
     backout_cooldown: int = 40       # ticks after a BACK_OUT before it can fire again
+    inspect_on_unresolved: bool = True  # close + can't classify -> INSPECT (peer down) first
+    inspect_hold_ticks: int = 16     # hold the crouch this long (look-down resolves the scan)
+    inspect_cooldown: int = 60       # ticks after an INSPECT before it can fire again
 
 
 class GaitSelector:
@@ -63,6 +69,8 @@ class GaitSelector:
         self._want_streak = 0
         self._clear_streak = 0
         self._backout_cd = 0             # cooldown ticks left after a BACK_OUT
+        self._inspect_hold = 0          # ticks left holding an INSPECT crouch
+        self._inspect_cd = 0           # cooldown ticks left after an INSPECT
         self._last_reason = ""
 
     @property
@@ -81,7 +89,31 @@ class GaitSelector:
         cooling = self._backout_cd > 0
         if cooling:
             self._backout_cd -= 1
+        insp_cooling = self._inspect_cd > 0
+        if insp_cooling:
+            self._inspect_cd -= 1
+
+        # holding an INSPECT crouch -- keep looking down until the timer elapses,
+        # then re-decide on the now-resolved scan.
+        if self._inspect_hold > 0:
+            self._inspect_hold -= 1
+            if self._inspect_hold == 0:
+                self._inspect_cd = c.inspect_cooldown
+                self._say("inspect done -- re-deciding")
+            else:
+                self._say(f"inspecting ({self._inspect_hold} left)")
+                return self._mode           # already GaitMode.INSPECT
         raw = self._raw_mode(r)
+
+        # close obstacle inside the near blind zone (can't tell tall from low)
+        # -> INSPECT: crouch, pitch the mast down, get a real look.
+        if (c.inspect_on_unresolved and r.present and r.unresolved
+                and not insp_cooling and self._inspect_hold == 0
+                and abs(r.bearing_norm) <= c.ahead_bearing):
+            self._inspect_hold = c.inspect_hold_ticks
+            self._commit(GaitMode.INSPECT, "close + unresolved -- inspect")
+            self._want, self._want_streak, self._clear_streak = GaitMode.INSPECT, 0, 0
+            return self._mode
 
         # stalled against something (no forward progress despite a move command)
         # -> BACK_OUT to re-approach, unless just backed out. Beats everything but

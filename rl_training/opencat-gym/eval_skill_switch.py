@@ -45,9 +45,10 @@ def _argv_val(flag, default):
     return default
 
 
-# --cliff-prob has to reach the env module BEFORE it's imported (it reads _g2e
-# at import). Peek argv here; argparse registers it too for --help / validation.
+# these have to reach the env module BEFORE it's imported (it reads _g2e at
+# import). Peek argv here; argparse registers them too for --help / validation.
 os.environ.setdefault("G2E_CLIFF_PROB", _argv_val("--cliff-prob", "0.0"))
+os.environ.setdefault("G2E_TERRAIN_BLIND_NEAR", _argv_val("--blind-near", "0.0"))
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
@@ -101,7 +102,9 @@ def rl_joint_deg(env, action):
 def terrain_reading(env):
     raw = env._scan_terrain()                   # [present, dist_norm, bearing_norm, tall]
     return TerrainReading(present=raw[0] > 0.5, dist_norm=float(raw[1]),
-                          bearing_norm=float(raw[2]), tall=raw[3] > 0.5)
+                          bearing_norm=float(raw[2]),
+                          tall=raw[3] > 0.5,
+                          unresolved=raw[3] < -0.5)   # -1 sentinel: close, can't classify
 
 
 _EDGE_RANGE = 0.35        # m look-ahead for the "is there floor?" probes
@@ -171,6 +174,11 @@ def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=Non
     for k in range(max_steps):
         if fwd_cmd is not None:
             env._cmd_fwd = base_cmd                  # hold a fixed march command (E-4c)
+        # INSPECT crouch pitches the mast down -> the scan sees into the near
+        # blind zone. Set the env flag from the switch's active skill BEFORE the
+        # scan this tick.
+        env._look_down = (switch is not None
+                          and switch.active_skill is GaitMode.INSPECT)
         action, _ = model.predict(obs, deterministic=True)
         mode, src = GaitMode.CRUISE, Source.RL
         rd = terrain_reading(env) if switch is not None else None
@@ -257,6 +265,9 @@ def main():
     ap.add_argument("--max-steps", type=int, default=260)
     ap.add_argument("--step-over-ref", default="tr_ref.npy",
                     help="keyframe ref for STEP_OVER (highstep_ref.npy | tr_ref.npy)")
+    ap.add_argument("--blind-near", default="0.0",
+                    help="near blind-zone radius (m); an obstacle inside it can't be "
+                         "classified until INSPECT crouches. 0 = off.")
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
     ap.add_argument("--gif-stride", type=int, default=3)

@@ -229,6 +229,11 @@ TERRAIN_FEATURE = False   # master switch. Off => obs is 278-d, run20m_ppo unaff
 TERRAIN_RANGE = 0.60      # m; nothing reported past this (a 192-px detector has short range)
 TERRAIN_FOV_DEG = 35.0    # half-angle of the forward cone scanned
 TERRAIN_TALL_Z = 0.055    # m; obstacle top above local ground >= this => tall_flag = 1
+TERRAIN_BLIND_NEAR = 0.0  # Phase E-5: > 0 models the real camera's NEAR blind zone.
+                         #   An obstacle whose hit is closer than this can't be classified
+                         #   (tall_flag = -1 sentinel, "close but unresolved") UNLESS
+                         #   self._look_down is set (the INSPECT crouch). 0 = no blind
+                         #   zone -> byte-identical for every run that doesn't set it.
 TERRAIN_REFRESH = 5       # recompute every N control steps (~16 Hz @ 80 Hz); held between
                          #   -> stale-between-frames, like the real ~10-30 FPS detection feed
 TERRAIN_MISS_PROB = 0.10  # per-refresh chance the detection is dropped though something is there
@@ -421,6 +426,7 @@ if _SKILL_REF:
     STAND_POSE = WKF_REF.mean(axis=0)
 
 TERRAIN_FEATURE      = _g2e("TERRAIN_FEATURE", bool(TERRAIN_FEATURE))
+TERRAIN_BLIND_NEAR   = _g2e("TERRAIN_BLIND_NEAR", TERRAIN_BLIND_NEAR)
 RANDOM_TERRAIN       = _g2e("RANDOM_TERRAIN", RANDOM_TERRAIN)
 RANDOM_TERRAIN_PROB  = _g2e("RANDOM_TERRAIN_PROB", RANDOM_TERRAIN_PROB)
 RANDOM_TERRAIN_MAX_H = _g2e("RANDOM_TERRAIN_MAX_H", RANDOM_TERRAIN_MAX_H)
@@ -1838,10 +1844,15 @@ class OpenCatGymEnv(gym.Env):
         if best is None:
             return np.zeros(4)
         d, b, tall = best
+        # near blind zone: too close to classify unless the robot is looking down
+        # (the INSPECT crouch pitches the mast down and halves the blind range).
+        _blind = TERRAIN_BLIND_NEAR * (0.4 if getattr(self, "_look_down", False) else 1.0)
+        tall_out = (-1.0 if (_blind > 0 and d < _blind and not getattr(self, "_look_down", False))
+                    else (1.0 if tall else 0.0))
         return np.array([1.0,
                          float(np.clip(d / TERRAIN_RANGE, 0.0, 1.0)),
                          float(np.clip(b / fov, -1.0, 1.0)),
-                         1.0 if tall else 0.0])
+                         tall_out])
 
     def _terrain_obs(self):
         """Refresh-gated + noised forward terrain feature for the observation.
