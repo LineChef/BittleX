@@ -46,20 +46,27 @@ BOUND = np.deg2rad(110.0)
 RES_DEG = 24.0                                        # RESIDUAL scale on top of the scripted base
                                                      # (small -- the base does most of it, policy nudges)
 
-# --- scripted base: the working part of climb_test.py -- front feet tuck up ->
-# reach forward -> plant on the ledge, body pulls forward staying LEVEL. The
-# policy learns a residual on top; its job is the hard part the script can't do
-# (bring the rear legs up without tipping -- needs IMU feedback). Deltas in DEG
-# from STANCE, URDF order [FLsh FLkn FRsh FRkn  BRhip BRkn BLhip BLkn].
+# --- scripted base: "rear up like a horse, then push". The policy learns a small
+# residual on top (RES_DEG); its job is to keep balance + finish the rear plant
+# with the IMU in the loop. Deltas in DEG from STANCE, URDF order
+# [FLsh FLkn FRsh FRkn  BRhip BRkn BLhip BLkn].
+#   1 REAR-UP    front feet fold up + reach high; rear legs extend -> the front
+#               unloads and the body rocks BACK, NOSE-UP, onto the rear support
+#               (nose-up is stable -- the faceplant only ever came from nose-down)
+#   2 FRONT PLANT front feet reach fwd + down onto the ledge top
+#   3 REAR PUSH  rear hips + knees extend HARD, front feet anchored on the ledge
+#               as the pivot -> drives the body fwd + up onto the surface
+#   4 REAR STEP  rear hips flex, rear feet lift fwd off the ground
+#   5 SETTLE     rear feet plant on the ledge, ease toward stance
 _BASE_POSES = np.array([
-    [0,   0,   0,   0,   0,   0,   0,   0],   # stance
-    [38, -32,  38, -32,   0,   0,   0,   0],  # front tuck UP
-    [-12, 34, -12,  34,   0,   0,   0,   0],  # front reach fwd + plant on the top
-    [16,  28,  16,  28,   4,   6,   4,   6],  # body pull, front planted
-    [16,  28,  16,  28,  24, -18,  24, -18],  # REAR tuck up (front holds on the ledge)
-    [10,  20,  10,  20,  -8,  22,  -8,  22],  # REAR reach fwd + plant on the ledge, settle
+    [0,    0,    0,    0,    0,    0,    0,    0],   # 0 stance
+    [32, -42,   32,  -42,    0,   12,    0,   12],   # 1 REAR-UP (nose-up, front reaches high)
+    [-14, 32,  -14,   32,    0,   12,    0,   12],   # 2 FRONT PLANT on the ledge top
+    [-10, 22,  -10,   22,   22,   30,   22,   30],   # 3 REAR PUSH (hips+knees extend, front anchored)
+    [10,  20,   10,   20,   30,  -18,   30,  -18],   # 4 REAR STEP (hips flex, rear feet come fwd/up)
+    [8,   16,    8,   16,   -6,   22,   -6,   22],   # 5 SETTLE (rear feet plant, ease to stance)
 ], dtype=float)
-_BASE_SEGS = [14, 20, 24, 18, 24]                     # env-steps per leg of the base motion
+_BASE_SEGS = [22, 20, 24, 18, 24]                     # env-steps per leg of the base motion
 
 
 def _build_base():
