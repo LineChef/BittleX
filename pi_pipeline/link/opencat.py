@@ -53,6 +53,15 @@ DROP_RECOVER = "kdropRec"       # last-ditch scripted flail-to-upright (firmware
 BALANCE = "kbalance"            # settle into a balanced stand (used after a get-up)
 STAND = "kup"                   # neutral standing posture
 
+# --- locomotion skills ----------------------------------------------------
+# `wkR` is the firmware's L/R mirror of `wkL` -- the skill parser accepts an
+# `R` suffix and mirrors. At near-zero forward these become a shuffling pivot
+# (turn-ish). `kang <deg>` (IMU closed-loop) is the cleaner turn-in-place but
+# needs on-hardware tuning -- see cliff_guard.py.
+WALK_LEFT = "kwkL"              # curved walk left / near-zero-fwd pivot left
+WALK_RIGHT = "kwkR"            # mirror of wkL
+WALK_BACKWARD = "kbkF"          # walk backward
+
 _BLOCKED_PREFIXES = ("c", "cd")  # calibration / factory -- never from the pipeline
 
 

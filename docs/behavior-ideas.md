@@ -340,6 +340,15 @@ gait, as a hard reflex that decides whether to command forward motion at all —
 same reasoning as why folding ledges into walk-policy training (Phase 4a)
 just made it timid.
 
+**Decision logic BUILT 2026-09-07** (`pi_pipeline/vision/cliff_guard.py`,
+`CliffGuard` + tests): `EdgeReading` in → `CliffAction` out
+(`NONE`/`SLOW`/`STOP`/`TURN_AWAY_LEFT`/`TURN_AWAY_RIGHT`/`BACK_UP`/`FREEZE`),
+zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing,
+pivot-too-close / boxed-in / floor-lost → `FREEZE`. The detector (`MockEdgeFeed`
+stub) and every `HARDWARE-GATED` config value (turn token, `pivot_safe_dist`,
+`rear_sensing`, …) still need the mounted camera + real-desk tuning. The rest of
+this entry stands.
+
 **Design — a new local reflex, stricter than `Avoider`:**
 - **Zero debounce.** `Avoider` waits a couple of consecutive frames before
   reacting (avoids flinching at noise). One confident "not floor" reading here

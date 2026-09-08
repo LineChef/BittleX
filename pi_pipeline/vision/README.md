@@ -19,6 +19,7 @@ a mock, so it's all testable now.
 |---|---|
 | `feed.py` | `Detection` + `DetectionFeed`: `MockDetectionFeed` (scripted frames, `approaching()` scenario builder) / `SerialDetectionFeed` (parses camera serial messages). |
 | `avoidance.py` | `Avoider.decide(frame) -> AvoidanceAction` (`NONE`/`STOP`/`BACK_UP`/`TURN_LEFT`/`TURN_RIGHT`). Debounced; urgent hazards preempt the cooldown. `ACTION_SKILL` maps actions to robot skills. |
+| `cliff_guard.py` | `CliffGuard.update(EdgeReading) -> CliffAction` (`NONE`/`SLOW`/`STOP`/`TURN_AWAY_*`/`BACK_UP`/`FREEZE`) — the "don't walk off the desk" reflex (behaviour-ideas B16). Zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing, pivot-too-close or boxed-in → `FREEZE` (call a human). **Decision logic only** — the floor-vs-edge detector is stubbed (`MockEdgeFeed`) and every `CliffGuardConfig` value marked `HARDWARE-GATED` needs tuning on the real mounted camera. |
 | `scene.py` | `summarize(frame)` (deterministic text) and `narrate(frame, ask)` (spoken-style, LLM-injected). |
 | `__main__.py` | demo CLI. |
 
