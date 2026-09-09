@@ -32,9 +32,11 @@ NEG_DIRS = ("_negatives", "negatives")
 
 
 def _quality(path: str) -> float:
-    """Cheap 0..1-ish quality score: mid-tone brightness + contrast + sharpness.
-    Same idea as curate_captures._quality, recomputed here so `--limit` can pick
-    the BEST N (not just every k-th). Falls back to 0 if PIL/numpy missing."""
+    """0..1-ish score: exposure + sharpness + **subject prominence** (detail
+    concentrated centrally = the subject fills / is centred in the frame, vs a
+    small subject lost in a mostly-flat floor/wall). Used by `--limit` to pick
+    the BEST N -- the frames where you can see the subject best. 0 if PIL/numpy
+    missing."""
     try:
         import numpy as np
         from PIL import Image, ImageStat
@@ -45,10 +47,19 @@ def _quality(path: str) -> float:
         lap = (g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]
                - 4.0 * g[1:-1, 1:-1])
         sharp = float(lap.var())
+        # subject prominence: edge energy in the centre 50% vs a border ring
+        h, w = lap.shape
+        cy0, cy1, cx0, cx1 = h // 4, 3 * h // 4, w // 4, 3 * w // 4
+        centre = float((lap[cy0:cy1, cx0:cx1] ** 2).mean())
+        border = lap.copy(); border[cy0:cy1, cx0:cx1] = 0.0
+        border_m = float((border ** 2).sum() / max(1, border.size - (cy1 - cy0) * (cx1 - cx0)))
+        prom = centre / (centre + border_m + 1e-6)      # 0.5 = flat, ->1 = subject centred
+
         s_bright = 1.0 - min(1.0, abs(bright - 110.0) / 110.0)
         s_contrast = min(1.0, contrast / 45.0)
         s_sharp = min(1.0, sharp / 60.0)
-        return 0.45 * s_sharp + 0.30 * s_bright + 0.25 * s_contrast
+        s_prom = min(1.0, max(0.0, (prom - 0.45) / 0.35))   # 0.45->0, 0.80->1
+        return 0.30 * s_sharp + 0.20 * s_bright + 0.15 * s_contrast + 0.35 * s_prom
     except Exception:
         return 0.0
 
@@ -143,6 +154,11 @@ def main() -> None:
                     help="write ONLY the .jpg files (no .txt / classes.txt / data.yaml) "
                          "-- for the SenseCraft browser + auto-label flow where the "
                          "label files just clutter the picker")
+    ap.add_argument("--box-fallback", action="store_true",
+                    help="for a positive with no .txt, write a generous centre box "
+                         "(single-subject sessions -- e.g. pets curated with "
+                         "--all-positives). Imports pre-drawn; loose but fine for a "
+                         "first / throwaway model.")
     a = ap.parse_args()
 
     root = os.path.expanduser(a.root)
@@ -183,6 +199,9 @@ def main() -> None:
                 pass
             elif txt:
                 _relabel(txt, os.path.join(out, base + ".txt"), cid, relabel)
+            elif a.box_fallback:
+                with open(os.path.join(out, base + ".txt"), "w") as f:
+                    f.write(f"{cid} 0.500000 0.520000 0.860000 0.860000\n")
             else:
                 missing += 1
             cpos += 1
