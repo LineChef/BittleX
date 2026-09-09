@@ -187,6 +187,7 @@ Multi-class capture library: `docs/research/capture-progress.md`. Point capture 
 |---|---|
 | `g2vision [labels]` | run the detection pipeline over serial, print live detections. e.g. `g2vision person,alex` |
 | `g2vision-demo` | mock detection feed, no hardware |
+| `g2visioneval [label] [secs]` | timed measurement — detection rate / confidence / p10 floor / flicker + VERDICT (for the dataset-size threshold test). 3rd arg `empty` + clear scene → false-fire check |
 
 **Voice / conversation**
 
