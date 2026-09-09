@@ -263,9 +263,9 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     if c.all_negatives:
         pos, neg = [], survivors               # whole session is background (empty rooms)
     elif c.all_positives:
-        pos, neg = survivors, []               # every frame IS the class (pet sessions,
-                                               #   or wrong/no detection model loaded) --
-                                               #   ignore any stray box; label at upload
+        for f in survivors:
+            f.box = None                       # boxes are from the wrong/no model --
+        pos, neg = survivors, []               #   drop them; box at upload instead
     elif have_boxes:
         pos = [f for f in survivors if f.has_face
                and (f.box[2] * f.box[3]) / (f.frame_px ** 2) >= c.min_box_frac]
