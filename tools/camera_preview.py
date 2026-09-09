@@ -67,13 +67,43 @@ def _hamming(a, b):
     return bin(a ^ b).count("1")
 
 
+IDLE_EXIT_S = float(os.environ.get("G2_CAM_IDLE_EXIT", "10"))  # no browser poll this long -> quit
+
 state = {
     "jpg": b"", "capturing": False, "saved": 0, "skipped": 0,
     "every": 4,          # save 1 of every N frames while capturing (~15 fps -> ~4/s)
     "_seen": 0, "fps": 0.0, "label": LABEL,
     "_last_hash": None, "_last_save_t": 0.0,
+    "_serial": None, "_last_poll": time.time(),
     "ndet": 0, "last_score": 0, "hit_frames": 0, "tot_frames": 0,
 }
+
+
+def _shutdown(why=""):
+    """Stop the module's inference loop, release the port, exit. Safe to call
+    from any thread / more than once."""
+    s = state.get("_serial")
+    if s is not None:
+        state["_serial"] = None
+        try:
+            s.write(b"AT+BREAK\r\n"); s.flush(); time.sleep(0.1)
+        except Exception:
+            pass
+        try:
+            s.close()
+        except Exception:
+            pass
+    if why:
+        print(f"camera_preview: {why} -- stopped inference, released the port", flush=True)
+    os._exit(0)
+
+
+def _idle_watchdog():
+    """Quit if the browser stopped polling (tab closed / navigated away)."""
+    while True:
+        time.sleep(2)
+        if time.time() - state["_last_poll"] > IDLE_EXIT_S:
+            _shutdown(f"no browser for {IDLE_EXIT_S:.0f}s")
 
 
 def _open():
@@ -127,7 +157,10 @@ def info_and_exit():
 
 def serial_loop():
     s = _open()
+    state["_serial"] = s
     _apply_camera_settings(s)
+    s.write(b"AT+BREAK\r\n"); time.sleep(0.2)  # clear any prior stuck INVOKE loop
+    s.reset_input_buffer()
     s.write(b"AT+INVOKE=-1,0,0\r\n")          # loop inference, results WITH jpeg
     buf, tprev = b"", time.time()
     while True:
@@ -235,6 +268,8 @@ lighting between short bursts.</p>
         (j.skipped?'  ('+j.skipped+' skipped, static)':''):'')}
  setInterval(()=>{document.getElementById('v').src='/frame.jpg?t='+Date.now()},90);
  setInterval(()=>fetch('/status').then(u),700);
+ // tab close / navigate away -> tell the server to stop + release the camera
+ addEventListener('pagehide',()=>{try{fetch('/quit',{keepalive:true})}catch(e){}});
 </script>
 """
 
@@ -268,7 +303,16 @@ class H(BaseHTTPRequestHandler):
             state["capturing"] = (p == "/start")
             self._json()
         elif p == "/status":
+            state["_last_poll"] = time.time()
             self._json()
+        elif p == "/quit":
+            self.send_response(200); self.end_headers()
+            try:
+                self.wfile.write(b"bye")
+            except Exception:
+                pass
+            threading.Thread(target=lambda: _shutdown("browser closed"),
+                             daemon=True).start()
         else:
             self.send_response(404); self.end_headers()
 
@@ -283,9 +327,16 @@ def main():
               "SenseCraft/Chrome tab that owns the port.")
         return
     threading.Thread(target=serial_loop, daemon=True).start()
+    threading.Thread(target=_idle_watchdog, daemon=True).start()
     print(f"preview -> http://localhost:{HTTP_PORT}   saving to {OUT}   "
           f"(prefix {LABEL}_*, sensor opt {CAM_RES}, AE +{hex(AE_BUMP)})")
-    ThreadingHTTPServer(("127.0.0.1", HTTP_PORT), H).serve_forever()
+    print(f"  closes itself when the browser tab closes (or {IDLE_EXIT_S:.0f}s idle), "
+          f"releasing the camera.")
+    srv = ThreadingHTTPServer(("127.0.0.1", HTTP_PORT), H)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        _shutdown("interrupted")
 
 
 if __name__ == "__main__":
