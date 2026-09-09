@@ -106,6 +106,7 @@ class Config:
                                      #   true repeats go, not distinct poses
     dedup: bool = True
     all_negatives: bool = False   # every frame -> background (empty-room sweeps)
+    all_positives: bool = False   # every frame -> the class (pet sessions / no det model)
     class_id: int = 0
     target_count: int = 100          # per-class goal the running tally reports against
     target_brightness: float = 110.0   # ideal mid-tone for scoring
@@ -261,6 +262,10 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     survivors = [f for f in frames if not f.reject]
     if c.all_negatives:
         pos, neg = [], survivors               # whole session is background (empty rooms)
+    elif c.all_positives:
+        pos, neg = survivors, []               # every frame IS the class (pet sessions,
+                                               #   or wrong/no detection model loaded) --
+                                               #   ignore any stray box; label at upload
     elif have_boxes:
         pos = [f for f in survivors if f.has_face
                and (f.box[2] * f.box[3]) / (f.frame_px ** 2) >= c.min_box_frac]
@@ -474,6 +479,10 @@ def main() -> None:
                     help="keep every frame (skip both near-duplicate passes)")
     ap.add_argument("--all-negatives", action="store_true",
                     help="treat the whole session as background/negatives (empty-room sweeps) -- no positives, ignore any stray detection box")
+    ap.add_argument("--all-positives", action="store_true",
+                    help="treat EVERY frame as the class -- pet sessions, or when the "
+                         "wrong/no detection model was loaded so pre-label boxes are junk. "
+                         "Ignores boxes; box at upload (SenseCraft auto-label / Roboflow).")
     ap.add_argument("--class-id", type=int, default=0)
     ap.add_argument("--target", type=int, default=100,
                     help="per-class positive goal the running tally reports against "
@@ -496,7 +505,7 @@ def main() -> None:
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,
                min_box_frac=a.min_box_frac, hash_thresh=a.hash_thresh,
                dup_thresh=a.dup_thresh, dedup=not a.no_dedup,
-               all_negatives=a.all_negatives,
+               all_negatives=a.all_negatives, all_positives=a.all_positives,
                class_id=a.class_id, target_count=a.target,
                label_region=a.label_region, face_crops=a.face_crops)
     curate(a.in_dir, a.out_dir, c)
