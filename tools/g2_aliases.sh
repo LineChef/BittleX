@@ -19,7 +19,9 @@ if [ -z "$G2_ROOT" ] || [ ! -d "$G2_ROOT/pi_pipeline" ]; then
   export G2_ROOT="$(cd "$(dirname "$_g2_self")/.." && pwd)"
   unset _g2_self
 fi
-export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/g2_face_capture}"
+# Raw capture root. Default is the multi-class library's raw folder; the old
+# single-class face flow needs `export G2_CAP_ROOT=~/Desktop/g2_face_capture`.
+export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/g2_capture_raw}"
 _G2_PY="$G2_ROOT/pi_pipeline/.venv/bin/python"            # companion-pipeline venv
 
 # run a python module/script from the repo, pipeline venv, WITHOUT moving the caller
@@ -128,11 +130,12 @@ g2libcombine() {
   [ -n "$cl" ] || { echo "set G2_VISION_CLASSES=\"...\" (id order) or pass it as an arg"; return 1; }
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cl"
 }
-# g2libsubset <N> [class]  -- capped single-class upload set for the threshold test
+# g2libsubset <N> <class>  -- capped single-class upload set for the threshold test
+#   (negatives auto-capped at ~N/4 so the ratio stays sane)
 g2libsubset() {
   local n="${1:?usage: g2libsubset <N> <class>}" cls="${2:?need a class name}"
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cls" \
-    --limit "$n" --out "$G2_LIB_ROOT/upload_$n"
+    --limit "$n" --neg-limit "$(( n / 4 ))" --out "$G2_LIB_ROOT/upload_$n"
 }
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
 

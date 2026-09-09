@@ -89,6 +89,9 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0,
                     help="cap positives PER CLASS at N, evenly spread across the "
                          "set (for the dataset-size threshold experiment)")
+    ap.add_argument("--neg-limit", type=int, default=0,
+                    help="cap negatives at N, evenly spread (keep the neg:pos ratio "
+                         "sane -- ~10-25%% of the positive count)")
     a = ap.parse_args()
 
     root = os.path.expanduser(a.root)
@@ -135,10 +138,15 @@ def main() -> None:
         print(f"  [{cid}] {cls:10} {cpos:4d} images{note}")
         grand_pos += cpos
 
-    for jpg in _negatives(root):
+    negs = list(_negatives(root))
+    if a.neg_limit and len(negs) > a.neg_limit:
+        idx = [round(i * (len(negs) - 1) / (a.neg_limit - 1)) for i in range(a.neg_limit)]
+        negs = [negs[i] for i in idx]
+    for jpg in negs:
         grand_neg += 1
         shutil.copy2(jpg, os.path.join(out, f"negative_{grand_neg:04d}.jpg"))
-    print(f"  [-]  negatives  {grand_neg:4d} images")
+    cap = f"  (capped at --neg-limit {a.neg_limit})" if a.neg_limit and grand_neg == a.neg_limit else ""
+    print(f"  [-]  negatives  {grand_neg:4d} images{cap}")
 
     # class list files -- Roboflow wants these on YOLO import; SenseCraft ignores
     # extras harmlessly.
