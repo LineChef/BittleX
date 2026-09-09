@@ -130,12 +130,12 @@ g2libcombine() {
   [ -n "$cl" ] || { echo "set G2_VISION_CLASSES=\"...\" (id order) or pass it as an arg"; return 1; }
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cl"
 }
-# g2libsubset <N> <class>  -- capped single-class upload set for the threshold test
-#   (negatives auto-capped at ~N/4 so the ratio stays sane)
+# g2libsubset <N> <class>  -- capped images-only upload set for the threshold test
+#   (negatives auto-capped at ~N/4; jpg only so SenseCraft auto-label isn't cluttered)
 g2libsubset() {
   local n="${1:?usage: g2libsubset <N> <class>}" cls="${2:?need a class name}"
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cls" \
-    --limit "$n" --neg-limit "$(( n / 4 ))" --out "$G2_LIB_ROOT/upload_$n"
+    --limit "$n" --neg-limit "$(( n / 4 ))" --images-only --out "$G2_LIB_ROOT/upload_$n"
 }
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
 

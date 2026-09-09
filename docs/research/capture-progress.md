@@ -138,11 +138,13 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 | | | | | | | |
 
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
-person captured so far). Subsets pre-built:
-`~/Desktop/g2_vision_library/upload_{40,80,120,160,all}` — N images + YOLO
-labels + ~N/4 background negatives (spread-sampled from the library's
-`_negatives/`), all class 0. Import each into its own SenseCraft project, train,
-deploy, then measure — **in a room none of the training images came from**:
+person captured so far). Subsets pre-built (jpg only — `--images-only`, so
+SenseCraft auto-label isn't cluttered):
+`~/Desktop/g2_vision_library/upload_{40,80,120,160,all}` — N person images +
+~N/4 background negatives (spread-sampled from `_negatives/`). Import each into
+its own SenseCraft project, **auto-label**, deselect the `negative_*` images,
+train, deploy, then measure — **in a room none of the training images came
+from**:
 
 ```
 g2visioneval <label> 30            # stand at close / mid / far, ~30 s
