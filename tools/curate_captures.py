@@ -102,6 +102,7 @@ class Config:
     min_box_frac: float = 0.03         # box area / frame area to count as a face
     hash_thresh: int = 6              # <= this hamming distance == "same frame"
     class_id: int = 0
+    target_count: int = 100          # per-class goal the running tally reports against
     target_brightness: float = 110.0   # ideal mid-tone for scoring
     n_buckets: int = 12               # timeline buckets for spread sampling
 
@@ -299,7 +300,7 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
 
     _contact_sheet(sel_pos, sel_neg, c, os.path.join(out_dir, "_contact_sheet.png"))
     summary = _summary(frames, sel_pos, sel_neg, rej, have_boxes, c)
-    summary += _session_tally(out_dir, len(sel_pos), len(sel_neg))
+    summary += _session_tally(out_dir, len(sel_pos), len(sel_neg), c.target_count)
     open(os.path.join(out_dir, "_summary.txt"), "w").write(summary)
     print(summary)
     return {"positives": len(sel_pos), "negatives": len(sel_neg),
@@ -328,7 +329,7 @@ def _contact_sheet(pos, neg, c: Config, path: str) -> None:
 
 def _session_tally(out_dir: str, n_pos: int, n_neg: int, target: int = 100) -> str:
     """If out_dir is `.../<name>/session_<k>/curated`, tally usable positives
-    across all that person's curated sessions and show progress to `target`."""
+    across all that class's curated sessions and show progress to `target`."""
     parts = os.path.normpath(out_dir).split(os.sep)
     try:
         si = next(i for i, p in enumerate(parts) if p.startswith("session_"))
@@ -422,6 +423,9 @@ def main() -> None:
     ap.add_argument("--min-box-frac", type=float, default=0.03)
     ap.add_argument("--hash-thresh", type=int, default=6)
     ap.add_argument("--class-id", type=int, default=0)
+    ap.add_argument("--target", type=int, default=100,
+                    help="per-class positive goal the running tally reports against "
+                         "(e.g. 250 for a fine-grained class like a specific ledge)")
     ap.add_argument("--label-region", choices=("person", "face"), default="person",
                     help="'face' tightens the pre-label box to the face (image stays full-frame)")
     ap.add_argument("--face-crops", action="store_true",
@@ -439,7 +443,8 @@ def main() -> None:
                min_brightness=a.min_brightness, max_brightness=a.max_brightness,
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,
                min_box_frac=a.min_box_frac, hash_thresh=a.hash_thresh,
-               class_id=a.class_id, label_region=a.label_region, face_crops=a.face_crops)
+               class_id=a.class_id, target_count=a.target,
+               label_region=a.label_region, face_crops=a.face_crops)
     curate(a.in_dir, a.out_dir, c)
 
 

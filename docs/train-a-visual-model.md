@@ -130,18 +130,23 @@ Re-run with tweaked flags freely — it's non-destructive (raw frames kept).
 
 ---
 
-## 5 · Combine sessions
+## 5 · Combine sessions (and classes)
 
-When all 3 `session_*/curated/` exist, gather them:
+`curate` names every run `pos_NNNN` / `neg_NNNN`, so a plain `cp` collides across
+sessions **and** across classes. Use the combiner — it renames to
+`<class>_s<k>_pos_NNNN.jpg` (+ matching `.txt`), tallies per class, and flags a
+forgotten `--class-id`:
+
 ```
-mkdir -p ~/Desktop/g2_face_capture/alex/upload
-cp ~/Desktop/g2_face_capture/alex/session_*/curated/pos_*.jpg \
-   ~/Desktop/g2_face_capture/alex/session_*/curated/pos_*.txt \
-   ~/Desktop/g2_face_capture/alex/session_*/curated/neg_*.jpg \
-   ~/Desktop/g2_face_capture/alex/upload/
+# layout:  <root>/<class>/session_<k>/curated/{pos_*.jpg,pos_*.txt,neg_*.jpg}
+python tools/combine_for_upload.py ~/Desktop/g2_capture --classes person,animal,ledge
+# -> ~/Desktop/g2_capture/upload/   (import THIS folder in step 6)
 ```
-(Filenames collide across sessions — rename per session first, or copy into
-per-session subdirs the importer can walk.)
+
+The `--classes` order is the class-id order — it must match how you ran
+`curate_captures.py --class-id N` per class, and it's your `VISION_LABELS` order.
+Single-class (one person, 3 sessions) works too: `combine_for_upload.py
+~/Desktop/g2_face_capture/alex` picks up `alex/session_*/curated` on its own.
 
 ---
 
