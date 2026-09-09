@@ -87,13 +87,21 @@ Full detail incl. the **standard pose set** (run it every session): `research/ca
    It sets the sensor to 480 + an auto-exposure lift, streams the feed with the
    detection box drawn, and (while "Start capturing" is on) saves
    `alex_NNNN.jpg` + `alex_NNNN.json` (the box, for pre-labels).
-4. Pose sequence — Start/Stop between changes, hold ~6–8 s each:
+
+   **Motion-gated saving is on by default** (`G2_CAP_GATE=12`): a held pose saves
+   ~1 frame (plus one every `G2_CAP_KEEPALIVE=8` s), and frames flow again when
+   you move — so you don't drown in near-identical shots. The status line shows
+   `saved N (M skipped, static)`. Move *slowly and deliberately* through each
+   pose and it captures the whole arc; freeze and it stops. `G2_CAP_GATE=0`
+   restores the old "save every 4th frame" behaviour.
+4. Pose sequence — you can leave capturing ON the whole time; move slowly:
    - **distance:** close (~1.5 ft) → mid (~3 ft) → far (~5–6 ft), straight on
    - **head:** slow full turn L↔R; chin up; chin down; look away L/R/up
    - **expression:** talking, smile, neutral, surprised
    - **occlusion:** hand near face, push hair back
    - **second spot / light:** repeat close + mid
-   - Aim for **~90–120 saved**, then ~12 s **negatives** (step out of frame).
+   - Aim for **~90–120 saved** (motion-gated, so most are distinct), then ~12 s
+     **negatives** (step out of frame / point at a wall).
 5. Stop the preview: `pkill -f camera_preview.py`.
 
 **3 sessions per person**, different rooms / lighting / clothes (session 1 can be
@@ -111,10 +119,14 @@ python tools/curate_captures.py \
 ```
 
 - Scores every frame (brightness / contrast / sharpness), drops rejects,
-  de-dups only *consecutive* near-identical frames, spread-samples across the
-  timeline, rotates upright, writes a **YOLO `.txt` per positive** from the
-  detection box (`--label-region face` tightens it toward the face; the *image*
-  stays full-frame — never crop training images for a detector).
+  **removes near-duplicates** (two passes: a held pose → 1 frame but a slow
+  head-turn keeps its arc; then a tight global pass drops a pose you captured
+  twice), spread-samples across the timeline, rotates upright, writes a **YOLO
+  `.txt` per positive** from the detection box (`--label-region face` tightens it
+  toward the face; the *image* stays full-frame — never crop training images for
+  a detector). The summary prints `dedup: dropped N near-duplicate positives`.
+  Tune with `--hash-thresh` (held-pose pass, higher = thin harder, default 8) /
+  `--dup-thresh` (global pass, default 4); `--no-dedup` keeps everything.
 - Outputs `pos_NNNN.jpg` (+ `.txt`), `neg_NNNN.jpg`, `_contact_sheet.png`,
   `_summary.txt`.
 - **Read the printout**: it reports **usable positives + negatives this

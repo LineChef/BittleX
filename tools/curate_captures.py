@@ -55,7 +55,7 @@ def sharpness(im: Image.Image) -> float:
     return float(lap.var())
 
 
-def ahash(im: Image.Image, side: int = 12) -> int:
+def ahash(im: Image.Image, side: int = 16) -> int:
     g = np.asarray(im.convert("L").resize((side, side), Image.BILINEAR), float)
     bits = (g > g.mean()).flatten()
     out = 0
@@ -100,7 +100,11 @@ class Config:
     min_sharpness: float = 8.0
     min_contrast: float = 12.0
     min_box_frac: float = 0.03         # box area / frame area to count as a face
-    hash_thresh: int = 6              # <= this hamming distance == "same frame"
+    hash_thresh: int = 8             # consecutive-run near-dup (holding one pose)
+    dup_thresh: int = 4              # global near-identical (same pose captured twice
+                                     #   anywhere in the session) -- tighter, so only
+                                     #   true repeats go, not distinct poses
+    dedup: bool = True
     class_id: int = 0
     target_count: int = 100          # per-class goal the running tally reports against
     target_brightness: float = 110.0   # ideal mid-tone for scoring
@@ -162,18 +166,39 @@ def _quality(f: Frame, c: Config) -> float:
 
 
 def _dedup(frames: list[Frame], thresh: int, gap: int = 12) -> list[Frame]:
-    """Collapse *consecutive* runs of near-identical frames (holding a pose) --
-    keep the sharpest of each run. Frames far apart in the capture are distinct
-    poses even if their coarse hash matches, so they're never merged."""
+    """Thin *consecutive* near-identical frames -- a held pose collapses to one
+    (its sharpest), but a slow continuous move (a head turn) keeps a frame each
+    time it has drifted past `thresh` from the ANCHOR that started the run. A
+    10 s head sweep is not collapsed to a single frame."""
     frames = sorted(frames, key=lambda f: f.idx)
     kept: list[Frame] = []
+    anchor: Frame | None = None
     for f in frames:
-        if kept and (f.idx - kept[-1].idx) <= gap and hamming(kept[-1].hash, f.hash) <= thresh:
+        same_pose = (anchor is not None
+                     and (f.idx - kept[-1].idx) <= gap
+                     and hamming(anchor.hash, f.hash) <= thresh)
+        if same_pose:
             if f.sharp > kept[-1].sharp:
-                kept[-1] = f            # swap in the sharper frame of this run
+                kept[-1] = f            # sharper representative of this hold
         else:
             kept.append(f)
+            anchor = f                 # a new pose / the view has moved on
     return kept
+
+
+def _global_dedup(frames: list[Frame], thresh: int) -> list[Frame]:
+    """Drop any frame near-identical to an EARLIER kept frame *anywhere* in the
+    session -- catches the same pose captured twice (you paused, came back to it).
+    `thresh` is tight, so distinct poses with a coincidentally close hash survive.
+    Keeps the sharpest of each cluster."""
+    kept: list[Frame] = []
+    for f in sorted(frames, key=lambda x: x.idx):
+        m = next((k for k in kept if hamming(k.hash, f.hash) <= thresh), None)
+        if m is None:
+            kept.append(f)
+        elif f.sharp > m.sharp:
+            kept[kept.index(m)] = f
+    return sorted(kept, key=lambda f: f.idx)
 
 
 def _spread_select(pool: list[Frame], n: int, buckets: int, total: int) -> list[Frame]:
@@ -240,14 +265,20 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     else:
         pos, neg = survivors, []
 
-    # only thin a pool that's comfortably bigger than the target -- otherwise
-    # every frame is worth keeping (natural micro-variation is good training data)
-    if len(pos) > int(1.6 * c.positives):
-        pos = _dedup(pos, c.hash_thresh)
-    if len(neg) > int(1.6 * c.negatives):
-        neg = _dedup(neg, c.hash_thresh)
+    # dedup ALWAYS (near-identical frames are never training value): first
+    # collapse runs of a held pose, then drop true repeats anywhere in the
+    # session. Distinct poses survive both passes.
+    n_pos0, n_neg0 = len(pos), len(neg)
+    if c.dedup:
+        pos = _global_dedup(_dedup(pos, c.hash_thresh), c.dup_thresh)
+        neg = _global_dedup(_dedup(neg, c.hash_thresh), c.dup_thresh)
+    dropped_pos, dropped_neg = n_pos0 - len(pos), n_neg0 - len(neg)
+
     sel_pos = _spread_select(pos, c.positives, c.n_buckets, len(frames))
-    sel_neg = sorted(neg, key=lambda f: -f.score)[:c.negatives]
+    if c.dedup and len(sel_pos) > 1:
+        sel_pos = _global_dedup(sel_pos, c.dup_thresh)   # no near-dups in the final set
+    sel_neg = _global_dedup(sorted(neg, key=lambda f: -f.score), c.dup_thresh)[:c.negatives] \
+        if c.dedup else sorted(neg, key=lambda f: -f.score)[:c.negatives]
 
     os.makedirs(out_dir, exist_ok=True)
     for old in glob.glob(os.path.join(out_dir, "*")):
@@ -300,6 +331,12 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
 
     _contact_sheet(sel_pos, sel_neg, c, os.path.join(out_dir, "_contact_sheet.png"))
     summary = _summary(frames, sel_pos, sel_neg, rej, have_boxes, c)
+    if c.dedup and (dropped_pos or dropped_neg):
+        summary += (f"dedup: dropped {dropped_pos} near-duplicate positives"
+                    f"{f' + {dropped_neg} negatives' if dropped_neg else ''} "
+                    f"({n_pos0}->{len(pos)} unique pos)\n")
+    elif not c.dedup:
+        summary += "dedup: OFF (--no-dedup)\n"
     summary += _session_tally(out_dir, len(sel_pos), len(sel_neg), c.target_count)
     open(os.path.join(out_dir, "_summary.txt"), "w").write(summary)
     print(summary)
@@ -421,7 +458,14 @@ def main() -> None:
     ap.add_argument("--min-sharpness", type=float, default=8.0)
     ap.add_argument("--min-contrast", type=float, default=12.0)
     ap.add_argument("--min-box-frac", type=float, default=0.03)
-    ap.add_argument("--hash-thresh", type=int, default=6)
+    ap.add_argument("--hash-thresh", type=int, default=8,
+                    help="hamming distance (256-bit hash) counted as 'same frame' "
+                         "within a consecutive run -- a held pose. Higher = thin harder.")
+    ap.add_argument("--dup-thresh", type=int, default=4,
+                    help="tighter hamming distance for the global pass that removes a "
+                         "pose captured twice anywhere in the session")
+    ap.add_argument("--no-dedup", action="store_true",
+                    help="keep every frame (skip both near-duplicate passes)")
     ap.add_argument("--class-id", type=int, default=0)
     ap.add_argument("--target", type=int, default=100,
                     help="per-class positive goal the running tally reports against "
@@ -443,6 +487,7 @@ def main() -> None:
                min_brightness=a.min_brightness, max_brightness=a.max_brightness,
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,
                min_box_frac=a.min_box_frac, hash_thresh=a.hash_thresh,
+               dup_thresh=a.dup_thresh, dedup=not a.no_dedup,
                class_id=a.class_id, target_count=a.target,
                label_region=a.label_region, face_crops=a.face_crops)
     curate(a.in_dir, a.out_dir, c)

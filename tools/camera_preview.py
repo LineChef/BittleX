@@ -18,6 +18,12 @@ Environment variables (all optional):
     G2_CAP_LABEL   filename prefix     (default: self)  -> <label>_0001.jpg
     G2_CAM_RES     sensor option       0=240x240  1=480x480 (default)  2=640x480
     G2_CAM_AEBUMP  auto-exposure lift  hex/int, default 0x30; 0 disables
+    G2_CAP_GATE    motion gate         only save a frame that differs from the last
+                                       saved one by >= this hamming distance
+                                       (256-bit avg-hash). default 12; 0 = off (save
+                                       every Nth frame, the old behaviour).
+    G2_CAP_KEEPALIVE  seconds          force a save after this long on a held pose
+                                       even if static (default 8; 0 = never)
 
 Deps (dev machine): pyserial, Pillow.  Stop with:  pkill -f camera_preview.py
 """
@@ -42,11 +48,30 @@ OUT = os.environ.get("G2_CAP_OUT") or os.path.expanduser("~/Desktop/g2_face_capt
 LABEL = os.environ.get("G2_CAP_LABEL", "self")
 CAM_RES = os.environ.get("G2_CAM_RES", "1")
 AE_BUMP = int(os.environ.get("G2_CAM_AEBUMP", "0x30"), 0)
+CAP_GATE = int(os.environ.get("G2_CAP_GATE", "12"))        # hamming; 0 = off
+CAP_KEEPALIVE = float(os.environ.get("G2_CAP_KEEPALIVE", "8"))  # s; 0 = never
+
+
+def _ahash(jpeg_bytes, side=16):
+    """256-bit average hash of a JPEG frame (pure PIL, no numpy)."""
+    im = Image.open(io.BytesIO(jpeg_bytes)).convert("L").resize((side, side))
+    px = list(im.getdata())
+    avg = sum(px) / len(px)
+    h = 0
+    for p in px:
+        h = (h << 1) | (1 if p > avg else 0)
+    return h
+
+
+def _hamming(a, b):
+    return bin(a ^ b).count("1")
+
 
 state = {
-    "jpg": b"", "capturing": False, "saved": 0,
+    "jpg": b"", "capturing": False, "saved": 0, "skipped": 0,
     "every": 4,          # save 1 of every N frames while capturing (~15 fps -> ~4/s)
     "_seen": 0, "fps": 0.0, "label": LABEL,
+    "_last_hash": None, "_last_save_t": 0.0,
     "ndet": 0, "last_score": 0, "hit_frames": 0, "tot_frames": 0,
 }
 
@@ -151,13 +176,27 @@ def serial_loop():
             if state["capturing"]:
                 state["_seen"] += 1
                 if state["_seen"] % state["every"] == 0:
-                    state["saved"] += 1
-                    existing = len([f for f in os.listdir(OUT) if f.endswith(".jpg")])
-                    stem = f"{OUT}/{state['label']}_{existing + 1:04d}"
-                    with open(stem + ".jpg", "wb") as f:
-                        f.write(clean_raw)                  # clean frame
-                    with open(stem + ".json", "w") as f:   # sidecar for curate
-                        json.dump({"resolution": resolution, "boxes": boxes}, f)
+                    save = True
+                    if CAP_GATE > 0:
+                        h = _ahash(clean_raw)
+                        lh = state["_last_hash"]
+                        moved = lh is None or _hamming(lh, h) >= CAP_GATE
+                        stale = (CAP_KEEPALIVE > 0
+                                 and now - state["_last_save_t"] >= CAP_KEEPALIVE)
+                        save = moved or stale
+                        if save:
+                            state["_last_hash"] = h
+                    if save:
+                        state["_last_save_t"] = now
+                        state["saved"] += 1
+                        existing = len([f for f in os.listdir(OUT) if f.endswith(".jpg")])
+                        stem = f"{OUT}/{state['label']}_{existing + 1:04d}"
+                        with open(stem + ".jpg", "wb") as f:
+                            f.write(clean_raw)                  # clean frame
+                        with open(stem + ".json", "w") as f:   # sidecar for curate
+                            json.dump({"resolution": resolution, "boxes": boxes}, f)
+                    else:
+                        state["skipped"] += 1
 
 
 PAGE = """<!doctype html><meta charset=utf-8><title>G2 camera capture</title>
@@ -192,7 +231,8 @@ lighting between short bursts.</p>
      '<b style="color:'+(j.ndet?'#4f4':'#888')+'">'+
      (j.ndet? j.ndet+' DETECTED  score '+j.last_score : 'no detection')+'</b>'+
      '  &nbsp; hit-rate '+hr+'%  &nbsp; '+j.fps.toFixed(1)+' fps'+
-     (j.capturing?'  &nbsp; ● CAPTURING saved '+j.saved:'')}
+     (j.capturing?'  &nbsp; ● CAPTURING saved '+j.saved+
+        (j.skipped?'  ('+j.skipped+' skipped, static)':''):'')}
  setInterval(()=>{document.getElementById('v').src='/frame.jpg?t='+Date.now()},90);
  setInterval(()=>fetch('/status').then(u),700);
 </script>
@@ -208,7 +248,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps({k: state[k] for k in
-            ("capturing", "saved", "fps", "ndet", "last_score", "hit_frames", "tot_frames")
+            ("capturing", "saved", "skipped", "fps", "ndet", "last_score", "hit_frames", "tot_frames")
         }).encode())
 
     def do_GET(self):

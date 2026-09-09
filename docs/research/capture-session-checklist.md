@@ -62,8 +62,13 @@ reposition, repeat. ~4 frames/sec.
 | 9 | **Second spot / different light** — repeat 1 + 3 (close + mid, straight on) | ~10 s | move near a window, or change which lamps are on |
 | N | **Negatives** — step fully out of frame / point at an empty wall | ~12 s | ~50 empty frames |
 
-≈ 250 raw frames → `curate` keeps ~80–120 usable. Aim for **~100 usable
-positives per person across the 3 sessions**.
+`camera_preview.py` saves **motion-gated** — a held pose is ~1 frame, moving
+resumes capture — so leave "Start capturing" on and move slowly through the
+poses. Expect ~60–120 saved per session (mostly distinct), not 250. `curate`
+then runs a second near-duplicate pass. Aim for **~100 usable positives per
+person across the 3 sessions**. (`G2_CAP_GATE=0` for the old save-every-Nth
+behaviour; raise `G2_CAP_GATE` if held poses still repeat, lower it if slow
+sweeps get skipped.)
 
 **Per-session variation:** session 1 can be one look (e.g. hair up); sessions
 2–3 the person's normal look. Each session in a different room / lighting if you
