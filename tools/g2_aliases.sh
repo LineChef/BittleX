@@ -95,6 +95,27 @@ g2combine() {
   echo "upload_images ($(ls "$ui"/*.jpg 2>/dev/null|wc -l|tr -d ' ') JPEGs only, for the SenseCraft browser) -> $ui"
 }
 
+# ---- persistent training library (multi-class) --------------------------------
+# docs/research/capture-progress.md.  Two folders:
+#   raw (disposable):  ~/Desktop/g2_capture_raw/<class>/session_<k>/[curated/]
+#   library (KEEP):     ~/Desktop/g2_vision_library/<class>/  + _MANIFEST.md
+# Capture/curate into the raw root:  export G2_CAP_ROOT=~/Desktop/g2_capture_raw
+# then  g2cam <class> <k>  ...  g2curate <class> <k> <rot>   (pass --class-id via
+# `_g2py tools/curate_captures.py` directly for a non-zero id / a --target).
+export G2_LIB_ROOT="${G2_LIB_ROOT:-$HOME/Desktop/g2_vision_library}"
+
+# g2promote <class> [session]  -- copy a reviewed curated session into the library
+g2promote() {
+  local cls="${1:?usage: g2promote <class> [session]}" sess="${2:-1}"
+  _g2py tools/promote_to_library.py \
+    "$G2_CAP_ROOT/$cls/session_$sess/curated" --library "$G2_LIB_ROOT" --class "$cls"
+}
+# g2libcombine [classes]  -- build $G2_LIB_ROOT/upload/ (default person,dog,cat,ledge)
+g2libcombine() {
+  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "${1:-person,dog,cat,ledge}"
+}
+g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
+
 # ------------------------------------------------------------- vision runtime
 
 # g2vision [labels]  -- run the detection pipeline over serial, print live detections

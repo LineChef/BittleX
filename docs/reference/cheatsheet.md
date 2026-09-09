@@ -175,6 +175,11 @@ standard pose set.
 | `g2cam-info` | print the serial port + which model is on the module |
 | `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
 | `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
+| `g2promote <class> [session]` | copy a reviewed `curated/` session into the persistent library `~/Desktop/g2_vision_library/<class>/`, updating `_MANIFEST.md` |
+| `g2libcombine [classes]` | build `~/Desktop/g2_vision_library/upload/` from the library (default `person,dog,cat,ledge`); rewrites label class-ids from the class order |
+| `g2libstatus` | print the library `_MANIFEST.md` (per-class counts) |
+
+Multi-class capture library: `docs/research/capture-progress.md`. Point capture at the raw root first: `export G2_CAP_ROOT=~/Desktop/g2_capture_raw`.
 
 **Vision runtime**
 
