@@ -115,8 +115,11 @@ Debugging behaviour needs the *reason*, not just the action. Convention:
 - **State machines stay pure** (no `diag` import — keeps them unit-testable) but
   each exposes a `last_reason: str` explaining its most recent `update()`.
   Implemented: `behavior/idle_posture.py` (`IdlePosture`),
-  `behavior/mode_controller.py` (`ModeController`). To add: `Explorer`,
-  `RecoveryFSM`, vision `avoidance`.
+  `behavior/mode_controller.py` (`ModeController`), `behavior/explore.py`
+  (`Explorer`, 2026-09-08). To add: `RecoveryFSM`, vision `avoidance`.
+- **`BehaviorDriver`** composes those and emits the transition markers itself
+  (as `DIAG` effects); `behavior/diag_bridge.emit_tick()` is the "driving loop
+  logs the transition" step for the behaviour layer.
 - **The driving loop logs the transition** with the reason + the inputs that
   produced it, only when something actually changes:
 
@@ -159,12 +162,23 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ## Phasing
 
-- **Phase 1 — now, pre-hardware (~1–2 days, most of the value):**
-  build `pi_pipeline/diag/` — JSONL logger + `logging.Handler` bridge + ring
-  buffer class + manifest writer + `diag summarize/replay/tail`. All
-  unit-testable with synthetic data. Retrofit `run_gait`, `thermal_guard`,
-  `serial_link`, `recovery` to emit the taxonomy events. Fold the existing
-  `run_gait --log` CSV in as a ring-buffer source.
+- **Phase 1 — DONE (2026-09-08), pre-hardware:**
+  `pi_pipeline/diag/` built (`f18230c`) — `Diag` JSONL logger + `DiagLogHandler`
+  / `bridge_stdlib_logging` + `RingBuffer` + manifest writer (git SHA/dirty,
+  config snapshot, policy hash, argv/host) + `python -m pi_pipeline.diag
+  list/summarize/tail/replay/sync`. Auto-flush the ring on ERROR+/named events.
+  6 tests. Retrofit status:
+  - `run_gait.py` — emits `imu.stale`, `skill.mode`, `cliff.frozen`, the
+    `servo.thermal_*` family, `loop.exception`. **done.**
+  - `thermal_guard` / `recovery` — stay pure; their driving loop (`run_gait`)
+    logs from the guard snapshot / `last_reason`. **done via the loop.**
+  - `serial_link` — emits `link.lost` / `link.reconnect` with a `gap_s`
+    (2026-09-08). **done.**
+  - `BehaviorDriver` — emits `DIAG` *effect* markers on every transition;
+    `behavior/diag_bridge.py` `emit_tick(tick)` turns them into
+    `mode.transition` / `posture.transition` / `enroll.*` / `cliff.reflex`
+    events. 3 tests. **done.**
+  - Folding `run_gait --log` CSV in as a ring-buffer source: still open (minor).
 - **Phase 2 — at bring-up:** watchdog/heartbeat thread, dump-on-incident wiring,
   battery + Pi-thermal sampling, the exception hook. Validate the black box
   actually captures a real fall / link drop.

@@ -55,12 +55,19 @@ class Explorer:
         self._investigate_until: float = 0.0
         self._hold_until: float = 0.0
         self._target = ""
+        self._reason = "init"
+
+    @property
+    def last_reason(self) -> str:
+        """Why the most recent decide() returned what it did -- for diag logging."""
+        return self._reason
 
     def reset(self) -> None:
         self._leg_start = None
         self._investigate_until = 0.0
         self._hold_until = 0.0
         self._target = ""
+        self._reason = "reset"
 
     def _bearing(self, det) -> float:
         return (det.center_x - 0.5) * 2.0 * self.cfg.fov_half_rad
@@ -76,11 +83,16 @@ class Explorer:
                 best, best_area = d, d.area
         return best
 
+    def _d(self, action: ExploreAction, **kw) -> ExploreDecision:
+        d = ExploreDecision(action, **kw)
+        self._reason = d.reason
+        return d
+
     def decide(self, frame: Frame, now: float) -> ExploreDecision:
         # 1. mid-investigation: hold until the dwell timer runs out
         if now < self._investigate_until:
-            return ExploreDecision(ExploreAction.INVESTIGATE, target=self._target,
-                                   reason="dwelling")
+            return self._d(ExploreAction.INVESTIGATE, target=self._target,
+                           reason="dwelling")
         if self._target:                       # dwell just ended
             self.nov.see_object(self._target, now)
             self._target = ""
@@ -89,7 +101,7 @@ class Explorer:
 
         # 2. brief pause between legs
         if now < self._hold_until:
-            return ExploreDecision(ExploreAction.HOLD, reason="pause")
+            return self._d(ExploreAction.HOLD, reason="pause")
 
         # 3. something new in view?
         det = self._most_novel(frame, now)
@@ -98,13 +110,13 @@ class Explorer:
             close = det.area >= self.cfg.near_area
             centered = abs(bearing) <= self.cfg.centered_rad
             if self.p.approach_novelty and not (close and centered):
-                return ExploreDecision(ExploreAction.APPROACH, turn=bearing,
-                                       target=det.label, reason="approach novelty")
+                return self._d(ExploreAction.APPROACH, turn=bearing,
+                               target=det.label, reason="approach novelty")
             # just look: orient if needed, then start the dwell
             self._target = det.label
             self._investigate_until = now + self.p.investigate_secs
-            return ExploreDecision(ExploreAction.INVESTIGATE, turn=bearing,
-                                   target=det.label, reason="found novelty")
+            return self._d(ExploreAction.INVESTIGATE, turn=bearing,
+                           target=det.label, reason="found novelty")
 
         # 4. nothing new -- wander. New leg when the current one is spent.
         if self._leg_start is None:
@@ -112,8 +124,8 @@ class Explorer:
             heading = self.nov.stalest_heading(now)
             self.nov.see_heading(heading, now)
             turn = heading * self.p.wander_turn_bias
-            return ExploreDecision(ExploreAction.TURN, turn=turn, reason="new leg")
+            return self._d(ExploreAction.TURN, turn=turn, reason="new leg")
         if now - self._leg_start >= self.p.explore_leg_secs:
             self._leg_start = None
-            return ExploreDecision(ExploreAction.HOLD, reason="leg done")
-        return ExploreDecision(ExploreAction.WANDER, reason="on leg")
+            return self._d(ExploreAction.HOLD, reason="leg done")
+        return self._d(ExploreAction.WANDER, reason="on leg")

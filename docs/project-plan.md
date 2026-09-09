@@ -581,9 +581,13 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
     sensor), staged: WARN speech ("I'm getting kinda tired…") → Petoi-style
     per-joint soft cutback → lie-down-until-cool. All constants placeholders;
     [`research/servo-thermal.md`](research/servo-thermal.md) "Retuning checklist".
-  - `pi_pipeline/diag/` — per-session JSONL event log + a ~15 s black-box ring
-    buffer flushed on any incident + session manifest + `summarize/replay/tail`.
-    Behaviour state machines expose `last_reason` so decisions log *why*.
+  - `pi_pipeline/diag/` — **Phase 1 done.** Per-session JSONL event log + a
+    ~15 s black-box ring buffer flushed on any incident + session manifest +
+    `summarize/replay/tail/sync`. `run_gait` + `serial_link` (`link.lost` /
+    `link.reconnect`) emit taxonomy events; behaviour state machines expose
+    `last_reason` and `behavior/diag_bridge.emit_tick()` logs `BehaviorDriver`
+    transitions. Phase 2 (watchdog/heartbeat, dump-on-incident wiring, battery +
+    Pi-thermal sampling) is at bring-up.
     [`research/hardware-diagnostics.md`](research/hardware-diagnostics.md).
   - `pi_pipeline/power/` — the zero-risk power levers (CPU governor, Wi-Fi
     power-save toggle, disable-unused peripherals). idle-REST built

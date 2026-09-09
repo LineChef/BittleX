@@ -29,6 +29,28 @@ class SerialLink:
         self._read_timeout = read_timeout
         self._auto_reconnect = auto_reconnect
         self._ser = None
+        self._down_since: float | None = None   # when the link last dropped
+        self._was_connected = False
+
+    @staticmethod
+    def _diag(level: str, name: str, **kv) -> None:
+        """Emit a named diagnostics event; never raises if diag isn't set up."""
+        try:
+            from ..diag import diag
+            diag.event("link", level, name, **kv)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _mark_down(self, why: str) -> None:
+        if self._down_since is None:
+            self._down_since = time.monotonic()
+            self._diag("WARN", "link.lost", why=why, port=self._port)
+
+    def _mark_up(self) -> None:
+        if self._down_since is not None:
+            self._diag("INFO", "link.reconnect", port=self._port,
+                       gap_s=round(time.monotonic() - self._down_since, 2))
+        self._down_since = None
 
     # --- connection ---------------------------------------------------------
 
@@ -49,6 +71,7 @@ class SerialLink:
         except Exception as e:  # noqa: BLE001 -- serial.SerialException + OSError
             log.warning("serial open %s failed: %s", self._port, e)
             self._ser = None
+            self._mark_down(f"open failed: {e}")
             return False
         time.sleep(self._reset_wait)
         try:
@@ -56,6 +79,9 @@ class SerialLink:
         except Exception:  # noqa: BLE001
             pass
         log.info("serial connected: %s @ %d", self._port, self._baud)
+        if self._was_connected:
+            self._mark_up()
+        self._was_connected = True
         return True
 
     def close(self) -> None:
@@ -85,6 +111,7 @@ class SerialLink:
         except Exception as e:  # noqa: BLE001
             log.warning("serial send failed (%s); marking disconnected", e)
             self.close()
+            self._mark_down(f"send failed: {e}")
             return ""
 
     def read_line(self) -> str:
@@ -98,6 +125,7 @@ class SerialLink:
         except Exception as e:  # noqa: BLE001
             log.warning("serial read failed (%s); marking disconnected", e)
             self.close()
+            self._mark_down(f"read failed: {e}")
             return ""
 
     def drain(self, seconds: float = 0.3) -> str:
