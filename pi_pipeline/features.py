@@ -43,8 +43,14 @@ class Features:
     # -- layer 1: sensing --
     imu: bool = True
     fall_detect: str = "act"            # off | alert | act
-    vision_safety: bool = True          # cliff/edge + obstacle (safety-critical)
-    vision_perception: bool = True      # scene / object / individual recognition
+    vision: bool = False                # MASTER gate: a real obstacle/edge/recognition
+                                        #   detector is deployed on the bot and trusted.
+                                        #   OFF by default -- the hardware only has a
+                                        #   single-class face model right now, so every
+                                        #   vision-driven navigation behaviour is held.
+                                        #   Turn the whole stack back on with `+vision`.
+    vision_safety: bool = True          # cliff/edge + obstacle (safety-critical) -- needs `vision`
+    vision_perception: bool = True      # scene / object / individual recognition -- needs `vision`
     mic: bool = True
     wake_word: bool = True
     # -- layer 2: actuation --
@@ -109,6 +115,15 @@ class Features:
                     thermal_guard=False)
                 notes.append("gait off -> explore/idle_rest/avoidance_act/thermal_guard off")
 
+        if not f.vision:
+            if f.vision_safety or f.vision_perception or f.avoidance_act or f.explore:
+                off(vision_safety=False, vision_perception=False,
+                    avoidance_act=False, explore=False)
+                notes.append("no vision hardware (features.vision off) -> vision_safety, "
+                             "vision_perception, avoidance_act and explore all held "
+                             "(only a single-class face model is deployed). Re-enable "
+                             "the stack with G2_FEATURES=\"+vision\".")
+
         if not f.vision_safety and (f.avoidance_act or f.explore):
             off(avoidance_act=False, explore=False)
             notes.append("no vision_safety -> avoidance_act off, explore off (don't wander blind)")
@@ -148,7 +163,7 @@ class Features:
 
 _GROUPS = [
     ("foundation", ["link", "estop"]),
-    ("sensing", ["imu", "fall_detect", "vision_safety", "vision_perception", "mic", "wake_word"]),
+    ("sensing", ["imu", "fall_detect", "vision", "vision_safety", "vision_perception", "mic", "wake_word"]),
     ("actuation", ["gait", "thermal_guard", "sound_cues", "leds"]),
     ("cognition", ["stt", "tts", "claude", "memory", "personality"]),
     ("autonomy", ["mode_controller", "explore", "idle_rest", "avoidance_act"]),
@@ -162,7 +177,7 @@ _ALL_BOOL = {f.name for f in fields(Features) if f.type == "bool"}
 
 _OFF = dict(
     link=False, estop=False, imu=False, fall_detect="off",
-    vision_safety=False, vision_perception=False, mic=False, wake_word=False,
+    vision=False, vision_safety=False, vision_perception=False, mic=False, wake_word=False,
     gait="off", thermal_guard=False, sound_cues=False, leds=False,
     stt=False, tts=False, claude=False, memory=False, personality=False,
     mode_controller=False, explore=False, idle_rest=False, avoidance_act=False,

@@ -191,3 +191,45 @@ def test_behavior_params_drive_idle_sit_timing():
     d = BehaviorDriver(p, clock=(c := Clk()))
     c.adv(4); assert d.tick().posture is Posture.ACTIVE
     c.adv(2); assert d.tick().posture is Posture.SIT     # sat at 5s, not the 20s default
+
+
+# --- vision_available=False: all vision-driven behaviour held ----------
+
+def test_no_vision_never_enters_explore():
+    p = BehaviorParams(idle_secs_before_explore=5)          # would wander fast
+    d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0),
+                       vision_available=False)
+    for _ in range(6):
+        c.adv(10)
+        t = d.tick(DriverInputs(frame=[det("mug", 0.5)]))
+        assert t.mode is not Mode.EXPLORE                   # stays IDLE, descends instead
+    assert t.posture in (Posture.SIT, Posture.RESTING)
+
+
+def test_no_vision_skips_recognition_hop():
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=Clk(), rng=random.Random(0), vision_available=False)
+    t = d.tick(DriverInputs(frame=[det("sam")],
+                            known_person_labels=frozenset({"sam"})))
+    assert "kjpF" not in payloads(t, EffectKind.SKILL)
+
+
+def test_no_vision_skips_cliff_reflex():
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=Clk(), rng=random.Random(0),
+                       cliff=CliffGuard(), vision_available=False)
+    edge = EdgeReading(present=True, dist_norm=0.15, bearing_norm=0.0, confidence=1.0)
+    t = d.tick(DriverInputs(edge=edge, frame=[]))
+    assert not any(e.kind is EffectKind.DIAG and e.payload[0] == "cliff.reflex"
+                   for e in t.effects)
+
+
+def test_no_vision_refuses_enrollment(tmp_path):
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=Clk(), rng=random.Random(0),
+                       vision_available=False, capture_root=str(tmp_path))
+    t = d.tick(DriverInputs(meet_name="Sam", person_present=True))
+    from pi_pipeline.behavior.enrollment import EnrollState
+    assert d.enroll.state is EnrollState.IDLE               # never started
+    speaks = payloads(t, EffectKind.SPEAK)
+    assert speaks and "can't see" in speaks[0].lower()

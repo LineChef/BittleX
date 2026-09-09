@@ -1,5 +1,17 @@
 # Vision-driven, goal-directed locomotion — investigation plan
 
+> **2026-09-08 — the whole vision-navigation stack is flag-gated OFF on
+> hardware.** The camera runs a single-class *face* model, not an
+> obstacle/edge detector — there is no sensor that perceives things in G2's
+> path. Phase E's scripted skill-switching (SkillSwitch / GaitSelector /
+> CliffGuard / INSPECT) showed sim-only gains but has no sensor to run on, and
+> the auto-scan-on-obstacle idea tested **negative** (report:
+> `claude.ai/code/artifact/ee26fdc3-585d-461a-9526-054737b38b41`). All of it is
+> now held behind **`features.vision`** (default `False`): `run_gait --skills`
+> refuses without it, `BehaviorDriver(vision_available=False)` drops EXPLORE /
+> recognition / cliff reflex / enrollment. Re-enable with `G2_FEATURES="+vision"`
+> once a real detector ships. See `docs/research/detection-layer.md`.
+
 > **Campaign closed 2026-09-08.** Phases A/C: turning not achievable in this sim
 > (→ firmware). **Phase D: vision-in-the-loop ruled out** — a forward terrain
 > feature made no more capable a gait than the blind policy (report:

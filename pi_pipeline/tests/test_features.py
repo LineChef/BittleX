@@ -20,6 +20,24 @@ def test_default_is_everything_on():
     assert not f.estop
 
 
+def test_vision_master_gate_holds_the_stack_by_default():
+    # empty spec -> p9-full, but `vision` defaults off -> the vision-driven
+    # navigation behaviours resolve OFF even though the profile lists them.
+    r = _resolved("")
+    assert not r.vision
+    assert not r.vision_safety and not r.vision_perception
+    assert not r.avoidance_act and not r.explore
+    # the rest of "full" is untouched
+    assert r.gait == "policy" and r.memory and r.mode_controller and r.idle_rest
+
+
+def test_plus_vision_restores_the_whole_stack():
+    r = _resolved("+vision")
+    assert r.vision
+    assert r.vision_safety and r.vision_perception
+    assert r.avoidance_act and r.explore
+
+
 def test_profiles_are_cumulative():
     p0, p2, p5, p9 = (PROFILES["p0-link"], PROFILES["p2-gait"],
                       PROFILES["p5-voice"], PROFILES["p9-full"])

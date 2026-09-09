@@ -29,6 +29,8 @@ class Mode(Enum):
 class ModeConfig:
     explore_max_secs: float = 90.0   # cap on one explore bout
     settle_secs: float = 3.0         # quiet grace after a conversation before wandering
+    allow_explore: bool = True       # False -> IDLE never advances to EXPLORE (no vision
+                                     #   hardware to wander safely; CONVERSE/IDLE still work)
 
 
 class ModeController:
@@ -88,6 +90,9 @@ class ModeController:
                 self._enter(Mode.IDLE, now, f"explore bout hit cap ({self.cfg.explore_max_secs:.0f}s)")
             return self._mode
         # IDLE -> EXPLORE once it's been quiet long enough
+        if not self.cfg.allow_explore:
+            self._reason = "explore disabled (allow_explore=False -- no vision hardware)"
+            return self._mode
         quiet = now - self._last_activity
         if quiet >= self.cfg.settle_secs and quiet >= self.p.idle_secs_before_explore:
             self._enter(Mode.EXPLORE, now,

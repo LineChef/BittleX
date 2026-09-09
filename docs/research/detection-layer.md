@@ -9,6 +9,25 @@ Status 2026-09-06: person-detection model deployed + validated end-to-end; the
 `terrain_feature`) are built and mock-tested; the multi-model management below is
 **not built**.
 
+> **2026-09-08 — vision-navigation held behind a flag.** The camera currently
+> runs a **single-class face model** (one enrolled face), not an
+> obstacle/edge/person detector. There is **no sensor that "just sees" things in
+> G2's path** — a tiny
+> camera + NPU only reports the classes its loaded model was trained on. Every
+> vision-driven navigation behaviour we built assumes a detector that does not
+> exist on the hardware yet, so it is now gated off by the master flag
+> **`features.vision`** (default `False`):
+> - `resolve()` forces `vision_safety`, `vision_perception`, `avoidance_act` and
+>   `explore` off whenever `vision` is off.
+> - `BehaviorDriver(vision_available=False)` — no EXPLORE roaming, no recognition
+>   hop, no CliffGuard reflex, "G2 meet X" enrollment refused with a spoken line.
+> - `run_gait.py --skills` refuses to start without `features.vision` (unless
+>   `--dry-run` / `--ignore-features`).
+>
+> Turn the whole stack back on in one move once a real detector ships:
+> `G2_FEATURES="+vision"`. Nothing was deleted — the logic, evals and docs
+> stand; they're just not reachable on the body until the sensor is real.
+
 ---
 
 ## The hard constraint

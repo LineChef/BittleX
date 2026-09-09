@@ -182,10 +182,22 @@ class BehaviorDriver:
                  enroll_cfg: EnrollmentConfig | None = None,
                  novelty_cfg: NoveltyConfig | None = None,
                  cliff=None,
+                 vision_available: bool = True,
                  capture_root: str = "training_data/faces"):
+        # vision_available=False: the bot has no obstacle/edge/person detector
+        # deployed (only a single-class face model), so every vision-driven
+        # behaviour is held -- no EXPLORE roaming, no recognition hop, no cliff
+        # reflex, no "G2 meet <name>" enrollment. CONVERSE + IDLE posture still
+        # run. Flip it back on once a real detector ships.  Mirrors
+        # features.vision; a runtime caller should pass `features.vision` here.
+        self._vision = bool(vision_available)
         self.p = (params or BehaviorParams()).clamp()
         self._clock = clock
-        self.mode = ModeController(self.p, mode_cfg, clock=clock)
+        mcfg = mode_cfg or ModeConfig()
+        if not self._vision and mcfg.allow_explore:
+            from dataclasses import replace as _replace
+            mcfg = _replace(mcfg, allow_explore=False)
+        self.mode = ModeController(self.p, mcfg, clock=clock)
         self.novelty = Novelty(novelty_cfg)
         self.explorer = Explorer(self.p, self.novelty, explore_cfg)
         # personality -> idle timing: use the BehaviorParams knobs unless the
@@ -340,7 +352,7 @@ class BehaviorDriver:
 
     # --- recognition hop ------------------------------------------------
     def _recognition_hop(self, i: DriverInputs, now: float) -> list:
-        if not i.known_person_labels:
+        if not self._vision or not i.known_person_labels:
             return []
         for det in i.frame:
             lab = getattr(det, "label", "")
@@ -355,7 +367,7 @@ class BehaviorDriver:
 
     # --- cliff reflex --------------------------------------------------
     def _cliff_reflex(self, i: DriverInputs, now: float) -> list | None:
-        if self.cliff is None or i.edge is None or CliffAction is None:
+        if not self._vision or self.cliff is None or i.edge is None or CliffAction is None:
             return None
         act = self.cliff.update(i.edge)
         if act is CliffAction.NONE:
@@ -389,9 +401,16 @@ class BehaviorDriver:
             self._choreo.start("wake", _wake_steps(),
                                on_done=self.idle.wake_done, now=now)
 
-        # 1. enrollment owns the robot
+        # 1. enrollment owns the robot (needs a person detector -- held without vision)
         if i.meet_name and not self.enroll.active:
-            effects += self._start_enrollment(i.meet_name.strip(), now)
+            if not self._vision:
+                effects.append(Effect(EffectKind.SPEAK,
+                                      "I can't see well enough to learn a new face right now.",
+                                      "meet <name> refused -- no vision hardware"))
+                effects.append(Effect(EffectKind.DIAG, ("enroll.refused", "no vision"),
+                                      "vision_available=False"))
+            else:
+                effects += self._start_enrollment(i.meet_name.strip(), now)
         if self.enroll.active:
             t = self.enroll.update(
                 now, person_present=i.person_present,
@@ -428,8 +447,9 @@ class BehaviorDriver:
 
         effects += self._recognition_hop(i, now)
 
-        # 4. EXPLORE -- roam, no posture descent
-        if mode is Mode.EXPLORE:
+        # 4. EXPLORE -- roam, no posture descent (ModeController won't enter it
+        #    without vision; this guard is belt-and-suspenders)
+        if mode is Mode.EXPLORE and self._vision:
             self.idle.update(now, exploring=True, person_present=i.person_present,
                              handled=i.held)
             effects += self._from_explore(i, now)

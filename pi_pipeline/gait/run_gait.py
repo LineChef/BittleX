@@ -555,7 +555,10 @@ def main():
                     help="don't consult G2_FEATURES (run even if gait is flagged off)")
     ap.add_argument("--skills", action="store_true",
                     help="run the Phase E vision-skill layer over the walk "
-                         "(GaitSelector + SkillSwitch + CliffGuard)")
+                         "(GaitSelector + SkillSwitch + CliffGuard). Requires "
+                         "features.vision (G2_FEATURES=\"+vision\") -- gated OFF by "
+                         "default because no obstacle/edge detector is deployed yet. "
+                         "--dry-run bypasses the gate with a mock feed.")
     ap.add_argument("--skills-feed", default="serial", choices=("serial", "mock"),
                     help="--skills detection source: 'serial' (Grove Vision AI on its own "
                          "USB port) or 'mock' (a scripted approaching box, bench check)")
@@ -570,6 +573,7 @@ def main():
     args = ap.parse_args()
 
     thermal_on = not args.no_thermal_guard
+    vision_flag = None
     if not args.ignore_features:
         try:
             from pi_pipeline.features import features, log_summary
@@ -579,8 +583,16 @@ def main():
                       "Use --ignore-features to run anyway.")
                 return
             thermal_on = thermal_on and features.thermal_guard
+            vision_flag = bool(features.vision)
         except Exception as e:  # noqa: BLE001
             print(f"features: not consulted ({e!r})")
+
+    if args.skills and vision_flag is False and not args.dry_run:
+        print("--skills needs features.vision, but no obstacle/edge detector is "
+              "deployed (the camera runs a single-class face model). "
+              "Set G2_FEATURES=\"+vision\" once one exists, or use --dry-run "
+              "(mock feed) / --ignore-features to force.")
+        return
 
     skill_layer = vision = None
     if args.skills:

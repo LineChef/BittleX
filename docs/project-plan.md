@@ -694,6 +694,16 @@ and `scene.summarize` / `scene.narrate` (LLM-injected, decoupled from `voice`).
 Remaining items are the serial wire format, a trained detection model, threshold
 tuning, and the Phase 10 wiring — all hardware-gated.
 
+> **2026-09-08 — vision-navigation is flag-gated OFF.** The camera runs a
+> single-class *face* model, not an obstacle/edge detector; nothing on the bot
+> perceives objects in its path. New master flag **`features.vision`** (default
+> `False`) forces `vision_safety` / `vision_perception` / `avoidance_act` /
+> `explore` off; `BehaviorDriver(vision_available=False)` drops EXPLORE,
+> recognition hop, CliffGuard reflex and "G2 meet X" enrollment;
+> `run_gait.py --skills` refuses without it. Re-enable the whole stack with
+> `G2_FEATURES="+vision"` once a real detector is deployed. Nothing deleted.
+> Rationale + the multi-class model options: `docs/research/detection-layer.md`.
+
 - **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
   cliff/edge detection, if pursued, must be a camera-based visual classifier
