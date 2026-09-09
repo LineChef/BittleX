@@ -112,11 +112,13 @@ g2promote() {
   _g2py tools/promote_to_library.py \
     "$G2_CAP_ROOT/$cls/session_$sess/curated" --library "$G2_LIB_ROOT" --class "$cls"
 }
-# g2neg [session]  -- curate an empty-room sweep as pure negatives + add to the library
-#   (capture into $G2_CAP_ROOT/negatives/session_<k>/ first, e.g. g2cam negatives <k>)
+# g2neg [session] [rotate] [min-sharpness]  -- curate an empty-room sweep as pure
+#   negatives + add to the library. min-sharpness defaults to 25 (drops the
+#   motion-blur from walking; a flat room scene still passes).
 g2neg() {
-  local sess="${1:-1}" d="$G2_CAP_ROOT/negatives/session_$sess"
-  _g2py tools/curate_captures.py "$d" "$d/curated" --all-negatives --rotate "${2:-0}"
+  local sess="${1:-1}" rot="${2:-0}" sharp="${3:-25}" d="$G2_CAP_ROOT/negatives/session_$sess"
+  _g2py tools/curate_captures.py "$d" "$d/curated" --all-negatives --rotate "$rot" \
+    --min-sharpness "$sharp"
   open "$d/curated/_contact_sheet.png" 2>/dev/null
   _g2py tools/promote_to_library.py "$d/curated" --library "$G2_LIB_ROOT"
 }
