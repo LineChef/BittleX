@@ -123,6 +123,7 @@ def main() -> None:
         os.makedirs(cls_dir, exist_ok=True)
         prefix = a.subdir or a.cls
         pi = _next_index(cls_dir, prefix)
+        unlabelled = 0
         for jpg in pos_jpgs:
             txt = jpg[:-4] + ".txt"
             dst = os.path.join(cls_dir, f"{prefix}_{pi:04d}")
@@ -130,9 +131,12 @@ def main() -> None:
             if os.path.isfile(txt):
                 shutil.copy2(txt, dst + ".txt")
             else:
-                print(f"  ! no label for {os.path.basename(jpg)} -- box it in SenseCraft/Roboflow")
+                unlabelled += 1
             pi += 1
             npos += 1
+        if unlabelled:
+            print(f"  note: {unlabelled}/{npos} have no pre-label box -- "
+                  f"box them at upload (SenseCraft auto-label / Roboflow)")
 
     ni = _next_index(neg_dir, "neg")
     nneg = 0
