@@ -221,12 +221,28 @@ def run_episode(env, model, switch, selector, cliff=None, max_steps=260, cap=Non
         if rd is not None:
             if rd.present and cur is None:
                 cur = {"x0": bx, "tall": rd.tall, "modes": {m: 0 for m in GaitMode},
-                       "zmin": bz, "zmax": bz, "steps": 0}
+                       "zmin": bz, "zmax": bz, "steps": 0,
+                       # --- "does scanning help" instrumentation ---
+                       "unresolved_seen": False,   # scan ever came back "close, can't classify"
+                       "inspect_fired": False,     # INSPECT ran during this encounter
+                       "tall_pre": ("unresolved" if rd.unresolved
+                                    else "tall" if rd.tall else "low"),  # first-sight call
+                       "tall_post": None,          # classification on the first RESOLVED read
+                                                   #   after INSPECT (what the sweep revealed)
+                       "resolved_this_tick": False}
             if cur is not None:
                 cur["modes"][mode] += 1
                 cur["zmin"] = min(cur["zmin"], bz)
                 cur["zmax"] = max(cur["zmax"], bz)
                 cur["steps"] += 1
+                if rd.present and rd.unresolved:
+                    cur["unresolved_seen"] = True
+                if mode is GaitMode.INSPECT:
+                    cur["inspect_fired"] = True
+                if (cur["inspect_fired"] and cur["tall_post"] is None
+                        and rd.present and not rd.unresolved
+                        and mode is not GaitMode.INSPECT):
+                    cur["tall_post"] = "tall" if rd.tall else "low"
                 if not rd.present:
                     cur["passed_m"] = bx - cur["x0"]
                     enc.append(cur)
@@ -270,6 +286,9 @@ def main():
     ap.add_argument("--blind-near", default="0.0",
                     help="near blind-zone radius (m); an obstacle inside it can't be "
                          "classified until INSPECT crouches. 0 = off.")
+    ap.add_argument("--no-inspect", action="store_true",
+                    help="disable the INSPECT-on-unresolved sweep in the selector "
+                         "(A/B against the default: does scanning help?)")
     ap.add_argument("--json-out", default=None)
     ap.add_argument("--gif", default=None, help="write a labelled GIF of the run here")
     ap.add_argument("--gif-stride", type=int, default=3)
@@ -283,7 +302,12 @@ def main():
     env = OpenCatGymEnv()
     model = PPO.load(args.model, device="cpu")
     switch = None if args.no_switch else make_switch(args.step_over_ref)
-    selector = None if args.no_switch else GaitSelector()
+    if args.no_switch:
+        selector = None
+    else:
+        from pi_pipeline.vision.gait_selector import GaitSelectorConfig
+        selector = GaitSelector(GaitSelectorConfig(
+            inspect_on_unresolved=not args.no_inspect))
     cliff = CliffGuard() if (switch and float(args.cliff_prob) > 0) else None
 
     tag = "SWITCH" if switch else "BASELINE"
@@ -298,6 +322,13 @@ def main():
     pitch_src = {s: [] for s in Source}
     enc_step, enc_nostep = [], []        # per-encounter passed_m, split by whether STEP_OVER fired
     cliff_eps = edge_falls = 0
+    # --- "does scanning help" tallies (per obstacle encounter) ---
+    sv = {"n": 0, "unresolved": 0, "inspect": 0,
+          "unres_traversed": 0, "unres_halted": 0, "unres_stuck": 0,
+          "post_tall": 0, "post_low": 0, "post_none": 0,
+          "wall_caught": 0,      # unresolved + INSPECT revealed TALL -> HALT (a wall the
+                                 #   no-inspect path would have tried to STEP_OVER)
+          "wall_caught_halted": 0}
     for base in offsets:
         for e in range(args.episodes):
             np.random.seed(args.seed + base + e)
@@ -315,7 +346,28 @@ def main():
                 z_src[s].extend(r.get("z_by_src", {}).get(s, []))
                 pitch_src[s].extend(r.get("pitch_by_src", {}).get(s, []))
             for en in r.get("encounters", []):
-                if en["modes"][GaitMode.HALT] > 0.5 * en["steps"]:
+                halt_dom = en["modes"][GaitMode.HALT] > 0.5 * en["steps"]
+                # scan-value tally
+                sv["n"] += 1
+                if en.get("inspect_fired"):
+                    sv["inspect"] += 1
+                if en.get("unresolved_seen"):
+                    sv["unresolved"] += 1
+                    passed = en.get("passed_m", 0.0)
+                    if halt_dom:
+                        sv["unres_halted"] += 1
+                    elif passed > 0.06:
+                        sv["unres_traversed"] += 1
+                    else:
+                        sv["unres_stuck"] += 1
+                    post = en.get("tall_post")
+                    sv["post_tall" if post == "tall" else
+                       "post_low" if post == "low" else "post_none"] += 1
+                    if post == "tall":
+                        sv["wall_caught"] += 1
+                        if halt_dom:
+                            sv["wall_caught_halted"] += 1
+                if halt_dom:
                     continue                      # wall stop -- not a traverse
                 (enc_step if en["modes"][GaitMode.STEP_OVER] > 0 else enc_nostep).append(en["passed_m"])
             print(f"[{tag} s{args.seed+base}+{e:2d}] fell={r['fell']!s:5s} fwd={r['fwd_m']:+.2f} m"
@@ -342,6 +394,9 @@ def main():
         "n_enc_stepover": len(enc_step), "n_enc_nostep": len(enc_nostep),
         "body_z_mean_by_source": {s.value: (_ms(z_src[s])[0]) for s in Source if z_src[s]},
         "body_pitch_mean_by_source": {s.value: (_ms(pitch_src[s])[0]) for s in Source if pitch_src[s]},
+        "scan_value": sv,
+        "inspect_enabled": (selector is not None and not args.no_inspect),
+        "blind_near_m": float(args.blind_near),
     }
     print(f"\n=== {tag}  {n} eps ({len(offsets)} seed offsets x {args.episodes}) ===")
     print(f"fall rate            {out['fall_rate']:.0%}  ({fell}/{n})")
@@ -362,6 +417,18 @@ def main():
         print("body-pitch by source " + "  ".join(
             f"{s.value} {out['body_pitch_mean_by_source'][s.value]:+.3f}"
             for s in Source if s.value in out["body_pitch_mean_by_source"]))
+        insp = "ON" if out["inspect_enabled"] else "OFF"
+        print(f"\n--- SCAN VALUE (INSPECT {insp}, blind-near {args.blind_near} m) ---")
+        print(f"obstacle encounters  {sv['n']}   unresolved (near blind zone) {sv['unresolved']}"
+              f"   INSPECT fired {sv['inspect']}")
+        if sv["unresolved"]:
+            u = sv["unresolved"]
+            print(f"unresolved outcome   traversed {sv['unres_traversed']}/{u}"
+                  f"   halted {sv['unres_halted']}/{u}   stuck {sv['unres_stuck']}/{u}")
+            print(f"post-INSPECT class   tall {sv['post_tall']}   low {sv['post_low']}"
+                  f"   never resolved {sv['post_none']}")
+            print(f"walls caught         {sv['wall_caught']}  (INSPECT revealed TALL; "
+                  f"no-inspect path would STEP_OVER)   -> halted {sv['wall_caught_halted']}")
     if args.json_out:
         json.dump(out, open(args.json_out, "w"), indent=2)
         print(f"wrote {args.json_out}")
