@@ -130,23 +130,35 @@ Re-run with tweaked flags freely — it's non-destructive (raw frames kept).
 
 ---
 
-## 5 · Combine sessions (and classes)
+## 5 · Promote to the library, then combine for upload
 
-`curate` names every run `pos_NNNN` / `neg_NNNN`, so a plain `cp` collides across
-sessions **and** across classes. Use the combiner — it renames to
-`<class>_s<k>_pos_NNNN.jpg` (+ matching `.txt`), tallies per class, and flags a
-forgotten `--class-id`:
+Keep two folders (see `research/capture-progress.md`): **`g2_capture_raw/`**
+(disposable — raw + curate output) and **`g2_vision_library/`** (KEEP — only
+curated, labelled, upload-ready, one subfolder per class).
+
+**Promote** each reviewed curated session into the library — it continues the
+per-class numbering and updates `_MANIFEST.md`:
 
 ```
-# layout:  <root>/<class>/session_<k>/curated/{pos_*.jpg,pos_*.txt,neg_*.jpg}
-python tools/combine_for_upload.py ~/Desktop/g2_capture --classes person,animal,ledge
-# -> ~/Desktop/g2_capture/upload/   (import THIS folder in step 6)
+python tools/promote_to_library.py \
+    ~/Desktop/g2_capture_raw/person/session_1/curated \
+    --library ~/Desktop/g2_vision_library --class person
+```
+(Idempotent — a promoted session is skipped unless `--force`.)
+
+**Combine** the library into one flat `upload/` folder when it's time to train.
+It renames to avoid collisions and rewrites each label's class-id from the
+`--classes` ORDER (so the library stays reorder-safe — the id lives in the class
+list, not baked into the files):
+
+```
+python tools/combine_for_upload.py ~/Desktop/g2_vision_library \
+    --classes person,dog,cat,ledge
+# -> ~/Desktop/g2_vision_library/upload/   (import THIS folder in step 6)
 ```
 
-The `--classes` order is the class-id order — it must match how you ran
-`curate_captures.py --class-id N` per class, and it's your `VISION_LABELS` order.
-Single-class (one person, 3 sessions) works too: `combine_for_upload.py
-~/Desktop/g2_face_capture/alex` picks up `alex/session_*/curated` on its own.
+`--classes` order = class-id order = your `VISION_LABELS`. It also runs on a raw
+root (`<class>/session_*/curated/…`) if you skip the library.
 
 ---
 

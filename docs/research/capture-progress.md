@@ -1,102 +1,141 @@
-# Multi-class detection model — capture progress
+# Multi-class detection model — capture progress + library
 
-The first multi-class model: **3 classes — `person`, `animal`, `ledge`.**
-A general-awareness model (living things + one hazard), **no individual
-recognition** (`animal` not dog/cat by name, `person` not by name — coarser
-classes are easier on a 192 px nano detector). Companion docs:
-`train-a-visual-model.md` (the end-to-end flow), `detection-layer.md` (why one
-model, the swap constraint), `capture-session-checklist.md` (the per-session
-routine).
+First multi-class model: **4 classes — `person`, `dog`, `cat`, `ledge`**
+(`ledge` last, after the camera is mounted on G2). No individual recognition —
+`person` is generic; `dog`/`cat` are the species, not named pets.
 
-> Class names are generic on purpose — nothing identifying goes in tracked files.
-> Real tags / bonds live only in the gitignored `.env`
-> (`VISION_LABELS=person,animal,ledge`, `G2_BONDS=…`).
+The point of the workflow below is a **persistent library**: every retrain just
+re-uploads the library plus whatever's new. Companion docs:
+`train-a-visual-model.md` (end-to-end), `detection-layer.md` (one-model
+constraint), `capture-session-checklist.md` (per-session routine).
+
+> Class names are generic on purpose — nothing identifying goes in tracked
+> files. Real tags / bonds live only in the gitignored `.env`
+> (`VISION_LABELS=person,dog,cat,ledge`, `G2_BONDS=…`).
+
+---
+
+## Two folders on the Desktop
+
+```
+~/Desktop/g2_capture_raw/            DISPOSABLE — raw frames + curate output
+  person/session_1/ *.jpg *.json                 (raw capture)
+  person/session_1/curated/ pos_*.jpg pos_*.txt neg_*.jpg _contact_sheet.png
+  dog/session_1/ ...
+  ...
+
+~/Desktop/g2_vision_library/         KEEP — only curated, labelled, upload-ready
+  person/  person_0001.jpg person_0001.txt ...
+  dog/     dog_0001.jpg ...
+  cat/     ...
+  ledge/   ...
+  _negatives/  neg_0001.jpg ...
+  _manifest.json   _MANIFEST.md      (running per-class counts, updated on promote)
+  upload/                            (rebuilt on demand by combine_for_upload.py)
+```
+
+`g2_capture_raw/` can be deleted any time once its sessions are promoted. The
+library is the asset — back it up.
 
 ---
 
 ## Per-class targets
 
-| id | class | target positives | difficulty | pre-label base | notes |
+| id | class | target | difficulty | pre-label base | notes |
 |---|---|---|---|---|---|
-| 0 | `person` | **~100–120** | coarse | Person Detection → auto boxes | you + spouse; close/mid/far, stand/crouch/walk; 2–3 rooms, varied light. Also the **calibration class** (train 40/80/120 subsets, find the plateau). |
-| 1 | `animal` | **~120–150** | coarse, 2 sub-types | COCO-80 model → boxes for frames it catches; hand-label the rest | dog + cat; burst-capture during normal activity, many short sessions, low yield each. |
-| 2 | `ledge` | **~200–250** | fine-grained (like the first face model) | none — hand-box every frame (Roboflow is faster for bulk) | **specific edges** (desk edge, etc.), every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered. **Capture after the camera is mounted on G2** — most POV-sensitive class. |
-| — | negatives | ~30–40 | — | — | empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line. |
+| 0 | `person` | ~100–120 | coarse | Person Detection → auto boxes | you + spouse; close/mid/far, stand/crouch/walk; 2–3 rooms, varied light. Also the **calibration class**. |
+| 1 | `dog` | ~120–150 | coarse, poor cooperation | COCO-80 model → boxes on frames it catches; hand-label rest | burst-capture during normal activity, many short sessions, low yield each. |
+| 2 | `cat` | ~120–150 | coarse, poor cooperation | COCO-80 model → boxes; hand-label rest | same. |
+| 3 | `ledge` | ~200–250 | fine-grained (like the first face model) | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered. **Do this after the G2 mount** — most POV-sensitive class. |
+| — | negatives | ~40–50 | — | — | empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line. |
 
-**Why `ledge` is 2× the others:** recognising *this* edge (not "a line") is
-fine-grained, the same overfitting problem the first single-class face model
-hit (~200+ images in practice). `person` / `animal` lean on pretrained backbones and can
-be seeded with public images, so they plateau lower.
+**Why `ledge` is ~2× the others:** recognising *this* edge (not "a line") is
+fine-grained — the overfitting problem the first single-class face model hit
+(~200+ images in practice). `person` / `dog` / `cat` lean on pretrained
+backbones and can be seeded with public images, so they plateau lower.
 
-**Multi-class balance:** the trainer weights by class frequency. If `ledge` ends
-up at 250 and `person` at 100, the model tilts toward `ledge`. Either roughly
-balance the final counts, oversample the smaller class at import, or accept the
-tilt (defensible for a hazard class).
+**Splitting `dog` + `cat`** doubles the hardest capture for the same behaviour
+("a pet is nearby") — kept separate here only because the plan wants distinct
+per-pet reactions later. If that stops mattering, merge to one `animal` class.
+
+**Class-id order is append-only.** `person,dog,cat,ledge` = ids 0–3. Add a class
+later → it's id 4, existing ids don't move. `combine_for_upload.py` rewrites each
+label's id from the `--classes` order, so the library itself stays reorder-safe.
 
 ---
 
-## POV rule (applies to every class)
+## POV rule (every class)
 
 Capture from **G2's mounted-camera POV — ~8–10 cm off the floor, slight upward
 tilt.** A shoe from standing height ≠ a shoe from shin height; the model won't
-transfer. If the camera isn't on the body yet: hand-hold at that height/angle for
-`person` / `animal` now, and plan a top-up pass once mounted. Do `ledge` only
-after the mount.
+transfer. Camera not on the body yet → hand-hold at that height/angle for
+`person` / `dog` / `cat` now; plan a top-up pass once mounted. `ledge` waits for
+the mount.
+
+---
+
+## The loop (per class, per session)
+
+```bash
+source pi_pipeline/.venv/bin/activate
+CLASS=person; K=1                          # <-- set these
+RAW=~/Desktop/g2_capture_raw/$CLASS/session_$K
+LIB=~/Desktop/g2_vision_library
+
+# 1. capture
+export G2_CAP_OUT=$RAW G2_CAP_LABEL=$CLASS G2_CAM_RES=1
+mkdir -p "$RAW"; rm -f "$RAW"/*.jpg "$RAW"/*.json
+python tools/camera_preview.py & open http://localhost:8080
+#   ... pose set — see capture-session-checklist.md ...
+pkill -f camera_preview.py
+
+# 2. curate  (--target per the table; --class-id matches the id column)
+python tools/curate_captures.py "$RAW" "$RAW/curated" \
+    --positives 150 --negatives 15 --class-id 0 --rotate 0 --target 120
+
+# 3. review $RAW/curated/_contact_sheet.png — upright? poses varied? boxes sane?
+#    fix any bad rotation with a different --rotate and re-run step 2.
+
+# 4. promote the good set into the library
+python tools/promote_to_library.py "$RAW/curated" --library "$LIB" --class $CLASS
+#    -> updates _MANIFEST.md with the new running counts
+```
+
+Repeat for every class / session. When ready to (re)train:
+
+```bash
+python tools/combine_for_upload.py ~/Desktop/g2_vision_library \
+    --classes person,dog,cat,ledge
+#   -> ~/Desktop/g2_vision_library/upload/   — import THIS into a SenseCraft
+#      multi-class Object Detection project (walkthrough §6)
+```
+
+`.env` on deploy (and flip the nav stack on at the same time):
+```
+VISION_LABELS=person,dog,cat,ledge
+G2_BONDS=person:0.5:curious, dog:0.7:playful, cat:0.6:curious
+G2_FEATURES="+vision"
+```
 
 ---
 
 ## Progress log
 
-Update after each `curate_captures.py` run (it prints the running total; use
-`--target` per the table above so the tally reports against the right goal).
+Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promote.
 
-| date | class | session | usable pos | usable neg | class total | notes |
+| date | class | session | promoted pos | promoted neg | library total (class) | notes |
 |---|---|---|---|---|---|---|
 | _pending_ | person | 1 | — | — | — | first session + calibration set |
 | | | | | | | |
 
-**Calibration checkpoint (`person`):** after ~120 usable, train SenseCraft quick
-models on 40 / 80 / 120 subsets, run each through
+**Calibration checkpoint (`person`, after ~120 in the library):** train
+SenseCraft quick models on 40 / 80 / 120 subsets, run each through
 `python -m pi_pipeline.vision serial <port>`, record detection rate / confidence
-/ flicker. Plateau point = the real per-coarse-class budget → adjust `animal`
-target, and gauge whether capture quality is good enough this round.
+/ flicker. Plateau = the real per-coarse-class budget → adjust the `dog`/`cat`
+targets, and confirm capture quality is good enough this round.
 
 | subset | detection rate | mean conf | flicker | verdict |
 |---|---|---|---|---|
 | 40 | | | | |
 | 80 | | | | |
 | 120 | | | | |
-
----
-
-## Workflow (per class, per session)
-
-```bash
-source pi_pipeline/.venv/bin/activate
-export G2_CAP_OUT=~/Desktop/g2_capture/<class>/session_<k>
-export G2_CAP_LABEL=<class> G2_CAM_RES=1
-mkdir -p "$G2_CAP_OUT"; rm -f "$G2_CAP_OUT"/*.jpg "$G2_CAP_OUT"/*.json
-python tools/camera_preview.py & open http://localhost:8080
-#   ... capture (see capture-session-checklist.md) ...
-pkill -f camera_preview.py
-
-python tools/curate_captures.py "$G2_CAP_OUT" "$G2_CAP_OUT/curated" \
-    --positives <target> --negatives 15 --class-id <id> --rotate 0 --target <goal>
-```
-
-When all classes/sessions are curated:
-
-```bash
-python tools/combine_for_upload.py ~/Desktop/g2_capture --classes person,animal,ledge
-#   -> ~/Desktop/g2_capture/upload/   (import into a SenseCraft multi-class
-#      Object Detection project — walkthrough §6)
-```
-
-`.env` on deploy:
-```
-VISION_LABELS=person,animal,ledge
-G2_BONDS=person:0.5:curious, animal:0.7:playful
-```
-Re-enable the vision-navigation stack at the same time: `G2_FEATURES="+vision"`
-(it's held off by default until a real detector exists — see
-`detection-layer.md`).
