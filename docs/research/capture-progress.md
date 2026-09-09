@@ -162,10 +162,16 @@ up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
 | subset | det rate | conf mean | conf p10 (floor) | flicker /min | verdict |
 |---|---|---|---|---|---|
 | 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank; camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.) |
-| 80 (eff. ~75) | 0% (1/384) | 79 | 79 | 2.4 | **FAIL** — fired once at conf 79, then nothing. Barely-started underfit: high precision (when it fires it's sure), ~zero recall. Curve is a cliff, not a ramp. |
-| 120 | _skipped — cliff, jump to full set_ | | | | |
+| 80 (eff. ~75) | 0% (1/384) | 79 | 79 | 2.4 | **FAIL** — fired once at conf 79, then nothing. High precision, ~zero recall — underfit. |
+| 120 | | | | | _next — the informative point between "80 fails" and the original ~161-image model that worked_ |
 | 160 | | | | | |
-| 238 (all) | | | | | |
+| 238 (all) | | | | | _only if 120 also near-zero — a pipeline sanity check (this is a superset of the known-good ~161)_ |
+
+> The original single-class face model (~161 of these same images, old weaker
+> dedup) worked well — empty room quiet, walk-ins acquired instantly, score
+> ~60–80. So the ceiling is known; the experiment is only about **how far down**
+> the count can go. Testing the full 238 re-proves the ceiling and wastes a
+> cycle unless 120 fails and we need to rule out a pipeline regression.
 
 | empty-scene run | false-fire rate | worst score | verdict |
 |---|---|---|---|
