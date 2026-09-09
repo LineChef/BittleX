@@ -92,6 +92,10 @@ def main() -> None:
     ap.add_argument("--neg-limit", type=int, default=0,
                     help="cap negatives at N, evenly spread (keep the neg:pos ratio "
                          "sane -- ~10-25%% of the positive count)")
+    ap.add_argument("--images-only", action="store_true",
+                    help="write ONLY the .jpg files (no .txt / classes.txt / data.yaml) "
+                         "-- for the SenseCraft browser + auto-label flow where the "
+                         "label files just clutter the picker")
     a = ap.parse_args()
 
     root = os.path.expanduser(a.root)
@@ -127,7 +131,9 @@ def main() -> None:
         for jpg, txt, tag in src:
             base = f"{cls}_{tag}_{cpos + 1:04d}"
             shutil.copy2(jpg, os.path.join(out, base + ".jpg"))
-            if txt:
+            if a.images_only:
+                pass
+            elif txt:
                 _relabel(txt, os.path.join(out, base + ".txt"), cid, relabel)
             else:
                 missing += 1
@@ -149,14 +155,15 @@ def main() -> None:
     print(f"  [-]  negatives  {grand_neg:4d} images{cap}")
 
     # class list files -- Roboflow wants these on YOLO import; SenseCraft ignores
-    # extras harmlessly.
-    with open(os.path.join(out, "classes.txt"), "w") as f:
-        f.write("\n".join(classes) + "\n")
-    with open(os.path.join(out, "data.yaml"), "w") as f:
-        f.write(f"nc: {len(classes)}\nnames: [{', '.join(classes)}]\n"
-                f"train: .\nval: .\n")
+    # extras harmlessly. Skipped for --images-only (pure jpg drop).
+    if not a.images_only:
+        with open(os.path.join(out, "classes.txt"), "w") as f:
+            f.write("\n".join(classes) + "\n")
+        with open(os.path.join(out, "data.yaml"), "w") as f:
+            f.write(f"nc: {len(classes)}\nnames: [{', '.join(classes)}]\n"
+                    f"train: .\nval: .\n")
 
-    if missing:
+    if missing and not a.images_only:
         print(f"\n  ! {missing} positives have NO label .txt -- these need boxing "
               f"(SenseCraft labeller, or Roboflow). Usually just the 'ledge' class.")
     print(f"\n  total: {grand_pos} positives ({grand_pos - missing} already labelled) "
