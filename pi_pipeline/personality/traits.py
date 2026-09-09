@@ -41,13 +41,20 @@ class BehaviorParams:
     vocalize_prob: float = 0.20            # 0..1 chance of an unprompted cue on an event
     fidget_prob: float = 0.05             # 0..1 chance of a small idle movement per idle tick
 
+    # --- idle posture timing (BehaviorDriver feeds these into IdlePostureConfig) ---
+    idle_sit_secs: float = 20.0           # quiet before ACTIVE -> SIT
+    idle_rest_secs: float = 90.0          # more quiet in SIT before SIT -> RESTING
+    # NOTE: no trait biases these yet -- which traits nudge them, and how much,
+    # is the same open "which traits, how much" call as the rest of the layer.
+
     # --- caution (feeds Avoider / terrain thresholds later) ---
     caution: float = 0.50                # 0..1 how early to slow / stop near obstacles & edges
 
     _UNIT_FIELDS = ("novelty_pull", "wander_turn_bias", "vocalize_prob",
                     "fidget_prob", "caution")
     _MIN_SECS = {"idle_secs_before_explore": 5.0, "explore_leg_secs": 1.0,
-                 "investigate_secs": 0.5, "revisit_secs": 10.0}
+                 "investigate_secs": 0.5, "revisit_secs": 10.0,
+                 "idle_sit_secs": 2.0, "idle_rest_secs": 5.0}
 
     def clamp(self) -> "BehaviorParams":
         for f in self._UNIT_FIELDS:

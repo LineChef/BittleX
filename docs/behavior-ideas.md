@@ -489,29 +489,41 @@ is ~1–2 s so only fold when idle > a few seconds.
       emits `PEEK` / `LIFE_SIGN` on the right triggers. Pure FSM + clock, 11
       tests, `last_reason` for diag. **Emits abstract actions only.**
 
-**TODO — the motion / "feels alive" layer (nothing in a live pipeline runs any of this yet)**
-- [ ] **Driver loop** — call `IdlePosture.update()` each tick with the real
-      inputs (last-command time, active-task flag, `Mode`, person-detected,
-      IMU-level/held/recovering), map `PostureAction` → OpenCat command
-      sequences, emit the `posture.transition` diag event with `last_reason`.
-- [ ] **Settle animation** — before `GO_REST`: a look-around (head pan), a
-      weight shift, an optional "sigh" cue. Dog-circling-before-lying-down.
-- [ ] **PEEK choreography** — the head-pan sweep + hold the `PEEK` action stands
-      for (currently a no-op).
-- [ ] **Breathing bob** — the small periodic body-height oscillation for
-      `LIFE_SIGN` (config `breathing`, currently a no-op).
-- [ ] **WAKE choreography** — the timed head-up → stretch (`str`) → stand
-      (`kup`) sequence; call `wake_done()` when it finishes.
-- [ ] **Graduated response motions** — distant sound → head turn only vs. full
-      rouse; picked up → snap to a safe posture. (FSM branches exist; motions
-      don't.)
+**The driver loop is built** (`pi_pipeline/behavior/driver.py`, 2026-09-08):
+`BehaviorDriver.tick(DriverInputs) -> DriverTick` composes `ModeController` +
+`Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` + `Enrollment` +
+optional `CliffGuard` and returns an ordered list of abstract `Effect`s
+(SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG). Still no I/O
+— a binding layer on the robot maps effects onto the actuator / TTS / frame
+grabber / session log. Priority: enrollment > running choreography (safety
+preempts) > CliffGuard reflex > CONVERSE > EXPLORE (+ sniff at a find) > IDLE
+descent (+ idle fidgets when settled). Recognition of a bonded label after an
+absence fires one excited hop. 11 tests, `last_reason` + `DIAG` effects for diag.
+
+**TODO — the motion / "feels alive" layer**
+- [x] **Driver loop** — `BehaviorDriver` (above). Emits `DIAG ("posture", ...)`
+      / `("mode", ...)` / `("enroll", ...)` transition events with `last_reason`.
+- [x] **Settle animation** — `_settle_steps`: look-around (head pan) + weight
+      shift, then the rest skill. Runs as a timed choreography before lie-down.
+- [x] **PEEK choreography** — `_peek_steps`: head-pan sweep + back to centre.
+- [ ] **Breathing bob** — driver emits `Effect(HEAD, "bob")` on `LIFE_SIGN`;
+      the actual body-height oscillation is still caller-side (needs `m`-command
+      or a keyframe). Config `breathing` off by default.
+- [x] **WAKE choreography** — `_wake_steps`: head-up → `kstr` → `kup`, then
+      `on_done` calls `idle.wake_done()`. Also armed when `IdlePosture` enters
+      WAKING via `on_activity()` (loud sound / picked up), not just via a
+      returned WAKE action.
+- [~] **Graduated response motions** — `loud_sound` → full rouse; `nearby_motion`
+      → PEEK (stay down); `picked_up`/`held` → clear any settle choreo and snap
+      to WAKING. A *distant* sound → head-turn-only (no rouse) is not yet a
+      distinct input.
 - [ ] **Sound / LED life signs** — soft sound in deep rest, eye/status LED
-      flicker while resting.
-- [ ] **Personality → idle timing** — add `idle_sit_secs` / `idle_rest_secs`
-      to `BehaviorParams`, a `Personality.idle_posture_config()` builder, and
-      decide which traits bias them (lazy/calm rests sooner, alert/energetic
-      stays up) — needs the same "which traits, how much" call as the rest of
-      this.
+      flicker while resting. (No CUE/LED effects emitted while RESTING yet.)
+- [~] **Personality → idle timing** — `idle_sit_secs` / `idle_rest_secs` added to
+      `BehaviorParams` (with clamp mins) and wired: `BehaviorDriver` builds
+      `IdlePostureConfig` from them unless the caller pins one. Still open: which
+      traits bias them and how much — the same "which traits, how much" call as
+      the rest of this layer; no trait touches them yet.
 - [ ] **On-demand vision gate** — **blocked on the camera** (expected
       ~2026-09-05 evening; confirm in hand). Split into two consumers, not one
       throttled feed: (a) a lean **edge-safety stream** (small model, low res,

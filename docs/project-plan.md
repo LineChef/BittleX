@@ -916,9 +916,23 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
 
 ### Ready logic, not yet wired to a runtime
 
-Built + unit-tested pure-logic modules waiting on the Phase 10 runtime loop
-(and, where noted, hardware). "Wire" = feed them their inputs each tick and act
-on their outputs in an actual control/behaviour loop.
+Built + unit-tested pure-logic modules. "Wire" = feed them their inputs each
+tick and act on their outputs in an actual control/behaviour loop.
+
+**The behaviour driver loop is built** (`pi_pipeline/behavior/driver.py`,
+2026-09-08). `BehaviorDriver.tick(DriverInputs) -> DriverTick` composes
+`ModeController` + `Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` +
+`Enrollment` + optional `CliffGuard` and returns an ordered list of abstract
+`Effect`s (SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG).
+It runs today against mock feeds + a fake clock (11 tests). Still needs, on
+hardware: the **binding layer** that maps `Effect`s onto the real
+actuator / TTS / frame-grabber / session log, plus the input plumbing (vision
+frame, IMU state, mic events). The `DIAG` effects are the hook for Diagnostics
+Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
+personality→idle-timing knobs, sniff-on-investigate, greeting-on-enrollment and
+excited-hop-on-recognition are all wired *inside* the driver now — see
+`docs/behavior-ideas.md` for the per-item status (a few sub-items, e.g. the
+breathing-bob motion and LED life-signs, are still caller-side).
 
 - [ ] **CARPET MODE — important; G2 stalls on carpet blind-forward.**
       `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested) is the decision
@@ -939,18 +953,15 @@ on their outputs in an actual control/behaviour loop.
   - **Optional, better:** retrain the walk with `CARPET` domain-randomisation so
     the RL policy itself handles pile (backlog H10 covers the carpet sysid);
     then `CARPET_GAIT` hand-off is only for deep pile.
-- [ ] **Personality gestures** — `pi_pipeline/behavior/gestures.py`
-      (`GesturePicker`, tested). Wire into the Phase 10 behaviour loop:
-  - idle fidgets: `picker.update(idle_quiet_s, can_gesture=<sitting & level &
-    no task>)` each idle tick → send `GESTURE_TOKEN[g]`, wait for it to finish.
-  - `picker.greeting()` when `Enrollment` enters `GREETING` (and on a "say hi"
-    voice intent) → wave / shake-paw / play-bow.
-  - `picker.sniff_find()` on `ExploreAction.INVESTIGATE` at a novel object.
-  - `picker.excited_hop()` when `bonds` recognises a person after an absence, or
-    a standout find. Loud — keep the hard cooldown.
-- [ ] **Idle-posture descent** (`behavior/idle_posture.py`) — already has the
-      SIT / REST / WAKE state machine; wire `str` (stretch) into the WAKE
-      choreography and `zz` into a deep-sleep variant of RESTING for sleep mode.
+- [x] **Personality gestures** — `GesturePicker` is now driven by
+      `BehaviorDriver`: idle fidgets while sitting & settled, `greeting()` on
+      `Enrollment` GREETING, `sniff_find()` on `ExploreAction.INVESTIGATE`,
+      `excited_hop()` on a bonded label seen after an absence (driver takes the
+      roster as `DriverInputs.known_person_labels`; `bonds` stays un-imported).
+      A "say hi" voice intent still needs a hook.
+- [x] **Idle-posture descent** — driven by `BehaviorDriver`; `kstr` is wired
+      into the WAKE choreography. Still open: `zz` (`opencat.SLEEP`) as a
+      deep-sleep variant of RESTING for sleep mode.
 - [ ] **INSPECT peer bow** — done + sim-validated (`buttUp_ref`, +22° nose-down);
       the earlier "author on hardware" caveat is resolved. Confirm on the real
       robot that the mounted camera's downward view actually improves the near
