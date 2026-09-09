@@ -400,7 +400,8 @@ def _session_tally(out_dir: str, n_pos: int, n_neg: int, target: int = 100) -> s
 def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
     L = []
     L.append(f"curated {len(frames)} frames  ->  {len(pos)} positives, {len(neg)} negatives")
-    L.append(f"pre-labels: {'YES (from detection boxes)' if have_boxes else 'NO (no sidecars) -- label at upload'}")
+    L.append("pre-labels: " + ("NONE -- every frame is the class, box at upload" if c.all_positives
+             else "YES (from detection boxes)" if have_boxes else "NO (no sidecars) -- label at upload"))
     L.append("browser upload: point SenseCraft at  " + os.path.join("<session>", "curated", "images_only") + "  (JPEGs only, Cmd+A)")
     L.append(f"rotate: {c.rotate} deg CW   class_id: {c.class_id}")
     if rej:
@@ -410,8 +411,8 @@ def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
         s = [f.sharp for f in pos]
         L.append(f"kept brightness: {min(b):.0f}..{max(b):.0f} (mean {sum(b)/len(b):.0f})   "
                  f"sharpness: {min(s):.0f}..{max(s):.0f}")
-        if have_boxes:
-            fr = [(f.box[2]*f.box[3])/(f.frame_px**2) for f in pos if f.box]
+        fr = [(f.box[2]*f.box[3])/(f.frame_px**2) for f in pos if f.box]
+        if fr:
             L.append(f"kept face-size (frac of frame): {min(fr):.2f}..{max(fr):.2f} (mean {sum(fr)/len(fr):.2f})")
         # balance hints
         if max(b) - min(b) < 30:
