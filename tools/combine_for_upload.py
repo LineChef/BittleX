@@ -134,13 +134,23 @@ def main() -> None:
         shutil.copy2(jpg, os.path.join(out, f"negative_{grand_neg:04d}.jpg"))
     print(f"  [-]  negatives  {grand_neg:4d} images")
 
+    # class list files -- Roboflow wants these on YOLO import; SenseCraft ignores
+    # extras harmlessly.
+    with open(os.path.join(out, "classes.txt"), "w") as f:
+        f.write("\n".join(classes) + "\n")
+    with open(os.path.join(out, "data.yaml"), "w") as f:
+        f.write(f"nc: {len(classes)}\nnames: [{', '.join(classes)}]\n"
+                f"train: .\nval: .\n")
+
     if missing:
-        print(f"\n  ! {missing} positives have NO label .txt -- box them at upload time")
-    print(f"\n  total: {grand_pos} labelled positives + {grand_neg} negatives, "
-          f"{len(classes)} classes")
+        print(f"\n  ! {missing} positives have NO label .txt -- these need boxing "
+              f"(SenseCraft labeller, or Roboflow). Usually just the 'ledge' class.")
+    print(f"\n  total: {grand_pos} positives ({grand_pos - missing} already labelled) "
+          f"+ {grand_neg} negatives, {len(classes)} classes")
     print(f"  VISION_LABELS={','.join(classes)}")
     print(f"\n  next: import {out}/ into a SenseCraft multi-class Object Detection "
-          f"project (walkthrough section 6).")
+          f"project (walkthrough section 6). The .txt files import as pre-drawn "
+          f"boxes -- do NOT run SenseCraft auto-label.")
 
 
 if __name__ == "__main__":

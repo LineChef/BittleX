@@ -181,13 +181,41 @@ root (`<class>/session_*/curated/…`) if you skip the library.
 2. **Step 1** — object name: `alex`.
 3. **Step 2** — skip the "Connect" (that's live capture; you have files).
 4. **Step 3** — **Import Dataset** → your `upload/` folder. The `.txt` files are
-   YOLO pre-labels; images land under **Labeled** with boxes drawn.
-   - Review each box; tighten to the face if needed. Assign class `alex`.
+   YOLO pre-labels; images land under **Labeled** with boxes **already drawn**.
+   - **Do NOT run SenseCraft's auto-label** — it single-classes everything. The
+     `.txt` files already carry the right class per image.
+   - Review the boxes; assign each class-id to its name (`0`→`person`, …).
    - Unlabeled (no-box) frames: box them by hand, or delete.
-   - Negatives: leave unlabeled. Delete any that actually show you.
-   - Need ≥10 labeled; aim for all ~100+.
+   - Negatives: leave unlabeled. Delete any that actually show a class.
+   - Need ≥10 labeled; aim for all.
 5. **Step 4** — target device **Grove Vision AI V2** → **Start Training**
    (~10–30 min, cloud).
+
+### Where the labels come from — you barely label anything
+
+Object detection is **one flat dataset, all classes uploaded together**; the
+class is set by the id in each `.txt`, not by folders. There is no "upload one
+class at a time" and there never will be — the model trains on all classes
+jointly. `combine_for_upload.py --classes a,b,c` builds that folder and writes
+`classes.txt` / `data.yaml` alongside.
+
+The boxes are made **at capture time**, not by you:
+
+| class | box source | your effort |
+|---|---|---|
+| `person` | Person-Detection base model → `.json` sidecar → `curate` writes the `.txt` | **none** — already labelled in the library |
+| `dog`, `cat` | capture with a **COCO-80** model loaded → sidecar has dog/cat boxes → `curate` writes `.txt` | none for frames it caught; hand-box the misses |
+| `ledge` | nothing auto-detects it | **box it** — see below |
+
+**Labelling `ledge`** (the only real work): it's one repeated object on a slow
+pan, so —
+- **Roboflow** is fastest: upload just the `ledge` images, use *Label Assist* /
+  "repeat previous box", export **YOLO v8**, drop the `.txt` files next to the
+  jpgs, `g2promote ledge`. ~20-30 min for ~200 frames.
+- **Or** box ~1 frame in 10 in any labeller, then
+  `python tools/interp_labels.py <curated_dir> --class-id 3` interpolates a box
+  onto every frame between your keyframes; spot-check the ones it flags as far
+  from a keyframe, then promote.
 
 ### Multi-class -- training ON TOP OF person detection
 
