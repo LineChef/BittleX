@@ -163,9 +163,19 @@ up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
 |---|---|---|---|---|---|
 | 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank; camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.) |
 | 80 (eff. ~75) | 0% (1/384) | 79 | 79 | 2.4 | **FAIL** — fired once at conf 79, then nothing. High precision, ~zero recall — underfit. |
-| 120 | | | | | _next — the informative point between "80 fails" and the original ~161-image model that worked_ |
-| 160 | | | | | |
-| 238 (all) | | | | | _only if 120 also near-zero — a pipeline sanity check (this is a superset of the known-good ~161)_ |
+| 120 (eff. ~118) | **100%** (461/461) | 91 | 84 | 0 | **PASS** — maxed out: 100% detection, floor 84 (≈2× the bar), zero flicker. Tested in a non-training room. |
+| 160 | _not run_ | | | | can't beat 100% detection; floor 84 leaves no meaningful headroom |
+| 238 (all) | _not run_ | | | | ceiling already known; 120 settles it |
+
+### Result: **~120 images per class**
+
+40 → 0/462, 80 → 1/384, **120 → 461/461**. The curve is a cliff, not a ramp —
+near-nothing until ~100, then it snaps to reliable. Budget **~120 (round to
+120–130 for margin)** per class for `<you>`, `<spouse>`, and as the starting
+target for `dog` / `cat`. `ledge` still gets more (~200–250) — it's the
+hardest-to-generalise class.
+Auto-label attrition ran ~10–15% (120 uploaded → ~118 trained), so capture
+~140 raw per class to land ~120 trained.
 
 > The original single-class face model (~161 of these same images, old weaker
 > dedup) worked well — empty room quiet, walk-ins acquired instantly, score
