@@ -66,8 +66,48 @@ learned gait, like the `vision/avoidance.py` pattern. Firmware-side for the
 feedback read (skips the serial round-trip). **Needs vision + hardware;** revisit
 once the vision module is installed and working. Related: the blind-clearance
 tradeoff (rejected as a standalone — costs speed/stability every step for an
-occasional benefit) and the front-foot **jam reflex** (feedback-only version of
-the same idea).
+occasional benefit) and **B9a**, the feedback-only jam reflex below.
+
+### B9a — Feedback-only jam reflex  🔴  (implement when hardware arrives)
+
+The vision-free half of B9, split out as its own task **now that the whole
+vision-navigation stack is flag-gated off** (`features.vision` default `False` —
+the camera only has a single-class face model, no obstacle detector). This is
+G2's "Roomba bump sensor" with no bump switch: the servos are the sensor.
+
+**Signal:** commanded joint angle vs. servo-reported actual angle on the
+forward-driving front-leg joints. Under normal load actual tracks commanded
+within a small error; when a foot is pressed against something immovable the
+servo strains at full torque but can't reach target, so the error stays wide
+open. Sustained divergence on those joints = "pushing against something, not
+moving."
+
+**Reflex:** a small threshold check outside the gait policy (same shape as
+`CliffGuard` / `ThermalGuard` — pure logic + tuned constants). On sustained
+front-leg divergence while a forward command is active → stop, back up a step,
+turn to a new heading, resume. Contact-triggered bump-and-turn.
+
+**Catches:** front feet jammed against a solid obstacle while walking forward.
+**Does NOT catch:** drop-offs (a foot finds *no* floor — opposite signal, needs
+its own check), soft obstacles, anything off to the side, anything not yet
+touched. Purely reactive, fires after contact.
+
+**Why hardware-gated (the trigger):** the divergence threshold can't be set
+without the real robot — normal carpet load, a leg brushing another leg,
+stepping a small bump, and working into a slope all produce divergence too, and
+Bittle is light (~290 g) + slow so the strain signal may be weak. Also need to
+confirm on hardware **which servos report feedback and at what rate**
+(`f` / `readAllFeedbackFast()` — "if supported"; `docs/research/hardware-specs.md`
+"Servo position feedback", `docs/research/petoi-firmware-reference.md`).
+
+**Build sketch:** `pi_pipeline/gait/jam_guard.py` — `JamGuard.update(cmd_deg[],
+fbk_deg[]) -> JamAction (NONE | BACK_OFF | TURN_AWAY)`, windowed per-joint error
+with enter/clear hysteresis, cooldown after a fire; wire into `run_gait.py` the
+way `CliffGuard` is (a reflex that can preempt the policy), emit a `jam.detected`
+diag event. Same proprioceptive family as carpet mode (`gait/carpet.py`), one
+level down: carpet compares commanded vs. actual *forward speed*; this compares
+commanded vs. actual *joint angle*. Unit-testable now against synthetic
+cmd/feedback traces; the constants wait for the bench.
 
 ### B13 — Climb as a separate skill policy
 Real climbing — surfaces taller than G2's standing height: full stairs, a curb it

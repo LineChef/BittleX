@@ -128,6 +128,14 @@ steps by hand from `pi-bring-up.md` — same content.
    actuator model if a retrain is warranted.
 9. `pi_pipeline/benchmark_pi.py` — full voice+API benchmark (audio wheels are the
    fragile part; `pi-bring-up.md` §7). Independent of the gait work.
+9a. **Feedback jam reflex (B9a)** — vision-free "Roomba bump" using
+    commanded-vs-actual front-leg joint angle as the contact sensor. First
+    confirm the servos report feedback and at what rate (`f` /
+    `readAllFeedbackFast()`), log a few walk-into-a-wall traces alongside normal
+    walking / carpet / small-bump traces, then build `gait/jam_guard.py`
+    (`JamGuard.update(cmd_deg, fbk_deg) -> NONE | BACK_OFF | TURN_AWAY`) and wire
+    it into `run_gait.py` like `CliffGuard`. The threshold tuning is the whole
+    job and needs those real traces. Full spec: `docs/behavior-ideas.md` **B9a**.
 10. **Rename `run20m_ppo`** once it has walked on the real robot and passed H1.
     The name is a training artefact ("a 20M-step PPO run"); after it's the
     shipped gait it should say what it *is* — e.g. `gait_v1` / `walk_ppo_v1` /
