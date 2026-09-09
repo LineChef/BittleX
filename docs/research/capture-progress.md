@@ -161,7 +161,7 @@ up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
 
 | subset | det rate | conf mean | conf p10 (floor) | flicker /min | verdict |
 |---|---|---|---|---|---|
-| 40 | | | | | |
+| 40 | 0% | — | — | 0 | **FAIL** — 0/462 frames, incl. point-blank; camera_preview hit-rate 0% too. Same images trained a working single-class model earlier at ~161, so it's a convergence-floor thing: 40 is too few for the nano detector. (SenseCraft auto-label: 43 labelled / 9 unlabelled — 3 negatives got a spurious box for the class.) |
 | 80 | | | | | |
 | 120 | | | | | |
 | 160 | | | | | |
