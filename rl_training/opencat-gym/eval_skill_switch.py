@@ -84,7 +84,9 @@ def _load(name):
 def make_switch(step_over_ref="tr_ref.npy"):
     refs = SkillRefs(
         step_over=_load(step_over_ref),         # trot (default -- beat the authored high-step in A/B) or highstep_ref
-        inspect=_load("cr_ref.npy"),            # crouch -- pitches the mast down
+        inspect=_load("buttUp_ref.npy"),        # Petoi play-bow: front-low / rear-high,
+                                               # NOSE-DOWN -> the mast actually pitches at the
+                                               # near ground (cr_ref was a level crouch)
         back_out=_load("bk_ref.npy"),           # walk backward
         stance=WKF_REF.mean(axis=0),            # neutral four-foot pose
     )

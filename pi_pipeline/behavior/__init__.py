@@ -10,6 +10,7 @@ from .enrollment import (
     build_script, count_completed_sessions, new_session_dir, mark_session_done,
 )
 from .explore import ExploreAction, ExploreConfig, ExploreDecision, Explorer
+from .gestures import Gesture, GestureConfig, GesturePicker, GESTURE_TOKEN
 from .idle_posture import IdlePosture, IdlePostureConfig, Posture, PostureAction
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
@@ -17,6 +18,7 @@ from .novelty import Novelty, NoveltyConfig
 __all__ = [
     "ModeController", "Mode", "ModeConfig",
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
+    "Gesture", "GestureConfig", "GesturePicker", "GESTURE_TOKEN",
     "Novelty", "NoveltyConfig",
     "IdlePosture", "IdlePostureConfig", "Posture", "PostureAction",
     "Enrollment", "EnrollmentConfig", "EnrollAction", "EnrollState", "EnrollTick",

@@ -26,6 +26,25 @@ Curiosity (via `BehaviorParams`) makes it linger longer on a find, range wider
 per leg, regain interest in seen things faster, and — above ~0.6 — actually
 walk up to a novel object instead of only turning to look at it.
 
+## `GesturePicker` — expressive Petoi behaviours (`gestures.py`)
+
+The little "alive" moves, each a built-in OpenCat skill (`link/opencat.py`
+tokens, `_ref.npy` for sim). Pure logic + a clock; the caller sends the token
+and waits for it to finish, gated on "safe to gesture" (sitting, level, no task).
+
+- **`update(idle_quiet_s, can_gesture)`** — while idle, occasionally emits an
+  idle fidget: `STRETCH` / `SCRATCH` / `SNIFF` / `NOD` / `SIT_SHIFT`. Weighted,
+  Poisson-ish spacing (`idle_interval_s`), per-gesture cooldown so it never
+  repeats or spams.
+- **`greeting()`** — one `WAVE` / `SHAKE_PAW` / `PLAY_BOW` at the start of a
+  meeting. Call it when `Enrollment` enters `GREETING`, or on a "say hi" intent.
+- **`sniff_find()`** — `SNIFF` when `Explorer` lands on a novel object
+  (`ExploreAction.INVESTIGATE`).
+- **`excited_hop()`** — a `HOP` (`kjpF`) for recognising a bonded person after a
+  while / a big find. Hard rate-limited — it's loud.
+
+`Gesture.PLAY_BOW` is also the gait layer's INSPECT peer pose (`buttUp_ref`).
+
 ## `Novelty` — what's been seen
 
 Time-decayed record of detection labels and coarse heading bins. `revisit_secs`

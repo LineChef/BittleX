@@ -61,18 +61,23 @@ def build(name):
         body = np.array(nums[4:4 + period * WALKING_DOF], dtype=float) * ratio
         frames_petoi = body.reshape(period, WALKING_DOF)
         kind = "gait"
-    elif period < -1:                                # behaviour
+    elif period <= -1:                               # behaviour (period == -1 -> single keyframe)
         n = abs(period)
         stride = FULL_DOF + BEHAVIOUR_EXTRA
         body = np.array(nums[7:7 + n * stride], dtype=float).reshape(n, stride) * ratio
         frames_petoi = body[:, 8:16]                 # leg joints only (DOF 8..15)
         period = n
         kind = "behaviour (approx -- keyframes, not a phase loop)"
+    elif period == 1:                                # static posture: one full-DOF row
+        row = np.array(nums[4:4 + FULL_DOF], dtype=float) * ratio
+        frames_petoi = row[8:16].reshape(1, WALKING_DOF)   # 8 leg joints
+        kind = "posture (single frame)"
     else:
-        raise SystemExit(f"{name}: period={period} is a static posture, not supported")
+        raise SystemExit(f"{name}: period={period} not supported")
 
     frames_urdf_deg = frames_petoi[:, PETOI_TO_URDF]
-    ref_rad = _resample(frames_urdf_deg, period)
+    ref_rad = (np.deg2rad(frames_urdf_deg) if period == 1
+               else _resample(frames_urdf_deg, period))
 
     out_name = re.sub(r"(F|L)$", "", name) + "_ref.npy"
     np.save(HERE / out_name, ref_rad)
@@ -82,8 +87,9 @@ def build(name):
     print(f"                 max {deg.max(0).round(0).astype(int).tolist()}")
     try:
         wkf = np.rad2deg(np.load(HERE / "wkf_ref.npy"))
-        print(f"  mean |{name} - wkF| = {np.abs(deg - wkf).mean():.1f} deg   "
-              f"knee-swing range vs wkF: {deg[:,1::2].ptp():.0f} vs {wkf[:,1::2].ptp():.0f}")
+        if deg.shape == wkf.shape:
+            print(f"  mean |{name} - wkF| = {np.abs(deg - wkf).mean():.1f} deg   "
+                  f"knee-swing range vs wkF: {deg[:,1::2].ptp():.0f} vs {wkf[:,1::2].ptp():.0f}")
     except FileNotFoundError:
         pass
     print(f"  wrote {out_name}  {ref_rad.shape}  (radians, URDF order)")

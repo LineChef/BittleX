@@ -61,6 +61,26 @@ STAND = "kup"                   # neutral standing posture
 WALK_LEFT = "kwkL"              # curved walk left / near-zero-fwd pivot left
 WALK_RIGHT = "kwkR"            # mirror of wkL
 WALK_BACKWARD = "kbkF"          # walk backward
+CARPET_WALK = "kcarpetF"        # OpenCat gait tuned for carpet (higher foot clearance,
+                               # different push) -- CarpetDetector switches to this on
+                               # sustained slip. See pi_pipeline/gait/carpet.py + carpet_ref.npy.
+JUMP = "kjpF"                   # genuine dynamic crouch-load-then-hop (also an "excited" tell)
+
+# --- personality / expressive skills -------------------------------------
+# Built-in OpenCat behaviours + postures, decoded to *_ref.npy in
+# rl_training/opencat-gym/reference_gait/ for sim. On hardware they are just
+# `k<name>` serial calls. The behaviour layer (pi_pipeline/behavior/) decides
+# WHEN; see behavior/gestures.py.
+STRETCH = "kstr"               # "just woke up" fore/aft stretch (also the WAKE step)
+SIT = "ksit"                   # sit posture (alert idle floor)
+SLEEP = "kzz"                  # curl up to sleep (sleep mode / deep idle-REST)
+PLAY_BOW = "kbuttUp"           # front-low / rear-high nose-down bow -- the INSPECT peer pose
+SNIFF = "ksnf"                 # head-down sniffing loop -- explore mode at a novel spot
+SCRATCH = "kscrh"              # dog scratch -- idle fidget
+NOD = "knd"                    # head nod -- acknowledgement / "yes"
+SHAKE_PAW = "kgdb"             # offer a paw / shake -- greeting, "G2 meet X"
+HIGH_FIVE = "kfiv"             # high-five -- social
+WAVE = "khi"                   # wave hello -- greeting
 
 _BLOCKED_PREFIXES = ("c", "cd")  # calibration / factory -- never from the pipeline
 
