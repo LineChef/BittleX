@@ -84,14 +84,17 @@ def main() -> None:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("curated_dir", help="a .../<class>/session_<k>/curated folder")
     ap.add_argument("--library", required=True, help="the KEEP library root")
-    ap.add_argument("--class", dest="cls", required=True, help="class name (= subfolder)")
+    ap.add_argument("--class", dest="cls", default="negatives",
+                    help="class name (= subfolder). Use the default for an "
+                         "all-negatives (empty-room) session -- it only adds to _negatives/.")
     ap.add_argument("--force", action="store_true", help="re-promote even if already done")
     a = ap.parse_args()
 
     cur = os.path.expanduser(a.curated_dir)
     lib = os.path.expanduser(a.library)
-    if not glob.glob(os.path.join(cur, "pos_*.jpg")):
-        sys.exit(f"no pos_*.jpg in {cur} -- run curate_captures.py first")
+    if not (glob.glob(os.path.join(cur, "pos_*.jpg"))
+            or glob.glob(os.path.join(cur, "neg_*.jpg"))):
+        sys.exit(f"no pos_*.jpg or neg_*.jpg in {cur} -- run curate_captures.py first")
 
     # a stable id for this session: ".../person/session_1/curated" -> "person/session_1"
     parts = os.path.normpath(cur).split(os.sep)
@@ -102,23 +105,25 @@ def main() -> None:
         sys.exit(f"{sess_id} already promoted (--force to redo). "
                  f"library has {m['classes'].get(a.cls, 0)} {a.cls} images.")
 
-    cls_dir = os.path.join(lib, a.cls)
     neg_dir = os.path.join(lib, NEG_DIR)
-    os.makedirs(cls_dir, exist_ok=True)
     os.makedirs(neg_dir, exist_ok=True)
 
-    pi = _next_index(cls_dir, a.cls)
     npos = 0
-    for jpg in sorted(glob.glob(os.path.join(cur, "pos_*.jpg"))):
-        txt = jpg[:-4] + ".txt"
-        dst = os.path.join(cls_dir, f"{a.cls}_{pi:04d}")
-        shutil.copy2(jpg, dst + ".jpg")
-        if os.path.isfile(txt):
-            shutil.copy2(txt, dst + ".txt")
-        else:
-            print(f"  ! no label for {os.path.basename(jpg)} -- box it in SenseCraft/Roboflow")
-        pi += 1
-        npos += 1
+    pos_jpgs = sorted(glob.glob(os.path.join(cur, "pos_*.jpg")))
+    if pos_jpgs:
+        cls_dir = os.path.join(lib, a.cls)
+        os.makedirs(cls_dir, exist_ok=True)
+        pi = _next_index(cls_dir, a.cls)
+        for jpg in pos_jpgs:
+            txt = jpg[:-4] + ".txt"
+            dst = os.path.join(cls_dir, f"{a.cls}_{pi:04d}")
+            shutil.copy2(jpg, dst + ".jpg")
+            if os.path.isfile(txt):
+                shutil.copy2(txt, dst + ".txt")
+            else:
+                print(f"  ! no label for {os.path.basename(jpg)} -- box it in SenseCraft/Roboflow")
+            pi += 1
+            npos += 1
 
     ni = _next_index(neg_dir, "neg")
     nneg = 0
@@ -127,15 +132,17 @@ def main() -> None:
         ni += 1
         nneg += 1
 
-    m["classes"][a.cls] = m["classes"].get(a.cls, 0) + npos
+    if npos:
+        m["classes"][a.cls] = m["classes"].get(a.cls, 0) + npos
     m["negatives"] = m["negatives"] + nneg
     if sess_id not in m["promoted"]:
         m["promoted"].append(sess_id)
     _write_manifest(lib, m)
 
-    print(f"promoted {sess_id}: +{npos} {a.cls}, +{nneg} negatives")
-    print(f"library now: " + ", ".join(f"{c} {n}" for c, n in sorted(m["classes"].items()))
-          + f", negatives {m['negatives']}")
+    added = f"+{npos} {a.cls}, " if npos else ""
+    print(f"promoted {sess_id}: {added}+{nneg} negatives")
+    cls_str = ", ".join(f"{c} {n}" for c, n in sorted(m["classes"].items()))
+    print(f"library now: {cls_str + ', ' if cls_str else ''}negatives {m['negatives']}")
 
 
 if __name__ == "__main__":

@@ -105,6 +105,7 @@ class Config:
                                      #   anywhere in the session) -- tighter, so only
                                      #   true repeats go, not distinct poses
     dedup: bool = True
+    all_negatives: bool = False   # every frame -> background (empty-room sweeps)
     class_id: int = 0
     target_count: int = 100          # per-class goal the running tally reports against
     target_brightness: float = 110.0   # ideal mid-tone for scoring
@@ -258,7 +259,9 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
         f.score = _quality(f, c)
 
     survivors = [f for f in frames if not f.reject]
-    if have_boxes:
+    if c.all_negatives:
+        pos, neg = [], survivors               # whole session is background (empty rooms)
+    elif have_boxes:
         pos = [f for f in survivors if f.has_face
                and (f.box[2] * f.box[3]) / (f.frame_px ** 2) >= c.min_box_frac]
         neg = [f for f in survivors if not f.has_face]
@@ -277,8 +280,9 @@ def curate(in_dir: str, out_dir: str, c: Config) -> dict:
     sel_pos = _spread_select(pos, c.positives, c.n_buckets, len(frames))
     if c.dedup and len(sel_pos) > 1:
         sel_pos = _global_dedup(sel_pos, c.dup_thresh)   # no near-dups in the final set
-    sel_neg = _global_dedup(sorted(neg, key=lambda f: -f.score), c.dup_thresh)[:c.negatives] \
-        if c.dedup else sorted(neg, key=lambda f: -f.score)[:c.negatives]
+    _neg_cap = len(neg) if c.all_negatives else c.negatives
+    sel_neg = _global_dedup(sorted(neg, key=lambda f: -f.score), c.dup_thresh)[:_neg_cap] \
+        if c.dedup else sorted(neg, key=lambda f: -f.score)[:_neg_cap]
 
     os.makedirs(out_dir, exist_ok=True)
     for old in glob.glob(os.path.join(out_dir, "*")):
@@ -412,9 +416,11 @@ def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
         if len(pos) < c.positives:
             L.append(f"  ! only {len(pos)} usable positives (wanted {c.positives}) -- "
                      "capture more / brighter / more varied")
-    if not have_boxes:
+    if not have_boxes and not c.all_negatives:
         L.append("  ! no detection sidecars -- capture with Person or (better) Face "
                  "Detection loaded so frames carry boxes for pre-labels + auto neg split")
+    if c.all_negatives:
+        L.append(f"  all-negatives mode: {len(sel_neg)} background frames, no positives")
     return "\n".join(L) + "\n"
 
 
@@ -466,6 +472,8 @@ def main() -> None:
                          "pose captured twice anywhere in the session")
     ap.add_argument("--no-dedup", action="store_true",
                     help="keep every frame (skip both near-duplicate passes)")
+    ap.add_argument("--all-negatives", action="store_true",
+                    help="treat the whole session as background/negatives (empty-room sweeps) -- no positives, ignore any stray detection box")
     ap.add_argument("--class-id", type=int, default=0)
     ap.add_argument("--target", type=int, default=100,
                     help="per-class positive goal the running tally reports against "
@@ -488,6 +496,7 @@ def main() -> None:
                min_sharpness=a.min_sharpness, min_contrast=a.min_contrast,
                min_box_frac=a.min_box_frac, hash_thresh=a.hash_thresh,
                dup_thresh=a.dup_thresh, dedup=not a.no_dedup,
+               all_negatives=a.all_negatives,
                class_id=a.class_id, target_count=a.target,
                label_region=a.label_region, face_crops=a.face_crops)
     curate(a.in_dir, a.out_dir, c)

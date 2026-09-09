@@ -110,9 +110,23 @@ g2promote() {
   _g2py tools/promote_to_library.py \
     "$G2_CAP_ROOT/$cls/session_$sess/curated" --library "$G2_LIB_ROOT" --class "$cls"
 }
+# g2neg [session]  -- curate an empty-room sweep as pure negatives + add to the library
+#   (capture into $G2_CAP_ROOT/negatives/session_<k>/ first, e.g. g2cam negatives <k>)
+g2neg() {
+  local sess="${1:-1}" d="$G2_CAP_ROOT/negatives/session_$sess"
+  _g2py tools/curate_captures.py "$d" "$d/curated" --all-negatives --rotate "${2:-0}"
+  open "$d/curated/_contact_sheet.png" 2>/dev/null
+  _g2py tools/promote_to_library.py "$d/curated" --library "$G2_LIB_ROOT"
+}
 # g2libcombine [classes]  -- build $G2_LIB_ROOT/upload/ (default person,dog,cat,ledge)
 g2libcombine() {
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "${1:-person,dog,cat,ledge}"
+}
+# g2libsubset <N> [classes]  -- build a capped upload set for the dataset-size threshold test
+g2libsubset() {
+  local n="${1:?usage: g2libsubset <N> [classes]}"
+  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "${2:-person}" \
+    --limit "$n" --out "$G2_LIB_ROOT/upload_$n"
 }
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
 
