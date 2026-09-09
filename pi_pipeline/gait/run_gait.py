@@ -246,7 +246,7 @@ def build_skill_layer(*, with_cliff_guard=True):
         raise RuntimeError("skill layer deps missing (pi_pipeline.vision / .gait import failed)")
     refs = SkillRefs(
         step_over=_load_ref("tr_ref.npy"),
-        inspect=_load_ref("buttUp_ref.npy"),          # Petoi play-bow -- nose-down, mast pitches
+        inspect=_load_ref("inspect_sweep_ref.npy"),   # up-and-down camera scan (nose-up -> bow)
         back_out=_load_ref("bk_ref.npy"),
         brace=None,                                   # derived: stance + knee flex
         stance=_load_ref("wkf_ref.npy").mean(axis=0),

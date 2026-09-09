@@ -132,6 +132,23 @@ def test_inspect_holds_until_cruise_requested():
     assert src is Source.RL
 
 
+def test_inspect_plays_its_multiframe_sweep_then_holds_the_last():
+    # a 4-frame INSPECT ref that ramps -- the sweep should move through it and
+    # converge on the LAST frame, not sit on frame 0.
+    sweep = np.tile(np.linspace(0.0, 0.9, 4)[:, None], (1, 8))   # rad, 4 frames
+    cfg = SkillSwitchConfig(blend_in_steps=2, blend_out_steps=2, inspect_sweep_ticks=8)
+    s = SkillSwitch(SkillRefs(step_over=STEP, inspect=sweep, back_out=BACK), cfg)
+    _reach_skill(s, GaitMode.INSPECT)
+    first, _ = s.update(GaitMode.INSPECT, RL)
+    poses = [first]
+    for _ in range(20):
+        out, _ = s.update(GaitMode.INSPECT, RL)
+        poses.append(out)
+    poses = np.array(poses)
+    assert poses[:, 0].ptp() > 5.0                     # it actually swept (degrees)
+    assert np.allclose(poses[-1], np.rad2deg(0.9), atol=1e-6)   # converged on the last frame
+
+
 def test_halt_preempts_a_running_step_over():
     s = sw()
     _reach_skill(s, GaitMode.STEP_OVER)               # step-over playing

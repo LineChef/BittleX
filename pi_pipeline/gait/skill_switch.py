@@ -69,6 +69,8 @@ class SkillSwitchConfig:
     play_ticks_per_cycle: int = 60  # control ticks to play one ref cycle
     latch_skill: bool = True        # ignore new non-HALT requests while a skill runs
     brace_ticks: int = 6            # BRACE holds the planted crouch this long, then auto-releases
+    inspect_sweep_ticks: int = 20  # INSPECT plays its multi-frame ref (nose-up -> bow scan)
+                                   # over this many ticks, then holds the last (bow) frame
     # phase-gated start (tune the windows against wkf_ref's real contact pattern)
     stance_phase_windows: tuple = ((0.0, 0.15), (0.5, 0.65))  # wkF phase, 0..1
     max_pending_ticks: int = 25     # start anyway after this many ticks waiting
@@ -166,6 +168,22 @@ class SkillSwitch:
         i = int(f)
         return _lerp(r[i], r[(i + 1) % n], f - i)
 
+    def _held_pose(self) -> np.ndarray:
+        """Pose to output while HOLDING. HALT = stance. INSPECT plays its
+        multi-frame sweep ref once (nose-up -> bow) over inspect_sweep_ticks,
+        then clamps to the last (bow) frame. Others just hold frame 0."""
+        sk = self._skill
+        if sk == GaitMode.HALT:
+            return self._stance
+        r = self._ref[sk]
+        n = len(r)
+        if sk == GaitMode.INSPECT and n > 1:
+            ph = self._skill_phase * (n - 1) / max(1, self._cfg.inspect_sweep_ticks)
+            i = int(min(ph, n - 1))
+            j = min(i + 1, n - 1)
+            return _lerp(r[i], r[j], min(ph, n - 1) - i)
+        return self._frame(sk, 0.0)
+
     def _skill_start_pose(self, skill: str) -> np.ndarray:
         return self._stance if skill == GaitMode.HALT else self._frame(skill, 0.0)
 
@@ -240,27 +258,25 @@ class SkillSwitch:
 
         # ---- HOLDING : BRACE / INSPECT / HALT pose ------
         if self._state == "holding":
+            self._skill_phase += 1
             # BRACE auto-releases after brace_ticks
-            if self._skill == GaitMode.BRACE:
-                self._skill_phase += 1
-                if self._skill_phase >= c.brace_ticks:
-                    self._from_pose = self._skill_start_pose(self._skill)
-                    self._state, self._blend_t = "blend_out", 0
-                    self._say("brace: done, blending out")
-                    return self._from_pose, Source.SCRIPTED
-            if mode in (GaitMode.CRUISE, GaitMode.CAREFUL) and self._skill != GaitMode.BRACE:
+            if self._skill == GaitMode.BRACE and self._skill_phase >= c.brace_ticks:
                 self._from_pose = self._skill_start_pose(self._skill)
+                self._state, self._blend_t = "blend_out", 0
+                self._say("brace: done, blending out")
+                return self._from_pose, Source.SCRIPTED
+            if mode in (GaitMode.CRUISE, GaitMode.CAREFUL) and self._skill != GaitMode.BRACE:
+                self._from_pose = self._held_pose()
                 self._state, self._blend_t = "blend_out", 0
                 self._say(f"{self._skill}: released, blending out")
                 return self._from_pose, Source.SCRIPTED
             if mode == GaitMode.HALT and self._skill != GaitMode.HALT:
-                return self._begin(GaitMode.HALT, self._skill_start_pose(self._skill))
+                return self._begin(GaitMode.HALT, self._held_pose())
             if (mode in (GaitMode.STEP_OVER, GaitMode.BACK_OUT, GaitMode.INSPECT)
                     and mode != self._skill and not c.latch_skill):
-                return self._begin(mode, self._skill_start_pose(self._skill))
+                return self._begin(mode, self._held_pose())
             self._say(f"{self._skill}: holding")
-            held = self._stance if self._skill == GaitMode.HALT else self._frame(self._skill, 0.0)
-            return held, Source.SCRIPTED
+            return self._held_pose(), Source.SCRIPTED
 
         # ---- BLEND OUT : skill pose -> stance -> RL pose --------
         self._blend_t += 1
