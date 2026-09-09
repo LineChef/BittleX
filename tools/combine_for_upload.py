@@ -81,6 +81,9 @@ def main() -> None:
     ap.add_argument("--no-relabel", action="store_true",
                     help="keep the class-id already in each .txt instead of "
                          "rewriting it from --classes order")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="cap positives PER CLASS at N, evenly spread across the "
+                         "set (for the dataset-size threshold experiment)")
     a = ap.parse_args()
 
     root = os.path.expanduser(a.root)
@@ -107,10 +110,12 @@ def main() -> None:
     grand_pos = grand_neg = 0
     missing = 0
     for cid, cls in enumerate(classes):
+        src = list(_class_sources(root, cls))
+        if a.limit and len(src) > a.limit:
+            idx = [round(i * (len(src) - 1) / (a.limit - 1)) for i in range(a.limit)]
+            src = [src[i] for i in idx]
         cpos = 0
-        seen = 0
-        for jpg, txt, tag in _class_sources(root, cls):
-            seen += 1
+        for jpg, txt, tag in src:
             base = f"{cls}_{tag}_{cpos + 1:04d}"
             shutil.copy2(jpg, os.path.join(out, base + ".jpg"))
             if txt:
@@ -118,9 +123,9 @@ def main() -> None:
             else:
                 missing += 1
             cpos += 1
-        note = "" if cpos else "  <-- 0 images, check the path / --classes name"
-        if not cpos:
-            note = "  <-- 0 images! check --classes name vs. the folder"
+        note = "" if cpos else "  <-- 0 images! check --classes name vs. the folder"
+        if a.limit and cpos == a.limit:
+            note = f"  (capped at --limit {a.limit})"
         print(f"  [{cid}] {cls:10} {cpos:4d} images{note}")
         grand_pos += cpos
 
