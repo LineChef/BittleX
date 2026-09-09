@@ -18,6 +18,59 @@ constraint), `capture-session-checklist.md` (per-session routine).
 
 ---
 
+## ⚠️ 2026-09-09 — the model MUST be Swift-YOLO (SSCMA), not Ultralytics YOLOv8
+
+Spent a full session getting a 3-class (`<you>`/`dog`/`cat`) model onto the
+Grove Vision AI V2 and hit a wall. **Root cause, confirmed by Seeed's own wiki**
+([grove_vision_ai_v2_sscma](https://wiki.seeedstudio.com/grove_vision_ai_v2_sscma/)):
+
+> *"Standard Ultralytics YOLOv8 exports won't work — models must be trained and
+> exported via SSCMA"* (Swift-YOLO).
+
+The GV2 firmware's on-device post-processor **only decodes the Swift-YOLO output
+head.** A standard Ultralytics YOLOv8 model will:
+
+- flash fine, and **run** (NPU executes the conv layers — Device Logger shows
+  `perf:{"preprocess":7,"inference":90,"postprocess":0}`)
+- but return `boxes:[]` on **every** frame, at **any** confidence threshold —
+  the firmware can't parse the `(1, 7, 756)` YOLOv8 detection tensor.
+
+So the whole **`g2_yolov8_3class.ipynb` Colab path is a dead end for this device.**
+The model it produced (the vela `.tflite` in `~/Desktop/g2_vision_library/`,
+mAP@50 0.995) is fine as a model — wrong architecture family for the chip. No
+re-export flag fixes it. (`yolo26` was already ruled out — firmware doesn't run
+it at all.)
+
+**What WAS correct** (keep for the real attempt):
+
+- Model file must be `*_int8_vela.tflite` (vela **is** required; SenseCraft did
+  not re-compile our pre-vela'd file — deployed it byte-identical).
+- vela config for the Himax WE2: `--accelerator-config ethos-u55-64`,
+  `const_mem_area=Axi1` (OffChipFlash), `arena/cache=Axi0` (SRAM). See the CFG
+  block in `g2_yolov8_3class.ipynb`'s vela cell.
+- Input **192×192**, square, ≤240.
+- SenseCraft "Object" list = model's class-id order → `0:<you> 1:dog 2:cat`
+  (our `data.yaml` order). Enter each: click **Add Object**, type, click
+  **Add Object** again to commit the chip (plain Enter just replaces the one
+  chip). Then **Send**.
+- SenseCraft "Send" needs a live session token. If the console logs
+  `[FleetEvents WS] global skip connect: no token` while the avatar still shows
+  you logged in → **hard-reload** (Cmd+Shift+R) after signing in, then retry.
+
+**Path forward — SSCMA / Swift-YOLO Colab.** This is the notebook we abandoned
+earlier over a `torch==2.0.0` pip failure; **that install error is the real
+blocker to solve.** Seeed keeps a current notebook linked from the wiki page
+above. The dataset is already built — `~/Downloads/custom_data.zip` (YOLO
+format). SSCMA wants **COCO** → convert with `tools/yolo_to_coco_zip.py`.
+
+**Device state:** currently holds the non-working YOLOv8 model; the old
+single-class face model was overwritten. Reflash once a Swift-YOLO model exists.
+
+SenseCraft **web** "Image Collection Training" is also Swift-YOLO but
+**single-class only** — no multi-class web path exists. Multi-class ⇒ SSCMA Colab.
+
+---
+
 ## Two folders on the Desktop
 
 ```
@@ -135,7 +188,9 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 | date | class | session | promoted pos | promoted neg | library total (class) | notes |
 |---|---|---|---|---|---|---|
 | 2026-09-09 | `<you>` | 1–3 | 238 | 10 | 238 | re-curated from the earlier single-class face set |
-| | | | | | | |
+| 2026-09-09 | `dog` | 1 | 120 | — | 120 | daylight session, subject-prominence `--limit 120` |
+| 2026-09-09 | `cat` | 1 | 120 | — | 120 | same |
+| 2026-09-09 | — | — | — | — | — | Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (Swift-YOLO required — see top note). |
 
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
 person captured so far). Subsets pre-built (jpg only — `--images-only`, so
