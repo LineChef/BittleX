@@ -914,6 +914,49 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
 - [ ] Ship a `requirements.txt` / dependency list for reproducibility.
 - [ ] Optional: write up learnings in the repo.
 
+### Ready logic, not yet wired to a runtime
+
+Built + unit-tested pure-logic modules waiting on the Phase 10 runtime loop
+(and, where noted, hardware). "Wire" = feed them their inputs each tick and act
+on their outputs in an actual control/behaviour loop.
+
+- [ ] **CARPET MODE — important; G2 stalls on carpet blind-forward.**
+      `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested) is the decision
+      logic: commanded vs. measured forward speed → `NORMAL` / `BOOST_CMD`
+      (raise the speed command to punch through pile) / `CARPET_GAIT`
+      (hand off to the firmware `kcarpetF`; `carpet_ref.npy` decoded for sim).
+      Remaining:
+  - **A forward-speed estimate on hardware** — the detector needs "measured
+    speed". Options: integrate IMU accel (drifty), vision optical flow off the
+    camera feed, or a fixed-distance timed check. Pick and build one.
+  - **Runtime wiring in the gait loop** (`gait/run_gait.py` or the behaviour
+    loop): call `det.update(cmd, measured)` each tick; on `BOOST_CMD` apply
+    `det.cmd_with_boost()` to `pol.set_command()`; on `CARPET_GAIT` pause the
+    residual policy and send `opencat.CARPET_WALK`, resume on `NORMAL`
+    (via-stance blend, same as a SkillSwitch hand-off).
+  - **Tune the thresholds on real carpet** (`boost_below`, `carpet_below`,
+    `enter_s`, `boost`) — the defaults are guesses.
+  - **Optional, better:** retrain the walk with `CARPET` domain-randomisation so
+    the RL policy itself handles pile (backlog H10 covers the carpet sysid);
+    then `CARPET_GAIT` hand-off is only for deep pile.
+- [ ] **Personality gestures** — `pi_pipeline/behavior/gestures.py`
+      (`GesturePicker`, tested). Wire into the Phase 10 behaviour loop:
+  - idle fidgets: `picker.update(idle_quiet_s, can_gesture=<sitting & level &
+    no task>)` each idle tick → send `GESTURE_TOKEN[g]`, wait for it to finish.
+  - `picker.greeting()` when `Enrollment` enters `GREETING` (and on a "say hi"
+    voice intent) → wave / shake-paw / play-bow.
+  - `picker.sniff_find()` on `ExploreAction.INVESTIGATE` at a novel object.
+  - `picker.excited_hop()` when `bonds` recognises a person after an absence, or
+    a standout find. Loud — keep the hard cooldown.
+- [ ] **Idle-posture descent** (`behavior/idle_posture.py`) — already has the
+      SIT / REST / WAKE state machine; wire `str` (stretch) into the WAKE
+      choreography and `zz` into a deep-sleep variant of RESTING for sleep mode.
+- [ ] **INSPECT peer bow** — done + sim-validated (`buttUp_ref`, +22° nose-down);
+      the earlier "author on hardware" caveat is resolved. Confirm on the real
+      robot that the mounted camera's downward view actually improves the near
+      obstacle read (the A/B is: swept/bow profile vs. plain forward scan into
+      the selector).
+
 ---
 
 ## Known risks / honest expectations
