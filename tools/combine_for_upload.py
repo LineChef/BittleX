@@ -47,13 +47,18 @@ def _relabel(txt: str, dst: str, class_id: int, relabel: bool) -> None:
 
 def _class_sources(root: str, cls: str):
     """Yield (jpg, txt_or_None, tag) for a class, from whichever layout it uses.
-    `tag` disambiguates the output filename."""
+    `tag` disambiguates the output filename. Library images may sit directly in
+    <class>/ or in per-bucket sub-folders (e.g. person/<individual>/) -- both
+    flatten to the one class here."""
     cdir = os.path.join(root, cls)
-    lib_jpgs = sorted(glob.glob(os.path.join(cdir, "*.jpg")))
+    lib_jpgs = sorted(glob.glob(os.path.join(cdir, "*.jpg"))
+                      + glob.glob(os.path.join(cdir, "*", "*.jpg")))
     if lib_jpgs:                                            # LIBRARY layout
         for jpg in lib_jpgs:
             t = jpg[:-4] + ".txt"
-            yield jpg, (t if os.path.isfile(t) else None), "lib"
+            bucket = os.path.basename(os.path.dirname(jpg))
+            tag = "lib" if bucket == cls else bucket        # bucket name in the filename
+            yield jpg, (t if os.path.isfile(t) else None), tag
         return
     for cd in sorted(glob.glob(os.path.join(cdir, "session_*", "curated"))):   # RAW
         sk = os.path.basename(os.path.dirname(cd)).replace("session_", "s")
@@ -97,6 +102,7 @@ def main() -> None:
             if not d.startswith(("_", "upload"))
             and os.path.isdir(os.path.join(root, d))
             and (glob.glob(os.path.join(root, d, "*.jpg"))
+                 or glob.glob(os.path.join(root, d, "*", "*.jpg"))
                  or glob.glob(os.path.join(root, d, "session_*", "curated"))))
     if not classes:
         sys.exit(f"no class folders found under {root}")

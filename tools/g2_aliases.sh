@@ -118,14 +118,20 @@ g2neg() {
   open "$d/curated/_contact_sheet.png" 2>/dev/null
   _g2py tools/promote_to_library.py "$d/curated" --library "$G2_LIB_ROOT"
 }
-# g2libcombine [classes]  -- build $G2_LIB_ROOT/upload/ (default person,dog,cat,ledge)
+# Class-id ORDER for the library. Set it in your shell / .env (the real names
+# are personal, so they're not committed):  export G2_VISION_CLASSES="a,b,dog,cat,ledge"
+: "${G2_VISION_CLASSES:=}"
+
+# g2libcombine [classes]  -- build $G2_LIB_ROOT/upload/  (arg overrides $G2_VISION_CLASSES)
 g2libcombine() {
-  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "${1:-person,dog,cat,ledge}"
+  local cl="${1:-$G2_VISION_CLASSES}"
+  [ -n "$cl" ] || { echo "set G2_VISION_CLASSES=\"...\" (id order) or pass it as an arg"; return 1; }
+  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cl"
 }
-# g2libsubset <N> [classes]  -- build a capped upload set for the dataset-size threshold test
+# g2libsubset <N> [class]  -- capped single-class upload set for the threshold test
 g2libsubset() {
-  local n="${1:?usage: g2libsubset <N> [classes]}"
-  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "${2:-person}" \
+  local n="${1:?usage: g2libsubset <N> <class>}" cls="${2:?need a class name}"
+  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cls" \
     --limit "$n" --out "$G2_LIB_ROOT/upload_$n"
 }
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }

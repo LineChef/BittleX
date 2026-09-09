@@ -57,6 +57,9 @@ def _write_manifest(lib: str, m: dict) -> None:
              "| class | images |", "|---|---|"]
     for c, n in sorted(m["classes"].items()):
         lines.append(f"| `{c}` | {n} |")
+        for bk, bn in sorted(m.get("buckets", {}).items()):
+            if bk.startswith(c + "/"):
+                lines.append(f"| &nbsp;&nbsp;`{bk}` | {bn} |")
     lines += [f"| _negatives_ | {m['negatives']} |", "",
               f"{len(m['promoted'])} session(s) promoted:", ""]
     lines += [f"- {s}" for s in m["promoted"]]
@@ -87,6 +90,10 @@ def main() -> None:
     ap.add_argument("--class", dest="cls", default="negatives",
                     help="class name (= subfolder). Use the default for an "
                          "all-negatives (empty-room) session -- it only adds to _negatives/.")
+    ap.add_argument("--subdir", default=None,
+                    help="optional sub-folder inside the class, e.g. a per-individual "
+                         "bucket for the 'person' class. All subdirs still flatten to "
+                         "the one class at combine time.")
     ap.add_argument("--force", action="store_true", help="re-promote even if already done")
     a = ap.parse_args()
 
@@ -110,13 +117,15 @@ def main() -> None:
 
     npos = 0
     pos_jpgs = sorted(glob.glob(os.path.join(cur, "pos_*.jpg")))
+    dest_key = a.cls if not a.subdir else f"{a.cls}/{a.subdir}"
     if pos_jpgs:
-        cls_dir = os.path.join(lib, a.cls)
+        cls_dir = os.path.join(lib, a.cls, a.subdir) if a.subdir else os.path.join(lib, a.cls)
         os.makedirs(cls_dir, exist_ok=True)
-        pi = _next_index(cls_dir, a.cls)
+        prefix = a.subdir or a.cls
+        pi = _next_index(cls_dir, prefix)
         for jpg in pos_jpgs:
             txt = jpg[:-4] + ".txt"
-            dst = os.path.join(cls_dir, f"{a.cls}_{pi:04d}")
+            dst = os.path.join(cls_dir, f"{prefix}_{pi:04d}")
             shutil.copy2(jpg, dst + ".jpg")
             if os.path.isfile(txt):
                 shutil.copy2(txt, dst + ".txt")
@@ -134,12 +143,15 @@ def main() -> None:
 
     if npos:
         m["classes"][a.cls] = m["classes"].get(a.cls, 0) + npos
+        if a.subdir:
+            m.setdefault("buckets", {})[dest_key] = \
+                m.get("buckets", {}).get(dest_key, 0) + npos
     m["negatives"] = m["negatives"] + nneg
     if sess_id not in m["promoted"]:
         m["promoted"].append(sess_id)
     _write_manifest(lib, m)
 
-    added = f"+{npos} {a.cls}, " if npos else ""
+    added = f"+{npos} {dest_key}, " if npos else ""
     print(f"promoted {sess_id}: {added}+{nneg} negatives")
     cls_str = ", ".join(f"{c} {n}" for c, n in sorted(m["classes"].items()))
     print(f"library now: {cls_str + ', ' if cls_str else ''}negatives {m['negatives']}")
