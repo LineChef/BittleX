@@ -128,14 +128,32 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 | _pending_ | person | 1 | — | — | — | first session + calibration set |
 | | | | | | | |
 
-**Calibration checkpoint (`person`, after ~120 in the library):** train
-SenseCraft quick models on 40 / 80 / 120 subsets, run each through
-`python -m pi_pipeline.vision serial <port>`, record detection rate / confidence
-/ flicker. Plateau = the real per-coarse-class budget → adjust the `dog`/`cat`
-targets, and confirm capture quality is good enough this round.
+**Calibration checkpoint (`person`).** Subsets are pre-built:
+`~/Desktop/g2_vision_library/upload_{40,80,120,160,all}` (each = N person images
++ labels + the negatives). Import each into its own SenseCraft project, train,
+deploy, then measure — **in a room none of the training images came from**:
 
-| subset | detection rate | mean conf | flicker | verdict |
-|---|---|---|---|---|
-| 40 | | | | |
-| 80 | | | | |
-| 120 | | | | |
+```
+g2visioneval <label> 30            # stand at close / mid / far, ~30 s
+g2visioneval <label> 30 empty      # point at a clear scene -- false-fire check
+```
+
+`pi_pipeline.vision eval` forces score floor 0 (see every score) and prints
+detection rate, confidence mean/median/**p10 (the floor)**, flicker, and a
+VERDICT against the bar (det ≥ 80%, conf floor ≥ `VISION_MIN_SCORE` = 45).
+
+**Stop rule:** the smallest subset that (a) clears the bar AND (b) the next size
+up doesn't beat by ≥ 5 pts detection or ≥ 8 pts floor. If even `upload_all`
+(238) fails the bar → it's a data-quality problem, not a count one.
+
+| subset | det rate | conf mean | conf p10 (floor) | flicker /min | verdict |
+|---|---|---|---|---|---|
+| 40 | | | | | |
+| 80 | | | | | |
+| 120 | | | | | |
+| 160 | | | | | |
+| 238 (all) | | | | | |
+
+| empty-scene run | false-fire rate | worst score | verdict |
+|---|---|---|---|
+| (best subset) | | | |

@@ -143,6 +143,17 @@ g2vision() {
 }
 g2vision-demo() { _g2py -m pi_pipeline.vision demo; }    # mock feed, no hardware
 
+# g2visioneval [label] [secs]  -- timed measurement: detection rate / confidence /
+#   floor / flicker for the dataset-size threshold test. Stand in frame at
+#   close/mid/far. Add a 3rd arg 'empty' + point at a clear scene for the
+#   false-fire check.  e.g.  g2visioneval <label> 30   |   g2visioneval <label> 30 empty
+g2visioneval() {
+  local port; port="$(ls /dev/cu.usbmodem* 2>/dev/null | head -1)"
+  local extra=""; [ "$3" = "empty" ] && extra="--expect-empty"
+  ( cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.vision eval \
+      "${port:-/dev/cu.usbmodem58FA1045341}" --label "${1:-}" --secs "${2:-30}" $extra )
+}
+
 # g2watchab [vision|blind] [latest|final]  -- replay the Phase D A/B run in the
 #   PyBullet GUI (latest checkpoint while training, or the final policy).
 g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" ); }
