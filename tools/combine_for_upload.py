@@ -31,6 +31,49 @@ import sys
 NEG_DIRS = ("_negatives", "negatives")
 
 
+def _quality(path: str) -> float:
+    """Cheap 0..1-ish quality score: mid-tone brightness + contrast + sharpness.
+    Same idea as curate_captures._quality, recomputed here so `--limit` can pick
+    the BEST N (not just every k-th). Falls back to 0 if PIL/numpy missing."""
+    try:
+        import numpy as np
+        from PIL import Image, ImageStat
+        im = Image.open(path)
+        st = ImageStat.Stat(im.convert("L"))
+        bright, contrast = st.mean[0], st.stddev[0]
+        g = np.asarray(im.convert("L"), dtype=np.float64)
+        lap = (g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:]
+               - 4.0 * g[1:-1, 1:-1])
+        sharp = float(lap.var())
+        s_bright = 1.0 - min(1.0, abs(bright - 110.0) / 110.0)
+        s_contrast = min(1.0, contrast / 45.0)
+        s_sharp = min(1.0, sharp / 60.0)
+        return 0.45 * s_sharp + 0.30 * s_bright + 0.25 * s_contrast
+    except Exception:
+        return 0.0
+
+
+def _pick_best(src: list, n: int) -> list:
+    """Best `n` of `src` by quality, spread across the set so poses/distances
+    stay varied: bucket by position, take the top-scoring from each bucket
+    round-robin. `src` items are (jpg, txt, tag)."""
+    if len(src) <= n:
+        return src
+    scored = sorted(range(len(src)), key=lambda i: i)          # keep original order
+    buckets = max(1, min(n, 24))
+    by_bucket: list[list[int]] = [[] for _ in range(buckets)]
+    for pos, i in enumerate(scored):
+        by_bucket[min(buckets - 1, pos * buckets // len(src))].append(i)
+    for b in by_bucket:
+        b.sort(key=lambda i: -_quality(src[i][0]))
+    out: list[int] = []
+    while len(out) < n and any(by_bucket):
+        for b in by_bucket:
+            if b and len(out) < n:
+                out.append(b.pop(0))
+    return [src[i] for i in sorted(out)]
+
+
 def _relabel(txt: str, dst: str, class_id: int, relabel: bool) -> None:
     if not relabel:
         shutil.copy2(txt, dst)
@@ -87,8 +130,12 @@ def main() -> None:
                     help="keep the class-id already in each .txt instead of "
                          "rewriting it from --classes order")
     ap.add_argument("--limit", type=int, default=0,
-                    help="cap positives PER CLASS at N, evenly spread across the "
-                         "set (for the dataset-size threshold experiment)")
+                    help="cap positives PER CLASS at N -- the BEST N by quality "
+                         "(sharpness/exposure/contrast), bucketed across the set so "
+                         "poses stay varied. This is your upload set.")
+    ap.add_argument("--limit-spread", action="store_true",
+                    help="with --limit: take every k-th frame instead of the best N "
+                         "(the old behaviour)")
     ap.add_argument("--neg-limit", type=int, default=0,
                     help="cap negatives at N, evenly spread (keep the neg:pos ratio "
                          "sane -- ~10-25%% of the positive count)")
@@ -125,8 +172,9 @@ def main() -> None:
     for cid, cls in enumerate(classes):
         src = list(_class_sources(root, cls))
         if a.limit and len(src) > a.limit:
-            idx = [round(i * (len(src) - 1) / (a.limit - 1)) for i in range(a.limit)]
-            src = [src[i] for i in idx]
+            src = (_pick_best(src, a.limit) if not a.limit_spread
+                   else [src[round(i * (len(src) - 1) / (a.limit - 1))]
+                         for i in range(a.limit)])
         cpos = 0
         for jpg, txt, tag in src:
             base = f"{cls}_{tag}_{cpos + 1:04d}"
