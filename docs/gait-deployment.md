@@ -128,6 +128,14 @@ steps by hand from `pi-bring-up.md` — same content.
    actuator model if a retrain is warranted.
 9. `pi_pipeline/benchmark_pi.py` — full voice+API benchmark (audio wheels are the
    fragile part; `pi-bring-up.md` §7). Independent of the gait work.
+10. **Rename `run20m_ppo`** once it has walked on the real robot and passed H1.
+    The name is a training artefact ("a 20M-step PPO run"); after it's the
+    shipped gait it should say what it *is* — e.g. `gait_v1` / `walk_ppo_v1` /
+    `g2_walk_v1`. Touches: `trained/run20m_ppo.zip` + `.onnx`, `deploy_map.py`,
+    `pi_pipeline/gait/run_gait.py` default, `eval_skill_switch.py`,
+    `watch_trained.py` / `g2watch` alias, `docs/gait-deployment.md`,
+    `docs/rl-runs/*`, memory. Keep a note of the old name so older run logs
+    still resolve. Do it as one rename commit, not piecemeal.
 
 ## Current state — RL side (context, not action)
 
@@ -186,4 +194,5 @@ is the frozen base gait. Do **not** start new gait-training loops.
 - On-robot control loop: BUILT + sim-validated (`pi_pipeline/gait/`).
 - Hardware-gated: wire BiBoard, --probe-imu (fix parse if needed), --openloop
   (verify servo signs), --cmd (learned gait), then H1 head-to-head.
+- After H1 passes: rename `run20m_ppo` to a deployment name (step 10 above).
 - Mac↔Pi isolation: unresolved; workaround = PC, or a USB-C Ethernet adapter.
