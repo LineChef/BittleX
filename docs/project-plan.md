@@ -954,11 +954,15 @@ tick and act on their outputs in an actual control/behaviour loop.
 `ModeController` + `Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` +
 `Enrollment` + optional `CliffGuard` and returns an ordered list of abstract
 `Effect`s (SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG).
-It runs today against mock feeds + a fake clock (11 tests). Still needs, on
-hardware: the **binding layer** that maps `Effect`s onto the real
-actuator / TTS / frame-grabber / session log, plus the input plumbing (vision
-frame, IMU state, mic events). The `DIAG` effects are the hook for Diagnostics
-Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
+It runs today against mock feeds + a fake clock (11 tests). The **binding layer**
+is built (`pi_pipeline/behavior/bindings.py`, 2026-09-10) — `DriverBindings`
+routes every `Effect` kind to an optional sink (actuator / tts / camera / cue /
+walker / head / diag), missing sinks drop-and-warn; `MockBindings` records every
+call so the whole loop is exercised end-to-end (idle descent → `ksit` → `d`,
+wake choreography → head/skill) in 7 tests. Still needs, on hardware: the real
+sink implementations (some exist — `voice/actuator.py`, `voice/cues.py`,
+`voice/tts.py`) and the input plumbing (vision frame, IMU state, mic events).
+The `DIAG` effects are the hook for Diagnostics Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
 personality→idle-timing knobs, sniff-on-investigate, greeting-on-enrollment and
 excited-hop-on-recognition are all wired *inside* the driver now — see
 `docs/behavior-ideas.md` for the per-item status (a few sub-items, e.g. the
