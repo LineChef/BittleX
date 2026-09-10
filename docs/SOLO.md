@@ -1,8 +1,5 @@
 # Working on G2 solo
 
-A launchpad for carrying the project forward without Claude. Points at the
-detailed docs rather than repeating them.
-
 ---
 
 ## First-time setup
