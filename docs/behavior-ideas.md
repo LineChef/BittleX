@@ -265,6 +265,14 @@ persona block, no custom voice FX. Timbre/cadence are a later nice-to-have, not
 worth the assistant-usefulness cost up front.
 *(User ask 2026-09-06 — Invader Zim / GIR.)*
 
+**BUILT 2026-09-10 — manner MVP.** `pi_pipeline/personality/gir.py` (`gir`
+trait): manner-only prompt block scaled by `level`, with a task-guard at every
+intensity ("the quirk is a garnish; still finish the task; drop character for
+anything serious"). **Opt-in, never the default** (user call 2026-09-10):
+`G2_CHARACTER=gir` turns it on at `G2_CHARACTER_LEVEL` (default **0.4**);
+`G2_TRAITS="gir=<lvl>"` overrides. `Personality.from_settings` folds the
+character env var into the trait spec. 11 tests. Timbre/cadence still parked.
+
 ---
 
 ## Autonomy modes

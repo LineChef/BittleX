@@ -68,6 +68,11 @@ class Settings:
     # --- Personality (traits that bias prompt / behaviour / cues) ---
     # comma-separated name=level, e.g. "curiosity=0.85, playfulness=0.4"
     traits_spec: str = field(default_factory=lambda: _env("G2_TRAITS", "curiosity=0.8"))
+    # Opt-in "character mode" -- OFF by default. Set G2_CHARACTER=gir to turn it
+    # on; G2_CHARACTER_LEVEL sets the 0..1 intensity (default 0.4). An explicit
+    # entry in G2_TRAITS still wins over this.
+    character_spec: str = field(default_factory=lambda: _env("G2_CHARACTER", ""))
+    character_level: float = field(default_factory=lambda: _env_float("G2_CHARACTER_LEVEL", 0.4))
     # Household roster for B15 -- PERSONAL DATA, real values only in the
     # gitignored .env. Format: name:closeness:disposition[:kind], ';'-separated.
     # disposition = affectionate|playful|curious|wary|fearful|neutral; kind =

@@ -61,7 +61,15 @@ class Personality:
 
     @classmethod
     def from_settings(cls, settings) -> "Personality":
-        return cls.from_spec(getattr(settings, "traits_spec", ""))
+        spec = getattr(settings, "traits_spec", "")
+        # opt-in character mode (G2_CHARACTER) folds in as a trait at
+        # G2_CHARACTER_LEVEL, unless G2_TRAITS already names it explicitly.
+        char = (getattr(settings, "character_spec", "") or "").strip().lower()
+        if char:
+            lvl = getattr(settings, "character_level", 0.4)
+            if char not in parse_traits(spec):
+                spec = f"{spec}, {char}={lvl}" if spec.strip() else f"{char}={lvl}"
+        return cls.from_spec(spec)
 
     # --- the three asks ---
 

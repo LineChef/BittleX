@@ -87,6 +87,27 @@ class VoskSTT:
                     return ""
 
 
+    @staticmethod
+    def transcribe_wav(model_path: str, wav_path: str) -> str:
+        """Recognise a mono 16-bit PCM WAV file -- no microphone / sounddevice.
+        For offline validation and batch transcription."""
+        import wave
+
+        from vosk import KaldiRecognizer, Model
+
+        m = Model(str(model_path))
+        with wave.open(str(wav_path), "rb") as w:
+            if w.getnchannels() != 1 or w.getsampwidth() != 2:
+                raise ValueError("transcribe_wav wants mono 16-bit PCM")
+            rec = KaldiRecognizer(m, w.getframerate())
+            while True:
+                data = w.readframes(4000)
+                if not data:
+                    break
+                rec.AcceptWaveform(data)
+            return json.loads(rec.FinalResult()).get("text", "").strip()
+
+
 def make_stt(mode: str, *, vosk_model_path: str, silence_s: float) -> STT:
     if mode == "vosk":
         return VoskSTT(vosk_model_path, silence_s=silence_s)
