@@ -3,6 +3,7 @@
 | Start here | |
 |---|---|
 | [`project-plan.md`](project-plan.md) | The living roadmap and decision log — read before starting work in any area. |
+| [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
 | [`behavior-ideas.md`](behavior-ideas.md) | Backlog of behaviours to explore (IDs B1…) — the "what next" list. |
 | [`guides/SOLO.md`](guides/SOLO.md) | Working-solo notes. |

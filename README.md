@@ -74,7 +74,7 @@ hardware mocked for now.
   state machine, the on-robot gait loop, the autonomous behaviour layer
   (explore mode, idle-REST staged descent), a servo thermal guard, a
   black-box diagnostics logger, and Pi power-management helpers — all scaffolded
-  and running on a dev machine with the hardware mocked; **413 tests passing**.
+  and running on a dev machine with the hardware mocked; **437 tests passing**.
 - **On-device vision** — a custom 3-class detection model (household member +
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
@@ -86,10 +86,11 @@ hardware mocked for now.
   ready to run the moment the SD adapter and robot arrive:
   [`docs/guides/pi-bring-up.md`](docs/guides/pi-bring-up.md).
 
-For a plain-language tour of how each part works, see
-[`docs/how-it-works.md`](docs/how-it-works.md). The ordered day-1 bring-up
-sequence is in [`docs/project-plan.md`](docs/project-plan.md) ("When the hardware
-arrives").
+A full inventory of what G2 can do, with per-item status, is in
+[`docs/capabilities.md`](docs/capabilities.md). For a plain-language tour of how
+each part works, see [`docs/how-it-works.md`](docs/how-it-works.md). The ordered
+day-1 bring-up sequence is in [`docs/project-plan.md`](docs/project-plan.md)
+("When the hardware arrives").
 
 ## Walking policy
 
