@@ -338,11 +338,21 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
     ring = None
+    wd = None
     if diag is not None:
         diag.start_session("gait", policy_path=getattr(pol, "onnx_path", None),
                            extra={"cmd_fwd": cmd_fwd, "hz": hz})
+        diag.install_excepthook()
         bridge_stdlib_logging()
         ring = diag.attach_ring(RingBuffer(seconds=15, hz=hz))
+        try:
+            from pi_pipeline.diag.watchdog import Watchdog, WatchdogConfig
+            from pi_pipeline.diag.sysmon import Sysmon
+            wd = Watchdog(WatchdogConfig(stall_after_s=max(0.25, 4.0 / hz)),
+                          on_stall=lambda: _send(lk, "d"), sysmon=Sysmon())
+            wd.start()
+        except Exception:
+            wd = None
     _guard_prev = "ok"
     _skill_prev = "cruise"
     if skill_layer is not None:
@@ -453,6 +463,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+                if wd is not None:
+                    wd.beat()
 
                 if ring is not None:
                     ring.push(t=round(time.perf_counter() - t_start, 3),
@@ -510,6 +522,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             diag.event("gait", "FATAL", "loop.exception", err=repr(e))
         raise
     finally:
+        if wd is not None:
+            wd.stop()
         _send(lk, "V")     # stream off
         _send(lk, "d")     # rest
         if vision is not None:
