@@ -33,7 +33,8 @@ object**.
 - Swift-YOLO as exported by **SSCMA / ModelAssistant `2.0.0` branch** (all the
   stock SenseCraft models — Person Detection, Hand Gesture — are this)
 - **Ultralytics YOLOv8** exported with **`ultralytics==8.2.8`** (per Seeed's
-  official wiki `ma_deploy_yolov8`, last updated Apr 2024)
+  official wiki `ma_deploy_yolov8`, last updated Apr 2024) — **confirmed working
+  2026-09-09**, exported locally on Apple Silicon (recipe below)
 - YOLO11 (added in the `20250102` release)
 - **NOT** YOLO26. **NOT** RTMDet. **NOT** the SSCMA `main` / `fix/colab-py312-main`
   re-implemented Swift-YOLO head.
@@ -49,6 +50,7 @@ object**.
 | SSCMA Swift-YOLO, `ModelAssistant` **`main`** branch (v1, junk boxes) | vendored stack, no mmcv, fast | **box flood** |
 | SSCMA Swift-YOLO, `main` branch (v3, real boxes, mAP@50 0.87) | same | **box flood, identical** — proved it's the export head, not the data |
 | SSCMA Swift-YOLO, **`fix/colab-py312`** (the `2.0.0` MMDet pipeline) | needs `mmcv 2.2` **source build, ~30 min, stalls Colab** | not completed — killed the build at 41 min |
+| **Ultralytics YOLOv8n, `ultralytics==8.2.8`, `format=tflite int8`** — trained on Colab, **exported locally on Apple Silicon** (arm64 py3.9) | 8.2.8 onnx2tf path, then vela | ✅ **WORKS** — clean single boxes, quiet on empty scene, `postprocess: 1ms`. Detects up close; box geometry frozen near the training-average location (under-calibrated INT8 — only 100 calib images) |
 
 Key realisation: v1 (bad boxes) and v3 (good boxes, mAP 0.87) flooded
 **identically**. That rules out the training data. The common factor is the
@@ -58,32 +60,86 @@ while stock Swift-YOLO works — "is the toolchain ahead of the firmware decode?
 
 ---
 
-## Recommended path: Ultralytics YOLOv8 pinned to `ultralytics==8.2.8`
+## The working recipe: `ultralytics==8.2.8`, exported locally on Apple Silicon
 
-Seeed's official multi-class recipe (`wiki.seeedstudio.com/ma_deploy_yolov8`).
-No mmcv, no COCO conversion, multi-class is just `nc` in `data.yaml`.
+**2026-09-09 — this produced the first model the device actually decodes.**
+3-class (`<you>`, `dog`, `cat`), YOLOv8n @ 192px, mAP@50 0.907 (`<you>` 0.995,
+`dog` 0.867, `cat` 0.859). On device: one box per real object, quiet on an empty
+scene, `postprocess: 1ms`.
+
+Seeed's official multi-class recipe is `wiki.seeedstudio.com/ma_deploy_yolov8` —
+no mmcv, no COCO conversion, multi-class is just `nc` in `data.yaml`.
+
+**Split the work:** Colab **trains** 8.2.8 fine, but cannot **export** it —
+Colab is Python 3.13 now and every `format=tflite` run hits the onnx2tf
+`flatbuffer_direct` bug. The export must run on an environment old enough to
+match the 8.2.8 toolchain. On the Mac that is **arm64 Python 3.9**
+(`/usr/bin/python3` → 3.9.6). Do **not** use the Homebrew `python3.11` at
+`/usr/local` — it's Intel/Rosetta → x86 TensorFlow → `Abort trap: 6` on AVX.
+
+### Train (Colab or local)
 
 ```bash
-pip install ultralytics==8.2.8 ethos-u-vela
-
+pip install ultralytics==8.2.8            # + numpy<2 if it resolves numpy 2.x
 yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100
-yolo export model=<runs/.../best.pt> format=tflite imgsz=192 int8 data=/content/ds/data.yaml
-#   -> best_full_integer_quant.tflite   (NHWC, onnx2tf path — the 8.2.8 default)
+# download best.pt   (glob '/content/out/**/weights/best.pt')
+```
+
+### One-time local export env (arm64 Python 3.9)
+
+```bash
+/usr/bin/python3 -m venv .venv && source .venv/bin/activate
+pip install "ultralytics==8.2.8" "tensorflow==2.16.2" "tf-keras==2.16.0" \
+            "onnx2tf==1.17.5" "onnxsim>=0.4.33" onnx_graphsurgeon sng4onnx \
+            ethos-u-vela
+```
+
+Three fixes are **mandatory** — each was a hard failure without it:
+
+| env / patch | error it fixes |
+|---|---|
+| `export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` | `_pickle.UnpicklingError: Weights only load failed` (torch ≥2.6 defaults `weights_only=True`) |
+| `export TF_USE_LEGACY_KERAS=1` | `A KerasTensor cannot be used as input to a TensorFlow function` (onnx2tf 1.17.5 is Keras-2; TF 2.16 ships Keras-3) |
+| patch `onnx2tf/onnx2tf.py` ~line 1410 → `normalized_calib_data = ((calib_data[idx] - mean) / std).astype(np.float32)` | `Cannot set tensor: Got FLOAT64 but expected FLOAT32 ... serving_default_images:0` (INT8 calib normalisation promotes to float64) |
+
+`onnxsim` (**not** `onnxslim` — different package) is also required, or onnx2tf
+hits `MaxPool: unsupported operand ... 'NoneType' and 'int'` on unsimplified
+dynamic dims. A `No module named 'tflite_support'` at the very end is
+**cosmetic** — `best_full_integer_quant.tflite` is already written; ignore it.
+
+### Export + vela
+
+```bash
+source .venv/bin/activate
+export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 TF_USE_LEGACY_KERAS=1
+
+yolo export model=best.pt format=tflite imgsz=192 int8 data=data.yaml
+#   -> best_saved_model/best_full_integer_quant.tflite   (NHWC 1x192x192x3, float32 in)
 
 vela --accelerator-config ethos-u55-64 --config vela_config.ini \
      --system-config My_Sys_Cfg --memory-mode My_Mem_Mode_Parent \
-     --output-dir out  best_full_integer_quant.tflite
-#   -> best_full_integer_quant_vela.tflite
+     --output-dir vela_out  best_saved_model/best_full_integer_quant.tflite
+#   -> best_full_integer_quant_vela.tflite   (2.31 MB, 284 ops, 0 CPU = 100% NPU)
 ```
 
-`vela_config.ini` = the Himax WE2 block (`core_clock=400e6`, `axi0=Sram`,
-`axi1=OffChipFlash`, `const_mem_area=Axi1`, `arena/cache=Axi0`, …) — full block
-in `ma_deploy_yolov8` and in every `g2_*` notebook's vela cell.
+`data.yaml`'s `val:` list **is** the INT8 calibration set (`yolo export int8`
+calibrates on the val split). Use **300+ varied** images. The working model used
+only 100 — that is the leading suspect for its "detects up close only, box
+frozen at the training-average position" behaviour.
 
-**Risk:** `ultralytics==8.2.8` (May 2024) on Colab's Python 3.13 + torch 2.11 —
-may need `numpy<2` pinned, or fall back to the last pre-LiteRT version
-(`ultralytics~=8.3.0`; the LiteRT default switch landed ~8.4.83, so anything
-≤8.4.82 still does the onnx2tf `format=tflite` export).
+`vela_config.ini` = the Himax WE2 block (`core_clock=400e6`, `axi0_port=Sram`,
+`axi1_port=OffChipFlash`, `const_mem_area=Axi1`, `arena_mem_area=Axi0`,
+`cache_mem_area=Axi0`) under `[System_Config.My_Sys_Cfg]` +
+`[Memory_Mode.My_Mem_Mode_Parent]` — full block in `ma_deploy_yolov8` and in
+every `g2_*` notebook's vela cell.
+
+### Flash
+
+SenseCraft → device page → **Upload Model** → pick
+`best_full_integer_quant_vela.tflite`, add class names as Objects
+(**Add Object → type → Add Object again** per chip; plain Enter overwrites the
+one chip), Send. Or local serial (see "Also worth knowing"). Then run
+**Cleanup** below.
 
 ### Dataset format (what `yolo train` wants)
 
@@ -176,6 +232,22 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
 
 ---
 
+## Cleanup — ALWAYS the last step
+
+Colab uploads the whole training set to the runtime VM. As soon as a model is
+flashed and confirmed on the device, and the local keepers exist under
+`~/Desktop/g2_vision_library/` (`best.pt`, the dataset zip, `*_vela.tflite`):
+
+1. Every Colab notebook used this round → **Runtime → Disconnect and delete
+   runtime**. That wipes the uploaded photos from Google's VM.
+2. The `.ipynb` files in Drive are **code only, no photos** — keep them (also
+   mirrored at `~/Desktop/g2_vision_library/` and `~/Downloads/`).
+
+This is part of the process, not optional: the photos are personal data and
+there's no reason to leave them on a third-party VM once the model is built.
+
+---
+
 ## Adding `<spouse>` later (the 4-class model)
 
 Once a 3-class model works on the device: capture `<spouse>` (~140 raw, same
@@ -183,5 +255,6 @@ routine — `capture-session-checklist.md`), `g2neg`/curate/`g2promote <spouse>`
 then `autobox_coco.py <spouse-folder> --coco-class person`, then rebuild the
 dataset zip with `--classes <you>,<spouse>,dog,cat` (id order is append-only,
 `combine_for_upload.py` rewrites every label from that order), retrain with the
-**same recipe** (`ultralytics==8.2.8`, `nc: 4`), reflash. `ledge` still waits
-for the G2 camera mount.
+**same recipe** (`ultralytics==8.2.8`, `nc: 4`), export locally via the recipe
+above, reflash, then **run the Cleanup step**. `ledge` still waits for the G2
+camera mount.
