@@ -96,6 +96,14 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ### Layer 1 — sensorless estimator + indicator (no new hardware, no retraining)
 
+> **BUILT 2026-09-10 (constants still placeholders — need §4b bench data).**
+> `pi_pipeline/gait/thermal_guard.py`: the I²t estimator was already there; added
+> the **3-tier per-joint indicator** (`ThermalTier` GREEN/AMBER/RED at 50 % / 85 %
+> of the estimated trip, on `GuardSnapshot.tiers` / `.hottest_tier`) and a
+> **per-joint spoken heads-up** (`snap.warm_phrase()` → "my left-front leg is
+> getting warm…"). `run_gait.py` logs `hottest_tier` to the CSV + ring buffer.
+
+
 **I²t thermal estimator** — the industry-standard sensorless winding-temp proxy
 (maxon, Synapticon, Ingenia motion controllers all ship this). Per joint:
 
@@ -124,6 +132,16 @@ pipeline — a spoken heads-up ("my left-front leg is getting warm"). Always log
 per-joint `H_j` so we can tune the model from real runs.
 
 ### Layer 2 — behaviour-layer duty-cycle governor (no retraining)
+
+> **BUILT 2026-09-10 (constants placeholders).** `pi_pipeline/behavior/thermal_governor.py`
+> — `ThermalGovernor.update(hottest_tier) -> GovernorDecision` (speed_scale,
+> soften_gait, avoid_uphill, hold_pose, reason). AMBER → 0.55× speed + soften +
+> avoid-uphill hint; RED → hold `COOLDOWN_POSE_DEG` (folded, frame-supported)
+> for `cooldown_min_s`, fall back to `opencat.SIT` / `REST`. Escalation is
+> immediate; de-escalation waits `deescalate_s` and RED additionally holds the
+> minimum, with a re-spike restarting the hold. Pure logic + fake clock, 9 tests.
+> Still to wire: the caller that applies the decision in the gait / behaviour
+> loop (A8 driver binding).
 
 In `pi_pipeline/behavior/` (same pattern as explore mode):
 

@@ -21,11 +21,23 @@ from __future__ import annotations
 
 
 from dataclasses import dataclass, field
+from enum import IntEnum
 
 import numpy as np
 
 # URDF / policy joint order: [FL-sh, FL-kn, FR-sh, FR-kn, BR-sh, BR-kn, BL-sh, BL-kn]
 _SHOULDER = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=float)   # shoulders carry gravity load
+_JOINT_NAMES = ("left-front", "left-front", "right-front", "right-front",
+                "right-back", "right-back", "left-back", "left-back")
+
+
+class ThermalTier(IntEnum):
+    """Per-joint heat state -- servo-thermal.md Layer 1 "3-tier indicator".
+    GREEN = fine; AMBER = the behaviour governor throttles (Layer 2);
+    RED = forced cooldown pose (Layer 2)."""
+    GREEN = 0
+    AMBER = 1
+    RED = 2
 
 # --- PLACEHOLDER constants -- gentle on purpose; retune with hardware ----------
 # (docs/research/servo-thermal.md "Retuning checklist")
@@ -46,6 +58,8 @@ _H_TRIP     = 60.0      # estimated danger line (unitless). Deliberately high --
 _WARN_FRAC     = 0.45   # WARN at 45% of trip -- "definitely before" the danger zone
 _COOLDOWN_FRAC = 0.85   # auto-rest at 85% of trip
 _REARM_FRAC    = 0.30   # re-allow a WARN announcement once H falls back under 30%
+_AMBER_FRAC    = 0.50   # 3-tier indicator (servo-thermal.md): >=50% of trip -> AMBER
+_RED_FRAC      = 0.85   # >=85% of trip -> RED  (matches _COOLDOWN_FRAC)
 _MAX_CONTINUOUS_S = 480.0   # generous backstop: 8 min of continuous locomotion ...
 _COOLDOWN_S       = 20.0    # ... then a 20 s rest. Not a nag; a floor.
 # NB: _MAX_CONTINUOUS_S is NOT a thermal estimate -- it is a blind "take a
@@ -67,6 +81,14 @@ WARN_PHRASE     = "I'm getting kinda tired and need to rest for a bit."
 COOLDOWN_PHRASE = "I really need to rest and cool down now."
 
 
+def _tier_for(frac: float) -> ThermalTier:
+    if frac >= _RED_FRAC:
+        return ThermalTier.RED
+    if frac >= _AMBER_FRAC:
+        return ThermalTier.AMBER
+    return ThermalTier.GREEN
+
+
 @dataclass
 class GuardSnapshot:
     state: str                 # "ok" | "warn" | "soft" | "cooldown"
@@ -76,6 +98,25 @@ class GuardSnapshot:
     duty_s: float              # seconds of continuous locomotion since last rest
     soft_mask: np.ndarray = field(default_factory=lambda: np.zeros(8, bool))
     tripped_reason: str = ""
+    tiers: np.ndarray = field(default_factory=lambda: np.zeros(8, np.int8))  # per-joint ThermalTier
+    hottest_tier: ThermalTier = ThermalTier.GREEN
+
+    def warm_joints(self) -> list[str]:
+        """Distinct leg names at AMBER or hotter -- for a spoken heads-up."""
+        seen, out = set(), []
+        for j, tier in enumerate(self.tiers):
+            if tier >= ThermalTier.AMBER and _JOINT_NAMES[j] not in seen:
+                seen.add(_JOINT_NAMES[j])
+                out.append(_JOINT_NAMES[j])
+        return out
+
+    def warm_phrase(self) -> str:
+        legs = self.warm_joints()
+        if not legs:
+            return WARN_PHRASE
+        which = legs[0] if len(legs) == 1 else " and ".join((", ".join(legs[:-1]), legs[-1]))
+        lead = "leg is" if len(legs) == 1 else "legs are"
+        return f"my {which} {lead} getting warm -- I should ease off soon."
 
 
 class ThermalGuard:
@@ -147,6 +188,9 @@ class ThermalGuard:
         hf = float(self._H[hj] / _H_TRIP)
         duty = self._duty_s
 
+        tiers = np.array([_tier_for(float(h) / _H_TRIP) for h in self._H], dtype=np.int8)
+        hottest_tier = ThermalTier(int(tiers.max()))
+
         soft_mask = self._soft_mask()
         state, reason = "ok", ""
         if self._H[hj] >= self._cool_H:
@@ -161,16 +205,19 @@ class ThermalGuard:
         elif self._H[hj] >= self._warn_H and self._warn_armed:
             state = "warn"
 
+        snap = GuardSnapshot(state, self._H.copy(), hj, hf, duty, soft_mask, reason,
+                             tiers=tiers, hottest_tier=hottest_tier)
+
         if state == "warn" and self._last_state not in ("warn", "soft", "cooldown"):
             self._warn_armed = False
-            self.on_announce(WARN_PHRASE)
+            self.on_announce(snap.warm_phrase())          # per-joint if we can name it
         elif state == "cooldown" and self._last_state != "cooldown":
             self.on_announce(COOLDOWN_PHRASE)
         elif state == "ok" and self._H[hj] < self._rearm_H:
             self._warn_armed = True
 
         self._last_state = state
-        return GuardSnapshot(state, self._H.copy(), hj, hf, duty, soft_mask, reason)
+        return snap
 
     def note_rest(self, seconds: float):
         """Call after an actual REST so the model cools and the duty timer resets."""

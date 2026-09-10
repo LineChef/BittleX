@@ -60,18 +60,27 @@ hardware mocked for now.
   geometry bug then collapsed `ep_rew_mean` at ~1.1 M steps on every
   new-course finetune (fixed, commit `01cf87e`; the tilted heightfield spawned
   the robot embedded in the terrain → runaway `r_height` penalty → critic
-  divergence). A fresh 20 M run (`run20m_newcourse`) on the fixed course is
-  underway to decide whether the redesigned course produces a better policy or
-  `run20m_ppo` stays the base. Benchmark upgraded with a held-out
-  generalization tier, command-following + tail metrics, and Wilson-CI
-  comparison. The eventual perception-in-the-loop gait is Phase 8. See
-  [`docs/rl-runs/`](docs/rl-runs/) for history.
+  divergence). A fresh 20 M run (`run20m_newcourse`) on the fixed course came
+  back a **negative result** — equivalent on the core ladder but clean
+  regressions on bare-robot / ledges / carpet / OOD slopes — so **`run20m_ppo`
+  stays the frozen base**; the new course's slope-fix and rubble variety are
+  parked for a future green-lit run. Sim locomotion work is otherwise done
+  pending the real-robot head-to-head. Learned vision-in-the-gait was ruled out
+  across four campaigns (Phases A–F); perception-assisted walking is now a
+  behaviour-layer reflex + scripted skill-switching, and is back-burnered until
+  G2 has a real forward depth sensor. See [`docs/rl-runs/`](docs/rl-runs/).
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
   (explore mode, idle-REST staged descent), a servo thermal guard, a
   black-box diagnostics logger, and Pi power-management helpers — all scaffolded
-  and running on a dev machine with the hardware mocked; **110 tests passing**.
+  and running on a dev machine with the hardware mocked; **293 tests passing**.
+- **On-device vision** — a custom 3-class detection model (household member +
+  `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
+  build path (the camera firmware is frozen at Jan 2025, which broke every modern
+  export toolchain until we pinned `ultralytics==8.2.8` + a local arm64 export)
+  is in [`docs/research/grove-vision-v2-custom-model.md`](docs/research/grove-vision-v2-custom-model.md),
+  with tooling in `tools/gv2/`.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:

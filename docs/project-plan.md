@@ -694,9 +694,11 @@ and `scene.summarize` / `scene.narrate` (LLM-injected, decoupled from `voice`).
 Remaining items are the serial wire format, a trained detection model, threshold
 tuning, and the Phase 10 wiring — all hardware-gated.
 
-> **2026-09-08 — vision-navigation is flag-gated OFF.** The camera runs a
-> single-class *face* model, not an obstacle/edge detector; nothing on the bot
-> perceives objects in its path. New master flag **`features.vision`** (default
+> **2026-09-08 — vision-navigation is flag-gated OFF.** The camera now runs a
+> working **3-class detection model** (household member + `dog` + `cat`,
+> 2026-09-09) — but that's *recognition*, still not an obstacle/edge detector,
+> so nothing on the bot perceives objects in its path and the gate stays on.
+> Master flag **`features.vision`** (default
 > `False`) forces `vision_safety` / `vision_perception` / `avoidance_act` /
 > `explore` off; `BehaviorDriver(vision_available=False)` drops EXPLORE,
 > recognition hop, CliffGuard reflex and "G2 meet X" enrollment;
@@ -748,11 +750,25 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       → `scene` → `Avoider`), acquires/drops the subject instantly, scores ~60–80.
       Wired into `.env` (`VISION_LABELS` / `VISION_MIN_SCORE=45`). Full workflow:
       `docs/train-a-visual-model.md`.
-- [ ] Train a custom SenseCraft detection model (cables, small objects, table
-      edges); record its label list + input size and the deploy workflow.
-- [ ] Multi-class `person` + face model — SenseCraft browser is single-class
-      only; needs Roboflow + SSCMA Colab (`swift_yolo`, export
-      `*_int8_vela.tflite`). Parked; see `docs/train-a-visual-model.md`.
+- [x] **Multi-class detection model WORKING on device (2026-09-09):** 3 classes
+      (household member + `dog` + `cat`), YOLOv8n @ 192 px, mAP@50 0.907. Root
+      cause of a week of dead flashes: the GV2 firmware is **frozen at Jan 2025**
+      and only decodes ~2024-era export heads. The path that works —
+      `ultralytics==8.2.8` trained on Colab, then `yolo export format=tflite
+      int8` run **locally on arm64 Python 3.9** (Colab's 3.13 can't), then vela.
+      All of it is repo tooling now: **`tools/gv2/`**
+      (`split_yolo_dataset.py`, `export_yolov8_gv2.sh`, `vela_config_we2.ini`) +
+      `tools/autobox_coco.py` + `tools/vision_diag.py`. Full 12-step process:
+      `docs/research/grove-vision-v2-custom-model.md`. Known limit of this first
+      model: detects up close only (100-image INT8 calib set; 300+ wanted) —
+      improvement loop speced in `docs/research/capture-progress.md`.
+- [ ] **Improve the 3-class model** — diagnostic `vision_diag` logging pass →
+      shot list → recapture (distance/pose variety) → retrain with a 300+
+      calibration set. Then add a 4th class (2nd household member) at `nc: 4`.
+- [ ] Train the **obstacle / table-edge** classes (cables, small objects, desk
+      edge) — the desk-edge class is `CliffGuard`'s detector and is gated on the
+      camera being **mounted on the frame** (real POV; hand-held frames won't
+      transfer). See B16.
 - [ ] **Cliff/edge avoidance — `CliffGuard`, designed 2026-09-04, HIGHEST
       PRIORITY once the camera lands** (G2 lives on the user's desk; must never
       walk off it). Full design: `docs/behavior-ideas.md` **B16**. Confirmed not

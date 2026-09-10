@@ -145,7 +145,7 @@ def test_inspect_plays_its_multiframe_sweep_then_holds_the_last():
         out, _ = s.update(GaitMode.INSPECT, RL)
         poses.append(out)
     poses = np.array(poses)
-    assert poses[:, 0].ptp() > 5.0                     # it actually swept (degrees)
+    assert np.ptp(poses[:, 0]) > 5.0                   # it actually swept (degrees)
     assert np.allclose(poses[-1], np.rad2deg(0.9), atol=1e-6)   # converged on the last frame
 
 
