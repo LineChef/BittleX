@@ -29,6 +29,12 @@ Bittle has a real, built-in self-righting capability, but it is narrower than th
 marketing framing suggests — and has limitations directly relevant to RL
 training, where falls will be frequent and messy.
 
+> **Sim replay (2026-09-10):** `rc`/`rl` keyframes replayed open-loop in
+> PyBullet recover **0/2** fall states — the sim can neither confirm nor rule out
+> the firmware get-up (approximate refs, no balance loop, no stable side-lie in
+> the URDF). Hardware testing is mandatory. Detail:
+> [`../rl-runs/getup-sim-replay.md`](../rl-runs/getup-sim-replay.md).
+
 ## What's confirmed to work
 
 - Petoi markets Bittle as reminiscent of Boston Dynamics' Spot — climbing steps

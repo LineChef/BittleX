@@ -153,8 +153,14 @@ The RL policy **can't** self-right (no roll-axis DOF — [[project_g2_no_self_ri
 Firmware has a scripted self-right, but only for slow side/forward falls and with
 no BiBoard-V1 IR trigger.
 
-- **Do now (sim):** run the get-up-sim reminder — replay the rc/rl get-up scripts
-  in PyBullet and watch them ([[project_getup_sim_reminder]]).
+- **Do now (sim): DONE 2026-09-10** — replayed `rc`/`rl` in PyBullet
+  (`reference_gait/verify_getup_reference.py`). **0/2 fall states recovered:**
+  `rc` from belly-flat reaches a transient 4-leg crouch then collapses (no
+  balance loop in open-loop replay); `rl` from supine produces no roll-over.
+  Expected — the refs are approximate keyframe decodes, replay is open-loop, and
+  this URDF has no stable side-lie. The sim can't validate the firmware get-up
+  either way; hardware testing is mandatory. Full write-up:
+  [`getup-sim-replay.md`](getup-sim-replay.md).
 - **Trigger (hardware):** G2 falls in orientations the firmware self-right
   doesn't cover, often enough to matter.
 - **Work:** almost certainly a **keyframe/scripted** skill (Skill Composer), not
