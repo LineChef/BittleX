@@ -60,18 +60,37 @@ class PiperTTS:
         self._sd = sd
         self._rate = self._voice.config.sample_rate
 
+    def _synth(self, text: str):
+        import numpy as np
+        chunks = list(self._voice.synthesize(text))
+        if not chunks:
+            return None, self._rate
+        return np.concatenate([c.audio_int16_array for c in chunks]), chunks[0].sample_rate
+
     def speak(self, text: str) -> None:
         if not text:
             return
         print(f"\n  G2: {text}\n")
-        import numpy as np
-
-        chunks = list(self._voice.synthesize(text))
-        if not chunks:
+        audio, rate = self._synth(text)
+        if audio is None:
             return
-        audio = np.concatenate([c.audio_int16_array for c in chunks])
-        self._sd.play(audio, chunks[0].sample_rate)
+        self._sd.play(audio, rate)
         self._sd.wait()
+
+    def synth_to_wav(self, text: str, out_path) -> tuple[int, int]:
+        """Synthesise `text` to a mono 16-bit WAV file -- no playback, no
+        sounddevice. For offline validation / pre-rendered stock phrases.
+        Returns (sample_rate, n_samples)."""
+        import wave
+        audio, rate = self._synth(text)
+        n = 0 if audio is None else len(audio)
+        with wave.open(str(out_path), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            if audio is not None:
+                w.writeframes(audio.tobytes())
+        return rate, n
 
 
 def make_tts(mode: str, *, piper_model_path: str) -> TTS:

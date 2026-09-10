@@ -626,18 +626,20 @@ the audio backends (deps + models) and everything hardware.
       one reply can both talk and move.
 - [x] **State-cue interface** — `voice/cues.py` (`LogCue` now; buzzer/posture
       later).
-- [ ] Audio capture on the Pi (Bittle's onboard mic). `voice/stt.py` /
-      `wake_word.py` use `sounddevice`; test on real mic hardware.
-- [ ] Speech-to-text — Vosk small English model for both wake word and full STT
-      (`requirements-audio.txt` + model download in `voice/README.md`). Confirm
-      it's light enough on the Pi Zero 2 WH; from similar Pi-based LLM voice
-      robots (SunFounder PiDog docs, `marceld23/Ai-Robo-Dog`,
-      `rockywuest/pidog-embodiment` — all Pi 4/5 with 2 GB+, so directional):
-  - Wake-word gate so full STT / network calls only fire on activation.
-  - Local TTS (Piper `en_US-ryan-low`) — `PiperTTS` implemented; needs the model.
-  - Health-monitor / auto-restart the audio + serial threads once they're real
-    (pidog-embodiment logs worker threads dying silently).
+- [x] **Audio backends installed + validated offline (2026-09-10).**
+      `requirements-audio.txt` deps are in `pi_pipeline/.venv`
+      (`vosk 0.3.44`, `piper-tts 1.7.0`, `sounddevice 0.5.6`, `onnxruntime
+      1.23.2`); models fetched (`models/piper` 301 MB incl. `en_US-ryan-low`,
+      `models/vosk` 68 MB small-en). New offline-testable methods
+      `PiperTTS.synth_to_wav()` / `VoskSTT.transcribe_wav()` + a round-trip test
+      (Piper synth → Vosk transcribe) that **passes** — the STT/TTS path works
+      end-to-end with no mic/speaker. Still hardware: real mic capture on the Pi,
+      speaker playback, and the Pi Zero 2 WH RAM/latency check (`benchmark_pi.py`).
+- [ ] Speech-to-text — real-mic capture + wake-word gate on the Pi (`voice/stt.py`
+      / `wake_word.py` `sounddevice` path). Health-monitor for the audio + serial
+      worker threads is built (`pi_pipeline/util/supervisor.py`).
   - Bookworm's PEP 668 blocks plain `pip install` on-device — use the venv.
+- [ ] Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out).
 - [ ] Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out).
 - [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard, confirm
       the skill commands land.
