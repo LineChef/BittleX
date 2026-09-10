@@ -179,9 +179,28 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
     `mode.transition` / `posture.transition` / `enroll.*` / `cliff.reflex`
     events. 3 tests. **done.**
   - Folding `run_gait --log` CSV in as a ring-buffer source: still open (minor).
-- **Phase 2 — at bring-up:** watchdog/heartbeat thread, dump-on-incident wiring,
-  battery + Pi-thermal sampling, the exception hook. Validate the black box
-  actually captures a real fall / link drop.
+- **Phase 2 — non-hardware parts DONE (2026-09-10):**
+  - `pi_pipeline/diag/watchdog.py` — `WatchdogCore` (pure timing logic:
+    heartbeat Hz + stall latch, fake-clock tested) + `Watchdog` thread. Control
+    loop calls `wd.beat()` each tick; the thread logs `sys/INFO/heartbeat`
+    every 1 s and, on a stall past `stall_after_s`, logs `sys/ERROR/loop.stall`
+    (auto-flushes the black box) and calls `on_stall` (wired to send `d` in
+    `run_gait.py`).
+  - `diag.incident(sub, name, **kv)` — the explicit dump-on-incident entry
+    point; `_FLUSH_NAMES` expanded to the whole failure taxonomy so any of
+    those names flushes the ring even at INFO.
+  - `diag.install_excepthook()` — unhandled exception → `sys/FATAL/unhandled.exception`
+    + black-box flush + manifest finalized `clean_exit=false`, then the normal
+    handler. Wired in `run_gait.py`.
+  - `diag.close()` now **finalizes the manifest** (duration, per-level event
+    counts, incident count, clean/crash).
+  - `pi_pipeline/diag/sysmon.py` — `Sysmon.sample(emit)` (watchdog calls it
+    each heartbeat): `read_soc_temp_c` works on any Linux; `read_pi_throttled`
+    (`vcgencmd`) and `read_battery_v` are `# HARDWARE` stubs returning `None`,
+    so it's a no-op on a dev machine. Emits `battery.sag` / `pi.thermal_throttle`
+    (rate-limited) once real readings exist.
+  - 13 tests. **Still hardware-gated:** validating the black box captures a real
+    fall / link drop; the battery ADC source.
 - **Phase 3 — as needed:** live Wi-Fi stream + laptop listener, longer-term
   trend rollups across sessions.
 

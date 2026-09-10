@@ -83,6 +83,7 @@ class DriverInputs:
     nearby_motion: bool = False             # small sound/motion -> PEEK, don't get up
     meet_name: str | None = None            # "G2, meet <name>" -> start enrollment
     cancel_enroll: bool = False
+    say_hi: bool = False                     # "say hi" / "wave" voice intent -> greeting gesture
 
     # --- continuous sensor / perception state ---
     imu_level: bool = True
@@ -250,6 +251,12 @@ class BehaviorDriver:
         if i.cancel_enroll and self.enroll.active:
             t = self.enroll.cancel(now)
             fx += self._from_enroll(t, now)
+        # "say hi" voice intent -> a greeting gesture, unless enrolment owns the
+        # robot or a non-wake choreography is mid-run
+        if i.say_hi and not self.enroll.active and not (
+                self._choreo.busy and self._choreo.label != "wake"):
+            g = self.gestures.greeting(now)
+            fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "say hi"))
         return fx
 
     # --- enrollment ------------------------------------------------------

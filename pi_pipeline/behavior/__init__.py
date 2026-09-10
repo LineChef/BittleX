@@ -5,6 +5,7 @@ decides wander/investigate intent during EXPLORE; `Novelty` tracks what's been
 seen so "curious" pulls toward the unseen. All pure logic, driven by the
 `BehaviorParams` the personality produces.
 """
+from .bindings import DriverBindings, MockBindings
 from .driver import (
     BehaviorDriver, DriverInputs, DriverTick, Effect, EffectKind,
 )
@@ -20,6 +21,7 @@ from .novelty import Novelty, NoveltyConfig
 
 __all__ = [
     "BehaviorDriver", "DriverInputs", "DriverTick", "Effect", "EffectKind",
+    "DriverBindings", "MockBindings",
     "ModeController", "Mode", "ModeConfig",
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
     "Gesture", "GestureConfig", "GesturePicker", "GESTURE_TOKEN",

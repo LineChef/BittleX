@@ -38,6 +38,13 @@ from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
 
+try:                                                          # carpet mode (optional)
+    from pi_pipeline.gait.carpet import CarpetAction, CarpetDetector  # noqa: E402
+    from pi_pipeline.gait.speed_estimate import ZuptSpeedEstimator    # noqa: E402
+    from pi_pipeline.link import opencat as _opencat                  # noqa: E402
+except Exception:                                             # noqa: BLE001
+    CarpetDetector = None
+
 try:                                                          # Phase E vision-skill layer (optional)
     from pi_pipeline.gait.skill_layer import SkillLayer       # noqa: E402
     from pi_pipeline.gait.skill_switch import SkillRefs       # noqa: E402
@@ -332,17 +339,35 @@ def _make_vision_feed(kind, port, baud):
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
-        turn_burst_s=1.0):
+        turn_burst_s=1.0, carpet=False):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
+    carpet_det = speed_est = None
+    _carpet_prev = "normal"
+    if carpet and CarpetDetector is not None:
+        carpet_det = CarpetDetector()
+        speed_est = ZuptSpeedEstimator()
+        print("[carpet] detector ON -- NOTE: forward-speed estimate needs the "
+              "6-axis IMU accel plumbed (currently inert); thresholds untuned.", flush=True)
+
     ring = None
+    wd = None
     if diag is not None:
         diag.start_session("gait", policy_path=getattr(pol, "onnx_path", None),
                            extra={"cmd_fwd": cmd_fwd, "hz": hz})
+        diag.install_excepthook()
         bridge_stdlib_logging()
         ring = diag.attach_ring(RingBuffer(seconds=15, hz=hz))
+        try:
+            from pi_pipeline.diag.watchdog import Watchdog, WatchdogConfig
+            from pi_pipeline.diag.sysmon import Sysmon
+            wd = Watchdog(WatchdogConfig(stall_after_s=max(0.25, 4.0 / hz)),
+                          on_stall=lambda: _send(lk, "d"), sysmon=Sysmon())
+            wd.start()
+        except Exception:
+            wd = None
     _guard_prev = "ok"
     _skill_prev = "cruise"
     if skill_layer is not None:
@@ -450,9 +475,40 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         i += 1
                         continue
 
+                if carpet_det is not None:
+                    eff_cmd = cmd_fwd * (sinfo.speed_scale if skill_layer is not None else 1.0)
+                    # HARDWARE: body-X accel isn't in the ypr+gyro IMU stream yet
+                    # (--imu-format 6axis carries ax/ay/az). None -> estimator inert.
+                    accel_fwd = None
+                    v_meas = speed_est.update(accel_fwd, pol.phase_frac(), dt)
+                    cact = carpet_det.update(eff_cmd, v_meas)
+                    if cact != _carpet_prev:
+                        if diag is not None:
+                            diag.event("gait", "WARN", "carpet.mode",
+                                       action=cact.value, reason=carpet_det.last_reason)
+                        print(f"[carpet] {_carpet_prev} -> {cact.value}: {carpet_det.last_reason}",
+                              flush=True)
+                        if _carpet_prev == CarpetAction.CARPET_GAIT.value \
+                                and cact is CarpetAction.NORMAL:
+                            _send(lk, _opencat.STAND)              # re-anchor after the firmware gait
+                            pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)),
+                                      q, [gx, gy, gz])
+                        _carpet_prev = cact.value
+                    if cact is CarpetAction.CARPET_GAIT:
+                        _send(lk, _opencat.CARPET_WALK)            # firmware kcarpetF drives; skip the policy send
+                        if wd is not None:
+                            wd.beat()
+                        i += 1
+                        t_next += dt
+                        continue
+                    if cact is CarpetAction.BOOST_CMD:
+                        pol.set_command(fwd=carpet_det.cmd_with_boost(eff_cmd))
+
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+                if wd is not None:
+                    wd.beat()
 
                 if ring is not None:
                     ring.push(t=round(time.perf_counter() - t_start, 3),
@@ -510,6 +566,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             diag.event("gait", "FATAL", "loop.exception", err=repr(e))
         raise
     finally:
+        if wd is not None:
+            wd.stop()
         _send(lk, "V")     # stream off
         _send(lk, "d")     # rest
         if vision is not None:
@@ -550,6 +608,10 @@ def main():
                     help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
     ap.add_argument("--log", default=None,
                     help="write a per-tick CSV (t, rpy, gyro, 8 joint deg) for real_vs_sim / sysid_replay")
+    ap.add_argument("--carpet", action="store_true",
+                    help="run CarpetDetector -- boost the speed cmd / hand off to "
+                         "firmware kcarpetF on sustained slip. Inert until the "
+                         "6-axis IMU accel is plumbed + thresholds tuned on carpet.")
     ap.add_argument("--no-thermal-guard", action="store_true",
                     help="disable the conservative servo thermal guard (WARN speech + rare auto-cooldown)")
     ap.add_argument("--ignore-features", action="store_true",
@@ -625,7 +687,7 @@ def main():
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
-                turn_burst_s=args.skills_turn_burst)
+                turn_burst_s=args.skills_turn_burst, carpet=args.carpet)
     finally:
         try:
             lk.close()

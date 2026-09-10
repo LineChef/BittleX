@@ -31,8 +31,14 @@ _LEVELS = {"DEBUG": 10, "INFO": 20, "WARN": 30, "WARNING": 30, "ERROR": 40, "FAT
 
 # events at/above this level auto-flush every attached ring buffer
 _FLUSH_AT = _LEVELS["ERROR"]
-# ... and these event names always flush regardless of their level
-_FLUSH_NAMES = {"fall.detected", "loop.stall", "servo.thermal_cooldown", "link.lost"}
+# ... and these event names always flush regardless of their level (the failure
+# taxonomy incidents from docs/research/hardware-diagnostics.md)
+_FLUSH_NAMES = {
+    "fall.detected", "loop.stall", "loop.exception", "unhandled.exception",
+    "servo.thermal_cooldown", "servo.stall", "link.lost",
+    "imu.stale", "onnx.overrun", "battery.sag", "pi.thermal_throttle",
+    "wifi.drop", "cliff.frozen", "jam.detected",
+}
 
 
 def _log_root() -> Path:
@@ -124,6 +130,9 @@ class Diag:
         self.session_dir: Path | None = None
         self._rings: list[RingBuffer] = []
         self._incident_n = 0
+        self._started_mono: float | None = None
+        self._lvl_counts: dict[str, int] = {}
+        self._excepthook_installed = False
 
     # -- lifecycle -----------------------------------------------------------
     def start_session(self, subsystem_hint: str = "run", *,
@@ -136,6 +145,9 @@ class Diag:
             d.mkdir(parents=True, exist_ok=True)
             self.session_id, self.session_dir = sid, d
             self._fp = open(d / "events.jsonl", "a", buffering=1)
+            self._started_mono = time.monotonic()
+            self._lvl_counts = {}
+            self._incident_n = 0
             manifest = {
                 "session_id": sid,
                 "started_wall": time.time(),
@@ -153,12 +165,59 @@ class Diag:
         self.event(subsystem_hint, "INFO", "session.start", session_id=sid)
         return sid
 
-    def close(self):
+    def close(self, *, clean: bool = True):
         with self._lock:
             if self._fp:
-                self.event_locked("sys", "INFO", "session.end")
+                self.event_locked("sys", "INFO", "session.end", clean=clean)
                 self._fp.close()
                 self._fp = None
+            self._finalize_manifest(clean)
+
+    def _finalize_manifest(self, clean: bool) -> None:
+        """Fill in end-of-session fields so a manifest alone tells you how a run
+        went (duration, event counts, incidents, clean vs crash)."""
+        if not self.session_dir:
+            return
+        mpath = self.session_dir / "manifest.json"
+        try:
+            man = json.loads(mpath.read_text())
+        except Exception:
+            return
+        man["ended_wall"] = time.time()
+        man["ended_iso"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        if self._started_mono is not None:
+            man["duration_s"] = round(time.monotonic() - self._started_mono, 1)
+        man["event_counts"] = dict(self._lvl_counts)
+        man["incident_count"] = self._incident_n
+        man["clean_exit"] = clean
+        try:
+            mpath.write_text(json.dumps(man, indent=2, default=str))
+        except Exception:
+            pass
+
+    def incident(self, subsystem: str, name: str, **kv):
+        """Log a failure-taxonomy incident at ERROR and guarantee a black-box
+        dump -- the explicit 'dump on incident' entry point."""
+        self.event(subsystem, "ERROR", name, **kv)
+
+    def install_excepthook(self):
+        """Turn an unhandled exception into a FATAL event + black-box flush +
+        manifest finalize before the interpreter's own handler runs. Idempotent."""
+        if self._excepthook_installed:
+            return
+        import sys
+        prev = sys.excepthook
+
+        def _hook(exc_type, exc, tb):
+            try:
+                self.event("sys", "FATAL", "unhandled.exception",
+                           err=f"{exc_type.__name__}: {exc}")
+                self._finalize_manifest(clean=False)
+            finally:
+                prev(exc_type, exc, tb)
+
+        sys.excepthook = _hook
+        self._excepthook_installed = True
 
     # -- ring buffers ------------------------------------------------------------
     def attach_ring(self, ring: RingBuffer) -> RingBuffer:
@@ -193,7 +252,9 @@ class Diag:
             self._fp.write(json.dumps(rec, default=str) + "\n")
         except Exception:
             pass
-        lvl = _LEVELS.get(level.upper(), 20)
+        lu = level.upper()
+        self._lvl_counts[lu] = self._lvl_counts.get(lu, 0) + 1
+        lvl = _LEVELS.get(lu, 20)
         if lvl >= _FLUSH_AT or name in _FLUSH_NAMES:
             self._dump_rings(name)
 

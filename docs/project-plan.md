@@ -923,13 +923,13 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       nothing in movement or vision imports it.
 - [ ] Semantic recall (embeddings) if FTS keyword matching feels too literal —
       weigh model/latency cost on the Pi first.
-- [ ] Small web UI to browse / prune memory (per the plan) — a ~100-line
-      single-file app over the existing `Store`: facts list with add/edit/delete,
-      searchable conversation log, a `recall()` preview, a wipe button.
-      **Deferred: revisit once real multi-session use has accumulated enough
-      history to make browsing/pruning worthwhile.** The CLI covers every
-      function meanwhile: `python -m pi_pipeline.memory
-      {facts,log,search,recall,remember,forget,wipe}`.
+- [x] **Small web UI to browse / prune memory — BUILT 2026-09-10.**
+      `pi_pipeline/memory/webui.py` (`python -m pi_pipeline.memory.webui`,
+      stdlib `http.server`, no deps, binds 127.0.0.1): facts list with
+      add / delete, searchable conversation log (FTS), a `recall()` preview,
+      and a confirm-gated wipe. HTML-escaped. 8 tests (page render + a live
+      server round-trip). The CLI still covers everything headless:
+      `python -m pi_pipeline.memory {facts,log,search,recall,remember,forget,wipe}`.
 - [ ] Exercise it across real multi-session conversations once the voice loop
       runs live (needs an API key / hardware) — and at that point re-check
       whether recall quality, the fact cap, and the decay ordering feel right on
@@ -954,32 +954,39 @@ tick and act on their outputs in an actual control/behaviour loop.
 `ModeController` + `Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` +
 `Enrollment` + optional `CliffGuard` and returns an ordered list of abstract
 `Effect`s (SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG).
-It runs today against mock feeds + a fake clock (11 tests). Still needs, on
-hardware: the **binding layer** that maps `Effect`s onto the real
-actuator / TTS / frame-grabber / session log, plus the input plumbing (vision
-frame, IMU state, mic events). The `DIAG` effects are the hook for Diagnostics
-Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
+It runs today against mock feeds + a fake clock (11 tests). The **binding layer**
+is built (`pi_pipeline/behavior/bindings.py`, 2026-09-10) — `DriverBindings`
+routes every `Effect` kind to an optional sink (actuator / tts / camera / cue /
+walker / head / diag), missing sinks drop-and-warn; `MockBindings` records every
+call so the whole loop is exercised end-to-end (idle descent → `ksit` → `d`,
+wake choreography → head/skill) in 7 tests. Still needs, on hardware: the real
+sink implementations (some exist — `voice/actuator.py`, `voice/cues.py`,
+`voice/tts.py`) and the input plumbing (vision frame, IMU state, mic events).
+The `DIAG` effects are the hook for Diagnostics Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
 personality→idle-timing knobs, sniff-on-investigate, greeting-on-enrollment and
 excited-hop-on-recognition are all wired *inside* the driver now — see
 `docs/behavior-ideas.md` for the per-item status (a few sub-items, e.g. the
 breathing-bob motion and LED life-signs, are still caller-side).
 
-- [ ] **CARPET MODE — important; G2 stalls on carpet blind-forward.**
-      `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested) is the decision
-      logic: commanded vs. measured forward speed → `NORMAL` / `BOOST_CMD`
-      (raise the speed command to punch through pile) / `CARPET_GAIT`
-      (hand off to the firmware `kcarpetF`; `carpet_ref.npy` decoded for sim).
-      Remaining:
-  - **A forward-speed estimate on hardware** — the detector needs "measured
-    speed". Options: integrate IMU accel (drifty), vision optical flow off the
-    camera feed, or a fixed-distance timed check. Pick and build one.
-  - **Runtime wiring in the gait loop** (`gait/run_gait.py` or the behaviour
-    loop): call `det.update(cmd, measured)` each tick; on `BOOST_CMD` apply
-    `det.cmd_with_boost()` to `pol.set_command()`; on `CARPET_GAIT` pause the
-    residual policy and send `opencat.CARPET_WALK`, resume on `NORMAL`
-    (via-stance blend, same as a SkillSwitch hand-off).
-  - **Tune the thresholds on real carpet** (`boost_below`, `carpet_below`,
-    `enter_s`, `boost`) — the defaults are guesses.
+- [~] **CARPET MODE — decision logic + runtime wiring done (2026-09-10);
+      hardware-gated on the accel source + threshold tuning.**
+      `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested): commanded vs.
+      measured forward speed → `NORMAL` / `BOOST_CMD` (raise the speed command
+      to punch through pile) / `CARPET_GAIT` (hand off to firmware `kcarpetF`).
+  - **Forward-speed estimate — BUILT:** `pi_pipeline/gait/speed_estimate.py`
+    `ZuptSpeedEstimator` — integrates body-X accel with a per-gait-cycle ZUPT
+    bias correction + a leak (steady walking ⇒ ∫accel over a cycle ≈ 0). Pure
+    logic, 6 tests. **Accel not plumbed yet:** `parse_imu_line` returns
+    ypr+gyro only; body-X accel needs the `--imu-format 6axis` stream. Passing
+    `accel_fwd=None` makes it inert, so `--carpet` is safe to leave off.
+  - **Runtime wiring — DONE:** `run_gait.py --carpet` (default off) runs the
+    estimator + detector each tick; `BOOST_CMD` → `pol.set_command(cmd_with_boost)`,
+    `CARPET_GAIT` → send `opencat.CARPET_WALK` and skip the policy send, re-anchor
+    the policy (`STAND` + `pol.reset`) on return to `NORMAL`. `carpet.mode` diag
+    events on transitions.
+  - **Still hardware-gated:** plumb body-X accel through `parse_imu_line`; tune
+    `boost_below` / `carpet_below` / `enter_s` / `boost` on real carpet; tune
+    `ZuptSpeedEstimator`'s `leak_hz` / `bias_lerp`.
   - **Optional, better:** retrain the walk with `CARPET` domain-randomisation so
     the RL policy itself handles pile (backlog H10 covers the carpet sysid);
     then `CARPET_GAIT` hand-off is only for deep pile.
@@ -988,10 +995,15 @@ breathing-bob motion and LED life-signs, are still caller-side).
       `Enrollment` GREETING, `sniff_find()` on `ExploreAction.INVESTIGATE`,
       `excited_hop()` on a bonded label seen after an absence (driver takes the
       roster as `DriverInputs.known_person_labels`; `bonds` stays un-imported).
-      A "say hi" voice intent still needs a hook.
+      A **"say hi" voice intent hook** is wired 2026-09-10 —
+      `DriverInputs.say_hi` → a `greeting()` gesture skill (suppressed during
+      enrollment / a non-wake choreography).
 - [x] **Idle-posture descent** — driven by `BehaviorDriver`; `kstr` is wired
-      into the WAKE choreography. Still open: `zz` (`opencat.SLEEP`) as a
-      deep-sleep variant of RESTING for sleep mode.
+      into the WAKE choreography. **Sleep mode** (the `zz` / `opencat.SLEEP`
+      deep-sleep below RESTING) has its FSM built 2026-09-10:
+      `pi_pipeline/behavior/sleep_mode.py` (`SleepMode`) — auto-sleep after long
+      RESTING, wake on IMU tap / wake word / loud sound, emits `ENTER_SLEEP`
+      (kzz + camera off + `power headless`) / `WAKE`. Driver wiring pending.
 - [ ] **INSPECT peer bow** — done + sim-validated (`buttUp_ref`, +22° nose-down);
       the earlier "author on hardware" caveat is resolved. Confirm on the real
       robot that the mounted camera's downward view actually improves the near
