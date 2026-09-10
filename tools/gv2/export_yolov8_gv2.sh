@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ultralytics YOLOv8 .pt  ->  firmware-20250102-compatible *_vela.tflite
 # for the Grove Vision AI V2. This is the export half of the 2026-09-09 recipe
-# (train on Colab, export here) -- see docs/research/grove-vision-v2-custom-model.md.
+# (train on Colab, export here) -- see docs/vision/custom-model-recipe.md.
 #
 #   tools/gv2/export_yolov8_gv2.sh  best.pt  <calib_images_dir>  [nc]  [name1,name2,...]
 #

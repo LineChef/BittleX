@@ -41,7 +41,7 @@ FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - T
 # action = 0 reproduces the open-loop scripted walk exactly, so the policy can
 # only add a learned correction on top of a gait that's already robust -- a
 # learned version of the firmware's gyro-balance layer. Motivation: the
-# learned-vs-scripted benchmark (docs/rl-runs/gait-benchmark.md) showed the scripted
+# learned-vs-scripted benchmark (docs/rl/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
 RESIDUAL_SCALE_DEG = 22   # gait-refinement G1: 11 -> 22. Wider correction authority (URMA/Bittle_Symmetry use ~30 deg). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; paired here with FAC_IMITATION 16 as a stronger anchor.
@@ -285,7 +285,7 @@ RUBBLE_X_RANGE = (0.08, 0.45)   # NEW -- applies everywhere, same reach reasonin
 
 # --- gait-refinement G3: sim-to-real domain randomisation -----------------
 # --- Payload = the mounted Pi companion stack. Modelled as TWO welded bodies so
-# the fore/aft CoM split is right (BOM: docs/research/hardware-specs.md "Mounted
+# the fore/aft CoM split is right (BOM: docs/hardware/specs.md "Mounted
 # payload weight", 2026-09-03). Target config = fully-loaded WITH camera (~76 g),
 # expected to be on the robot by the time the frame arrives.
 #   SPINE  = Pi Zero 2 WH + SD (~14 g) + PiSugar S w/ 1200 mAh cell (~33 g) +
@@ -318,7 +318,7 @@ CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.
                           # DR episodes, 4M-step continuation from run20m_ppo) was a REVERT:
                           # no new capability (base already 0% falls on carpet + whole decathlon)
                           # and ~8-10% forward-speed loss on flat AND carpet. See
-                          # docs/rl-runs/robustness-backlog.md log + the "Carpet Training Verdict"
+                          # docs/rl/robustness-backlog.md log + the "Carpet Training Verdict"
                           # report. The course stays defined for eval/viz (watch.py --challenge
                           # carpet, CHALLENGES dict overrides these).
 CARPET_SWELL = 0.022      # broad rolling undulation (m) on top of the CARPET bumps -- low-freq swell
@@ -333,7 +333,7 @@ CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 # G2's paws load the pile at a small fraction of a human footstep's pressure
 # (~a couple hundred grams peak per paw vs body weight through a human foot), so
 # "has some give" to a hand does not translate 1:1 -- a first estimate, meant to
-# be refined once real hardware data exists (docs/rl-runs/robustness-backlog.md
+# be refined once real hardware data exists (docs/rl/robustness-backlog.md
 # style: probe before assuming). restitution is fixed at 0 -- carpet doesn't
 # bounce, no reason to randomise that up.
 CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
@@ -473,7 +473,7 @@ FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
-# --- Anti-stall (R-NOSTALL, docs/rl-runs/robustness-backlog.md) -------------
+# --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
 # commanded speed while a move command is active. Sparse: a bonus each ~0.15 m
 # of net progress cleared *while an obstacle was recently in view*. Designed to
@@ -1020,7 +1020,7 @@ class OpenCatGymEnv(gym.Env):
             _dir = np.sign(self._cmd_fwd)
             capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
-        # Scripted-gait lessons (docs/rl-runs/gait-benchmark.md): keep feet on the ground
+        # Scripted-gait lessons (docs/rl/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)

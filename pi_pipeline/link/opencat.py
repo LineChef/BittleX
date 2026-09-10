@@ -5,7 +5,7 @@ commands over serial. This module builds the command strings the pipeline needs
 and gates the dangerous ones.
 
 Confirmed against PetoiCamp/OpenCatEsp32 src (OpenCat.h T_* macros, 2026-09-07 --
-see docs/research/petoi-firmware-reference.md) and the project's Phase 4 notes:
+see docs/hardware/petoi-firmware-reference.md) and the project's Phase 4 notes:
   k<skill>            perform a named skill        e.g. "kwkF", "ksit", "kbalance"
   m<idx> <deg> ...    move joint(s), chainable     e.g. "m0 30 8 -35"
   b<tone> <ms> ...    buzzer melody / beep         e.g. "b12 8 14 8"
@@ -44,7 +44,7 @@ QUERY = "?"                      # help/status -- not seen in the partial OpenCa
 # Built-in OpenCat keyframe skills for getting back up after a fall. `rc` and
 # `rl` are "Instinct" (firmware) skills; the firmware also auto-runs `rc` on an
 # IMU-detected flip when gyro assist is on. Verified against
-# PetoiCamp/OpenCat/src/InstinctBittle.h -- see docs/research/self-righting-research.md.
+# PetoiCamp/OpenCat/src/InstinctBittle.h -- see docs/hardware/self-righting.md.
 # Bittle has no roll-axis joint, so these scripted sequences (which lever the
 # body over using the legs) are the recovery path -- not a learned policy.
 RECOVER = "krc"                  # self-right / get-up from a side or forward fall

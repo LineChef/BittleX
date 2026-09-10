@@ -37,7 +37,7 @@ print a per-phase-family gap breakdown: a residual concentrated in the
 spread evenly across the `wkf` (dynamic swing+stance) family instead points at
 a mechanism the contact model can't represent at all -- fiber drag on a foot
 moving through pile above the floor plane -- which would need a new term, not
-just a CARPET_SOFT refit. See docs/rl-runs/hardware-gated-training-backlog.md H10.
+just a CARPET_SOFT refit. See docs/rl/hardware-gated-backlog.md H10.
 """
 import argparse
 import itertools
@@ -304,7 +304,7 @@ def main():
             print(f"  - carpet lateralFriction: np.random.uniform({lo:.2f}, {hi:.2f})   (was 0.9, 1.3)")
         print("\nIf the residual after this fit still concentrates in the `wkf` phase family (see "
               "breakdown above), that's evidence for the missing swing-phase fiber-drag term, not a "
-              "CARPET_SOFT problem -- see H10 in docs/rl-runs/hardware-gated-training-backlog.md.")
+              "CARPET_SOFT problem -- see H10 in docs/rl/hardware-gated-backlog.md.")
         return
 
     if not args.fit:

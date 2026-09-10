@@ -80,7 +80,7 @@ class BalancedLearned:
     gait, not learned into it. Probed against the bare-robot brutal cells:
     k=0.6 took T6.2b from 17% fell to 0% and T6.3b from 80% to 40%, both
     matching or beating scripted's own bare fall rate on the same cells with
-    zero retraining. See docs/rl-runs/ for the full probe.
+    zero retraining. See docs/rl/ for the full probe.
 
     KEEP THIS OUT OF TRAINING. If a policy ever trains WITH this correction
     active, the reward signal gets muddied the same way MIDWALK_PUSH_REFLEX's

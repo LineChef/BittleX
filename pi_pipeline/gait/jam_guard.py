@@ -34,7 +34,7 @@ leg brushing another leg, stepping a small bump, and working into a slope all
 produce divergence too, and Bittle is light + slow so the strain signal may be
 weak). Also unconfirmed until the bench: which servos report feedback and at
 what rate (`opencat.SERVO_FEEDBACK` / `readAllFeedbackFast()` -- "if supported",
-see docs/research/hardware-specs.md "Servo position feedback"). Unit-testable now
+see docs/hardware/specs.md "Servo position feedback"). Unit-testable now
 against synthetic cmd/feedback traces; the numbers wait for the bench.
 
 Wiring (later, on hardware) -- in `gait/run_gait.py`, alongside the thermal

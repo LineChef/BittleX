@@ -123,7 +123,7 @@ class Avoider:
 # SLOW has no skill -- the caller should instead scale the forward speed command
 # down (e.g. to ~40%) while it's active, since the RL walk policy tracks a speed
 # command directly. TURN_* trigger the firmware scripted turn gaits (RL turning
-# is not available -- see docs/rl-runs/vision-goal-locomotion-plan.md).
+# is not available -- see docs/rl/vision-in-gait.md).
 ACTION_SKILL = {
     AvoidanceAction.STOP: "stand",
     AvoidanceAction.BACK_UP: "walk_backward",

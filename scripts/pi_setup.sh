@@ -24,7 +24,7 @@
 #   bash pi_setup.sh --post-reboot   # run phase 2 by hand
 #   bash pi_setup.sh --status        # where are we
 #
-# Mirrors docs/research/pi-bring-up.md sections 3-8. Robot / BiBoard not required.
+# Mirrors docs/guides/pi-bring-up.md sections 3-8. Robot / BiBoard not required.
 set -u
 
 REPORT="$HOME/g2_pi_report.txt"

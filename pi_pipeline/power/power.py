@@ -1,6 +1,6 @@
 """Power-management helpers for the Pi Zero 2 W (PiSugar-fed).
 
-Three idle-state levers with zero autonomy risk (see docs/research/pi-power.md):
+Three idle-state levers with zero autonomy risk (see docs/hardware/pi-power.md):
   1. disable unused peripherals   (onboard LEDs now; audio/camera-LED via boot config)
   2. Wi-Fi power-save toggle       (on when headless -- +~200 ms/API call, breaks streaming)
   3. CPU governor                  (ondemand -- NOT powersave; verify no control-tick jitter)
@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 
 # Boot-config lines (need a reboot; can't be set at runtime). Add to
-# /boot/firmware/config.txt -- see docs/research/pi-set-up.md.
+# /boot/firmware/config.txt -- see docs/guides/pi-bring-up.md.
 BOOT_CONFIG_LINES = [
     "dtparam=audio=off",          # no 3.5mm / HDMI audio in use
     "dtoverlay=disable-bt",       # already set for the serial port; harmless if duplicated

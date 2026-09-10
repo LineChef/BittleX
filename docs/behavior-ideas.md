@@ -37,10 +37,8 @@ is a single **command-conditioned policy** (yaw-rate + speed command in the
 observation, reward tracks the command) rather than a separate turn gait. But
 it's **not scheduled** — OpenCat firmware turn gaits (`wkL` etc.) work today and
 the vision pursuit layer can use them. Build the RL version only if firmware
-turns oscillate in visual pursuit or fail on terrain — decision gate after the
-drift-fix loop + Decathlon; see
-`docs/rl-runs/auto-iteration-log-survive-loop.md`. Sidestep / sneak / backward
-still fit the separate-run framing here.
+turns oscillate in visual pursuit or fail on terrain. Sidestep / sneak /
+backward still fit the separate-run framing here.
 
 ### B3 — Skill Composer authoring
 Stand up a workflow around **Petoi's Skill Composer** (the no-code desktop tool
@@ -51,7 +49,7 @@ export to an `Instinct*.h` array). This is the authoring capability that B4
 ### B9 — Vision + servo-resistance obstacle traversal
 When the **vision module** spots an obstacle it judges walkable-over (small box,
 close, low), use **servo-resistance / position-feedback divergence** (command vs.
-actual angle on the front joints — see `docs/research/hardware-specs.md` "Servo
+actual angle on the front joints — see `docs/hardware/specs.md` "Servo
 position feedback") as a **secondary confirmation signal** that a foot has
 actually made contact, then trigger one of two responses:
 - a dedicated **step-over gait** (exaggerated front-leg swing) for low obstacles, or
@@ -97,8 +95,8 @@ without the real robot — normal carpet load, a leg brushing another leg,
 stepping a small bump, and working into a slope all produce divergence too, and
 Bittle is light (~290 g) + slow so the strain signal may be weak. Also need to
 confirm on hardware **which servos report feedback and at what rate**
-(`f` / `readAllFeedbackFast()` — "if supported"; `docs/research/hardware-specs.md`
-"Servo position feedback", `docs/research/petoi-firmware-reference.md`).
+(`f` / `readAllFeedbackFast()` — "if supported"; `docs/hardware/specs.md`
+"Servo position feedback", `docs/hardware/petoi-firmware-reference.md`).
 
 **Build sketch:** `pi_pipeline/gait/jam_guard.py` — `JamGuard.update(cmd_deg[],
 fbk_deg[]) -> JamAction (NONE | BACK_OFF | TURN_AWAY)`, windowed per-joint error
@@ -362,14 +360,14 @@ Then compare training paths: (a) fresh SenseCraft, (b) fine-tune from a
 person-aware Swift-YOLO checkpoint (SSCMA/Colab), (c) multi-class `person` +
 `self` SenseCraft project. Module currently holds the dud model — redeploy
 "Person Detection" from the library to get real detections back.
-Measured detector behaviour + firmware facts: `docs/research/vision-detector-bench.md`.
+Measured detector behaviour + firmware facts: `docs/vision/detector-bench.md`.
 
 **Implementation plans (2026-09-06):**
 - Person recognition + **enrollment mode** ("G2, meet X"): the enrollment FSM is
   built (`behavior/enrollment.py`, 15 tests); full design + what the driver still
-  needs is in `docs/research/person-recognition.md`.
+  needs is in `docs/vision/person-recognition.md`.
 - The multi-model **detection layer** (safety / interaction / objects models +
-  a model-manager that swaps by mode): `docs/research/detection-layer.md`.
+  a model-manager that swaps by mode): `docs/vision/detection-layer.md`.
 
 ### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
 G2 spends most of its time on the user's desk. It needs to explore and look
@@ -445,7 +443,7 @@ this entry stands.
 
 Needs the camera + a custom-trained classifier — fully gated, nothing to build
 or train on the RL/gait side right now. When the camera lands, this is a day-1
-custom-model priority (`hardware-readiness.md` Day-1-with-the-camera checklist),
+custom-model priority (project-plan.md Phase 8),
 ahead of [B15].
 
 ### B11 — Learn its way around the house (topological place memory)
@@ -522,7 +520,7 @@ See the "Power awareness" note in `docs/project-plan.md`.
 ### B18 — Idle power management + "feels alive" idle behaviour  🟡
 Runtime-maximising measures + the lifelike idle layer they hang off. Full
 analysis + the autonomy-impact table in
-[`research/pi-power.md`](research/pi-power.md) "Power-management measures".
+[`hardware/pi-power.md`](hardware/pi-power.md) "Power-management measures".
 **Principle: these are IDLE-STATE levers** — during active exploration the only
 savings are the clean set (efficient gait, disabled peripherals); you can't
 gate what autonomy depends on (vision, gait).

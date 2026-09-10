@@ -10,7 +10,7 @@
 # purpose (that's their job); `g2back` returns you.
 #
 # RL/gait helpers (g2train, g2watch) live in ~/.bash_profile, unchanged.
-# `g2help` prints this list.  `docs/reference/cheatsheet.md` is the reference.
+# `g2help` prints this list.  `docs/guides/cheatsheet.md` is the reference.
 # =============================================================================
 
 # G2_ROOT: honour an existing value, else the location of this file.
@@ -35,7 +35,7 @@ g2back() { cd - >/dev/null && pwd; }                                            
 g2test() { ( cd "$G2_ROOT" && "$_G2_PY" -m pytest pi_pipeline/tests/ -q ); }     # run the pipeline test suite
 
 # ------------------------------------------------- camera capture + model train
-# Walkthrough: docs/train-a-visual-model.md   Routine + poses: docs/research/capture-session-checklist.md
+# Walkthrough: docs/guides/train-vision-model.md   Routine + poses: docs/vision/capture-checklist.md
 
 # g2cam <name> [session]  -- start the live capture preview at localhost:8080,
 #                            saving to ~/Desktop/g2_face_capture/<name>/session_<n>/
@@ -53,7 +53,7 @@ g2cam() {
   preview   -> http://localhost:8080   (click "Start capturing" for each pose)
   stop      -> g2cam-stop     then:  g2curate $name $sess
 
-  STANDARD POSE SET  (docs/research/capture-session-checklist.md)
+  STANDARD POSE SET  (docs/vision/capture-checklist.md)
    1. Close (~1.5 ft), straight on, neutral -- small head movement   ~8s
    2. Close, talking + a smile                                       ~6s
    3. Mid (~3 ft), straight on, neutral                              ~8s
@@ -98,7 +98,7 @@ g2combine() {
 }
 
 # ---- persistent training library (multi-class) --------------------------------
-# docs/research/capture-progress.md.  Two folders:
+# docs/vision/capture-progress.md.  Two folders:
 #   raw (disposable):  ~/Desktop/g2_capture_raw/<class>/session_<k>/[curated/]
 #   library (KEEP):     ~/Desktop/g2_vision_library/<class>/  + _MANIFEST.md
 # Capture/curate into the raw root:  export G2_CAP_ROOT=~/Desktop/g2_capture_raw
@@ -204,14 +204,13 @@ g2docs() {
   cat <<'EOF'
 Key docs (in docs/):
   SOLO.md                              start here if carrying on without Claude
-  train-a-visual-model.md              full camera-model walkthrough
-  research/capture-session-checklist.md   the capture routine + standard pose set
-  research/person-recognition.md       recognition design + "G2, meet X" enrollment
-  research/detection-layer.md          one-model-slot / multi-model architecture
-  research/vision-detector-bench.md    measured module behaviour + AE-lift + orientation
-  feature-flags.md                     staged bring-up (g2feat --profiles)
-  hardware-readiness.md                day-1 checklists
-  reference/cheatsheet.md              the command reference (this + RL commands)
+  guides/train-vision-model.md              full camera-model walkthrough
+  vision/capture-checklist.md   the capture routine + standard pose set
+  vision/person-recognition.md       recognition design + "G2, meet X" enrollment
+  vision/detection-layer.md          one-model-slot / multi-model architecture
+  vision/detector-bench.md    measured module behaviour + AE-lift + orientation
+  guides/feature-flags.md                     staged bring-up (g2feat --profiles)
+  guides/cheatsheet.md              the command reference (this + RL commands)
 EOF
 }
 

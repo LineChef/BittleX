@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pi_pipeline/setup_pi.sh
 # One-shot OS provisioning for the Raspberry Pi Zero 2 W that rides on G2.
-# Idempotent — safe to re-run. Details + rationale: docs/research/pi-bring-up.md
+# Idempotent — safe to re-run. Details + rationale: docs/guides/pi-bring-up.md
 #
 # Run once over SSH after the first boot, as the normal user (not root):
 #     bash ~/bittleX/pi_pipeline/setup_pi.sh

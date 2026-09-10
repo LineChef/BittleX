@@ -1,11 +1,11 @@
 """Servo thermal guard -- a CONSERVATIVE, log-first safety net against burning
-out a P1S under sustained load. See docs/research/servo-thermal.md.
+out a P1S under sustained load. See docs/hardware/servo-thermal.md.
 
 The P1S has no temperature or current feedback, so heat is *estimated* from the
 commanded joint motion (an I2t-style accumulator). Every constant below is a
 PLACEHOLDER tuned to be gentle -- it should essentially never fire during normal
 walking. Retune once we have real bench data:
-  docs/research/servo-thermal.md  ->  "Retuning checklist"
+  docs/hardware/servo-thermal.md  ->  "Retuning checklist"
 
 Two tiers, deliberately not aggressive:
   WARN     -- G2 says "I'm getting kinda tired and need to rest for a bit."
@@ -40,7 +40,7 @@ class ThermalTier(IntEnum):
     RED = 2
 
 # --- PLACEHOLDER constants -- gentle on purpose; retune with hardware ----------
-# (docs/research/servo-thermal.md "Retuning checklist")
+# (docs/hardware/servo-thermal.md "Retuning checklist")
 _STAND_DEG = np.array([35.0, -35.0, 35.0, -35.0, 35.0, -35.0, 35.0, -35.0])  # ~wkF mean, refine from wkf_ref
 _K_VEL      = 0.010     # weight on |joint speed| (deg/s) in the effort proxy
 _K_DEV      = 0.004     # weight on |deg from neutral stand| (gravity-held torque)
@@ -66,7 +66,7 @@ _COOLDOWN_S       = 20.0    # ... then a 20 s rest. Not a nag; a floor.
 # break" floor in case the heat estimator is miscalibrated. CANDIDATE FOR
 # REMOVAL: once the bench test calibrates the estimator, evaluate raising this
 # a lot or dropping it entirely (set to 0 to disable). See
-# docs/research/servo-thermal.md "Retuning checklist".
+# docs/hardware/servo-thermal.md "Retuning checklist".
 # Dormant stall detector (needs real servo-angle feedback). Petoi-style
 # per-joint reactive cutback: a joint that isn't tracking gets its command
 # pulled toward neutral first (SOFT_JOINT); only a stall that won't settle

@@ -1,7 +1,7 @@
 """Score the H1 head-to-head from measured numbers -> comparison table + verdict.
 
 Enter what you measured on the robot (per the rubric in
-docs/rl-runs/h1-head-to-head-rubric.md). This just does the bookkeeping and
+docs/rl/h1-rubric.md). This just does the bookkeeping and
 applies the decision rule -- no measurement, no simulation.
 
     python pi_pipeline/gait/h1_score.py --from runs.json

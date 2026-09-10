@@ -30,7 +30,7 @@ on the Pi Zero 2 W.
 ## Command reference (what we use)
 
 Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 —
-`docs/research/petoi-firmware-reference.md`) + project Phase 4 notes:
+`docs/hardware/petoi-firmware-reference.md`) + project Phase 4 notes:
 
 | Command | Meaning |
 |---|---|
@@ -45,7 +45,7 @@ Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 
 | `p` | pause (`T_PAUSE`) |
 | `t` | tilt command (`T_TILT`) |
 | `XS` | BiBoard: enter Serial-2 mode so it talks to the Pi |
-| `krc` / `krl` | built-in get-up skills — self-right, and roll off the back. Firmware auto-runs `krc` once per IMU tick on a detected flip (`|roll|>85°`) **when gyro assist is on** — no retry/give-up logic of its own. See `docs/research/self-righting-research.md`. |
+| `krc` / `krl` | built-in get-up skills — self-right, and roll off the back. Firmware auto-runs `krc` once per IMU tick on a detected flip (`|roll|>85°`) **when gyro assist is on** — no retry/give-up logic of its own. See `docs/hardware/self-righting.md`. |
 
 `v` / `V` is firmware **version**, not "print IMU" (earlier guess was wrong).
 `?` (help/status) is still unverified against the firmware parser.

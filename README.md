@@ -37,11 +37,11 @@ The full roadmap and decision log are in
 |---|---|
 | Petoi Bittle X V2 (alloy servos) | Core quadruped platform, built on OpenCat / BiBoard V1 (ESP32) |
 | Raspberry Pi Zero 2 W | Runs the voice / memory / vision / Claude pipeline |
-| PiSugar S 1200 mAh | Independent Pi power, not shared with the servo battery — see [`docs/research/pi-power.md`](docs/research/pi-power.md) |
+| PiSugar S 1200 mAh | Independent Pi power, not shared with the servo battery — see [`docs/hardware/pi-power.md`](docs/hardware/pi-power.md) |
 | Petoi AI Vision Camera Module | Grove Vision AI V2, onboard neural processor for on-device inference |
 
 Full parts list, costs, and vendor-doc specs: [`docs/project-plan.md`](docs/project-plan.md)
-and [`docs/research/hardware-specs.md`](docs/research/hardware-specs.md).
+and [`docs/hardware/specs.md`](docs/hardware/specs.md).
 
 ## Project Status
 
@@ -68,7 +68,7 @@ hardware mocked for now.
   pending the real-robot head-to-head. Learned vision-in-the-gait was ruled out
   across four campaigns (Phases A–F); perception-assisted walking is now a
   behaviour-layer reflex + scripted skill-switching, and is back-burnered until
-  G2 has a real forward depth sensor. See [`docs/rl-runs/`](docs/rl-runs/).
+  G2 has a real forward depth sensor. See [`docs/rl/`](docs/rl/).
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
@@ -79,16 +79,17 @@ hardware mocked for now.
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
   export toolchain until we pinned `ultralytics==8.2.8` + a local arm64 export)
-  is in [`docs/research/grove-vision-v2-custom-model.md`](docs/research/grove-vision-v2-custom-model.md),
+  is in [`docs/vision/custom-model-recipe.md`](docs/vision/custom-model-recipe.md),
   with tooling in `tools/gv2/`.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:
-  [`docs/research/pi-bring-up.md`](docs/research/pi-bring-up.md).
+  [`docs/guides/pi-bring-up.md`](docs/guides/pi-bring-up.md).
 
 For a plain-language tour of how each part works, see
-[`docs/how-it-works.md`](docs/how-it-works.md). For the pre-hardware state and the
-day-1 checklist, see [`docs/hardware-readiness.md`](docs/hardware-readiness.md).
+[`docs/how-it-works.md`](docs/how-it-works.md). The ordered day-1 bring-up
+sequence is in [`docs/project-plan.md`](docs/project-plan.md) ("When the hardware
+arrives").
 
 ## Walking policy
 

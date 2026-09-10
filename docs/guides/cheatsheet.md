@@ -1,0 +1,305 @@
+# Command Cheat Sheet
+
+The single command reference for the project — quick tables **and** the full
+step sequences (RL runs by hand, env setup, …). Add to it by telling me
+"add this to the cheat sheet".
+
+Shell helpers: RL (`g2train`, `g2watch`) in `~/.bash_profile`; companion +
+camera (`g2cam`, `g2curate`, …) in `tools/g2_aliases.sh` — `source` it (see
+"Companion pipeline & camera" below). Every companion alias except `g2` /
+`g2rl` runs from any directory and leaves your cwd unchanged. RL commands run
+from `rl_training/opencat-gym/`.
+
+---
+
+## Training / the automated loop
+
+| Command | Does |
+|---|---|
+| `g2train <tag>` | Start a training run (checklist, TensorBoard, background). e.g. `g2train v9` |
+| `python train.py --tag <tag> --steps 2000000` | Run directly (from `rl_training/opencat-gym/`, venv active) |
+| `python train.py --tag <tag> --from trained/<ckpt>_ppo --steps 1000000` | Finetune from a checkpoint (note: diverged in Run 5 — use fresh) |
+| `touch rl_training/opencat-gym/STOP` | Ask the automated loop to stop cleanly after the current iteration |
+| `pgrep -fl "train.py"` | Is a training run active? (shows PID) |
+| `pkill -f "train.py"` | Stop all training runs |
+| `tail -f rl_training/opencat-gym/trained/<tag>_console.log` | Watch a run's live SB3 output |
+
+## Watching a policy (PyBullet GUI — run from your own terminal)
+
+> GUI windows do **not** appear when launched from a background/detached process.
+> Run these in an interactive terminal. Every run is a fresh randomised episode
+> (not a loop of one recording); close the window to stop.
+
+**`watch.py` — pick a policy + a challenge.** From `rl_training/opencat-gym/`:
+
+| Command | Does |
+|---|---|
+| `python watch.py --list` | Print every challenge name |
+| `python watch.py` | `run20m_ppo`, flat ground, cruise (0.10 m/s) |
+| `python watch.py --challenge slope-up` | **Just one challenge** — a 12° climb. Also: `slope-up-gentle` (5°), `slope-up-steep` (15°), `slope-down` (−12°), `slope-down-steep` (−24°), `cross-slope` (5° roll) |
+| `python watch.py --challenge obstacles` | 35 mm obstacle field. Also `obstacles-small` (20 mm), `obstacles-big` (50 mm), `obstacles-huge` (85 mm) |
+| `python watch.py --challenge shoves` | Repeated 0.55 shoves. Also `one-shove` (single hard hit), `shoves-hard` (1.0 magnitude) |
+| `python watch.py --challenge step-down` | 30 mm drop. Also `threshold-up` (15 mm), `step-up` (30 mm), `big-ledge` (45 mm random) |
+| `python watch.py --challenge weak-servos` | 60% torque cutback + a −12° descent |
+| `python watch.py --challenge slope+obstacles` | 9° slope + 30 mm obstacles |
+| `python watch.py --challenge carpet` | **The rough-terrain course** (`run20m_carpet` training substrate): one heightfield, 13 mm multi-octave bumps + a broad ~±11 mm/1.5 m rolling swell, floor never shows. `carpet-rough` = 19 mm bumps + bigger swell. Auto-extends to 2000 steps; `--steps N` to override |
+| `python watch.py --challenge rubble` | **Dense tumbled rubble** — hundreds of rounded chunks (spheres / capsule ridges / some angular) half-sunk in the ground so feet deflect over rather than catch an edge, 15 mm exposed-height cap. `rubble-hard` = bigger/denser. *Superseded by `carpet` for training* — kept for viz. Auto-extends to 2000 steps; `--steps N` to override |
+| `python watch.py --challenge gauntlet` | **The hard combined test (T5.1):** 4°/9° slope + 40 mm obstacles + repeated shoves |
+| `python watch.py --challenge brutal-gauntlet` | **The T6.4 hardened tier:** 20° slope + 70 mm + 1.0 shoves |
+| `... --cmd 0.13` | Change the forward-speed command (creep ≈ 0.04, cruise 0.10, fast ≈ 0.14, backward < 0) |
+| `... --speed 0.5` | Slow-mo (0.5×); `--speed 2` = 2× |
+| `... --dr clean` | Drop the non-challenge DR (no payload). Default `payload` = the deployment config; `full` = training DR |
+| `... --model trained/checkpoints/<tag>_<N>_steps` | Watch a mid-training snapshot instead of `run20m_ppo` |
+| `python watch.py --challenge <name> --gif` | **If the GUI window won't open** (Intel Python under Rosetta, headless box): render the challenge to `watch_<name>.gif` instead. `--runs 4` for more episodes. `open watch_<name>.gif` |
+| `pkill -f watch.py` | Close it (or Ctrl-C / close the window) |
+
+**`g2watch` / `watch_trained.py` — quick "just show me the gait" (loops):**
+
+| Command | Does |
+|---|---|
+| `g2watch` | GUI replay of the newest `trained/*_ppo.zip`, episode after episode. Shell fn in `~/.bash_profile`. |
+| `g2watch trained/<tag>_ppo` | A specific policy — e.g. `g2watch trained/run20m_ppo` |
+| `g2watch trained/checkpoints/<tag>_<N>_steps` | A mid-training snapshot |
+| `python watch_trained.py trained/<ckpt> --dr-terrain 0.012` / `--dr-push 0.35` | Replay on one held-out disturbance |
+| `pkill -f watch_trained.py` | Close it |
+
+## TensorBoard
+
+| Command | Does |
+|---|---|
+| `open http://localhost:6006/` | Open the dashboard (started automatically by `g2train`) |
+| `python -m tensorboard.main --logdir trained/tensorboard_logs/ --port 6006` | Start it manually |
+| `pkill -f "tensorboard.*tensorboard_logs"` | Stop it |
+
+Run → `PPO_N` mapping is in the per-run logs (`docs/auto-iteration-log*.md`).
+
+## Evaluating a policy — scored, headless
+
+All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20m_ppo`.
+
+| Command | Does |
+|---|---|
+| `python evaluate_policy.py <ckpt> --episodes 8` | Quick metrics: speed, yaw drift, trot corr, stride, startup ratio, foot clearance |
+| `... --dr-terrain 0.012` / `--dr-push 0.35` / `--dr-friction 0.3` / `--dr-mass 0.15` / `--dr-gyro 0.02` | Grade on one held-out disturbance (any `--dr-*` zeroes all knobs first) |
+| `... --frames-dir eval_frames/<name>` | Also dump ~30 frames for a look |
+
+### The decathlon — the graded easy→brutal ladder, learned vs scripted
+
+| Command | Does |
+|---|---|
+| `python benchmark_decathlon.py --learned <ckpt> --episodes 24 --json-out /tmp/dec.json` | Run **all** cells T1–T7 (flat, slopes, obstacles, stumble-catch, gauntlet, T6 hardened, T7 ledge). Prints fell% / speed / cond-survival per cell |
+| `... --extra-dr payload` | **Deployment config:** 75 g payload forced on, rough + torque-cutback off (the number that matters for hardware) |
+| `... --extra-dr clean` | No payload / rough / cutback — cell tests exactly its label |
+| `... --extra-dr full` | Training DR (payload 90%, rough 35%, cutback 40%) |
+| `... --scripted-balance 0.5` | Give the scripted `wkF` baseline a gyro-balance assist (fairer comparison) |
+| `... --gif-dir /tmp/dec_gifs` | Also render the gauntlet cell, learned + scripted |
+| `python build_decathlon_report.py /tmp/dec.json` | Turn the JSON into an HTML report |
+
+> No single-cell flag on the decathlon — for one challenge use `watch.py --challenge <name>`
+> (visual) or `evaluate_policy.py --dr-<knob>` (scored, single knob).
+
+### Other scored benchmarks
+
+| Command | Does |
+|---|---|
+| `python benchmark_commanded.py --learned <ckpt> --episodes 16 --json-out /tmp/cmd.json` | Speed-command tracking: creep / cruise / fast / backward / stand / turn — commanded vs achieved, heading drift |
+| `python benchmark_gaits.py --learned <ckpt> --episodes 28 --scripted-balance 0.5` | Head-to-head vs scripted `wkF` on flat + obstacle courses (distance, trot corr, falls) |
+| `python benchmark_recovery.py <ckpt-a> <ckpt-b>` | Bare-robot stance-recovery probe (payload OFF, rough + escalating shoves) — the decathlon can't see recovery with the payload on. Compares two checkpoints |
+| `python robustness_sweep.py --learned <ckpt> --seeds 16 --json-out /tmp/rob.json` | Sweep each sim-to-real axis (payload mass, cmd latency, joint offset, IMU noise, torque cutback) one at a time — where does the gait break? |
+| `python render_showcase.py --learned <ckpt> --out showcase.gif` | One annotated GIF of every skill back-to-back (cruise / creep / fast / stand / shoves / slopes / gauntlet / thresholds / steps). `--scripted-balance 0.5` for the scripted version |
+| `python render_gif.py <ckpt> out.gif --steps 250 --stride 2` | One episode → animated GIF |
+
+## Deployment / sim-to-real  (see `docs/guides/gait-deployment.md`, `docs/rl/h1-rubric.md`)
+
+**Mac side** (`rl_training/opencat-gym/`):
+
+| Command | Does |
+|---|---|
+| `python export_onnx.py --model trained/run20m_ppo --out trained/run20m_ppo.onnx` | Export the deterministic policy to ONNX (drops value net + noise) |
+| `python verify_onnx.py --model trained/run20m_ppo --onnx trained/run20m_ppo.onnx` | Parity check: ONNX vs PyTorch actions across gaussian + a real rollout |
+| `python validate_deploy.py` | Drive `pi_pipeline/gait/residual_policy.py` from the sim in lockstep with `model.predict` — asserts obs + joint targets match bit-for-bit |
+| `python sysid_replay.py --log <real_log.csv>` | Replay a real robot log's joint commands open-loop in a sim mirror; report the sim-to-real tilt/rate gap |
+| `python sysid_replay.py --log <real_log.csv> --fit` | + sweep motor force / PD gains / `CMD_LATENCY_STEPS` to close the gap; prints the env edits |
+
+**Pi side** (`pi_pipeline/gait/`, in a venv with onnxruntime):
+
+| Command | Does |
+|---|---|
+| `python bench_real.py` | Time the real `run20m_ppo.onnx` end-to-end (ONNX + obs build) — the per-tick cost |
+| `python run_gait.py --dry-run --seconds 5` | Full 80 Hz loop, synthetic IMU, no serial — rate check |
+| `python run_gait.py --probe-imu` | Print raw BiBoard `V` IMU stream — check `parse_imu_line` matches the format |
+| `python run_gait.py --openloop` | Play `wkf_ref.npy` open-loop (on a cradle) — verify servo signs, set `deploy_map.SERVO_SIGN` |
+| `python run_gait.py --cmd 0.10` | The learned gait on the real robot (firmware balance off) |
+| `python run_gait.py --cmd 0.10 --keep-firmware-balance --log run.csv` | + firmware gyro-assist underneath, logging per-tick for `sysid_replay` |
+| `python run_gait.py --cmd 0.10 --carpet` | + carpet-slip detector (BOOST_CMD / `kcarpetF` hand-off). Inert until body-X accel is plumbed through `parse_imu_line` + thresholds tuned on real carpet |
+| `python sysid_collect.py --log sysid.csv` | Policy-free calibration sequence (loaded poses + slow wkF) → log for `sysid_replay` |
+| `python h1_score.py --template > runs.json` then `python h1_score.py --from runs.json` | Score the H1 head-to-head from measured numbers → verdict |
+
+## wkF reference gait (imitation reward)
+
+| Command | Does |
+|---|---|
+| `python reference_gait/build_wkf_reference.py` | Rebuild `wkf_ref.npy` from `InstinctBittleESP.h` |
+| `python reference_gait/verify_wkf_reference.py` | Score sign/mirroring variants by open-loop forward walk |
+| `python reference_gait/verify_wkf_reference.py identity --render` | Render the open-loop reference playback to a GIF |
+| `python reference_gait/build_skill_reference.py rc rl` | Decode any OpenCat skill from `InstinctBittleESP.h` → `<name>_ref.npy` |
+| `python reference_gait/verify_getup_reference.py --gif --sheet` | Replay the firmware `rc`/`rl` get-up in PyBullet (H9). 0/2 recover — see `docs/rl/getup-sim-replay.md` |
+
+
+## Companion pipeline & camera (`pi_pipeline/`)
+
+Shell helpers: `tools/g2_aliases.sh`. Load with
+`source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh`
+(add to `~/.zshrc` to make permanent). `g2help` prints the list; `docs/SOLO.md`
+is the solo-operation guide; `docs/guides/train-vision-model.md` is the full
+camera-model walkthrough; `docs/vision/capture-checklist.md` has the
+standard pose set.
+
+> The `!` prefix in Claude Code runs each line in a fresh shell, so `source` +
+> `g2*` on separate lines won't work — use one line
+> (`source ...g2_aliases.sh && g2cam alex 1`) or your own Terminal.
+
+**Environment**
+
+| Command | Does |
+|---|---|
+| `g2` | cd repo + activate `pi_pipeline/.venv` |
+| `g2rl` | cd `rl_training/opencat-gym/` + activate the RL `.venv` |
+| `g2test` | run the `pi_pipeline` test suite |
+| `g2back` | return to the directory you were in before `g2` / `g2rl` |
+| `g2help` | list these helpers · `g2docs` list the key docs |
+
+**Camera capture + model training** (`docs/guides/train-vision-model.md`)
+
+| Command | Does |
+|---|---|
+| `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
+| `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
+| `g2cam-info` | print the serial port + which model is on the module |
+| `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
+| `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
+| `g2promote <class> [session]` | copy a reviewed `curated/` session into the persistent library `~/Desktop/g2_vision_library/<class>/`, updating `_MANIFEST.md` |
+| `g2libcombine [classes]` | build `~/Desktop/g2_vision_library/upload/` from the library (default `person,dog,cat,ledge`); rewrites label class-ids from the class order |
+| `g2libstatus` | print the library `_MANIFEST.md` (per-class counts) |
+
+Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at the raw root first: `export G2_CAP_ROOT=~/Desktop/g2_capture_raw`.
+
+**Vision runtime**
+
+| Command | Does |
+|---|---|
+| `g2vision [labels]` | run the detection pipeline over serial, print live detections. e.g. `g2vision person,alex` |
+| `g2vision-demo` | mock detection feed, no hardware |
+| `g2visioneval [label] [secs]` | timed measurement — detection rate / confidence / p10 floor / flicker + VERDICT (for the dataset-size threshold test). 3rd arg `empty` + clear scene → false-fire check |
+
+**Voice / conversation**
+
+| Command | Does |
+|---|---|
+| `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
+| `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
+| `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
+| `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
+| `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
+| _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
+
+**Memory / config / diagnostics**
+
+| Command | Does |
+|---|---|
+| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
+| `python -m pi_pipeline.memory.webui` | local web UI to browse / prune memory — `http://127.0.0.1:8899` |
+| `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
+| `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |
+| `g2diag [list\|summarize sid\|tail sid\|replay sid]` | read a diagnostics session |
+
+**Robot (on hardware)**
+
+| Command | Does |
+|---|---|
+| `g2serial [ports\|ping\|send <cmd>\|skills\|rest]` | BiBoard serial link checks |
+| `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |
+| `g2power [status\|headless\|interactive\|governor <n>]` | Pi power-management helpers |
+
+**Raw (no alias)**
+
+| Command | Does |
+|---|---|
+| `python tools/curate_captures.py --help` | all curate flags |
+| `python tools/camera_preview.py --info` | port + loaded model, no server |
+| `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
+
+
+## RL training — detail
+
+### Common rules for `rl_training/opencat-gym/`
+
+- **Run from that directory** (scripts import `opencat_gym_env` locally, load `models/` by relative path).
+- **Use the RL venv**: `source .venv/bin/activate` from the repo root, or call `../../.venv/bin/python`.
+- **Every run needs a unique `<tag>`** — it names `trained/<tag>_ppo.zip`, `trained/checkpoints/<tag>_<steps>_steps.zip`, `trained/<tag>_console.log`. Reusing a tag overwrites. Convention: `v6`, `v7`, ….
+
+### Start a run by hand (when `g2train` isn't available)
+
+```bash
+cd rl_training/opencat-gym
+ls trained/ | grep <tag>                         # 1. tag unused? expect no output
+pgrep -fl train.py                               # 2. no run active
+pkill -f "watch_trained.py|view_sim.py"          # 3. close sim viewers (they steal CPU)
+../../.venv/bin/python smoke_train.py            # 4. if you edited the env/train.py (~90s, reward in-range, no nan)
+pgrep -f "tensorboard.*tensorboard_logs" || nohup ../../.venv/bin/tensorboard   --logdir trained/tensorboard_logs/ --port 6006 > trained/tensorboard.log 2>&1 &   # 5.
+nohup ../../.venv/bin/python train.py --tag <tag> > trained/<tag>_console.log 2>&1 &  # 6. launch
+echo "PID $!"                                    #    write this down
+tail -n 20 trained/<tag>_console.log             # 7. verify: "Logging to ...PPO_N", ep_rew_mean a real number, fps in the hundreds
+```
+When it finishes: `g2watch`, then record the result under Phase 3 in `docs/project-plan.md`.
+
+### `start_run.sh` flags (from `rl_training/opencat-gym/`)
+
+| Command | Effect |
+|---|---|
+| `./start_run.sh v8` | normal run |
+| `./start_run.sh v8 --steps 20000` | short run — extra args pass to `train.py` |
+| `./start_run.sh v8 --force` | allow a tag whose files already exist (overwrites) |
+
+### Continue a run (reward function UNCHANGED)
+
+```bash
+cd rl_training/opencat-gym
+# edit continue_train.py first — source checkpoint + output name are hardcoded near the top, NO cli args
+pgrep -fl train.py                               # no run active
+nohup ../../.venv/bin/python continue_train.py > trained/<name>_console.log 2>&1 &
+```
+2M more steps with `reset_num_timesteps=False`. Reward change -> fresh `g2train` instead.
+
+### RL "tests" (no pytest on the RL side)
+
+| Command (from `rl_training/opencat-gym/`) | Verifies |
+|---|---|
+| `../../.venv/bin/python smoke_train.py` | whole pipeline at 20K steps (~90s): env, PPO loop, logging, checkpoint |
+| `../../.venv/bin/python -c "from stable_baselines3.common.env_checker import check_env; from opencat_gym_env import OpenCatGymEnv; check_env(OpenCatGymEnv()); print('OK')"` | env spaces / shapes / return types |
+
+### One-time env setup
+
+```bash
+# RL venv (repo root) — Homebrew python@3.11; macOS system Python too old
+python3.11 -m venv .venv && source .venv/bin/activate
+CPPFLAGS="-Dfdopen=fdopen" pip install -r requirements.txt   # CPPFLAGS mandatory on macOS (pybullet zlib build bug)
+# companion pipeline venv
+python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_pipeline/requirements.txt
+```
+
+## Git landmarks
+
+| Command | Does |
+|---|---|
+| `git checkout gait-v6-known-good -- rl_training/opencat-gym/opencat_gym_env.py` | Restore the pre-loop v6 reward function |
+| `git checkout phase3-gait -- rl_training/opencat-gym/opencat_gym_env.py` | Restore the locked Phase 3 gait config |
+| `g2watch trained/phase3-gait_ppo` | Replay the locked Phase 3 gait |
+| `git for-each-ref refs/backup/` | Pre-history-rewrite backup refs |
+
+## Quick checks
+
+| Command | Does |
+|---|---|
+| `ps aux \| grep -iE "python\|pybullet\|tensorboard" \| grep -v grep` | Everything RL-related that's running |
+| `../../.venv/bin/python smoke_train.py` | ~90 s pipeline sanity check (reward ~40–60, no NaN) |

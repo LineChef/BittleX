@@ -1,5 +1,5 @@
 """GaitSelector -- turn a forward terrain reading into a `GaitMode` for the
-SkillSwitch. Phase E-1 of docs/rl-runs/vision-goal-locomotion-plan.md.
+SkillSwitch. Phase E-1 of docs/rl/vision-in-gait.md.
 
 Pure logic, same shape as `avoidance.py` / `cliff_guard.py`. Input mirrors the
 sim's `_scan_terrain()` output ([present, dist_norm, bearing_norm, tall]); on

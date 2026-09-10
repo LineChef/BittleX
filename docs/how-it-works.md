@@ -136,7 +136,7 @@ detection list.
 **Where it stands:** a custom 3-class detection model (a household member + dog +
 cat) is trained and **running on the actual camera** — the hard part was that the
 camera's firmware is frozen at Jan 2025 and broke every modern export toolchain
-until we pinned an older one (`docs/research/grove-vision-v2-custom-model.md`).
+until we pinned an older one (`docs/vision/custom-model-recipe.md`).
 The avoidance reflex and the "what do you see" path are wired against that feed
 (and a mock feed for tests). What's left is an obstacle / table-edge detector
 (the desk-edge one is the `CliffGuard` reflex's input) and threshold tuning —

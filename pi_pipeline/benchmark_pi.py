@@ -10,7 +10,7 @@ Every section is independent and degrades gracefully: a missing model, missing
 API key, or non-Linux host just prints SKIP and the run continues. Nothing here
 needs the robot.
 
-Measures the things docs/research/pi-bring-up.md flags as untested on a Zero 2 W:
+Measures the things docs/guides/pi-bring-up.md flags as untested on a Zero 2 W:
   - RAM headroom idle -> voice stack loaded -> mid-exchange
   - Piper synth time as x realtime  (want < 1.0)
   - Vosk transcription time as x realtime

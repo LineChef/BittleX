@@ -25,7 +25,7 @@ should we work on next."
 | 5 V / 2.5 A micro-USB power supply | $10 |
 | Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
 | PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
-| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/gait-deployment.md` step 6 | — |
+| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 | — |
 
 ### Resolved
 
@@ -34,7 +34,7 @@ should we work on next."
   servo-spike brownouts. The PiSugar pogo-pins to the Pi's underside pads, leaving
   the GPIO header free, and provides UPS safe-shutdown. To avoid two 5 V sources,
   wire BiBoard → Pi **data-only (RX/TX/GND)**, no 5 V. Full reasoning:
-  [`docs/research/pi-power.md`](research/pi-power.md).
+  [`docs/hardware/pi-power.md`](hardware/pi-power.md).
 - **Enclosure:** Petoi ships an official back-cover STL with a Pi cutout
   ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
   so the cover can close over the mounted Pi.
@@ -45,7 +45,7 @@ should we work on next."
   BiBoard V0). Board also carries a **6-axis MPU6050 IMU (no magnetometer)**, an
   onboard offline voice-recognition module, and a speaker.
 - **Full vendor-doc spec sheet** for every part — with the "why it matters" for
-  each — is in [`docs/research/hardware-specs.md`](research/hardware-specs.md).
+  each — is in [`docs/hardware/specs.md`](hardware/specs.md).
   Key downstream effects: no magnetometer ⇒ favour **yaw-rate** over absolute
   heading in the RL reward (Phase 3); the vision module can stream **detections
   or a raw frame but not both**, and runs at 192×192 / ~10–30 FPS (Phase 8);
@@ -84,7 +84,7 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
   behaviour (rest sooner on low charge) is blocked on the estimate above.
   **Sleep-mode FSM built 2026-09-10** (`behavior/sleep_mode.py`). On-demand
   vision (the two-stream safety/rich split) is still a design task (B18). Full
-  analysis: [`research/pi-power.md`](research/pi-power.md).
+  analysis: [`hardware/pi-power.md`](hardware/pi-power.md).
 - **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
   Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
   actual cell state. Optional; the timer is enough to start.
@@ -155,7 +155,7 @@ leave us without a shippable gait — worst case is a wasted overnight.
   head-to-head. Established that big-stumble recovery can't be reward-tuned
   further on this control setup.
 - **Sim benchmark, learned vs scripted** (`benchmark_gaits.py`,
-  [`docs/rl-runs/gait-benchmark.md`](rl-runs/gait-benchmark.md)): on flat ground the learned
+  [`docs/rl/gait-benchmark.md`](rl/gait-benchmark.md)): on flat ground the learned
   gaits win — `phase3-gait` covers ~4× the distance of open-loop `wkF` keyframes.
   On obstacle courses the scripted keyframes are hard to beat; `phase3-gait` does
   markedly worse (brittle, trips), `gait-v7-stumble-catch` only reaches parity.
@@ -172,8 +172,8 @@ leave us without a shippable gait — worst case is a wasted overnight.
   diagonal-support catch shaping) — **none was a keeper; no gait change.** Also
   fixed a silent bug where every `--from` continuation diverged (LR restart at
   3e-4 on a converged policy). Details:
-  [`docs/rl-runs/refinement-regimen.md`](rl-runs/refinement-regimen.md),
-  [`docs/rl-runs/phase4-decision-log.md`](rl-runs/phase4-decision-log.md).
+  [`docs/rl/refinement-regimen.md`](rl/refinement-regimen.md),
+  [`docs/rl/phase4-decision-log.md`](rl/phase4-decision-log.md).
 - **Sim gait work is now done pending hardware.** The open question — is a
   learned gait actually better than OpenCat's scripted `wkF` for plain walking —
   has a sim answer above; the real-robot head-to-head confirms it against the
@@ -187,7 +187,7 @@ leave us without a shippable gait — worst case is a wasted overnight.
   came back a **negative result** — `run20m_ppo` stays the frozen base. Learned
   vision-in-the-gait was then ruled out across Phases A–F. **Sim locomotion work
   is done pending the real-robot H1 head-to-head.** The remaining scenario ideas
-  live in [`docs/rl-runs/hardware-gated-training-backlog.md`](rl-runs/hardware-gated-training-backlog.md),
+  live in [`docs/rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md),
   each with a trigger. Detail of the push itself is kept below for history.
   - **Rough-terrain training.** The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
     amplitude — cosmetic. Built a proper rough course: `CARPET`, a single
@@ -205,7 +205,7 @@ leave us without a shippable gait — worst case is a wasted overnight.
   - **Robustness backlog** — the categorised list of real-world scenarios still
     to train/eval (single-servo failure, IMU bias/mount tilt, pick-up &
     set-down, directional terrain catches, slope transitions, friction
-    asymmetry, …): [`docs/rl-runs/robustness-backlog.md`](rl-runs/robustness-backlog.md).
+    asymmetry, …): [`docs/rl/robustness-backlog.md`](rl/robustness-backlog.md).
 
   **Update 2026-09-05 — the training collapse + fresh retrain.** `run20m_carpet`
   was reverted (no capability gain, eroded flat speed — R0 in the robustness
@@ -251,171 +251,51 @@ through Run 6; Run 7 corrected it — multiply pre-Run-7 reported m/s by 1.6 to
 compare. The real BiBoard control rate is ~48–50 Hz (servo PWM limit), relevant
 for Phase 6.
 
-### Training history
+### Training history (condensed)
 
-Runs are 2M steps unless noted, ~35–40 min wall time each on this machine.
-Reward-shaping constants are the `FAC_*` module-level values in
-`opencat_gym_env.py`.
+The full per-round working logs (v1–v7 tuning, the automated loops, the survive
+loop) were removed 2026-09-10 — git history has them. The load-bearing results:
 
-**v1 — baseline.** Reward peaked ~900 mid-run, then collapsed in the final third
-(down to ~25) with `approx_kl`/`clip_fraction` spiking. Cause: `PENALTY_STEPS =
-2e6` equalled total training length, so the stability/smoothness penalty was
-still ramping when the run ended, and the fixed learning rate turned the forced
-late correction into a violent jump.
+**v1–v6 — getting to a stable trot (Aug 2026).** Four early runs collapsed
+mid-training (`approx_kl` spike, reward → ~0) regardless of the reward function.
+Root cause was **structural, not any one term**: `PENALTY_STEPS` equalled the run
+length (the smoothness penalty never finished ramping) and the LR / clip range
+never decayed. **Fix (v5):** `PENALTY_STEPS` 2e6 → 5e5 + a linear LR decay in
+`train.py` — reward then climbed smoothly to ~1100. **v6** (`PAW_Z_TARGET`
+5 → 15 mm, tag `gait-v6-known-good`) was the first clean converged trot, but
+curved slightly right.
 
-**v1 continuation.** Trained 2M more steps under the now-fully-ramped penalty;
-reward recovered to ~331 with full-length episodes — confirming the diagnosis. A
-lone `approx_kl` spike (22.8) near the very end was noted but not understood.
-Visual replay: farther travel, but legs jittering/sliding rather than stepping,
-and a rightward curve ending in a fall.
+**Automated loop 1 — the curve fix.** `FAC_HEADING = 5.0` (penalise *accumulated*
+heading error, not just yaw rate) killed the rightward curve: end-of-episode
+drift 12.5° → 0.16°, never falls. Result **`auto_gait_final` (tag `phase3-gait`)**,
+merged. Loops 2–4 then established that **reward-weight tuning cannot crisp the
+trot further** — `auto_gait_final` sits at a local optimum; the remaining levers
+are structural (diagonal-pair phase in the obs, `wkF` imitation, a CPG action
+space).
 
-**v2 — anti-slip / clearance / yaw.** `FAC_SLIP` 0→0.01, `FAC_CLEARANCE` 0→0.1,
-new `FAC_YAW = 0.1` (from the previously-unused yaw rate; not added to the
-observation). No violent collapse this time, but reward declined from a ~900 peak
-to ~490. Visual: much closer to real walking, front-right foot over-lifting late
-in the episode.
+**Run 5 — DR + `wkF` imitation.** Wired the domain-randomisation knobs
+(friction / link-mass / IMU-noise / shoves / obstacles) behind a curriculum ramp,
+and added `FAC_IMITATION` — a DeepMimic-style phase-by-phase match to Bittle's
+`wkF` keyframes (`reference_gait/`, open-loop verified). **The imitation reward is
+what finally produced a real diagonal trot** that weight tuning alone could not.
 
-**Adopted from [`bmabsout/opencat-gym`](https://github.com/bmabsout/opencat-gym)**
-(an active fork that independently removed time-varying reward ramps, validating
-the `PENALTY_STEPS` diagnosis):
+**Run 6 — fall recovery.** **Key finding: a Bittle cannot self-right from a full
+tip-over (> 1.3 rad) — no roll-axis actuation.** An escalating recovery reward
+(weight 8 → 22, torque-boosted, eased criteria) converged at 0 % recovered every
+time. The loop pivoted to the learnable version — *catching a stumble before it
+becomes a fall* — via `FAC_BALANCE`. Winner **`auto_rec_r5_ppo` (tag
+`gait-v7-stumble-catch`)**: trot −0.58 (crispest in the project), no
+obstacle-course falls, ~7 % slower than `phase3-gait`. Merged. The recovery
+window code stays in `opencat_gym_env.py` but dormant (`FAC_RECOVERY = 0`).
+Firmware's own scripted self-right covers only slow side/forward falls and has no
+BiBoard-V1 IR trigger — [`docs/hardware/self-righting.md`](hardware/self-righting.md).
 
-- `FAC_JITTER = 0.2` — penalizes joints reversing direction frame-to-frame,
-  targeting shuffle more directly than `FAC_SMOOTH_1/2`.
-- Cyclical time/phase observation input (`TIME_PHASE_PERIOD = 100`) — a rhythmic
-  clock to help the policy learn periodic gaits (observation 246 → 247).
-- Periodic checkpointing — `train.py`/`continue_train.py` now save every ~200K
-  steps to `trained/checkpoints/`, so an interruption costs one checkpoint, not
-  the whole run.
-- Not adopted (bigger redesigns): soft-min reward aggregation,
-  gravity-vector observation, dropping joint history.
-
-**v3 — jitter + phase input.** Stopped early, superseded by v4 (no checkpoint
-existed yet). The pause added a diagonal-trot goal: could a gait-symmetry reward,
-or bootstrapping from Bittle's built-in `wkF` walk keyframes, produce a real trot
-faster than pure RL exploration? A lightweight reward term was chosen to try
-first; the scripted-gait bootstrap and a CPG action-space redesign were deferred.
-
-**Gait-symmetry reward — `FAC_GAIT_SYMMETRY = 2.0`.** Rewards `−(diagonal_a ·
-diagonal_b)` where `diagonal_a` = front-right + back-left joint-angle deltas,
-`diagonal_b` = front-left + back-right — positive when the diagonal pairs move
-in opposition (a trot). Verified in PyBullet first: all 8 walking joints share
-the same sign convention in the URDF, so "same sign of angle change" genuinely
-means "in phase," no mirroring needed. Applied **unramped** (full strength from
-step 1), so it shapes gait structure before the policy can lock into a different
-pattern.
-
-**v4 — + gait symmetry.** First run with anti-jitter + phase input + gait
-symmetry together. Reward peaked ~1010, then hit the same collapse signature as
-v1 (`approx_kl` 26.9, `clip_fraction` 0.91, reward → ~0.4) at 73% through
-training. **Same failure despite a completely different reward function** — so
-the cause is structural, not any one term.
-
-**Root cause (across v1–v4).** Two issues, both unaddressed since v1:
-
-1. `PENALTY_STEPS = 2e6` had equalled total training length every run — the
-   penalty continuously reshaped the reward landscape for the whole run (v4's
-   spike at 73%, not 100%, shows continuous pressure, not just an endgame
-   effect).
-2. Fixed learning rate (`3e-4`) and clip range (`0.2`) never decayed. Standard
-   PPO practice decays them to prevent destabilizing updates once the policy has
-   converged and its action noise has shrunk.
-
-**Fixes for v5:** `PENALTY_STEPS` 2e6 → **5e5** (full strength at 25% of a 2M
-run), and a linear learning-rate decay in `train.py` (`linear_schedule(3e-4)` →
-~0 by the end). Clip-range decay was left as a fallback.
-
-**v5 — the fix worked.** Reward climbed smoothly and monotonically from ~47 to
-**~1100** (highest yet, stable), full-length episodes throughout, `approx_kl` and
-`clip_fraction` *decreasing* toward the end. Confirms the root-cause diagnosis.
-Visual: faster, but all four legs take small shuffling steps rather than real
-strides. Likely a reward-shape effect — `PAW_Z_TARGET = 0.005` barely rewards a
-lift, `FAC_SMOOTH_1/2` penalize movement magnitude, and a fall ends the episode,
-so many small "safe" steps are locally optimal.
-
-**v6 — bigger steps.** `PAW_Z_TARGET` 5 → **15 mm**, `FAC_SMOOTH_1/2` 1.0 → **0.5**,
-plus per-term reward logging in `step()`'s `info` dict (`r_movement`,
-`r_gait_symmetry`, …) so behavior changes trace to a specific term. Tagged
-`gait-v6-known-good`: ep_rew ~1220, clean convergence, best gait so far —
-reasonable diagonal trot — but curves slightly right by the end.
-
-**Tooling (v6 era).** `start_run.sh <tag>` — one-command launcher with the pre-run
-checklist (no stacked runs, warns about lingering viewers, starts TensorBoard,
-backgrounds training). `train.py` takes `--tag` and `--steps`. Shell helpers
-`g2train` / `g2watch`; the `/train` slash command.
-
-**Automated loop 1 — fix the rightward curve.** First unattended run of the
-[`docs/reference/automated-testing-loop.md`](reference/automated-testing-loop.md) workflow, on
-`auto-gait-iteration`. Added `evaluate_policy.py` (headless metrics + frame
-renders). Five 1M-step tuning iterations + one 2M confirming run. Three changes
-from v6: **`FAC_HEADING = 5.0`** (penalize accumulated heading error from the
-quaternion, not just yaw rate — this fixed the curve), **`PAW_Z_TARGET` 15 → 20 mm**
-(stop the back feet dragging once heading control made the gait front-heavy),
-**`FAC_GAIT_SYMMETRY` 2.0 → 3.5**. Result `auto_gait_final` vs v6: end-of-episode
-heading drift **12.5° → 0.16°**, lateral wander **0.24 → 0.045 m**, speed held,
-never falls. Known miss: `diagonal_trot_corr` −0.59 at 2M (the 1M checkpoints hit
-−0.90 — the fully-converged policy walks straight but its diagonal timing
-loosens). Merged to `development`; write-ups in
-[`docs/rl-runs/auto-iteration-report-2026-08-30.md`](rl-runs/auto-iteration-report-2026-08-30.md)
-and [`docs/rl-runs/auto-iteration-log.md`](rl-runs/auto-iteration-log.md).
-
-**Automated loops 2–4 + a final run — set aside.** Attempts to fix a supposed
-start-up "stutter" and tighten the trot. The stutter turned out to be a
-measurement artifact (baseline evaluated in a mismatched env; real
-`startup_speed_ratio` ≈ 0.84, fine). Every trot attempt — `FAC_GAIT_SYMMETRY`
-weight tuning, a decay ramp, a phase-locked reformulation, a stride-length
-reward — either dissolved the trot or regressed heading/stride at 2M
-convergence. **Conclusion: `auto_gait_final` sits at a local optimum that
-reward-weight tuning cannot push past.** Records:
-`docs/auto-iteration-{log,report-*}-run{2,3,4}.md`,
-`docs/rl-runs/auto-iteration-log-final.md` (reformulated terms live only on
-`auto-gait-iteration`). Remaining trot-crispness levers are structural
-(diagonal-pair phase in the observation, `wkF` imitation, or a CPG action space).
-
-**Run 5 — domain randomization + `wkF` imitation** (merged to `development`).
-Wired up the previously-dead DR knobs — per-episode friction, link-mass, and IMU-
-noise randomization, random shoves, scattered obstacle boxes — behind a curriculum
-ramp. Added a DeepMimic-style imitation reward (`FAC_IMITATION`) that matches
-Bittle's built-in `wkF` walk keyframes phase by phase (`reference_gait/`,
-extracted from `InstinctBittleESP.h`, open-loop verified). The imitation reward is
-what finally produced a real diagonal trot that weight tuning alone could not.
-Also added `evaluate_policy.py --dr-*` held-out scenario flags.
-
-**Run 6 — fall recovery / self-righting** (6 rounds, unattended, on
-`auto-gait-iteration`). **Key finding: a Bittle cannot self-right from a full
-tip-over (> 1.3 rad) — it has no roll-axis actuation, a missing degree of
-freedom.** An escalating recovery reward (weight 8 → 22, denser shaping, eased
-criteria, pushes suspended while down, actuator torque boosted) converged at 0%
-recovered every time. The loop pivoted to the learnable version — *catching a
-stumble before it becomes a fall* — via `FAC_BALANCE`, an always-on reward for
-driving body tilt back toward level while wobbling. Winner **`auto_rec_r5_ppo`,
-tag `gait-v7-stumble-catch`**: `diagonal_trot_corr` −0.58 (crispest in the
-project), max yaw drift 7.6°, no obstacle-course falls; ~7% slower forward than
-`phase3-gait`. The recovery-window code stays in `opencat_gym_env.py` but dormant
-(`FAC_RECOVERY = 0`). Merged to `development`. Records:
-[`docs/rl-runs/auto-iteration-log-run6.md`](rl-runs/auto-iteration-log-run6.md),
-[`docs/rl-runs/auto-iteration-report-2026-08-31.md`](rl-runs/auto-iteration-report-2026-08-31.md).
-
-Note this is the *RL-policy* limit (8 walking joints only). OpenCat's **firmware**
-has a separate built-in scripted self-right skill — but it only covers slow
-side/forward falls, not fast ones and not a flip onto the back, and its usual
-trigger (the IR remote) isn't supported on BiBoard V1. Details, sources, and the
-plug-in points: [`docs/research/self-righting-research.md`](research/self-righting-research.md).
-Expect frequent manual righting during real-robot RL sessions.
-
-**Run 7 — "walk": target speed + stumble recovery** (closed, on
-`auto-gait-iteration`). Added a deliberate `TARGET_SPEED` (0.11 m/s) with a
-tracking-bonus reward, IMU tilt history + angular acceleration in the observation
-(247 → 273), and several attempts to improve stumble recovery (a tilt-slowed
-phase clock, imitation-fade while wobbling, tilt-rate damping in `FAC_BALANCE`,
-concentrated impulse drills). **Outcome:** `big_stumble_recovery_rate` stayed at
-0.0 across all three rounds — recovery is bounded by the control setup (reactive,
-IMU-only, weak sagittal-plane legs), not by reward tuning, confirming Run 6.
-`walk_r2` is the best checkpoint (tag `walk-v8-r2`): 0% falls on flat ground and
-the 30 mm course, best heading of the project (4–5° max yaw drift), trot −0.50 —
-but it converges slow (~0.07 m/s vs the 0.11 target) and is not merged to
-`development`. **Decision:** stop reward-tuning recovery; settle the RL-vs-scripted
-question on real hardware with a head-to-head once it arrives. Record:
-[`docs/rl-runs/auto-iteration-log-run7.md`](rl-runs/auto-iteration-log-run7.md).
+**Run 7 — target speed + more recovery.** `big_stumble_recovery_rate` stayed 0.0
+across three rounds — **recovery is bounded by the control setup (reactive,
+IMU-only, weak sagittal legs), not by reward tuning** (confirms Run 6). Best
+checkpoint `walk_r2` (tag `walk-v8-r2`): 0 % falls, best heading of the project,
+but converges slow (~0.07 m/s) — not merged. **Decision: stop reward-tuning
+recovery; settle RL-vs-scripted on real hardware (the H1 head-to-head).**
 
 ### Evaluate and lock ✅
 
@@ -440,7 +320,7 @@ question on real hardware with a head-to-head once it arrives. Record:
   from the gyro) rather than accumulated heading error, and expect real-world
   heading hold to be looser than the sim's sub-degree numbers. Affects the
   resid-tuning loop directly. See
-  [`docs/research/hardware-specs.md`](research/hardware-specs.md).
+  [`docs/hardware/specs.md`](hardware/specs.md).
 - Imitation-learning approaches from the UVA/Harvard Bittle research (stretch,
   optional).
 - **Reactive obstacle purchase:** teach the policy that when a front foot is
@@ -450,21 +330,17 @@ question on real hardware with a head-to-head once it arrives. Record:
   curriculum plus a loose/decaying imitation weight, for a generally higher,
   more adaptive swing. Revisit after the reactive-robustness gait is solid.
 
-**Survive-loop (Session A, closed 2026-09-01).** 10 rounds (`surv_r1..r10`) tried
-to lift the residual gait's *conditional survival* — the fraction of courses where
-scripted `wkF` falls but the learned gait stays up. Two approaches: a bespoke
-survival reward (S1–S8, capped at 25%) and the field-standard recipe from
-`legged_gym` / PA-LOCO (S9–S10, 18% then 7%). **Neither cleared the 30% target —
-the reactive stumble-catch ceiling on this platform (IMU-only, no roll DOF, weak
-sagittal servos) is real, matching Runs 6–7.** Approved gait: **`surv_r5`** — 18%
-conditional survival but passes every other gate (flat speed 0.094, trot −0.55,
-obstacle fall rate at parity with scripted). `opencat_gym_env.py` on `development`
-is at its config. `surv_r2` (25%, but walks slow) is the higher-survival
-alternative. Full log:
-[`docs/rl-runs/auto-iteration-log-survive-loop.md`](rl-runs/auto-iteration-log-survive-loop.md).
-Field-standard insights (`projected_gravity` obs, explicit terminal fall penalty,
-dominant soft speed reward) are noted there for a future *hardware-in-the-loop*
-pass — not more blind sim iteration.
+**Survive-loop (Session A, closed 2026-09-01).** 10 rounds tried to lift the
+residual gait's *conditional survival* — the fraction of courses where scripted
+`wkF` falls but the learned gait stays up. Neither a bespoke survival reward
+(capped ~25 %) nor the `legged_gym` / PA-LOCO field-standard recipe (18 %) cleared
+the 30 % target — **the reactive stumble-catch ceiling on this platform (IMU-only,
+no roll DOF, weak sagittal servos) is real**, matching Runs 6–7. Approved gait
+**`surv_r5`** (18 %, passes every other gate: flat speed 0.094, trot −0.55,
+obstacle fall rate at parity with scripted); `opencat_gym_env.py` on `development`
+is at its config. Field-standard insights (`projected_gravity` obs, explicit
+terminal fall penalty, dominant soft speed reward) are worth a *hardware-in-the-loop*
+pass, not more blind sim iteration.
 
 ## Recovery — walk / catch / get-up (separate from the gait)
 
@@ -482,7 +358,7 @@ over separate skills**, not one monolithic policy.
 Bittle has no roll-axis joint, so a *learned* self-right is off the table (Run 6).
 The scripted `rc`/`rl` keyframes lever the body over with the legs; the firmware
 also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
-[`docs/research/self-righting-research.md`](research/self-righting-research.md).
+[`docs/hardware/self-righting.md`](hardware/self-righting.md).
 
 **Built pre-hardware (2026-09-01):**
 - `pi_pipeline/link/opencat.py` — `RECOVER`/`ROLL_OVER`/`BALANCE`/`STAND` tokens.
@@ -512,7 +388,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       (headless), confirm SSH access.
   - **Can start NOW (Pi + PiSugar + card + PSU arrived 2026-09-01; robot/camera
     not yet).** Full researched runbook + open-question answers in
-    [`docs/research/pi-bring-up.md`](research/pi-bring-up.md): flash Bookworm
+    [`docs/guides/pi-bring-up.md`](guides/pi-bring-up.md): flash Bookworm
     64-bit Lite, kill Wi-Fi power-save, zram+swapfile, disable-BT for the PL011
     UART, deploy `pi_pipeline` on ARM, then `benchmark_pi.py` (Vosk / Piper /
     Claude-API / RAM). PiSugar **S** = dumb UPS: no I²C, no battery %, power-
@@ -520,7 +396,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Mount the Pi; test power and serial **independently** (power can work while
       serial doesn't). Per Petoi's Raspberry Pi serial docs:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
-    data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/research/pi-power.md`](research/pi-power.md).
+    data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](hardware/pi-power.md).
   - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
     the Pi cutout.
   - `sudo raspi-config` → Interface Options → Serial Port → disable the serial
@@ -556,14 +432,18 @@ through it. Command reference and a hardware bring-up checklist are in
       Serial-2 on the BiBoard; `check_serial ping` / `skills` to confirm.
 - [x] Test the vision module's on-device detection via the SenseCraft AI Model
       Assistant web debug GUI. **Done 2026-09-05** — stock classification model
-      deployed, live feed + labels confirmed. Next: camera→Pi over **USB**
-      (`/dev/ttyACM0`), not the Grove/GPIO pins — see `docs/hardware-readiness.md`
-      "Day-1-with-the-camera checklist" step 3.
+      deployed, live feed + labels confirmed.
+- **Camera → Pi is over USB, not the Grove/GPIO pins** (decided 2026-09-05 from
+      the Seeed wiki): the Grove 4-pin connector is **I²C** (`0x62`), not UART.
+      Link the module USB-C → the Pi's USB *data* port (Pi Zero 2 W: the *inner*
+      micro-USB) → it enumerates as `/dev/ttyACM0`, same SSCMA AT/JSON protocol,
+      `VISION_SERIAL_BAUD` 921600. `SerialDetectionFeed` sends `AT+INVOKE=-1,0,1`
+      on open (the module doesn't self-stream) and `AT+BREAK` on close.
 
 ## Phase 6 — RL sim-to-real deployment
 
 **Status (2026-09-03): the deployment stack is BUILT and sim-validated;
-remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`.
+remaining work is hardware-gated.** Full plan + state: `docs/guides/gait-deployment.md`.
 
 - [x] **Pi bring-up** (`scripts/pi_setup.sh`) — Zero 2 W runs the policy-sized
       net in **0.43 ms** (3% of the 80 Hz budget), no thermal throttling. The
@@ -586,7 +466,7 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
     GREEN/AMBER/RED at 50/85 % of trip) + per-joint spoken warning; new
     `behavior/thermal_governor.py` (`ThermalGovernor`) — AMBER throttles
     speed + softens gait, RED holds a folded cooldown pose. All constants
-    placeholders; [`research/servo-thermal.md`](research/servo-thermal.md).
+    placeholders; [`hardware/servo-thermal.md`](hardware/servo-thermal.md).
   - `pi_pipeline/diag/` — **Phase 1 + the non-hardware parts of Phase 2 done
     (2026-09-10).** JSONL event log + black-box ring + manifest +
     `summarize/replay/tail/sync`; taxonomy events from `run_gait` / `serial_link`
@@ -595,12 +475,12 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
     `diag.incident()` + expanded auto-flush names, `install_excepthook()`,
     manifest finalize on close, `diag/sysmon.py` (`# HARDWARE` battery /
     Pi-thermal stubs). Left: validating the black box on a real fall / link drop.
-    [`research/hardware-diagnostics.md`](research/hardware-diagnostics.md).
+    [`hardware/diagnostics.md`](hardware/diagnostics.md).
   - `pi_pipeline/power/` — zero-risk power levers (CPU governor, Wi-Fi
     power-save, disable-unused peripherals). idle-REST built; **sleep-mode FSM
     built 2026-09-10** (`behavior/sleep_mode.py` — curl + vision off +
     power-save, wakes on IMU/wake-word/sound). Driver-side wiring of both
-    pending. [`research/pi-power.md`](research/pi-power.md).
+    pending. [`hardware/pi-power.md`](hardware/pi-power.md).
   - `pi_pipeline/util/supervisor.py` — **new 2026-09-10.** `Supervisor` +
     `WatchdogPolicy`: restart-on-death/hang with exponential backoff + a
     give-up ceiling, for the audio / serial worker threads on hardware.
@@ -631,7 +511,7 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
       remote path doesn't apply — likely a serial command). Add it to
       `pi_pipeline/link/opencat.py`. Falls will be frequent during RL sessions
       and the firmware skill only covers slow side/forward ones — see
-      [`docs/research/self-righting-research.md`](research/self-righting-research.md).
+      [`docs/hardware/self-righting.md`](hardware/self-righting.md).
 
 ## Phase 7 — Voice + Claude integration
 
@@ -741,7 +621,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
 > recognition hop, CliffGuard reflex and "G2 meet X" enrollment;
 > `run_gait.py --skills` refuses without it. Re-enable the whole stack with
 > `G2_FEATURES="+vision"` once a real detector is deployed. Nothing deleted.
-> Rationale + the multi-class model options: `docs/research/detection-layer.md`.
+> Rationale + the multi-class model options: `docs/vision/detection-layer.md`.
 
 - **Hardware constraint:** Bittle X has one module slot, taken by the AI Vision
   Camera. A separate proximity/distance sensor is not an option alongside it — so
@@ -750,7 +630,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
   module's `classes()` output for that — a boxless classification path, lighter
   than object detection.
 - **Vision module limits** (vendor docs — full detail in
-  [`docs/research/hardware-specs.md`](research/hardware-specs.md)):
+  [`docs/hardware/specs.md`](hardware/specs.md)):
   - **Detections *or* a raw frame, never both at once.** The `Avoider` reflex
     (needs the detection stream) and `scene.narrate` (needs a frame for Claude)
     must timeshare or mode-switch, not run concurrently. Results and frames use
@@ -786,7 +666,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       wall; the negatives killed it. Runs through `g2vision` (`SerialDetectionFeed`
       → `scene` → `Avoider`), acquires/drops the subject instantly, scores ~60–80.
       Wired into `.env` (`VISION_LABELS` / `VISION_MIN_SCORE=45`). Full workflow:
-      `docs/train-a-visual-model.md`.
+      `docs/guides/train-vision-model.md`.
 - [x] **Multi-class detection model WORKING on device (2026-09-09):** 3 classes
       (household member + `dog` + `cat`), YOLOv8n @ 192 px, mAP@50 0.907. Root
       cause of a week of dead flashes: the GV2 firmware is **frozen at Jan 2025**
@@ -796,9 +676,9 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       All of it is repo tooling now: **`tools/gv2/`**
       (`split_yolo_dataset.py`, `export_yolov8_gv2.sh`, `vela_config_we2.ini`) +
       `tools/autobox_coco.py` + `tools/vision_diag.py`. Full 12-step process:
-      `docs/research/grove-vision-v2-custom-model.md`. Known limit of this first
+      `docs/vision/custom-model-recipe.md`. Known limit of this first
       model: detects up close only (100-image INT8 calib set; 300+ wanted) —
-      improvement loop speced in `docs/research/capture-progress.md`.
+      improvement loop speced in `docs/vision/capture-progress.md`.
 - [ ] **Improve the 3-class model** — diagnostic `vision_diag` logging pass →
       shot list → recapture (distance/pose variety) → retrain with a 300+
       calibration set. Then add a 4th class (2nd household member) at `nc: 4`.
@@ -829,7 +709,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
     queries, not continuous avoidance — matches the split above.
 - [~] **Perception-in-the-loop locomotion — RL approach CLOSED 2026-09-07; now a
       behaviour-layer reflex.** A 3-campaign autonomous investigation
-      (`docs/rl-runs/vision-goal-locomotion-plan.md`) tried to bake a
+      (`docs/rl/vision-in-gait.md`) tried to bake a
       forward-terrain feature + goal-bearing command + cliff feature into the
       gait policy so it could slow / step-over / detour / halt from vision.
       **Result: goal-directed turning is not achievable in this sim** — an
@@ -879,8 +759,8 @@ tuning, and the Phase 10 wiring — all hardware-gated.
         Vision AI feed or mock). Walk-around maneuver **can't be scripted** —
         no lateral leg DOF; a detour needs a firmware turn (nav-layer decision).
         Report: `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
-        Plan: `docs/rl-runs/vision-goal-locomotion-plan.md` (`>>> RESUME (Phase E)`).
-        The adapter skill probe (`docs/rl-runs/adapter-skill-probe-spec.md`)
+        Plan: `docs/rl/vision-in-gait.md` (`>>> RESUME (Phase E)`).
+        The adapter skill probe (`docs/rl/adapter-skill-probe-spec.md`)
         stays the route for *one* genuinely-learned skill if a scripted one
         proves too fragile on hardware.
 
@@ -936,7 +816,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       skill for the cases it covers, a learned fallback for the rest). Ruled out
       as a pure reward-shaping target in Run 7; becomes incremental once the IMU
       is already feeding the policy. See
-      [`docs/research/self-righting-research.md`](research/self-righting-research.md).
+      [`docs/hardware/self-righting.md`](hardware/self-righting.md).
 
 ## Phase 9 — Memory system
 
@@ -1046,6 +926,64 @@ breathing-bob motion and LED life-signs, are still caller-side).
       robot that the mounted camera's downward view actually improves the near
       obstacle read (the A/B is: swept/bow profile vs. plain forward scan into
       the selector).
+
+---
+
+## When the hardware arrives — ordered bring-up
+
+The phases above are grouped by system; this is the sequence to actually work
+through once the Bittle X + BiBoard land (the Pi bring-up is already done — see
+Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
+
+**Assembly & mechanical**
+1. Assemble Bittle X V2; check servo calibration (ships calibrated — fine-tune
+   only if movement looks off).
+2. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera
+   + mount actually on the robot. Weigh the **camera cluster and the PiSugar S
+   battery separately** (the battery is >½ the current spine estimate; if it
+   mounts somewhere distinct, it needs its own sim body). Balance each piece on
+   an edge for height + fore/aft CoM. Then set `PAYLOAD_MASS_*` / `HEAD_MASS_*` /
+   positions in `opencat_gym_env.py` and retrain (or `--finetune-lr`) if the
+   delta from ~76 g is real — [`rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md) **H2**.
+3. **On the calibration stand, before it touches the ground:** full
+   range-of-motion pass by hand / `check_serial` (watch for binding / leg-on-leg
+   collision), then firmware `c16` auto joint calibration. Safe place for first
+   power-on. Detailed gait steps: [`guides/gait-deployment.md`](guides/gait-deployment.md) step 6.
+4. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
+   source. Confirm the back cover still fits.
+
+**Serial link (Phase 5)**
+5. `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
+   `.env` (likely `/dev/ttyS0` → `/dev/ttyAMA0` after `disable-bt`).
+6. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
+7. `check_serial ping` (firmware banner) → `send kbalance` (robot stands) →
+   `skills` (runs the conversational set).
+
+**Voice (Phase 7)**
+8. `python -m pi_pipeline.voice --mode text` → Claude + memory end-to-end (key is
+   already set).
+9. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD`,
+   `G2_STT_SILENCE_S`. `--mode voice --actuator serial` for the full loop.
+10. `benchmark_pi.py` on the actual Pi — confirm `en_US-ryan-low` + Vosk hit
+    real-time on 512 MB. If sluggish: shorter `CLAUDE_MAX_TOKENS`, streaming TTS,
+    a longer "thinking" cue.
+
+**RL sim-to-real (Phase 6 — stack already built + sim-validated)**
+11. `pi_pipeline/gait/bench_real.py` — real-time joint control on the Pi (sim
+    bench: 0.43 ms/step).
+12. `run_gait.py --probe-imu` → `--openloop` (verify servo signs) → `--cmd` (the
+    learned gait) → **the H1 head-to-head** vs firmware `kwkF`. Methodology +
+    decision rule: [`rl/h1-rubric.md`](rl/h1-rubric.md); `h1_score.py` produces the verdict.
+
+**Vision on the robot (Phase 8)**
+13. Mount the camera on G2, train the **desk-edge classifier** on the real
+    mounted POV (B16 — highest priority), wire `Avoider` decisions to the
+    actuator, build the `CliffGuard` reflex against the trained classifier.
+
+**Integration (Phase 10)**
+14. Voice + vision + memory concurrently; resolve timing/resource conflicts
+    (historically the messiest phase). Then revisit locomotion with perception in
+    the loop toward the Phase 8 Target capability.
 
 ---
 

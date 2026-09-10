@@ -36,7 +36,7 @@ LADDER = [
 
     # 2026-09-04: trimmed the pure severity-progression rungs that added no
     # signal beyond their endpoints (0% falls, ~1% speed delta -- see
-    # docs/rl-runs/ for the full before/after). Gentle-up/gentle-down (T2.1/
+    # docs/rl/ for the full before/after). Gentle-up/gentle-down (T2.1/
     # T2.2) cut; steep up/down (T3.1/T3.2) and extreme down (T6.1, a real
     # discriminator) bracket the same range with the interesting result kept.
     # Cross-slope (T2.3) stays -- a different axis, not a severity step.
@@ -101,7 +101,7 @@ LADDER = [
     # T6.3b/T6.4b severity 2026-09-04: the T6.3/T6.4 payload-on knob values,
     # reused as-is for bare robot, landed at 95-97% fall rate -- basically
     # "always fails", as uninformative as the old 0% was, just at the other
-    # extreme. Probed a few candidates (see docs/rl-runs/) and picked settings
+    # extreme. Probed a few candidates (see docs/rl/) and picked settings
     # that land in a real hard-but-passable band instead.
     ("T6.3b", 6, "stumble-catch",  "Brutal shoves (0.70 @ 0.012) -- bare robot",
         {"IMPULSE_PUSH": 0.70, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20,

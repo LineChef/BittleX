@@ -2,7 +2,7 @@
 walk, or a scripted keyframe skill, with a smooth handoff so the switch doesn't
 lurch.
 
-Phase E-1 of the vision-triggered-skills plan (docs/rl-runs/vision-goal-locomotion-plan.md).
+Phase E-1 of the vision-triggered-skills plan (docs/rl/vision-in-gait.md).
 The learned residual gait (`gait/residual_policy.py`) stays the base -- it is
 never retrained. When a situation calls for a specific motion (step over a low
 obstacle, crouch to look at near ground, hold still), this layer takes control

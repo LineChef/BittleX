@@ -2,7 +2,7 @@
 """Curate a raw capture batch into a training-ready set.
 
 Repeatable post-processing for face/object capture sessions (see
-docs/research/person-recognition.md). Given a folder of `*.jpg` frames -- and,
+docs/vision/person-recognition.md). Given a folder of `*.jpg` frames -- and,
 if present, `<name>.json` sidecars carrying the module's detection boxes for
 that frame -- it:
 

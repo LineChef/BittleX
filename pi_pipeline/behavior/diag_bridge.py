@@ -9,7 +9,7 @@ back as a behaviour timeline:
     posture.transition sit->resting   because "160s sat >= 90s"
     cliff.reflex      stop            because "edge at 0.18 m"
 
-See docs/research/hardware-diagnostics.md "Decision events".
+See docs/hardware/diagnostics.md "Decision events".
 """
 from __future__ import annotations
 

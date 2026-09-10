@@ -1,4 +1,4 @@
-"""Pi power-management helpers. See docs/research/pi-power.md and power.py."""
+"""Pi power-management helpers. See docs/hardware/pi-power.md and power.py."""
 from __future__ import annotations
 
 from .power import (

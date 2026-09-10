@@ -1,7 +1,7 @@
 """Diagnostics core: a structured per-session event log + a black-box ring
 buffer, so an unknown hardware failure leaves enough context to debug it.
 
-See docs/research/hardware-diagnostics.md.
+See docs/hardware/diagnostics.md.
 
     from pi_pipeline.diag import diag, RingBuffer
 
@@ -32,7 +32,7 @@ _LEVELS = {"DEBUG": 10, "INFO": 20, "WARN": 30, "WARNING": 30, "ERROR": 40, "FAT
 # events at/above this level auto-flush every attached ring buffer
 _FLUSH_AT = _LEVELS["ERROR"]
 # ... and these event names always flush regardless of their level (the failure
-# taxonomy incidents from docs/research/hardware-diagnostics.md)
+# taxonomy incidents from docs/hardware/diagnostics.md)
 _FLUSH_NAMES = {
     "fall.detected", "loop.stall", "loop.exception", "unhandled.exception",
     "servo.thermal_cooldown", "servo.stall", "link.lost",

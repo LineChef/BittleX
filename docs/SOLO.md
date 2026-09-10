@@ -35,17 +35,17 @@ out**, so anything needing the robot to move is bench-only for now.
 
 ## The task in progress: a face-recognition model
 
-Full steps + commands: **`docs/train-a-visual-model.md`**. Short form:
+Full steps + commands: **`docs/guides/train-vision-model.md`**. Short form:
 
 ```
 g2cam-info                 # check the camera's connected + what model is loaded
 g2cam alex 1               # capture session 1 -> preview at localhost:8080
-#   ... run the pose sequence (docs/research/capture-session-checklist.md) ...
+#   ... run the pose sequence (docs/vision/capture-checklist.md) ...
 g2cam-stop
 g2curate alex 1            # filter -> training set + pre-labels; prints the usable count
 #   repeat for sessions 2 and 3 (different rooms / light)
 g2combine alex             # gather all sessions -> upload/
-#   ... upload to SenseCraft, label, train, deploy (train-a-visual-model.md steps 6-7) ...
+#   ... upload to SenseCraft, label, train, deploy (guides/train-vision-model.md steps 6-7) ...
 g2vision alex              # verify the deployed model over serial
 ```
 
@@ -86,13 +86,13 @@ nothing.
   rotation is also the mount orientation for G2. Curate's `--rotate` (90/180/
   270) makes the saved files upright; the contact sheet shows if it's wrong.
 - **Low light.** `g2cam` already sets 480 capture + an auto-exposure lift
-  (`docs/research/vision-detector-bench.md`). Past that it's real light — add
+  (`docs/vision/detector-bench.md`). Past that it's real light — add
   lamps. Brighter = longer exposure = more motion blur, so hold still on poses.
 - **A trained model that detects nothing** = the dataset was too weak. Recapture
   brighter / more / more varied and retrain — it's free and fast.
 - **Feature flags.** `G2_FEATURES=profile:p2-gait` etc. restrict what starts, for
   isolating bugs during bring-up. Empty = everything on. See
-  `docs/feature-flags.md`.
+  `docs/guides/feature-flags.md`.
 
 ---
 
@@ -103,7 +103,7 @@ nothing.
   pre-commit hook blocks personal terms (your SenseCraft name included), so use
   placeholders in tracked files.
 - **A from-scratch ~20M gait run.** Gated on the green-light checklist
-  (`docs/rl-runs/hardware-gated-training-backlog.md` + `project_longrun_trigger`
+  (`docs/rl/hardware-gated-backlog.md` + `project_longrun_trigger`
   memory). The 2026-09-05 new-course run was a negative result — `run20m_ppo`
   stays the base.
 - **Deleting capture folders / `trained/` checkpoints / the memory DB.** Look
@@ -115,13 +115,13 @@ nothing.
 
 | Topic | Doc |
 |---|---|
-| Camera-model training, end to end | `docs/train-a-visual-model.md` |
-| Capture routine (per session) | `docs/research/capture-session-checklist.md` |
-| Recognition design + "G2, meet X" enrollment | `docs/research/person-recognition.md` |
-| One-slot / multi-model detection architecture | `docs/research/detection-layer.md` |
-| Measured module behaviour + AE-lift finding | `docs/research/vision-detector-bench.md` |
-| Staged bring-up flags | `docs/feature-flags.md` |
-| Day-1 hardware checklists | `docs/hardware-readiness.md` |
-| RL/gait history + backlog | `docs/rl-runs/` |
+| Camera-model training, end to end | `docs/guides/train-vision-model.md` |
+| Capture routine (per session) | `docs/vision/capture-checklist.md` |
+| Recognition design + "G2, meet X" enrollment | `docs/vision/person-recognition.md` |
+| One-slot / multi-model detection architecture | `docs/vision/detection-layer.md` |
+| Measured module behaviour + AE-lift finding | `docs/vision/detector-bench.md` |
+| Staged bring-up flags | `docs/guides/feature-flags.md` |
+| Day-1 bring-up sequence | `docs/project-plan.md` ("When the hardware arrives") |
+| RL/gait history + backlog | `docs/rl/` |
 | Everything else | `docs/project-plan.md`, `docs/how-it-works.md` |
-| All commands | `docs/reference/cheatsheet.md` |
+| All commands | `docs/guides/cheatsheet.md` |

@@ -18,7 +18,7 @@ for that pose, waits, and on failure ESCALATES through a ladder
   GETTING_UP  --stable again-------> SETTLE -> UPRIGHT
               --timeout-----------> escalate (up to max_attempts) -> GIVE_UP
 
-Firmware relationship (docs/research/petoi-firmware-reference.md): OpenCatEsp32
+Firmware relationship (docs/hardware/petoi-firmware-reference.md): OpenCatEsp32
 auto-fires `rc` ONCE PER IMU TICK on `|roll| > 85deg` when gyro assist is on, with
 no give-up. This FSM fires a touch earlier (fall_rad 1.3 rad = 74deg) so it can
 pick the pose-specific maneuver before a full flip, and it DOES give up. If the
