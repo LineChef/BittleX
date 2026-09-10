@@ -44,12 +44,19 @@ pi_pipeline/
   behavior/            # what G2 does on its own between conversations
     driver.py          # BehaviorDriver.tick() -> ordered Effects (composes it all)
     bindings.py        # DriverBindings: Effect -> real sink; MockBindings for tests
+    runtime.py         # BehaviorRuntime: ticks the driver, feeds it its inputs
+    __main__.py        # python -m pi_pipeline.behavior (mock demo of the loop)
     mode_controller.py explore.py novelty.py idle_posture.py gestures.py
     enrollment.py      # "G2, meet <name>" capture FSM
-    sleep_mode.py      # deep-idle FSM (curl + vision off + power-save)
+    sleep_mode.py      # deep-idle FSM (curl + vision off + power-save), wired in the driver
     thermal_governor.py # servo-thermal Layer 2 (AMBER throttle / RED cooldown pose)
-    chirps.py          # B5 emotive buzzer-melody vocabulary
+    chirps.py          # B5 emotive buzzer-melody vocabulary, wired in the driver
     diag_bridge.py     # driver DIAG effects -> diag events
+  app/                 # Phase 10 integration: the ONLY place with real I/O wiring
+    sinks.py           # serial + power backed DriverBindings sinks; build_bindings()
+    sensors.py         # SensorHub: IMU stream + detection feed -> the sensors() dict
+    __main__.py        # python -m pi_pipeline.app — voice loop + behaviour runtime
+  doctor.py            # python -m pi_pipeline.doctor — bring-up readiness checklist
   gait/                # Phase 6 — sim-to-real deployment of run20m_ppo
     residual_policy.py deploy_map.py run_gait.py   # the 80 Hz on-robot loop
     thermal_guard.py   # I2t heat estimate + 3-tier indicator
@@ -89,14 +96,16 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**413 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**494 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
-conversation parse / tool-ack / retry paths (stub Anthropic client), memory
-store + recall + decay + web UI, the vision feed + avoidance + cliff guard, the
-behaviour driver + bindings + all its state machines, the gait guards
-(thermal / jam / carpet / speed estimate), diagnostics + watchdog, the worker
-supervisor, and the personality traits + character toggle. Run before committing.
-With a key: `pytest pi_pipeline/tests/test_livecheck.py -s` hits the real API.
+conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
+memory store + recall + decay + recency + web UI, the vision feed + avoidance +
+cliff guard, the behaviour driver + bindings + runtime + all its state machines
+(mode / explore / idle / sleep / mood / chirps / enrollment), the app sinks +
+SensorHub, the gait guards (thermal / jam / carpet / speed estimate), diagnostics
++ watchdog, the worker supervisor, the personality traits + character toggle, and
+the `doctor` preflight. Run before committing. With a key:
+`pytest pi_pipeline/tests/test_livecheck.py -s` hits the real API.
 
 ## Run
 
@@ -108,4 +117,14 @@ python -m pi_pipeline.voice --mode text
 python -m pi_pipeline.voice --mode voice
 
 # Either mode: --actuator mock (default) logs skill commands; --actuator serial sends them
+
+# The whole robot as one program — voice loop + behaviour runtime, side by side.
+python -m pi_pipeline.app                 # mock: no serial, dry-run power
+python -m pi_pipeline.app --serial        # talk to the BiBoard
+
+# The behaviour runtime alone, against mocks (idle -> sit -> rest -> sleep -> wake)
+python -m pi_pipeline.behavior
+
+# Bring-up readiness checklist (run the moment the Pi + body are wired)
+python -m pi_pipeline.doctor              # add --serial to also ping the BiBoard
 ```

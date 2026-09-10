@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **474 passing tests**.
+`pi_pipeline/` carries **494 passing tests**.
 
 ---
 
@@ -94,8 +94,12 @@ abstract **effects** (`SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE
 CHIRP / POWER / DIAG`), which `DriverBindings` routes to whatever sinks are
 injected. `BehaviorRuntime` (`runtime.py`) is the loop that ticks the driver at
 a fixed rate, feeds it inputs from injected sources (event queue, detection
-feed, sensors, mood recency, bonded roster), and dispatches the effects —
-`python -m pi_pipeline.behavior` runs the whole thing against mocks. All 🧩.
+feed, sensors, mood recency, bonded roster), and dispatches the effects.
+**`pi_pipeline/app/`** is the real-I/O wiring: serial + power backed sinks
+(`app/sinks.py`), a `SensorHub` that turns the IMU stream + detection feed into
+the driver's continuous inputs (`app/sensors.py`), and `python -m pi_pipeline.app`
+— the voice loop and the behaviour runtime running side by side over one shared
+link, **mock by default, `--serial` on the robot**. All 🧩.
 
 - **Modes** — `converse` / `idle` / `explore`, with a controller that switches
   between them.
@@ -245,6 +249,10 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 - **Feature flags** (`G2_FEATURES`, `docs/guides/feature-flags.md`) — staged
   bring-up: perception / vision-nav stack gated **off** until a real detector
   exists.
+- **`doctor` preflight** (`python -m pi_pipeline.doctor`) — one-command bring-up
+  readiness check: `.env` completeness, API key validity + expiry, model files
+  (Vosk / Piper / gait ONNX), Python deps, serial port + optional board ping,
+  audio devices, free disk. Non-zero exit on any hard failure.
 
 ---
 
@@ -283,7 +291,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 474
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 494
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

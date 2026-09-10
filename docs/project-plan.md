@@ -877,10 +877,34 @@ resulting effects through the injected `DriverBindings` and exposes
 No threads, doesn't own the voice loop — the two run side by side, the voice
 loop just `post()`s events. `python -m pi_pipeline.behavior` runs it against
 `MockBindings` and prints the effect stream (idle → sit → rest → sleep →
-wake-word → rouse). 11 tests. **Left for hardware:** construct it in a top-level
-runner with the *real* sinks + sources (some sinks exist: `voice/actuator.py`,
-`voice/cues.py`, `voice/tts.py`, `pi_pipeline.power`); plumb the real detection
-feed, IMU state, and mic events; run it alongside `VoiceLoop`.
+wake-word → rouse). 11 tests.
+
+**`pi_pipeline/app/` — the real I/O wiring, built 2026-09-10.** The one place
+that ties everything together with hardware:
+- `app/sinks.py` — serial + power backed `DriverBindings` sinks:
+  `SerialActuatorSink` (raw safe-checked tokens — `k…`, `d`, `m0 …`, `b…`),
+  `HeadSink` (head-pan `m0`), `WalkerSink` (firmware `wkF`/`wkL`/`wkR`,
+  continuous), `PowerSink` (`pi_pipeline.power` profiles), `CameraSink`,
+  `LockedLink` (mutex around the shared `SerialLink`); `build_bindings(link)`
+  wires them.
+- `app/sensors.py` — `SensorHub`: drains the serial IMU stream (`parse_imu_line`)
+  → `imu_level` / `imu_stable` / `held`, reads the detection feed →
+  `person_present`; `sample()` is the runtime's `sensors()` callable. Thresholds
+  are FIRST-CUT / HARDWARE-GATED.
+- `app/__main__.py` — `python -m pi_pipeline.app`: the `VoiceLoop` (main thread)
+  + `BehaviorRuntime` (daemon thread) over one shared link; the voice loop's new
+  `on_event` hook bridges `wake_word` / `conversation_ended` / `told_sleep` to
+  `rt.post()`. **Mock by default** (null link, dry-run power — still exercises the
+  real sink/sensor code); `--serial` on hardware, nothing else changes.
+- `pi_pipeline/doctor.py` — `python -m pi_pipeline.doctor`: a bring-up readiness
+  checklist (`.env` completeness, API key validity + expiry, Vosk/Piper/gait-ONNX
+  files, Python deps, serial port, `--serial` board ping, audio devices, free
+  disk); non-zero exit on any hard FAIL so it drops into a bring-up script.
+
+**Left for hardware:** plumb a real `SerialDetectionFeed` into `SensorHub` +
+`BehaviorRuntime.frame_source`; tune the `SensorConfig` IMU thresholds against
+`--probe-imu`; confirm the head-pan joint index + range; the `WalkerSink` is
+firmware-gait only (the RL gait is `gait/run_gait.py`, run separately).
 
 ### Ready logic, not yet wired to a runtime
 

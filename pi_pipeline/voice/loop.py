@@ -45,6 +45,7 @@ class VoiceLoop:
         cue: Cue,
         memory=None,  # Phase 9: object with .recall(text) -> str and .record(user, reply)
         follow_up_s: float = 0.0,
+        on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
     ):
         self._wake = wake_word
         self._stt = stt
@@ -55,6 +56,8 @@ class VoiceLoop:
         self._memory = memory
         self._follow_up_s = max(0.0, follow_up_s)
         self._in_session = False
+        # bridge to the behaviour runtime (if running alongside); no-op otherwise
+        self._events = on_event or (lambda **_kw: None)
         # slow-moving mood from interaction recency -> a one-line system-prompt
         # note + (on the robot) idle-timing bias. Needs a memory to read
         # recency from; harmless without one (stays NEUTRAL -> empty hint).
@@ -76,6 +79,7 @@ class VoiceLoop:
     def _end_session(self) -> None:
         self._in_session = False
         self._cue.set("idle")
+        self._events(conversation_ended=True)
 
     def _handle_character(self, cc) -> None:
         """Toggle an opt-in character mode (e.g. 'enable gir mode'). Rebuilds the
@@ -100,6 +104,7 @@ class VoiceLoop:
     def _one_turn(self) -> None:
         if not self._in_session:
             self._wake.wait()
+            self._events(wake_word=True)
             if self._memory:
                 self._memory.mark_session_start()
 
@@ -119,6 +124,7 @@ class VoiceLoop:
         cmd = match_local_command(user_text)
         if cmd == "sleep":
             log.info("'go to sleep' -- ending session")
+            self._events(told_sleep=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, going quiet. Say the wake word when you need me.")
             self._end_session()

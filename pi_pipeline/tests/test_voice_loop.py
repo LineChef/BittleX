@@ -81,11 +81,12 @@ class _Mem:
         self.recorded.append(user_text)
 
 
-def _loop(script, follow_up_s=8.0, memory=None):
+def _loop(script, follow_up_s=8.0, memory=None, on_event=None):
     w, stt, conv, tts = _Wake(), _STT(script), _Conv(), _TTS()
     lp = VoiceLoop(
         wake_word=w, stt=stt, conversation=conv, tts=tts,
         actuator=_Act(), cue=_Cue(), memory=memory, follow_up_s=follow_up_s,
+        on_event=on_event,
     )
     return lp, w, stt, conv, tts
 
@@ -153,3 +154,15 @@ def test_session_start_marked_once_per_wake():
     _run(lp, 3)
     assert m.marks == 1
     assert m.recorded == ["a", "b"]
+
+
+# ------------------------------------------------ Phase 10 event bridge
+def test_on_event_bridge_posts_wake_end_and_sleep():
+    events = []
+    lp, w, stt, conv, tts = _loop(
+        ["hello", "go to sleep", ""], on_event=lambda **kw: events.append(kw))
+    _run(lp, 3)
+    kinds = [next(iter(e)) for e in events]
+    assert kinds[0] == "wake_word"                 # first turn waited for wake
+    assert "told_sleep" in kinds                   # "go to sleep" bridged
+    assert "conversation_ended" in kinds           # session end bridged
