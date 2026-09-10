@@ -8,6 +8,12 @@ Companion: `capture-progress.md` (data/capture tracker),
 `train-a-visual-model.md` (the older SenseCraft-web single-class flow),
 `detection-layer.md` (one-model-slot architecture).
 
+Repo tooling for this flow: **`tools/gv2/`** —
+`split_yolo_dataset.py` (library → train/val zip), `export_yolov8_gv2.sh`
+(the arm64 local export + vela, exact pins inside), `vela_config_we2.ini`
+(the Himax WE2 vela profile). Plus `tools/autobox_coco.py`,
+`tools/combine_for_upload.py`, `tools/vision_diag.py`.
+
 ---
 
 ## Core constraint: the device firmware is frozen at Jan 2025
@@ -65,83 +71,69 @@ while stock Swift-YOLO works — "is the toolchain ahead of the firmware decode?
 **2026-09-09 — this produced the first model the device actually decodes.**
 3-class (`<you>`, `dog`, `cat`), YOLOv8n @ 192px, mAP@50 0.907 (`<you>` 0.995,
 `dog` 0.867, `cat` 0.859). On device: one box per real object, quiet on an empty
-scene, `postprocess: 1ms`.
+scene, `postprocess: 1ms`. All three classes detect.
 
 Seeed's official multi-class recipe is `wiki.seeedstudio.com/ma_deploy_yolov8` —
 no mmcv, no COCO conversion, multi-class is just `nc` in `data.yaml`.
 
-**Split the work:** Colab **trains** 8.2.8 fine, but cannot **export** it —
-Colab is Python 3.13 now and every `format=tflite` run hits the onnx2tf
-`flatbuffer_direct` bug. The export must run on an environment old enough to
-match the 8.2.8 toolchain. On the Mac that is **arm64 Python 3.9**
-(`/usr/bin/python3` → 3.9.6). Do **not** use the Homebrew `python3.11` at
-`/usr/local` — it's Intel/Rosetta → x86 TensorFlow → `Abort trap: 6` on AVX.
+**The one non-obvious split:** Colab **trains** 8.2.8 fine but **cannot export**
+it — Colab is Python 3.13 now and every `format=tflite` run hits the onnx2tf
+`flatbuffer_direct` bug. Export must run on an environment old enough to match
+the 8.2.8 toolchain: **arm64 Python 3.9** (`/usr/bin/python3` → 3.9.6 on this
+Mac). **Not** the Homebrew `python3.11` at `/usr/local` — Intel/Rosetta → x86
+TensorFlow → `Abort trap: 6` on AVX. `tools/gv2/export_yolov8_gv2.sh` builds the
+right venv and refuses to run on x86.
 
-### Train (Colab or local)
+### Full process, start to finish
 
-```bash
-pip install ultralytics==8.2.8            # + numpy<2 if it resolves numpy 2.x
-yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100
-# download best.pt   (glob '/content/out/**/weights/best.pt')
-```
+Every command below refers to a file **in this repo** — nothing lives only in a
+notebook or a scratch dir any more.
 
-### One-time local export env (arm64 Python 3.9)
+| # | step | command |
+|---|---|---|
+| 1 | **Capture** each class (motion-gated). Ask the tag name first; follow `docs/research/capture-session-checklist.md`. | `g2cam <class> <session>` |
+| 2 | **Curate** — dedup, contact sheet, writes YOLO `.txt` from the capture-time detector. | `curate_captures.py … --class-id N` (aliases `g2neg` for empty rooms) |
+| 3 | **Promote** the good frames into the library. | `g2promote <class> <session>` |
+| 4 | **Auto-box** any class whose captures had no boxes (pets), using a COCO YOLOv8. | `python tools/autobox_coco.py ~/Desktop/g2_vision_library/<class> --coco-class {person,dog,cat} --weights yolov8m.pt --imgsz 800 --overwrite` |
+| 5 | **Combine** the library → one flat folder, class-ids rewritten from `--classes` order. | `python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/g2_vision_library/upload_vN` |
+| 6 | **Split + resize + zip** → the dataset the notebook eats. | `python tools/gv2/split_yolo_dataset.py ~/Desktop/g2_vision_library/upload_vN --classes <you>,dog,cat --imgsz 224 --out ~/Desktop/g2_vision_library/custom_data_yolo_vN.zip` |
+| 7 | **Train** on Colab — `g2_yolov8_828_3class.ipynb`, T4 GPU, upload the zip from step 6, run top-to-bottom, download `best.pt`. | notebook: `yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100` |
+| 8 | **Build a calibration set** — 300+ varied jpgs. Reuse `upload_vN` or a wider pull; a flat folder of `.jpg` is all the script needs. | (a folder path) |
+| 9 | **Export + vela locally** — makes the arm64 venv, patches onnx2tf, exports INT8 tflite, vela → 100% NPU. | `tools/gv2/export_yolov8_gv2.sh best.pt <calib_dir> 3 <you>,dog,cat` |
+| 10 | **Flash** — SenseCraft → device page → **Upload Model** → pick `gv2_out/best_full_integer_quant_vela.tflite`, add class names as Objects (**Add Object → type → Add Object again** per chip; plain Enter overwrites the one chip), Send. Or `python-sscma` serial (see "Also worth knowing"). | |
+| 11 | **Verify** on device: quiet on empty scene, one box per object. Headless: `python tools/vision_diag.py <port> --secs 40`. | |
+| 12 | **Cleanup** — delete the Colab runtime (wipes the uploaded photos). See the Cleanup section. | |
 
-```bash
-/usr/bin/python3 -m venv .venv && source .venv/bin/activate
-pip install "ultralytics==8.2.8" "tensorflow==2.16.2" "tf-keras==2.16.0" \
-            "onnx2tf==1.17.5" "onnxsim>=0.4.33" onnx_graphsurgeon sng4onnx \
-            ethos-u-vela
-```
+### What `export_yolov8_gv2.sh` does (and why each piece is load-bearing)
 
-Three fixes are **mandatory** — each was a hard failure without it:
+Exact pins live in the script (`ultralytics==8.2.8`, `tensorflow==2.16.2`,
+`tf-keras==2.16.0`, `onnx==1.16.1`, `onnx2tf==1.17.5`, `onnxsim==0.4.36`,
+`onnx_graphsurgeon==0.6.1`, `sng4onnx==2.0.1`, `numpy==1.26.4`,
+`ethos-u-vela==5.0.0`). Three fixes are **mandatory** — each was a hard failure
+without it:
 
 | env / patch | error it fixes |
 |---|---|
-| `export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` | `_pickle.UnpicklingError: Weights only load failed` (torch ≥2.6 defaults `weights_only=True`) |
-| `export TF_USE_LEGACY_KERAS=1` | `A KerasTensor cannot be used as input to a TensorFlow function` (onnx2tf 1.17.5 is Keras-2; TF 2.16 ships Keras-3) |
-| patch `onnx2tf/onnx2tf.py` ~line 1410 → `normalized_calib_data = ((calib_data[idx] - mean) / std).astype(np.float32)` | `Cannot set tensor: Got FLOAT64 but expected FLOAT32 ... serving_default_images:0` (INT8 calib normalisation promotes to float64) |
+| `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1` | `_pickle.UnpicklingError: Weights only load failed` (torch ≥2.6 defaults `weights_only=True`) |
+| `TF_USE_LEGACY_KERAS=1` | `A KerasTensor cannot be used as input to a TensorFlow function` (onnx2tf 1.17.5 is Keras-2; TF 2.16 ships Keras-3) |
+| patch `onnx2tf/onnx2tf.py`: `normalized_calib_data = (…) / std` → append `.astype(np.float32)` | `Cannot set tensor: Got FLOAT64 but expected FLOAT32 … serving_default_images:0` (INT8 calib normalisation promotes to float64) |
 
 `onnxsim` (**not** `onnxslim` — different package) is also required, or onnx2tf
-hits `MaxPool: unsupported operand ... 'NoneType' and 'int'` on unsimplified
+hits `MaxPool: unsupported operand … 'NoneType' and 'int'` on unsimplified
 dynamic dims. A `No module named 'tflite_support'` at the very end is
 **cosmetic** — `best_full_integer_quant.tflite` is already written; ignore it.
 
-### Export + vela
+The INT8 **calibration set** is the `val:` list in the throwaway `data.yaml` the
+script writes (`yolo export int8` calibrates on val). **Use 300+ varied images**
+— the working model used only 100 and that is the leading suspect for its
+"detects up close only, box frozen at the training-average position" behaviour.
 
-```bash
-source .venv/bin/activate
-export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 TF_USE_LEGACY_KERAS=1
+vela runs with `tools/gv2/vela_config_we2.ini` (committed) —
+`--accelerator-config ethos-u55-64 --system-config My_Sys_Cfg --memory-mode
+My_Mem_Mode_Parent`. Output `gv2_out/*_vela.tflite`, ~2.3 MB, `ethos-u` op
+present, 0 CPU ops.
 
-yolo export model=best.pt format=tflite imgsz=192 int8 data=data.yaml
-#   -> best_saved_model/best_full_integer_quant.tflite   (NHWC 1x192x192x3, float32 in)
-
-vela --accelerator-config ethos-u55-64 --config vela_config.ini \
-     --system-config My_Sys_Cfg --memory-mode My_Mem_Mode_Parent \
-     --output-dir vela_out  best_saved_model/best_full_integer_quant.tflite
-#   -> best_full_integer_quant_vela.tflite   (2.31 MB, 284 ops, 0 CPU = 100% NPU)
-```
-
-`data.yaml`'s `val:` list **is** the INT8 calibration set (`yolo export int8`
-calibrates on the val split). Use **300+ varied** images. The working model used
-only 100 — that is the leading suspect for its "detects up close only, box
-frozen at the training-average position" behaviour.
-
-`vela_config.ini` = the Himax WE2 block (`core_clock=400e6`, `axi0_port=Sram`,
-`axi1_port=OffChipFlash`, `const_mem_area=Axi1`, `arena_mem_area=Axi0`,
-`cache_mem_area=Axi0`) under `[System_Config.My_Sys_Cfg]` +
-`[Memory_Mode.My_Mem_Mode_Parent]` — full block in `ma_deploy_yolov8` and in
-every `g2_*` notebook's vela cell.
-
-### Flash
-
-SenseCraft → device page → **Upload Model** → pick
-`best_full_integer_quant_vela.tflite`, add class names as Objects
-(**Add Object → type → Add Object again** per chip; plain Enter overwrites the
-one chip), Send. Or local serial (see "Also worth knowing"). Then run
-**Cleanup** below.
-
-### Dataset format (what `yolo train` wants)
+### Dataset format (what step 6 produces / `yolo train` wants)
 
 ```
 ds/
@@ -150,8 +142,9 @@ ds/
   labels/train/*.txt   labels/val/*.txt     # YOLO: "<cls> cx cy w h" normalised; class ids 0/1/2
 ```
 Negatives = image with **no** `.txt` → ultralytics treats as background.
-Build it from the library with the inline splitter (see below) — **not**
-`yolo_to_coco_zip.py` (that's for the SSCMA path).
+`split_yolo_dataset.py` does a seeded, class-stratified split (default 15% val)
+so every class + the negatives pool appears in val. Do **not** use
+`yolo_to_coco_zip.py` here (that's for the dropped SSCMA path).
 
 ---
 
@@ -176,14 +169,17 @@ are motion-blurred junk — dog capture session had heavy blur; that class wants
 recapture with the subject held still). Writes class id `0` as a placeholder;
 `combine_for_upload.py --classes` rewrites it from the class order.
 
-Then flatten + resize + zip:
+Then combine → split → zip (steps 5–6 above):
 ```bash
-python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/g2_vision_library/upload_v3
-# resize every jpg to 224 (SSCMA/YOLO train at 192; 224 keeps a margin, shrinks the zip < 10 MB),
-# drop unlabelled positives, keep negatives, then either:
-#   YOLO path  -> the inline images/{train,val}+labels/{train,val} splitter (in this session's scratchpad build_* scripts / g2_yolov8 notebook cell 4)
-#   SSCMA path -> tools/yolo_to_coco_zip.py <flat_dir> <you>,dog,cat --out custom_data_coco.zip
+python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes <you>,dog,cat \
+  --out ~/Desktop/g2_vision_library/upload_vN
+python tools/gv2/split_yolo_dataset.py ~/Desktop/g2_vision_library/upload_vN --classes <you>,dog,cat \
+  --imgsz 224 --out ~/Desktop/g2_vision_library/custom_data_yolo_vN.zip
 ```
+`split_yolo_dataset.py` resizes (224; train runs at 192, the margin keeps the
+zip small), does the seeded class-stratified train/val split, and carries
+negatives through as background. (The dropped SSCMA path used
+`tools/yolo_to_coco_zip.py` instead — not needed now.)
 
 `tools/vision_diag.py <port> --secs 40` — headless: pulls raw device boxes,
 applies score-floor + NMS + top-K, flags "PLANTED" box locations (fire every
@@ -250,11 +246,15 @@ there's no reason to leave them on a third-party VM once the model is built.
 
 ## Adding `<spouse>` later (the 4-class model)
 
-Once a 3-class model works on the device: capture `<spouse>` (~140 raw, same
-routine — `capture-session-checklist.md`), `g2neg`/curate/`g2promote <spouse>`,
-then `autobox_coco.py <spouse-folder> --coco-class person`, then rebuild the
-dataset zip with `--classes <you>,<spouse>,dog,cat` (id order is append-only,
-`combine_for_upload.py` rewrites every label from that order), retrain with the
-**same recipe** (`ultralytics==8.2.8`, `nc: 4`), export locally via the recipe
-above, reflash, then **run the Cleanup step**. `ledge` still waits for the G2
-camera mount.
+Run the **Full process** table again, changed only at:
+- step 1–3: capture `<spouse>` (~140 raw, `capture-session-checklist.md`),
+  `g2neg`/curate/`g2promote <spouse>`
+- step 4: `autobox_coco.py <spouse-folder> --coco-class person`
+- steps 5–6: `--classes <you>,<spouse>,dog,cat` (id order is append-only —
+  `combine_for_upload.py` + `split_yolo_dataset.py` rewrite/read every label
+  from that order; the existing `<you>`/`dog`/`cat` frames don't change)
+- step 7: notebook `nc: 4` (the split's `data.yaml` already carries it)
+- step 9: `export_yolov8_gv2.sh best.pt <calib_dir> 4 <you>,<spouse>,dog,cat`
+- step 12: Cleanup, as always.
+
+`ledge` still waits for the G2 camera mount.
