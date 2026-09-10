@@ -13,6 +13,13 @@ with them:
 As with voice/memory, every hardware-specific piece is behind an interface with
 a mock, so it's all testable now.
 
+**Model status:** a custom **3-class detector** (a household member + `dog` +
+`cat`) is trained and running on the actual camera —
+`docs/research/grove-vision-v2-custom-model.md` (the reproducible recipe) and
+`docs/research/capture-progress.md` (the improvement plan). Still needed: an
+obstacle / desk-edge detector (the edge one feeds `CliffGuard`), which is gated
+on the camera being physically mounted on the frame.
+
 ## Modules
 
 | File | Role |

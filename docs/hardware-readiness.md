@@ -92,12 +92,13 @@ core / audio / dev. Fully `.env`-driven (`.env.example` documents every setting)
 
 ### Tests
 
-`pi_pipeline/tests/` — **88 pytest tests, all green**, no network / audio / API
-key. Covers the skill catalogue, the conversation parse / tool-ack / retry
-paths (stub Anthropic client), the memory store / recall / decay / temporal
-filter, the serial command builders + safety, the vision detection model +
-avoidance reflex + terrain feature, and the personality + behavior layers.
-Run: `pi_pipeline/.venv/bin/pytest`.
+`pi_pipeline/tests/` — **413 green (+1 skipped without an API key)**, no network
+/ audio required. Covers the skill catalogue, the conversation parse / tool-ack
+/ retry paths (stub Anthropic client), the memory store / recall / decay / web
+UI, the serial builders + safety, the vision feed + avoidance + cliff guard,
+the behaviour driver + bindings + state machines, the gait guards (thermal /
+jam / carpet / speed estimate), diagnostics + watchdog, the supervisor, and
+personality + character toggle. Run: `pi_pipeline/.venv/bin/pytest`.
 
 ---
 
@@ -209,21 +210,25 @@ sync on the Pi (`git pull`).
 
 ---
 
-## Camera-gated backlog — queued up for tomorrow
+## Camera-gated backlog
 
-Everything across the docs that was blocked on "needs the camera," in the order
-it becomes reachable:
+Everything that was blocked on "needs the camera," in the order it becomes
+reachable. The camera itself is here and working:
 
-**Reachable with just the camera (start tomorrow, per the checklist above)**
-- [x] Verify the live detection format — done 2026-09-05 (centre coords, 240 px;
-  `feed.py` auto-starts inference now). See the checklist above.
-- Calibrate `AvoiderConfig` (`vision/avoidance.py`) against real detections
-- Calibrate `TerrainFeatureConfig` (`vision/terrain_feature.py`) — the walk
-  policy's forward-terrain-signal constants
-- Train + deploy the first custom SenseCraft model
-- **B15 — recognize household members**: start photographing + labelling now;
-  the bond/disposition layer in `pi_pipeline/personality/` is already built and
-  waiting for real detections
+**Done**
+- [x] Verify the live detection format — 2026-09-05 (centre coords, 240 px).
+- [x] First custom model trained + deployed — a single-class face detector
+  (2026-09-06), then a **working 3-class model** (household member + dog + cat,
+  2026-09-09) — `docs/research/grove-vision-v2-custom-model.md`.
+
+**Reachable with the camera (bench, un-mounted)**
+- Improve the 3-class model — the `vision_diag` logging pass → shot list →
+  recapture → retrain (`docs/research/capture-progress.md`); add a 4th class.
+- Calibrate `AvoiderConfig` (`vision/avoidance.py`) against real detections.
+- ~~Calibrate `TerrainFeatureConfig`~~ — moot; vision-in-the-gait was ruled out.
+
+**Gated on the camera being MOUNTED on the frame (real POV)**
+- `CliffGuard` desk-edge classifier (B16) and the obstacle / small-object classes.
 
 **B16 — `CliffGuard` desk-edge classifier — DEFERRED by the user 2026-09-05
 until the camera is mounted on the Bittle frame.** Still #1 priority the moment

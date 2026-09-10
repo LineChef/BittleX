@@ -24,6 +24,13 @@ A bare name means level `1.0`. Unknown names are warned about and skipped (a
 config from a newer build still loads on an older one). Empty ⇒ the neutral
 personality: base prompt unchanged, neutral behaviour params.
 
+**Character mode (opt-in, off by default).** `G2_CHARACTER=gir` turns on the
+`gir` "chaotic little robot" manner (pastiche, no show quotes; a task-guard at
+every level) at `G2_CHARACTER_LEVEL` (default `0.4`); an explicit `gir=<level>`
+in `G2_TRAITS` overrides it. In the voice loop it's also toggleable at runtime —
+"enable gir mode" / "disable gir mode" / "set gir to 70" — and that choice
+persists to `<state dir>/character.json`, which outranks the env var.
+
 ```
 python -m pi_pipeline.personality                 # show what G2_TRAITS resolves to
 python -m pi_pipeline.personality "curiosity=0.9" # …with an override
@@ -86,8 +93,10 @@ Explorer / greeting layer is a separate reviewed change.
 2. Add it to `REGISTRY` in `traits.py`.
 3. Set its level in `G2_TRAITS`.
 
-Nothing else changes. Candidate next traits: `playfulness`, `caution`,
-`affection`, `independence` — each mostly a `bias()` + a `prompt_fragment()`.
-The behaviour-idea backlog items **B4** (expressive body language), **B5**
-(chirp vocabulary), and **B6** (mood from memory) all plug in through the `cues`
-channel and `BehaviorParams`.
+Nothing else changes. Concrete traits so far: `curiosity`, `gir`. Candidates:
+`playfulness`, `caution`, `affection`, `independence`.
+
+Related pieces: **B5** chirp vocabulary is `behavior/chirps.py` (a `cues`-channel
+consumer); **B6** mood-from-memory is `mood.py` here (`MoodModel` → a
+`phrasing_hint()` for the system prompt + `idle_bias()` for `IdlePosture`);
+**B4** expressive body language still needs Skill Composer + hardware.

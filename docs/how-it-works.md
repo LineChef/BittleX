@@ -39,8 +39,16 @@ straight tracking, handles small obstacles and light shoves). It **cannot** do
 dramatic saves or get back up after tipping over — the robot physically lacks the
 joints for that (no roll-axis actuation, weak leg servos). So the learned walk is
 **paused** until it can be compared head-to-head against Petoi's built-in scripted
-walk on real hardware; if it holds up, work resumes to feed *vision* into it so
-the robot can anticipate terrain rather than just react to it.
+walk on real hardware.
+
+Baking *vision* into the walk policy was tried (four training campaigns) and
+**ruled out** — a policy that can see forward learned to plow through obstacles,
+not brace for them. Perception-assisted walking is instead a layer *above* the
+gait: a fast reflex that slows the speed command near an obstacle, plus scripted
+"step over / halt / back out" keyframe moves the vision layer picks — with the
+learned walk left frozen. That whole direction is on the back burner until G2
+gets a real forward depth sensor (the current camera detects *what* it sees, not
+*how far*).
 
 ---
 
@@ -61,8 +69,8 @@ also able to move in response.
 3. **Think** — the text goes to Claude via the API, together with any relevant
    *memory*. Claude replies with something to say, and optionally an instruction
    to perform a physical skill.
-4. **Speak** — the reply is turned into speech on-device (Piper, currently the
-   "Alan" British voice) and played.
+4. **Speak** — the reply is turned into speech on-device (Piper; default voice
+   `en_US-ryan-low`, the light one the Pi Zero 2 W can afford) and played.
 5. **Act** — if Claude asked for a skill (sit, wave, walk), that goes out over
    the *link*.
 
@@ -125,15 +133,18 @@ detection list.
    handed to Claude (through the voice layer's callable), so G2 can describe its
    surroundings out loud when asked.
 
-**Where it runs today:** against a mock detection feed — a scripted "obstacle
-approaching" scenario — so the avoidance logic and the description path are fully
-testable now. The real camera's message format has been confirmed and the parser
-for it is written.
+**Where it stands:** a custom 3-class detection model (a household member + dog +
+cat) is trained and **running on the actual camera** — the hard part was that the
+camera's firmware is frozen at Jan 2025 and broke every modern export toolchain
+until we pinned an older one (`docs/research/grove-vision-v2-custom-model.md`).
+The avoidance reflex and the "what do you see" path are wired against that feed
+(and a mock feed for tests). What's left is an obstacle / table-edge detector
+(the desk-edge one is the `CliffGuard` reflex's input) and threshold tuning —
+those need the camera physically mounted on the frame for the real point of view.
 
-**Later:** once vision is working on hardware, feed the detections into the
-*walking* policy so the robot can plan around obstacles it sees rather than only
-reacting to ones it bumps. That is the main thing a learned gait can do that a
-scripted one cannot.
+**Note:** this is *recognition*, not navigation. Feeding detections into the
+*walking policy* was tried and ruled out (see Walking, above) — vision assists
+walking as a reflex layer on top of the frozen gait, not inside it.
 
 ---
 

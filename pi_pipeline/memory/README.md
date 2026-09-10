@@ -47,7 +47,13 @@ python -m pi_pipeline.memory forget "Their name is Sam."   # by text or #id
 python -m pi_pipeline.memory wipe --yes
 ```
 
-Or open it directly: `sqlite3 pi_pipeline/memory/data/g2_memory.db`.
+Or a local web UI (stdlib only, binds 127.0.0.1):
+
+```bash
+python -m pi_pipeline.memory.webui        # http://127.0.0.1:8899
+```
+
+Or open the DB directly: `sqlite3 pi_pipeline/memory/data/g2_memory.db`.
 
 **In conversation:** saying **"forget that"** deletes everything recorded since
 the wake word (`Memory.mark_session_start` / `forget_session`, driven by
@@ -57,4 +63,6 @@ the wake word (`Memory.mark_session_start` / `forget_session`, driven by
 
 - Semantic recall (embeddings) if FTS keyword matching feels too literal —
   weigh the model/latency cost on the Pi first.
-- A small web UI to browse/prune memory (per the plan).
+- Exercise it across real multi-session conversations once the voice loop runs
+  live, and re-check whether recall quality / the fact cap / decay ordering feel
+  right on genuine history.

@@ -10,15 +10,16 @@ Every stage is an interface with a dev implementation and a robot implementation
 
 | File | Role |
 |---|---|
-| `conversation.py` | Anthropic client, rolling history, `perform_skill` tool. Turns a reply into `AssistantTurn(speech, actions)`. Has the seam for Phase 9 memory (`send(..., memory_context=)`). |
+| `conversation.py` | Anthropic client, rolling history, `perform_skill` + `remember` tools. Turns a reply into `AssistantTurn(speech, actions, facts)`. Memory seam (`send(..., memory_context=)`); `set_personality()` swaps the persona mid-session. |
 | `skills.py` | Curated OpenCat skill catalogue + serial command mapping (`walk_forward` → `kwkF`). |
 | `actuator.py` | `MockActuator` (logs) / `SerialActuator` (BiBoard over serial). |
-| `tts.py` | `MacTTS` (`say`) / `PiperTTS` / `PrintTTS`. |
-| `stt.py` | `TextSTT` (stdin) / `VoskSTT` (mic). |
+| `tts.py` | `MacTTS` (`say`) / `PiperTTS` (+ `synth_to_wav`) / `PrintTTS`. |
+| `stt.py` | `TextSTT` (stdin) / `VoskSTT` (mic; + `transcribe_wav`). |
 | `wake_word.py` | `AlwaysAwake` / `VoskWakeWord`. |
-| `commands.py` | spoken session/privacy commands the loop handles itself (no Claude call): "forget that", "go to sleep". |
+| `commands.py` | spoken commands the loop handles itself (no Claude call): "forget that", "go to sleep", "enable/disable gir mode". |
 | `cues.py` | listening / thinking / speaking indicator (log now; buzzer/posture later). |
 | `loop.py` | the orchestrator. |
+| `livecheck.py` | real-API end-to-end check (`python -m pi_pipeline.voice.livecheck`; needs a key). |
 | `__main__.py` | CLI entrypoint. |
 
 ## Run it
@@ -82,9 +83,11 @@ candidates in `models/piper/`:
 | `en_US-hfc_male-medium` | male, very natural / "real person", personality-neutral |
 | `en_GB-alan-medium` | British male, composed, a bit of gravitas — fun for a small robot |
 
-Current default: **`en_GB-alan-medium`**. Change it by setting `PIPER_MODEL_PATH` in `.env`, e.g.
-`PIPER_MODEL_PATH=models/piper/en_US-ryan-medium.onnx`. To try others, download
-`<name>.onnx` + `<name>.onnx.json` from the repo above into `models/piper/`.
+Current default: **`en_US-ryan-low`** (the Pi Zero 2 W-safe tier). On a dev
+machine, set `PIPER_MODEL_PATH` in `.env` to a `medium` voice for nicer audio,
+e.g. `PIPER_MODEL_PATH=models/piper/en_US-ryan-medium.onnx`. To try others,
+download `<name>.onnx` + `<name>.onnx.json` from the repo above into
+`models/piper/`.
 
 ## Models for voice mode
 
@@ -108,8 +111,8 @@ Piper `x_low` voices are gone from the current `rhasspy/piper-voices` repo, so
 answer is a longer "thinking" cue over the synth gap / shorter replies /
 pre-synth'd stock phrases — not a lighter model.
 
-The Pi's `.env` should set `PIPER_MODEL_PATH=models/piper/en_US-ryan-low.onnx`
-(the code default `en_GB-alan-medium` is for the dev Mac).
+`en_US-ryan-low` is already the code default, so the Pi needs no override; a dev
+machine can point `PIPER_MODEL_PATH` at a `medium` voice for nicer audio.
 
 `sounddevice` needs PortAudio — macOS `brew install portaudio`, Pi
 `sudo apt install libportaudio2`.

@@ -131,6 +131,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python run_gait.py --openloop` | Play `wkf_ref.npy` open-loop (on a cradle) — verify servo signs, set `deploy_map.SERVO_SIGN` |
 | `python run_gait.py --cmd 0.10` | The learned gait on the real robot (firmware balance off) |
 | `python run_gait.py --cmd 0.10 --keep-firmware-balance --log run.csv` | + firmware gyro-assist underneath, logging per-tick for `sysid_replay` |
+| `python run_gait.py --cmd 0.10 --carpet` | + carpet-slip detector (BOOST_CMD / `kcarpetF` hand-off). Inert until body-X accel is plumbed through `parse_imu_line` + thresholds tuned on real carpet |
 | `python sysid_collect.py --log sysid.csv` | Policy-free calibration sequence (loaded poses + slow wkF) → log for `sysid_replay` |
 | `python h1_score.py --template > runs.json` then `python h1_score.py --from runs.json` | Score the H1 head-to-head from measured numbers → verdict |
 
@@ -141,6 +142,8 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python reference_gait/build_wkf_reference.py` | Rebuild `wkf_ref.npy` from `InstinctBittleESP.h` |
 | `python reference_gait/verify_wkf_reference.py` | Score sign/mirroring variants by open-loop forward walk |
 | `python reference_gait/verify_wkf_reference.py identity --render` | Render the open-loop reference playback to a GIF |
+| `python reference_gait/build_skill_reference.py rc rl` | Decode any OpenCat skill from `InstinctBittleESP.h` → `<name>_ref.npy` |
+| `python reference_gait/verify_getup_reference.py --gif --sheet` | Replay the firmware `rc`/`rl` get-up in PyBullet (H9). 0/2 recover — see `docs/rl-runs/getup-sim-replay.md` |
 
 
 ## Companion pipeline & camera (`pi_pipeline/`)
@@ -196,12 +199,16 @@ Multi-class capture library: `docs/research/capture-progress.md`. Point capture 
 | `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
 | `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
 | `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
+| `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
+| `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
+| _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
 
 **Memory / config / diagnostics**
 
 | Command | Does |
 |---|---|
-| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory |
+| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
+| `python -m pi_pipeline.memory.webui` | local web UI to browse / prune memory — `http://127.0.0.1:8899` |
 | `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
 | `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |
 | `g2diag [list\|summarize sid\|tail sid\|replay sid]` | read a diagnostics session |
