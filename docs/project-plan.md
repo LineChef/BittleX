@@ -968,22 +968,25 @@ excited-hop-on-recognition are all wired *inside* the driver now — see
 `docs/behavior-ideas.md` for the per-item status (a few sub-items, e.g. the
 breathing-bob motion and LED life-signs, are still caller-side).
 
-- [ ] **CARPET MODE — important; G2 stalls on carpet blind-forward.**
-      `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested) is the decision
-      logic: commanded vs. measured forward speed → `NORMAL` / `BOOST_CMD`
-      (raise the speed command to punch through pile) / `CARPET_GAIT`
-      (hand off to the firmware `kcarpetF`; `carpet_ref.npy` decoded for sim).
-      Remaining:
-  - **A forward-speed estimate on hardware** — the detector needs "measured
-    speed". Options: integrate IMU accel (drifty), vision optical flow off the
-    camera feed, or a fixed-distance timed check. Pick and build one.
-  - **Runtime wiring in the gait loop** (`gait/run_gait.py` or the behaviour
-    loop): call `det.update(cmd, measured)` each tick; on `BOOST_CMD` apply
-    `det.cmd_with_boost()` to `pol.set_command()`; on `CARPET_GAIT` pause the
-    residual policy and send `opencat.CARPET_WALK`, resume on `NORMAL`
-    (via-stance blend, same as a SkillSwitch hand-off).
-  - **Tune the thresholds on real carpet** (`boost_below`, `carpet_below`,
-    `enter_s`, `boost`) — the defaults are guesses.
+- [~] **CARPET MODE — decision logic + runtime wiring done (2026-09-10);
+      hardware-gated on the accel source + threshold tuning.**
+      `pi_pipeline/gait/carpet.py` (`CarpetDetector`, tested): commanded vs.
+      measured forward speed → `NORMAL` / `BOOST_CMD` (raise the speed command
+      to punch through pile) / `CARPET_GAIT` (hand off to firmware `kcarpetF`).
+  - **Forward-speed estimate — BUILT:** `pi_pipeline/gait/speed_estimate.py`
+    `ZuptSpeedEstimator` — integrates body-X accel with a per-gait-cycle ZUPT
+    bias correction + a leak (steady walking ⇒ ∫accel over a cycle ≈ 0). Pure
+    logic, 6 tests. **Accel not plumbed yet:** `parse_imu_line` returns
+    ypr+gyro only; body-X accel needs the `--imu-format 6axis` stream. Passing
+    `accel_fwd=None` makes it inert, so `--carpet` is safe to leave off.
+  - **Runtime wiring — DONE:** `run_gait.py --carpet` (default off) runs the
+    estimator + detector each tick; `BOOST_CMD` → `pol.set_command(cmd_with_boost)`,
+    `CARPET_GAIT` → send `opencat.CARPET_WALK` and skip the policy send, re-anchor
+    the policy (`STAND` + `pol.reset`) on return to `NORMAL`. `carpet.mode` diag
+    events on transitions.
+  - **Still hardware-gated:** plumb body-X accel through `parse_imu_line`; tune
+    `boost_below` / `carpet_below` / `enter_s` / `boost` on real carpet; tune
+    `ZuptSpeedEstimator`'s `leak_hz` / `bias_lerp`.
   - **Optional, better:** retrain the walk with `CARPET` domain-randomisation so
     the RL policy itself handles pile (backlog H10 covers the carpet sysid);
     then `CARPET_GAIT` hand-off is only for deep pile.
