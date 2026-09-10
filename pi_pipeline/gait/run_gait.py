@@ -357,7 +357,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on"))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
-                   + ",guard_state,hottest_j,hottest_frac,duty_s\n")
+                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s\n")
 
     if disable_firmware_balance:
         _send(lk, "g")            # toggle firmware gyro assist OFF -> policy has full control
@@ -459,7 +459,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                               roll=round(r, 4), pitch=round(p_, 4), yaw=round(y, 4),
                               gx=round(gx, 4), gy=round(gy, 4), gz=round(gz, 4),
                               step_ms=round(lat[-1] * 1e3, 2),
-                              guard=snap.state, hot_j=snap.hottest_j,
+                              guard=snap.state, hot_j=snap.hottest_j, hot_tier=int(snap.hottest_tier),
                               hot_frac=round(snap.hottest_frac, 3), duty_s=round(snap.duty_s, 1),
                               **{f"j{k}": int(v) for k, v in enumerate(joint_deg)})
                 if diag is not None and snap.state != _guard_prev:
@@ -491,10 +491,11 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                     t_next = time.perf_counter()
 
                 if logf:
-                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s,%s,%d,%.3f,%.0f\n" % (
+                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s,%s,%d,%d,%.3f,%.0f\n" % (
                         time.perf_counter() - t_start, r, p_, y, gx, gy, gz,
                         ",".join(str(int(v)) for v in joint_deg),
-                        snap.state, snap.hottest_j, snap.hottest_frac, snap.duty_s))
+                        snap.state, snap.hottest_j, int(snap.hottest_tier),
+                        snap.hottest_frac, snap.duty_s))
             t_next += dt
             slack = t_next - time.perf_counter()
             if slack > 0:
