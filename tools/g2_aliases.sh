@@ -203,7 +203,7 @@ g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status |
 g2docs() {
   cat <<'EOF'
 Key docs (in docs/):
-  SOLO.md                              start here if carrying on without Claude
+  guides/SOLO.md                       start here if carrying on without Claude
   guides/train-vision-model.md              full camera-model walkthrough
   vision/capture-checklist.md   the capture routine + standard pose set
   vision/person-recognition.md       recognition design + "G2, meet X" enrollment

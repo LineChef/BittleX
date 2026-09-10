@@ -150,7 +150,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 
 Shell helpers: `tools/g2_aliases.sh`. Load with
 `source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh`
-(add to `~/.zshrc` to make permanent). `g2help` prints the list; `docs/SOLO.md`
+(add to `~/.zshrc` to make permanent). `g2help` prints the list; `docs/guides/SOLO.md`
 is the solo-operation guide; `docs/guides/train-vision-model.md` is the full
 camera-model walkthrough; `docs/vision/capture-checklist.md` has the
 standard pose set.

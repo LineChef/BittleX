@@ -5,7 +5,7 @@
 | [`project-plan.md`](project-plan.md) | The living roadmap and decision log — read before starting work in any area. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
 | [`behavior-ideas.md`](behavior-ideas.md) | Backlog of behaviours to explore (IDs B1…) — the "what next" list. |
-| [`SOLO.md`](SOLO.md) | Working-solo notes. |
+| [`guides/SOLO.md`](guides/SOLO.md) | Working-solo notes. |
 
 ## `guides/` — how to do a thing
 
