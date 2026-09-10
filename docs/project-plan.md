@@ -82,8 +82,9 @@ The PiSugar **S** gives no battery %, voltage, or low-battery signal (only
   toggle / disable-unused peripherals) and `behavior/idle_posture.py` (idle-REST
   staged descent — sit, then lie down, with life signs). Battery-*aware*
   behaviour (rest sooner on low charge) is blocked on the estimate above.
-  On-demand vision + full sleep mode are queued for a focused design session
-  (B18). Full analysis: [`research/pi-power.md`](research/pi-power.md).
+  **Sleep-mode FSM built 2026-09-10** (`behavior/sleep_mode.py`). On-demand
+  vision (the two-stream safety/rich split) is still a design task (B18). Full
+  analysis: [`research/pi-power.md`](research/pi-power.md).
 - **Later upgrade for a real signal (not just a timer):** an ADC on a BiBoard
   Grove analog pin (G3/G4) reading the pack voltage, so the warning is based on
   actual cell state. Optional; the timer is enough to start.
@@ -179,12 +180,15 @@ leave us without a shippable gait — worst case is a wasted overnight.
   *firmware* gait. Next steps are ONNX export + Pi bring-up, then that
   head-to-head. Learned-gait work otherwise resumes only when
   perception-in-the-loop becomes active — see the **Phase 8 Target capability**.
-- **Pre-hardware robustness push — ACTIVE (from 2026-09-03).** While the frame
-  ships (10–25 days out), reopening gait training to harden it for *walk-anywhere*
-  use — G2 will not always be on flat ground. `run20m_ppo` stays the frozen
-  deployment base; these are reversible continuations, kept only if they net
-  capability per the bar (see [`feedback_training_capability_bar`] / the
-  refinement regimen).
+- **Pre-hardware robustness push — CONCLUDED (see the 2026-09-05 update below +
+  the hardware-gated backlog).** Reopened 2026-09-03 to harden the walk for
+  *walk-anywhere* use; every finetune-continuation on the new course collapsed
+  (one geometry bug, fixed), and the fresh from-scratch `run20m_newcourse` 20M
+  came back a **negative result** — `run20m_ppo` stays the frozen base. Learned
+  vision-in-the-gait was then ruled out across Phases A–F. **Sim locomotion work
+  is done pending the real-robot H1 head-to-head.** The remaining scenario ideas
+  live in [`docs/rl-runs/hardware-gated-training-backlog.md`](rl-runs/hardware-gated-training-backlog.md),
+  each with a trigger. Detail of the push itself is kept below for history.
   - **Rough-terrain training.** The base recipe's `ROUGH_TERRAIN` was ~1.8 mm
     amplitude — cosmetic. Built a proper rough course: `CARPET`, a single
     `GEOM_HEIGHTFIELD` body (no scattered obstacles), 13 mm multi-octave bumps +
@@ -576,28 +580,50 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
       from `model.predict` across 5 commands × 251 steps.
 - [x] **Deployment-safety infrastructure (2026-09-05), built + unit-tested,
       hardware-validation pending:**
-  - `pi_pipeline/gait/thermal_guard.py` — conservative servo thermal guard on
-    `run_gait.py`. Estimates per-joint heat from commanded motion (no P1S
-    sensor), staged: WARN speech ("I'm getting kinda tired…") → Petoi-style
-    per-joint soft cutback → lie-down-until-cool. All constants placeholders;
-    [`research/servo-thermal.md`](research/servo-thermal.md) "Retuning checklist".
-  - `pi_pipeline/diag/` — **Phase 1 done.** Per-session JSONL event log + a
-    ~15 s black-box ring buffer flushed on any incident + session manifest +
-    `summarize/replay/tail/sync`. `run_gait` + `serial_link` (`link.lost` /
-    `link.reconnect`) emit taxonomy events; behaviour state machines expose
-    `last_reason` and `behavior/diag_bridge.emit_tick()` logs `BehaviorDriver`
-    transitions. Phase 2 (watchdog/heartbeat, dump-on-incident wiring, battery +
-    Pi-thermal sampling) is at bring-up.
+  - `pi_pipeline/gait/thermal_guard.py` — servo thermal guard on `run_gait.py`.
+    Estimates per-joint heat from commanded motion (no P1S sensor).
+    **Layer 1+2 done 2026-09-10:** 3-tier per-joint indicator (`ThermalTier`
+    GREEN/AMBER/RED at 50/85 % of trip) + per-joint spoken warning; new
+    `behavior/thermal_governor.py` (`ThermalGovernor`) — AMBER throttles
+    speed + softens gait, RED holds a folded cooldown pose. All constants
+    placeholders; [`research/servo-thermal.md`](research/servo-thermal.md).
+  - `pi_pipeline/diag/` — **Phase 1 + the non-hardware parts of Phase 2 done
+    (2026-09-10).** JSONL event log + black-box ring + manifest +
+    `summarize/replay/tail/sync`; taxonomy events from `run_gait` / `serial_link`
+    / the behaviour driver. Phase 2: `diag/watchdog.py` (heartbeat +
+    stall→black-box-flush→safe-stop, wired into `run_gait`),
+    `diag.incident()` + expanded auto-flush names, `install_excepthook()`,
+    manifest finalize on close, `diag/sysmon.py` (`# HARDWARE` battery /
+    Pi-thermal stubs). Left: validating the black box on a real fall / link drop.
     [`research/hardware-diagnostics.md`](research/hardware-diagnostics.md).
-  - `pi_pipeline/power/` — the zero-risk power levers (CPU governor, Wi-Fi
-    power-save toggle, disable-unused peripherals). idle-REST built
-    (`behavior/idle_posture.py`); on-demand vision + sleep mode pending a
-    focused session. [`research/pi-power.md`](research/pi-power.md).
+  - `pi_pipeline/power/` — zero-risk power levers (CPU governor, Wi-Fi
+    power-save, disable-unused peripherals). idle-REST built; **sleep-mode FSM
+    built 2026-09-10** (`behavior/sleep_mode.py` — curl + vision off +
+    power-save, wakes on IMU/wake-word/sound). Driver-side wiring of both
+    pending. [`research/pi-power.md`](research/pi-power.md).
+  - `pi_pipeline/util/supervisor.py` — **new 2026-09-10.** `Supervisor` +
+    `WatchdogPolicy`: restart-on-death/hang with exponential backoff + a
+    give-up ceiling, for the audio / serial worker threads on hardware.
+  - `pi_pipeline/behavior/bindings.py` — **new 2026-09-10.** `DriverBindings`
+    maps every `BehaviorDriver` `Effect` onto an optional sink; `MockBindings`
+    lets the whole driver loop run end-to-end in CI. Real sink impls +
+    input plumbing are the on-hardware step.
+  - `pi_pipeline/gait/jam_guard.py` — **new 2026-09-10.** `JamGuard` (B9a):
+    vision-free servo-strain jam reflex (bump-and-turn). Constants HW-gated.
+  - `pi_pipeline/gait/speed_estimate.py` + `run_gait.py --carpet` — **new
+    2026-09-10.** `ZuptSpeedEstimator` (IMU-accel + per-cycle ZUPT) feeds
+    `CarpetDetector`; BOOST_CMD / firmware-`kcarpetF` hand-off wired. Body-X
+    accel plumbing through `parse_imu_line` + threshold tuning are HW-gated.
 - [ ] **On hardware:** wire Pi↔BiBoard, `run_gait.py --probe-imu` (fix
       `parse_imu_line` if the format differs) → `--openloop` (verify servo
       signs) → `--cmd` (learned gait) → the H1 head-to-head vs firmware `kwkF`.
 - The older `ger01d/opencat-gym-sim2real` firmware path is **not used** — the
   stock OpenCat `m` command + `V` IMU stream carry the loop; no firmware flash.
+- **No firmware fork (decided 2026-09-10).** `pi_pipeline` stays an application
+  layer on **stock** OpenCatEsp32 over serial — that already exposes the
+  keyframe library, gyro-balance, IMU exception reflexes, and calibration. New
+  skills go via Skill Composer ("Newbility" slots), not a rebuild. Fork only
+  narrowly + later if a capability genuinely can't be done Pi-side.
 - [ ] Expect a real sim-to-real performance gap — normal, not failure.
 - [ ] Iterate: adjust the reward and/or retrain in sim based on real-hardware
       behavior, redeploy.
@@ -609,14 +635,17 @@ remaining work is hardware-gated.** Full plan + state: `docs/gait-deployment.md`
 
 ## Phase 7 — Voice + Claude integration
 
-**Status:** the pipeline is scaffolded and runs end-to-end on a dev machine in
-text mode — `pi_pipeline/voice/` (own venv, `pi_pipeline/requirements.txt`).
-`wake → STT → Claude → TTS → skill` with every hardware-specific stage behind an
-interface (`MockActuator`/`SerialActuator`, `MacTTS`/`PiperTTS`,
-`TextSTT`/`VoskSTT`, `AlwaysAwake`/`VoskWakeWord`). Claude replies parsed into
-spoken text + `perform_skill` tool calls; a curated OpenCat skill catalogue maps
-to serial commands. Offline tests cover the parse path. Remaining items below are
-the audio backends (deps + models) and everything hardware.
+**Status:** the pipeline runs end-to-end on a dev machine in text mode —
+`pi_pipeline/voice/` (own venv). `wake → STT → Claude → TTS → skill`, every
+hardware-specific stage behind an interface (`MockActuator`/`SerialActuator`,
+`MacTTS`/`PiperTTS`, `TextSTT`/`VoskSTT`, `AlwaysAwake`/`VoskWakeWord`). Claude
+replies parsed into spoken text + `perform_skill` / `remember` tool calls.
+**Audio backends installed + validated offline (2026-09-10)** — Piper synth →
+WAV → Vosk transcribe round-trips at 94 % word recall (`benchmark_pi.py`). A
+character mode (`gir`, opt-in, toggleable by voice) rides on the personality
+trait system. Remaining: a live-API run (needs a key —
+`python -m pi_pipeline.voice.livecheck`), real mic/speaker on the Pi, and the
+Pi Zero 2 W voice-stack benchmark.
 
 - [x] **Config-driven Claude client** — `pi_pipeline/config.py` (env: key, model,
       max tokens, timeout, history depth, persona) + `voice/conversation.py`

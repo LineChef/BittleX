@@ -83,7 +83,10 @@ class Settings:
     # spelled the way Vosk transcribes it, not "G2"
     wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "gee two"))
     vosk_model_path: str = field(default_factory=lambda: _env("VOSK_MODEL_PATH", "models/vosk"))
-    piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_GB-alan-medium.onnx"))
+    # Default = the Pi Zero 2 W-safe 'low' tier (fetch_models.sh's primary). On a
+    # dev machine, override PIPER_MODEL_PATH in .env to a 'medium' voice if you
+    # want it to sound nicer -- the Pi can't afford one.
+    piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_US-ryan-low.onnx"))
     stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.2))
     # After a reply, keep the mic open this long for a follow-up before requiring
     # the wake word again. Resets on every exchange, so a normal back-and-forth
