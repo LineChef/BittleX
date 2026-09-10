@@ -41,6 +41,39 @@ def test_composes_in_a_personality_system_prompt():
     assert "sidekick" in out.lower()
 
 
+class _FakeSettings:
+    def __init__(self, traits="curiosity=0.8", character="", level=0.4):
+        self.traits_spec = traits
+        self.character_spec = character
+        self.character_level = level
+
+
+def test_character_mode_is_off_by_default():
+    per = Personality.from_settings(_FakeSettings())
+    assert not any(t.name == "gir" for t in per.traits)
+
+
+def test_g2_character_turns_gir_on_at_default_level():
+    per = Personality.from_settings(_FakeSettings(character="gir"))
+    g = [t for t in per.traits if t.name == "gir"]
+    assert g and abs(g[0].level - 0.4) < 1e-9
+    # and curiosity is still there -- character composes, doesn't replace
+    assert any(t.name == "curiosity" for t in per.traits)
+
+
+def test_character_level_is_configurable():
+    per = Personality.from_settings(_FakeSettings(character="gir", level=0.75))
+    g = [t for t in per.traits if t.name == "gir"][0]
+    assert abs(g.level - 0.75) < 1e-9
+
+
+def test_explicit_g2_traits_entry_wins_over_g2_character():
+    per = Personality.from_settings(
+        _FakeSettings(traits="gir=0.95", character="gir", level=0.4))
+    g = [t for t in per.traits if t.name == "gir"][0]
+    assert abs(g.level - 0.95) < 1e-9
+
+
 def test_cues():
     assert "chirp_happy" in Gir(0.6).cues("greet")
     assert "excited_hop" in Gir(0.6).cues("greet")

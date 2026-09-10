@@ -9,8 +9,11 @@ only, never verbatim show dialogue**. Scaled by `level` (the 0..1 intensity
 dial): 0.2 = "a hint of quirk", 0.5 = "clearly a character", 0.85+ = "full
 chaos" (with an explicit note that it must still finish the actual task).
 
-Activate per-deployment: `G2_TRAITS="gir=0.4"`. (A `G2_CHARACTER=gir` alias
-could fold into this later; the trait is the mechanism.)
+**Opt-in, never the default.** Off unless turned on:
+  * `G2_CHARACTER=gir`               -> on at `G2_CHARACTER_LEVEL` (default 0.4)
+  * `G2_CHARACTER_LEVEL=0.7`         -> pick the intensity
+  * `G2_TRAITS="gir=0.9, ..."`       -> explicit; wins over G2_CHARACTER
+`personality.Personality.from_settings` folds `G2_CHARACTER` into the trait spec.
 """
 from __future__ import annotations
 
