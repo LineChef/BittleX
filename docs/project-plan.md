@@ -990,8 +990,11 @@ breathing-bob motion and LED life-signs, are still caller-side).
       roster as `DriverInputs.known_person_labels`; `bonds` stays un-imported).
       A "say hi" voice intent still needs a hook.
 - [x] **Idle-posture descent** — driven by `BehaviorDriver`; `kstr` is wired
-      into the WAKE choreography. Still open: `zz` (`opencat.SLEEP`) as a
-      deep-sleep variant of RESTING for sleep mode.
+      into the WAKE choreography. **Sleep mode** (the `zz` / `opencat.SLEEP`
+      deep-sleep below RESTING) has its FSM built 2026-09-10:
+      `pi_pipeline/behavior/sleep_mode.py` (`SleepMode`) — auto-sleep after long
+      RESTING, wake on IMU tap / wake word / loud sound, emits `ENTER_SLEEP`
+      (kzz + camera off + `power headless`) / `WAKE`. Driver wiring pending.
 - [ ] **INSPECT peer bow** — done + sim-validated (`buttUp_ref`, +22° nose-down);
       the earlier "author on hardware" caveat is resolved. Confirm on the real
       robot that the mounted camera's downward view actually improves the near

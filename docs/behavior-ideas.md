@@ -575,10 +575,15 @@ absence fires one excited hop. 11 tests, `last_reason` + `DIAG` effects for diag
       (IMU + gait state confirm), even the safety stream can idle — can't walk
       off a cliff standing still. Calibrate the detectable-range vs fps
       numbers once the camera is here.
-- [ ] **Sleep-mode state machine** — servos REST + vision off + governor down +
-      Wi-Fi power-save on. Builds on `IdlePosture` RESTING. Wake trigger =
-      **IMU** (tap/lift — always-on for balance anyway); optionally a
-      loud-sound threshold, or the wake word itself.
+- [~] **Sleep-mode state machine — LOGIC BUILT 2026-09-10.**
+      `pi_pipeline/behavior/sleep_mode.py` (`SleepMode`, 11 tests, pure FSM +
+      clock). AWAKE → DOZING → ASLEEP → ROUSING. Auto-sleeps after
+      `sleep_after_resting_s` of continuous `IdlePosture.RESTING` (person-present
+      blocks the *auto* path, not the explicit "go to sleep" command);
+      `min_sleep_s` anti-thrash; wakes on IMU tap / wake word / loud sound (the
+      last toggleable). Emits `ENTER_SLEEP` (caller: `kzz` + camera `Xc` +
+      `python -m pi_pipeline.power headless`) and `WAKE`. Still to wire: the
+      caller that runs those, in the behaviour driver (A8).
 - [x] **Mic privacy — DONE (decision + build, 2026-09-05).** The user weighed
       the always-on options and chose a **continuous wake word while G2 is
       powered on** — G2 is session-powered, not a 24/7 fixture, so the exposure
