@@ -93,8 +93,13 @@ Explorer / greeting layer is a separate reviewed change.
 2. Add it to `REGISTRY` in `traits.py`.
 3. Set its level in `G2_TRAITS`.
 
-Nothing else changes. Concrete traits so far: `curiosity`, `gir`. Candidates:
-`playfulness`, `caution`, `affection`, `independence`.
+Nothing else changes. Concrete traits so far: `curiosity`, `playfulness`, `gir`.
+Candidates: `caution`, `affection`, `independence`.
+
+`playfulness` is deliberately *distinct* from `curiosity` — curiosity notices
+novelty and **lingers** on it; playfulness is bouncy energy that **flits** and
+engages people. They pull against each other on `investigate_secs`, so a
+curious+playful G2 investigates but not for as long.
 
 Related pieces: **B5** chirp vocabulary is `behavior/chirps.py` (a `cues`-channel
 consumer); **B6** mood-from-memory is `mood.py` here (`MoodModel` → a
