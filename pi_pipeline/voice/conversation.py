@@ -82,12 +82,25 @@ class Conversation:
         self._client = anthropic.Anthropic(
             api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s
         )
+        self._base_system = cfg.system_prompt
         p = personality or Personality.from_settings(cfg)
-        self._system_prompt = p.system_prompt(cfg.system_prompt)
+        self._personality = p
+        self._system_prompt = p.system_prompt(self._base_system)
         if p.traits:
             log.info("personality: %s", p.describe())
         self._history: list[dict] = []
         self._pending_tool_results: list[dict] = []
+
+    @property
+    def personality(self) -> Personality:
+        return self._personality
+
+    def set_personality(self, p: Personality) -> None:
+        """Swap the personality mid-session (e.g. the user asks to enable a
+        character mode). Rebuilds the system prompt; history is kept."""
+        self._personality = p
+        self._system_prompt = p.system_prompt(self._base_system)
+        log.info("personality now: %s", p.describe())
 
     def _trim(self) -> None:
         max_msgs = max(2, self._cfg.history_turns * 2)

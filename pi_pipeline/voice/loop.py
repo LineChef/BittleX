@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import logging
 
+from ..personality import character_state
 from .actuator import Actuator
-from .commands import match_local_command
+from .commands import match_local_command, parse_character_command
 from .conversation import Conversation
+
+_DEFAULT_CHARACTER_LEVEL = 0.4
 from .cues import Cue
 from .stt import STT
 from .tts import TTS
@@ -69,6 +72,26 @@ class VoiceLoop:
         self._in_session = False
         self._cue.set("idle")
 
+    def _handle_character(self, cc) -> None:
+        """Toggle an opt-in character mode (e.g. 'enable gir mode'). Rebuilds the
+        personality on the live Conversation and persists it for next start."""
+        self._cue.set("speaking")
+        if cc is None:
+            self._tts.speak("I didn't catch which mode you meant.")
+            return
+        p = self._conv.personality
+        if cc.on:
+            lvl = cc.level if cc.level is not None else _DEFAULT_CHARACTER_LEVEL
+            self._conv.set_personality(p.with_character(cc.name, lvl))
+            character_state.save(cc.name, lvl)
+            log.info("character mode %s ON at %.2f", cc.name, lvl)
+            self._tts.speak(f"Okay, {cc.name} mode on.")
+        else:
+            self._conv.set_personality(p.without_character(cc.name))
+            character_state.clear()
+            log.info("character mode %s OFF", cc.name)
+            self._tts.speak(f"Okay, {cc.name} mode off.")
+
     def _one_turn(self) -> None:
         if not self._in_session:
             self._wake.wait()
@@ -103,6 +126,11 @@ class VoiceLoop:
                 self._tts.speak("Okay, I've forgotten that.")
             else:
                 self._tts.speak("There's nothing new to forget.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "character":
+            self._handle_character(parse_character_command(user_text))
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return
