@@ -42,6 +42,12 @@ def run_livecheck(cfg=settings) -> LiveCheckReport:
         r.lines.append("  no ANTHROPIC_API_KEY -- set it in .env")
         return r
 
+    lvl, msg = cfg.api_key_expiry_status()
+    if lvl == "expired":
+        r.check("api key not expired", False, msg)
+    elif msg:
+        r.lines.append(f"  NOTE: {msg}")
+
     conv = Conversation(cfg)
     r.lines.append(f"  model: {cfg.claude_model}   max_tokens: {cfg.claude_max_tokens}")
 

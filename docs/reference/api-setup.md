@@ -22,6 +22,12 @@ local, and can warn *before* the hard stop is hit). Do both.
 - [ ] **Bookmark the key's console page** so revoking a lost/compromised key is a
       2-minute job, not a search (ties to the lost-device hardening item in
       `pi-set-up.md` §9).
+- [ ] **If you set an expiry on the key**, also put that date in `.env` as
+      `ANTHROPIC_API_KEY_EXPIRES=YYYY-MM-DD`. G2 then logs a warning as it nears
+      (`G2_API_KEY_EXPIRY_WARN_DAYS`, default 30) and an error once it's past —
+      so an expired key is never a silent non-reply. **Built 2026-09-10**
+      (`config.api_key_expiry_status()`, surfaced at voice startup + in
+      `livecheck`). Reset both the console expiry and this date when you rotate.
 
 ## G2 side — local, faster, and can warn ahead of time — NOT YET BUILT
 

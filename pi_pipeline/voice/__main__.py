@@ -39,6 +39,11 @@ def main() -> None:
 
     log_summary()
 
+    _lvl, _msg = settings.api_key_expiry_status()
+    if _msg:
+        _log = logging.getLogger("g2.voice")
+        (_log.error if _lvl == "expired" else _log.warning)(_msg)
+
     voice = args.mode == "voice"
     if voice and not features.mic:
         logging.getLogger("g2.voice").warning(

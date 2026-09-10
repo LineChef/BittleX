@@ -10,6 +10,7 @@ Usage:
 """
 from __future__ import annotations
 
+import datetime as _dt
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -54,6 +55,12 @@ _DEFAULT_SYSTEM_PROMPT = (
 class Settings:
     # --- Claude ---
     anthropic_api_key: str = field(default_factory=lambda: _env("ANTHROPIC_API_KEY"))
+    # ISO date (YYYY-MM-DD) you set the console key to expire on -- G2 warns as it
+    # nears, and says clearly once it's past, so an expired key is never a silent
+    # "why won't it answer". Empty = no check.
+    api_key_expires: str = field(default_factory=lambda: _env("ANTHROPIC_API_KEY_EXPIRES"))
+    api_key_expiry_warn_days: int = field(
+        default_factory=lambda: _env_int("G2_API_KEY_EXPIRY_WARN_DAYS", 30))
     claude_model: str = field(default_factory=lambda: _env("CLAUDE_MODEL", "claude-sonnet-5"))
     claude_max_tokens: int = field(default_factory=lambda: _env_int("CLAUDE_MAX_TOKENS", 400))
     request_timeout_s: float = field(default_factory=lambda: _env_float("CLAUDE_TIMEOUT_S", 30.0))
@@ -136,6 +143,32 @@ class Settings:
                 "repo root and fill it in."
             )
         return self.anthropic_api_key
+
+    def api_key_expiry_status(self, today: "_dt.date | None" = None) -> tuple[str, str]:
+        """(level, message). level: 'ok' | 'warn' | 'expired' | 'unset' | 'malformed'.
+        'ok' and 'unset' carry an empty message. Set ANTHROPIC_API_KEY_EXPIRES to
+        the console key's expiry date to enable the check."""
+        raw = self.api_key_expires
+        if not raw:
+            return "unset", ""
+        try:
+            exp = _dt.date.fromisoformat(raw)
+        except ValueError:
+            return "malformed", (
+                f"ANTHROPIC_API_KEY_EXPIRES={raw!r} is not a YYYY-MM-DD date -- "
+                "expiry check disabled")
+        today = today or _dt.date.today()
+        days = (exp - today).days
+        if days < 0:
+            return "expired", (
+                f"ANTHROPIC_API_KEY expired {-days} day(s) ago ({raw}). Create a "
+                "new key (Console -> API Keys, G2 workspace), update .env, and "
+                "reset ANTHROPIC_API_KEY_EXPIRES.")
+        if days <= self.api_key_expiry_warn_days:
+            return "warn", (
+                f"ANTHROPIC_API_KEY expires in {days} day(s) ({raw}) -- plan to "
+                "rotate it (Console -> API Keys, G2 workspace).")
+        return "ok", ""
 
 
 settings = Settings()
