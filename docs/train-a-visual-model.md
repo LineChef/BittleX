@@ -217,6 +217,13 @@ pan, so —
   onto every frame between your keyframes; spot-check the ones it flags as far
   from a keyframe, then promote.
 
+> **Architecture lock (2026-09-09):** whatever path you take, the model has to be
+> **Swift-YOLO** — the GV2 firmware's box decoder understands nothing else. A
+> standard Ultralytics YOLOv8 model (e.g. from an Ultralytics Colab) will flash,
+> run on the NPU, and return `boxes:[]` forever. SenseCraft **web** training is
+> Swift-YOLO but single-class; **multi-class needs the SSCMA Swift-YOLO Colab**
+> (`research/capture-progress.md` has the status + the `torch==2.0.0` blocker).
+
 ### Multi-class -- training ON TOP OF person detection
 
 To get one model that does person detection AND recognises individuals
@@ -285,6 +292,7 @@ unrecognised person defaulted to `curious`.
 | Dark / grainy frames | `G2_CAM_RES=1` + the AE lift are on by default in `camera_preview.py`; graininess past that is **low light** — add lamps. Longer exposure (brighter) trades against motion blur — hold still on poses. |
 | Only a handful of positives after curate | De-dup was collapsing distinct poses (fixed: consecutive-only). If still low, it's genuinely a capture-coverage problem — capture more easy (close/mid straight-on) frames. |
 | Trained model detects nothing | Dataset below the floor — dark, too few (<~40 varied), one lighting/background. Recapture in daylight, 3 varied sessions, retrain. |
+| Model flashes + runs (`inference: ~90ms` in Device Logger) but `boxes:[]` on every frame, any threshold | **Wrong architecture.** GV2 firmware only decodes the **Swift-YOLO** head. A standard Ultralytics YOLOv8 export runs but its detection tensor is unreadable → permanent empty boxes. Must train/export via SSCMA. See `research/capture-progress.md` 2026-09-09 note. |
 | Model confuses two people | Coarse at 192 px — more data per person, or move to face-embedding recognition (`research/person-recognition.md` "upgrade path"). |
 
 ## What lives where

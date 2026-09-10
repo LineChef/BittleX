@@ -70,3 +70,4 @@ rl_training/opencat-gym/benchmark_*.gif
 
 # Generated cosmetic carpet texture (watch.py), not source
 rl_training/opencat-gym/.carpet_tex_cache.png
+*.pt

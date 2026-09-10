@@ -18,6 +18,66 @@ constraint), `capture-session-checklist.md` (per-session routine).
 
 ---
 
+## ✅ 2026-09-09 — SOLVED: `ultralytics==8.2.8`, exported locally on Apple Silicon
+
+A 3-class (`<you>`/`dog`/`cat`) YOLOv8n now decodes on the device — clean single
+boxes, quiet on an empty scene, mAP@50 0.907. The fix was the frozen-firmware
+toolchain match below **plus** running `yolo export format=tflite int8` on
+**arm64 Python 3.9** (Colab's py3.13 can train 8.2.8 but can't export it —
+onnx2tf `flatbuffer_direct` bug). Full recipe + the 3 mandatory workarounds:
+**`grove-vision-v2-custom-model.md` → "The working recipe"**, and its
+**"Cleanup"** step (delete the Colab runtime so the uploaded photos are wiped)
+is now a permanent last step of every build.
+
+**Known limitation of this first model:** detects only up close, and the box is
+frozen near the training-average position — under-calibrated INT8 (100 calib
+images; recipe wants 300+) and a thin/close-framed `<you>` set. Fix = a `<you>`
+capture pass for distance + position variety, then re-export.
+
+### How we got here (the diagnosis)
+
+The device firmware (`SSCMA-Micro`, latest release `20250102`) does the
+post-processing (anchor decode / objectness gate / NMS) around the flashed
+`.tflite`, so the model's output **head must match its decoder**. That decoder
+is frozen at Jan 2025; every training toolchain drifted forward since.
+
+- `boxes:[]` forever → head unrecognised (we hit this with `ultralytics==8.4.146`
+  — its LiteRT export ≠ the 8.2.8 graph the firmware knows).
+- **box flood**, 10-30/frame on an anchor grid, `postprocess:0ms`, sliders inert
+  → firmware dumping raw anchors, no NMS (we hit this with SSCMA `main`-branch
+  Swift-YOLO — both a junk-box model AND a real-box mAP@50 0.87 model flooded
+  *identically*, proving it's the export head not the data).
+
+**Decodes on `20250102`:** SSCMA `2.0.0`-branch Swift-YOLO, Ultralytics YOLOv8
+via **`ultralytics==8.2.8`** (Seeed's official `ma_deploy_yolov8` recipe),
+YOLO11. **Does not:** YOLO26, RTMDet, SSCMA `main` re-implemented Swift-YOLO.
+
+**Path that worked:** Ultralytics YOLOv8 pinned **`ultralytics==8.2.8`** — no
+mmcv, multi-class native, plain YOLO-format dataset (no COCO conversion),
+exported locally on arm64 py3.9. SSCMA path dropped. Edge Impulse FOMO stays on
+the shelf as a fallback (compiles its own firmware `.uf2`, immune to this class
+of problem; gives centroids not boxes) — not needed.
+
+**Still correct regardless of toolchain:** `*_int8_vela.tflite` format, WE2 vela
+config (`ethos-u55-64`, `const_mem_area=Axi1`, `arena/cache=Axi0`), 192×192
+square input ≤240, model ≤2 MB. SenseCraft "Object" list = class-id order
+`0:<you> 1:dog 2:cat`; each chip needs **Add Object → type → Add Object again**.
+SenseCraft "Send" needs a live token — if the console logs
+`[FleetEvents WS] global skip connect: no token`, hard-reload after sign-in.
+Or skip SenseCraft: local serial flash with `python-sscma`
+(`sscma.cli flasher m.tflite 0x400000` + `AT+INFO="<b64 json>"`).
+
+**Data was re-labelled** (`tools/autobox_coco.py` — dog/cat had no boxes,
+training used whole-frame fallback → position-prior overfit): `<you>` 230,
+`cat` 218, `dog` 127 (dog session motion-blurred, wants a recapture).
+`tools/vision_diag.py <port>` judges a flashed model headless (flags "PLANTED"
+box locations = overfit/garbage).
+
+**Device state:** holds the working 3-class model (`g2_3class_yolov8_828_vela.tflite`).
+SenseCraft **web** training is single-class only — no multi-class web path.
+
+---
+
 ## Two folders on the Desktop
 
 ```
@@ -135,7 +195,10 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 | date | class | session | promoted pos | promoted neg | library total (class) | notes |
 |---|---|---|---|---|---|---|
 | 2026-09-09 | `<you>` | 1–3 | 238 | 10 | 238 | re-curated from the earlier single-class face set |
-| | | | | | | |
+| 2026-09-09 | `dog` | 1 | 120 | — | 120 | daylight session, subject-prominence `--limit 120` |
+| 2026-09-09 | `cat` | 1 | 120 | — | 120 | same |
+| 2026-09-09 | — | — | — | — | — | Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (thought Swift-YOLO required — wrong; see below). |
+| 2026-09-09 | — | — | — | — | — | Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**). **Exported locally on arm64 py3.9** (`ultralytics==8.2.8` + onnx2tf 1.17.5, 3 workarounds) → vela 100% NPU → `g2_3class_yolov8_828_vela.tflite` (2.31 MB). **WORKS on device** — clean single boxes. Detects up close only (100-image INT8 calib; box frozen near training-avg position). |
 
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
 person captured so far). Subsets pre-built (jpg only — `--images-only`, so
