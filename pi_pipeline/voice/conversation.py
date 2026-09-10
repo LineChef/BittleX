@@ -69,6 +69,17 @@ _REMEMBER_TOOL = {
 _TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL]
 
 
+class ConversationError(RuntimeError):
+    """A Claude call failed for a *known, non-transient* reason. `spoken` is the
+    in-character line for G2 to say; `kind` is one of 'auth' / 'rate' / 'billing'.
+    `voice/loop.py` catches this before its generic handler."""
+
+    def __init__(self, kind: str, spoken: str):
+        super().__init__(f"{kind}: {spoken}")
+        self.kind = kind
+        self.spoken = spoken
+
+
 @dataclass
 class AssistantTurn:
     speech: str
@@ -112,13 +123,27 @@ class Conversation:
 
     def _create(self, **kw):
         last_err: Exception | None = None
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 return self._client.messages.create(**kw)
+            except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+                log.error("Claude auth failed (%s) -- key invalid/expired/blocked", type(e).__name__)
+                raise ConversationError("auth", self._cfg.speech_api_auth) from e
+            except anthropic.BadRequestError as e:
+                if any(w in str(e).lower() for w in ("credit", "billing", "balance", "quota")):
+                    log.error("Claude billing/quota block: %s", e)
+                    raise ConversationError("billing", self._cfg.speech_api_billing) from e
+                raise
+            except anthropic.RateLimitError as e:
+                last_err = e
+                log.warning("Claude rate-limited; attempt %d/3", attempt + 1)
+                time.sleep(2.0 * (attempt + 1))
             except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
                 last_err = e
-                log.warning("Claude call failed (%s); attempt %d", type(e).__name__, attempt + 1)
+                log.warning("Claude call failed (%s); attempt %d/3", type(e).__name__, attempt + 1)
                 time.sleep(1.0 + attempt)
+        if isinstance(last_err, anthropic.RateLimitError):
+            raise ConversationError("rate", self._cfg.speech_api_rate) from last_err
         raise last_err  # type: ignore[misc]
 
     def send(self, user_text: str, memory_context: str | None = None) -> AssistantTurn:

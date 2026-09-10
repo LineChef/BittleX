@@ -19,7 +19,7 @@ import logging
 from ..personality import character_state
 from .actuator import Actuator
 from .commands import match_local_command, parse_character_command
-from .conversation import Conversation
+from .conversation import Conversation, ConversationError
 
 _DEFAULT_CHARACTER_LEVEL = 0.4
 from .cues import Cue
@@ -139,6 +139,13 @@ class VoiceLoop:
         try:
             context = self._memory.recall(user_text) if self._memory else None
             turn = self._conv.send(user_text, memory_context=context)
+        except ConversationError as e:      # known reason -> say it plainly
+            log.warning("Claude call failed (%s): %s", e.kind, e.spoken)
+            self._cue.set("speaking")
+            self._tts.speak(e.spoken)
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
         except Exception:  # noqa: BLE001 -- one bad turn must not kill the loop
             log.exception("turn failed")
             self._cue.set("speaking")

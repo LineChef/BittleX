@@ -57,22 +57,21 @@ even a G2 setting:
       cap (`G2_BUDGET_WARN_PCT`, default ~0.8). The first time a period crosses
       it, G2 says/logs a warning once — not every subsequent call, so it doesn't
       nag — e.g. "heads up, I'm at 80% of today's chat budget."
-- [ ] **Anthropic's OWN limit errors — a different signal, handle them too.**
-      Local tracking only catches what G2 itself predicts; it can't see
-      Anthropic's real-time state (someone hit the console spend limit, a burst
-      tripped the account's rate limit, the plan's quota is exhausted). Right
-      now `Conversation._create()` only retries on timeout/connection errors —
-      a rate-limit or billing error from the API would surface as a raw
-      exception, or worse, fail silently. Catch these specifically and give
-      each its own clear, spoken/logged response instead of a crash:
-      - **Rate limit** (`RateLimitError` / HTTP 429) — transient; back off and
-        retry a couple of times, and if it's still failing, say so ("I'm being
-        rate-limited, give me a moment") rather than hang or error out.
-      - **Billing / quota block** (e.g. the console spend limit was actually
-        hit, or the account is out of credit) — not retryable; G2 should say
-        so plainly ("I've hit my API limit and can't respond right now") the
-        *first* time it happens, so you know immediately rather than
-        discovering it from a string of silent non-replies.
+- [x] **Anthropic's OWN limit / auth errors — clear spoken responses. BUILT
+      2026-09-10.** `Conversation._create()` now classifies:
+      - **Auth** (`AuthenticationError` / `PermissionDeniedError`, HTTP 401/403
+        — revoked / expired / wrong key) → no retry, `ConversationError(kind=
+        "auth")`; G2 says `G2_SPEECH_API_AUTH` (default *"I can't reach my brain
+        right now -- my API key may be invalid or expired."*).
+      - **Rate limit** (`RateLimitError` / 429) → backs off and retries up to 3×;
+        if still failing, `kind="rate"`, G2 says `G2_SPEECH_API_RATE`.
+      - **Billing / quota** (a 400 mentioning credit / billing / balance / quota)
+        → no retry, `kind="billing"`, G2 says `G2_SPEECH_API_BILLING`.
+      - Anything else still falls through to the loop's generic "I glitched".
+      `voice/loop.py` catches `ConversationError` first, speaks `.spoken`, logs
+      the `.kind`, and keeps the loop alive. Phrases are `.env`-overridable.
+      Still deferred (unless you hit issues): the *proactive* local budget
+      tracker / caps / call-rate limiter above.
 - [ ] `python -m pi_pipeline.voice usage` (or similar) — check current spend /
       remaining budget anytime, without opening the console.
 - [ ] **Verify all three end-to-end** before trusting them: temporarily set a

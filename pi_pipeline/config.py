@@ -61,6 +61,17 @@ class Settings:
     api_key_expires: str = field(default_factory=lambda: _env("ANTHROPIC_API_KEY_EXPIRES"))
     api_key_expiry_warn_days: int = field(
         default_factory=lambda: _env_int("G2_API_KEY_EXPIRY_WARN_DAYS", 30))
+    # What G2 says out loud when a Claude call fails for a *known* reason (so it
+    # isn't the generic "I glitched"). Override in .env to reword in character.
+    speech_api_auth: str = field(default_factory=lambda: _env(
+        "G2_SPEECH_API_AUTH",
+        "I can't reach my brain right now -- my API key may be invalid or expired."))
+    speech_api_rate: str = field(default_factory=lambda: _env(
+        "G2_SPEECH_API_RATE",
+        "I'm being rate-limited. Give me a moment and try again."))
+    speech_api_billing: str = field(default_factory=lambda: _env(
+        "G2_SPEECH_API_BILLING",
+        "I've hit my usage limit and can't chat right now."))
     claude_model: str = field(default_factory=lambda: _env("CLAUDE_MODEL", "claude-sonnet-5"))
     claude_max_tokens: int = field(default_factory=lambda: _env_int("CLAUDE_MAX_TOKENS", 400))
     request_timeout_s: float = field(default_factory=lambda: _env_float("CLAUDE_TIMEOUT_S", 30.0))
