@@ -78,6 +78,41 @@ SenseCraft **web** training is single-class only — no multi-class web path.
 
 ---
 
+## Diagnostic logging pass — do this BEFORE the next capture round
+
+The working model detects all 3 classes but: `<you>` up close only, box frozen
+near the training-average position; `cat` lost to `dog` once at a rear/ambiguous
+angle. Rather than just capturing *more*, log structured sessions against known
+ground truth first, so the next capture pass targets the actual gaps.
+
+**How:** `python tools/vision_diag.py <port> --secs 60` per session (it parses
+the Device Logger stream headless: score-floor + NMS + top-K, flags "PLANTED"
+box locations). Narrate or script the ground truth; fill the table after.
+
+| session | what to do | reading to record |
+|---|---|---|
+| `<you>` distance sweep | walk 3ft → 6ft → 10ft → back, slowly, centre of frame | score at each distance; the distance where it drops below ~50 or stops firing |
+| `<you>` position sweep | stand left / centre / right / half-out-of-frame at ~5ft | does the box track, or stay frozen? score per position |
+| `cat` pose sweep | facing toward / away / curled / low light, mid-distance | score; every frame the class flips to `dog` (note the pose) |
+| `dog` pose sweep | same poses | score; flips to `cat`; false-negatives (no box on a clearly-visible dog) |
+| empty room | 60s, nobody/no pet in frame | any box at all = a false positive → that scene becomes a negative |
+| post-retrain re-run | repeat the above on the new model | box coords tracking (not frozen) = localization fixed; score deltas per cell |
+
+**Shot list (fill from the readings above):**
+
+| class | weak condition found | capture target |
+|---|---|---|
+| `<you>` | _(e.g. "no detect past 6ft")_ | _(e.g. "40 frames at 6–12ft, walking")_ |
+| `cat` | _(e.g. "rear-view flips to dog")_ | |
+| `dog` | | |
+
+**Independent of the logging:** rebuild the INT8 calibration set to **300+
+varied images** (was 100) — highest-probability fix for "up close only", no
+diagnosis needed. `tools/gv2/export_yolov8_gv2.sh <best.pt> <calib_dir>` takes
+any flat folder of jpgs as `<calib_dir>`.
+
+---
+
 ## Two folders on the Desktop
 
 ```
