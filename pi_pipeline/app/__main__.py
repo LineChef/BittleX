@@ -18,6 +18,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import signal
+import tempfile
 import threading
 
 from ..behavior import BehaviorDriver, BehaviorRuntime
@@ -28,6 +31,20 @@ from .sensors import SensorHub
 from .sinks import LockedLink, build_bindings
 
 log = logging.getLogger("g2.app")
+
+# a running `pi_pipeline.app` writes its PID here so `--halt` / `--release` (and
+# `kill -USR1 <pid>`) can reach it for an out-of-band emergency stop.
+_PIDFILE = os.path.join(tempfile.gettempdir(), "g2_app.pid")
+
+
+def _signal_running_instance(sig: int, what: str) -> None:
+    try:
+        with open(_PIDFILE) as f:
+            pid = int(f.read().strip())
+        os.kill(pid, sig)
+        print(f"sent {what} to pi_pipeline.app (pid {pid})")
+    except (OSError, ValueError) as e:
+        raise SystemExit(f"no running pi_pipeline.app to {what} ({e})")
 
 
 def _make_link(serial: bool):
@@ -90,9 +107,21 @@ def main() -> None:
     ap.add_argument("--serial", action="store_true", help="talk to the BiBoard (default: mock)")
     ap.add_argument("--no-voice", action="store_true")
     ap.add_argument("--no-behavior", action="store_true")
+    ap.add_argument("--bench", action="store_true",
+                    help="BENCH/stand mode: no autonomous movement, voice actuator "
+                         "forced to mock -- for calibration + diagnostic tools on the stand")
     ap.add_argument("--hz", type=float, default=8.0, help="behaviour tick rate")
+    ap.add_argument("--halt", action="store_true",
+                    help="EMERGENCY STOP a running pi_pipeline.app and exit")
+    ap.add_argument("--release", action="store_true",
+                    help="clear a latched emergency stop on a running instance and exit")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+
+    if args.halt:
+        return _signal_running_instance(signal.SIGUSR1, "EMERGENCY STOP")
+    if args.release:
+        return _signal_running_instance(signal.SIGUSR2, "release")
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -103,6 +132,11 @@ def main() -> None:
     if msg:
         (log.error if lvl == "expired" else log.warning)(msg)
 
+    if args.bench:
+        log.warning("=== BENCH MODE === autonomous movement OFF; voice actuator = mock. "
+                    "Run calibration / check_serial / --probe-imu freely.")
+        args.no_behavior = True
+
     link = _make_link(args.serial)
     rt = None if args.no_behavior else _build_runtime(link, hz=args.hz)
     on_event = rt.post if rt is not None else None
@@ -111,12 +145,24 @@ def main() -> None:
     if rt is None and voice is None:
         ap.error("nothing to run (--no-voice and --no-behavior)")
 
+    # emergency stop: SIGUSR1 halts, SIGUSR2 releases (also `--halt` / `--release`
+    # from another shell). Ctrl-C still exits the whole program.
+    if rt is not None:
+        signal.signal(signal.SIGUSR1, lambda *_: rt.halt())
+        signal.signal(signal.SIGUSR2, lambda *_: rt.release())
+    try:
+        with open(_PIDFILE, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
+
     rt_thread = None
     if rt is not None:
         rt_thread = threading.Thread(target=rt.run_forever, name="behavior", daemon=True)
         rt_thread.start()
-        log.info("behaviour runtime started (%.0f Hz, %s)", args.hz,
-                 "serial" if link else "mock")
+        log.info("behaviour runtime started (%.0f Hz, %s) -- "
+                 "emergency stop: `python -m pi_pipeline.app --halt` or kill -USR1 %d",
+                 args.hz, "serial" if link else "mock", os.getpid())
 
     try:
         if voice is not None:
@@ -134,6 +180,10 @@ def main() -> None:
             memory.close()
         if link is not None:
             link.close()
+        try:
+            os.remove(_PIDFILE)
+        except OSError:
+            pass
         log.info("stopped")
 
 

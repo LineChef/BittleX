@@ -36,6 +36,7 @@ log = logging.getLogger("g2.behavior.runtime")
 
 # the DriverInputs fields the event queue accepts (discrete, per-tick)
 _EVENT_BOOLS = (
+    "halt", "release",
     "wake_word", "conversation_ended", "told_stop", "told_stay", "told_sleep",
     "rebuffed", "picked_up", "loud_sound", "imu_tap", "nearby_motion",
     "cancel_enroll", "say_hi",
@@ -121,11 +122,27 @@ class BehaviorRuntime:
 
     def pause(self) -> None:
         """Stop ticking (e.g. while the mic is mid-utterance and the serial link
-        shouldn't be contended). Queued events survive until resume()."""
+        shouldn't be contended). Queued events survive until resume().
+        An emergency `halt()` still gets through."""
         self._paused = True
 
     def resume(self) -> None:
         self._paused = False
+
+    def halt(self) -> None:
+        """EMERGENCY STOP -- freeze G2 now. Latches the driver's stop and
+        immediately dispatches it, ignoring `pause`. Call `release()` to clear."""
+        self.driver.estop.halt()
+        try:
+            self.bindings.dispatch(self.driver.tick(self._assemble(self._clock())))
+        except Exception:  # noqa: BLE001 -- a halt must never raise
+            log.exception("emergency halt dispatch failed")
+        log.warning("EMERGENCY STOP -- behaviour runtime halted")
+
+    def release(self) -> None:
+        """Clear a latched emergency stop; normal behaviour resumes next tick."""
+        self.driver.estop.release()
+        log.warning("emergency stop released -- behaviour runtime resuming")
 
     def stop(self) -> None:
         self._stop = True
@@ -144,7 +161,7 @@ class BehaviorRuntime:
         )
 
     def tick(self, now: float | None = None) -> DriverTick | None:
-        if self._paused:
+        if self._paused and not self.driver.estop.halted:
             return None
         now = self._clock() if now is None else now
         i = self._assemble(now)

@@ -32,6 +32,7 @@ from ..personality.mood import IdleBias, Mood, MoodConfig, MoodModel
 from ..personality.traits import BehaviorParams
 from ..vision.feed import Frame
 from .chirps import ChirpMood, Chirper
+from .emergency import EmergencyStop
 from .enrollment import (
     Enrollment, EnrollmentConfig, EnrollAction, EnrollState, EnrollTick,
     count_completed_sessions, new_session_dir, mark_session_done,
@@ -78,6 +79,10 @@ class DriverInputs:
     now: float | None = None
     frame: Frame = ()                       # vision detections this instant
 
+    # --- emergency stop (latching, top priority) ---
+    halt: bool = False                     # freeze G2 NOW and hold until `release`
+    release: bool = False                  # clear a latched emergency stop
+
     # --- discrete events since the last tick ---
     wake_word: bool = False                 # addressed / wake phrase heard
     conversation_ended: bool = False
@@ -119,6 +124,7 @@ class DriverTick:
     mood: Mood = Mood.NEUTRAL
     sleep_state: SleepState = SleepState.AWAKE
     seek_attention: bool = False   # LONELY -> a caller may add a gentle attention wander
+    halted: bool = False           # emergency stop is latched
 
 
 # PostureAction -> the head-up / stretch / stand choreography, as (delay_s, Effect)
@@ -200,6 +206,7 @@ class BehaviorDriver:
                  mood_cfg: MoodConfig | None = None,
                  sleep_cfg: SleepModeConfig | None = None,
                  chirps: bool = True,
+                 estop_freeze_token: str = "kbalance",
                  cliff=None,
                  vision_available: bool = True,
                  capture_root: str = "training_data/faces"):
@@ -233,6 +240,7 @@ class BehaviorDriver:
         self._base_rest_after_s = self.idle.cfg.rest_after_s
         self.mood_model = MoodModel(mood_cfg, clock=clock)
         self.sleep = SleepMode(sleep_cfg, clock=clock)
+        self.estop = EmergencyStop(freeze_token=estop_freeze_token)
         self.chirper = Chirper(clock=clock) if chirps else None
         self.gestures = GesturePicker(gesture_cfg, clock=clock, rng=rng)
         self.enroll = Enrollment(enroll_cfg, clock=clock)
@@ -446,6 +454,17 @@ class BehaviorDriver:
         now = self._clock() if i.now is None else i.now
         effects: list = []
 
+        # 0. EMERGENCY STOP -- latching, outranks everything. While halted the
+        #    driver computes nothing else: just stop + hold until `release`.
+        if i.halt:
+            self.estop.halt()
+        if i.release:
+            self.estop.release()
+        if self.estop.halted:
+            self._choreo.clear()
+            return self._finish(self.mode.update(now), self.estop.effects(), now,
+                                reason="EMERGENCY STOP (halted)")
+
         effects += self._apply_events(i, now)
 
         # --- mood: slow-moving, from interaction recency (fed by the runtime
@@ -603,4 +622,5 @@ class BehaviorDriver:
                           enroll_state=self.enroll.state,
                           effects=diags + effects, reason=reason,
                           mood=self.mood_model.mood, sleep_state=self.sleep.state,
-                          seek_attention=self._seek_attention)
+                          seek_attention=self._seek_attention,
+                          halted=self.estop.halted)

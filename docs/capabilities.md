@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **494 passing tests**.
+`pi_pipeline/` carries **501 passing tests**.
 
 ---
 
@@ -212,6 +212,12 @@ that need the camera mounted on the frame for a real point of view.
 
 All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 
+- **Emergency stop** (`behavior/emergency.py`) — the manual override: latches
+  `BehaviorDriver` above *everything* (enrollment / sleep / safety / mode), emits
+  stop + an alert chirp + one hold command (`kbalance` by default, configurable),
+  and holds until explicitly released. Triggered by a voice phrase ("emergency
+  stop" / "freeze" / "halt" / "stop moving"), `python -m pi_pipeline.app --halt`,
+  or `kill -USR1 <pid>`; cleared by "resume" / `--release` / `SIGUSR2`.
 - **Jam reflex** (`gait/jam_guard.py`, B9a) — vision-free: from commanded-vs-actual
   front-leg joint angle, detect a stuck push and run a fixed bump-and-turn.
 - **Servo thermal guard** (`gait/thermal_guard.py`) — per-joint temperature
@@ -253,6 +259,10 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   readiness check: `.env` completeness, API key validity + expiry, model files
   (Vosk / Piper / gait ONNX), Python deps, serial port + optional board ping,
   audio devices, free disk. Non-zero exit on any hard failure.
+- **Bench mode** (`python -m pi_pipeline.app --bench`) — for when G2 is on the
+  calibration stand: no autonomous movement, voice actuator forced to mock, a
+  clear banner — so `check_serial` / `run_gait --probe-imu` / joint calibration
+  own the serial link without the behaviour loop fighting them.
 
 ---
 
@@ -291,7 +301,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 494
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 501
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

@@ -7,6 +7,7 @@ seen so "curious" pulls toward the unseen. All pure logic, driven by the
 """
 from .bindings import DriverBindings, MockBindings
 from .chirps import CHIRP, ChirpMood, Chirper, chirp_for, cue_chirp
+from .emergency import EmergencyStop
 from .driver import (
     BehaviorDriver, DriverInputs, DriverTick, Effect, EffectKind,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "BehaviorDriver", "DriverInputs", "DriverTick", "Effect", "EffectKind",
     "DriverBindings", "MockBindings",
     "CHIRP", "ChirpMood", "Chirper", "chirp_for", "cue_chirp",
+    "EmergencyStop",
     "SleepAction", "SleepMode", "SleepModeConfig", "SleepState",
     "BehaviorRuntime", "latest_frame_source",
     "ModeController", "Mode", "ModeConfig",

@@ -219,6 +219,8 @@ Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at
 |---|---|
 | `python -m pi_pipeline.doctor` | **bring-up readiness checklist** — `.env`, API key + expiry, model files, deps, serial port, audio, disk. `--serial` also pings the board. Non-zero exit on any hard FAIL |
 | `python -m pi_pipeline.app` | the whole robot — voice loop + behaviour runtime, side by side. Mock by default; `--serial` talks to the BiBoard |
+| `python -m pi_pipeline.app --bench` | **stand/bench mode** — no autonomous movement, voice actuator = mock. Use while running calibration / `check_serial` / `--probe-imu` |
+| `python -m pi_pipeline.app --halt` / `--release` | **EMERGENCY STOP** a running app (freeze + hold) / clear it. Also `kill -USR1 <pid>` / `-USR2`, or _say_ "emergency stop" / "freeze" / "resume" |
 | `python -m pi_pipeline.behavior` | behaviour runtime alone vs mocks — prints the effect stream (idle → sit → rest → sleep → wake) |
 | `g2serial [ports\|ping\|send <cmd>\|skills\|rest]` | BiBoard serial link checks |
 | `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |

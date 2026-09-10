@@ -96,7 +96,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**494 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**501 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +
@@ -121,6 +121,11 @@ python -m pi_pipeline.voice --mode voice
 # The whole robot as one program — voice loop + behaviour runtime, side by side.
 python -m pi_pipeline.app                 # mock: no serial, dry-run power
 python -m pi_pipeline.app --serial        # talk to the BiBoard
+python -m pi_pipeline.app --bench         # on the calibration stand: no autonomous movement
+
+# EMERGENCY STOP a running app (freezes + holds until released)
+python -m pi_pipeline.app --halt          # or:  kill -USR1 <pid>
+python -m pi_pipeline.app --release       # clear it  (or: kill -USR2 <pid>)
 
 # The behaviour runtime alone, against mocks (idle -> sit -> rest -> sleep -> wake)
 python -m pi_pipeline.behavior
@@ -128,3 +133,6 @@ python -m pi_pipeline.behavior
 # Bring-up readiness checklist (run the moment the Pi + body are wired)
 python -m pi_pipeline.doctor              # add --serial to also ping the BiBoard
 ```
+
+Emergency stop is also a voice phrase — "emergency stop" / "freeze" / "halt" /
+"stop moving" latches it; "resume" / "as you were" clears it.

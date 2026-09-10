@@ -46,6 +46,17 @@ _SLEEP = (
     "go to sleep",
 )
 
+# Emergency stop -- a hard, latching freeze. Matched loosely (these phrases are
+# never a normal request) and handled before anything else, no Claude call.
+_HALT = (
+    "emergency stop", "freeze", "halt", "stop stop stop", "stop moving",
+    "dont move", "hold still", "abort",
+)
+_RESUME = (
+    "resume", "you can move", "as you were", "unfreeze", "carry on",
+    "at ease", "you can go", "release",
+)
+
 # character mode: "enable gir mode", "turn on gir", "gir mode off", "set gir to 70"
 _CHAR_NAMES = ("gir",)
 _CHAR_ON = ("enable", "turn on", "switch on", "activate", "start", "go into", "be",
@@ -134,10 +145,16 @@ def looks_like_rebuff(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"forget"``, ``"sleep"``, ``"character"``, or ``None``."""
+    """Return ``"halt"``, ``"resume"``, ``"forget"``, ``"sleep"``,
+    ``"character"``, or ``None``. Checked in that order -- an emergency stop
+    wins over everything."""
     n = _normalize(text)
     if not n:
         return None
+    if _has_verb(n, _HALT):
+        return "halt"
+    if _has_verb(n, _RESUME):
+        return "resume"
     if _hit(n, _FORGET):
         return "forget"
     if _hit(n, _SLEEP):

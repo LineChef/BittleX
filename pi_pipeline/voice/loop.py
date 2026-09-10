@@ -122,6 +122,21 @@ class VoiceLoop:
             raise KeyboardInterrupt
 
         cmd = match_local_command(user_text)
+        if cmd == "halt":
+            log.warning("EMERGENCY STOP (voice command %r)", user_text)
+            self._events(halt=True)
+            self._cue.set("speaking")
+            self._tts.speak("Stopping.")
+            self._end_session()
+            return
+        if cmd == "resume":
+            log.info("emergency stop released (voice)")
+            self._events(release=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, moving again.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
         if cmd == "sleep":
             log.info("'go to sleep' -- ending session")
             self._events(told_sleep=True)

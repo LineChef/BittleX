@@ -901,6 +901,24 @@ that ties everything together with hardware:
   files, Python deps, serial port, `--serial` board ping, audio devices, free
   disk); non-zero exit on any hard FAIL so it drops into a bring-up script.
 
+**Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
+A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`
+(checked at step 0, above enrollment / sleep / safety / mode): on `halt` it emits
+stop + an ALERT chirp + one hold command (`kbalance` default, `estop_freeze_token`
+configurable to `ksit` / `d`), then re-asserts stop every tick until `release`.
+`BehaviorRuntime.halt()` / `.release()` dispatch it immediately even while
+`pause`d. Triggers: the voice phrases "emergency stop" / "freeze" / "halt" /
+"stop moving" / "abort" (`commands.match_local_command` → `"halt"`, checked
+first, no Claude call), `python -m pi_pipeline.app --halt`, or `kill -USR1 <pid>`
+(the app writes a pidfile); cleared by "resume" / "as you were" / `--release` /
+`SIGUSR2`. This is the human backstop for the not-yet-trained `CliffGuard`.
+
+**Bench mode** — `python -m pi_pipeline.app --bench`: for when G2 is on the
+calibration stand. Suppresses the behaviour runtime entirely and forces the
+voice actuator to mock, with a `=== BENCH MODE ===` banner, so `check_serial` /
+`run_gait --probe-imu` / firmware `c16` calibration own the serial link with
+nothing autonomous competing.
+
 **Left for hardware:** plumb a real `SerialDetectionFeed` into `SensorHub` +
 `BehaviorRuntime.frame_source`; tune the `SensorConfig` IMU thresholds against
 `--probe-imu`; confirm the head-pan joint index + range; the `WalkerSink` is

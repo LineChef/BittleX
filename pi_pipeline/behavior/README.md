@@ -39,8 +39,12 @@ assembles each `DriverInputs` from injected **sources**:
 - `roster()` → bonded-person labels, for the recognition hop.
 
 `tick()` dispatches the effects through the `bindings`; `run_forever(max_ticks=…)`
-/ `stop()` / `pause()` / `resume()` drive it. No threads, doesn't own the voice
-loop — they run side by side and the voice loop just `post()`s events.
+/ `stop()` / `pause()` / `resume()` drive it. `halt()` / `release()` are the
+**emergency stop** (`behavior/emergency.py`) — `halt()` latches the driver above
+everything and dispatches a stop + hold immediately, ignoring `pause`; nothing
+resumes until `release()`. No threads, doesn't own the voice loop — they run
+side by side and the voice loop just `post()`s events (`wake_word`,
+`conversation_ended`, `told_sleep`, `halt`, `release`, …).
 `python -m pi_pipeline.behavior` runs it against `MockBindings`.
 
 ## `DriverBindings` — the binding layer (`bindings.py`)
