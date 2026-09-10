@@ -115,3 +115,26 @@ def test_full_loop_wake_word_triggers_cue_and_head_up():
     # the wake rouse choreography runs head-up -> stretch -> stand
     assert "head.move" in mb.names()
     assert "actuator.perform" in mb.names()
+
+
+# ------------------------------------------------------- CHIRP / POWER routing
+def test_chirp_effect_plays_a_buzzer_string_on_the_actuator():
+    from pi_pipeline.behavior import ChirpMood
+    mb = MockBindings()
+    out = mb.dispatch([Effect(EffectKind.CHIRP, ChirpMood.SLEEPY)])
+    assert out == ["chirp:sleepy"]
+    calls = dict((n, a) for n, a, k in mb.calls)
+    (arg,) = calls["actuator.perform"]
+    assert arg.startswith("b") and " " in arg          # opencat.beep format
+
+
+def test_power_effect_routes_to_the_power_sink():
+    mb = MockBindings()
+    out = mb.dispatch([Effect(EffectKind.POWER, "headless")])
+    assert out == ["power:headless"]
+    assert ("power.set_profile", ("headless",), {}) in mb.calls
+
+
+def test_power_effect_without_a_sink_is_dropped():
+    b = DriverBindings()                   # no power sink
+    assert b.dispatch([Effect(EffectKind.POWER, "headless")]) == ["drop:power"]

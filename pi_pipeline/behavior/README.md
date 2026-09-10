@@ -7,22 +7,30 @@ What G2 does on its own between conversations. Pure logic, driven by the
 ## `BehaviorDriver` — the runtime that ties it together (`driver.py`)
 
 `BehaviorDriver.tick(DriverInputs) -> DriverTick` composes `ModeController` +
-`Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` + `Enrollment` + optional
-`CliffGuard` and returns an ordered list of abstract `Effect`s
-(SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG). Priority each
-tick: enrollment > a running WAKE/settle/PEEK choreography (safety preempts) >
-CliffGuard reflex > CONVERSE > EXPLORE (+ a sniff at a find) > IDLE descent
-(+ idle fidgets). A bonded person seen after an absence fires one excited hop.
-Still no I/O — `bindings.py` maps the effects onto real sinks.
+`Explorer`/`Novelty` + `IdlePosture` + `SleepMode` + `MoodModel` + `Chirper` +
+`GesturePicker` + `Enrollment` + optional `CliffGuard` and returns an ordered
+list of abstract `Effect`s
+(SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / CHIRP / POWER /
+DIAG). Priority each tick: mood (scales the idle-descent timing) → deep-idle
+**sleep** gate (owns the robot while DOZING / ASLEEP; wakes on wake word / tap /
+lift / loud sound / spoken-to / command) → enrollment → a running
+WAKE/settle/PEEK choreography (safety preempts) → CliffGuard reflex → CONVERSE →
+EXPLORE (+ a sniff at a find) → IDLE descent (+ idle fidgets). A bonded person
+seen after an absence fires one excited hop. Emotive `CHIRP`s (one shared
+`Chirper`, ≤1/tick) fire on recognition, a startle, a greeting, an edge reflex,
+and sleep entry. `DriverTick` also carries `mood`, `sleep_state`, and
+`seek_attention`. Still no I/O — `bindings.py` maps the effects onto real sinks.
 
 ## `DriverBindings` — the binding layer (`bindings.py`)
 
 `DriverBindings.dispatch(tick)` routes each `Effect` kind to an injected sink
-(`actuator` / `tts` / `camera` / `cue` / `walker` / `head` / `on_diag`); a
-missing sink drops-and-warns. `MockBindings` records every call, so the whole
-driver loop is exercised end-to-end in tests. On hardware: supply the real
-sinks (`voice/actuator.py`, `voice/tts.py`, `voice/cues.py`, a frame grabber,
-the session log) + the input plumbing (vision frame, IMU state, mic events).
+(`actuator` / `tts` / `camera` / `cue` / `walker` / `head` / `power` /
+`on_diag`); a missing sink drops-and-warns. `CHIRP` → `actuator.perform` with an
+`opencat.beep(...)` string; `POWER` → `power.set_profile("headless"|"interactive")`.
+`MockBindings` records every call, so the whole driver loop is exercised
+end-to-end in tests. On hardware: supply the real sinks (`voice/actuator.py`,
+`voice/tts.py`, `voice/cues.py`, `pi_pipeline.power`, a frame grabber, the
+session log) + the input plumbing (vision frame, IMU state, mic events).
 
 ## `ModeController` — the top-level switch
 

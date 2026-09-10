@@ -115,6 +115,24 @@ def parse_character_command(text: str) -> CharacterCommand | None:
     return None
 
 
+# Short reproachful phrases -> nudge the mood model to SUBDUED for a while.
+# Advisory only (no command action), so a loose match is low-cost; still kept
+# tight so ordinary sentences don't trip it. Phrases are already in the form
+# `_normalize` produces (lowercased, no punctuation, filler words dropped).
+_REBUFF = (
+    "leave me alone", "stop it", "stop that", "be quiet", "shut up",
+    "go away", "quit it", "cut it out", "knock it off", "stop talking",
+    "thats enough", "settle down", "calm down", "youre annoying",
+    "stop bothering me",
+)
+
+
+def looks_like_rebuff(text: str) -> bool:
+    """True for a short 'that's enough / leave me alone' style correction."""
+    n = _normalize(text)
+    return bool(n) and any(p in n for p in _REBUFF)
+
+
 def match_local_command(text: str) -> str | None:
     """Return ``"forget"``, ``"sleep"``, ``"character"``, or ``None``."""
     n = _normalize(text)

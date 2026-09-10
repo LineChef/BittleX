@@ -1,6 +1,9 @@
 import random
 
-from pi_pipeline.behavior import BehaviorDriver, DriverInputs, EffectKind
+from pi_pipeline.behavior import (
+    BehaviorDriver, DriverInputs, EffectKind, Posture,
+    SleepModeConfig, SleepState,
+)
 from pi_pipeline.behavior.chirps import (
     CHIRP, ChirpMood, Chirper, chirp_for, cue_chirp,
 )
@@ -96,3 +99,122 @@ def test_say_hi_is_suppressed_during_enrollment(tmp_path):
     c.adv(0.5)
     tick = d.tick(DriverInputs(say_hi=True))
     assert not any(e.reason == "say hi" for e in tick.effects)
+
+
+# ---------------------------------------------- mood: unknown recency = NEUTRAL
+def test_no_recency_data_stays_neutral():
+    m, _ = _mood(lonely_after_s=2700)
+    assert m.update(last_interaction_s=None) is Mood.NEUTRAL   # not LONELY
+    assert m.phrasing_hint() == ""
+    assert m.idle_bias().sit_mult == 1.0
+
+
+# --------------------------------------------- driver: mood scales idle timing
+def test_lonely_mood_makes_the_driver_settle_sooner():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9,
+                                      idle_sit_secs=10, idle_rest_secs=200),
+                       clock=c, rng=random.Random(0),
+                       mood_cfg=MoodConfig(lonely_after_s=1800))
+    # LONELY -> sit_mult 0.6 -> sit_after ~6s instead of 10
+    c.adv(7.0)
+    tick = d.tick(DriverInputs(last_interaction_s=3600))
+    assert tick.posture is Posture.SIT
+    assert tick.mood is Mood.LONELY and tick.seek_attention
+
+
+def test_neutral_mood_keeps_base_idle_timing():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9,
+                                      idle_sit_secs=10, idle_rest_secs=200),
+                       clock=c, rng=random.Random(0))
+    c.adv(7.0)
+    tick = d.tick(DriverInputs(last_interaction_s=None))
+    assert tick.posture is Posture.ACTIVE and tick.mood is Mood.NEUTRAL
+
+
+# --------------------------------------------------- driver: emotive chirps
+def test_say_hi_also_chirps_a_greeting():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=c, rng=random.Random(0))
+    c.adv(0.5)
+    tick = d.tick(DriverInputs(say_hi=True))
+    chirps = [e.payload for e in tick.effects if e.kind is EffectKind.CHIRP]
+    assert ChirpMood.GREETING in chirps
+
+
+def test_pickup_chirps_alert_once_rate_limited():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=c, rng=random.Random(0))
+    c.adv(0.5)
+    t1 = d.tick(DriverInputs(picked_up=True, held=True))
+    assert any(e.kind is EffectKind.CHIRP and e.payload is ChirpMood.ALERT
+               for e in t1.effects)
+    c.adv(0.3)                                   # inside the chirp cooldown
+    t2 = d.tick(DriverInputs(loud_sound=True))
+    assert not any(e.kind is EffectKind.CHIRP for e in t2.effects)
+
+
+def test_chirps_can_be_disabled():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=c, rng=random.Random(0), chirps=False)
+    c.adv(0.5)
+    tick = d.tick(DriverInputs(say_hi=True))
+    assert not any(e.kind is EffectKind.CHIRP for e in tick.effects)
+
+
+# --------------------------------------------------- driver: deep-idle sleep
+def _run(d, c, secs, dt=2.0, **inputs):
+    """Tick the driver for `secs`, returning every effect it emitted."""
+    seen = []
+    for _ in range(int(secs / dt)):
+        c.adv(dt)
+        seen += d.tick(DriverInputs(**inputs)).effects
+    return seen
+
+
+def _sleepy_driver(**sleep_kw):
+    c = Clk()
+    cfg = dict(sleep_after_resting_s=30.0, settle_timeout_s=2.0)
+    cfg.update(sleep_kw)
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9,
+                                      idle_sit_secs=5, idle_rest_secs=10),
+                       clock=c, rng=random.Random(0),
+                       sleep_cfg=SleepModeConfig(**cfg))
+    return d, c
+
+
+def test_driver_enters_sleep_after_long_rest():
+    d, c = _sleepy_driver()
+    seen = _run(d, c, 90.0)                     # quiet: descend, rest, then sleep
+    payloads = {(e.kind, e.payload) for e in seen}
+    assert (EffectKind.SKILL, "kzz") in payloads
+    assert (EffectKind.POWER, "headless") in payloads
+    assert (EffectKind.CAPTURE, ("off", None)) in payloads
+    assert any(e.kind is EffectKind.CHIRP and e.payload is ChirpMood.SLEEPY
+               for e in seen)
+    assert d.tick(DriverInputs()).sleep_state in (SleepState.DOZING, SleepState.ASLEEP)
+
+
+def test_driver_wakes_on_wake_word_and_runs_the_rouse():
+    d, c = _sleepy_driver(min_sleep_s=1.0)
+    _run(d, c, 90.0)                            # -> ASLEEP
+    assert d.tick(DriverInputs()).sleep_state is SleepState.ASLEEP
+    c.adv(5.0)
+    tick = d.tick(DriverInputs(wake_word=True))
+    payloads = {(e.kind, e.payload) for e in tick.effects}
+    assert (EffectKind.POWER, "interactive") in payloads
+    assert (EffectKind.CAPTURE, ("on", None)) in payloads
+    # and the rouse choreography starts this same tick
+    assert any(e.kind is EffectKind.HEAD for e in tick.effects)
+
+
+def test_told_sleep_overrides_person_present():
+    d, c = _sleepy_driver(sleep_after_resting_s=1e9)  # never auto-sleeps
+    _run(d, c, 60.0)                                  # just lie down
+    c.adv(2.0)
+    tick = d.tick(DriverInputs(told_sleep=True, person_present=True))
+    assert any(e.kind is EffectKind.SKILL and e.payload == "kzz" for e in tick.effects)

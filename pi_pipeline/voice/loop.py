@@ -17,8 +17,9 @@ from __future__ import annotations
 import logging
 
 from ..personality import character_state
+from ..personality.mood import MoodModel
 from .actuator import Actuator
-from .commands import match_local_command, parse_character_command
+from .commands import looks_like_rebuff, match_local_command, parse_character_command
 from .conversation import Conversation, ConversationError
 
 _DEFAULT_CHARACTER_LEVEL = 0.4
@@ -54,6 +55,10 @@ class VoiceLoop:
         self._memory = memory
         self._follow_up_s = max(0.0, follow_up_s)
         self._in_session = False
+        # slow-moving mood from interaction recency -> a one-line system-prompt
+        # note + (on the robot) idle-timing bias. Needs a memory to read
+        # recency from; harmless without one (stays NEUTRAL -> empty hint).
+        self._mood = MoodModel()
 
     def run_forever(self) -> None:
         self._cue.set("idle")
@@ -134,6 +139,15 @@ class VoiceLoop:
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return
+
+        # slow mood: refresh from interaction recency, fold the hint into the
+        # system prompt for this turn (a rebuff drops it to SUBDUED for a while)
+        if looks_like_rebuff(user_text):
+            self._mood.note_rebuff()
+        recency = getattr(self._memory, "recency", None)
+        age, n_recent = recency() if callable(recency) else (None, 0)
+        self._mood.update(last_interaction_s=age, exchanges_recent=n_recent)
+        self._conv.set_mood_hint(self._mood.phrasing_hint())
 
         self._cue.set("thinking")
         try:

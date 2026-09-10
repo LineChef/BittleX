@@ -11,6 +11,8 @@ the piece that actually does something with them on the robot:
   SPEAK   -> tts.speak(text)                 (or tts.say)
   CAPTURE -> camera.set_capture(on, kind)
   CUE     -> cue.set(stage)
+  CHIRP   -> actuator.perform(opencat.beep(...))  -- the buzzer melody for a mood
+  POWER   -> power.set_profile(name)         (or power.profile / power.apply)
   DIAG    -> on_diag(name, reason)           (default: pi_pipeline.diag.event)
 
 Every sink is optional. A missing sink means that effect kind is dropped and
@@ -22,6 +24,7 @@ from __future__ import annotations
 import logging
 
 from ..link import opencat
+from .chirps import CHIRP, ChirpMood
 from .driver import DriverTick, Effect, EffectKind
 
 log = logging.getLogger("g2.behavior.bindings")
@@ -38,13 +41,14 @@ def _call(obj, *names):
 
 class DriverBindings:
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
-                 walker=None, head=None, on_diag=None):
+                 walker=None, head=None, power=None, on_diag=None):
         self.actuator = actuator
         self.tts = tts
         self.camera = camera
         self.cue = cue
         self.walker = walker
         self.head = head
+        self.power = power
         self._on_diag = on_diag or _default_diag
         self._warned: set[str] = set()
 
@@ -117,6 +121,19 @@ class DriverBindings:
                 return self._miss("cue")
             fn(e.payload)
             return f"cue:{e.payload}"
+        if k is EffectKind.CHIRP:
+            mood = e.payload if isinstance(e.payload, ChirpMood) else ChirpMood(e.payload)
+            fn = self.actuator and _call(self.actuator, "perform")
+            if not fn:
+                return self._miss("chirp")
+            fn(opencat.beep(CHIRP[mood]))
+            return f"chirp:{mood.value}"
+        if k is EffectKind.POWER:
+            fn = self.power and _call(self.power, "set_profile", "profile", "apply")
+            if not fn:
+                return self._miss("power")
+            fn(str(e.payload))
+            return f"power:{e.payload}"
         if k is EffectKind.DIAG:
             name, reason = (e.payload if isinstance(e.payload, (tuple, list)) else (e.payload, e.reason))
             self._on_diag(name, reason)
@@ -156,6 +173,7 @@ class MockBindings(DriverBindings):
             cue=_Recorder(self.calls, "cue"),
             walker=_Recorder(self.calls, "walker"),
             head=_Recorder(self.calls, "head"),
+            power=_Recorder(self.calls, "power"),
             on_diag=lambda n, r: self.calls.append(("diag", (n, r), {})),
         )
 

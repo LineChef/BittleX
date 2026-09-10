@@ -534,7 +534,8 @@ Pi Zero 2 W voice-stack benchmark.
       `voice/skills.py` maps skill names to OpenCat `k<token>` serial commands;
       one reply can both talk and move.
 - [x] **State-cue interface** — `voice/cues.py` (`LogCue` now; buzzer/posture
-      later). Chirp vocabulary drafted 2026-09-10 (`behavior/chirps.py`).
+      later). Chirp vocabulary drafted 2026-09-10 (`behavior/chirps.py`), wired
+      into `BehaviorDriver` as `CHIRP` effects 2026-09-10 (see Phase 10).
 - [~] **Live API end-to-end check — harness built 2026-09-10, needs a key to run.**
       `pi_pipeline/voice/livecheck.py` (`python -m pi_pipeline.voice.livecheck`) /
       `test_livecheck.py` (skips without a key): a few billed calls that verify a
@@ -916,11 +917,27 @@ breathing-bob motion and LED life-signs, are still caller-side).
       `DriverInputs.say_hi` → a `greeting()` gesture skill (suppressed during
       enrollment / a non-wake choreography).
 - [x] **Idle-posture descent** — driven by `BehaviorDriver`; `kstr` is wired
-      into the WAKE choreography. **Sleep mode** (the `zz` / `opencat.SLEEP`
-      deep-sleep below RESTING) has its FSM built 2026-09-10:
-      `pi_pipeline/behavior/sleep_mode.py` (`SleepMode`) — auto-sleep after long
-      RESTING, wake on IMU tap / wake word / loud sound, emits `ENTER_SLEEP`
-      (kzz + camera off + `power headless`) / `WAKE`. Driver wiring pending.
+      into the WAKE choreography. **Sleep mode** (`opencat.SLEEP` / `kzz`
+      deep-sleep below RESTING) — FSM built 2026-09-10, **wired into
+      `BehaviorDriver` 2026-09-10**: a sleep gate above enrollment / mode
+      auto-sleeps after long RESTING (or on `DriverInputs.told_sleep`, which
+      overrides person-present), and while DOZING / ASLEEP owns the robot. It
+      emits `SKILL kzz` + `POWER headless` + `CAPTURE off` + a `CHIRP` on sleep;
+      on a wake signal (wake word / tap / lift / loud sound / spoken-to) it
+      emits `POWER interactive` + `CAPTURE on` and hands back to IdlePosture's
+      rouse choreography. New effect kinds: `CHIRP` (payload `ChirpMood`) and
+      `POWER` (`"headless"` | `"interactive"`), routed by `DriverBindings`.
+- [x] **Emotive chirps (B5) + mood (B6) wired 2026-09-10.** The driver emits a
+      rate-limited `CHIRP` on recognition (HAPPY), a startle (ALERT), "say hi"
+      (GREETING), an edge reflex (ALERT), and sleep entry (SLEEPY). The
+      `MoodModel` runs in the driver (scales the idle-descent timing:
+      LONELY settles sooner + `DriverTick.seek_attention`, SUBDUED holds
+      longer) and in the voice loop (`Memory.recency()` → `last_interaction_s` +
+      session exchange count each turn → `Conversation.set_mood_hint()` folds a
+      one-line note into the system prompt; a "leave me alone"-style phrase
+      (`commands.looks_like_rebuff`) nudges it to SUBDUED). Recency is
+      in-process only — `exchanges.ts` is a date, not a clock time, by privacy
+      design.
 - [ ] **INSPECT peer bow** — done + sim-validated (`buttUp_ref`, +22° nose-down);
       the earlier "author on hardware" caveat is resolved. Confirm on the real
       robot that the mounted camera's downward view actually improves the near

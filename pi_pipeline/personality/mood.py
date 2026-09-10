@@ -75,7 +75,13 @@ class MoodModel:
             self._mood = Mood.SUBDUED
             return self._mood
 
-        gap = last_interaction_s if last_interaction_s is not None else 1e12
+        if last_interaction_s is None:
+            # no recency data (runtime not feeding the memory store) -> no mood
+            # colouring. "Unknown" must not read as "lonely".
+            self._mood = Mood.NEUTRAL
+            return self._mood
+
+        gap = last_interaction_s
         if gap >= c.lonely_after_s:
             self._mood = Mood.LONELY
         elif exchanges_recent >= c.playful_exchanges and gap <= c.content_within_s:

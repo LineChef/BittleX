@@ -96,7 +96,8 @@ class Conversation:
         self._base_system = cfg.system_prompt
         p = personality or Personality.from_settings(cfg)
         self._personality = p
-        self._system_prompt = p.system_prompt(self._base_system)
+        self._mood_hint = ""
+        self._rebuild_system()
         if p.traits:
             log.info("personality: %s", p.describe())
         self._history: list[dict] = []
@@ -106,12 +107,28 @@ class Conversation:
     def personality(self) -> Personality:
         return self._personality
 
+    def _rebuild_system(self) -> None:
+        """Compose the live system prompt: base + personality fragments + an
+        optional slow-mood line. Called on any personality / mood change."""
+        s = self._personality.system_prompt(self._base_system)
+        if self._mood_hint:
+            s = s.rstrip() + "\n\n" + self._mood_hint
+        self._system_prompt = s
+
     def set_personality(self, p: Personality) -> None:
         """Swap the personality mid-session (e.g. the user asks to enable a
         character mode). Rebuilds the system prompt; history is kept."""
         self._personality = p
-        self._system_prompt = p.system_prompt(self._base_system)
+        self._rebuild_system()
         log.info("personality now: %s", p.describe())
+
+    def set_mood_hint(self, hint: str) -> None:
+        """Set (or clear, with "") the one-line mood note the mood model
+        produces. Cheap -- call it every turn; only rebuilds on a change."""
+        hint = (hint or "").strip()
+        if hint != self._mood_hint:
+            self._mood_hint = hint
+            self._rebuild_system()
 
     def _trim(self) -> None:
         max_msgs = max(2, self._cfg.history_turns * 2)

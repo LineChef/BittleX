@@ -12,6 +12,7 @@ Memory deliberately only surfaces the older material so the two don't overlap.
 from __future__ import annotations
 
 import logging
+import time
 
 from ..config import Settings
 from .store import Store
@@ -20,7 +21,7 @@ log = logging.getLogger("g2.memory")
 
 
 class Memory:
-    def __init__(self, cfg: Settings):
+    def __init__(self, cfg: Settings, *, clock=time.monotonic):
         self._cfg = cfg
         self._store = Store(cfg.memory_db_path)
         self._max_facts = cfg.memory_max_facts
@@ -32,6 +33,13 @@ class Memory:
         # what this session recorded
         self._session_from_ex = 0
         self._session_from_fact = 0
+        # in-process interaction recency, for the mood model. Deliberately NOT
+        # from the DB: `exchanges.ts` is a date only (no clock time) by privacy
+        # design, so sub-day recency can't come from disk. Session-local,
+        # nothing persisted.
+        self._clock = clock
+        self._last_exchange_at: float | None = None
+        self._session_exchanges = 0
 
     def close(self) -> None:
         self._store.close()
@@ -41,6 +49,14 @@ class Memory:
         later `forget_session()` removes only what this session added."""
         self._session_from_ex = self._store.max_exchange_id()
         self._session_from_fact = self._store.max_fact_id()
+        self._session_exchanges = 0
+
+    def recency(self) -> tuple[float | None, int]:
+        """`(seconds_since_last_exchange | None, exchanges_this_session)` -- the
+        two inputs the mood model wants. `None` age = nothing recorded yet."""
+        age = (None if self._last_exchange_at is None
+               else self._clock() - self._last_exchange_at)
+        return age, self._session_exchanges
 
     def forget_session(self) -> tuple[int, int]:
         """Delete every exchange and fact recorded since `mark_session_start()`.
@@ -79,6 +95,8 @@ class Memory:
 
     def record(self, user_text: str, turn) -> None:
         self._store.log_exchange(user_text, turn.speech, list(turn.actions))
+        self._last_exchange_at = self._clock()
+        self._session_exchanges += 1
         for fact in getattr(turn, "facts", []):
             if self._store.add_fact(fact):
                 log.info("remembered: %s", fact)

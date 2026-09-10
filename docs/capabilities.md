@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **437 passing tests**.
+`pi_pipeline/` carries **464 passing tests**.
 
 ---
 
@@ -91,7 +91,8 @@ serial:
 
 `pi_pipeline/behavior/` — a `BehaviorDriver` that turns sensor + mode state into
 abstract **effects** (`SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE /
-DIAG`), which `DriverBindings` routes to whatever sinks are injected. All 🧩.
+CHIRP / POWER / DIAG`), which `DriverBindings` routes to whatever sinks are
+injected. All 🧩.
 
 - **Modes** — `converse` / `idle` / `explore`, with a controller that switches
   between them.
@@ -99,12 +100,20 @@ DIAG`), which `DriverBindings` routes to whatever sinks are injected. All 🧩.
   bearing, and investigate whatever is *new* in view (novelty tracker).
 - **Idle-posture staged descent** — what pose G2 holds with nothing to do:
   peek → sit → rest → sleep, backing off gradually rather than freezing.
+- **Deep-idle sleep** — below RESTING: after a long quiet stretch (or on
+  command) the driver curls up (`kzz`), drops the Pi to the power-save profile,
+  and turns the camera off, then wakes on the wake word / a tap / a loud sound /
+  being spoken to — emitting the rouse choreography and restoring full power.
+- **Mood-scaled idle timing** — the slow mood (below) shortens the descent
+  delays when LONELY (settle sooner, seek attention) and lengthens them when
+  SUBDUED.
 - **Gestures** — the behaviour layer decides *when* to fire expressive skills
   (bow, wave, nod…) from context.
 - **Person enrollment choreography** — speak / orient / capture-on / capture-off
   steps to walk a new face through a capture session.
-- **Chirps** — non-verbal `beep`-sequence moods (happy / confused / alert /
-  sleepy / question / greeting).
+- **Emotive chirps** — the driver emits a `beep`-melody mood (happy / alert /
+  sleepy / greeting …) on recognition, a startle, a greeting, an edge reflex,
+  or sleep entry, rate-limited to at most one per tick.
 
 ---
 
@@ -121,7 +130,9 @@ DIAG`), which `DriverBindings` routes to whatever sinks are injected. All 🧩.
     0.4, **off unless you turn it on** (env or by asking G2 "enable Gir mode").
     Task-guarded at every level so it never derails a real instruction.
 - **Mood model** — NEUTRAL / CONTENT / PLAYFUL / LONELY / SUBDUED from recent
-  interaction history; shifts phrasing and idle bias; notices being rebuffed.
+  interaction history; notices being rebuffed. Wired: the voice loop feeds it
+  interaction recency each turn and folds its one-line hint into the system
+  prompt; the behaviour driver applies its idle-timing bias.
 - **Bonds** (`G2_BONDS`) — per-person familiarity + disposition
   (affectionate / playful / fearful …) that colours how G2 greets and reacts.
   Personal identifiers live only in the gitignored `.env`.
@@ -203,7 +214,9 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   cooldown pose; escalates immediately, de-escalates only after a hold.
 - **Sleep mode** (`behavior/sleep_mode.py`) — AWAKE → DOZING → ASLEEP → ROUSING;
   enters after a rest period (blocked while a person is present), wakes on loud
-  sound / tap / wake word / command.
+  sound / tap / wake word / command. **Wired into `BehaviorDriver`**: emits
+  `SKILL kzz` + `POWER headless` + `CAPTURE off` on sleep, `POWER interactive` +
+  `CAPTURE on` + the rouse choreography on wake.
 - **Carpet detector** (`gait/carpet.py`) — sustained forward-slip → switch to the
   `carpetF` gait. (Runtime wiring + a speed-estimate source still to finish.)
 - **Speed estimator** (`gait/speed_estimate.py`) — per-gait-cycle ZUPT
@@ -267,7 +280,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 437
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 464
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

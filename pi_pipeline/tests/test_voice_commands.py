@@ -41,3 +41,24 @@ def test_sleep_variants(text):
 ])
 def test_no_false_positives(text):
     assert match_local_command(text) is None
+
+
+# ------------------------------------------------------------------ rebuff (B6)
+import pytest
+from pi_pipeline.voice.commands import looks_like_rebuff
+
+
+@pytest.mark.parametrize("text", [
+    "leave me alone", "G2, stop it", "be quiet please", "shut up",
+    "okay that's enough", "knock it off", "stop talking", "you're annoying",
+])
+def test_rebuff_phrases_match(text):
+    assert looks_like_rebuff(text)
+
+
+@pytest.mark.parametrize("text", [
+    "what's the weather", "tell me a story about a quiet forest",
+    "can you stop the timer at noon", "I left my keys somewhere",
+])
+def test_ordinary_sentences_are_not_rebuffs(text):
+    assert not looks_like_rebuff(text)

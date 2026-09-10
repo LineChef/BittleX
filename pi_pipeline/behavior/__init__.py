@@ -6,9 +6,11 @@ seen so "curious" pulls toward the unseen. All pure logic, driven by the
 `BehaviorParams` the personality produces.
 """
 from .bindings import DriverBindings, MockBindings
+from .chirps import CHIRP, ChirpMood, Chirper, chirp_for, cue_chirp
 from .driver import (
     BehaviorDriver, DriverInputs, DriverTick, Effect, EffectKind,
 )
+from .sleep_mode import SleepAction, SleepMode, SleepModeConfig, SleepState
 from .enrollment import (
     Enrollment, EnrollmentConfig, EnrollAction, EnrollState, EnrollTick,
     build_script, count_completed_sessions, new_session_dir, mark_session_done,
@@ -22,6 +24,8 @@ from .novelty import Novelty, NoveltyConfig
 __all__ = [
     "BehaviorDriver", "DriverInputs", "DriverTick", "Effect", "EffectKind",
     "DriverBindings", "MockBindings",
+    "CHIRP", "ChirpMood", "Chirper", "chirp_for", "cue_chirp",
+    "SleepAction", "SleepMode", "SleepModeConfig", "SleepState",
     "ModeController", "Mode", "ModeConfig",
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
     "Gesture", "GestureConfig", "GesturePicker", "GESTURE_TOKEN",

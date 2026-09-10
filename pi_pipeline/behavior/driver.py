@@ -28,8 +28,10 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ..personality.mood import IdleBias, Mood, MoodConfig, MoodModel
 from ..personality.traits import BehaviorParams
 from ..vision.feed import Frame
+from .chirps import ChirpMood, Chirper
 from .enrollment import (
     Enrollment, EnrollmentConfig, EnrollAction, EnrollState, EnrollTick,
     count_completed_sessions, new_session_dir, mark_session_done,
@@ -41,6 +43,7 @@ from .idle_posture import (
 )
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
+from .sleep_mode import SleepAction, SleepMode, SleepModeConfig, SleepState
 
 try:  # CliffGuard is optional -- the driver runs fine with no edge sensing
     from ..vision.cliff_guard import CliffAction, EdgeReading
@@ -58,6 +61,8 @@ class EffectKind(Enum):
     SPEAK = "speak"      # payload: text
     CAPTURE = "capture"  # payload: ("on", step_kind) | ("off", None)
     CUE = "cue"          # payload: "idle" | "listening" | "thinking" | "speaking"
+    CHIRP = "chirp"      # payload: ChirpMood -- an emotive buzzer melody
+    POWER = "power"      # payload: "headless" | "interactive" -- Pi power profile
     DIAG = "diag"        # payload: (event, reason) -- structured-log hook
 
 
@@ -78,8 +83,11 @@ class DriverInputs:
     conversation_ended: bool = False
     told_stop: bool = False                 # explicit "stop" / "that's enough"
     told_stay: bool = False                 # "stay" / "wait here" -> sit and hold
+    told_sleep: bool = False                # "go to sleep" -> deep-idle now (overrides person-present)
+    rebuffed: bool = False                  # "leave me alone" / harsh correction -> mood SUBDUED
     picked_up: bool = False                 # lifted this tick (edge of `held`)
     loud_sound: bool = False                # a startling noise -> rouse
+    imu_tap: bool = False                   # a tap / knock on the shell -> wake from sleep
     nearby_motion: bool = False             # small sound/motion -> PEEK, don't get up
     meet_name: str | None = None            # "G2, meet <name>" -> start enrollment
     cancel_enroll: bool = False
@@ -96,6 +104,10 @@ class DriverInputs:
     edge: object = None                    # EdgeReading | None, for CliffGuard
     known_person_labels: frozenset = frozenset()  # bonded roster -> recognition hop
 
+    # --- mood inputs (from the memory store's recency, fed by the runtime) ---
+    last_interaction_s: float | None = None  # seconds since the last exchange (None = unknown)
+    exchanges_recent: int = 0                # exchanges within the mood window
+
 
 @dataclass
 class DriverTick:
@@ -104,6 +116,9 @@ class DriverTick:
     enroll_state: EnrollState
     effects: list = field(default_factory=list)
     reason: str = ""
+    mood: Mood = Mood.NEUTRAL
+    sleep_state: SleepState = SleepState.AWAKE
+    seek_attention: bool = False   # LONELY -> a caller may add a gentle attention wander
 
 
 # PostureAction -> the head-up / stretch / stand choreography, as (delay_s, Effect)
@@ -182,6 +197,9 @@ class BehaviorDriver:
                  gesture_cfg: GestureConfig | None = None,
                  enroll_cfg: EnrollmentConfig | None = None,
                  novelty_cfg: NoveltyConfig | None = None,
+                 mood_cfg: MoodConfig | None = None,
+                 sleep_cfg: SleepModeConfig | None = None,
+                 chirps: bool = True,
                  cliff=None,
                  vision_available: bool = True,
                  capture_root: str = "training_data/faces"):
@@ -208,6 +226,14 @@ class BehaviorDriver:
                 sit_after_s=self.p.idle_sit_secs,
                 rest_after_s=self.p.idle_rest_secs),
             clock=clock)
+        # base idle timings -- mood scales these each tick (LONELY descends
+        # sooner, SUBDUED holds a pose longer). Kept so the scaling is always
+        # applied to the original, not compounded.
+        self._base_sit_after_s = self.idle.cfg.sit_after_s
+        self._base_rest_after_s = self.idle.cfg.rest_after_s
+        self.mood_model = MoodModel(mood_cfg, clock=clock)
+        self.sleep = SleepMode(sleep_cfg, clock=clock)
+        self.chirper = Chirper(clock=clock) if chirps else None
         self.gestures = GesturePicker(gesture_cfg, clock=clock, rng=rng)
         self.enroll = Enrollment(enroll_cfg, clock=clock)
         self.cliff = cliff
@@ -221,11 +247,22 @@ class BehaviorDriver:
         self._prev_mode = self.mode.mode
         self._prev_posture = self.idle.posture
         self._prev_enroll = self.enroll.state
+        self._prev_sleep = self.sleep.state
+        self._seek_attention = False
         self._last_reason = "init"
 
     @property
     def last_reason(self) -> str:
         return self._last_reason
+
+    # --- chirps ----------------------------------------------------------
+    def _chirp(self, mood: ChirpMood, now: float, reason: str = "") -> list:
+        """A rate-limited emotive chirp, as a (possibly empty) effect list.
+        One shared Chirper across all trigger points -> at most one buzz/tick."""
+        if self.chirper is None or not self.chirper.ready(now):
+            return []
+        self.chirper.fired(now)
+        return [Effect(EffectKind.CHIRP, mood, reason or mood.value)]
 
     # --- event fan-out -----------------------------------------------------
     def _apply_events(self, i: DriverInputs, now: float) -> list:
@@ -245,6 +282,12 @@ class BehaviorDriver:
             self.mode.on_activity()
             self.idle.on_activity()
             self._t_last_activity = now
+        # sleep wake signals are fed to sleep.update() in the tick's sleep gate
+        # (not via on_activity() here -- that would swallow the WAKE action).
+        if i.picked_up or i.loud_sound:
+            fx += self._chirp(ChirpMood.ALERT, now, "startled")
+        if i.rebuffed:
+            self.mood_model.note_rebuff(now)
         # a hard safety event clears an in-flight non-safety choreography
         if (i.picked_up or i.held) and self._choreo.busy and self._choreo.label != "wake":
             self._choreo.clear()
@@ -257,6 +300,7 @@ class BehaviorDriver:
                 self._choreo.busy and self._choreo.label != "wake"):
             g = self.gestures.greeting(now)
             fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "say hi"))
+            fx += self._chirp(ChirpMood.GREETING, now, "say hi")
         return fx
 
     # --- enrollment ------------------------------------------------------
@@ -366,10 +410,12 @@ class BehaviorDriver:
             if lab in i.known_person_labels and self.novelty.is_novel_object(lab, now):
                 self.novelty.see_object(lab, now)
                 g = self.gestures.excited_hop(now)
+                happy = self._chirp(ChirpMood.HAPPY, now, f"recognised {lab}")
                 if g is not Gesture.NONE:
                     return [Effect(EffectKind.SKILL, GESTURE_TOKEN[g],
-                                   f"recognised {lab} after an absence")]
+                                   f"recognised {lab} after an absence")] + happy
                 self._last_reason = f"recognised {lab}, hop on cooldown"
+                return happy
         return []
 
     # --- cliff reflex --------------------------------------------------
@@ -380,6 +426,7 @@ class BehaviorDriver:
         if act is CliffAction.NONE:
             return None
         fx = [Effect(EffectKind.DIAG, ("cliff.reflex", act.value), "edge in view")]
+        fx += self._chirp(ChirpMood.ALERT, now, f"cliff {act.value}")
         if act is CliffAction.SLOW:
             fx.append(Effect(EffectKind.WALK, 0.0, "cliff: slow"))
         elif act in (CliffAction.STOP, CliffAction.FREEZE):
@@ -400,6 +447,54 @@ class BehaviorDriver:
         effects: list = []
 
         effects += self._apply_events(i, now)
+
+        # --- mood: slow-moving, from interaction recency (fed by the runtime
+        #     from the memory store). Scales the idle-descent timing --
+        #     LONELY settles sooner and seeks attention; SUBDUED holds longer.
+        self.mood_model.update(now, last_interaction_s=i.last_interaction_s,
+                               exchanges_recent=i.exchanges_recent)
+        bias: IdleBias = self.mood_model.idle_bias()
+        self.idle.cfg.sit_after_s = self._base_sit_after_s * bias.sit_mult
+        self.idle.cfg.rest_after_s = self._base_rest_after_s * bias.rest_mult
+        self._seek_attention = bias.seek_attention
+
+        # --- deep-idle sleep -- the state below IdlePosture RESTING. Sits
+        #     above enrollment / choreography / mode: while DOZING / ASLEEP it
+        #     owns the robot (no explore, no descent, buzz-free) until a wake
+        #     signal (wake word, tap/lift, loud sound, spoken-to, or command).
+        if i.told_sleep:
+            self.sleep.on_command_sleep()
+        _, s_act = self.sleep.update(
+            now, resting=self.idle.posture is Posture.RESTING,
+            person_present=i.person_present, loud_sound=i.loud_sound,
+            imu_tap=i.imu_tap or i.picked_up,          # lifted == a wake
+            wake_word=i.wake_word or i.told_stop)      # spoken to == a wake
+        if s_act is SleepAction.ENTER_SLEEP:
+            effects += [
+                Effect(EffectKind.DIAG, ("sleep", "enter"), self.sleep.last_reason),
+                *self._chirp(ChirpMood.SLEEPY, now, "going to sleep"),
+                Effect(EffectKind.SKILL, "kzz", "curl up to sleep"),
+                Effect(EffectKind.POWER, "headless", "sleep: power-save profile"),
+                Effect(EffectKind.CAPTURE, ("off", None), "sleep: camera off"),
+            ]
+            return self._finish(self.mode.update(now), effects, now,
+                                reason=f"sleep: {self.sleep.last_reason}")
+        if s_act is SleepAction.WAKE:
+            effects += [
+                Effect(EffectKind.DIAG, ("sleep", "wake"), self.sleep.last_reason),
+                Effect(EffectKind.POWER, "interactive", "wake: full-power profile"),
+                Effect(EffectKind.CAPTURE, ("on", None), "wake: camera on"),
+            ]
+            self.idle.on_activity()  # hand back to IdlePosture's own rouse
+            if self.idle.posture is Posture.WAKING and self._choreo.label != "wake":
+                self._choreo.start("wake", _wake_steps(),
+                                   on_done=self.idle.wake_done, now=now)
+                effects += self._choreo.pump(now)
+            return self._finish(self.mode.update(now), effects, now,
+                                reason=f"waking: {self.sleep.last_reason}")
+        if self.sleep.asleep:  # DOZING / ASLEEP, no transition -> hold
+            return self._finish(self.mode.update(now), effects, now,
+                                reason=f"asleep: {self.sleep.last_reason}")
 
         # IdlePosture may have entered WAKING via on_activity() (loud sound,
         # picked up) without update() returning a WAKE action -- arm the rouse
@@ -499,6 +594,13 @@ class BehaviorDriver:
                                 ("enroll", f"{self._prev_enroll.value}->{self.enroll.state.value}"),
                                 self.enroll.last_reason))
             self._prev_enroll = self.enroll.state
+        if self.sleep.state is not self._prev_sleep:
+            diags.append(Effect(EffectKind.DIAG,
+                                ("sleep", f"{self._prev_sleep.value}->{self.sleep.state.value}"),
+                                self.sleep.last_reason))
+            self._prev_sleep = self.sleep.state
         return DriverTick(mode=mode, posture=self.idle.posture,
                           enroll_state=self.enroll.state,
-                          effects=diags + effects, reason=reason)
+                          effects=diags + effects, reason=reason,
+                          mood=self.mood_model.mood, sleep_state=self.sleep.state,
+                          seek_attention=self._seek_attention)

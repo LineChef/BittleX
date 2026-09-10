@@ -74,5 +74,15 @@ class Chirper:
         self._last = now
         return chirp_for(mood)
 
+    def ready(self, now: float | None = None) -> bool:
+        """True if a chirp would fire now -- lets a caller decide to emit an
+        abstract CHIRP effect without materialising the serial string."""
+        now = self._clock() if now is None else now
+        return now - self._last >= self._gap
+
+    def fired(self, now: float | None = None) -> None:
+        """Record that a chirp just went out (pairs with `ready()`)."""
+        self._last = self._clock() if now is None else now
+
     def reset(self) -> None:
         self._last = -1e9

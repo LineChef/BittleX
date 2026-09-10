@@ -220,21 +220,34 @@ gaits. Low effort once B3 exists; high payoff for how alive G2 feels. These are
 the tokens the `personality` `cues()` channel returns — wire them to real skills
 here.
 
-### B5 — Emotive sound (chirp vocabulary)  — FIRST CUT BUILT 2026-09-10
+### B5 — Emotive sound (chirp vocabulary)  — BUILT + WIRED 2026-09-10
 `pi_pipeline/behavior/chirps.py` — `ChirpMood` (happy / confused / alert /
 sleepy / question / greeting) → `b<tone> <ms> …` sequences via `opencat.beep`;
 `cue_chirp(stage)` maps the voice listening/thinking/speaking cue; `Chirper`
-rate-limits. Tone/duration values are placeholders — **tune by ear on the real
-buzzer**. Still to wire: callers send these on the matching events (cue changes,
-greetings, edge reflex, sleep entry). 3 tests.
+rate-limits (`ready()` / `fired()` added so the driver can emit an abstract
+effect without building the string). **Wired 2026-09-10:** `BehaviorDriver`
+emits a `CHIRP` effect (payload `ChirpMood`, one shared `Chirper` → ≤1/tick) on
+recognition (HAPPY), a startle / pickup / loud sound (ALERT), "say hi"
+(GREETING), an edge reflex (ALERT), and sleep entry (SLEEPY); `DriverBindings`
+routes `CHIRP` → `actuator.perform(opencat.beep(...))`. Tone/duration values are
+still placeholders — **tune by ear on the real buzzer**. Voice listening/thinking
+cue chirps (`cue_chirp`) still not sent by the loop.
 
-### B6 — Mood from memory  — FIRST CUT BUILT 2026-09-10
+### B6 — Mood from memory  — BUILT + WIRED 2026-09-10
 `pi_pipeline/personality/mood.py` — `MoodModel.update(last_interaction_s,
 exchanges_recent, ...)` → `Mood` (neutral / content / playful / lonely /
 subdued); `phrasing_hint()` (a sentence for the system prompt) + `idle_bias()`
-(sit/rest delay multipliers + `seek_attention` for LONELY). Pure logic + clock,
-5 tests. Still to wire: feed it the memory store's recency counts, apply
-`idle_bias` to `IdlePosture` and `phrasing_hint` to `Personality.system_prompt`.
+(sit/rest delay multipliers + `seek_attention` for LONELY). `last_interaction_s
+is None` → NEUTRAL (unknown ≠ lonely). **Wired 2026-09-10:**
+- Voice loop — `Memory.recency()` (in-process: seconds since last `record()` +
+  session exchange count; *not* from the DB, whose `ts` is a date by privacy
+  design) feeds `MoodModel` each turn → `Conversation.set_mood_hint()` folds the
+  one-line hint into the live system prompt (survives a personality swap). A
+  "leave me alone"-style phrase (`commands.looks_like_rebuff`) → `note_rebuff()`.
+- Behaviour driver — runs its own `MoodModel` from `DriverInputs.last_interaction_s`
+  / `.exchanges_recent`, scales the `IdlePosture` sit/rest delays by the bias
+  each tick, and surfaces `DriverTick.mood` / `.seek_attention`.
+
 Thresholds are first-cut. Composes with B4/B5.
 
 ### B19 — Stylised character voice/persona presets  ⚪

@@ -127,3 +127,19 @@ def test_wipe(cfg):
     mem.store.wipe()
     assert mem.store.exchange_count() == 0
     assert mem.store.list_facts() == []
+
+
+# ------------------------------------------------------- interaction recency (B6)
+def test_recency_none_until_first_record_then_counts(cfg):
+    t = [1000.0]
+    m = Memory(cfg, clock=lambda: t[0])
+    assert m.recency() == (None, 0)
+    m.mark_session_start()
+    m.record("hi", _turn("hello"))
+    t[0] += 5.0
+    age, n = m.recency()
+    assert age == 5.0 and n == 1
+    m.record("still there?", _turn("yep"))
+    assert m.recency()[1] == 2
+    m.mark_session_start()                    # a new wake resets the session count
+    assert m.recency()[1] == 0

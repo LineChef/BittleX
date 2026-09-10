@@ -24,10 +24,14 @@ class _STT:
 class _Conv:
     def __init__(self):
         self.sent = []
+        self.mood_hints = []
 
     def send(self, text, memory_context=None):
         self.sent.append(text)
         return types.SimpleNamespace(speech="ok", actions=[], facts=[])
+
+    def set_mood_hint(self, hint):
+        self.mood_hints.append(hint)
 
 
 class _TTS:
@@ -69,6 +73,9 @@ class _Mem:
 
     def recall(self, text):
         return None
+
+    def recency(self):
+        return (None, 0)
 
     def record(self, user_text, turn):
         self.recorded.append(user_text)

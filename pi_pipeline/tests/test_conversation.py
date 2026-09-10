@@ -70,3 +70,23 @@ def test_retry_on_timeout_then_succeeds(cfg, fake_anthropic, monkeypatch):
     monkeypatch.setattr("time.sleep", lambda *_: None)
     turn = conv.send("hi")
     assert turn.speech == "recovered" and calls["n"] == 2
+
+
+# ------------------------------------------------------------- mood hint (B6)
+def test_mood_hint_folds_into_system_prompt_and_clears(cfg, fake_anthropic):
+    conv = Conversation(cfg)
+    base = conv._system_prompt
+    conv.set_mood_hint("You've been on your own for a while; keen for company.")
+    assert "keen for company" in conv._system_prompt
+    assert conv._system_prompt.startswith(base)
+    conv.set_mood_hint("")                       # NEUTRAL -> hint cleared
+    assert conv._system_prompt == base
+
+
+def test_mood_hint_survives_a_personality_swap(cfg, fake_anthropic):
+    from pi_pipeline.personality import Personality
+    conv = Conversation(cfg)
+    conv.set_mood_hint("you're in a bouncy, playful mood.")
+    conv.set_personality(Personality.from_spec("gir=0.5"))
+    assert "playful mood" in conv._system_prompt      # mood hint survived the swap
+    assert "gir" in conv.personality.describe()
