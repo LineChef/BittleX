@@ -222,16 +222,22 @@ gaits. Low effort once B3 exists; high payoff for how alive G2 feels. These are
 the tokens the `personality` `cues()` channel returns — wire them to real skills
 here.
 
-### B5 — Emotive sound (chirp vocabulary)
-A vocabulary of short buzzer melodies (`b<tone> <ms> …` over the serial link) for
-states: **happy, confused, alert, sleepy**. Cheap, big personality return, and
-doubles as the Phase 7 listening/thinking/speaking state cue. Software + link.
+### B5 — Emotive sound (chirp vocabulary)  — FIRST CUT BUILT 2026-09-10
+`pi_pipeline/behavior/chirps.py` — `ChirpMood` (happy / confused / alert /
+sleepy / question / greeting) → `b<tone> <ms> …` sequences via `opencat.beep`;
+`cue_chirp(stage)` maps the voice listening/thinking/speaking cue; `Chirper`
+rate-limits. Tone/duration values are placeholders — **tune by ear on the real
+buzzer**. Still to wire: callers send these on the matching events (cue changes,
+greetings, edge reflex, sleep entry). 3 tests.
 
-### B6 — Mood from memory
-Recent events + the memory store bias G2's idle behavior and phrasing. Example: a
-long silence → G2 does an attention-seeking wander and delivers a wistful line
-when next spoken to. Pure software on top of `pi_pipeline/memory/`; composes with
-B4/B5.
+### B6 — Mood from memory  — FIRST CUT BUILT 2026-09-10
+`pi_pipeline/personality/mood.py` — `MoodModel.update(last_interaction_s,
+exchanges_recent, ...)` → `Mood` (neutral / content / playful / lonely /
+subdued); `phrasing_hint()` (a sentence for the system prompt) + `idle_bias()`
+(sit/rest delay multipliers + `seek_attention` for LONELY). Pure logic + clock,
+5 tests. Still to wire: feed it the memory store's recency counts, apply
+`idle_bias` to `IdlePosture` and `phrasing_hint` to `Personality.system_prompt`.
+Thresholds are first-cut. Composes with B4/B5.
 
 ### B19 — Stylised character voice/persona presets  ⚪
 A themed "character mode" for G2, selectable by env var

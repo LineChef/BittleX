@@ -995,7 +995,9 @@ breathing-bob motion and LED life-signs, are still caller-side).
       `Enrollment` GREETING, `sniff_find()` on `ExploreAction.INVESTIGATE`,
       `excited_hop()` on a bonded label seen after an absence (driver takes the
       roster as `DriverInputs.known_person_labels`; `bonds` stays un-imported).
-      A "say hi" voice intent still needs a hook.
+      A **"say hi" voice intent hook** is wired 2026-09-10 —
+      `DriverInputs.say_hi` → a `greeting()` gesture skill (suppressed during
+      enrollment / a non-wake choreography).
 - [x] **Idle-posture descent** — driven by `BehaviorDriver`; `kstr` is wired
       into the WAKE choreography. **Sleep mode** (the `zz` / `opencat.SLEEP`
       deep-sleep below RESTING) has its FSM built 2026-09-10:
