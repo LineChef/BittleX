@@ -862,6 +862,26 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
 - [ ] Ship a `requirements.txt` / dependency list for reproducibility.
 - [ ] Optional: write up learnings in the repo.
 
+### The integration runtime — built 2026-09-10
+
+**`pi_pipeline/behavior/runtime.py` (`BehaviorRuntime`)** is the Phase 10 seam:
+the loop that ticks `BehaviorDriver` at a fixed rate and feeds it its inputs
+each tick from injected **sources** — a discrete-event queue (`post(**events)`,
+drained per tick; the voice loop / a mic watcher / an IMU tap detector push
+`wake_word` / `conversation_ended` / `told_sleep` / `say_hi` / `loud_sound` /
+`imu_tap` / `meet_name` / … in), a `frame_source()` (wrap a `DetectionFeed`
+with `latest_frame_source`), a `sensors()` dict (imu/held/person), a `recency()`
+(`Memory.recency`) for mood, and a `roster()` (bonded labels). It dispatches the
+resulting effects through the injected `DriverBindings` and exposes
+`tick()` / `run_forever(max_ticks=…)` / `stop()` / `pause()` / `resume()`.
+No threads, doesn't own the voice loop — the two run side by side, the voice
+loop just `post()`s events. `python -m pi_pipeline.behavior` runs it against
+`MockBindings` and prints the effect stream (idle → sit → rest → sleep →
+wake-word → rouse). 11 tests. **Left for hardware:** construct it in a top-level
+runner with the *real* sinks + sources (some sinks exist: `voice/actuator.py`,
+`voice/cues.py`, `voice/tts.py`, `pi_pipeline.power`); plumb the real detection
+feed, IMU state, and mic events; run it alongside `VoiceLoop`.
+
 ### Ready logic, not yet wired to a runtime
 
 Built + unit-tested pure-logic modules. "Wire" = feed them their inputs each

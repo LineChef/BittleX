@@ -20,12 +20,14 @@ from .gestures import Gesture, GestureConfig, GesturePicker, GESTURE_TOKEN
 from .idle_posture import IdlePosture, IdlePostureConfig, Posture, PostureAction
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
+from .runtime import BehaviorRuntime, latest_frame_source
 
 __all__ = [
     "BehaviorDriver", "DriverInputs", "DriverTick", "Effect", "EffectKind",
     "DriverBindings", "MockBindings",
     "CHIRP", "ChirpMood", "Chirper", "chirp_for", "cue_chirp",
     "SleepAction", "SleepMode", "SleepModeConfig", "SleepState",
+    "BehaviorRuntime", "latest_frame_source",
     "ModeController", "Mode", "ModeConfig",
     "Explorer", "ExploreAction", "ExploreDecision", "ExploreConfig",
     "Gesture", "GestureConfig", "GesturePicker", "GESTURE_TOKEN",

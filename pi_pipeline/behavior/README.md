@@ -21,6 +21,28 @@ seen after an absence fires one excited hop. Emotive `CHIRP`s (one shared
 and sleep entry. `DriverTick` also carries `mood`, `sleep_state`, and
 `seek_attention`. Still no I/O — `bindings.py` maps the effects onto real sinks.
 
+## `BehaviorRuntime` — the loop that runs it (`runtime.py`)
+
+The Phase 10 integration seam. `BehaviorRuntime(driver, bindings, *,
+frame_source, sensors, recency, roster, hz)` ticks the driver at `hz` and
+assembles each `DriverInputs` from injected **sources**:
+
+- `post(**events)` — external producers (the voice loop, a mic-energy watcher,
+  an IMU tap detector) queue discrete events (`wake_word`, `conversation_ended`,
+  `told_sleep`, `say_hi`, `loud_sound`, `imu_tap`, `meet_name`, …); drained once
+  per tick, booleans OR between ticks.
+- `frame_source()` → the latest detection `Frame` (`latest_frame_source(feed)`
+  adapts a `DetectionFeed`).
+- `sensors()` → a dict of `imu_level` / `imu_stable` / `held` / `person_present`
+  / `recovering`.
+- `recency()` → `Memory.recency()` output, for the mood model.
+- `roster()` → bonded-person labels, for the recognition hop.
+
+`tick()` dispatches the effects through the `bindings`; `run_forever(max_ticks=…)`
+/ `stop()` / `pause()` / `resume()` drive it. No threads, doesn't own the voice
+loop — they run side by side and the voice loop just `post()`s events.
+`python -m pi_pipeline.behavior` runs it against `MockBindings`.
+
 ## `DriverBindings` — the binding layer (`bindings.py`)
 
 `DriverBindings.dispatch(tick)` routes each `Effect` kind to an injected sink

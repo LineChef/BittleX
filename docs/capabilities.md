@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **464 passing tests**.
+`pi_pipeline/` carries **474 passing tests**.
 
 ---
 
@@ -92,7 +92,10 @@ serial:
 `pi_pipeline/behavior/` — a `BehaviorDriver` that turns sensor + mode state into
 abstract **effects** (`SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE /
 CHIRP / POWER / DIAG`), which `DriverBindings` routes to whatever sinks are
-injected. All 🧩.
+injected. `BehaviorRuntime` (`runtime.py`) is the loop that ticks the driver at
+a fixed rate, feeds it inputs from injected sources (event queue, detection
+feed, sensors, mood recency, bonded roster), and dispatches the effects —
+`python -m pi_pipeline.behavior` runs the whole thing against mocks. All 🧩.
 
 - **Modes** — `converse` / `idle` / `explore`, with a controller that switches
   between them.
@@ -280,7 +283,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 464
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 474
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.
