@@ -13,6 +13,25 @@ BiBoard, Grove Vision AI camera.
 Everything below needs only the Pi + card + power (+ the PiSugar for the last
 bit). None of it needs the robot.
 
+## 0. Connectors / adapters to have on hand (order ahead)
+
+From the repo's hardware research (`docs/hardware/specs.md`, `pi-power.md`) —
+what you physically need to join the three boards:
+
+| Link | What connects | What to buy |
+|---|---|---|
+| **PiSugar S → Pi Zero 2 W** | pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box** | **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring. |
+| **Pi → BiBoard (serial, data-only)** | 3 lines: Pi **GPIO14 TXD → BiBoard RX**, Pi **GPIO15 RXD → BiBoard TX** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power). | **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them). If the BiBoard routes the Pi UART through its **Grove G1 (UART2)** socket rather than loose pins, also get a **Grove-4-pin-to-Dupont / Grove-to-male-pin pigtail** (Seeed "Grove - 4 pin to pin header" conversion cable, ~$3). **Check the Bittle X box first** — Petoi often includes a BiBoard↔Pi cable. |
+| **microSD → computer** (for flashing) | writing the Pi OS image | a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**. |
+
+Also nice to have: a small strip of **thermal tape** for the WH heatsink (no
+clip point — §6b), and a **USB-A→micro-USB** cable for both the Pi power supply
+and PiSugar charging.
+
+**One open item** (flag for Petoi support or resolve with the board in hand):
+whether the BiBoard's standard Pi mount ties the 5 V line to the data lines by
+default — if so, physically leave that pin's wire off. (`pi-power.md` "Open item".)
+
 ---
 
 ## 0. The headline facts that shape every choice
