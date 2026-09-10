@@ -625,7 +625,13 @@ the audio backends (deps + models) and everything hardware.
       `voice/skills.py` maps skill names to OpenCat `k<token>` serial commands;
       one reply can both talk and move.
 - [x] **State-cue interface** — `voice/cues.py` (`LogCue` now; buzzer/posture
-      later).
+      later). Chirp vocabulary drafted 2026-09-10 (`behavior/chirps.py`).
+- [~] **Live API end-to-end check — harness built 2026-09-10, needs a key to run.**
+      `pi_pipeline/voice/livecheck.py` (`python -m pi_pipeline.voice.livecheck`) /
+      `test_livecheck.py` (skips without a key): a few billed calls that verify a
+      plain reply, `perform_skill` parsing on "do a happy wiggle", `remember`
+      fact parsing, and the `memory_context` seam. Put `ANTHROPIC_API_KEY` in
+      `.env` and run it.
 - [x] **Audio backends installed + validated offline (2026-09-10).**
       `requirements-audio.txt` deps are in `pi_pipeline/.venv`
       (`vosk 0.3.44`, `piper-tts 1.7.0`, `sounddevice 0.5.6`, `onnxruntime
