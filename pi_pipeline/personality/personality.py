@@ -60,16 +60,34 @@ class Personality:
         return cls(traits)
 
     @classmethod
-    def from_settings(cls, settings) -> "Personality":
+    def from_settings(cls, settings, *, runtime_state: bool = True) -> "Personality":
         spec = getattr(settings, "traits_spec", "")
-        # opt-in character mode (G2_CHARACTER) folds in as a trait at
-        # G2_CHARACTER_LEVEL, unless G2_TRAITS already names it explicitly.
+        # opt-in character mode folds in as a trait, unless G2_TRAITS already
+        # names it explicitly. Precedence: runtime state file > G2_CHARACTER env.
         char = (getattr(settings, "character_spec", "") or "").strip().lower()
-        if char:
-            lvl = getattr(settings, "character_level", 0.4)
-            if char not in parse_traits(spec):
-                spec = f"{spec}, {char}={lvl}" if spec.strip() else f"{char}={lvl}"
+        lvl = getattr(settings, "character_level", 0.4)
+        if runtime_state:
+            from . import character_state
+            rt_name, rt_lvl = character_state.load()
+            if rt_name is not None:
+                char, lvl = rt_name, (rt_lvl if rt_lvl is not None else lvl)
+        if char and char not in parse_traits(spec):
+            spec = f"{spec}, {char}={lvl}" if spec.strip() else f"{char}={lvl}"
         return cls.from_spec(spec)
+
+    def with_character(self, name: str, level: float) -> "Personality":
+        """A new Personality = these traits with `name` added / replaced at
+        `level`. Used to toggle character mode at runtime."""
+        name = name.lower()
+        cls = REGISTRY.get(name)
+        if cls is None:
+            return Personality(list(self.traits))
+        kept = [t for t in self.traits if t.name != name]
+        return Personality(kept + [cls(max(0.0, min(1.0, float(level))))])
+
+    def without_character(self, name: str) -> "Personality":
+        name = name.lower()
+        return Personality([t for t in self.traits if t.name != name])
 
     # --- the three asks ---
 
