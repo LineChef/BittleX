@@ -94,7 +94,9 @@ class Trait:
 
 # name -> class. Extended as traits are added.
 from .curiosity import Curiosity  # noqa: E402  (import after Trait is defined)
+from .gir import Gir  # noqa: E402
 
 REGISTRY: dict[str, type[Trait]] = {
     Curiosity.name: Curiosity,
+    Gir.name: Gir,
 }
