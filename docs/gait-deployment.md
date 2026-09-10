@@ -43,9 +43,9 @@ policy-inference benchmark, 2-min thermal/Wi-Fi stress, then writes
 `~/g2_pi_report.txt`, uploads it, writes the URL to `~/g2_report_url.txt`,
 removes its own hook, touches `~/g2_pi_DONE`.
 
-After the reboot, wait ~15 min, SSH back in: `cat ~/g2_report_url.txt` (give that
-URL to Claude) or `cat ~/g2_pi_report.txt`. `bash …/pi_setup.sh --status` shows
-progress. Escape hatches: `--manual` (no auto-reboot), `--post-reboot` (run phase
+After the reboot, wait ~15 min, SSH back in: `cat ~/g2_report_url.txt` for the
+uploaded report link, or `cat ~/g2_pi_report.txt` to read it directly.
+`bash …/pi_setup.sh --status` shows progress. Escape hatches: `--manual` (no auto-reboot), `--post-reboot` (run phase
 2 by hand).
 
 The report's numbers that matter:

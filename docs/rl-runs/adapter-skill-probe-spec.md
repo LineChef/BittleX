@@ -2,8 +2,7 @@
 
 **Status:** SPECCED, NOT BUILT. Lives on `development` (this doc only, no code).
 The throwaway `adapter-skill-probe` branch was deleted 2026-09-07 — it only ever
-held an older copy of this spec. Deferred: user hit <10% weekly Claude usage;
-build resumes on quota reset or in a fresh session, branching fresh from
+held an older copy of this spec. Deferred; resume by branching fresh from
 `development`. Phase D A/B still running (see `vision-goal-locomotion-plan.md`
 START HERE) and is unaffected.
 

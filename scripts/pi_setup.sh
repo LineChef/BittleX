@@ -16,7 +16,7 @@
 #   removes its own @reboot hook, touches ~/g2_pi_DONE.
 #
 # You: wait ~15 min after the reboot, ssh back in, then:
-#   cat ~/g2_report_url.txt      # give this URL to Claude
+#   cat ~/g2_report_url.txt      # the uploaded report link
 #   cat ~/g2_pi_report.txt       # or read it yourself
 #
 # Escape hatches:
