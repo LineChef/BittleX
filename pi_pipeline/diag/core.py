@@ -24,6 +24,7 @@ import subprocess
 import threading
 import time
 from collections import deque
+from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -218,6 +219,36 @@ class Diag:
 
         sys.excepthook = _hook
         self._excepthook_installed = True
+
+    @contextmanager
+    def session(self, subsystem_hint: str = "run", **kw):
+        """One-line diagnostics for a CLI entrypoint: `start_session` +
+        `install_excepthook` + bridge stdlib logging on entry, `close()` on
+        exit -- `clean=False` (+ one last FATAL event) if the block raised.
+
+            with diag.session("check_serial", extra={"cmd": args.cmd}):
+                ...  # do the thing
+
+        A crash still reaches `sys.excepthook` afterward (this doesn't
+        suppress the exception), so the FATAL event and the manifest are
+        recorded even if something upstream catches it later.
+        """
+        self.start_session(subsystem_hint, **kw)
+        self.install_excepthook()
+        bridge_stdlib_logging()
+        try:
+            yield self
+        except (SystemExit, KeyboardInterrupt):
+            # a deliberate exit (sys.exit(N) / Ctrl-C), not a crash -- don't
+            # flag it FATAL, but still close so the manifest gets finalized.
+            self.close(clean=True)
+            raise
+        except BaseException as e:
+            self.event(subsystem_hint, "FATAL", "session.exception", err=repr(e))
+            self.close(clean=False)
+            raise
+        else:
+            self.close(clean=True)
 
     # -- ring buffers ------------------------------------------------------------
     def attach_ring(self, ring: RingBuffer) -> RingBuffer:

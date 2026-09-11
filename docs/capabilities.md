@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **563 passing tests**.
+`pi_pipeline/` carries **567 passing tests**.
 
 ---
 
@@ -288,9 +288,14 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   handshake (`?` banner + `P` voltage readback — confirms it actually speaks
   OpenCat, not just that the port opened), audio devices, free disk. Non-zero
   exit on any hard failure.
-- **Black-box logging in the integrated app** — `pi_pipeline.app` starts a
-  diagnostics session + crash hook on launch, same as the gait loop; the first
-  real hardware session is recorded, not silently unlogged.
+- **Black-box logging on every CLI entrypoint** — `diag.session(name)` (a
+  context manager: start + crash hook + stdlib-logging bridge on entry, close
+  on exit) is wired into `pi_pipeline.app`, `doctor`, `check_serial`,
+  `pi_pipeline.voice`, and `gait/bench_real.py`, alongside the pre-existing
+  `run_gait.py` — so the very first command you run during bring-up is
+  recorded, not just the ones that happen to reach the integrated app.
+  `SystemExit` / `KeyboardInterrupt` are recognised as a clean exit, not a
+  crash.
 - **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 14-step
   hardware sequence as a resumable, interactive checklist (progress persists
   to disk); auto-runs only read-only/passive steps, always shows movement
@@ -344,7 +349,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 563
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 567
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

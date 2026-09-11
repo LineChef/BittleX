@@ -20,8 +20,15 @@ import time
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HERE)
+sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for pi_pipeline.diag
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
+
+try:
+    from pi_pipeline.diag import diag  # noqa: E402
+except Exception:  # noqa: BLE001 -- diag is optional
+    diag = None
 
 
 def _fake_imu(rng, tilt=0.05):
@@ -48,6 +55,14 @@ def main():
     ap.add_argument("--threads", type=int, default=2)
     args = ap.parse_args()
 
+    if diag is not None:
+        with diag.session("bench_real", extra={"n": args.n, "threads": args.threads}):
+            _run(args)
+    else:
+        _run(args)
+
+
+def _run(args):
     rng = np.random.default_rng(0)
     pol = ResidualGaitPolicy(onnx_path=args.onnx, wkf_path=args.wkf, intra_op_threads=args.threads)
     pol.set_command(fwd=args.cmd, yaw=0.0)

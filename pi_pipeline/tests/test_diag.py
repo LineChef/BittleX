@@ -70,3 +70,36 @@ def test_flush_by_name_even_at_info(d):
     d.attach_ring(RingBuffer(seconds=1, hz=10)).push(x=1)
     d.event("recovery", "INFO", "fall.detected", roll=1.4)   # name is in _FLUSH_NAMES
     assert list(d.session_dir.glob("blackbox_*.csv"))
+
+
+def test_session_context_manager_clean_exit(d, tmp_path):
+    with d.session("check_serial", extra={"cmd": "ports"}) as dg:
+        assert dg is d
+    man = json.loads((d.session_dir / "manifest.json").read_text())
+    assert man["clean_exit"] is True
+    assert man["subsystem_hint"] == "check_serial"
+    assert d._fp is None   # closed
+
+
+def test_session_context_manager_logs_fatal_on_a_real_exception(d):
+    with pytest.raises(ValueError):
+        with d.session("doctor"):
+            raise ValueError("boom")
+    events = _events(d)
+    assert any(e["name"] == "session.exception" and e["lvl"] == "FATAL" for e in events)
+
+
+def test_session_context_manager_treats_system_exit_as_clean(d):
+    with pytest.raises(SystemExit):
+        with d.session("doctor"):
+            raise SystemExit(1)
+    events = _events(d)
+    assert not any(e["name"] == "session.exception" for e in events)
+
+
+def test_session_context_manager_treats_keyboard_interrupt_as_clean(d):
+    with pytest.raises(KeyboardInterrupt):
+        with d.session("voice"):
+            raise KeyboardInterrupt()
+    events = _events(d)
+    assert not any(e["name"] == "session.exception" for e in events)

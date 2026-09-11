@@ -14,6 +14,7 @@ import logging
 import time
 
 from ..config import settings
+from ..diag import diag
 from ..voice import skills as skillcat
 from . import opencat
 from .serial_link import SerialLink
@@ -81,42 +82,43 @@ def main() -> None:
     fm.add_argument("--walk-s", type=float, default=2.0, help="seconds to run wkF before auto-rest")
     args = ap.parse_args()
 
-    if args.cmd == "ports":
-        found = SerialLink.list_ports()
-        for dev, desc in found:
-            print(f"  {dev}  {desc}")
-        print(f"  configured: {settings.serial_port} @ {settings.serial_baud}")
-        if not found:
-            print("  (none -- pyserial missing, or no adapters connected)")
-        return
+    with diag.session("check_serial", extra={"cmd": args.cmd}):
+        if args.cmd == "ports":
+            found = SerialLink.list_ports()
+            for dev, desc in found:
+                print(f"  {dev}  {desc}")
+            print(f"  configured: {settings.serial_port} @ {settings.serial_baud}")
+            if not found:
+                print("  (none -- pyserial missing, or no adapters connected)")
+            return
 
-    link = _link()
-    if not link.connect():
-        print(f"could not open {settings.serial_port}")
-        return
-    try:
-        if args.cmd == "ping":
-            print("banner:", link.drain(1.0) or "(silent)")
-            print("query :", link.send(opencat.QUERY) or "(no reply)")
-        elif args.cmd == "send":
-            if not opencat.is_safe(args.command):
-                print(f"refusing unsafe command {args.command!r}")
-                return
-            print("reply:", link.send(args.command) or "(no reply)")
-        elif args.cmd == "skills":
-            for name, sk_ in skillcat.SKILLS.items():
-                cmd = skillcat.serial_command(name)
-                print(f"  {name:14} -> {cmd}")
-                link.send(cmd, read_reply=False)
-                time.sleep(args.hold)
-            link.send(opencat.REST, read_reply=False)
-        elif args.cmd == "rest":
-            link.send(opencat.REST, read_reply=False)
-            print("sent 'd' (rest)")
-        elif args.cmd == "firstmove":
-            _firstmove(link, deg=args.deg, walk_s=args.walk_s)
-    finally:
-        link.close()
+        link = _link()
+        if not link.connect():
+            print(f"could not open {settings.serial_port}")
+            return
+        try:
+            if args.cmd == "ping":
+                print("banner:", link.drain(1.0) or "(silent)")
+                print("query :", link.send(opencat.QUERY) or "(no reply)")
+            elif args.cmd == "send":
+                if not opencat.is_safe(args.command):
+                    print(f"refusing unsafe command {args.command!r}")
+                    return
+                print("reply:", link.send(args.command) or "(no reply)")
+            elif args.cmd == "skills":
+                for name, sk_ in skillcat.SKILLS.items():
+                    cmd = skillcat.serial_command(name)
+                    print(f"  {name:14} -> {cmd}")
+                    link.send(cmd, read_reply=False)
+                    time.sleep(args.hold)
+                link.send(opencat.REST, read_reply=False)
+            elif args.cmd == "rest":
+                link.send(opencat.REST, read_reply=False)
+                print("sent 'd' (rest)")
+            elif args.cmd == "firstmove":
+                _firstmove(link, deg=args.deg, walk_s=args.walk_s)
+        finally:
+            link.close()
 
 
 if __name__ == "__main__":

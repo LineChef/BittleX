@@ -8,6 +8,14 @@ import pytest
 from pi_pipeline.config import Settings
 
 
+@pytest.fixture(autouse=True)
+def _isolate_diag_logs(tmp_path, monkeypatch):
+    """Any test that exercises a CLI `main()` (doctor, check_serial, voice, ...)
+    may start a real `diag` session -- redirect it to a per-test tmp dir so the
+    suite never writes to the developer's actual ~/g2_logs."""
+    monkeypatch.setenv("G2_LOG_DIR", str(tmp_path / "g2_logs"))
+
+
 @pytest.fixture
 def cfg(tmp_path):
     """A Settings pointed at a temp DB, with a fake API key so Conversation builds."""

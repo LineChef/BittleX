@@ -913,7 +913,19 @@ that ties everything together with hardware:
 - **Black-box logging in `pi_pipeline.app`** — `diag.start_session("app", ...)` +
   `install_excepthook()` + `bridge_stdlib_logging()` at startup, `diag.close()`
   in the shutdown path — the first real hardware session is now recorded like
-  any gait run, not silently unlogged.
+  any gait run, not silently unlogged. **Extended 2026-09-10 to every CLI
+  entrypoint**, not just the integrated app — the actual first thing you run
+  during bring-up (`check_serial`, `doctor`) is usually one of those, not
+  `pi_pipeline.app`. Added `Diag.session(subsystem_hint, **kw)`
+  (`pi_pipeline/diag/core.py`) — a context manager wrapping the same
+  start/hook/bridge/close sequence, treating `SystemExit`/`KeyboardInterrupt`
+  as a clean exit (not a FATAL crash) so `doctor`'s own `sys.exit(1)` on a
+  failed check doesn't get misreported. Wired into `check_serial.py`,
+  `doctor.py`, `voice/__main__.py`, and `gait/bench_real.py` (the last via the
+  same optional-import + dual sys.path pattern `run_gait.py` uses, since it can
+  run as a bare script). `pi_pipeline/tests/conftest.py` gained an autouse
+  fixture pointing `G2_LOG_DIR` at a tmp dir, so the test suite no longer
+  writes real session logs to the developer's `~/g2_logs`.
 - **The voice actuator shares the real serial link** — `voice/actuator.py`
   `SerialActuator(port, baud, *, link=None)` accepts an existing link (the
   app's `LockedLink`) instead of always opening its own on the same port, and

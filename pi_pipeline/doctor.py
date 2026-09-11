@@ -162,21 +162,26 @@ def main(argv=None) -> None:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
-    checks = run(ping_serial=args.serial)
-    if args.json:
-        print(json.dumps(checks, indent=2))
-    else:
-        width = max(len(c["name"]) for c in checks)
+    from .diag import diag
+    with diag.session("doctor", extra={"serial": args.serial}):
+        checks = run(ping_serial=args.serial)
+        if args.json:
+            print(json.dumps(checks, indent=2))
+        else:
+            width = max(len(c["name"]) for c in checks)
+            for c in checks:
+                line = f"  [{_MARK[c['status']]}]  {c['name']:<{width}}"
+                if c["detail"]:
+                    line += f"   {c['detail']}"
+                print(line)
+            n_fail = sum(c["status"] == FAIL for c in checks)
+            n_warn = sum(c["status"] == WARN for c in checks)
+            print(f"\n{len(checks)} checks -- {n_fail} fail, {n_warn} warn")
         for c in checks:
-            line = f"  [{_MARK[c['status']]}]  {c['name']:<{width}}"
-            if c["detail"]:
-                line += f"   {c['detail']}"
-            print(line)
-        n_fail = sum(c["status"] == FAIL for c in checks)
-        n_warn = sum(c["status"] == WARN for c in checks)
-        print(f"\n{len(checks)} checks -- {n_fail} fail, {n_warn} warn")
+            if c["status"] == FAIL:
+                diag.event("doctor", "WARN", "check.fail", check=c["name"], detail=c["detail"])
 
-    sys.exit(1 if any(c["status"] == FAIL for c in checks) else 0)
+        sys.exit(1 if any(c["status"] == FAIL for c in checks) else 0)
 
 
 if __name__ == "__main__":
