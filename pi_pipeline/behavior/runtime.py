@@ -36,7 +36,7 @@ log = logging.getLogger("g2.behavior.runtime")
 
 # the DriverInputs fields the event queue accepts (discrete, per-tick)
 _EVENT_BOOLS = (
-    "halt", "release",
+    "halt", "release", "ack",
     "wake_word", "conversation_ended", "told_stop", "told_stay", "told_sleep",
     "shutdown", "arm_explore", "disarm_explore",
     "rebuffed", "picked_up", "loud_sound", "imu_tap", "nearby_motion",

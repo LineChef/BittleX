@@ -26,6 +26,7 @@ class ChirpMood(Enum):
     SLEEPY = "sleepy"        # entering rest / sleep mode
     QUESTION = "question"    # asking something / enrollment prompt
     GREETING = "greeting"    # "G2 meet X" / say-hi trill
+    ACK = "ack"             # "heard you" -- fires on every recognised voice command
 
 
 # (tone_index, duration_units) sequences. Kept short (<= ~5 notes).
@@ -36,11 +37,13 @@ CHIRP: dict[ChirpMood, list[tuple[int, int]]] = {
     ChirpMood.SLEEPY:   [(16, 10), (12, 12), (9, 16)],      # slow descending, low
     ChirpMood.QUESTION: [(19, 5), (26, 8)],                 # rising two-note "?"
     ChirpMood.GREETING: [(24, 3), (28, 3), (24, 3), (30, 6)],  # quick trill
+    ChirpMood.ACK:      [(26, 3), (30, 3)],                 # quick "got it" blip
 }
 
 # voice-loop cue stage -> a mood (or None to stay silent)
 _CUE_MOOD = {
     "listening": ChirpMood.ALERT,
+    "heard":     ChirpMood.ACK,
     "thinking":  ChirpMood.QUESTION,
     "speaking":  None,
     "idle":      None,

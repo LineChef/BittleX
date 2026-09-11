@@ -87,6 +87,7 @@ class DriverInputs:
     # --- discrete events since the last tick ---
     wake_word: bool = False                 # addressed / wake phrase heard
     conversation_ended: bool = False
+    ack: bool = False                       # a voice command was recognised -> "heard you" chirp
     told_stop: bool = False                 # explicit "stop" / "that's enough"
     told_stay: bool = False                 # "stay" / "wait here" -> sit and hold
     arm_explore: bool = False               # "go ahead and look around" -> allow Tier 1 roam
@@ -283,6 +284,10 @@ class BehaviorDriver:
     # --- event fan-out -----------------------------------------------------
     def _apply_events(self, i: DriverInputs, now: float) -> list:
         fx: list = []
+        if i.ack:
+            # "heard you" -- always fires (not rate-limited); the audible proof
+            # that G2 registered a voice command, so a misheard one is obvious.
+            fx.append(Effect(EffectKind.CHIRP, ChirpMood.ACK, "voice command heard"))
         if i.wake_word:
             self.mode.on_conversation_start()
             self.idle.on_activity()

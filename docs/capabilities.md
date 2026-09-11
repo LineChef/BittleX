@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **517 passing tests**.
+`pi_pipeline/` carries **522 passing tests**.
 
 ---
 
@@ -171,7 +171,13 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
 - **Tool-calls Claude can make mid-turn:**
   - `perform_skill` — G2 acts out a skill while it talks.
   - `remember` — commit a fact to persistent memory.
-- **Local commands** (no API) — forget, sleep, character on/off, parsed on-device.
+- **Local commands** (no API) — emergency stop / resume, shut down, explore
+  arm / disarm, go to sleep, forget, character on/off — parsed on-device,
+  checked before Claude (emergency stop wins over everything).
+- **Command acknowledgement** — *every* recognised voice command (and every
+  conversational turn) fires an instant "heard you" chirp + a `heard` cue before
+  the slower spoken reply, and G2 never moves silently (a bare skill still gets
+  a spoken "Okay"). Makes a misheard command obvious so you can cancel it.
 - **Memory seam** — every turn pulls memory context before the API call and
   writes back after.
 - **Graceful degradation** — auth / rate-limit / billing failures each map to a
@@ -314,7 +320,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 517
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 522
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

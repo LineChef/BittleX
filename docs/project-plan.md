@@ -536,6 +536,14 @@ Pi Zero 2 W voice-stack benchmark.
 - [x] **State-cue interface** — `voice/cues.py` (`LogCue` now; buzzer/posture
       later). Chirp vocabulary drafted 2026-09-10 (`behavior/chirps.py`), wired
       into `BehaviorDriver` as `CHIRP` effects 2026-09-10 (see Phase 10).
+- [x] **Command acknowledgement (user request 2026-09-10)** — *every* recognised
+      local command (`match_local_command` non-`None`) **and** every
+      conversational turn fires `DriverInputs.ack` → an un-rate-limited
+      `ChirpMood.ACK` "heard you" blip + a `"heard"` cue, *before* the slower
+      spoken reply; and a bare skill from Claude with no speech now still gets a
+      spoken "Okay". Rationale: a misheard command is immediately audible so it
+      can be cancelled ("resume" / activity). `ack` in `_EVENT_BOOLS`; the voice
+      loop bridges it via `on_event`.
 - [~] **Live API end-to-end check — harness built 2026-09-10, needs a key to run.**
       `pi_pipeline/voice/livecheck.py` (`python -m pi_pipeline.voice.livecheck`) /
       `test_livecheck.py` (skips without a key): a few billed calls that verify a

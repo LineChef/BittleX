@@ -218,3 +218,22 @@ def test_told_sleep_overrides_person_present():
     c.adv(2.0)
     tick = d.tick(DriverInputs(told_sleep=True, person_present=True))
     assert any(e.kind is EffectKind.SKILL and e.payload == "kzz" for e in tick.effects)
+
+
+# ----------------------------------------------- ack chirp (every command)
+def test_ack_input_always_chirps_not_rate_limited():
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9),
+                       clock=c, rng=random.Random(0))
+    t1 = d.tick(DriverInputs(ack=True))
+    assert any(e.kind is EffectKind.CHIRP and e.payload is ChirpMood.ACK
+               for e in t1.effects)
+    c.adv(0.05)                                       # well inside any cooldown
+    t2 = d.tick(DriverInputs(ack=True))
+    assert any(e.kind is EffectKind.CHIRP and e.payload is ChirpMood.ACK
+               for e in t2.effects)
+
+
+def test_cue_chirp_maps_heard_to_ack():
+    from pi_pipeline.behavior.chirps import cue_chirp, chirp_for
+    assert cue_chirp("heard") == chirp_for(ChirpMood.ACK)

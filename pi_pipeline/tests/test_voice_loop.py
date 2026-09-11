@@ -166,3 +166,31 @@ def test_on_event_bridge_posts_wake_end_and_sleep():
     assert kinds[0] == "wake_word"                 # first turn waited for wake
     assert "told_sleep" in kinds                   # "go to sleep" bridged
     assert "conversation_ended" in kinds           # session end bridged
+
+
+# --------------------------------------- G2 always acknowledges a command
+def test_recognised_command_acks_before_acting():
+    events = []
+    lp, w, stt, conv, tts = _loop(
+        ["go to sleep", ""], on_event=lambda **kw: events.append(kw))
+    _run(lp, 2)
+    kinds = [next(iter(e)) for e in events]
+    # ack fires for the command, before the told_sleep action event
+    assert kinds.index("ack") < kinds.index("told_sleep")
+
+
+def test_conversational_turn_also_acks():
+    events = []
+    lp, w, stt, conv, tts = _loop(
+        ["what do you see", ""], on_event=lambda **kw: events.append(kw))
+    _run(lp, 2)
+    assert any("ack" in e for e in events)
+    assert conv.sent == ["what do you see"]           # still went to Claude
+
+
+def test_actions_without_speech_still_get_a_spoken_ok():
+    lp, w, stt, conv, tts = _loop(["sit down", ""])
+    conv.send = lambda text, memory_context=None: __import__("types").SimpleNamespace(
+        speech="", actions=["sit"], facts=[])
+    _run(lp, 2)
+    assert "Okay." in tts.said

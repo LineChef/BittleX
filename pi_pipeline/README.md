@@ -96,7 +96,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**517 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**522 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +
@@ -133,6 +133,10 @@ python -m pi_pipeline.behavior
 # Bring-up readiness checklist (run the moment the Pi + body are wired)
 python -m pi_pipeline.doctor              # add --serial to also ping the BiBoard
 ```
+
+Every recognised command (and every conversational turn) fires an instant
+"heard you" chirp + cue *before* the spoken reply, and G2 never acts silently —
+so a misheard command is obvious and you can cancel it ("resume" / "never mind").
 
 **Spoken commands** (handled locally, no Claude call):
 - "emergency stop" / "freeze" / "halt" / "stop moving" → latch the freeze;

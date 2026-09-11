@@ -122,6 +122,13 @@ class VoiceLoop:
             raise KeyboardInterrupt
 
         cmd = match_local_command(user_text)
+        if cmd is not None:
+            # G2 always signals that he registered a command -- an instant "heard
+            # you" chirp (+ cue), before the slower spoken reply. Makes a
+            # misheard command obvious so you can say "resume" / "never mind".
+            self._events(ack=True)
+            self._cue.set("heard")
+
         if cmd == "halt":
             log.warning("EMERGENCY STOP (voice command %r)", user_text)
             self._events(halt=True)
@@ -193,6 +200,10 @@ class VoiceLoop:
         self._mood.update(last_interaction_s=age, exchanges_recent=n_recent)
         self._conv.set_mood_hint(self._mood.phrasing_hint())
 
+        # a conversational turn: still signal "heard you" -- the Claude round
+        # trip has real latency on this hardware, so an instant chirp + the
+        # thinking cue tell you G2 registered it.
+        self._events(ack=True)
         self._cue.set("thinking")
         try:
             context = self._memory.recall(user_text) if self._memory else None
@@ -215,6 +226,8 @@ class VoiceLoop:
         self._cue.set("speaking")
         if turn.speech:
             self._tts.speak(turn.speech)
+        elif turn.actions:
+            self._tts.speak("Okay.")          # never move silently -- always a spoken ack
         for skill in turn.actions:
             self._act.perform(skill)
 

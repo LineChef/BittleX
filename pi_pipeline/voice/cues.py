@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Literal, Protocol
 
-Stage = Literal["idle", "listening", "thinking", "speaking"]
+Stage = Literal["idle", "listening", "heard", "thinking", "speaking"]
 
 log = logging.getLogger("g2.cue")
 
