@@ -31,6 +31,7 @@ from enum import Enum
 from ..personality.mood import IdleBias, Mood, MoodConfig, MoodModel
 from ..personality.traits import BehaviorParams
 from ..vision.feed import Frame
+from .approach import ApproachConfig, ApproachTarget
 from .attentive import AttentiveConfig, AttentiveLook
 from .chirps import ChirpMood, Chirper
 from .emergency import EmergencyStop
@@ -45,6 +46,7 @@ from .idle_posture import (
 )
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
+from .place_memory import PlaceMemory, PlaceMemoryConfig
 from .sleep_mode import SleepAction, SleepMode, SleepModeConfig, SleepState
 
 try:  # CliffGuard is optional -- the driver runs fine with no edge sensing
@@ -92,13 +94,15 @@ class DriverInputs:
     told_stay: bool = False                 # "stay" / "wait here" -> sit and hold
     arm_explore: bool = False               # "go ahead and look around" -> allow Tier 1 roam
     disarm_explore: bool = False            # "that's enough" -> end the roam bout
+    come_here: bool = False                 # "come here" -> directed walk toward a person
     told_sleep: bool = False                # "go to sleep" -> curl up + dormant now
     shutdown: bool = False                  # "shut down" -> lie flat, then dormant
     rebuffed: bool = False                  # "leave me alone" / harsh correction -> mood SUBDUED
     picked_up: bool = False                 # lifted this tick (edge of `held`)
     loud_sound: bool = False                # a startling noise -> rouse
     imu_tap: bool = False                   # a tap / knock on the shell -> wake from sleep
-    nearby_motion: bool = False             # small sound/motion -> PEEK, don't get up
+    nearby_motion: bool = False             # small sound/motion -> PEEK / glance toward it
+    sound_bearing: float | None = None      # where a sound came from (rad, + = right), if known
     meet_name: str | None = None            # "G2, meet <name>" -> start enrollment
     cancel_enroll: bool = False
     say_hi: bool = False                     # "say hi" / "wave" voice intent -> greeting gesture
@@ -130,6 +134,7 @@ class DriverTick:
     sleep_state: SleepState = SleepState.AWAKE
     seek_attention: bool = False   # LONELY -> a caller may add a gentle attention wander
     halted: bool = False           # emergency stop is latched
+    place_notes: list = field(default_factory=list)  # new B11 spatial-pattern facts this tick
 
 
 # PostureAction -> the head-up / stretch / stand choreography, as (delay_s, Effect)
@@ -211,6 +216,8 @@ class BehaviorDriver:
                  mood_cfg: MoodConfig | None = None,
                  sleep_cfg: SleepModeConfig | None = None,
                  attentive_cfg: AttentiveConfig | None = None,
+                 approach_cfg: ApproachConfig | None = None,
+                 place_cfg: PlaceMemoryConfig | None = None,
                  chirps: bool = True,
                  estop_freeze_token: str = "kbalance",
                  cliff=None,
@@ -235,6 +242,10 @@ class BehaviorDriver:
         # Tier 0 "attentive" -- stationary curiosity, layered on IDLE posture
         self.attentive = AttentiveLook(self.novelty, attentive_cfg, clock=clock,
                                        vision_available=self._vision)
+        # "come here" -- a directed one-shot walk toward a person
+        self.approach = ApproachTarget(approach_cfg, clock=clock)
+        # place memory (B11) -- stable "the dog is often to the left" patterns
+        self.place = PlaceMemory(place_cfg)
         # personality -> idle timing: use the BehaviorParams knobs unless the
         # caller pinned an explicit config.
         self.idle = IdlePosture(
@@ -259,6 +270,7 @@ class BehaviorDriver:
         self._session_dir: str | None = None
         self._session_name = ""
         self._explore_target = ""
+        self._roam_chirp_at: float | None = None   # last "I'm roaming" chirp; None = not roaming
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
         self._prev_mode = self.mode.mode
@@ -303,11 +315,16 @@ class BehaviorDriver:
             self.explorer.reset()
         if i.disarm_explore:
             self.mode.disarm_explore()
-        # anything that should break roaming / rouse from rest
-        if i.told_stop or i.picked_up or i.loud_sound:
+        if i.come_here and self._vision:
+            self.approach.start(now)
+        # anything that should break roaming / rouse from rest / stop approaching
+        if i.told_stop or i.picked_up or i.loud_sound or i.come_here:
             self.mode.on_activity()
             self.idle.on_activity()
             self._t_last_activity = now
+        if (i.told_stop or i.picked_up or i.wake_word or i.disarm_explore) \
+                and self.approach.active:
+            self.approach.cancel()
         # sleep wake signals are fed to sleep.update() in the tick's sleep gate
         # (not via on_activity() here -- that would swallow the WAKE action).
         if i.picked_up or i.loud_sound:
@@ -396,8 +413,10 @@ class BehaviorDriver:
         elif d.action is ExploreAction.TURN:
             fx.append(Effect(EffectKind.TURN, d.turn, d.reason))
         elif d.action is ExploreAction.APPROACH:
+            self.place.observe(d.target, d.turn)
             fx.append(Effect(EffectKind.WALK, d.turn, f"approach {d.target}"))
         elif d.action is ExploreAction.INVESTIGATE:
+            self.place.observe(d.target, d.turn)
             fx.append(Effect(EffectKind.STOP, None, f"investigate {d.target}"))
             if abs(d.turn) > 1e-3:
                 fx.append(Effect(EffectKind.HEAD, float(d.turn), "orient to find"))
@@ -507,8 +526,8 @@ class BehaviorDriver:
         _, s_act = self.sleep.update(
             now, resting=self.idle.posture is Posture.RESTING,
             person_present=i.person_present, loud_sound=i.loud_sound,
-            imu_tap=i.imu_tap or i.picked_up,          # lifted == a wake
-            wake_word=i.wake_word or i.told_stop)      # spoken to == a wake
+            imu_tap=i.imu_tap or i.picked_up,                  # lifted == a wake
+            wake_word=i.wake_word or i.told_stop or i.come_here)  # spoken to == a wake
         if s_act is SleepAction.LIE_DOWN:             # shutdown: lie flat first
             return self._finish(self.mode.update(now),
                                 effects + [Effect(EffectKind.SKILL, "d", "shutdown: lie down")],
@@ -587,6 +606,21 @@ class BehaviorDriver:
 
         mode = self.mode.update(now)
 
+        # 2c. "come here" -- a directed one-shot walk toward a person. Beats
+        #     CONVERSE / EXPLORE / IDLE (it's a direct command); enrollment,
+        #     choreography, safety, sleep above still preempt. Disarms itself on
+        #     arrival / give-up.
+        if self.approach.active and self._vision:
+            for e in self.approach.decide(list(i.frame), now):
+                if e.kind is EffectKind.CHIRP:
+                    effects += self._chirp(e.payload, now, e.reason)
+                else:
+                    effects.append(e)
+            self.idle.update(now, exploring=True, person_present=i.person_present,
+                             handled=i.held)   # hold ACTIVE, no descent
+            return self._finish(Mode.APPROACH, effects, now,
+                                reason=f"come here: {self.approach.last_reason}")
+
         # 3. CONVERSE -- attentive hold
         if mode is Mode.CONVERSE:
             _, pa = self.idle.update(now, in_conversation=True,
@@ -604,14 +638,25 @@ class BehaviorDriver:
             if self.explorer.exhausted:
                 self.mode.disarm_explore()
                 self.explorer.reset()
+                self._roam_chirp_at = None
                 return self._finish(self.mode.update(now),
                                     effects + [Effect(EffectKind.STOP, None, "leash: bout done")],
                                     now, reason="explore: leg budget spent -> disarm")
+            # audible "I'm roaming" -- a soft chirp on entry, then periodically,
+            # so autonomous movement is never a surprise
+            if self._roam_chirp_at is None:
+                self._roam_chirp_at = now
+                effects.append(Effect(EffectKind.CHIRP, ChirpMood.GREETING, "starting to roam"))
+            elif now - self._roam_chirp_at >= self.explorer.cfg.roam_chirp_s:
+                self._roam_chirp_at = now
+                effects.append(Effect(EffectKind.CHIRP, ChirpMood.QUESTION, "still roaming"))
             self.idle.update(now, exploring=True, person_present=i.person_present,
                              handled=i.held)
             effects += self._from_explore(i, now)
             return self._finish(mode, effects, now,
                                 reason=f"explore: {self._explore_target or 'roaming'}")
+        else:
+            self._roam_chirp_at = None       # not roaming -> reset the entry chirp
 
         # 5. IDLE -- staged descent + idle fidgets + the Tier 0 attentive layer
         safe_to_rest = (i.imu_level and i.imu_stable and not i.held
@@ -633,7 +678,9 @@ class BehaviorDriver:
         if pa is PostureAction.NONE and self.idle.posture in (Posture.SIT, Posture.RESTING):
             for e in self.attentive.decide(
                     list(i.frame), resting=self.idle.posture is Posture.RESTING,
-                    now=now, person_present=i.person_present):
+                    now=now, person_present=i.person_present,
+                    sound=i.nearby_motion, loud=i.loud_sound,
+                    sound_bearing=i.sound_bearing):
                 if e.kind is EffectKind.CHIRP:
                     effects += self._chirp(e.payload, now, e.reason)
                 else:
@@ -670,4 +717,5 @@ class BehaviorDriver:
                           effects=diags + effects, reason=reason,
                           mood=self.mood_model.mood, sleep_state=self.sleep.state,
                           seek_attention=self._seek_attention,
-                          halted=self.estop.halted)
+                          halted=self.estop.halted,
+                          place_notes=self.place.pending_notes())

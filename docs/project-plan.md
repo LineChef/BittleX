@@ -948,6 +948,31 @@ The single time-based `EXPLORE` mode is split:
   classifier (B16) upgrades it for near-edge use. Operating contract: G2 is
   always supervised, and the operator only arms Tier 1 when G2 is on the floor.
 
+**Explore polish, built 2026-09-10** (follow-up pass):
+- **Tier 0 sound reaction** — `AttentiveLook.decide()` takes `sound` / `loud` /
+  `sound_bearing`; turns the head toward a sound (or a quick scan if the bearing
+  is unknown). A loud sound interrupts a gaze-follow. No camera needed.
+- **Gaze-follow satiation** — after `follow_satiate_s` of continuous follow it
+  drops to `follow_glance_cooldown_s` glances so it doesn't stare; a big bearing
+  change or the person leaving view re-engages.
+- **"Come here"** — `behavior/approach.py` (`ApproachTarget`), voice command
+  `"come"` ("come here" / "come to me" — *not* "come back", which is
+  `"unexplore"`). `DriverInputs.come_here` → `Mode.APPROACH`: a one-shot directed
+  walk toward the largest person detection, `STOP` + happy chirp on arrival
+  (`close_area`), `STOP` + confused chirp on give-up (`give_up_s`). Preempts
+  IDLE / EXPLORE / CONVERSE; enrollment / choreography / safety / sleep still
+  win. Cancelled by `told_stop` / pickup / wake word; needs `_vision`.
+- **Audible roam state** — the driver emits a `GREETING` chirp on entering
+  EXPLORE and a `QUESTION` chirp every `ExploreConfig.roam_chirp_s` while
+  roaming, so autonomous movement is never a surprise.
+- **Place memory (B11 start)** — `behavior/place_memory.py` (`PlaceMemory`):
+  `observe(label, bearing)` on each Tier-1 investigate/approach; once a label
+  repeats in the same 4-way direction `min_sightings` times it emits a durable
+  sentence ("The dog is often to the left…"), surfaced as
+  `DriverTick.place_notes` and forwarded by `BehaviorRuntime` `on_observation`
+  → `Memory.store.add_fact` (the app wires this when memory is enabled). No
+  timestamps — the memory store rejects temporal detail anyway.
+
 **Graceful shutdown, built 2026-09-10** — voice "shut down" / "shutdown" /
 "power down" / "go dormant" (`commands` → `"shutdown"`) → `DriverInputs.shutdown`
 → `SleepMode.on_command_shutdown()`: G2 emits `d` (lie flat), holds

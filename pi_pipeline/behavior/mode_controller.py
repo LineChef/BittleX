@@ -30,6 +30,7 @@ class Mode(Enum):
     CONVERSE = "converse"
     IDLE = "idle"
     EXPLORE = "explore"
+    APPROACH = "approach"   # a directed "come here" walk (driver-owned, one-shot)
 
 
 @dataclass

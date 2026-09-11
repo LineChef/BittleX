@@ -5,6 +5,7 @@ decides wander/investigate intent during EXPLORE; `Novelty` tracks what's been
 seen so "curious" pulls toward the unseen. All pure logic, driven by the
 `BehaviorParams` the personality produces.
 """
+from .approach import ApproachConfig, ApproachTarget
 from .attentive import AttentiveConfig, AttentiveLook
 from .bindings import DriverBindings, MockBindings
 from .chirps import CHIRP, ChirpMood, Chirper, chirp_for, cue_chirp
@@ -22,12 +23,15 @@ from .gestures import Gesture, GestureConfig, GesturePicker, GESTURE_TOKEN
 from .idle_posture import IdlePosture, IdlePostureConfig, Posture, PostureAction
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
+from .place_memory import PlaceMemory, PlaceMemoryConfig
 from .runtime import BehaviorRuntime, latest_frame_source
 
 __all__ = [
     "BehaviorDriver", "DriverInputs", "DriverTick", "Effect", "EffectKind",
     "DriverBindings", "MockBindings",
+    "ApproachConfig", "ApproachTarget",
     "AttentiveConfig", "AttentiveLook",
+    "PlaceMemory", "PlaceMemoryConfig",
     "CHIRP", "ChirpMood", "Chirper", "chirp_for", "cue_chirp",
     "EmergencyStop",
     "SleepAction", "SleepMode", "SleepModeConfig", "SleepState",

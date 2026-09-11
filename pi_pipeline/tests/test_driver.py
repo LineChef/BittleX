@@ -284,3 +284,22 @@ def test_shutdown_lies_down_then_goes_dormant():
     assert dormant is not None
     assert ("off", None) in payloads(dormant, EffectKind.CAPTURE)
     assert "kzz" not in payloads(dormant, EffectKind.SKILL)  # stays flat, doesn't curl
+
+
+def test_roam_emits_an_audible_state():
+    from pi_pipeline.behavior.chirps import ChirpMood
+    from pi_pipeline.behavior.explore import ExploreConfig
+    d, c = _mk(params=BehaviorParams(), explore_cfg=ExploreConfig(roam_chirp_s=5.0))
+    c.adv(10)
+    t = d.tick(DriverInputs(arm_explore=True, frame=[]))
+    assert any(e.kind is EffectKind.CHIRP for e in t.effects)   # entry chirp
+    got_periodic = False
+    for _ in range(30):
+        c.adv(1.0)
+        t = d.tick(DriverInputs(frame=[]))
+        if t.mode is not Mode.EXPLORE:
+            break
+        if any(e.kind is EffectKind.CHIRP and e.payload is ChirpMood.QUESTION
+               for e in t.effects):
+            got_periodic = True
+    assert got_periodic

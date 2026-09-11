@@ -160,6 +160,14 @@ class VoiceLoop:
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return
+        if cmd == "come":
+            log.info("come-here (voice)")
+            self._events(come_here=True)
+            self._cue.set("speaking")
+            self._tts.speak("Coming.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
         if cmd == "shutdown":
             log.info("shutdown requested (voice) -- lie down then dormant")
             self._events(shutdown=True)

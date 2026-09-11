@@ -72,7 +72,14 @@ _EXPLORE = (
 )
 _UNEXPLORE = (
     "stop exploring", "stop looking around", "stop wandering", "come back",
-    "thats enough", "that will do", "come here",
+    "thats enough", "that will do",
+)
+
+# "Come here" -- a directed walk toward you (distinct from "come back" above).
+# No bare "come" (ambiguous with "come back"); needs "come here" / "come to me".
+_COME = (
+    "come here", "come to me", "over here", "here boy", "walk to me",
+    "come over here",
 )
 
 # character mode: "enable gir mode", "turn on gir", "gir mode off", "set gir to 70"
@@ -163,7 +170,7 @@ def looks_like_rebuff(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"explore"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
     ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"character"``, or ``None``.
     Checked in that order -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -175,6 +182,8 @@ def match_local_command(text: str) -> str | None:
         return "resume"
     if _hit(n, _SHUTDOWN) or _has_verb(n, ("shutdown",)):
         return "shutdown"
+    if _hit(n, _COME):
+        return "come"
     if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):
         return "explore"
     if _hit(n, _UNEXPLORE):

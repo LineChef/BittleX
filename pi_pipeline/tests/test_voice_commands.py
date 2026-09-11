@@ -82,3 +82,11 @@ def test_shutdown_is_its_own_command_not_a_halt():
     # and the emergency phrases still halt
     assert _mlc("emergency stop") == "halt"
     assert _mlc("freeze") == "halt"
+
+
+def test_come_here_vs_come_back():
+    assert _mlc("come here") == "come"
+    assert _mlc("come to me") == "come"
+    assert _mlc("come over here") == "come"
+    assert _mlc("come back") == "unexplore"          # ending the roam, not approach
+    assert _mlc("that's enough") == "unexplore"

@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **522 passing tests**.
+`pi_pipeline/` carries **541 passing tests**.
 
 ---
 
@@ -105,16 +105,24 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
   between them.
 - **Explore, two tiers:**
   - **Tier 0 "attentive"** (`behavior/attentive.py`) — *stationary*, always
-    active as a life-signs layer on IDLE: gaze-follows a person with head/body,
-    reacts to something new in view (look → peer bow → curious chirp), does a
-    periodic head pan-scan, greets known people. **No walking, ever** — safe on
-    desk or floor.
+    active as a life-signs layer on IDLE: turns toward a sound ("what was
+    that?"), gaze-follows a person with head/body then **satiates** (drops to
+    occasional glances so it doesn't stare), reacts to something new in view
+    (look → peer bow → curious chirp), does a periodic head pan-scan, greets
+    known people. **No walking, ever** — safe on desk or floor.
   - **Tier 1 "roam"** — walking exploration (wander stalest heading, investigate
     novelty). **Voice-armed only** ("G2, go ahead and look around" / "exploration
-    mode"); no time-based entry. Ends on any activity, a bout cap, a leg-budget
-    leash, or "that's enough" — and disarms, so each bout needs re-arming.
-    Gated by `features.vision`; the desk-edge classifier (B16) upgrades it for
-    near-edge use.
+    mode"); no time-based entry. Emits an audible "I'm roaming" chirp on entry
+    and periodically, so movement is never a surprise. Ends on any activity, a
+    bout cap, a leg-budget leash, or "that's enough" — and disarms, so each bout
+    needs re-arming. Gated by `features.vision`; the desk-edge classifier (B16)
+    upgrades it for near-edge use.
+  - **"Come here"** (`behavior/approach.py`) — a directed one-shot walk toward
+    the nearest person; stops close, or gives up (with a confused chirp) if it
+    loses sight. Voice command, `Mode.APPROACH`.
+  - **Place memory** (`behavior/place_memory.py`, B11) — while roaming, G2
+    accumulates *stable* spatial patterns ("the dog is often to the left") — no
+    timestamps — and writes them as durable facts once a direction repeats.
 - **Idle-posture staged descent** — what pose G2 holds with nothing to do:
   peek → sit → rest → sleep, backing off gradually rather than freezing.
 - **Graceful shutdown** — "shut down" / "go dormant" → G2 lies flat (`d`) first,
@@ -320,7 +328,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 522
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 541
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

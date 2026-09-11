@@ -96,7 +96,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**522 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**541 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +

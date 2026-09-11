@@ -45,6 +45,8 @@ class ExploreConfig:
     hold_secs: float = 0.6        # pause between legs
     max_legs: int = 8            # short-leash proxy (no odometry): end the bout after
                                  #   this many walk legs. The driver disarms EXPLORE.
+    roam_chirp_s: float = 12.0   # while roaming, a soft "I'm exploring" chirp this often
+                                 #   so movement is never a surprise (driver emits it)
 
 
 class Explorer:

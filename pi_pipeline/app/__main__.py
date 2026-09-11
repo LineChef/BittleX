@@ -56,24 +56,33 @@ def _make_link(serial: bool):
     return LockedLink(lk)
 
 
-def _build_runtime(link, *, hz: float):
+def _make_memory():
+    if not (settings.memory_enabled and features.memory):
+        return None
+    from ..memory.memory import Memory
+    return Memory(settings)
+
+
+def _build_runtime(link, *, hz: float, memory=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
     driver = BehaviorDriver(personality.behavior_params(),
                             vision_available=features.vision)
     bindings = build_bindings(link, dry_run_power=link is None)
     hub = SensorHub(link)
+    # B11 place memory: "the dog is often to the left" -> a durable fact
+    on_obs = (lambda note: memory.store.add_fact(note)) if memory is not None else None
     rt = BehaviorRuntime(
         driver, bindings,
         sensors=hub.sample,
         roster=lambda: frozenset(b.label for b in bonds),
+        on_observation=on_obs,
         hz=hz,
     )
     return rt
 
 
-def _build_voice(on_event):
-    from ..memory.memory import Memory
+def _build_voice(on_event, memory=None):
     from ..voice.actuator import make_actuator
     from ..voice.conversation import Conversation
     from ..voice.cues import LogCue
@@ -81,10 +90,6 @@ def _build_voice(on_event):
     from ..voice.stt import make_stt
     from ..voice.tts import make_tts
     from ..voice.wake_word import make_wake_word
-
-    memory = None
-    if settings.memory_enabled and features.memory:
-        memory = Memory(settings)
 
     loop = VoiceLoop(
         wake_word=make_wake_word("none", vosk_model_path=settings.vosk_model_path,
@@ -99,7 +104,7 @@ def _build_voice(on_event):
         follow_up_s=0.0,
         on_event=on_event,
     )
-    return loop, memory
+    return loop
 
 
 def main() -> None:
@@ -137,12 +142,15 @@ def main() -> None:
                     "Run calibration / check_serial / --probe-imu freely.")
         args.no_behavior = True
 
+    memory = _make_memory()
     link = _make_link(args.serial)
-    rt = None if args.no_behavior else _build_runtime(link, hz=args.hz)
+    rt = None if args.no_behavior else _build_runtime(link, hz=args.hz, memory=memory)
     on_event = rt.post if rt is not None else None
-    voice, memory = (None, None) if args.no_voice else _build_voice(on_event)
+    voice = None if args.no_voice else _build_voice(on_event, memory=memory)
 
     if rt is None and voice is None:
+        if memory is not None:
+            memory.close()
         ap.error("nothing to run (--no-voice and --no-behavior)")
 
     # emergency stop: SIGUSR1 halts, SIGUSR2 releases (also `--halt` / `--release`

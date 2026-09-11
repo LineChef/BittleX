@@ -315,6 +315,11 @@ built-in 80-class COCO classifier) → approach controller (the `Avoider`
 bearing/area math, inverted to close distance instead of open it) → stop when
 close. Ambitious; a headline demo.
 
+**Person-flavoured version built 2026-09-10** — `behavior/approach.py`
+(`ApproachTarget`), voice "come here" → `Mode.APPROACH`: walk toward the largest
+person detection, stop close, give up on lost sight. Generalising it to an
+arbitrary target label is the remaining B8 work (+ obstacle avoidance under it).
+
 ### B15 — Recognize household members  🟡  ⚪
 Train the vision model to detect **specific individuals as their own classes**
 (household people and pets), not just generic "person" / "cat" / "dog". Petoi
@@ -470,6 +475,13 @@ ahead of [B15].
 G2 builds up a sense of *where it is* over time — as **place recognition + a
 graph of places**, never a metric floor plan (no depth/lidar, and monocular
 VSLAM is out of reach on a 512 MB Pi with a 192×192 low-FPS camera).
+
+**First slice built 2026-09-10** — `behavior/place_memory.py` (`PlaceMemory`):
+while roaming, `observe(label, bearing)` accumulates sightings; once a label
+recurs in the same 4-way direction `min_sightings` times it writes a durable
+fact ("the dog is often to the left") via the runtime's `on_observation` seam →
+`Memory.store.add_fact`. Direction-relative-to-usual-spot only — no graph, no
+coordinates, no timestamps. The place *graph* + landmarks below are still TODO.
 
 - **Places:** at a spot, capture the view and store a scene description in the
   memory DB ("kitchen: checkerboard floor, fridge base on the right, dark

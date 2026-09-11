@@ -38,7 +38,7 @@ log = logging.getLogger("g2.behavior.runtime")
 _EVENT_BOOLS = (
     "halt", "release", "ack",
     "wake_word", "conversation_ended", "told_stop", "told_stay", "told_sleep",
-    "shutdown", "arm_explore", "disarm_explore",
+    "shutdown", "arm_explore", "disarm_explore", "come_here",
     "rebuffed", "picked_up", "loud_sound", "imu_tap", "nearby_motion",
     "cancel_enroll", "say_hi",
 )
@@ -99,6 +99,7 @@ class _Pending:
 class BehaviorRuntime:
     def __init__(self, driver: BehaviorDriver, bindings: DriverBindings, *,
                  frame_source=None, sensors=None, recency=None, roster=None,
+                 on_observation=None,
                  hz: float = 10.0, clock=time.monotonic, sleep=time.sleep):
         self.driver = driver
         self.bindings = bindings
@@ -107,6 +108,8 @@ class BehaviorRuntime:
         self._recency = recency or (lambda: (None, 0))
         # bonded-person labels (from personality/bonds) -> the recognition hop
         self._roster = roster or (lambda: ())
+        # B11 place-memory: new spatial-pattern facts -> Memory.store.add_fact
+        self._on_observation = on_observation or (lambda _note: None)
         self._period = 1.0 / hz if hz > 0 else 0.0
         self._clock = clock
         self._sleep = sleep
@@ -168,6 +171,11 @@ class BehaviorRuntime:
         i = self._assemble(now)
         t = self.driver.tick(i)
         self.bindings.dispatch(t)
+        for note in t.place_notes:
+            try:
+                self._on_observation(note)
+            except Exception:  # noqa: BLE001 -- a memory write must not kill the loop
+                log.exception("on_observation failed for %r", note)
         self.last_tick = t
         return t
 

@@ -101,3 +101,57 @@ def test_attentive_does_not_walk():
                                 person_present=True))
         assert EffectKind.WALK not in [e.kind for e in t.effects]
         assert EffectKind.TURN not in [e.kind for e in t.effects]
+
+
+# ------------------------------------------ sound reaction (#1) + satiation (#2)
+def test_turns_toward_a_sound_with_bearing():
+    a, c = _look(sound_cooldown_s=1.0)
+    c.adv(2)
+    fx = a.decide([], resting=False, now=c(), sound=True, sound_bearing=-0.4)
+    assert fx and fx[0].kind is EffectKind.HEAD and fx[0].payload == -0.4
+
+
+def test_soundless_bearing_does_a_quick_scan():
+    a, c = _look()
+    c.adv(2)
+    fx = a.decide([], resting=False, now=c(), sound=True)
+    assert fx and fx[0].payload == "pan_sweep"
+
+
+def test_loud_sound_interrupts_a_gaze_follow():
+    a, c = _look(follow_deadband_rad=0.05, follow_satiate_s=999)
+    c.adv(1); a.decide([det("face", cx=0.8)], resting=False, now=c())   # following
+    c.adv(0.1)
+    fx = a.decide([det("face", cx=0.8)], resting=False, now=c(),
+                  loud=True, sound_bearing=0.5)
+    assert fx and fx[0].payload == 0.5 and "loud" in fx[0].reason.lower() or \
+        any(e.reason == "toward a sound" for e in fx)
+
+
+def test_gaze_follow_satiates_to_glances():
+    a, c = _look(follow_deadband_rad=0.05, follow_cooldown_s=0.2,
+                 follow_satiate_s=3.0, follow_glance_cooldown_s=5.0,
+                 follow_reengage_rad=1.0)
+    # follow steadily for > satiate window (same bearing so no re-engage)
+    got = 0
+    for _ in range(40):
+        c.adv(0.3)
+        if a.decide([det("face", cx=0.75)], resting=False, now=c()):
+            got += 1
+    assert a.satiated
+    # once satiated, follow moves are throttled to the long glance cooldown
+    c.adv(1.0)
+    assert not a.decide([det("face", cx=0.75)], resting=False, now=c())   # inside glance cooldown
+    c.adv(6.0)
+    assert a.decide([det("face", cx=0.75)], resting=False, now=c())       # a glance
+
+
+def test_person_leaving_view_resets_satiation():
+    a, c = _look(follow_satiate_s=1.0, follow_reengage_rad=1.0,
+                 follow_deadband_rad=0.05, follow_cooldown_s=0.1)
+    for _ in range(20):
+        c.adv(0.3)
+        a.decide([det("face", cx=0.7)], resting=False, now=c())
+    assert a.satiated
+    c.adv(0.3); a.decide([], resting=False, now=c())          # nobody in view
+    assert not a.satiated

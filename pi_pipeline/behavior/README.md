@@ -63,10 +63,12 @@ session log) + the input plumbing (vision frame, IMU state, mic events).
 ```
 CONVERSE   a conversation is active — preempts everything, no autonomous movement
 IDLE       awake, still. Holds a posture + the Tier 0 "attentive" layer
-           (attentive.py): gaze-follow / novelty-react / periodic scan. No walking.
+           (attentive.py): sound-turn / gaze-follow / novelty-react / scan. No walking.
 EXPLORE    Tier 1: walking exploration. VOICE-ARMED ONLY (arm_explore()) — never
-           time-based. Ends after `explore_max_secs`, on any activity, on the
-           Explorer leg budget, or disarm_explore(); disarms on exit.
+           time-based. Audible "roaming" chirp on entry + periodically. Ends after
+           `explore_max_secs`, on any activity, on the Explorer leg budget, or
+           disarm_explore(); disarms on exit.
+APPROACH   a directed "come here" walk (approach.py). Driver-owned, one-shot.
 ```
 
 The caller drives it: `on_conversation_start/end`, `on_activity()` (picked up,
@@ -77,10 +79,30 @@ command), and `update()` once per tick for the current `Mode`.
 
 A frame + a clock in, a list of `Effect`s out (`HEAD` / `SKILL` / `CHIRP` — never
 `WALK`/`TURN`). The driver runs it in the IDLE branch while a posture holds
-steady: gaze-follow the nearest person, react to a novel object (look → peer bow
-→ curious chirp), or a periodic head pan-scan. `vision_available=False` → only
-the periodic scan. Composes with `IdlePosture` (still settles) and the
-recognition hop (greets known people).
+steady, priority order: turn toward a sound (`sound` / `loud` / `sound_bearing`
+in) → gaze-follow the nearest person (with **satiation** — `follow_satiate_s`
+past which it drops to `follow_glance_cooldown_s` glances; a big bearing change
+or the person leaving view re-engages) → react to a novel object (look → peer
+bow → curious chirp) → periodic head pan-scan. `vision_available=False` → only
+the sound reaction + periodic scan. Composes with `IdlePosture` (still settles)
+and the recognition hop (greets known people).
+
+## `ApproachTarget` — "come here" (`approach.py`)
+
+Armed by `DriverInputs.come_here` (voice "come here"). A one-shot directed walk:
+each tick emits `WALK` toward the largest person detection, `STOP` + a happy
+chirp on arrival (`close_area`), or `STOP` + a confused chirp on give-up
+(`give_up_s` with no sighting). Disarms itself; the driver reports `Mode.APPROACH`
+while active. Cancelled by `told_stop` / pickup / wake word.
+
+## `PlaceMemory` — B11 spatial patterns (`place_memory.py`)
+
+`observe(label, bearing)` on each Tier-1 investigate/approach; once the same
+label repeats in the same 4-way direction `min_sightings` times it emits a
+durable sentence ("The dog is often to the left…") via `pending_notes()`, which
+the driver surfaces as `DriverTick.place_notes` and the runtime forwards to
+`on_observation` (→ `Memory.store.add_fact`). No timestamps — stable patterns
+only, matching what the memory store will accept.
 
 ## `Explorer` — wander + investigate (Tier 1)
 
