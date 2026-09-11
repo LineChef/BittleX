@@ -18,6 +18,13 @@ Movement commands are always shown as text to run yourself in another shell,
 never auto-executed here -- calibration (`c16`) and anything that walks or
 gets the robot up should happen with your hands free to catch it, not from
 inside this script's confirm prompt.
+
+STAY ON THE CALIBRATION STAND THROUGH STEP 12a. Servo sign, the real IMU
+format, and payload weight are all unknown until the real robot is in hand;
+on the stand, getting any of them wrong is a flailing leg, not a fall or a
+walk off an edge. The floor is earned once step 12a's --openloop confirms the
+servo signs are right -- that's the one check that genuinely needs ground
+contact (step 12b, the H1 head-to-head).
 """
 from __future__ import annotations
 
@@ -56,7 +63,8 @@ def _steps() -> list[Step]:
             "opencat_gym_env.py and retrain or --finetune-lr "
             "(docs/rl/hardware-gated-backlog.md H2)."),
         Step("3", "Assembly & mechanical", "Range-of-motion pass + firmware calibration",
-            "On the calibration stand, BEFORE it touches the ground: a full "
+            "ON THE STAND, BEFORE it touches the ground -- and stay there "
+            "through step 12a (see the rule at the top of this list): a full "
             "range-of-motion pass by hand (watch for binding / leg-on-leg "
             "collision), then firmware `c16` auto joint calibration. "
             "NOTE: this tool refuses calibration commands by design "
@@ -85,11 +93,12 @@ def _steps() -> list[Step]:
             "A passive handshake first (safe, nothing moves):",
             cmd=[py, "-m", "pi_pipeline.doctor", "--serial"]),
         Step("7b", "Serial link", "First movement: balance, then the skill set",
-            "Only after step 3's calibration and with the robot somewhere safe "
-            "to move -- these two commands are shown, not auto-run:\n"
+            "ON THE STAND. Only after step 3's calibration is clean -- these "
+            "commands are shown, not auto-run:\n"
+            "  python -m pi_pipeline.link.check_serial firstmove\n"
             "  python -m pi_pipeline.link.check_serial send kbalance\n"
             "  python -m pi_pipeline.link.check_serial skills",
-            manual_cmd="python -m pi_pipeline.link.check_serial send kbalance"),
+            manual_cmd="python -m pi_pipeline.link.check_serial firstmove"),
         Step("8", "Voice", "Claude + memory end-to-end",
             "Text mode first -- the API key is already set.",
             cmd=[py, "-m", "pi_pipeline.voice", "--mode", "text"]),
@@ -107,13 +116,23 @@ def _steps() -> list[Step]:
             "auto-run (drives real servos): "
             "python pi_pipeline/gait/bench_real.py",
             manual_cmd="python pi_pipeline/gait/bench_real.py"),
-        Step("12", "RL sim-to-real", "The H1 head-to-head",
-            "run_gait.py --probe-imu (confirm the IMU format) -> --openloop "
-            "(verify servo signs) -> --cmd (the learned gait) -> the H1 "
-            "head-to-head vs firmware kwkF. Methodology + decision rule: "
-            "docs/rl/h1-rubric.md; h1_score.py produces the verdict. Shown, "
-            "not auto-run: python pi_pipeline/gait/run_gait.py --probe-imu",
+        Step("12a", "RL sim-to-real", "IMU probe + servo-sign check -- STILL ON THE STAND",
+            "This is the last stand-only step. run_gait.py --probe-imu "
+            "confirms the real IMU format (genuinely unknown until now); "
+            "--openloop then verifies each servo's sign against "
+            "deploy_map.py's SERVO_SIGN. Do NOT move to the floor (step 12b) "
+            "until --openloop looks right -- a flipped sign needs to be caught "
+            "here, not mid-walk. Shown, not auto-run: "
+            "python pi_pipeline/gait/run_gait.py --probe-imu",
             manual_cmd="python pi_pipeline/gait/run_gait.py --probe-imu"),
+        Step("12b", "RL sim-to-real", "The H1 head-to-head -- FIRST TIME ON THE FLOOR",
+            "Only after 12a's --openloop confirms correct servo signs. "
+            "--cmd (the learned gait) -> the H1 head-to-head vs firmware "
+            "kwkF. Methodology + decision rule: docs/rl/h1-rubric.md; "
+            "h1_score.py produces the verdict. Keep the emergency stop within "
+            "reach (--halt, or say 'emergency stop') for the whole thing. "
+            "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1",
+            manual_cmd="python pi_pipeline/gait/run_gait.py --cmd 0.1"),
         Step("13", "Vision on the robot", "Mount the camera, train the edge classifier",
             "Train the desk-edge classifier on the real mounted POV (B16 -- "
             "highest priority), wire Avoider decisions to the actuator, build "
@@ -155,9 +174,25 @@ def _print_step(step: Step, *, done: bool) -> None:
         print(f"    $ {step.manual_cmd}   (run this yourself -- not auto-run)")
 
 
+_STAND_RULE = (
+    "\n*** STAY ON THE CALIBRATION STAND THROUGH STEP 12a. ***\n"
+    "Servo sign, the real IMU format, and payload weight are all unknown until\n"
+    "now -- on the stand, getting one wrong is a flailing leg, not a fall. The\n"
+    "floor is earned once 12a's --openloop confirms the servo signs (12b).\n"
+)
+
+
 def _run_interactive(steps: list, done: set) -> None:
+    print(_STAND_RULE)
     for step in steps:
         _print_step(step, done=step.id in done)
+        if step.id == "12b":
+            confirm = input("\n  This is the FIRST FLOOR TEST. Did step 12a's "
+                           "--openloop look correct? [y/N] ").strip().lower()
+            if confirm != "y":
+                print("  Stopping here -- go back to step 12a first.")
+                _save_progress(done)
+                return
         while True:
             prompt = "[Enter]=done"
             if step.cmd:
@@ -193,6 +228,7 @@ def main() -> None:
 
     steps = _steps()
     if args.list:
+        print(_STAND_RULE)
         done = _load_progress()
         for step in steps:
             _print_step(step, done=step.id in done)

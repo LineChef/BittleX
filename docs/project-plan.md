@@ -1140,6 +1140,17 @@ The phases above are grouped by system; this is the sequence to actually work
 through once the Bittle X + BiBoard land (the Pi bring-up is already done — see
 Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 
+> **Rule: stay on the calibration stand through step 12a. No floor time before
+> then.** Everything through "verify servo signs" — assembly, calibration,
+> first movement, voice, the RL joint-control bench, IMU probing, open-loop
+> gait verification — happens with G2 supported on the stand, weight off its
+> feet. That's deliberate: servo sign, the real IMU format, and payload weight
+> are all genuinely unknown until the real robot is in hand (see "Known risks
+> / honest expectations" below), and on the stand a mistake in any of them is
+> at most a flailing leg, not a fall or a walk off an edge. The floor is
+> earned once `--openloop` confirms the servo signs are right — that's the one
+> thing that actually requires ground contact to test honestly (H1, step 12b).
+
 **Assembly & mechanical**
 1. Assemble Bittle X V2; check servo calibration (ships calibrated — fine-tune
    only if movement looks off).
@@ -1157,14 +1168,15 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 4. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover still fits.
 
-**Serial link (Phase 5)**
+**Serial link (Phase 5) — still on the stand**
 5. `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
    `.env` (likely `/dev/ttyS0` → `/dev/ttyAMA0` after `disable-bt`).
 6. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
-7. `check_serial ping` (firmware banner) → `send kbalance` (robot stands) →
-   `skills` (runs the conversational set).
+7. `python -m pi_pipeline.doctor --serial` (passive handshake) → **on the stand:**
+   `check_serial firstmove` (guided, confirmed, one joint at a time) → once that's
+   clean, `send kbalance` → `skills` (cycles the conversational set).
 
-**Voice (Phase 7)**
+**Voice (Phase 7) — still on the stand (nothing here needs the floor)**
 8. `python -m pi_pipeline.voice --mode text` → Claude + memory end-to-end (key is
    already set).
 9. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD`,
@@ -1173,12 +1185,17 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
     real-time on 512 MB. If sluggish: shorter `CLAUDE_MAX_TOKENS`, streaming TTS,
     a longer "thinking" cue.
 
-**RL sim-to-real (Phase 6 — stack already built + sim-validated)**
+**RL sim-to-real (Phase 6 — stack already built + sim-validated) — still on the stand**
 11. `pi_pipeline/gait/bench_real.py` — real-time joint control on the Pi (sim
     bench: 0.43 ms/step).
-12. `run_gait.py --probe-imu` → `--openloop` (verify servo signs) → `--cmd` (the
-    learned gait) → **the H1 head-to-head** vs firmware `kwkF`. Methodology +
-    decision rule: [`rl/h1-rubric.md`](rl/h1-rubric.md); `h1_score.py` produces the verdict.
+12a. **On the stand:** `run_gait.py --probe-imu` (confirm the real IMU format —
+    genuinely unknown until now) → `--openloop` (verify servo signs against
+    `deploy_map.py`'s `SERVO_SIGN` — a flipped sign must be caught here, not on
+    the floor). Do not proceed to 12b until this is clean.
+12b. **Now the floor, for the first time:** `--cmd` (the learned gait) →
+    **the H1 head-to-head** vs firmware `kwkF`. Methodology + decision rule:
+    [`rl/h1-rubric.md`](rl/h1-rubric.md); `h1_score.py` produces the verdict.
+    Emergency stop (`--halt` / "emergency stop") within reach the whole time.
 
 **Vision on the robot (Phase 8)**
 13. Mount the camera on G2, train the **desk-edge classifier** on the real
