@@ -67,7 +67,7 @@ pi_pipeline/
   vision/              # Phase 8 — camera / detection feed / avoidance / cliff guard
   memory/              # Phase 9 — SQLite conversation memory; webui.py (browse/prune)
   link/                # Phase 5 — resilient BiBoard serial link + recovery FSM
-    check_serial.py    # port/ping/skill checks + `firstmove` (guided first movement)
+    check_serial.py    # port/ping/skill checks + `firstmove` (guided first movement) + `allmoves` (full movement sweep, voltage/latency log)
     trace.py           # TracingLink (log every command sent) + replay
   diag/                # black-box logger + ring buffer + watchdog + sysmon stubs
   power/               # CPU governor / Wi-Fi power-save / disable peripherals
@@ -99,7 +99,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**570 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**577 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +
@@ -136,11 +136,16 @@ python -m pi_pipeline.behavior
 # Bring-up readiness checklist (run the moment the Pi + body are wired)
 python -m pi_pipeline.doctor              # add --serial to also handshake the BiBoard
 
-# The guided, resumable 14-step hardware bring-up sequence
+# The guided, resumable 17-step hardware bring-up sequence (stand-only
+# through step 12a; 12b is the first floor test, gated behind a confirm)
 python -m pi_pipeline.bringup             # --list / --restart / --from <id>
 
 # Guided first movement: one joint at a time, confirmed, then kbalance + a wkF burst
 python -m pi_pipeline.link.check_serial firstmove
+
+# Full movement sweep: every known move (skills + gestures + sleep + carpet +
+# recovery keyframes), logging voltage and reply latency per move to diag
+python -m pi_pipeline.link.check_serial allmoves
 
 # Log every serial command sent, then replay the same sequence later
 python -m pi_pipeline.app --serial --trace ~/g2_trace.jsonl
@@ -151,11 +156,14 @@ Every recognised command (and every conversational turn) fires an instant
 "heard you" chirp + cue *before* the spoken reply, and G2 never acts silently —
 so a misheard command is obvious and you can cancel it ("resume" / "never mind").
 
-**Spoken commands** (handled locally, no Claude call):
+**Spoken commands** (handled locally, no Claude call) — full phrase list +
+the conversational skill catalogue in
+[`docs/guides/voice-commands.md`](../docs/guides/voice-commands.md):
 - "emergency stop" / "freeze" / "halt" / "stop moving" → latch the freeze;
   "resume" / "as you were" → clear it.
 - "shut down" / "power down" / "go dormant" → lie flat, then go dormant.
   "go to sleep" → the lighter curl-up variant.
+- "come here" / "come to me" → walk directly to whoever's nearest.
 - "go ahead and look around" / "exploration mode" → arm Tier 1 roam;
   "that's enough" / "come back" → disarm. (Tier 0 stationary attentiveness is
   always on.)

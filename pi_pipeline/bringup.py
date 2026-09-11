@@ -99,6 +99,17 @@ def _steps() -> list[Step]:
             "  python -m pi_pipeline.link.check_serial send kbalance\n"
             "  python -m pi_pipeline.link.check_serial skills",
             manual_cmd="python -m pi_pipeline.link.check_serial firstmove"),
+        Step("7c", "Serial link", "Full movement sweep -- every known move, ON THE STAND",
+            "Cycles EVERY move G2 knows (voice skills + the autonomous-behaviour "
+            "gestures + sleep + carpet gait + the recovery/get-up keyframes, "
+            "which nothing else exercises), reading back battery voltage after "
+            "each one and logging it to the diag session -- a good pass to run "
+            "now, while it's supported: a per-move voltage log after the fact "
+            "can point at a joint or sequence worth a closer look before it "
+            "matters on the floor. Confirms separately before the recovery "
+            "keyframes (they move the body through its full range). Shown, "
+            "not auto-run: python -m pi_pipeline.link.check_serial allmoves",
+            manual_cmd="python -m pi_pipeline.link.check_serial allmoves"),
         Step("8", "Voice", "Claude + memory end-to-end",
             "Text mode first -- the API key is already set.",
             cmd=[py, "-m", "pi_pipeline.voice", "--mode", "text"]),

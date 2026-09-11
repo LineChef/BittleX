@@ -6,6 +6,7 @@
     python -m pi_pipeline.link.check_serial skills              # cycle the conversational skill set
     python -m pi_pipeline.link.check_serial rest                # send 'd' (safe state)
     python -m pi_pipeline.link.check_serial firstmove           # guided, confirmed first movement
+    python -m pi_pipeline.link.check_serial allmoves            # cycle EVERY known move + log voltage/latency
 """
 from __future__ import annotations
 
@@ -68,6 +69,121 @@ def _firstmove(link: SerialLink, *, deg: float, walk_s: float) -> None:
         print("sent 'd' (rest) -- first-move check done.")
 
 
+def _all_moves() -> list:
+    """(name, token, kind) for every distinct movement G2 knows how to
+    perform, deduped by the resulting serial token. Two catalogues that don't
+    otherwise overlap: `voice/skills.py` (what Claude can invoke by
+    conversation) and `behavior/gestures.py` (what the autonomous behaviour
+    layer fires on its own -- greetings, idle fidgets, the excited hop) --
+    plus sleep, the carpet gait, and the recovery/get-up keyframes, none of
+    which either catalogue covers. `kind` is one of skill/gesture/sleep/
+    carpet/recovery; recovery keyframes are always last."""
+    from ..behavior.gestures import GESTURE_TOKEN
+
+    seen: dict = {}
+    for name in skillcat.SKILLS:
+        tok = skillcat.serial_command(name)
+        seen.setdefault(tok, (name, tok, "skill"))
+    for g, tok in GESTURE_TOKEN.items():
+        seen.setdefault(tok, (g.value, tok, "gesture"))
+    seen.setdefault(opencat.SLEEP, ("sleep", opencat.SLEEP, "sleep"))
+    seen.setdefault(opencat.CARPET_WALK, ("carpet-walk", opencat.CARPET_WALK, "carpet"))
+
+    ordered = list(seen.values())
+    ordered += [
+        ("self-right", opencat.RECOVER, "recovery"),
+        ("roll-from-supine", opencat.ROLL_OVER, "recovery"),
+        ("drop-recover", opencat.DROP_RECOVER, "recovery"),
+    ]
+    return ordered
+
+
+_RULE = "=" * 60
+
+
+def _announce(i: int, total: int, name: str, kind: str, token: str, *,
+              lead_s: float, bell: bool) -> None:
+    """Print an unmissable, numbered header for the move about to run, with a
+    beat of lead time (and an optional terminal bell) before it actually
+    fires -- so if you're watching the robot instead of the screen, you get a
+    cue to look up before it moves, not just a line of text after the fact."""
+    print(f"\n{_RULE}\n[{i}/{total}]  {name}  ({kind})  ->  {token}\n{_RULE}")
+    if bell:
+        print("\a", end="", flush=True)
+    if lead_s > 0:
+        print(f"  starting in {lead_s:g}s...")
+        time.sleep(lead_s)
+
+
+def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
+              skip_recovery: bool, announce_s: float = 1.5,
+              bell: bool = True) -> None:
+    """Cycle every named movement G2 knows, reading back battery voltage
+    (against a logged idle baseline, so a reviewer sees sag, not just an
+    absolute number) and the reply latency after each one, logging both to
+    the diag session -- so a review afterward can spot a move that drew
+    unusually hard, replied slow (heading toward the link's read-timeout,
+    a early sign of a move going non-responsive), or got no reply at all,
+    not just what looked wrong live. Each move gets a numbered, ruled-off
+    announcement with a lead-time pause (+ a terminal bell) before it fires,
+    so which move is currently running is never ambiguous while watching the
+    robot rather than the screen. The recovery/get-up keyframes (self-right,
+    roll, drop-recover) get their own confirm before that section, since they
+    move the body through its full range -- this pass logs voltage/latency
+    for them same as everything else, but NOT whether the body actually ended
+    up upright; that needs the IMU stream, whose line format --probe-imu
+    (step 12a) hasn't confirmed yet at this point in the runbook, so it isn't
+    wired in here. Always ends at `d` (rest)."""
+    moves = _all_moves()
+    total = len(moves) - (3 if skip_recovery else 0)
+    print(f"Cycling {total} known moves ({hold:g}s hold each; recovery "
+         f"keyframes get {recovery_hold:g}s and a confirm first).\n")
+
+    t0 = time.perf_counter()
+    baseline = (link.send(opencat.PRINT_VOLTAGE) or "").strip()
+    diag.event("check_serial", "INFO", "sweep.baseline", voltage=baseline,
+              elapsed_s=round(time.perf_counter() - t0, 3))
+    if baseline:
+        print(f"idle baseline battery: {baseline}\n")
+
+    warned = False
+    done = 0
+    try:
+        for name, token, kind in moves:
+            if kind == "recovery":
+                if skip_recovery:
+                    continue
+                if not warned:
+                    warned = True
+                    choice = input("\nNext: the recovery/get-up keyframes (self-right, "
+                                  "roll-from-supine, drop-recover) -- these move the body "
+                                  "through its full range. Continue? [Enter/q] "
+                                  ).strip().lower()
+                    if choice == "q":
+                        break
+            done += 1
+            _announce(done, total, name, kind, token, lead_s=announce_s, bell=bell)
+            link.send(token, read_reply=False)
+            hold_s = recovery_hold if kind == "recovery" else hold
+            print(f"  running -- watch now ({hold_s:g}s)")
+            time.sleep(hold_s)
+            t0 = time.perf_counter()
+            voltage = (link.send(opencat.PRINT_VOLTAGE) or "").strip()
+            elapsed = round(time.perf_counter() - t0, 3)
+            diag.event("check_serial", "INFO", "move.done",
+                      move=name, token=token, kind=kind, voltage=voltage,
+                      elapsed_s=elapsed)
+            if voltage:
+                print(f"      battery: {voltage}  ({elapsed:g}s reply)")
+            else:
+                print(f"      (no reply, {elapsed:g}s -- board may have gone unresponsive)")
+    finally:
+        link.send(opencat.REST, read_reply=False)
+        print("\nsent 'd' (rest) -- allmoves sweep done. "
+             "Review the diag session's events.jsonl for the per-move voltage "
+             "and reply-latency log.")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     ap = argparse.ArgumentParser(prog="pi_pipeline.link.check_serial")
@@ -80,6 +196,17 @@ def main() -> None:
     fm = sub.add_parser("firstmove")
     fm.add_argument("--deg", type=float, default=15.0, help="degrees to nudge each joint")
     fm.add_argument("--walk-s", type=float, default=2.0, help="seconds to run wkF before auto-rest")
+    am = sub.add_parser("allmoves")
+    am.add_argument("--hold", type=float, default=2.5, help="seconds to hold each move")
+    am.add_argument("--recovery-hold", type=float, default=4.0,
+                    help="seconds to hold each recovery keyframe (they're longer sequences)")
+    am.add_argument("--skip-recovery", action="store_true",
+                    help="skip the self-right / roll / drop-recover keyframes")
+    am.add_argument("--announce-s", type=float, default=1.5,
+                    help="pause after announcing a move, before it fires -- "
+                         "time to look up from the terminal to the robot")
+    am.add_argument("--no-bell", action="store_true",
+                    help="skip the terminal bell before each move")
     args = ap.parse_args()
 
     with diag.session("check_serial", extra={"cmd": args.cmd}):
@@ -117,6 +244,10 @@ def main() -> None:
                 print("sent 'd' (rest)")
             elif args.cmd == "firstmove":
                 _firstmove(link, deg=args.deg, walk_s=args.walk_s)
+            elif args.cmd == "allmoves":
+                _allmoves(link, hold=args.hold, recovery_hold=args.recovery_hold,
+                         skip_recovery=args.skip_recovery, announce_s=args.announce_s,
+                         bell=not args.no_bell)
         finally:
             link.close()
 

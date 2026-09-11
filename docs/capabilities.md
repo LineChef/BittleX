@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **570 passing tests**.
+`pi_pipeline/` carries **577 passing tests**.
 
 ---
 
@@ -179,9 +179,11 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
 - **Tool-calls Claude can make mid-turn:**
   - `perform_skill` — G2 acts out a skill while it talks.
   - `remember` — commit a fact to persistent memory.
-- **Local commands** (no API) — emergency stop / resume, shut down, explore
-  arm / disarm, go to sleep, forget, character on/off — parsed on-device,
-  checked before Claude (emergency stop wins over everything).
+- **Local commands** (no API) — emergency stop / resume, shut down, come here,
+  explore arm / disarm, go to sleep, forget, character on/off — parsed
+  on-device, checked before Claude (emergency stop wins over everything).
+  Full phrase list + the conversational skill catalogue:
+  [`docs/guides/voice-commands.md`](guides/voice-commands.md).
 - **Command acknowledgement** — *every* recognised voice command (and every
   conversational turn) fires an instant "heard you" chirp + a `heard` cue before
   the slower spoken reply, and G2 never moves silently (a bare skill still gets
@@ -296,14 +298,30 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   recorded, not just the ones that happen to reach the integrated app.
   `SystemExit` / `KeyboardInterrupt` are recognised as a clean exit, not a
   crash.
-- **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 14-step
+- **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 17-step
   hardware sequence as a resumable, interactive checklist (progress persists
   to disk); auto-runs only read-only/passive steps, always shows movement
-  commands as text instead of executing them.
+  commands as text instead of executing them. Steps 1–12a are enforced
+  stand-only; step 12b (the first floor test) sits behind an explicit
+  `[y/N]` confirm.
 - **Guided first movement** (`check_serial firstmove`) — one joint at a time
   (head, then the 8 leg servos) with a confirm before and after each, then
   `kbalance`, then a single timed `wkF` burst — always ends at rest, including
   on abort.
+- **Full movement sweep** (`check_serial allmoves`) — cycles every move G2
+  knows (the 17 voice-conversation skills, the 6 non-duplicate autonomous
+  behaviour gestures, sleep, the carpet gait, and the recovery/get-up
+  keyframes, deduped, 28 total), logging battery voltage and reply latency
+  after each one against a logged idle baseline — a data-gathering pass run
+  on the stand at bring-up (runbook step 7c) that can point at a joint or
+  sequence worth a closer look before it matters on the floor. Each move gets
+  a numbered, ruled-off terminal announcement ("`[7/28] walk_forward
+  (skill) -> kwkF`"), a bell, and a lead-time pause (`--announce-s`,
+  default 1.5s) before it fires — so which move is currently running is
+  never ambiguous while watching the robot instead of the screen. Doesn't yet
+  verify a recovery keyframe's *outcome* (body upright or not) — that needs
+  the IMU stream, whose line format isn't confirmed until step 12a's
+  `--probe-imu`, which comes later in the sequence.
 - **Serial trace + replay** (`pi_pipeline/link/trace.py`) — every command sent
   to the BiBoard logged to a timestamped file (`--trace <path>` on the app);
   `trace.py replay` re-sends the same sequence with the same relative pacing.
@@ -338,7 +356,9 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 - **Fall-recovery state machine** (`link/recovery.py`) — detect a flip → run the
   scripted get-up → settle.
 - **Bring-up self-test** (`link/check_serial.py`) — list ports, ping the board,
-  send one command, or cycle every skill as a hardware smoke test.
+  send one command, cycle the conversational skill set, or run the full
+  `allmoves` sweep (every move G2 knows, voltage + latency logged) as a
+  hardware smoke test.
 
 ---
 
@@ -349,7 +369,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 570
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 577
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

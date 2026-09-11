@@ -13,6 +13,7 @@
 | | |
 |---|---|
 | [`cheatsheet.md`](guides/cheatsheet.md) | Curated quick-reference — command tables + full step sequences. |
+| [`voice-commands.md`](guides/voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills. |
 | [`pi-bring-up.md`](guides/pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
 | [`gait-deployment.md`](guides/gait-deployment.md) | The sim→real path for `run20m_ppo` (ONNX, on-robot loop, bring-up steps). |
 | [`train-vision-model.md`](guides/train-vision-model.md) | The SenseCraft capture→train→deploy flow. |

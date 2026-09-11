@@ -944,7 +944,8 @@ that ties everything together with hardware:
   bring-up churn starts.
 
 **The three bigger deployment-easing items — built 2026-09-10:**
-- **`pi_pipeline/bringup.py`** — `python -m pi_pipeline.bringup`: the 14-step
+- **`pi_pipeline/bringup.py`** — `python -m pi_pipeline.bringup`: the (now
+  17-step, after splitting step 12 into 12a/12b and adding 7c below)
   "When the hardware arrives" sequence above, as a guided, resumable checklist
   instead of a doc to re-read and lose your place in. Progress persists to
   `<G2_STATE_DIR>/bringup_progress.json` (`--restart` clears it, `--from <id>`
@@ -971,6 +972,39 @@ that ties everything together with hardware:
   [--serial]` re-sends the same commands with the same relative pacing — "it
   did something weird, what did we send it" becomes a file to read and a
   sequence you can reproduce, not a memory to trust.
+
+**Full movement sweep — built 2026-09-10.** `check_serial`'s `skills` cycle
+only ever exercised `voice/skills.py`'s 17-item conversational catalogue —
+entirely missing `behavior/gestures.py`'s autonomous-behaviour gesture set (6
+non-duplicate tokens after dedup), sleep (`kzz`), the carpet gait
+(`kcarpetF`), and the recovery/get-up keyframes (`krc`/`krl`/`kdropRec`),
+which nothing else exercises at all. New `check_serial allmoves`: `_all_moves()`
+returns every distinct move across both catalogues plus those four, deduped by
+serial token (28 total); `_allmoves()` cycles them, reading back battery
+voltage and reply latency after each one against a logged idle baseline
+(so a review afterward sees sag/slowdown, not just an absolute number) and
+logging it all to the diag session — a data-gathering pass, not a pass/fail
+check. The recovery keyframes get their own confirm first (they move the body
+through its full range) and can be skipped (`--skip-recovery`). Always ends
+at `d` (rest). Deliberately does **not** yet verify a recovery keyframe's
+actual outcome (did the body end up upright) — that needs the IMU stream,
+whose line format isn't confirmed until step 12a's `--probe-imu`, which comes
+later in the sequence than this sweep does; worth revisiting as a v2 once
+that format is known. Wired into the runbook as new step **7c**, right after
+the `skills` cycle, still on the stand.
+
+**Real-time feedback pass — same day.** The original sweep printed a move's
+name right before sending it and moved straight to the next one with nothing
+between them — fine for the diag log, but easy to lose track of which move is
+currently happening if you're watching the robot instead of the terminal.
+`_announce()` now prints a numbered, ruled-off header per move
+(`[7/28]  walk_forward  (skill)  ->  kwkF`) against the *effective* total
+(excludes the 3 recovery keyframes when `--skip-recovery`), rings a terminal
+bell, and pauses `--announce-s` (default 1.5s) before the move actually
+fires — a beat to look up from the screen to the robot before, not after, it
+moves. Both the bell and the lead pause are configurable
+(`--no-bell`, `--announce-s 0`) for a faster unattended run once the sweep's
+familiar.
 
 **Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
 A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`
@@ -1174,7 +1208,11 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 6. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
 7. `python -m pi_pipeline.doctor --serial` (passive handshake) → **on the stand:**
    `check_serial firstmove` (guided, confirmed, one joint at a time) → once that's
-   clean, `send kbalance` → `skills` (cycles the conversational set).
+   clean, `send kbalance` → `skills` (cycles the conversational set) →
+   `allmoves` (cycles EVERY move G2 knows — skills + the autonomous-behaviour
+   gestures + sleep + carpet gait + the recovery/get-up keyframes, logging
+   battery voltage + reply latency per move against an idle baseline; a good
+   data-gathering pass to run now, before it matters on the floor).
 
 **Voice (Phase 7) — still on the stand (nothing here needs the floor)**
 8. `python -m pi_pipeline.voice --mode text` → Claude + memory end-to-end (key is
