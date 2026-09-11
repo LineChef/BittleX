@@ -471,10 +471,63 @@ or train on the RL/gait side right now. When the camera lands, this is a day-1
 custom-model priority (project-plan.md Phase 8),
 ahead of [B15].
 
+### B20 — Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer  🔴 ⚪
+Design session 2026-09-10. G2 currently only recognizes 5 trained classes
+(household member / spouse / dog / cat / ledge) and isn't expected to grow much
+past that for a while — so any behaviour that needs to notice *arbitrary*
+objects (clutter on the desk, an unfamiliar item) needs a different approach
+than "train another named class per object."
+
+**Two candidate paths — deliberately left undecided until this is built:**
+
+1. **A 6th "objects" class in the existing model.** Trained as a coarse
+   *localizer* only ("something foreign is here"), not a classifier of *what* —
+   identifying the specific thing would be a separate Pi-side step (see below).
+   Needs real labeled training data like every other class (no way around
+   it — there's no free "unknown blob" fallback the frozen firmware exposes;
+   YOLO's internal per-anchor "objectness" score isn't surfaced in this
+   device's serial output, only finished label+box+confidence detections).
+   **Real risk:** a broad, visually-incoherent class sharing the same model as
+   5 tightly-scoped ones can dilute all of them — the person class already
+   needed extra calibration data once (100 images wasn't enough). Would need
+   the same threshold-eval rigor as before before trusting it, and probably
+   needs *more* and *more varied* capture than a single-item class. One model
+   slot stays in use, though — no runtime swapping.
+2. **A separate Pi-side layer — no camera retraining.** Localize via motion /
+   frame-diffing or a pretrained generic saliency model on the Pi, then an
+   embedding/similarity comparison ("have I seen this specific thing before?")
+   to recognize instances without ever training a closed-set class for them —
+   the same idea already used for individual person recognition, generalized.
+   **Zero risk to the trained model's quality**, no new capture burden
+   competing with the 5 classes' budgets. Cost is different: needs raw camera
+   frames (a timeshare with the detection stream on this hardware — can't have
+   both at once) and its own compute budget on a 512 MB Pi with no GPU.
+
+**Current leaning (not a final decision):** the separate-layer path, precisely
+because it can't degrade the primary detection — worth weighing seriously
+against option 1 when this is actually picked up. Revisit fully at build time.
+
 ### B11 — Learn its way around the house (topological place memory)
 G2 builds up a sense of *where it is* over time — as **place recognition + a
 graph of places**, never a metric floor plan (no depth/lidar, and monocular
 VSLAM is out of reach on a 512 MB Pi with a 192×192 low-FPS camera).
+
+**Design explored + deferred 2026-09-10** — a `PlaceModel` (fingerprint
+clustering by detection-label sets, a guided multi-angle head scan before
+confirming a genuinely new place, risk learned from CliffGuard incidents there
++ relaxed after many incident-free visits, plus a human override "you're on
+the desk"/"you're on the floor") was designed and prototyped. **Deferred**: it
+hinges on landmark classes (furniture, doorways) the vision model isn't
+expected to gain soon — with only 5 classes, fingerprints have almost nothing
+to distinguish rooms by. Revisit once [B20] or a landmark-class expansion
+lands; the design above is the starting point, not a rewrite.
+
+**Simpler piece worth building standalone, whenever:** a caution *state*, not
+tied to place recognition at all — defaults cautious, a voice override
+("you're on the desk" → no roam/approach; "you're on the floor" → normal)
+gates Tier 1 roam and "come here", and a real CliffGuard incident (once that
+class is trained) pushes it to HIGH automatically. No clustering, no
+fingerprints, ships independent of the vision model growing.
 
 **First slice built 2026-09-10** — `behavior/place_memory.py` (`PlaceMemory`):
 while roaming, `observe(label, bearing)` accumulates sightings; once a label
