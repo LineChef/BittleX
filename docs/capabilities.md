@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **501 passing tests**.
+`pi_pipeline/` carries **517 passing tests**.
 
 ---
 
@@ -103,10 +103,23 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
 
 - **Modes** — `converse` / `idle` / `explore`, with a controller that switches
   between them.
-- **Explore mode** — wander the current heading, start a fresh leg on a new
-  bearing, and investigate whatever is *new* in view (novelty tracker).
+- **Explore, two tiers:**
+  - **Tier 0 "attentive"** (`behavior/attentive.py`) — *stationary*, always
+    active as a life-signs layer on IDLE: gaze-follows a person with head/body,
+    reacts to something new in view (look → peer bow → curious chirp), does a
+    periodic head pan-scan, greets known people. **No walking, ever** — safe on
+    desk or floor.
+  - **Tier 1 "roam"** — walking exploration (wander stalest heading, investigate
+    novelty). **Voice-armed only** ("G2, go ahead and look around" / "exploration
+    mode"); no time-based entry. Ends on any activity, a bout cap, a leg-budget
+    leash, or "that's enough" — and disarms, so each bout needs re-arming.
+    Gated by `features.vision`; the desk-edge classifier (B16) upgrades it for
+    near-edge use.
 - **Idle-posture staged descent** — what pose G2 holds with nothing to do:
   peek → sit → rest → sleep, backing off gradually rather than freezing.
+- **Graceful shutdown** — "shut down" / "go dormant" → G2 lies flat (`d`) first,
+  holds ~2 s, then goes dormant (power-save + camera off, stays flat). Distinct
+  from the emergency freeze and from "go to sleep" (which curls).
 - **Deep-idle sleep** — below RESTING: after a long quiet stretch (or on
   command) the driver curls up (`kzz`), drops the Pi to the power-save profile,
   and turns the camera off, then wakes on the wake word / a tap / a loud sound /
@@ -301,7 +314,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 501
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 517
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

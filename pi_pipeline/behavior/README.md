@@ -62,14 +62,27 @@ session log) + the input plumbing (vision frame, IMU state, mic events).
 
 ```
 CONVERSE   a conversation is active — preempts everything, no autonomous movement
-IDLE       awake, still. After `idle_secs_before_explore` of quiet → EXPLORE
-EXPLORE    wandering / investigating. Ends after `explore_max_secs` or on any activity
+IDLE       awake, still. Holds a posture + the Tier 0 "attentive" layer
+           (attentive.py): gaze-follow / novelty-react / periodic scan. No walking.
+EXPLORE    Tier 1: walking exploration. VOICE-ARMED ONLY (arm_explore()) — never
+           time-based. Ends after `explore_max_secs`, on any activity, on the
+           Explorer leg budget, or disarm_explore(); disarms on exit.
 ```
 
 The caller drives it: `on_conversation_start/end`, `on_activity()` (picked up,
-addressed, told to stop), and `update()` once per tick for the current `Mode`.
+addressed, told to stop), `arm_explore()` / `disarm_explore()` (the voice
+command), and `update()` once per tick for the current `Mode`.
 
-## `Explorer` — wander + investigate
+## `AttentiveLook` — Tier 0, stationary curiosity (`attentive.py`)
+
+A frame + a clock in, a list of `Effect`s out (`HEAD` / `SKILL` / `CHIRP` — never
+`WALK`/`TURN`). The driver runs it in the IDLE branch while a posture holds
+steady: gaze-follow the nearest person, react to a novel object (look → peer bow
+→ curious chirp), or a periodic head pan-scan. `vision_available=False` → only
+the periodic scan. Composes with `IdlePosture` (still settles) and the
+recognition hop (greets known people).
+
+## `Explorer` — wander + investigate (Tier 1)
 
 A detection `Frame` + a clock in, an `ExploreDecision` out (`WANDER` / `TURN` /
 `APPROACH` / `INVESTIGATE` / `HOLD`, with a `turn` in radians). The caller maps

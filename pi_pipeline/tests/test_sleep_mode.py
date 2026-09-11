@@ -120,3 +120,27 @@ def test_reset():
     _run(s, t, 3.0, resting=True)
     s.reset()
     assert s.state is SleepState.AWAKE
+
+
+# ---------------------------------------- 'shut down' -- lie down, then dormant
+def test_shutdown_lies_down_then_dozes_flat():
+    s, t = _sm(shutdown_settle_s=2.0, settle_timeout_s=1.0)
+    s.on_command_shutdown()
+    st, a = s.update(resting=False)
+    assert a is SleepAction.LIE_DOWN and not s.shutting_down     # step 1: lie flat
+    st, a = s.update(resting=True)                               # same tick window
+    assert a is SleepAction.NONE                                 # settling, emitted once
+    t[0] += 3.0
+    st, a = s.update(resting=True)
+    assert st is SleepState.DOZING and a is SleepAction.ENTER_SLEEP
+    assert s.shutting_down                                       # caller keeps it flat, skips kzz
+
+
+def test_activity_cancels_a_pending_shutdown():
+    s, t = _sm(shutdown_settle_s=5.0)
+    s.on_command_shutdown()
+    s.update(resting=False)                                      # LIE_DOWN
+    s.on_activity()
+    t[0] += 10.0
+    st, a = s.update(resting=False)
+    assert st is SleepState.AWAKE and a is SleepAction.NONE      # never went dormant

@@ -38,6 +38,7 @@ class SleepState(Enum):
 
 class SleepAction(Enum):
     NONE = "none"
+    LIE_DOWN = "lie_down"         # shutdown: lie flat (`d`) first, then go dormant
     ENTER_SLEEP = "enter_sleep"   # curl up (kzz) + vision off + power-save on
     WAKE = "wake"                 # power up + uncurl + hand back to IdlePosture
 
@@ -49,6 +50,7 @@ class SleepModeConfig:
     min_sleep_s: float = 15.0              # ignore wake signals for this long after entering (anti-thrash)
     settle_timeout_s: float = 4.0          # DOZING auto-advances to ASLEEP if settled() never comes
     rouse_timeout_s: float = 5.0           # ROUSING auto-finishes if wake_done() never comes
+    shutdown_settle_s: float = 2.0         # 'shut down': lie down, hold this long, THEN go dormant
     loud_sound_wakes: bool = True
 
 
@@ -60,6 +62,9 @@ class SleepMode:
         self._since = clock()
         self._resting_since: float | None = None
         self._commanded = False
+        self._shutdown_at: float | None = None   # 'shut down' -> lie down, then dormant
+        self._lie_emitted = False
+        self._shutting_down = False               # this dormancy came from a shutdown
         self._reason = "init"
 
     @property
@@ -74,6 +79,12 @@ class SleepMode:
     def last_reason(self) -> str:
         return self._reason
 
+    @property
+    def shutting_down(self) -> bool:
+        """The current/pending dormancy was asked for by 'shut down' (lie flat +
+        dormant), not by 'go to sleep' (curl). Lets the caller pick the pose."""
+        return self._shutting_down
+
     def reset(self) -> None:
         self.__init__(self.cfg, clock=self._clock)
 
@@ -87,12 +98,22 @@ class SleepMode:
 
     # --- events ---------------------------------------------------------------
     def on_command_sleep(self) -> None:
-        """Explicit 'go to sleep' -- overrides the person-present block."""
+        """Explicit 'go to sleep' -- curl up (kzz), overrides person-present."""
         self._commanded = True
 
+    def on_command_shutdown(self) -> None:
+        """Explicit 'shut down' -- lie flat (`d`) first, hold `shutdown_settle_s`,
+        THEN go dormant. Overrides the person-present block."""
+        if self._shutdown_at is None and self._state is SleepState.AWAKE:
+            self._shutdown_at = self._clock()
+            self._lie_emitted = False
+
     def on_activity(self) -> None:
-        """Any deliberate interaction -- rouse if sleeping."""
+        """Any deliberate interaction -- rouse if sleeping / cancel a shutdown."""
         now = self._clock()
+        self._shutdown_at = None
+        self._lie_emitted = False
+        self._shutting_down = False
         if self._state in (SleepState.DOZING, SleepState.ASLEEP):
             self._enter(SleepState.ROUSING, now, "activity -> rouse")
 
@@ -102,6 +123,7 @@ class SleepMode:
 
     def wake_done(self) -> None:
         if self._state is SleepState.ROUSING:
+            self._shutting_down = False
             self._enter(SleepState.AWAKE, self._clock(), "wake choreography done -> awake")
 
     # --- tick ---------------------------------------------------------------
@@ -147,6 +169,19 @@ class SleepMode:
             self._reason = ("asleep (min-sleep hold)" if wake_signal
                             else "asleep")
             return self._state, SleepAction.NONE
+
+        # AWAKE: 'shut down' -- lie flat, hold, then go dormant
+        if self._shutdown_at is not None:
+            if now - self._shutdown_at < c.shutdown_settle_s:
+                if not self._lie_emitted:
+                    self._lie_emitted = True
+                    self._reason = "shutdown: lie down"
+                    return self._state, SleepAction.LIE_DOWN
+                self._reason = "shutdown: settling before dormant"
+                return self._state, SleepAction.NONE
+            self._shutdown_at = None
+            self._shutting_down = True
+            return self._enter(SleepState.DOZING, now, "shutdown: lay down -> dormant")
 
         # AWAKE: decide whether to fall asleep
         if self._commanded:

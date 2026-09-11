@@ -57,6 +57,24 @@ _RESUME = (
     "at ease", "you can go", "release",
 )
 
+# 'Shut down' -- graceful: lie down first, then go dormant (NOT the emergency
+# freeze, and NOT an OS power-off).
+_SHUTDOWN = (
+    "shut down", "shutdown", "power down", "power off", "go dormant",
+    "shut yourself down", "time to shut down",
+)
+
+# Tier 1 roam -- voice-armed only ("G2, go ahead and look around").
+_EXPLORE = (
+    "go ahead and look around", "look around", "have a look around",
+    "exploration mode", "explore", "go explore", "go and explore",
+    "check things out", "go for a wander", "wander around",
+)
+_UNEXPLORE = (
+    "stop exploring", "stop looking around", "stop wandering", "come back",
+    "thats enough", "that will do", "come here",
+)
+
 # character mode: "enable gir mode", "turn on gir", "gir mode off", "set gir to 70"
 _CHAR_NAMES = ("gir",)
 _CHAR_ON = ("enable", "turn on", "switch on", "activate", "start", "go into", "be",
@@ -145,9 +163,9 @@ def looks_like_rebuff(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"forget"``, ``"sleep"``,
-    ``"character"``, or ``None``. Checked in that order -- an emergency stop
-    wins over everything."""
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"explore"``,
+    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"character"``, or ``None``.
+    Checked in that order -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
         return None
@@ -155,6 +173,12 @@ def match_local_command(text: str) -> str | None:
         return "halt"
     if _has_verb(n, _RESUME):
         return "resume"
+    if _hit(n, _SHUTDOWN) or _has_verb(n, ("shutdown",)):
+        return "shutdown"
+    if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):
+        return "explore"
+    if _hit(n, _UNEXPLORE):
+        return "unexplore"
     if _hit(n, _FORGET):
         return "forget"
     if _hit(n, _SLEEP):

@@ -62,3 +62,23 @@ def test_rebuff_phrases_match(text):
 ])
 def test_ordinary_sentences_are_not_rebuffs(text):
     assert not looks_like_rebuff(text)
+
+
+# ------------------------------------------------- explore / shutdown commands
+from pi_pipeline.voice.commands import match_local_command as _mlc
+
+
+def test_explore_and_unexplore_phrases():
+    for p in ("go ahead and look around", "exploration mode", "look around",
+              "go explore", "wander around"):
+        assert _mlc(p) == "explore", p
+    for p in ("that's enough", "stop exploring", "come back", "stop looking around"):
+        assert _mlc(p) == "unexplore", p
+
+
+def test_shutdown_is_its_own_command_not_a_halt():
+    for p in ("shut down", "shutdown", "power down", "go dormant", "G2 shut down"):
+        assert _mlc(p) == "shutdown", p
+    # and the emergency phrases still halt
+    assert _mlc("emergency stop") == "halt"
+    assert _mlc("freeze") == "halt"

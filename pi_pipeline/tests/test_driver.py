@@ -97,21 +97,22 @@ def test_picked_up_preempts_a_settle_choreo():
 # --- explore ----------------------------------------------------------
 
 def test_explore_investigates_novel_object_with_a_sniff():
-    p = BehaviorParams(idle_secs_before_explore=10, investigate_secs=3.0,
-                       approach_novelty=False)
+    p = BehaviorParams(investigate_secs=3.0, approach_novelty=False)
     d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
-    c.adv(11)
-    t = d.tick(DriverInputs(frame=[det("mug", area_side=0.45, bearing=0.5)]))
+    c.adv(11)                                       # past the settle grace
+    # Tier 1 roam is voice-armed only -- no time-based entry
+    assert d.tick(DriverInputs(frame=[])).mode is Mode.IDLE
+    t = d.tick(DriverInputs(arm_explore=True,
+                            frame=[det("mug", area_side=0.45, bearing=0.5)]))
     assert t.mode is Mode.EXPLORE
     assert EffectKind.STOP in kinds(t)             # hold to look
     assert "ksnf" in payloads(t, EffectKind.SKILL)  # sniff a find
 
 
 def test_explore_wanders_when_nothing_new():
-    p = BehaviorParams(idle_secs_before_explore=10)
-    d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
+    d = BehaviorDriver(BehaviorParams(), clock=(c := Clk()), rng=random.Random(0))
     c.adv(11)
-    t = d.tick(DriverInputs(frame=[]))
+    t = d.tick(DriverInputs(arm_explore=True, frame=[]))
     assert t.mode is Mode.EXPLORE
     assert EffectKind.TURN in kinds(t) or EffectKind.WALK in kinds(t)
 
@@ -233,3 +234,53 @@ def test_no_vision_refuses_enrollment(tmp_path):
     assert d.enroll.state is EnrollState.IDLE               # never started
     speaks = payloads(t, EffectKind.SPEAK)
     assert speaks and "can't see" in speaks[0].lower()
+
+
+# --- Tier 1 explore: voice-armed, leg-budget leash --------------------
+
+def test_explore_needs_voice_arm_and_disarms_on_activity():
+    d, c = _mk(params=BehaviorParams())
+    c.adv(20)
+    assert d.tick(DriverInputs()).mode is Mode.IDLE          # never auto
+    assert d.tick(DriverInputs(arm_explore=True)).mode is Mode.EXPLORE
+    # any activity ends it AND disarms -- must be re-armed
+    assert d.tick(DriverInputs(told_stop=True)).mode is not Mode.EXPLORE
+    c.adv(20)
+    assert d.tick(DriverInputs()).mode is Mode.IDLE
+    assert d.tick(DriverInputs(disarm_explore=True)).mode is Mode.IDLE
+
+
+def test_explore_leg_budget_ends_the_bout():
+    from pi_pipeline.behavior.explore import ExploreConfig
+    d, c = _mk(params=BehaviorParams(explore_leg_secs=0.1),
+               explore_cfg=ExploreConfig(max_legs=3, hold_secs=0.05))
+    c.adv(10)
+    d.tick(DriverInputs(arm_explore=True))
+    saw_idle = False
+    for _ in range(60):
+        c.adv(0.2)
+        t = d.tick(DriverInputs(frame=[]))
+        if t.mode is Mode.IDLE:
+            saw_idle = True
+            break
+    assert saw_idle                                          # leg budget disarmed it
+
+
+# --- shutdown: lie down, then dormant --------------------------------
+
+def test_shutdown_lies_down_then_goes_dormant():
+    d, c = _mk(params=BehaviorParams())
+    c.adv(1)
+    t = d.tick(DriverInputs(shutdown=True))
+    assert "d" in payloads(t, EffectKind.SKILL)              # lie flat first
+    # hold through the settle window, then it goes dormant (power-save, camera off)
+    dormant = None
+    for _ in range(40):
+        c.adv(0.5)
+        t = d.tick(DriverInputs())
+        if any(e.kind is EffectKind.POWER and e.payload == "headless" for e in t.effects):
+            dormant = t
+            break
+    assert dormant is not None
+    assert ("off", None) in payloads(dormant, EffectKind.CAPTURE)
+    assert "kzz" not in payloads(dormant, EffectKind.SKILL)  # stays flat, doesn't curl

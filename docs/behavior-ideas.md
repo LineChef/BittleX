@@ -295,12 +295,19 @@ vision `narrate` path). A "mode" the voice loop can enter and exit. Exercises
 vision + avoidance + voice + link together — a good capstone. Add it as another
 `Mode` in `pi_pipeline/behavior/mode_controller.py` alongside EXPLORE.
 
-**Explore mode + a curiosity trait are built** (`pi_pipeline/personality/` +
-`pi_pipeline/behavior/`, 2026-09-03): the `ModeController` (CONVERSE / IDLE /
-EXPLORE), the `Explorer` (wander + investigate-novelty intent), `Novelty`
-tracking, and the trait framework that steers them. Pure logic, tested against
-mocks; the runtime loop that drives the actuator + cues + memory logging is the
-Phase 10 integration and needs the camera.
+**Explore mode is built as two tiers** (design session 2026-09-10; see
+`project-plan.md` Phase 10):
+- **Tier 0 "attentive"** (`behavior/attentive.py`) — stationary, always-on
+  life-signs layer on IDLE: gaze-follow a person, react to novelty (look → peer
+  bow → curious chirp), periodic head scan, greet known people. No walking.
+- **Tier 1 "roam"** — `Mode.EXPLORE` (`ModeController` + `Explorer` + `Novelty`),
+  now **voice-armed only** ("G2, go ahead and look around"), leg-budget leash,
+  disarms on exit. Gated by `features.vision`.
+`BehaviorRuntime` + `pi_pipeline/app/` wire it to real I/O; still needs the
+camera + edge classifier (B16) for near-edge roam.
+
+Patrol mode (the walked-loop + narrate-on-motion capstone above) would be a
+third `Mode` layered on Tier 1.
 
 ### B8 — Go-to-object
 "Go to the red cup" → detect the object (a custom SenseCraft model, or the

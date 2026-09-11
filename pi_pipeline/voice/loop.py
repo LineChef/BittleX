@@ -137,6 +137,29 @@ class VoiceLoop:
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return
+        if cmd == "explore":
+            log.info("explore armed (voice)")
+            self._events(arm_explore=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, looking around. Make sure I'm on the floor.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "unexplore":
+            log.info("explore disarmed (voice)")
+            self._events(disarm_explore=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, coming back.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "shutdown":
+            log.info("shutdown requested (voice) -- lie down then dormant")
+            self._events(shutdown=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, lying down and shutting down. Wake me when you need me.")
+            self._end_session()
+            return
         if cmd == "sleep":
             log.info("'go to sleep' -- ending session")
             self._events(told_sleep=True)

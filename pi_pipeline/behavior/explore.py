@@ -43,6 +43,8 @@ class ExploreConfig:
     min_area: float = 0.004       # ignore specks
     min_conf: float = 0.35
     hold_secs: float = 0.6        # pause between legs
+    max_legs: int = 8            # short-leash proxy (no odometry): end the bout after
+                                 #   this many walk legs. The driver disarms EXPLORE.
 
 
 class Explorer:
@@ -55,6 +57,7 @@ class Explorer:
         self._investigate_until: float = 0.0
         self._hold_until: float = 0.0
         self._target = ""
+        self._legs = 0
         self._reason = "init"
 
     @property
@@ -62,11 +65,18 @@ class Explorer:
         """Why the most recent decide() returned what it did -- for diag logging."""
         return self._reason
 
+    @property
+    def exhausted(self) -> bool:
+        """True once the bout has used its leg budget -- the driver disarms
+        EXPLORE (there's no odometry, so leg count is the distance proxy)."""
+        return self._legs >= self.cfg.max_legs
+
     def reset(self) -> None:
         self._leg_start = None
         self._investigate_until = 0.0
         self._hold_until = 0.0
         self._target = ""
+        self._legs = 0
         self._reason = "reset"
 
     def _bearing(self, det) -> float:
@@ -121,10 +131,12 @@ class Explorer:
         # 4. nothing new -- wander. New leg when the current one is spent.
         if self._leg_start is None:
             self._leg_start = now
+            self._legs += 1
             heading = self.nov.stalest_heading(now)
             self.nov.see_heading(heading, now)
             turn = heading * self.p.wander_turn_bias
-            return self._d(ExploreAction.TURN, turn=turn, reason="new leg")
+            return self._d(ExploreAction.TURN, turn=turn,
+                           reason=f"new leg ({self._legs}/{self.cfg.max_legs})")
         if now - self._leg_start >= self.p.explore_leg_secs:
             self._leg_start = None
             return self._d(ExploreAction.HOLD, reason="leg done")

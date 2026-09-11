@@ -31,6 +31,7 @@ from enum import Enum
 from ..personality.mood import IdleBias, Mood, MoodConfig, MoodModel
 from ..personality.traits import BehaviorParams
 from ..vision.feed import Frame
+from .attentive import AttentiveConfig, AttentiveLook
 from .chirps import ChirpMood, Chirper
 from .emergency import EmergencyStop
 from .enrollment import (
@@ -88,7 +89,10 @@ class DriverInputs:
     conversation_ended: bool = False
     told_stop: bool = False                 # explicit "stop" / "that's enough"
     told_stay: bool = False                 # "stay" / "wait here" -> sit and hold
-    told_sleep: bool = False                # "go to sleep" -> deep-idle now (overrides person-present)
+    arm_explore: bool = False               # "go ahead and look around" -> allow Tier 1 roam
+    disarm_explore: bool = False            # "that's enough" -> end the roam bout
+    told_sleep: bool = False                # "go to sleep" -> curl up + dormant now
+    shutdown: bool = False                  # "shut down" -> lie flat, then dormant
     rebuffed: bool = False                  # "leave me alone" / harsh correction -> mood SUBDUED
     picked_up: bool = False                 # lifted this tick (edge of `held`)
     loud_sound: bool = False                # a startling noise -> rouse
@@ -205,6 +209,7 @@ class BehaviorDriver:
                  novelty_cfg: NoveltyConfig | None = None,
                  mood_cfg: MoodConfig | None = None,
                  sleep_cfg: SleepModeConfig | None = None,
+                 attentive_cfg: AttentiveConfig | None = None,
                  chirps: bool = True,
                  estop_freeze_token: str = "kbalance",
                  cliff=None,
@@ -226,6 +231,9 @@ class BehaviorDriver:
         self.mode = ModeController(self.p, mcfg, clock=clock)
         self.novelty = Novelty(novelty_cfg)
         self.explorer = Explorer(self.p, self.novelty, explore_cfg)
+        # Tier 0 "attentive" -- stationary curiosity, layered on IDLE posture
+        self.attentive = AttentiveLook(self.novelty, attentive_cfg, clock=clock,
+                                       vision_available=self._vision)
         # personality -> idle timing: use the BehaviorParams knobs unless the
         # caller pinned an explicit config.
         self.idle = IdlePosture(
@@ -285,6 +293,11 @@ class BehaviorDriver:
         if i.told_stay:
             self.idle.on_stay_command()
             self.mode.on_activity()
+        if i.arm_explore:
+            self.mode.arm_explore()
+            self.explorer.reset()
+        if i.disarm_explore:
+            self.mode.disarm_explore()
         # anything that should break roaming / rouse from rest
         if i.told_stop or i.picked_up or i.loud_sound:
             self.mode.on_activity()
@@ -483,18 +496,29 @@ class BehaviorDriver:
         #     signal (wake word, tap/lift, loud sound, spoken-to, or command).
         if i.told_sleep:
             self.sleep.on_command_sleep()
+        if i.shutdown:
+            self._choreo.clear()
+            self.sleep.on_command_shutdown()
         _, s_act = self.sleep.update(
             now, resting=self.idle.posture is Posture.RESTING,
             person_present=i.person_present, loud_sound=i.loud_sound,
             imu_tap=i.imu_tap or i.picked_up,          # lifted == a wake
             wake_word=i.wake_word or i.told_stop)      # spoken to == a wake
+        if s_act is SleepAction.LIE_DOWN:             # shutdown: lie flat first
+            return self._finish(self.mode.update(now),
+                                effects + [Effect(EffectKind.SKILL, "d", "shutdown: lie down")],
+                                now, reason="shutdown: lying down before dormant")
         if s_act is SleepAction.ENTER_SLEEP:
+            shut = self.sleep.shutting_down
+            effects.append(Effect(EffectKind.DIAG,
+                                  ("sleep", "shutdown" if shut else "enter"),
+                                  self.sleep.last_reason))
+            effects += self._chirp(ChirpMood.SLEEPY, now, "going dormant")
+            if not shut:                              # 'go to sleep' curls; 'shut down' is already flat
+                effects.append(Effect(EffectKind.SKILL, "kzz", "curl up to sleep"))
             effects += [
-                Effect(EffectKind.DIAG, ("sleep", "enter"), self.sleep.last_reason),
-                *self._chirp(ChirpMood.SLEEPY, now, "going to sleep"),
-                Effect(EffectKind.SKILL, "kzz", "curl up to sleep"),
-                Effect(EffectKind.POWER, "headless", "sleep: power-save profile"),
-                Effect(EffectKind.CAPTURE, ("off", None), "sleep: camera off"),
+                Effect(EffectKind.POWER, "headless", "dormant: power-save profile"),
+                Effect(EffectKind.CAPTURE, ("off", None), "dormant: camera off"),
             ]
             return self._finish(self.mode.update(now), effects, now,
                                 reason=f"sleep: {self.sleep.last_reason}")
@@ -568,16 +592,23 @@ class BehaviorDriver:
 
         effects += self._recognition_hop(i, now)
 
-        # 4. EXPLORE -- roam, no posture descent (ModeController won't enter it
-        #    without vision; this guard is belt-and-suspenders)
+        # 4. EXPLORE (Tier 1) -- armed roam, no posture descent. ModeController
+        #    only enters it when voice-armed; this vision guard is
+        #    belt-and-suspenders. The leg budget ends the bout (no odometry).
         if mode is Mode.EXPLORE and self._vision:
+            if self.explorer.exhausted:
+                self.mode.disarm_explore()
+                self.explorer.reset()
+                return self._finish(self.mode.update(now),
+                                    effects + [Effect(EffectKind.STOP, None, "leash: bout done")],
+                                    now, reason="explore: leg budget spent -> disarm")
             self.idle.update(now, exploring=True, person_present=i.person_present,
                              handled=i.held)
             effects += self._from_explore(i, now)
             return self._finish(mode, effects, now,
                                 reason=f"explore: {self._explore_target or 'roaming'}")
 
-        # 5. IDLE -- staged descent + idle fidgets
+        # 5. IDLE -- staged descent + idle fidgets + the Tier 0 attentive layer
         safe_to_rest = (i.imu_level and i.imu_stable and not i.held
                         and not i.recovering)
         _, pa = self.idle.update(
@@ -591,6 +622,17 @@ class BehaviorDriver:
             if g is not Gesture.NONE:
                 effects.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g],
                                       self.gestures.last_reason))
+
+        # Tier 0 "attentive" -- stationary curiosity while a posture is held
+        # steady (gaze-follow / novelty react / periodic scan). No locomotion.
+        if pa is PostureAction.NONE and self.idle.posture in (Posture.SIT, Posture.RESTING):
+            for e in self.attentive.decide(
+                    list(i.frame), resting=self.idle.posture is Posture.RESTING,
+                    now=now, person_present=i.person_present):
+                if e.kind is EffectKind.CHIRP:
+                    effects += self._chirp(e.payload, now, e.reason)
+                else:
+                    effects.append(e)
 
         return self._finish(mode, effects, now,
                             reason=f"idle: {self.idle.last_reason}")

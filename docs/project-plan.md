@@ -919,6 +919,36 @@ voice actuator to mock, with a `=== BENCH MODE ===` banner, so `check_serial` /
 `run_gait --probe-imu` / firmware `c16` calibration own the serial link with
 nothing autonomous competing.
 
+**Explore mode — two-tier redesign, built 2026-09-10** (user design session).
+The single time-based `EXPLORE` mode is split:
+- **Tier 0 "attentive"** (`behavior/attentive.py`, `AttentiveLook`) — stationary,
+  *always active* as a life-signs layer the driver runs in the IDLE branch while
+  a posture holds steady: gaze-follow the nearest person (`HEAD` bearing),
+  react to a novel object (look → `kbuttUp` peer bow → QUESTION chirp), a
+  periodic head pan-scan (`scan_every_s`), and greets known people via the
+  existing recognition hop. Never emits `WALK`/`TURN`. `vision_available=False`
+  → periodic scan only. G2 still settles (sit → rest → sleep) underneath.
+- **Tier 1 "roam"** — `Mode.EXPLORE` is now **voice-armed only**:
+  `ModeController.arm_explore()` / `disarm_explore()`, entered solely when armed
+  (+ the post-conversation `settle_secs` grace); **no time-based entry**. Ends on
+  any activity, `explore_max_secs`, the new `Explorer` leg budget
+  (`ExploreConfig.max_legs`, a no-odometry distance proxy → driver disarms), or
+  "that's enough" — and disarms on every exit, so each bout needs re-arming.
+  `DriverInputs.arm_explore` / `disarm_explore`; voice phrases "go ahead and
+  look around" / "exploration mode" → `commands` `"explore"`, "that's enough" /
+  "come back" → `"unexplore"`. Still gated by `features.vision`; the desk-edge
+  classifier (B16) upgrades it for near-edge use. Operating contract: G2 is
+  always supervised, and the operator only arms Tier 1 when G2 is on the floor.
+
+**Graceful shutdown, built 2026-09-10** — voice "shut down" / "shutdown" /
+"power down" / "go dormant" (`commands` → `"shutdown"`) → `DriverInputs.shutdown`
+→ `SleepMode.on_command_shutdown()`: G2 emits `d` (lie flat), holds
+`shutdown_settle_s` (~2 s, `SleepAction.LIE_DOWN`), then transitions to DOZING /
+`ENTER_SLEEP` with `SleepMode.shutting_down` set so the driver skips the `kzz`
+curl and just does POWER headless + camera off + a sleepy chirp. Any activity /
+wake word cancels a pending shutdown or rouses from it. Not an OS power-off;
+"go to sleep" stays the lighter curl variant.
+
 **Left for hardware:** plumb a real `SerialDetectionFeed` into `SensorHub` +
 `BehaviorRuntime.frame_source`; tune the `SensorConfig` IMU thresholds against
 `--probe-imu`; confirm the head-pan joint index + range; the `WalkerSink` is

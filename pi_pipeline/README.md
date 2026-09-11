@@ -96,7 +96,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**501 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**517 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +
@@ -134,5 +134,13 @@ python -m pi_pipeline.behavior
 python -m pi_pipeline.doctor              # add --serial to also ping the BiBoard
 ```
 
-Emergency stop is also a voice phrase — "emergency stop" / "freeze" / "halt" /
-"stop moving" latches it; "resume" / "as you were" clears it.
+**Spoken commands** (handled locally, no Claude call):
+- "emergency stop" / "freeze" / "halt" / "stop moving" → latch the freeze;
+  "resume" / "as you were" → clear it.
+- "shut down" / "power down" / "go dormant" → lie flat, then go dormant.
+  "go to sleep" → the lighter curl-up variant.
+- "go ahead and look around" / "exploration mode" → arm Tier 1 roam;
+  "that's enough" / "come back" → disarm. (Tier 0 stationary attentiveness is
+  always on.)
+- "forget that" → drop this session's exchanges + facts.
+- "enable / disable gir mode" → toggle the opt-in character.

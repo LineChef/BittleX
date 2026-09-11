@@ -44,50 +44,70 @@ class Clock:
     def __call__(self): return self.t
 
 
-def test_idle_to_explore_after_quiet():
+def test_explore_is_voice_armed_only_never_time_based():
     clk = Clock()
-    p = BehaviorParams(idle_secs_before_explore=20)
-    mc = ModeController(p, ModeConfig(settle_secs=3, explore_max_secs=60), clock=clk)
-    assert mc.update() is Mode.IDLE
-    clk.t = 19
-    assert mc.update() is Mode.IDLE
-    clk.t = 21
+    mc = ModeController(BehaviorParams(), ModeConfig(settle_secs=3), clock=clk)
+    clk.t = 9999                                  # arbitrarily long quiet
+    assert mc.update() is Mode.IDLE               # never auto-enters
+    mc.arm_explore()
+    assert mc.update() is Mode.EXPLORE            # armed + settle grace passed
+
+
+def test_arm_before_settle_grace_waits():
+    clk = Clock()
+    mc = ModeController(BehaviorParams(), ModeConfig(settle_secs=3), clock=clk)
+    mc.on_conversation_end()                      # resets last_activity to now (t=0)
+    mc.arm_explore()
+    clk.t = 2
+    assert mc.update() is Mode.IDLE               # inside the settle grace
+    clk.t = 4
     assert mc.update() is Mode.EXPLORE
 
 
-def test_conversation_preempts_and_resets():
+def test_conversation_preempts_and_disarms():
     clk = Clock()
-    mc = ModeController(BehaviorParams(idle_secs_before_explore=10),
-                        ModeConfig(settle_secs=2), clock=clk)
+    mc = ModeController(BehaviorParams(), ModeConfig(settle_secs=2), clock=clk)
     clk.t = 20
+    mc.arm_explore()
     assert mc.update() is Mode.EXPLORE
     mc.on_conversation_start()
     assert mc.update() is Mode.CONVERSE
     mc.on_conversation_end()
     assert mc.mode is Mode.IDLE
-    clk.t = 21                                   # not yet past settle
-    assert mc.update() is Mode.IDLE
-    clk.t = 40                                   # past settle + idle window
-    assert mc.update() is Mode.EXPLORE
+    clk.t = 40
+    assert mc.update() is Mode.IDLE              # disarmed -- needs re-arming
 
 
-def test_activity_stops_exploring():
+def test_activity_stops_and_disarms_exploring():
     clk = Clock()
-    mc = ModeController(BehaviorParams(idle_secs_before_explore=5), clock=clk)
+    mc = ModeController(BehaviorParams(), clock=clk)
     clk.t = 10
+    mc.arm_explore()
     assert mc.update() is Mode.EXPLORE
     mc.on_activity()
+    assert mc.mode is Mode.IDLE and not mc.explore_armed
+
+
+def test_disarm_ends_the_bout():
+    clk = Clock()
+    mc = ModeController(BehaviorParams(), ModeConfig(settle_secs=1), clock=clk)
+    clk.t = 10
+    mc.arm_explore()
+    assert mc.update() is Mode.EXPLORE
+    mc.disarm_explore()
     assert mc.mode is Mode.IDLE
 
 
-def test_explore_bout_times_out():
+def test_explore_bout_times_out_and_disarms():
     clk = Clock()
-    mc = ModeController(BehaviorParams(idle_secs_before_explore=5),
+    mc = ModeController(BehaviorParams(),
                         ModeConfig(explore_max_secs=30, settle_secs=1), clock=clk)
     clk.t = 10
+    mc.arm_explore()
     assert mc.update() is Mode.EXPLORE
     clk.t = 45
     assert mc.update() is Mode.IDLE
+    assert not mc.explore_armed                   # must be re-armed by voice
 
 
 # --- Explorer ----------------------------------------------------------

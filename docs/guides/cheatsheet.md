@@ -202,6 +202,8 @@ Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at
 | `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
 | `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
 | _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
+| _say_ "go ahead and look around" / "exploration mode" ⟷ "that's enough" / "come back" | arm / disarm **Tier 1 roam** (walking explore — voice-armed only; leg-budget leash; disarms on exit). Tier 0 "attentive" (stationary gaze-follow + reactions) is always on |
+| _say_ "shut down" / "power down" / "go dormant" | **graceful shutdown** — G2 lies flat (`d`), holds ~2 s, then goes dormant (power-save + camera off). "go to sleep" is the lighter curl variant; "emergency stop" is the freeze |
 
 **Memory / config / diagnostics**
 

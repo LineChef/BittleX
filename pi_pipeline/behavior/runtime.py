@@ -38,6 +38,7 @@ log = logging.getLogger("g2.behavior.runtime")
 _EVENT_BOOLS = (
     "halt", "release",
     "wake_word", "conversation_ended", "told_stop", "told_stay", "told_sleep",
+    "shutdown", "arm_explore", "disarm_explore",
     "rebuffed", "picked_up", "loud_sound", "imu_tap", "nearby_motion",
     "cancel_enroll", "say_hi",
 )
