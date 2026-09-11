@@ -57,6 +57,7 @@ pi_pipeline/
     sensors.py         # SensorHub: IMU stream + detection feed -> the sensors() dict
     __main__.py        # python -m pi_pipeline.app — voice loop + behaviour runtime
   doctor.py            # python -m pi_pipeline.doctor — bring-up readiness checklist
+  bringup.py           # python -m pi_pipeline.bringup — guided, resumable bring-up checklist
   gait/                # Phase 6 — sim-to-real deployment of run20m_ppo
     residual_policy.py deploy_map.py run_gait.py   # the 80 Hz on-robot loop
     thermal_guard.py   # I2t heat estimate + 3-tier indicator
@@ -66,6 +67,8 @@ pi_pipeline/
   vision/              # Phase 8 — camera / detection feed / avoidance / cliff guard
   memory/              # Phase 9 — SQLite conversation memory; webui.py (browse/prune)
   link/                # Phase 5 — resilient BiBoard serial link + recovery FSM
+    check_serial.py    # port/ping/skill checks + `firstmove` (guided first movement)
+    trace.py           # TracingLink (log every command sent) + replay
   diag/                # black-box logger + ring buffer + watchdog + sysmon stubs
   power/               # CPU governor / Wi-Fi power-save / disable peripherals
   util/                # supervisor.py — restart-on-death/hang for worker threads
@@ -96,7 +99,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**548 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**563 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +
@@ -131,7 +134,17 @@ python -m pi_pipeline.app --release       # clear it  (or: kill -USR2 <pid>)
 python -m pi_pipeline.behavior
 
 # Bring-up readiness checklist (run the moment the Pi + body are wired)
-python -m pi_pipeline.doctor              # add --serial to also ping the BiBoard
+python -m pi_pipeline.doctor              # add --serial to also handshake the BiBoard
+
+# The guided, resumable 14-step hardware bring-up sequence
+python -m pi_pipeline.bringup             # --list / --restart / --from <id>
+
+# Guided first movement: one joint at a time, confirmed, then kbalance + a wkF burst
+python -m pi_pipeline.link.check_serial firstmove
+
+# Log every serial command sent, then replay the same sequence later
+python -m pi_pipeline.app --serial --trace ~/g2_trace.jsonl
+python -m pi_pipeline.link.trace replay ~/g2_trace.jsonl --dry-run
 ```
 
 Every recognised command (and every conversational turn) fires an instant

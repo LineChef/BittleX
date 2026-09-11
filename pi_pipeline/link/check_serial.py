@@ -5,6 +5,7 @@
     python -m pi_pipeline.link.check_serial send kbalance       # send one command, print the reply
     python -m pi_pipeline.link.check_serial skills              # cycle the conversational skill set
     python -m pi_pipeline.link.check_serial rest                # send 'd' (safe state)
+    python -m pi_pipeline.link.check_serial firstmove           # guided, confirmed first movement
 """
 from __future__ import annotations
 
@@ -22,6 +23,50 @@ def _link() -> SerialLink:
     return SerialLink(settings.serial_port, settings.serial_baud)
 
 
+# name -> OpenCat servo index (deploy_map.py's confirmed Petoi joint map).
+# Head first (index 0, lowest stakes), then the 8 leg servos.
+_JOINTS = [
+    ("head-pan", 0),
+    ("FL-shoulder", 8), ("FR-shoulder", 9), ("BR-shoulder", 10), ("BL-shoulder", 11),
+    ("FL-knee", 12), ("FR-knee", 13), ("BR-knee", 14), ("BL-knee", 15),
+]
+
+
+def _firstmove(link: SerialLink, *, deg: float, walk_s: float) -> None:
+    """One joint at a time through a small range of motion, each step
+    confirmed, before ever trying `kbalance` or a walk gait. Always leaves the
+    robot at `d` (rest) on exit, including on Ctrl-C."""
+    print(f"Guided first movement -- {deg:g} degree nudge per joint, confirmed each step.")
+    print("Enter = do it, s = skip this joint, q = stop here (and rest).\n")
+    try:
+        for name, idx in _JOINTS:
+            choice = input(f"  nudge {name} (servo {idx}) by +{deg:g} deg? [Enter/s/q] "
+                          ).strip().lower()
+            if choice == "q":
+                break
+            if choice == "s":
+                continue
+            link.send(opencat.move_joints([(idx, int(deg))]), read_reply=False)
+            after = input(f"    watch it, then Enter to return {name} to neutral "
+                         f"(or q to stop here)... ").strip().lower()
+            if after == "q":
+                break
+            link.send(opencat.move_joints([(idx, 0)]), read_reply=False)
+        else:
+            choice = input("\nAll joints checked. Send kbalance (robot stands)? "
+                          "[Enter/q] ").strip().lower()
+            if choice != "q":
+                link.send(opencat.BALANCE, read_reply=False)
+                choice = input(f"\nStanding OK? Run kwkF for {walk_s:g}s then auto-rest? "
+                              "[Enter/q] ").strip().lower()
+                if choice != "q":
+                    link.send(opencat.skill("wkF"), read_reply=False)
+                    time.sleep(walk_s)
+    finally:
+        link.send(opencat.REST, read_reply=False)
+        print("sent 'd' (rest) -- first-move check done.")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     ap = argparse.ArgumentParser(prog="pi_pipeline.link.check_serial")
@@ -31,6 +76,9 @@ def main() -> None:
     p_send = sub.add_parser("send"); p_send.add_argument("command")
     sk = sub.add_parser("skills"); sk.add_argument("--hold", type=float, default=2.5)
     sub.add_parser("rest")
+    fm = sub.add_parser("firstmove")
+    fm.add_argument("--deg", type=float, default=15.0, help="degrees to nudge each joint")
+    fm.add_argument("--walk-s", type=float, default=2.0, help="seconds to run wkF before auto-rest")
     args = ap.parse_args()
 
     if args.cmd == "ports":
@@ -65,6 +113,8 @@ def main() -> None:
         elif args.cmd == "rest":
             link.send(opencat.REST, read_reply=False)
             print("sent 'd' (rest)")
+        elif args.cmd == "firstmove":
+            _firstmove(link, deg=args.deg, walk_s=args.walk_s)
     finally:
         link.close()
 

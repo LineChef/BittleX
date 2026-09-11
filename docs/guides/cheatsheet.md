@@ -225,7 +225,10 @@ Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at
 | `python -m pi_pipeline.app --bench` | **stand/bench mode** — no autonomous movement, voice actuator = mock. Use while running calibration / `check_serial` / `--probe-imu` |
 | `python -m pi_pipeline.app --halt` / `--release` | **EMERGENCY STOP** a running app (freeze + hold) / clear it. Also `kill -USR1 <pid>` / `-USR2`, or _say_ "emergency stop" / "freeze" / "resume" |
 | `python -m pi_pipeline.behavior` | behaviour runtime alone vs mocks — prints the effect stream (idle → sit → rest → sleep → wake) |
-| `g2serial [ports\|ping\|send <cmd>\|skills\|rest]` | BiBoard serial link checks |
+| `python -m pi_pipeline.bringup` | **guided, resumable bring-up checklist** — the 14-step hardware sequence, one step at a time. `--list` / `--restart` / `--from <id>` |
+| `g2serial [ports\|ping\|send <cmd>\|skills\|rest\|firstmove]` | BiBoard serial link checks; `firstmove` = guided one-joint-at-a-time first movement (confirmed, always ends at rest) |
+| `python -m pi_pipeline.app --trace <path>` | log every serial command sent to a timestamped file |
+| `python -m pi_pipeline.link.trace replay <path> [--dry-run]` | replay a trace at the same relative pacing |
 | `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |
 | `g2power [status\|headless\|interactive\|governor <n>]` | Pi power-management helpers |
 

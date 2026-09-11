@@ -931,6 +931,35 @@ that ties everything together with hardware:
 - **`pre-hardware` git tag** — a rollback point on `development` before
   bring-up churn starts.
 
+**The three bigger deployment-easing items — built 2026-09-10:**
+- **`pi_pipeline/bringup.py`** — `python -m pi_pipeline.bringup`: the 14-step
+  "When the hardware arrives" sequence above, as a guided, resumable checklist
+  instead of a doc to re-read and lose your place in. Progress persists to
+  `<G2_STATE_DIR>/bringup_progress.json` (`--restart` clears it, `--from <id>`
+  jumps to a step, `--list` prints everything non-interactively). At each step:
+  `Enter`=done, `r`=run the suggested command (only offered for read-only /
+  passive ones — port listing, `doctor`, a text-mode voice check, the
+  benchmark), `s`=skip, `q`=quit-and-save. **Movement commands (`c16`
+  calibration, `kbalance`, `kwkF`, `--probe-imu`, `bench_real.py`) are always
+  shown as text, never auto-run** — anything that moves a joint needs your
+  hands free to catch it, not a confirm prompt inside this script.
+- **`check_serial firstmove`** — a guided, confirmed first movement: one joint
+  at a time (head, then the 8 leg servos by the confirmed Petoi map from
+  `gait/deploy_map.py` — FL/FR/BR/BL shoulder then knee), each nudged by
+  `--deg` (default 15°) with an explicit confirm before AND after, then (only
+  if you keep saying yes) `kbalance`, then a single timed `wkF` burst
+  (`--walk-s`) that **always ends at `d` (rest)** — including on `q` or
+  Ctrl-C at any point, via a `finally`.
+- **`pi_pipeline/link/trace.py`** — `TracingLink` wraps any link and appends
+  every outbound command to a timestamped JSONL file
+  (`{"t", "cmd", "reply"}`); `python -m pi_pipeline.app --trace <path>` wires
+  it in transparently (both the voice actuator and the behaviour runtime's
+  sinks log through the same file, since they share one link).
+  `python -m pi_pipeline.link.trace replay <path> [--dry-run] [--speed N]
+  [--serial]` re-sends the same commands with the same relative pacing — "it
+  did something weird, what did we send it" becomes a file to read and a
+  sequence you can reproduce, not a memory to trust.
+
 **Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
 A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`
 (checked at step 0, above enrollment / sleep / safety / mode): on `halt` it emits

@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **548 passing tests**.
+`pi_pipeline/` carries **563 passing tests**.
 
 ---
 
@@ -291,6 +291,17 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 - **Black-box logging in the integrated app** — `pi_pipeline.app` starts a
   diagnostics session + crash hook on launch, same as the gait loop; the first
   real hardware session is recorded, not silently unlogged.
+- **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 14-step
+  hardware sequence as a resumable, interactive checklist (progress persists
+  to disk); auto-runs only read-only/passive steps, always shows movement
+  commands as text instead of executing them.
+- **Guided first movement** (`check_serial firstmove`) — one joint at a time
+  (head, then the 8 leg servos) with a confirm before and after each, then
+  `kbalance`, then a single timed `wkF` burst — always ends at rest, including
+  on abort.
+- **Serial trace + replay** (`pi_pipeline/link/trace.py`) — every command sent
+  to the BiBoard logged to a timestamped file (`--trace <path>` on the app);
+  `trace.py replay` re-sends the same sequence with the same relative pacing.
 - **Bench mode** (`python -m pi_pipeline.app --bench`) — for when G2 is on the
   calibration stand: no autonomous movement, voice actuator forced to mock, a
   clear banner — so `check_serial` / `run_gait --probe-imu` / joint calibration
@@ -333,7 +344,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 548
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 563
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

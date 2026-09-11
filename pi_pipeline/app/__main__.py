@@ -47,13 +47,18 @@ def _signal_running_instance(sig: int, what: str) -> None:
         raise SystemExit(f"no running pi_pipeline.app to {what} ({e})")
 
 
-def _make_link(serial: bool):
+def _make_link(serial: bool, *, trace_path: str | None = None):
     if not serial:
         return None
     from ..link.serial_link import SerialLink
     lk = SerialLink(settings.serial_port, settings.serial_baud)
     lk.connect()
-    return LockedLink(lk)
+    link = LockedLink(lk)
+    if trace_path:
+        from ..link.trace import TracingLink
+        link = TracingLink(link, trace_path)
+        log.info("serial trace -> %s", trace_path)
+    return link
 
 
 def _make_memory():
@@ -129,6 +134,9 @@ def main() -> None:
                     help="EMERGENCY STOP a running pi_pipeline.app and exit")
     ap.add_argument("--release", action="store_true",
                     help="clear a latched emergency stop on a running instance and exit")
+    ap.add_argument("--trace", metavar="PATH",
+                    help="log every serial command sent (from voice or behaviour) to this "
+                         "file; replay with `python -m pi_pipeline.link.trace replay PATH`")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -160,7 +168,7 @@ def main() -> None:
         args.no_behavior = True
 
     memory = _make_memory()
-    link = _make_link(args.serial)
+    link = _make_link(args.serial, trace_path=args.trace)
     voice_link = None if args.bench else link   # --bench: voice actuator stays mock too
     rt = None if args.no_behavior else _build_runtime(link, hz=args.hz, memory=memory)
     on_event = rt.post if rt is not None else None
