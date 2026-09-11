@@ -82,7 +82,7 @@ def _build_runtime(link, *, hz: float, memory=None):
     return rt
 
 
-def _build_voice(on_event, memory=None):
+def _build_voice(on_event, memory=None, link=None):
     from ..voice.actuator import make_actuator
     from ..voice.conversation import Conversation
     from ..voice.cues import LogCue
@@ -91,14 +91,23 @@ def _build_voice(on_event, memory=None):
     from ..voice.tts import make_tts
     from ..voice.wake_word import make_wake_word
 
+    # share the ONE serial link with the behaviour runtime (LockedLink is
+    # mutex'd) so a conversational `perform_skill` actually moves G2 under
+    # --serial, instead of silently logging like the mock. `link=None`
+    # (mock mode, or --bench forcing it) keeps the old mock-actuator behaviour.
+    actuator = (make_actuator("serial", port=settings.serial_port,
+                              baud=settings.serial_baud, link=link)
+               if link is not None else
+               make_actuator("mock", port=settings.serial_port, baud=settings.serial_baud))
+
     loop = VoiceLoop(
         wake_word=make_wake_word("none", vosk_model_path=settings.vosk_model_path,
                                  phrase=settings.wake_word),
         stt=make_stt("text", vosk_model_path=settings.vosk_model_path,
                      silence_s=settings.stt_silence_s),
         conversation=Conversation(settings),
-        tts=make_tts("mac"),
-        actuator=make_actuator("mock", port=settings.serial_port, baud=settings.serial_baud),
+        tts=make_tts("mac", piper_model_path=settings.piper_model_path),
+        actuator=actuator,
         cue=LogCue(),
         memory=memory,
         follow_up_s=0.0,
@@ -137,6 +146,14 @@ def main() -> None:
     if msg:
         (log.error if lvl == "expired" else log.warning)(msg)
 
+    # black-box session logging -- so the FIRST real hardware session is
+    # captured like any gait run is, not silently unrecorded.
+    from ..diag import diag as _diag
+    from ..diag.core import bridge_stdlib_logging as _bridge_diag_logging
+    _diag.start_session("app", extra={"serial": args.serial, "bench": args.bench})
+    _diag.install_excepthook()
+    _bridge_diag_logging()
+
     if args.bench:
         log.warning("=== BENCH MODE === autonomous movement OFF; voice actuator = mock. "
                     "Run calibration / check_serial / --probe-imu freely.")
@@ -144,13 +161,15 @@ def main() -> None:
 
     memory = _make_memory()
     link = _make_link(args.serial)
+    voice_link = None if args.bench else link   # --bench: voice actuator stays mock too
     rt = None if args.no_behavior else _build_runtime(link, hz=args.hz, memory=memory)
     on_event = rt.post if rt is not None else None
-    voice = None if args.no_voice else _build_voice(on_event, memory=memory)
+    voice = None if args.no_voice else _build_voice(on_event, memory=memory, link=voice_link)
 
     if rt is None and voice is None:
         if memory is not None:
             memory.close()
+        _diag.close(clean=True)
         ap.error("nothing to run (--no-voice and --no-behavior)")
 
     # emergency stop: SIGUSR1 halts, SIGUSR2 releases (also `--halt` / `--release`
@@ -192,6 +211,7 @@ def main() -> None:
             os.remove(_PIDFILE)
         except OSError:
             pass
+        _diag.close(clean=True)
         log.info("stopped")
 
 

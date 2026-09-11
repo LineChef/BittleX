@@ -68,3 +68,49 @@ def test_main_exit_code_reflects_failures(patch_settings):
     with pytest.raises(SystemExit) as e:
         doctor.main([])
     assert e.value.code == 0
+
+
+def test_serial_ping_does_a_passive_handshake(monkeypatch, patch_settings):
+    calls = []
+
+    class FakeLink:
+        def __init__(self, port, baud):
+            pass
+
+        def connect(self):
+            return True
+
+        def send(self, cmd, read_reply=True):
+            calls.append(cmd)
+            return "12.3" if cmd == "P" else "OpenCat v1"
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("pi_pipeline.link.serial_link.SerialLink", FakeLink)
+    patch_settings(serial_port=__file__)   # any path that exists
+    rows = {r["name"]: r for r in doctor.run(ping_serial=True)}
+    assert rows["BiBoard responds"]["status"] == doctor.OK
+    assert rows["battery voltage reads back"]["status"] == doctor.OK
+    assert calls == ["?", "P"]
+
+
+def test_serial_ping_flags_a_non_opencat_reply(monkeypatch, patch_settings):
+    class FakeLink:
+        def __init__(self, port, baud):
+            pass
+
+        def connect(self):
+            return True
+
+        def send(self, cmd, read_reply=True):
+            return ""   # nothing comes back
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("pi_pipeline.link.serial_link.SerialLink", FakeLink)
+    patch_settings(serial_port=__file__)
+    rows = {r["name"]: r for r in doctor.run(ping_serial=True)}
+    assert rows["BiBoard responds"]["status"] == doctor.WARN
+    assert rows["battery voltage reads back"]["status"] == doctor.WARN

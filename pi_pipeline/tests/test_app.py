@@ -171,3 +171,23 @@ def test_build_runtime_wires_a_working_loop():
     rt.post(conversation_ended=True)
     rt.tick()
     assert rt.last_tick.mode is Mode.IDLE
+
+
+# ---------------------------------------- B: voice actuator shares the link
+def test_build_voice_uses_mock_actuator_without_a_link():
+    from pi_pipeline.app.__main__ import _build_voice
+    from pi_pipeline.voice.actuator import MockActuator
+
+    loop = _build_voice(on_event=None, link=None)
+    assert isinstance(loop._act, MockActuator)
+
+
+def test_build_voice_shares_the_serial_link_when_given_one():
+    from pi_pipeline.app.__main__ import _build_voice
+    from pi_pipeline.voice.actuator import SerialActuator
+
+    lk = FakeLink()
+    loop = _build_voice(on_event=None, link=lk)
+    assert isinstance(loop._act, SerialActuator)
+    assert loop._act._link is lk
+    assert not loop._act._owns_link

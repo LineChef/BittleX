@@ -45,13 +45,21 @@ class SerialActuator:
     The link opens lazily and reconnects on drop, so a yanked cable logs a
     warning instead of crashing the loop. Not exercised until hardware is
     connected (needs pyserial).
+
+    Pass an existing `link` (e.g. `pi_pipeline.app`'s shared `LockedLink`) to
+    reuse one connection across callers instead of opening a second one on the
+    same port; omit it to open a private `SerialLink` as before.
     """
 
-    def __init__(self, port: str, baud: int):
+    def __init__(self, port: str, baud: int, *, link=None):
         from ..link import opencat
-        from ..link.serial_link import SerialLink
 
         self._opencat = opencat
+        self._owns_link = link is None   # only close a link we opened ourselves
+        if link is not None:
+            self._link = link
+            return
+        from ..link.serial_link import SerialLink
         self._link = SerialLink(port, baud)
         if self._link.connect():
             log.info("serial actuator connected on %s @ %d", port, baud)
@@ -70,10 +78,11 @@ class SerialActuator:
         self._link.send(self._opencat.REST, read_reply=False)
 
     def close(self) -> None:
-        self._link.close()
+        if self._owns_link:
+            self._link.close()   # a shared link's lifecycle belongs to whoever built it
 
 
-def make_actuator(mode: str, *, port: str, baud: int) -> Actuator:
+def make_actuator(mode: str, *, port: str, baud: int, link=None) -> Actuator:
     if mode == "serial":
-        return SerialActuator(port, baud)
+        return SerialActuator(port, baud, link=link)
     return MockActuator()

@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **541 passing tests**.
+`pi_pipeline/` carries **548 passing tests**.
 
 ---
 
@@ -284,8 +284,13 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   exists.
 - **`doctor` preflight** (`python -m pi_pipeline.doctor`) — one-command bring-up
   readiness check: `.env` completeness, API key validity + expiry, model files
-  (Vosk / Piper / gait ONNX), Python deps, serial port + optional board ping,
-  audio devices, free disk. Non-zero exit on any hard failure.
+  (Vosk / Piper / gait ONNX), Python deps, serial port + optional passive board
+  handshake (`?` banner + `P` voltage readback — confirms it actually speaks
+  OpenCat, not just that the port opened), audio devices, free disk. Non-zero
+  exit on any hard failure.
+- **Black-box logging in the integrated app** — `pi_pipeline.app` starts a
+  diagnostics session + crash hook on launch, same as the gait loop; the first
+  real hardware session is recorded, not silently unlogged.
 - **Bench mode** (`python -m pi_pipeline.app --bench`) — for when G2 is on the
   calibration stand: no autonomous movement, voice actuator forced to mock, a
   clear banner — so `check_serial` / `run_gait --probe-imu` / joint calibration
@@ -328,7 +333,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 541
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 548
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

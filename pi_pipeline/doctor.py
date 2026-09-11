@@ -6,11 +6,13 @@ prints a green/red checklist. Exits non-zero if anything is a hard FAIL, so it
 drops into a bring-up script.
 
     python -m pi_pipeline.doctor                # local checks
-    python -m pi_pipeline.doctor --serial       # also ping the BiBoard
+    python -m pi_pipeline.doctor --serial       # also handshake the BiBoard
     python -m pi_pipeline.doctor --json         # machine-readable
 
 Checks: .env completeness, Anthropic key validity + expiry, model files
 (Vosk / Piper / gait ONNX), Python deps, serial port, audio devices, free disk.
+`--serial` adds a passive handshake -- port opens, a `?` banner, a `P` voltage
+readback -- reads only, nothing that moves the robot, safe to run any time.
 """
 from __future__ import annotations
 
@@ -97,16 +99,28 @@ def _check_serial(s, ping: bool) -> list:
     exists = os.path.exists(port)
     out = [_r("serial port exists", OK if exists else WARN,
               port if exists else f"{port} not present (robot not wired yet?)")]
-    if ping and exists and _has("serial"):
-        try:
-            from .link.serial_link import SerialLink
-            lk = SerialLink(port, s.serial_baud)
-            banner = lk.send("?", read_reply=True) if lk.connect() else ""
-            lk.close()
-            out.append(_r("BiBoard responds", OK if banner else WARN,
-                          banner[:60] or "no reply to '?'"))
-        except Exception as e:  # noqa: BLE001
-            out.append(_r("BiBoard responds", WARN, f"{type(e).__name__}: {e}"))
+    if not (ping and exists and _has("serial")):
+        return out
+    # a passive handshake -- reads only, nothing that moves the robot, so this
+    # is safe to run any time (mid-assembly, on the stand, before --bench even).
+    try:
+        from .link import opencat
+        from .link.serial_link import SerialLink
+        lk = SerialLink(port, s.serial_baud)
+        if not lk.connect():
+            out.append(_r("BiBoard responds", WARN, f"could not open {port}"))
+            return out
+        banner = lk.send(opencat.QUERY, read_reply=True)
+        out.append(_r("BiBoard responds", OK if banner else WARN,
+                      banner[:60] or "no reply to '?' -- check baud / wiring"))
+        voltage = lk.send(opencat.PRINT_VOLTAGE, read_reply=True)
+        v_ok = bool(voltage) and any(ch.isdigit() for ch in voltage)
+        out.append(_r("battery voltage reads back", OK if v_ok else WARN,
+                      voltage[:60] or "no reply to 'P' -- firmware may not be OpenCat, "
+                                     "or the board isn't powered"))
+        lk.close()
+    except Exception as e:  # noqa: BLE001
+        out.append(_r("BiBoard responds", WARN, f"{type(e).__name__}: {e}"))
     return out
 
 

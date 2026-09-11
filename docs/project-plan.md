@@ -909,6 +909,28 @@ that ties everything together with hardware:
   files, Python deps, serial port, `--serial` board ping, audio devices, free
   disk); non-zero exit on any hard FAIL so it drops into a bring-up script.
 
+**Deployment-easing batch — built 2026-09-10** (agreed earlier, executed now):
+- **Black-box logging in `pi_pipeline.app`** — `diag.start_session("app", ...)` +
+  `install_excepthook()` + `bridge_stdlib_logging()` at startup, `diag.close()`
+  in the shutdown path — the first real hardware session is now recorded like
+  any gait run, not silently unlogged.
+- **The voice actuator shares the real serial link** — `voice/actuator.py`
+  `SerialActuator(port, baud, *, link=None)` accepts an existing link (the
+  app's `LockedLink`) instead of always opening its own on the same port, and
+  only closes a link it opened itself (`_owns_link`). `make_actuator(..., link=)`
+  passes it through. `--bench` still forces the voice actuator to mock
+  regardless of `--serial`, per its documented guarantee. Fixes a real gap:
+  previously a conversational `perform_skill` never moved G2 even under
+  `--serial`, because `_build_voice` hardcoded a mock actuator. (Also fixed in
+  passing: `make_tts("mac")` was missing the now-required `piper_model_path`
+  kwarg — `python -m pi_pipeline.app` would have crashed on its first TTS call.)
+- **`doctor --serial` deeper handshake** — beyond the port existing, sends the
+  firmware `?` query and reads the `P` battery-voltage reply (both passive,
+  nothing moves) so "the board actually speaks OpenCat" is verified, not just
+  "the port opened."
+- **`pre-hardware` git tag** — a rollback point on `development` before
+  bring-up churn starts.
+
 **Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
 A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`
 (checked at step 0, above enrollment / sleep / safety / mode): on `halt` it emits
