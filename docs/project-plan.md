@@ -1006,6 +1006,73 @@ moves. Both the bell and the lead pause are configurable
 (`--no-bell`, `--announce-s 0`) for a faster unattended run once the sweep's
 familiar.
 
+**Deployment scope fixed — 2026-09-14.** `pi-bring-up.md` §7 and
+`gait-deployment.md`'s automated path both used to say `git clone` the **whole**
+repo onto the Pi. Fixed to deploy only what actually runs there:
+- `pi-bring-up.md` §7 — `rsync`s just `pi_pipeline/` (the code) and
+  `rl_training/opencat-gym/trained/run20m_ppo.onnx` (<1 MB, the one exported
+  policy file) from the Mac, `--delete` on the directory sync so a local
+  rename/delete doesn't linger stale on the Pi. A git-sparse-checkout
+  alternative is noted for anyone who wants `git pull` instead.
+- `gait-deployment.md`'s `pi_setup.sh` needed even less — it's fully
+  self-contained (builds its own synthetic ONNX stub in-line just to
+  benchmark inference speed) — so that's now `scp` of the one script file,
+  fixed in both the doc and the script's own header comment.
+- **`docs/` is never deployed at all**, by construction — the `rsync` source
+  is `pi_pipeline/` specifically, not the repo root, so nothing outside that
+  directory (`docs/`, `rl_training/`'s checkpoints/logs/GIFs, the RL
+  toolchain) ever reaches the Pi. The only markdown that does ride along is
+  `pi_pipeline/`'s own handful of small per-module `README.md` files (code
+  documentation living next to the code it documents), not the `docs/` tree.
+- **Why it matters, concretely:** `rl_training/` alone was ~4.7 GB the day
+  this was caught (and only grows with every training run on `development`)
+  — zero benefit to a Pi that never executes any of it, on a 32 GB card.
+
+**B20 object-recognition gallery — decided + core built 2026-09-14.** Design
+conversation settled the open question from the 2026-09-10 session: **option 2
+(separate Pi-side layer) is decided, not just leaning** — a 6th model class is
+off the table, precisely because a broad, visually-incoherent class sharing
+the trained detector's weights risks diluting the 5 it already does well.
+Then a follow-up conversation about storage (don't fill the Pi's limited
+space with dupes/junk, cap it, know when an object has "enough" data) plus a
+request to have G2 collect candidates *during* explore mode rather than
+requiring a manual capture session, landed the mechanism itself, behind new
+`features.object_gallery` (off by default, needs `vision` + `explore`):
+- `vision/object_gallery.py` — `ObjectGallery`, pure decision logic (no I/O,
+  no ML): dedup via cosine-similarity thresholds (same-instance vs.
+  near-duplicate), a quality gate, a capacity cap with oldest-`last_seen`
+  eviction that **never** touches a named or `locked` entry, and
+  auto-`locked` ("enough data") at a configurable sample count or manually
+  via the review tool. JSON persistence at `G2_OBJECT_GALLERY_DIR`
+  (`~/.local/share/g2/object_gallery` default — outside the repo, same rule
+  as `memory_db_path`).
+- `behavior/object_seek.py` — `ObjectSeek`, the *when is it safe* gate: only
+  proposes a scan when `Explorer`'s decision this tick was `HOLD` or
+  `INVESTIGATE` (already stationary for its own reasons — this never asks G2
+  to stop walking for a photo, and never interrupts locomotion), cooldown
+  rate-limited, skipped once the gallery signals no capacity. Composed into
+  `BehaviorDriver._from_explore()` as a same-tick `CAPTURE` on/off pulse
+  (reusing the effect enrollment already uses) + a `DIAG` event. Priority
+  over every other system is structural, not re-checked: `_from_explore()`
+  is only reached after emergency stop / sleep / enrollment /
+  choreography-safety / "come here" / conversation have already had first
+  claim on the tick, per the driver's existing order.
+- `tools/label_objects.py` — the review/labeling interface, entirely local
+  (`generate` writes a local `review.html` with a field for every piece of
+  data that matters — name, note, a complete flag, discard — and a
+  client-side-only "download labels.json" button, no server; `apply` writes
+  it back into the gallery and deletes discarded crop files). Nothing
+  published or uploaded, matching the `training_data/` privacy rule.
+- **Still hardware-gated, deliberately not built:** the localizer (what
+  decides "something's here" — motion/frame-diff or a generic saliency
+  model) and the embedding model (what fingerprints a crop). Both need the
+  real camera to tune/choose, but **both are also independently testable
+  NOW, pre-hardware** — the Grove Vision AI V2 and the Pi Zero 2 W are both
+  already bench-bring-up-done (Phase 6 / Phase 8), just not mounted on the
+  body — worth doing before wiring a model in, not after.
+- 22 new tests (`test_object_gallery.py`, `test_object_seek.py`, 4 in
+  `test_driver.py`) — 599 passing total.
+
 **Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
 A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`
 (checked at step 0, above enrollment / sleep / safety / mode): on `halt` it emits

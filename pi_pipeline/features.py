@@ -69,6 +69,12 @@ class Features:
     explore: bool = True
     idle_rest: bool = True
     avoidance_act: bool = True          # vision avoidance drives the actuator
+    object_gallery: bool = False        # B20 -- opportunistic recognition-library
+                                        #   capture during explore. OFF by default:
+                                        #   no localizer/embedding model chosen yet,
+                                        #   and it needs `vision` + `explore` to mean
+                                        #   anything. Not in any profile's "on" set
+                                        #   yet -- opt in explicitly with `+object_gallery`.
     # -- cross-cutting --
     power_profile: str = "headless"    # off | interactive | headless
     diag: bool = True                  # black-box logging; kept on for bring-up
@@ -128,6 +134,10 @@ class Features:
             off(avoidance_act=False, explore=False)
             notes.append("no vision_safety -> avoidance_act off, explore off (don't wander blind)")
 
+        if f.object_gallery and not (f.vision and f.explore):
+            off(object_gallery=False)
+            notes.append("object_gallery needs vision + explore -> held off")
+
         if not f.mic and (f.stt or f.wake_word):
             off(stt=False, wake_word=False)
             notes.append("no mic -> stt off, wake_word off")
@@ -166,7 +176,7 @@ _GROUPS = [
     ("sensing", ["imu", "fall_detect", "vision", "vision_safety", "vision_perception", "mic", "wake_word"]),
     ("actuation", ["gait", "thermal_guard", "sound_cues", "leds"]),
     ("cognition", ["stt", "tts", "claude", "memory", "personality"]),
-    ("autonomy", ["mode_controller", "explore", "idle_rest", "avoidance_act"]),
+    ("autonomy", ["mode_controller", "explore", "idle_rest", "avoidance_act", "object_gallery"]),
     ("cross", ["power_profile", "diag"]),
 ]
 
@@ -181,6 +191,7 @@ _OFF = dict(
     gait="off", thermal_guard=False, sound_cues=False, leds=False,
     stt=False, tts=False, claude=False, memory=False, personality=False,
     mode_controller=False, explore=False, idle_rest=False, avoidance_act=False,
+    object_gallery=False,
     power_profile="off", diag=True,
 )
 

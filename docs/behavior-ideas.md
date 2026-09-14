@@ -471,7 +471,7 @@ or train on the RL/gait side right now. When the camera lands, this is a day-1
 custom-model priority (project-plan.md Phase 8),
 ahead of [B15].
 
-### B20 — Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer  🔴 ⚪
+### B20 — Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer  — PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated)
 Design session 2026-09-10. G2 currently only recognizes 5 trained classes
 (household member / spouse / dog / cat / ledge) and isn't expected to grow much
 past that for a while — so any behaviour that needs to notice *arbitrary*
@@ -503,9 +503,83 @@ than "train another named class per object."
    frames (a timeshare with the detection stream on this hardware — can't have
    both at once) and its own compute budget on a 512 MB Pi with no GPU.
 
-**Current leaning (not a final decision):** the separate-layer path, precisely
-because it can't degrade the primary detection — worth weighing seriously
-against option 1 when this is actually picked up. Revisit fully at build time.
+**Decided 2026-09-14: option 2, the separate Pi-side layer.** Precisely
+because it can't degrade the primary detection — option 1 (6th model class)
+is no longer under consideration.
+
+**Built 2026-09-14, behind `features.object_gallery` (OFF by default, needs
+`vision` + `explore`):**
+- **`vision/object_gallery.py`** — `ObjectGallery`/`GalleryEntry`/
+  `ObjectGalleryConfig`. Pure decision logic (embedding + quality score in, a
+  `GalleryDecision` out — `NEW`/`ADD_SAMPLE`/`DUPLICATE`/`LOW_QUALITY`/
+  `LOCKED`/`REJECTED_AT_CAPACITY`), no I/O, no ML — same shape as
+  `cliff_guard.py`. Answers the storage-space design questions directly:
+  - **dedup** — `same_instance_threshold` (cosine sim, default 0.80) collapses
+    re-sightings into one entry; `near_duplicate_threshold` (0.93) skips
+    saving another sample once one's close enough to be redundant.
+  - **quality filter** — refuses anything under `min_quality` before it's ever
+    compared. The actual pixel score (blur/brightness/crop-size, `curate_
+    captures.py`-style) is the caller's job, same pattern as `Enrollment`'s
+    `face_quality` — keeps this module free of an image-processing dependency.
+  - **a cap, with eviction** — `max_entries` (200 default) plus an optional
+    `max_total_mb` byte ceiling the caller measures and passes in. Eviction is
+    oldest-`last_seen` first, and **never** touches a named or `locked`
+    entry — nothing you cared enough to label is ever silently dropped.
+  - **"enough data" per object** — `locked`, set automatically at
+    `max_samples_per_entry` (5 default) or manually via `mark_complete()`
+    from the review tool. A locked entry keeps recognising (its `last_seen`
+    still updates) but stops accumulating samples.
+  - JSON persistence (`save`/`load`) — `G2_OBJECT_GALLERY_DIR` (`.env`,
+    default `~/.local/share/g2/object_gallery`, same outside-the-repo rule as
+    `memory_db_path`).
+- **`behavior/object_seek.py`** — `ObjectSeek`, the *when is it safe to scan*
+  gate for explore mode. Only proposes a scan when `Explorer`'s decision this
+  tick was `HOLD` or `INVESTIGATE` (already stationary for its own reasons —
+  never asks G2 to stop walking for a photo, and a photo taken while walking
+  would be motion-blurred anyway), rate-limited (`scan_cooldown_s`, 20s
+  default), and skipped outright once the gallery signals no capacity.
+  Priority over "primary systems" is structural, not re-checked here: it's
+  only ever called from `_from_explore()`, which the driver reaches after
+  emergency stop / sleep / enrollment / choreography-safety / "come here" /
+  conversation have all already had first claim on the tick.
+- **Driven into `BehaviorDriver._from_explore()`** — a `SCAN` decision emits a
+  same-tick `CAPTURE` on/off pulse (`("on"/"off", "object_scan")`, the same
+  effect enrollment already uses) plus a `DIAG` event, gated on
+  `object_gallery_enabled and self._vision` (constructor args, mirroring how
+  `vision_available` already works — a runtime caller passes `features.
+  object_gallery` / `features.vision`).
+- **`tools/label_objects.py`** — the review/labeling interface, entirely
+  local (nothing published or uploaded, same rule as `training_data/`):
+  `generate <gallery_dir>` writes a local `review.html` (unlabeled entries by
+  default, `--all` for everything) with each entry's saved crop(s) and a
+  field for every relevant piece of data — name, a free-text note, a
+  "complete" flag, "discard" — plus a client-side "Download labels.json" button (no
+  server, no round-trip through Claude). `apply <gallery_dir> <labels.json>`
+  writes it all back into the gallery's index and deletes the crop files of
+  anything discarded.
+
+**Deliberately NOT built yet (hardware-gated, same as everywhere else this
+applies):**
+- **THE LOCALIZER** — what actually decides "something worth looking at is in
+  frame" (motion/frame-diff or a generic saliency model). Needs the real
+  camera to tune; `object_seek.py` only decides *when* it's safe to try, not
+  *what* to look at.
+- **THE EMBEDDING MODEL** — not chosen. `ObjectGallery` works with whatever
+  vector it's handed, so this is a swap-in once picked, not a rewrite. **A
+  candidate model's real accuracy (does it cluster same-object photos and
+  separate different ones cleanly) and its real inference latency on the Pi
+  Zero 2 W are both testable NOW, pre-hardware** — the Grove Vision AI V2 and
+  the Pi are both already bench-bring-up-done (Phase 6 / Phase 8), just not
+  mounted on the Bittle X body yet. Worth doing before wiring a model in.
+- **Live gallery-capacity feedback into `ObjectSeek`** — `gallery_has_
+  capacity` defaults `True` at the call site for now; threading the app
+  layer's real gallery instance through is the same "driver NOT BUILT
+  (hardware-gated)" gap `Enrollment`'s real driver has.
+- **A real house library at volume** — pre-hardware, the mechanism above only
+  sees whatever passes in front of a stationary bench camera. Tier 1 roam
+  (where the seek hook lives) is voice-armed only and leg-budget-leashed, not
+  continuously running, so real volume also wants the body to exist and roam
+  more than it currently does — a later design question, not blocking this.
 
 ### B11 — Learn its way around the house (topological place memory)
 G2 builds up a sense of *where it is* over time — as **place recognition + a
@@ -582,10 +656,35 @@ scaffolding that makes its decisions actionable and remembered is the work.
 ## Authoring
 
 ### B10 — Teach me a trick
-Conversationally record a joint sequence you puppet ("G2, when I say 'spin', do
-this…"), save it as a new skill in the memory DB, and expose it to
-`perform_skill`. Memory + link + a small authoring flow layered over the Skill
-Composer idea (B3).
+Grow a persistent bank of user-taught tricks, each saved to the memory DB
+under a name and exposed to `perform_skill` exactly like a built-in skill —
+callable by voice from then on, in every future session. Two tiers, in build
+order:
+
+- **Now, software-only: compose from existing primitives.** "G2, when I say
+  'spin', turn left twice then sit" — Claude chains already-known skills /
+  gestures under a new name via the Skill Composer idea (B3). No new firmware
+  capability needed; works today, even in mock mode. This is "learning" only
+  in the sense of *recording a macro* — no generalisation, no ML — the trick
+  is the literal sequence you named, replayed the same way every time skill
+  selection would replay any other.
+- **Later, hardware-gated: raw joint puppeteering.** `d` (rest) already
+  relaxes the servos, and `j` (`READ_JOINTS`) reads back live joint angles
+  (`pi_pipeline/link/opencat.py`) — so physically posing G2 by hand while
+  polling `j` on a timer is a real, confirmed-from-firmware recording path,
+  not speculative. What that buys you, honestly: the recording is a
+  **sampled** reproduction of your motion (fidelity capped by the polling
+  rate and per-poll serial round-trip, not a continuous mocap-quality copy),
+  and playback drives through those keyframes via `POSITION_CONTROL` the same
+  point-to-point way any scripted skill does — so it will look similar to
+  what you did, not an exact replay of your continuous velocity, and it
+  carries the same "never test a new movement off the stand first" risk as
+  any other new joint sequence, since a puppeted pose you found stable in
+  your hands may not be one the robot can hold or recover from on its own.
+- **Bank semantics:** taught tricks persist in the memory DB (same store as
+  facts/memory, survives restarts), so the library only grows — a name
+  collision with a built-in skill should be rejected or require confirmation,
+  not silently shadow it.
 
 ---
 

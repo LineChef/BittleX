@@ -50,6 +50,7 @@ session records exactly what ran.
 | | `explore` | gait, vision_safety | autonomous wander / investigate |
 | | `idle_rest` | gait | staged ACTIVE→SIT→RESTING descent |
 | | `avoidance_act` | vision_safety, gait | vision avoidance drives the actuator (vs. log only) |
+| | `object_gallery` | vision, explore | B20 recognition-by-instance library — opportunistic capture during explore, off by default |
 | cross | `power_profile` | — | `off` / `interactive` / `headless` |
 | | `diag` | — | black-box logging; kept on for bring-up |
 
@@ -62,6 +63,7 @@ Adjustments are applied and reported, never silent:
 - no `imu` → policy gait falls back to `scripted`, `fall_detect=off`
 - `gait=off` → no `explore` / `idle_rest` / `avoidance_act` / `thermal_guard`
 - no `vision_safety` → no `avoidance_act`, no `explore` (don't wander blind)
+- no `vision` or no `explore` → no `object_gallery` (needs both to mean anything)
 - no `mic` → no `stt`, no `wake_word`
 - notes-only: `wake_word` without `stt`; `explore` without `mode_controller`;
   `claude` without `stt`/`tts`

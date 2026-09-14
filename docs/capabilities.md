@@ -17,7 +17,7 @@ the *what*, kept current as capabilities land.
 
 The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
 the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **577 passing tests**.
+`pi_pipeline/` carries **599 passing tests**.
 
 ---
 
@@ -234,6 +234,20 @@ that need the camera mounted on the frame for a real point of view.
   through the voice layer's callable.
 - **Cliff / edge guard** — a reflex whose input is a table-edge detector (the
   detector itself is the main remaining vision work).
+- **Object recognition gallery** (B20, `vision/object_gallery.py` +
+  `behavior/object_seek.py`) — 🧩, behind `features.object_gallery` (off by
+  default). Recognises *specific* objects it's personally seen before by
+  visual-similarity fingerprint, not a trained category — grows on its own,
+  no retraining. Dedup, a quality gate, a capacity cap with eviction that
+  never touches a named/locked entry, and "enough data" auto-locking are all
+  built and unit-tested; opportunistically triggers during explore mode's
+  already-stationary moments (never interrupts walking), rate-limited,
+  structurally lowest-priority (only reachable after every other behaviour
+  has had first claim on the tick). `tools/label_objects.py` is the fully
+  local review/labeling interface (name / note / a complete flag / discard),
+  nothing published or uploaded. Still hardware-gated: the localizer (what
+  decides "something's here") and the embedding model (what fingerprints it)
+  are both unbuilt — see [`behavior-ideas.md`](behavior-ideas.md) B20.
 
 ---
 
@@ -369,7 +383,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 577
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, 599
   tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.

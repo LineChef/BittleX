@@ -146,6 +146,40 @@ those need the camera physically mounted on the frame for the real point of view
 *walking policy* was tried and ruled out (see Walking, above) — vision assists
 walking as a reflex layer on top of the frozen gait, not inside it.
 
+### A second, separate kind of recognition (new, off by default)
+
+The trained detector above knows five specific things, and isn't meant to grow
+much past that — adding a sixth, broad "generic object" class to that same
+model risks making the five it already does well *worse*, so that path was
+deliberately ruled out. Instead there's a second system, entirely separate
+from that model, for recognising things **by instance** rather than by
+category: "I've seen this exact thing before," not "this is a shoe."
+
+It works by fingerprinting: a photo crop becomes a short vector, and a new
+sighting is compared against a library of vectors already stored. A close
+match means "the same thing again"; nothing close means "something new,"
+which joins the library **unnamed** until someone tells G2 what it is.
+Naming is optional and entirely separate from recognition working at all — G2
+can track "I've seen unnamed thing #17 four times" without ever knowing what
+it's called.
+
+It only ever looks for new things during explore mode, and only in the
+moments it's already standing still for some other reason — it never
+interrupts a walk to take a photo. A cap on both how many things it
+remembers and the estimated space they take up keeps it from ever crowding
+out real disk space, and anything already named or flagged "done" is
+protected from ever being deleted to make room for something new. Reviewing
+and naming what it's found happens on a private, local page generated on
+demand — nothing about what's in the house is ever uploaded or shared
+anywhere.
+
+**Where it stands:** the accounting (what counts as a duplicate, when
+something's "done," what gets evicted under space pressure) is built and
+tested, behind a feature flag that's off by default. The two pieces that
+actually need the camera to build — deciding *where* in a frame something new
+is, and the model that turns a crop into a fingerprint — aren't chosen yet;
+see `docs/behavior-ideas.md` **B20**.
+
 ---
 
 ## Link

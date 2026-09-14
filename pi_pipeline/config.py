@@ -121,6 +121,15 @@ class Settings:
     memory_max_facts: int = field(default_factory=lambda: _env_int("G2_MEMORY_MAX_FACTS", 30))
     memory_recall_exchanges: int = field(default_factory=lambda: _env_int("G2_MEMORY_RECALL", 3))
 
+    # --- Object recognition gallery (B20 -- behind `features.object_gallery`) ---
+    # Same rule as memory_db_path: personal photos of things in the house live
+    # OUTSIDE the repo/synced tree, never in git or a cloud-synced folder.
+    object_gallery_dir: str = field(default_factory=lambda: os.path.expanduser(
+        _env("G2_OBJECT_GALLERY_DIR", "~/.local/share/g2/object_gallery")))
+    object_gallery_max_entries: int = field(default_factory=lambda: _env_int("G2_OBJECT_GALLERY_MAX_ENTRIES", 200))
+    object_gallery_max_samples: int = field(default_factory=lambda: _env_int("G2_OBJECT_GALLERY_MAX_SAMPLES", 5))
+    object_gallery_max_mb: int = field(default_factory=lambda: _env_int("G2_OBJECT_GALLERY_MAX_MB", 200))
+
     # --- Robot link (used on hardware; ignored by MockActuator) ---
     # /dev/serial0 = "the primary UART", whichever physical one it is. On the Pi
     # Zero 2 W after `dtoverlay=disable-bt` (see setup_pi.sh) that's the stable

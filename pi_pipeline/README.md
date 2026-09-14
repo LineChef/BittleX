@@ -47,6 +47,7 @@ pi_pipeline/
     runtime.py         # BehaviorRuntime: ticks the driver, feeds it its inputs
     __main__.py        # python -m pi_pipeline.behavior (mock demo of the loop)
     mode_controller.py explore.py novelty.py idle_posture.py gestures.py
+    object_seek.py     # B20 -- *when* it's safe to grab an object-gallery scan
     enrollment.py      # "G2, meet <name>" capture FSM
     sleep_mode.py      # deep-idle FSM (curl + vision off + power-save), wired in the driver
     thermal_governor.py # servo-thermal Layer 2 (AMBER throttle / RED cooldown pose)
@@ -65,6 +66,7 @@ pi_pipeline/
     jam_guard.py       # B9a vision-free servo-strain jam reflex
     skill_layer.py skill_switch.py gait_selector.py   # Phase E scripted skill switching
   vision/              # Phase 8 — camera / detection feed / avoidance / cliff guard
+    object_gallery.py  # B20 -- recognition-by-instance library (dedup/quality/capacity), no ML here
   memory/              # Phase 9 — SQLite conversation memory; webui.py (browse/prune)
   link/                # Phase 5 — resilient BiBoard serial link + recovery FSM
     check_serial.py    # port/ping/skill checks + `firstmove` (guided first movement) + `allmoves` (full movement sweep, voltage/latency log)
@@ -99,7 +101,7 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**577 pass, 1
+`pi_pipeline/tests/` — no network, audio, or API key required (**599 pass, 1
 skips** without a key — the live-API check). Covers the skill catalogue, the
 conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
 memory store + recall + decay + recency + web UI, the vision feed + avoidance +

@@ -117,6 +117,49 @@ def test_explore_wanders_when_nothing_new():
     assert EffectKind.TURN in kinds(t) or EffectKind.WALK in kinds(t)
 
 
+# --- B20 object-gallery seek (feature-flagged) --------------------------
+
+def test_object_gallery_off_by_default_never_requests_a_scan():
+    p = BehaviorParams(investigate_secs=3.0, approach_novelty=False)
+    d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
+    c.adv(11)
+    t = d.tick(DriverInputs(arm_explore=True,
+                            frame=[det("mug", area_side=0.45, bearing=0.5)]))
+    assert t.mode is Mode.EXPLORE and EffectKind.STOP in kinds(t)  # investigating
+    assert EffectKind.CAPTURE not in kinds(t)          # flag is off -- never wired in
+
+
+def test_object_gallery_scans_while_stationary_during_explore():
+    p = BehaviorParams(investigate_secs=3.0, approach_novelty=False)
+    d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0),
+                       object_gallery_enabled=True)
+    c.adv(11)
+    t = d.tick(DriverInputs(arm_explore=True,
+                            frame=[det("mug", area_side=0.45, bearing=0.5)]))
+    assert t.mode is Mode.EXPLORE and EffectKind.STOP in kinds(t)  # investigating -> stationary
+    caps = payloads(t, EffectKind.CAPTURE)
+    assert ("on", "object_scan") in caps and ("off", "object_scan") in caps
+    assert ("object_scan.requested", "investigate") in payloads(t, EffectKind.DIAG)
+
+
+def test_object_gallery_never_scans_while_actually_walking():
+    d = BehaviorDriver(BehaviorParams(), clock=(c := Clk()), rng=random.Random(0),
+                       object_gallery_enabled=True)
+    c.adv(11)
+    t = d.tick(DriverInputs(arm_explore=True, frame=[]))   # nothing novel -> wander/turn
+    assert t.mode is Mode.EXPLORE
+    assert EffectKind.CAPTURE not in kinds(t)               # never interrupts locomotion
+
+
+def test_object_gallery_needs_vision_even_if_flagged_on():
+    d = BehaviorDriver(BehaviorParams(), clock=(c := Clk()), rng=random.Random(0),
+                       object_gallery_enabled=True, vision_available=False)
+    c.adv(11)
+    t = d.tick(DriverInputs(frame=[]))
+    assert t.mode is not Mode.EXPLORE                        # no vision -> no explore at all
+    assert EffectKind.CAPTURE not in kinds(t)
+
+
 # --- conversation ---------------------------------------------------
 
 def test_wake_word_enters_converse_and_holds_still():

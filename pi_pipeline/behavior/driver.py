@@ -46,6 +46,7 @@ from .idle_posture import (
 )
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
+from .object_seek import ObjectSeek, ObjectSeekAction, ObjectSeekConfig
 from .place_memory import PlaceMemory, PlaceMemoryConfig
 from .sleep_mode import SleepAction, SleepMode, SleepModeConfig, SleepState
 
@@ -218,10 +219,12 @@ class BehaviorDriver:
                  attentive_cfg: AttentiveConfig | None = None,
                  approach_cfg: ApproachConfig | None = None,
                  place_cfg: PlaceMemoryConfig | None = None,
+                 object_seek_cfg: ObjectSeekConfig | None = None,
                  chirps: bool = True,
                  estop_freeze_token: str = "kbalance",
                  cliff=None,
                  vision_available: bool = True,
+                 object_gallery_enabled: bool = False,
                  capture_root: str = "training_data/faces"):
         # vision_available=False: the bot has no obstacle/edge/person detector
         # deployed (only a single-class face model), so every vision-driven
@@ -230,6 +233,11 @@ class BehaviorDriver:
         # run. Flip it back on once a real detector ships.  Mirrors
         # features.vision; a runtime caller should pass `features.vision` here.
         self._vision = bool(vision_available)
+        # B20 object-recognition gallery -- OFF by default (feature-flagged,
+        # mirrors `self._vision`: a runtime caller should pass
+        # `features.object_gallery` here). Needs vision hardware to mean
+        # anything, so it's also gated on `self._vision` at the call site.
+        self._object_gallery = bool(object_gallery_enabled)
         self.p = (params or BehaviorParams()).clamp()
         self._clock = clock
         mcfg = mode_cfg or ModeConfig()
@@ -246,6 +254,12 @@ class BehaviorDriver:
         self.approach = ApproachTarget(approach_cfg, clock=clock)
         # place memory (B11) -- stable "the dog is often to the left" patterns
         self.place = PlaceMemory(place_cfg)
+        # B20 object-recognition gallery -- *when* it's safe to grab a
+        # candidate frame during explore mode (see object_seek.py). The
+        # gallery itself (dedup/quality/capacity) lives in
+        # vision/object_gallery.py, off in the app/vision layer -- this is
+        # only ever the "is now an OK moment" gate.
+        self.object_seek = ObjectSeek(object_seek_cfg, clock=clock)
         # personality -> idle timing: use the BehaviorParams knobs unless the
         # caller pinned an explicit config.
         self.idle = IdlePosture(
@@ -313,6 +327,7 @@ class BehaviorDriver:
         if i.arm_explore:
             self.mode.arm_explore()
             self.explorer.reset()
+            self.object_seek.reset()
         if i.disarm_explore:
             self.mode.disarm_explore()
         if i.come_here and self._vision:
@@ -425,6 +440,14 @@ class BehaviorDriver:
                 fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "sniff a find"))
         elif d.action is ExploreAction.HOLD:
             fx.append(Effect(EffectKind.STOP, None, d.reason))
+
+        if self._object_gallery and self._vision:
+            seek = self.object_seek.update(now, explore_action=d.action)
+            if seek.action is ObjectSeekAction.SCAN:
+                fx.append(Effect(EffectKind.CAPTURE, ("on", "object_scan"), seek.reason))
+                fx.append(Effect(EffectKind.CAPTURE, ("off", "object_scan"), seek.reason))
+                fx.append(Effect(EffectKind.DIAG, ("object_scan.requested", d.action.value),
+                                 seek.reason))
         return fx
 
     # --- posture ------------------------------------------------------
