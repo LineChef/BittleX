@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # G2 Pi Zero 2 W bring-up -- one command, hands-off.
 #
-#   git clone -b development https://github.com/LineChef/BittleX
-#   bash BittleX/scripts/pi_setup.sh
+#   scp scripts/pi_setup.sh g2pi@g2pi.local:~/pi_setup.sh   # from a machine with the repo
+#   ssh g2pi@g2pi.local bash ~/pi_setup.sh
+#
+# (This script is self-contained -- it reads nothing else from the repo, so it
+# only needs to get to the Pi itself, not a full `git clone`.)
 #
 # Phase 1 (interactive, ~10-25 min): you'll be asked for your sudo password once.
 #   wifi power-save off, apt full-upgrade, base packages, swap (zram+swapfile),

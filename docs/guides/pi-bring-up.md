@@ -215,13 +215,29 @@ loop. 30-second peel-and-stick when needed.
 ## 7. Deploy `pi_pipeline` to the Pi
 
 `pi_pipeline/` is already a real codebase (link/ voice/ vision/ memory/ + a test
-suite), currently developed and tested on the Mac. Getting it onto ARM:
+suite), currently developed and tested on the Mac. Getting it onto ARM: **copy
+only what runs there** — `pi_pipeline/` itself plus the one exported policy
+file (`rl_training/opencat-gym/trained/run20m_ppo.onnx`, <1 MB). **Not** a full
+`git clone` of the repo — `rl_training/` is the PyBullet/SB3 training
+toolchain plus its checkpoints, TensorBoard logs, and GIFs (**~4.7 GB today,
+and it only grows** with every training run on `development`), none of which
+G2 ever runs. On a 32 GB card that's not fatal, but it's dead weight for
+zero benefit, and it compounds every time you re-sync.
 
 ```bash
+# on the Pi — system libs the wheels need (git isn't required for this)
+sudo apt install -y python3-venv python3-dev build-essential \
+     libportaudio2 libatlas-base-dev
+
+# from the Mac — run every time after a local change, to push it to the Pi.
+# the mkdir is one-time setup: unlike the first rsync (which creates its own
+# destination tree), a single-file rsync needs that directory to already exist.
+ssh g2pi@g2pi.local mkdir -p ~/bittleX/rl_training/opencat-gym/trained
+rsync -avz --delete pi_pipeline/ g2pi@g2pi.local:~/bittleX/pi_pipeline/
+rsync -avz rl_training/opencat-gym/trained/run20m_ppo.onnx \
+      g2pi@g2pi.local:~/bittleX/rl_training/opencat-gym/trained/run20m_ppo.onnx
+
 # on the Pi
-sudo apt install -y git python3-venv python3-dev build-essential \
-     libportaudio2 libatlas-base-dev   # system libs the wheels need
-git clone <repo>  ~/bittleX      # or rsync from the Mac
 cd ~/bittleX/pi_pipeline
 python3 -m venv .venv
 . .venv/bin/activate
@@ -230,6 +246,29 @@ pip install -r requirements.txt          # pip on Pi OS already uses piwheels.or
 pip install -r requirements-audio.txt    # the risky one
 python -m pytest                          # link/recovery/memory/skills are offline — expect green
 ```
+
+**What those two `rsync` lines actually do**, run *from the Mac* (source =
+your local checkout, destination = the Pi over SSH, same `g2pi@g2pi.local` from
+§2 above — no separate git step, no GitHub reachability needed from the Pi at
+all):
+- `-a` ("archive") — recurse into subdirectories and preserve permissions,
+  timestamps, and symlinks, so it behaves like a real copy, not a flat file
+  dump.
+- `-v` — verbose, print what's transferring.
+- `-z` — compress in transit, worth it over Wi-Fi.
+- `--delete` (first line only) — also remove anything on the Pi's
+  `pi_pipeline/` that no longer exists in the Mac's copy, so a file you
+  deleted or renamed locally doesn't linger there stale. Left off the second
+  line since it's a single named file, not a directory to keep in sync.
+- Only changed files actually transfer on a re-run (rsync diffs by size +
+  mtime) — so re-syncing after a small edit is fast, not a full re-copy.
+
+Prefer git-based deploys instead (e.g. to know exactly which commit is on the
+robot)? `git clone --filter=blob:none --no-checkout <repo> ~/bittleX && cd
+~/bittleX && git sparse-checkout set pi_pipeline rl_training/opencat-gym/trained
+&& git checkout development` gets the same result without ever downloading
+`rl_training`'s history/checkpoints — more moving parts than `rsync`, so it's
+not the default here, but it's there if you want `git pull` to update instead.
 
 **Why the audio install is the fragile step (detail):** packages with compiled
 code ship as *wheels* per OS+CPU+Python. If no `linux_aarch64` wheel matches,

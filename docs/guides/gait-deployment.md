@@ -27,11 +27,17 @@ cannot — see "Network").
 
 Everything here is doable **without the robot/BiBoard connected**.
 
-The runbook is codified as a **one-command, hands-off** script:
+The runbook is codified as a **one-command, hands-off** script. It's fully
+self-contained — reads nothing else from the repo (it builds its own synthetic
+`[276→256→256→8]` ONNX stub in-line just to benchmark inference speed; the
+real `run20m_ppo.onnx` and `pi_pipeline/` come later, in a separate step) — so
+it only needs the one script file on the Pi, **not a full repo clone**:
 
 ```
-# on the Pi (already cloned there, or: git clone -b development https://github.com/LineChef/BittleX)
-bash BittleX/scripts/pi_setup.sh
+# from whichever machine is driving this (has the repo checked out) —
+# copies just the one script, nothing else:
+scp scripts/pi_setup.sh g2pi@g2pi.local:~/pi_setup.sh    # or g2pi@192.168.1.181
+ssh g2pi@g2pi.local bash ~/pi_setup.sh
 ```
 
 Phase 1 (interactive, one sudo prompt, ~10–25 min): Wi-Fi power-save off, `apt
