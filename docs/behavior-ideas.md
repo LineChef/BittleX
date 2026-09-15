@@ -169,6 +169,30 @@ bet. Do B14 as a fun on-hardware experiment when the gait work is settled.
 
 ---
 
+### B21 — Pick up small objects with its mouth
+A grasp-and-retrieve skill: approach an object, pick it up, carry/deliver it.
+
+**Hardware reality check first.** G2 has 9 servo DOF total — 2 per leg (×4
+legs) + **1 neck joint**, no jaw, no gripper, no actuated mouth. The neck is a
+single pitch/tilt joint, not a closing mechanism — there's currently no way to
+grip and hold an object. This needs a hardware addition (a small servo-driven
+jaw, a passive spring-loaded mouth attachment, or a different mechanism like a
+scoop or electromagnet) before any software/behavior work is worth doing.
+
+**If a gripping mechanism gets added later:** the retrieve skill itself
+(approach → position → grip → lift/carry → release) would follow the same
+scripted-base + bounded-residual + reward-iteration recipe as any other new
+skill (see [`skill-learning-method.md`](rl/skill-learning-method.md)), same
+approach as B14's jump. Locating the object to grab would lean on the vision
+detection layer — B20's object gallery already tracks recognized objects by
+instance, which is the natural source for "where is the thing I should pick
+up."
+
+**Trigger:** a mouth/gripper hardware addition — not currently planned or
+purchased. Logged here as an idea, not a near-term item.
+
+---
+
 ### B17 — House-room scene generator, for vision detectors + reflex rules (vision-gated)  🔴 ⚪
 A room-like sim scene: walls, floor-material transitions, toys/clutter on the
 floor, ledges — the actual shape of the place G2 will live in. **Not an RL
