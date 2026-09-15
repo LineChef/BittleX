@@ -54,7 +54,13 @@ rl_training/opencat-gym/eval_frames/
 rl_training/opencat-gym/STOP
 rl_training/opencat-gym/frames_wkf/
 
-# Claude Code project config lives at user level (~/.claude/), not in the repo
+# Claude Code project config lives at user level (~/.claude/), not in the repo.
+# CLAUDE.md itself stays untracked by preference (never in the public repo).
+# It's backed up OUTSIDE the repo at ~/.local/share/g2/CLAUDE.md.backup and
+# auto-restored from there by tools/githooks/post-checkout|post-merge if it
+# ever goes missing locally (e.g. a wiped sandbox/worktree). The backup path
+# is per-machine and never touches git, so cloning the repo elsewhere can't
+# reproduce it.
 .claude/
 CLAUDE.md
 CLAUDE.local.md

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Keep the local, outside-the-repo CLAUDE.md backup fresh: after every commit,
+# if CLAUDE.md exists in the working tree, copy it to ~/.local/share/g2/. That
+# path never touches git (it's outside the repo entirely), so this can't leak
+# CLAUDE.md's content into the public repo -- it only ever writes to disk on
+# this machine.
+# Activate once per clone:  git config core.hooksPath tools/githooks
+set -u
+
+src="$(git rev-parse --show-toplevel)/CLAUDE.md"
+backup_dir="$HOME/.local/share/g2"
+
+if [ -f "$src" ]; then
+  mkdir -p "$backup_dir"
+  cp "$src" "$backup_dir/CLAUDE.md.backup"
+fi
+exit 0

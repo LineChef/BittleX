@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Restore CLAUDE.md from its local, outside-the-repo backup if it's missing
+# (e.g. after a fresh clone, or a sandbox/worktree that doesn't carry over
+# gitignored files). The backup lives at ~/.local/share/g2/, never in git, so
+# cloning this repo on another machine can never reproduce it -- only the
+# machine that wrote the backup can restore from it.
+# Never overwrites an existing CLAUDE.md -- local edits are always kept.
+# Activate once per clone:  git config core.hooksPath tools/githooks
+set -u
+
+backup="$HOME/.local/share/g2/CLAUDE.md.backup"
+target="$(git rev-parse --show-toplevel)/CLAUDE.md"
+
+if [ -f "$backup" ] && [ ! -f "$target" ]; then
+  cp "$backup" "$target"
+  echo "post-checkout: restored CLAUDE.md from local backup ($backup)"
+fi
+exit 0
