@@ -140,13 +140,72 @@ library is the asset — back it up.
 
 ## Per-class targets
 
+**2026-09-14 — target raised to 150/class, with a mandatory distance mix.**
+The flat ~120 target below was validated for *general* recognition (see
+"Result: ~120 images per class"), but a distance diagnostic on the deployed
+`<you>` model (`tools/vision_diag.py`) found it detects **only at close range**
+— every kept detection had a box filling 67–90% of the frame, with 14+ second
+gaps of zero raw detections during the mid/far part of a sweep. Checking the
+actual training labels explained why: of 230 `<you>` images, **0% were "far"
+and 0.9% were "mid"** — 99% were close/very-close. Raw *count* was never the
+problem (230 already exceeds 120); *composition* was. `dog`/`cat` show the
+same pattern, just less extreme (their natural burst-capture style produced
+some incidental mid-range variety, but almost no real "far").
+
+New standard per class: **150 images, with this distance-bucket mix**
+(bucket = `sqrt(box_w * box_h)` from the YOLO label — box size as a fraction
+of the frame):
+
+| bucket | range (sz) | target % | target count @150 |
+|---|---|---|---|
+| far | < 0.30 | 20% | 30 |
+| mid | 0.30–0.50 | 30% | 45 |
+| close | 0.50–0.70 | 30% | 45 |
+| vclose | ≥ 0.70 | 20% | 30 |
+
+**Tooling — analyze and (re)optimize a class against this target any time the
+library grows:**
+
+```bash
+# report only -- per-class bucket counts vs. target, flags exactly which
+# bucket is short and by how many images (no files touched)
+python tools/optimize_library.py ~/Desktop/g2_vision_library --report
+
+# materialize a quality-ranked, deduped, composition-capped 150-image subset
+# per class, ready for combine_for_upload.py -- within each distance bucket
+# it keeps the sharpest/best-exposed survivors after dedup, not just any N
+python tools/optimize_library.py ~/Desktop/g2_vision_library --classes <you>,dog,cat \
+    --target 150 --out ~/Desktop/g2_vision_library/upload_optimized
+```
+
+Re-run it after every promote — it always re-selects from the full current
+pool (never a cached snapshot), so results only improve as capture continues.
+It never deletes or reorders anything in the library itself.
+
+**Before promoting a new session, check it isn't just re-capturing what the
+library already has** (this matters most when deliberately targeting an
+under-filled bucket like far/mid — you want new information, not more
+near-duplicates of the close-up shots that already dominate):
+
+```bash
+python tools/check_library_overlap.py <session_dir>/curated --library ~/Desktop/g2_vision_library \
+    --class <you>            # add --remove to drop flagged near-dupes before promoting
+```
+
+**Keep class counts roughly in step.** When one class gets a targeted top-up
+(e.g. `<you>` getting a far/mid pass), plan a matching pass for the others in
+the same round rather than letting one class's total pull far ahead — a
+severely imbalanced class distribution biases the shared multi-class model.
+This is a process habit, not a retroactive fix: don't prune a class that's
+already ahead, just don't let the gap widen further without a reason.
+
 | id | class | target | difficulty | pre-label base | notes |
 |---|---|---|---|---|---|
-| 0 | `<you>` | ~100–150 | fine-grained (individual recognition) | Person Detection → auto boxes | close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. |
-| 1 | `<spouse>` | ~100–150 | fine-grained | Person Detection → auto boxes | same routine, separate sessions. |
-| 2 | `dog` | ~120–150 | coarse, poor cooperation | COCO-80 model → boxes on frames it catches; hand-label rest | burst-capture during normal activity, many short sessions, low yield each. |
-| 3 | `cat` | ~120–150 | coarse, poor cooperation | COCO-80 model → boxes; hand-label rest | same. |
-| 4 | `ledge` | ~200–250 | fine-grained | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered. **Do this after the G2 mount** — most POV-sensitive class. |
+| 0 | `<you>` | 150 (see mix above) | fine-grained (individual recognition) | Person Detection → auto boxes | close/mid/far, stand/crouch/walk; 2–3 rooms, varied light; different clothes/hair across sessions so it keys on *you*, not an outfit. The **calibration class**. Confirmed 2026-09-14: the standard pose set's "far (~5–6 ft)" pose still produced close/vclose-bucket boxes — genuinely far shots need more distance than that pose implies; verify with the bucket math above, not by eye. |
+| 1 | `<spouse>` | 150 (see mix above) | fine-grained | Person Detection → auto boxes | same routine, separate sessions. Not started as of 2026-09-14 (0 images) — capture from scratch targeting the mix above from session 1, rather than discovering the same close-up-only gap later. |
+| 2 | `dog` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes on frames it catches; hand-label rest | burst-capture during normal activity, many short sessions, low yield each. As of 2026-09-14, 123 of 250 library files have no label at all (hand-labeling was never finished) — resolve that before counting toward the target. |
+| 3 | `cat` | 150 (see mix above) | coarse, poor cooperation | COCO-80 model → boxes; hand-label rest | same. |
+| 4 | `ledge` | ~200–250 | fine-grained | none — hand-box every frame (Roboflow faster for bulk) | **your specific edges**, every approach angle, 15–40 cm out, lamp on/off, clear vs. cluttered. **Do this after the G2 mount** — most POV-sensitive class. Apply the same distance-mix discipline once capture starts; "approach angle" variety maps to the same far→close spectrum. |
 | — | negatives | ~40–50 | — | — | empty floor, plain walls, non-target edges (rug borders, grout) so `ledge` doesn't fire on any line; other people / portraits / coat racks so `<you>`/`<spouse>` don't fire on strangers. |
 
 **Individual recognition is coarse at 192 px** — two people who look similar
@@ -178,7 +237,41 @@ people + pets now; plan a top-up pass once mounted. `ledge` waits for the mount.
 
 ---
 
-## The loop (per class, per session)
+## The loop — automated (2026-09-14, recommended)
+
+Capture is still manual — everything after it isn't. `g2cam` starts the live
+preview and tells you the exact follow-up when you stop it:
+
+```bash
+g2cam <you> 1              # capture: live preview at localhost:8080, pose set
+                            # per capture-checklist.md, "Start capturing" per pose
+g2cam-stop
+g2auto <you>                # curate -> dedup-against-library -> promote ->
+                             # rebuild the 150/class optimized upload set
+#   -> ~/Desktop/g2_vision_library/upload_optimized/upload/  -- import into SenseCraft
+```
+
+`g2auto` (no argument) processes every class with a pending raw session, not
+just one — run it bare after a multi-class capture round. It's idempotent
+(re-running is always safe; already-promoted sessions are detected via the
+library manifest and skipped) and it always rebuilds the optimized upload set
+from the *current* full library, so it's also the right thing to run after
+manually fixing up a session (e.g. re-labelling) with no new capture at all.
+`--dry-run` previews every command it would run without changing anything.
+
+Under the hood this chains four scripts (each still runnable standalone if you
+need to intervene — e.g. `check_library_overlap.py --remove` was built
+specifically so a deliberately far/mid-targeted session doesn't waste its
+quota re-capturing what the library already has):
+`curate_captures.py` → `check_library_overlap.py` → `promote_to_library.py` →
+(`optimize_library.py` + `combine_for_upload.py`). See `tools/auto_process_captures.py`'s
+own docstring for every flag, and "Per-class targets" above for the 150/class,
+distance-mix target it optimizes toward.
+
+**Training itself stays manual** — review the resulting `upload/` folder,
+import it into SenseCraft, and train there as before (walkthrough §6).
+
+## The loop — manual, step by step (what `g2auto` does per session)
 
 ```bash
 source pi_pipeline/.venv/bin/activate
@@ -200,8 +293,15 @@ python tools/curate_captures.py "$RAW" "$RAW/curated" \
 # 3. review $RAW/curated/_contact_sheet.png — upright? poses varied? boxes sane?
 #    fix any bad rotation with a different --rotate and re-run step 2.
 
-# 4. promote the good set into the library
+# 4. drop anything that duplicates what's already in the library
+python tools/check_library_overlap.py "$RAW/curated" --library "$LIB" --class $CLASS --remove
+
+# 5. promote the good set into the library
 python tools/promote_to_library.py "$RAW/curated" --library "$LIB" --class $CLASS
+
+# 6. rebuild the optimized, 150/class upload set from the full library
+python tools/optimize_library.py "$LIB" --target 150 --out "$LIB/upload_optimized"
+python tools/combine_for_upload.py "$LIB/upload_optimized"
 ```
 
 Repeat for every class / session. When ready to (re)train — **pass the class
@@ -234,6 +334,9 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 | 2026-09-09 | `cat` | 1 | 120 | — | 120 | same |
 | 2026-09-09 | — | — | — | — | — | Built `custom_data.zip` (`<you>`/dog/cat, YOLO fmt) → trained YOLOv8n in `g2_yolov8_3class.ipynb` (mAP@50 **0.995**) → vela → flashed. **Dead on device** (thought Swift-YOLO required — wrong; see below). |
 | 2026-09-09 | — | — | — | — | — | Re-labelled dog/cat with `autobox_coco.py` (`<you>` 230, cat 218, dog 127), rebuilt `custom_data_yolo_v3.zip` (nc:3, 224px), retrained YOLOv8n (mAP@50 **0.907**). **Exported locally on arm64 py3.9** (`ultralytics==8.2.8` + onnx2tf 1.17.5, 3 workarounds) → vela 100% NPU → `g2_3class_yolov8_828_vela.tflite` (2.31 MB). **WORKS on device** — clean single boxes. Detects up close only (100-image INT8 calib; box frozen near training-avg position). |
+| 2026-09-14 | `<you>` | — | — | — | 238 (230 labeled) | **Distance diagnostic** (`tools/vision_diag.py`, 60 s sweep): detector fires *only* at close range — every kept box had `sz` (box-side fraction of frame) 0.67–0.90, with 14+ s stretches of zero raw detections during the mid/far part of the sweep. First two attempts came back with near-zero detections at any range; root cause was the camera module's physical **orientation**, not the model — re-checked with `python tools/camera_preview.py --info` (confirms port + loaded model without holding the port) and by eye once the module was rotated correctly. Checked *why* against the training labels: of 230 `<you>` images, **0% far (sz<0.30), 0.9% mid (0.30–0.50)** — 99% close/very-close. Count was never the issue (230 already exceeds the old 120 target); composition was. `dog`/`cat` show the same skew, less extreme (17–20% mid, but far is still only 0.5–4.7%). |
+| 2026-09-14 | — | — | — | — | — | **Decisions:** (1) target raised **120 → 150/class**, now with a mandatory distance-bucket mix (far 20% / mid 30% / close 30% / vclose 20% — see "Per-class targets" above) instead of a flat count, so this doesn't silently recur for `<spouse>`/`ledge`. (2) Keep class counts roughly in step going forward — a top-up for one class should be matched for the others in the same round, but nothing gets pruned from a class that's already ahead. (3) `<you>` gets an incremental **+40 images (20 far @ 8–12 ft, 20 mid @ 4–6 ft)** as a first step, added to the 230 (not replacing) — re-run the diagnostic after retraining/redeploying to check whether 40 closed the gap before capturing more. |
+| 2026-09-14 | — | — | — | — | — | **New tooling**, both reusing `curate_captures.py`'s tested hash/quality functions rather than reimplementing: `tools/optimize_library.py` — analyzes (`--report`) or materializes (`--out`) a quality-ranked (sharpness + exposure), deduped, distance-composition-capped subset per class against the 150 target; rerunnable any time the library grows, never touches the library itself. `tools/check_library_overlap.py` — before promoting a new session, flags (`--remove` to delete) any curated image that's a near-duplicate of one already promoted for that class, across *all* prior sessions, not just the current one. |
 
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
 person captured so far). Subsets pre-built (jpg only — `--images-only`, so

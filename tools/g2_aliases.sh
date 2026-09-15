@@ -51,7 +51,7 @@ g2cam() {
 
   capturing -> $out
   preview   -> http://localhost:8080   (click "Start capturing" for each pose)
-  stop      -> g2cam-stop     then:  g2curate $name $sess
+  stop      -> g2cam-stop     then:  g2auto $name   (curate+dedup+promote+rebuild upload, automatic)
 
   STANDARD POSE SET  (docs/vision/capture-checklist.md)
    1. Close (~1.5 ft), straight on, neutral -- small head movement   ~8s
@@ -140,6 +140,18 @@ g2libsubset() {
     --limit "$n" --neg-limit "$(( n / 4 ))" --images-only --out "$G2_LIB_ROOT/upload_$n"
 }
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
+
+# g2auto [classes] [--dry-run]  -- the FULL automated pipeline: for every
+#   pending raw session (curate -> dedup-against-library -> promote), then
+#   rebuild the 150/class optimized upload set. Capture (g2cam) is the only
+#   manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/,
+#   ready to import into SenseCraft. Idempotent -- safe to re-run any time,
+#   already-promoted sessions are skipped automatically.
+g2auto() {
+  local cls=""
+  if [ -n "${1:-}" ] && [ "${1:-}" != "--dry-run" ]; then cls="--classes $1"; shift; fi
+  _g2py tools/auto_process_captures.py --library "$G2_LIB_ROOT" --raw-root "$G2_CAP_ROOT" $cls "$@"
+}
 
 # ------------------------------------------------------------- vision runtime
 
