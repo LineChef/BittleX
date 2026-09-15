@@ -401,6 +401,11 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
     data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](hardware/pi-power.md).
   - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
     the Pi cutout.
+  - 3D print Petoi's official Pi standoff bracket to mount the Pi+PiSugar
+    assembly to the frame — download
+    [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl)
+    (Pi Zero 2 W). Full reasoning + diagrams:
+    [`docs/hardware/biboard-pi-connector.md`](hardware/biboard-pi-connector.md).
   - `sudo raspi-config` → Interface Options → Serial Port → disable the serial
     login shell, enable the serial hardware → reboot.
   - Disable the Pi's 1-wire interface (GPIO 4 reset-signal conflict).

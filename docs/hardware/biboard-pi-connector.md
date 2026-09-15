@@ -19,6 +19,9 @@ PiSugar S  --2 pogo pins (5V+GND), 4 screws, no wiring-->  Pi Zero 2 W  --3 wire
       the rest are reusable elsewhere)
 - [ ] Soldering iron + solder, only if BiBoard's header isn't already
       populated
+- [ ] A 3D-printed Pi standoff to mount the assembly to the frame — Petoi's
+      official part, [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl)
+      (see "Mounting the Pi assembly" below)
 
 ## Step 1 — Mount PiSugar to the Pi
 
@@ -86,6 +89,69 @@ Pi side, only on BiBoard's, in Step 2.)
 - [ ] BiBoard TX2 goes to Pi **pin 10**, not pin 8 (they're easy to swap)
 - [ ] All 3 wires are seated firmly at both ends
 
+## Mounting the Pi assembly (standoff, not stacking on BiBoard)
+
+Petoi's own FAQ and accessory library confirm how the Pi physically attaches
+to Bittle/Bittle X — this is not guessed:
+
+- Petoi's FAQ: *"Both Nybble/Nybble Q and Bittle/Bittle X support connecting
+  to a Raspberry Pi directly... You may need to 3D print extra support
+  structures for your project. Here's the 3D-printed Pi-support for
+  Bittle."* ([petoi.com/pages/faq](https://www.petoi.com/pages/faq))
+- That support is a real, published part: **`Bittle_standoffPi.stl`**, in
+  Petoi's official accessories repo, folder
+  [`stl/Bittle & BittleX/RaspberryPiStandOff/`](https://github.com/PetoiCamp/NonCodeFiles/tree/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff) —
+  containing `Pi_StandOffRegular.stl` (this build's target — Pi Zero 2 W),
+  `Pi3A_standOff.stl` (for the Pi 3A+), and a `.3mf` of the same part.
+- A standoff is a spacer post: it screws to the robot's frame and elevates
+  the Pi (with PiSugar screwed underneath it) above whatever is below it. The
+  Pi assembly is **not resting on BiBoard's PCB** — both BiBoard and the
+  standoff mount to the frame independently. The only thing that connects the
+  Pi to BiBoard at all is the 3-wire TX/RX/GND link from Step 3 — there is no
+  mechanical connection between the two boards.
+- Standoff height and exact mounting-hole positions aren't published
+  anywhere found, so the clearance and footprint alignment shown below are
+  the most defensible reading of the confirmed facts, not a measurement.
+
+## What it should look like assembled
+
+No real photo exists yet — these are illustrative diagrams (not real photos),
+drawn to real relative scale. The stacking order and sizes are derived from
+the sources above and from the real dimensions below; the exact footprint
+alignment is a best guess, reasoned as follows:
+
+- PiSugar's own documentation confirms it mounts **under** the Pi and contacts
+  two dedicated pads, never the GPIO header — so the header stays free on top,
+  the Pi doesn't need to be flipped.
+- **Pi Zero 2 W and PiSugar S are both a confirmed 65 × 30 mm** — identical
+  footprints, which is why they're drawn as one overlaid shape below.
+  **BiBoard measures ~68 × 59 mm**, estimated from its photo using the USB-C
+  connector's standardized shell width (~8.7 mm) as a scale reference — Petoi
+  doesn't publish an official spec. BiBoard is close in width to the Pi/PiSugar
+  footprint but nearly double the depth.
+- Because the Pi↔BiBoard link is loose wires, not a rigid pin-header stack,
+  nothing forces the Pi's footprint to align with BiBoard's header position —
+  the wires can route however they need to. Since BiBoard's real footprint is
+  bigger than the Pi+PiSugar's in both directions, the diagrams below **nest**
+  the smaller Pi/PiSugar footprint inside BiBoard's larger one (with margin on
+  every side), rather than showing an unmotivated overhang past BiBoard's
+  edge — an earlier draft of this diagram assumed pin-driven alignment and
+  drew the Pi hanging off BiBoard's edge; that assumption didn't hold up once
+  the wire-vs-rigid-header distinction was worked through.
+
+Top-down, all three genuinely overlapping at their real position and size —
+semi-transparent fills so the overlap itself is visible, the Pi/PiSugar
+footprint nested inside BiBoard's larger one with margin on every side, plus
+the standoff's two mounting posts (approximate position — exact hole spacing
+isn't published):
+
+![Illustrative top-down diagram: BiBoard, PiSugar, and the Pi drawn at their real relative sizes, the smaller Pi/PiSugar footprint nested inside BiBoard's larger one, with the standoff's two mounting posts marked](images/biboard-pi-connector/assembled-topdown.png)
+
+Side view of the same stack, each layer solid, with the printed standoff
+holding the Pi assembly clear of BiBoard and both mounted to a shared frame:
+
+![Illustrative side-view diagram: BiBoard mounted to the frame, a printed standoff rising from the same frame to hold PiSugar and the Pi above it, wires routed from the Pi's header down past the standoff to BiBoard's header](images/biboard-pi-connector/assembled-side.png)
+
 ## Reference
 
 Full pinout, both boards:
@@ -116,4 +182,8 @@ both boards are in hand.
 - [For BiBoard V1 | Petoi Doc Center](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1)
 - [BiBoard V1 Guide | Petoi Doc Center](https://docs.petoi.com/biboard/biboard-v1-guide) — source of the official board diagram
 - [PiSugarS Series | PiSugar Docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series)
+- [PiSugar S | Tindie](https://www.tindie.com/products/pisugar/pisugar-s-battery-for-raspberry-pi-zero/) — "bottom connection... without affecting GPIO expansion," confirming PiSugar mounts under the Pi and never touches the GPIO header
 - [Raspberry PI Zero 2W TOP 02.jpg | Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Raspberry_PI_Zero_2W_TOP_02.jpg) — CC BY-SA 4.0, source of the Pi Zero 2 W photos above
+- BiBoard's ~68 × 59 mm size is not published anywhere found — measured from `petoi-official-diagram.png` using the on-board USB-C receptacle's standardized shell width (~8.7 mm) as a pixel-to-mm scale reference
+- [Frequently Asked Questions | Petoi](https://www.petoi.com/pages/faq) — confirms direct Pi mounting on Bittle/Bittle X and links the official Pi standoff accessory
+- [`RaspberryPiStandOff/` | PetoiCamp/NonCodeFiles on GitHub](https://github.com/PetoiCamp/NonCodeFiles/tree/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff) — the official 3D-printable Pi standoff: [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl) (Pi Zero 2 W / this build), [`Pi3A_standOff.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi3A_standOff.stl) (Pi 3A+)
