@@ -70,11 +70,14 @@ is to **wire Bittle X to the Pi's serial / data pins only (RX / TX / GND) — no
 the 5V power pin** — letting PiSugar be the sole power source. This removes the
 shared-power question entirely.
 
-## Open item
+## Resolved — data-only wiring confirmed
 
-Confirm with Petoi support (or once hardware is in hand) whether BiBoard V2's
-connection to the Pi can be wired data-only, or whether its standard mounting
-inherently ties the 5V line together with the data lines by default.
+**2026-09-14:** BiBoard V1's Pi connector is a discrete 5-pin header (TX2,
+RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
+forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
+both +5V pins left unconnected) is straightforward. Full pinout, confirmed
+from Petoi's own official board diagram, plus annotated photos:
+[`biboard-pi-connector.md`](biboard-pi-connector.md).
 
 ---
 

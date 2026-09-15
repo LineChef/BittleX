@@ -53,8 +53,10 @@ should we work on next."
 
 ### Open (check when hardware arrives)
 
-- Confirm BiBoard V2 can be wired data-only, or whether its mount ties 5 V to the
-  data lines by default.
+- ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved 2026-09-14**: it's a
+  discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
+  official board diagram. Data-only wiring is straightforward. Full pinout +
+  annotated photos: [`hardware/biboard-pi-connector.md`](hardware/biboard-pi-connector.md).
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.

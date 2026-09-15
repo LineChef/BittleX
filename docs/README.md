@@ -40,9 +40,17 @@
 | [`diagnostics.md`](hardware/diagnostics.md) | Black-box logging + watchdog design (Phase 1 + non-HW Phase 2 built). |
 | [`servo-thermal.md`](hardware/servo-thermal.md) | Servo overheat risk + the layered mitigation (Layer 1+2 built). |
 | [`pi-power.md`](hardware/pi-power.md) | Powering the Pi (PiSugar S; BiBoard data-only) + power-management levers. |
+| [`biboard-pi-connector.md`](hardware/biboard-pi-connector.md) | How PiSugar, the Pi, and BiBoard connect — PiSugar's mechanical fit + the confirmed 5-pin BiBoard&harr;Pi wiring, with annotated real board photos. |
 | [`self-righting.md`](hardware/self-righting.md) | Bittle's built-in self-right — limited; no BiBoard-V1 IR trigger. |
 | [`petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) | Confirmed-from-source serial tokens, IMU thresholds, skill format. |
 | [`petoi-skills-survey.md`](hardware/petoi-skills-survey.md) | Which OpenCat built-in skills are worth pulling into G2. |
+
+## `build/` — the physical assembly record
+
+Reproducible step-by-step documentation of the actual hardware build (wiring,
+soldering, mounting, calibration, real measurements) — separate from
+`hardware/`'s specs and pre-build research. See [`build/README.md`](build/README.md).
+No entries yet; starts once Bittle X and the camera arrive.
 
 ## `rl/` — gait training: conclusions, backlogs, specs
 
