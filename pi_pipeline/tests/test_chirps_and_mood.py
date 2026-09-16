@@ -29,6 +29,25 @@ def test_cue_chirp_maps_stages():
     assert cue_chirp("bogus") is None
 
 
+def test_chirps_live_toggle_off_then_on():
+    # "say hi" chirps through the toggleable Chirper (unlike the "heard you"
+    # ack chirp, which deliberately always fires regardless of this toggle).
+    # GesturePicker's own greeting cooldown (45s) starts its clock at 0.0, so
+    # begin past that and advance well beyond it between the two "say hi"s.
+    t = [1000.0]
+    d = BehaviorDriver(clock=lambda: t[0])
+    assert d.chirper is not None
+    d.tick(DriverInputs(chirps_off=True))
+    assert d.chirper is None
+    fx = d.tick(DriverInputs(say_hi=True))
+    assert not any(e.kind is EffectKind.CHIRP for e in fx.effects)
+    d.tick(DriverInputs(chirps_on=True))
+    assert d.chirper is not None
+    t[0] = 1100.0
+    fx = d.tick(DriverInputs(say_hi=True))
+    assert any(e.kind is EffectKind.CHIRP for e in fx.effects)
+
+
 def test_chirper_rate_limits():
     t = [0.0]
     ch = Chirper(min_gap_s=2.0, clock=lambda: t[0])

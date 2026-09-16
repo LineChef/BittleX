@@ -72,7 +72,8 @@ def _build_runtime(link, *, hz: float, memory=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
     driver = BehaviorDriver(personality.behavior_params(),
-                            vision_available=features.vision)
+                            vision_available=features.vision,
+                            chirps=features.sound_cues)
     bindings = build_bindings(link, dry_run_power=link is None)
     hub = SensorHub(link)
     # B11 place memory: "the dog is often to the left" -> a durable fact

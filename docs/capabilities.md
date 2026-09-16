@@ -30,11 +30,11 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 | Sim → real | `run20m_ppo` exported to ONNX, bit-for-bit validated against the on-robot control loop; Pi inference measured at 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography | 🧩 |
 | Personality | Composable traits (curiosity, playfulness, "Gir" character mode), mood model, per-person bonds — all `.env`-driven | ✅ |
-| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` tool-calls and graceful degradation when the API is down | ✅ (mocked audio) / 🧩 mic+speaker |
+| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down | ✅ (mocked audio) / 🧩 mic+speaker |
 | Memory | Persistent fact store with recall, a CLI, and a localhost web UI | ✅ |
 | Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed | ✅ model / 🧩 mounted camera |
 | Safety reflexes | Jam reflex, servo thermal guard + governor, cliff/edge guard, watchdog, sleep mode, carpet detector | 🧩 |
-| Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall | ✅ logic / 🧩 HW sensors |
+| Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status) | ✅ logic / 🧩 HW sensors |
 | Power | Idle-REST staged descent, on-demand vision, sleep mode — three zero-risk levers built | ✅ logic / 🧩 tuning |
 | Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ logic / 🧩 cable |
 

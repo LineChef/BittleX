@@ -17,12 +17,17 @@ from __future__ import annotations
 import logging
 
 from ..personality import character_state
+from ..personality import gir
 from ..personality.mood import MoodModel
+from . import narration
 from .actuator import Actuator
-from .commands import looks_like_rebuff, match_local_command, parse_character_command
+from .commands import (
+    looks_like_rebuff, match_local_command, parse_character_command,
+    parse_narration_command,
+)
 from .conversation import Conversation, ConversationError
 
-_DEFAULT_CHARACTER_LEVEL = 0.4
+_DEFAULT_CHARACTER_LEVEL = gir.level_to_intensity(gir.DEFAULT_LEVEL)
 from .cues import Cue
 from .stt import STT
 from .tts import TTS
@@ -93,8 +98,9 @@ class VoiceLoop:
             lvl = cc.level if cc.level is not None else _DEFAULT_CHARACTER_LEVEL
             self._conv.set_personality(p.with_character(cc.name, lvl))
             character_state.save(cc.name, lvl)
-            log.info("character mode %s ON at %.2f", cc.name, lvl)
-            self._tts.speak(f"Okay, {cc.name} mode on.")
+            n = gir.nearest_level(lvl)   # echo back *what* the level does, not just the number
+            log.info("character mode %s ON at %.2f (level %d)", cc.name, lvl, n)
+            self._tts.speak(f"Okay, {cc.name} mode on, {gir.describe_level(n)}.")
         else:
             self._conv.set_personality(p.without_character(cc.name))
             character_state.clear()
@@ -195,6 +201,34 @@ class VoiceLoop:
             return
         if cmd == "character":
             self._handle_character(parse_character_command(user_text))
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "chirps_on":
+            log.info("chirps enabled (voice)")
+            self._events(chirps_on=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, chirps on.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "chirps_off":
+            log.info("chirps disabled (voice)")
+            self._events(chirps_off=True)
+            self._cue.set("speaking")
+            self._tts.speak("Okay, chirps off.")
+            self._in_session = self._follow_up_s > 0
+            self._cue.set("idle")
+            return
+        if cmd == "narration_level":
+            n = parse_narration_command(user_text)
+            log.info("narration verbosity level %s (voice)", n)
+            self._cue.set("speaking")
+            if n is None:
+                self._tts.speak(f"Narration levels go 1 to {narration.LEVELS} -- which one?")
+            else:
+                self._conv.set_narration_hint(narration.hint_for_level(n))
+                self._tts.speak(f"Okay, narration level {n}: {narration.describe_level(n)}.")
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return

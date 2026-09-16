@@ -40,7 +40,7 @@ _EVENT_BOOLS = (
     "wake_word", "conversation_ended", "told_stop", "told_stay", "told_sleep",
     "shutdown", "arm_explore", "disarm_explore", "come_here",
     "rebuffed", "picked_up", "loud_sound", "imu_tap", "nearby_motion",
-    "cancel_enroll", "say_hi",
+    "cancel_enroll", "say_hi", "chirps_on", "chirps_off",
 )
 # continuous sensor keys a `sensors()` callable may return
 _SENSOR_KEYS = (

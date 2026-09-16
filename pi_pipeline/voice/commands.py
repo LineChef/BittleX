@@ -16,6 +16,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from ..personality.gir import level_to_intensity as _gir_level_to_intensity
+
 # filler words stripped before matching, so "hey G2, forget that please" ==
 # "forget that"
 _STRIP_TOKENS = {
@@ -82,6 +84,23 @@ _COME = (
     "come over here",
 )
 
+# chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
+# not backed by it (that flag is boot-time only; this is a runtime override).
+_CHIRPS_ON = (
+    "turn on your chirps", "turn on chirps", "enable chirps", "chirps on",
+    "start chirping", "enable your chirping",
+)
+_CHIRPS_OFF = (
+    "turn off your chirps", "turn off chirps", "disable chirps", "chirps off",
+    "stop chirping", "no more chirping", "quiet the chirps",
+)
+
+# narration verbosity: "narration level 4", "set verbosity to 2" -- a 1-5
+# level, parsed by _parse_named_level below. Distinct wording/name from the
+# mood-nudging _REBUFF list below ("be quiet" etc. nudges mood, it doesn't
+# touch this setting) so the two never collide.
+_NARRATION_NAMES = ("narration", "verbosity")
+
 # character mode: "enable gir mode", "turn on gir", "gir mode off", "set gir to 70"
 _CHAR_NAMES = ("gir",)
 _CHAR_ON = ("enable", "turn on", "switch on", "activate", "start", "go into", "be",
@@ -110,10 +129,23 @@ _LEVEL_WORDS = {"zero": 0.0, "quarter": 0.25, "half": 0.5, "medium": 0.5,
                 "full": 1.0, "max": 1.0, "maximum": 1.0, "low": 0.25, "high": 0.85}
 
 
+def _parse_named_level(raw: str, lo: int = 1, hi: int = 5) -> int | None:
+    """Parse 'level N' (a small integer, 1..hi) -- the primary way to set
+    gir/narration intensity now. Kept separate from _parse_level below (which
+    still handles old-style 'to 70%' / 'to full' phrasing for gir) so a
+    number after 'level' is never ambiguous with a raw percentage."""
+    m = re.search(r"\blevel\s+(\d{1,2})\b", raw)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return n if lo <= n <= hi else None
+
+
 def _parse_level(raw: str) -> float | None:
     """Parse a requested intensity from raw (un-normalised) lowercased text --
-    'to 0.7', 'at 70', 'level 70%', 'to full'."""
-    m = re.search(r"(?:to|at|level)\s+(?:(\d+(?:\.\d+)?)\s*(%|percent)?|([a-z]+))", raw)
+    'to 0.7', 'at 70', 'to full'. Old-style percentage/word phrasing, kept
+    working for gir alongside the new 'level N' scale above."""
+    m = re.search(r"(?:to|at)\s+(?:(\d+(?:\.\d+)?)\s*(%|percent)?|([a-z]+))", raw)
     if not m:
         return None
     if m.group(1):
@@ -130,7 +162,9 @@ def _has_verb(norm: str, verbs: tuple[str, ...]) -> bool:
 
 
 def parse_character_command(text: str) -> CharacterCommand | None:
-    """Recognise 'enable/disable <name> mode' (optionally '... to <level>')."""
+    """Recognise 'enable/disable <name> mode' (optionally '... level <1-5>',
+    the primary form -- or the old '... to <percent/word>' phrasing, still
+    understood)."""
     n = _normalize(text)
     if not n:
         return None
@@ -138,7 +172,8 @@ def parse_character_command(text: str) -> CharacterCommand | None:
     for name in _CHAR_NAMES:
         if name not in n.split():
             continue
-        level = _parse_level(raw)
+        named = _parse_named_level(raw, hi=5)
+        level = _gir_level_to_intensity(named) if named is not None else _parse_level(raw)
         # OFF is checked first so "stop being gir" / "no more gir" win.
         if (_has_verb(n, _CHAR_OFF)
                 or re.search(rf"\b{name}\b(?:\s+mode)?\s+off\b", n)
@@ -148,6 +183,16 @@ def parse_character_command(text: str) -> CharacterCommand | None:
                 or re.search(rf"\b{name}\b(?:\s+mode)?\s+on\b", n)
                 or level is not None):            # naming a level == turn it on / adjust
             return CharacterCommand(name, on=True, level=level)
+    return None
+
+
+def parse_narration_command(text: str) -> int | None:
+    """Recognise 'narration level <1-5>' / 'verbosity level <1-5>' /
+    'set narration to <1-5>' -> the requested level, or None."""
+    n = _normalize(text)
+    if not n or not any(name in n.split() for name in _NARRATION_NAMES):
+        return None
+    return _parse_named_level(text.lower(), hi=5)
     return None
 
 
@@ -171,8 +216,9 @@ def looks_like_rebuff(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
-    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"character"``, or ``None``.
-    Checked in that order -- an emergency stop wins over everything."""
+    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
+    -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
         return None
@@ -192,6 +238,12 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
+    if _hit(n, _CHIRPS_ON):
+        return "chirps_on"
+    if _hit(n, _CHIRPS_OFF):
+        return "chirps_off"
+    if parse_narration_command(text) is not None:
+        return "narration_level"
     if parse_character_command(text) is not None:
         return "character"
     return None

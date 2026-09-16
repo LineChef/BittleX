@@ -107,6 +107,8 @@ class DriverInputs:
     meet_name: str | None = None            # "G2, meet <name>" -> start enrollment
     cancel_enroll: bool = False
     say_hi: bool = False                     # "say hi" / "wave" voice intent -> greeting gesture
+    chirps_on: bool = False                  # "turn on your chirps" -> re-enable, live
+    chirps_off: bool = False                 # "turn off your chirps" -> disable, live
 
     # --- continuous sensor / perception state ---
     imu_level: bool = True
@@ -299,6 +301,12 @@ class BehaviorDriver:
         return self._last_reason
 
     # --- chirps ----------------------------------------------------------
+    def set_chirps_enabled(self, enabled: bool) -> None:
+        """Live-toggle chirps without restarting (voice: 'turn off your
+        chirps'). A fresh `Chirper` on re-enable, not a resurrected one --
+        the old rate-limit window is stale after however long chirps were off."""
+        self.chirper = Chirper(clock=self._clock) if enabled else None
+
     def _chirp(self, mood: ChirpMood, now: float, reason: str = "") -> list:
         """A rate-limited emotive chirp, as a (possibly empty) effect list.
         One shared Chirper across all trigger points -> at most one buzz/tick."""
@@ -359,6 +367,10 @@ class BehaviorDriver:
             g = self.gestures.greeting(now)
             fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "say hi"))
             fx += self._chirp(ChirpMood.GREETING, now, "say hi")
+        if i.chirps_on:
+            self.set_chirps_enabled(True)
+        if i.chirps_off:
+            self.set_chirps_enabled(False)
         return fx
 
     # --- enrollment ------------------------------------------------------

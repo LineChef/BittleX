@@ -2,9 +2,15 @@
 
     python -m pi_pipeline.diag list
     python -m pi_pipeline.diag summarize [SESSION]      # SESSION = id, dir, or omitted = latest
+    python -m pi_pipeline.diag last-failure [SESSION]   # most recent failure-taxonomy event
     python -m pi_pipeline.diag tail [SESSION]
     python -m pi_pipeline.diag replay SESSION [--around HH:MM:SS] [--window 5]
     python -m pi_pipeline.diag sync SESSION DEST
+
+`summarize`/`last-failure`'s actual logic lives in `core.py` as
+`summarize_session()`/`last_failure()` (plain functions returning text) --
+this CLI just resolves a session and prints. `voice/conversation.py`'s
+`diagnostics_query` tool calls the same two functions directly.
 """
 from __future__ import annotations
 
@@ -15,41 +21,16 @@ import sys
 import time
 from pathlib import Path
 
-from .core import _LEVELS, _log_root
-
-
-def _sessions() -> list[Path]:
-    root = _log_root()
-    if not root.is_dir():
-        return []
-    return sorted((p for p in root.iterdir() if p.is_dir() and (p / "events.jsonl").exists()),
-                  key=lambda p: p.stat().st_mtime)
+from .core import _LEVELS, _log_root, _read_events, _resolve_session, _sessions
+from .core import last_failure as _last_failure
+from .core import summarize_session as _summarize_session
 
 
 def _resolve(session: str | None) -> Path:
-    if not session:
-        s = _sessions()
-        if not s:
-            sys.exit(f"no sessions under {_log_root()}")
-        return s[-1]
-    p = Path(session)
-    if p.is_dir():
-        return p
-    cand = _log_root() / session
-    if cand.is_dir():
-        return cand
-    sys.exit(f"session not found: {session}")
-
-
-def _read_events(d: Path):
-    with open(d / "events.jsonl") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    pass
+    d = _resolve_session(session)
+    if d is None:
+        sys.exit(f"no sessions under {_log_root()}" if not session else f"session not found: {session}")
+    return d
 
 
 def cmd_list(_):
@@ -61,58 +42,14 @@ def cmd_list(_):
         print(f"{d.name}   {len(evs):5d} events  {n_warn:3d} warn+  {bb} blackbox  {dur:6.0f}s")
 
 
-def _thermal_summary(evs):
-    warn = [e for e in evs if e.get("name") == "servo.thermal_warn"]
-    soft = [e for e in evs if e.get("name") == "servo.soft_cutback"]
-    cool = [e for e in evs if e.get("name") == "servo.thermal_cooldown"]
-    rec = [e for e in evs if e.get("name") == "servo.thermal_recover"]
-    peak = max((e.get("hottest_frac", 0.0) for e in evs if "hottest_frac" in e), default=0.0)
-    if not (warn or soft or cool or peak):
-        print("  thermal: nothing logged (guard off, or never warmed)")
-        return
-    print(f"  thermal: peak heat estimate {peak:.0%} of danger line")
-    print(f"           WARN x{len(warn)}   soft-cutback x{len(soft)}   COOLDOWN x{len(cool)}   recover x{len(rec)}")
-    joints = {}
-    for e in evs:
-        j = e.get("hottest_j")
-        if j is not None:
-            joints[j] = joints.get(j, 0) + 1
-    if joints:
-        hot = sorted(joints.items(), key=lambda kv: -kv[1])[:3]
-        print("           hottest joint (ticks): " + ", ".join(f"j{j}:{n}" for j, n in hot))
-    for e in cool:
-        t = time.strftime("%H:%M:%S", time.localtime(e["wall_ts"]))
-        print(f"           [{t}] COOLDOWN -- {e.get('reason', '')}")
-
-
 def cmd_summarize(a):
+    d = _resolve(a.session)  # validate + friendly exit before handing off
+    print(_summarize_session(str(d)))
+
+
+def cmd_last_failure(a):
     d = _resolve(a.session)
-    evs = list(_read_events(d))
-    man = json.loads((d / "manifest.json").read_text()) if (d / "manifest.json").exists() else {}
-    print(f"session {d.name}")
-    git = man.get("git", {})
-    print(f"  git {str(git.get('sha'))[:12]}{' (dirty)' if git.get('dirty') else ''}   "
-          f"host {man.get('host')}   argv {' '.join(man.get('argv', [])[:4])}")
-    if man.get("policy", {}).get("path"):
-        print(f"  policy {man['policy']['path']}  sha16 {man['policy'].get('sha256_16')}")
-    if not evs:
-        print("  (no events)"); return
-    dur = evs[-1]["mono_t"] - evs[0]["mono_t"]
-    by_lvl = {}
-    for e in evs:
-        by_lvl[e.get("lvl", "?")] = by_lvl.get(e.get("lvl", "?"), 0) + 1
-    print(f"  {len(evs)} events over {dur:.0f}s   " + "  ".join(f"{k}:{v}" for k, v in sorted(by_lvl.items())))
-    _thermal_summary(evs)
-    print("  timeline (WARN and above):")
-    for e in evs:
-        if _LEVELS.get(e.get("lvl", "INFO"), 20) >= 30:
-            t = time.strftime("%H:%M:%S", time.localtime(e["wall_ts"]))
-            kv = " ".join(f"{k}={v}" for k, v in e.items()
-                          if k not in ("wall_ts", "mono_t", "sid", "sub", "lvl", "name"))
-            print(f"    [{t}] {e['lvl']:5} {e['sub']}/{e['name']}  {kv}")
-    bb = sorted(d.glob("blackbox_*.csv"))
-    if bb:
-        print("  black-box dumps: " + ", ".join(p.name for p in bb))
+    print(_last_failure(str(d)))
 
 
 def cmd_tail(a):
@@ -163,7 +100,7 @@ def main():
     ap = argparse.ArgumentParser(prog="python -m pi_pipeline.diag")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list").set_defaults(fn=cmd_list)
-    for name, fn in (("summarize", cmd_summarize), ("tail", cmd_tail)):
+    for name, fn in (("summarize", cmd_summarize), ("last-failure", cmd_last_failure), ("tail", cmd_tail)):
         sp = sub.add_parser(name); sp.add_argument("session", nargs="?"); sp.set_defaults(fn=fn)
     rp = sub.add_parser("replay"); rp.add_argument("session")
     rp.add_argument("--around"); rp.add_argument("--window", type=float, default=0.0)

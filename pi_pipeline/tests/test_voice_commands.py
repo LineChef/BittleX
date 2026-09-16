@@ -90,3 +90,32 @@ def test_come_here_vs_come_back():
     assert _mlc("come over here") == "come"
     assert _mlc("come back") == "unexplore"          # ending the roam, not approach
     assert _mlc("that's enough") == "unexplore"
+
+
+# ------------------------------------------------------ chirps / narration
+def test_chirps_on_and_off_phrases():
+    for p in ("turn off your chirps", "disable chirps", "chirps off",
+              "stop chirping", "hey G2 turn off chirps"):
+        assert _mlc(p) == "chirps_off", p
+    for p in ("turn on your chirps", "enable chirps", "chirps on", "start chirping"):
+        assert _mlc(p) == "chirps_on", p
+
+
+def test_narration_level_phrases():
+    from pi_pipeline.voice.commands import parse_narration_command as _pnc
+    for p in ("narration level 1", "set verbosity to level 5", "narration level 3"):
+        assert _mlc(p) == "narration_level", p
+    assert _pnc("narration level 1") == 1
+    assert _pnc("verbosity level 5") == 5
+    assert _pnc("set narration to level 9") is None      # out of 1-5 range
+    assert _pnc("level 3") is None                        # no narration/verbosity name at all
+
+
+def test_chirps_and_narration_dont_collide_with_rebuff():
+    # "be quiet" / "stop talking" nudge mood (looks_like_rebuff), they are
+    # NOT the chirps/narration toggle -- different mechanism, different words.
+    assert _mlc("be quiet") is None
+    assert _mlc("stop talking") is None
+    assert looks_like_rebuff("be quiet")
+    assert not looks_like_rebuff("turn off your chirps")
+    assert not looks_like_rebuff("narrate less")

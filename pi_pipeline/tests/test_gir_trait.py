@@ -1,3 +1,4 @@
+from pi_pipeline.personality import gir as gir_module
 from pi_pipeline.personality.gir import Gir
 from pi_pipeline.personality.personality import Personality
 from pi_pipeline.personality.traits import BehaviorParams, REGISTRY
@@ -80,3 +81,30 @@ def test_cues():
     assert Gir(0.6).cues("greet").count("excited_hop") == 1
     assert Gir(0.3).cues("greet") == ["chirp_happy"]      # no hop at low level
     assert Gir(0.05).cues("greet") == []
+
+
+# --------------------------------------------------- voice-facing 1-5 levels
+def test_levels_is_five_not_ten():
+    assert gir_module.LEVELS == 5
+
+
+def test_level_to_intensity_spans_the_on_range():
+    assert gir_module.level_to_intensity(1) == gir_module._LEVEL_LO
+    assert gir_module.level_to_intensity(5) == gir_module._LEVEL_HI
+    # every level is meaningfully "on" -- none dip below the off threshold
+    for n in range(1, 6):
+        assert Gir(gir_module.level_to_intensity(n)).prompt_fragment() is not None
+
+
+def test_nearest_level_round_trips():
+    for n in range(1, 6):
+        assert gir_module.nearest_level(gir_module.level_to_intensity(n)) == n
+
+
+def test_describe_level_matches_the_real_tiers():
+    # levels 1-2 -> light quirk, 3-4 -> core character, 5 -> full chaos
+    assert "light quirk" in gir_module.describe_level(1)
+    assert "light quirk" in gir_module.describe_level(2)
+    assert "clearly a character" in gir_module.describe_level(3)
+    assert "clearly a character" in gir_module.describe_level(4)
+    assert "full chaos" in gir_module.describe_level(5)

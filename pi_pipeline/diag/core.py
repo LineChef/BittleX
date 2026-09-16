@@ -92,6 +92,124 @@ def _file_hash(path: str | os.PathLike) -> str | None:
         return None
 
 
+# --- session query helpers -------------------------------------------------
+# Shared by the `python -m pi_pipeline.diag` CLI (prints these) and
+# voice/conversation.py's diagnostics_query tool (returns them as text for
+# Claude to read and speak from). Nothing here is hardware-specific.
+
+def _sessions() -> list[Path]:
+    root = _log_root()
+    if not root.is_dir():
+        return []
+    return sorted((p for p in root.iterdir() if p.is_dir() and (p / "events.jsonl").exists()),
+                  key=lambda p: p.stat().st_mtime)
+
+
+def _resolve_session(session: str | None) -> Path | None:
+    if not session:
+        s = _sessions()
+        return s[-1] if s else None
+    p = Path(session)
+    if p.is_dir():
+        return p
+    cand = _log_root() / session
+    return cand if cand.is_dir() else None
+
+
+def _read_events(d: Path):
+    with open(d / "events.jsonl") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError:
+                    pass
+
+
+def _thermal_lines(evs: list[dict]) -> list[str]:
+    warn = [e for e in evs if e.get("name") == "servo.thermal_warn"]
+    soft = [e for e in evs if e.get("name") == "servo.soft_cutback"]
+    cool = [e for e in evs if e.get("name") == "servo.thermal_cooldown"]
+    rec = [e for e in evs if e.get("name") == "servo.thermal_recover"]
+    peak = max((e.get("hottest_frac", 0.0) for e in evs if "hottest_frac" in e), default=0.0)
+    if not (warn or soft or cool or peak):
+        return ["thermal: nothing logged (guard off, or never warmed)"]
+    lines = [f"thermal: peak heat estimate {peak:.0%} of danger line",
+             f"WARN x{len(warn)}   soft-cutback x{len(soft)}   COOLDOWN x{len(cool)}   recover x{len(rec)}"]
+    joints: dict = {}
+    for e in evs:
+        j = e.get("hottest_j")
+        if j is not None:
+            joints[j] = joints.get(j, 0) + 1
+    if joints:
+        hot = sorted(joints.items(), key=lambda kv: -kv[1])[:3]
+        lines.append("hottest joint (ticks): " + ", ".join(f"j{j}:{n}" for j, n in hot))
+    for e in cool:
+        t = time.strftime("%H:%M:%S", time.localtime(e["wall_ts"]))
+        lines.append(f"[{t}] COOLDOWN -- {e.get('reason', '')}")
+    return lines
+
+
+def summarize_session(session: str | None = None) -> str:
+    """Plain-text summary of one session's diagnostics: git/host, event-level
+    counts, the thermal picture, and the WARN+ timeline. Same content as
+    `python -m pi_pipeline.diag summarize`, returned instead of printed --
+    this is what the voice diagnostics_query tool speaks from."""
+    d = _resolve_session(session)
+    if d is None:
+        return "No diagnostic sessions found." if not session else f"No session found matching {session!r}."
+    evs = list(_read_events(d))
+    man = json.loads((d / "manifest.json").read_text()) if (d / "manifest.json").exists() else {}
+    lines = [f"session {d.name}"]
+    git = man.get("git", {})
+    lines.append(f"git {str(git.get('sha'))[:12]}{' (dirty)' if git.get('dirty') else ''}   "
+                 f"host {man.get('host')}   argv {' '.join(man.get('argv', [])[:4])}")
+    if man.get("policy", {}).get("path"):
+        lines.append(f"policy {man['policy']['path']}  sha16 {man['policy'].get('sha256_16')}")
+    if not evs:
+        lines.append("(no events)")
+        return "\n".join(lines)
+    dur = evs[-1]["mono_t"] - evs[0]["mono_t"]
+    by_lvl: dict = {}
+    for e in evs:
+        by_lvl[e.get("lvl", "?")] = by_lvl.get(e.get("lvl", "?"), 0) + 1
+    lines.append(f"{len(evs)} events over {dur:.0f}s   " + "  ".join(f"{k}:{v}" for k, v in sorted(by_lvl.items())))
+    lines.extend(_thermal_lines(evs))
+    warn_evs = [e for e in evs if _LEVELS.get(e.get("lvl", "INFO"), 20) >= 30]
+    if warn_evs:
+        lines.append("timeline (WARN and above):")
+        for e in warn_evs:
+            t = time.strftime("%H:%M:%S", time.localtime(e["wall_ts"]))
+            kv = " ".join(f"{k}={v}" for k, v in e.items()
+                          if k not in ("wall_ts", "mono_t", "sid", "sub", "lvl", "name"))
+            lines.append(f"[{t}] {e['lvl']:5} {e['sub']}/{e['name']}  {kv}")
+    else:
+        lines.append("no WARN+ events -- a clean session")
+    bb = sorted(d.glob("blackbox_*.csv"))
+    if bb:
+        lines.append("black-box dumps: " + ", ".join(p.name for p in bb))
+    return "\n".join(lines)
+
+
+def last_failure(session: str | None = None) -> str:
+    """The most recent failure-taxonomy event (see `_FLUSH_NAMES`) in a
+    session, in plain text -- what the diagnostics_query tool answers
+    "why did you fall / stall / lose the link" from."""
+    d = _resolve_session(session)
+    if d is None:
+        return "No diagnostic sessions found." if not session else f"No session found matching {session!r}."
+    evs = [e for e in _read_events(d) if e.get("name") in _FLUSH_NAMES
+           or _LEVELS.get(e.get("lvl", "INFO"), 20) >= _LEVELS["ERROR"]]
+    if not evs:
+        return f"No failures logged in session {d.name} -- a clean run."
+    e = evs[-1]
+    t = time.strftime("%H:%M:%S", time.localtime(e["wall_ts"]))
+    kv = " ".join(f"{k}={v}" for k, v in e.items()
+                  if k not in ("wall_ts", "mono_t", "sid", "sub", "lvl", "name"))
+    return f"[{t}] {e['lvl']} {e['sub']}/{e['name']}  {kv}  (session {d.name})"
+
+
 class RingBuffer:
     """Fixed-size buffer of recent telemetry rows; dumped on an incident."""
 

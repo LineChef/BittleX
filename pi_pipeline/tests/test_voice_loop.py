@@ -25,6 +25,7 @@ class _Conv:
     def __init__(self):
         self.sent = []
         self.mood_hints = []
+        self.narration_hints = []
 
     def send(self, text, memory_context=None):
         self.sent.append(text)
@@ -32,6 +33,9 @@ class _Conv:
 
     def set_mood_hint(self, hint):
         self.mood_hints.append(hint)
+
+    def set_narration_hint(self, hint):
+        self.narration_hints.append(hint)
 
 
 class _TTS:
@@ -194,3 +198,26 @@ def test_actions_without_speech_still_get_a_spoken_ok():
         speech="", actions=["sit"], facts=[])
     _run(lp, 2)
     assert "Okay." in tts.said
+
+
+# ------------------------------------------------------ chirps / narration
+def test_chirps_on_off_post_events_not_claude():
+    events = []
+    lp, w, stt, conv, tts = _loop(
+        ["turn off your chirps", "turn on your chirps", ""],
+        on_event=lambda **kw: events.append(kw))
+    _run(lp, 3)
+    assert conv.sent == []                          # never reached Claude
+    kinds = [next(iter(e)) for e in events]
+    assert "chirps_off" in kinds and "chirps_on" in kinds
+
+
+def test_narration_level_sets_hint_not_claude():
+    # levels 1 and 5 (not 3, the default -- its hint is deliberately empty)
+    lp, w, stt, conv, tts = _loop(["narration level 1", "narration level 5", ""])
+    _run(lp, 3)
+    assert conv.sent == []
+    assert len(conv.narration_hints) == 2
+    assert conv.narration_hints[0] != conv.narration_hints[1]
+    assert all(conv.narration_hints)                 # both non-empty hints
+    assert "level 1" in tts.said[0] and "level 5" in tts.said[1]

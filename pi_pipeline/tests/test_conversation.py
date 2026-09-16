@@ -90,3 +90,32 @@ def test_mood_hint_survives_a_personality_swap(cfg, fake_anthropic):
     conv.set_personality(Personality.from_spec("gir=0.5"))
     assert "playful mood" in conv._system_prompt      # mood hint survived the swap
     assert "gir" in conv.personality.describe()
+
+
+# ------------------------------------------------------- diagnostics_query
+def test_diagnostics_query_status_reads_features(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("tool_use", name="diagnostics_query", id="d1",
+                                        input={"topic": "status"})))
+    conv = Conversation(cfg)
+    conv.send("what features are you running with?")
+    assert "foundation" in conv._pending_tool_results[0]["content"]  # a features.describe() group
+
+
+def test_diagnostics_query_summary_with_no_sessions(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("tool_use", name="diagnostics_query", id="d1",
+                                        input={"topic": "summary"})))
+    conv = Conversation(cfg)
+    conv.send("what happened just now?")
+    assert "no diagnostic sessions" in conv._pending_tool_results[0]["content"].lower()
+
+
+def test_diagnostics_query_result_flushed_on_next_turn(cfg, fake_anthropic):
+    conv = Conversation(cfg)
+    fake_anthropic.set_reply(Resp(Block("tool_use", name="diagnostics_query", id="d1",
+                                        input={"topic": "last_failure"})))
+    conv.send("why did you fall?")
+    fake_anthropic.set_reply(Resp(Block("text", text="ok")))
+    conv.send("thanks")
+    last_user_blocks = fake_anthropic.calls[-1]["messages"][-1]["content"]
+    assert any(b.get("type") == "tool_result" and b["tool_use_id"] == "d1"
+               for b in last_user_blocks)

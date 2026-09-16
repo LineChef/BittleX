@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 import anthropic
 
 from ..config import Settings
+from ..diag.core import last_failure, summarize_session
+from ..features import features
 from ..personality import Personality
 from . import skills
 
@@ -66,7 +68,36 @@ _REMEMBER_TOOL = {
     },
 }
 
-_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL]
+_DIAGNOSTICS_TOOL = {
+    "name": "diagnostics_query",
+    "description": (
+        "Look up G2's own diagnostic data to answer questions about what "
+        "happened, why something failed, or what mode G2 is running in. Use "
+        "this for things like 'why did you fall', 'what happened just now', "
+        "'are you okay', or 'what features are you running with'. The result "
+        "comes back as plain text on your *next* reply, not this one -- so "
+        "acknowledge the question now (e.g. \"let me check\") and give the "
+        "real answer, in your own words, once you have it."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "topic": {
+                "type": "string",
+                "enum": ["summary", "last_failure", "status"],
+                "description": (
+                    "'summary' = overview of the current/most recent session "
+                    "(events, thermal state, warnings). 'last_failure' = the "
+                    "most recent fall/stall/error, what and when. 'status' = "
+                    "which features/modes are currently enabled."
+                ),
+            }
+        },
+        "required": ["topic"],
+    },
+}
+
+_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL]
 
 
 class ConversationError(RuntimeError):
@@ -97,6 +128,7 @@ class Conversation:
         p = personality or Personality.from_settings(cfg)
         self._personality = p
         self._mood_hint = ""
+        self._narration_hint = ""
         self._rebuild_system()
         if p.traits:
             log.info("personality: %s", p.describe())
@@ -109,10 +141,13 @@ class Conversation:
 
     def _rebuild_system(self) -> None:
         """Compose the live system prompt: base + personality fragments + an
-        optional slow-mood line. Called on any personality / mood change."""
+        optional slow-mood line + an optional narration-verbosity line. Called
+        on any personality / mood / verbosity change."""
         s = self._personality.system_prompt(self._base_system)
         if self._mood_hint:
             s = s.rstrip() + "\n\n" + self._mood_hint
+        if self._narration_hint:
+            s = s.rstrip() + "\n\n" + self._narration_hint
         self._system_prompt = s
 
     def set_personality(self, p: Personality) -> None:
@@ -128,6 +163,15 @@ class Conversation:
         hint = (hint or "").strip()
         if hint != self._mood_hint:
             self._mood_hint = hint
+            self._rebuild_system()
+
+    def set_narration_hint(self, hint: str) -> None:
+        """Set (or clear, with "") how much G2 narrates its own actions/
+        reasoning -- voice: 'explain more' / 'keep it brief'. Session-only,
+        like the mood hint; doesn't persist across restarts."""
+        hint = (hint or "").strip()
+        if hint != self._narration_hint:
+            self._narration_hint = hint
             self._rebuild_system()
 
     def _trim(self) -> None:
@@ -205,6 +249,19 @@ class Conversation:
                 if fact:
                     facts.append(fact)
                 self._ack(block.id, "saved" if fact else "empty fact, not saved")
+            elif block.type == "tool_use" and block.name == "diagnostics_query":
+                topic = (block.input or {}).get("topic", "summary")
+                try:
+                    if topic == "last_failure":
+                        result = last_failure()
+                    elif topic == "status":
+                        result = features.describe()
+                    else:
+                        result = summarize_session()
+                except Exception:  # noqa: BLE001 -- a lookup failure must not kill the turn
+                    log.exception("diagnostics_query(%r) failed", topic)
+                    result = "diagnostics lookup failed -- nothing usable to report."
+                self._ack(block.id, result)
 
         self._trim()
         return AssistantTurn(
