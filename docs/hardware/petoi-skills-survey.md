@@ -13,6 +13,8 @@ order), the same format the RL env / SkillSwitch consume.
 | skill | what it is | use for G2 |
 |---|---|---|
 | **`rc`** (recover) | scripted self-right, slow falls | already have `rc_ref.npy`; the firmware self-right the get-up work leans on. Pair with the FAC_BALANCE stumble-catch. |
+| **`balance`** | **verified 2026-09-15, not what the name suggests.** Decoded directly from `InstinctBittleESP.h` + replayed in PyBullet: it's a static single-frame pose, all 8 leg joints to 30° — **byte-identical to `up`** (the neutral-stand pose). In sim the body drops *lower* and all 4 legs splay out/up, not a dynamic balancing act. Matches the community description of `kbalance` as a **calibration-check pose** (moves limbs symmetrically to verify servo calibration), not a trick. Already correctly used in code as the emergency-freeze/post-recovery settle token (`pi_pipeline/link/opencat.py` `BALANCE`, `pi_pipeline/behavior/emergency.py`) — that usage was already accurate. Only `pi_pipeline/voice/skills.py`'s Claude-facing description was wrong ("stand and actively balance") — corrected 2026-09-15 to "settle into a low, stable stand (same pose as 'stand')". **Does not produce the hind-leg-rearing "stand up" motion** seen in Petoi's `stand.gif` demo. See the `bx`/`showOff`/`chr`/`lucky` row below for the actual candidate check. |
+| **`bx` / `showOff` / `chr` / `lucky`** | **Checked 2026-09-15 as two-legged-stand candidates — none confirmed.** Picked by name (`bx` = "box", `showOff`, `chr` = "cheer", `lucky`) after `balance` turned out not to be the trick, decoded + replayed each in PyBullet (spawn standing, play the keyframes, check final body height/pitch/roll): `showOff` and `chr` stand **taller and stiffer-legged but still on all 4 feet** (body height 0.087 m vs ~0.04 m normal stand) — not bipedal. `bx` and `lucky` both **tip the robot onto its back** in sim (roll → 180°) rather than settling into a balanced pose. **Inconclusive, not a clean no** — `bx`/`lucky` are dynamic, momentum-based tricks; a slow static keyframe-interpolation replay with no real foot friction is the same category of sim limitation that failed on the `cmh` climb keyframe (`docs/rl/hardware-gated-backlog.md` H7), not proof the real robot can't do them. **No stock Bittle skill confirms a working two-legged stand** — if wanted, treat as untested, hardware-gated, same status as `cmh`/climb: verify for real once the body's here, don't assume from firmware alone either way. |
 | **`buttUp`** (play-bow / downward-dog) | posture, nose-down pitch +15° | the **INSPECT peer-pose** the sim couldn't hold — Petoi already tuned it. Port as the INSPECT scaffold (tilt camera down at a near obstacle). |
 | **`carpetF` / `carpetL`** | walk gait tuned for **carpet** | directly targets the known "G2 stalls on carpet" problem. Decode + A/B vs `wkF` on the carpet cell. |
 | **`str`** (stretch) | "just woke up" stretch posture | idle / wake behaviour for the autonomous layer. |
@@ -29,12 +31,36 @@ order), the same format the RL env / SkillSwitch consume.
 
 ## Lower priority / situational
 
-- **`rl`** (roll), **`tbl`** (tumble), **`lnd`** (land), **`dropRec`** (drop-recover) — recovery variants; useful if get-up work widens beyond `rc`.
-- **`bf` / `ff` / `flip` / `showOff` / `pu` / `pu1` / `clap`** — acrobatic tricks / demos. Personality "do a trick" commands.
+> **Decision 2026-09-15 — no flipping or rolling behavior, mounted-payload
+> risk.** G2 carries a Pi + PiSugar stack (~61–78 g, see
+> [`specs.md`](specs.md) "Mounted payload weight") on a printed standoff
+> bracket off the rear frame (`docs/hardware/biboard-pi-connector.md`), not
+> the molded body shell — not built to survive a hard tumble/flip impact, and
+> the extra elevated mass shifts G2's moment of inertia away from what these
+> tricks were tuned for on a bare unit. **Excluded from `perform_skill` /
+> voice / any built-in "do a trick" set:** `flip`, `flipD`, `flipF`, `bf`,
+> `tbl` (tumble), `rl` (roll, as a trick — the get-up-chain use in `rc`/H9
+> recovery work is unaffected, that's a fall-recovery path not a voluntary
+> trick), `bx` ("box" — already observed tipping the sim robot onto its back,
+> consistent with this concern), `lucky` (same tip-over behavior observed).
+> Applies for the life of the Pi/PiSugar mount; revisit only if the mount is
+> redesigned to be impact-rated.
+>
+> **`excited` skipped too (2026-09-15).** Investigated as a possible turn-in-place
+> substitute (see `docs/project-plan.md`'s turning notes) — no confirmed
+> firmware token, best-guess proxy was `tbl`-style bounce/rock, replayed in
+> PyBullet with explicit yaw tracking: ~1° net yaw over 3 cycles, no real
+> turning effect. Moot now anyway since its likely underlying motion is the
+> same bounce/tumble category excluded above for payload risk. Turning stays
+> on the already-working firmware path (`wkL`/`wkR`/`bk`, foot-slip + gyro
+> assist).
+
+- ~~`rl` (roll), `tbl` (tumble)~~ — **excluded, see note above.** `lnd` (land), `dropRec` (drop-recover) — recovery variants; useful if get-up work widens beyond `rc`.
+- ~~`bf` / `flip`~~ — **excluded, see note above.** `ff` / `showOff` / `pu` / `pu1` / `clap` — acrobatic tricks / demos. Personality "do a trick" commands.
 - **`mw` / `wh`** — the OpenCat sound-emote skills: a short body motion paired with a vocalisation. The voice layer already does TTS; these add body language.
 - **`dg` (dig), `pee`** — comedic dog behaviours; explore/personality flavour.
 - **`gpF/gpL` (gallop), `vtF` (vault), `bk*` (backward)** — extra locomotion; `bk_ref` already decoded. Gallop = a faster gait if top speed ever matters.
-- **`kc` (kick), `bx` (box), `toss`/`ts`** — object interaction; relevant only if a manipulation/play feature is added.
+- **`kc` (kick), ~~`bx` (box)~~ (excluded, see note above), `toss`/`ts`** — object interaction; relevant only if a manipulation/play feature is added.
 
 ## Not relevant
 

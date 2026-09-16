@@ -35,7 +35,7 @@ SKILLS: dict[str, Skill] = {
     "sit":       Skill("sit",  "sit down", False),
     "stand":     Skill("up",   "stand up in the neutral pose", False),
     "rest":      Skill("rest", "lie down and relax the servos", False),
-    "balance":   Skill("balance", "stand and actively balance", False),
+    "balance":   Skill("balance", "settle into a low, stable stand (same pose as 'stand'; used after a get-up)", False),
     "stretch":   Skill("str",  "stretch", False),
     "wave":      Skill("hi",   "wave hello with a front leg", False),
     "push_ups":  Skill("pu",   "do push-ups", False),

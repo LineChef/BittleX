@@ -60,7 +60,11 @@ airtight, forward −29% because sim `HALT` = frozen (no turn layer). The catch:
 obstacle/edge detector. Held behind `features.vision`. The auto-scan-on-obstacle
 variant (INSPECT bow to get a better near read) tested **negative**.
 
-**Phase F — learned CLIMB skill: sim-fidelity wall.** Full harness built
+**Phase F — learned CLIMB skill: sim-fidelity wall.** *(2026-09-15: need
+confirmed — this is scheduled hardware-gated work now, not a closed idea. See
+[H7](hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--) and
+[B13](../behavior-ideas.md) for the reference gif and the on-hardware plan.)*
+Full harness built
 (`climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`). Nothing
 climbs a ≥ 2.5 cm ledge in PyBullet — not 6 scripted-base designs, not
 from-scratch RL, not Petoi's own `cmh` keyframe, across standoff / torque /

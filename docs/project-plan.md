@@ -619,6 +619,21 @@ reliable stair climbing. Those are bounded by the hardware (weak sagittal-plane
 servos, no roll-axis joint, a detection — not depth — camera at head height) and
 by the reactive-recovery ceiling established in Runs 6–7.
 
+> **2026-09-15 — climbing a single ledge, confirmed need.** Not the "reliable
+> stair climbing" scope-out above — a discrete climb-over-one-ledge skill
+> (B13/H7), decided needed rather than deferred. Phase F (2026-09-08) tried it
+> in sim and hit a wall (`cmh` keyframe + 6 scripted-base designs + from-scratch
+> RL all failed to clear a ≥ 2.5 cm ledge in PyBullet) — diagnosed as a
+> sim-fidelity limit on contact/grip physics, not proof the real robot can't do
+> it. On-hardware plan: port `cmh` and hand-tune first (cheap, answers the real
+> question sim couldn't), then explore a `cmh`-anchored learned residual for
+> generalization across ledge scenarios. Triggered by vision skill-switching
+> (Phase E's `SkillSwitch`/`GaitSelector`, already sim-validated, shelved only
+> for lack of a sensor) — a second reason to solve the forward-sensor gap,
+> without reopening the separately-closed question of vision *inside* the
+> continuous walk policy. Details: [`docs/rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--),
+> [`docs/behavior-ideas.md`](behavior-ideas.md) B13.
+
 **Status:** `pi_pipeline/vision/` is scaffolded and testable against a mock
 detection feed — same mock-interface pattern as voice/memory. `DetectionFeed`
 (`MockDetectionFeed` / `SerialDetectionFeed`), a local `Avoider` reflex
@@ -1328,6 +1343,17 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 - RL gaits will look rougher than an animal's, especially early.
 - Sim-to-real rarely works on the first deploy — expect a gap and iteration.
 - Full integration (Phase 10) is the hardest, messiest part.
+
+> **2026-09-15 — no flipping/rolling tricks, mounted-payload risk.** The Pi +
+> PiSugar stack (~61–78 g) rides on a printed standoff off the rear frame, not
+> the molded body shell (`docs/hardware/biboard-pi-connector.md`) — not
+> impact-rated for a hard tumble, and the elevated mass shifts G2's moment of
+> inertia off what these tricks were tuned for on a bare unit. `flip`/`flipD`/
+> `flipF`/`bf`/`tbl`/`rl`(as a trick)/`bx`/`lucky` excluded from any
+> voice/`perform_skill` trick set for the life of this mount. Also skipping
+> `excited` — investigated as a turn-in-place substitute, sim showed ~0° net
+> yaw, and its likely underlying motion falls in the same excluded bounce/
+> tumble category anyway. Full detail: `docs/hardware/petoi-skills-survey.md`.
 
 ## Reference: how OpenCat gaits are structured
 

@@ -3,23 +3,40 @@
 ## The problem
 
 Bittle X's BiBoard can power a mounted Raspberry Pi through the same 2×5 GPIO
-socket used for serial communication — but Petoi's own documentation confirms a
-real tradeoff:
+socket used for serial communication — Petoi's own FAQ confirms this is the
+stock, default way to run a Pi on Bittle: *"All of our robots run on
+NyBoard/BiBoard which can power the Pi and communicate with the Pi through the
+serial port in the 2x5 socket."*
 
-> "Reduced motion capability may happen when connected to Pi! A stronger battery
-> is needed." — guide.petoi.com
+**Correction (2026-09-15):** an earlier version of this doc quoted *"Reduced
+motion capability may happen when connected to Pi! A stronger battery is
+needed"* as if it were general Petoi guidance. Re-traced to its source
+(`guide.petoi.com`'s Raspberry-Pi-serial-port page): that warning is on the
+**NyBoard/Nybble** section, about Nybble's stock **two 14500 batteries in
+series**, and Petoi's own fix for it is to upgrade to *"high drain 7.4 Lipo
+batteries, or 2S-18650."* The parallel **BiBoard/Bittle** section of the same
+page has **no equivalent warning**. Bittle X's stock battery is already a
+7.4 V 2S LiPo (1000 mAh, 2 A typ / 5 A peak, see below) — i.e. already the
+"high-drain 7.4 V LiPo" class Petoi tells Nybble owners to upgrade *to*. So
+the specific failure mode Petoi documented (weak 14500 cells starving under
+Pi + servo load) doesn't obviously carry over to Bittle's stock setup.
 
-This matches a well-documented pattern in the general Raspberry Pi / robotics
-community: when a Pi shares a battery with servos, the current spikes from servo
-movement cause the shared battery's voltage to dip, which can starve the Pi
-(weaker movement, or in more severe cases, Pi brownouts / crashes). Multiple
-independent Raspberry Pi forum threads confirm this same failure mode outside of
-Bittle specifically — the standard community fix is running the Pi off its own
-separate power source rather than sharing one with the motors / servos.
+What still holds, independent of that misattributed quote: a shared battery's
+voltage dips under servo current spikes, which can starve a co-powered
+microcontroller (weaker movement, or in more severe cases, Pi brownouts /
+crashes) — a board-agnostic pattern confirmed across generic Raspberry Pi
+forum threads, not specific to Petoi's hardware. That risk isn't eliminated by
+Bittle's bigger battery, just less clear-cut than "Petoi warns against it" —
+it's untested on this specific hardware, applied to a workload (RL
+training/testing — near-constant servo movement) that's exactly the stress
+case where it would show up if it does.
 
-**Conclusion:** power the Pi independently rather than relying on Bittle X's
-shared battery, especially given RL training / testing involves near-constant
-servo movement.
+**Conclusion:** power the Pi independently as the cautious choice for this
+project's workload, not because there's a confirmed Bittle-specific problem —
+sharing BiBoard's battery is a real, commonly-used, simpler option (and avoids
+the PiSugar stack-height case-fit question, since a bare Pi already fits
+Petoi's stock `Bittle_Cover_with_hole_for_Pi.stl` back cover). PiSugar removes
+the open question entirely rather than fixing a confirmed one.
 
 ## Choosing a Pi power source
 
@@ -145,9 +162,9 @@ So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 
 ## Sources
 
-- Petoi FAQ — confirms BiBoard can power + communicate with Pi via the 2×5 socket
+- [Petoi FAQ](https://www.petoi.com/pages/faq) — confirms BiBoard can power + communicate with Pi via the 2×5 socket, recommends Pi 3A+/Zero
 - Petoi BiBoard V0 Guide — power circuit details
-- guide.petoi.com — "Raspberry Pi serial port as an interface" — "reduced motion" / stronger battery note
+- [guide.petoi.com — "Raspberry Pi serial port as an interface"](https://guide.petoi.com/apis/raspberry-pi-serial-port-as-an-interface) — the "reduced motion" / stronger-battery note is on the **NyBoard/Nybble** section (two 14500 cells); the parallel **BiBoard/Bittle** section has no equivalent warning
 - Petoi Camp forum — BiBoard power tap thread
 - PiSugar official docs / GitHub wiki — GPIO occupation details
 - Raspberry Pi Forums — servo/Pi shared-battery brownout threads; GPIO 5V-rail-sharing thread

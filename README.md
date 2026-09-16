@@ -15,14 +15,18 @@ The full roadmap and decision log are in
 - **Locomotion**: a *command-following* walking policy trained by reinforcement
   learning (simulation → sim-to-real), rather than switching between hand-scripted
   gaits. It takes a speed and heading command and produces the gait — stand,
-  start/stop, forward, backward, turn — and stays upright across slopes,
-  obstacles, rough ground, shoves, and the weight shift from the mounted Pi/camera
-  payload.
+  start/stop, forward, backward — and stays upright across slopes, obstacles,
+  rough ground, shoves, and the weight shift from the mounted Pi/camera payload.
+  Turning is deliberately **not** part of the trained policy — real turning
+  depends on foot-slip and a firmware gyro-assist a training sim can't
+  reproduce, so it's handled by falling back to scripted firmware gaits
+  (`wkL`/`wkR`) instead.
 - **Recovery**: detect a fall from the IMU, run the firmware get-up skill for the
   falls the hardware *can* recover from, and know when it needs a human.
-- **Perception → navigation**: an onboard AI vision module for obstacle detection,
-  and vision-guided movement — pick a visible target, head toward it, and correct
-  course along the way.
+- **Perception → navigation**: an onboard AI vision module for obstacle
+  detection, and reactive skill-switching — recognize an obstacle or ledge it
+  can't just walk over, and swap in the right scripted response (step over,
+  climb, back out) before handing back to the walk policy.
 - **Voice**: natural spoken conversation powered by the Claude API (speech-to-text
   → Claude → text-to-speech), with movement used as body language.
 - **Memory**: persistent context across conversations, and a sense of place
@@ -65,10 +69,18 @@ hardware mocked for now.
   regressions on bare-robot / ledges / carpet / OOD slopes — so **`run20m_ppo`
   stays the frozen base**; the new course's slope-fix and rubble variety are
   parked for a future green-lit run. Sim locomotion work is otherwise done
-  pending the real-robot head-to-head. Learned vision-in-the-gait was ruled out
-  across four campaigns (Phases A–F); perception-assisted walking is now a
-  behaviour-layer reflex + scripted skill-switching, and is back-burnered until
-  G2 has a real forward depth sensor. See [`docs/rl/`](docs/rl/).
+  pending the real-robot head-to-head. Learned vision-*conditioning the walk
+  policy* was ruled out (Phases A–D, plus the `smoke_vfix3` retry) — reward-shaping
+  "see it → step over it" into the trained gait just makes it plow through or
+  stall. The replacement, Phase E's vision-triggered scripted skill-switching,
+  showed real sim gains but is back-burnered until G2 has a real forward
+  sensor (the camera is a recognition model, not an obstacle/edge detector).
+  **Exception, decided 2026-09-15:** a discrete climb-a-ledge skill (B13) is
+  no longer deferred — Phase F found climbing was a sim-fidelity wall, not a
+  real-hardware limit, so it's scheduled once the body arrives, starting
+  scripted (no sensor needed for that first step) before exploring a learned
+  residual. See [`docs/rl/`](docs/rl/) and
+  [`docs/rl/hardware-gated-backlog.md`](docs/rl/hardware-gated-backlog.md) H7.
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
@@ -204,11 +216,17 @@ ledges into the walk (bred timidity — it backed away from steps).
 
 **Limits.** No forward perception — the policy reacts only *after* a foot makes
 contact. Against a curb, a thin lip, or sustained rough ground it **stalls rather
-than falls**, and it cannot deliberately step over or route around an obstacle it
-hasn't touched. That is the Phase 8 perception-in-the-loop work; the
-terrain-feature plumbing is built and training waits on hardware. It also does
-not self-right, climb stairs, or jump (a jump is planned as a separate
-on-command skill, [`docs/behavior-ideas.md`](docs/behavior-ideas.md) B14).
+than falls**, and it cannot deliberately step over or route around an obstacle
+it hasn't touched. Folding "see it → step over it" into the trained gait itself
+was tried and closed (Phase D, the `smoke_vfix3` retry) — it just plows through
+or stalls; the accepted fix is a *discrete* reaction layered outside the walk
+policy (vision picks a scripted response, not a learned one), built and
+sim-validated but waiting on a real forward sensor. It also does not self-right
+or jump (a jump is planned as a separate on-command skill,
+[`docs/behavior-ideas.md`](docs/behavior-ideas.md) B14), and does not climb —
+though unlike the others, climbing a single ledge is now a **confirmed,
+scheduled** goal (B13) once the body arrives, not a maybe: Phase F's sim
+attempt hit a contact-physics wall, not proof the real robot can't do it.
 
 ## Repo Structure
 

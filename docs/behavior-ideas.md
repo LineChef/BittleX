@@ -107,7 +107,62 @@ level down: carpet compares commanded vs. actual *forward speed*; this compares
 commanded vs. actual *joint angle*. Unit-testable now against synthetic
 cmd/feedback traces; the constants wait for the bench.
 
-### B13 — Climb as a separate skill policy
+### B13 — Climb as a separate skill policy  🟢 CONFIRMED NEED (2026-09-15)
+**Decided need, not a deferred idea.** Reference motion: Petoi's own `cmh`
+demo, [`step.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif)
+— front paws reach up onto a raised box, body hauls up and over, ends standing
+fully on top. This is exactly what Phase F tried in sim and hit a wall on (see
+[H7](rl/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--) and
+[`vision-in-gait.md`](rl/vision-in-gait.md#phase-f)) — **a sim-fidelity limit
+on the training harness, not evidence the real robot can't do it.** Scheduled
+to build for real once the body is in hand; not gated on "is there a concrete
+need" any more.
+
+**Second reference motion — the horizontal case, not a climb at all:** Petoi's
+[`gap.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/gap.gif)
+demo (real Bittle X, official, 8.5 cm gap between two same-height platforms).
+Checked frame-by-frame (2026-09-15) — **no airborne moment, this is quasi-static,
+not a jump**: rear feet stay planted on the near platform while the front legs
+stretch forward and down to plant on the far platform (body bridges the gap
+diagonally), *then* the rear legs release and follow across. Same reach → plant
+→ shift-weight → pull-through technique as `cmh`/B9's "climbing protocol," just
+applied horizontally instead of vertically. No matching named firmware skill
+found (doesn't match `jmp`'s crouch-load-explode shape or anything else in the
+~90-skill list) — almost certainly hand-choreographed via direct joint
+commands (`m<idx> <deg>`) for the demo, not a single callable token. Relevant
+here as a second worked example of the same technique, and because it's less
+demanding than a full ledge-climb (no need to *lift* the body onto a taller
+surface, just reach + balance on an extended asymmetric stance) — a plausible
+easier on-ramp to validate the reach-plant-shift primitive on real hardware
+before attempting a full climb.
+
+**Scripted vs. learned — explore both:**
+- **Scripted first (day-1 attempt):** port Petoi's `cmh` keyframe directly,
+  hand-tune approach distance + timing against a real step. Cheapest path to
+  "does it climb at all" on real hardware/friction, which sim couldn't tell us.
+- **Learned residual, worth exploring too:** a `cmh`-anchored residual policy
+  (same recipe as the walk gait —
+  [`skill-learning-method.md`](rl/skill-learning-method.md)) could generalize
+  across ledge heights/materials/approach angles a single fixed keyframe can't.
+  Train on real IMU + whatever ledge-detection signal exists, not PyBullet —
+  the sim gap was specifically about contact/grip physics and body-pitch
+  limits, not about RL as a method.
+
+**Reopens the vision question — narrowly.** This needs a real forward sensor
+to trigger "invoke climb" (same architecture as B9/Phase E: vision spots a
+step too tall to walk over → skill switch → climb → hand back to the walk
+policy). That does **not** reverse the closed Phase D/`smoke_vfix3` finding
+(vision conditioning *inside* the continuous walk policy doesn't help — plow
+or stall). It reopens the *other* half that was never ruled out on its
+merits: Phase E's `SkillSwitch`/`GaitSelector` discrete skill-switching
+already showed real sim gains (+48% through low obstacles, 0% vs 34%
+edge-falls) and was only shelved for lack of a sensor, not because it didn't
+work. Climb is now a second, arguably stronger reason to solve the
+forward-sensor gap.
+
+**Original framing below, superseded by the above on the "is this worth
+doing" question — kept for the technical detail:**
+
 Real climbing — surfaces taller than G2's standing height: full stairs, a curb it
 can't walk up, onto a low platform — is **its own RL skill policy**, not part of
 the command-following walk policy. It needs a different motion (rear the front up,
@@ -135,9 +190,9 @@ Tier split from the 2026-09-03 discussion:
 - **> standing height (this idea, B13):** separate skill policy.
 
 Highest sim2real risk of anything on the roadmap — contact-rich, posture-
-dependent. **Defer until there's a concrete need** (does G2 actually need to
-change floors / get on furniture?). Get Tier 2 for near-free out of Phase 4;
-schedule B13 only when the use case is real. Needs hardware to validate.
+dependent. **Need confirmed 2026-09-15 — no longer deferred**, see the note at
+the top of this entry. Get Tier 2 for near-free out of Phase 4. Needs hardware
+to validate; day-1 bring-up candidate once the body is in hand.
 
 ### B14 — Jump / hop as an on-command skill  🟡  ⚪
 A discrete, deliberately-triggered hop — **never** in the walk policy's action
@@ -179,6 +234,18 @@ grip and hold an object. This needs a hardware addition (a small servo-driven
 jaw, a passive spring-loaded mouth attachment, or a different mechanism like a
 scoop or electromagnet) before any software/behavior work is worth doing.
 
+**Market check (2026-09-15): no mouth/jaw product exists, buy-it-today
+fallback is an arm, not a mouth.** Searched Petoi's store and the community
+3D-print accessory list:
+- No official or community mouth/jaw gripper for Bittle/Bittle X was found.
+  The closest head-mounted accessory is a 3D-printed "Beetle Horn" that only
+  *pushes* objects, not grips them.
+- Petoi does sell a [Robotic Arm Gripper Extension Kit](https://www.petoi.com/products/bittle-arm-extension-with-metal-servos)
+  ($69, alloy servos, spring-loaded 2-DOF claw) — a separate arm-mounted
+  gripper, not a mouth mechanism. It's the realistic buy-it-today option if
+  the goal is object manipulation in general rather than specifically "with
+  its mouth"; a true mouth/jaw would still be a custom build.
+
 **If a gripping mechanism gets added later:** the retrieve skill itself
 (approach → position → grip → lift/carry → release) would follow the same
 scripted-base + bounded-residual + reward-iteration recipe as any other new
@@ -190,6 +257,49 @@ up."
 
 **Trigger:** a mouth/gripper hardware addition — not currently planned or
 purchased. Logged here as an idea, not a near-term item.
+
+---
+
+### B22 — Actuated tail (hardware addition + tail-driven behaviors)
+An add-on servo tail — a hardware addition, not something G2 has today (9
+servo DOF, no tail channel used; see `docs/hardware/pi-power.md`-adjacent
+research in the 2026-09-15 conversation history).
+
+**Hardware, researched 2026-09-15:**
+- Petoi's own CAD repo has an official **[`Bittle_tail.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/Bittle_tail.stl)** (found in
+  `stl/Bittle & BittleX/`, missed on an earlier store-only search). Downloaded
+  and inspected the mesh directly: the mount is a single oval hole with a
+  small central nub — a **pivot-pin joint, not a servo spline**. Reads as
+  **passive** — almost certainly the companion piece to the official
+  `BittleFoxHead` chin accessory (same fox aesthetic), swinging freely rather
+  than being driven.
+- A community **passive counterweight tail** also exists:
+  [Thingiverse #6875437](https://www.thingiverse.com/thing:6875437), clips
+  onto the rear bar, no servo.
+- **Retail Nybble ships a real driven tail** — confirmed 11 DOF (8 leg + 2
+  head + **1 tail servo**), proof a driven tail works on this firmware/board
+  family. Its actual CAD isn't in Petoi's public STL repo (proprietary
+  injection-molded part), so it can't be copied directly.
+- **Path to an actuated version:** take the `Bittle_tail.stl` shape (or the
+  Thingiverse one) and replace its pin-hole mount with a servo-horn adapter,
+  driven from one of BiBoard V1's **3 free PWM channels** (9 of 12 used today:
+  8 leg + 1 neck) — a horn-adapter redesign, not a from-scratch tail. OpenCat's
+  skill-array format already reserves a generic "tail" channel across the
+  product line (`docs/project-plan.md` "16 servo channels: 4 head/tail/gripper,
+  12 legs"), so firmware support for driving a tail servo isn't new work either.
+
+**Tail-driven behaviors, once actuated (personality/expression, not
+locomotion):** wag on greeting / person-recognition (ties into
+[[B15]]/`personality/`), droop in low-power or sleep mode, a startle-flick
+paired with the chirp vocabulary ([B5]), idle sway during explore/attentive
+mode as a "thinking" tell. All expressive-layer work — same category as [B4]
+(expressive body language), driven through `pi_pipeline/personality/` /
+`pi_pipeline/behavior/`, no RL training involved (it's a single servo, not a
+locomotion joint).
+
+**Trigger:** a servo + printed horn adapter, hand-built — not currently
+planned or purchased. Logged as an idea, not a near-term item, same status as
+[B21]'s mouth/gripper.
 
 ---
 

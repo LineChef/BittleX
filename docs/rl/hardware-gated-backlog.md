@@ -113,29 +113,61 @@ B2. Only if autonomy-mode testing surfaces a concrete gap.
 - **Backward as its own tuned gait:** the current policy does `cmd_fwd < 0`
   already; only revisit if hardware shows backing up is unreliable.
 
-## H7 — Climb as a separate skill policy  🔴  ⚪
+## H7 — Climb as a separate skill policy  🔴  🟢 CONFIRMED NEED (2026-09-15)
 
 B13. Surfaces taller than standing height (full stairs, curbs it can't walk up,
 onto a low platform). Its own motion, reward, terminal condition.
 
+Reference motion — Petoi's `cmh` demo:
+![Petoi cmh climb demo — front paws reach onto a raised box, body hauls up and over, ends standing fully on top](https://github.com/PetoiCamp/NonCodeFiles/raw/master/gif/step.gif)
+([source](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif))
+
+Second reference — the horizontal case, same technique, not a jump:
+![Petoi gap-crossing demo — rear feet stay planted while front legs stretch forward to plant on the far platform, body bridges an 8.5cm gap diagonally, then the rear legs release and follow across](https://github.com/PetoiCamp/NonCodeFiles/raw/master/gif/gap.gif)
+([source](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/gap.gif)) —
+real Bittle X, official demo, an 8.5 cm gap between two same-height platforms.
+Checked frame-by-frame (2026-09-15): **no airborne moment** — reach → plant →
+shift weight → pull the rear across, the same technique as `cmh` above, just
+applied horizontally instead of vertically. No matching named firmware skill
+found; almost certainly hand-choreographed via direct joint commands
+(`m<idx> <deg>`) rather than a single `k<skill>` token. Less demanding than a
+full ledge-climb (no need to lift the body onto a taller surface) — a
+plausible easier on-ramp to validate the reach-plant-shift primitive on real
+hardware before attempting a full climb.
+
+- **No longer gated on "a demonstrated need"** — confirmed 2026-09-15: G2
+  needs a climb/clear-a-ledge skill. Scheduled once the body is in hand, not
+  deferred behind a trigger.
 - **Highest sim-to-real risk on the roadmap** — contact-rich, posture-dependent.
-- **Trigger:** a real, demonstrated need — does G2 actually have to change floors
-  / get onto furniture in the use cases we care about? Not before.
 - **Tier 2 (~25–70 mm):** a conditioning-input extension of the walk policy
   rather than a separate policy — the Phase 4 ledge primitive is the on-ramp.
 - Needs hardware to validate at all.
 
-**Phase F (2026-09-08) attempted this in sim and hit a wall.** Full harness built
-(`rl_training/opencat-gym/climb_env.py` / `train_climb.py` / `eval_climb.py` /
-`climbwatch`). Nothing climbs a ≥ 2.5 cm ledge in PyBullet — not 6 scripted-base
-designs, not from-scratch RL, not **Petoi's own `cmh` keyframe**
-(`reference_gait/cmh_ref.npy`), across standoff / torque / friction sweeps.
-Measured: front paw can't reach forward *and* up; body can't rear >~13°; `cmh`
-needs real foot-grip + a human in the loop. **Sim-fidelity wall, not a design
-gap.** On-hardware path: port `cmh`, tune approach distance + keyframe on a real
-step, then residual policy on real IMU. Details in the Phase F RESULT block of
-`vision-goal-locomotion-plan.md`. The reusable output is the method
-(`docs/rl/skill-learning-method.md`), not a climb.
+**Phase F (2026-09-08) attempted this in sim and hit a wall — this is a
+sim-fidelity limit on the training harness, not evidence the real robot can't
+climb.** Full harness built (`rl_training/opencat-gym/climb_env.py` /
+`train_climb.py` / `eval_climb.py` / `climbwatch`). Nothing climbs a ≥ 2.5 cm
+ledge in PyBullet — not 6 scripted-base designs, not from-scratch RL, not
+**Petoi's own `cmh` keyframe** (`reference_gait/cmh_ref.npy`, same motion as
+the gif above), across standoff / torque / friction sweeps. Measured: front
+paw can't reach forward *and* up; body can't rear >~13°; `cmh` needs real
+foot-grip + a human in the loop — none of which PyBullet's contact model
+reproduces. Details in the Phase F RESULT block of `vision-goal-locomotion-plan.md`.
+
+**On-hardware plan (both worth exploring, per 2026-09-15 discussion):**
+- **Scripted first:** port `cmh` directly, hand-tune approach distance +
+  keyframe timing against a real step. Cheapest way to learn whether it climbs
+  at all on real friction/grip, which sim couldn't answer.
+- **Learned residual:** a `cmh`-anchored residual (the standard recipe,
+  `docs/rl/skill-learning-method.md`), trained on real IMU rather than
+  PyBullet, could generalize across ledge heights/materials/approach angles
+  in a way a fixed keyframe can't — worth trying once the scripted version
+  works at all, not a replacement for it.
+- Skill-switch trigger is vision-gated (see B13/B9's "climbing protocol" and
+  Phase E's `SkillSwitch`/`GaitSelector`) — this is a second, stronger reason
+  to unblock the forward-sensor gap, without reopening the separately-closed
+  question of vision *inside* the continuous walk policy (Phase D /
+  `smoke_vfix3`, still a dead end).
 
 ## H8 — On-MCU gait policy (Decision Transformer)  🔴
 
