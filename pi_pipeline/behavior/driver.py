@@ -321,7 +321,13 @@ class BehaviorDriver:
         if i.ack:
             # "heard you" -- always fires (not rate-limited); the audible proof
             # that G2 registered a voice command, so a misheard one is obvious.
+            # Paired with a quick head nod ("nd", a 4-frame one-shot -- fast
+            # enough not to delay whatever real action follows) as the visual
+            # half of the same acknowledgement. Both are skipped for free
+            # during an emergency stop -- tick() returns before _apply_events
+            # ever runs while estop.halted.
             fx.append(Effect(EffectKind.CHIRP, ChirpMood.ACK, "voice command heard"))
+            fx.append(Effect(EffectKind.SKILL, "knd", "ack: nod"))
         if i.wake_word:
             self.mode.on_conversation_start()
             self.idle.on_activity()
@@ -681,10 +687,10 @@ class BehaviorDriver:
             # so autonomous movement is never a surprise
             if self._roam_chirp_at is None:
                 self._roam_chirp_at = now
-                effects.append(Effect(EffectKind.CHIRP, ChirpMood.GREETING, "starting to roam"))
+                effects += self._chirp(ChirpMood.GREETING, now, "starting to roam")
             elif now - self._roam_chirp_at >= self.explorer.cfg.roam_chirp_s:
                 self._roam_chirp_at = now
-                effects.append(Effect(EffectKind.CHIRP, ChirpMood.QUESTION, "still roaming"))
+                effects += self._chirp(ChirpMood.QUESTION, now, "still roaming")
             self.idle.update(now, exploring=True, person_present=i.person_present,
                              handled=i.held)
             effects += self._from_explore(i, now)

@@ -35,7 +35,7 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 | Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed | ✅ model / 🧩 mounted camera |
 | Safety reflexes | Jam reflex, servo thermal guard + governor, cliff/edge guard, watchdog, sleep mode, carpet detector | 🧩 |
 | Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status) | ✅ logic / 🧩 HW sensors |
-| Power | Idle-REST staged descent, on-demand vision, sleep mode — three zero-risk levers built | ✅ logic / 🧩 tuning |
+| Power | Idle-REST staged descent + sleep mode (real power-profile switch, camera off) fully built and tested; on-demand vision is still just binary on/off, not scaled to activity | ✅ logic / 🧩 tuning |
 | Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ logic / 🧩 cable |
 
 ---

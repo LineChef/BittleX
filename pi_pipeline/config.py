@@ -98,8 +98,10 @@ class Settings:
     bonds_spec: str = field(default_factory=lambda: _env("G2_BONDS", ""))
 
     # --- Voice I/O ---
-    # spelled the way Vosk transcribes it, not "G2"
-    wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "gee two"))
+    # Comma-separated -- any one of them wakes G2. Spelled the way Vosk
+    # transcribes each phrase, not necessarily how it's written ("gee two", not
+    # "G2").
+    wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "gee two, hey buddy, hey bud"))
     vosk_model_path: str = field(default_factory=lambda: _env("VOSK_MODEL_PATH", "models/vosk"))
     # Default = the Pi Zero 2 W-safe 'low' tier (fetch_models.sh's primary). On a
     # dev machine, override PIPER_MODEL_PATH in .env to a 'medium' voice if you

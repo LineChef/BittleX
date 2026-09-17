@@ -29,7 +29,7 @@ def _wake() -> None:
     from .wake_word import VoskWakeWord
 
     ww = VoskWakeWord(settings.vosk_model_path, settings.wake_word)
-    print(f'Listening for the wake word: "{settings.wake_word}"  (Ctrl+C to stop)')
+    print(f'Listening for a wake phrase: "{settings.wake_word}"  (Ctrl+C to stop)')
     n = 0
     try:
         while True:

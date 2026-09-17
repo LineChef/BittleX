@@ -29,8 +29,21 @@ class AlwaysAwake:
         return
 
 
+def _parse_phrases(phrase: str | list[str]) -> list[str]:
+    """Multiple wake phrases, comma-separated in one string (`G2_WAKE_WORD`) or
+    already a list -- any one of them wakes G2. Lower-cased, stripped, empties
+    dropped, de-duplicated (order-preserving)."""
+    raw = phrase.split(",") if isinstance(phrase, str) else phrase
+    seen: dict[str, None] = {}
+    for p in raw:
+        p = p.lower().strip()
+        if p:
+            seen[p] = None
+    return list(seen)
+
+
 class VoskWakeWord:
-    def __init__(self, model_path: str, phrase: str, sample_rate: int = 16000):
+    def __init__(self, model_path: str, phrase: str | list[str], sample_rate: int = 16000):
         import sounddevice as sd
         from vosk import KaldiRecognizer, Model
 
@@ -39,10 +52,12 @@ class VoskWakeWord:
             raise FileNotFoundError(f"Vosk model not found at {p}.")
         self._sd = sd
         self._rate = sample_rate
-        self._phrase = phrase.lower().strip()
+        self._phrases = _parse_phrases(phrase)
+        if not self._phrases:
+            raise ValueError("no wake phrase given (G2_WAKE_WORD is empty)")
         self._model = Model(str(p))
-        # restrict the recogniser to the wake phrase + [unk] -> very low CPU
-        self._grammar = json.dumps([self._phrase, "[unk]"])
+        # restrict the recogniser to the wake phrases + [unk] -> very low CPU
+        self._grammar = json.dumps([*self._phrases, "[unk]"])
         self._Recognizer = KaldiRecognizer
 
     def wait(self) -> None:
@@ -65,12 +80,14 @@ class VoskWakeWord:
                     heard = json.loads(rec.Result()).get("text", "")
                 else:
                     heard = json.loads(rec.PartialResult()).get("partial", "")
-                if self._phrase in heard.lower():
-                    log.info("wake word heard")
+                heard = heard.lower()
+                hit = next((p for p in self._phrases if p in heard), None)
+                if hit:
+                    log.info("wake word heard (%r)", hit)
                     return
 
 
-def make_wake_word(mode: str, *, vosk_model_path: str, phrase: str) -> WakeWord:
+def make_wake_word(mode: str, *, vosk_model_path: str, phrase: str | list[str]) -> WakeWord:
     if mode == "vosk":
         return VoskWakeWord(vosk_model_path, phrase)
     return AlwaysAwake()
