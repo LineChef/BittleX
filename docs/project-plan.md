@@ -37,7 +37,13 @@ should we work on next."
   [`docs/hardware/pi-power.md`](hardware/pi-power.md).
 - **Enclosure:** Petoi ships an official back-cover STL with a Pi cutout
   ([`Bittle_Cover_with_hole_for_Pi.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/BittleCover/Bittle_Cover_with_hole_for_Pi.stl)),
-  so the cover can close over the mounted Pi.
+  so the cover can close over the mounted Pi. **2026-09-16: likely too shallow
+  for Pi+PiSugar.** Measured its real bbox — 71.2 × **18.6** × 73.9 mm, and
+  18.6 mm is the full outer depth (shell walls included), same clearance
+  bottleneck as the standoff clips below, just from the enclosure side. A
+  custom-modified version is now planned alongside the clips — see "Build:
+  modified standoff clips + cover" below and `docs/build/biboard-pi-connector.md`
+  for the full plan.
 - **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
   detection results over serial rather than streaming raw frames. Flash is
@@ -56,10 +62,28 @@ should we work on next."
 - ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved 2026-09-14**: it's a
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
   official board diagram. Data-only wiring is straightforward. Full pinout +
-  annotated photos: [`hardware/biboard-pi-connector.md`](hardware/biboard-pi-connector.md).
+  annotated photos: [`build/biboard-pi-connector.md`](build/biboard-pi-connector.md).
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.
+  **Researched, 2026-09-16 — leaning toward "probably fine," still not fully
+  confirmed.** Checked Petoi's official serial docs directly
+  ([overview](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac),
+  [BiBoard V1 page](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1))
+  — neither mentions the Zero at all, positive or negative; only 3/4/5 are
+  documented. But there's a real technical reason to expect it works: Petoi's
+  docs say Pi 3 and Pi 4 both use `/dev/ttyS0` for this connection, which is
+  a direct consequence of those SoCs reserving the PL011 UART for Bluetooth
+  and falling back to the mini-UART. The Pi Zero 2 W uses a Pi-3-generation
+  SoC with the **identical** PL011-to-Bluetooth arrangement, so it also
+  defaults to `/dev/ttyS0` — same underlying serial architecture as the one
+  family Petoi *does* confirm works, not an unconsidered edge case. Also
+  found: Petoi's own Pi-mounting bracket (`Pi_StandOffRegular.stl`, already
+  in use — see `build/biboard-pi-connector.md`) is Zero-specific, which
+  at minimum confirms Petoi designed real hardware for this board, even if
+  that speaks to mechanical fit more than to serial compatibility. Net: good
+  reason to expect it works, still worth the ~30-second confirmation once
+  wired up rather than treating it as settled.
 - Confirm the back cover fits once the Pi is mounted.
 - BiBoard V1's onboard voice-recognition module + speaker: decide whether the
   wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
@@ -405,18 +429,32 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
     assembly to the frame — download
     [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl)
     (Pi Zero 2 W). Full reasoning + diagrams:
-    [`docs/hardware/biboard-pi-connector.md`](hardware/biboard-pi-connector.md).
-  - `sudo raspi-config` → Interface Options → Serial Port → disable the serial
-    login shell, enable the serial hardware → reboot.
-  - Disable the Pi's 1-wire interface (GPIO 4 reset-signal conflict).
-  - Disable Wi-Fi power-save (`sudo iw wlan0 set power_save off`) proactively —
-    the `brcmfmac` power-save bug drops SSH under CPU load and is a nightmare to
-    diagnose later.
-  - On the BiBoard: serial command `XS` (or edit `OpenCat.h` and reflash) to
-    enable Serial-2 working mode.
-  - Serial device: likely `/dev/ttyS0` on the Pi Zero 2 W (Pi-3-family SoC);
-    confirm once wired.
-  - Use `ardSerial.py` from the OpenCat repo as the reference serial commander.
+    [`docs/build/biboard-pi-connector.md`](build/biboard-pi-connector.md).
+- [ ] **Build: modified standoff clips + cover, for Pi+PiSugar clearance —
+      clip built (N=17.5mm, best guess), cover not started.** This is now a
+      status line only — the full findings, build history (v1→v2→v3), mount
+      decision (which edge + why), and screw sourcing live in
+      [`docs/build/biboard-pi-connector.md`](build/biboard-pi-connector.md)
+      (the single build manual, Steps 1-5) and the
+      [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
+      — that's the canonical reference, not this checklist.
+  - Clip STL checked in:
+    [`docs/build/cad/Pi_StandOffRegular_extended17.5mm.stl`](build/cad/Pi_StandOffRegular_extended17.5mm.stl),
+    still pending a real joint-measurement to confirm or correct N.
+  - Cover on hold until the assembled stack can be measured.
+  - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
+    "Screws to buy."
+- [ ] `sudo raspi-config` → Interface Options → Serial Port → disable the serial
+      login shell, enable the serial hardware → reboot.
+- [ ] Disable the Pi's 1-wire interface (GPIO 4 reset-signal conflict).
+- [ ] Disable Wi-Fi power-save (`sudo iw wlan0 set power_save off`) proactively —
+      the `brcmfmac` power-save bug drops SSH under CPU load and is a nightmare to
+      diagnose later.
+- [ ] On the BiBoard: serial command `XS` (or edit `OpenCat.h` and reflash) to
+      enable Serial-2 working mode.
+- [ ] Serial device: likely `/dev/ttyS0` on the Pi Zero 2 W (Pi-3-family SoC);
+      confirm once wired.
+- [ ] Use `ardSerial.py` from the OpenCat repo as the reference serial commander.
 - [ ] Set up the AI Vision Camera Module: mount at the head, connect to the Grove
       socket, upload firmware via Petoi Desktop App or Arduino IDE.
 
@@ -724,6 +762,12 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       sensing either) — a zero-debounce local reflex that preempts every other
       behavior, using the light `classes()` floor-vs-edge path, custom-trained
       on the real desk, biased hard toward false-stops over a missed edge.
+      **Behavior-audit finding, 2026-09-16:** on top of needing the trained
+      desk-edge classifier + mounted camera, the wiring itself is incomplete —
+      `app/__main__.py`'s `_build_runtime()` never constructs a `CliffGuard` or
+      passes `cliff=` to `BehaviorDriver`, so the reflex has zero live effect
+      even once those land. Needs both the classifier work and the wiring,
+      not just one.
       Physical backstop (a desk-edge lip, supervision-gated autonomy) is the
       honest answer for a true "never," since vision alone can't promise it.
 - [x] **Scene description path** — `vision/scene.py`: `summarize()` (deterministic
@@ -1191,6 +1235,17 @@ call so the whole loop is exercised end-to-end (idle descent → `ksit` → `d`,
 wake choreography → head/skill) in 7 tests. Still needs, on hardware: the real
 sink implementations (some exist — `voice/actuator.py`, `voice/cues.py`,
 `voice/tts.py`) and the input plumbing (vision frame, IMU state, mic events).
+**Behavior-audit finding, 2026-09-16 — Enrollment specifically:** `app/sinks.py`'s
+`build_bindings()` hardcodes `tts=None, cue=None` (comment: "the voice loop
+owns TTS; SPEAK effects are rare here") — true for most of the driver, but
+**`Enrollment`'s entire interaction is SPEAK effects** ("What's your name?",
+capture progress, completion/abort). No bridge exists from `BehaviorDriver`'s
+effect stream into the voice loop's real `TTS`/`Cue` objects (`voice/loop.py`
+and `behavior/runtime.py` never cross-reference each other's I/O). Right now
+"G2, meet Sam" runs the full enrollment flow with no audible feedback at all.
+Needs a real design decision — give `BehaviorRuntime` a reference to the voice
+loop's live `TTS`/`Cue`, or special-case enrollment's SPEAK effects to route
+through the voice loop directly — not a quick wire-up.
 The `DIAG` effects are the hook for Diagnostics Phase 1. Gestures, idle-posture descent + WAKE/settle/PEEK choreography,
 personality→idle-timing knobs, sniff-on-investigate, greeting-on-enrollment and
 excited-hop-on-recognition are all wired *inside* the driver now — see
@@ -1263,7 +1318,19 @@ The phases above are grouped by system; this is the sequence to actually work
 through once the Bittle X + BiBoard land (the Pi bring-up is already done — see
 Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 
-> **Rule: stay on the calibration stand through step 12a. No floor time before
+**Staged in two phases, gated on the Pi.** Phase 0 below is deliberately
+everything that can be ruled out with *only* the bare Bittle X + BiBoard —
+frame assembly, servo calibration, and a full movement sweep — none of it
+touches the Pi, PiSugar, or camera at all. That's a real checkpoint, not just
+a reordering: it isolates mechanical/servo/BiBoard problems from
+Pi-stack problems before the two are ever combined on the frame, while the Pi
++ PiSugar + clip assembly is bench dry-fit and de-risked independently
+(off-frame). Everything from Phase 1 on is gated on "the Pi is now physically
+wired to the frame" and picks up the original step order (weighing,
+serial link, voice, RL, vision, integration) unchanged in substance —
+only renumbered.
+
+> **Rule: stay on the calibration stand through step 13a. No floor time before
 > then.** Everything through "verify servo signs" — assembly, calibration,
 > first movement, voice, the RL joint-control bench, IMU probing, open-loop
 > gait verification — happens with G2 supported on the stand, weight off its
@@ -1272,65 +1339,106 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 > / honest expectations" below), and on the stand a mistake in any of them is
 > at most a flailing leg, not a fall or a walk off an edge. The floor is
 > earned once `--openloop` confirms the servo signs are right — that's the one
-> thing that actually requires ground contact to test honestly (H1, step 12b).
+> thing that actually requires ground contact to test honestly (H1, step 13b).
 
-**Assembly & mechanical**
+**Diagnostics-mode impact of the Phase-0 split.** Checked this directly
+against `pi_pipeline/diag/core.py` and `check_serial.py` rather than assuming:
+session logging (`diag.event`, `events.jsonl`, `manifest.json` under
+`~/g2_logs/`) is **not** Pi-gated — it's a plain module-level singleton that
+auto-starts its own session on first `event()` call (`Diag.event_locked` →
+`start_session("auto")`), and `check_serial`'s `allmoves` already calls
+`diag.event(...)` directly for the idle-baseline read and every per-move
+voltage/latency line. That means `allmoves`, run completely standalone from a
+dev machine with nothing but a serial cable to BiBoard, gets the **exact same**
+diagnostic logging it would get running through the full `pi_pipeline.app` on
+the Pi — nothing about Phase 0 is diagnostics-degraded. The one piece that
+*is* Pi/voice-gated is the **spoken** `diagnostics_query` tool (it lives in
+`voice/conversation.py`, needs the running app); the underlying
+`summarize_session()` / `last_failure()` it speaks from work identically from
+the CLI (`python -m pi_pipeline.diag summarize`) with no Pi involved. Given
+that, `allmoves` — the comprehensive "cycle everything, log voltage +
+latency" test — moves *up* into Phase 0 rather than getting a new, weaker,
+unlogged stand-in: it needs a serial connection to BiBoard, not a Pi, so it
+runs against BiBoard's own USB port from a laptop (temporarily set
+`G2_SERIAL_PORT` to that port, not the eventual Pi value). It then runs
+**again**, unmodified, once the Pi is wired in (Phase 1, step 8) — same
+command, same event schema — specifically so the two sessions' `events.jsonl`
+can be diffed to see whether adding the Pi + PiSugar's weight and wiring
+measurably changed battery sag or reply latency on any move. That diff is a
+concrete, evidence-based answer to "did adding the Pi stack change anything
+mechanically," not a guess.
+
+**Phase 0 — bare hardware, no Pi in the loop**
 1. Assemble Bittle X V2; check servo calibration (ships calibrated — fine-tune
    only if movement looks off).
-2. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera
+2. **On the calibration stand, before it touches the ground:** full
+   range-of-motion pass by hand / `check_serial` (watch for binding / leg-on-leg
+   collision), then firmware `c16` auto joint calibration. Safe place for first
+   power-on. Detailed gait steps: [`guides/gait-deployment.md`](guides/gait-deployment.md) step 6.
+3. **Still on the stand, BiBoard's own USB port, no Pi wired:**
+   `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
+   `.env` to that port → `firstmove` (guided, confirmed, one joint at a time) →
+   once that's clean, `send kbalance` → `skills` → `allmoves` (cycles EVERY
+   move G2 knows — skills + the autonomous-behaviour gestures + sleep + carpet
+   gait + the recovery/get-up keyframes, logging battery voltage + reply
+   latency per move against an idle baseline, same as it always did — see the
+   diagnostics-impact note above). A clean pass here is the actual "base
+   hardware ruled out" checkpoint — note this session's ID
+   (`~/g2_logs/<session_id>/`) as the pre-Pi baseline to diff against later.
+   *(In parallel, off-frame: bench dry-fit the Pi + PiSugar + clip assembly to
+   de-risk that build independently — see
+   [`build/biboard-pi-connector.md`](build/biboard-pi-connector.md).)*
+
+**Phase 1 — the Pi is now physically wired to the frame**
+4. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera
    + mount actually on the robot. Weigh the **camera cluster and the PiSugar S
    battery separately** (the battery is >½ the current spine estimate; if it
    mounts somewhere distinct, it needs its own sim body). Balance each piece on
    an edge for height + fore/aft CoM. Then set `PAYLOAD_MASS_*` / `HEAD_MASS_*` /
    positions in `opencat_gym_env.py` and retrain (or `--finetune-lr`) if the
    delta from ~76 g is real — [`rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md) **H2**.
-3. **On the calibration stand, before it touches the ground:** full
-   range-of-motion pass by hand / `check_serial` (watch for binding / leg-on-leg
-   collision), then firmware `c16` auto joint calibration. Safe place for first
-   power-on. Detailed gait steps: [`guides/gait-deployment.md`](guides/gait-deployment.md) step 6.
-4. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
+5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover still fits.
 
 **Serial link (Phase 5) — still on the stand**
-5. `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
-   `.env` (likely `/dev/ttyS0` → `/dev/ttyAMA0` after `disable-bt`).
-6. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
-7. `python -m pi_pipeline.doctor --serial` (passive handshake) → **on the stand:**
-   `check_serial firstmove` (guided, confirmed, one joint at a time) → once that's
-   clean, `send kbalance` → `skills` (cycles the conversational set) →
-   `allmoves` (cycles EVERY move G2 knows — skills + the autonomous-behaviour
-   gestures + sleep + carpet gait + the recovery/get-up keyframes, logging
-   battery voltage + reply latency per move against an idle baseline; a good
-   data-gathering pass to run now, before it matters on the floor).
+6. `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in
+   `.env` back to the Pi's port (likely `/dev/ttyS0` → `/dev/ttyAMA0` after
+   `disable-bt`).
+7. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
+8. `python -m pi_pipeline.doctor --serial` (passive handshake) → **on the stand:**
+   `check_serial firstmove` again, now through the Pi → once clean, `send kbalance`
+   → `skills` → **`allmoves` again** (same command as Phase 0 step 3, now
+   through the Pi's wiring) — diff this session's `events.jsonl` against the
+   Phase 0 baseline for a voltage/latency delta from the Pi stack.
 
 **Voice (Phase 7) — still on the stand (nothing here needs the floor)**
-8. `python -m pi_pipeline.voice --mode text` → Claude + memory end-to-end (key is
+9. `python -m pi_pipeline.voice --mode text` → Claude + memory end-to-end (key is
    already set).
-9. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD`,
-   `G2_STT_SILENCE_S`. `--mode voice --actuator serial` for the full loop.
-10. `benchmark_pi.py` on the actual Pi — confirm `en_US-ryan-low` + Vosk hit
+10. `check_audio wake` / `stt` on the Pi's mic → tune `G2_WAKE_WORD`,
+    `G2_STT_SILENCE_S`. `--mode voice --actuator serial` for the full loop.
+11. `benchmark_pi.py` on the actual Pi — confirm `en_US-ryan-low` + Vosk hit
     real-time on 512 MB. If sluggish: shorter `CLAUDE_MAX_TOKENS`, streaming TTS,
     a longer "thinking" cue.
 
 **RL sim-to-real (Phase 6 — stack already built + sim-validated) — still on the stand**
-11. `pi_pipeline/gait/bench_real.py` — real-time joint control on the Pi (sim
+12. `pi_pipeline/gait/bench_real.py` — real-time joint control on the Pi (sim
     bench: 0.43 ms/step).
-12a. **On the stand:** `run_gait.py --probe-imu` (confirm the real IMU format —
+13a. **On the stand:** `run_gait.py --probe-imu` (confirm the real IMU format —
     genuinely unknown until now) → `--openloop` (verify servo signs against
     `deploy_map.py`'s `SERVO_SIGN` — a flipped sign must be caught here, not on
-    the floor). Do not proceed to 12b until this is clean.
-12b. **Now the floor, for the first time:** `--cmd` (the learned gait) →
+    the floor). Do not proceed to 13b until this is clean.
+13b. **Now the floor, for the first time:** `--cmd` (the learned gait) →
     **the H1 head-to-head** vs firmware `kwkF`. Methodology + decision rule:
     [`rl/h1-rubric.md`](rl/h1-rubric.md); `h1_score.py` produces the verdict.
     Emergency stop (`--halt` / "emergency stop") within reach the whole time.
 
 **Vision on the robot (Phase 8)**
-13. Mount the camera on G2, train the **desk-edge classifier** on the real
+14. Mount the camera on G2, train the **desk-edge classifier** on the real
     mounted POV (B16 — highest priority), wire `Avoider` decisions to the
     actuator, build the `CliffGuard` reflex against the trained classifier.
 
 **Integration (Phase 10)**
-14. Voice + vision + memory concurrently; resolve timing/resource conflicts
+15. Voice + vision + memory concurrently; resolve timing/resource conflicts
     (historically the messiest phase). Then revisit locomotion with perception in
     the loop toward the Phase 8 Target capability.
 
@@ -1346,7 +1454,7 @@ Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 
 > **2026-09-15 — no flipping/rolling tricks, mounted-payload risk.** The Pi +
 > PiSugar stack (~61–78 g) rides on a printed standoff off the rear frame, not
-> the molded body shell (`docs/hardware/biboard-pi-connector.md`) — not
+> the molded body shell (`docs/build/biboard-pi-connector.md`) — not
 > impact-rated for a hard tumble, and the elevated mass shifts G2's moment of
 > inertia off what these tricks were tuned for on a bare unit. `flip`/`flipD`/
 > `flipF`/`bf`/`tbl`/`rl`(as a trick)/`bx`/`lucky` excluded from any

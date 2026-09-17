@@ -11,7 +11,10 @@ measurements, and anything that differed from the original plan.
 
 ## Entries
 
-None yet — Bittle X and the camera module haven't arrived. The first entries
-will cover Pi provisioning, the BiBoard↔Pi serial wiring
-(`docs/hardware/biboard-pi-connector.md` has the pre-build reference for this
-step), servo calibration, and the camera mount.
+| | |
+|---|---|
+| [`biboard-pi-connector.md`](biboard-pi-connector.md) | Pi + PiSugar + BiBoard: the wiring build manual (steps 1-4, annotated real board photos) plus the standoff clip mounting investigation, mm-accurate installation diagram, and the modified-clip STLs (`cad/`) — kept together as one build reference rather than split from the pre-build research, since it's what gets used at the bench. |
+
+Everything else is not yet started — Bittle X and the camera module haven't
+arrived. Next entries will cover Pi provisioning, servo calibration, and the
+camera mount.

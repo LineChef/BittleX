@@ -131,9 +131,9 @@ So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 |---|---|---|---|
 | **Disable unused peripherals** (onboard LEDs runtime; audio + camera-LED via boot config) | **BUILT** — `pi_pipeline.power` (`disable_onboard_leds()`, `BOOT_CONFIG_LINES`) | none | boot lines go in `config.txt` at Pi setup (pi-set-up.md) |
 | **Wi-Fi power-save when headless** (`iw dev wlan0 set power_save on`) | **BUILT** — `pi_pipeline.power.set_wifi_power_save()` / `apply_headless_profile()` | +100–300 ms per network round-trip. Claude API is already 1–3 s/turn → ~10 % bump, imperceptible in speech. Wake-word is local, unaffected. **Breaks streaming (SSH, live video).** | on in autonomous mode; off when a human is actively connected |
-| **idle-REST timeout** — send `d` after N s of no command | yes — behavior/gait, mock-link testable | Must be **behaviour-aware**: laying down during an explore pause (thinking/observing) is slow to resume and looks broken | trigger only from a true "no goals, no stimuli" state; explore mode holds a stand/sit between moves |
-| **On-demand vision** — gate the Grove Vision AI V2 | API now; tuned with the camera | **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move | "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep |
-| **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on | logic partly now (`behavior/mode_controller.py`); wake conditions need hardware | Fine *if* wake triggers are good; risk = sleeping through something it should react to | keep a cheap always-on trigger (IMU motion, mic level, wake word); vision + gait stay down until woken. Desirable "rests when nothing's happening" behaviour for a companion bot |
+| **idle-REST timeout** — send `d` after N s of no command | **BUILT** — `behavior/idle_posture.py`'s `IdlePosture` (ACTIVE→SIT→RESTING staged descent, mood-scaled timeouts, person-present multiplier, "stay" override, `safe_to_rest` gating, wired into `BehaviorDriver.tick()`, 109 lines of tests) | Was already behaviour-aware from the start — exploring holds ACTIVE with no descent (`exploring=True` short-circuits it), a conversation holds SIT and never lies down | done; see `docs/guides/voice-commands.md` / `capabilities.md` |
+| **On-demand vision** — gate the Grove Vision AI V2 | **Not built — only a binary on/off exists**, tied to sleep-mode entry/exit (`EffectKind.CAPTURE`). The rate-scaling ambition below has zero implementation, not even stubbed — just an unused `kind` param on the `CAPTURE` effect anticipating it | **Cannot mean "off during exploration"** — that's how it sees where to go / avoids cliffs. CliffGuard reflex needs a feed whenever it *could* move | "scale to activity": full rate navigating, low rate stationary-monitoring, off only in sleep. **This is the one remaining open design question.** |
+| **Sleep / idle mode** — servos REST, vision off, governor down, Wi-Fi power-save on | **BUILT** — `behavior/sleep_mode.py`'s `SleepMode` (AWAKE→DOZING→ASLEEP→ROUSING, auto-sleep after prolonged RESTING, "go to sleep"/"shut down" commands, real wake signals: IMU tap, loud sound, wake word, anti-thrash min-sleep hold), wired into `BehaviorDriver.tick()` with real effect dispatch (power-profile switch + camera off in `bindings.py`), 146 lines of tests | Wake triggers already cover the risk noted here — IMU tap / loud sound / wake word all wake it | done |
 | **CPU governor → `ondemand`** | **BUILT** — `pi_pipeline.power.set_cpu_governor()` (refuses `powersave`) | Ramp latency could cause one late 80 Hz control tick after idle | use `ondemand` (fast ramp), **not** `powersave`; verify with `benchmark_pi.py` loop-jitter |
 | **Camera resolution / fps down** | with hardware | detection may degrade | drop only if detection still passes |
 | **PiSugar low-power mode** | with hardware | — | check if it exists and whether the Pi can trigger it |
@@ -151,12 +151,26 @@ So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 ## Next
 
 - **DONE:** disable-unused (`pi_pipeline.power`), Wi-Fi power-save toggle,
-  CPU-governor helper — `python -m pi_pipeline.power status|headless|interactive`.
-- **Focused-session TODO** (needs behaviour-aware design): idle-REST,
-  on-demand-vision gate, sleep-mode state machine. idle-REST is the priority.
+  CPU-governor helper — `python -m pi_pipeline.power status|headless|interactive`
+  — **and** idle-REST staged descent (`IdlePosture`) and the sleep-mode state
+  machine (`SleepMode`), both fully built + wired + tested (corrected 2026-09-16;
+  an earlier version of this doc listed these as still needing a focused
+  design session — they don't, that work already landed).
+- **Focused-session TODO:** on-demand vision rate-scaling only — the camera
+  currently just goes on/off with sleep mode, not scaled to activity level as
+  originally scoped above.
 - **Hardware-gated:** a real power budget from an inline current meter (the
   PiSugar S has no telemetry) — active walking, idle-stand, sit, REST, Pi under
   vision load, Pi asleep. Feeds the sleep-mode timeout tuning.
+- **Forward-looking caution, found on Petoi's community forum archive,
+  2026-09-16:** if a *real* OS-level power-off is ever added (not needed
+  today — G2's "shut down" voice command is deliberately not an OS power-off,
+  see `project-plan.md` "Graceful shutdown"), a community member
+  ([petoi.camp, "Next Steps: Pogo Pins..." thread](https://www.petoi.camp/))
+  reported `sudo shutdown -h now` **just reboots** the Raspberry Pi when
+  attached to a Petoi board via the 2×5 socket, rather than powering off —
+  no resolution found in the thread. Worth a real test before ever wiring a
+  voice command to an actual `shutdown`, not something to assume works.
 
 ---
 

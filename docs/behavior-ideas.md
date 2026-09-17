@@ -931,3 +931,96 @@ absence fires one excited hop. 11 tests, `last_reason` + `DIAG` effects for diag
 - [ ] Real per-state power budget from an inline current meter (walking / sit /
       REST / Pi under vision load / Pi asleep) — tunes the sleep timeout, feeds
       B12.
+
+### B23 — Bounded self-modification: G2 adjusts its own personality knobs from experience
+Logged 2026-09-16, idea stage — not started. G2 already does a narrow form of
+this (calling `remember` on its own initiative during conversation, which then
+shapes future responses). This extends the same principle to the
+`personality/traits.py` / `BehaviorParams` knobs currently only changeable via
+explicit voice command (gir level, narration verbosity, mood decay, idle-REST
+timing, etc.) — G2 noticing a pattern over time and adjusting itself, not just
+storing a fact.
+
+**Guardrails, not blanket permission:**
+- **Explicit allowlist, enforced in code.** Only "personality knob" params —
+  anything already in `BehaviorParams`/traits. Safety-critical logic
+  (emergency stop, thermal governor, `CliffGuard` thresholds, motor limits)
+  is never reachable, not even softly. Hard min/max bounds per param, same
+  pattern as `gir.py`'s `LEVELS=5` clamping intensity between `_LEVEL_LO`/
+  `_LEVEL_HI`.
+- **Trigger on accumulated evidence, not a single turn.** Signal source:
+  `pi_pipeline/diag` session logs — a pattern across multiple sessions
+  ("explore cut short by CliffGuard 3 sessions running," "idle-REST firing
+  fast every evening conversation"), not a one-off reaction.
+- **Transparent + reversible, never silent.** Same convention as gir/narration
+  level changes today (spoken echo-back: "Okay, level 3 — normal detail").
+  Self-adjustments get announced out loud and logged as a durable,
+  inspectable record — what changed, when, why — plus an easy reset to the
+  trait `REGISTRY` defaults, and a rate limit (e.g. one self-adjustment per
+  session) so it can't thrash.
+
+**Staged rollout — how to actually validate this before trusting it:**
+mechanical correctness (bounds enforced, logged, revertible, rate-limited) is
+ordinary unit testing, same as the rest of `pi_pipeline/tests` — no judgment
+calls needed there. Whether the *adjustments themselves* are good is the hard
+part, since that's a subjective call about whether G2 got more pleasant to
+live with, not a metric. Trust it in stages:
+1. **Shadow mode** — G2 computes and logs what it *would* change, doesn't
+   apply anything. Review the log periodically, judge the reasoning with zero
+   risk before any of it takes effect.
+2. **Suggest, don't apply** — same detection, but G2 asks out loud instead of
+   acting ("I've noticed X — want me to dial back Y?"), routed through the
+   same confirm-before-acting pattern already used for anything consequential.
+3. **Auto-apply, easy revert** — only after (1) and (2) look consistently
+   reasonable, starting with the lowest-stakes knob (narration verbosity is
+   the natural first candidate — already reversible, already low-stakes).
+
+**Cheapest possible prototype, no new tool required:** let G2 `remember` a
+specific *kind* of fact — a preference override, same storage as everything
+else it remembers today — and have `Personality.behavior_params()` check for
+that category of memory when composing params each session. Tests whether the
+concept feels right in practice before building a dedicated tool with real
+guardrails around it.
+
+### B24 — Agency: G2 forms its own goals, not just executes rule-based autonomy
+Logged 2026-09-16, idea stage — deliberately **not a near-term item**.
+Explicit sequencing from the user: validate the existing base work
+(hardware bring-up, gait, voice, behavior driver — everything already
+built) running reliably first; agency and self-modification ([B23]) are a
+later phase once that foundation is solid, not concurrent with it.
+
+**The distinction that matters:** autonomy of *movement* (already partly
+built — explore mode, idle-REST, sleep all run as state machines without a
+person prompting each step) is not the same as autonomy of *decision-making*
+(mostly not built — those state machines follow fixed rules; Claude mainly
+handles conversation, not moment-to-moment behavior choices). Agency means
+the second one: G2 forming its own short-term goals ("I haven't checked the
+living room in a while") and acting on them, rather than executing a
+pre-built behavior tree — handing more real-time decisions to Claude's
+judgment instead of deterministic FSM logic.
+
+**Concrete axes this could extend along, once revisited:**
+- **Goal-formation** — Claude deciding what to do next during idle/attentive
+  ticks, not just the driver's fixed priority order.
+- **Initiative** — G2 speaking up or acting unprompted (beyond today's
+  rule-triggered chirps/reactions), based on its own judgment that something
+  is worth mentioning or doing.
+- **Priorities/drives** — something adjacent to homeostatic "wants," beyond
+  today's mood-from-memory ([B6]) and static personality traits.
+
+**The core tension, already partly navigated once:** the project has already
+made one deliberate call on exactly this tradeoff — explore mode's "roam"
+tier (actual walking around) requires explicit voice permission ("go ahead
+and look around"), while only the passive "attentive" tier runs always-on
+(see `project_explore_two_tier` memory). That precedent — gate the more
+agentic behavior behind consent — is the likely starting posture for
+extending agency further, not open-ended self-direction. More agency in a
+physical robot living with a family trades directly against predictability:
+the more G2 decides for itself, the harder it is to guarantee it won't do
+something inconvenient, unsafe, or just annoying at the wrong moment.
+
+**Relationship to [B23]:** complementary, not the same idea. B23 is
+narrow — G2 tuning its own existing personality *parameters* from evidence.
+B24 is broader — G2 forming and acting on its own *goals* in the first
+place. B23 is the more tractable, lower-risk piece and the more natural
+first step if/when this gets picked back up.

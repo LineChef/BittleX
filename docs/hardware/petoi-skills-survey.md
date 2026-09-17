@@ -34,7 +34,7 @@ order), the same format the RL env / SkillSwitch consume.
 > **Decision 2026-09-15 — no flipping or rolling behavior, mounted-payload
 > risk.** G2 carries a Pi + PiSugar stack (~61–78 g, see
 > [`specs.md`](specs.md) "Mounted payload weight") on a printed standoff
-> bracket off the rear frame (`docs/hardware/biboard-pi-connector.md`), not
+> bracket off the rear frame (`docs/build/biboard-pi-connector.md`), not
 > the molded body shell — not built to survive a hard tumble/flip impact, and
 > the extra elevated mass shifts G2's moment of inertia away from what these
 > tricks were tuned for on a bare unit. **Excluded from `perform_skill` /
