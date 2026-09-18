@@ -78,3 +78,15 @@ against run20m_ppo.
   the new resid30 checkpoint needs no override, since 30 is now the
   module default). Noting this here so it isn't missed during the Stage 3
   benchmark suite.
+
+### Report requirement: action-deviation charts are a standard section, not a separate page
+
+User clarified 2026-09-18: the action-magnitude/tilt comparison (currently
+at https://claude.ai/artifact/AxqHBWqBga8XDG8YsQ2Dhv, built as a side
+artifact for the "when does it deviate" question) must be folded into the
+Stage 3 benchmark report itself as a standard section -- generated for both
+checkpoints (run20m_ppo and the resid30 candidate) using the same
+action_trace.py methodology, not left as a separate linked page. Leg-tinted
+replay GIFs (leg_tint.py, wired into render_gif.py etc.) are also a
+standard section of that same report. Apply this same standard to any
+future benchmark report from this project, not just this campaign.
