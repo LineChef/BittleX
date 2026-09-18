@@ -1,134 +1,143 @@
 # Resiliency campaign log
 
-Queued third, after the resid30 campaign and gait-friction testing. Two
-phases: (1) build a proper resiliency-measurement tool and use it to
-characterize every candidate stressor, (2) once characterized, design and
-run a fresh 20M training run explicitly targeting resiliency, willing to
-trade some cadence/speed-matching quality for it.
+Queued third, after the resid30 campaign and gait-friction testing. Folds
+together two things: the new testing this session planned (long-duration
+drift, aggressive command transitions, latency, servo-miscalibration, plus
+the fall-hunting list) **and** a prior systematic campaign
+(`docs/rl/robustness-backlog.md`, the "R-series," Sept 3-7) that already
+tested most of the same ground months earlier and reached a conclusion
+worth leading with.
 
-## Why a new measurement tool, not just more `evaluate_policy.py` runs
+## The reframe: stalling, not falling, is the dominant failure mode
 
-Today "resiliency" is measured ad hoc — `fell_fraction` on whatever single
-scenario a script happens to set up, or a decathlon cell's fixed-severity
-pass/fail. That's good enough for a one-off "does X cause falls" check
-(which is how we found the rough-terrain and slope results), but it can't
-answer the actual question this campaign needs answered: **is a candidate
-policy more resilient than the last one, and by how much, in a way that's
-comparable across training rounds.**
+Found while checking the robustness backlog for prior art before building
+new test infrastructure — should have been the first thing checked, not
+the last. A 300+ rollout probe batch against the frozen base (`run20m_ppo`)
+found **1 fall**. Everywhere else, the robot didn't tumble — it stopped:
 
-A proper resiliency benchmark needs three things the current tools don't
-give in one place:
-1. **A dose-response sweep per stressor**, not one fixed severity — so
-   improvement shows up as "fall rate at severity X dropped from 40% to
-   15%," not just a binary pass/fail that can't track partial progress.
-2. **Recovery quality, not just fall/no-fall** — peak tilt reached, whether
-   it recovered without falling even if it wobbled hard, time-to-recover.
-   Two policies that both "don't fall" at a given severity aren't equally
-   resilient if one is visibly closer to the edge.
-3. **A long-duration axis** — every test run in this campaign so far used
-   ~250-step (~3s) episodes. Real G2 operation is continuous for minutes;
-   small per-step imperfections (the friction campaign's whole subject)
-   could compound very differently over 60+ seconds than over 3.
+| Scenario | Result |
+|---|---|
+| Carpet, 90s episode | speed decayed to 0.00 m/s by 60s |
+| Side-hill, 10-15deg sustained tilt (R12a) | -73% speed |
+| Stepped split, one side raised 15-25mm (R12b) | -92% speed (under left feet specifically -- a real left/right handedness asymmetry) |
+| Thin raised lip, 15mm (R4) | 0/16 crossed, just recoils |
+| Pick-up/set-down (R3) | 31/32 re-acquire fine -- no problem here |
 
-## Plan: `benchmark_resiliency.py`
+This matches everything found independently this session too (lateral
+pushes, terrain roughness, one-sided steps -- none produced falls) from the
+other direction: this gait is hard to knock over, but gives up very easily
+under sustained resistance. **"How do we make it fall" was the wrong
+primary question; "how do we make it stop giving up" is the one the
+project's own prior work already answered was real.**
 
-New script, modeled on `benchmark_decathlon.py`'s structure (matched
-per-episode seeds, JSON output, `tools/build_decathlon_report.py`-style
-HTML reporting) but organized around dose-response sweeps instead of fixed
-graded tiers. For each stressor axis: run N episodes at each of several
-severity levels, record fall fraction, peak tilt distribution, recovery
-time for survived-but-disturbed episodes, and forward progress (to catch
-"gave up and stood still" as a soft failure, not just literal falls).
-Output: a per-axis dose-response table/chart for diagnosis, plus a single
-composite resiliency score (e.g. mean fall rate across all axes at a fixed
-"moderate-hard" severity) for at-a-glance tracking across training rounds.
+A fix was already designed and implemented for exactly this:
+**`FAC_NOSTALL`** (dense window-speed bleed while stalled below
+`NOSTALL_FLOOR_FRAC` of commanded speed, plus a per-0.15m breakthrough
+bonus while resisted) -- currently `FAC_NOSTALL = 0.0`, **off** in both
+`run20m_ppo` and the resid30 checkpoints. It was validated once (Phase D,
+vision-vs-blind A/B) but scoped narrowly to that experiment and never
+folded into the main walk recipe. Design note from when it was built: "only
+makes sense trained WITH the forward terrain feature" -- worth confirming
+whether that constraint still holds or whether it can activate without the
+vision terrain feature too, since `features.vision` is currently gated off
+project-wide.
 
-This tool gets built once and reused for every future resiliency check,
-not just this campaign.
+## What's already answered vs. genuinely open
 
-## Stressor axes to characterize (testing rounds, after gait-friction)
+Mapping everything discussed this session against the R-series backlog,
+so nothing gets rebuilt from scratch:
 
-Priority order per the user's steer: #1 and #4 first, then
-latency/servo-miscalibration, then the rest already discussed.
+**Already tested, real findings, no need to re-derive:**
+- R10 (long-duration drift, this session's #1 priority) -- confirmed
+  severe (0 m/s by 60s on carpet). What's still open: re-verify against
+  the *current* checkpoints (run20m_ppo confirmed pre-resid30; resid30 and
+  any future recipe need their own check), since the original probe used
+  `run20m_carpet`, an intermediate checkpoint from that era.
+- R12a/R12b (uneven terrain / stepped split) -- confirmed severe stalling,
+  essentially the same test as the one-sided-step idea from earlier this
+  session, already done properly with real numbers.
+- R4 (thin raised lip / threshold) -- confirmed severe (0/16), a very
+  realistic home-robot scenario (rug edges, door thresholds).
+- R3 (pick-up/set-down) -- confirmed fine, no action needed.
+- R11 (lateral link collision), R1 (single weak/dead servo), R7 (servo
+  backlash/deadband) -- explicitly `DROPPED` in the prior campaign. Not
+  re-opening without a specific reason to.
 
-1. **Long-duration continuous-walk drift** (highest priority). Extend
-   episodes well past the standard 250 steps (e.g. 2000+ steps, ~25s+) and
-   check whether fall rate or drift increases over the course of a single
-   long episode, not just across many short ones. Tests whether the
-   friction-campaign's ~7-8 degree baseline residual usage compounds into
-   real trouble over realistic operating durations.
-2. **Aggressive command transitions** (highest priority). Sudden stop,
-   sudden reversal, rapid alternating forward/backward commands — a fixed
-   set of transition "scripts," not a static disturbance. Tests whether
-   the gait handles its own commanded behavior changing abruptly.
-3. **Command latency** (`CMD_LATENCY_STEPS`, currently 0/untested).
-   Sweep 0, 1, 2, 4, 8 control-steps of lag. Directly relevant to hardware
-   transfer -- sim runs at 80Hz, the real BiBoard control loop is ~48-50Hz,
-   a real, already-documented gap this axis has never been trained against.
-4. **Servo zero-point miscalibration** (`JOINT_OFFSET_DEG`, currently
-   0.0/untested). Sweep 0, 2, 5, 10 degrees per-joint offset. Also directly
-   relevant to hardware transfer -- real servos are never perfectly
-   zeroed.
-5. **Rough terrain** (`ROUGH_TERRAIN`, proven to cause real falls at
-   T8.2's setting, never properly swept). Amplitude sweep past the current
-   default, same "characterize past the trained range" logic as slopes.
-6. **Drop/pit** (new mechanism, not yet built). A sudden drop-away under
-   one foot, not just a raised step -- overextension/loss-of-support is a
-   different failure mechanic than anything tested so far, and specifically
-   matches "a steep step down on one side."
-7. **Dense/sharp obstacle field**, sized to intersect swing-foot
-   trajectories specifically, pushed well past the range already ruled out
-   (0.006-0.060 with no effect).
-8. **`STUCK_FOOT`** (built, never tested). Sweep probability/duration.
-9. **Already-randomized-but-uncharacterized DR knobs**: `RANDOM_FRICTION`
-   (+/-30% default), `TORQUE_CUTBACK` (up to 35% torque loss),
-   `PAYLOAD_MASS_RAND` (43-79g) -- find their actual failure thresholds
-   the same way, rather than trusting the training default is well-matched
-   to where things break.
-10. **Combined gnarly course**, last, once the individual axes are
-    understood -- rough terrain + dense obstacles + latency together. This
-    is where the compounding effect (the actual pattern behind why
-    isolated pushes failed but rough terrain succeeded) is expected to
-    show up most clearly.
+**Flagged for reopening, status changed since the original triage:**
+- **R2 (IMU bias & mount tilt)** -- was `DEFERRED` pending "how solid is
+  the real Pi<->PiSugar connection." That's now answered: confirmed solid
+  tonight (correct pogo-pin orientation found and verified). Worth
+  reopening.
+- **R9 (within-episode degradation -- latency ramp, thermal/battery sag)**
+  -- already flagged "revisit after the 20M run," which is what's
+  in-flight right now (Stage 3). Directly covers this session's
+  latency/servo-miscalibration priority, but frames it as *ramping during
+  an episode* rather than fixed-per-episode -- more realistic than a
+  static offset, worth using this framing instead of a simpler static test.
+- **R8 (aggressive command dynamics)** -- explicitly `DROPPED` in the
+  original triage (no detailed reasoning recorded in the log for why,
+  unlike some other drops). This session's #4 priority matches R8
+  directly. Flagging the conflict rather than silently overriding the
+  prior call: worth a quick check of *why* it was dropped (git history
+  around 2026-09-03 may have the reasoning even though this doc's entry is
+  terse) before re-running it, in case there was a real reason, not just
+  triage bandwidth.
 
-Explicitly deprioritized per user steer: steep slopes past 14 degrees
-(real, confirmed, but not a realistic scenario for G2's actual
-environment) -- kept as a documented finding (`slope-ceiling-log.md`), not
-pursued as a training target.
+**Already-built mechanisms to reuse instead of building new ones:**
+- **`RUBBLE`** (not `RANDOM_TERRAIN`, which this session tested and found
+  nothing) is the actual primary discrete-obstacle hazard, `RUBBLE_N`
+  up to 560 / `RUBBLE_MAX_H` up to 0.020 already used in the hardest
+  existing gauntlet cells. Use this, swept past those values, for "dense
+  obstacle field" testing instead of building something new.
+- **`LEDGE_HEIGHT`/`LEDGE_PROB`/`LEDGE_DIR`** (`LEDGE_DIR=-1` = step-down
+  only) is literally the drop/pit mechanism from this session's list --
+  already built, currently retired/inert. Real history worth knowing:
+  Phase 4a tried training on it at 25mm/30% DR and made ledge handling
+  *worse* ("robot backs away from steps") while halving nominal walk speed
+  -- a documented negative result for training on it carelessly, still
+  fine to use for held-out eval/characterization.
+- **`STUCK_FOOT_PROB`** -- confirmed still just a knob in the `_ZERO`
+  reset list, matches this session's stuck-foot idea, still untested.
 
-## Phase 2: a resiliency-focused 20M training run
+**Genuinely new, not covered by prior work:**
+- Static per-episode servo zero-offset (`JOINT_OFFSET_DEG`) -- R9 covers a
+  *ramping* version, not a fixed miscalibration from episode start; worth
+  testing both.
+- Aggressive command transitions as this session specifically framed them
+  (sudden stop, sudden reversal, rapid oscillation) -- pending the R8
+  reopening-reasoning check above.
+- The combined "gnarly course" (multiple stressors at once) -- the prior
+  campaign tested axes individually; compounding effects specifically
+  weren't the focus there.
 
-Once the axes above are characterized, design a new training recipe and
-run it fresh (20M steps), explicitly trading some of the current gait's
-cadence-matching/speed-tracking tightness for resilience under the
-stressors that actually proved meaningful. Concrete levers, to be finalized
-once real dose-response data exists rather than guessed now:
+## Revised plan
 
-- **Curriculum**: enable/increase DR probability and amplitude for
-  whichever axes showed a real dose-response (expected: rough terrain,
-  drop/pit, dense obstacles, latency, servo offset; expected NOT
-  meaningful: more of what's already ruled out, e.g. plain lateral pushes).
-- **Reward rebalancing**: likely loosen `FAC_IMITATION` and/or
-  `FAC_SPEED`/`FAC_SPEED_TRACK` somewhat -- a resiliency-focused gait may
-  need to deviate further from the exact scripted reference and exact
-  commanded speed when survival is at stake, and today's tight imitation
-  anchor may be actively fighting that. This is the "willing to sacrifice
-  some other stats" tradeoff made concrete.
-- **Residual authority**: worth revisiting `RESIDUAL_SCALE_DEG` again with
-  real data this time -- the resid30 campaign found no saturation under
-  easy conditions, but a genuinely harder curriculum might exercise the
-  wider ceiling for real, which would be the first real evidence either
-  way (vs. today's speed-only motivation).
-- **`FAC_RESIDUAL_COST`/`FAC_RESID_SMOOTH`**: may need loosening too, so
-  the policy doesn't get over-penalized for large corrective motions in
-  genuine crisis moments.
-- Final evaluation: the new checkpoint gets scored on
-  `benchmark_resiliency.py` (did it actually get more resilient) AND the
-  standard `benchmark_decathlon.py`/`evaluate_policy.py` metrics (did it
-  regress catastrophically on ordinary walking) -- both matter, this is a
-  tradeoff being made deliberately, not blindly.
-- Compare against both `run20m_ppo` and whichever recipe wins the resid30
-  campaign, not just one baseline.
+1. **Re-verify R10/R12/R4 against the current checkpoints** (run20m_ppo,
+   then whichever wins resid30) -- cheap, the test methodology already
+   exists, just needs re-running. Confirms the stalling problem is still
+   present in the current frontier, not just the older checkpoint it was
+   originally found on.
+2. **Try enabling `FAC_NOSTALL`** as a real training round -- this is the
+   already-designed, already-partially-validated fix for the actual
+   confirmed dominant failure mode, higher leverage than inventing new
+   stressor axes blind. Check whether it needs the terrain-feature
+   dependency it was originally scoped with, or works standalone.
+3. **Reopen R2 (IMU bias)** now that the hardware precondition is met.
+4. **Run R9 properly** (within-episode latency/thermal/battery ramp) --
+   covers this session's latency + servo-miscalibration priorities in a
+   more realistic form than a static test.
+5. **Check R8's drop reasoning** before deciding whether to re-run
+   aggressive command transitions as originally proposed or in some
+   modified form.
+6. **Characterize `RUBBLE` and `LEDGE_DIR=-1`** properly (dose-response
+   sweep, past the values already used in existing gauntlet cells) --
+   reusing existing mechanisms, not building new ones.
+7. **`STUCK_FOOT`**, static `JOINT_OFFSET_DEG`, and the combined gnarly
+   course last, as originally planned -- these remain genuinely new.
+8. Build `benchmark_resiliency.py` (dose-response sweep tool, composite
+   score, as originally planned) once the above informs what it actually
+   needs to measure -- better to design the tool around real findings than
+   guess at its shape first.
 
 ## Rounds
 
