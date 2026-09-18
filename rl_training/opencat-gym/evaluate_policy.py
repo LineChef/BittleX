@@ -185,9 +185,21 @@ def summarize(episodes):
             if ddj[25:75].mean() > 1e-9:
                 startup_jerk_ratio.append(float(ddj[:25].mean() / ddj[25:75].mean()))
 
+    # Per-term reward breakdown (mean over all steps, all episodes) -- every
+    # key the env's info dict exposes (r_imitation, r_joint_limit, r_balance,
+    # etc.), not just the couple already used above. Useful for diagnosing a
+    # specific reward term without TensorBoard (e.g. the resid30 campaign
+    # watching r_imitation/r_joint_limit for the crawl-regression signature).
+    reward_terms_mean = {}
+    for _, per_term, _, _, _ in episodes:
+        for k, v in per_term.items():
+            reward_terms_mean.setdefault(k, []).extend(v)
+    reward_terms_mean = {k: float(np.mean(v)) for k, v in reward_terms_mean.items()}
+
     m = lambda a: float(np.mean(a)) if len(a) else None
     return {
         "episodes": len(episodes),
+        "reward_terms_mean": reward_terms_mean,
         "episode_len_mean": m(lens),
         "fell_fraction": m(falls),
         "forward_distance_m_mean": m(fwd),
