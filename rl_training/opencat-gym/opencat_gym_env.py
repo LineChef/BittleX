@@ -472,6 +472,7 @@ FAC_CLIFF_FALL     = _g2e("FAC_CLIFF_FALL", 80.0)    # one-shot penalty for the 
 FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when an edge is RIGHT there (tight gate, small)
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
+RESIDUAL_SCALE_DEG = _g2e("RESIDUAL_SCALE_DEG", RESIDUAL_SCALE_DEG)  # resid30: override so a checkpoint trained under a DIFFERENT scale (e.g. run20m_ppo at 22) can be evaluated correctly even while the module default is set for the current campaign (30) -- G2E_RESIDUAL_SCALE_DEG=22, else the actions get physically misapplied at the wrong scale.
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
 # --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
