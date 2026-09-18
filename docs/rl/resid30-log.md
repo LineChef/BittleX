@@ -90,3 +90,32 @@ action_trace.py methodology, not left as a separate linked page. Leg-tinted
 replay GIFs (leg_tint.py, wired into render_gif.py etc.) are also a
 standard section of that same report. Apply this same standard to any
 future benchmark report from this project, not just this campaign.
+
+### Round 1 result: clean, no retuning needed
+
+- **Finished:** 2026-09-18 03:17 EDT, 3,014,656 total steps, `ep_rew_mean`
+  climbed 700 -> ~2700, `approx_kl` settled near zero (converged, not
+  diverged). Checkpoint: `trained/resid30_r1_ppo.zip`.
+- **evaluate_policy.py (12 episodes)** vs the corrected `run20m_ppo`
+  baseline (`G2E_RESIDUAL_SCALE_DEG=22`):
+  - `fell_fraction`: 0.0 both.
+  - `r_imitation` raw match ratio: 0.955 (resid30) vs 0.915 (base) -- no
+    crawl-regression signature, if anything a tighter match to `wkF`.
+  - `diagonal_trot_corr_mean`: -0.557 (resid30) vs -0.523 (base) -- slightly
+    crisper anti-phase trot.
+  - `r_joint_limit`: 0.0 both -- the soft-barrier concern flagged in the
+    plan (30deg reaching into the penalty zone at saturation) doesn't
+    manifest in practice; the policy isn't spending anywhere near full
+    saturation on average.
+  - `r_residual_cost`: -0.11 (resid30) vs -0.38 (base) -- lower, as
+    expected: the FAC_RESIDUAL_COST scaling preserves real-degree cost, so
+    the same real correction costs a smaller fraction of the wider budget.
+  - `startup_speed_ratio_mean` initially looked concerning (1.84 -> -1.43),
+    but this was command-sampling noise between two independently-sampled
+    12-episode evals (eval doesn't pin cmd_fwd per episode, and the
+    curriculum includes a backward-command band). Re-measured with a
+    pinned, matched 0.10 m/s command, 8 seeds each: 0.85 (base) vs 0.83
+    (resid30) -- statistically identical, both show the same occasional
+    per-seed startup stutter. Not a regression.
+- **Decision: clean pass, no Round 2 needed.** Moving directly to Stage 2
+  (10M validation run w/ bailout gates), per the plan's decision gate.
