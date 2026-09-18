@@ -407,7 +407,11 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 
 ## Phase 4 — Hardware assembly
 
-- [ ] Assemble Bittle X V2 (~40–90 min).
+- [ ] **Assemble Bittle X V2 (~40–90 min) — current blocker, frame ships
+      unassembled.** Pi+PiSugar wiring/bring-up (Steps 2-4,
+      `docs/build/biboard-pi-connector.md`) and the mount redesign (Step 5)
+      both need BiBoard, which only exists once this is built — not
+      available standalone.
 - [ ] Check servo calibration — pre-assembled units ship calibrated, so this is a
       check/fine-tune, not an assumed step. Only dig in if movement looks off.
 - [ ] Get it moving on stock firmware first, before any custom code.
