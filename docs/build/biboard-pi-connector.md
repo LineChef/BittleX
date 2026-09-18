@@ -20,9 +20,9 @@ PiSugar S  --5 pogo pins (header solder joints), 4 screws, no wiring-->  Pi Zero
       cable in the Bittle X box before doing anything below; if so, skip to
       Step 3
 - [ ] A 5-pin header to solder onto BiBoard, if one isn't already there
-- [ ] Female-to-female Dupont jumper wires (3 needed; a 40-pack is cheap and
-      the rest are reusable elsewhere) — get a couple of **longer** ones
-      (20&ndash;30cm) too, not just the standard short ones; see
+- [x] Female-to-female Dupont jumper wires — 40pc/10cm in hand (2026-09-18).
+      Still need a couple of **longer** ones (20&ndash;30cm), not just the
+      standard short ones, once the final mount position is decided; see
       [Step 5](#step-5--mount-the-assembled-stack-to-the-frame)
 - [ ] Soldering iron + solder, only if BiBoard's header isn't already
       populated
@@ -133,7 +133,7 @@ room for a pan head (vs. needing a flush/countersunk flathead like the M2×4
 flathead Petoi uses elsewhere in the kit). Check this visually against the
 boss pocket once the part is printed, before assuming pan-head is correct.
 
-## Step 1 — Mount PiSugar to the Pi
+## Step 1 — Mount PiSugar to the Pi ✅ done (2026-09-18)
 
 Bench work — no BiBoard needed, can happen any time.
 
