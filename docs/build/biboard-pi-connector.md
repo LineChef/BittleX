@@ -30,9 +30,10 @@ PiSugar S  --5 pogo pins (header solder joints), 4 screws, no wiring-->  Pi Zero
       — see [Screws to buy](#screws-to-buy) below
 - [ ] A way to mount the assembled stack to the frame — **not yet solved,
       on hold until the frame arrives**; see
-      [Print the standoff clip](#print-the-standoff-clip) below. Not needed
-      for Steps 1&ndash;4 — those work with the stack sitting loose on the
-      bench.
+      [Print the standoff clip](#print-the-standoff-clip) below. Only
+      Step 1 (Pi+PiSugar) is actually mount-independent — Steps 2&ndash;4
+      need BiBoard itself, which ships as part of the frame kit, so they're
+      hardware-blocked until the frame arrives too, not just Step 5.
 
 ### Get oriented: Pi Zero 2W ports
 
@@ -74,8 +75,9 @@ measurement and stays useful for whatever mount design replaces the clip,
 but the clip's underlying grip mechanism is invalidated. **Mount redesign is
 deferred until the frame arrives** — see the status note at the top of
 [Step 5](#step-5--mount-the-assembled-stack-to-the-frame) for what's ruled
-out so far and why. None of Steps 1&ndash;4 (wiring/bring-up) need a mount —
-the stack can sit unmounted on the bench for all of that.
+out so far and why. Only Step 1 (Pi+PiSugar) is actually mount-independent
+— Steps 2&ndash;4 need BiBoard itself, which ships as part of the frame
+kit, so they're hardware-blocked until the frame arrives too.
 
 Petoi's own FAQ and accessory library confirm how the Pi physically attaches
 to Bittle/Bittle X — this is not guessed: *"Both Nybble/Nybble Q and
@@ -314,9 +316,11 @@ decided" (kept below, collapsed, for the record):
 **Decided: wait for the frame to physically arrive before finalizing this.**
 This is an explicit open question, left unresolved on purpose until then —
 not a gap to fill in with more research or design work in the meantime.
-Steps 1&ndash;4 (wiring, bring-up) don't need a mount — the stack can sit
-unmounted on the bench for all of that. Also still open: PiSugar's power
-switch lands under the Pi's mini-HDMI-port edge once correctly oriented
+Note this isn't just a mount question: BiBoard itself ships as part of the
+frame kit, so Steps 2&ndash;4 (which need BiBoard) are also hardware-blocked
+until the frame arrives, not only Step 5. Only Step 1 (Pi+PiSugar) was ever
+actually available standalone, and it's done. Also still open: PiSugar's
+power switch lands under the Pi's mini-HDMI-port edge once correctly oriented
 (Step 1) — whatever mount/cover design happens here should keep that edge
 reachable, or accept leaving PiSugar always powered on as a fallback.
 
