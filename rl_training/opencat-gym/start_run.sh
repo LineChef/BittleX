@@ -11,13 +11,13 @@
 #   3. Warn about lingering PyBullet viewer windows (they slow training).
 #   4. Warn if opencat_gym_env.py / train.py have uncommitted changes and no
 #      smoke test was run since.
-#   5. Start TensorBoard (if needed) and open it in the browser.
-#   6. Launch training in the background; print PID / log path / how to stop.
+#   5. Launch training in the background; print PID / log path / how to stop.
+#      (TensorBoard is no longer auto-started -- not needed; training itself
+#      no longer logs to it either, see train.py.)
 set -euo pipefail
 
 cd "$(dirname "$0")"
 VENV_PY="../../.venv/bin/python"
-VENV_TB="../../.venv/bin/tensorboard"
 
 # ---- parse args: first arg is the tag; pull out --force; rest go to train.py ----
 TAG="${1:-}"
@@ -76,18 +76,7 @@ if command -v git >/dev/null && \
   [ "$ans" = "y" ] || { echo "Aborting."; exit 1; }
 fi
 
-# ---- 5. TensorBoard ----
-if ! pgrep -f "tensorboard.*tensorboard_logs" >/dev/null; then
-  nohup "$VENV_TB" --logdir trained/tensorboard_logs/ --port 6006 \
-        > trained/tensorboard.log 2>&1 &
-  echo "TensorBoard started -> http://localhost:6006/"
-  sleep 5
-else
-  echo "TensorBoard already up -> http://localhost:6006/"
-fi
-open "http://localhost:6006/" 2>/dev/null || true
-
-# ---- 6. launch ----
+# ---- 5. launch ----
 LOG="trained/${TAG}_console.log"
 nohup "$VENV_PY" train.py --tag "$TAG" "${PASS_ARGS[@]}" > "$LOG" 2>&1 &
 PID=$!
@@ -104,4 +93,4 @@ echo "  follow: tail -f $LOG"
 echo "  stop:   kill $PID"
 echo
 echo "Next: when it finishes (~40 min), replay it with  g2watch  and log the"
-echo "result + curve in docs/project-plan.md before starting the next run."
+echo "result in docs/project-plan.md before starting the next run."

@@ -29,7 +29,8 @@ def linear_schedule(initial_value):
 if __name__ == "__main__":
     # --tag names this run everywhere: checkpoints land in
     # trained/checkpoints/<tag>_<steps>_steps.zip and the final model in
-    # trained/<tag>_ppo.zip. The TensorBoard run (PPO_N) still auto-increments.
+    # trained/<tag>_ppo.zip. TensorBoard logging is disabled (tensorboard_log=None
+    # below) -- not needed; use evaluate_policy.py / g2watch on checkpoints instead.
     # Pass the reward-iteration label, e.g.  python train.py --tag v7
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag",
@@ -79,7 +80,7 @@ if __name__ == "__main__":
                          n_steps=int(2048*8/parallel_env),
                          learning_rate=args.finetune_lr,
                          target_kl=args.finetune_target_kl,
-                         tensorboard_log="trained/tensorboard_logs/")
+                         tensorboard_log=None)
         model.learn(args.steps, callback=checkpoint_callback,
                     reset_num_timesteps=True)
     else:
@@ -88,7 +89,7 @@ if __name__ == "__main__":
                     n_steps=int(2048*8/parallel_env),
                     learning_rate=linear_schedule(3e-4),
                     verbose=1,
-                    tensorboard_log="trained/tensorboard_logs/").learn(args.steps, callback=checkpoint_callback)
+                    tensorboard_log=None).learn(args.steps, callback=checkpoint_callback)
 
     model.save(f"trained/{args.tag}_ppo")
 
