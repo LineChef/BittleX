@@ -72,20 +72,21 @@ containing `Pi_StandOffRegular.stl` (this build's target — Pi Zero 2 W),
 `Pi3A_standOff.stl` (for the Pi 3A+), and a `.3mf` of the same part.
 
 **Print this file:**
-[`docs/build/cad/Pi_StandOffRegular_extended17.5mm.stl`](cad/Pi_StandOffRegular_extended17.5mm.stl)
-— the modified clip (v3), bridge extended to N=17.5mm to make room for
-PiSugar. **This is still a best guess, not a confirmed spec** — it's built
-from PiSugar's isolated thickness measurement (5/8&Prime;/15.875mm), not the
-real assembled Pi+PiSugar stack. If you can measure the real joined stack
-before printing, do that first and let the number be corrected; otherwise
-print this version and test-fit. Full reasoning, measurement history, and
-the mechanism this clip relies on (Screw B, retention theory, which edge to
-mount at) are in [Step 5](#step-5--mount-the-assembled-stack-to-the-frame).
+[`docs/build/cad/Pi_StandOffRegular_extended19.15mm.stl`](cad/Pi_StandOffRegular_extended19.15mm.stl)
+— the modified clip (v4), bridge extended to N=19.15mm. **Built from a real
+measurement, not a guess:** PiSugar screwed to the Pi, measured
+assembled — 3/4″ (19.05mm) from PiSugar's bottom to the top of the Pi's bare
+PCB (not counting the header) — plus a ~2mm wiring/fit allowance, minus the
+1.9mm the notch/cap already contributes. Full reasoning, measurement
+history, and the mechanism this clip relies on (Screw B, retention theory,
+which edge to mount at) are in
+[Step 5](#step-5--mount-the-assembled-stack-to-the-frame).
 
+[`Pi_StandOffRegular_extended17.5mm.stl`](cad/Pi_StandOffRegular_extended17.5mm.stl)
+(v3) and
 [`Pi_StandOffRegular_extended13mm.stl`](cad/Pi_StandOffRegular_extended13mm.stl)
-is the previous (13mm) version, kept in the repo marked **superseded** — it
-was found to be undersized once checked against PiSugar's real thickness.
-Not deleted, since 17.5mm is also still unconfirmed.
+(v2) are both earlier versions, kept in the repo marked **superseded** — both
+were built from estimates before the real joined measurement was taken.
 
 ### Screws to buy
 
@@ -207,7 +208,7 @@ standard short ones.
 
 ## Step 5 — Mount the assembled stack to the frame
 
-![Proportionally-accurate (13px=1mm) cross-section of the full physical stack at one corner, bottom to top: robot frame, BiBoard (1.6mm), the modified standoff clip (base+boss 5.1mm, solid clip material not wiring space / target +17.5mm bridge, revised from 13mm / notch-cap 1.9mm), PiSugar (15.875mm, measured) and the Pi board (~1.5mm, typical) now fully contained with a ~2mm wiring allowance instead of overflowing the old bridge — plus a top-down inset showing the decided clip-edge choice: the back edge (away from the head) preferred for head-servo clearance and gait-balance reasons, with the edge nearest BiBoard's header kept as an alternate usable with a longer jumper wire, both one full edge (never diagonal, which is physically impossible given the Pi Zero's small footprint), and Screw B running as one shared fastener from the clip's boss, through the base, through BiBoard, into the frame](images/biboard-pi-connector/bracket-installation.png)
+![Proportionally-accurate (13px=1mm) cross-section of the full physical stack at one corner, bottom to top: robot frame, BiBoard (1.6mm), the modified standoff clip (base+boss 5.1mm, solid clip material not wiring space / confirmed 19.15mm bridge, from a real caliper measurement of the assembled stack / notch-cap 1.9mm), PiSugar (15.875mm, measured) and the Pi board (3.175mm, derived as the remainder of the 19.05mm combined PiSugar+PCB measurement) now fully contained with a ~2mm wiring allowance instead of overflowing the old 13mm/17.5mm bridge — plus a top-down inset showing the decided clip-edge choice: the back edge (away from the head) preferred for head-servo clearance and gait-balance reasons, with the edge nearest BiBoard's header kept as an alternate usable with a longer jumper wire, both one full edge (never diagonal, which is physically impossible given the Pi Zero's small footprint), and Screw B running as one shared fastener from the clip's boss, through the base, through BiBoard, into the frame](images/biboard-pi-connector/bracket-installation.png)
 [Live, interactive version](https://claude.ai/artifact/CWFJSvX7MievwnSHPnzV9b) (kept in sync with this file; the PNG here is a static export for offline/print reading).
 
 ### The mount, decided
@@ -407,7 +408,7 @@ chrome/silver screw head seated in a recessed pocket.
 </details>
 
 <details>
-<summary><b>The PiSugar clearance problem — how N=17.5mm was reached (build history v1→v2→v3)</b></summary>
+<summary><b>The PiSugar clearance problem — how N=19.15mm was confirmed (build history v1→v2→v3→v4)</b></summary>
 
 A standoff is a spacer post that elevates the Pi (with PiSugar screwed
 underneath it) above whatever is below it. **Superseded: the Pi assembly IS
@@ -575,20 +576,30 @@ measurement.** The agreed steps:
   at z≈18.3mm), so the boss stays exactly where v2 left it (unshifted, peak
   z≈3.5mm) and only the notch/top section moves up further. All 4 clips
   verified watertight, single connected solid each, new total height
-  24.5mm (5.1 base+boss + 17.5 bridge + 1.9 notch/cap). Checked into this
-  repo at
-  [`docs/build/cad/Pi_StandOffRegular_extended17.5mm.stl`](cad/Pi_StandOffRegular_extended17.5mm.stl)
+  24.5mm (5.1 base+boss + 17.5 bridge + 1.9 notch/cap). Still a best guess
+  at this point — built from PiSugar's isolated thickness, not the real
+  joined stack.
+- **Real measurement taken, v4 built — `Pi_StandOffRegular_extended19.15mm.stl`,
+  N=19.15mm.** With PiSugar actually screwed to the Pi, the user measured
+  the assembled stack directly: **3/4″ (19.05mm)** from PiSugar's bottom to
+  the top of the Pi's bare PCB (deliberately not counting the GPIO header,
+  which sticks up past the clip's notch and isn't what the clip needs to
+  clear). Corrected budget: 19.05 + ~2mm wiring/fit allowance − 1.9mm the
+  notch/cap already contributes → **19.15mm bridge**. Built by extending v3
+  — same pipeline, spliced 1.65mm additional material at z≈22.0mm (inside
+  the confirmed-constant cross-section, before the notch/cap transition at
+  z≈22.7mm), boss unshifted (peak z≈3.5mm, verified). All 4 clips
+  watertight, single solid each, new total height 26.15mm (5.1 base+boss +
+  19.15 bridge + 1.9 notch/cap). Checked into this repo at
+  [`docs/build/cad/Pi_StandOffRegular_extended19.15mm.stl`](cad/Pi_StandOffRegular_extended19.15mm.stl)
   (matches the copy on the user's Desktop, checksums verified identical).
-  [`Pi_StandOffRegular_extended13mm.stl`](cad/Pi_StandOffRegular_extended13mm.stl)
-  stays in the repo too, marked superseded, not deleted, since 17.5mm is
-  still a best guess too.
-- **Still needed:** physically join PiSugar to the Pi (screws + pogo pins,
-  as final) and measure the real assembled stack — this is the number that
-  actually matters, 17.5mm is only a best guess from PiSugar's isolated
-  thickness. Rebuild again (splice a delta onto whichever version is
-  closest, same pipeline) once that measurement is in, and update the
-  diagram again to match. The cover file is still **not started** — same
-  hold as before, now extended to the clip's own N as well.
+  v3, v2, and v1 all stay in the repo too, marked superseded, not deleted —
+  kept for the record now that a confirmed version exists.
+- **This is the version to print.** The cover file is still **not
+  started** — the user also measured the full stack including the header
+  (1″/25.4mm), which is the number the cover needs (it has to enclose
+  everything, not just grip the board edge like the clip does) — but the
+  cover modification itself hasn't been done yet.
 
 Options 1 (stack two clip sets), 2 (relocate PiSugar via extended pogo
 wires), and 4 (swap to the generic Printables Pi Zero adapter plate) above
