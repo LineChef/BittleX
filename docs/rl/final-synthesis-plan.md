@@ -38,15 +38,24 @@ campaign's backlog, not in this recipe.
 
 ## Deliverable
 
-A written recipe (this doc, filled in at that point) naming the exact
-constants changing from today's defaults, the reasoning per change (with a
-citation back to the specific campaign/round that justified it), whether a
-bridge validation round is needed and why, and the final go-ahead plan for
-the fresh 20M run itself (tag, expected duration, comparison baseline(s),
-and which benchmarks it needs to clear — the resiliency composite score
-from `benchmark_resiliency.py` and the standard decathlon/keep-revert bar
-both, since this is a deliberate tradeoff being made with eyes open, not a
-blind win).
+Two parts, both in this doc, filled in once all three campaigns are done:
+
+1. **Round-by-round summary, every campaign.** For each round that actually
+   ran (resid30, gait-friction, resiliency alike): what was being tested,
+   what the result was, and what it means -- a plain narrative recap, not
+   just a link back to the individual campaign logs. Someone reading only
+   this doc should come away understanding the whole testing journey, not
+   just the final answer. The per-round detail still lives in each
+   campaign's own log; this is the readable summary layer on top.
+2. **The recipe itself** -- naming the exact constants changing from
+   today's defaults, the reasoning per change (with a citation back to the
+   specific campaign/round that justified it), whether a bridge validation
+   round is needed and why, and the final go-ahead plan for the fresh 20M
+   run itself (tag, expected duration, comparison baseline(s), and which
+   benchmarks it needs to clear -- the resiliency composite score from
+   `benchmark_resiliency.py` and the standard decathlon/keep-revert bar
+   both, since this is a deliberate tradeoff being made with eyes open, not
+   a blind win).
 
 ## Status
 
