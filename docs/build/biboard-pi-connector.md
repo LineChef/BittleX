@@ -7,7 +7,7 @@ material that isn't needed to complete a step is marked as such and can be
 skipped on a first read.
 
 ```
-PiSugar S  --2 pogo pins (5V+GND), 4 screws, no wiring-->  Pi Zero 2 W  --3 wires (TX/RX/GND)-->  BiBoard V1
+PiSugar S  --5 pogo pins (header solder joints), 4 screws, no wiring-->  Pi Zero 2 W  --3 wires (TX/RX/GND)-->  BiBoard V1
 ```
 
 ## Before you start
@@ -28,8 +28,11 @@ PiSugar S  --2 pogo pins (5V+GND), 4 screws, no wiring-->  Pi Zero 2 W  --3 wire
       populated
 - [ ] M2 pan-head self-tapping screws, small mixed assortment (6&ndash;12mm)
       — see [Screws to buy](#screws-to-buy) below
-- [ ] A 3D-printed, modified Pi standoff clip to mount the assembly to the
-      frame — see [Print the standoff clip](#print-the-standoff-clip) below
+- [ ] A way to mount the assembled stack to the frame — **not yet solved,
+      on hold until the frame arrives**; see
+      [Print the standoff clip](#print-the-standoff-clip) below. Not needed
+      for Steps 1&ndash;4 — those work with the stack sitting loose on the
+      bench.
 
 ### Get oriented: Pi Zero 2W ports
 
@@ -57,8 +60,22 @@ edge, three ports along the bottom:
 
 ### Print the standoff clip
 
-**Start this first** — printing takes lead time, and everything else in this
-doc can happen while it's in progress.
+**On hold as of 2026-09-18 — do not print yet.** The corner-clip mounting
+mechanism itself (not just the bridge height) has since been found not to
+work with the real assembled stack: there is no chip-free corner anywhere on
+the Pi Zero 2W's top side for an edge-grip notch to clip onto (header pins
+reach both top corners, microSD engulfs the left edge, the CSI connector
+sits at the top-right, mini-HDMI and a micro-USB port sit at the two bottom
+corners). This wasn't visible from reasoning about the header/port edges
+alone — a full top-down photo of the board (already in this repo,
+`images/biboard-pi-connector/pizero-overview.png`) shows every corner
+crowded. The height math below (N=19.15mm) is still a confirmed, real
+measurement and stays useful for whatever mount design replaces the clip,
+but the clip's underlying grip mechanism is invalidated. **Mount redesign is
+deferred until the frame arrives** — see the status note at the top of
+[Step 5](#step-5--mount-the-assembled-stack-to-the-frame) for what's ruled
+out so far and why. None of Steps 1&ndash;4 (wiring/bring-up) need a mount —
+the stack can sit unmounted on the bench for all of that.
 
 Petoi's own FAQ and accessory library confirm how the Pi physically attaches
 to Bittle/Bittle X — this is not guessed: *"Both Nybble/Nybble Q and
@@ -71,16 +88,16 @@ Petoi's official accessories repo, folder
 containing `Pi_StandOffRegular.stl` (this build's target — Pi Zero 2 W),
 `Pi3A_standOff.stl` (for the Pi 3A+), and a `.3mf` of the same part.
 
-**Print this file:**
+**Height-corrected file (mechanism now invalidated, kept for reference):**
 [`docs/build/cad/Pi_StandOffRegular_extended19.15mm.stl`](cad/Pi_StandOffRegular_extended19.15mm.stl)
-— the modified clip (v4), bridge extended to N=19.15mm. **Built from a real
-measurement, not a guess:** PiSugar screwed to the Pi, measured
-assembled — 3/4″ (19.05mm) from PiSugar's bottom to the top of the Pi's bare
-PCB (not counting the header) — plus a ~2mm wiring/fit allowance, minus the
-1.9mm the notch/cap already contributes. Full reasoning, measurement
-history, and the mechanism this clip relies on (Screw B, retention theory,
-which edge to mount at) are in
-[Step 5](#step-5--mount-the-assembled-stack-to-the-frame).
+— bridge extended to N=19.15mm. **Built from a real measurement, not a
+guess:** PiSugar screwed to the Pi, measured assembled — 3/4″ (19.05mm) from
+PiSugar's bottom to the top of the Pi's bare PCB (not counting the header) —
+plus a ~2mm wiring/fit allowance, minus the 1.9mm the notch/cap already
+contributes. Full reasoning, measurement history, and the mechanism this
+clip relies on (Screw B, retention theory, which edge to mount at) are in
+[Step 5](#step-5--mount-the-assembled-stack-to-the-frame) — all now
+superseded background, kept for the record.
 
 [`Pi_StandOffRegular_extended17.5mm.stl`](cad/Pi_StandOffRegular_extended17.5mm.stl)
 (v3) and
@@ -123,11 +140,43 @@ Bench work — no BiBoard needed, can happen any time.
 ![PiSugar S board, top view](images/biboard-pi-connector/pisugar-s.png)
 
 Align PiSugar's 4 screw holes underneath the Pi and secure it with the
-included screws. Two spring-loaded pogo pins on PiSugar make contact with two
-pads on the underside of the Pi automatically — **5V and GND, power only**.
+included screws.
 
-No wiring, no soldering, no pin diagram to check — the screw holes only line
-up one way.
+**Orientation matters — get it wrong and PiSugar will not power the Pi, with
+no obvious sign anything is wrong.** The 4 mounting holes are spaced
+symmetrically, so PiSugar physically bolts on in **two different 180°
+rotations** — screws thread in fine either way. Only one of them is
+electrically correct:
+
+- **Correct:** PiSugar's own micro-USB charging port, power switch, and
+  battery end up under the Pi's mini-HDMI/USB-port edge. PiSugar's pogo-pin
+  end ends up under the Pi's GPIO header edge.
+- **Wrong (but bolts on just as easily):** PiSugar rotated 180° from that —
+  pogo pins land on bare PCB under the middle of the board, nowhere near the
+  header.
+
+Confirmed 2026-09-17 the hard way, after PiSugar was originally assembled in
+the wrong rotation and showed no power to the Pi (see the background section
+below for the full diagnostic trail). Before fully tightening the screws,
+hold the two boards edge-to-edge and visually check that PiSugar's pogo pins
+land on the Pi's header solder-joint row (the double row of small pads at
+the base of the 40-pin header, visible from the underside) — don't rely on
+the screw holes fitting as confirmation, since they fit either way.
+
+**What the pogo pins actually contact:** 5 spring-loaded pogo pins (not 2),
+landing directly on the underside solder joints of the Pi's own 40-pin
+header — not a separate test-pad cluster elsewhere on the board. Confirmed
+three ways: PiSugar's official FAQ states pogo pins contact "the bottom of
+the Raspberry Pi's GPIO pins"; PiSugar's own PCB legend identifies one of
+the 5 contacts as SCL, tied to GPIO3 (physical header pin 5) for
+auto-startup; and directly visible in a macro photo of the assembled stack
+(pins pressed against the header pin bases). The likely signal mapping is
+5V/5V/SCL/GND/GND, using header pins in the 2/4/5/6 range — not
+independently confirmed pin-by-pin, but consistent with everything above.
+
+No wiring, no soldering — but do check the orientation before this leaves
+the bench, since it's easy to reassemble correctly later but easy to miss
+entirely if you only check that the screws went in.
 
 ## Step 2 — Prepare BiBoard's Pi header
 
@@ -211,6 +260,69 @@ standard short ones.
 ![Proportionally-accurate (13px=1mm) cross-section of the full physical stack at one corner, bottom to top: robot frame, BiBoard (1.6mm), the modified standoff clip (base+boss 5.1mm, solid clip material not wiring space / confirmed 19.15mm bridge, from a real caliper measurement of the assembled stack / notch-cap 1.9mm), PiSugar (15.875mm, measured) and the Pi board (3.175mm, derived as the remainder of the 19.05mm combined PiSugar+PCB measurement) now fully contained with a ~2mm wiring allowance instead of overflowing the old 13mm/17.5mm bridge — plus a top-down inset showing the decided clip-edge choice: the back edge (away from the head) preferred for head-servo clearance and gait-balance reasons, with the edge nearest BiBoard's header kept as an alternate usable with a longer jumper wire, both one full edge (never diagonal, which is physically impossible given the Pi Zero's small footprint), and Screw B running as one shared fastener from the clip's boss, through the base, through BiBoard, into the frame](images/biboard-pi-connector/bracket-installation.png)
 [Live, interactive version](https://claude.ai/artifact/CWFJSvX7MievwnSHPnzV9b) (kept in sync with this file; the PNG here is a static export for offline/print reading).
 
+### Status: mount mechanism invalidated, redesign deferred
+
+**As of 2026-09-18, the corner-clip approach below is ruled out and no
+replacement is designed yet.** Two things changed since "The mount,
+decided" (kept below, collapsed, for the record):
+
+1. **No corner of the Pi Zero 2W's top side is actually chip-free.** The
+   back-edge-vs-header-edge debate below assumed the two short edges
+   (microSD side, camera-connector side) were clear for a clip's edge-grip
+   notch. A full top-down photo of the real board
+   (`images/biboard-pi-connector/pizero-overview.png`, already in this
+   repo) shows every corner crowded — header pins reach both top corners,
+   microSD takes most of the left edge, the CSI connector sits at
+   top-right, mini-HDMI and a micro-USB port occupy the two bottom
+   corners. There's no edge for a notch-style clip to grip anywhere on the
+   bare board.
+2. **The obvious fallback (screw through the Pi's own mounting holes into a
+   flat bracket) doesn't work either.** Those 4 holes are already used to
+   screw PiSugar to the Pi — a bracket would need a longer shared screw
+   running bracket→PiSugar→Pi through the same holes, and PiSugar's
+   battery sits in the way of at least some of them. Confirmed candidate
+   [Raspberry Pi Zero Adapter Bracket](https://www.printables.com/model/645024-raspberry-pi-zero-adapter-bracket)
+   (MaffooClock, Printables, screw-through design) was evaluated and ruled
+   out on this basis — its whole mounting mechanism assumes a bare Pi Zero
+   with free mounting holes, which this build doesn't have.
+
+**Options on the table, not yet decided between:**
+- Temporarily disconnect PiSugar's (magnetically-mounted) battery during
+  assembly only, to get a screwdriver to the shared holes, then reseat it —
+  works, but means detaching the battery on every future disassembly too,
+  which matters while the project is still in active hardware iteration.
+- A custom bracket with a recessed pocket shaped to the battery, so a flat
+  plate can sit close to the board without needing the shared holes at all.
+- Relocate the battery off PiSugar entirely — glue it elsewhere on the
+  frame, extend wires to PiSugar's `BAT+` pad — which fully clears the
+  board for whatever mount design follows, at the cost of a rewiring step.
+- Some form of edge-clamp around the *assembled* Pi+PiSugar block (rather
+  than the bare Pi) — untested whether the combined stack has a clear edge
+  the bare board doesn't.
+- Grip around the **screw heads** at the mounting holes instead of the
+  board edge. Every mounting hole necessarily has a small clear zone around
+  it (a screw/washer has to seat against something), even at corners
+  otherwise too crowded for an edge-grip notch — so a pocket/socket shaped
+  to capture the screw head, rather than a notch sized for bare PCB edge,
+  could use that guaranteed-clear spot instead. Would need to be sized to
+  span the full Pi+PiSugar stack thickness (not just the Pi's 1.6mm PCB) to
+  also solve the stack-thickness problem. Doesn't depend on the frame at
+  all — could in principle be prototyped before the frame arrives, using
+  real screw-head dimensions (diameter/height) once measured. Floated as a
+  "this could work" idea, not a chosen direction.
+
+**Decided: wait for the frame to physically arrive before finalizing this.**
+This is an explicit open question, left unresolved on purpose until then —
+not a gap to fill in with more research or design work in the meantime.
+Steps 1&ndash;4 (wiring, bring-up) don't need a mount — the stack can sit
+unmounted on the bench for all of that. Also still open: PiSugar's power
+switch lands under the Pi's mini-HDMI-port edge once correctly oriented
+(Step 1) — whatever mount/cover design happens here should keep that edge
+reachable, or accept leaving PiSugar always powered on as a fallback.
+
+<details>
+<summary>Superseded: "The mount, decided" — back-edge clip theory, before the chip-clearance finding</summary>
+
 ### The mount, decided
 
 **Which edge: the back (away from the head), not the edge nearest BiBoard's
@@ -259,6 +371,8 @@ BiBoard's real corner-to-corner distance in either direction, any offset
 from the corner screw to better center the Pi, or whether 2-point clamping
 holds the board securely — all pending physically test-fitting the real
 parts, not resolvable from photos alone.
+
+</details>
 
 ### Background: how the mount was figured out
 

@@ -425,23 +425,21 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
     data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](hardware/pi-power.md).
   - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
     the Pi cutout.
-  - 3D print Petoi's official Pi standoff bracket to mount the Pi+PiSugar
-    assembly to the frame — download
-    [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl)
-    (Pi Zero 2 W). Full reasoning + diagrams:
-    [`docs/build/biboard-pi-connector.md`](build/biboard-pi-connector.md).
-- [ ] **Build: modified standoff clips + cover, for Pi+PiSugar clearance —
-      clip built (N=17.5mm, best guess), cover not started.** This is now a
-      status line only — the full findings, build history (v1→v2→v3), mount
-      decision (which edge + why), and screw sourcing live in
+  - Petoi's official Pi standoff bracket (`Pi_StandOffRegular.stl`) does
+    **not** work as-is for this stack — see status line below.
+- [ ] **Build: Pi+PiSugar mount to the frame — power confirmed working
+      2026-09-17, mount mechanism not yet solved, deferred until the frame
+      physically arrives.** This is now a status line only — the full
+      findings (PiSugar orientation fix, confirmed pogo-pin/header contact
+      mechanism, why the corner-clip and screw-through-bracket approaches
+      were both ruled out, and the candidate options being weighed) live in
       [`docs/build/biboard-pi-connector.md`](build/biboard-pi-connector.md)
       (the single build manual, Steps 1-5) and the
       [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
       — that's the canonical reference, not this checklist.
-  - Clip STL checked in:
-    [`docs/build/cad/Pi_StandOffRegular_extended17.5mm.stl`](build/cad/Pi_StandOffRegular_extended17.5mm.stl),
-    still pending a real joint-measurement to confirm or correct N.
-  - Cover on hold until the assembled stack can be measured.
+  - Steps 1-4 (wiring, bring-up) don't need a mount — proceed with those on
+    the bench regardless.
+  - Cover on hold until the mount approach is decided.
   - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
     "Screws to buy."
 - [ ] `sudo raspi-config` → Interface Options → Serial Port → disable the serial
