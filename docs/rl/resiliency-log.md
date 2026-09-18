@@ -1,6 +1,10 @@
 # Resiliency campaign log
 
-Queued third, after the resid30 campaign and gait-friction testing. Folds
+Queued third, after the resid30 campaign and gait-friction testing, and
+followed by `docs/rl/final-synthesis-plan.md` once this campaign (and the
+other two) are done -- that's where findings across all three campaigns
+turn into an actual fresh-20M-run recipe. This doc stays scoped to
+resiliency testing itself. Folds
 together two things: the new testing this session planned (long-duration
 drift, aggressive command transitions, latency, servo-miscalibration, plus
 the fall-hunting list) **and** a prior systematic campaign
