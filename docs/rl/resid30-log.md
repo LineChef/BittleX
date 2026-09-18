@@ -119,3 +119,40 @@ future benchmark report from this project, not just this campaign.
     per-seed startup stutter. Not a regression.
 - **Decision: clean pass, no Round 2 needed.** Moving directly to Stage 2
   (10M validation run w/ bailout gates), per the plan's decision gate.
+
+### Stage 2: 10M validation run, clean pass
+
+- **Completed:** 2026-09-18 07:01 EDT, 10,010,624 total steps, both
+  bailout gates passed (1M gross sanity, 3M on-track), no BAILOUT file.
+  `ep_rew_mean` ~2800, `approx_kl` settled low (0.0026-0.0035). Paused via
+  SIGSTOP partway through for a disturbance-mechanism investigation
+  (see below), resumed via SIGCONT -- confirmed safe since the bailout
+  wrapper's gate check is purely checkpoint-file-based with no wall-clock
+  stall detection. Checkpoint: `trained/resid30_val10m_ppo.zip`.
+- **evaluate_policy.py (12 episodes)** vs run20m_ppo baseline and the 3M
+  Round-1 checkpoint:
+  - `fell_fraction`: 0.0 across all three.
+  - `diagonal_trot_corr_mean`: -0.523 (base) -> -0.557 (3M) -> -0.584 (10M)
+    -- continuing to tighten with more training, not degrading.
+  - `yaw_abs_max_deg_mean`: 0.54 (base) -> 1.02 (3M) -> 0.42 (10M) -- the 3M
+    checkpoint's slightly wider yaw drift resolved with more training.
+  - `r_imitation` raw match ratio: 0.955 (10M) -- stable, no crawl
+    regression at 10M either.
+  - `r_joint_limit`: 0.0 -- still no saturation pressure even at 10M steps.
+- **Decision: clean pass, proceeding directly to Stage 3** (fresh 20M run),
+  per the plan's decision gate.
+
+### Aside: extensive disturbance-mechanism investigation (see also
+docs/rl/slope-ceiling-log.md)
+
+While Stage 2 was mid-run, investigated whether the robot can be made to
+fall at all, at the user's request. Ruled out horizontal shoves (any
+direction/timing, up to 10 m/s / 10N sustained, ~3.8x body weight -- ruled
+out `resetBaseVelocity` as a flawed test method first, since it bypasses
+ground friction; redid properly with `applyExternalForce`), uniform terrain
+roughness (0.006-0.060 range), and a sustained one-sided foot-height
+mismatch (10-80mm, confirmed via direct contact-point logging, 216 real
+contacts). None produced falls. A quick decathlon pass found the real,
+confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
+-- 62% fall rate. Spawned the slope-ceiling follow-on experiment
+(`docs/rl/slope-ceiling-log.md`), queued after creep-friction.
