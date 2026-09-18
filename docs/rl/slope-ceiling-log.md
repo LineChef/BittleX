@@ -1,7 +1,7 @@
 # Slope-ceiling campaign log
 
 Queued third, after the resid30 campaign (`docs/rl/resid30-log.md`) and the
-creep-speed friction fix (`docs/rl/creep-friction-log.md`). Same branch
+gait-friction fix (`docs/rl/gait-friction-log.md`). Same branch
 (`auto-gait-iteration`), same automated-testing-loop.md methodology.
 
 ## Context
