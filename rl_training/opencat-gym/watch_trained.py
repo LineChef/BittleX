@@ -107,6 +107,27 @@ import pybullet as p
 from leg_tint import setup_leg_tint, apply_leg_tint
 setup_leg_tint(env)
 
+import pybullet_data
+_checker_path = pybullet_data.getDataPath() + "/checker_blue.png"
+
+
+def _fix_floor():
+    # Body 0 is the ground (plane or heightfield). Put a texture on it so
+    # it's readable -- and it fixes the macOS black-floor glitch. Reloaded
+    # fresh after every reset, same fix as watch.py (a texture id loaded
+    # before reset() is not reliably valid after it).
+    try:
+        _tex = p.loadTexture(_checker_path)
+        p.changeVisualShape(0, -1, rgbaColor=[1, 1, 1, 1], textureUniqueId=_tex)
+    except Exception:
+        try:
+            p.changeVisualShape(0, -1, rgbaColor=[0.82, 0.82, 0.85, 1.0], textureUniqueId=-1)
+        except Exception:
+            pass
+
+
+_fix_floor()
+
 _TR = opencat_gym_env.TERRAIN_RANGE
 _FOV = np.deg2rad(opencat_gym_env.TERRAIN_FOV_DEG)
 _BRG = np.linspace(-_FOV, _FOV, 9)
@@ -142,6 +163,7 @@ try:
         if terminated or truncated:
             obs, info = env.reset()
             setup_leg_tint(env)
+            _fix_floor()
 except (KeyboardInterrupt, pybullet.error):
     pass  # Ctrl+C, or the GUI window was closed
 finally:
