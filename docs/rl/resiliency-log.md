@@ -121,9 +121,14 @@ so nothing gets rebuilt from scratch:
    exists, just needs re-running. Confirms the stalling problem is still
    present in the current frontier, not just the older checkpoint it was
    originally found on.
-2. **Try enabling `FAC_NOSTALL`** as a real training round -- this is the
+2. **Re-instate `FAC_NOSTALL`** -- confirmed priority (user, 2026-09-18),
+   not just a "try it" item. Deliberately **not** touching the in-flight
+   Stage 3 run for this (too far in -- 11M+/20M steps -- to change the
+   recipe mid-run); this is queued as the first real reward change in the
+   resiliency campaign's own training round instead. This is the
    already-designed, already-partially-validated fix for the actual
-   confirmed dominant failure mode, higher leverage than inventing new
+   confirmed dominant failure mode (the gait stopping when it hits
+   resistance, e.g. an obstacle), higher leverage than inventing new
    stressor axes blind. Check whether it needs the terrain-feature
    dependency it was originally scoped with, or works standalone.
 3. **Reopen R2 (IMU bias)** now that the hardware precondition is met.
