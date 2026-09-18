@@ -32,8 +32,10 @@ PiSugar S  --5 pogo pins (header solder joints), 4 screws, no wiring-->  Pi Zero
       on hold until the frame arrives**; see
       [Print the standoff clip](#print-the-standoff-clip) below. Only
       Step 1 (Pi+PiSugar) is actually mount-independent — Steps 2&ndash;4
-      need BiBoard itself, which ships as part of the frame kit, so they're
-      hardware-blocked until the frame arrives too, not just Step 5.
+      need BiBoard itself, which ships as part of the frame kit **unassembled**
+      (Phase 4's "Assemble Bittle X V2," ~40&ndash;90 min), so they're
+      hardware-blocked until the frame both arrives and is built, not just
+      Step 5.
 
 ### Get oriented: Pi Zero 2W ports
 
@@ -76,8 +78,9 @@ but the clip's underlying grip mechanism is invalidated. **Mount redesign is
 deferred until the frame arrives** — see the status note at the top of
 [Step 5](#step-5--mount-the-assembled-stack-to-the-frame) for what's ruled
 out so far and why. Only Step 1 (Pi+PiSugar) is actually mount-independent
-— Steps 2&ndash;4 need BiBoard itself, which ships as part of the frame
-kit, so they're hardware-blocked until the frame arrives too.
+— Steps 2&ndash;4 need BiBoard itself, which ships as part of the frame kit
+**unassembled** (Phase 4's "Assemble Bittle X V2," ~40&ndash;90 min), so
+they're hardware-blocked until the frame both arrives and is built.
 
 Petoi's own FAQ and accessory library confirm how the Pi physically attaches
 to Bittle/Bittle X — this is not guessed: *"Both Nybble/Nybble Q and
@@ -317,9 +320,11 @@ decided" (kept below, collapsed, for the record):
 This is an explicit open question, left unresolved on purpose until then —
 not a gap to fill in with more research or design work in the meantime.
 Note this isn't just a mount question: BiBoard itself ships as part of the
-frame kit, so Steps 2&ndash;4 (which need BiBoard) are also hardware-blocked
-until the frame arrives, not only Step 5. Only Step 1 (Pi+PiSugar) was ever
-actually available standalone, and it's done. Also still open: PiSugar's
+frame kit **unassembled** (Phase 4's "Assemble Bittle X V2," ~40&ndash;90
+min), so Steps 2&ndash;4 (which need BiBoard) are also hardware-blocked
+until the frame both arrives and is built, not only Step 5. Only Step 1
+(Pi+PiSugar) was ever actually available standalone, and it's done. Also
+still open: PiSugar's
 power switch lands under the Pi's mini-HDMI-port edge once correctly oriented
 (Step 1) — whatever mount/cover design happens here should keep that edge
 reachable, or accept leaving PiSugar always powered on as a fallback.

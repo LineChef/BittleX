@@ -439,8 +439,9 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
       — that's the canonical reference, not this checklist.
   - Step 1 (Pi+PiSugar) is done and needed no mount. Steps 2-4 are also
-    hardware-blocked until the frame arrives, though — not just the mount
-    (Step 5) — since BiBoard itself ships as part of the frame kit.
+    hardware-blocked, though — not just the mount (Step 5) — since BiBoard
+    ships as part of the frame kit **unassembled**; see "Assemble Bittle X
+    V2" above, the actual first blocker.
   - Cover on hold until the mount approach is decided.
   - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
     "Screws to buy."
