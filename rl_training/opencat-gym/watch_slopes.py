@@ -44,6 +44,7 @@ env = OpenCatGymEnv()
 
 from stable_baselines3 import PPO
 model = PPO.load(args.checkpoint)
+from leg_tint import setup_leg_tint, apply_leg_tint
 
 p.configureDebugVisualizerCamera if False else None
 
@@ -64,10 +65,12 @@ def set_slope(entry):
 i = 0
 set_slope(SLOPES[0])
 obs, info = env.reset()
+setup_leg_tint(env)
 try:
     while True:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
+        apply_leg_tint(env, action)
         pos = p.getBasePositionAndOrientation(env.robot_id)[0]
         p.resetDebugVisualizerCamera(cameraDistance=0.42, cameraYaw=50,
                                      cameraPitch=-22,
@@ -79,6 +82,7 @@ try:
             i = (i + 1) % len(SLOPES)
             set_slope(SLOPES[i])
             obs, info = env.reset()
+            setup_leg_tint(env)
 except (KeyboardInterrupt, p.error):
     pass
 finally:

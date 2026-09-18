@@ -22,6 +22,7 @@ import pybullet as p
 import opencat_gym_env
 opencat_gym_env.GUI_MODE = False
 from opencat_gym_env import OpenCatGymEnv
+from leg_tint import setup_leg_tint, apply_leg_tint
 
 PAW_LINKS = [3, 6, 9, 12]          # foot link indices (from the env)
 EPISODE_CAP = 250
@@ -30,6 +31,8 @@ EPISODE_CAP = 250
 def run_episode(env, model, render_frames=0, frames_dir=None):
     obs, _ = env.reset()
     rid = env.robot_id
+    if render_frames and frames_dir:
+        setup_leg_tint(env)
 
     p0, _ = p.getBasePositionAndOrientation(rid)
     rec = {
@@ -61,6 +64,9 @@ def run_episode(env, model, render_frames=0, frames_dir=None):
         rec["joint"].append(np.array(js, dtype=float))
         for k, v in info.items():
             per_term.setdefault(k, []).append(float(v))
+
+        if render_frames and frames_dir:
+            apply_leg_tint(env, action)
 
         if render_frames and frames_dir and steps <= EPISODE_CAP:
             every = max(EPISODE_CAP // render_frames, 1)

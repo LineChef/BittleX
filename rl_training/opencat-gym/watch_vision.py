@@ -38,6 +38,8 @@ from stable_baselines3 import PPO
 model = PPO.load(args.checkpoint)
 
 import pybullet as p
+from leg_tint import setup_leg_tint, apply_leg_tint
+setup_leg_tint(env)
 
 FOV = np.deg2rad(TERRAIN_FOV_DEG)
 BEARINGS = np.linspace(-FOV, FOV, 9)
@@ -89,6 +91,7 @@ try:
     while True:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
+        apply_leg_tint(env, action)
         _draw_scan()
         time.sleep(1 / 60)
         step += 1
@@ -98,6 +101,7 @@ try:
                   f"bearing_norm={bearing_n:+.2f}  tall_flag={tall:.0f}")
         if terminated or truncated:
             obs, info = env.reset()
+            setup_leg_tint(env)
             step = 0
 except (KeyboardInterrupt, p.error):
     pass

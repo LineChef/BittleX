@@ -9,6 +9,7 @@ import pybullet as p
 import opencat_gym_env
 opencat_gym_env.GUI_MODE = False
 from opencat_gym_env import OpenCatGymEnv
+from leg_tint import setup_leg_tint, apply_leg_tint
 
 ap = argparse.ArgumentParser()
 ap.add_argument("checkpoint")
@@ -43,11 +44,13 @@ env = OpenCatGymEnv()
 model = PPO.load(args.checkpoint)
 obs, _ = env.reset()
 rid = env.robot_id
+setup_leg_tint(env)
 
 frames = []
 for t in range(args.steps):
     action, _ = model.predict(obs, deterministic=True)
     obs, _, term, trunc, _ = env.step(action)
+    apply_leg_tint(env, action)
     if t % args.stride == 0:
         pos = p.getBasePositionAndOrientation(rid)[0]
         _, _, rgb, _, _ = p.getCameraImage(
@@ -61,6 +64,7 @@ for t in range(args.steps):
     if term or trunc:
         obs, _ = env.reset()
         rid = env.robot_id
+        setup_leg_tint(env)
 env.close()
 
 from PIL import Image

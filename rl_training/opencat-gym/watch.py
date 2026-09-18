@@ -187,6 +187,8 @@ def main():
     env.reset()                 # materialise the GUI window BEFORE torch loads (macOS)
     import pybullet as p
     import numpy as np
+    from leg_tint import setup_leg_tint, apply_leg_tint
+    setup_leg_tint(env)
 
     import benchmark_decathlon as DEC   # noqa: E402  (after env on purpose)
     DEC._EXTRA_DR = args.dr
@@ -227,6 +229,7 @@ def main():
             DEC._apply(knobs)
             run += 1
             obs, _ = env.reset()
+            setup_leg_tint(env)
             # Body 0 is the ground (plane or heightfield). Put a texture on it
             # (checker warps over height variation; a mottled fleck for flat
             # carpet) so it's readable -- and it fixes the macOS black-floor
@@ -245,6 +248,7 @@ def main():
             while True:
                 a, _ = model.predict(obs, deterministic=True)
                 obs, _, term, trunc, _ = env.step(a)
+                apply_leg_tint(env, a)
                 pos, q = p.getBasePositionAndOrientation(env.robot_id)
                 if gif_mode:
                     if steps % EVERY == 0:

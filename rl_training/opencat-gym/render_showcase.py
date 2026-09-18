@@ -72,6 +72,7 @@ def main():
 
     env = OpenCatGymEnv()
     model, who = build_controller(args, env)
+    from leg_tint import setup_leg_tint, apply_leg_tint
     print(f"showcase: {who}  payload={args.payload}  -> {args.out}", flush=True)
 
     frames, labels = [], []
@@ -86,6 +87,7 @@ def main():
         if hasattr(model, "reset"):
             model.reset()
         obs, _ = env.reset()
+        setup_leg_tint(env)
         if hasattr(env, "set_command"):
             env.set_command(fwd=cf, yaw=cy)
         n_steps = int(secs * 60)                       # sim runs ~60 Hz display cadence
@@ -94,8 +96,10 @@ def main():
         for t in range(n_steps):
             a, _ = model.predict(obs, deterministic=True)
             obs, _, term, trunc, _ = env.step(a)
+            apply_leg_tint(env, a)
             if hasattr(env, "set_command") and (term or trunc):
                 obs, _ = env.reset(); env.set_command(fwd=cf, yaw=cy)
+                setup_leg_tint(env)
             if t % every == 0:
                 pos = p.getBasePositionAndOrientation(env.robot_id)[0]
                 _, _, rgb, _, _ = p.getCameraImage(

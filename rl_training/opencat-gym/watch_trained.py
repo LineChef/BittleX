@@ -104,6 +104,8 @@ model = PPO.load(args.checkpoint)
 import numpy as np
 import pybullet
 import pybullet as p
+from leg_tint import setup_leg_tint, apply_leg_tint
+setup_leg_tint(env)
 
 _TR = opencat_gym_env.TERRAIN_RANGE
 _FOV = np.deg2rad(opencat_gym_env.TERRAIN_FOV_DEG)
@@ -133,11 +135,13 @@ try:
     while True:
         action, _state = model.predict(obs, deterministic=True)
         obs, reward, terminated, truncated, info = env.step(action)
+        apply_leg_tint(env, action)
         if _show_vis:
             _draw_scan()
         time.sleep(1 / 60)
         if terminated or truncated:
             obs, info = env.reset()
+            setup_leg_tint(env)
 except (KeyboardInterrupt, pybullet.error):
     pass  # Ctrl+C, or the GUI window was closed
 finally:
