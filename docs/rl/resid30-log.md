@@ -156,3 +156,50 @@ contacts). None produced falls. A quick decathlon pass found the real,
 confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
 -- 62% fall rate. Spawned the slope-ceiling follow-on experiment
 (`docs/rl/slope-ceiling-log.md`), queued after creep-friction.
+
+### Issue hit + fixed: Stage 1/Stage 2 verdicts were flat-ground-only, not full-DR
+
+- **Symptom:** user asked, correctly, whether testing had actually covered
+  anything beyond flat ground despite being halfway through Stage 3.
+- **Root cause:** `evaluate_policy.py` calls without any `--dr-*` flag
+  don't force `DR_EVAL_FULL` -- domain-randomization strength (`self._dr`)
+  instead ramps as `min(1.0, step_counter_session / DR_RAMP_STEPS)`
+  (`DR_RAMP_STEPS=500,000`). A fresh evaluation session only runs ~3,000
+  steps total (12 episodes x 251 steps), so `self._dr` sat at roughly
+  0.006 throughout every Stage 1/Stage 2 evaluation call -- terrain,
+  slopes, pushes, roughness were all scaled to near-zero. Every "clean
+  pass" verdict logged for Stage 1 and Stage 2 was genuinely flat-ground
+  only, not a real read on training-distribution behavior.
+- **A second near-miss while fixing this:** first attempt used
+  `--dr-friction 0.30` to force full DR strength -- but `evaluate_policy.py`'s
+  own `--dr-*` handling zeroes every *other* DR knob first (by design, for
+  isolated held-out tests), so that call tested friction alone with
+  terrain/slopes/pushes still off. Correct fix: set
+  `opencat_gym_env.DR_EVAL_FULL = True` directly at the module level
+  before creating the env, leaving every other knob at its real trained
+  default -- the same approach `benchmark_decathlon.py`/`benchmark_gaits.py`
+  already use.
+- **Reassurance:** the actual benchmark tools that will produce Stage 3's
+  real keep/revert verdict (`benchmark_decathlon.py`, `benchmark_gaits.py`)
+  already set `DR_EVAL_FULL = True` correctly -- this bug only affected my
+  own supplementary spot-checks, not the pipeline that actually decides
+  anything.
+- **Corrected Stage 1/Stage 2 numbers, full DR, 12 episodes each, matched
+  seeds:**
+
+  | Checkpoint | Falls | Speed (m/s) | Trot correlation |
+  |---|---|---|---|
+  | `run20m_ppo` (22deg) | 0/12 | 0.027 | -0.24 |
+  | `resid30_r1` (30deg, 3M) | 0/12 | 0.025 | -0.38 |
+  | `resid30_val10m` (30deg, 10M) | 0/12 | 0.030 | -0.46 |
+
+  No falls for any checkpoint under real conditions -- the earlier "no
+  falls" verdict holds. What's new: the resid30 checkpoints hold a
+  noticeably crisper trot under real stress (-0.38/-0.46 vs -0.24) than
+  the flat-only comparison showed (which was only -0.56/-0.58 vs -0.52, a
+  much smaller apparent gap) -- early, encouraging signal that the wider
+  residual authority may be doing real work under actual disturbance, not
+  just sitting unused. Speed is comparable across all three. Still not a
+  substitute for Stage 3's real decathlon-based verdict once the 20M run
+  finishes -- 12 episodes, one seed set, is a spot-check, not the final
+  word.
