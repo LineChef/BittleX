@@ -554,6 +554,18 @@ for cyc in range(N_CYCLES):
     this_pull = min(PULL_DEG_PER_CYCLE, max(0.0, MAX_KNEE_FLEX_DEG - _flex_since_replant))
     lt = hold_targets.copy()
     if this_pull > 0:
+        # Simple geometric stop (re-attempt, scoped much smaller than the
+        # reverted UPDATE 8/9 version -- no alternating, no active replant,
+        # just this one check, re-validated against the full 5-seed set
+        # before trusting it this time): stop retracting the instant either
+        # front foot's lead-ahead-of-body margin drops below a modest
+        # threshold, so the leg never rotates past the point of providing
+        # real support. 25mm is a middle ground between the original
+        # (15mm, still rotated too far per direct user report) and the
+        # reverted attempt's 40mm (which, combined with alternating +
+        # active replant, regressed reliability at the wider seed set).
+        PULL_MARGIN_M = 0.025
+        stopped_early = False
         for st in range(10):
             frac = (st + 1) / 10
             lt = hold_targets.copy()
@@ -566,6 +578,14 @@ for cyc in range(N_CYCLES):
                 # reference climb's tall stance throughout the pull.
                 p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, lt, forces=_rear_force(2.5))
                 sim_step()
+            body_x_now = p.getBasePositionAndOrientation(rid)[0][0]
+            fl_x = p.getLinkState(rid, PAW_LF)[0][0]
+            fr_x = p.getLinkState(rid, PAW_RF)[0][0]
+            if (fl_x - body_x_now) < PULL_MARGIN_M or (fr_x - body_x_now) < PULL_MARGIN_M:
+                stopped_early = True
+                break
+        if stopped_early:
+            print(f"    pull stopped early at cycle {cyc} (foot reached the support margin)")
         _flex_since_replant += this_pull
     hold_targets = lt
     fl_anchor = p.getLinkState(rid, PAW_LF)[0]
