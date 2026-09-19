@@ -69,6 +69,71 @@ corrupted, 4/4, tilt 9.1 -- stable landing, front knee still visually bent).
 
 ---
 
+## UPDATE 7 (same resumed session): investigated the "full fix" (redesign propulsion, not patch the landing) -- real progress, genuine hard tradeoff found
+
+User asked directly for the next step toward a full fix (not another
+patch): find WHY the propulsion mechanism loses height in the first place
+and address that, rather than continuing to recover height after the fact.
+
+**First hypothesis, disproven directly**: thought the front-knee-PULL
+mechanism's own accumulated retraction was the driver, and that the
+original `REPLANT_EVERY=5` reset (which never fires within our 3-cycle
+convergence) was the missing safety valve. Exposed `--replant-every` as a
+CLI arg and tested 1 and 2 -- **the front-leg replant attempts mostly
+failed outright ("FL=stuck", no new contact found)** since there's too
+little forward progress between attempts this early for a fresh probe to
+find new ground, and even when a replant nominally succeeded, **body_z at
+the moment RB plants was IDENTICAL (0.0542-0.0546m) regardless of replant
+frequency.** Also tested halving `--pull-deg-per-cycle`/`--max-knee-flex-deg`
+directly -- again, body_z at RB's plant was unchanged to the decimal place.
+**The front-knee pull magnitude is NOT the driver of this specific
+collapse.**
+
+**Real driver, confirmed by elimination**: the striking invariance of
+body_z (0.0542-0.0546m) across every front-leg-focused change, combined
+with a clear rear-leg-cycling smoking gun (body_z drops specifically during
+each tuck-swing-extend cycle in the printed trace: 0.1017 -> 0.0819 across
+cycles 0-1, well before RB even attempts to plant), pointed at the REAR
+leg's own tuck-swing-extend amplitude instead. Tested directly: cutting
+`--tuck-knee-deg`/`--swing-hip-deg` roughly in half (45/-28 -> 20/-15)
+preserved height dramatically better through the early cycles (0.1035 ->
+0.0887 by cycle 5, vs. the baseline's 0.1017 -> 0.0819 by cycle 1) --
+**confirms the rear-leg tuck-swing-extend magnitude is the real driver of
+the height loss**, not the front pull as originally suspected.
+
+**But this isn't a free fix -- it's a genuine, sharply nonlinear tradeoff**:
+that same drastic reduction took until cycle 6 for RB to even get in range
+(vs. cycle 2 at default amplitude) and then FLIPPED at cycle 7 (tilt 127).
+A moderate reduction (38/-25, ~15% cut) gave ZERO measurable improvement in
+body_z at RB's plant -- identical to the unmodified default. An
+intermediate value (32/-22) was tried too and flipped even earlier (cycle
+2, tilt 94) -- worse than either the large cut or no cut at all, suggesting
+a real nonlinearity/resonance in this parameter space, not a smooth
+tradeoff curve. **Small changes to tuck/swing amplitude do nothing; large
+changes destabilize; there's no simple scalar sweet spot found yet.**
+
+**Where this leaves the "full fix"**: genuinely understood now, not
+guessed -- the rear-leg tuck-swing-extend motion trades propulsion strength
+against body height directly and non-linearly, the same way the front-pull
+mechanism trades propulsion against height (confirmed back in UPDATE 6,
+just not the dominant term here). A real fix likely needs the rear-leg
+motion to generate its OWN propulsion more efficiently per unit of height
+lost -- e.g. a genuinely different swing shape, or an amplitude that
+adapts/ramps rather than a fixed large value throughout -- rather than a
+single global scalar tuned by trial and error. This is a well-scoped,
+understood research question for next time, not a mystery: "why does a
+smaller tuck/swing amplitude fail to propel reliably well before it
+meaningfully helps height, with no smooth middle ground?"
+
+**Reverted** all the exploratory parameter changes from this update (none
+gave a clean win) back to the validated defaults (`--replant-every 5`
+[still exposed as a CLI arg for future experiments], `--pull-deg-per-cycle
+6`, `--max-knee-flex-deg 30`, `--tuck-knee-deg 45`, `--swing-hip-deg -28`).
+**Kept** UPDATE 6's synchronized stand-up push (the one change that gave a
+clean, reliable, if modest, win: +9-10mm across 3 seeds, no regressions).
+
+---
+
 ## UPDATE 6 (same resumed session): TRUE root cause found via visual frame review -- height collapse, not tilt
 
 The "sitting on its belly" problem was never actually about tilt or the

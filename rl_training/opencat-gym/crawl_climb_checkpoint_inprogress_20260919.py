@@ -70,6 +70,11 @@ ap.add_argument("--n-cycles", type=int, default=15,
                       "With the tuck-swing-extend rear-leg motion + probe-and-plant finish, 3 "
                       "test seeds all converged (both rear legs planted, no tail needed) within "
                       "3-4 cycles -- 15 leaves real safety margin without wasting runtime.")
+ap.add_argument("--replant-every", type=int, default=5,
+                 help="re-probe the front feet forward every N cycles, resetting accumulated knee "
+                      "flex -- with the drag+probe breakthrough converging in just 3 cycles, the "
+                      "default of 5 never fires even once, so front-knee flex accumulates unchecked "
+                      "(traced directly to a body-height collapse -- see the session checkpoint doc)")
 ap.add_argument("--pull-deg-per-cycle", type=float, default=6,
                  help="front-knee retraction per pull sub-phase (degrees) -- the drag strength")
 ap.add_argument("--max-knee-flex-deg", type=float, default=30,
@@ -527,7 +532,7 @@ print("Repeated pull+step (small increments, many cycles): the reference-gait "
 
 N_CYCLES = args.n_cycles
 PULL_DEG_PER_CYCLE = args.pull_deg_per_cycle
-REPLANT_EVERY = 5
+REPLANT_EVERY = args.replant_every
 MAX_KNEE_FLEX_DEG = args.max_knee_flex_deg
 # The full 6->60 stance+swing loop was tried and destabilized badly (tilt hit
 # 180deg by cycle 3): replaying cmh's "stance/push" portion while the front
