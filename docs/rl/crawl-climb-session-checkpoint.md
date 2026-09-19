@@ -69,6 +69,51 @@ corrupted, 4/4, tilt 9.1 -- stable landing, front knee still visually bent).
 
 ---
 
+## UPDATE 8 (same resumed session): geometric pull-stop -- real, correct fix; confirms rear-leg cycling is still the dominant lever
+
+User's direct mechanical insight: the front-leg pull rotates the whole leg
+backward as the body moves past the anchored foot (like a person pulling
+themselves up and past their own planted hand) -- if it keeps retracting
+PAST the point where the foot is roughly under the body, the leg stops
+providing any vertical support at all and just keeps rotating toward
+pointing backward. The old cap (`MAX_KNEE_FLEX_DEG`, a fixed joint-angle
+budget) had no idea where the foot actually was in space relative to the
+body -- it would keep retracting up to its degree budget regardless of
+whether the leg had already rotated past useful support.
+
+**Fix implemented**: a genuine geometric stop, not a joint-angle one. After
+each pull sub-step, check whether either front foot's world-x position has
+fallen behind (foot_x - body_x < 0.015m) the body -- if so, stop pulling
+immediately for that cycle regardless of how much of the per-cycle degree
+budget remains. Validated on 3 seeds: still 4/4, consistent tilt
+17.2-18.0deg, the stop fires reliably (visible directly in the printed
+trace) and does NOT prevent RB/LB from reaching the platform (confirmed
+directly: the pull's real job, per the user, is just to move the body
+forward enough for the rear foot's swing to reach the ledge, not to hold a
+permanent support pose -- this still happens fine with the stop in place).
+
+**Honest result**: the fix is mechanically correct and worth keeping, but
+by the time it can trigger (cycle 2+), most of the visible height loss has
+ALREADY happened during cycles 0-1 -- which UPDATE 7 already traced to the
+REAR leg's tuck-swing-extend cycling, not the front pull. So this fix
+prevents the front legs from over-rotating FURTHER in later cycles (a real
+problem, now solved) but doesn't address the DOMINANT early-cycle height
+loss, which remains open. Tried combining this fix with UPDATE 7's reduced
+tuck-swing amplitude (which alone flipped at cycle 7) -- delayed the
+failure to cycle 8 but didn't prevent it; weaker rear propulsion still
+needs too many cycles and something else gives out eventually. Reviewed
+our own replay frames again post-fix (per the now-permanent practice) --
+visually similar to before, consistent with the numbers.
+
+**Where this leaves it**: two real, validated, non-destabilizing fixes are
+now in place (UPDATE 6's stand-up push, this update's geometric pull-stop),
+together worth keeping regardless of what comes next. The genuinely open
+question is still UPDATE 7's: how to make the REAR leg's tuck-swing-extend
+motion generate the same propulsion without needing as much height-costing
+amplitude -- likely needs a shape change, not just a scalar reduction.
+
+---
+
 ## UPDATE 7 (same resumed session): investigated the "full fix" (redesign propulsion, not patch the landing) -- real progress, genuine hard tradeoff found
 
 User asked directly for the next step toward a full fix (not another

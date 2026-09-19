@@ -552,6 +552,21 @@ for cyc in range(N_CYCLES):
     this_pull = min(PULL_DEG_PER_CYCLE, max(0.0, MAX_KNEE_FLEX_DEG - _flex_since_replant))
     lt = hold_targets.copy()
     if this_pull > 0:
+        # Geometric stop, not just a joint-angle budget: the pull rotates
+        # the whole leg backward as the body moves past the anchored foot
+        # (exactly like a person pulling themselves up and past their own
+        # planted hand) -- if it keeps going PAST the point where the foot
+        # is roughly under the body, the leg stops providing any vertical
+        # support at all and just keeps rotating toward pointing backward,
+        # which is a big part of why the body was falling forward/collapsing
+        # once both front legs got fully retracted (directly reported by the
+        # user). Stop the pull the instant the foot is no longer meaningfully
+        # ahead of the body, regardless of how much of the per-cycle degree
+        # budget is left -- a leg positioned under the frame can actually
+        # hold weight; a leg rotated past that can only keep pulling down.
+        UNDER_BODY_MARGIN_M = 0.015
+        body_x_now = p.getBasePositionAndOrientation(rid)[0][0]
+        stopped_early = False
         for st in range(10):
             frac = (st + 1) / 10
             lt = hold_targets.copy()
@@ -564,6 +579,15 @@ for cyc in range(N_CYCLES):
                 # reference climb's tall stance throughout the pull.
                 p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, lt, forces=_rear_force(2.5))
                 sim_step()
+            fl_x = p.getLinkState(rid, PAW_LF)[0][0]
+            fr_x = p.getLinkState(rid, PAW_RF)[0][0]
+            body_x_now = p.getBasePositionAndOrientation(rid)[0][0]
+            if (fl_x - body_x_now) < UNDER_BODY_MARGIN_M or (fr_x - body_x_now) < UNDER_BODY_MARGIN_M:
+                stopped_early = True
+                break
+        if stopped_early:
+            print(f"    pull stopped early at cycle {cyc}: front foot reached under the body "
+                  f"(fl_x-body_x={fl_x-body_x_now:.4f}, fr_x-body_x={fr_x-body_x_now:.4f})")
         _flex_since_replant += this_pull
     hold_targets = lt
     fl_anchor = p.getLinkState(rid, PAW_LF)[0]
