@@ -65,10 +65,25 @@ ap.add_argument("--loop-end", type=int, default=60,
                  help="unused, kept for backward compat")
 ap.add_argument("--n-passes", type=int, default=2,
                  help="unused, kept for backward compat")
-ap.add_argument("--n-cycles", type=int, default=40,
-                 help="number of small pull+step cycles for the repeated body-advance phase. "
-                      "40 (up from the original 16) is needed at step-scale 1.3 to actually close "
-                      "the pre-tail gap -- see docs/rl/crawl-climb-session-checkpoint.md.")
+ap.add_argument("--n-cycles", type=int, default=15,
+                 help="max pull+tuck-swing-extend cycles before falling back to the tail push. "
+                      "With the tuck-swing-extend rear-leg motion + probe-and-plant finish, 3 "
+                      "test seeds all converged (both rear legs planted, no tail needed) within "
+                      "3-4 cycles -- 15 leaves real safety margin without wasting runtime.")
+ap.add_argument("--pull-deg-per-cycle", type=float, default=6,
+                 help="front-knee retraction per pull sub-phase (degrees) -- the drag strength")
+ap.add_argument("--max-knee-flex-deg", type=float, default=30,
+                 help="cap on accumulated front-knee flexion between replants")
+ap.add_argument("--tuck-knee-deg", type=float, default=45,
+                 help="rear-leg tuck-swing-extend motion, phase 1: how tight the knee tucks in")
+ap.add_argument("--swing-hip-deg", type=float, default=-28,
+                 help="rear-leg tuck-swing-extend motion, phase 2: how far the hip swings the "
+                      "still-tucked leg forward")
+ap.add_argument("--rear-step-every", type=int, default=1,
+                 help="only do an active rear-leg tuck-swing-extend step every N cycles. 3 was tried "
+                      "(matching 'drag mostly, step occasionally') but never closed enough distance "
+                      "to trigger the probe-and-plant finish within n-cycles; 1 (step every cycle) "
+                      "converges in just 3-4 cycles total and reliably skips the tail push entirely.")
 ap.add_argument("--step-scale", type=float, default=1.3,
                  help="amplitude multiplier on the rear-leg swing's relative delta from cmh's own "
                       "swing shape. 1.0 (cmh's literal amplitude) plateaus around a 150mm pre-tail "
@@ -456,15 +471,9 @@ print("Repeated pull+step (small increments, many cycles): the reference-gait "
       "the front feet forward to reset it and keep advancing the anchor.")
 
 N_CYCLES = args.n_cycles
-# Kept tall/shallow (3deg/15deg, not the original 6deg/30deg) per explicit
-# request -- the reference climb stands much taller throughout. Cutting this
-# alongside alternating single-leg stepping did undershoot badly (RB ended
-# 116-144mm behind at --body-target-margin-m 0.10), but rather than restoring
-# squat depth, compensate on approach distance instead -- closer means less
-# ground for the (now gentler) mechanism to cover.
-PULL_DEG_PER_CYCLE = 6
+PULL_DEG_PER_CYCLE = args.pull_deg_per_cycle
 REPLANT_EVERY = 5
-MAX_KNEE_FLEX_DEG = 30
+MAX_KNEE_FLEX_DEG = args.max_knee_flex_deg
 # The full 6->60 stance+swing loop was tried and destabilized badly (tilt hit
 # 180deg by cycle 3): replaying cmh's "stance/push" portion while the front
 # feet are RIGIDLY anchored reproduces the exact "rigid anchor + rear push
@@ -474,8 +483,11 @@ MAX_KNEE_FLEX_DEG = 30
 # mechanism; this only gives the rear legs cmh's real swing SHAPE in place of
 # the hand-built flex/flex/reset motion.
 REAR_GAIT_START, REAR_GAIT_END = 39, 60
+PROBE_ATTEMPT_THRESHOLD_M = 0.08
 flipped = False
 _flex_since_replant = 0.0
+rb_anchor = None
+lb_anchor = None
 for cyc in range(N_CYCLES):
     this_pull = min(PULL_DEG_PER_CYCLE, max(0.0, MAX_KNEE_FLEX_DEG - _flex_since_replant))
     lt = hold_targets.copy()
@@ -497,51 +509,118 @@ for cyc in range(N_CYCLES):
     fl_anchor = p.getLinkState(rid, PAW_LF)[0]
     fr_anchor = p.getLinkState(rid, PAW_RF)[0]
 
-    # Both rear legs lift together using cmh's own real swing shape (RB_HIP
-    # dips ~20->10deg, RB_KNEE lifts ~23->41deg between ticks 39-45, LB runs
-    # a similar curve -- a real lift-and-reach-forward motion). Tried
-    # alternating (one leg fixed/extended while the other steps, matching the
-    # reference video's visual) but it consistently broke reliability even
-    # with full squat depth and the original reach margin restored in
-    # isolation (0-2/4 across every combination tried) -- halving each leg's
-    # step frequency cut propulsion more than any other single change did.
-    # Reverted to synchronized, which is the last combination validated 4/4
-    # across all three seeds. Only the KNEE returns to baseline afterward
-    # (foot placement); the HIP stays at its swept-forward position, which is
-    # what gives each leg a real forward step each cycle instead of net-zero
-    # progress (confirmed: resetting both left RB 130mm+ behind the edge).
-    LIFT_END = 45
-    base_seq = CLIMB_POSE_SEQ[REAR_GAIT_START]
-    rear_base = hold_targets.copy()
-    SUPPORT_FORCE = 1.0   # firm, not soft -- keeps the legs extended/tall, not sagging
-    # cmh's own swing amplitude alone plateaus (152->68mm over 40 cycles,
-    # diminishing returns + rising tilt) -- scaling the delta amplifies the
-    # SAME shape into a bigger step, closing the pre-tail gap faster per
-    # cycle instead of just adding more repetitions.
-    STEP_SCALE = args.step_scale
-    for t in range(REAR_GAIT_START, LIFT_END):
-        tgt = hold_targets.copy()
-        tgt[RB_HIP] = rear_base[RB_HIP] + STEP_SCALE * (CLIMB_POSE_SEQ[t][RB_HIP] - base_seq[RB_HIP])
-        tgt[RB_KNEE] = rear_base[RB_KNEE] + STEP_SCALE * (CLIMB_POSE_SEQ[t][RB_KNEE] - base_seq[RB_KNEE])
-        tgt[LB_HIP] = rear_base[LB_HIP] + STEP_SCALE * (CLIMB_POSE_SEQ[t][LB_HIP] - base_seq[LB_HIP])
-        tgt[LB_KNEE] = rear_base[LB_KNEE] + STEP_SCALE * (CLIMB_POSE_SEQ[t][LB_KNEE] - base_seq[LB_KNEE])
-        tgt = _with_front_ik(tgt, fl_anchor, fr_anchor)
-        for _wait in range(FRAME_SKIP):
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_rear_force(SUPPORT_FORCE))
-            sim_step()
-    lifted = tgt
-    place_target = lifted.copy()
-    place_target[RB_KNEE] = rear_base[RB_KNEE]
-    place_target[LB_KNEE] = rear_base[LB_KNEE]
-    PLACE_STEPS = 10
-    for st in range(PLACE_STEPS):
-        frac = (st + 1) / PLACE_STEPS
-        tgt = lifted * (1 - frac) + place_target * frac
-        tgt = _with_front_ik(tgt.copy(), fl_anchor, fr_anchor)
-        for _wait in range(FRAME_SKIP):
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_rear_force(SUPPORT_FORCE))
-            sim_step()
-    hold_targets = tgt
+    # Once a rear leg is close enough, plant it directly with the SAME
+    # validated probe mechanism the front legs use (reach forward, search
+    # down, confirm real contact) instead of an invented stepping shape --
+    # matches the reference climb precisely: one rear leg kicks forward
+    # until it hits the ledge and plants there, which then brings the body
+    # (and the other rear leg) close enough to plant too. Naming convention:
+    # PAW_LF/PAW_RF/PAW_RB/PAW_LB = Left-Front/Right-Front/Right-Back/
+    # Left-Back, so same-side pairs are (LF,LB) and (RF,RB).
+    #
+    # Pure front-pull alone (removing the swing-step entirely) was tried and
+    # plateaued far short of the platform (~145mm, WORSE than with swing-
+    # stepping) -- the rear legs are still bearing real weight/friction after
+    # the extend phase and actively resist being dragged rather than sliding
+    # freely, so drag alone isn't enough propulsion in this sim. Swing-
+    # stepping (every REAR_STEP_EVERY cycles) stays as the real propulsion;
+    # the probe-and-plant below is the FINISHING move once a leg is
+    # genuinely in reach, not a replacement for stepping.
+    rb_cur = p.getLinkState(rid, PAW_RB)[0]
+    lb_cur = p.getLinkState(rid, PAW_LB)[0]
+    if rb_anchor is None and (EDGE_X - rb_cur[0]) < PROBE_ATTEMPT_THRESHOLD_M:
+        margin = max(args.forward_margin_m, (EDGE_X - rb_cur[0]) + 0.02)
+        hold_targets, rb_new, rb_solid = probe_leg_onto_platform(
+            PAW_RB, RB_HIP, RB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor},
+            platform_top_z, margin, args.above_margin_m, lift_first=True)
+        if rb_new is not None and rb_solid:
+            rb_anchor = rb_new
+            print(f"  RB planted at cycle {cyc}: {1000*(rb_anchor[0]-EDGE_X):.0f}mm past the edge")
+            # Same-side front leg (RF/FR) advances deeper for more leverage
+            # once its rear partner has purchase -- directly observed in the
+            # reference climb as a big part of how it gains the pull-up.
+            fr_cur = p.getLinkState(rid, PAW_RF)[0]
+            fr_margin = max(args.forward_margin_m, (fr_cur[0] - EDGE_X) + 0.02)
+            hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
+                PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor},
+                platform_top_z, fr_margin, args.above_margin_m, lift_first=False)
+            if fr_new is not None:
+                fr_anchor = fr_new
+                print(f"  FR (same side as RB) advanced for leverage: "
+                      f"{'SOLID' if fr_solid else 'marginal'}")
+    elif rb_anchor is not None and lb_anchor is None and (EDGE_X - lb_cur[0]) < PROBE_ATTEMPT_THRESHOLD_M:
+        margin = max(args.forward_margin_m, (EDGE_X - lb_cur[0]) + 0.02)
+        hold_targets, lb_new, lb_solid = probe_leg_onto_platform(
+            PAW_LB, LB_HIP, LB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor},
+            platform_top_z, margin, args.above_margin_m, lift_first=True)
+        if lb_new is not None and lb_solid:
+            lb_anchor = lb_new
+            print(f"  LB planted at cycle {cyc}: {1000*(lb_anchor[0]-EDGE_X):.0f}mm past the edge")
+            # Same-side front leg (LF/FL) advances deeper for more leverage.
+            fl_cur = p.getLinkState(rid, PAW_LF)[0]
+            fl_margin = max(args.forward_margin_m, (fl_cur[0] - EDGE_X) + 0.02)
+            hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
+                PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
+                platform_top_z, fl_margin, args.above_margin_m, lift_first=False)
+            if fl_new is not None:
+                fl_anchor = fl_new
+                print(f"  FL (same side as LB) advanced for leverage: "
+                      f"{'SOLID' if fl_solid else 'marginal'}")
+    elif cyc % args.rear_step_every == 0:
+        # Three distinct, sequential phases (user's direct description of
+        # the reference climb's rear-leg motion), replacing the cmh-swing-
+        # shape blend which moved hip and knee together throughout:
+        #   1. TUCK: knee flexes in as tight as possible, hip stays put.
+        #   2. SWING: hip rotates the whole (still-tucked) leg forward,
+        #      knee stays tucked -- ground clearance is maximal here since
+        #      the foot is pulled in close to the body.
+        #   3. EXTEND: only now does the knee swing back down/out, and
+        #      THIS is the actual power stroke that propels the body
+        #      forward -- held at a firmer force than the first two phases
+        #      since it's doing real work against the ground, not just
+        #      repositioning.
+        rear_base = hold_targets.copy()
+        SUPPORT_FORCE = 1.0
+        TUCK_KNEE_DEG = args.tuck_knee_deg
+        SWING_HIP_DEG = args.swing_hip_deg
+        PHASE_STEPS = 15
+
+        tucked = rear_base.copy()
+        tucked[RB_KNEE] = rear_base[RB_KNEE] + np.deg2rad(TUCK_KNEE_DEG)
+        tucked[LB_KNEE] = rear_base[LB_KNEE] + np.deg2rad(TUCK_KNEE_DEG)
+        for st in range(PHASE_STEPS):
+            frac = (st + 1) / PHASE_STEPS
+            tgt = rear_base * (1 - frac) + tucked * frac
+            tgt = _with_front_ik(tgt.copy(), fl_anchor, fr_anchor)
+            for _wait in range(FRAME_SKIP):
+                p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_rear_force(SUPPORT_FORCE))
+                sim_step()
+        print(f"    tuck: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+
+        swung = tucked.copy()
+        swung[RB_HIP] = tucked[RB_HIP] - np.deg2rad(SWING_HIP_DEG)
+        swung[LB_HIP] = tucked[LB_HIP] - np.deg2rad(SWING_HIP_DEG)
+        for st in range(PHASE_STEPS):
+            frac = (st + 1) / PHASE_STEPS
+            tgt = tucked * (1 - frac) + swung * frac
+            tgt = _with_front_ik(tgt.copy(), fl_anchor, fr_anchor)
+            for _wait in range(FRAME_SKIP):
+                p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_rear_force(SUPPORT_FORCE))
+                sim_step()
+        print(f"    swing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+
+        extended = swung.copy()
+        extended[RB_KNEE] = rear_base[RB_KNEE]
+        extended[LB_KNEE] = rear_base[LB_KNEE]
+        for st in range(PHASE_STEPS):
+            frac = (st + 1) / PHASE_STEPS
+            tgt = swung * (1 - frac) + extended * frac
+            tgt = _with_front_ik(tgt.copy(), fl_anchor, fr_anchor)
+            for _wait in range(FRAME_SKIP):
+                p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_rear_force(SUPPORT_FORCE * 2))
+                sim_step()
+        hold_targets = tgt
+        print(f"    extend/propel: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
 
     tl = tilt()
     bx = p.getBasePositionAndOrientation(rid)[0][0]
@@ -550,6 +629,11 @@ for cyc in range(N_CYCLES):
     if tl > 68.8:
         print(f"FLIPPED at cycle {cyc}")
         flipped = True
+        break
+
+    if rb_anchor is not None and lb_anchor is not None:
+        print(f"  Both rear legs planted via drag+probe at cycle {cyc} -- "
+              f"skipping the explosive tail push entirely.")
         break
 
     if (cyc + 1) % REPLANT_EVERY == 0 and cyc + 1 < N_CYCLES:
@@ -580,70 +664,111 @@ if flipped:
     env.close()
     raise SystemExit
 
+# The in-loop probe check runs at the TOP of each cycle using the position
+# from the END of the previous cycle -- so if the last cycle's step is what
+# finally brought a leg into range, there's no next cycle left to actually
+# try the probe. One more attempt here, on the final position, catches that.
+rb_cur = p.getLinkState(rid, PAW_RB)[0]
+lb_cur = p.getLinkState(rid, PAW_LB)[0]
+if rb_anchor is None and (EDGE_X - rb_cur[0]) < PROBE_ATTEMPT_THRESHOLD_M:
+    margin = max(args.forward_margin_m, (EDGE_X - rb_cur[0]) + 0.02)
+    hold_targets, rb_new, rb_solid = probe_leg_onto_platform(
+        PAW_RB, RB_HIP, RB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor},
+        platform_top_z, margin, args.above_margin_m, lift_first=True)
+    if rb_new is not None and rb_solid:
+        rb_anchor = rb_new
+        print(f"  RB planted (final check): {1000*(rb_anchor[0]-EDGE_X):.0f}mm past the edge")
+        fr_cur = p.getLinkState(rid, PAW_RF)[0]
+        fr_margin = max(args.forward_margin_m, (fr_cur[0] - EDGE_X) + 0.02)
+        hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
+            PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor},
+            platform_top_z, fr_margin, args.above_margin_m, lift_first=False)
+        if fr_new is not None:
+            fr_anchor = fr_new
+if rb_anchor is not None and lb_anchor is None and (EDGE_X - lb_cur[0]) < PROBE_ATTEMPT_THRESHOLD_M:
+    margin = max(args.forward_margin_m, (EDGE_X - lb_cur[0]) + 0.02)
+    hold_targets, lb_new, lb_solid = probe_leg_onto_platform(
+        PAW_LB, LB_HIP, LB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor},
+        platform_top_z, margin, args.above_margin_m, lift_first=True)
+    if lb_new is not None and lb_solid:
+        lb_anchor = lb_new
+        print(f"  LB planted (final check): {1000*(lb_anchor[0]-EDGE_X):.0f}mm past the edge")
+        fl_cur = p.getLinkState(rid, PAW_LF)[0]
+        fl_margin = max(args.forward_margin_m, (fl_cur[0] - EDGE_X) + 0.02)
+        hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
+            PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
+            platform_top_z, fl_margin, args.above_margin_m, lift_first=False)
+        if fl_new is not None:
+            fl_anchor = fl_new
+
 rb_pre_tail = p.getLinkState(rid, PAW_RB)[0]
 lb_pre_tail = p.getLinkState(rid, PAW_LB)[0]
 print(f"  PRE-TAIL: RB is {1000*(EDGE_X-rb_pre_tail[0]):.0f}mm behind the edge, "
       f"LB is {1000*(EDGE_X-lb_pre_tail[0]):.0f}mm behind -- how far the crawl "
       f"loop got them on its own, before the tail's push contributes anything.")
 
-print("Tail step-up (cmh's own real tick-by-tick path, not a shortcut, but "
-      "executed much more slowly at moderate force instead of the raw "
-      "explosive 4-steps-per-tick/force-6.5 burst)...")
-TICK_SUBSTEPS = 8   # was 4 -- same path, ~2x slower (16 was tried and made
-                    # things WORSE -- more time for the body to tip before
-                    # the joints catch up, confirmed: one seed hit 168deg
-                    # tilt where the original fast version never did)
-for ti, t in enumerate(range(166, len(CLIMB_POSE_SEQ))):
-    tgt = _with_front_ik(CLIMB_POSE_SEQ[t].copy(), fl_anchor, fr_anchor)
-    f = _rear_force(min(PUSH_FORCE, 2.0 + (PUSH_FORCE - 2.0) * (ti + 1) / 4))
-    for _ in range(TICK_SUBSTEPS):
-        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=f)
-        sim_step()
-    tl = tilt()
-    if tl > 68.8:
-        print(f"FLIPPED during push at tick {t}")
-        flipped = True
-        break
-hold_targets = tgt
-bx = p.getBasePositionAndOrientation(rid)[0][0]
-print(f"  push done: body_x={bx:.4f}, tilt={tilt():.1f}")
-
-# Front legs got here via probe-and-verify, not cmh's blind trajectory --
-# the rear legs need the same treatment now that the natural-gait advance
-# has brought the body close. cmh's own tail motion pushes the rear paws
-# BACKWARD relative to the body (a launch, not a placement -- confirmed
-# via the earlier FK trace), so it was never going to land them on the
-# platform precisely; reuse the same validated probe mechanism instead.
 labels = ["FL", "FR", "RB", "LB"]
-fl_anchor = p.getLinkState(rid, PAW_LF)[0]
-fr_anchor = p.getLinkState(rid, PAW_RF)[0]
-rb_start = p.getLinkState(rid, PAW_RB)[0]
-rear_forward_margin = max(args.forward_margin_m, (EDGE_X - rb_start[0]) + 0.020)
-print(f"  RB starts {1000*(EDGE_X-rb_start[0]):.0f}mm behind the edge -- using "
-      f"{1000*rear_forward_margin:.0f}mm forward margin instead of the front legs' "
-      f"{1000*args.forward_margin_m:.0f}mm")
-lb_anchor = None
-print("Probing RB onto the platform (front feet held anchored)...")
-hold_targets2, rb_anchor, rb_solid = probe_leg_onto_platform(
-    PAW_RB, RB_HIP, RB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor}, platform_top_z,
-    rear_forward_margin, args.above_margin_m)
-if rb_anchor is not None:
-    print(f"RB secured: {'SOLID' if rb_solid else 'marginal'}")
-    hold_targets = hold_targets2
-    lb_start = p.getLinkState(rid, PAW_LB)[0]
-    lb_forward_margin = max(args.forward_margin_m, (EDGE_X - lb_start[0]) + 0.020)
-    print("Probing LB onto the platform (front feet + RB held anchored)...")
-    hold_targets2, lb_anchor, lb_solid = probe_leg_onto_platform(
-        PAW_LB, LB_HIP, LB_KNEE, hold_targets,
-        {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor}, platform_top_z,
-        lb_forward_margin, args.above_margin_m)
-    if lb_anchor is not None:
-        print(f"LB secured: {'SOLID' if lb_solid else 'marginal'}")
-        hold_targets = hold_targets2
-    else:
-        print("LB never found the platform")
+if rb_anchor is not None and lb_anchor is not None:
+    print("  Both rear legs already planted via drag+probe -- no tail push needed.")
 else:
-    print("RB never found the platform")
+    print("Tail step-up (cmh's own real tick-by-tick path, not a shortcut, but "
+          "executed much more slowly at moderate force instead of the raw "
+          "explosive 4-steps-per-tick/force-6.5 burst)...")
+    TICK_SUBSTEPS = 8   # was 4 -- same path, ~2x slower (16 was tried and made
+                        # things WORSE -- more time for the body to tip before
+                        # the joints catch up, confirmed: one seed hit 168deg
+                        # tilt where the original fast version never did)
+    for ti, t in enumerate(range(166, len(CLIMB_POSE_SEQ))):
+        tgt = _with_front_ik(CLIMB_POSE_SEQ[t].copy(), fl_anchor, fr_anchor)
+        f = _rear_force(min(PUSH_FORCE, 2.0 + (PUSH_FORCE - 2.0) * (ti + 1) / 4))
+        for _ in range(TICK_SUBSTEPS):
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=f)
+            sim_step()
+        tl = tilt()
+        if tl > 68.8:
+            print(f"FLIPPED during push at tick {t}")
+            flipped = True
+            break
+    hold_targets = tgt
+    bx = p.getBasePositionAndOrientation(rid)[0][0]
+    print(f"  push done: body_x={bx:.4f}, tilt={tilt():.1f}")
+
+    # Front legs got here via probe-and-verify, not cmh's blind trajectory --
+    # the rear legs need the same treatment now that the natural-gait advance
+    # has brought the body close. cmh's own tail motion pushes the rear paws
+    # BACKWARD relative to the body (a launch, not a placement -- confirmed
+    # via the earlier FK trace), so it was never going to land them on the
+    # platform precisely; reuse the same validated probe mechanism instead.
+    fl_anchor = p.getLinkState(rid, PAW_LF)[0]
+    fr_anchor = p.getLinkState(rid, PAW_RF)[0]
+    if rb_anchor is None:
+        rb_start = p.getLinkState(rid, PAW_RB)[0]
+        rear_forward_margin = max(args.forward_margin_m, (EDGE_X - rb_start[0]) + 0.020)
+        print(f"  RB starts {1000*(EDGE_X-rb_start[0]):.0f}mm behind the edge -- using "
+              f"{1000*rear_forward_margin:.0f}mm forward margin instead of the front legs' "
+              f"{1000*args.forward_margin_m:.0f}mm")
+        print("Probing RB onto the platform (front feet held anchored)...")
+        hold_targets2, rb_anchor, rb_solid = probe_leg_onto_platform(
+            PAW_RB, RB_HIP, RB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor}, platform_top_z,
+            rear_forward_margin, args.above_margin_m)
+        if rb_anchor is not None:
+            print(f"RB secured: {'SOLID' if rb_solid else 'marginal'}")
+            hold_targets = hold_targets2
+        else:
+            print("RB never found the platform")
+    if rb_anchor is not None and lb_anchor is None:
+        lb_start = p.getLinkState(rid, PAW_LB)[0]
+        lb_forward_margin = max(args.forward_margin_m, (EDGE_X - lb_start[0]) + 0.020)
+        print("Probing LB onto the platform (front feet + RB held anchored)...")
+        hold_targets2, lb_anchor, lb_solid = probe_leg_onto_platform(
+            PAW_LB, LB_HIP, LB_KNEE, hold_targets,
+            {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor}, platform_top_z,
+            lb_forward_margin, args.above_margin_m)
+        if lb_anchor is not None:
+            print(f"LB secured: {'SOLID' if lb_solid else 'marginal'}")
+            hold_targets = hold_targets2
+        else:
+            print("LB never found the platform")
 
 def _with_all_four_ik(tgt):
     anchors4 = {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor}
@@ -659,9 +784,17 @@ def _with_all_four_ik(tgt):
     return tgt
 
 
-for _ in range(40):
+FINAL_SETTLE_STEPS = 40
+for _fs in range(FINAL_SETTLE_STEPS):
     tgt = _with_all_four_ik(hold_targets.copy())
-    p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * ANCHOR_FORCE)
+    # Ramp the hold force in gradually (0.8 -> ANCHOR_FORCE) instead of
+    # snapping every leg rigid the instant the last one plants -- the search
+    # phase holds everything soft (0.5), so an instant jump to full anchor
+    # stiffness right when the last leg's weight transfers on is exactly the
+    # kind of jolt that was knocking already-solid footing loose elsewhere.
+    # A soft-landing ramp lets the newly-planted leg settle in smoothly.
+    settle_force = 0.8 + (ANCHOR_FORCE - 0.8) * min(1.0, (_fs + 1) / 15)
+    p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * settle_force)
     sim_step()
 paws = [p.getLinkState(rid, j)[0] for j in CLIMB_PAW_LINKS]
 final_tilt = tilt()
