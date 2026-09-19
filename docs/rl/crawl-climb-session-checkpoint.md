@@ -1,3 +1,74 @@
+## UPDATE 5 (same resumed session): standing-tilt stability recovered (knee angle still cosmetic-only)
+
+Continued the standing-posture investigation from UPDATE 4, testing five
+substantive approaches in sequence (each tested directly, not guessed):
+
+1. Jump straight to flat-ground `STANCE` -> outright flip. Reverted (already
+   in UPDATE 4).
+2. Multi-stage gradual un-crouch toward a fixed knee target (25deg) ->
+   avoided a flip but landed tilted 44-47deg across all 3 seeds. Reverted --
+   this was the state committed at the end of UPDATE 4.
+3. **Fresh front-anchor re-plant** (re-probe FL/FR with the paw already on
+   the platform, `do_slide=False`, instead of trusting the stale anchor
+   captured early in the climb): revealed something important -- tilt was
+   ALREADY fine (9.4deg) at this point, unchanged from before any un-crouch
+   attempt. **The multi-stage un-crouch in approach 2 was itself CAUSING
+   the 44-47deg tilt, not fixing a real instability that already existed.**
+   The ~90deg front knee is a stable equilibrium for THIS anchor -- forcing
+   it to a different angle without an anchor to match is what destabilizes.
+4. Tested a single isolated 5deg knee-only reduction from that stable
+   baseline -- tilt immediately spiked to 22.6deg. Confirms the ~90deg
+   configuration, while numerically stable, is a fragile/marginal
+   equilibrium: even a small perturbation to the knee angle alone (without
+   moving the foot) knocks it off balance.
+5. Tried repositioning the front foot closer to the body via fresh IK
+   toward a pulled-back anchor (reasoning: less horizontal reach -> less
+   knee fold) -- tilt stayed stable, but knee angle got slightly WORSE
+   (90.2 -> 90.8deg). Wrong lever: the real driver isn't horizontal
+   distance, it's vertical -- the body sits tall (the rear legs' own
+   leverage effect) while the front foot is still near platform height, so
+   the knee must fold to bridge that height gap regardless of horizontal
+   foot position.
+6. Tried letting the REAR legs settle down slightly (undoing part of their
+   own extension: -15deg hip, -10deg knee) while continuously re-anchoring
+   the front feet via fresh IK, reasoning the whole body would genuinely
+   lower and the front knee would un-fold as a side effect -- tilt stayed
+   great (9.0-9.2deg) but the knee barely moved (90.2 -> 90.5deg). The
+   4-point-anchored system is heavily over-constrained; small joint-target
+   nudges don't meaningfully change the settled body geometry once all four
+   feet are IK-locked in place.
+
+**Net result**: reverted the destabilizing multi-stage un-crouch (approach
+2) entirely. Current state = approach 3 (fresh anchor re-plant) + approach 6
+(harmless rear settle, kept since it doesn't hurt, though it didn't
+meaningfully help either). **Tilt is now consistently 9.0-9.2deg across all
+3 test seeds** -- a real, substantial improvement over the 43.8-47.0deg the
+previous committed state had, even though the front knee angle itself is
+unchanged (~90deg) and still doesn't visually match the reference climb's
+natural standing bend (frame 07). Stability is fully solved; the cosmetic
+appearance is not.
+
+**Why this is hard, stated plainly**: with all four feet IK-anchored to
+fixed world positions simultaneously, the system has very little remaining
+freedom -- almost every joint-space degree of freedom is already determined
+by the anchor constraints, foot geometry, and gravity. Changing how ANY one
+leg looks, without releasing an anchor and genuinely re-planting the foot
+somewhere new (accepting a corresponding change in the body's actual
+support base), just fights the other three anchors. A real fix likely needs
+either (a) never letting the front knee reach ~90deg during the climb in
+the first place (attempted directly in UPDATE 4 -- capping it broke anchor
+tracking and caused flips, so this needs a subtler approach, e.g. capping
+only in the SPECIFIC high-tilt moments where it's not actually load-bearing
+rather than uniformly), or (b) a genuine final re-plant of one or more feet
+to a new position chosen for a natural stance, not just an in-place angle
+adjustment.
+
+Replay regenerated and verified at this state
+(`/Users/markjohnson/Desktop/crawl_climb.gif`, seed 7000, 750 frames, 0
+corrupted, 4/4, tilt 9.1 -- stable landing, front knee still visually bent).
+
+---
+
 ## STANDING GOAL, added 2026-09-19 (read this first)
 
 Once the climb + standing posture is working reliably (current open item:

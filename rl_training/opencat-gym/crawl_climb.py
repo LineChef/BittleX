@@ -832,52 +832,98 @@ print(f"  front knee flex before standing: FL={fl_knee_deg:.1f}deg FR={fr_knee_d
       f"(accumulated across the initial secure, the slide-deeper depth fix, and the same-side "
       f"leverage advance -- far more than the pull mechanism's own 30deg cap alone accounts for)")
 print("Standing tall now that all four feet are secured on the platform -- "
-      "jumping straight to a flat-ground STANCE target was tried and caused an "
-      "outright flip (the front knees were at ~90deg, essentially sitting on "
-      "the belly; that's too large a correction to make in one motion from "
-      "such an extreme starting point). Un-crouching gradually and only as "
-      "far as needed instead -- small, direct, modest-force nudge back "
-      "toward a reasonable stance angle, not a jump to an unrelated target.")
-TARGET_KNEE_DEG = 25   # a reasonable standing bend -- not STANCE's 6deg (tuned for
-                        # flat-ground walking, not a foot up on an elevated platform)
-# One continuous 65deg-ish ramp (90 -> 25) was tried and left the robot
-# badly tilted (51-55deg, not a real stand) even though it didn't flip --
-# too much correction happening continuously. Un-crouching in several
-# smaller stages instead, each one settling briefly before the next, similar
-# to how a real animal shifts weight incrementally when standing up from a
-# crouch rather than doing it in one continuous motion.
-UNCROUCH_STAGES = 4
-STAGE_STEPS = 25
-SETTLE_STEPS = 10
-stage_knee_start_fl = hold_targets[FL_KNEE]
-stage_knee_start_fr = hold_targets[FR_KNEE]
-target_fl = min(hold_targets[FL_KNEE], np.deg2rad(TARGET_KNEE_DEG))
-target_fr = min(hold_targets[FR_KNEE], np.deg2rad(TARGET_KNEE_DEG))
-cur_target = hold_targets.copy()
-for stage in range(1, UNCROUCH_STAGES + 1):
-    stage_frac = stage / UNCROUCH_STAGES
-    stage_target = cur_target.copy()
-    stage_target[FL_KNEE] = stage_knee_start_fl + (target_fl - stage_knee_start_fl) * stage_frac
-    stage_target[FR_KNEE] = stage_knee_start_fr + (target_fr - stage_knee_start_fr) * stage_frac
-    stage_start = cur_target.copy()
-    for _st in range(STAGE_STEPS):
-        frac = (_st + 1) / STAGE_STEPS
-        tgt = stage_start * (1 - frac) + stage_target * frac
-        for _wait in range(FRAME_SKIP):
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 1.5)
-            sim_step()
-    for _wait in range(SETTLE_STEPS):
-        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 1.5)
+      "un-crouching the front knee IN PLACE (toward a fixed target angle) "
+      "was tried, in one continuous motion and in several smaller stages; "
+      "both left the robot tilted 44-55deg, not standing. The knee angle "
+      "isn't really the thing to fix directly -- the STALE ANCHOR is: "
+      "fl_anchor/fr_anchor were captured back when the body was still low, "
+      "and the rear-leg extension has genuinely lifted the body a lot since "
+      "then, so holding that same old anchor forces the extreme fold. "
+      "Re-establishing a FRESH front anchor now, with the paw already on "
+      "the platform and the body at its current (taller) height, should "
+      "naturally settle on a much more reasonable knee angle instead of "
+      "fighting the old one.")
+fl_cur = p.getLinkState(rid, PAW_LF)[0]
+fl_margin = max(0.01, (fl_cur[0] - EDGE_X))
+hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
+    PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
+    platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False)
+if fl_new is not None:
+    fl_anchor = fl_new
+fr_cur = p.getLinkState(rid, PAW_RF)[0]
+fr_margin = max(0.01, (fr_cur[0] - EDGE_X))
+hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
+    PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
+    platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False)
+if fr_new is not None:
+    fr_anchor = fr_new
+js = p.getJointStates(rid, env.joint_id)
+print(f"  fresh front anchors: FL_KNEE={np.degrees(js[FL_KNEE][0]):.1f}deg "
+      f"FR_KNEE={np.degrees(js[FR_KNEE][0]):.1f}deg, "
+      f"body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+
+# A single 5deg knee-only change (tested directly) immediately spiked tilt
+# to 22.6 -- this ~90deg-knee configuration is a fragile, marginal
+# equilibrium, not a robust stand; changing the knee IN PLACE (without
+# moving the foot) isn't the right lever. Repositioning the FOOT itself
+# closer to the body instead: less reach required means less knee fold
+# naturally, tracked via fresh IK toward a pulled-back anchor (not a direct
+# joint-angle edit), so hip and knee move together in a way that's
+# geometrically consistent instead of fighting each other.
+# Pulling the front anchor backward (horizontal) was tried and made the
+# knee angle slightly WORSE (90.2 -> 90.8deg) -- the real driver isn't
+# horizontal distance, it's VERTICAL: the body sits tall (the rear-leg
+# extension's own job) while the front foot is still down near platform
+# height, so the front knee has to fold to bridge that height gap no matter
+# where the foot sits horizontally. Letting the REAR legs settle down a
+# little too (undoing part of their own extension) should let the whole
+# body genuinely lower, which should un-fold the front knee as a natural
+# side effect -- rather than fighting the front leg in isolation while the
+# rear insists on holding the body up tall.
+print("Letting the rear legs settle down slightly (undoing part of their "
+      "own extension) so the body genuinely lowers, un-folding the front "
+      "knee as a natural side effect instead of fighting it in isolation.")
+REAR_SETTLE_HIP_DEG = 15
+REAR_SETTLE_KNEE_DEG = 10
+REAR_SETTLE_STEPS = 20
+TILT_ABORT = 16
+rear_start = hold_targets.copy()
+rear_target = hold_targets.copy()
+rear_target[RB_HIP] -= np.deg2rad(REAR_SETTLE_HIP_DEG)
+rear_target[LB_HIP] -= np.deg2rad(REAR_SETTLE_HIP_DEG)
+rear_target[RB_KNEE] -= np.deg2rad(REAR_SETTLE_KNEE_DEG)
+rear_target[LB_KNEE] -= np.deg2rad(REAR_SETTLE_KNEE_DEG)
+cur = hold_targets.copy()
+for _rstep in range(REAR_SETTLE_STEPS):
+    frac = (_rstep + 1) / REAR_SETTLE_STEPS
+    rear_frac_target = rear_start * (1 - frac) + rear_target * frac
+    ik_fl = p.calculateInverseKinematics(rid, PAW_LF, fl_anchor)
+    ik_fr = p.calculateInverseKinematics(rid, PAW_RF, fr_anchor)
+    ik_rb = p.calculateInverseKinematics(rid, PAW_RB, rb_anchor)
+    ik_lb = p.calculateInverseKinematics(rid, PAW_LB, lb_anchor)
+    nxt = rear_frac_target.copy()
+    nxt[FL_SHOULDER], nxt[FL_KNEE] = ik_fl[FL_SHOULDER], ik_fl[FL_KNEE]
+    nxt[FR_SHOULDER], nxt[FR_KNEE] = ik_fr[FR_SHOULDER], ik_fr[FR_KNEE]
+    for _wait in range(6):
+        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, nxt, forces=np.ones(8) * 1.5)
         sim_step()
-    cur_target = tgt
-    print(f"    uncrouch stage {stage}/{UNCROUCH_STAGES}: "
-          f"body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
-    if tilt() > 40:
-        print(f"    tilt getting high -- stopping the uncrouch here rather than pushing further")
+    if tilt() > TILT_ABORT:
+        print(f"    rear-settle step {_rstep+1}: tilt={tilt():.1f} -- over {TILT_ABORT}deg, stopping here")
         break
-tgt = cur_target
-hold_targets = tgt
-print(f"  standing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+    cur = nxt
+    if (_rstep + 1) % 5 == 0:
+        print(f"    rear-settle step {_rstep+1}/{REAR_SETTLE_STEPS}: FL_KNEE="
+              f"{np.degrees(cur[FL_KNEE]):.1f}deg, body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, "
+              f"tilt={tilt():.1f}")
+hold_targets = cur
+fl_anchor = p.getLinkState(rid, PAW_LF)[0]
+fr_anchor = p.getLinkState(rid, PAW_RF)[0]
+# The final settle below re-solves fresh IK toward fl_anchor/fr_anchor --
+# if those still point at the OLD (pre-reduction) position, that settle
+# would just snap the knee straight back to ~90deg and undo this entirely.
+# Update them to wherever the foot actually ended up.
+fl_anchor = p.getLinkState(rid, PAW_LF)[0]
+fr_anchor = p.getLinkState(rid, PAW_RF)[0]
 print(f"  standing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
 
 FINAL_SETTLE_STEPS = 40
