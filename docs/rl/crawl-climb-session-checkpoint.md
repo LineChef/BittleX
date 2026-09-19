@@ -1,3 +1,29 @@
+## STANDING GOAL, added 2026-09-19 (read this first)
+
+Once the climb + standing posture is working reliably (current open item:
+the tilted-landing problem in UPDATE 4 below), **the next phase is
+robustness, not just a single validated scenario**. So far every result in
+this doc is from ONE tuned configuration (fixed ledge height 25mm, fixed
+approach margin 0.10, a handful of seeds that mostly just vary the walk
+policy's noise, not the actual climb geometry). Before calling B13/H7
+sim-validated, test the SAME mechanism across a real range of slightly
+different situations, e.g.:
+- Ledge height (`--ledge-h`): the 15-30mm sweet band the original foot-
+  probing validation found, not just 25mm.
+- Approach distance/angle: `--body-target-margin-m` swept wider, and any
+  off-axis/non-square approach if the walk policy's own heading noise ever
+  produces one.
+- Starting body position/orientation variety beyond just RNG seed (seed
+  varies the walk policy's noise, not the geometry it starts the climb from).
+- Possibly DR/friction variation already built into `benchmark_decathlon`'s
+  `_EXTRA_DR` mechanism, if that's relevant to foot-contact sensing.
+
+A mechanism tuned to one exact scenario (current state) is a much weaker
+claim than one that degrades gracefully across a family of scenarios. Don't
+declare this skill done on the strength of 3-5 seeds at one fixed geometry.
+
+---
+
 ## UPDATE 4 (same resumed session): reference frames captured + standing-posture problem diagnosed (not yet solved)
 
 After UPDATE 3's breakthrough, the user pointed out the obvious next problem:

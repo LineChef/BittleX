@@ -731,6 +731,30 @@ by the reactive-recovery ceiling established in Runs 6–7.
 > without reopening the separately-closed question of vision *inside* the
 > continuous walk policy. Details: [`docs/rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--),
 > [`docs/behavior-ideas.md`](behavior-ideas.md) B13.
+>
+> **2026-09-19 — sim-fidelity wall closed; a real crawl-climb controller
+> works in sim.** The "sim couldn't clear a ledge" finding above was a gap
+> in the sim setup, not the simulator itself: the front leg's own 2-DOF
+> reach-vs-depth limit was the real blocker, and a validated foot-probing
+> skill (joint-tracking-error contact sensing) worked around it. Built
+> `rl_training/opencat-gym/crawl_climb.py`: probe-verified front-foot
+> placement, a front-pull + tuck-swing-extend rear-leg motion (closely
+> matching the official reference climb's own mechanics — reach far,
+> stand tall for leverage, plant one rear leg via the same probe-and-search
+> mechanism once close enough, advance the same-side front leg), which gets
+> all four paws reliably onto a raised ledge without the earlier "jump"
+> (explosive tail push) the mechanism depended on before. Full log:
+> [`docs/rl/crawl-climb-session-checkpoint.md`](rl/crawl-climb-session-checkpoint.md).
+> One open problem remaining (front legs collapse into an unstable, tilted
+> crouch once both rear legs plant, root cause diagnosed but not yet fixed
+> cleanly — same doc). **Once that's resolved and the climb is reliable on
+> its own terms, the next goal is robustness**: test the same mechanism
+> across a range of slightly different situations (ledge height, approach
+> angle/distance, starting position, seed/DR variation) rather than just
+> the single tuned scenario validated so far — this is the actual bar for
+> calling B13/H7 sim-validated, not just "works once, tuned to one case."
+> Still sim-only; on-hardware `cmh` port is unblocked by this but not yet
+> started.
 
 **Status:** `pi_pipeline/vision/` is scaffolded and testable against a mock
 detection feed — same mock-interface pattern as voice/memory. `DetectionFeed`
