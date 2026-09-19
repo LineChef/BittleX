@@ -1,3 +1,57 @@
+## UPDATE 11 (same resumed session): quality over raw reliability -- promoted the lead-margin version despite its lower pass rate
+
+Important correction to UPDATE 10's framing. After reverting to the
+5-seed-reliable `af6cb44` state and trying (and reverting) three more
+experiments -- a slower/less-aggressive rear-leg walking gait, and a
+concurrent front-pull+rear-tuck merge (0/5, total failure, reverted
+immediately) -- the user pushed back on the premise directly: **the crude
+"N/4 paws on top" + "did it flip" pass/fail check is not the same thing as
+quality**, and shouldn't be treated as the automatic tie-breaker between
+candidate mechanisms. Their own recollection of watching the replays: the
+lead-margin version (`15df366`, reverted in UPDATE 10 for failing 2 of 5
+seeds by the flip check) was subjectively the BEST-LOOKING attempt so far
+-- front legs stay ahead of the body as it pulls forward, the body
+genuinely stabilizes standing on the ledge for a moment, even though it
+then eventually loses that stability. That's real, visible progress toward
+a controlled climb that the current "reliable" checkpoint doesn't show
+(the current checkpoint's front knee still collapses to ~90deg and looks
+belly-down the whole time -- it just happens to keep satisfying the
+numeric check while looking bad, exactly the same category of problem as
+the tail-jump and the tilt-blind-to-height issues earlier this session).
+
+**Decision, made directly by the user, not inferred**: promote `15df366`'s
+content back to `crawl_climb.py` as the working baseline, ON TOP OF the two
+independent safety fixes from UPDATE 10 (the `None`-anchor crash guard, and
+a new fix -- flipped runs previously never actually saved their GIF, just
+captured frames and exited; fixed so a flip can be reviewed too, which is
+how the walking-gait failure video was produced for the user to inspect).
+This is a DELIBERATE trade: known to fail (flip) on 2 of the 5 established
+seeds (7005, 7006), in exchange for visibly better motion quality on the
+seeds that do succeed. Re-verified 7000/7002/7003 still succeed with this
+combination (tilt 19.1-19.9deg, consistent with `15df366`'s own original
+numbers).
+
+**Process lesson, stated plainly**: UPDATE 10's "always keep a 5-seed-
+verified checkpoint" instinct was sound and stays the standing practice
+for CATCHING regressions and knowing exactly what's safe to fall back to
+-- but pass rate alone should not be the sole deciding factor for which
+candidate becomes the working version going forward. When a lower-pass-
+rate version is visibly closer to the actual goal (a controlled, stable
+climb) than a higher-pass-rate version that "succeeds" in a way that still
+looks wrong, that's worth weighing directly with the user rather than
+auto-selecting on the crude metric. Keep validating broadly and keep
+detailed records of exactly which commit does what (as this doc already
+does) so an earlier, better-quality candidate can always be recovered and
+promoted, like this update just did.
+
+Replays for comparison: `/Users/markjohnson/Desktop/crawl_climb_leadmargin_best.gif`
+(seed 7000, this promoted version, verified clean, 858 frames) and
+`/Users/markjohnson/Desktop/crawl_climb_walking_fail.gif` (seed 7002, the
+reverted walking-gait experiment, showing exactly how that one fails --
+flips at cycle 5, tilt 179.3).
+
+---
+
 ## UPDATE 10 (same resumed session): IMPORTANT -- reverted to the last 5-seed-verified checkpoint; testing-breadth lesson
 
 **Critical process lesson, stated plainly because it nearly caused real
