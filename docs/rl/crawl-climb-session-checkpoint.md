@@ -1,3 +1,87 @@
+## UPDATE 3 (same resumed session): BREAKTHROUGH -- drag+probe rear-leg mechanism, tail push eliminated
+
+This is the biggest architectural change of the whole session, driven by a
+sequence of increasingly specific user observations from watching the
+reference climb closely:
+
+1. "Use the front legs to drag the back legs forward like the scripted gait
+   does" -- decoupled rear-leg stepping from every cycle; front-pull alone
+   drags the body (rear legs held firm/extended) between steps.
+2. "If they are bent when the front legs try to drag them forward it will
+   destabilize the stance... they need to be almost fully extended" --
+   confirmed the rear legs already stay extended during drag (pull phase
+   never touches rear joint angles; held at firm force 2.5).
+3. "After the back legs are dragged forward, one leg kicks forward till it
+   encounters the ledge and plants there, then the other foot is now close
+   enough to step up" -- this is the single biggest insight: the rear legs
+   shouldn't do an invented "stepping shape" at all. They should use the
+   SAME validated probe-and-plant mechanism the front legs already use
+   (reach forward, search down, confirm real contact) once close enough.
+4. "After the second leg steps up... one front leg on the same side that
+   just swung forward steps forward too, to gain more leverage" -- added:
+   once a rear leg plants, immediately advance the same-side front leg
+   (naming convention: PAW_LF/RF/RB/LB = Left-Front/Right-Front/Right-Back/
+   Left-Back, so pairs are (LF,LB) and (RF,RB)).
+5. "The back legs tuck the lower leg in tight, THEN the top part swings
+   forward, THEN only then does the lower leg swing down to propel the
+   body forward" -- replaced the cmh-swing-shape blend entirely with an
+   explicit 3-phase sequential motion: TUCK (knee flexes in tight, hip
+   fixed) -> SWING (hip rotates the still-tucked leg forward, knee fixed)
+   -> EXTEND (knee straightens back out, the actual power stroke, held at
+   2x force since it's doing real work against the ground).
+
+**Bug found and fixed along the way**: the swing-hip direction was
+initially backwards -- body_x DECREASED through tuck/swing/extend every
+cycle, getting worse each time (traced directly via phase-by-phase
+diagnostic prints, exactly as the user asked -- "work through each part one
+by one"). Flipping the sign (`--swing-hip-deg` default changed from +28 to
+-28) immediately reversed this: body_x began climbing steadily every phase.
+
+**Also found**: the probe-attempt check only ran at the TOP of each cycle
+using the PREVIOUS cycle's position, so the very last cycle's progress
+(which finally closed the gap) never got checked before the loop exited.
+Added one more probe attempt right after the main loop, on the final
+position, as a fix.
+
+**Also found**: `--rear-step-every 3` (matching "drag mostly, step
+occasionally" literally) never let the body get close enough to trigger the
+probe-attempt threshold (80mm) at all within `n_cycles` -- pure front-pull
+drag alone plateaus far short (~145mm, WORSE than the old swing-shape
+stepping) because the rear legs are still bearing real weight/friction after
+the extend phase and actively resist being dragged. Stepping EVERY cycle
+(`--rear-step-every 1`) is what's actually needed; "drag" happens within
+each step's tuck+swing phases (foot lifted, not gripping), and the
+propulsion comes from the extend phase's power stroke, not from passive
+dragging between separate steps.
+
+**Result: this is the best outcome of the entire session.** 5/5 test seeds
+(7000, 7002, 7003, 7005, 7006) all converge to 4/4 within exactly 3 cycles
+(RB plants at cycle 2, LB at cycle 3), tilt tightly clustered 9.5-9.7 deg,
+**the explosive tail push is skipped entirely** -- both rear legs plant via
+genuine probe-verified contact (37-41mm past the edge, real margin) before
+the tail phase ever runs. This directly solves the core "looks like a jump"
+problem that's been the session's central open issue since it was first
+quantified (the 130-160mm pre-tail gap). The whole climb is also much
+faster now: replay dropped from ~150s (40 cycles of swing-shape stepping)
+to ~55s (3-4 cycles of tuck-swing-extend).
+
+**New defaults set**: `--rear-step-every 1` (was 3), `--n-cycles 15` (down
+from 40 -- real safety margin above the observed 3-4 cycle convergence,
+without wasting runtime on a now-unnecessary large cap). New CLI args:
+`--tuck-knee-deg` (default 45), `--swing-hip-deg` (default -28).
+
+Replay regenerated and verified (`/Users/markjohnson/Desktop/crawl_climb.gif`,
+seed 7000, 909 frames, 0 corrupted, tilt 9.6, 4/4, no tail).
+
+**Not yet re-tried on this new mechanism**: the 60mm reach margin, -8deg
+initial RB lean (both still pending, now on top of an entirely different and
+much better baseline than when they were last tried). Also not yet checked:
+whether `TUCK_KNEE_DEG=45`/`SWING_HIP_DEG=-28` are actually tuned optimally,
+or just the first values that happened to work -- there may be room to
+smooth the motion further or reduce tilt below 9.5 deg with a proper sweep.
+
+---
+
 ## UPDATE 2 (same resumed session): jerkiness root-caused + fixed, seed 7003 plateau resolved as a side effect
 
 User's diagnosis: jerky transitions between movements were knocking already-
