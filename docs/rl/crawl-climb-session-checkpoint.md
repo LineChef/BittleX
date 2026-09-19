@@ -1,3 +1,56 @@
+## SESSION PAUSE NOTE (2026-09-19): resume-here summary
+
+Session paused after UPDATE 12 below. User is confident this is gettable and
+wants to resume without re-deriving anything already learned. Read this note
+first, then UPDATE 12/11 for full detail.
+
+**Current committed state**: `crawl_climb.py` == commit `9de2f06` on branch
+`auto-gait-iteration`. This is the "quality over raw reliability"
+lead-margin checkpoint: front-leg pull uses a geometric under-body-margin
+stop (`UNDER_BODY_MARGIN_M = 0.04`), rear legs use SYNCHRONIZED (not
+alternating) TUCK->SWING->EXTEND. Reliable (4/4) on seeds 7000/7002/7003;
+KNOWN to flip on 7005/7006 -- this is a deliberate, user-approved trade
+(motion quality over raw pass rate). Do not "fix" this by reverting to an
+earlier, more-reliable-but-worse-looking version without asking first --
+see UPDATE 11's quality-over-reliability decision.
+
+**Comparison replay GIFs published as a web page** (so no local file-path
+issues): https://claude.ai/artifact/QSof1bujRj3NPMf1LDZC2B -- seed 7005
+(succeeds under the walking+lead-margin combo) and seed 7000 (flips under
+the same combo at cycle 3). Underlying local files, if needed again:
+`/Users/markjohnson/Desktop/crawl_climb_combo_success.gif` and
+`crawl_climb_combo_fail.gif`.
+
+**What's actually unresolved, i.e. where to pick back up**:
+1. The user's direction ("back legs walking forward while front legs pull
+   forward, in concert, at the right speed") has been tried twice and is
+   NOT yet a clean win -- see UPDATE 12, point 1. It's a genuine trade
+   (fixes 7005/7006, breaks 7000/7002), not an improvement, in both the
+   sequential and concurrent-timing forms tried so far.
+2. Concurrent (same-physics-step) timing of the front pull and rear tuck
+   has failed decisively TWICE on two different baselines (0/5 total
+   failure once, 1/4 and 2/4 incomplete the second time) -- see UPDATE 12,
+   point 2, for the specific suspected causes (ad hoc shared force value of
+   1.5; possible force interference between the two motions on
+   overlapping/adjacent joints within one physics step). Don't retry the
+   same merged-loop implementation without addressing one of those first.
+3. **Untried lever, flagged directly by the user and never yet varied in
+   isolation**: step SPEED / phase duration timing. Every experiment so far
+   varied amplitude (how far the rear leg tucks/swings) or leg-selection
+   logic (which leg steps when), never how FAST each phase executes. The
+   user's own words: "the speed at which this step takes place is gonna be
+   what makes or breaks this approach." This is the most promising next
+   thing to try that hasn't been tried yet.
+4. Standing practices to keep following: validate any change against the
+   full 5-seed set (7000/7002/7003/7005/7006) before trusting it, not a
+   subset (see `feedback_seed_testing_breadth` memory); always keep a
+   verified checkpoint to revert to; quality (does it visually match the
+   reference climb) beats raw pass-rate as the deciding factor when the two
+   conflict (see UPDATE 11); give the user any new replay link FIRST, before
+   reviewing frames myself (see `feedback_review_replay_myself` memory).
+
+---
+
 ## UPDATE 12 (same resumed session): rear-leg walking + concurrent pull/step timing, tried on the promoted checkpoint -- both negative
 
 Two more direct user-requested experiments tried on top of UPDATE 11's
