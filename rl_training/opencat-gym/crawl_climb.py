@@ -147,10 +147,32 @@ def sim_step():
 
 def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anchors,
                              platform_top_z, forward_margin, above_margin,
-                             lift_first=True, weight_shift=None, do_slide=True):
+                             lift_first=True, weight_shift=None, do_slide=True,
+                             anchor_force=0.5):
     """Lift+reach+search one leg onto the platform, holding any already-secured
     legs (in `anchors`: {link: world_pos}) fixed via continuous IK throughout.
-    Returns (hold_targets, new_anchor_pos_or_None, solid_bool)."""
+    Returns (hold_targets, new_anchor_pos_or_None, solid_bool).
+
+    `anchor_force`: how firmly the ALREADY-anchored legs (not the leg being
+    probed, which always searches gently at 0.5) are held. The default 0.5
+    matches the original front-leg-probing behavior; found directly (by
+    extracting and looking at replay frames, not just trusting tilt) that
+    0.5 is nowhere near firm enough once the anchored legs are already
+    bearing real body weight at an extreme knee angle -- the body sags
+    noticeably during a ~100-150+ step search at that softness, causing a
+    straight-down collapse that stayed invisible to tilt (which only
+    measures orientation, not height). Pass a firmer value (2.5-3.0) for
+    any probe call happening after the front legs are already load-bearing.
+    """
+    def _probe_forces(probe_force=0.5):
+        f = np.ones(8) * probe_force   # the leg actively searching stays gentle
+        for link in anchors:
+            sh, kn = {PAW_LF: (FL_SHOULDER, FL_KNEE), PAW_RF: (FR_SHOULDER, FR_KNEE),
+                      PAW_RB: (RB_HIP, RB_KNEE), PAW_LB: (LB_HIP, LB_KNEE)}[link]
+            f[sh] = anchor_force
+            f[kn] = anchor_force
+        return f.tolist()
+
     def _with_anchors(tgt):
         for link, pos in anchors.items():
             sh, kn = {PAW_LF: (FL_SHOULDER, FL_KNEE), PAW_RF: (FR_SHOULDER, FR_KNEE),
@@ -168,7 +190,7 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
             st_targets[idx] -= d
         for _ in range(30):
             tgt = _with_anchors(st_targets.copy())
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 1.0)
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_probe_forces(1.0))
             sim_step()
         hold_targets = st_targets
 
@@ -181,7 +203,7 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
             lt[knee_idx] = hold_targets[knee_idx] - np.deg2rad(40) * frac
             tgt = _with_anchors(lt.copy())
             for _wait in range(10):
-                p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 0.2)
+                p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_probe_forces(0.2))
                 sim_step()
         hold_targets = lt
     paw_clear = p.getLinkState(rid, paw_link)[0]
@@ -210,7 +232,7 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
         rt[knee_idx] = ikr[knee_idx]
         tgt = _with_anchors(rt.copy())
         for _wait in range(10):
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 0.5)
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_probe_forces())
             sim_step()
             cur = p.getLinkState(rid, paw_link)[0]
             if abs(cur[0] - rp[0]) < 0.003 and abs(cur[2] - rp[2]) < 0.003:
@@ -231,7 +253,7 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
         targets[knee_idx] = ik[knee_idx]
         tgt = _with_anchors(targets.copy())
         for _wait in range(10):
-            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 0.5)
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=_probe_forces())
             sim_step()
             if abs(p.getLinkState(rid, paw_link)[0][2] - tp[2]) < 0.003:
                 break
@@ -275,7 +297,7 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
                     starg[knee_idx] = sik[knee_idx]
                     stgt = _with_anchors(starg.copy())
                     for _wait in range(6):
-                        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, stgt, forces=np.ones(8) * 0.5)
+                        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, stgt, forces=_probe_forces())
                         sim_step()
                     scps = p.getContactPoints(bodyA=rid, linkIndexA=paw_link)
                     if not scps:
@@ -364,7 +386,8 @@ hold_targets, fr_anchor, fr_solid = probe_leg_onto_platform(
 if fr_anchor is None:
     print("FR never found the platform -- aborting")
     raise SystemExit
-print(f"FR secured: {'SOLID' if fr_solid else 'marginal'}")
+print(f"FR secured: {'SOLID' if fr_solid else 'marginal'}, "
+      f"body_z={p.getBasePositionAndOrientation(rid)[0][2]:.4f}")
 
 ANCHOR_FORCE = 3.0
 PUSH_FORCE = 6.5
@@ -482,8 +505,8 @@ hold_targets = _with_front_ik(lt.copy(), fl_anchor, fr_anchor)
 fl_anchor = p.getLinkState(rid, PAW_LF)[0]
 fr_anchor = p.getLinkState(rid, PAW_RF)[0]
 tl = tilt()
-bx = p.getBasePositionAndOrientation(rid)[0][0]
-print(f"  extended: body_x={bx:.4f}, tilt={tl:.1f}")
+bx, _by, bz = p.getBasePositionAndOrientation(rid)[0]
+print(f"  extended: body_x={bx:.4f}, tilt={tl:.1f}, body_z={bz:.4f}")
 if tl > 68.8:
     print("FLIPPED during rear-leg extension -- aborting")
     if args.out and frames:
@@ -564,7 +587,7 @@ for cyc in range(N_CYCLES):
         margin = max(args.forward_margin_m, (EDGE_X - rb_cur[0]) + 0.02)
         hold_targets, rb_new, rb_solid = probe_leg_onto_platform(
             PAW_RB, RB_HIP, RB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor},
-            platform_top_z, margin, args.above_margin_m, lift_first=True)
+            platform_top_z, margin, args.above_margin_m, lift_first=True, anchor_force=2.5)
         if rb_new is not None and rb_solid:
             rb_anchor = rb_new
             print(f"  RB planted at cycle {cyc}: {1000*(rb_anchor[0]-EDGE_X):.0f}mm past the edge")
@@ -575,7 +598,7 @@ for cyc in range(N_CYCLES):
             fr_margin = max(args.forward_margin_m, (fr_cur[0] - EDGE_X) + 0.02)
             hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
                 PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor},
-                platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False)
+                platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
             if fr_new is not None:
                 fr_anchor = fr_new
                 print(f"  FR (same side as RB) advanced for leverage: "
@@ -584,7 +607,7 @@ for cyc in range(N_CYCLES):
         margin = max(args.forward_margin_m, (EDGE_X - lb_cur[0]) + 0.02)
         hold_targets, lb_new, lb_solid = probe_leg_onto_platform(
             PAW_LB, LB_HIP, LB_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RF: fr_anchor, PAW_RB: rb_anchor},
-            platform_top_z, margin, args.above_margin_m, lift_first=True)
+            platform_top_z, margin, args.above_margin_m, lift_first=True, anchor_force=2.5)
         if lb_new is not None and lb_solid:
             lb_anchor = lb_new
             print(f"  LB planted at cycle {cyc}: {1000*(lb_anchor[0]-EDGE_X):.0f}mm past the edge")
@@ -593,7 +616,7 @@ for cyc in range(N_CYCLES):
             fl_margin = max(args.forward_margin_m, (fl_cur[0] - EDGE_X) + 0.02)
             hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
                 PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
-                platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False)
+                platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
             if fl_new is not None:
                 fl_anchor = fl_new
                 print(f"  FL (same side as LB) advanced for leverage: "
@@ -655,8 +678,8 @@ for cyc in range(N_CYCLES):
         print(f"    extend/propel: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
 
     tl = tilt()
-    bx = p.getBasePositionAndOrientation(rid)[0][0]
-    print(f"  cycle {cyc}: body_x={bx:.4f}, tilt={tl:.1f}, "
+    bx, _by, bz = p.getBasePositionAndOrientation(rid)[0]
+    print(f"  cycle {cyc}: body_x={bx:.4f}, body_z={bz:.4f}, tilt={tl:.1f}, "
           f"FL_slip={_foot_slipped(PAW_LF, fl_anchor)}, FR_slip={_foot_slipped(PAW_RF, fr_anchor)}")
     if tl > 68.8:
         print(f"FLIPPED at cycle {cyc}")
@@ -664,8 +687,10 @@ for cyc in range(N_CYCLES):
         break
 
     if rb_anchor is not None and lb_anchor is not None:
+        bz_here = p.getBasePositionAndOrientation(rid)[0][2]
         print(f"  Both rear legs planted via drag+probe at cycle {cyc} -- "
-              f"skipping the explosive tail push entirely.")
+              f"skipping the explosive tail push entirely. "
+              f"body_z={bz_here:.4f}m (clearance above platform={bz_here-platform_top_z:.4f}m)")
         break
 
     if (cyc + 1) % REPLANT_EVERY == 0 and cyc + 1 < N_CYCLES:
@@ -847,14 +872,14 @@ fl_cur = p.getLinkState(rid, PAW_LF)[0]
 fl_margin = max(0.01, (fl_cur[0] - EDGE_X))
 hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
     PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
-    platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False)
+    platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
 if fl_new is not None:
     fl_anchor = fl_new
 fr_cur = p.getLinkState(rid, PAW_RF)[0]
 fr_margin = max(0.01, (fr_cur[0] - EDGE_X))
 hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
     PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
-    platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False)
+    platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
 if fr_new is not None:
     fr_anchor = fr_new
 js = p.getJointStates(rid, env.joint_id)
@@ -880,62 +905,111 @@ print(f"  fresh front anchors: FL_KNEE={np.degrees(js[FL_KNEE][0]):.1f}deg "
 # body genuinely lower, which should un-fold the front knee as a natural
 # side effect -- rather than fighting the front leg in isolation while the
 # rear insists on holding the body up tall.
-print("Letting the rear legs settle down slightly (undoing part of their "
-      "own extension) so the body genuinely lowers, un-folding the front "
-      "knee as a natural side effect instead of fighting it in isolation.")
-REAR_SETTLE_HIP_DEG = 15
-REAR_SETTLE_KNEE_DEG = 10
-REAR_SETTLE_STEPS = 20
-TILT_ABORT = 16
-rear_start = hold_targets.copy()
-rear_target = hold_targets.copy()
-rear_target[RB_HIP] -= np.deg2rad(REAR_SETTLE_HIP_DEG)
-rear_target[LB_HIP] -= np.deg2rad(REAR_SETTLE_HIP_DEG)
-rear_target[RB_KNEE] -= np.deg2rad(REAR_SETTLE_KNEE_DEG)
-rear_target[LB_KNEE] -= np.deg2rad(REAR_SETTLE_KNEE_DEG)
+# REAL root cause, now confirmed (not guessed): body_z was ALREADY down to
+# 0.0542m by the moment RB's own probe fires (traced tick by tick: 0.1020 ->
+# 0.1017 -> 0.0819 -> 0.0542m across the pull cycles) -- BEFORE any of this
+# "standing" code runs at all, and unaffected by a firmer anchor-hold-force
+# fix (tested directly, identical numbers with or without it). The pull
+# mechanism's own front-knee retraction is what's doing this: it's the
+# actual propulsion source (folding the knee generates the pull leverage),
+# and folding a leg mechanically shortens it, which necessarily lowers the
+# body -- a real, expected side effect of how this propulsion works, not a
+# bug. So earlier fixes aimed at "why is the knee at 90deg" or "why isn't
+# the anchor holding firmly" were addressing the wrong layer entirely.
+#
+# The real fix is a genuine stand-up push: since all four feet are now
+# resting on solid, FLAT platform ground (unlike anywhere during the climb
+# itself, where the geometry was actively changing), a SYNCHRONIZED
+# extension of all four legs together should be far safer than adjusting
+# one leg in isolation against the others -- much closer to how a real
+# quadruped recovers from a crouch (push up on every leg at once, not one
+# at a time). Very small per-step increments, watching both tilt AND height
+# gain, aborting early if tilt rises.
+print("Synchronized stand-up push: extending all four legs together (front "
+      "knee straightens, rear hip+knee extend further) in small increments, "
+      "since a full crouch recovery on one leg at a time either destabilized "
+      "or had no effect -- pushing up on all four together, like a real "
+      "quadruped would, since all four feet are now on solid flat ground. "
+      "Done in MULTIPLE STAGES with a settle between each, so tilt has a "
+      "chance to recover before the next push adds more, rather than one "
+      "continuous push that has to stop the moment tilt crosses a threshold.")
+STANDUP_FRONT_KNEE_DEG_PER_STAGE = 12
+STANDUP_REAR_HIP_DEG_PER_STAGE = 5
+STANDUP_REAR_KNEE_DEG_PER_STAGE = 4
+STANDUP_STAGES = 4
+STANDUP_STEPS_PER_STAGE = 15
+SETTLE_STEPS_PER_STAGE = 20
+TILT_ABORT = 20
+z0 = p.getBasePositionAndOrientation(rid)[0][2]
 cur = hold_targets.copy()
-for _rstep in range(REAR_SETTLE_STEPS):
-    frac = (_rstep + 1) / REAR_SETTLE_STEPS
-    rear_frac_target = rear_start * (1 - frac) + rear_target * frac
-    ik_fl = p.calculateInverseKinematics(rid, PAW_LF, fl_anchor)
-    ik_fr = p.calculateInverseKinematics(rid, PAW_RF, fr_anchor)
-    ik_rb = p.calculateInverseKinematics(rid, PAW_RB, rb_anchor)
-    ik_lb = p.calculateInverseKinematics(rid, PAW_LB, lb_anchor)
-    nxt = rear_frac_target.copy()
-    nxt[FL_SHOULDER], nxt[FL_KNEE] = ik_fl[FL_SHOULDER], ik_fl[FL_KNEE]
-    nxt[FR_SHOULDER], nxt[FR_KNEE] = ik_fr[FR_SHOULDER], ik_fr[FR_KNEE]
-    for _wait in range(6):
-        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, nxt, forces=np.ones(8) * 1.5)
+for _stage in range(STANDUP_STAGES):
+    start = cur.copy()
+    target = cur.copy()
+    target[FL_KNEE] -= np.deg2rad(STANDUP_FRONT_KNEE_DEG_PER_STAGE)
+    target[FR_KNEE] -= np.deg2rad(STANDUP_FRONT_KNEE_DEG_PER_STAGE)
+    target[RB_HIP] += np.deg2rad(STANDUP_REAR_HIP_DEG_PER_STAGE)
+    target[LB_HIP] += np.deg2rad(STANDUP_REAR_HIP_DEG_PER_STAGE)
+    target[RB_KNEE] += np.deg2rad(STANDUP_REAR_KNEE_DEG_PER_STAGE)
+    target[LB_KNEE] += np.deg2rad(STANDUP_REAR_KNEE_DEG_PER_STAGE)
+    stage_cur = start.copy()
+    for _sstep in range(STANDUP_STEPS_PER_STAGE):
+        frac = (_sstep + 1) / STANDUP_STEPS_PER_STAGE
+        nxt = start * (1 - frac) + target * frac
+        for _wait in range(6):
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, nxt, forces=np.ones(8) * 2.0)
+            sim_step()
+        if tilt() > TILT_ABORT:
+            break
+        stage_cur = nxt
+    # settle at firm force before the next stage, letting tilt recover
+    for _wait in range(SETTLE_STEPS_PER_STAGE):
+        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, stage_cur, forces=np.ones(8) * 2.5)
         sim_step()
+    z_now = p.getBasePositionAndOrientation(rid)[0][2]
+    print(f"    standup stage {_stage+1}/{STANDUP_STAGES}: body_z={z_now:.4f} "
+          f"(+{1000*(z_now-z0):.0f}mm), tilt={tilt():.1f}")
+    cur = stage_cur
     if tilt() > TILT_ABORT:
-        print(f"    rear-settle step {_rstep+1}: tilt={tilt():.1f} -- over {TILT_ABORT}deg, stopping here")
+        print(f"    tilt still over {TILT_ABORT}deg after settling -- stopping the stand-up push here")
         break
-    cur = nxt
-    if (_rstep + 1) % 5 == 0:
-        print(f"    rear-settle step {_rstep+1}/{REAR_SETTLE_STEPS}: FL_KNEE="
-              f"{np.degrees(cur[FL_KNEE]):.1f}deg, body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, "
-              f"tilt={tilt():.1f}")
+z_final = p.getBasePositionAndOrientation(rid)[0][2]
+print(f"  stand-up push done: body_z={z_final:.4f} (+{1000*(z_final-z0):.0f}mm from before), tilt={tilt():.1f}")
 hold_targets = cur
+# The final settle below re-solves fresh IK toward all four anchors -- if
+# any still point at the OLD (pre-standup) position, that settle would just
+# snap the leg straight back and undo the stand-up push. The rear legs
+# weren't anchor-tracked during the push (direct joint control, so they
+# could actually extend), so their foot position moved too -- update all
+# four to wherever the feet actually ended up.
 fl_anchor = p.getLinkState(rid, PAW_LF)[0]
 fr_anchor = p.getLinkState(rid, PAW_RF)[0]
-# The final settle below re-solves fresh IK toward fl_anchor/fr_anchor --
-# if those still point at the OLD (pre-reduction) position, that settle
-# would just snap the knee straight back to ~90deg and undo this entirely.
-# Update them to wherever the foot actually ended up.
-fl_anchor = p.getLinkState(rid, PAW_LF)[0]
-fr_anchor = p.getLinkState(rid, PAW_RF)[0]
+rb_anchor = p.getLinkState(rid, PAW_RB)[0]
+lb_anchor = p.getLinkState(rid, PAW_LB)[0]
 print(f"  standing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
 
+# CRITICAL BUG FOUND (by extracting and looking at our own replay frames,
+# not just trusting tilt): a soft-starting force ramp (0.8 -> ANCHOR_FORCE
+# over 15 steps) here was letting the body SAG STRAIGHT DOWN under gravity
+# during that low-force window, before the ramp caught up -- with the front
+# knee already near its ~90deg limit (an awkward, barely-supportable
+# configuration), 0.8 isn't enough to hold the body's weight up at all.
+# This is a STRAIGHT-DOWN collapse (body stays level/un-rotated the whole
+# time), which is exactly why `tilt` (roll/pitch only) never caught it --
+# tilt measures ORIENTATION, not HEIGHT, and a robot can be perfectly level
+# while completely collapsed. Confirmed directly: extracted frames from our
+# own GIF around this point in the sequence show the body flush against the
+# platform surface, legs splayed, matching the user's "falls on its face"
+# report exactly -- something the printed tilt diagnostic never revealed.
+# Fix: track body HEIGHT explicitly (not just tilt) as a real diagnostic
+# going forward, and start this settle at firm force throughout -- the
+# jerkiness a soft start was meant to prevent is a far smaller problem than
+# an invisible collapse.
+body_z_before_settle = p.getBasePositionAndOrientation(rid)[0][2]
+print(f"  body height before final settle: {body_z_before_settle:.4f}m")
 FINAL_SETTLE_STEPS = 40
 for _fs in range(FINAL_SETTLE_STEPS):
     tgt = _with_all_four_ik(hold_targets.copy())
-    # Ramp the hold force in gradually (0.8 -> ANCHOR_FORCE) instead of
-    # snapping every leg rigid the instant the last one plants -- the search
-    # phase holds everything soft (0.5), so an instant jump to full anchor
-    # stiffness right when the last leg's weight transfers on is exactly the
-    # kind of jolt that was knocking already-solid footing loose elsewhere.
-    # A soft-landing ramp lets the newly-planted leg settle in smoothly.
-    settle_force = 0.8 + (ANCHOR_FORCE - 0.8) * min(1.0, (_fs + 1) / 15)
+    settle_force = ANCHOR_FORCE
     p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * settle_force)
     sim_step()
 paws = [p.getLinkState(rid, j)[0] for j in CLIMB_PAW_LINKS]
@@ -948,8 +1022,15 @@ if final_tilt > 68.8:
 else:
     on_top_each = {lbl: (pz > platform_top_z - 0.02 and px > EDGE_X - 0.02) for lbl, (px, py, pz) in zip(labels, paws)}
 on_top = sum(on_top_each.values())
-bx = p.getBasePositionAndOrientation(rid)[0][0]
-print(f"FINAL: {on_top}/4 paws on-top {on_top_each}, body_x={bx:.4f}, tilt={final_tilt:.1f}")
+bx, by, bz = p.getBasePositionAndOrientation(rid)[0]
+# Paw-height alone doesn't catch a collapsed body between well-planted feet
+# (confirmed directly: tilt stayed ~9deg while the body sat flush against
+# the platform, legs splayed -- "sitting on its belly" exactly as reported).
+# Report body height relative to the platform explicitly so this is visible
+# in the numbers from now on, not just discoverable by extracting frames.
+body_clearance = bz - platform_top_z
+print(f"FINAL: {on_top}/4 paws on-top {on_top_each}, body_x={bx:.4f}, "
+      f"tilt={final_tilt:.1f}, body_clearance_above_platform={body_clearance:.4f}m")
 
 if args.out and frames:
     # Extra hold frames at the SAME constant duration as the rest, not a

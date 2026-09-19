@@ -69,6 +69,83 @@ corrupted, 4/4, tilt 9.1 -- stable landing, front knee still visually bent).
 
 ---
 
+## UPDATE 6 (same resumed session): TRUE root cause found via visual frame review -- height collapse, not tilt
+
+The "sitting on its belly" problem was never actually about tilt or the
+front knee's angle in isolation -- both UPDATE 4 and UPDATE 5 were
+diagnosing the wrong layer. Found by finally doing what should have
+happened much earlier: extracting and looking at frames from OUR OWN
+replay (not just the reference video), after the user reported "no change"
+across several regenerated GIFs with different unique filenames (ruling out
+a caching explanation). A frame at the very end of the sequence showed the
+body essentially flush against the platform, legs splayed -- while
+`tilt()` (roll/pitch only) read a perfectly fine ~9 degrees the whole time.
+**`tilt` measures orientation, not height -- a robot can be dead level while
+completely collapsed onto the ground, and every earlier "stability" check
+this session was blind to that.**
+
+Traced body height (`body_z`) explicitly, tick by tick, through the whole
+sequence for the first time: 0.0828 (FR secured) -> 0.1020 (rear-leg
+extension raises it, working correctly) -> 0.1017 (cycle 0, still tall) ->
+**0.0819 (cycle 1) -> 0.0542 (cycle 2, when RB's probe fires) -> 0.0545
+(stays low from here)**. The big drop is real and happens during the crawl
+cycles themselves, well before any of the "standing" code from UPDATE 4/5
+even runs.
+
+Root cause, now correctly identified: **the front-knee-pull mechanism IS
+the propulsion source (folding the knee against a friction-held foot is
+what generates the pull), and folding a leg mechanically shortens it,
+which necessarily lowers the body.** This is a real, expected side effect
+of how the current propulsion works, not a bug -- which is why UPDATE 5's
+five approaches (all aimed at the front knee's angle or the anchor-holding
+force) either had no effect or destabilized: they were treating a symptom
+of the propulsion mechanism as if it were an independent tracking problem.
+Confirmed directly that anchor-holding force wasn't it either: added a
+firmer `anchor_force` parameter to `probe_leg_onto_platform` for every
+probe call after the front legs are already load-bearing (RB/LB plants,
+same-side leverage advances) -- identical body_z numbers with or without
+it.
+
+**Mitigation implemented**: a synchronized 4-leg "stand-up push" once all
+four feet are secured -- front knees straighten and rear hip+knee extend
+further, TOGETHER (not one leg in isolation, which is what UPDATE 5's
+attempts got wrong), in several small stages with a settle between each.
+Reasoning: with all four feet now resting on solid, flat platform ground
+(unlike anywhere during the climb itself), a synchronized push is much
+closer to how a real quadruped recovers from a crouch than adjusting one
+leg while the other three fight it. **Result, validated on 3 seeds: a
+real, consistent +9 to +10mm height gain** (clearance above the platform
+36-98mm... actually 29mm -> 37-38mm), landing tilt 19.1-19.4deg. Tried
+extending this further (more stages, looser tilt tolerance) -- hit a
+genuine equilibrium around 20deg tilt that more settle time doesn't
+recover from (not a transient spike), so returns diminish fast past the
+current tuning.
+
+**Honest assessment after extracting and reviewing our own replay frames
+again post-fix**: the fix is real and measurably correct in the
+underlying physics, but NOT yet a dramatic visual improvement -- the robot
+still looks meaningfully lower/flatter than the reference climb's natural
+stand (frame 07 in `docs/rl/reference-frames/`). A full resolution likely
+needs a fundamentally different propulsion mechanism for the drag/pull
+phase -- one that doesn't rely on progressively folding the front knee for
+leverage in the first place, so there's no height deficit to recover from
+at the end -- rather than continuing to patch the landing after the fact.
+This is a real, well-scoped open problem for next time, not a mystery.
+
+**New standing practice adopted**: extract and look at frames from BOTH
+the reference video AND our own replay output whenever verifying a fix,
+not just printed numeric diagnostics. `tilt` (or any single scalar) can be
+blind to failure modes a human eye catches immediately -- confirmed
+directly this session, twice now (once for the reference-video comparison
+itself, once for this exact bug).
+
+Replay regenerated and verified multiple times at this state (latest:
+`/Users/markjohnson/Desktop/crawl_climb_v4.gif`, seed 7000, 743 frames, 0
+corrupted, 4/4, final tilt 19.4, body clearance 37.8mm -- up from ~29mm,
+real but modest visual improvement).
+
+---
+
 ## STANDING GOAL, added 2026-09-19 (read this first)
 
 Once the climb + standing posture is working reliably (current open item:
