@@ -1,3 +1,97 @@
+## UPDATE 4 (same resumed session): reference frames captured + standing-posture problem diagnosed (not yet solved)
+
+After UPDATE 3's breakthrough, the user pointed out the obvious next problem:
+once all four feet are secured, the front legs "go limp" and the body "lays
+flat" on the platform instead of standing on top of it -- described directly
+as "the front legs just fully pull straight back until the robot is sitting
+on its belly."
+
+**Reference frames captured**: downloaded the official PetoiCamp reference
+video (yt-dlp, format 134 -- Homebrew's ffmpeg/yt-dlp formulae are blocked
+by an outdated Xcode on this machine, worked around with pip-installable
+`yt-dlp` + `imageio-ffmpeg`, which ship prebuilt binaries and need no
+compilation) and extracted 7 key frames covering the whole climb sequence,
+saved permanently at `docs/rl/reference-frames/` with a README describing
+each phase. **Caution for next time**: the `pip install` for these tools
+upgraded numpy to 2.4.6 in the shared project venv, which silently breaks
+`stable-baselines3` (needs numpy<2.0) -- caught and fixed immediately
+(`pip install "numpy<2.0"`) but verify `python crawl_climb.py ... ` still
+runs before trusting any test after installing new packages into this venv.
+
+The frames confirm real, useful detail: frame 03
+(`03-steep-arch-rear-extended.png`) shows the rear legs nearly fully
+extended driving the body into a steep mantle position BEFORE any rear
+stepping -- direct visual confirmation that "tall stance = leverage" is
+real, not a stylistic guess. Frame 07 (`07-final-standing-tall.png`) is the
+target for the open problem: the real robot ends up standing tall, level,
+and naturally on top, nothing like our sim's collapse.
+
+**Root cause traced precisely** (through several failed hypotheses, each
+tested and ruled out directly rather than guessed):
+1. First hypothesis: the front knee is over-flexed by the "slide deeper"
+   depth fix being applied twice (once at initial securing, again during
+   the same-side leverage advance from UPDATE 3). Added a `do_slide` param
+   to skip the redundant slide on the advance call -- **did not change the
+   result at all** (knee still landed at exactly ~90.1-90.2deg across all
+   3 seeds). Ruled out.
+2. Second hypothesis: `_with_front_ik`'s rate limiter (RATE_LIMIT_DEG=4/call)
+   lets the knee reach an extreme angle during a transient peak-tilt moment
+   mid-maneuver (tilt hit 20-46deg at points) and never gets enough
+   follow-up calls to walk back down once tilt recovers. Tested directly:
+   added 40 extra `_with_front_ik` settle calls after both rear legs plant,
+   at which point tilt has already recovered to 9.2deg -- knee STILL landed
+   at ~90.5deg. Ruled out.
+3. **Actual cause, confirmed by elimination**: the rear-leg extension
+   phase and the tuck-swing-extend cycles have genuinely lifted the BODY
+   much higher by the time both rear legs plant (that IS their leverage
+   effect, working as intended) -- so the OLD front anchor point, captured
+   early when the body was still low near platform level, ends up almost
+   directly BELOW the shoulder joint by the end. Reaching straight down to
+   that point geometrically requires near-maximal knee fold. This is not a
+   bug in the anchor tracking -- it's a real, correct consequence of how
+   much the body rises during the climb. The mismatch is between "how high
+   the body needs to be mid-climb for leverage" and "how high it should
+   settle once done" -- nothing currently bridges that gap.
+4. Tried capping the knee directly inside `_with_front_ik` (55deg) to
+   prevent this -- broke anchor tracking outright (flip by cycle 3, every
+   seed, before LB even plants): the knee genuinely NEEDS to reach ~90deg
+   at some points during the maneuver to hold the anchor precisely. Capping
+   it there is capping something load-bearing, not fixing a bug. Reverted.
+5. Tried a direct jump from the ~90deg crouch straight to a flat-ground
+   `STANCE` target (imported from climb_env) -- caused an outright flip
+   (tilt 180). Too large a correction in one motion from such an extreme
+   starting configuration, and STANCE itself is tuned for flat-ground
+   walking, not a foot already up on an elevated platform. Reverted.
+6. **Current partial mitigation**: un-crouch the front knee gradually in 4
+   stages (90deg -> ~25deg target, stopping early if tilt exceeds 40deg)
+   instead of one continuous motion. This avoids an outright flip (which
+   both single-shot attempts caused) but doesn't reach a clean stand either
+   -- all 3 seeds consistently abort at stage 3/4 with tilt settling around
+   44-47deg. **Better than a flip, but not yet the fix** -- the robot ends
+   up tilted, not standing tall and level like frame 07.
+
+**Where this leaves things**: the climb itself (UPDATE 3's mechanism) is
+fully intact and unaffected -- 3/3 seeds still 4/4, converging in exactly 3
+cycles, no tail push. The OPEN problem is entirely in what happens in the
+~1 second after both rear legs plant. Given the root cause (an anchor point
+captured too early, before the body's climb-leverage height increase), a
+more promising direction for next time than more uncrouch-tuning: don't
+treat the ORIGINAL front-leg anchor as sacred through the whole sequence --
+periodically RE-ESTABLISH it (a fresh, shallow probe-and-replant, similar to
+the existing `REPLANT_EVERY` mechanism already used earlier in the crawl
+loop) as the body rises, so by the time both rear legs plant, the front
+anchor already reflects something close to the CURRENT body height rather
+than a stale, now-far-below point. That would need each re-plant to also
+choose a shallower forward-margin/above-margin appropriate to a taller
+body pose, not the original ledge-height-relative values.
+
+Replay regenerated and verified at this state
+(`/Users/markjohnson/Desktop/crawl_climb.gif`, seed 7000, 767 frames, 0
+corrupted, 4/4, tilt 45.5 at the very end -- visibly tilted in the final
+stand, not yet resolved).
+
+---
+
 ## UPDATE 3 (same resumed session): BREAKTHROUGH -- drag+probe rear-leg mechanism, tail push eliminated
 
 This is the biggest architectural change of the whole session, driven by a

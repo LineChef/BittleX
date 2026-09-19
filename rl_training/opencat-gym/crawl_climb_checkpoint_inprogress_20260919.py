@@ -26,7 +26,7 @@ _bd._EXTRA_DR = "clean"
 from benchmark_decathlon import _apply
 from opencat_gym_env import OpenCatGymEnv
 from leg_tint import setup_leg_tint, apply_leg_tint
-from climb_env import _BASE as CLIMB_POSE_SEQ, PAW as CLIMB_PAW_LINKS, FRAME_SKIP
+from climb_env import _BASE as CLIMB_POSE_SEQ, PAW as CLIMB_PAW_LINKS, FRAME_SKIP, STANCE
 
 FL_SHOULDER, FL_KNEE = 0, 1
 FR_SHOULDER, FR_KNEE = 2, 3
@@ -147,7 +147,7 @@ def sim_step():
 
 def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anchors,
                              platform_top_z, forward_margin, above_margin,
-                             lift_first=True, weight_shift=None):
+                             lift_first=True, weight_shift=None, do_slide=True):
     """Lift+reach+search one leg onto the platform, holding any already-secured
     legs (in `anchors`: {link: world_pos}) fixed via continuous IK throughout.
     Returns (hold_targets, new_anchor_pos_or_None, solid_bool)."""
@@ -186,6 +186,15 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
         hold_targets = lt
     paw_clear = p.getLinkState(rid, paw_link)[0]
 
+    # Safety cap for both the reach and search-down phases below: without
+    # this, reaching for an ABSOLUTE world-x target (above_x) on a repeat
+    # call -- e.g. the same-side leverage advance, called on a leg that's
+    # already been secured/dragged forward once and has less natural "slack"
+    # left -- can saturate the knee at its physical joint limit (confirmed
+    # directly: all 3 test seeds hit exactly ~90deg). That's what was
+    # leaving the robot sitting on its belly once all four feet were secured.
+    SAFE_KNEE_LIMIT_DEG = 89
+
     above_x = EDGE_X + forward_margin
     above_z = platform_top_z + above_margin
     rt = hold_targets.copy()
@@ -194,6 +203,8 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
         rp = [paw_clear[0] + (above_x - paw_clear[0]) * frac, paw_clear[1],
               paw_clear[2] + (above_z - paw_clear[2]) * frac]
         ikr = p.calculateInverseKinematics(rid, paw_link, rp)
+        if abs(np.degrees(ikr[knee_idx])) > SAFE_KNEE_LIMIT_DEG:
+            break   # would over-flex the knee to reach this -- stop, use the last good position
         rt = hold_targets.copy()
         rt[shoulder_idx] = ikr[shoulder_idx]
         rt[knee_idx] = ikr[knee_idx]
@@ -213,6 +224,8 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
         frac = (st + 1) / args.search_steps
         tp = [paw_over[0], paw_over[1], paw_over[2] + (far_z - paw_over[2]) * frac]
         ik = p.calculateInverseKinematics(rid, paw_link, tp)
+        if abs(np.degrees(ik[knee_idx])) > SAFE_KNEE_LIMIT_DEG:
+            break   # would over-flex the knee to reach this -- stop, use the last good position
         targets = hold_targets.copy()
         targets[shoulder_idx] = ik[shoulder_idx]
         targets[knee_idx] = ik[knee_idx]
@@ -240,12 +253,23 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
             # height is known, slide forward along the (now known-safe)
             # surface to a deeper, more secure resting point instead of
             # settling for wherever first contact happened.
-            if nz > 0.7:
+            if nz > 0.7 and do_slide:
+                # Safety cap: without this, the slide can walk the knee all
+                # the way to its physical joint limit (~90deg, confirmed
+                # directly -- all 3 test seeds hit EXACTLY that value) when
+                # the requested slide target is slightly out of natural
+                # reach, especially on a repeat call (e.g. the same-side
+                # leverage advance) where the leg has already used up some
+                # of its reach. That's what was causing the robot to end up
+                # sitting on its belly once all four feet were secured.
+                SAFE_KNEE_LIMIT_DEG = 89
                 slide_target_x = cur[0] + SLIDE_DEPTH_M
                 for _sst in range(20):
                     sfrac = (_sst + 1) / 20
                     sp = [cur[0] + (slide_target_x - cur[0]) * sfrac, cur[1], cur[2]]
                     sik = p.calculateInverseKinematics(rid, paw_link, sp)
+                    if abs(np.degrees(sik[knee_idx])) > SAFE_KNEE_LIMIT_DEG:
+                        break   # would over-flex the knee to reach this -- stop, use the last good position
                     starg = hold_targets.copy()
                     starg[shoulder_idx] = sik[shoulder_idx]
                     starg[knee_idx] = sik[knee_idx]
@@ -381,6 +405,14 @@ def _with_front_ik(tgt, fl_pos, fr_pos):
     for j, v in raw.items():
         prev = _front_ik_prev.get(j, v)
         limited[j] = prev + np.clip(v - prev, -bound, bound)
+    # Tried an absolute cap on the knee here too, reasoning it would stop
+    # the runaway squat -- it broke anchor tracking instead (flip by cycle
+    # 3, every seed): the knee genuinely needs to reach ~90deg at some
+    # points to hold the anchor precisely as the body's pitch shifts through
+    # the tuck-swing-extend cycles. The ~90deg knee angle isn't a bug in the
+    # anchor tracking itself -- it's a real consequence of how much the body
+    # moves during the maneuver. Fix belongs in the final standing
+    # transition (uncrouching FROM ~90deg safely), not here.
     _front_ik_prev.update(limited)
     tgt[FL_SHOULDER], tgt[FL_KNEE] = limited[FL_SHOULDER], limited[FL_KNEE]
     tgt[FR_SHOULDER], tgt[FR_KNEE] = limited[FR_SHOULDER], limited[FR_KNEE]
@@ -543,7 +575,7 @@ for cyc in range(N_CYCLES):
             fr_margin = max(args.forward_margin_m, (fr_cur[0] - EDGE_X) + 0.02)
             hold_targets, fr_new, fr_solid = probe_leg_onto_platform(
                 PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor, PAW_RB: rb_anchor},
-                platform_top_z, fr_margin, args.above_margin_m, lift_first=False)
+                platform_top_z, fr_margin, args.above_margin_m, lift_first=False, do_slide=False)
             if fr_new is not None:
                 fr_anchor = fr_new
                 print(f"  FR (same side as RB) advanced for leverage: "
@@ -561,7 +593,7 @@ for cyc in range(N_CYCLES):
             fl_margin = max(args.forward_margin_m, (fl_cur[0] - EDGE_X) + 0.02)
             hold_targets, fl_new, fl_solid = probe_leg_onto_platform(
                 PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor, PAW_RB: rb_anchor, PAW_LB: lb_anchor},
-                platform_top_z, fl_margin, args.above_margin_m, lift_first=False)
+                platform_top_z, fl_margin, args.above_margin_m, lift_first=False, do_slide=False)
             if fl_new is not None:
                 fl_anchor = fl_new
                 print(f"  FL (same side as LB) advanced for leverage: "
@@ -783,6 +815,70 @@ def _with_all_four_ik(tgt):
         tgt[kn] = ik[kn]
     return tgt
 
+
+# Tried extra _with_front_ik settle calls here, reasoning the knee was
+# stuck at an old transient-tilt extreme and hadn't had enough calls to walk
+# back down -- disproven directly: even 40 more calls at tilt fully settled
+# to 9.2deg still needed ~90deg knee flex. The REAL explanation: the rear
+# legs have genuinely lifted the body much higher by this point (that's
+# their whole leverage purpose), so the OLD front anchor -- captured early,
+# near platform level -- is now almost directly below the shoulder, which
+# geometrically requires near-max knee fold to reach. Not a tracking bug.
+
+js = p.getJointStates(rid, env.joint_id)
+fl_knee_deg = np.degrees(js[FL_KNEE][0])
+fr_knee_deg = np.degrees(js[FR_KNEE][0])
+print(f"  front knee flex before standing: FL={fl_knee_deg:.1f}deg FR={fr_knee_deg:.1f}deg "
+      f"(accumulated across the initial secure, the slide-deeper depth fix, and the same-side "
+      f"leverage advance -- far more than the pull mechanism's own 30deg cap alone accounts for)")
+print("Standing tall now that all four feet are secured on the platform -- "
+      "jumping straight to a flat-ground STANCE target was tried and caused an "
+      "outright flip (the front knees were at ~90deg, essentially sitting on "
+      "the belly; that's too large a correction to make in one motion from "
+      "such an extreme starting point). Un-crouching gradually and only as "
+      "far as needed instead -- small, direct, modest-force nudge back "
+      "toward a reasonable stance angle, not a jump to an unrelated target.")
+TARGET_KNEE_DEG = 25   # a reasonable standing bend -- not STANCE's 6deg (tuned for
+                        # flat-ground walking, not a foot up on an elevated platform)
+# One continuous 65deg-ish ramp (90 -> 25) was tried and left the robot
+# badly tilted (51-55deg, not a real stand) even though it didn't flip --
+# too much correction happening continuously. Un-crouching in several
+# smaller stages instead, each one settling briefly before the next, similar
+# to how a real animal shifts weight incrementally when standing up from a
+# crouch rather than doing it in one continuous motion.
+UNCROUCH_STAGES = 4
+STAGE_STEPS = 25
+SETTLE_STEPS = 10
+stage_knee_start_fl = hold_targets[FL_KNEE]
+stage_knee_start_fr = hold_targets[FR_KNEE]
+target_fl = min(hold_targets[FL_KNEE], np.deg2rad(TARGET_KNEE_DEG))
+target_fr = min(hold_targets[FR_KNEE], np.deg2rad(TARGET_KNEE_DEG))
+cur_target = hold_targets.copy()
+for stage in range(1, UNCROUCH_STAGES + 1):
+    stage_frac = stage / UNCROUCH_STAGES
+    stage_target = cur_target.copy()
+    stage_target[FL_KNEE] = stage_knee_start_fl + (target_fl - stage_knee_start_fl) * stage_frac
+    stage_target[FR_KNEE] = stage_knee_start_fr + (target_fr - stage_knee_start_fr) * stage_frac
+    stage_start = cur_target.copy()
+    for _st in range(STAGE_STEPS):
+        frac = (_st + 1) / STAGE_STEPS
+        tgt = stage_start * (1 - frac) + stage_target * frac
+        for _wait in range(FRAME_SKIP):
+            p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 1.5)
+            sim_step()
+    for _wait in range(SETTLE_STEPS):
+        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, tgt, forces=np.ones(8) * 1.5)
+        sim_step()
+    cur_target = tgt
+    print(f"    uncrouch stage {stage}/{UNCROUCH_STAGES}: "
+          f"body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+    if tilt() > 40:
+        print(f"    tilt getting high -- stopping the uncrouch here rather than pushing further")
+        break
+tgt = cur_target
+hold_targets = tgt
+print(f"  standing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
+print(f"  standing: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
 
 FINAL_SETTLE_STEPS = 40
 for _fs in range(FINAL_SETTLE_STEPS):
