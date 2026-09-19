@@ -237,6 +237,16 @@ footfall (contact-model stiffness/damping only approximates this).
   pile height, rough drag-force reading (paw-sized weight + fish/luggage scale)
   vs the same pull on bare floor — not a substitute for sysid, just a check the
   current guess isn't wildly off before hardware exists.
+- **R10 (resiliency campaign, long-duration drift) deferred here (2026-09-18).**
+  R10 originally found severe stalling on carpet (speed decayed to 0 m/s by
+  60s) on an older checkpoint, in sim. User's call: re-verify this on real
+  carpet once hardware exists rather than re-run it in sim against current
+  checkpoints -- sim carpet is exactly the guessed, unvalidated model this
+  entry exists to fix, so a sim-only re-verification would carry the same
+  fidelity risk the original finding did. Bundle with the sysid work above --
+  same setup (real robot, real carpet), and the sysid log itself (tracking
+  error + IMU over a real walk) will show directly whether the stalling
+  pattern still holds, without a separate dedicated test.
 
 ## H11 — Servo thermal management  🟡
 

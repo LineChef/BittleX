@@ -148,6 +148,32 @@ before attempting a full climb.
   the sim gap was specifically about contact/grip physics and body-pitch
   limits, not about RL as a method.
 
+**A third option, narrower than either above — deliberate foot-probing before
+committing weight (2026-09-18).** Not continuous blind climbing (ruled out
+for G2 specifically: the successful proprioceptive-locomotion literature
+relies on real-time joint-torque sensing at full gait rate, e.g. ANYmal's
+IMU+encoders+torque-sensor stack, and G2 only has real-time IMU — the
+Bittle X V2's confirmed position-feedback servos are too slow and PWM-wire-
+disruptive for control-rate use, see [`specs.md`](hardware/specs.md#servo-position-feedback-researched-2026-09-01)).
+But a *slow, deliberate* probe-then-decide action is a different, smaller
+problem: pause, extend a leg toward where the next foothold should be,
+check whether it met resistance around the expected point (or reached past
+it, or reached further than the climb should ever need), then decide to
+commit weight or retract and adjust. That's compatible with the real
+feedback servos' actual ~5-20 Hz blocking-read rate, because it doesn't
+need to happen at the 80 Hz gait/control rate — it's a discrete decision,
+not continuous locomotion. Buildable and testable in **sim now**, no
+hardware needed to start: PyBullet gives instant, unrestricted ground-truth
+joint state every step (none of the real hardware's shared-PWM-wire
+constraint exists in sim), so the probe-and-decide *logic* can be
+prototyped and validated before hardware arrives. What still needs real
+hardware is confirming the actual feedback signal's real-world rate/noise
+is good enough to execute the same decision procedure for real — a
+validation step, not a blocker on starting. Complementary to both options
+above, not a replacement: could inform *where* a scripted `cmh` places a
+foot, or give a learned residual a slow, discrete correction opportunity
+between the fast continuous corrections it already makes.
+
 **Reopens the vision question — narrowly.** This needs a real forward sensor
 to trigger "invoke climb" (same architecture as B9/Phase E: vision spots a
 step too tall to walk over → skill switch → climb → hand back to the walk

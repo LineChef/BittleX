@@ -203,3 +203,144 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
   substitute for Stage 3's real decathlon-based verdict once the 20M run
   finishes -- 12 episodes, one seed set, is a spot-check, not the final
   word.
+
+## Stage 3: full 20M run + head-to-head benchmark suite
+
+- **Completed:** 2026-09-18, 20,004,864 total steps, `approx_kl=0.0039`
+  converged. Checkpoint: `trained/run20m_resid30_ppo.zip`.
+- **Benchmark suite run:** `benchmark_decathlon.py` (28-60 eps/cell, 30
+  cells) and `benchmark_gaits.py` (12 eps/cell, 14 cells) for both
+  checkpoints in parallel, plus `benchmark_recovery.py` (64-episode bare-robot
+  shove probe) and `action_trace.py` (obstacle course + flat) for both.
+  Full report published as an HTML artifact (GIFs embedded, standard format
+  per the note above):
+  `https://claude.ai/artifact/PbbdCpVZybTo8QveG9R16N`
+
+### Decathlon (30 cells, learned-vs-learned: 22deg baseline vs 30deg resid30)
+
+Aggregate: mean fall rate 8.7% (22deg) -> 10.7% (30deg); mean speed 0.0658
+-> 0.0672 m/s (comparable, slightly higher); mean |trot corr| 0.514 -> 0.564
+(noticeably tighter gait symmetry). Within the actual trained envelope
+(tiers T1-T8, everything up to and including the existing gauntlet cells)
+the two are essentially flat-to-improved for resid30: fall rates match or
+resid30 is a few points worse/better depending on cell, speed is equal or
+a bit higher, trot correlation is consistently tighter. The aggregate
+fall-rate regression is driven almost entirely by four cells at or beyond
+the training envelope's edge:
+
+| Cell | What | 22deg falls | 30deg falls |
+|---|---|---|---|
+| T9.1 | 18deg slope up (beyond the 14deg training ceiling) | **62%** | **0%** |
+| T9.2 | 20deg slope down (beyond training; descent is harder) | **0%** | **68%** |
+| T8.2 | Rough/uneven: dense bumps + rolling swell | 4% | 25% |
+| T9.3 | Rubble denser/taller than anything in training | 22% | 32% |
+
+T9.1 is the exact failure mode `docs/rl/slope-ceiling-log.md` was queued
+to fix by raising `SLOPE_MAX_DEG` -- resid30 fixes it completely with zero
+dedicated slope training, an unplanned but genuine win. T9.2 is a new,
+comparably severe failure in the mirror direction (steep descent, also
+beyond the 14deg ceiling) that didn't exist in the 22deg baseline --
+`forward_speed_mps_mean` goes negative (-0.054), consistent with
+tumbling/backsliding down the slope rather than a controlled fall. Reads
+as the same underlying gap (behavior undefined past the trained slope
+envelope) manifesting on whichever side wasn't luckily covered by the
+wider residual authority, not two unrelated problems. T8.2 and T9.3 are
+smaller, real regressions on denser/rougher terrain than trained on --
+worth a look in the resiliency campaign's planned `RUBBLE` dose-response
+sweep, but not dominant.
+
+### Gaits (each checkpoint vs its own scripted baseline, 14 cells x 12 eps)
+
+Zero falls for either checkpoint on any cell. resid30 beats scripted by a
+wider margin than the 22deg baseline does almost everywhere -- e.g. flat:
+22deg learned 0.087 vs scripted 0.069 m/s (+26%); 30deg learned 0.099 vs
+scripted 0.066 m/s (+50%). Same pattern holds across obstacles, slopes,
+slip patches, and lean-force cells. resid30 is more decisively
+"scripted+" than the current baseline, not just comparable to it.
+
+### Action trace (residual usage, degrees RMS)
+
+Despite the wider 30deg ceiling, resid30 uses *less* of its budget than
+the 22deg baseline: mean RMS 4.4-4.5deg (resid30) vs 7.4-7.6deg (22deg
+baseline), peak 11.6-11.9deg vs 16.6-18.5deg, on both the flat and
+obstacle-course traces. The extra headroom isn't being spent by default --
+it's available when needed (T9.1) without costing efficiency when it
+isn't.
+
+### Recovery probe (bare robot, escalating shoves, 64 episodes each, re-run
+fresh this pass after the original run's JSON was lost to a stale
+scratchpad path -- see fix below)
+
+| Checkpoint | Falls | Recover rate | Resettle steps (mean) |
+|---|---|---|---|
+| `run20m_ppo` (22deg) | 55% | 7% | 17.7 |
+| `run20m_resid30_ppo` (30deg) | 50% | 9% | 21.0 |
+
+resid30 falls slightly less and recovers slightly more often, but takes
+~19% longer to resettle when it does. Only 3 (22deg) and 4 (30deg) actual
+recovery events happened in 64 episodes each -- the resettle-time
+comparison rests on single-digit samples per checkpoint, too few to call
+either a real regression or noise with confidence. Not weighing this
+heavily in the verdict.
+
+### Issue hit + fixed: recovery-probe JSON output was pointed at a dead scratchpad path
+
+`benchmark_recovery.py`'s `json.dump` call had been hand-patched mid-session
+to a hardcoded absolute path in a previous conversation's scratchpad
+directory (`.../d7c45dae-.../scratchpad/recovery_probe.json`), which no
+longer exists in this session -- the original recovery-probe numbers
+referenced earlier in this campaign were lost with it. Fixed to write to
+`trained/recovery_probe.json` (relative, in-repo, alongside every other
+benchmark output) and re-ran fresh rather than trust the earlier recalled
+numbers; the table above is the verified re-run.
+
+### Verdict: lean keep, promotion to new frozen baseline is the user's call
+
+Against the project's standing keep/revert bar (net capability, lean keep,
+revert only for destabilization / real speed cost / no new capability):
+speed is comparable-to-better everywhere, trot symmetry is consistently
+tighter, the scripted-baseline margin widens, and residual usage is
+*lower* despite more headroom -- efficiency, not just capability, improved.
+The one real cost is T9.2, a genuine new failure mode, but it's confined
+to conditions already beyond the trained envelope (same category as the
+T9.1 problem resid30 fixes), not a regression inside the gait's actual
+operating range. Reads as "wider envelope, same edge-of-envelope
+brittleness moved to the other side" rather than a net-worse gait.
+
+Not unilaterally promoting `run20m_resid30_ppo` to replace the frozen
+`run20m_ppo` baseline -- per the project's deployment-candidate model,
+that promotion is a deliberate decision for the user to make with the
+real numbers in hand, not an automatic outcome of a clean benchmark pass.
+Recommendation if asked: keep resid30 as the leading candidate, and let
+the queued slope-ceiling campaign (which now needs to cover *both*
+directions, not just up) resolve T9.2 before any promotion decision.
+
+### Promotion: run20m_resid30_ppo is the new frozen base (2026-09-18)
+
+User's call, made explicitly with the full Stage 3 numbers above in hand
+(not a default from a clean pass): the results read as close overall, but
+resid30's edge is qualitative as well as quantitative -- it has
+meaningfully more correction authority available for obstacles/disturbance
+(the T9.1 fix, the wider gaits-vs-scripted margin) while spending *less*
+of its budget day-to-day than the 22deg baseline does, which the aggregate
+fall-rate number alone understates. Accepted explicitly, not glossed over:
+T9.2 (steep descent beyond the 14deg training ceiling, 0%->68% falls) is a
+real new weakness in the new base, confined to past-training-envelope
+slope conditions. `docs/rl/slope-ceiling-log.md` is queued to close it,
+now bidirectional.
+
+`CLAUDE.md`'s RL-training section updated: frozen deployment base is now
+`run20m_resid30_ppo`, `run20m_ppo` kept in `trained/` as the prior-base
+reference point (not deleted, not the fallback target for new runs
+anymore). `opencat_gym_env.py`'s live constants already matched resid30's
+recipe going into this decision (30deg ceiling, `FAC_IMITATION=16`,
+`FAC_RESIDUAL_COST=2.8`, `FAC_RESID_SMOOTH=8.2` -- unchanged since Stage 3
+training), so the gait-friction campaign's first round, already in
+progress, needed no recipe change to build on the new base correctly.
+
+Not yet touched, deliberately: the hardware-deployment stack
+(`docs/guides/gait-deployment.md`, the ONNX export + Pi-inference
+validation) was built and verified against `run20m_ppo` specifically --
+that revalidation against resid30 isn't urgent pre-hardware and wasn't
+requested as part of this promotion, but it's a real follow-up before
+resid30 (or whatever wins the remaining campaigns) actually deploys.

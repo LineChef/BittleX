@@ -47,6 +47,19 @@ RESIDUAL_MODE = True
 RESIDUAL_SCALE_DEG = 30   # resid30 campaign: 22 -> 30, matching URMA/Bittle_Symmetry's ~30 deg. FRESH run, not a continuation -- Phase 4c already showed continuation can't reach past the converged policy's ceiling (docs/rl/hardware-gated-backlog.md H4). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; G1 paired 22 with FAC_IMITATION 16. Current FAC_IMITATION=11 was tuned for 22 (G4b, for an unrelated speed-command reason) -- bumped back to 16 alongside this change as a starting anchor, watched closely for the same crawl signature. FAC_RESIDUAL_COST/FAC_RESID_SMOOTH scaled proportionally below since both act on the normalized action, not raw degrees.
 FAC_RESIDUAL_COST = 2.8   # resid30: 1.5 -> 2.8 (x(30/22)^2 ~1.86). -mean(action^2) * this -- deviate from the scripted pose only when it helps. Scaled to preserve the real per-degree cost now that RESIDUAL_SCALE_DEG is wider (this term penalizes the normalized action, not raw degrees).
 FAC_RESID_SMOOTH = 8.2    # resid30: 6.0 -> 8.2 (x(30/22) ~1.36). rtune_r4: -mean(|action - prev_action|) * this (ramped). Penalise frame-to-frame jerk in the correction, not its magnitude -- a smoother residual should cut roll oscillation / heading drift without capping the authority needed for a 50mm trip. Scaled with RESIDUAL_SCALE_DEG for the same normalization reason as FAC_RESIDUAL_COST.
+FAC_RESID_CALM_BONUS = 0.0   # gait-friction campaign, option 2 -- ABANDONED (2026-09-18).
+                             # EXTRA residual-cost weight, ramped by tilt (see git history /
+                             # docs/rl/gait-friction-log.md for the full mechanism). Two
+                             # rounds (3.0 confirmed, 1.0 called early on strong partial
+                             # evidence) both regressed -- residual usage went UP, not down.
+                             # Root cause: FAC_SPEED_TRACK (60.0) dominates FAC_RESIDUAL_COST
+                             # by ~15-20x, so the residual's correction is instrumentally
+                             # necessary (closing the open-loop speed-tracking gap), not
+                             # frivolous -- penalizing it doesn't remove that necessity, it
+                             # just makes an already-required correction more expensive to
+                             # make well. Left wired in (default 0 = off) in case revisited,
+                             # but not the active approach -- see option 1 (cadence
+                             # recalibration) instead.
 
 # --- Stay-down / stay-level shaping (also from the scripted-gait benchmark) ---
 FAC_DUTY = 0.0            # r1: 4.0 was the main 'freeze with feet planted' attractor -> the gait stalled. wkF already has a good duty factor by construction; don't reward it.
@@ -144,7 +157,62 @@ PHASE_SLOW_RATE = 1.0      # DISABLED (1.0 = phase always advances normally). Tr
 # cmd_fwd that maps to wkF's native cadence (phase rate 1.0).
 PHASE_RATE_NOM_CMD = 0.10
 PHASE_RATE_MIN = 0.35
-PHASE_RATE_MAX = 1.60
+PHASE_RATE_CORRECTION_ENABLED = False  # gait-friction campaign concluded 2026-09-18: this
+                                       # correction (gaitfriction_r5) also regressed, same
+                                       # direction as every other lever tried -- reverted to
+                                       # off by default, same as FAC_RESID_CALM_BONUS. Left
+                                       # wired in (tables + toggle kept) rather than deleted,
+                                       # in case revisited. When False, _prate falls back to
+                                       # the original ratio-only formula with a 1.60 cap,
+                                       # regardless of PHASE_RATE_MAX below. Eval scripts
+                                       # comparing checkpoints trained before vs after this
+                                       # existed must still set this per-checkpoint, else they
+                                       # get a reference a given checkpoint never trained
+                                       # against -- same per-checkpoint-config trap
+                                       # RESIDUAL_SCALE_DEG's _g2e() override exists for.
+PHASE_RATE_MAX = 2.00   # gait-friction campaign, option 1 (cadence recalibration, round 1):
+                        # raised 1.60 -> 2.00 -- a bounded increase, not the ~3x a *full*
+                        # correction would need at the top of the command range (measured
+                        # directly, see below; fully closing the gap there would mean an
+                        # unreasonable stepping rate). Captures most of the correction in
+                        # the creep/low-cruise range, partial only in the fast band -- see
+                        # PHASE_RATE_CORRECTION_CMD/_FACTOR.
+
+# gait-friction campaign (2026-09-18): PHASE_RATE_* above only scales *cadence*
+# -- wkF's per-joint amplitude is fixed, so the open-loop reference only
+# actually matches the commanded speed at PHASE_RATE_NOM_CMD; everywhere else
+# in the sampled range (including ordinary cruise, 0.08-0.12) there's a real
+# gap the residual has to continuously cover, which is the likely cause of the
+# ~7-8deg baseline residual usage even on calm flat ground. Tried scaling
+# _ref_pose's swing around STAND_POSE by this same ratio (AMP_SCALE_MIN/MAX) --
+# reverted after two rounds, both regressions (roughly doubled residual usage
+# at every band, including the cmd==NOM_CMD no-op point). See _ref_pose's
+# docstring and docs/rl/gait-friction-log.md for the full result. Then tried
+# FAC_RESID_CALM_BONUS (reward-shaping, doesn't touch the reference) --
+# also regressed, twice, root cause: FAC_SPEED_TRACK dominates
+# FAC_RESIDUAL_COST by ~15-20x, so the residual's correction is
+# instrumentally necessary, not frivolous; penalizing it doesn't remove that
+# necessity.
+#
+# Option 1, this round: fix the actual open-loop mismatch directly instead
+# of touching pose or reward. Measured the open-loop (action=0) speed
+# response cleanly (n=16/point, calm-ground DR -- friction/mass/payload on,
+# terrain/push off, matching what "calm" means for this campaign):
+#   cmd    0.03  0.04  0.05  0.06  0.07  0.08  0.09  0.10  0.11  0.115 0.125 0.13  0.14  0.15
+#   actual .023  .028  .032  .036  .043  .045  .053  .055  .056  .058  .062  .062  .069  .072
+# Undershoot grows from ~23% at cmd=0.03 to ~50% by cmd=0.11 and plateaus --
+# NOT closable via cadence alone at the top of the range without an
+# unreasonable stepping rate (~3x nominal at cmd=0.15). PHASE_RATE_CORRECTION_*
+# below is the measured cmd -> corrected-phase-rate-multiplier lookup
+# (np.interp'd, then clipped to PHASE_RATE_MIN/MAX) -- captures the real,
+# achievable part of the correction in creep/low-cruise, partial only above
+# ~cmd=0.10 where the physical ceiling bites. Honest partial fix, not a
+# complete one, consistent with the per-episode-variance limitation already
+# found (a static curve can only target the average case).
+PHASE_RATE_CORRECTION_CMD = [0.0, 0.025, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10,
+                              0.11, 0.115, 0.125, 0.13, 0.14, 0.15, 1.0]
+PHASE_RATE_CORRECTION_FACTOR = [1.0, 1.0, 1.30, 1.45, 1.57, 1.65, 1.64, 1.78, 1.71, 1.81,
+                                 1.98, 2.00, 2.03, 2.09, 2.02, 2.08, 2.08]
 
 # Impulse "recovery drills" (Run 7): in addition to the small continuous nudges
 # (RANDOM_PUSH), deliver an occasional LARGE base-velocity kick at a random gait
@@ -209,6 +277,10 @@ CMD_LATENCY_STEPS = 0    # apply the action from N control-steps ago (fixed lag)
 JOINT_OFFSET_DEG = 0.0   # per-episode per-joint servo zero-point miscalibration, +/- this many
                          # deg (uniform), scaled by _dr. Added to the commanded target; the
                          # encoder read-back carries it too, like a real calibration offset.
+IMU_BIAS_DEG = 0.0       # R2 (resiliency campaign): per-episode persistent roll/pitch IMU bias,
+                         # +/- this many deg (uniform), scaled by _dr -- a tilted mount or a
+                         # calibration error, not RANDOM_GYRO's zero-mean per-step noise. Affects
+                         # only what the policy sees (obs_ang, tilt_history), never the reward.
 
 # --- forward terrain feature (Phase 8: perception-in-the-loop gait). DEFAULT OFF.
 # When TERRAIN_FEATURE is False the observation is EXACTLY as run20m_ppo trained
@@ -366,6 +438,15 @@ SLOPE_MAX_DEG = 14.0      # coverage R1: per-episode ground tilt, random roll & 
                           # scaled by _dr. 2026-09-04: raised 10->14 alongside switching the draw to
                           # triangular (see reset()) -- most episodes still land near-flat, but the
                           # tail now reaches into "steep" territory instead of capping at "gentle".
+                          # slope-ceiling campaign (2026-09-18): tried raising 14->20 (round 1) --
+                          # REVERTED, closed as inconclusive/negative. Neither target cell improved
+                          # (T9.2 20deg down: unchanged at 68% falls; T9.1 18deg up: regressed 0->68%),
+                          # though the rest of the decathlon stayed roughly flat, unlike this session's
+                          # other 7 failed rounds. Diagnosis: SLOPE_MAX_DEG's triangular sampling +
+                          # DR ramp likely left the widened 14-20deg tail too thinly and late sampled
+                          # in a 3M-step round to teach anything there. A denser-sampling round 2 was
+                          # proposed but not run -- user's call to close the campaign here instead. See
+                          # docs/rl/slope-ceiling-log.md for the full result and options considered.
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
@@ -477,9 +558,32 @@ FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (defau
 # --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
 # commanded speed while a move command is active. Sparse: a bonus each ~0.15 m
-# of net progress cleared *while an obstacle was recently in view*. Designed to
-# be trained WITH the terrain feature -- gives vision something to leverage
-# ("saw it, slowed, stepped over, kept going" > "walked into it and scrabbled").
+# of net progress cleared *while an obstacle was recently in view*. Originally
+# designed to be trained WITH the terrain feature -- gives vision something to
+# leverage ("saw it, slowed, stepped over, kept going" > "walked into it and
+# scrabbled").
+#
+# nostall_r1 (2026-09-18, FAC_NOSTALL=22, FAC_NOSTALL_BONUS=8, bonus given a
+# standalone "was stalled" trigger since TERRAIN_FEATURE is off project-wide)
+# -- CLEAR REGRESSION, not the anticipated fix. Full decathlon: mean fall
+# rate nearly doubled (10.7% -> 20.3%); every bare-robot stalling-diagnostic
+# cell got worse (T6.5b alone: 5% -> 68%); T9.1 (resid30's own headline
+# fix, 18deg slope) got completely undone (0% -> 68%). A dedicated side-hill
+# check (12deg sustained cross-slope) matched independently: 42% -> 100%
+# falls.
+#
+# nostall_r2 (FAC_NOSTALL_BONUS 8->0, penalty only, isolating the bonus as
+# the suspected culprit) -- SAME result: side-hill still 100% falls,
+# identical to round 1. Hypothesis refuted -- the bonus wasn't it. The
+# dense bleed penalty itself is the problem: it applies constant pressure
+# against dropping below a speed floor with no way to distinguish "giving
+# up unnecessarily" from "correctly slowing down to stay balanced" --
+# R12's own original finding is that even the *unmodified* gait needs to
+# drop speed ~73% on a sustained side-hill to stay upright, which
+# FAC_NOSTALL structurally fights regardless of cause. Two non-improving
+# rounds -- REVERTED to 0/off. Documented negative result, same standard
+# as every other failed lever this session. See docs/rl/resiliency-log.md
+# for full data from both rounds.
 FAC_NOSTALL        = _g2e("FAC_NOSTALL", 0.0)        # dense bleed weight; 0 = off
 FAC_NOSTALL_BONUS  = _g2e("FAC_NOSTALL_BONUS", 8.0)  # per-0.15 m breakthrough bonus (only while resisted)
 NOSTALL_FLOOR_FRAC = _g2e("NOSTALL_FLOOR", 0.4)      # window speed below this * |cmd_fwd| -> bleed
@@ -826,8 +930,12 @@ class OpenCatGymEnv(gym.Env):
             pass
         else:
             _pd = 1.0 if self._cmd_fwd >= 0 else -1.0
-            _prate = float(np.clip(abs(self._cmd_fwd) / PHASE_RATE_NOM_CMD,
-                                   PHASE_RATE_MIN, PHASE_RATE_MAX))
+            _correction = (float(np.interp(abs(self._cmd_fwd), PHASE_RATE_CORRECTION_CMD,
+                                           PHASE_RATE_CORRECTION_FACTOR))
+                           if PHASE_RATE_CORRECTION_ENABLED else 1.0)
+            _rate_max = PHASE_RATE_MAX if PHASE_RATE_CORRECTION_ENABLED else 1.60
+            _prate = float(np.clip(abs(self._cmd_fwd) / PHASE_RATE_NOM_CMD * _correction,
+                                   PHASE_RATE_MIN, _rate_max))
             self._phase += _pd * _prate * (PHASE_SLOW_RATE if self._prev_tilt > PHASE_SLOW_TILT else 1.0)
         # mid-episode command changes -> start/stop/transition practice
         if getattr(self, '_forced_cmd', None) is None and np.random.rand() < CMD_RESAMPLE_PROB:
@@ -838,14 +946,28 @@ class OpenCatGymEnv(gym.Env):
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
         # can oscillate on real data.
         obs_ang, obs_vel_clip = state_ang, state_vel_clip
+        # R2 (resiliency campaign): persistent per-episode roll/pitch bias --
+        # mount tilt or IMU calibration error -- distinct from RANDOM_GYRO's
+        # zero-mean per-step noise below. Applied before the noise layer (bias
+        # first, then noise on top, matching a real miscalibrated+noisy sensor).
+        # Off by default (self._imu_bias_euler stays zeros); a probe script
+        # sets IMU_BIAS_DEG externally, same convention as DR_EVAL_FULL.
+        _imu_bias = getattr(self, '_imu_bias_euler', None)
+        _biased_euler = state_ang_euler
+        if _imu_bias is not None and (_imu_bias[0] != 0.0 or _imu_bias[1] != 0.0):
+            _true_euler = p.getEulerFromQuaternion(state_ang)
+            obs_ang = p.getQuaternionFromEuler(
+                [_true_euler[0] + _imu_bias[0], _true_euler[1] + _imu_bias[1], _true_euler[2]])
+            _biased_euler = state_ang_euler + _imu_bias
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
         if gyro_n:
-            obs_ang = np.clip(np.array(state_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
+            obs_ang = np.clip(np.array(obs_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
             obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
             ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
         # Tilt history (Run 7): last LENGTH_TILT_HISTORY steps of (roll, pitch),
-        # normalised so the fall threshold (1.3 rad) is +/-1. Same IMU noise.
-        tnorm = np.clip(state_ang_euler / 1.3, -1.0, 1.0)
+        # normalised so the fall threshold (1.3 rad) is +/-1. Same IMU noise
+        # (and the same persistent bias, if any).
+        tnorm = np.clip(_biased_euler / 1.3, -1.0, 1.0)
         if gyro_n:
             tnorm = np.clip(tnorm + np.random.normal(0.0, gyro_n, 2), -1.0, 1.0)
         self.tilt_history = np.append(self.tilt_history, tnorm)
@@ -988,14 +1110,24 @@ class OpenCatGymEnv(gym.Env):
             self._x1s.append(current_position)
             if len(self._x1s) > 80:
                 self._x1s.pop(0)
+            _stalled = False
             if len(self._x1s) >= 40:
                 _win_mps = ((self._x1s[-1] - self._x1s[0])
                             / (len(self._x1s) / CONTROL_HZ) * np.sign(self._cmd_fwd))
                 _floor = NOSTALL_FLOOR_FRAC * abs(self._cmd_fwd)
                 if _win_mps < _floor:
                     r_nostall = -FAC_NOSTALL * (_floor - _win_mps)
+                    _stalled = True
             self._obs_recent = max(0, getattr(self, "_obs_recent", 0) - 1)
-            if TERRAIN_FEATURE and getattr(self, "_terrain_feat", np.zeros(4))[0] > 0.5:
+            # FAC_NOSTALL_BONUS originally only armed off a recent TERRAIN_FEATURE
+            # obstacle sighting -- inert under the current recipe (TERRAIN_FEATURE
+            # is False project-wide, vision-in-gait closed), which would've silently
+            # dropped the bonus half of this mechanism, penalty-only. Added a second,
+            # standalone trigger: arm off "was stalled" (the same proprioceptive
+            # signal that drives the penalty above), so the breakthrough bonus fires
+            # without vision too. Vision trigger kept for if TERRAIN_FEATURE is ever
+            # re-enabled -- either condition arms it, not a replacement.
+            if _stalled or (TERRAIN_FEATURE and getattr(self, "_terrain_feat", np.zeros(4))[0] > 0.5):
                 self._obs_recent = 30
             if getattr(self, "_prog_ref", None) is None:
                 self._prog_ref = current_position
@@ -1027,6 +1159,10 @@ class OpenCatGymEnv(gym.Env):
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
         upright_penalty = FAC_UPRIGHT * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
+        if RESIDUAL_MODE and FAC_RESID_CALM_BONUS > 0:
+            calm_factor = max(0.0, 1.0 - tilt / IMITATION_TILT_FADE)
+            residual_cost += (FAC_RESID_CALM_BONUS * calm_factor
+                               * float(np.mean(np.asarray(action) ** 2)))
         if RESIDUAL_MODE:
             resid_smooth_cost = FAC_RESID_SMOOTH * float(
                 np.mean(np.abs(np.asarray(action) - self._prev_action)))
@@ -1350,7 +1486,14 @@ class OpenCatGymEnv(gym.Env):
         if r < 0.32:        # cruise (mid)
             self._cmd_fwd = np.random.uniform(0.08, 0.12)
         elif r < 0.52:      # creep (low)
-            self._cmd_fwd = np.random.uniform(0.02, 0.055)
+            # gait-friction campaign: was uniform(0.02, 0.055) -- below ~0.035
+            # the ratio to PHASE_RATE_NOM_CMD is under PHASE_RATE_MIN's 0.35
+            # floor, so those commands have a built-in ~90%+ open-loop mismatch
+            # cadence alone can't close (confirmed directly: open-loop actual
+            # speed at cmd=0.02 is ~0.002 m/s); train on commands the scripted
+            # gait can actually reach instead. Independent of the amplitude-
+            # scaling attempt (reverted) -- kept on its own merits.
+            self._cmd_fwd = np.random.uniform(0.04, 0.055)
         elif r < 0.70:      # fast (top)
             self._cmd_fwd = np.random.uniform(0.115, CMD_FWD_MAX)
         elif r < 0.87:      # stand
@@ -1643,6 +1786,10 @@ class OpenCatGymEnv(gym.Env):
         if JOINT_OFFSET_DEG > 0 and self._dr > 0:
             self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
                                   * np.deg2rad(1.0) * self._dr)
+        self._imu_bias_euler = np.zeros(2)
+        if IMU_BIAS_DEG > 0 and self._dr > 0:
+            self._imu_bias_euler = (np.random.uniform(-IMU_BIAS_DEG, IMU_BIAS_DEG, 2)
+                                    * np.deg2rad(1.0) * self._dr)
         
         # Initialize urdf links and joints.
         self.joint_id = []
@@ -1875,7 +2022,22 @@ class OpenCatGymEnv(gym.Env):
 
     def _ref_pose(self, phase_idx):
         """Residual base pose for this phase: wkF, or blended toward wkL / wkR by
-        the yaw command when TURN_BLEND is on. cmd_yaw=0 => pure wkF."""
+        the yaw command when TURN_BLEND is on. cmd_yaw=0 => pure wkF.
+
+        gait-friction campaign (2026-09-18): tried amplitude-scaling this pose's
+        swing around STAND_POSE by cmd_fwd/PHASE_RATE_NOM_CMD, hoping a
+        slower/faster command would get a smaller/larger swing (not just a
+        different cadence) and close the open-loop speed-tracking gap.
+        REVERTED after two rounds, both regressions: residual usage roughly
+        doubled at every speed band (round 1, clip 0.35-1.60) and stayed
+        ~1.5-2x worse even with a much narrower clip (round 2, 0.70-1.30) --
+        including at cmd_fwd==PHASE_RATE_NOM_CMD, the literal no-op point,
+        which ruled out a simple reward-imbalance explanation. Root cause
+        read as: training one shared policy against a continuously-reshaping
+        reference across the whole command range makes the whole-range
+        behavior worse, not just the extremes. See docs/rl/gait-friction-log.md.
+        Superseded by FAC_RESID_CALM_BONUS (a reward-shaping lever, doesn't
+        touch the reference) as the campaign's primary fix."""
         base = WKF_REF[phase_idx % len(WKF_REF)]
         if not TURN_BLEND or WKL_REF is None:
             return base

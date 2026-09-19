@@ -47,6 +47,67 @@ convention, off whichever recipe wins the resid30 campaign. Check
 specifically whether fall rate on the T9.1-style steep-slope cell actually
 drops, not just aggregate metrics.
 
+## Update: resid30 Stage 3 changed the shape of this problem
+
+The resid30 campaign's Stage 3 decathlon run (`docs/rl/resid30-log.md`)
+found that widening `RESIDUAL_SCALE_DEG` 22->30 fixes T9.1 (this doc's
+original finding, 18deg slope up, beyond the 14deg training ceiling)
+completely -- 62% fall rate on the 22deg baseline down to 0% on resid30,
+with zero dedicated slope training. But the same run found a new, equally
+severe failure in the mirror direction: T9.2 (20deg slope down, also
+beyond the 14deg ceiling) went from 0% falls (22deg baseline) to 68%
+falls (resid30) -- `forward_speed_mps_mean` goes negative, consistent with
+tumbling down the slope rather than a controlled stop. Reads as the same
+underlying gap (undefined behavior past the trained slope envelope)
+showing up on whichever side isn't covered, not two independent problems.
+
+**Consequence for this campaign's approach:** raising `SLOPE_MAX_DEG`
+needs to validate *both* directions (up and down) going forward, not just
+re-check the original up-slope failure point -- a fix that only chases the
+side that failed on the current leading checkpoint risks re-creating the
+same asymmetry the next time the residual budget or recipe changes.
+Whether this campaign proceeds against `run20m_ppo` (22deg) or
+`run20m_resid30_ppo` (30deg) once resid30's promotion decision is made
+will change which direction looks urgent -- worth re-confirming both
+directions on whichever checkpoint this runs against, rather than assuming
+only the previously-known failure point still applies.
+
 ## Rounds
 
-(none yet -- queued behind resid30 and creep-friction)
+### Round 1 — slopeceiling_r1
+
+- **Started:** 2026-09-18, 3M steps, PID 92879. Base: `run20m_resid30_ppo`'s
+  recipe (the frozen base) -- `FAC_NOSTALL` stays off (reverted, documented
+  negative result in the resiliency campaign), gait-friction's cadence
+  correction stays off (also reverted). Fresh run, not a continuation.
+- **`SLOPE_MAX_DEG` 14 -> 20**, bidirectional -- past both known failure
+  points (T9.1 18deg up, T9.2 20deg down), same "raise past what breaks
+  it" logic as the original 10->14 move, now applied to both signs of
+  tilt instead of one.
+- **Smoke test:** passed clean before launch.
+- **What to check at completion:** fall rate specifically on T9.1-style
+  (steep up) and T9.2-style (steep down) decathlon cells, not just
+  aggregate metrics -- confirms whether the fix actually closes both
+  directions of the gap, or just moves which side fails.
+
+### Closed (2026-09-18) -- reverted, inconclusive/negative, user's call
+
+Presented three options after round 1's mixed result: (1) denser sampling
+specifically in the 14-20deg band, targeting the diagnosed cause; (2) same
+distribution, run longer; (3) revert and close the campaign now, given the
+broader pattern this session (8 of 8 attempted changes since the resid30
+promotion -- 5 gait-friction, 2 `FAC_NOSTALL`, this one -- failed to
+clearly improve anything). User chose (3).
+
+`SLOPE_MAX_DEG` reverted 20 -> 14. `opencat_gym_env.py` confirmed back to
+a clean state matching the resid30 baseline across every campaign this
+testing cycle touched (`FAC_RESID_CALM_BONUS=0`, `PHASE_RATE_CORRECTION_ENABLED=False`,
+`FAC_NOSTALL=0`, `SLOPE_MAX_DEG=14`) -- smoke-tested clean.
+
+T9.1/T9.2 (steep up/down slope, beyond the 14deg training ceiling) remain
+open, real, measured weak points -- this campaign didn't resolve them, it
+ruled out one specific approach (widen `SLOPE_MAX_DEG` via the existing
+triangular sampling, in a single 3M round) without conclusively testing
+whether a denser-sampling variant would fare better. Worth revisiting with
+that specific fix if this area gets picked back up later, rather than
+re-deriving the diagnosis from scratch.

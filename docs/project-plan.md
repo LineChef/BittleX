@@ -252,6 +252,61 @@ leave us without a shippable gait — worst case is a wasted overnight.
   T9 held-out generalization tier, per-cell command-following + tail stats,
   Wilson-CI comparison, ledge cells lowered to 15–20 mm + step-down restored.
 
+  **Update 2026-09-18 — frozen base promoted to `run20m_resid30_ppo`; three
+  campaigns running.** (Note: the detailed day-to-day between 2026-09-05 and
+  this entry lives in the dated `docs/rl/*.md` logs, not backfilled here —
+  this is a rollup of today specifically.)
+  - **`RESIDUAL_SCALE_DEG` widened 22 -> 30** (fresh 20M run, `run20m_resid30_ppo`),
+    full Stage 3 benchmark suite run against the prior `run20m_ppo` base
+    (decathlon, gaits-vs-scripted, recovery probe, action-trace, leg-tinting
+    replays — published report). Close overall, but resid30 wins decisively
+    within the trained envelope (tighter trot symmetry, comparable-or-better
+    speed everywhere, wider margin over scripted) while using *less* residual
+    budget doing it; the one real cost is a new failure at steep descents
+    beyond the training slope ceiling (T9.2, mirrors and was traded for fixing
+    the prior T9.1 up-slope failure). **User's call: promoted to the new
+    frozen base** — `CLAUDE.md`'s RL-training section and
+    [`docs/rl/resid30-log.md`](rl/resid30-log.md) have the full report and
+    reasoning; `run20m_ppo` kept in `trained/` as the prior-base reference
+    point, not deleted.
+  - **Gait-friction campaign** (why the residual spends ~4-8deg even on calm
+    flat ground): amplitude-scaling the reference pose by commanded speed
+    tried and **reverted after two rounds**, both clear regressions (residual
+    usage roughly doubled, then still ~1.5x worse even with a much narrower
+    clip range) — full diagnosis in
+    [`docs/rl/gait-friction-log.md`](rl/gait-friction-log.md). Investigated
+    and downgraded a cadence-recalibration alternative before writing any
+    code (the open-loop speed gap turned out to depend heavily on
+    per-episode randomized friction/payload, not fixable by a static
+    correction curve). Current primary fix, training now: `FAC_RESID_CALM_BONUS`,
+    a tilt-gated (continuous ramp, not a hard threshold — an earlier hard
+    cutoff on this same signal already caused PPO divergence once,
+    `IMITATION_FADE_FACTOR`'s Phase 4b history) extra residual-cost weight
+    specifically while the robot is stable, designed to avoid punishing
+    reactions to genuine stumbles.
+  - **Resiliency campaign**: reframed around the R-series backlog's finding
+    that *stalling*, not falling, is this gait's dominant real-world failure
+    mode. Built and smoke-tested four new probe scripts (IMU bias, within-
+    episode latency/thermal ramp, aggressive command transitions, a
+    RUBBLE/LEDGE/STUCK_FOOT/JOINT_OFFSET dose-response sweep) — full detail
+    in [`docs/rl/resiliency-log.md`](rl/resiliency-log.md). Ledge step-down
+    investigated in depth (confirmed via direct contact-point check and
+    visual replay it's a real destabilization, not a "foot finds nothing"
+    pit; found the recoverable band, ~24-27mm, vs. saturated failure at
+    30mm+) and gated: ledge-recovery training only proceeds *after*
+    `FAC_NOSTALL` (the designed anti-stalling fix, still unlaunched) shows a
+    real, measured reduction in stalling — Phase 4a already showed training
+    ledge exposure without that fix in place makes things worse ("backs
+    away from steps").
+  - **Researched, deliberately not pursued:** continuous proprioceptive
+    "feel the ground" blind climbing — the successful literature (ANYmal
+    and others) depends on real-time joint-torque sensing G2 doesn't have;
+    the confirmed servo position-feedback on the ordered hardware is too
+    slow and PWM-disruptive for control-rate use. A narrower, genuinely
+    buildable version — slow, deliberate probe-before-committing (not
+    continuous locomotion) — logged as a real backlog item under
+    [B13](../behavior-ideas.md) instead, sim-testable now without hardware.
+
 ### Environment
 
 `rl_training/opencat-gym/` is a curated copy of
