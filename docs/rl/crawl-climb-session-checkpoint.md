@@ -1,3 +1,89 @@
+## UPDATE 2 (same resumed session): jerkiness root-caused + fixed, seed 7003 plateau resolved as a side effect
+
+User's diagnosis: jerky transitions between movements were knocking already-
+solid front footing off the platform, forcing the sequence to restart. Two
+fixes:
+
+1. **`_with_front_ik` rate-limited** (`RATE_LIMIT_DEG=4.0` per call): even
+   though the anchor target is static, PyBullet's IK solver can jump between
+   qualitatively different joint solutions near some configurations -- a
+   real discontinuous snap despite a continuous cartesian target. Clamping
+   the per-call change to 4deg keeps convergence (still reaches the true
+   anchor, just gradually) without permitting the snap.
+2. **Root cause of the shallow-footing vulnerability, separately diagnosed
+   by the user**: our footholds land right at the edge (many contacts under
+   15mm past the edge, several outright negative/marginal) while the
+   reference gait plants noticeably deeper -- a shallow foothold has almost
+   no margin before ANY perturbation (jerky or not) knocks it loose. Added a
+   post-contact "slide deeper" step to `probe_leg_onto_platform`: once first
+   contact is found, explicitly slide the foot forward
+   `SLIDE_DEPTH_M=0.025` (25mm) along the now-known-safe surface (stops
+   early if it detects sliding off the platform edge) instead of settling
+   for wherever first contact happened. This directly counteracts the
+   earlier-documented "2-DOF IK retreats in x as it searches deeper" effect
+   -- first contact was already known to land shallower than intended;
+   this recovers depth afterward instead.
+
+**Result, 3-seed validation (step_scale=1.3, n_cycles=40, margin=0.10)**: all
+3 now 4/4 with contact margins mostly 10-48mm (vs. many under 15mm or
+negative before). **Seed 7003's plateau (previously stuck at 122-131mm
+PRE-TAIL regardless of scale/cycles) is resolved as a side effect** -- now
+29-47mm PRE-TAIL, tilt 8.8, 4/4. Likely explanation: shallower/failed
+footholds were wasting replant cycles on marginal contacts that didn't hold,
+so deeper contacts let the crawl loop make more consistent progress.
+
+Replay regenerated and verified (`/Users/markjohnson/Desktop/crawl_climb.gif`,
+seed 7000, 2514 frames, 0 corrupted, tilt 16.8, 4/4).
+
+**Note**: the rate limiter was tested once in isolation BEFORE the slide-
+deeper fix and caused a flip on one seed + a near-failure on another --
+don't assume the rate limiter alone is safe; it's only been validated
+together with the slide-deeper fix, not separately. If either needs to be
+reverted independently later, re-test both combinations.
+
+**Still not re-tried on this new baseline**: the 60mm reach margin and -8°
+initial RB lean (both still pending re-addition, now on top of this even
+better baseline).
+
+---
+
+## UPDATE (resumed session, same week): STEP_SCALE sweep resolved
+
+Picked back up from "Next steps" item 1. Exposed `--step-scale` and
+`--n-cycles` as real CLI args (were hardcoded). Verified the `STEP_SCALE=1.0`
+baseline first (matches this doc exactly: 4/4 x3 seeds, but PRE-TAIL
+145-162mm, tilt 23.5 -- confirmed the revert was clean).
+
+Swept `step_scale` in {1.3, 1.6, 2.0, 2.5} x `n_cycles` in {16, 24}, seed
+7000. **Counterintuitive finding**: 1.6-2.5 all plateau around a 130-140mm
+pre-tail gap regardless of scale -- MORE amplitude doesn't help past a point.
+But **1.3 gave by far the smallest gap (58-93mm)**, at the cost of not yet
+reaching 4/4 (insufficient distance) at only 16-24 cycles. Extended cycle
+count at scale=1.3: 32 cycles -> 46-70mm, tilt 3.7 (4/4); 40 cycles -> 36-61mm,
+tilt 9.6 (4/4); 48 cycles -> 22-49mm but tilt climbing to 17.2 (diminishing
+returns starting). **`step_scale=1.3, n_cycles=40` is the new sweet spot.**
+
+3-seed validation at 1.3/40: seed 7000 -> 61/36mm, 4/4, tilt 9.6. Seed 7002 ->
+61/47mm, 4/4, tilt 7.2. **Seed 7003 plateaus at 122-131mm regardless of more
+cycles (tried 32/40) or higher scale (tried 1.4, 1.5)** -- traced directly:
+from cycle ~15 onward this seed's per-5-cycle-block net progress is
+essentially zero (each replant resets to ~the same position, next block just
+regains the same lost ground, no net gain) -- a genuine steady-state specific
+to this seed's geometry, not a slow-but-real convergence. Not yet resolved;
+not blocking, since 2/3 seeds now show a qualitatively different climb (way
+less reliance on the tail's jump: body_x at push-done time dropped from
+~0.45-0.56 to ~0.05-0.09 for the converging seeds).
+
+**Set as new defaults**: `--step-scale 1.3` (was hardcoded 1.6), `--n-cycles
+40` (was 16). Replay regenerated and verified
+(`/Users/markjohnson/Desktop/crawl_climb.gif`, seed 7000, 2452 frames, 0
+corrupted). **Not yet re-added**: the 60mm reach margin and -8° initial RB
+lean (checkpoint's next-steps item 3) -- still pending, now on top of this
+new, better baseline instead of the old one. Seed 7003's plateau is a good
+candidate for the NEXT isolated investigation once those are re-added.
+
+---
+
 # Crawl-climb session checkpoint (2026-09-19, saved at 97% weekly usage)
 
 Read this before touching `rl_training/opencat-gym/crawl_climb.py` again. It

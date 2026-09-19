@@ -36,6 +36,7 @@ PAW_LF, PAW_RF, PAW_RB, PAW_LB = 3, 6, 9, 12
 EDGE_X = 0.11
 CLIMB_REACH_FRAME = 20
 FRAME_MS = 67
+SLIDE_DEPTH_M = 0.025   # how far to slide forward onto the platform after first contact
 
 ap = argparse.ArgumentParser()
 ap.add_argument("checkpoint")
@@ -64,8 +65,18 @@ ap.add_argument("--loop-end", type=int, default=60,
                  help="unused, kept for backward compat")
 ap.add_argument("--n-passes", type=int, default=2,
                  help="unused, kept for backward compat")
-ap.add_argument("--n-cycles", type=int, default=16,
-                 help="number of small pull+step cycles for the repeated body-advance phase")
+ap.add_argument("--n-cycles", type=int, default=40,
+                 help="number of small pull+step cycles for the repeated body-advance phase. "
+                      "40 (up from the original 16) is needed at step-scale 1.3 to actually close "
+                      "the pre-tail gap -- see docs/rl/crawl-climb-session-checkpoint.md.")
+ap.add_argument("--step-scale", type=float, default=1.3,
+                 help="amplitude multiplier on the rear-leg swing's relative delta from cmh's own "
+                      "swing shape. 1.0 (cmh's literal amplitude) plateaus around a 150mm pre-tail "
+                      "gap; counterintuitively, LARGER scales (1.6-2.5) plateau even earlier (~130mm) "
+                      "-- 1.3 is the value that actually keeps closing distance with more cycles "
+                      "instead of saturating. 2/3 test seeds converge to a 36-61mm pre-tail gap at "
+                      "1.3/40 (tilt 7-9.6 deg); one seed (7003) hits a seed-specific plateau around "
+                      "125mm regardless of scale -- not yet resolved, see the checkpoint doc.")
 args = ap.parse_args()
 
 CAPTURE_EVERY = max(1, round(FRAME_MS / 1000 * 60 * args.speed))
@@ -203,6 +214,43 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
             cur = p.getLinkState(rid, paw_link)[0]
             x_margin_mm = 1000 * (cur[0] - EDGE_X)
             solid = nz > 0.9 and x_margin_mm > 5
+
+            # First contact usually lands shallow (near the edge, sometimes
+            # under 5mm or even negative) -- the achieved x drifts short of
+            # the commanded target under contact forces, matching an earlier
+            # finding this leg's IK naturally retreats in x as it searches
+            # deeper. A shallow foothold has almost no margin before a jerky
+            # movement knocks it back off, which was directly reported as
+            # the thing destabilizing the whole sequence. Now that contact
+            # height is known, slide forward along the (now known-safe)
+            # surface to a deeper, more secure resting point instead of
+            # settling for wherever first contact happened.
+            if nz > 0.7:
+                slide_target_x = cur[0] + SLIDE_DEPTH_M
+                for _sst in range(20):
+                    sfrac = (_sst + 1) / 20
+                    sp = [cur[0] + (slide_target_x - cur[0]) * sfrac, cur[1], cur[2]]
+                    sik = p.calculateInverseKinematics(rid, paw_link, sp)
+                    starg = hold_targets.copy()
+                    starg[shoulder_idx] = sik[shoulder_idx]
+                    starg[knee_idx] = sik[knee_idx]
+                    stgt = _with_anchors(starg.copy())
+                    for _wait in range(6):
+                        p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, stgt, forces=np.ones(8) * 0.5)
+                        sim_step()
+                    scps = p.getContactPoints(bodyA=rid, linkIndexA=paw_link)
+                    if not scps:
+                        break   # slid off the edge of the platform -- stop, use the last good position
+                    targets = starg
+                cur = p.getLinkState(rid, paw_link)[0]
+                x_margin_mm = 1000 * (cur[0] - EDGE_X)
+                fcps = p.getContactPoints(bodyA=rid, linkIndexA=paw_link)
+                fnz = fcps[0][7][2] if fcps else nz
+                solid = fnz > 0.9 and x_margin_mm > 5
+                print(f"  slid deeper: x-margin={x_margin_mm:.1f}mm, tilt={tilt():.1f} -> "
+                      f"{'SOLID' if solid else 'marginal'}")
+                return targets, cur, solid
+
             print(f"  contact: normal=({nx:.2f},{ny:.2f},{nz:.2f}), x-margin={x_margin_mm:.1f}mm, "
                   f"tilt={tilt():.1f} -> {'SOLID' if solid else 'marginal'}")
             return targets, cur, solid
@@ -286,6 +334,10 @@ FRONT_JOINTS_IDX = [FL_SHOULDER, FL_KNEE, FR_SHOULDER, FR_KNEE]
 RESIDUAL_BOUND_DEG = 30   # same bound as the walk policy's own scripted-base residual
 
 
+RATE_LIMIT_DEG = 4.0   # max change per call to _with_front_ik's front targets
+_front_ik_prev = {}
+
+
 def _with_front_ik(tgt, fl_pos, fr_pos):
     # Full override -- used during the crawl loop, where the front feet must
     # be PRECISELY fixed each cycle to generate real pull-leverage. Tried a
@@ -294,10 +346,29 @@ def _with_front_ik(tgt, fl_pos, fr_pos):
     # pose shifts fast enough during the rear-leg swing that a +/-30deg
     # residual can't track the anchor tightly enough, so the front feet
     # gradually drift off their foothold instead of staying planted.
+    #
+    # Rate-limited on top of the full solve: re-solving IK fresh every call
+    # toward a STATIC anchor should be continuous, but PyBullet's IK solver
+    # can occasionally jump between qualitatively different joint solutions
+    # near certain configurations -- a real discontinuous snap even though
+    # the cartesian target never moved. That snap is what knocks an already-
+    # solid front foot loose and destabilizes the rest of the sequence
+    # (reported directly: jerkiness between movements costs the stable
+    # footing already achieved on top of the platform). Clamping the
+    # per-call change keeps the anchor precise (it still converges toward
+    # the true IK solution, just gradually) without permitting a snap.
     ik_fl = p.calculateInverseKinematics(rid, PAW_LF, fl_pos)
     ik_fr = p.calculateInverseKinematics(rid, PAW_RF, fr_pos)
-    tgt[FL_SHOULDER], tgt[FL_KNEE] = ik_fl[FL_SHOULDER], ik_fl[FL_KNEE]
-    tgt[FR_SHOULDER], tgt[FR_KNEE] = ik_fr[FR_SHOULDER], ik_fr[FR_KNEE]
+    raw = {FL_SHOULDER: ik_fl[FL_SHOULDER], FL_KNEE: ik_fl[FL_KNEE],
+           FR_SHOULDER: ik_fr[FR_SHOULDER], FR_KNEE: ik_fr[FR_KNEE]}
+    bound = np.deg2rad(RATE_LIMIT_DEG)
+    limited = {}
+    for j, v in raw.items():
+        prev = _front_ik_prev.get(j, v)
+        limited[j] = prev + np.clip(v - prev, -bound, bound)
+    _front_ik_prev.update(limited)
+    tgt[FL_SHOULDER], tgt[FL_KNEE] = limited[FL_SHOULDER], limited[FL_KNEE]
+    tgt[FR_SHOULDER], tgt[FR_KNEE] = limited[FR_SHOULDER], limited[FR_KNEE]
     return tgt
 
 
@@ -447,7 +518,7 @@ for cyc in range(N_CYCLES):
     # diminishing returns + rising tilt) -- scaling the delta amplifies the
     # SAME shape into a bigger step, closing the pre-tail gap faster per
     # cycle instead of just adding more repetitions.
-    STEP_SCALE = 1.6
+    STEP_SCALE = args.step_scale
     for t in range(REAR_GAIT_START, LIFT_END):
         tgt = hold_targets.copy()
         tgt[RB_HIP] = rear_base[RB_HIP] + STEP_SCALE * (CLIMB_POSE_SEQ[t][RB_HIP] - base_seq[RB_HIP])
