@@ -69,6 +69,53 @@ corrupted, 4/4, tilt 9.1 -- stable landing, front knee still visually bent).
 
 ---
 
+## UPDATE 9 (same resumed session): lead margin + active replant -- works for one cycle, erodes again after
+
+User refined the geometric-stop insight further: stopping right at "under
+the body" (the original 15mm margin) isn't enough -- the body's weight
+keeps shifting forward after the pull ends (momentum, plus the rear leg's
+own next action), so the foot needs to stop with a real LEAD margin still
+clearly ahead of the body, the same way a walking gait plants a foot ahead
+of the body's center of mass rather than directly under it.
+
+**Two changes**: (1) increased `UNDER_BODY_MARGIN_M` from 0.015 to 0.04 (a
+real 40mm lead, not just barely-under), and (2) added an ACTIVE re-plant
+check at the END of every cycle (not just during the pull phase) -- since
+the pull's own stop can't catch the body advancing past the front anchor
+from the REAR leg's own tuck-swing-extend action, which happens after the
+pull in the same cycle. If a front foot has fallen behind the margin by the
+end of a cycle, it gets a fresh forward re-plant right there instead of
+just being left behind.
+
+**Result, validated on 3 seeds**: still 4/4, consistent tilt 19.1-19.9deg
+(comparable to before), clearance still ~37.7mm. The lead margin genuinely
+works for the FIRST cycle (confirmed in the trace: cycle 0's end-of-cycle
+check triggered "FR re-planted forward," and cycle 1's own pull-phase
+check showed both feet a healthy 33-42mm ahead, exactly the intended
+margin) -- but by cycle 2 the margin has eroded to near-zero/negative
+again, and by cycles 3-4 it's clearly negative (-37 to -44mm), with no
+further "re-planted forward" messages after cycle 0. **The active replant
+isn't firing reliably enough across all cycles to hold the margin
+throughout** -- likely because the rear leg's own forward drag happens
+continuously through the cycle, not just once, so a single end-of-cycle
+check-and-correct isn't enough to keep up over multiple cycles. Reviewed
+our own replay frames again post-fix -- visually similar to before,
+consistent with the numbers (the final posture is governed more by where
+things end up after cycles 2-4, where the margin has already eroded, than
+by the correctly-held cycle 0-1 state).
+
+**Honest state**: this is real, confirmed, directionally-correct progress
+(the lead-margin concept works exactly as intended when it fires), but not
+yet a complete fix -- the enforcement needs to be more persistent/continuous
+across the whole cycle sequence, not just checked once per cycle boundary.
+A natural next step: check and correct the margin more frequently (e.g.
+after the rear-leg action specifically, in addition to after the pull), or
+raise the trigger threshold so a partial erosion re-triggers a replant
+before it goes fully negative, rather than only checking once at the very
+end of each cycle.
+
+---
+
 ## UPDATE 8 (same resumed session): geometric pull-stop -- real, correct fix; confirms rear-leg cycling is still the dominant lever
 
 User's direct mechanical insight: the front-leg pull rotates the whole leg
