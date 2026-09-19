@@ -1,3 +1,49 @@
+## UPDATE 12 (same resumed session): rear-leg walking + concurrent pull/step timing, tried on the promoted checkpoint -- both negative
+
+Two more direct user-requested experiments tried on top of UPDATE 11's
+promoted checkpoint (lead-margin front pull):
+
+1. **Rear-leg walking gait** (true alternation, 0.75x per-step amplitude,
+   same as tried before but now layered on the lead-margin baseline instead
+   of the 5-seed-reliable one): genuinely interesting but NOT a clean win --
+   it's a real trade, not an improvement. Seeds 7005/7006 (which FAILED
+   under lead-margin alone) now SUCCEED with this combination. But seeds
+   7000/7002 (which succeeded reliably under lead-margin alone) now FLIP.
+   Different failure pattern, not strictly better. Replays saved for
+   comparison: `/Users/markjohnson/Desktop/crawl_climb_combo_success.gif`
+   (seed 7005, succeeds) and `crawl_climb_combo_fail.gif` (seed 7000,
+   flips at cycle 3) -- both on Desktop.
+2. **Concurrent pull+rear-tuck timing** ("in concert," merging the front
+   pull and the stepping leg's tuck phase into one shared loop instead of
+   fully sequential) -- tried TWICE now on two different baselines. First
+   attempt (on the narrower 25mm-margin, non-alternating baseline): 0/5,
+   total failure, every seed ended with the body flush against the ground.
+   Second attempt (on THIS update's walking+lead-margin combination):
+   1/4 and 2/4 on the two seeds tested (not even flips -- just incomplete,
+   legs never all secured). **Concurrent timing has now failed decisively
+   twice, on two different baselines -- this specific "merge the loops"
+   implementation approach has a real structural problem, not a tuning
+   issue.** Not recommended to retry the same merged-loop approach again
+   without first understanding why concurrent execution breaks things that
+   sequential execution (with the same underlying targets) doesn't -- likely
+   candidates: the merged loop uses a softer force (1.5) than either the
+   pull's own 2.5 or the tuck's own 1.0-2.0, which was an ad hoc choice, or
+   the two motions' forces interfere with each other when applied to
+   overlapping/adjacent joints within the same physics step in ways that
+   don't show up when they're strictly sequential.
+
+**Reverted both.** Current committed state remains `9de2f06` (the promoted
+lead-margin version, no rear-leg walking, no concurrency) -- confirmed
+still 4/4 on seed 7000 after both reverts.
+
+**Bug fixed along the way (already committed, part of `9de2f06`)**: flipped
+runs previously never saved their GIF at all (only captured extra frames,
+then exited without ever calling the save code) -- fixed so a flip now
+saves a reviewable replay, which is how `crawl_climb_walking_fail.gif` and
+`crawl_climb_combo_fail.gif` were produced.
+
+---
+
 ## UPDATE 11 (same resumed session): quality over raw reliability -- promoted the lead-margin version despite its lower pass rate
 
 Important correction to UPDATE 10's framing. After reverting to the
