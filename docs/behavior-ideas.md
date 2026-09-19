@@ -174,6 +174,39 @@ above, not a replacement: could inform *where* a scripted `cmh` places a
 foot, or give a learned residual a slow, discrete correction opportunity
 between the fast continuous corrections it already makes.
 
+**Closed, step-down case, negative result (2026-09-19) — see
+[`rl/foot-probing-log.md`](rl/foot-probing-log.md) for the full campaign.**
+The sensing mechanism itself (joint tracking error reveals real ground
+contact) is validated and real. What isn't viable is the specific motion
+tested to get the leg into position to use it: lifting one leg from the
+walk's natural pose is geometrically unstable (center of mass sits outside
+the remaining 3-leg support triangle) — fixable with a weight-shift, but
+that shift costs enough reach that the leg only reaches ~12-15mm past the
+edge (not the ~30-60mm real depth needed), and what's left of its
+kinematic budget after that only searches ~4-5mm down before hitting its
+own limit. The only safe (level, <5°) trigger point in the gait cycle is
+also structurally ~25-30mm before the true edge — tightening the trigger
+doesn't help, it just removes the only safe option. Step-up was not
+explored (gated on step-down succeeding first, per the approved test
+plan). Revisiting this would need a deliberate commanded approach-and-stop
+motion rather than an opportunistic freeze of the walk's pose — a
+different design, not a tuning pass on this prototype — and could also try
+a rear leg, never tested here.
+
+**Round 2 (2026-09-19)** tried exactly that "different design" — a
+deliberate commanded stop-and-settle (via the trained policy's own stop
+behavior) instead of an opportunistic freeze, plus a shorter ledge. Fixed
+stability completely (tilt <2° throughout, vs. 10-17° before) via the
+settle plus two further fixes (direct knee-flexion lift, IK reach from
+that better-conditioned pose — reach improved to +40mm past the edge).
+But sensing still fails, confirmed with contact-normal checking (not just
+whether contact fires): every nonzero ledge, even 5mm, registers a
+sideways-pointing normal — the paw hits the ledge's own vertical riser
+wall, not the floor, because the leg's 2-DOF IK retreats in x as it
+searches deeper. Same root limitation as round 1 (can't hold reach and
+depth at once), now confirmed a second, independent way. See
+`rl/foot-probing-log.md` round 2 for the full trace.
+
 **Reopens the vision question — narrowly.** This needs a real forward sensor
 to trigger "invoke climb" (same architecture as B9/Phase E: vision spots a
 step too tall to walk over → skill switch → climb → hand back to the walk
