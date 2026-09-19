@@ -49,6 +49,11 @@ datasets/
 # Run console logs
 *.log
 
+# Benchmark/eval JSON outputs -- disposable, reproducible by rerunning the
+# benchmark_*.py / resilience_*.py tools, same category as the checkpoints above
+rl_training/opencat-gym/trained/*.json
+rl_training/opencat-gym/robustness_sweep.json
+
 # Automated-iteration scratch
 rl_training/opencat-gym/eval_frames/
 rl_training/opencat-gym/STOP

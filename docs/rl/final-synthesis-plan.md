@@ -57,6 +57,17 @@ Two parts, both in this doc, filled in once all three campaigns are done:
    both, since this is a deliberate tradeoff being made with eyes open, not
    a blind win).
 
+## Hard checkpoint before the 20M run (user, 2026-09-18)
+
+**Do not launch the final 20M run without explicit user go-ahead**, even
+though every other round this cycle has been run autonomously per
+standing instruction. The user wants to review all three campaigns'
+results together, in one pass, before the recipe/launch decision gets
+made -- this overrides the general "don't stop testing" autonomy for this
+one specific transition. Everything up through finishing the analysis and
+writing the recipe (the two deliverable parts above) can proceed
+unattended as normal; the line is launching the actual 20M run itself.
+
 ## Status
 
 Not started — waiting on resid30, gait-friction, and resiliency campaigns

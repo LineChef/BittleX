@@ -108,6 +108,4 @@ if __name__ == "__main__":
         rs = f"{o['resettle_steps_mean']:.1f}" if o['resettle_steps_mean'] is not None else "--"
         print(f"{o['ckpt']:<26}{o['falls']:>7}{o['fall_rate']:>7.0%}{o['big_spikes']:>8}"
               f"{o['recovered']:>7}{rr:>7}{rs:>10}{o['net_x_mean']:>8.3f}{o['net_x_min']:>10.3f}")
-    json.dump(out, open(sys.argv[-1].replace("trained/", "").replace("/", "_") + "__recovery_probe.json", "w")
-              if False else open("/private/tmp/claude-502/-Users-markjohnson-Desktop-OneFolder-projects-bittleX/"
-                                 "d7c45dae-58d7-4bee-ac85-5462b49fdbd6/scratchpad/recovery_probe.json", "w"), indent=1)
+    json.dump(out, open("trained/recovery_probe.json", "w"), indent=1)
