@@ -180,6 +180,8 @@ def probe_leg_onto_platform(paw_link, shoulder_idx, knee_idx, hold_targets, anch
 
     def _with_anchors(tgt):
         for link, pos in anchors.items():
+            if pos is None:
+                continue   # that leg never found the platform -- nothing to anchor to
             sh, kn = {PAW_LF: (FL_SHOULDER, FL_KNEE), PAW_RF: (FR_SHOULDER, FR_KNEE),
                       PAW_RB: (RB_HIP, RB_KNEE), PAW_LB: (LB_HIP, LB_KNEE)}[link]
             ik = p.calculateInverseKinematics(rid, link, pos)
@@ -552,30 +554,6 @@ for cyc in range(N_CYCLES):
     this_pull = min(PULL_DEG_PER_CYCLE, max(0.0, MAX_KNEE_FLEX_DEG - _flex_since_replant))
     lt = hold_targets.copy()
     if this_pull > 0:
-        # Geometric stop, not just a joint-angle budget: the pull rotates
-        # the whole leg backward as the body moves past the anchored foot
-        # (exactly like a person pulling themselves up and past their own
-        # planted hand) -- if it keeps going PAST the point where the foot
-        # is roughly under the body, the leg stops providing any vertical
-        # support at all and just keeps rotating toward pointing backward,
-        # which is a big part of why the body was falling forward/collapsing
-        # once both front legs got fully retracted (directly reported by the
-        # user). Stop the pull the instant the foot is no longer meaningfully
-        # ahead of the body, regardless of how much of the per-cycle degree
-        # budget is left -- a leg positioned under the frame can actually
-        # hold weight; a leg rotated past that can only keep pulling down.
-        # Stop while the foot is still clearly AHEAD of the body, not just
-        # barely under it -- the body's weight keeps shifting forward after
-        # the pull ends (momentum, plus whatever comes next), so the foot
-        # needs a real lead margin to still be in a supportive position by
-        # the time that weight arrives, the same way a walking gait plants a
-        # foot ahead of the body's center of mass, not directly under it.
-        # 15mm (and only checked every ~10 substeps, so often crossed by
-        # more than that in practice) was nowhere near enough lead --
-        # directly reported as still rotating too far back.
-        UNDER_BODY_MARGIN_M = 0.04
-        body_x_now = p.getBasePositionAndOrientation(rid)[0][0]
-        stopped_early = False
         for st in range(10):
             frac = (st + 1) / 10
             lt = hold_targets.copy()
@@ -588,15 +566,6 @@ for cyc in range(N_CYCLES):
                 # reference climb's tall stance throughout the pull.
                 p.setJointMotorControlArray(rid, env.joint_id, p.POSITION_CONTROL, lt, forces=_rear_force(2.5))
                 sim_step()
-            fl_x = p.getLinkState(rid, PAW_LF)[0][0]
-            fr_x = p.getLinkState(rid, PAW_RF)[0][0]
-            body_x_now = p.getBasePositionAndOrientation(rid)[0][0]
-            if (fl_x - body_x_now) < UNDER_BODY_MARGIN_M or (fr_x - body_x_now) < UNDER_BODY_MARGIN_M:
-                stopped_early = True
-                break
-        if stopped_early:
-            print(f"    pull stopped early at cycle {cyc}: front foot reached under the body "
-                  f"(fl_x-body_x={fl_x-body_x_now:.4f}, fr_x-body_x={fr_x-body_x_now:.4f})")
         _flex_since_replant += this_pull
     hold_targets = lt
     fl_anchor = p.getLinkState(rid, PAW_LF)[0]
@@ -714,35 +683,6 @@ for cyc in range(N_CYCLES):
                 sim_step()
         hold_targets = tgt
         print(f"    extend/propel: body_x={p.getBasePositionAndOrientation(rid)[0][0]:.4f}, tilt={tilt():.1f}")
-
-    # The pull's own geometric stop only protects against the PULL itself
-    # pushing the foot behind the body -- it can't catch the body advancing
-    # past the (fixed) front anchor from the REAR leg's own action instead
-    # (tuck-swing-extend also drags the body forward, independent of the
-    # front pull). Check again here, after the whole cycle's actions, and
-    # actively replant forward (not just refuse to worsen it) if a front
-    # foot has ended up behind the same ahead-of-body margin.
-    body_x_check = p.getBasePositionAndOrientation(rid)[0][0]
-    fl_x_check = p.getLinkState(rid, PAW_LF)[0][0]
-    fr_x_check = p.getLinkState(rid, PAW_RF)[0][0]
-    if (fl_x_check - body_x_check) < UNDER_BODY_MARGIN_M:
-        fl_cur2 = p.getLinkState(rid, PAW_LF)[0]
-        fl_margin2 = max(args.forward_margin_m, (fl_cur2[0] - EDGE_X) + 0.015)
-        hold_targets, fl_new2, _fl_solid2 = probe_leg_onto_platform(
-            PAW_LF, FL_SHOULDER, FL_KNEE, hold_targets, {PAW_RF: fr_anchor},
-            platform_top_z, fl_margin2, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
-        if fl_new2 is not None:
-            fl_anchor = fl_new2
-            print(f"    FL re-planted forward (had fallen behind the body)")
-    if (fr_x_check - body_x_check) < UNDER_BODY_MARGIN_M:
-        fr_cur2 = p.getLinkState(rid, PAW_RF)[0]
-        fr_margin2 = max(args.forward_margin_m, (fr_cur2[0] - EDGE_X) + 0.015)
-        hold_targets, fr_new2, _fr_solid2 = probe_leg_onto_platform(
-            PAW_RF, FR_SHOULDER, FR_KNEE, hold_targets, {PAW_LF: fl_anchor},
-            platform_top_z, fr_margin2, args.above_margin_m, lift_first=False, do_slide=False, anchor_force=2.5)
-        if fr_new2 is not None:
-            fr_anchor = fr_new2
-            print(f"    FR re-planted forward (had fallen behind the body)")
 
     tl = tilt()
     bx, _by, bz = p.getBasePositionAndOrientation(rid)[0]

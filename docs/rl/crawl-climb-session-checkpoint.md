@@ -1,3 +1,61 @@
+## UPDATE 10 (same resumed session): IMPORTANT -- reverted to the last 5-seed-verified checkpoint; testing-breadth lesson
+
+**Critical process lesson, stated plainly because it nearly caused real
+damage**: UPDATE 8 and 9's front-leg geometric-pull-stop / lead-margin /
+active-replant changes were only tested on 3 seeds (7000/7002/7003) before
+being committed as reliable. When the user asked for an always-available
+working checkpoint (prompting a wider re-check), testing against the FULL
+5-seed set this session has used throughout (adding 7005/7006) revealed
+**both of those commits actually flip on 2 of 5 seeds** (166-178deg tilt,
+outright failures) -- a real reliability regression that the narrower
+3-seed check simply didn't catch. Bisected directly (checked out each
+commit, re-ran the 5-seed set): `af6cb44` ("Investigate the full-fix
+direction...", i.e. the state right after UPDATE 6's stand-up push, BEFORE
+any of the front-leg pull-stop work) is confirmed 100% reliable across all
+5 seeds, tilt tightly clustered 17.5-20.0deg. `cc598b9` and `15df366` (the
+geometric-stop and lead-margin commits) are NOT reliable at this broader
+seed set, despite passing their own narrower validation at the time.
+
+**Action taken**: reverted `crawl_climb.py` to `af6cb44`'s content, re-added
+only the one-line safety fix from UPDATE 9 (a `None`-check in
+`probe_leg_onto_platform`'s `_with_anchors` so a leg that never found the
+platform can't crash `calculateInverseKinematics` -- this fix itself
+doesn't change behavior when anchors ARE valid, and was re-verified safe
+on 3 seeds before committing). **This reverts the front-leg geometric-
+pull-stop, lead-margin, and active-replant work from UPDATES 8 and 9
+entirely** -- none of it is in the current committed state. The underlying
+insights (stop the pull before the leg rotates past useful support;
+anticipate the body's forward momentum with a lead margin) are still
+believed correct and worth revisiting, but need re-implementing and
+re-validating against the full 5-seed set before being trusted again, not
+just 3.
+
+**Also tried and reverted this same update**: a "natural walking gait" rear
+-leg version (true alternation + smaller 0.55x per-step amplitude, per
+direct user request) -- body height preservation was genuinely better when
+it worked, but 1 of 5 seeds failed outright (slid off the platform) and
+tilt varied 17-50deg across the others. Also tried a "smart" alternating
+version that dedicates every cycle to whichever rear leg isn't anchored yet
+(rather than blind cyc%2 parity) -- this FLIPPED on all 3 of its first test
+seeds outright, worse than either alternative. Both reverted.
+
+**Standing practice going forward, per direct user instruction**: always
+keep a verified, working checkpoint to revert to -- test any change against
+the FULL seed set this session has established (7000, 7002, 7003, 7005,
+7006 at minimum) before considering it validated, not a narrower subset.
+When in doubt, `git stash` + checkout a candidate earlier commit + re-run
+the full seed set is a fast, cheap way to bisect exactly which commit
+introduced a regression, as done here.
+
+Current committed state (after this update): `crawl_climb.py` =
+UPDATE 6's stand-up push mechanism (the tuck-swing-extend rear legs, drag
++probe front-leg finish, synchronized/no alternation anywhere, full lunge-
+sized single step per cycle) + the one-line anchor-None safety fix. 100%
+reliable across 5 seeds, tilt 17.5-20.0deg, front knee still ~90deg
+(cosmetic-only issue, UPDATE 6's honest finding still stands).
+
+---
+
 ## UPDATE 5 (same resumed session): standing-tilt stability recovered (knee angle still cosmetic-only)
 
 Continued the standing-posture investigation from UPDATE 4, testing five
