@@ -312,12 +312,12 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   recorded, not just the ones that happen to reach the integrated app.
   `SystemExit` / `KeyboardInterrupt` are recognised as a clean exit, not a
   crash.
-- **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 17-step
-  hardware sequence as a resumable, interactive checklist (progress persists
-  to disk); auto-runs only read-only/passive steps, always shows movement
-  commands as text instead of executing them. Steps 1–12a are enforced
-  stand-only; step 12b (the first floor test) sits behind an explicit
-  `[y/N]` confirm.
+- **Guided bring-up runbook** (`python -m pi_pipeline.bringup`) — the 20-step
+  hardware sequence (Phase 0 bare hardware → Phase 1+ with the Pi wired in)
+  as a resumable, interactive checklist (progress persists to disk);
+  auto-runs only read-only/passive steps, always shows movement commands as
+  text instead of executing them. Steps 1–13a are enforced stand-only; step
+  13b (the first floor test) sits behind an explicit `[y/N]` confirm.
 - **Guided first movement** (`check_serial firstmove`) — one joint at a time
   (head, then the 8 leg servos) with a confirm before and after each, then
   `kbalance`, then a single timed `wkF` burst — always ends at rest, including
@@ -327,15 +327,18 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   behaviour gestures, sleep, the carpet gait, and the recovery/get-up
   keyframes, deduped, 28 total), logging battery voltage and reply latency
   after each one against a logged idle baseline — a data-gathering pass run
-  on the stand at bring-up (runbook step 7c) that can point at a joint or
-  sequence worth a closer look before it matters on the floor. Each move gets
-  a numbered, ruled-off terminal announcement ("`[7/28] walk_forward
-  (skill) -> kwkF`"), a bell, and a lead-time pause (`--announce-s`,
-  default 1.5s) before it fires — so which move is currently running is
-  never ambiguous while watching the robot instead of the screen. Doesn't yet
-  verify a recovery keyframe's *outcome* (body upright or not) — that needs
-  the IMU stream, whose line format isn't confirmed until step 12a's
-  `--probe-imu`, which comes later in the sequence.
+  on the stand at bring-up TWICE (runbook step 3c on BiBoard's own USB
+  before the Pi is wired in, then again at step 8c through the Pi, so the
+  two sessions can be diffed for a voltage/latency delta from the Pi stack)
+  that can point at a joint or sequence worth a closer look before it
+  matters on the floor. Each move gets a numbered, ruled-off terminal
+  announcement ("`[7/28] walk_forward (skill) -> kwkF`"), a bell, and a
+  lead-time pause (`--announce-s`, default 1.5s) before it fires — so which
+  move is currently running is never ambiguous while watching the robot
+  instead of the screen. Doesn't yet verify a recovery keyframe's *outcome*
+  (body upright or not) — that needs the IMU stream, whose line format isn't
+  confirmed until step 13a's `--probe-imu`, which comes later in the
+  sequence.
 - **Serial trace + replay** (`pi_pipeline/link/trace.py`) — every command sent
   to the BiBoard logged to a timestamped file (`--trace <path>` on the app);
   `trace.py replay` re-sends the same sequence with the same relative pacing.

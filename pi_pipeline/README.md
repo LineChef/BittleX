@@ -138,8 +138,9 @@ python -m pi_pipeline.behavior
 # Bring-up readiness checklist (run the moment the Pi + body are wired)
 python -m pi_pipeline.doctor              # add --serial to also handshake the BiBoard
 
-# The guided, resumable 17-step hardware bring-up sequence (stand-only
-# through step 12a; 12b is the first floor test, gated behind a confirm)
+# The guided, resumable 20-step hardware bring-up sequence (Phase 0 bare
+# hardware -> Phase 1+ with the Pi wired in, stand-only through step 13a;
+# 13b is the first floor test, gated behind a confirm)
 python -m pi_pipeline.bringup             # --list / --restart / --from <id>
 
 # Guided first movement: one joint at a time, confirmed, then kbalance + a wkF burst

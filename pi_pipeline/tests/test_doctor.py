@@ -12,6 +12,7 @@ def _fake_settings(**over):
         piper_model_path="/nope/piper.onnx",
         serial_port="/nope/ttyX",
         serial_baud=115200,
+        features_spec="",
     )
     base.update(over)
     s = types.SimpleNamespace(**base)
@@ -114,3 +115,16 @@ def test_serial_ping_flags_a_non_opencat_reply(monkeypatch, patch_settings):
     rows = {r["name"]: r for r in doctor.run(ping_serial=True)}
     assert rows["BiBoard responds"]["status"] == doctor.WARN
     assert rows["battery voltage reads back"]["status"] == doctor.WARN
+
+
+def test_features_check_surfaces_spec_and_estop(patch_settings):
+    patch_settings(features_spec="")
+    rows = {r["name"]: r for r in doctor.run()}
+    assert rows["G2_FEATURES spec"]["status"] == doctor.OK
+    assert "everything ON" in rows["G2_FEATURES spec"]["detail"]
+    assert rows["estop"]["status"] == doctor.OK
+
+    patch_settings(features_spec="+estop")
+    rows = {r["name"]: r for r in doctor.run()}
+    assert rows["estop"]["status"] == doctor.WARN
+    assert "ENGAGED" in rows["estop"]["detail"]

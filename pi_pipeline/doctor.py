@@ -10,7 +10,9 @@ drops into a bring-up script.
     python -m pi_pipeline.doctor --json         # machine-readable
 
 Checks: .env completeness, Anthropic key validity + expiry, model files
-(Vosk / Piper / gait ONNX), Python deps, serial port, audio devices, free disk.
+(Vosk / Piper / gait ONNX), Python deps, serial port, audio devices, free disk,
+and what G2_FEATURES actually resolves to (spec, gait mode, explore, estop --
+easy to forget the default is *everything on*, not a safe minimal profile).
 `--serial` adds a passive handshake -- port opens, a `?` banner, a `P` voltage
 readback -- reads only, nothing that moves the robot, safe to run any time.
 """
@@ -143,6 +145,24 @@ def _check_disk() -> list:
     return [_r("free disk", OK if free_gb > 1.0 else WARN, f"{free_gb:.1f} GB")]
 
 
+def _check_features(s) -> list:
+    """Surface what G2_FEATURES actually resolves to before bring-up runs the
+    real app -- easy to forget the default (empty spec) is *everything on*,
+    including autonomous gait/explore, not a safe minimal profile."""
+    from .features import Features
+    spec = s.features_spec or "(unset -- default profile: everything ON)"
+    f, notes = Features.from_settings(s).resolve()
+    out = [_r("G2_FEATURES spec", OK, spec)]
+    out.append(_r("gait mode", OK, f.gait))
+    out.append(_r("explore (autonomous roam, voice-armed)", OK,
+                  "enabled" if f.explore else "disabled"))
+    out.append(_r("estop", WARN if f.estop else OK,
+                  "ENGAGED -- all actuation/autonomy held" if f.estop else "not engaged"))
+    for note in notes:
+        out.append(_r("feature resolve adjustment", WARN, note))
+    return out
+
+
 def run(*, ping_serial: bool = False) -> list:
     from .config import settings as s
     checks: list = []
@@ -153,6 +173,7 @@ def run(*, ping_serial: bool = False) -> list:
     checks += _check_serial(s, ping_serial)
     checks += _check_audio()
     checks += _check_disk()
+    checks += _check_features(s)
     return checks
 
 

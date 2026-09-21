@@ -132,7 +132,7 @@ def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
     move the body through its full range -- this pass logs voltage/latency
     for them same as everything else, but NOT whether the body actually ended
     up upright; that needs the IMU stream, whose line format --probe-imu
-    (step 12a) hasn't confirmed yet at this point in the runbook, so it isn't
+    (step 13a) hasn't confirmed yet at this point in the runbook, so it isn't
     wired in here. Always ends at `d` (rest)."""
     moves = _all_moves()
     total = len(moves) - (3 if skip_recovery else 0)

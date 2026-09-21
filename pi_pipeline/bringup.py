@@ -188,8 +188,20 @@ def _steps() -> list[Step]:
             "kwkF. Methodology + decision rule: docs/rl/h1-rubric.md; "
             "h1_score.py produces the verdict. Keep the emergency stop within "
             "reach (--halt, or say 'emergency stop') for the whole thing. "
-            "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1",
+            "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1\n"
+            "ONCE H1 PASSES: rename run20m_ppo from its training-artefact name "
+            "to a deployment name (one rename commit) -- don't defer this, it "
+            "gets easy to forget once integration work starts.",
             manual_cmd="python pi_pipeline/gait/run_gait.py --cmd 0.1"),
+        Step("13c", "RL sim-to-real (Phase 6)", "OPTIONAL, not blocking: servo-thermal bench calibration",
+            "The thermal governor (gait/thermal_guard.py) has never seen real "
+            "hardware -- every constant is a placeholder. Whenever convenient "
+            "post-H1 (not blocking further bring-up): hold the robot in a "
+            "fixed hard stance (or one leg against a stop) until protection "
+            "trips, log the time and the cooldown curve, fit k_gen/k_diss/"
+            "T_trip from that. Full procedure: docs/hardware/servo-thermal.md "
+            "section 3 item 5 / section 4b's retuning checklist.",
+            manual_cmd=None),
         Step("14", "Vision on the robot (Phase 8)", "Mount the camera, train the edge classifier",
             "Train the desk-edge classifier on the real mounted POV (B16 -- "
             "highest priority), wire Avoider decisions to the actuator, build "

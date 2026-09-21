@@ -1095,7 +1095,10 @@ that ties everything together with hardware:
 
 **The three bigger deployment-easing items — built 2026-09-10:**
 - **`pi_pipeline/bringup.py`** — `python -m pi_pipeline.bringup`: the (now
-  17-step, after splitting step 12 into 12a/12b and adding 7c below)
+  17-step, after splitting step 12 into 12a/12b and adding 7c below;
+  **renumbered again 2026-09-20 to a 20-step Phase 0/Phase 1 split matching
+  the "When the hardware arrives" section below exactly** — see that
+  section's own 2026-09-20 callout)
   "When the hardware arrives" sequence above, as a guided, resumable checklist
   instead of a doc to re-read and lose your place in. Progress persists to
   `<G2_STATE_DIR>/bringup_progress.json` (`--restart` clears it, `--from <id>`
@@ -1138,9 +1141,10 @@ check. The recovery keyframes get their own confirm first (they move the body
 through its full range) and can be skipped (`--skip-recovery`). Always ends
 at `d` (rest). Deliberately does **not** yet verify a recovery keyframe's
 actual outcome (did the body end up upright) — that needs the IMU stream,
-whose line format isn't confirmed until step 12a's `--probe-imu`, which comes
+whose line format isn't confirmed until step 13a's `--probe-imu`, which comes
 later in the sequence than this sweep does; worth revisiting as a v2 once
-that format is known. Wired into the runbook as new step **7c**, right after
+that format is known. Wired into the runbook as new step **7c** (renumbered
+to **3c**/**8c** in the 2026-09-20 Phase 0/Phase 1 split), right after
 the `skills` cycle, still on the stand.
 
 **Real-time feedback pass — same day.** The original sweep printed a move's
