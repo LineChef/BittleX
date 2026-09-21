@@ -1102,7 +1102,7 @@ that ties everything together with hardware:
   jumps to a step, `--list` prints everything non-interactively). At each step:
   `Enter`=done, `r`=run the suggested command (only offered for read-only /
   passive ones — port listing, `doctor`, a text-mode voice check, the
-  benchmark), `s`=skip, `q`=quit-and-save. **Movement commands (`c16`
+  benchmark), `s`=skip, `q`=quit-and-save. **Movement commands (`c`
   calibration, `kbalance`, `kwkF`, `--probe-imu`, `bench_real.py`) are always
   shown as text, never auto-run** — anything that moves a joint needs your
   hands free to catch it, not a confirm prompt inside this script.
@@ -1238,7 +1238,7 @@ first, no Claude call), `python -m pi_pipeline.app --halt`, or `kill -USR1 <pid>
 **Bench mode** — `python -m pi_pipeline.app --bench`: for when G2 is on the
 calibration stand. Suppresses the behaviour runtime entirely and forces the
 voice actuator to mock, with a `=== BENCH MODE ===` banner, so `check_serial` /
-`run_gait --probe-imu` / firmware `c16` calibration own the serial link with
+`run_gait --probe-imu` / firmware `c` calibration own the serial link with
 nothing autonomous competing.
 
 **Explore mode — two-tier redesign, built 2026-09-10** (user design session).
@@ -1402,6 +1402,27 @@ The phases above are grouped by system; this is the sequence to actually work
 through once the Bittle X + BiBoard land (the Pi bring-up is already done — see
 Phase 6). The camera arrived first and its bench bring-up is done (Phase 8).
 
+> **2026-09-20 — pre-arrival research pass against Petoi's official docs.**
+> Cross-checked this sequence against the actual Bittle X V2 user manual
+> (calibration/first-power-on pages) rather than just firmware source —
+> findings + sourced corrections in
+> [`hardware/calibration-and-bringup-research.md`](hardware/calibration-and-bringup-research.md).
+> Highlights: pre-assembled units are only **coarse**-tuned (calibration is
+> routine, not conditional); joints need to match a specific bootup posture
+> *before* first power-on; a stuck-feeling new joint is usually gear
+> protection engaging, not a fault; and the real calibration-entry serial
+> token is bare `c`, not `c16` (fixed below and in `bringup.py`; verify
+> against the real board once serial is up either way, since
+> `check_serial` blocks both by design and neither has been sent for real
+> yet). **Known desync flagged, not yet fixed**: `pi_pipeline/bringup.py`'s
+> step IDs/order still reflect the pre-Phase-0-split flat list (e.g. its
+> step 2 "weigh the build" still precedes its step 4 "wire Pi↔BiBoard",
+> the opposite of this doc's Phase 0/Phase 1 split, where weighing is
+> gated on the Pi already being wired to the frame) — the restructuring
+> below was never propagated into the interactive tool. Worth a dedicated
+> pass to renumber `bringup.py` to match before bring-up actually starts,
+> so the tool and this doc agree.
+
 **Staged in two phases, gated on the Pi.** Phase 0 below is deliberately
 everything that can be ruled out with *only* the bare Bittle X + BiBoard —
 frame assembly, servo calibration, and a full movement sweep — none of it
@@ -1453,11 +1474,16 @@ concrete, evidence-based answer to "did adding the Pi stack change anything
 mechanically," not a guess.
 
 **Phase 0 — bare hardware, no Pi in the loop**
-1. Assemble Bittle X V2; check servo calibration (ships calibrated — fine-tune
-   only if movement looks off).
+1. Assemble Bittle X V2. Match joints to the bootup posture in Petoi's
+   unboxing diagram *before* first power-on. Ships only **coarse**-tuned
+   (not fully calibrated) — plan on step 2's calibration pass, don't treat
+   it as conditional. A joint that feels stuck despite a correct command is
+   likely new-gear protection, not a fault — rotate it by hand first.
 2. **On the calibration stand, before it touches the ground:** full
    range-of-motion pass by hand / `check_serial` (watch for binding / leg-on-leg
-   collision), then firmware `c16` auto joint calibration. Safe place for first
+   collision), then firmware `c` auto joint calibration (also enterable by
+   powering on with the robot tilted one side up, if serial/app isn't
+   ready yet). Safe place for first
    power-on. Detailed gait steps: [`guides/gait-deployment.md`](guides/gait-deployment.md) step 6.
 3. **Still on the stand, BiBoard's own USB port, no Pi wired:**
    `python -m pi_pipeline.link.check_serial ports` → set `G2_SERIAL_PORT` in

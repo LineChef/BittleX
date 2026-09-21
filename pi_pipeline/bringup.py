@@ -15,16 +15,27 @@ it, `q` quits and saves your place. Progress is written to
 stop and resume across sessions -- and across days.
 
 Movement commands are always shown as text to run yourself in another shell,
-never auto-executed here -- calibration (`c16`) and anything that walks or
+never auto-executed here -- calibration (`c`) and anything that walks or
 gets the robot up should happen with your hands free to catch it, not from
 inside this script's confirm prompt.
 
-STAY ON THE CALIBRATION STAND THROUGH STEP 12a. Servo sign, the real IMU
+STAY ON THE CALIBRATION STAND THROUGH STEP 13a. Servo sign, the real IMU
 format, and payload weight are all unknown until the real robot is in hand;
 on the stand, getting any of them wrong is a flailing leg, not a fall or a
-walk off an edge. The floor is earned once step 12a's --openloop confirms the
+walk off an edge. The floor is earned once step 13a's --openloop confirms the
 servo signs are right -- that's the one check that genuinely needs ground
-contact (step 12b, the H1 head-to-head).
+contact (step 13b, the H1 head-to-head).
+
+Steps 1-3 are Phase 0: bare Bittle X + BiBoard only, nothing Pi/PiSugar/
+camera related -- deliberately rules out mechanical/servo/BiBoard problems
+before the Pi is ever wired in. Step 3 talks to BiBoard over its own USB
+port (temporarily set G2_SERIAL_PORT to that, not the eventual Pi port).
+Steps 4 onward are Phase 1+, gated on the Pi being physically wired to the
+frame -- step 8 re-runs the same serial checks as step 3, now through the
+Pi, specifically so the two sessions' event logs can be diffed for a
+voltage/latency delta from adding the Pi stack. Step IDs here match
+docs/project-plan.md's "When the hardware arrives" numbering exactly --
+keep the two in sync if either changes.
 """
 from __future__ import annotations
 
@@ -50,10 +61,62 @@ class Step:
 def _steps() -> list[Step]:
     py = sys.executable
     return [
-        Step("1", "Assembly & mechanical", "Assemble Bittle X V2",
-            "Check servo calibration -- it ships calibrated; only fine-tune if "
-            "movement looks off once it's together."),
-        Step("2", "Assembly & mechanical", "Weigh the final build",
+        # --- Phase 0: bare Bittle X + BiBoard, no Pi in the loop ---
+        Step("1", "Assembly & mechanical (Phase 0)", "Assemble Bittle X V2",
+            "Match joints to the bootup posture in Petoi's unboxing diagram "
+            "BEFORE the first power-on (bittle-x.petoi.com/2-open-the-box), "
+            "not just whatever position they happen to sit in. Pre-assembled "
+            "units ship only COARSE-tuned per Petoi's own docs -- plan on "
+            "doing step 2's calibration pass, not skipping it. If a joint "
+            "feels stuck/weak despite a correct command, that's likely tight "
+            "new-gear protection kicking in, not a fault -- rotate it by "
+            "hand with moderate resistance first. Route the neck cable "
+            "knee-side to shoulder-side to avoid pinching. Full research: "
+            "docs/hardware/calibration-and-bringup-research.md."),
+        Step("2", "Assembly & mechanical (Phase 0)", "Range-of-motion pass + firmware calibration",
+            "ON THE STAND, BEFORE it touches the ground -- and stay there "
+            "through step 13a (see the rule at the top of this list): a full "
+            "range-of-motion pass by hand (watch for binding / leg-on-leg "
+            "collision), then firmware calibration (bare `c` per Petoi's "
+            "docs, not `c16` -- verify the real token once serial is up). "
+            "If serial/app access isn't working yet, calibration mode can "
+            "also be entered by powering on with the robot tilted one side "
+            "up (auto-trigger on 2022+ units, which covers Bittle X V2). "
+            "NOTE: this tool refuses calibration commands by design "
+            "(opencat.is_safe blocks the 'c'/'cd' prefixes) -- send it "
+            "through Petoi's own app or a raw serial terminal, not through "
+            "check_serial. Once joints move safely by hand, step 3's "
+            "`firstmove` walks a guided one-joint-at-a-time check + a single "
+            "confirmed step, before anything free-runs. Detailed steps: "
+            "docs/guides/gait-deployment.md step 6."),
+        Step("3a", "Serial link (Phase 0, BiBoard USB, no Pi)", "Find the serial port",
+            "STILL ON THE STAND, no Pi wired -- talk to BiBoard over its own "
+            "USB port. List ports, then TEMPORARILY set G2_SERIAL_PORT in "
+            ".env to that port (you'll point it back at the Pi in step 6).",
+            cmd=[py, "-m", "pi_pipeline.link.check_serial", "ports"]),
+        Step("3b", "Serial link (Phase 0, BiBoard USB, no Pi)", "First movement: balance, then the skill set",
+            "Only after step 2's calibration is clean -- these commands are "
+            "shown, not auto-run:\n"
+            "  python -m pi_pipeline.link.check_serial firstmove\n"
+            "  python -m pi_pipeline.link.check_serial send kbalance\n"
+            "  python -m pi_pipeline.link.check_serial skills",
+            manual_cmd="python -m pi_pipeline.link.check_serial firstmove"),
+        Step("3c", "Serial link (Phase 0, BiBoard USB, no Pi)", "Full movement sweep -- every known move, ON THE STAND",
+            "Cycles EVERY move G2 knows (voice skills + the autonomous-behaviour "
+            "gestures + sleep + carpet gait + the recovery/get-up keyframes, "
+            "which nothing else exercises), reading back battery voltage after "
+            "each one and logging it to the diag session. This is the actual "
+            "'base hardware ruled out' checkpoint -- note this session's ID "
+            "(~/g2_logs/<session_id>/) as the pre-Pi baseline to diff against "
+            "once step 8c re-runs this same sweep through the Pi. Confirms "
+            "separately before the recovery keyframes (they move the body "
+            "through its full range). Shown, not auto-run: "
+            "python -m pi_pipeline.link.check_serial allmoves\n"
+            "(In parallel, off-frame: bench dry-fit the Pi + PiSugar + clip "
+            "assembly independently -- docs/build/biboard-pi-connector.md.)",
+            manual_cmd="python -m pi_pipeline.link.check_serial allmoves"),
+        # --- Phase 1+: the Pi is now physically wired to the frame ---
+        Step("4", "Assembly & mechanical (Phase 1)", "Weigh the final build",
             "Weigh the whole build on a kitchen scale with the Pi + PiSugar S + "
             "camera + mount actually on it. Weigh the camera cluster and the "
             "PiSugar S battery SEPARATELY (the battery is more than half the "
@@ -62,93 +125,76 @@ def _steps() -> list[Step]:
             "~76 g estimate, update PAYLOAD_MASS_*/HEAD_MASS_* in "
             "opencat_gym_env.py and retrain or --finetune-lr "
             "(docs/rl/hardware-gated-backlog.md H2)."),
-        Step("3", "Assembly & mechanical", "Range-of-motion pass + firmware calibration",
-            "ON THE STAND, BEFORE it touches the ground -- and stay there "
-            "through step 12a (see the rule at the top of this list): a full "
-            "range-of-motion pass by hand (watch for binding / leg-on-leg "
-            "collision), then firmware `c16` auto joint calibration. "
-            "NOTE: this tool refuses calibration commands by design "
-            "(opencat.is_safe blocks the 'c'/'cd' prefixes) -- send c16 "
-            "through Petoi's own app or a raw serial terminal, not through "
-            "check_serial. Once joints move safely by hand, "
-            "`python -m pi_pipeline.link.check_serial firstmove` walks a "
-            "guided one-joint-at-a-time check + a single confirmed step, "
-            "before anything free-runs. Detailed steps: "
-            "docs/guides/gait-deployment.md step 6."),
-        Step("4", "Assembly & mechanical", "Wire Pi <-> BiBoard",
+        Step("5", "Assembly & mechanical (Phase 1)", "Wire Pi <-> BiBoard",
             "Data-only: RX/TX/GND (crossed), GND-GND. Leave the Pi's 5V pin "
             "unconnected -- PiSugar S is the sole power source. Confirm the "
             "back cover still fits. Connectors: docs/guides/pi-bring-up.md #0."),
-        Step("5", "Serial link", "Find the serial port",
-            "List ports, then set G2_SERIAL_PORT in .env (likely /dev/ttyS0 -> "
-            "/dev/ttyAMA0 after disable-bt).",
+        Step("6", "Serial link (Phase 5, via Pi)", "Find the serial port",
+            "List ports, then set G2_SERIAL_PORT in .env BACK to the Pi's port "
+            "(likely /dev/ttyS0 -> /dev/ttyAMA0 after disable-bt).",
             cmd=[py, "-m", "pi_pipeline.link.check_serial", "ports"]),
-        Step("6", "Serial link", "Enable Serial-2 on the BiBoard",
+        Step("7", "Serial link (Phase 5, via Pi)", "Enable Serial-2 on the BiBoard",
             "Send `XS` (or edit OpenCat.h + reflash) so the board talks to the "
             "Pi over UART2. This can change which connection carries the "
             "reply, so it's shown here rather than auto-run: "
             "python -m pi_pipeline.link.check_serial send XS",
             manual_cmd="python -m pi_pipeline.link.check_serial send XS"),
-        Step("7", "Serial link", "Confirm the board responds",
+        Step("8a", "Serial link (Phase 5, via Pi)", "Confirm the board responds",
             "A passive handshake first (safe, nothing moves):",
             cmd=[py, "-m", "pi_pipeline.doctor", "--serial"]),
-        Step("7b", "Serial link", "First movement: balance, then the skill set",
-            "ON THE STAND. Only after step 3's calibration is clean -- these "
-            "commands are shown, not auto-run:\n"
+        Step("8b", "Serial link (Phase 5, via Pi)", "First movement: balance, then the skill set -- again, now through the Pi",
+            "ON THE STAND. Same commands as step 3b, now routed through the "
+            "Pi instead of BiBoard's own USB -- shown, not auto-run:\n"
             "  python -m pi_pipeline.link.check_serial firstmove\n"
             "  python -m pi_pipeline.link.check_serial send kbalance\n"
             "  python -m pi_pipeline.link.check_serial skills",
             manual_cmd="python -m pi_pipeline.link.check_serial firstmove"),
-        Step("7c", "Serial link", "Full movement sweep -- every known move, ON THE STAND",
-            "Cycles EVERY move G2 knows (voice skills + the autonomous-behaviour "
-            "gestures + sleep + carpet gait + the recovery/get-up keyframes, "
-            "which nothing else exercises), reading back battery voltage after "
-            "each one and logging it to the diag session -- a good pass to run "
-            "now, while it's supported: a per-move voltage log after the fact "
-            "can point at a joint or sequence worth a closer look before it "
-            "matters on the floor. Confirms separately before the recovery "
-            "keyframes (they move the body through its full range). Shown, "
-            "not auto-run: python -m pi_pipeline.link.check_serial allmoves",
+        Step("8c", "Serial link (Phase 5, via Pi)", "Full movement sweep -- again, now through the Pi",
+            "Same command as step 3c, now through the Pi's wiring -- diff "
+            "this session's events.jsonl against the Phase 0 (step 3c) "
+            "baseline for a voltage/latency delta from adding the Pi + "
+            "PiSugar stack. Shown, not auto-run: "
+            "python -m pi_pipeline.link.check_serial allmoves",
             manual_cmd="python -m pi_pipeline.link.check_serial allmoves"),
-        Step("8", "Voice", "Claude + memory end-to-end",
+        Step("9", "Voice (Phase 7, still on the stand)", "Claude + memory end-to-end",
             "Text mode first -- the API key is already set.",
             cmd=[py, "-m", "pi_pipeline.voice", "--mode", "text"]),
-        Step("9", "Voice", "Audio on the Pi's mic/speaker",
+        Step("10", "Voice (Phase 7, still on the stand)", "Audio on the Pi's mic/speaker",
             "Tune G2_WAKE_WORD / G2_STT_SILENCE_S against the real mic, then "
             "try the full loop: "
             "python -m pi_pipeline.voice --mode voice --actuator serial"),
-        Step("10", "Voice", "Benchmark the voice stack on the real Pi",
+        Step("11", "Voice (Phase 7, still on the stand)", "Benchmark the voice stack on the real Pi",
             "Confirms en_US-ryan-low + Vosk hit real-time on 512 MB. If "
             "sluggish: shorter CLAUDE_MAX_TOKENS, streaming TTS, a longer "
             "'thinking' cue.",
             cmd=[py, "-m", "pi_pipeline.benchmark_pi"]),
-        Step("11", "RL sim-to-real", "Real-time joint control bench",
+        Step("12", "RL sim-to-real (Phase 6, still on the stand)", "Real-time joint control bench",
             "Sim bench was 0.43 ms/step -- confirm on the real Pi. Shown, not "
             "auto-run (drives real servos): "
             "python pi_pipeline/gait/bench_real.py",
             manual_cmd="python pi_pipeline/gait/bench_real.py"),
-        Step("12a", "RL sim-to-real", "IMU probe + servo-sign check -- STILL ON THE STAND",
+        Step("13a", "RL sim-to-real (Phase 6)", "IMU probe + servo-sign check -- STILL ON THE STAND",
             "This is the last stand-only step. run_gait.py --probe-imu "
             "confirms the real IMU format (genuinely unknown until now); "
             "--openloop then verifies each servo's sign against "
-            "deploy_map.py's SERVO_SIGN. Do NOT move to the floor (step 12b) "
+            "deploy_map.py's SERVO_SIGN. Do NOT move to the floor (step 13b) "
             "until --openloop looks right -- a flipped sign needs to be caught "
             "here, not mid-walk. Shown, not auto-run: "
             "python pi_pipeline/gait/run_gait.py --probe-imu",
             manual_cmd="python pi_pipeline/gait/run_gait.py --probe-imu"),
-        Step("12b", "RL sim-to-real", "The H1 head-to-head -- FIRST TIME ON THE FLOOR",
-            "Only after 12a's --openloop confirms correct servo signs. "
+        Step("13b", "RL sim-to-real (Phase 6)", "The H1 head-to-head -- FIRST TIME ON THE FLOOR",
+            "Only after 13a's --openloop confirms correct servo signs. "
             "--cmd (the learned gait) -> the H1 head-to-head vs firmware "
             "kwkF. Methodology + decision rule: docs/rl/h1-rubric.md; "
             "h1_score.py produces the verdict. Keep the emergency stop within "
             "reach (--halt, or say 'emergency stop') for the whole thing. "
             "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1",
             manual_cmd="python pi_pipeline/gait/run_gait.py --cmd 0.1"),
-        Step("13", "Vision on the robot", "Mount the camera, train the edge classifier",
+        Step("14", "Vision on the robot (Phase 8)", "Mount the camera, train the edge classifier",
             "Train the desk-edge classifier on the real mounted POV (B16 -- "
             "highest priority), wire Avoider decisions to the actuator, build "
             "the CliffGuard reflex against the trained classifier."),
-        Step("14", "Integration", "Voice + vision + memory concurrently",
+        Step("15", "Integration (Phase 10)", "Voice + vision + memory concurrently",
             "Historically the messiest phase -- budget real time for timing/"
             "resource conflicts. Then revisit locomotion with perception in "
             "the loop toward the Phase 8 target capability."),
@@ -186,10 +232,10 @@ def _print_step(step: Step, *, done: bool) -> None:
 
 
 _STAND_RULE = (
-    "\n*** STAY ON THE CALIBRATION STAND THROUGH STEP 12a. ***\n"
+    "\n*** STAY ON THE CALIBRATION STAND THROUGH STEP 13a. ***\n"
     "Servo sign, the real IMU format, and payload weight are all unknown until\n"
     "now -- on the stand, getting one wrong is a flailing leg, not a fall. The\n"
-    "floor is earned once 12a's --openloop confirms the servo signs (12b).\n"
+    "floor is earned once 13a's --openloop confirms the servo signs (13b).\n"
 )
 
 
@@ -197,11 +243,11 @@ def _run_interactive(steps: list, done: set) -> None:
     print(_STAND_RULE)
     for step in steps:
         _print_step(step, done=step.id in done)
-        if step.id == "12b":
-            confirm = input("\n  This is the FIRST FLOOR TEST. Did step 12a's "
+        if step.id == "13b":
+            confirm = input("\n  This is the FIRST FLOOR TEST. Did step 13a's "
                            "--openloop look correct? [y/N] ").strip().lower()
             if confirm != "y":
-                print("  Stopping here -- go back to step 12a first.")
+                print("  Stopping here -- go back to step 13a first.")
                 _save_progress(done)
                 return
         while True:
