@@ -13,6 +13,26 @@ progresses. Behavior ideas to pick from live in
 [`docs/behavior-ideas.md`](behavior-ideas.md) — the reference list for "what
 should we work on next."
 
+> **⚠️ CURRENT TOP PRIORITY (2026-09-20): the real-time control loop's
+> feedback rate is 16x slower than it was designed for — resolve before H1
+> is meaningful.** Found while re-tracing `OpenCatEsp32` firmware source to
+> fix the IMU serial protocol: the function that actually streams
+> orientation (`imu.h` `print6Axis()`) has a hard internal throttle,
+> `PRINT6AXIS_MIN_INTERVAL = 200` ms — a firmware-level 5 Hz ceiling,
+> independent of anything on the Python side. `run_gait.py`'s control loop
+> runs at `CONTROL_HZ = 80` (12.5 ms/tick), so for ~15 of every 16 ticks the
+> policy would run on a stale, held orientation reading, not fresh
+> proprioception. Separately (smaller but related): that stream carries
+> acceleration, not gyro/angular-velocity, which `ResidualGaitPolicy` also
+> needs and doesn't have. Neither is fixed yet — both are flagged, not
+> decided. Full technical detail:
+> [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md)'s
+> "Confirmed serial line format" section. **Pick this up first in the next
+> session, before any other bring-up or gait work** — it changes whether
+> the trained policy is even meaningfully testable on real hardware as
+> currently architected, so it should be resolved (or at least a decision
+> made) before H1 (step 13b) is treated as a real signal.
+
 ---
 
 ## Parts list (finalized — $567)
