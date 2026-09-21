@@ -9,8 +9,13 @@ behaviour driver reads each tick:
   person_present-- a person/face label in the latest detection frame
 
 The IMU thresholds are FIRST-CUT and HARDWARE-GATED -- tune once the real DMP
-stream is in front of us (`run_gait.py --probe-imu` shows the format;
-`parse_imu_line` is shared with the gait loop).
+stream is in front of us (`run_gait.py --probe-imu` shows the format).
+`parse_imu_line` is imported from `gait/imu_parse.py`, shared with the gait
+loop -- until 2026-09-20 this module had its own separate, unfixed copy that
+had quietly drifted out of sync (see that module's docstring for what was
+wrong and how it fails: NOT loudly -- an unparseable line just falls through
+to `_ingest_imu`'s "no data -> assume level and stable" default below,
+forever, since `_last_imu_at` never advances either).
 """
 from __future__ import annotations
 
@@ -19,40 +24,9 @@ import math
 import time
 from dataclasses import dataclass
 
+from ..gait.imu_parse import parse_imu_line
+
 log = logging.getLogger("g2.app.sensors")
-
-
-def parse_imu_line(line: str, fmt: str = "auto", deg_in: bool = True):
-    """(roll, pitch, yaw [rad], gx, gy, gz [rad/s]) or None if not an IMU frame.
-
-    Kept in sync with `gait/run_gait.py`'s copy (that module is script-style and
-    not cleanly importable). Handles the common OpenCat `print6Axis` shapes:
-      "ypr <yaw> <pitch> <roll>" | "<y> <p> <r> <gx> <gy> <gz>" | 3-num r/p/y.
-    """
-    s = line.strip().replace(",", " ")
-    if not s:
-        return None
-    toks = s.split()
-    try:
-        if toks and toks[0].lower() in ("ypr", "ang"):
-            yaw, pitch, roll = (float(x) for x in toks[1:4])
-            g = [0.0, 0.0, 0.0]
-        else:
-            nums = [float(x) for x in toks]
-            if len(nums) == 3:
-                yaw, pitch, roll = nums if fmt == "ypr" else (nums[2], nums[1], nums[0])
-                g = [0.0, 0.0, 0.0]
-            elif len(nums) >= 6:
-                if fmt == "6axis":                 # ax ay az gx gy gz -> no orientation
-                    return None
-                yaw, pitch, roll = nums[0:3]
-                g = nums[3:6]
-            else:
-                return None
-    except ValueError:
-        return None
-    k = math.pi / 180.0 if deg_in else 1.0
-    return (roll * k, pitch * k, yaw * k, g[0] * k, g[1] * k, g[2] * k)
 
 
 @dataclass

@@ -15,9 +15,18 @@ The output is a noisy estimate of *mean* forward speed -- which is exactly what
 CarpetDetector wants (it windows efficiency over ~2 s anyway).
 
 HARDWARE-GATED on two counts, both marked below:
-  1. the accel source -- `run_gait.parse_imu_line` currently returns orientation
-     + gyro only; body-X accel needs plumbing once the real IMU stream format is
-     confirmed (`--imu-format 6axis` carries ax/ay/az).
+  1. the accel source -- as of 2026-09-20 the real IMU line format IS
+     confirmed (`gait/imu_parse.py`), and it DOES carry body-frame ax/ay/az
+     (the same line print6Axis() also puts yaw/pitch/roll on) -- but
+     imu_parse.parse_imu_line() currently discards it (only orientation is
+     returned; see that module's docstring). Wiring accel through to this
+     estimator is real, bounded work now, not blocked on unknowns anymore.
+     Separately: that same source trace found the firmware throttles this
+     entire line to a hard 5Hz ceiling (`PRINT6AXIS_MIN_INTERVAL`), so this
+     estimator's `update()` would be integrating a held/stale accel value
+     across most control ticks too -- same constraint as the gait policy's
+     feedback loop, see the priority callout at the top of
+     docs/project-plan.md. Worth bearing in mind when this gets bench-tuned.
   2. the constants (`leak_hz`, `bias_lerp`, `min_cycle_s`) want bench tuning.
 """
 from __future__ import annotations
