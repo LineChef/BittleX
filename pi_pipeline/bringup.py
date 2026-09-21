@@ -174,8 +174,19 @@ def _steps() -> list[Step]:
             "python pi_pipeline/gait/bench_real.py",
             manual_cmd="python pi_pipeline/gait/bench_real.py"),
         Step("13a", "RL sim-to-real (Phase 6)", "IMU probe + servo-sign check -- STILL ON THE STAND",
-            "This is the last stand-only step. run_gait.py --probe-imu "
-            "confirms the real IMU format (genuinely unknown until now); "
+            "This is the last stand-only step. The line FORMAT is now known "
+            "from firmware source (MCU:/ICM: prefix, accel then negated "
+            "yaw/pitch/roll -- parse_imu_line already updated) -- "
+            "--probe-imu here is now confirming two things still genuinely "
+            "unknown until real hardware: (1) which chip prefix this unit "
+            "actually sends (MCU vs ICM), and (2) the real yaw sign (parsed "
+            "as re-negated back to raw, unverified against an actual "
+            "rotation -- rotate the robot and confirm the sign looks right, "
+            "flip in parse_imu_line if backwards). Also a reminder: this "
+            "stream is ACCELERATION, not gyro -- residual_policy.py needs "
+            "real angular velocity, which stock firmware doesn't stream at "
+            "all (see parse_imu_line's docstring) -- that's a separate, "
+            "still-open decision, not something --probe-imu can resolve. "
             "--openloop then verifies each servo's sign against "
             "deploy_map.py's SERVO_SIGN. Do NOT move to the floor (step 13b) "
             "until --openloop looks right -- a flipped sign needs to be caught "

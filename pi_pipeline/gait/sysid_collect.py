@@ -1,5 +1,5 @@
 """Pi-side: run a fixed, policy-free calibration sequence on the real robot while
-logging the `V` IMU stream + every joint command. The log feeds
+logging the `gP` continuous 6-axis IMU stream + every joint command. The log feeds
 `rl_training/opencat-gym/sysid_replay.py`, which replays the same commands
 open-loop in the sim and measures the sim-to-real gap.
 
@@ -91,7 +91,7 @@ def main():
     t0 = time.perf_counter()
     try:
         _send(lk, "g"); time.sleep(0.2)          # firmware balance OFF -- we want raw response
-        _send(lk, "V"); time.sleep(0.2)          # IMU stream on
+        _send(lk, "gP"); time.sleep(0.2)         # continuous 6-axis print on (see run_gait.probe_imu)
 
         _send_pose(lk, STAND, "stand0")
         _stream_hold(lk, deploy_map.policy_deg_to_move_cmd(STAND), 2.0, args.hz, args.imu_format, logf, t0)
@@ -120,7 +120,7 @@ def main():
     except KeyboardInterrupt:
         print("\n^C")
     finally:
-        _send(lk, "V")          # stream off
+        _send(lk, "gp")         # stream off (lowercase C_PRINT_OFF, not a toggle)
         _send(lk, "d")          # rest
         logf.close()
         lk.close()

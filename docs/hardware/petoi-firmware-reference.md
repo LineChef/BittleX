@@ -1,8 +1,10 @@
 # Petoi / OpenCat firmware reference
 
-Confirmed from `PetoiCamp/OpenCatEsp32` source (2026-09-07), the BiBoard/ESP32
-firmware that runs on G2 (Bittle X). Captured so the knowledge isn't lost between
-sessions. Verify against the repo if firmware has moved on.
+Confirmed from `PetoiCamp/OpenCatEsp32` source (2026-09-07, IMU serial
+protocol + line format re-verified against `main` again 2026-09-20), the
+BiBoard/ESP32 firmware that runs on G2 (Bittle X). Captured so the
+knowledge isn't lost between sessions. Verify against the repo if firmware
+has moved on.
 
 ## Repositories
 
@@ -36,26 +38,72 @@ Newline-terminated ASCII over UART. Confirmed set:
 | `j` / `j <idx>` | `T_JOINTS` | **return all joint angles / one joint** |
 | `f` | `T_SERVO_FEEDBACK` | servo position feedback (if the servo chip supports it) |
 | `g` | `T_GYRO` | gyro function toggle (bare `g`) |
-| `gU` | `C_GYRO_UPDATE` | force a gyro data update |
-| `gB` | `C_GYRO_BALANCE` | turn on gyro balancing |
+| `gU` / `gu` | `C_GYRO_UPDATE` / `_OFF` | continuous gyro data update on/off (already **on by default from boot** — `updateGyroQ = true` is set during IMU init, so `gU` is rarely needed just to get data flowing) |
+| `gB` / `gb` | `C_GYRO_BALANCE` / `_OFF` | turn gyro balancing on/off |
 | `gc` | `C_GYRO_CALIBRATE` | calibrate the IMU |
+| `gP` | `C_PRINT` (in the `g`-context) | **start CONTINUOUS 6-axis print** — sets `printGyroQ = true`, which is what actually makes `readEnvironment()` call `print6Axis()` every loop |
+| `gp` | `C_PRINT_OFF` | stop it — **NOT symmetric with `gP`**, this is "print once then stop", not a toggle; sending `gP` twice does not turn it off |
 | `p` | `T_PAUSE` | pause |
 | `t` | `T_TILT` | tilt command |
 | `c` / `cd` | calibration / factory | **never send from the pipeline** |
 
-`v` / `V` are **not** an IMU-print token (earlier guess in `pi_pipeline/link/opencat.py`
-was wrong — likely firmware version). To read orientation: `gU` then read, or rely
-on the exception stream.
+**CONFIRMED 2026-09-20, corrects the previous entry here:** `v`/`V` are still
+not a real token at all (grepped current `main` source directly — no match
+anywhere in the command parser), and `pi_pipeline/gait/run_gait.py` /
+`sysid_collect.py` were both sending it until this date, which would have
+been silently ignored by the board and produced *zero* streamed IMU data —
+`--probe-imu` would have hit a dead loop-timeout at first real bring-up.
+Fixed in both files to send `gP`/`gp` instead, matching the actual
+`T_GYRO`+`C_PRINT` mechanism traced above. `python -m pi_pipeline.gait.run_gait
+--probe-imu` still needs to run against the real board to confirm this against
+actual hardware (nothing above has touched a real BiBoard) — that's step 13a
+of the bring-up sequence.
 
 ## IMU
 
-- **MPU6050, DMP quaternion fusion** (no hand-tuned complementary filter).
+- BiBoard V1 compiles support for **both MPU6050 and ICM42670** and picks
+  whichever chip is physically present at runtime (`OpenCat.h` defines both
+  `IMU_MPU6050` and `IMU_ICM42670` for `BiBoard_V1_0`) — don't assume MPU6050
+  without checking which prefix (`MCU:` vs `ICM:`) the real board actually
+  sends (see the confirmed line format below).
+- DMP quaternion fusion (no hand-tuned complementary filter).
 - `IMU_PERIOD 5` ms → **200 Hz** sample loop. `IMU_SKIP 1`, `IMU_SKIP_MORE 23`
   for frame-skip during motion.
 - Orientation as YPR (yaw/pitch/roll ≈ body z/y/x).
 - Balance hooks: `RollPitchDeviation[2]`, `balanceSlope[2] = {1, 1}`, `gyroBalanceQ`.
   Exact balance `KP/KI/KD` gains not yet pulled — TODO if the deployment balance
   loop needs matching.
+
+### Confirmed serial line format (`imu.h` `print6Axis()`, 2026-09-20)
+
+The function actually wired into the main loop (via `readEnvironment()`) —
+**not** the similarly-named but dead `print6AxisMacro()`, which is unused
+and would have been the wrong thing to match against:
+
+```
+MCU:<ax><ay><az><yaw><pitch><roll>      # MPU6050
+ICM:<ax><ay><az><yaw><pitch><roll>      # ICM42670
+```
+
+`snprintf(..., "MCU:%6.2f%6.2f%6.2f%7.1f%7.1f%7.1f", ax, ay, az, -yaw, pitch, roll)`
+— fixed-width, no explicit delimiter (padding makes it whitespace-safe in
+practice), accel in g, angles in degrees, **yaw printed negated**.
+`PRINT_ACCELERATION` is unconditionally defined in current firmware, so the
+accel triplet is always present — there is no gyro-only variant.
+
+**Open gap, not yet resolved:** this line carries acceleration, not
+angular velocity. The firmware's raw-gyro print path exists in source but
+is dead code (commented out in `print6AxisMacro()`, which isn't even
+called) — no true gyro/angular-rate is available over stock-firmware
+serial at all. `pi_pipeline/gait/residual_policy.py`'s `ResidualGaitPolicy`
+needs real roll/pitch angular velocity as an observation input, which this
+stream cannot supply. `parse_imu_line()` in `run_gait.py` deliberately
+returns zero rather than smuggling accel into the gyro slot. Needs a real
+decision before the policy loop is trustworthy on hardware: finite-differencing
+consecutive `ypr` samples in the Python control loop (the policy's own
+training observations already rely on a finite-diff angular-accel channel,
+so there's precedent), or revisiting the no-firmware-fork decision
+(`docs/project-plan.md`, 2026-09-10) for just a gyro-print re-enable.
 
 ### Exception detection (`imu.h` `getImuException()`)
 

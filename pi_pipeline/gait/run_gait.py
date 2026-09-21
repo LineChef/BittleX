@@ -12,9 +12,13 @@ Pipeline per tick (~80 Hz):
     "m8 <d> 12 <d> ..."  = deploy_map.policy_deg_to_move_cmd(joint_deg_urdf)
     serial.send(cmd)
 
-The BiBoard streams 6-axis IMU after the `V` token. The exact line format
-differs by firmware build -- run --probe-imu first and, if it doesn't match
-`parse_imu_line` below, adjust that one function (or pass --imu-format).
+The BiBoard streams 6-axis IMU after the `gP` command (T_GYRO 'g' +
+C_PRINT 'P' -- NOT the bare 'V' this code sent before 2026-09-20; that
+token doesn't exist in current firmware source at all). Line format is now
+confirmed from source (see parse_imu_line's docstring) but the gyro slot
+it returns is a placeholder zero -- the real stream carries acceleration,
+not angular velocity; run --probe-imu at bring-up to confirm the chip
+prefix (MCU/ICM) and yaw sign on the real unit before trusting this loop.
 
 SAFETY: on any of {IMU parse failures piling up, Ctrl-C, loop overrun}, the loop
 sends `d` (rest, servos relaxed) and exits. deploy_map clamps every command to
@@ -96,15 +100,62 @@ def parse_imu_line(line, fmt="auto", deg_in=True):
     """Return (roll, pitch, yaw [rad], gx, gy, gz [rad/s]) or None if this line
     isn't an IMU frame.
 
-    Handles the common OpenCat `print6Axis` shapes:
+    CONFIRMED against `PetoiCamp/OpenCatEsp32` src (`src/imu.h` `print6Axis()`,
+    called from `readEnvironment()` on every loop() while `printGyroQ` is on,
+    i.e. after sending `gP` -- see `T_GYRO`/`C_PRINT` in `src/OpenCat.h`)
+    2026-09-20 -- the real, currently-shipping line shape is:
+
+        MCU:<ax><ay><az><yaw><pitch><roll>      (MPU6050 chip)
+        ICM:<ax><ay><az><yaw><pitch><roll>      (ICM42670 chip)
+
+    fixed-width (`%6.2f` for accel in g, `%7.1f` for angles in degrees),
+    no explicit delimiter -- BiBoard V1 compiles support for BOTH chips and
+    picks whichever is physically present at runtime, so either prefix is
+    valid. `PRINT_ACCELERATION` is unconditionally defined in current
+    firmware, so the accel triplet is always present. yaw is printed
+    negated (`-mpu.ypr[0]` / `-icm.ypr[0]`) -- sign re-negated back to raw
+    here; NOT yet empirically confirmed against a real board (do one
+    physical rotation check at bring-up step 13a and flip if backwards).
+
+    IMPORTANT GAP (found during this same research pass, not yet resolved):
+    this line carries ACCELERATION, not GYRO/angular-velocity -- the
+    firmware's raw-gyro print path is dead code (commented out in
+    `imu.h`), so no true angular-rate is available over serial at all under
+    stock firmware. `ResidualGaitPolicy` needs real roll/pitch angular
+    velocity (see `gait/residual_policy.py`) -- this stream cannot supply
+    it. Deliberately NOT smuggled into the gyro return slot below (that
+    would silently feed the wrong physical quantity, in the wrong units,
+    to the policy as if it were angular rate -- worse than returning
+    nothing) -- the gyro slot returns zero here, same convention already
+    used elsewhere in this function when no true gyro is available. Needs
+    a real fix before this stream is trustworthy for the policy loop: e.g.
+    finite-differencing consecutive `ypr` samples in this control loop (the
+    policy's own training obs already relies on a finite-diff angular-accel
+    channel, so precedent exists), or revisiting the no-firmware-fork
+    stance for just a gyro-print re-enable. Flagged, not fixed here --
+    needs a decision, not a guess.
+
+    Older/fallback shapes kept for robustness in case a different firmware
+    build is ever in play:
       - "ypr <yaw> <pitch> <roll>"                (DMP, degrees)
-      - "<ax> <ay> <az> <gx> <gy> <gz>"           (raw 6-axis)
+      - "<ax> <ay> <az> <gx> <gy> <gz>"           (raw 6-axis, true gyro)
       - "<yaw> <pitch> <roll> <gx> <gy> <gz>"     (ypr + gyro, if enabled)
-    Adjust here once --probe-imu shows the real format.
     """
     s = line.strip().replace(",", " ")
     if not s:
         return None
+    k = math.pi / 180.0 if deg_in else 1.0
+    for prefix in ("MCU:", "ICM:"):
+        if s.startswith(prefix):
+            try:
+                nums = [float(x) for x in s[len(prefix):].split()]
+            except ValueError:
+                return None
+            if len(nums) != 6:
+                return None
+            _ax, _ay, _az, neg_yaw, pitch, roll = nums  # accel not used -- see docstring gap
+            yaw = -neg_yaw
+            return (roll * k, pitch * k, yaw * k, 0.0, 0.0, 0.0)
     toks = s.split()
     try:
         if toks and toks[0].lower() in ("ypr", "ang"):
@@ -128,7 +179,6 @@ def parse_imu_line(line, fmt="auto", deg_in=True):
                 return None
     except ValueError:
         return None
-    k = math.pi / 180.0 if deg_in else 1.0
     return (roll * k, pitch * k, yaw * k, g[0] * k, g[1] * k, g[2] * k)
 
 
@@ -145,15 +195,23 @@ def _open_link(port, baud):
 
 
 def probe_imu(lk, seconds):
-    print("sending 'V' (toggle IMU stream); printing raw lines for", seconds, "s")
-    _send(lk, "V")
+    # CONFIRMED from firmware source (src/OpenCat.h, src/reaction.h) 2026-09-20:
+    # 'V' is not a real token at all (grepped the current source, doesn't exist
+    # anywhere in the command parser -- would just be silently ignored). The
+    # actual continuous-6-axis-print trigger is T_GYRO ('g') + C_PRINT ('P'),
+    # i.e. the two-character command "gP" -- updateGyroQ is already true from
+    # boot, so "gU" isn't needed just to get the stream moving. Turning it back
+    # off is NOT symmetric: send "gp" (lowercase C_PRINT_OFF), not "gP" again --
+    # 'P' vs 'p' selects continuous-vs-once, it isn't a toggle.
+    print("sending 'gP' (start continuous 6-axis print); printing raw lines for", seconds, "s")
+    _send(lk, "gP")
     t0 = time.time()
     while time.time() - t0 < seconds:
         line = lk.read_line()
         if line:
             print(repr(line))
-    _send(lk, "V")
-    print("stream toggled off. Match parse_imu_line() to the format above.")
+    _send(lk, "gp")
+    print("stream stopped ('gp'). Match parse_imu_line() to the format above.")
 
 
 def openloop(lk, cycles, hz):
@@ -392,7 +450,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
     time.sleep(1.0)
 
-    _send(lk, "V")                # start IMU stream
+    _send(lk, "gP")                # start continuous 6-axis stream (see probe_imu's note)
     time.sleep(0.2)
 
     # prime: read one good IMU frame for the reset
@@ -568,7 +626,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     finally:
         if wd is not None:
             wd.stop()
-        _send(lk, "V")     # stream off
+        _send(lk, "gp")    # stream off (lowercase C_PRINT_OFF, not a toggle)
         _send(lk, "d")     # rest
         if vision is not None:
             vision.close()
