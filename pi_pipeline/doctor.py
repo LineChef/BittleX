@@ -70,13 +70,16 @@ def _check_models(s) -> list:
     ok_piper = os.path.isfile(piper) and os.path.isfile(piper + ".json")
     out.append(_r("Piper voice", OK if ok_piper else WARN,
                   piper if ok_piper else f"{piper}(.json) missing (voice mode only)"))
-    onnx = "rl_training/opencat-gym/trained/run20m_ppo.onnx"
-    for cand in (onnx, "models/gait/run20m_ppo.onnx"):
-        if os.path.isfile(cand):
-            out.append(_r("Gait policy ONNX", OK, cand))
-            break
+    from .gait.residual_policy import DEFAULT_POLICY, default_policy_path, residual_scale_for
+    onnx = default_policy_path()
+    if os.path.isfile(onnx):
+        side = os.path.isfile(onnx + ".json")
+        scale = residual_scale_for(onnx)
+        out.append(_r("Gait policy ONNX", OK if side else WARN,
+                      f"{onnx} (residual scale {scale:g} deg"
+                      + (")" if side else " -- NO .onnx.json sidecar, legacy default; rsync it with the .onnx)")))
     else:
-        out.append(_r("Gait policy ONNX", WARN, "not found (export before the H1 run)"))
+        out.append(_r("Gait policy ONNX", WARN, f"{DEFAULT_POLICY} not found (export before the H1 run)"))
     return out
 
 

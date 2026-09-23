@@ -28,6 +28,8 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "pi_pipeline", "gait"))
 sys.path.insert(0, HERE)
 os.chdir(HERE)          # opencat_gym_env loads its URDF by relative path
 
+import residual_policy  # noqa: E402
+
 
 def run_one(cmd_fwd, steps, onnx_path, wkf_path, verbose=False):
     import opencat_gym_env as E
@@ -103,6 +105,11 @@ def main():
     ap.add_argument("--cmd", type=float, default=None)
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
+    # Pin the env's residual scale to the one this ONNX declares (sidecar), before
+    # run_one() imports the env -- the module default follows the current training
+    # campaign, which need not be this policy's.
+    os.environ["G2E_RESIDUAL_SCALE_DEG"] = f"{residual_policy.residual_scale_for(args.onnx):g}"
+    print(f"residual scale: {os.environ['G2E_RESIDUAL_SCALE_DEG']} deg ({args.onnx})")
 
     cmds = [args.cmd] if args.cmd is not None else [0.0, 0.04, 0.10, 0.14, -0.06]
     print(f"{'cmd':>6} {'n':>4} {'obs0_err':>10} {'obs_max':>10} {'obs_mean':>10} "

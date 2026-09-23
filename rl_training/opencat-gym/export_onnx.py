@@ -48,6 +48,10 @@ def main():
     ap.add_argument("--model", default="trained/run20m_ppo")
     ap.add_argument("--out", default=None, help="default: <model>.onnx")
     ap.add_argument("--opset", type=int, default=13)
+    ap.add_argument("--residual-scale-deg", type=float, default=None,
+                    help="scale the policy was TRAINED with, written to the <out>.json sidecar the Pi "
+                         "reads (default: opencat_gym_env.RESIDUAL_SCALE_DEG, which honours "
+                         "G2E_RESIDUAL_SCALE_DEG -- set that for a checkpoint trained at another scale)")
     args = ap.parse_args()
     out = args.out or (args.model + ".onnx")
 
@@ -89,6 +93,19 @@ def main():
     except Exception as e:  # noqa: BLE001
         print(f"onnx.checker warning: {e}")
     print(f"wrote {out}  ({os.path.getsize(out)/1024:.0f} KB)")
+
+    # Sidecar: the residual scale the Pi must apply this policy's actions at
+    # (pi_pipeline/gait/residual_policy.py residual_scale_for). Ships with the .onnx.
+    import datetime
+    import json
+    scale = args.residual_scale_deg
+    if scale is None:
+        import opencat_gym_env
+        scale = float(opencat_gym_env.RESIDUAL_SCALE_DEG)
+    with open(out + ".json", "w") as f:
+        json.dump({"residual_scale_deg": scale, "checkpoint": os.path.basename(args.model),
+                   "exported": datetime.date.today().isoformat()}, f, indent=1)
+    print(f"wrote {out}.json  (residual_scale_deg={scale:g})")
 
 
 if __name__ == "__main__":

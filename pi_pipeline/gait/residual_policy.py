@@ -53,7 +53,11 @@ CMD_FWD_MAX = 0.15
 CMD_FWD_MIN = -0.10
 CMD_YAW_MAX = 0.45
 BOUND_ANG_RAD = np.deg2rad(110)
-RESIDUAL_SCALE_DEG = 22
+RESIDUAL_SCALE_DEG = 22          # LEGACY default: run20m_ppo's scale. Newer policies declare their
+                                 # own in a sidecar `<policy>.onnx.json` (export_onnx.py writes it);
+                                 # see residual_scale_for(). A mismatch silently applies every
+                                 # correction at the wrong size.
+DEFAULT_POLICY = "run20m_ppo.onnx"   # the deployed policy; promoting a new one changes this line
 STAND_FWD_THRESH = 0.025
 ANG_FACTOR = 0.10
 LEN_JOINT_HISTORY = 30
@@ -82,20 +86,38 @@ def proj_gravity_body(q):
     ])
 
 
+def default_policy_path():
+    """The deployed policy: pi_pipeline/gait/<DEFAULT_POLICY> on the Pi (rsync'd there),
+    else rl_training/opencat-gym/trained/<DEFAULT_POLICY> on the dev machine."""
+    train = os.path.normpath(os.path.join(
+        _HERE, "..", "..", "rl_training", "opencat-gym", "trained", DEFAULT_POLICY))
+    return next((p for p in (os.path.join(_HERE, DEFAULT_POLICY), train) if os.path.exists(p)),
+                os.path.join(_HERE, DEFAULT_POLICY))
+
+
+def residual_scale_for(onnx_path):
+    """Residual scale (deg) the policy was trained with: from its sidecar
+    `<onnx_path>.json` ("residual_scale_deg"), else the legacy RESIDUAL_SCALE_DEG."""
+    import json
+    side = str(onnx_path) + ".json"
+    if os.path.exists(side):
+        with open(side) as f:
+            return float(json.load(f)["residual_scale_deg"])
+    return float(RESIDUAL_SCALE_DEG)
+
+
 class ResidualGaitPolicy:
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort
         self.CONTROL_HZ = CONTROL_HZ
-        _train = os.path.normpath(os.path.join(
-            _HERE, "..", "..", "rl_training", "opencat-gym", "trained", "run20m_ppo.onnx"))
-        onnx_path = onnx_path or next(
-            (p for p in (os.path.join(_HERE, "run20m_ppo.onnx"), _train) if os.path.exists(p)),
-            os.path.join(_HERE, "run20m_ppo.onnx"))
+        onnx_path = onnx_path or default_policy_path()
         wkf_path = wkf_path or os.path.join(_HERE, "wkf_ref.npy")
         if not os.path.exists(onnx_path):
             raise FileNotFoundError(
-                f"run20m_ppo.onnx not found (looked in pi_pipeline/gait/ and "
+                f"{os.path.basename(onnx_path)} not found (looked in pi_pipeline/gait/ and "
                 f"rl_training/opencat-gym/trained/). Run export_onnx.py, or pass onnx_path=")
+        self.onnx_path = onnx_path
+        self.residual_scale_deg = residual_scale_for(onnx_path)
         so = ort.SessionOptions()
         so.intra_op_num_threads = int(intra_op_threads)
         self._sess = ort.InferenceSession(onnx_path, so, providers=["CPUExecutionProvider"])
@@ -156,7 +178,7 @@ class ResidualGaitPolicy:
         self.last_action = action
         is_stand = abs(self._cmd_fwd) < STAND_FWD_THRESH
         ref = self.STAND_POSE if is_stand else self.WKF_REF[int(self._phase) % TIME_PHASE_PERIOD]
-        joint_rad = np.clip(ref + action * np.deg2rad(RESIDUAL_SCALE_DEG),
+        joint_rad = np.clip(ref + action * np.deg2rad(self.residual_scale_deg),
                             -BOUND_ANG_RAD, BOUND_ANG_RAD)
         joint_deg = np.rint(np.rad2deg(joint_rad)).astype(int)
         joint_rad_rounded = np.deg2rad(joint_deg.astype(np.float64))

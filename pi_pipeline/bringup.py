@@ -140,7 +140,12 @@ def _steps() -> list[Step]:
             "python -m pi_pipeline.link.check_serial send XS",
             manual_cmd="python -m pi_pipeline.link.check_serial send XS"),
         Step("8a", "Serial link (Phase 5, via Pi)", "Confirm the board responds",
-            "A passive handshake first (safe, nothing moves):",
+            "A passive handshake first (safe, nothing moves). Also note the "
+            "firmware version from the '?' banner: the gait's command-timing "
+            "model (rl_training/opencat-gym/firmware_model.py) and the 5 Hz "
+            "IMU throttle were traced from OpenCatEsp32 source as of "
+            "2026-09-08 -- an older build can differ, so compare before "
+            "trusting the sim's lag numbers:",
             cmd=[py, "-m", "pi_pipeline.doctor", "--serial"]),
         Step("8b", "Serial link (Phase 5, via Pi)", "First movement: balance, then the skill set -- again, now through the Pi",
             "ON THE STAND. Same commands as step 3b, now routed through the "
@@ -173,6 +178,15 @@ def _steps() -> list[Step]:
             "auto-run (drives real servos): "
             "python pi_pipeline/gait/bench_real.py",
             manual_cmd="python pi_pipeline/gait/bench_real.py"),
+        Step("12a", "RL sim-to-real (Phase 6, still on the stand)", "Deploy the release-candidate policy (+/-30 deg), with its sidecar",
+            "The residual scale travels with the policy: export_onnx.py writes "
+            "<policy>.onnx.json (residual_scale_deg) and residual_policy.py reads "
+            "it (legacy 22 only when no sidecar). Set DEFAULT_POLICY in "
+            "residual_policy.py, rsync the .onnx AND .onnx.json to the Pi together, "
+            "and confirm on the dev machine first: validate_deploy.py --onnx "
+            "<policy>.onnx must say ALL OK with 'residual scale: 30 deg'. Shown, not "
+            "auto-run: python rl_training/opencat-gym/validate_deploy.py --onnx <policy>.onnx",
+            manual_cmd="python rl_training/opencat-gym/validate_deploy.py --onnx <policy>.onnx"),
         Step("13a", "RL sim-to-real (Phase 6)", "IMU probe + servo-sign check -- STILL ON THE STAND",
             "This is the last stand-only step. The line FORMAT is now known "
             "from firmware source (MCU:/ICM: prefix, accel then negated "
@@ -182,11 +196,15 @@ def _steps() -> list[Step]:
             "actually sends (MCU vs ICM), and (2) the real yaw sign (parsed "
             "as re-negated back to raw, unverified against an actual "
             "rotation -- rotate the robot and confirm the sign looks right, "
-            "flip in parse_imu_line if backwards). Also a reminder: this "
-            "stream is ACCELERATION, not gyro -- residual_policy.py needs "
-            "real angular velocity, which stock firmware doesn't stream at "
-            "all (see parse_imu_line's docstring) -- that's a separate, "
-            "still-open decision, not something --probe-imu can resolve. "
+            "flip in parse_imu_line if backwards). Do the same for ROLL and "
+            "PITCH: tip the nose down by hand, then the left side down, and "
+            "confirm each reads the sign the sim uses (URDF frame, x forward, "
+            "y left, z up: nose-down is positive pitch, left-side-down is "
+            "negative roll). A flipped roll/pitch sign makes the policy "
+            "'correct' tilt the wrong way. --probe-imu also prints the "
+            "measured line rate: expect ~5 Hz (stock firmware's print "
+            "throttle). The stream has no gyro; run_gait feeds the policy "
+            "zero rate, which sim shows costs nothing (resilience_imu_rate.py). "
             "--openloop then verifies each servo's sign against "
             "deploy_map.py's SERVO_SIGN. Do NOT move to the floor (step 13b) "
             "until --openloop looks right -- a flipped sign needs to be caught "
