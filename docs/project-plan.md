@@ -42,6 +42,15 @@ should we work on next."
 >    prioritized by how much the conclusion depended on body tilt or falls.
 > 3. Re-baseline the deployed policy and the scripted walk on the corrected sim
 >    (started 2026-09-23; results in `docs/rl/hw1-log.md`).
+> 4. **Revisit full fall-recovery in sim at some point (not in scope for the
+>    current redesign).** Given how many sim details have turned out wrong
+>    since 2026-09-02, the H9 get-up replay's "0/2 recovered" result
+>    (`docs/rl/getup-sim-replay.md`) deserves a validated recheck before being
+>    treated as settled — it is NOT payload-bug-tainted (the script loads the
+>    bare URDF directly, no `OpenCatGymEnv`/payload involved), but it carries
+>    its own documented approximations (open-loop, no IMU-triggered waits, no
+>    gyro-balance layer, decoded keyframes). For all we know the real get-up
+>    commands do work; don't treat the old sim result as final.
 
 > **Current state of the gait (2026-09-23): the IMU-rate priority is resolved,
 > and a new gait trained under G2's real control path is the release candidate.**
