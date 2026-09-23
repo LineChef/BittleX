@@ -28,6 +28,34 @@ Does NOT catch: drop-offs (a foot finds *no* floor -- opposite signal, that's
 CliffGuard's job), soft obstacles, anything off to the side, anything not yet
 touched. Purely reactive -- fires after contact.
 
+Lag-tolerant comparison (2026-09-22). The servo is NOT expected to sit on the
+Pi's latest command: the firmware executes each `i` command as an eased move at
+~2 deg per 8 ms, reads the next command only when that finishes, and drops a
+backlog (oldest waiting command wins) -- in sim that's ~55 ms behind and ~9 deg
+off the latest command on a perfectly healthy leg
+(rl_training/opencat-gym/firmware_model.py, resilience_joint_cmd.py). Comparing
+against the latest command would read every fast swing as a jam. So each front
+joint's error is the distance from its feedback angle to the RANGE its commands
+swept over the last `lag_window_s` -- 0 while the servo is anywhere on the
+recently commanded path, growing only when it's stuck outside it.
+
+Feedback reads are sparse and costly: `f` makes the firmware re-attach each pin,
+send a request pulse and time the reply (espServo.h readFeedback, tens of ms for
+a full set), and the firmware loop executes no joint command meanwhile. Call
+`update()` every control tick with `fbk_deg=None` on ticks without a fresh read
+(the command history still records), and read feedback no faster than
+`JamGuardConfig.feedback_hz`.
+
+Sim check (2026-09-22, run20m_ppo through the `i` firmware model, sim joint
+angles as 5 Hz feedback): 0 false fires in 18 episodes on flat / 20 mm
+obstacles / rough ground -- where the old latest-command comparison would
+have averaged ~13 deg of "error" on plain walking. But walking into a wall
+did NOT fire either (0/6): the body stops (~0.11 m) while the legs keep
+tracking their commanded path -- feet tap the wall and slide. The sim couldn't
+show the strain signal this reflex assumes; whether a real P1S pinned on an
+obstacle shows it is the bench question. If it doesn't, the jam cue has to
+come from "walking commanded, not advancing" instead (needs a speed source).
+
 HARDWARE-GATED. Every constant in `JamGuardConfig` is a placeholder: the
 divergence threshold can't be set without the real robot (normal carpet load, a
 leg brushing another leg, stepping a small bump, and working into a slope all
@@ -38,8 +66,8 @@ see docs/hardware/specs.md "Servo position feedback"). Unit-testable now
 against synthetic cmd/feedback traces; the numbers wait for the bench.
 
 Wiring (later, on hardware) -- in `gait/run_gait.py`, alongside the thermal
-guard: poll `f` for the servo feedback vector each tick (or every few ticks),
-call `jam.update(cmd_deg, fbk_deg, forward_active=cmd_fwd > MIN)`, and on a
+guard: poll `f` for the servo feedback vector at `feedback_hz` (not every tick),
+call `jam.update(cmd_deg, fbk_deg or None, forward_active=cmd_fwd > MIN)` every tick, and on a
 non-NONE action preempt the policy for a scripted burst the way CliffGuard's
 turn/back-up hand-off works. Emit `diag.event(*jam.diag_event()[0],
 **jam.diag_event()[1])` on a phase change.
@@ -68,9 +96,14 @@ class JamGuardConfig:
     front_idx: tuple[int, ...] = (0, 1, 2, 3)
 
     window_s: float = 0.6          # tracking error is averaged over this
+    lag_window_s: float = 0.12     # a joint is on-track if its feedback lies within the range its
+                                  #   commands swept over this long (firmware `i` lag ~55 ms in sim)
+    feedback_hz: float = 5.0       # suggested max feedback read rate (each read stalls the firmware loop)
     jam_deg: float = 12.0         # sustained mean front-joint |cmd - fbk| above this -> jammed
-    min_jammed_joints: int = 2    # this many front joints must exceed jam_deg on the latest read
-                                  #   (one strained joint alone could be leg-on-leg contact)
+    min_jammed_joints: int = 2    # this many front joints must average over jam_deg across the window
+                                  #   (one strained joint alone could be leg-on-leg contact). Windowed,
+                                  #   not latest-read: a leg pinned mid-walk only diverges on the part
+                                  #   of the stride that pushes into the obstacle.
     enter_s: float = 0.4          # divergence must persist this long before BACK_OFF
     backoff_s: float = 0.8        # hold BACK_OFF this long (the back-up burst)
     turn_s: float = 1.0           # hold TURN_AWAY this long (the heading change)
@@ -85,7 +118,8 @@ class JamGuard:
     def __init__(self, cfg: JamGuardConfig | None = None, *, clock=time.monotonic):
         self.cfg = cfg or JamGuardConfig()
         self._clock = clock
-        self._samples: deque[tuple[float, float, int]] = deque()  # (t, mean_err_deg, n_over)
+        self._samples: deque[tuple[float, tuple]] = deque()       # (t, per-front-joint error deg)
+        self._cmds: deque[tuple[float, tuple]] = deque()          # (t, front-joint commands)
         self._action = JamAction.NONE
         self._jam_since: float | None = None
         self._phase_until: float = 0.0        # when the current BACK_OFF / TURN_AWAY ends
@@ -120,10 +154,21 @@ class JamGuard:
         whatever heading info it has; default left."""
         return self.cfg.turn_left_token if prefer_left else self.cfg.turn_right_token
 
+    def _track_err(self, j: int, k: int, fbk: float) -> float:
+        """Distance from feedback to the span joint j's commands covered lately."""
+        vals = [cmds[k] for _, cmds in self._cmds]
+        lo, hi = min(vals), max(vals)
+        return lo - fbk if fbk < lo else (fbk - hi if fbk > hi else 0.0)
+
     def update(self, cmd_deg, fbk_deg, *, forward_active: bool,
                now: float | None = None) -> JamAction:
+        """`fbk_deg=None` on ticks without a fresh feedback read: the command is
+        recorded, the jam decision waits for the next read."""
         now = self._clock() if now is None else now
         c = self.cfg
+        self._cmds.append((now, tuple(float(cmd_deg[i]) for i in c.front_idx)))
+        while self._cmds and now - self._cmds[0][0] > c.lag_window_s:
+            self._cmds.popleft()
 
         # not walking forward -> jam is meaningless; abandon any running maneuver
         if not forward_active:
@@ -154,17 +199,21 @@ class JamGuard:
             return self._action
 
         # --- idle: watch for a jam -----------------------------------------
-        errs = [abs(float(cmd_deg[i]) - float(fbk_deg[i])) for i in c.front_idx]
-        mean_err = sum(errs) / len(errs)
-        n_over = sum(e >= c.jam_deg for e in errs)
-        self._samples.append((now, mean_err, n_over))
+        if fbk_deg is None:
+            self._status = "waiting for a feedback read"
+            return self._action
+        errs = [self._track_err(i, k, float(fbk_deg[i])) for k, i in enumerate(c.front_idx)]
+        self._samples.append((now, tuple(errs)))
         while self._samples and now - self._samples[0][0] > c.window_s:
             self._samples.popleft()
 
-        w_mean = sum(m for _, m, _ in self._samples) / len(self._samples)
-        w_over = self._samples[-1][2]                   # jammed-joint count on the latest read
+        n = len(self._samples)
+        per_joint = [sum(e[k] for _, e in self._samples) / n for k in range(len(errs))]
+        over = [m for m in per_joint if m >= c.jam_deg]
+        w_over = len(over)
+        w_mean = sum(over) / w_over if over else max(per_joint)
 
-        jammed = w_mean >= c.jam_deg and w_over >= c.min_jammed_joints
+        jammed = w_over >= c.min_jammed_joints
         self._jam_since = (self._jam_since or now) if jammed else None
 
         if jammed and now - self._jam_since >= c.enter_s:

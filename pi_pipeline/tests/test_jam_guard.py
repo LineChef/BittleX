@@ -120,3 +120,56 @@ def test_turn_token_picks_a_side():
     g, _ = _guard()
     assert g.turn_token(prefer_left=True) == JamGuardConfig().turn_left_token
     assert g.turn_token(prefer_left=False) == JamGuardConfig().turn_right_token
+
+
+# ------------------------------------------------------------------ lag tolerance
+def _swing(t):
+    """A front-leg command sweeping ~200 deg/s, like the walk's fast phase."""
+    import math
+    a = 35.0 * math.sin(2 * math.pi * 1.0 * t)
+    return [a, -a, -a, a, 30.0, -40.0, 30.0, -40.0]
+
+
+def test_healthy_leg_lagging_the_command_is_not_a_jam():
+    """With `i`, the servo trails the Pi's command by ~55 ms (firmware easing +
+    oldest-wins backlog). Against the LATEST command that is 10+ deg of error on
+    a fast swing -- it must not read as a jam."""
+    g, t = _guard(enter_s=0.3)
+    a = JamAction.NONE
+    for k in range(160):                                   # 2 s at 80 Hz
+        t[0] = k / 80
+        fbk = _swing(t[0] - 0.055)                         # healthy, 55 ms late
+        a = g.update(_swing(t[0]), fbk, forward_active=True)
+        assert a is JamAction.NONE
+
+
+def test_leg_pinned_by_an_obstacle_mid_walk_is_a_jam():
+    """Realistic wall: two front joints follow their (lagged) command except they
+    can't pass 0 deg -- divergence only on the part of the stride that pushes
+    into the obstacle, which is exactly what the windowed per-joint mean catches."""
+    g, t = _guard(enter_s=0.3)
+    a = JamAction.NONE
+    for k in range(160):
+        t[0] = k / 80
+        fbk = list(_swing(t[0] - 0.055))
+        fbk[0] = min(fbk[0], 0.0)
+        fbk[3] = min(fbk[3], 0.0)
+        a = g.update(_swing(t[0]), fbk, forward_active=True)
+        if a is JamAction.BACK_OFF:
+            break
+    assert a is JamAction.BACK_OFF
+
+
+def test_ticks_without_a_feedback_read_only_record_the_command():
+    g, t = _guard(enter_s=0.3)
+    for k in range(160):
+        t[0] = k / 80
+        fbk = _fbk(20.0, 3) if k % 16 == 0 else None       # 5 Hz feedback reads
+        a = g.update(CMD, fbk, forward_active=True)
+        if a is JamAction.BACK_OFF:
+            break
+    assert a is JamAction.BACK_OFF
+    g2, t2 = _guard()
+    t2[0] = 0.1
+    assert g2.update(CMD, None, forward_active=True) is JamAction.NONE
+    assert "waiting" in g2.status

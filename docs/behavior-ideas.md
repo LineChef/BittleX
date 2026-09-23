@@ -98,6 +98,14 @@ confirm on hardware **which servos report feedback and at what rate**
 (`f` / `readAllFeedbackFast()` — "if supported"; `docs/hardware/specs.md`
 "Servo position feedback", `docs/hardware/petoi-firmware-reference.md`).
 
+**Status 2026-09-22:** logic built and made lag-tolerant. With the `i` command
+the servo trails the Pi's command by ~55 ms, so each front joint is now judged
+against the range its recent commands swept, not the latest command (0 false
+fires in sim on flat / obstacles / rough ground). Sim couldn't show the jam
+signal itself: walking into a wall stops the body but the legs keep tracking
+(feet slide). Bench question: does a real P1S pinned on an obstacle diverge?
+Feedback reads stall the firmware loop, so read at ~5 Hz, not every tick.
+
 **Build sketch:** `pi_pipeline/gait/jam_guard.py` — `JamGuard.update(cmd_deg[],
 fbk_deg[]) -> JamAction (NONE | BACK_OFF | TURN_AWAY)`, windowed per-joint error
 with enter/clear hysteresis, cooldown after a fire; wire into `run_gait.py` the
