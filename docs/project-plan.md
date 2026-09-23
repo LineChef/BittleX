@@ -13,6 +13,36 @@ progresses. Behavior ideas to pick from live in
 [`docs/behavior-ideas.md`](behavior-ideas.md) — the reference list for "what
 should we work on next."
 
+> **⚠️ SIM BUG FOUND (2026-09-23) — much of the resilience testing since 2026-09-02
+> needs re-evaluation.** The welded payload bodies (Pi + PiSugar "spine", camera
+> "head"; added in `839a7bf`, 2026-09-02, gait-refinement G3) were created with no
+> shape, so they had **zero rotational inertia** — which the physics engine treats
+> as "cannot rotate". Welded to the torso, they **locked G2's body orientation**:
+> roll/pitch/yaw moved ±0.06° while trotting, where a real trotting body rolls ~±4°.
+> Fixed (`PAYLOAD_INERTIA="box"`: real inertia from a non-colliding box; `"legacy"`
+> reproduces the old behaviour). Payload was on in 90–100 % of training episodes, so
+> **every policy since `run20m_ppo` trained on a tilt-locked body**, and every
+> payload-on evaluation measured one. Likely affected: the learned gaits' limp (it is
+> this artifact), payload-on "0 % falls", stumble-catch / push-recovery and balance
+> results, tilt- and IMU-related conclusions (incl. "the 5 Hz IMU costs nothing"),
+> heading-hold/drift, slopes and side-hills, and learned-vs-scripted comparisons.
+> Bare-robot cells were unaffected.
+>
+> **TODO — before building on any past resilience result:**
+> 1. **Evaluate which past tests and conclusions this likely impacted** — go through
+>    the RL logs (`docs/rl/*`, `hardware-gated-backlog.md`, `robustness-backlog.md`,
+>    `resiliency-log.md`, `slope-ceiling-log.md`, `gait-friction-log.md`,
+>    `resid30-log.md`, `phase4-decision-log.md`, `vision-in-gait.md`) for anything
+>    trained or judged with the payload on, and classify each as unaffected /
+>    suspect / invalidated.
+> 2. **Come up with a list of trainings to re-test** on the corrected sim —
+>    including approaches that were closed or reverted because of results measured
+>    on the locked body (e.g. `FAC_NOSTALL`, the slope-ceiling rounds, gait-friction
+>    rounds, stumble-catch / recovery work, `START_POSE_JITTER`, `FAC_FALL_PENALTY`),
+>    prioritized by how much the conclusion depended on body tilt or falls.
+> 3. Re-baseline the deployed policy and the scripted walk on the corrected sim
+>    (started 2026-09-23; results in `docs/rl/hw1-log.md`).
+
 > **Current state of the gait (2026-09-23): the IMU-rate priority is resolved,
 > and a new gait trained under G2's real control path is the release candidate.**
 > Tracing the 5 Hz IMU issue through OpenCatEsp32 found a bigger gap: the Pi was

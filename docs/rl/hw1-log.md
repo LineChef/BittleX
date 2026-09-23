@@ -242,6 +242,21 @@ too strong (slows everything).
 - **`hw5`** = `hw2` config + `FAC_STANCE_HOVER=3`, running to a 3M averaged gate.
   Bar: least-used paw ≥ ~0.35 while keeping `hw2`'s slope/fall gains.
 
+### The limp was a sim artifact: the payload locked the body's rotation (2026-09-23)
+
+The limp appears only with the payload on (bare robot: least-used paw 45–50 %, no
+limp) and doesn't depend on the payload's mass or position — a 1 g + 1 g welded
+payload limps exactly like the full one, and the same mass added into the torso
+doesn't. Cause: the welded payload bodies had zero rotational inertia, which Bullet
+treats as "cannot rotate"; welded to the torso, they locked G2's orientation
+(scripted walk: roll ±0.06° with the welded payload vs ±4° with the mass in the
+torso). Fixed with `PAYLOAD_INERTIA="box"` (real inertia, collisions off): roll
+back to ±4°, yaw drifts again. Every run since 2026-09-02 trained on the locked
+body; the limp-fix queue (`hw5`–`hw8`: stance hover, average-correction penalty,
+footfall imitation) was chasing this artifact — none passed, and none needs
+pursuing. `BENCH_VERSION` 3. Re-baseline on the corrected sim in progress; see the
+top of `project-plan.md` for the audit of what else this affected.
+
 Going forward: no separate 3M pilots — launch the full run and gate on its own
 3M checkpoint against the previous full run's 3M checkpoint.
 

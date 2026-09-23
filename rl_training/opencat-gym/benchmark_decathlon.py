@@ -198,7 +198,10 @@ _EXTRA_DR = "full"
 # -- a rough episode resets the grade to 0 in the env, so ~35 % of every slope
 # cell's episodes were flat rough ground. Results from version 1 aren't
 # comparable on slope cells; --scripted-from refuses to mix versions.
-BENCH_VERSION = 2
+# BENCH_VERSION 3 (2026-09-23): the welded payload no longer locks the body's
+# rotation (opencat_gym_env PAYLOAD_INERTIA); every payload-on result before it
+# was on a tilt-locked robot.
+BENCH_VERSION = 3
 
 # Module default of every knob any cell sets, captured at import. _apply
 # restores these before each cell: until 2026-09-22 knobs outside _ZERO leaked

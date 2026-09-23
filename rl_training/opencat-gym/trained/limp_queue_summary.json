@@ -1,0 +1,28 @@
+[
+ {
+  "tag": "hw6_20m",
+  "desc": "stance hover 6",
+  "least_paw": 0.122,
+  "gait_ok": false,
+  "slopes_kept": false,
+  "limp_fixed": false,
+  "T1.1": 0.055,
+  "T8.2": 0.0101,
+  "T5.1b": 0.3125,
+  "up 16": 0.0499,
+  "side 12": 0.018
+ },
+ {
+  "tag": "hw8_20m",
+  "desc": "stance hover 3 + footfall imitation 3",
+  "least_paw": 0.028,
+  "gait_ok": false,
+  "slopes_kept": false,
+  "limp_fixed": false,
+  "T1.1": 0.0643,
+  "T8.2": 0.0188,
+  "T5.1b": 0.8062,
+  "up 16": 0.0221,
+  "side 12": 0.0036
+ }
+]

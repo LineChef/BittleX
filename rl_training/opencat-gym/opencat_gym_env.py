@@ -401,6 +401,15 @@ HEAD_MASS_NOM = 0.015     # kg -- camera cluster on the front mast. Mounts whene
 HEAD_MASS_RAND = 0.005   # +/- kg -> head 10-20 g (mount variation; low end ~= camera-off early bring-up)
 HEAD_MASS_POS = (0.055, 0.0, 0.020)   # base frame: ~5.5cm fwd (just ahead of the 0.105 m torso), ~2cm up.
                            # Static -- neck held level for the gait. MEASURE on assembly.
+PAYLOAD_INERTIA = "box"   # 2026-09-23 BUG FIX. The welded payload bodies were created with no shape ->
+                          # ZERO inertia, which Bullet treats as "cannot rotate" (infinite rotational
+                          # inertia); welded to the torso, that locked G2's roll/pitch/yaw to ~+-0.06 deg
+                          # (a trotting body really rolls ~+-4 deg). It caused the learned gaits' limp and
+                          # made payload-on falls / tilt / heading results unrealistic, in every run since
+                          # 839a7bf (2026-09-02). "box": inertia from a box the size of the real part,
+                          # collisions off. "legacy": the old zero-inertia bodies (reproduce past runs only).
+PAYLOAD_BOX_HALF = (0.033, 0.015, 0.008)   # spine: Pi Zero 2 W + PiSugar S stack, ~66 x 30 x 16 mm
+HEAD_BOX_HALF = (0.010, 0.012, 0.010)      # head: camera cluster, ~20 x 24 x 20 mm
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
@@ -623,6 +632,7 @@ SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
 FAC_CONTACT_IMITATION = _g2e("FAC_CONTACT_IMITATION", FAC_CONTACT_IMITATION)
 FAC_STANCE_HOVER   = _g2e("FAC_STANCE_HOVER", FAC_STANCE_HOVER)      # hw5: 3.0
+PAYLOAD_INERTIA    = _g2e("PAYLOAD_INERTIA", PAYLOAD_INERTIA)        # "legacy" = pre-fix zero-inertia payload
 FAC_RESID_BIAS     = _g2e("FAC_RESID_BIAS", FAC_RESID_BIAS)          # hw7
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
@@ -1660,6 +1670,17 @@ class OpenCatGymEnv(gym.Env):
         else:              # backward
             self._cmd_fwd = np.random.uniform(-0.09, -0.03)
 
+    @staticmethod
+    def _payload_body(mass, half, pos):
+        """A welded payload body. "box": real inertia from a non-colliding box; "legacy":
+        the pre-2026-09-23 shapeless body (zero inertia = locks the robot's rotation)."""
+        if PAYLOAD_INERTIA == "legacy":
+            return p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=-1, basePosition=pos)
+        cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
+        b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, basePosition=pos)
+        p.setCollisionFilterGroupMask(b, -1, 0, 0)     # inertia from the box; touches nothing
+        return b
+
     def reset(self, seed=None, options=None):
         self.step_counter = 0
         self.arm_contact = 0
@@ -1926,9 +1947,8 @@ class OpenCatGymEnv(gym.Env):
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3)
             off = [PAYLOAD_POS[0] + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
-            self._payload_id = p.createMultiBody(
-                baseMass=float(pm), baseCollisionShapeIndex=-1,
-                basePosition=[start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
+            self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF,
+                [start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
             _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
                                     p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
             p.changeConstraint(_c, maxForce=5e3)
@@ -1936,9 +1956,8 @@ class OpenCatGymEnv(gym.Env):
                 hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
                 hj = np.random.uniform(-0.003, 0.003, 3)
                 hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
-                self._head_id = p.createMultiBody(
-                    baseMass=float(hm), baseCollisionShapeIndex=-1,
-                    basePosition=[start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
+                self._head_id = self._payload_body(hm, HEAD_BOX_HALF,
+                    [start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
                 p.changeConstraint(_hc, maxForce=5e3)
