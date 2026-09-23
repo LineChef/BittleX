@@ -65,6 +65,16 @@ class ScriptedGait:
             target = np.clip(target + self._k * corr, -_BOUND, _BOUND)
 
         self._phase += 1
+        if opencat_gym_env.RESIDUAL_MODE:
+            # Residual env: it already commands its own wkF reference each step,
+            # so the pure scripted walk is a ZERO residual (plus the optional
+            # balance nudge, in residual units). Until 2026-09-22 this returned
+            # the absolute-mode action below, which the residual env applied as
+            # a residual -- commanding ~7.5 deg mean / 22 deg max off wkF, so
+            # every "scripted" baseline in residual-mode benchmarks was a
+            # distorted walk, not the real one.
+            corr = (target - WKF_REF[(self._phase - 1) % len(WKF_REF)]) if self._k else np.zeros(8)
+            return np.clip(corr / np.deg2rad(opencat_gym_env.RESIDUAL_SCALE_DEG), -1.0, 1.0), None
         return np.clip((target - cur) / _DS, -1.0, 1.0), None
 
 

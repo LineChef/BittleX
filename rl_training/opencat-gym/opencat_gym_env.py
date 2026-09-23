@@ -277,6 +277,22 @@ CMD_LATENCY_STEPS = 0    # apply the action from N control-steps ago (fixed lag)
 JOINT_OFFSET_DEG = 0.0   # per-episode per-joint servo zero-point miscalibration, +/- this many
                          # deg (uniform), scaled by _dr. Added to the commanded target; the
                          # encoder read-back carries it too, like a real calibration offset.
+# --- real control path (2026-09-22; see firmware_model.py, resilience_imu_rate.py,
+# resilience_joint_cmd.py). Default off = the idealized path every checkpoint
+# before hw1 was trained on. ---
+IMU_HOLD_STEPS = 0       # >0: the policy's orientation obs refreshes only every N control
+                         # steps (16 = the stock firmware's 5 Hz IMU print at 80 Hz), random
+                         # phase per episode, rounded to the print's 0.1 deg. Obs only.
+IMU_RATE_ZERO = False    # True: roll/pitch rate + ang-accel obs are 0 (stream has no gyro).
+CMD_PATH = ""            # "" = joint targets applied instantly. "i" / "m" / "ifast": run them
+                         # through firmware_model.FirmwareCmdPath (execution time, oldest-wins
+                         # backlog) -- what the servos are actually driven to on the BiBoard.
+CMD_PATH_EXTRA_MS_MAX = 0.0  # per-episode uniform [0, this] ms extra per command: unmodeled
+                             # firmware loop work (IMU reads, prints), so the policy doesn't
+                             # overfit the model's exact timing.
+JOINT_TARGET_HOOK = None # callable(env, joint_angs_rad) -> rad actually sent to the motors.
+                         # Models the BiBoard's command execution (resilience_joint_cmd.py);
+                         # the policy's observation keeps the commanded targets. None = inert.
 IMU_BIAS_DEG = 0.0       # R2 (resiliency campaign): per-episode persistent roll/pitch IMU bias,
                          # +/- this many deg (uniform), scaled by _dr -- a tilted mount or a
                          # calibration error, not RANDOM_GYRO's zero-mean per-step noise. Affects
@@ -311,6 +327,11 @@ TERRAIN_REFRESH = 5       # recompute every N control steps (~16 Hz @ 80 Hz); he
 TERRAIN_MISS_PROB = 0.10  # per-refresh chance the detection is dropped though something is there
 TERRAIN_JITTER = 0.04     # gaussian std on normalised dist & bearing (detector box jitter)
 RANDOM_FRICTION = 0.30   # +/- fraction on ground lateral friction, per episode. surv_r1: 0.22 -> 0.30.
+BODY_MASS_SCALE = 1.0    # nominal scale on every URDF link mass, before RANDOM_MASS. The URDF
+                         # totals 269 g = the very bottom of Petoi's published 269-353 g for
+                         # Bittle X (battery / alloy-vs-plastic servos unstated); G2 is the
+                         # alloy model. hw1: 1.12 (~301 g) centres the range; x(1 +/-
+                         # RANDOM_MASS) then spans ~247-355 g. Re-set from the step-4 weigh-in.
 RANDOM_MASS = 0.18       # +/- fraction on every robot link mass, per episode. surv_r1: 0.10 -> 0.18 -- the policy needs to see real inertia variation to learn to compensate for it (~= the Pi+PiSugar payload swing).
 RANDOM_PUSH = 0.2       # random horizontal shove: max instantaneous base-velocity kick (m/s) -- the small continuous nudge. The big concentrated hits come from IMPULSE_PUSH (Run 7).
 RANDOM_PUSH_PROB = 0.02  # R-rob REVERTED
@@ -554,6 +575,13 @@ FAC_CLIFF_SLOW     = _g2e("FAC_CLIFF_SLOW", 2.0)     # reward low fwd speed when
 CLIFF_SLOW_DIST    = _g2e("CLIFF_SLOW_DIST", 0.15)   # edge_dist_norm below this => the slow reward is live
 FAC_IMITATION      = _g2e("FAC_IMITATION", FAC_IMITATION)   # loosen the wkF/blend anchor for turning runs (default 11.0)
 RESIDUAL_SCALE_DEG = _g2e("RESIDUAL_SCALE_DEG", RESIDUAL_SCALE_DEG)  # resid30: override so a checkpoint trained under a DIFFERENT scale (e.g. run20m_ppo at 22) can be evaluated correctly even while the module default is set for the current campaign (30) -- G2E_RESIDUAL_SCALE_DEG=22, else the actions get physically misapplied at the wrong scale.
+IMU_HOLD_STEPS     = _g2e("IMU_HOLD_STEPS", IMU_HOLD_STEPS)          # hw1: 16 = stock 5 Hz IMU print
+IMU_RATE_ZERO      = _g2e("IMU_RATE_ZERO", IMU_RATE_ZERO)            # hw1: stream has no gyro
+CMD_PATH           = _g2e("CMD_PATH", CMD_PATH)                      # hw1: "i" = firmware simultaneous move
+CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
+BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
+IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
+JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
 # --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
@@ -866,10 +894,22 @@ class OpenCatGymEnv(gym.Env):
             self._stuck_timer -= 1
 
         # Set new joint angles
+        _motor_angs = joint_angs
+        if CMD_PATH:
+            if self._fw is None:
+                from firmware_model import FirmwareCmdPath
+                _j0 = np.asarray(p.getJointStates(self.robot_id, self.joint_id), dtype=object)[:, 0]
+                self._fw = FirmwareCmdPath(CMD_PATH, np.rad2deg(_j0.astype(float)), extra_s=self._fw_extra_s)
+            _t = self._fw_k / CONTROL_HZ
+            self._fw.send(_t, np.rad2deg(joint_angs))
+            _motor_angs = np.deg2rad(self._fw.output(_t + 0.5 / CONTROL_HZ))   # mid-step servo drive
+            self._fw_k += 1
+        if JOINT_TARGET_HOOK is not None:
+            _motor_angs = JOINT_TARGET_HOOK(self, joint_angs.copy())
         p.setJointMotorControlArray(self.robot_id,
                                     self.joint_id,
                                     p.POSITION_CONTROL,
-                                    joint_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
+                                    _motor_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
                                     forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
         p.stepSimulation() # Delay of data transfer
         # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
@@ -945,7 +985,19 @@ class OpenCatGymEnv(gym.Env):
         # IMU noise: noise only what the policy SEES, not the reward. The real
         # BiBoard IMU is noisy/biased; a policy trained on perfect orientation
         # can oscillate on real data.
-        obs_ang, obs_vel_clip = state_ang, state_vel_clip
+        obs_ang, obs_vel_clip, obs_euler = state_ang, state_vel_clip, state_ang_euler
+        # IMU_HOLD_STEPS / IMU_RATE_ZERO: what the stock firmware stream delivers
+        # (5 Hz, 0.1 deg, no gyro). Obs only -- reward terms keep the clean state.
+        if IMU_HOLD_STEPS > 0:
+            if self._imu_held is None or self._imu_hold_k % IMU_HOLD_STEPS == 0:
+                _e = np.round(np.rad2deg(p.getEulerFromQuaternion(state_ang)), 1)
+                _q = p.getQuaternionFromEuler(np.deg2rad(_e))
+                self._imu_held = (_q, np.asarray(p.getEulerFromQuaternion(_q)[0:2]))
+            self._imu_hold_k += 1
+            obs_ang, obs_euler = self._imu_held
+        if IMU_RATE_ZERO:
+            obs_vel_clip = np.zeros(2)
+            ang_acc = np.zeros(2)
         # R2 (resiliency campaign): persistent per-episode roll/pitch bias --
         # mount tilt or IMU calibration error -- distinct from RANDOM_GYRO's
         # zero-mean per-step noise below. Applied before the noise layer (bias
@@ -953,17 +1005,18 @@ class OpenCatGymEnv(gym.Env):
         # Off by default (self._imu_bias_euler stays zeros); a probe script
         # sets IMU_BIAS_DEG externally, same convention as DR_EVAL_FULL.
         _imu_bias = getattr(self, '_imu_bias_euler', None)
-        _biased_euler = state_ang_euler
+        _biased_euler = obs_euler
         if _imu_bias is not None and (_imu_bias[0] != 0.0 or _imu_bias[1] != 0.0):
-            _true_euler = p.getEulerFromQuaternion(state_ang)
+            _true_euler = p.getEulerFromQuaternion(obs_ang)
             obs_ang = p.getQuaternionFromEuler(
                 [_true_euler[0] + _imu_bias[0], _true_euler[1] + _imu_bias[1], _true_euler[2]])
-            _biased_euler = state_ang_euler + _imu_bias
+            _biased_euler = obs_euler + _imu_bias
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
         if gyro_n:
             obs_ang = np.clip(np.array(obs_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
-            obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
-            ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
+            if not IMU_RATE_ZERO:   # no rate signal on the real stream -> the Pi feeds an exact 0
+                obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
+                ang_acc = np.clip(ang_acc + np.random.normal(0.0, gyro_n, 2), -1, 1)
         # Tilt history (Run 7): last LENGTH_TILT_HISTORY steps of (roll, pitch),
         # normalised so the fall threshold (1.3 rad) is +/-1. Same IMU noise
         # (and the same persistent bias, if any).
@@ -1786,6 +1839,13 @@ class OpenCatGymEnv(gym.Env):
         if JOINT_OFFSET_DEG > 0 and self._dr > 0:
             self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
                                   * np.deg2rad(1.0) * self._dr)
+        # real control path (IMU_HOLD_STEPS / CMD_PATH); inert by default
+        self._imu_held = None
+        self._imu_hold_k = int(np.random.randint(IMU_HOLD_STEPS)) if IMU_HOLD_STEPS > 0 else 0
+        self._fw = None
+        self._fw_k = 0
+        self._fw_extra_s = (np.random.uniform(0.0, CMD_PATH_EXTRA_MS_MAX) / 1000.0
+                            if CMD_PATH and CMD_PATH_EXTRA_MS_MAX > 0 else 0.0)
         self._imu_bias_euler = np.zeros(2)
         if IMU_BIAS_DEG > 0 and self._dr > 0:
             self._imu_bias_euler = (np.random.uniform(-IMU_BIAS_DEG, IMU_BIAS_DEG, 2)
@@ -1809,12 +1869,14 @@ class OpenCatGymEnv(gym.Env):
 
         # Per-episode link-mass randomization (URDF masses are estimates; the
         # real robot's battery/wiring shift the distribution).
-        if RANDOM_MASS > 0:
+        if RANDOM_MASS > 0 or BODY_MASS_SCALE != 1.0:
             for link in range(-1, p.getNumJoints(self.robot_id)):
                 m0 = p.getDynamicsInfo(self.robot_id, link)[0]
                 if m0 > 0:
-                    p.changeDynamics(self.robot_id, link, mass=m0 * (
-                        1.0 + np.random.uniform(-RANDOM_MASS, RANDOM_MASS) * self._dr))
+                    k = BODY_MASS_SCALE
+                    if RANDOM_MASS > 0:
+                        k *= 1.0 + np.random.uniform(-RANDOM_MASS, RANDOM_MASS) * self._dr
+                    p.changeDynamics(self.robot_id, link, mass=m0 * k)
 
         # Setting start position. This influences training.
         joint_angs = np.deg2rad(np.array([1, 0, 1, 0, 1, 0, 1, 0])*50)

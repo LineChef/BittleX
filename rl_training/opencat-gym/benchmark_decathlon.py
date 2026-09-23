@@ -190,7 +190,19 @@ _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean"
 _EXTRA_DR = "full"
 
 
+# Module default of every knob any cell sets, captured at import. _apply
+# restores these before each cell: until 2026-09-22 knobs outside _ZERO leaked
+# from one cell into every later one -- most importantly the bare-robot cells'
+# PAYLOAD_PROB=0, which silently ran every cell after T6.5b (T7.x-T9.x) with no
+# Pi/battery payload (learned-gait T9.1 falls: 8/20 bare vs 0/20 with payload).
+_CELL_DEFAULTS = {k: getattr(opencat_gym_env, k)
+                  for c in LADDER for k in c[4]
+                  if not k.startswith("_") and hasattr(opencat_gym_env, k)}
+
+
 def _apply(cell_knobs):
+    for k, v in _CELL_DEFAULTS.items():
+        setattr(opencat_gym_env, k, v)
     for k in _ZERO:
         if hasattr(opencat_gym_env, k):
             setattr(opencat_gym_env, k, 0.0)
@@ -245,6 +257,17 @@ def main():
     ap.add_argument("--extra-dr", choices=("full", "clean", "payload"), default="full",
                     help="non-cell DR: full=env defaults, clean=no payload/rough/cutback, "
                          "payload=payload forced on, rough+cutback off")
+    ap.add_argument("--hw", choices=("i", "m", "ifast"), default=None,
+                    help="score the LEARNED gait through G2's real control path: stock 5 Hz "
+                         "IMU with no rate (IMU_HOLD_STEPS=16, IMU_RATE_ZERO) and this joint "
+                         "command through firmware_model (CMD_PATH). The scripted walk runs "
+                         "natively either way -- the firmware plays kwkF from its own memory.")
+    ap.add_argument("--scripted-from", default=None,
+                    help="reuse the scripted walk's per-cell results from an earlier decathlon JSON "
+                         "instead of re-simulating them (~half the runtime). Only valid when that run "
+                         "used the same --episodes/--seed/--extra-dr/--scripted-balance and env "
+                         "defaults: the scripted walk is deterministic under those (identical across "
+                         "every 2026-09-22 run). Checked below; mismatches abort.")
     args = ap.parse_args()
 
     global _EXTRA_DR
@@ -259,7 +282,23 @@ def main():
         learned = BalancedLearned(learned, env, k=args.learned_balance)
     scripted = ScriptedGait(env, balance_k=args.scripted_balance)
 
-    out = {"learned_path": args.learned, "episodes": args.episodes,
+    def _hw(on):
+        opencat_gym_env.IMU_HOLD_STEPS = 16 if on else 0
+        opencat_gym_env.IMU_RATE_ZERO = bool(on)
+        opencat_gym_env.CMD_PATH = args.hw if on else ""
+
+    prior_sc = None
+    if args.scripted_from:
+        import json as _json
+        prior = _json.load(open(args.scripted_from))
+        for k, v in (("episodes", args.episodes), ("extra_dr", args.extra_dr),
+                     ("scripted_balance", args.scripted_balance)):
+            if prior.get(k) != v:
+                raise SystemExit(f"--scripted-from {args.scripted_from}: {k}={prior.get(k)!r}, this run {v!r}")
+        prior_sc = {c["id"]: c for c in prior["cells"]}
+
+    out = {"learned_path": args.learned, "episodes": args.episodes, "hw": args.hw,
+           "scripted_from": args.scripted_from,
            "extra_dr": args.extra_dr, "scripted_balance": args.scripted_balance, "cells": []}
     for cid, tier, skill, label, knobs in LADDER:
         # a cell can carry a reserved "_episodes" key to override the global
@@ -270,11 +309,20 @@ def main():
         real_knobs = {k: v for k, v in knobs.items() if k != "_episodes"}
         _apply(real_knobs)
         print(f"\n=== {cid}  T{tier}  {label}  ({cell_episodes} eps) ===", flush=True)
+        _hw(args.hw)
         rl, rl_eps = _bench(env, learned, cell_episodes, args.seed, reflex=False)
-        sc, sc_eps = _bench(env, scripted, cell_episodes, args.seed, reflex=False)
-        sc_fall = [i for i, d in enumerate(sc_eps) if d["fell"]]
+        _hw(None)
+        if prior_sc is not None:
+            pc = prior_sc[cid]
+            if pc["episodes"] != cell_episodes or pc["knobs"] != {k: (list(v) if isinstance(v, tuple) else v) for k, v in real_knobs.items()}:
+                raise SystemExit(f"--scripted-from: cell {cid} differs from the saved run")
+            sc = pc["scripted"]
+            sc_fall = list(range(pc["scripted_fall_episodes"]))   # count only; per-episode ids not saved
+        else:
+            sc, sc_eps = _bench(env, scripted, cell_episodes, args.seed, reflex=False)
+            sc_fall = [i for i, d in enumerate(sc_eps) if d["fell"]]
         cond_surv = (sum(1 for i in sc_fall if not rl_eps[i]["fell"]) / len(sc_fall)
-                     if sc_fall else None)
+                     if sc_fall and prior_sc is None else None)   # needs per-episode scripted falls
         print(f"  learned fell {rl['fell_fraction']:.0%}  |  scripted fell {sc['fell_fraction']:.0%}"
               f"  |  learned {rl['forward_speed_mps_mean']:.3f} m/s vs {sc['forward_speed_mps_mean']:.3f}"
               + (f"  |  cond.surv {cond_surv:.0%} of {len(sc_fall)}" if cond_surv is not None else ""),
