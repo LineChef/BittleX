@@ -63,7 +63,8 @@ def run_episode(env, model, render_frames=0, frames_dir=None):
         js = np.asarray(p.getJointStates(rid, env.joint_id), dtype=object)[:, 0]
         rec["joint"].append(np.array(js, dtype=float))
         for k, v in info.items():
-            per_term.setdefault(k, []).append(float(v))
+            if np.ndim(v) == 0:              # scalar terms only (info also carries e.g. paw_contact lists)
+                per_term.setdefault(k, []).append(float(v))
 
         if render_frames and frames_dir:
             apply_leg_tint(env, action)

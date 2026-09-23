@@ -202,6 +202,46 @@ penalty moved it rather than removing it.
   `hw1_20m` 0.28 (4.5×); at weight 8 the limp costs ~1.7/step (~10 % of the
   total). Unramped, like joint imitation. Not yet trained.
 
+### Gates were too noisy; averaged re-evaluation (2026-09-23)
+
+`hw3` (slopes only) and `hw4` (footfall imitation 8 only) were each stopped at
+3M and gated. Every run appeared to regress on uphill walking and sills vs
+`hw1_20m`@3M — including `hw4`, which had no slope training. `hw1`'s own
+neighbouring checkpoints explained it: 20 mm sill 0.048 / **0.100** / 0.040 m/s
+at 2.6 / 3.0 / 3.4M. The @3M baseline was a lucky snapshot, so single-checkpoint
+gates manufactured regressions — **stopping `hw2` as "mixed" was a wrong call on
+that evidence.** `multi_ckpt_eval.py` now scores 5 checkpoints (2.2–3.0M) per run
+and reports mean ± spread; this is the standard gate from here.
+
+| mean ± spread over 2.2–3.0M | hw1 | hw2 slopes+leg-balance | hw3 slopes | hw4 footfalls |
+|---|---|---|---|---|
+| least-used paw (scripted 0.41) | 0.20 ±0.03 | 0.22 ±0.03 | 0.17 ±0.01 | 0.16 ±0.08 |
+| footfall mismatch (scripted 0.06) | 0.41 | **0.29** | 0.45 | **0.33** |
+| uphill 16° m/s | 0.030 ±0.036 | **0.065** ±0.004 | 0.049 | 0.014 |
+| side-hill 12° m/s | 0.011 | **0.029** | 0.024 | **0.056** |
+| flat m/s | 0.102 | 0.091 | 0.100 | 0.076 |
+| rough ground m/s | 0.044 | 0.031 | 0.034 | 0.024 |
+| bare gauntlet falls | 74 % | **37 %** | 63 % | 75 % |
+
+`hw2` is the best overall; no run fixed the limp; footfall imitation at 8 is
+too strong (slows everything).
+
+### Limp diagnosis, round 2
+
+- The limping paw hovers **2–4 mm** above the surface while the scripted walk
+  has it down, carrying ~0.2 N vs ~2.5 N. The model is balanced (CoM 0.5 mm
+  off-centre sideways).
+- Part of it is a constant lopsided correction: subtracting `hw1_20m`'s mean
+  per-joint correction brings FR from 10 % to 32 % contact at unchanged speed.
+  But `hw2`'s larger offsets are a lean its gait depends on (subtracting them
+  halves its speed) — it has to be trained out, not removed afterwards.
+- Binary contact terms can't see "almost down". **`FAC_STANCE_HOVER`** penalizes
+  the hover distance itself (downward ray from each paw; paws the scripted walk
+  has firmly down at this phase; beyond the 6.5 mm resting height, per 5 mm).
+  Full strength: scripted −0.08/step, `hw1_20m` −1.3, `hw2`@3M −2.1.
+- **`hw5`** = `hw2` config + `FAC_STANCE_HOVER=3`, running to a 3M averaged gate.
+  Bar: least-used paw ≥ ~0.35 while keeping `hw2`'s slope/fall gains.
+
 Going forward: no separate 3M pilots — launch the full run and gate on its own
 3M checkpoint against the previous full run's 3M checkpoint.
 

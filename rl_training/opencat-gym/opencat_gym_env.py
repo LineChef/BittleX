@@ -485,6 +485,14 @@ FAC_LEG_BALANCE = 0.0     # hw2: every learned gait limps (one paw on the ground
                           # fraction over the last LEG_BALANCE_WINDOW steps falling below
                           # LEG_BALANCE_TARGET, while walking. Ramped with the other shaping terms.
 LEG_BALANCE_TARGET = 0.30
+FAC_STANCE_HOVER = 0.0    # hw5 (2026-09-23): the limp is a paw hovering 2-4 mm above the ground while the
+                          # scripted walk has it firmly down (carrying ~0.2 N vs ~2.5 N). Binary contact
+                          # terms can't see "almost down"; this penalizes the hover distance itself:
+                          # for each paw with P(down) > 0.9 in wkf_contact_ref.npy at this stride phase,
+                          # (paw-centre-to-surface - STANCE_REST_MM), clipped to [0, 20] mm, per 5 mm,
+                          # averaged over those paws. Measured by a short downward ray from each paw, so
+                          # it works on slopes / rubble / ledges. Ramped with the other shaping terms.
+STANCE_REST_MM = 6.5      # paw-centre height when resting on the surface (scripted walk: 6.5-6.7 mm)
 FAC_CONTACT_IMITATION = 0.0  # hw4 (2026-09-23): per-paw footfall imitation -- penalty = this * mean over
                           # the 4 paws of |in contact - P(down)| where P(down) is Petoi's scripted wkF
                           # walk's footfall probability at the current stride phase
@@ -608,6 +616,7 @@ BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
 SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
 FAC_CONTACT_IMITATION = _g2e("FAC_CONTACT_IMITATION", FAC_CONTACT_IMITATION)
+FAC_STANCE_HOVER   = _g2e("FAC_STANCE_HOVER", FAC_STANCE_HOVER)      # hw5: 3.0
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
@@ -929,6 +938,23 @@ class OpenCatGymEnv(gym.Env):
             _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
                      * len(self._contact_ref)) % len(self._contact_ref)
             contact_imit_pen = float(np.mean(np.abs(np.asarray(paw_contact, float) - self._contact_ref[_b])))
+
+        # hw5: stance hover -- how far above the surface are paws that should be planted
+        stance_hover_pen = 0.0
+        if FAC_STANCE_HOVER > 0 and not getattr(self, '_is_stand', False):
+            if getattr(self, '_contact_ref', None) is None:
+                self._contact_ref = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                         "reference_gait", "wkf_contact_ref.npy"))
+            _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
+                     * len(self._contact_ref)) % len(self._contact_ref)
+            _due = [i for i in range(4) if self._contact_ref[_b][i] > 0.9]
+            if _due:
+                _pos = [p.getLinkState(self.robot_id, paw_idx[i])[0] for i in _due]
+                _hits = p.rayTestBatch(_pos, [(x, y, z - 0.06) for x, y, z in _pos])
+                _hov = [min(20.0, max(0.0, h[2] * 60.0 - STANCE_REST_MM)) / 5.0
+                        for h in _hits if h[0] >= 0 and h[0] != self.robot_id]
+                if _hov:
+                    stance_hover_pen = float(np.mean(_hov))
 
         # hw2: leg balance -- least-used paw's contact fraction over the recent window
         leg_balance_pen = 0.0
@@ -1387,6 +1413,7 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
                     + FAC_LEG_BALANCE * leg_balance_pen
+                    + FAC_STANCE_HOVER * stance_hover_pen
                     + obs_bump_pen
                     + FAC_POWER * power_use))
 
@@ -1427,6 +1454,7 @@ class OpenCatGymEnv(gym.Env):
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "r_leg_balance": -penalty_scale * FAC_LEG_BALANCE * leg_balance_pen,
+            "r_stance_hover": -penalty_scale * FAC_STANCE_HOVER * stance_hover_pen,
             "r_contact_imitation": -FAC_CONTACT_IMITATION * contact_imit_pen,
             "paw_contact": [bool(c) for c in paw_contact],   # FL FR BR LB, as the reward terms see it
             "phase_step0": self._phase_step0,
