@@ -31,6 +31,11 @@ CONTROL_HZ = 80.0
 
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
+PENALTY_RAMP_CAP = 1.0    # 2026-09-23: cap on penalty_scale (steps / PENALTY_STEPS, per env). It was
+                          # uncapped, so shaping penalties grew ~5x by the end of a 20M run with 8
+                          # envs -- the comment above intends "full, stable strength", and every
+                          # reward weight was tuned in 2-3M runs that never passed ~0.75x. 0 = the
+                          # old uncapped behaviour (every checkpoint trained before hw2).
 FAC_MOVEMENT = 300        # Reward forward progress (capped at TARGET_SPEED). surv_r5: back to surv_r2's 300 (r3's 550 flattened the trot, r4's 350 no better). The tilt-gated MIN_SPEED floor now holds the flat-speed gate without fighting a stumble.
 FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - TARGET_SPEED), unramped -- mirror of the MIN_SPEED floor on the fast side. surv_r2: 60 -> 35, surv_r1 pulled flat speed to 0.081 (just under the 0.085 gate); the MIN_SPEED floor (120) still stops a stall.
 
@@ -595,6 +600,7 @@ CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
 BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
 SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
+PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
@@ -1233,6 +1239,8 @@ class OpenCatGymEnv(gym.Env):
             _dir = np.sign(self._cmd_fwd)
             capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
         penalty_scale = self.step_counter_session / PENALTY_STEPS
+        if PENALTY_RAMP_CAP > 0:
+            penalty_scale = min(penalty_scale, PENALTY_RAMP_CAP)
         # Scripted-gait lessons (docs/rl/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
         # from the scripted pose only when it helps.

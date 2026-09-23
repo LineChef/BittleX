@@ -151,15 +151,17 @@ through the real path, pure slopes — no rough-terrain episodes, no torque cut)
   downhill — "T6.1 −24° descent" was a 24° climb, T9.1/T9.2 swapped); slope
   cells no longer get rough-terrain episodes (they reset the grade to 0, ~35 %
   of each slope cell). `--scripted-from` refuses to mix versions.
-- **Found, not changed:** the shaping-penalty ramp is uncapped
+- **Shaping-penalty ramp capped (`PENALTY_RAMP_CAP = 1.0`).** It was uncapped
   (`penalty_scale = steps / PENALTY_STEPS`, per env) — ~5× by the end of a 20M
-  run with 8 envs, though the comment intends full strength and hold. It's the
-  cause of the late reward decline in 20M runs. Left as-is so `hw2` changes one
-  thing at a time; decide after.
+  run with 8 envs, though the comment intends full strength and hold, and every
+  reward weight was tuned in 2–3M runs that never passed ~0.75×. It caused the
+  late reward decline in both 20M runs. The cap only acts past ~4M total steps,
+  so it doesn't affect the 3M gate. `PENALTY_RAMP_CAP=0` reproduces the old
+  behaviour (every checkpoint before `hw2`).
 
-### hw2_20m (launched 2026-09-23)
+### hw2_20m (launched 2026-09-23; restarted ~30 min in to add the ramp cap)
 
-`hw1` config + `SLOPE_TARGET_PROB=0.3` (half side-hills 3–15°, either side
+`hw1` config + ramp cap + `SLOPE_TARGET_PROB=0.3` (half side-hills 3–15°, either side
 down; half 12–24° climbs; never on rough/carpet) + `FAC_LEG_BALANCE=1.5`
 (penalty when the least-used paw's contact over the last 2 s falls below 30 %;
 ~0 for scripted, large for `hw1_20m`'s limp). Gated at its own 3M checkpoint
