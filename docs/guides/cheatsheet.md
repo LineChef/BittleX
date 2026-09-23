@@ -88,6 +88,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | Command | Does |
 |---|---|
 | `python benchmark_decathlon.py --learned <ckpt> --episodes 24 --json-out /tmp/dec.json` | Run **all** cells T1–T7 (flat, slopes, obstacles, stumble-catch, gauntlet, T6 hardened, T7 ledge). Prints fell% / speed / cond-survival per cell |
+| `python benchmark_decathlon.py --learned <ckpt> --episodes 28 --hw i --scripted-from trained/decathlon_hw1_i_hw.json --json-out <out>.json` | Score the learned gait through G2's **real control path** (5 Hz IMU + `i` command timing); reuses the saved scripted scores (~half the runtime) |
 | `... --extra-dr payload` | **Deployment config:** 75 g payload forced on, rough + torque-cutback off (the number that matters for hardware) |
 | `... --extra-dr clean` | No payload / rough / cutback — cell tests exactly its label |
 | `... --extra-dr full` | Training DR (payload 90%, rough 35%, cutback 40%) |
@@ -116,8 +117,11 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | Command | Does |
 |---|---|
 | `python export_onnx.py --model trained/run20m_ppo --out trained/run20m_ppo.onnx` | Export the deterministic policy to ONNX (drops value net + noise) |
+| `python export_onnx.py --model trained/<run>_ppo` | Export a policy: writes `<run>_ppo.onnx` **and** the `.onnx.json` sidecar with its residual scale (ship both to the Pi) |
 | `python verify_onnx.py --model trained/run20m_ppo --onnx trained/run20m_ppo.onnx` | Parity check: ONNX vs PyTorch actions across gaussian + a real rollout |
 | `python validate_deploy.py` | Drive `pi_pipeline/gait/residual_policy.py` from the sim in lockstep with `model.predict` — asserts obs + joint targets match bit-for-bit |
+| `python validate_deploy.py --onnx trained/<run>_ppo.onnx` | Same check for a specific policy — must print `residual scale: <N> deg` from its sidecar and `ALL OK` |
+| `python resilience_imu_rate.py` / `python resilience_joint_cmd.py` | What the stock 5 Hz IMU / the `m` vs `i` joint command cost the deployed policy in sim |
 | `python sysid_replay.py --log <real_log.csv>` | Replay a real robot log's joint commands open-loop in a sim mirror; report the sim-to-real tilt/rate gap |
 | `python sysid_replay.py --log <real_log.csv> --fit` | + sweep motor force / PD gains / `CMD_LATENCY_STEPS` to close the gap; prints the env edits |
 

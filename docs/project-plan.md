@@ -13,25 +13,19 @@ progresses. Behavior ideas to pick from live in
 [`docs/behavior-ideas.md`](behavior-ideas.md) — the reference list for "what
 should we work on next."
 
-> **⚠️ CURRENT TOP PRIORITY (2026-09-20): the real-time control loop's
-> feedback rate is 16x slower than it was designed for — resolve before H1
-> is meaningful.** Found while re-tracing `OpenCatEsp32` firmware source to
-> fix the IMU serial protocol: the function that actually streams
-> orientation (`imu.h` `print6Axis()`) has a hard internal throttle,
-> `PRINT6AXIS_MIN_INTERVAL = 200` ms — a firmware-level 5 Hz ceiling,
-> independent of anything on the Python side. `run_gait.py`'s control loop
-> runs at `CONTROL_HZ = 80` (12.5 ms/tick), so for ~15 of every 16 ticks the
-> policy would run on a stale, held orientation reading, not fresh
-> proprioception. Separately (smaller but related): that stream carries
-> acceleration, not gyro/angular-velocity, which `ResidualGaitPolicy` also
-> needs and doesn't have. Neither is fixed yet — both are flagged, not
-> decided. Full technical detail:
-> [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md)'s
-> "Confirmed serial line format" section. **Pick this up first in the next
-> session, before any other bring-up or gait work** — it changes whether
-> the trained policy is even meaningfully testable on real hardware as
-> currently architected, so it should be resolved (or at least a decision
-> made) before H1 (step 13b) is treated as a real signal.
+> **Current state of the gait (2026-09-23): the IMU-rate priority is resolved,
+> and a new gait trained under G2's real control path is the release candidate.**
+> Tracing the 5 Hz IMU issue through OpenCatEsp32 found a bigger gap: the Pi was
+> sending `m`, which moves joints one at a time (G2 wouldn't walk at all); it now
+> sends `i`. The 5 Hz IMU itself costs nothing measurable in sim. Four pipeline
+> bugs (5 Hz loop, dead pickup detection, IMU stream never started in app mode,
+> 1 s lock stall), two benchmark bugs (distorted scripted baseline, payload
+> leaking between cells) and a sim-vs-hardware audit were fixed along the way.
+> `hw1_20m` — trained with the 5 Hz IMU, the `i` command timing, realistic mass
+> and small calibration errors — is the release candidate, promoted unless its
+> benchmark shows a large regression. Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
+> Still hardware-gated: firmware version check (step 8a), roll/pitch sign (13a),
+> JamGuard strain test. Climb work paused (how G2 decides to climb is open).
 
 ---
 
@@ -490,10 +484,13 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Check servo calibration — pre-assembled units ship calibrated, so this is a
       check/fine-tune, not an assumed step. Only dig in if movement looks off.
 - [ ] Get it moving on stock firmware first, before any custom code.
-- [ ] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
-      (headless), confirm SSH access.
-  - **Can start NOW (Pi + PiSugar + card + PSU arrived 2026-09-01; robot/camera
-    not yet).** Full researched runbook + open-question answers in
+- [x] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
+      (headless), confirm SSH access. **Done (2026-09-02)** — card flashed
+      (`~/pi-setup/flash-pi.sh`, custom hostname/user/Wi-Fi/SSH-key baked into
+      `custom.toml` rather than the Imager GUI), SSH confirmed as
+      `<user>@g2pi.local`. Superseded by the full bring-up, `[x]`'d in Phase 6
+      below.
+  - Full researched runbook + open-question answers in
     [`docs/guides/pi-bring-up.md`](guides/pi-bring-up.md): flash Bookworm
     64-bit Lite, kill Wi-Fi power-save, zram+swapfile, disable-BT for the PL011
     UART, deploy `pi_pipeline` on ARM, then `benchmark_pi.py` (Vosk / Piper /
@@ -580,8 +577,8 @@ remaining work is hardware-gated.** Full plan + state: `docs/guides/gait-deploym
 - [x] **On-robot control loop** — `pi_pipeline/gait/`: `residual_policy.py`
       (exact 278-d obs mirror + phase clock + residual→joint map),
       `deploy_map.py` (URDF→OpenCat servo indices, sign/offset calibration
-      hooks), `run_gait.py` (80 Hz loop: BiBoard `V` IMU stream → policy → `m`
-      command). `validate_deploy.py` confirms **0 joint-degree cells differ**
+      hooks), `run_gait.py` (80 Hz loop: BiBoard `gP` IMU stream, 5 Hz, held between
+      frames → policy → `i` command). `validate_deploy.py` confirms **0 joint-degree cells differ**
       from `model.predict` across 5 commands × 251 steps.
 - [x] **Deployment-safety infrastructure (2026-09-05), built + unit-tested,
       hardware-validation pending:**
@@ -623,7 +620,7 @@ remaining work is hardware-gated.** Full plan + state: `docs/guides/gait-deploym
       `parse_imu_line` if the format differs) → `--openloop` (verify servo
       signs) → `--cmd` (learned gait) → the H1 head-to-head vs firmware `kwkF`.
 - The older `ger01d/opencat-gym-sim2real` firmware path is **not used** — the
-  stock OpenCat `m` command + `V` IMU stream carry the loop; no firmware flash.
+  stock OpenCat `i` command + `gP` IMU stream carry the loop; no firmware flash.
 - **No firmware fork (decided 2026-09-10).** `pi_pipeline` stays an application
   layer on **stock** OpenCatEsp32 over serial — that already exposes the
   keyframe library, gyro-balance, IMU exception reflexes, and calibration. New
@@ -1539,7 +1536,9 @@ mechanically," not a guess.
    `.env` back to the Pi's port (likely `/dev/ttyS0` → `/dev/ttyAMA0` after
    `disable-bt`).
 7. Enable Serial-2 on the BiBoard (`XS`, or edit `OpenCat.h` + reflash).
-8. `python -m pi_pipeline.doctor --serial` (passive handshake) → **on the stand:**
+8. `python -m pi_pipeline.doctor --serial` (passive handshake; **note the firmware
+   version** in the `?` banner — the gait's command-timing model and 5 Hz IMU throttle
+   were traced from OpenCatEsp32 source as of 2026-09-08) → **on the stand:**
    `check_serial firstmove` again, now through the Pi → once clean, `send kbalance`
    → `skills` → **`allmoves` again** (same command as Phase 0 step 3, now
    through the Pi's wiring) — diff this session's `events.jsonl` against the
@@ -1557,6 +1556,14 @@ mechanically," not a guess.
 **RL sim-to-real (Phase 6 — stack already built + sim-validated) — still on the stand**
 12. `pi_pipeline/gait/bench_real.py` — real-time joint control on the Pi (sim
     bench: 0.43 ms/step).
+12a. **Deploy the release-candidate policy (±30°), not `run20m_ppo` (±22°).**
+    The residual scale now travels with the policy file: `export_onnx.py` writes
+    `<policy>.onnx.json` (`residual_scale_deg`) and `residual_policy.py` reads it
+    (legacy fallback 22 only when no sidecar exists). Deploying = set
+    `DEFAULT_POLICY` in `residual_policy.py`, rsync the `.onnx` **and** its
+    `.onnx.json` to the Pi together, and confirm on the dev machine first with
+    `validate_deploy.py --onnx <policy>.onnx` ("ALL OK" — it pins the sim to the
+    sidecar's scale). Check the log line `residual scale: 30 deg`.
 13a. **On the stand:** `run_gait.py --probe-imu` (confirm the real IMU format —
     genuinely unknown until now) → `--openloop` (verify servo signs against
     `deploy_map.py`'s `SERVO_SIGN` — a flipped sign must be caught here, not on

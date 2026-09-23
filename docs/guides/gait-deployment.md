@@ -14,9 +14,8 @@ cannot — see "Network").
   `rl_training/opencat-gym/`; Pi-side runtime in `pi_pipeline/`.
 - **Repo**: `https://github.com/LineChef/BittleX`, default work branch
   **`development`**. Public. `main` is stale.
-- **This machine (Mac)** has the full repo and the RL toolchain. It **cannot
-  reach the Pi** — the Verizon G3100 router isolates Wi-Fi clients from each
-  other, and the Mac is on Wi-Fi.
+- **This machine (Mac)** has the full repo and the RL toolchain, and **can
+  reach the Pi over SSH** as of 2026-09-22 (see "Network — Mac→Pi SSH" below).
 - **The PC** (Windows, Ethernet) **can** reach the Pi. You are (probably)
   running on the PC now, so you can drive the Pi directly over SSH.
 - **The Pi**: hostname `g2pi`, `192.168.1.181`, user is whatever was set at flash
@@ -88,7 +87,7 @@ steps by hand from `pi-bring-up.md` — same content.
     `[8,12,9,13,10,14,11,15]`, with per-servo **sign/offset calibration hooks**
     (all identity now — MUST verify on hardware via `run_gait.py --openloop`).
   - `run_gait.py` — 80 Hz loop: parse BiBoard `V` IMU stream → quat →
-    `policy.step` → `m` command. Modes: `--probe-imu`, `--openloop`, `--cmd <spd>`.
+    `policy.step` → `i` command (all joints at once; `m` moves them one at a time and can't keep up). Modes: `--probe-imu`, `--openloop`, `--cmd <spd>`.
     Sends `d` (rest) on any exit; clamps every command to ±120°.
   - `validate_deploy.py` (in `rl_training/opencat-gym/`) drives `residual_policy`
     from the sim in lockstep with `model.predict`: **0 joint-degree cells differ**
@@ -171,20 +170,20 @@ is the frozen base gait. Do **not** start new gait-training loops.
   measurement: `docs/rl/hardware-gated-backlog.md` (H1–H9). H1 =
   the learned-vs-scripted head-to-head, the question the whole RL track hinges on.
 
-## Network — the isolation problem (unresolved)
+## Network — Mac→Pi SSH (resolved 2026-09-22)
 
-- **Confirmed**: G3100 blocks Wi-Fi‑client‑to‑Wi‑Fi‑client traffic. Mac→Pi fails
-  (`EHOSTUNREACH`); Mac→gateway/internet works; PC(Ethernet)→Pi works;
-  router→Pi works. Not the Pi, not Mac software (pf disabled, no MDM/extensions,
-  route table clean) — purely the router.
-- **Likely cause**: G3100 + paired **E3200 extender** (currently offline but
-  still paired) enforce client isolation; no "AP isolation off" toggle exists in
-  the G3100 UI. IGMP proxy and SON (Self-Organizing Network, currently Enabled)
-  are contributing suspects.
-- **Fixes to try** (best-supported first): un-pair/remove the E3200 in the router
-  UI → reboot; disable IGMP proxy (Routing settings, per band); disable SON →
-  reboot; factory reset (last resort). Or sidestep: Ethernet adapter on the Mac.
-- Not blocking the Pi work — that's why you're on the PC.
+- **Symptom**: from the Mac, `ssh`/`ping` to the Pi failed (`EHOSTUNREACH`)
+  while Mac→gateway/internet worked, PC(Ethernet)→Pi worked, and router→Pi
+  worked. An Ethernet adapter on the Mac did not help.
+- **Root cause: the Jamf framework (MDM agent) on the Mac**, which was blocking
+  traffic to hosts on the local subnet. Disabling it fixed SSH immediately.
+  Not the router: the earlier suspicion of router/extender client isolation
+  (IGMP proxy, SON) was a red herring, and the earlier "no MDM" check had missed it.
+- **Command**: `ssh <user>@g2pi.local` (the user set when the card was flashed).
+- **If it comes back**: check for an MDM / endpoint-security agent on the Mac
+  before touching the router. `ping` the Pi's raw IP (rules out mDNS), then
+  `ssh -vvv` to see whether it's a timeout (something on the path) or the Pi
+  rejecting the connection.
 
 ## Conventions (from the user's standing preferences)
 

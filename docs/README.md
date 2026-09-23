@@ -61,6 +61,7 @@ No other entries yet; the rest starts once Bittle X and the camera arrive.
 
 | | |
 |---|---|
+| [`hw1-log.md`](rl/hw1-log.md) | Training under G2's real control path (5 Hz IMU, `i` command timing), the pipeline/benchmark fixes behind it, and the `hw1_20m` release candidate. |
 | [`hardware-gated-backlog.md`](rl/hardware-gated-backlog.md) | RL/gait work deferred to hardware (H1–H12), each with a trigger. |
 | [`h1-rubric.md`](rl/h1-rubric.md) | The real-robot learned-vs-scripted comparison rubric. |
 | [`vision-in-gait.md`](rl/vision-in-gait.md) | The vision-in-the-gait campaign (Phases A–F) — **closed**; why, and what was built. |

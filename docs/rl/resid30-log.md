@@ -1,5 +1,11 @@
 # resid30 campaign log
 
+> **Note (2026-09-23):** the "scripted" baseline in these benchmark runs was not
+> the pure `wkF` walk (a residual-mode bug commanded it ~7.5° off), and cells
+> after the bare-robot ones silently ran without the payload. Both are fixed and
+> rescored in [`hw1-log.md`](hw1-log.md); treat the learned-vs-scripted numbers
+> below as superseded.
+
 Testing whether widening `RESIDUAL_SCALE_DEG` 22 -> 30 (a fresh run, not a
 continuation of `run20m_ppo`) produces a policy that beats the frozen
 baseline on the standard benchmark. Plan:

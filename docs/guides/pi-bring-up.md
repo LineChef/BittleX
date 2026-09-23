@@ -79,6 +79,11 @@ solid or irregular blink during first boot is normal. No HDMI attached = no
 console, so if SSH never comes up after ~5 min, re-flash and re-check the Wi-Fi
 country + SSID/password in Imager settings.
 
+Gotcha: if the Pi answers from other machines on the network but the Mac gets
+`EHOSTUNREACH`, check for an MDM / endpoint-security agent on the Mac (a Jamf
+framework was the cause here, not the router). See
+[`gait-deployment.md`](gait-deployment.md) "Network — Mac→Pi SSH".
+
 ## 3. Kill Wi-Fi power-save (do this before anything heavy)
 
 ```bash
@@ -216,8 +221,11 @@ loop. 30-second peel-and-stick when needed.
 
 `pi_pipeline/` is already a real codebase (link/ voice/ vision/ memory/ + a test
 suite), currently developed and tested on the Mac. Getting it onto ARM: **copy
-only what runs there** — `pi_pipeline/` itself plus the one exported policy
-file (`rl_training/opencat-gym/trained/run20m_ppo.onnx`, <1 MB). **Not** a full
+only what runs there** — `pi_pipeline/` itself plus the one exported policy:
+the `.onnx` named by `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`
+(<1 MB) **and its `.onnx.json` sidecar**, which carries the residual scale the
+policy was trained at (22° for `run20m_ppo`, 30° for every later candidate —
+a missing sidecar silently falls back to 22°). **Not** a full
 `git clone` of the repo — `rl_training/` is the PyBullet/SB3 training
 toolchain plus its checkpoints, TensorBoard logs, and GIFs (**~4.7 GB today,
 and it only grows** with every training run on `development`), none of which
@@ -234,8 +242,9 @@ sudo apt install -y python3-venv python3-dev build-essential \
 # destination tree), a single-file rsync needs that directory to already exist.
 ssh g2pi@g2pi.local mkdir -p ~/bittleX/rl_training/opencat-gym/trained
 rsync -avz --delete pi_pipeline/ g2pi@g2pi.local:~/bittleX/pi_pipeline/
-rsync -avz rl_training/opencat-gym/trained/run20m_ppo.onnx \
-      g2pi@g2pi.local:~/bittleX/rl_training/opencat-gym/trained/run20m_ppo.onnx
+POLICY=$(python3 -c "import sys; sys.path.insert(0, 'pi_pipeline/gait'); import residual_policy as r; print(r.DEFAULT_POLICY)")
+rsync -avz rl_training/opencat-gym/trained/$POLICY rl_training/opencat-gym/trained/$POLICY.json \
+      g2pi@g2pi.local:~/bittleX/rl_training/opencat-gym/trained/
 
 # on the Pi
 cd ~/bittleX/pi_pipeline

@@ -1,5 +1,11 @@
 # Gait Benchmark — Learned vs. Scripted
 
+> **Note (2026-09-23):** the "scripted" baseline in these benchmark runs was not
+> the pure `wkF` walk (a residual-mode bug commanded it ~7.5° off), and cells
+> after the bare-robot ones silently ran without the payload. Both are fixed and
+> rescored in [`hw1-log.md`](hw1-log.md); treat the learned-vs-scripted numbers
+> below as superseded.
+
 Head-to-head of the RL-trained gaits against Bittle's built-in `wkF` walk
 keyframes, on the same obstacle course. Run with
 `rl_training/opencat-gym/benchmark_gaits.py` — both gaits run inside the training

@@ -91,19 +91,19 @@ practice), accel in g, angles in degrees, **yaw printed negated**.
 `PRINT_ACCELERATION` is unconditionally defined in current firmware, so the
 accel triplet is always present — there is no gyro-only variant.
 
-**Open gap, not yet resolved:** this line carries acceleration, not
-angular velocity. The firmware's raw-gyro print path exists in source but
+**No angular rate, 5 Hz ceiling — how the Pi side handles it (2026-09-22).**
+The line carries acceleration, not angular velocity; the raw-gyro print path
 is dead code (commented out in `print6AxisMacro()`, which isn't even
-called) — no true gyro/angular-rate is available over stock-firmware
-serial at all. `pi_pipeline/gait/residual_policy.py`'s `ResidualGaitPolicy`
-needs real roll/pitch angular velocity as an observation input, which this
-stream cannot supply. `parse_imu_line()` in `run_gait.py` deliberately
-returns zero rather than smuggling accel into the gyro slot. Needs a real
-decision before the policy loop is trustworthy on hardware: finite-differencing
-consecutive `ypr` samples in the Python control loop (the policy's own
-training observations already rely on a finite-diff angular-accel channel,
-so there's precedent), or revisiting the no-firmware-fork decision
-(`docs/project-plan.md`, 2026-09-10) for just a gyro-print re-enable.
+called). And `print6Axis()` returns early unless 200 ms have passed since its
+last print (`PRINT6AXIS_MIN_INTERVAL`), so the stream is at most 5 Hz. Every
+call site (main loop, `transform()`'s per-step print, skills) goes through
+that one throttle — there is no faster read path in stock firmware.
+`gait/imu_parse.py`'s `ImuFeed` holds the latest frame between prints and
+derives roll/pitch rate by finite-differencing consecutive frames;
+`run_gait.py` and `app/sensors.py` both use it, reading through
+`SerialLink.poll_imu()` (non-blocking; IMU lines are split out of command
+replies). What that costs the gait policy in sim:
+`rl_training/opencat-gym/resilience_imu_rate.py`.
 
 ### Exception detection (`imu.h` `getImuException()`)
 
