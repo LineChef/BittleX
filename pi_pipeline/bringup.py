@@ -187,6 +187,17 @@ def _steps() -> list[Step]:
             "<policy>.onnx must say ALL OK with 'residual scale: 30 deg'. Shown, not "
             "auto-run: python rl_training/opencat-gym/validate_deploy.py --onnx <policy>.onnx",
             manual_cmd="python rl_training/opencat-gym/validate_deploy.py --onnx <policy>.onnx"),
+        Step("12b", "RL sim-to-real (Phase 6, still on the stand)", "Does `i` echo on completion? If so, send only the freshest target",
+            "With commands backed up, the firmware runs the OLDEST waiting one and "
+            "drops the rest, so 80 Hz streaming means lag and stale targets. Source "
+            "shows a token echo after each finished command, but some move paths have "
+            "it commented out -- measure it: with the IMU stream off, send a few `i` "
+            "moves and log what comes back and when. If `i` echoes reliably: switch "
+            "run_gait.py to send-on-acknowledgement (keep only the newest target, send "
+            "on the echo, time out and resend if one is lost), update firmware_model.py "
+            "to match, measure the real lag and retrain under it. If not: keep "
+            "streaming; the firmware fix needs a fork (revisit only if the lag hurts). "
+            "Shown, not auto-run: python -m pi_pipeline.link.check_serial send \"i8 50\""),
         Step("13a", "RL sim-to-real (Phase 6)", "IMU probe + servo-sign check -- STILL ON THE STAND",
             "This is the last stand-only step. The line FORMAT is now known "
             "from firmware source (MCU:/ICM: prefix, accel then negated "

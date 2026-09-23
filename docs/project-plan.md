@@ -1565,6 +1565,19 @@ mechanically," not a guess.
     `.onnx.json` to the Pi together, and confirm on the dev machine first with
     `validate_deploy.py --onnx <policy>.onnx` ("ALL OK" — it pins the sim to the
     sidecar's scale). Check the log line `residual scale: 30 deg`.
+12b. **Check whether `i` echoes on completion — if so, send only the freshest target.**
+    When commands back up, the firmware runs the *oldest* waiting one and drops the
+    rest (`read_serial()` keeps the first command it reads), so streaming at 80 Hz
+    means lag (~55 ms in the sim model) and stale targets. Source shows a token echo
+    after each finished command (`printToAllPorts(token)` in `reaction.h`), but some
+    move paths have it commented out — **measure it on the real board**: send a few
+    `i` moves with the IMU stream off and log what comes back and when. **If `i`
+    echoes reliably:** switch `run_gait.py` to send-on-acknowledgement (hold only
+    the newest target, send it when the echo arrives, time out and resend if an echo
+    is lost), update `firmware_model.py` to match, measure the real lag, and retrain
+    the gait under the shorter lag (the sim suggests roughly half: ~15–30 ms). **If
+    it doesn't:** keep streaming; the firmware-side fix (keep the newest command)
+    would need a fork — revisit the no-fork decision only if the measured lag hurts.
 13a. **On the stand:** `run_gait.py --probe-imu` (confirm the real IMU format —
     genuinely unknown until now) → `--openloop` (verify servo signs against
     `deploy_map.py`'s `SERVO_SIGN` — a flipped sign must be caught here, not on
