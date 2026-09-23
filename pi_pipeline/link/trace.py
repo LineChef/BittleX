@@ -46,6 +46,9 @@ class TracingLink:
     def read_line(self) -> str:
         return self._link.read_line()
 
+    def poll_imu(self) -> list:
+        return self._link.poll_imu()
+
     def connect(self) -> bool:
         return self._link.connect()
 

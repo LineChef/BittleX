@@ -77,6 +77,8 @@ def _build_runtime(link, *, hz: float, memory=None):
                             object_gallery_enabled=features.object_gallery)
     bindings = build_bindings(link, dry_run_power=link is None)
     hub = SensorHub(link)
+    if link is not None:
+        hub.start_stream()   # nothing else turns the IMU print on in app mode
     # B11 place memory: "the dog is often to the left" -> a durable fact
     on_obs = (lambda note: memory.store.add_fact(note)) if memory is not None else None
     rt = BehaviorRuntime(
@@ -216,6 +218,8 @@ def main() -> None:
         if memory is not None:
             memory.close()
         if link is not None:
+            if rt is not None:
+                link.send("gp", read_reply=False, settle=0.0)   # IMU print off
             link.close()
         try:
             os.remove(_PIDFILE)

@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(_HERE, ".."))
 sys.path.insert(0, _HERE)
 
 import deploy_map                                          # noqa: E402
-from run_gait import parse_imu_line, _open_link, _send, _readline   # noqa: E402
+from run_gait import parse_imu_line, _open_link, _send, _latest_imu_line   # noqa: E402
 
 STAND = [50, 0, 50, 0, 50, 0, 50, 0]        # URDF order, deg -- matches env reset
 # a few poses that load the servos differently (URDF order, deg)
@@ -53,7 +53,7 @@ def _stream_hold(lk, cmd_str, seconds, hz, imu_fmt, logf, t0):
     dt = 1.0 / hz
     end = time.perf_counter() + seconds
     while time.perf_counter() < end:
-        line = _readline(lk)
+        line = _latest_imu_line(lk)
         p = parse_imu_line(line, imu_fmt) if line else None
         if p:
             r, pi, y, gx, gy, gz = p
@@ -90,7 +90,7 @@ def main():
     logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8)) + ",phase\n")
     t0 = time.perf_counter()
     try:
-        _send(lk, "g"); time.sleep(0.2)          # firmware balance OFF -- we want raw response
+        _send(lk, "gb"); time.sleep(0.2)         # firmware balance OFF (explicit; bare "g" toggles)
         _send(lk, "gP"); time.sleep(0.2)         # continuous 6-axis print on (see run_gait.probe_imu)
 
         _send_pose(lk, STAND, "stand0")
@@ -106,7 +106,7 @@ def main():
             for k, frame in enumerate(ref):
                 deg = np.rint(np.rad2deg(frame)).astype(int)
                 _send_pose(lk, deg, f"wkf_c{c}_f{k}")
-                line = _readline(lk)
+                line = _latest_imu_line(lk)
                 p = parse_imu_line(line, args.imu_format) if line else None
                 if p:
                     r, pi, y, gx, gy, gz = p
@@ -122,6 +122,7 @@ def main():
     finally:
         _send(lk, "gp")         # stream off (lowercase C_PRINT_OFF, not a toggle)
         _send(lk, "d")          # rest
+        _send(lk, "gB")         # restore firmware balance
         logf.close()
         lk.close()
     print(f"wrote {args.log}")

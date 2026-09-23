@@ -38,6 +38,11 @@ class LockedLink:
         with self._lock:
             return self._link.read_line()
 
+    def poll_imu(self) -> list:
+        """Non-blocking, so holding the lock here never delays a send."""
+        with self._lock:
+            return self._link.poll_imu()
+
     @property
     def is_connected(self) -> bool:
         return getattr(self._link, "is_connected", False)
@@ -189,6 +194,9 @@ class _NullLink:
 
     def read_line(self) -> str:
         return ""
+
+    def poll_imu(self) -> list:
+        return []
 
     def close(self) -> None:
         pass

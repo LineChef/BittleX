@@ -24,6 +24,10 @@ class FakeLink:
     def read_line(self):
         return self._lines.pop(0) if self._lines else ""
 
+    def poll_imu(self):
+        out, self._lines = self._lines, []
+        return out
+
     def close(self):
         pass
 
@@ -86,6 +90,8 @@ def test_locked_link_passes_through():
     ll = LockedLink(lk)
     ll.send("kbalance", read_reply=False)
     assert lk.sent == ["kbalance"] and ll.read_line() == "ypr 1 2 3"
+    lk._lines = ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0"]
+    assert ll.poll_imu() == ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0"]
     assert ll.is_connected
 
 

@@ -74,3 +74,48 @@ def test_legacy_ypr_fallback_still_works(rg):
 def test_garbage_and_empty_lines_return_none(rg):
     assert rg.parse_imu_line("garbage line") is None
     assert rg.parse_imu_line("") is None
+
+
+class _FiveHzImuLink:
+    """Emits one IMU line per 200 ms like stock firmware; records sends."""
+
+    def __init__(self):
+        import time
+        self._t0 = time.monotonic()
+        self._emitted = 0
+        self.sent = []
+
+    def send(self, cmd, **kw):
+        self.sent.append(cmd)
+        return ""
+
+    def poll_imu(self):
+        import time
+        due = int((time.monotonic() - self._t0) / 0.2) + 1
+        out = ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0"] * (due - self._emitted)
+        self._emitted = due
+        return out
+
+
+def test_loop_ticks_at_control_rate_not_imu_print_rate(rg, monkeypatch):
+    """Until 2026-09-22 the loop blocked on readline each tick, so the 5 Hz
+    firmware IMU print paced the policy, gait phase and joint commands."""
+    pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(rg, "diag", None)
+    lk = _FiveHzImuLink()
+    rg.run(lk, 0.10, 1.0, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False)
+    moves = [c for c in lk.sent if c.startswith("i") and " " in c]
+    assert len(moves) >= 70            # ~80 ticks in 1 s, minus the stand pose
+    assert lk._emitted <= 16           # while only ~5 IMU frames/s arrived (incl. setup pauses)
+    # balance off is the explicit "gb" (bare "g" toggles), restored on exit
+    assert "g" not in lk.sent and lk.sent.index("gb") < lk.sent.index("gP")
+    assert lk.sent[-1] == "gB"
+
+
+def test_gait_move_command_is_simultaneous_i_not_sequential_m():
+    """`m` moves joints one at a time (>=144 ms per 8-joint command) -- the
+    gait loop must send `i`, which moves them together."""
+    from pi_pipeline.gait import deploy_map
+    cmd = deploy_map.policy_deg_to_move_cmd([50, 0, 50, 0, 50, 0, 50, 0])
+    assert cmd == "i8 50 12 0 9 50 13 0 10 50 14 0 11 50 15 0"

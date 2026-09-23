@@ -6,21 +6,25 @@
     python -m pi_pipeline.gait.run_gait --cmd 0.0 --seconds 5 # stand + hold
 
 Pipeline per tick (~80 Hz):
-    parse IMU line -> (roll,pitch,yaw rad, gyro xyz rad/s)
+    ImuFeed <- every IMU line received since last tick (non-blocking poll)
+      -> latest (roll,pitch,yaw rad) held between the firmware's 5 Hz prints,
+         roll/pitch rate = 0 (--imu-rate fd: finite difference; no better in sim)
     quat = euler_to_quat(rpy)
     joint_deg_urdf = ResidualGaitPolicy.step(quat, gyro)
-    "m8 <d> 12 <d> ..."  = deploy_map.policy_deg_to_move_cmd(joint_deg_urdf)
+    "i8 <d> 12 <d> ..."  = deploy_map.policy_deg_to_move_cmd(joint_deg_urdf)
     serial.send(cmd)
 
 The BiBoard streams 6-axis IMU after the `gP` command (T_GYRO 'g' +
 C_PRINT 'P' -- NOT the bare 'V' this code sent before 2026-09-20; that
-token doesn't exist in current firmware source at all). Line format is now
-confirmed from source (see parse_imu_line's docstring) but the gyro slot
-it returns is a placeholder zero -- the real stream carries acceleration,
-not angular velocity; run --probe-imu at bring-up to confirm the chip
+token doesn't exist in current firmware source at all). Line format is
+confirmed from source (see parse_imu_line's docstring). The stream is
+throttled to 5 Hz in firmware and carries no gyro, so the loop must not wait
+for IMU lines: until 2026-09-22 it did a blocking readline per tick, which
+paced the whole loop -- policy, gait phase and joint commands -- to the 5 Hz
+IMU print instead of 80 Hz. Run --probe-imu at bring-up to confirm the chip
 prefix (MCU/ICM) and yaw sign on the real unit before trusting this loop.
 
-SAFETY: on any of {IMU parse failures piling up, Ctrl-C, loop overrun}, the loop
+SAFETY: on any of {no IMU frame for IMU_STALE_S, Ctrl-C, loop overrun}, the loop
 sends `d` (rest, servos relaxed) and exits. deploy_map clamps every command to
 +/-120 deg. Start with --openloop on a stand/cradle before trusting the policy.
 """
@@ -35,13 +39,14 @@ import time
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HERE)                              # sibling modules, also under `python -m`
 sys.path.insert(0, os.path.join(_HERE, ".."))          # for `link`
 sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for `pi_pipeline.diag`
 
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
-from imu_parse import parse_imu_line                          # noqa: E402  -- shared with app/sensors.py
+from imu_parse import ImuFeed, parse_imu_line                 # noqa: E402  -- shared with app/sensors.py
 
 try:                                                          # carpet mode (optional)
     from pi_pipeline.gait.carpet import CarpetAction, CarpetDetector  # noqa: E402
@@ -100,6 +105,7 @@ def euler_to_quat(roll, pitch, yaw):
 
 # --------------------------------------------------------------------- loop
 STAND_URDF_DEG = [50, 0, 50, 0, 50, 0, 50, 0]     # matches env.reset() start pose
+IMU_STALE_S = 0.6     # no IMU frame for this long (3 missed 5 Hz prints) -> stop
 
 
 def _open_link(port, baud):
@@ -122,11 +128,14 @@ def probe_imu(lk, seconds):
     print("sending 'gP' (start continuous 6-axis print); printing raw lines for", seconds, "s")
     _send(lk, "gP")
     t0 = time.time()
+    n = 0
     while time.time() - t0 < seconds:
-        line = lk.read_line()
-        if line:
+        for line in lk.poll_imu():
             print(repr(line))
+            n += 1
+        time.sleep(0.01)
     _send(lk, "gp")
+    print(f"{n} IMU lines in {seconds:.0f} s = {n / seconds:.1f} Hz (stock firmware caps this at 5 Hz)")
     print("stream stopped ('gp'). Match parse_imu_line() to the format above.")
 
 
@@ -313,7 +322,7 @@ def _make_vision_feed(kind, port, baud):
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
-        turn_burst_s=1.0, carpet=False):
+        turn_burst_s=1.0, carpet=False, imu_rate="zero"):
     pol = ResidualGaitPolicy()
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
@@ -359,7 +368,12 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                    + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s\n")
 
     if disable_firmware_balance:
-        _send(lk, "g")            # toggle firmware gyro assist OFF -> policy has full control
+        # firmware balance OFF -> policy has full control. "gb", not bare "g":
+        # bare "g" TOGGLES gyroBalanceQ, so after any session that already sent
+        # it (or a crash that skipped the restore) it would turn balance ON --
+        # and with balance on the firmware also runs its own lifted / fall /
+        # push reflex skills over the policy (reaction.h dealWithExceptions).
+        _send(lk, "gb")
         time.sleep(0.2)
 
     # go to the sim's reset stance, let it settle
@@ -370,23 +384,27 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     time.sleep(0.2)
 
     # prime: read one good IMU frame for the reset
-    rpy_g = None
+    feed = ImuFeed(imu_fmt, rate_mode=imu_rate)
     t0 = time.time()
-    while rpy_g is None and time.time() - t0 < 3.0:
-        line = _readline(lk)
-        if line:
-            rpy_g = parse_imu_line(line, imu_fmt)
-    if rpy_g is None:
+    while feed.frame is None and time.time() - t0 < 3.0:
+        feed.update(lk.poll_imu(), time.monotonic())
+        time.sleep(0.01)
+    if feed.frame is None:
         _send(lk, "d")
         raise SystemExit("no parseable IMU frame in 3 s -- run --probe-imu and fix parse_imu_line()")
 
-    r, p_, y, gx, gy, gz = rpy_g
+    r, p_, y, gx, gy, gz = feed.frame
+    # Yaw rebase: the IMU has no magnetometer, so firmware yaw is relative to
+    # the power-on heading plus drift -- anything in +/-180. Training always
+    # starts at yaw 0. Sim shows run20m_ppo ignores a yaw offset (0-180 deg,
+    # 2026-09-22), but rebasing keeps any policy on the distribution it saw.
+    yaw0 = y
+    y = 0.0
     q = euler_to_quat(r, p_, y)
     pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
 
     dt = 1.0 / hz
     n = int(seconds * hz) if seconds else None
-    miss = 0
     t_next = time.perf_counter()
     t_start = time.perf_counter()
     lat = []
@@ -395,18 +413,18 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     try:
         i = 0
         while n is None or i < n:
-            line = _readline(lk)
-            parsed = parse_imu_line(line, imu_fmt) if line else None
-            if parsed is None:
-                miss += 1
-                if miss > 20:
-                    print("!! 20 consecutive IMU misses -- stopping")
-                    if diag is not None:
-                        diag.event("gait", "ERROR", "imu.stale", consecutive_misses=miss)
-                    break
+            # never wait on the IMU: take what has arrived, step on the held frame
+            now = time.monotonic()
+            feed.update(lk.poll_imu(), now)
+            imu_age = feed.age(now)
+            if imu_age > IMU_STALE_S:
+                print(f"!! no IMU frame for {imu_age:.2f} s -- stopping")
+                if diag is not None:
+                    diag.event("gait", "ERROR", "imu.stale", age_s=round(imu_age, 3))
+                break
             else:
-                miss = 0
-                r, p_, y, gx, gy, gz = parsed
+                r, p_, y, gx, gy, gz = feed.frame
+                y = math.remainder(y - yaw0, 2.0 * math.pi)
                 q = euler_to_quat(r, p_, y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
@@ -544,6 +562,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             wd.stop()
         _send(lk, "gp")    # stream off (lowercase C_PRINT_OFF, not a toggle)
         _send(lk, "d")     # rest
+        if disable_firmware_balance:
+            _send(lk, "gB")    # restore the firmware default (balance + reflexes on)
         if vision is not None:
             vision.close()
         if logf:
@@ -557,8 +577,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     print("sent rest.")
 
 
-def _readline(lk):
-    return lk.read_line() or None
+def _latest_imu_line(lk):
+    """Newest IMU line received since the last call (non-blocking), or None."""
+    lines = lk.poll_imu()
+    return lines[-1] if lines else None
 
 
 def _send(lk, cmd):
@@ -573,13 +595,16 @@ def main():
     ap.add_argument("--cmd", type=float, default=0.10, help="forward speed command, m/s")
     ap.add_argument("--seconds", type=float, default=0.0, help="0 = run until Ctrl-C")
     ap.add_argument("--imu-format", default="auto", choices=("auto", "ypr", "rpy", "6axis"))
+    ap.add_argument("--imu-rate", default="zero", choices=("fd", "zero"),
+                    help="roll/pitch rate fed to the policy: fd = finite difference of "
+                         "consecutive 5 Hz IMU frames, zero = none (stream has no gyro)")
     ap.add_argument("--probe-imu", action="store_true")
     ap.add_argument("--openloop", action="store_true")
     ap.add_argument("--dry-run", action="store_true",
                     help="full loop with synthetic IMU and no serial -- rate check")
     ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
     ap.add_argument("--keep-firmware-balance", action="store_true",
-                    help="do NOT send 'g' -- leave the firmware gyro-assist layer on under the policy")
+                    help="do NOT send 'gb' -- leave the firmware gyro-assist layer on under the policy")
     ap.add_argument("--log", default=None,
                     help="write a per-tick CSV (t, rpy, gyro, 8 joint deg) for real_vs_sim / sysid_replay")
     ap.add_argument("--carpet", action="store_true",
@@ -661,7 +686,7 @@ def main():
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
-                turn_burst_s=args.skills_turn_burst, carpet=args.carpet)
+                turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate)
     finally:
         try:
             lk.close()

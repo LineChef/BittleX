@@ -13,6 +13,11 @@ from __future__ import annotations
 
 import math
 
+# The firmware stream's line prefixes (MPU6050 / ICM42670). link/serial_link.py
+# keeps an identical IMU_PREFIXES for its reply/IMU demux -- a test asserts
+# they match.
+IMU_PREFIXES = ("MCU:", "ICM:")
+
 
 def parse_imu_line(line, fmt="auto", deg_in=True):
     """Return (roll, pitch, yaw [rad], gx, gy, gz [rad/s]) or None if this line
@@ -71,7 +76,7 @@ def parse_imu_line(line, fmt="auto", deg_in=True):
     if not s:
         return None
     k = math.pi / 180.0 if deg_in else 1.0
-    for prefix in ("MCU:", "ICM:"):
+    for prefix in IMU_PREFIXES:
         if s.startswith(prefix):
             try:
                 nums = [float(x) for x in s[len(prefix):].split()]
@@ -106,3 +111,69 @@ def parse_imu_line(line, fmt="auto", deg_in=True):
     except ValueError:
         return None
     return (roll * k, pitch * k, yaw * k, g[0] * k, g[1] * k, g[2] * k)
+
+
+def _wrap(a):
+    return (a + math.pi) % (2.0 * math.pi) - math.pi
+
+
+class ImuFeed:
+    """Latest-frame holder for the firmware IMU stream.
+
+    Stock firmware prints a frame at most every 200 ms (`print6Axis()`'s
+    PRINT6AXIS_MIN_INTERVAL -> 5 Hz) and the MCU:/ICM: line has no angular
+    rate. Callers that tick faster (run_gait at 80 Hz, SensorHub) feed every
+    received line through `update()` and read `frame` every tick: orientation
+    is held between prints, and angular rate is the finite difference of the
+    last two frames (by Pi receive time), held likewise. Lines that do carry a
+    true gyro (the legacy 6-number shapes parse_imu_line still accepts) pass
+    their rate through unchanged.
+
+    rate_mode "zero" reports zero rate instead of the finite difference.
+    """
+
+    MIN_FD_DT = 0.05     # frames closer than this (a buffered burst) don't update the rate
+
+    def __init__(self, fmt="auto", rate_mode="fd"):
+        if rate_mode not in ("fd", "zero"):
+            raise ValueError(f"rate_mode must be 'fd' or 'zero', not {rate_mode!r}")
+        self.fmt = fmt
+        self.rate_mode = rate_mode
+        self.frame = None            # (roll, pitch, yaw, gx, gy, gz) or None before the first frame
+        self.stamp = None            # receive time of the latest frame
+        self.frames = 0
+        self._prev = None            # (t, roll, pitch, yaw) of the frame the rate was last taken from
+
+    def update(self, lines, now):
+        """Ingest raw lines received since the last call. True if any parsed."""
+        fresh = False
+        for line in lines:
+            p = parse_imu_line(line, self.fmt) if line else None
+            if p is None:
+                continue
+            r, pi, y, gx, gy, gz = p
+            if line.lstrip().startswith(IMU_PREFIXES):
+                gx, gy, gz = self._rate(now, r, pi, y)
+            self.frame = (r, pi, y, gx, gy, gz)
+            self.stamp = now
+            self.frames += 1
+            fresh = True
+        return fresh
+
+    def _rate(self, t, r, p, y):
+        held = self.frame[3:] if self.frame is not None else (0.0, 0.0, 0.0)
+        if self.rate_mode == "zero":
+            return 0.0, 0.0, 0.0
+        if self._prev is None:
+            self._prev = (t, r, p, y)
+            return 0.0, 0.0, 0.0
+        t0, r0, p0, y0 = self._prev
+        dt = t - t0
+        if dt < self.MIN_FD_DT:
+            return held
+        self._prev = (t, r, p, y)
+        return (_wrap(r - r0) / dt, _wrap(p - p0) / dt, _wrap(y - y0) / dt)
+
+    def age(self, now):
+        """Seconds since the latest frame (inf before the first)."""
+        return math.inf if self.stamp is None else now - self.stamp
