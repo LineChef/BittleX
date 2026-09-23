@@ -168,6 +168,40 @@ down; half 12–24° climbs; never on rough/carpet) + `FAC_LEG_BALANCE=1.5`
 vs `hw1_20m`@3M: `paw_balance.py`, `slope_sweep.py`, v2 benchmark. Split into
 separate runs only if the gate is mixed.
 
+**3M gate (2026-09-23): mixed → stopped at 3.7M, split.** vs `hw1_20m`@3M:
+limp not fixed (least-used paw 17 % vs 22 % — it moved to another leg);
+side-hills 12–15° ~2× faster (0.036/0.033 vs 0.017/0.015 m/s) but side-hills
+5–8° and climbs 8–20° 20–45 % slower, flat −10 %, sills/rough/rubble slower;
+bare-robot falls down (164 vs 223 / 1,048) and downhill faster. Two changes in
+one run couldn't say which caused the regressions.
+
+### hw3_20m (launched 2026-09-23)
+
+`hw1` config + ramp cap + `SLOPE_TARGET_PROB=0.3` only (no leg-balance term).
+Same 3M gate vs `hw1_20m`@3M. The limp needs its own look: the leg-balance
+penalty moved it rather than removing it.
+
+### The limp: root cause and fix (2026-09-23)
+
+- **Cause: the diagonal partner, not the limping leg.** In `hw1_20m` (FR paw
+  down 16 % of steps), zeroing the FR leg's own correction only brings it to
+  21 %; zeroing the **BL** correction brings FR to 40 % (scripted 48 %). FR and
+  BL are a trot diagonal — the learned BL correction extends that leg so it
+  props the body alone and FR never quite lands.
+- **Why training allows it:** the reward is ~blind to it — planting FR changes
+  the total by +0.03/step (~0.2 %). The existing diagonal trot term
+  (`FAC_FOOT_PHASE`) is ~0.5/step against ~15 for joint imitation. hw2's
+  `FAC_LEG_BALANCE` only pushed on the least-used paw, so the policy satisfied
+  it by moving the limp to another leg.
+- **Fix candidate: footfall imitation (`FAC_CONTACT_IMITATION`).** Petoi's
+  scripted walk has a clean diagonal schedule (FR+BL down together, then
+  FL+BR). `reference_gait/build_contact_ref.py` records it per stride phase
+  (through the `i` timing, using the env's own contact readings) into
+  `wkf_contact_ref.npy`; the term penalizes each paw's mismatch against it.
+  Per-paw targets can't be met by shifting the limp. Mismatch: scripted 0.06,
+  `hw1_20m` 0.28 (4.5×); at weight 8 the limp costs ~1.7/step (~10 % of the
+  total). Unramped, like joint imitation. Not yet trained.
+
 Going forward: no separate 3M pilots — launch the full run and gate on its own
 3M checkpoint against the previous full run's 3M checkpoint.
 

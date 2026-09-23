@@ -485,6 +485,13 @@ FAC_LEG_BALANCE = 0.0     # hw2: every learned gait limps (one paw on the ground
                           # fraction over the last LEG_BALANCE_WINDOW steps falling below
                           # LEG_BALANCE_TARGET, while walking. Ramped with the other shaping terms.
 LEG_BALANCE_TARGET = 0.30
+FAC_CONTACT_IMITATION = 0.0  # hw4 (2026-09-23): per-paw footfall imitation -- penalty = this * mean over
+                          # the 4 paws of |in contact - P(down)| where P(down) is Petoi's scripted wkF
+                          # walk's footfall probability at the current stride phase
+                          # (reference_gait/wkf_contact_ref.npy, build_contact_ref.py). Root cause of the
+                          # limp: the diagonal partner (BL for an FR limp) extends and props the body so
+                          # the other paw never lands; the reward was ~0.2 % sensitive to it. Unramped,
+                          # like FAC_IMITATION. Walking only.
 LEG_BALANCE_WINDOW = 160  # control steps (2 s, ~2 gait cycles)
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
@@ -600,6 +607,7 @@ CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
 BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
 SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
+FAC_CONTACT_IMITATION = _g2e("FAC_CONTACT_IMITATION", FAC_CONTACT_IMITATION)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
@@ -742,6 +750,7 @@ class OpenCatGymEnv(gym.Env):
 
     def step(self, action):
         p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
+        self._phase_step0 = float(getattr(self, "_phase", 0.0))   # stride phase this step started at
         # CMD_LATENCY_STEPS: FIFO command buffer -- apply the action from N steps
         # ago, so the policy runs against the delay the real serial/servo path adds.
         if CMD_LATENCY_STEPS > 0:
@@ -910,6 +919,16 @@ class OpenCatGymEnv(gym.Env):
             foot_phase_pen = 0.7
         else:                           # 0 or 4 feet down -- not a trot at all
             foot_phase_pen = 1.0
+
+        # hw4: footfall imitation against the scripted walk's contact schedule
+        contact_imit_pen = 0.0
+        if FAC_CONTACT_IMITATION > 0 and not getattr(self, '_is_stand', False):
+            if getattr(self, '_contact_ref', None) is None:
+                self._contact_ref = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                         "reference_gait", "wkf_contact_ref.npy"))
+            _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
+                     * len(self._contact_ref)) % len(self._contact_ref)
+            contact_imit_pen = float(np.mean(np.abs(np.asarray(paw_contact, float) - self._contact_ref[_b])))
 
         # hw2: leg balance -- least-used paw's contact fraction over the recent window
         leg_balance_pen = 0.0
@@ -1344,6 +1363,7 @@ class OpenCatGymEnv(gym.Env):
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
+                 - FAC_CONTACT_IMITATION * contact_imit_pen
                  + speed_reward
                  + balance_reward
                  + survive_step_reward
@@ -1407,6 +1427,9 @@ class OpenCatGymEnv(gym.Env):
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "r_leg_balance": -penalty_scale * FAC_LEG_BALANCE * leg_balance_pen,
+            "r_contact_imitation": -FAC_CONTACT_IMITATION * contact_imit_pen,
+            "paw_contact": [bool(c) for c in paw_contact],   # FL FR BR LB, as the reward terms see it
+            "phase_step0": self._phase_step0,
             "base_height_m": base_clearance,
             "r_power": -penalty_scale * FAC_POWER * power_use,
             "r_obs_bump": -penalty_scale * obs_bump_pen,
