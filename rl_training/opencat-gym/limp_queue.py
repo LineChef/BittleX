@@ -1,4 +1,11 @@
-"""Limp-fix candidate queue (2026-09-23): one training at a time, early stop, averaged gate.
+"""RETIRED (2026-09-23): the limp turned out to be the payload zero-inertia bug
+(see opencat_gym_env.py's PAYLOAD_INERTIA and docs/rl/hw1-log.md), not something
+reward shaping needed to fix. FAC_LEG_BALANCE / FAC_STANCE_HOVER / FAC_RESID_BIAS /
+FAC_CONTACT_IMITATION are removed from opencat_gym_env.py -- the G2E_ overrides
+below are now no-ops, so re-running this would silently train hw5-hw8 with no
+real difference between them. Kept only as a record of what was tried; do not run.
+
+Limp-fix candidate queue (2026-09-23): one training at a time, early stop, averaged gate.
 
 Every candidate is the best run's config (hw2: real control path + targeted slopes +
 leg balance + ramp cap) plus a limp fix. For each, in order:

@@ -202,6 +202,15 @@ penalty moved it rather than removing it.
   `hw1_20m` 0.28 (4.5×); at weight 8 the limp costs ~1.7/step (~10 % of the
   total). Unramped, like joint imitation. Not yet trained.
 
+**Removed (2026-09-23), after the payload fix.** `FAC_LEG_BALANCE`,
+`FAC_STANCE_HOVER`, `FAC_RESID_BIAS` and `FAC_CONTACT_IMITATION` (hw2/hw5/hw7/hw4)
+were all built to fight this limp. With the payload bug found and fixed, the limp
+is understood to be substantially that artifact, not something reward shaping
+needed to solve — and none of the four candidates actually worked (hover and
+contact imitation cost 37–46 % of flat speed; resid-bias made the limp worse).
+All four are removed from `opencat_gym_env.py`; `limp_queue.py` is retired
+(kept only as a record — its `G2E_*` overrides are now no-ops).
+
 ### Gates were too noisy; averaged re-evaluation (2026-09-23)
 
 `hw3` (slopes only) and `hw4` (footfall imitation 8 only) were each stopped at

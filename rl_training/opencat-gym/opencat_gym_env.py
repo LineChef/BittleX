@@ -489,33 +489,11 @@ SLOPE_TARGET_PROB = 0.0   # hw2 (2026-09-23): this fraction of episodes gets a T
                           # Sign: pitch > 0 is DOWNHILL for forward walking, so climbs are negative.
 SIDEHILL_DEG = (3.0, 15.0)
 UPHILL_DEG = (12.0, 24.0)
-FAC_LEG_BALANCE = 0.0     # hw2: every learned gait limps (one paw on the ground ~13-17 % of steps vs
-                          # 41-61 % for scripted wkF). Penalty on the least-used paw's ground-contact
-                          # fraction over the last LEG_BALANCE_WINDOW steps falling below
-                          # LEG_BALANCE_TARGET, while walking. Ramped with the other shaping terms.
-LEG_BALANCE_TARGET = 0.30
-FAC_STANCE_HOVER = 0.0    # hw5 (2026-09-23): the limp is a paw hovering 2-4 mm above the ground while the
-                          # scripted walk has it firmly down (carrying ~0.2 N vs ~2.5 N). Binary contact
-                          # terms can't see "almost down"; this penalizes the hover distance itself:
-                          # for each paw with P(down) > 0.9 in wkf_contact_ref.npy at this stride phase,
-                          # (paw-centre-to-surface - STANCE_REST_MM), clipped to [0, 20] mm, per 5 mm,
-                          # averaged over those paws. Measured by a short downward ray from each paw, so
-                          # it works on slopes / rubble / ledges. Ramped with the other shaping terms.
-STANCE_REST_MM = 6.5
-FAC_RESID_BIAS = 0.0      # hw7 (2026-09-23): part of the limp is a constant lopsided correction (hw1_20m:
-                          # FL shoulder +5.9 deg, BR knee -6.4 deg on average; subtracting it restores the
-                          # limping paw 10 -> 32 %). Penalizes mean(ema^2) of each joint's normalized
-                          # residual, ema over RESID_BIAS_TAU steps -- the average offset, not the
-                          # stride-by-stride correction. Ramped with the other shaping terms.
-RESID_BIAS_TAU = 80.0     # control steps (1 s, ~one stride)      # paw-centre height when resting on the surface (scripted walk: 6.5-6.7 mm)
-FAC_CONTACT_IMITATION = 0.0  # hw4 (2026-09-23): per-paw footfall imitation -- penalty = this * mean over
-                          # the 4 paws of |in contact - P(down)| where P(down) is Petoi's scripted wkF
-                          # walk's footfall probability at the current stride phase
-                          # (reference_gait/wkf_contact_ref.npy, build_contact_ref.py). Root cause of the
-                          # limp: the diagonal partner (BL for an FR limp) extends and props the body so
-                          # the other paw never lands; the reward was ~0.2 % sensitive to it. Unramped,
-                          # like FAC_IMITATION. Walking only.
-LEG_BALANCE_WINDOW = 160  # control steps (2 s, ~2 gait cycles)
+# 2026-09-23: FAC_LEG_BALANCE / FAC_STANCE_HOVER / FAC_RESID_BIAS / FAC_CONTACT_IMITATION
+# (hw2/hw5/hw7/hw4) were built to fight the learned gaits' limp. Dropped: the limp turned
+# out to be the payload zero-inertia bug (below), not something reward shaping needed to
+# fix -- none of the four helped once tested, and two of them (hover, contact imitation)
+# actively cost flat-ground speed. See docs/rl/hw1-log.md for the full audit.
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
@@ -629,11 +607,7 @@ CMD_PATH           = _g2e("CMD_PATH", CMD_PATH)                      # hw1: "i" 
 CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
 BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
 SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
-FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
-FAC_CONTACT_IMITATION = _g2e("FAC_CONTACT_IMITATION", FAC_CONTACT_IMITATION)
-FAC_STANCE_HOVER   = _g2e("FAC_STANCE_HOVER", FAC_STANCE_HOVER)      # hw5: 3.0
 PAYLOAD_INERTIA    = _g2e("PAYLOAD_INERTIA", PAYLOAD_INERTIA)        # "legacy" = pre-fix zero-inertia payload
-FAC_RESID_BIAS     = _g2e("FAC_RESID_BIAS", FAC_RESID_BIAS)          # hw7
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
@@ -723,7 +697,6 @@ class OpenCatGymEnv(gym.Env):
         self._sforce_vec = (0.0, 0.0)
         self._slope_rp = (0.0, 0.0)
         self._slope_targeted = False
-        self._leg_contact_hist = []
         self._reflex_dir = 0.0
         self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
                                                  # sets this so the reflex applies only to the
@@ -945,52 +918,6 @@ class OpenCatGymEnv(gym.Env):
             foot_phase_pen = 0.7
         else:                           # 0 or 4 feet down -- not a trot at all
             foot_phase_pen = 1.0
-
-        # hw4: footfall imitation against the scripted walk's contact schedule
-        contact_imit_pen = 0.0
-        if FAC_CONTACT_IMITATION > 0 and not getattr(self, '_is_stand', False):
-            if getattr(self, '_contact_ref', None) is None:
-                self._contact_ref = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                         "reference_gait", "wkf_contact_ref.npy"))
-            _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
-                     * len(self._contact_ref)) % len(self._contact_ref)
-            contact_imit_pen = float(np.mean(np.abs(np.asarray(paw_contact, float) - self._contact_ref[_b])))
-
-        # hw7: residual bias -- the running-average correction per joint, pushed toward 0
-        resid_bias_pen = 0.0
-        if FAC_RESID_BIAS > 0:
-            _a = np.asarray(action, dtype=float)
-            if getattr(self, '_resid_ema', None) is None or len(self._resid_ema) != len(_a):
-                self._resid_ema = np.zeros_like(_a)
-            self._resid_ema += (_a - self._resid_ema) / RESID_BIAS_TAU
-            resid_bias_pen = float(np.mean(self._resid_ema ** 2))
-
-        # hw5: stance hover -- how far above the surface are paws that should be planted
-        stance_hover_pen = 0.0
-        if FAC_STANCE_HOVER > 0 and not getattr(self, '_is_stand', False):
-            if getattr(self, '_contact_ref', None) is None:
-                self._contact_ref = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                         "reference_gait", "wkf_contact_ref.npy"))
-            _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
-                     * len(self._contact_ref)) % len(self._contact_ref)
-            _due = [i for i in range(4) if self._contact_ref[_b][i] > 0.9]
-            if _due:
-                _pos = [p.getLinkState(self.robot_id, paw_idx[i])[0] for i in _due]
-                _hits = p.rayTestBatch(_pos, [(x, y, z - 0.06) for x, y, z in _pos])
-                _hov = [min(20.0, max(0.0, h[2] * 60.0 - STANCE_REST_MM)) / 5.0
-                        for h in _hits if h[0] >= 0 and h[0] != self.robot_id]
-                if _hov:
-                    stance_hover_pen = float(np.mean(_hov))
-
-        # hw2: leg balance -- least-used paw's contact fraction over the recent window
-        leg_balance_pen = 0.0
-        if FAC_LEG_BALANCE > 0 and not getattr(self, '_is_stand', False):
-            self._leg_contact_hist.append(paw_contact)
-            if len(self._leg_contact_hist) > LEG_BALANCE_WINDOW:
-                self._leg_contact_hist.pop(0)
-            if len(self._leg_contact_hist) >= LEG_BALANCE_WINDOW // 2:
-                least = float(np.min(np.mean(np.asarray(self._leg_contact_hist, float), axis=0)))
-                leg_balance_pen = max(0.0, LEG_BALANCE_TARGET - least) / LEG_BALANCE_TARGET
 
         # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
         if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
@@ -1415,7 +1342,6 @@ class OpenCatGymEnv(gym.Env):
                  + FAC_GAIT_SYMMETRY * gait_symmetry
                  + FAC_STRIDE * stride_reward
                  + FAC_IMITATION * imitation_reward
-                 - FAC_CONTACT_IMITATION * contact_imit_pen
                  + speed_reward
                  + balance_reward
                  + survive_step_reward
@@ -1438,9 +1364,6 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_HEIGHT * height_penalty
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
-                    + FAC_LEG_BALANCE * leg_balance_pen
-                    + FAC_STANCE_HOVER * stance_hover_pen
-                    + FAC_RESID_BIAS * resid_bias_pen
                     + obs_bump_pen
                     + FAC_POWER * power_use))
 
@@ -1480,10 +1403,6 @@ class OpenCatGymEnv(gym.Env):
             "r_height": -penalty_scale * FAC_HEIGHT * height_penalty,
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
-            "r_leg_balance": -penalty_scale * FAC_LEG_BALANCE * leg_balance_pen,
-            "r_stance_hover": -penalty_scale * FAC_STANCE_HOVER * stance_hover_pen,
-            "r_resid_bias": -penalty_scale * FAC_RESID_BIAS * resid_bias_pen,
-            "r_contact_imitation": -FAC_CONTACT_IMITATION * contact_imit_pen,
             "paw_contact": [bool(c) for c in paw_contact],   # FL FR BR LB, as the reward terms see it
             "phase_step0": self._phase_step0,
             "base_height_m": base_clearance,
@@ -1735,8 +1654,6 @@ class OpenCatGymEnv(gym.Env):
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
         self._slope_targeted = False
-        self._leg_contact_hist = []
-        self._resid_ema = None
         if SLOPE_FIXED_RP is not None:
             self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
         elif SLOPE_TARGET_PROB > 0 and self._dr > 0 and np.random.rand() < SLOPE_TARGET_PROB:
