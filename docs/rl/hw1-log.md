@@ -127,6 +127,45 @@ Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
   Exported with its sidecar; `validate_deploy.py` ALL OK at 30° (0 joint-degree
   cells differ, 5 commands × 251 steps); `DEFAULT_POLICY = "hw1_20m_ppo.onnx"`.
 
+## Slopes (2026-09-23)
+
+`slope_sweep.py` (payload on, mass 1.12, ±2° calibration error, learned gait
+through the real path, pure slopes — no rough-terrain episodes, no torque cut),
+`hw1_20m`, 20 eps per condition, 0 % falls everywhere:
+
+| Terrain | hw1_20m m/s | scripted m/s |
+|---|---|---|
+| Downhill 4–28° | 0.103–0.120 | 0.079–0.106 |
+| Uphill 4 / 12 / 16 / 20 / 24 / 28° | 0.104 / 0.087 / 0.069 / 0.037 / 0.009 / −0.034 | 0.087 / 0.061 / 0.041 / 0.001 / −0.001 / −0.054 |
+| Side-hill 5 / 6 / 7 / 8 / 12–20° | 0.088 / 0.073 / 0.048 / 0.020 / ~0.02 | 0.084 / 0.052 / 0.019 / 0.021 / ~0.005 |
+
+- **Side-hills stall by ~8°.** The gait levels its body (roll 8° → 0° within a
+  second); with the body level on tilted ground the downhill legs can't reach it
+  (FR paw 8 % contact, BR 19 %) and G2 pushes on ~two legs. Bittle has no
+  hip-roll joint — only lengthening the downhill legs fixes it.
+- **Climbs stall ~24°** (scripted ~20°). Downhill is fine at any tested angle.
+- **Every learned gait limps**: flat-ground paw contact — scripted wkF 41–61 %
+  per paw; `hw1_20m` FR 13–16 %; `run20m_resid30` BL 17 %; `run20m_ppo` mildest.
+  The model is symmetric (identical paw shapes, friction, heights).
+- **Benchmark fixes (BENCH_VERSION 2):** slope labels corrected (pitch > 0 is
+  downhill — "T6.1 −24° descent" was a 24° climb, T9.1/T9.2 swapped); slope
+  cells no longer get rough-terrain episodes (they reset the grade to 0, ~35 %
+  of each slope cell). `--scripted-from` refuses to mix versions.
+- **Found, not changed:** the shaping-penalty ramp is uncapped
+  (`penalty_scale = steps / PENALTY_STEPS`, per env) — ~5× by the end of a 20M
+  run with 8 envs, though the comment intends full strength and hold. It's the
+  cause of the late reward decline in 20M runs. Left as-is so `hw2` changes one
+  thing at a time; decide after.
+
+### hw2_20m (launched 2026-09-23)
+
+`hw1` config + `SLOPE_TARGET_PROB=0.3` (half side-hills 3–15°, either side
+down; half 12–24° climbs; never on rough/carpet) + `FAC_LEG_BALANCE=1.5`
+(penalty when the least-used paw's contact over the last 2 s falls below 30 %;
+~0 for scripted, large for `hw1_20m`'s limp). Gated at its own 3M checkpoint
+vs `hw1_20m`@3M: `paw_balance.py`, `slope_sweep.py`, v2 benchmark. Split into
+separate runs only if the gate is mixed.
+
 Going forward: no separate 3M pilots — launch the full run and gate on its own
 3M checkpoint against the previous full run's 3M checkpoint.
 

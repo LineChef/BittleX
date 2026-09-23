@@ -1,5 +1,13 @@
 # Slope-ceiling campaign log
 
+> **Superseded (2026-09-23), see [`hw1-log.md`](hw1-log.md) "Slopes":** the
+> benchmark's slope labels were inverted (pitch > 0 is *downhill*), T7.x–T9.x
+> ran without the payload (cell-knob leak), and ~35 % of every slope cell's
+> episodes were flat rough ground. So "T9.1 18° up" was really 18° downhill,
+> "T9.2 20° down" was a 20° climb, and the falls this campaign chased were
+> bare-robot results. A clean re-measure found G2 falls on no slope with its
+> payload; its real problems are side-hills (stalls by ~8°) and climbs past ~20°.
+
 Queued third, after the resid30 campaign (`docs/rl/resid30-log.md`) and the
 gait-friction fix (`docs/rl/gait-friction-log.md`). Same branch
 (`auto-gait-iteration`), same automated-testing-loop.md methodology.

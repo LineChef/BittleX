@@ -51,7 +51,7 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
   PyBullet; a learned *residual* on Bittle's scripted `wkF` trot, IMU-corrected
   every control step.
   - Tracks forward-speed commands to **0.007 m/s** and heading commands.
-  - Walks a **−24° descent**.
+  - Climbs a **24° slope** (the benchmark labelled it a descent until 2026-09-23; its up/down labels were inverted).
   - **0 % falls** on the payload-on (Pi + camera mass) 27-cell decathlon.
   - Conditioned on the mounted-payload configuration, so the sim gait already
     "knows" it is carrying the companion stack.

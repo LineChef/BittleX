@@ -468,6 +468,19 @@ SLOPE_MAX_DEG = 14.0      # coverage R1: per-episode ground tilt, random roll & 
                           # in a 3M-step round to teach anything there. A denser-sampling round 2 was
                           # proposed but not run -- user's call to close the campaign here instead. See
                           # docs/rl/slope-ceiling-log.md for the full result and options considered.
+SLOPE_TARGET_PROB = 0.0   # hw2 (2026-09-23): this fraction of episodes gets a TARGETED slope where the
+                          # gait stalls (slope sweep, docs/rl/hw1-log.md): half side-hills of
+                          # SIDEHILL_DEG (either side down), half climbs of UPHILL_DEG. Scaled by _dr;
+                          # never combined with rough/carpet heightfields (those reset the grade).
+                          # Sign: pitch > 0 is DOWNHILL for forward walking, so climbs are negative.
+SIDEHILL_DEG = (3.0, 15.0)
+UPHILL_DEG = (12.0, 24.0)
+FAC_LEG_BALANCE = 0.0     # hw2: every learned gait limps (one paw on the ground ~13-17 % of steps vs
+                          # 41-61 % for scripted wkF). Penalty on the least-used paw's ground-contact
+                          # fraction over the last LEG_BALANCE_WINDOW steps falling below
+                          # LEG_BALANCE_TARGET, while walking. Ramped with the other shaping terms.
+LEG_BALANCE_TARGET = 0.30
+LEG_BALANCE_WINDOW = 160  # control steps (2 s, ~2 gait cycles)
 SLOPE_FIXED_RP = None     # benchmark-only: (roll_rad, pitch_rad) forces a deterministic ground tilt (overrides the random draw)
 START_POSE_JITTER = 0.0   # R3 REVERTED: softened push-hard 50->57% / obst-50+push 36->50% with no measured capability gain (low-value: G2 starts from known poses). See coverage log.
 STUCK_FOOT_PROB = 0.0     # per-step prob of jamming one leg joint (holds its angle) for STUCK_FOOT_STEPS
@@ -580,6 +593,8 @@ IMU_RATE_ZERO      = _g2e("IMU_RATE_ZERO", IMU_RATE_ZERO)            # hw1: stre
 CMD_PATH           = _g2e("CMD_PATH", CMD_PATH)                      # hw1: "i" = firmware simultaneous move
 CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
 BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
+SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
+FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
@@ -667,6 +682,8 @@ class OpenCatGymEnv(gym.Env):
         self._sforce_timer = 0   # sustained-force perturbation
         self._sforce_vec = (0.0, 0.0)
         self._slope_rp = (0.0, 0.0)
+        self._slope_targeted = False
+        self._leg_contact_hist = []
         self._reflex_dir = 0.0
         self._reflex_on = MIDWALK_PUSH_REFLEX   # per-instance override -- benchmark_gaits.py
                                                  # sets this so the reflex applies only to the
@@ -887,6 +904,16 @@ class OpenCatGymEnv(gym.Env):
             foot_phase_pen = 0.7
         else:                           # 0 or 4 feet down -- not a trot at all
             foot_phase_pen = 1.0
+
+        # hw2: leg balance -- least-used paw's contact fraction over the recent window
+        leg_balance_pen = 0.0
+        if FAC_LEG_BALANCE > 0 and not getattr(self, '_is_stand', False):
+            self._leg_contact_hist.append(paw_contact)
+            if len(self._leg_contact_hist) > LEG_BALANCE_WINDOW:
+                self._leg_contact_hist.pop(0)
+            if len(self._leg_contact_hist) >= LEG_BALANCE_WINDOW // 2:
+                least = float(np.min(np.mean(np.asarray(self._leg_contact_hist, float), axis=0)))
+                leg_balance_pen = max(0.0, LEG_BALANCE_TARGET - least) / LEG_BALANCE_TARGET
 
         # Stuck foot (coverage loop): hold the jammed joint at its captured angle.
         if self._stuck_timer > 0 and 0 <= self._stuck_joint < 8:
@@ -1331,6 +1358,7 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_HEIGHT * height_penalty
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
+                    + FAC_LEG_BALANCE * leg_balance_pen
                     + obs_bump_pen
                     + FAC_POWER * power_use))
 
@@ -1370,6 +1398,7 @@ class OpenCatGymEnv(gym.Env):
             "r_height": -penalty_scale * FAC_HEIGHT * height_penalty,
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
+            "r_leg_balance": -penalty_scale * FAC_LEG_BALANCE * leg_balance_pen,
             "base_height_m": base_clearance,
             "r_power": -penalty_scale * FAC_POWER * power_use,
             "r_obs_bump": -penalty_scale * obs_bump_pen,
@@ -1607,8 +1636,17 @@ class OpenCatGymEnv(gym.Env):
         self._cliff_this_ep = bool(CLIFF_PROB > 0 and self._dr > 0 and np.random.rand() < CLIFF_PROB)
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
+        self._slope_targeted = False
+        self._leg_contact_hist = []
         if SLOPE_FIXED_RP is not None:
             self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
+        elif SLOPE_TARGET_PROB > 0 and self._dr > 0 and np.random.rand() < SLOPE_TARGET_PROB:
+            self._slope_targeted = True
+            if np.random.rand() < 0.5:     # side-hill, either side down
+                r = np.deg2rad(np.random.uniform(*SIDEHILL_DEG)) * self._dr * np.random.choice([-1.0, 1.0])
+                self._slope_rp = (float(r), 0.0)
+            else:                          # climb (negative pitch = uphill)
+                self._slope_rp = (0.0, -float(np.deg2rad(np.random.uniform(*UPHILL_DEG)) * self._dr))
         elif SLOPE_MAX_DEG > 0 and self._dr > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._dr
             # 2026-09-04: triangular, not uniform -- most episodes near-flat, with a
@@ -1629,9 +1667,9 @@ class OpenCatGymEnv(gym.Env):
         # Both heightfield branches below now apply self._slope_rp (already
         # computed above, fixed or random) to the whole field's orientation
         # instead of discarding it, so this restriction is gone.
-        _carpet = (CARPET > 0 and self._dr > 0
+        _carpet = (CARPET > 0 and self._dr > 0 and not self._slope_targeted
                    and np.random.rand() < CARPET_PROB)
-        _rough = (not _carpet and ROUGH_TERRAIN > 0 and self._dr > 0
+        _rough = (not _carpet and not self._slope_targeted and ROUGH_TERRAIN > 0 and self._dr > 0
                   and np.random.rand() < ROUGH_TERRAIN_PROB)
         # 2026-09-05 slope-collapse fix: a heightfield body is placed at x=1.4/1.6,
         # so rotating it by the slope quaternion pivots ~1.5 m from the robot and

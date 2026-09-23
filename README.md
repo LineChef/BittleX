@@ -60,7 +60,7 @@ hardware mocked for now.
   under G2's real control path — the stock firmware's 5 Hz IMU and its `i`
   joint-command timing (see [`docs/rl/hw1-log.md`](docs/rl/hw1-log.md)). Before
   that the base was `run20m_resid30_ppo`, and before that **`run20m_ppo`** (20 M
-  steps from scratch: tracks speed commands to 0.007 m/s, walks a −24° descent,
+  steps from scratch: tracks speed commands to 0.007 m/s, climbs a 24° slope,
   0 % falls on the payload-on decathlon), exported to ONNX and sim-validated
   bit-for-bit against the on-robot control loop. **2026-09-05:** the training
   ground was redesigned (rubble-primary, wider slopes); a heightfield-tilt
@@ -145,9 +145,11 @@ the changes that measurably helped were kept.
 **Terrain**
 
 - **Inclines.** Every episode the ground is tilted a random roll *and* pitch up
-  to ±10°; the policy generalizes well past that — it walks a −24° descent
-  *forward* at ~0.06 m/s, climbs to +15°, and holds a straight line across a
-  cross-slope, at 0 % falls.
+  to ±10°; the policy generalizes well past that — it climbs a 24° slope
+  *forward* at ~0.06 m/s, walks down steep descents, and holds a straight line
+  across a cross-slope, at 0 % falls. (A 2026-09-23 re-measure with corrected
+  slope labels found its limits are side-hills past ~8° and climbs past ~20°;
+  see `docs/rl/hw1-log.md`.)
 - **Scattered obstacles.** Every episode drops 4–10 small boxes (to ~45 mm,
   short along-path, never spanning the lane) in the walking path. The policy
   never sees them coming, so what it learned is to *clear or deflect over* them
@@ -178,8 +180,8 @@ the changes that measurably helped were kept.
   curriculum** — it escalates only while the policy is surviving most recent
   episodes and backs off when it isn't, so it masters the catchable range before
   the pushes get harder.
-- **Result:** 0 % falls across the full easy→brutal test ladder (to −24°
-  descent, 85 mm obstacles, 1.0-impulse shoves, a 20° compound gauntlet) with the
+- **Result:** 0 % falls across the full easy→brutal test ladder (to a 24°
+  climb, 85 mm obstacles, 1.0-impulse shoves, a 20° compound gauntlet) with the
   payload on. Lifted, held, and dropped at an angle, it re-acquires the gait 31
   of 32 times.
 

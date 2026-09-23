@@ -43,8 +43,8 @@ LADDER = [
     ("T2.3", 2, "slopes",         "Cross-slope  (5 deg roll)",  {"SLOPE_FIXED_RP": (D(5), 0.0)}),
     ("T2.4", 2, "obstacles",      "Small obstacles  (20 mm)",   {"RANDOM_TERRAIN": 0.020}),
 
-    ("T3.1", 3, "slopes",         "Steep up  (12 deg)",         {"SLOPE_FIXED_RP": (0.0, D(12))}),
-    ("T3.2", 3, "slopes",         "Steep down  (-12 deg)",      {"SLOPE_FIXED_RP": (0.0, D(-12))}),
+    ("T3.1", 3, "slopes",         "Steep downhill  (12 deg)",   {"SLOPE_FIXED_RP": (0.0, D(12))}),
+    ("T3.2", 3, "slopes",         "Steep uphill  (12 deg)",     {"SLOPE_FIXED_RP": (0.0, D(-12))}),
     # Medium/big obstacles (T3.3/T4.4) and the two-factor combos (T3.4
     # slope+obstacle, T4.3 obstacles+shoves) cut -- middle interpolation
     # points on a smooth trend, and the fuller Compound Stress category below
@@ -56,7 +56,7 @@ LADDER = [
     ("T4.2", 4, "stumble-catch",  "Repeated shoves",
         {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012}),
 
-    ("T5.1", 5, "everything",     "The gauntlet: slope + rubble + repeated shoves",
+    ("T5.1", 5, "everything",     "The gauntlet: 9 deg downhill + 4 deg side-hill + rubble + repeated shoves",
         {"SLOPE_FIXED_RP": (D(4), D(9)), "RUBBLE": 0.016, "RUBBLE_N": 400,
          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.015,
          "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25}),
@@ -68,17 +68,17 @@ LADDER = [
     # extreme stress. T6.1 (steep descent: learned walks down, scripted slides
     # back) and T6.5 (weak servos: the one failure mode the payload's inertia
     # cannot mask) are the real discriminators.
-    ("T6.1", 6, "slopes",         "Extreme down  (-24 deg)",
+    ("T6.1", 6, "slopes",         "Extreme uphill  (24 deg)",
         {"SLOPE_FIXED_RP": (0.0, D(-24))}),
     ("T6.2", 6, "obstacles",      "Huge obstacles  (85 mm) + push",
         {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35}),
     ("T6.3", 6, "stumble-catch",  "Brutal shoves  (1.00 @ 0.018)",
         {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25}),
-    ("T6.4", 6, "everything",     "Brutal gauntlet: 20 deg slope + dense rubble + brutal shoves",
+    ("T6.4", 6, "everything",     "Brutal gauntlet: 20 deg downhill + 8 deg side-hill + dense rubble + brutal shoves",
         {"SLOPE_FIXED_RP": (D(8), D(20)), "RUBBLE": 0.020, "RUBBLE_N": 560,
          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.020,
          "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45}),
-    ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg descent",
+    ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg uphill",
         {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))}),
 
     # Bare-robot variants (2026-09-04): every T5/T6 cell above reads 0% falls for
@@ -106,12 +106,12 @@ LADDER = [
     ("T6.3b", 6, "stumble-catch",  "Brutal shoves (0.70 @ 0.012) -- bare robot",
         {"IMPULSE_PUSH": 0.70, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20,
          "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    ("T6.4b", 6, "everything",     "Brutal gauntlet: 14 deg slope + dense rubble + brutal shoves -- bare robot",
+    ("T6.4b", 6, "everything",     "Brutal gauntlet: 14 deg downhill + 6 deg side-hill + dense rubble + brutal shoves -- bare robot",
         {"SLOPE_FIXED_RP": (D(6), D(14)), "RUBBLE": 0.020, "RUBBLE_N": 560,
          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.020,
          "IMPULSE_PUSH": 0.70, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.30,
          "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    ("T6.5b", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg descent -- bare robot",
+    ("T6.5b", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg uphill -- bare robot",
         {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12)),
          "PAYLOAD_PROB": 0.0, "_episodes": 60}),
 
@@ -156,14 +156,14 @@ LADDER = [
     # regimes. A policy that learned a robust gait holds up; one that overfit
     # the training course degrades sharply. All fast (250-step) cells, kept to
     # four so the tier stays cheap (~3 min/gait).
-    ("T9.1", 9, "held-out",       "Slope 18 deg up (beyond training's 14 deg ceiling)",
+    ("T9.1", 9, "held-out",       "Slope 18 deg downhill (beyond training's 14 deg ceiling)",
         {"SLOPE_FIXED_RP": (0.0, D(18)), "_episodes": 40}),
-    ("T9.2", 9, "held-out",       "Slope 20 deg down (beyond training; descent is harder)",
+    ("T9.2", 9, "held-out",       "Slope 20 deg uphill (beyond training)",
         {"SLOPE_FIXED_RP": (0.0, D(-20)), "_episodes": 40}),
     ("T9.3", 9, "held-out",       "Rubble denser + taller than anything in training",
         {"RUBBLE": 0.024, "RUBBLE_N": 680, "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.026,
          "_episodes": 40}),
-    ("T9.4", 9, "held-out",       "Slippery incline: 6 deg + heavy friction randomization (wet-ramp analog)",
+    ("T9.4", 9, "held-out",       "Slippery decline: 6 deg downhill + heavy friction randomization (wet-ramp analog)",
         {"SLOPE_FIXED_RP": (0.0, D(6)), "RANDOM_FRICTION": 0.6, "_episodes": 40}),
 ]
 
@@ -190,6 +190,16 @@ _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean"
 _EXTRA_DR = "full"
 
 
+# Sign convention (verified 2026-09-23 by walking forward on the tilted plane):
+# SLOPE_FIXED_RP pitch > 0 is DOWNHILL for forward walking, < 0 uphill; roll is
+# side-hill. Until 2026-09-23 every up/down label here was inverted.
+#
+# BENCH_VERSION 2 (2026-09-23): slope cells no longer get rough-terrain episodes
+# -- a rough episode resets the grade to 0 in the env, so ~35 % of every slope
+# cell's episodes were flat rough ground. Results from version 1 aren't
+# comparable on slope cells; --scripted-from refuses to mix versions.
+BENCH_VERSION = 2
+
 # Module default of every knob any cell sets, captured at import. _apply
 # restores these before each cell: until 2026-09-22 knobs outside _ZERO leaked
 # from one cell into every later one -- most importantly the bare-robot cells'
@@ -198,6 +208,8 @@ _EXTRA_DR = "full"
 _CELL_DEFAULTS = {k: getattr(opencat_gym_env, k)
                   for c in LADDER for k in c[4]
                   if not k.startswith("_") and hasattr(opencat_gym_env, k)}
+# ROUGH_TERRAIN isn't a cell knob but _apply zeroes it for slope cells -- restore it too
+_CELL_DEFAULTS["ROUGH_TERRAIN"] = opencat_gym_env.ROUGH_TERRAIN
 
 
 def _apply(cell_knobs):
@@ -228,6 +240,8 @@ def _apply(cell_knobs):
     opencat_gym_env.RANDOM_TERRAIN_PROB = 1.0
     opencat_gym_env.RANDOM_TERRAIN_MAX_H = 999.0
     opencat_gym_env.DR_EVAL_FULL = True
+    if cell_knobs.get("SLOPE_FIXED_RP") is not None:
+        opencat_gym_env.ROUGH_TERRAIN = 0.0    # a rough episode would reset the grade to 0
     if _EXTRA_DR == "clean":
         opencat_gym_env.PAYLOAD_PROB = 0.0
         opencat_gym_env.ROUGH_TERRAIN = 0.0
@@ -292,12 +306,13 @@ def main():
         import json as _json
         prior = _json.load(open(args.scripted_from))
         for k, v in (("episodes", args.episodes), ("extra_dr", args.extra_dr),
-                     ("scripted_balance", args.scripted_balance)):
+                     ("scripted_balance", args.scripted_balance), ("bench_version", BENCH_VERSION)):
             if prior.get(k) != v:
                 raise SystemExit(f"--scripted-from {args.scripted_from}: {k}={prior.get(k)!r}, this run {v!r}")
         prior_sc = {c["id"]: c for c in prior["cells"]}
 
     out = {"learned_path": args.learned, "episodes": args.episodes, "hw": args.hw,
+           "bench_version": BENCH_VERSION,
            "scripted_from": args.scripted_from,
            "extra_dr": args.extra_dr, "scripted_balance": args.scripted_balance, "cells": []}
     for cid, tier, skill, label, knobs in LADDER:
