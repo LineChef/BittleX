@@ -96,7 +96,36 @@ All knobs default off (older checkpoints replay unchanged) and are exposed as
 | Run | Config | Result |
 |---|---|---|
 | `hw1_i` (3M pilot) | 5 Hz IMU + `i` + 0–4 ms | Real-path decathlon: fastest policy so far (0.073 m/s avg; 0.115 vs scripted 0.101 on flat); falls 162/1048, in line with the ideal-trained 3M `resid30_r1` (149); residual p95 21° of 30 |
-| `hw1_20m` | pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30° | **Release candidate** (user decision: promote unless a large regression). 20M steps, due ~4 AM ET 2026-09-23; benchmark + promotion follow |
+| `hw1_20m` | pilot + `BODY_MASS_SCALE=1.12`, `IMU_BIAS_DEG=2`, `JOINT_OFFSET_DEG=2`, ±30° | **Promoted — deployed policy (`DEFAULT_POLICY`).** See results below |
+
+### `hw1_20m` results (2026-09-23)
+
+20.0M steps, finished 03:42 ET. Reward peaked ~1,970 at 8M and ended ~1,680 —
+the same late decline as the previous 20M run (−31 % from its peak), which
+comes from penalties/randomization ramping up over training, not the policy
+degrading. Final KL 0.002. Residual rms 5.0°, p95 14.8° of 30°, 0 % of steps
+near the limit. Replay reviewed frame by frame: level, full-extension trot.
+
+Real-path decathlon (`--hw i`, 30 cells, 1,048 eps; scripted reused):
+
+| | Falls | Avg speed |
+|---|---|---|
+| Scripted (pure `wkF`) | 77 | 0.0625 |
+| **`hw1_20m`** | 161 | 0.0707 |
+| `run20m_resid30_ppo` (previous base) | 94 | 0.0720 |
+
+- 25 of 30 cells: 0 % falls and faster than scripted in every one — flat
+  0.108 vs 0.101, 18° climb 0.104 vs 0.087, 20° descent 0.069 vs 0.022, rough
+  ground 0.038 vs 0.015, 20 mm obstacles 0.050 vs 0.015.
+- All falls are in the 5 bare-robot (no payload) stress cells. The outlier is
+  **T6.5b** (60 % torque cutback + 12° descent, bare): 68 % falls and backward
+  drift vs 0 % for scripted and the previous base. The same cell with the
+  payload (T6.5) is 0 % falls and faster than scripted. G2 always carries its
+  payload; note also the benchmark robot is 269 g, lighter than the ~301 g
+  `hw1_20m` trained for. Flagged, not blocking.
+- Verdict (user's bar: promote unless a large regression): **promoted.**
+  Exported with its sidecar; `validate_deploy.py` ALL OK at 30° (0 joint-degree
+  cells differ, 5 commands × 251 steps); `DEFAULT_POLICY = "hw1_20m_ppo.onnx"`.
 
 Going forward: no separate 3M pilots — launch the full run and gate on its own
 3M checkpoint against the previous full run's 3M checkpoint.

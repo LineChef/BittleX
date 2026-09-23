@@ -1,4 +1,4 @@
-"""Time the REAL run20m_ppo policy on this machine, end to end -- ONNX inference
+"""Time the REAL deployed policy (residual_policy.DEFAULT_POLICY) on this machine, end to end -- ONNX inference
 plus the full 278-d observation build (ResidualGaitPolicy.step), the thing the
 80 Hz control loop actually does per tick.
 
@@ -82,7 +82,7 @@ def _run(args):
     ms = lat * 1e3
 
     budget = 1000.0 / CONTROL_HZ
-    print(f"ResidualGaitPolicy.step  (real run20m_ppo, {args.threads} threads, n={args.n})")
+    print(f"ResidualGaitPolicy.step  (real {os.path.basename(pol.onnx_path)}, {args.threads} threads, n={args.n})")
     print(f"  mean   {ms.mean():.3f} ms")
     print(f"  median {np.median(ms):.3f} ms")
     print(f"  p95    {np.percentile(ms, 95):.3f} ms")

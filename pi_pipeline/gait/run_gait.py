@@ -1,4 +1,4 @@
-"""On-Pi control loop: run run20m_ppo on the real robot.
+"""On-Pi control loop: run the deployed gait policy (residual_policy.DEFAULT_POLICY) on the real robot.
 
     python -m pi_pipeline.gait.run_gait --probe-imu           # see what the BiBoard streams
     python -m pi_pipeline.gait.run_gait --openloop            # play wkf_ref.npy, no policy (calibration)

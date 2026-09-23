@@ -5,7 +5,7 @@ See docs/hardware/diagnostics.md.
 
     from pi_pipeline.diag import diag, RingBuffer
 
-    diag.start_session("gait", policy_path="gait/run20m_ppo.onnx")
+    diag.start_session("gait", policy_path="gait/hw1_20m_ppo.onnx")
     ring = diag.attach_ring(RingBuffer(seconds=15, hz=80))
     ...
     ring.push(roll=r, pitch=p, jerr=max_err, guard=snap.state)

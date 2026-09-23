@@ -25,7 +25,7 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 
 | Domain | Headline | Status |
 |---|---|---|
-| Locomotion — learned | An RL walk that tracks speed/heading commands; release candidate `hw1_20m` is trained under G2's real control path (5 Hz IMU, firmware `i` command timing) — see `docs/rl/hw1-log.md` | ✅ sim / 🧩 robot |
+| Locomotion — learned | An RL walk that tracks speed/heading commands; deployed policy `hw1_20m` is trained under G2's real control path (5 Hz IMU, firmware `i` command timing) — see `docs/rl/hw1-log.md` | ✅ sim / 🧩 robot |
 | Locomotion — scripted | ~20 OpenCat keyframe skills wired with friendly names (walk, turn, back up, carpet gait, jump, get-up, sit, stretch, expressive moves) | 🧩 |
 | Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography | 🧩 |
@@ -43,7 +43,7 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 ## Locomotion
 
 ### Learned gait (RL) — ✅ in sim, 🧩 on the robot
-- **`hw1_20m`** — release candidate (2026-09-23). Trained under a model of G2's
+- **`hw1_20m`** — the deployed policy (2026-09-23). Trained under a model of G2's
   real control path: the stock firmware's 5 Hz IMU with no rate signal, the
   `i` joint command's execution timing, realistic body mass, and small IMU /
   servo calibration errors. Full record: `docs/rl/hw1-log.md`.

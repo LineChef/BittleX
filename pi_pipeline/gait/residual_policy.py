@@ -1,5 +1,5 @@
 """ResidualGaitPolicy -- run the trained residual-on-wkF walking policy
-(`run20m_ppo.onnx`) on real IMU data, producing joint targets for the BiBoard.
+(`DEFAULT_POLICY`, e.g. `hw1_20m_ppo.onnx`) on real IMU data, producing joint targets for the BiBoard.
 
 Pure numpy + onnxruntime. No pybullet, no serial. Exact deployment mirror of
 `opencat_gym_env.OpenCatGymEnv`'s observation build + residual->joint mapping;
@@ -17,7 +17,7 @@ Control-flow mirrors the env exactly:
      return joints  (8 ints, degrees, URDF order)
 
 Usage:
-    pol = ResidualGaitPolicy()                         # gait/run20m_ppo.onnx + gait/wkf_ref.npy
+    pol = ResidualGaitPolicy()                         # DEFAULT_POLICY (+ .onnx.json) + gait/wkf_ref.npy
     pol.set_command(fwd=0.10, yaw=0.0)
     quat, gyro = read_imu()
     pol.reset(joint_pos_rad_urdf, quat, gyro)
@@ -57,7 +57,7 @@ RESIDUAL_SCALE_DEG = 22          # LEGACY default: run20m_ppo's scale. Newer pol
                                  # own in a sidecar `<policy>.onnx.json` (export_onnx.py writes it);
                                  # see residual_scale_for(). A mismatch silently applies every
                                  # correction at the wrong size.
-DEFAULT_POLICY = "run20m_ppo.onnx"   # the deployed policy; promoting a new one changes this line
+DEFAULT_POLICY = "hw1_20m_ppo.onnx"  # the deployed policy (release candidate 2026-09-23); promoting a new one changes this line
 STAND_FWD_THRESH = 0.025
 ANG_FACTOR = 0.10
 LEN_JOINT_HISTORY = 30

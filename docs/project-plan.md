@@ -22,8 +22,9 @@ should we work on next."
 > 1 s lock stall), two benchmark bugs (distorted scripted baseline, payload
 > leaking between cells) and a sim-vs-hardware audit were fixed along the way.
 > `hw1_20m` — trained with the 5 Hz IMU, the `i` command timing, realistic mass
-> and small calibration errors — is the release candidate, promoted unless its
-> benchmark shows a large regression. Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
+> and small calibration errors — is **promoted and deployed** (`DEFAULT_POLICY`):
+> 0 % falls and faster than scripted on every cell with the payload; its one
+> weak spot is bare-robot stress cells (T6.5b). Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
 > Still hardware-gated: firmware version check (step 8a), roll/pitch sign (13a),
 > JamGuard strain test. Climb work paused (how G2 decides to climb is open).
 

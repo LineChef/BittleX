@@ -1,1 +1,1 @@
-"""On-robot residual-gait deployment: run20m_ppo.onnx -> BiBoard."""
+"""On-robot residual-gait deployment: the exported policy (residual_policy.DEFAULT_POLICY) -> BiBoard."""

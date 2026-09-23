@@ -56,7 +56,7 @@ hardware mocked for now.
 - **RL locomotion** (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
   pipeline. The gait is a learned *residual* on Bittle's scripted `wkF` walk,
   IMU-corrected every control step, conditioned on speed/heading commands and the
-  mounted Pi/camera payload. **Release candidate (2026-09-23): `hw1_20m`**, trained
+  mounted Pi/camera payload. **Deployed policy (2026-09-23): `hw1_20m`**, trained
   under G2's real control path — the stock firmware's 5 Hz IMU and its `i`
   joint-command timing (see [`docs/rl/hw1-log.md`](docs/rl/hw1-log.md)). Before
   that the base was `run20m_resid30_ppo`, and before that **`run20m_ppo`** (20 M
