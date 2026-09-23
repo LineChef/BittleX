@@ -46,7 +46,8 @@ def flat_contacts(env, m, episodes=4, steps=320):
     E.ROUGH_TERRAIN, E.TORQUE_CUTBACK = 0.0, 0.0
     realistic()
     E.EPISODE_LENGTH = steps + 5
-    hits, mis, n = np.zeros(4), [], 0
+    hits, mis, hov, n = np.zeros(4), [], [], 0
+    import pybullet as p
     for s in range(episodes):
         np.random.seed(3000 + s)
         obs, _ = env.reset()
@@ -59,9 +60,14 @@ def flat_contacts(env, m, episodes=4, steps=320):
             b = int((info["phase_step0"] % 100) / 100 * len(ref)) % len(ref)
             hits += c
             mis.append(np.abs(c - ref[b]).mean())
+            due = [i for i in range(4) if ref[b][i] > 0.9]
+            if due:
+                pos = [p.getLinkState(env.robot_id, (3, 6, 9, 12)[i])[0] for i in due]
+                hs = p.rayTestBatch(pos, [(x, y, z - 0.06) for x, y, z in pos])
+                hov += [max(0.0, h[2] * 60.0 - 6.5) for h in hs if h[0] >= 0 and h[0] != env.robot_id]
             n += 1
     return dict(paw=(hits / n).round(3).tolist(), least_paw=float((hits / n).min()),
-                footfall_mismatch=float(np.mean(mis)))
+                footfall_mismatch=float(np.mean(mis)), stance_hover_mm=float(np.mean(hov)) if hov else 0.0)
 
 
 def main():
@@ -70,6 +76,10 @@ def main():
     ap.add_argument("--steps", default="2200000,2400000,2600000,2800000,3000000")
     ap.add_argument("--episodes", type=int, default=16)
     ap.add_argument("--summarize", nargs="*")
+    ap.add_argument("--limp-only", action="store_true",
+                    help="flat-ground limp metrics only (least-used paw, footfall mismatch, stance hover) -- "
+                         "the fast early check")
+    ap.add_argument("--out", default=None, help="default trained/mce_<run>.json (limp-only: mce_limp_<run>_<steps>.json)")
     args = ap.parse_args()
     if args.summarize:
         return summarize(args.summarize)
@@ -84,6 +94,10 @@ def main():
         m = _load_learned(ck)
         row = dict(run=args.run, step=int(st))
         row.update(flat_contacts(env, m))
+        if args.limp_only:
+            rows.append(row)
+            print(json.dumps(row), flush=True)
+            continue
         for name, roll, pitch in SLOPES:
             B._apply({})
             E.ROUGH_TERRAIN, E.TORQUE_CUTBACK = 0.0, 0.0
@@ -102,20 +116,21 @@ def main():
         E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 0, False, ""
         rows.append(row)
         print(json.dumps(row), flush=True)
-    with open(f"trained/mce_{args.run}.json", "w") as f:
+    out = args.out or (f"trained/mce_limp_{args.run}.json" if args.limp_only else f"trained/mce_{args.run}.json")
+    with open(out, "w") as f:
         json.dump(rows, f, indent=1)
 
 
 def summarize(paths):
-    keys = (["least_paw", "footfall_mismatch"] + [n for n, _, _ in SLOPES]
+    keys = (["least_paw", "footfall_mismatch", "stance_hover_mm"] + [n for n, _, _ in SLOPES]
             + list(CELLS_SPEED) + list(CELLS_FALLS))
     data = {p: json.load(open(p)) for p in paths}
     print(f"{'metric':>18} " + " ".join(f"{d[0]['run']:>17}" for d in data.values()))
     for k in keys:
         cols = []
         for rows in data.values():
-            v = np.array([r[k] for r in rows], float)
-            cols.append(f"{v.mean():7.3f} ±{v.std():5.3f}  ")
+            v = np.array([r.get(k, np.nan) for r in rows], float)
+            cols.append(f"{np.nanmean(v):7.3f} ±{np.nanstd(v):5.3f}  " if np.isfinite(v).any() else f"{'-':>15}  ")
         print(f"{k:>18} " + " ".join(f"{c:>17}" for c in cols))
 
 

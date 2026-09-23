@@ -492,7 +492,13 @@ FAC_STANCE_HOVER = 0.0    # hw5 (2026-09-23): the limp is a paw hovering 2-4 mm 
                           # (paw-centre-to-surface - STANCE_REST_MM), clipped to [0, 20] mm, per 5 mm,
                           # averaged over those paws. Measured by a short downward ray from each paw, so
                           # it works on slopes / rubble / ledges. Ramped with the other shaping terms.
-STANCE_REST_MM = 6.5      # paw-centre height when resting on the surface (scripted walk: 6.5-6.7 mm)
+STANCE_REST_MM = 6.5
+FAC_RESID_BIAS = 0.0      # hw7 (2026-09-23): part of the limp is a constant lopsided correction (hw1_20m:
+                          # FL shoulder +5.9 deg, BR knee -6.4 deg on average; subtracting it restores the
+                          # limping paw 10 -> 32 %). Penalizes mean(ema^2) of each joint's normalized
+                          # residual, ema over RESID_BIAS_TAU steps -- the average offset, not the
+                          # stride-by-stride correction. Ramped with the other shaping terms.
+RESID_BIAS_TAU = 80.0     # control steps (1 s, ~one stride)      # paw-centre height when resting on the surface (scripted walk: 6.5-6.7 mm)
 FAC_CONTACT_IMITATION = 0.0  # hw4 (2026-09-23): per-paw footfall imitation -- penalty = this * mean over
                           # the 4 paws of |in contact - P(down)| where P(down) is Petoi's scripted wkF
                           # walk's footfall probability at the current stride phase
@@ -617,6 +623,7 @@ SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 FAC_LEG_BALANCE    = _g2e("FAC_LEG_BALANCE", FAC_LEG_BALANCE)        # hw2: 1.5
 FAC_CONTACT_IMITATION = _g2e("FAC_CONTACT_IMITATION", FAC_CONTACT_IMITATION)
 FAC_STANCE_HOVER   = _g2e("FAC_STANCE_HOVER", FAC_STANCE_HOVER)      # hw5: 3.0
+FAC_RESID_BIAS     = _g2e("FAC_RESID_BIAS", FAC_RESID_BIAS)          # hw7
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
@@ -938,6 +945,15 @@ class OpenCatGymEnv(gym.Env):
             _b = int((self._phase_step0 % TIME_PHASE_PERIOD) / TIME_PHASE_PERIOD
                      * len(self._contact_ref)) % len(self._contact_ref)
             contact_imit_pen = float(np.mean(np.abs(np.asarray(paw_contact, float) - self._contact_ref[_b])))
+
+        # hw7: residual bias -- the running-average correction per joint, pushed toward 0
+        resid_bias_pen = 0.0
+        if FAC_RESID_BIAS > 0:
+            _a = np.asarray(action, dtype=float)
+            if getattr(self, '_resid_ema', None) is None or len(self._resid_ema) != len(_a):
+                self._resid_ema = np.zeros_like(_a)
+            self._resid_ema += (_a - self._resid_ema) / RESID_BIAS_TAU
+            resid_bias_pen = float(np.mean(self._resid_ema ** 2))
 
         # hw5: stance hover -- how far above the surface are paws that should be planted
         stance_hover_pen = 0.0
@@ -1414,6 +1430,7 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_FOOT_PHASE * foot_phase_pen
                     + FAC_LEG_BALANCE * leg_balance_pen
                     + FAC_STANCE_HOVER * stance_hover_pen
+                    + FAC_RESID_BIAS * resid_bias_pen
                     + obs_bump_pen
                     + FAC_POWER * power_use))
 
@@ -1455,6 +1472,7 @@ class OpenCatGymEnv(gym.Env):
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "r_leg_balance": -penalty_scale * FAC_LEG_BALANCE * leg_balance_pen,
             "r_stance_hover": -penalty_scale * FAC_STANCE_HOVER * stance_hover_pen,
+            "r_resid_bias": -penalty_scale * FAC_RESID_BIAS * resid_bias_pen,
             "r_contact_imitation": -FAC_CONTACT_IMITATION * contact_imit_pen,
             "paw_contact": [bool(c) for c in paw_contact],   # FL FR BR LB, as the reward terms see it
             "phase_step0": self._phase_step0,
@@ -1697,6 +1715,7 @@ class OpenCatGymEnv(gym.Env):
         self._slope_rp = (0.0, 0.0)
         self._slope_targeted = False
         self._leg_contact_hist = []
+        self._resid_ema = None
         if SLOPE_FIXED_RP is not None:
             self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
         elif SLOPE_TARGET_PROB > 0 and self._dr > 0 and np.random.rand() < SLOPE_TARGET_PROB:
