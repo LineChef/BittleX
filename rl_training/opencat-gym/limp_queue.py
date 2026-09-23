@@ -8,9 +8,12 @@ leg balance + ramp cap) plus a limp fix. For each, in order:
      steps; stop it there if it's better on NEITHER least-used paw (< hw2 + 0.05) NOR
      stance hover (> 70 % of hw2's)
   3. otherwise stop at 3.0M and run the full 5-checkpoint gate (multi_ckpt_eval.py)
-  4. PASS = least-used paw >= 0.35 and hw2's gains kept (uphill 16 >= 0.05 m/s,
-     side-hill 12 >= 0.024, bare gauntlet falls <= 0.5, flat >= 0.085); the queue
-     stops at the first pass -- a 20M run is only launched after review with the user
+  4. main gait OK = flat >= 0.088 m/s at the 0.10 command (the 10 % bar, 0.090, with
+     0.088-0.092 treated as a tie, not a fail), rough ground >= 0.028, bare gauntlet
+     falls <= 0.5; slopes kept = uphill 16 >= 0.05, side-hill 12 >= 0.024.
+     Limp: least-used paw >= 0.40 (scripted-level, 0.41) with the gait OK stops the
+     queue; 0.35-0.40 counts as a fix but the queue keeps looking for a better one.
+     At the end every gated candidate is ranked in trained/limp_queue_summary.json.
 
     python limp_queue.py                  # run the whole queue
     python limp_queue.py --adopt hw5_20m  # hw5_20m is already training: start with it
@@ -34,8 +37,13 @@ CANDIDATES = [
     ("hw8_20m", "stance hover 3 + footfall imitation 3", dict(G2E_FAC_STANCE_HOVER="3", G2E_FAC_CONTACT_IMITATION="3")),
 ]
 EARLY = "1600000,1800000,2000000"
-PASS = dict(least_paw=(">=", 0.35), **{"up 16": (">=", 0.05), "side 12": (">=", 0.024)},
-            **{"T5.1b": ("<=", 0.5), "T1.1": (">=", 0.085)})
+GAIT = {"T1.1": (">=", 0.088), "T8.2": (">=", 0.028), "T5.1b": ("<=", 0.5)}
+SLOPES_KEPT = {"up 16": (">=", 0.05), "side 12": (">=", 0.024)}
+LIMP_FIX, LIMP_SCRIPTED = 0.35, 0.40
+
+
+def meets(rows, bars):
+    return all((mean(rows, k) >= lim) if op == ">=" else (mean(rows, k) <= lim) for k, (op, lim) in bars.items())
 
 
 def log(msg):
@@ -99,6 +107,7 @@ def main():
     b_paw, b_hov = mean(base_early, "least_paw"), mean(base_early, "stance_hover_mm")
     log(f"hw2 early baseline: least-used paw {b_paw:.3f}, stance hover {b_hov:.1f} mm")
     start = [c[0] for c in CANDIDATES].index(args.adopt) if args.adopt else 0
+    summary = []
     for tag, desc, extra in CANDIDATES[start:]:
         log(f"--- {tag}: {desc}")
         if not training(tag):
@@ -126,14 +135,21 @@ def main():
             continue
         subprocess.run([PY, "multi_ckpt_eval.py", "--summarize", "trained/mce_hw1_20m.json",
                         "trained/mce_hw2_20m.json", f"trained/mce_{tag}.json"])
-        verdict = {k: (mean(rows, k), op, lim) for k, (op, lim) in PASS.items()}
-        ok = all((v >= lim) if op == ">=" else (v <= lim) for v, op, lim in verdict.values())
-        log(f"{tag} gate: " + ", ".join(f"{k} {v:.3f} ({op} {lim})" for k, (v, op, lim) in verdict.items())
-            + f" -> {'PASS' if ok else 'fail'}")
-        if ok:
-            log(f"{tag} PASSES -- queue stopped. Review with the user before any 20M run.")
-            return
-    log("queue finished, no candidate passed -- nothing training. Review with the user.")
+        paw = mean(rows, "least_paw")
+        res = dict(tag=tag, desc=desc, least_paw=round(paw, 3), gait_ok=meets(rows, GAIT),
+                   slopes_kept=meets(rows, SLOPES_KEPT), limp_fixed=paw >= LIMP_FIX,
+                   **{k: round(mean(rows, k), 4) for k in list(GAIT) + list(SLOPES_KEPT)})
+        summary.append(res)
+        json.dump(summary, open("trained/limp_queue_summary.json", "w"), indent=1)
+        log(f"{tag} gate: " + json.dumps(res))
+        if res["gait_ok"] and paw >= LIMP_SCRIPTED:
+            log(f"{tag} reaches scripted-level footfalls with the main gait intact -- queue stopped.")
+            break
+    ranked = sorted(summary, key=lambda r: (r["gait_ok"] and r["limp_fixed"], r["gait_ok"], r["least_paw"]), reverse=True)
+    json.dump(ranked, open("trained/limp_queue_summary.json", "w"), indent=1)
+    log("queue finished, nothing training. Ranked candidates: "
+        + "; ".join(f"{r['tag']} paw {r['least_paw']} gait {'ok' if r['gait_ok'] else 'NO'} "
+                    f"slopes {'kept' if r['slopes_kept'] else 'lost'}" for r in ranked))
 
 
 if __name__ == "__main__":
