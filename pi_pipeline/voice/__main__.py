@@ -73,7 +73,8 @@ def main() -> None:
                 silence_s=settings.stt_silence_s,
             ),
             conversation=Conversation(settings),
-            tts=make_tts(tts_mode, piper_model_path=settings.piper_model_path),
+            tts=make_tts(tts_mode, piper_model_path=settings.piper_model_path,
+                        robot_effect=settings.voice_robot_effect),
             actuator=make_actuator(
                 args.actuator, port=settings.serial_port, baud=settings.serial_baud
             ),

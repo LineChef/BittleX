@@ -32,7 +32,12 @@ HERE = pathlib.Path(__file__).parent
 URDF = str(HERE.parent / "models" / "bittle_esp32.urdf")
 RC = np.load(HERE / "rc_ref.npy")           # (100, 8) rad, URDF order
 RL = np.load(HERE / "rl_ref.npy")
-BOUND = np.deg2rad(115)                      # URDF leg-joint clamp
+# 2026-09-24: BOUND (a flat +/-115 deg script-level clamp on every joint) is
+# gone -- it was silently truncating rc_ref.npy's real self-right keyframes
+# (which need up to -176/+200 deg on specific joints), on top of the URDF's
+# own (now correct, per-joint, asymmetric) limits already enforced by
+# PyBullet's POSITION_CONTROL. One source of truth for joint limits now:
+# models/bittle_esp32.urdf. See docs/research/community-projects.md Finding 1b.
 NEUTRAL = np.array([0.7, -1.0] * 4)          # mild stand — held while the fall settles
 DROP_Z = 0.16                                # spawn height so the fall commits to its pose
 SETTLE = 120                                 # steps to let the fallen pose settle
@@ -74,7 +79,20 @@ def _uprightness(rid: int) -> tuple[float, float, float]:
     return abs(roll), abs(pitch), z
 
 
-def run_case(name: str, want_gif: bool, want_sheet: bool) -> dict:
+# TESTING (2026-09-24, not committed): crude proxy for the firmware's
+# gyro-balance layer, which runs live during the real rc/rl -- this replay
+# was fully open-loop before. Same corrective shape as benchmark_gaits.py's
+# BalancedLearned (URDF joint order [FLs,FLk,FRs,FRk,BRs,BRk,BLs,BLk],
+# confirmed to match this script's jid order by direct pybullet dump), but
+# that gain (k=0.6) was tuned for small walking-scale tilts -- get-up starts
+# from tilts up to pi, so the gain here is a free parameter to sweep, not a
+# known-good value ported over.
+def _balance_corr(roll: float, pitch: float) -> np.ndarray:
+    return (np.array([-pitch, -pitch, -pitch, -pitch, pitch, pitch, pitch, pitch])
+            + np.array([-roll, -roll, roll, roll, roll, roll, -roll, -roll]))
+
+
+def run_case(name: str, want_gif: bool, want_sheet: bool, balance_k: float = 0.0) -> dict:
     cfg = CASES[name]
     p.connect(p.DIRECT)
     p.setGravity(0, 0, -9.81)
@@ -87,7 +105,7 @@ def run_case(name: str, want_gif: bool, want_sheet: bool) -> dict:
     for j in jid:
         p.changeDynamics(rid, j, maxJointVelocity=np.pi * 10)
 
-    traj = np.concatenate([np.clip(s, -BOUND, BOUND) for s in cfg["skills"]], axis=0)
+    traj = np.concatenate(cfg["skills"], axis=0)
 
     # let the robot fall and settle in a normal stance, THEN run the skill
     for _ in range(SETTLE):
@@ -101,6 +119,10 @@ def run_case(name: str, want_gif: bool, want_sheet: bool) -> dict:
     best_up = 1e9
     for t in range(total):
         tgt = traj[t % len(traj)]
+        if balance_k:
+            _, orn = p.getBasePositionAndOrientation(rid)
+            roll, pitch, _ = p.getEulerFromQuaternion(orn)
+            tgt = tgt + balance_k * _balance_corr(roll, pitch)
         p.setJointMotorControlArray(rid, jid, p.POSITION_CONTROL, tgt,
                                     forces=np.ones(len(jid)) * FORCE)
         for _ in range(SUBSTEPS):
@@ -152,13 +174,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gif", action="store_true", help="write getup_<case>.gif for each")
     ap.add_argument("--sheet", action="store_true", help="write getup_contact_sheet.png")
+    ap.add_argument("--balance", type=float, default=0.0,
+                    help="TESTING: crude gyro-balance-layer proxy gain, 0 = off (original behavior)")
     a = ap.parse_args()
 
     print(f"{'case':<11} {'start r/p':>12} {'end r/p':>12} {'end z':>7} "
           f"{'min tilt-sum':>13}  verdict")
     results = []
     for name in CASES:
-        r = run_case(name, a.gif, a.sheet)
+        r = run_case(name, a.gif, a.sheet, balance_k=a.balance)
         results.append(r)
         print(f"{r['case']:<11} "
               f"{r['start_roll']:>5.2f}/{r['start_pitch']:<5.2f} "

@@ -122,6 +122,7 @@ def _clamp01(x: float) -> float:
 
 
 def parse_bonds(spec: str) -> list[Bond]:
+    """Parses G2_BONDS ("name:closeness:disposition[:kind]; ...") into Bonds."""
     """`"self:1.0:affectionate; sam:0.7:playful:person; rex:0.4:wary:pet"` ->
     [Bond, ...]. Fields: `name:closeness:disposition[:kind]`, `;`-separated.
     Tolerant: blank -> [], missing closeness/disposition -> defaults + a warning,
@@ -146,6 +147,8 @@ def parse_bonds(spec: str) -> list[Bond]:
 
 
 class Bonds:
+    """The parsed roster -- lookup by recognition label, plus the closeness
+    drift and describe() used for logging/debugging."""
     """The set of known bonds, plus the defaults for anyone unrecognised."""
 
     def __init__(self, bonds: list[Bond] | None = None):

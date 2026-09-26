@@ -172,6 +172,8 @@ class SerialDetectionFeed:
         return f"obj{target_id}"
 
     def frames(self) -> Iterator[Frame]:
+        # reads and parses one detection message per loop, skipping anything
+        # that isn't a results-carrying INVOKE line
         while True:
             raw = self._ser.readline().decode("utf-8", "replace").strip()
             if not raw or not raw.startswith("{"):

@@ -100,6 +100,7 @@ class ThermalGovernor:
         return GovernorState.NORMAL
 
     def _decision(self) -> GovernorDecision:
+        # maps the current state to concrete speed/pose/hint values
         c = self.cfg
         if self._state is GovernorState.COOLDOWN:
             return GovernorDecision(self._state, 0.0, True, True, tuple(c.cooldown_pose), self._reason)

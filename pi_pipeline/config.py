@@ -53,6 +53,7 @@ _DEFAULT_SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class Settings:
+    # One field per env var; see the module docstring for how values are loaded.
     # --- Claude ---
     anthropic_api_key: str = field(default_factory=lambda: _env("ANTHROPIC_API_KEY"))
     # ISO date (YYYY-MM-DD) you set the console key to expire on -- G2 warns as it
@@ -107,6 +108,12 @@ class Settings:
     # dev machine, override PIPER_MODEL_PATH in .env to a 'medium' voice if you
     # want it to sound nicer -- the Pi can't afford one.
     piper_model_path: str = field(default_factory=lambda: _env("PIPER_MODEL_PATH", "models/piper/en_US-ryan-low.onnx"))
+    # Ring-modulation robot-voice effect layered on top of whichever Piper
+    # voice is configured (2026-09-24, user picked the 45Hz/60%-mix setting
+    # after hearing several options -- see voice/effects.py). On by default;
+    # doesn't change which voice model is used, just post-processes its
+    # output. G2_VOICE_ROBOT_EFFECT=0 to turn it off.
+    voice_robot_effect: bool = field(default_factory=lambda: _env("G2_VOICE_ROBOT_EFFECT", "1") not in ("0", "false", "no"))
     stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.2))
     # After a reply, keep the mic open this long for a follow-up before requiring
     # the wake word again. Resets on every exchange, so a normal back-and-forth
@@ -159,6 +166,7 @@ class Settings:
     ])  # deployed model's class names, in id order; empty -> "obj<id>"
 
     def require_api_key(self) -> str:
+        """Returns the API key, or raises with setup instructions if unset."""
         if not self.anthropic_api_key:
             raise RuntimeError(
                 "ANTHROPIC_API_KEY is not set. Copy .env.example to .env at the "

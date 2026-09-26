@@ -208,6 +208,8 @@ class Conversation:
         raise last_err  # type: ignore[misc]
 
     def send(self, user_text: str, memory_context: str | None = None) -> AssistantTurn:
+        # one turn: sends the user text (+ any pending tool acks), then sorts
+        # the reply into speech + skills to perform + facts to remember
         blocks: list[dict] = list(self._pending_tool_results)
         self._pending_tool_results = []
         if memory_context:

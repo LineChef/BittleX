@@ -51,9 +51,22 @@ should we work on next."
 >    its own documented approximations (open-loop, no IMU-triggered waits, no
 >    gyro-balance layer, decoded keyframes). For all we know the real get-up
 >    commands do work; don't treat the old sim result as final.
+>    **2026-09-24 addition:** `models/bittle_esp32.urdf`'s joint limits are
+>    ±90° (±1.57 rad) across every joint — confirmed by inspection. A related
+>    open-source Bittle X MuJoCo model (`MarcHesse/bittle-mujoco`, found
+>    researching community Bittle projects) widened its own limits to ±149°
+>    (shoulders) / −70°..+149° (knees) specifically because "OpenCat's own
+>    fall-recovery skill commands angles far outside the walking range." If
+>    our URDF's ±90° is genuinely too narrow for `rc`'s real keyframes, the
+>    sim would be physically unable to represent the recovery motion at all —
+>    a concrete, checkable reason the "0/2 recovered" result could be a
+>    URDF-limit artifact rather than a real recovery failure. Check this
+>    before the eventual recheck: decode `rc`'s actual keyframe angles
+>    (`reference_gait/build_skill_reference.py`) and see whether any exceed
+>    ±90°.
 
-> **Current state of the gait (2026-09-23): the IMU-rate priority is resolved,
-> and a new gait trained under G2's real control path is the release candidate.**
+> **Current state of the gait (2026-09-23): the IMU-rate priority is resolved;
+> `hw1_20m` is deployed but stale, a fresh baseline is training now.**
 > Tracing the 5 Hz IMU issue through OpenCatEsp32 found a bigger gap: the Pi was
 > sending `m`, which moves joints one at a time (G2 wouldn't walk at all); it now
 > sends `i`. The 5 Hz IMU itself costs nothing measurable in sim. Four pipeline
@@ -61,9 +74,18 @@ should we work on next."
 > 1 s lock stall), two benchmark bugs (distorted scripted baseline, payload
 > leaking between cells) and a sim-vs-hardware audit were fixed along the way.
 > `hw1_20m` — trained with the 5 Hz IMU, the `i` command timing, realistic mass
-> and small calibration errors — is **promoted and deployed** (`DEFAULT_POLICY`):
-> 0 % falls and faster than scripted on every cell with the payload; its one
-> weak spot is bare-robot stress cells (T6.5b). Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
+> and small calibration errors — is still `DEFAULT_POLICY` on disk, but its
+> "0% falls, faster than scripted on every cell" result **was measured before
+> the payload-lock bug below was found**, on a tilt-locked body — it does not
+> hold under corrected physics. Re-scored on the rebuilt 21-cell benchmark
+> (`--hw i`, real control path) it falls 15% even on flat, calm ground and
+> catastrophically on most other cells, because it never learned to handle a
+> body that can actually tilt. It is **not being used as Phase B's learned
+> comparator.** `base1_20m` — a fresh run under corrected payload physics, the
+> post-limp-removal reward set, and no new course mechanics yet — is training
+> now as the real baseline; the four new course mechanics + a re-test of
+> ledges wait behind it as Phase B (`phase_b_orchestrator.py`, 7 candidate
+> rounds). Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
 > Still hardware-gated: firmware version check (step 8a), roll/pitch sign (13a),
 > JamGuard strain test. Climb work paused (how G2 decides to climb is open).
 

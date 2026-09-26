@@ -85,6 +85,7 @@ class Explorer:
         return (det.center_x - 0.5) * 2.0 * self.cfg.fov_half_rad
 
     def _most_novel(self, frame: Frame, now: float):
+        # largest confident detection the novelty tracker hasn't seen recently
         best, best_area = None, 0.0
         for d in frame:
             if d.confidence < self.cfg.min_conf or d.area < self.cfg.min_area:

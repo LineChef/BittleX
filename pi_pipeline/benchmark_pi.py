@@ -77,6 +77,7 @@ def _sh(*cmd) -> str | None:
 
 # ------------------------------------------------------------------ sections --
 def sec_system(out: Row) -> None:
+    # host facts: model, cores, RAM, python/kernel version
     print("\n=== system ===")
     model = None
     for p in ("/proc/device-tree/model", "/sys/firmware/devicetree/base/model"):
@@ -264,6 +265,7 @@ def sec_all_voices(out: Row, sentence: str) -> None:
             print(f"  {mp.name:<28} SKIP  ({e})")
 
 def sec_claude(out: Row, samples: int) -> None:
+    # p50/p95 latency for a minimal round-trip message
     print("\n=== Claude API round-trip ===")
     key = settings.anthropic_api_key
     if not key:
@@ -291,6 +293,7 @@ def sec_claude(out: Row, samples: int) -> None:
         out.add("claude", "round-trip", "SKIP", str(e))
 
 def sec_stress(out: Row, seconds: int) -> None:
+    # loads every core, watches temp/throttling and main-loop scheduler jitter
     print(f"\n=== CPU load / thermal ({seconds}s) ===")
     if not LINUX:
         print("  SKIP  (not Linux)")
@@ -336,6 +339,7 @@ def sec_stress(out: Row, seconds: int) -> None:
     out.add("thermal", "main-loop jitter", f"{j:.0f} ms", jverdict)
 
 def sec_serial(out: Row) -> None:
+    # just checks the robot/vision serial device paths exist
     print("\n=== serial port ===")
     for label, port in (("robot link", settings.serial_port),
                         ("vision link", settings.vision_serial_port)):

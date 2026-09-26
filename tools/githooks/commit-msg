@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Strip AI-attribution lines (Co-Authored-By: Claude, "Generated with Claude
+# Code", the robot-emoji line) from the commit message before it's used --
+# this repo never carries attribution, see CLAUDE.md. File-content
+# attribution is handled separately by the pre-commit hook (this hook only
+# ever sees the message file, never staged file content).
+# Activate once per clone:  git config core.hooksPath tools/githooks
+set -u
+
+msg_file="${1:-}"
+[ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
+
+pattern='Co-Authored-By:.*([Cc]laude|[Aa]nthropic)|Generated with \[?Claude Code|🤖 Generated with'
+if grep -qE "$pattern" "$msg_file"; then
+  grep -vE "$pattern" "$msg_file" > "$msg_file.tmp" && mv "$msg_file.tmp" "$msg_file"
+  echo "commit-msg: stripped an attribution line from the commit message"
+fi
+exit 0

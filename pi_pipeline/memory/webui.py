@@ -35,6 +35,7 @@ li .meta{color:#8889;font-size:.85em;white-space:nowrap}
 
 
 def _page(store: Store, *, q: str = "", recall_q: str = "") -> str:
+    # renders the whole single-page UI: facts list, log search, recall preview, wipe
     facts = store.list_facts()
     fact_items = "".join(
         f"<li><form method=post action=/forget style=margin:0>"
@@ -107,6 +108,7 @@ def _page(store: Store, *, q: str = "", recall_q: str = "") -> str:
 
 
 class _Handler(BaseHTTPRequestHandler):
+    """GET / serves the page; POST /add, /forget, /wipe mutate the store then redirect."""
     db_path = ""
 
     def _store(self) -> Store:

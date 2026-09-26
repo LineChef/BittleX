@@ -185,14 +185,24 @@ The RL policy **can't** self-right (no roll-axis DOF — [[project_g2_no_self_ri
 Firmware has a scripted self-right, but only for slow side/forward falls and with
 no BiBoard-V1 IR trigger.
 
-- **Do now (sim): DONE 2026-09-10** — replayed `rc`/`rl` in PyBullet
-  (`reference_gait/verify_getup_reference.py`). **0/2 fall states recovered:**
-  `rc` from belly-flat reaches a transient 4-leg crouch then collapses (no
-  balance loop in open-loop replay); `rl` from supine produces no roll-over.
-  Expected — the refs are approximate keyframe decodes, replay is open-loop, and
-  this URDF has no stable side-lie. The sim can't validate the firmware get-up
-  either way; hardware testing is mandatory. Full write-up:
-  [`getup-sim-replay.md`](getup-sim-replay.md).
+- **Do now (sim): DONE 2026-09-10, re-verified 2026-09-24** — replayed `rc`/`rl`
+  in PyBullet (`reference_gait/verify_getup_reference.py`). Fixed the URDF's
+  joint-range limits (too narrow for `rc_ref.npy`'s real angles) and a second,
+  independent script-level clamp that was silently truncating them too — real
+  improvement: `rl` now genuinely rolls supine-to-prone, and both cases reach a
+  legitimate near-standing pose mid-sequence (z 0.02→0.09m). Still **0/2
+  recovered** — root cause pinned down via frame trace: the reference loses
+  the good pose at the `rl`→`rc` handoff and at `rc`'s own tail, not from any
+  execution-quality issue. Tested and ruled out six variables (balance
+  correction, timing/convergence, torque, friction, play-count, slowdown) —
+  none help, because open-loop replay of this reference structurally can't
+  stay standing regardless of how it's played back. Real fix would need
+  actual RL training (motion-imitation or from-scratch), a materially bigger
+  effort, not attempted. Researched the field: no Bittle-specific prior work,
+  but real techniques exist for this exact problem (RSI, DeepMimic-style
+  imitation) if this ever gets picked up as its own project. The sim can't
+  validate the firmware get-up either way; hardware testing is mandatory.
+  Full write-up: [`getup-sim-replay.md`](getup-sim-replay.md).
 - **Trigger (hardware):** G2 falls in orientations the firmware self-right
   doesn't cover, often enough to matter.
 - **Work:** almost certainly a **keyframe/scripted** skill (Skill Composer), not
@@ -302,6 +312,32 @@ generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
   final env — don't spend a standalone 20M just to test the course.
 - **User intent (2026-09-05):** wants to revisit building a better course
   eventually; tabled while gait training is paused pre-hardware.
+
+## H13 — Servo response characterization (τ, speed ceiling)  🟡
+
+Found reviewing community Bittle/Petoi projects (2026-09-24,
+[`../research/community-projects.md`](../research/community-projects.md)):
+our sim never measured a real servo response. A comparable project
+(BittleJuice) measured its own Bittle X servos at τ = 33 ms, ceiling ≈
+137°/s. Measured against our own trained policy (`servo_saturation_check.py`,
+against `base1_20m`): mean commanded joint speed 98.9°/s, p95 261.2°/s, max
+514.3°/s, and **26.33% of all joint-step commands exceed the assumed 137°/s
+ceiling**. `firmware_model.py` models the firmware's own command-timing ramp
+but treats each interpolated waypoint as instantly achieved, with no
+separate physical-servo-lag term on top.
+
+- **Trigger:** hardware arrival — servo type (alloy vs. plastic gears) and
+  board revision change the real numbers, so BittleJuice's 33ms/137°/s can't
+  be assumed for G2 without measuring it.
+- **Do-now sim work:** DONE — `servo_saturation_check.py` built and run
+  against `base1_20m` (26.33% over the assumed ceiling, see above). Re-run
+  against whatever policy comes out of the current Phase B/C campaign, and
+  again once G2's real ceiling is known.
+- **If characterization shows a real mismatch:** model servo response lag
+  properly (fit the command-timing filter and the actuator model *together*
+  against the measured step response, per BittleJuice's explicit warning
+  against double-counting lag if they're fit separately) rather than just
+  adding a naive velocity clamp on top of what's already there.
 
 ---
 

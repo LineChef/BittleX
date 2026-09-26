@@ -109,6 +109,7 @@ IMU_STALE_S = 0.6     # no IMU frame for this long (3 missed 5 Hz prints) -> sto
 
 
 def _open_link(port, baud):
+    """Opens the BiBoard serial link or exits with a clear error."""
     from link.serial_link import SerialLink
     lk = SerialLink(port, baud=baud)
     if not lk.connect():
@@ -117,6 +118,8 @@ def _open_link(port, baud):
 
 
 def probe_imu(lk, seconds):
+    """Bring-up check: start the IMU stream, print raw lines and the measured
+    rate for `seconds`, then stop it."""
     # CONFIRMED from firmware source (src/OpenCat.h, src/reaction.h) 2026-09-20:
     # 'V' is not a real token at all (grepped the current source, doesn't exist
     # anywhere in the command parser -- would just be silently ignored). The
@@ -140,6 +143,8 @@ def probe_imu(lk, seconds):
 
 
 def openloop(lk, cycles, hz):
+    """Replays the scripted wkF walk with no policy/IMU -- a firmware/servo
+    sanity check before running the real control loop."""
     ref = np.load(os.path.join(_HERE, "wkf_ref.npy"))          # (100,8) rad, URDF order
     dt = 1.0 / hz
     print(f"open-loop wkF playback: {cycles} cycles, {hz} Hz. Ctrl-C to stop.")
@@ -584,6 +589,7 @@ def _latest_imu_line(lk):
 
 
 def _send(lk, cmd):
+    """Fire-and-forget serial send -- no reply wait."""
     lk.send(cmd, read_reply=False, settle=0.0)
 
 

@@ -1,10 +1,48 @@
 #!/usr/bin/env bash
-# Block a commit whose staged changes or commit message contain a private term.
-# Term list: .gitprivacy-terms (gitignored -- one whole-word term per line,
-# '#' comments, case-insensitive).
+# Three checks before every commit:
+#   1. Block a commit whose staged changes or commit message contain a
+#      private term. Term list: .gitprivacy-terms (gitignored -- one
+#      whole-word term per line, '#' comments, case-insensitive).
+#   2. Strip AI-attribution lines (Co-Authored-By: Claude, "Generated with
+#      Claude Code", etc.) from staged file content -- this repo never
+#      carries attribution, see CLAUDE.md. Commit-message attribution is
+#      handled separately by the commit-msg hook (message files aren't
+#      staged, so this hook never sees them).
+#   3. Unstage any staged image file outside docs/ -- replay GIFs/PNGs are
+#      never meant to be committed (see CLAUDE.md); docs/ is the one place
+#      real images (hardware photos, diagrams) belong.
 # Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
+
+# --- 2. strip attribution from staged file content ---------------------
+# Excludes tools/githooks/* -- this pattern definition necessarily contains
+# the words it's matching against, so scanning the hooks themselves would
+# self-match (same reason the privacy-term check below excludes itself).
+attribution_pattern='Co-Authored-By:.*([Cc]laude|[Aa]nthropic)|Generated with \[?Claude Code|🤖 Generated with'
+staged_files="$(git diff --cached --name-only --diff-filter=ACM -- . ':(exclude)tools/githooks/*')"
+if [ -n "$staged_files" ]; then
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    if grep -qE "$attribution_pattern" "$f" 2>/dev/null; then
+      grep -vE "$attribution_pattern" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+      git add -- "$f"
+      echo "pre-commit: stripped an attribution line from $f"
+    fi
+  done <<< "$staged_files"
+fi
+
+# --- 3. unstage images outside docs/ ------------------------------------
+image_pattern='\.(png|jpg|jpeg|gif|webp|bmp)$'
+staged_images="$(git diff --cached --name-only --diff-filter=ACM \
+  | grep -iE "$image_pattern" | grep -v '^docs/' || true)"
+if [ -n "$staged_images" ]; then
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    git reset -q -- "$f"
+    echo "pre-commit: unstaged image file (not under docs/): $f"
+  done <<< "$staged_images"
+fi
 
 repo_root="$(git rev-parse --show-toplevel)"
 terms_file="$repo_root/.gitprivacy-terms"

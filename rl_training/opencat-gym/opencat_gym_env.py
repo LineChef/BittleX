@@ -295,9 +295,36 @@ CMD_PATH = ""            # "" = joint targets applied instantly. "i" / "m" / "if
 CMD_PATH_EXTRA_MS_MAX = 0.0  # per-episode uniform [0, this] ms extra per command: unmodeled
                              # firmware loop work (IMU reads, prints), so the policy doesn't
                              # overfit the model's exact timing.
+CMD_SEND_EVERY_N = 1        # 2026-09-25: only meaningful when CMD_PATH is set. 1 = send every
+                             # control tick (old default). N>1 = send only every Nth tick, same
+                             # idea as resilience_joint_cmd.py's "i@Hz" eval probe (which never
+                             # touched training -- that script only overrides JOINT_TARGET_HOOK
+                             # for benchmarking, it doesn't change what CMD_PATH itself does).
+                             # Sending less often gives the firmware's oldest-wins serial backlog
+                             # (moduleManager.h read_serial()) fewer queued commands to choose
+                             # from at once, so the one it executes is fresher on average -- this
+                             # doesn't reduce the per-command transformSpeed easing lag itself
+                             # (that needs the firmware fix), only the extra staleness backlog
+                             # adds on top of it. Measured (joint_cmd_run20m.json, T1.1/T5.1b):
+                             # i@40 (every 2nd tick) and i@27 (every 3rd) both beat plain i on
+                             # latency (57.6ms -> 53.9ms / 48.6ms) and joint-tracking error; i@27
+                             # was consistently the better of the two on both cells. Module
+                             # default here stays 1 (inert), matching every other real-path knob's
+                             # "off = idealized path" convention -- BASE in run_pipeline.py sets
+                             # G2E_CMD_SEND_EVERY_N=3 to actually apply it to training.
 JOINT_TARGET_HOOK = None # callable(env, joint_angs_rad) -> rad actually sent to the motors.
                          # Models the BiBoard's command execution (resilience_joint_cmd.py);
                          # the policy's observation keeps the commanded targets. None = inert.
+SERVO_RATE_LIMIT_DEG_S = 137.0  # 2026-09-24: physical servo speed ceiling, applied AFTER
+                         # CMD_PATH's firmware software-ramp output (the firmware decides what
+                         # to ask the servo to do; this decides whether the servo can keep up --
+                         # composed, not double-counted). Placeholder from a comparable project's
+                         # measured Bittle X V2 alloy-servo/BiBoard V1 unit (same servo class as
+                         # ours per docs/hardware/specs.md's P1S alloy servos) -- not G2's own
+                         # measurement yet (docs/rl/hardware-gated-backlog.md H13). Impact-tested
+                         # 2026-09-24 against base1_20m (eval-only, no retraining): T1.1 -2% speed,
+                         # T9.1 -7%, T7.1 -42% speed, T5.2 ledge fell 0%->15% -- a real effect, not
+                         # negligible. 0 = off (legacy unlimited, pre-2026-09-24 behavior).
 IMU_BIAS_DEG = 0.0       # R2 (resiliency campaign): per-episode persistent roll/pitch IMU bias,
                          # +/- this many deg (uniform), scaled by _dr -- a tilted mount or a
                          # calibration error, not RANDOM_GYRO's zero-mean per-step noise. Affects
@@ -363,6 +390,23 @@ RANDOM_TERRAIN_MAX_H = 0.010   # NEW -- hard passability cap (m), training only.
                                 # eval so the deliberate obstacle-progression cells (T4.4/T6.2,
                                 # up to 85mm) are unaffected -- those are meant to probe past
                                 # comfortable, not guarantee passability.
+RUG_SLIDE_PROB = 0.0        # rug category (2026-09-23): flat floor, LOW friction. Mechanically this
+                             # is just a hard, flat, low-grip surface -- no bump texture, no rug-like
+                             # compliance -- so despite the variable name it's a better model of TILE /
+                             # polished hardwood than of an actual loose rug (2026-09-24 naming note:
+                             # user pointed out a real sliding rug would need the rug itself modeled as
+                             # a movable object, which this doesn't do). Distinct from CARPET's fixed
+                             # bumpy texture and the flat high-friction "carpet floor" below. Mutually
+                             # exclusive with both. Renaming the variables themselves is pending a
+                             # clean restart point (see docs/rl/hw1-log.md) -- live processes already
+                             # reference these names by their current spelling.
+RUG_SLIDE_FRICTION = 0.35   # lateral friction under this low-friction (tile-like) floor (bare floor ~1.0)
+SNAG_OBSTACLE_PROB = 0.0    # obstacles category (2026-09-23): thin, low, lane-spanning boxes (a
+                             # cable/cord analog) -- distinct from RANDOM_TERRAIN's taller, narrower
+                             # bumps. Contact-recovery objective, not step-over (the gait is blind).
+SNAG_OBSTACLE_N = 2          # how many per episode
+SNAG_HEIGHT_M = 0.010        # cable/cord-scale height
+SNAG_HALF_LEN_M = 0.006      # along-path half-length -- thin, so a foot can land squarely on it
 RUBBLE = 0.012         # 2026-09-04: promoted to the PRIMARY training discrete-object hazard,
                         # replacing always-on RANDOM_TERRAIN boxes -- varied shapes (rounded +
                         # some angular) instead of only hard edges, and RUBBLE_MAX_H gives it a
@@ -395,7 +439,10 @@ RUBBLE_X_RANGE = (0.08, 0.45)   # NEW -- applies everywhere, same reach reasonin
 # balance each sub-assembly on an edge for its CoM). This is an estimate until then.
 PAYLOAD_MASS_NOM = 0.061   # kg -- SPINE body only (camera is HEAD_MASS_*, below)
 PAYLOAD_MASS_RAND = 0.018  # +/- kg -> spine 43-79 g (trimmed build .. heavy mount / draining cell)
-PAYLOAD_POS = (-0.020, 0.0, 0.025)   # base frame: ~2cm back, ~2.5cm up. FIXED (+-3mm jitter only).
+PAYLOAD_POS = (-0.022, 0.0, 0.025)   # base frame: ~2.2cm back, ~2.5cm up. FIXED (+-3mm jitter only).
+                                      # 2026-09-24: back edge flush with the real back-2-screw mount
+                                      # (hip-joint line, x=-0.055) -- box half-length 0.033m, so
+                                      # center = -0.055 + 0.033 = -0.022. Was -0.020 (arbitrary).
                            # z=0.025 is pessimistic-for-tipping; a stack tight to the cover is ~0.015-0.020.
 HEAD_MASS_NOM = 0.015     # kg -- camera cluster on the front mast. Mounts whenever the spine payload does.
 HEAD_MASS_RAND = 0.005   # +/- kg -> head 10-20 g (mount variation; low end ~= camera-off early bring-up)
@@ -455,9 +502,19 @@ CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
 # enabling for real; two finite floor segments, not the infinite plane.py, so
 # doesn't compose with _carpet/_rough (those replace the whole ground already).
 SURFACE_TRANSITION_PROB = 0.0
+SURFACE_TRANSITION_STEP_M = 0.0  # transitions category (2026-09-23): height offset (m) of segment B
+                                  # relative to segment A -- the realistic "threshold strip" case
+                                  # (material change AND a small ledge together, not just friction).
+                                  # + = step up, - = step down. 0 = the original material-only transition.
 SURFACE_TRANSITION_X = 0.18      # where it changes underfoot -- within a 250-step
                                    # episode's actual ~0.3m reach, so it's actually crossed
 TORQUE_CUTBACK = 0.35      # 0..1 max per-joint motor-force reduction (P1S electronic overheat cutback), * _dr
+TORQUE_SLOPE_CORRELATE = False  # thermal category (2026-09-23): when True, an episode that already
+                                  # drew a nonzero targeted slope gets a much higher chance of ALSO
+                                  # triggering TORQUE_CUTBACK. Independent per-knob randomization can
+                                  # under-sample this combination, which the corrected-sim slope sweep
+                                  # found is the worst single case (near-100% falls). Off = the
+                                  # original independent draw.
 FAC_POWER = 0.05           # ramped penalty on sum(|joint torque| * |joint vel|) -- efficient gait = less heat = more runtime
 DR_EVAL_FULL = False     # eval sets this True -> dr = 1 regardless of step count
 DEPLOY_DEBUG = False     # validate_deploy.py sets this True -> each step stashes self._deploy_dbg
@@ -605,9 +662,36 @@ IMU_HOLD_STEPS     = _g2e("IMU_HOLD_STEPS", IMU_HOLD_STEPS)          # hw1: 16 =
 IMU_RATE_ZERO      = _g2e("IMU_RATE_ZERO", IMU_RATE_ZERO)            # hw1: stream has no gyro
 CMD_PATH           = _g2e("CMD_PATH", CMD_PATH)                      # hw1: "i" = firmware simultaneous move
 CMD_PATH_EXTRA_MS_MAX = _g2e("CMD_PATH_EXTRA_MS_MAX", CMD_PATH_EXTRA_MS_MAX)
+CMD_SEND_EVERY_N   = _g2e("CMD_SEND_EVERY_N", CMD_SEND_EVERY_N)      # r3: 3 = i@27, the better of the two measured options
+FAC_RESIDUAL_COST  = _g2e("FAC_RESIDUAL_COST", FAC_RESIDUAL_COST)    # r3: reward-tuning candidate, ledges-only
+FAC_RESID_SMOOTH   = _g2e("FAC_RESID_SMOOTH", FAC_RESID_SMOOTH)      # r3: reward-tuning candidate, ledges-only
+FAC_YAW_TRACK      = _g2e("FAC_YAW_TRACK", FAC_YAW_TRACK)            # r3: 6.0 -> 9.0 -- Deployment_CandidateV1's
+    # yaw_rate_rms ran 1.3-2.4x scripted's on every cell checked (T1.1/T5.2/T5.3/T7.2), while net
+    # heading drift was comparable -- the gait isn't ending up off-course, it's wobbling more
+    # moment-to-moment while walking. Note: an OLDER, now-replaced mechanism (FAC_STABILITY /
+    # plain FAC_YAW) backfired when raised (rtune_r2: falls 14->21%, yaw 8->13deg -- over-damped
+    # the correction layer). FAC_YAW_TRACK is what replaced that approach, not the same lever, but
+    # the general risk (over-constraining the correction hurts hazard cells) still applies -- this
+    # is why it's a measured 50% bump, not an aggressive one, and why the final report tracks
+    # yaw_rate_rms/heading_drift explicitly to catch a repeat of that failure mode.
 BODY_MASS_SCALE    = _g2e("BODY_MASS_SCALE", BODY_MASS_SCALE)        # hw1: 1.12
 SLOPE_TARGET_PROB  = _g2e("SLOPE_TARGET_PROB", SLOPE_TARGET_PROB)    # hw2: 0.3
 PAYLOAD_INERTIA    = _g2e("PAYLOAD_INERTIA", PAYLOAD_INERTIA)        # "legacy" = pre-fix zero-inertia payload
+SURFACE_TRANSITION_PROB = _g2e("SURFACE_TRANSITION_PROB", SURFACE_TRANSITION_PROB)
+SURFACE_TRANSITION_STEP_M = _g2e("SURFACE_TRANSITION_STEP_M", SURFACE_TRANSITION_STEP_M)
+RUG_SLIDE_PROB     = _g2e("RUG_SLIDE_PROB", RUG_SLIDE_PROB)
+RUG_SLIDE_FRICTION = _g2e("RUG_SLIDE_FRICTION", RUG_SLIDE_FRICTION)
+SNAG_OBSTACLE_PROB = _g2e("SNAG_OBSTACLE_PROB", SNAG_OBSTACLE_PROB)
+SNAG_OBSTACLE_N    = _g2e("SNAG_OBSTACLE_N", SNAG_OBSTACLE_N)
+TORQUE_SLOPE_CORRELATE = _g2e("TORQUE_SLOPE_CORRELATE", TORQUE_SLOPE_CORRELATE)
+# CARPET* previously had no G2E_ override -- settable only in-process via
+# benchmark_decathlon._apply(), not by a training subprocess (2026-09-23 gap
+# found building the Phase B carpet round).
+CARPET             = _g2e("CARPET", CARPET)
+CARPET_PROB        = _g2e("CARPET_PROB", CARPET_PROB)
+CARPET_SOFT        = _g2e("CARPET_SOFT", CARPET_SOFT)
+CARPET_SWELL       = _g2e("CARPET_SWELL", CARPET_SWELL)
+SERVO_RATE_LIMIT_DEG_S = _g2e("SERVO_RATE_LIMIT_DEG_S", SERVO_RATE_LIMIT_DEG_S)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
@@ -932,11 +1016,24 @@ class OpenCatGymEnv(gym.Env):
                 _j0 = np.asarray(p.getJointStates(self.robot_id, self.joint_id), dtype=object)[:, 0]
                 self._fw = FirmwareCmdPath(CMD_PATH, np.rad2deg(_j0.astype(float)), extra_s=self._fw_extra_s)
             _t = self._fw_k / CONTROL_HZ
-            self._fw.send(_t, np.rad2deg(joint_angs))
+            if self._fw_k % CMD_SEND_EVERY_N == 0:
+                self._fw.send(_t, np.rad2deg(joint_angs))
             _motor_angs = np.deg2rad(self._fw.output(_t + 0.5 / CONTROL_HZ))   # mid-step servo drive
             self._fw_k += 1
         if JOINT_TARGET_HOOK is not None:
             _motor_angs = JOINT_TARGET_HOOK(self, joint_angs.copy())
+        if SERVO_RATE_LIMIT_DEG_S > 0:
+            # Physical servo speed ceiling, applied AFTER whatever CMD_PATH /
+            # JOINT_TARGET_HOOK already decided to command -- the firmware
+            # model decides what to ASK the servo to do; this decides whether
+            # the servo can physically KEEP UP. Composed, not double-counted.
+            _max_step = np.deg2rad(SERVO_RATE_LIMIT_DEG_S) / CONTROL_HZ
+            if self._servo_prev_angs is None:
+                self._servo_prev_angs = _motor_angs.copy()
+            else:
+                _delta = np.clip(_motor_angs - self._servo_prev_angs, -_max_step, _max_step)
+                _motor_angs = self._servo_prev_angs + _delta
+            self._servo_prev_angs = _motor_angs.copy()
         p.setJointMotorControlArray(self.robot_id,
                                     self.joint_id,
                                     p.POSITION_CONTROL,
@@ -1708,6 +1805,9 @@ class OpenCatGymEnv(gym.Env):
         _carpet_floor = (not _carpet and not _rough and not _surface_transition
                          and CARPET_SOFT > 0 and self._dr > 0
                          and SLOPE_FIXED_RP is None and np.random.rand() < CARPET_PROB)
+        _slide_rug_floor = (not _carpet and not _rough and not _surface_transition and not _carpet_floor
+                            and RUG_SLIDE_PROB > 0 and self._dr > 0
+                            and SLOPE_FIXED_RP is None and np.random.rand() < RUG_SLIDE_PROB)
         if _carpet:
             _n = 190                                  # fine grid -> foot-scale bumps
             _raw = np.random.uniform(-1, 1, (_n, _n))
@@ -1769,7 +1869,8 @@ class OpenCatGymEnv(gym.Env):
             _cs_a = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_a_hi - _a_lo) / 2, 0.4, 0.02])
             plane_id = p.createMultiBody(0, _cs_a, basePosition=[(_a_hi + _a_lo) / 2, 0, -0.02], baseOrientation=_quat)
             _cs_b = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_b_hi - _b_lo) / 2, 0.4, 0.02])
-            _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02], baseOrientation=_quat)
+            _step = SURFACE_TRANSITION_STEP_M   # threshold-strip case: material change + a small ledge together
+            _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02 + _step], baseOrientation=_quat)
             p.changeDynamics(_seg_b, -1, contactStiffness=6e4, contactDamping=900,
                              restitution=0.0, lateralFriction=1.1)   # carpet-typical, same spirit as CARPET_SOFT
             p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])   # box floors render near-black in the GUI otherwise
@@ -1802,6 +1903,11 @@ class OpenCatGymEnv(gym.Env):
                 contactDamping=float(np.random.uniform(300, 1500) * (1 + 0.6 * _ck)),
                 restitution=0.0,   # carpet doesn't bounce
                 lateralFriction=float(np.random.uniform(0.9, 1.3)))  # carpet typically grips a bit more than hardwood
+        if _slide_rug_floor:
+            # A loose/slick rug: reduced grip, not necessarily soft -- distinct failure mode from the
+            # bumpy CARPET heightfield or the high-friction flat carpet floor above.
+            p.changeDynamics(plane_id, -1,
+                lateralFriction=float(RUG_SLIDE_FRICTION * self._dr + 1.0 * (1 - self._dr)))
         if DEFORM_GROUND > 0 and self._dr > 0:
             k = DEFORM_GROUND * self._dr
             p.changeDynamics(plane_id, -1,
@@ -1818,6 +1924,8 @@ class OpenCatGymEnv(gym.Env):
             self._scatter_obstacles(RANDOM_TERRAIN * self._dr)
         if RUBBLE > 0 and self._dr > 0 and np.random.rand() < RUBBLE_PROB:
             self._scatter_rubble(RUBBLE * self._dr, RUBBLE_N)
+        if SNAG_OBSTACLE_PROB > 0 and self._dr > 0 and np.random.rand() < SNAG_OBSTACLE_PROB:
+            self._scatter_snags(SNAG_OBSTACLE_N)
 
         # Phase 4: sharp step across the whole lane. Flat ground only, not with the
         # rough heightfield (which replaces the plane). Step-up = raised plateau
@@ -1881,7 +1989,14 @@ class OpenCatGymEnv(gym.Env):
 
         # gait-refinement G3: per-joint motor-force scale (overheat cutback)
         self._torque_scale = np.ones(8)
-        if TORQUE_CUTBACK > 0 and self._dr > 0 and np.random.rand() < 0.4:
+        # Thermal category (2026-09-23): correlate with slope on request -- an episode that
+        # already drew a nonzero targeted slope gets a much higher chance of ALSO triggering
+        # TORQUE_CUTBACK, instead of leaving the combination to independent per-knob chance.
+        # The corrected-sim slope sweep found overheat+tilt together is the worst single case.
+        _torque_trigger = 0.4
+        if TORQUE_SLOPE_CORRELATE and (self._slope_rp[0] != 0.0 or self._slope_rp[1] != 0.0):
+            _torque_trigger = 0.85
+        if TORQUE_CUTBACK > 0 and self._dr > 0 and np.random.rand() < _torque_trigger:
             k = np.random.choice(8, np.random.randint(1, 4), replace=False)
             self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._dr, 1.0, len(k))
 
@@ -1898,6 +2013,7 @@ class OpenCatGymEnv(gym.Env):
         self._fw_k = 0
         self._fw_extra_s = (np.random.uniform(0.0, CMD_PATH_EXTRA_MS_MAX) / 1000.0
                             if CMD_PATH and CMD_PATH_EXTRA_MS_MAX > 0 else 0.0)
+        self._servo_prev_angs = None   # SERVO_RATE_LIMIT_DEG_S per-episode state
         self._imu_bias_euler = np.zeros(2)
         if IMU_BIAS_DEG > 0 and self._dr > 0:
             self._imu_bias_euler = (np.random.uniform(-IMU_BIAS_DEG, IMU_BIAS_DEG, 2)
@@ -2288,6 +2404,27 @@ class OpenCatGymEnv(gym.Env):
                 across,                           # across-path half-width
                 h / 2])
             p.createMultiBody(0, cs, basePosition=[x, y, z_ground + h / 2],
+                              baseOrientation=box_orn)
+
+    def _scatter_snags(self, n):
+        """Obstacles category (2026-09-23): thin, low, lane-spanning boxes -- a
+        cable/cord analog, distinct from _scatter_obstacles' taller, narrower
+        bumps. Deliberately thin ALONG the path (SNAG_HALF_LEN_M) so a foot can
+        land squarely on it, but spans most of the lane (a cord usually crosses
+        the walking direction), at cable-scale height. Contact-recovery
+        objective -- the gait is blind, it can't step over what it hasn't seen,
+        so this tests recovering from an unexpected snag, not avoiding one."""
+        roll, pitch = getattr(self, "_slope_rp", (0.0, 0.0))
+        nrm = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
+                        np.cos(pitch) * np.cos(roll)])
+        box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
+        for _ in range(n):
+            x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], RANDOM_TERRAIN_X_RANGE[1])
+            y = np.random.uniform(-0.02, 0.02)
+            z_ground = -(nrm[0] * x + nrm[1] * y) / nrm[2]
+            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
+                SNAG_HALF_LEN_M, np.random.uniform(0.14, 0.22), SNAG_HEIGHT_M / 2])
+            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + SNAG_HEIGHT_M / 2],
                               baseOrientation=box_orn)
 
 

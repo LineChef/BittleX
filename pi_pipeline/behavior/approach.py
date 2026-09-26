@@ -54,6 +54,7 @@ class ApproachTarget:
         self._reason = "cancelled"
 
     def _target(self, frame):
+        # picks the largest confident matching detection to walk toward
         best, best_area = None, 0.0
         for d in frame:
             if getattr(d, "label", "") not in self.cfg.labels:

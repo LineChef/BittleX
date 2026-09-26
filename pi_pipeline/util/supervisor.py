@@ -87,6 +87,7 @@ class WatchdogPolicy:
 
     # -- query ------------------------------------------------------------
     def poll(self, now: float) -> Decision:
+        """Decides RUN / RESTART(with backoff) / GIVE_UP from the events seen so far."""
         c = self.cfg
         if self._given_up:
             return Decision(WatchAction.GIVE_UP, reason="already gave up")
@@ -215,6 +216,8 @@ class Supervisor:
         self._policy.on_heartbeat(self._last_beat_mono)
 
     def _supervise(self) -> None:
+        """The supervisor thread body: spawn the worker, then loop polling the
+        watchdog policy and restarting/giving up per its decision."""
         self._spawn_worker()
         while not self._stopping.is_set():
             time.sleep(self._poll)

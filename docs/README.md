@@ -57,6 +57,12 @@ soldering, mounting, calibration, real measurements) — separate from
 
 No other entries yet; the rest starts once Bittle X and the camera arrive.
 
+## `research/` — community projects, external findings
+
+| | |
+|---|---|
+| [`community-projects.md`](research/community-projects.md) | Findings from reviewing other Bittle/Petoi community projects (BittleJuice, bittle-mujoco, MH-FLOCKE, TypeFly) + the incorporation plan. |
+
 ## `rl/` — gait training: conclusions, backlogs, specs
 
 | | |

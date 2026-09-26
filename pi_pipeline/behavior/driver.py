@@ -73,6 +73,8 @@ class EffectKind(Enum):
 
 @dataclass
 class Effect:
+    """One abstract action a tick produced -- a binding layer maps this onto
+    a real actuator/TTS/camera/log call."""
     kind: EffectKind
     payload: object = None
     reason: str = ""
@@ -80,6 +82,9 @@ class Effect:
 
 @dataclass
 class DriverInputs:
+    """Everything the driver needs for one tick: sensor state + discrete
+    events since the last call. Construct fresh each tick; nothing here
+    persists between calls."""
     now: float | None = None
     frame: Frame = ()                       # vision detections this instant
 
@@ -128,6 +133,8 @@ class DriverInputs:
 
 @dataclass
 class DriverTick:
+    """What tick() decided this step: the resulting mode/posture/state, the
+    ordered Effects to execute, and why."""
     mode: Mode
     posture: Posture
     enroll_state: EnrollState
@@ -208,6 +215,9 @@ class _Choreo:
 
 
 class BehaviorDriver:
+    """The composition root: owns every behaviour sub-module and ticks them
+    in priority order (see the module docstring). No I/O -- tick() is a pure
+    function of state + DriverInputs -> DriverTick."""
     def __init__(self, params: BehaviorParams | None = None, *,
                  clock=time.monotonic, rng=None,
                  mode_cfg: ModeConfig | None = None,
@@ -528,6 +538,9 @@ class BehaviorDriver:
 
     # --- the tick ----------------------------------------------------
     def tick(self, i: DriverInputs | None = None) -> DriverTick:
+        """One control step: runs the priority chain (estop > sleep > enrollment
+        > choreography > safety > come-here > converse > explore > idle) and
+        returns the first one that claims the tick."""
         i = i or DriverInputs()
         now = self._clock() if i.now is None else i.now
         effects: list = []

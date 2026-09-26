@@ -62,6 +62,8 @@ class WatchdogCore:
         self._stalled = False        # a beat clears the latch
 
     def poll(self, now: float) -> tuple[WatchVerdict, dict]:
+        # checks staleness first (latches STALL once), else checks if a
+        # periodic heartbeat is due
         c = self.cfg
         if self._started is None:
             return WatchVerdict.OK, {}
@@ -115,6 +117,7 @@ class Watchdog:
         return bool(self._thread and self._thread.is_alive())
 
     def _run(self) -> None:
+        # background timer thread: polls the core logic and emits diag events
         while not self._stop.wait(self._poll):
             verdict, ctx = self.core.poll(self._clock())
             if verdict is WatchVerdict.STALL:

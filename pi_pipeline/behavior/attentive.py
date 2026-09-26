@@ -77,6 +77,7 @@ class AttentiveLook:
         return (det.center_x - 0.5) * 2.0 * self.cfg.fov_half_rad
 
     def _nearest_person(self, frame):
+        # largest confident person/face detection in frame
         best, best_area = None, 0.0
         for d in frame:
             if getattr(d, "label", "") not in self.cfg.person_labels:
@@ -88,6 +89,7 @@ class AttentiveLook:
         return best
 
     def _novel_object(self, frame, now: float):
+        # largest non-person detection the novelty tracker hasn't seen recently
         best, best_area = None, 0.0
         for d in frame:
             lab = getattr(d, "label", "")

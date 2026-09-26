@@ -83,10 +83,12 @@ class Features:
 
     @classmethod
     def from_spec(cls, spec: str) -> "Features":
+        """Builds a Features set from a raw G2_FEATURES-style string."""
         return _parse(spec)
 
     @classmethod
     def from_settings(cls, settings) -> "Features":
+        """Builds a Features set from settings.features_spec."""
         return _parse(getattr(settings, "features_spec", ""))
 
     # --------------------------------------------------------------- resolve
@@ -154,10 +156,12 @@ class Features:
     # ----------------------------------------------------------- introspect
 
     def enabled(self, name: str) -> bool:
+        """True if a bool flag is set, or a mode field isn't "off"."""
         v = getattr(self, name, False)
         return bool(v) if isinstance(v, bool) else v not in ("", "off")
 
     def describe(self) -> str:
+        """Human-readable +flag/-flag/field:value summary, grouped by layer."""
         rows = []
         for grp, names in _GROUPS:
             parts = []
@@ -212,6 +216,7 @@ _STAGES = [
 
 
 def _build_profiles() -> dict[str, dict]:
+    """Expands _STAGES into each profile's full flag dict (cumulative)."""
     out: dict[str, dict] = {}
     acc = dict(_OFF)
     for name, delta in _STAGES:
@@ -225,6 +230,7 @@ DEFAULT_PROFILE = "p9-full"
 
 
 def _match_profile(name: str) -> str | None:
+    """Resolves a profile name or unambiguous prefix (e.g. "p2") to its full name."""
     name = name.strip().lower()
     if name in PROFILES:
         return name
@@ -235,6 +241,8 @@ def _match_profile(name: str) -> str | None:
 # ------------------------------------------------------------------- parse
 
 def _parse(spec: str) -> Features:
+    """Parses a G2_FEATURES spec string into a Features set, starting from a
+    profile (default p9-full) and applying +flag/-flag/field:value tokens."""
     spec = (spec or "").strip()
     base = dict(PROFILES[DEFAULT_PROFILE])
     tokens = [t.strip() for t in spec.split(",") if t.strip()]

@@ -50,10 +50,11 @@ def _stt() -> None:
     print(f'  heard: {text!r}   ({time.monotonic() - t0:.1f}s)')
 
 
-def _tts(text: str, model: str | None) -> None:
+def _tts(text: str, model: str | None, robot: bool | None) -> None:
     from .tts import PiperTTS
 
-    PiperTTS(model or settings.piper_model_path).speak(text)
+    effect = settings.voice_robot_effect if robot is None else robot
+    PiperTTS(model or settings.piper_model_path, robot_effect=effect).speak(text)
 
 
 def main() -> None:
@@ -66,6 +67,10 @@ def main() -> None:
     p_tts = sub.add_parser("tts")
     p_tts.add_argument("text")
     p_tts.add_argument("--model", default=None)
+    p_tts.add_argument("--robot", dest="robot", action="store_true", default=None,
+                       help="force the robot-voice effect on (default: settings.voice_robot_effect)")
+    p_tts.add_argument("--no-robot", dest="robot", action="store_false",
+                       help="force the robot-voice effect off")
     args = ap.parse_args()
 
     if args.cmd == "devices":
@@ -75,7 +80,7 @@ def main() -> None:
     elif args.cmd == "stt":
         _stt()
     elif args.cmd == "tts":
-        _tts(args.text, args.model)
+        _tts(args.text, args.model, args.robot)
 
 
 if __name__ == "__main__":

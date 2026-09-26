@@ -11,7 +11,11 @@ gait through the real control path; scripted isn't needed -- runs are compared
 with each other):
   - flat: per-paw ground contact, footfall mismatch vs the scripted schedule, speed
   - slopes (pure, no rough episodes): uphill 8/16, side-hill 8/12 and -8
-  - benchmark cells: T1.1 T2.4 T3.2 T7.2 T8.2 T9.3 (speed), T5.1b T6.3b (falls)
+  - benchmark cells (2026-09-23 ladder rebuild, 21-cell/no-bare-robot):
+    T1.1 T7.1 T2.2 T5.2 T10.1 T6.2 (speed), T11.2 T8.1 (falls -- the two
+    hardest remaining payload-on cells now that bare-robot is gone; may still
+    read 0% falls same as the old T6 tier did before the bare-robot variants
+    existed, that's a result not a bug)
 
     python multi_ckpt_eval.py --run hw1_20m --steps 2200000,2400000,2600000,2800000,3000000
     python multi_ckpt_eval.py --summarize trained/mce_hw1_20m.json trained/mce_hw4_20m.json
@@ -29,8 +33,8 @@ from benchmark_gaits import _load_learned, _bench
 from opencat_gym_env import OpenCatGymEnv
 
 D = math.radians
-CELLS_SPEED = ("T1.1", "T2.4", "T3.2", "T7.2", "T8.2", "T9.3")
-CELLS_FALLS = ("T5.1b", "T6.3b")
+CELLS_SPEED = ("T1.1", "T7.1", "T2.2", "T5.2", "T10.1", "T6.2")
+CELLS_FALLS = ("T11.2", "T8.1")
 SLOPES = (("up 8", 0.0, -D(8)), ("up 16", 0.0, -D(16)),
           ("side 8", D(8), 0.0), ("side 12", D(12), 0.0), ("side -8", -D(8), 0.0))
 

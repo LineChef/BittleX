@@ -119,6 +119,8 @@ def _fts_query(text: str) -> str:
 
 
 class Store:
+    """Thin wrapper over the two-table sqlite schema above -- open/close plus
+    one method per query the rest of the memory package needs."""
     def __init__(self, db_path: str):
         p = Path(db_path)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -158,6 +160,8 @@ class Store:
         return cur.rowcount
 
     def search_exchanges(self, text: str, limit: int, exclude_last: int = 0) -> list[sqlite3.Row]:
+        # relevance search via FTS5, optionally excluding the N most recent
+        # rows (so recall doesn't just echo back the current conversation)
         q = _fts_query(text)
         if not q:
             return []

@@ -50,6 +50,7 @@ def _cmp(cid, m, scr, rl):
 
 
 def score(d):
+    # per-condition SCR vs RL comparison table + the KEEP/FALL-BACK/MIDDLE verdict
     conds = d.get("conditions", {})
     rows = []
     rl_better_metrics, rl_worse_falls_everyday = set(), []

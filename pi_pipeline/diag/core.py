@@ -59,6 +59,8 @@ def _git_sha() -> dict:
 
 
 def _redact(d: dict) -> dict:
+    """Replaces any key/token/secret/password value with "***" before it
+    can land in a manifest, recursing into nested dicts/dataclasses."""
     out = {}
     for k, v in d.items():
         if any(s in k.lower() for s in ("key", "token", "secret", "password")):
@@ -242,6 +244,9 @@ class RingBuffer:
 
 
 class Diag:
+    """The session singleton: one events.jsonl + manifest.json per session,
+    plus any attached RingBuffers dumped to CSV on an incident."""
+
     def __init__(self):
         self._lock = threading.Lock()
         self._fp = None
@@ -388,6 +393,8 @@ class Diag:
             self.event_locked(subsystem, level, name, **kv)
 
     def event_locked(self, subsystem: str, level: str, name: str, **kv):
+        """Same as event() but assumes the caller already holds self._lock
+        (auto-starts a session first if none is running)."""
         if self._fp is None:            # lazily auto-start so nothing is lost
             self._lock.release()
             try:
@@ -422,6 +429,8 @@ class DiagLogHandler(logging.Handler):
 
 
 def bridge_stdlib_logging(root: str = "g2"):
+    """Routes stdlib logging.getLogger("g2.*") records into the diag event
+    stream too, so a plain log.warning() still ends up in events.jsonl."""
     lg = logging.getLogger(root)
     if not any(isinstance(h, DiagLogHandler) for h in lg.handlers):
         lg.addHandler(DiagLogHandler())

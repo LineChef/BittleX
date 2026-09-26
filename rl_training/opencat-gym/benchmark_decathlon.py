@@ -1,12 +1,18 @@
 """The Decathlon -- a graded learned-vs-scripted comparison that ramps from
 easy to brutal across every skill G2 has been trained on.
 
-24 cells in 8 tiers (19 payload-on + 5 bare-robot fall-rate variants); both gaits
-run every cell on matched per-episode seeds. Trimmed 2026-09-04 from an earlier
-32-cell version -- see the LADDER comments for what was cut and why.
+21 cells in 11 categories, rebuilt 2026-09-23 for the payload-bug-fixed fresh-
+start training campaign (see docs/rl/hw1-log.md): every cell payload-on, no
+bare-robot variants (removed per user decision -- a 30% time cost per run,
+not worth paying every iteration), categories map onto the redesigned staged
+training course one-to-one so a cell result reads directly as "did this stage
+train". Both gaits run every cell on matched per-episode seeds. Replaces the
+24-cell/8-tier version (see git history for that LADDER) -- old cell IDs
+(T5.1b, T6.2b-T6.5b, T9.1-T9.4, etc.) referenced in older docs/scripts are
+historical and no longer exist here.
 Writes a JSON that build_decathlon_report.py turns into an HTML report.
 
-    python benchmark_decathlon.py --learned trained/<tag>_ppo --episodes 28 \
+    python benchmark_decathlon.py --learned trained/<tag>_ppo --episodes 20 \
         --json-out /path/decathlon.json --gif-dir /path/gifs
 """
 import argparse
@@ -27,152 +33,88 @@ D = math.radians
 _ZERO = ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM_TERRAIN",
          "IMPULSE_PUSH", "SLOPE_MAX_DEG", "START_POSE_JITTER", "STUCK_FOOT_PROB",
          "SUSTAINED_FORCE", "DEFORM_GROUND", "SLIP_PATCH",
-         "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR", "RUBBLE", "RUBBLE_PROB", "CARPET", "CARPET_SWELL", "CARPET_SOFT")
+         "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR", "RUBBLE", "RUBBLE_PROB",
+         "CARPET", "CARPET_SWELL", "CARPET_SOFT",
+         # new course mechanics (2026-09-23) -- same leak risk as everything else here
+         "SURFACE_TRANSITION_PROB", "SURFACE_TRANSITION_STEP_M", "RUG_SLIDE_PROB", "SNAG_OBSTACLE_PROB")
 
 # (id, tier, skill, human label, {env knob overrides})
+# 11 categories / 21 cells, one-to-one with the redesigned staged training
+# course (docs/rl/hw1-log.md, 2026-09-23 rebuild). Payload on throughout --
+# bare-robot variants removed per user decision (30% of run time for a
+# diagnostic that rarely changed a call). "modest" slope/cross-slope severity
+# per user direction: G2 won't see steep grades often in real use, so this
+# ladder isn't chasing a severity ceiling the way the old T6 tier did.
 LADDER = [
     ("T1.1", 1, "flat walk",      "Flat, calm",                 {}),
     ("T1.2", 1, "straight line",  "Flat + gentle nudges",       {"RANDOM_PUSH": 0.12, "RANDOM_PUSH_PROB": 0.02}),
 
-    # 2026-09-04: trimmed the pure severity-progression rungs that added no
-    # signal beyond their endpoints (0% falls, ~1% speed delta -- see
-    # docs/rl/ for the full before/after). Gentle-up/gentle-down (T2.1/
-    # T2.2) cut; steep up/down (T3.1/T3.2) and extreme down (T6.1, a real
-    # discriminator) bracket the same range with the interesting result kept.
-    # Cross-slope (T2.3) stays -- a different axis, not a severity step.
-    ("T2.3", 2, "slopes",         "Cross-slope  (5 deg roll)",  {"SLOPE_FIXED_RP": (D(5), 0.0)}),
-    ("T2.4", 2, "obstacles",      "Small obstacles  (20 mm)",   {"RANDOM_TERRAIN": 0.020}),
+    ("T2.1", 2, "slopes",         "Downhill  (8 deg)",          {"SLOPE_FIXED_RP": (0.0, D(8))}),
+    ("T2.2", 2, "slopes",         "Uphill  (12 deg)",           {"SLOPE_FIXED_RP": (0.0, D(-12))}),
 
-    ("T3.1", 3, "slopes",         "Steep downhill  (12 deg)",   {"SLOPE_FIXED_RP": (0.0, D(12))}),
-    ("T3.2", 3, "slopes",         "Steep uphill  (12 deg)",     {"SLOPE_FIXED_RP": (0.0, D(-12))}),
-    # Medium/big obstacles (T3.3/T4.4) and the two-factor combos (T3.4
-    # slope+obstacle, T4.3 obstacles+shoves) cut -- middle interpolation
-    # points on a smooth trend, and the fuller Compound Stress category below
-    # now covers combination effects more thoroughly than these narrower
-    # two-factor cells did.
+    ("T3.1", 3, "slopes",         "Cross-slope  (5 deg roll)",  {"SLOPE_FIXED_RP": (D(5), 0.0)}),
+    ("T3.2", 3, "slopes",         "Cross-slope  (10 deg roll)", {"SLOPE_FIXED_RP": (D(10), 0.0)}),
 
-    ("T4.1", 4, "stumble-catch",  "One hard shove",
-        {"IMPULSE_PUSH": 0.65, "IMPULSE_PUSH_PROB": 0.004}),
-    ("T4.2", 4, "stumble-catch",  "Repeated shoves",
-        {"IMPULSE_PUSH": 0.55, "IMPULSE_PUSH_PROB": 0.012}),
+    # Transitions (B17 in behavior-ideas.md): material change alone, then the
+    # same transition with a small step at the same point -- real doorway
+    # thresholds usually carry both at once (2026-09-23 user clarification).
+    ("T4.1", 4, "transition",     "Carpet-to-hard transition  (material only)",
+        {"SURFACE_TRANSITION_PROB": 1.0, "SURFACE_TRANSITION_STEP_M": 0.0, "ROUGH_TERRAIN": 0.0}),
+    ("T4.2", 4, "transition",     "Carpet-to-hard transition + small step  (12 mm)",
+        {"SURFACE_TRANSITION_PROB": 1.0, "SURFACE_TRANSITION_STEP_M": 0.012, "ROUGH_TERRAIN": 0.0}),
 
-    ("T5.1", 5, "everything",     "The gauntlet: 9 deg downhill + 4 deg side-hill + rubble + repeated shoves",
-        {"SLOPE_FIXED_RP": (D(4), D(9)), "RUBBLE": 0.016, "RUBBLE_N": 400,
-         "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.015,
-         "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25}),
+    # Ledge / step, direction-random each episode -- a realistic disturbance
+    # (door sills, rug edges, low curbs) the payload's inertia does not paper
+    # over. Three heights spanning realistic sill (15mm) to past-comfortable
+    # stress (40mm) for a blind low-clearance trot.
+    ("T5.1", 5, "ledge",          "Ledge  (15 mm, random up/down)",
+        {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
+    ("T5.2", 5, "ledge",          "Ledge  (25 mm, random up/down)",
+        {"LEDGE_HEIGHT": 0.025, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
+    ("T5.3", 5, "ledge",          "Ledge  (40 mm, random up/down)  -- past-comfortable stress",
+        {"LEDGE_HEIGHT": 0.040, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
 
-    # T6: the hardened tier. With the payload on, both gaits are essentially
-    # unfallable on terrain/shove stress -- even -24 deg descents and a 20 deg
-    # brutal gauntlet give 0% falls. So T6 is NOT scored on fall rate; it is
-    # scored on COMMANDED PROGRESS + speed retention + heading drift under
-    # extreme stress. T6.1 (steep descent: learned walks down, scripted slides
-    # back) and T6.5 (weak servos: the one failure mode the payload's inertia
-    # cannot mask) are the real discriminators.
-    ("T6.1", 6, "slopes",         "Extreme uphill  (24 deg)",
-        {"SLOPE_FIXED_RP": (0.0, D(-24))}),
-    ("T6.2", 6, "obstacles",      "Huge obstacles  (85 mm) + push",
-        {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35}),
-    ("T6.3", 6, "stumble-catch",  "Brutal shoves  (1.00 @ 0.018)",
+    ("T6.1", 6, "terrain",        "Rubble  (moderate)",
+        {"RUBBLE": 0.016, "RUBBLE_N": 400, "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.015}),
+    ("T6.2", 6, "terrain",        "Rubble  (dense, deeper than training)",
+        {"RUBBLE": 0.024, "RUBBLE_N": 680, "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.026, "_episodes": 40}),
+
+    ("T7.1", 7, "obstacles",      "Box obstacles  (25 mm)",     {"RANDOM_TERRAIN": 0.025}),
+    ("T7.2", 7, "obstacles",      "Snag obstacles  (thin, lane-spanning -- cable/cord analog)",
+        {"SNAG_OBSTACLE_PROB": 1.0}),
+
+    ("T8.1", 8, "stumble-catch",  "Brutal shoves  (1.00 @ 0.018)",
         {"IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.25}),
-    ("T6.4", 6, "everything",     "Brutal gauntlet: 20 deg downhill + 8 deg side-hill + dense rubble + brutal shoves",
-        {"SLOPE_FIXED_RP": (D(8), D(20)), "RUBBLE": 0.020, "RUBBLE_N": 560,
-         "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.020,
-         "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45}),
-    ("T6.5", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg uphill",
+
+    ("T9.1", 9, "weak servos",    "Overheated servos (60% cutback) + 12 deg uphill",
         {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12))}),
 
-    # Bare-robot variants (2026-09-04): every T5/T6 cell above reads 0% falls for
-    # BOTH gaits with the payload on -- its own comment already says why (the
-    # payload's inertia stabilizes hard enough to absorb any single stressor we
-    # throw at it). These five re-run the hardest cells with PAYLOAD_PROB=0 --
-    # no deployment mass to lean on -- as the actual fall-rate-focused diagnostic.
-    # Added alongside the payload-on cells, not replacing them, so the rest of
-    # the ladder's story (payload-on throughout) stays comparable end to end.
-    # Episode count bumped (see _episodes) -- once a fall rate is genuinely
-    # nonzero, 20 samples isn't enough to trust the number run over run.
-    ("T5.1b", 5, "everything",     "The gauntlet -- bare robot",
+    # Rug: bumpy/soft fitted carpet (high-grip) vs a loose slick rug
+    # (low-grip) -- opposite failure modes, deliberately both kept.
+    ("T10.1", 10, "carpet",       "House carpet  (flat, mild compliance)",
+        {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.3}),
+    ("T10.2", 10, "carpet",       "Slick tile / low-friction hard floor  (reduced grip)",
+        {"RUG_SLIDE_PROB": 1.0, "ROUGH_TERRAIN": 0.0, "SURFACE_TRANSITION_PROB": 0.0}),
+
+    # Combined gauntlet stress -- the two hardest cells in the ladder, episode
+    # count bumped for confidence per the same reasoning as the old bare-robot
+    # cells: once results start moving, 20 samples isn't enough to trust.
+    ("T11.1", 11, "everything",   "The gauntlet: 9 deg downhill + 4 deg side-hill + rubble + repeated shoves",
         {"SLOPE_FIXED_RP": (D(4), D(9)), "RUBBLE": 0.016, "RUBBLE_N": 400,
          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.015,
-         "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25,
-         "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    ("T6.2b", 6, "obstacles",      "Huge obstacles (85 mm) + push -- bare robot",
-        {"RANDOM_TERRAIN": 0.085, "RANDOM_PUSH": 0.35,
-         "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    # T6.3b/T6.4b severity 2026-09-04: the T6.3/T6.4 payload-on knob values,
-    # reused as-is for bare robot, landed at 95-97% fall rate -- basically
-    # "always fails", as uninformative as the old 0% was, just at the other
-    # extreme. Probed a few candidates (see docs/rl/) and picked settings
-    # that land in a real hard-but-passable band instead.
-    ("T6.3b", 6, "stumble-catch",  "Brutal shoves (0.70 @ 0.012) -- bare robot",
-        {"IMPULSE_PUSH": 0.70, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.20,
-         "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    ("T6.4b", 6, "everything",     "Brutal gauntlet: 14 deg downhill + 6 deg side-hill + dense rubble + brutal shoves -- bare robot",
-        {"SLOPE_FIXED_RP": (D(6), D(14)), "RUBBLE": 0.020, "RUBBLE_N": 560,
+         "IMPULSE_PUSH": 0.60, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.25, "_episodes": 40}),
+    ("T11.2", 11, "everything",   "Brutal gauntlet: 20 deg downhill + 8 deg side-hill + dense rubble + brutal shoves",
+        {"SLOPE_FIXED_RP": (D(8), D(20)), "RUBBLE": 0.020, "RUBBLE_N": 560,
          "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.020,
-         "IMPULSE_PUSH": 0.70, "IMPULSE_PUSH_PROB": 0.012, "RANDOM_PUSH": 0.30,
-         "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-    ("T6.5b", 6, "weak servos",    "Overheated servos (60% cutback) + 12 deg uphill -- bare robot",
-        {"TORQUE_CUTBACK": 0.60, "SLOPE_FIXED_RP": (0.0, D(-12)),
-         "PAYLOAD_PROB": 0.0, "_episodes": 60}),
-
-    # T7: ledge / step. A realistic disturbance (door sills, rug edges, low curbs)
-    # the payload's inertia does NOT paper over -- a bad foot plant on an edge
-    # still starts a topple. Score on fall rate AND recovery events / time-to-settle.
-    # 2026-09-05: 30 mm reads as a near-limit stress for a blind low-clearance
-    # trot (belly clearance ~40-60 mm, swing height much less) -- realistic sills
-    # are 10-20 mm. Primary cells now 15/20 mm; 30 mm kept as an explicit
-    # past-comfortable stress rung. Step-down (T7.4) restored at the realistic
-    # height so both directions are visible even if "down" reads easy.
-    ("T7.1", 7, "ledge",          "Threshold up  (15 mm)",
-        {"LEDGE_HEIGHT": 0.015, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
-    ("T7.2", 7, "ledge",          "Step up  (20 mm sill)",
-        {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
-    ("T7.3", 7, "ledge",          "Step up  (30 mm) -- past-comfortable stress",
-        {"LEDGE_HEIGHT": 0.030, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}),
-    ("T7.4", 7, "ledge",          "Step down  (20 mm sill)",
-        {"LEDGE_HEIGHT": 0.020, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}),
-    ("T7.5", 7, "ledge",          "Big ledge  (45 mm, random up/down)",
-        {"LEDGE_HEIGHT": 0.045, "LEDGE_PROB": 1.0, "LEDGE_DIR": 0}),
-
-    # T8: carpet / soft ground. Kept as a PERMANENT benchmark cell regardless of
-    # whether any given checkpoint was trained on it (2026-09-04 decision) --
-    # the point is tracking learned-vs-scripted on real soft/uneven ground over
-    # time, not just when there happens to be a carpet-specific run to grade.
-    # T8.1 is the user's actual carpet (~1/4in / 6.4mm pile, compliance
-    # calibrated mild for G2's light paw-loading -- see opencat_gym_env.py
-    # CARPET_SOFT comment). T8.2 is rough, uneven ground: fine dense bumps
-    # (CARPET) PLUS a broad rolling-hill swell (CARPET_SWELL) in the same cell
-    # -- deliberately combined, not two separate courses (2026-09-04: this
-    # combination, not a standalone rolling-hills tier, is what "very uneven
-    # terrain" meant in practice; ROUGH_TERRAIN, the separate rolling-hill-only
-    # heightfield, stays unused -- CARPET_SWELL already covers that ground).
-    ("T8.1", 8, "carpet",         "House carpet  (flat, mild compliance)",
-        {"CARPET": 0.0, "CARPET_PROB": 1.0, "CARPET_SOFT": 0.3}),
-    ("T8.2", 8, "carpet",         "Rough, uneven ground: dense bumps + rolling swell  (19 mm bumps + 35 mm swell)",
-        {"CARPET": 0.019, "CARPET_SWELL": 0.035, "CARPET_PROB": 1.0}),
-
-    # T9: HELD-OUT generalization tier (2026-09-05). Conditions deliberately
-    # OUTSIDE the training distribution -- the policy never trains on these
-    # regimes. A policy that learned a robust gait holds up; one that overfit
-    # the training course degrades sharply. All fast (250-step) cells, kept to
-    # four so the tier stays cheap (~3 min/gait).
-    ("T9.1", 9, "held-out",       "Slope 18 deg downhill (beyond training's 14 deg ceiling)",
-        {"SLOPE_FIXED_RP": (0.0, D(18)), "_episodes": 40}),
-    ("T9.2", 9, "held-out",       "Slope 20 deg uphill (beyond training)",
-        {"SLOPE_FIXED_RP": (0.0, D(-20)), "_episodes": 40}),
-    ("T9.3", 9, "held-out",       "Rubble denser + taller than anything in training",
-        {"RUBBLE": 0.024, "RUBBLE_N": 680, "RUBBLE_PROB": 1.0, "RUBBLE_MAX_H": 0.026,
-         "_episodes": 40}),
-    ("T9.4", 9, "held-out",       "Slippery decline: 6 deg downhill + heavy friction randomization (wet-ramp analog)",
-        {"SLOPE_FIXED_RP": (0.0, D(6)), "RANDOM_FRICTION": 0.6, "_episodes": 40}),
+         "IMPULSE_PUSH": 1.00, "IMPULSE_PUSH_PROB": 0.018, "RANDOM_PUSH": 0.45, "_episodes": 40}),
 ]
 
 GIF_CELLS = {                      # one representative cell per report category
     "T1.1": "baseline",
-    "T6.1": "progression",         # slope progression's extreme end -- one of T6's real discriminators
-    "T8.2": "surface",             # rough ground: dense bumps + rolling swell
-    "T7.3": "hazard",              # step-up sill -- a known near-limit realistic case
-    "T6.4b": "compound",           # brutal gauntlet, bare robot -- the headline hardest test
+    "T2.2": "progression",         # steepest single-slope cell
+    "T6.2": "surface",             # dense rubble, deeper than training
+    "T5.2": "hazard",              # mid-height ledge -- a known near-limit realistic case
+    "T11.2": "compound",           # brutal gauntlet -- the headline hardest test
 }
 _METRICS = ["fell_fraction", "forward_speed_mps_mean", "forward_distance_m_mean",
             "diagonal_trot_corr_mean", "yaw_rate_rms_deg_mean", "lat_offset_max_m_mean",
