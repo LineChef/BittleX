@@ -46,6 +46,12 @@ datasets/
 *.mp4
 *.mov
 
+# No GIFs anywhere in the repo, ever -- replay/training footage or otherwise.
+# Diagrams we author go in docs/ as .png/.svg; the pre-commit hook enforces
+# both rules (never touches PNGs deliberately staged under docs/, always
+# unstages a .gif).
+*.gif
+
 # Run console logs
 *.log
 
@@ -72,8 +78,6 @@ CLAUDE.local.md
 
 # Downloaded STT/TTS models (Vosk, Piper) -- large, not versioned
 models/
-rl_training/opencat-gym/*.gif
-rl_training/opencat-gym/benchmark_*.gif
 
 # Pre-commit privacy denylist. Enable the hook per clone:
 #   git config core.hooksPath tools/githooks

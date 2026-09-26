@@ -8,9 +8,10 @@
 #      carries attribution, see CLAUDE.md. Commit-message attribution is
 #      handled separately by the commit-msg hook (message files aren't
 #      staged, so this hook never sees them).
-#   3. Unstage any staged image file outside docs/ -- replay GIFs/PNGs are
-#      never meant to be committed (see CLAUDE.md); docs/ is the one place
-#      real images (hardware photos, diagrams) belong.
+#   3. Unstage any staged GIF unconditionally, and any other staged image
+#      file outside docs/ -- no GIFs (replay/training footage) ever get
+#      committed anywhere in the repo (see CLAUDE.md); docs/ is the one
+#      place real images (hardware photos, diagrams we make) belong.
 # Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
@@ -32,8 +33,18 @@ if [ -n "$staged_files" ]; then
   done <<< "$staged_files"
 fi
 
-# --- 3. unstage images outside docs/ ------------------------------------
-image_pattern='\.(png|jpg|jpeg|gif|webp|bmp)$'
+# --- 3. unstage GIFs (always) and other images outside docs/ -----------
+gif_pattern='\.gif$'
+staged_gifs="$(git diff --cached --name-only --diff-filter=ACM | grep -iE "$gif_pattern" || true)"
+if [ -n "$staged_gifs" ]; then
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    git reset -q -- "$f"
+    echo "pre-commit: unstaged GIF (never committed, anywhere): $f"
+  done <<< "$staged_gifs"
+fi
+
+image_pattern='\.(png|jpg|jpeg|webp|bmp)$'
 staged_images="$(git diff --cached --name-only --diff-filter=ACM \
   | grep -iE "$image_pattern" | grep -v '^docs/' || true)"
 if [ -n "$staged_images" ]; then
