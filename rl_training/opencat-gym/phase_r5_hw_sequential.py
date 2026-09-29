@@ -37,7 +37,10 @@ LOG = "trained/phase_r5_hw_sequential.log"
 STEPS = "3e6"
 FINAL_20M_TAG = "r5_hw_20m"
 INTERIM_NAME = "r5_hw_candidate"
-V21_REPORT = "trained/phase_yaw_tuning_report.json"   # Release_CandidateV2.1's own historic benchmark
+V21_REPORT = "trained/phase_yaw_r3_report.json"   # Release_CandidateV2.1's own historic benchmark --
+    # this is the actual file on disk; phase_yaw_tuning.py's own subprocess call names a different
+    # path (trained/phase_yaw_tuning_report.json) that was never actually produced, caught 2026-09-28
+    # before this script's first real run reached its comparison step
 OUT_REPORT = "trained/phase_r5_hw_sequential_report.json"
 RETRY_LR = "1e-4"
 NEW_SKILL_LEARNABLE_MAX = 0.85
@@ -251,23 +254,45 @@ def run_gated_20m_with_midcheck(tag, extra, all_cells, deployment_name, from_ckp
     return False
 
 
-def _compare_vs_v21(new_report_path):
-    """Per explicit user instruction: compare ONLY against Release_CandidateV2.1's
-    historic report, not V1 or hw1_20m. Returns (verdicts dict, yaw_ok bool)."""
-    if not os.path.exists(V21_REPORT):
-        log(f"No comparison possible -- {V21_REPORT} not found.")
-        return {}, None
-    v21 = {s["slug"]: s for s in json.load(open(V21_REPORT))["sections"]}
+def _compare_vs_v21_and_scripted(new_report_path):
+    """Per explicit user instruction: compare against Release_CandidateV2.1's
+    historic report (not V1 or hw1_20m) AND against the scripted gait -- so the
+    final report shows both how the real-hardware-IMU retrain changed things
+    relative to V2.1, and how it now stands against scripted. phase_c_report.py's
+    sections already carry scripted_fell/scripted_speed/scripted_yaw_rate_rms_deg
+    alongside the learned_* fields, pulled from the NEW report (measured under
+    this run's own eval pass, not copied from V2.1's).
+    Returns (per_category table, verdicts-vs-v21 dict, v21's flat yaw_rms)."""
     new = {s["slug"]: s for s in json.load(open(new_report_path))["sections"]}
+    v21 = {}
+    if os.path.exists(V21_REPORT):
+        v21 = {s["slug"]: s for s in json.load(open(V21_REPORT))["sections"]}
+    else:
+        log(f"No V2.1 comparison possible -- {V21_REPORT} not found.")
     NOISE = 0.05
+    table = []
     verdicts = {}
-    for slug in v21:
-        if slug not in new:
-            continue
-        d = new[slug]["learned_fell"] - v21[slug]["learned_fell"]
-        verdicts[slug] = "win" if d < -NOISE else ("loss" if d > NOISE else "tie")
+    for slug, sec in new.items():
+        row = dict(slug=slug, name=sec.get("name", slug),
+                   new_fell=sec.get("learned_fell"), new_speed=sec.get("learned_speed"),
+                   scripted_fell=sec.get("scripted_fell"), scripted_speed=sec.get("scripted_speed"),
+                   new_yaw_rms=sec.get("learned_yaw_rate_rms_deg"),
+                   scripted_yaw_rms=sec.get("scripted_yaw_rate_rms_deg"))
+        if slug in v21:
+            row["v21_fell"] = v21[slug].get("learned_fell")
+            row["v21_speed"] = v21[slug].get("learned_speed")
+            row["v21_yaw_rms"] = v21[slug].get("learned_yaw_rate_rms_deg")
+            d = row["new_fell"] - row["v21_fell"]
+            row["verdict_vs_v21"] = "win" if d < -NOISE else ("loss" if d > NOISE else "tie")
+            verdicts[slug] = row["verdict_vs_v21"]
+        if row["new_fell"] is not None and row["scripted_fell"] is not None:
+            d2 = row["new_fell"] - row["scripted_fell"]
+            row["verdict_vs_scripted"] = "win" if d2 < -NOISE else ("loss" if d2 > NOISE else "tie")
+        table.append(row)
     log(f"r5_hw vs Release_CandidateV2.1 per category: {verdicts}")
-    return verdicts, v21.get("flat_ground", {}).get("learned_yaw_rate_rms_deg")
+    log(f"r5_hw vs scripted per category: "
+        f"{ {r['slug']: r.get('verdict_vs_scripted') for r in table} }")
+    return table, verdicts, v21.get("flat_ground", {}).get("learned_yaw_rate_rms_deg")
 
 
 def main():
@@ -328,13 +353,13 @@ def main():
     yaw_rms, drift = _score_yaw(FINAL_20M_TAG, final_step) if ckpts else (None, None)
     log(f"r5_hw final yaw_rms={yaw_rms}, heading_drift={drift}")
 
-    verdicts, v21_yaw_rms = _compare_vs_v21(OUT_REPORT)
+    table, verdicts, v21_yaw_rms = _compare_vs_v21_and_scripted(OUT_REPORT)
     losses = [s for s, v in verdicts.items() if v == "loss"]
-    beats_or_ties = not losses
+    beats_or_ties = not losses if verdicts else None   # None = no V2.1 comparison was possible at all
     yaw_needs_work = (yaw_rms is not None and v21_yaw_rms is not None and yaw_rms >= v21_yaw_rms - 0.15)
 
     with open("trained/phase_r5_hw_gate_decision.json", "w") as f:
-        json.dump(dict(verdicts=verdicts, beats_or_ties_v21=beats_or_ties,
+        json.dump(dict(comparison_table=table, verdicts=verdicts, beats_or_ties_v21=beats_or_ties,
                        yaw_rms=yaw_rms, heading_drift=drift, v21_yaw_rms=v21_yaw_rms,
                        yaw_needs_work=yaw_needs_work, final_step=final_step), f, indent=2)
 

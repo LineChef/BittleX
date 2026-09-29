@@ -190,10 +190,26 @@ def main():
              and tuned[slug]["learned_fell"] - base[slug]["learned_fell"] > NOISE]
     tuned_yaw = tuned.get("flat_ground", {}).get("learned_yaw_rate_rms_deg", 99)
     yaw_improved = tuned_yaw < baseline_yaw_rms - 0.15
+    # Per user instruction: the final report needs a scripted-gait comparison too,
+    # not just tuned-vs-base. phase_c_report.py's sections already carry
+    # scripted_fell/scripted_speed/scripted_yaw_rate_rms_deg alongside learned_*.
+    comparison_table = []
+    for slug, sec in tuned.items():
+        row = dict(slug=slug, name=sec.get("name", slug),
+                   new_fell=sec.get("learned_fell"), new_speed=sec.get("learned_speed"),
+                   scripted_fell=sec.get("scripted_fell"), scripted_speed=sec.get("scripted_speed"),
+                   new_yaw_rms=sec.get("learned_yaw_rate_rms_deg"),
+                   scripted_yaw_rms=sec.get("scripted_yaw_rate_rms_deg"))
+        if row["new_fell"] is not None and row["scripted_fell"] is not None:
+            d = row["new_fell"] - row["scripted_fell"]
+            row["verdict_vs_scripted"] = "win" if d < -NOISE else ("loss" if d > NOISE else "tie")
+        comparison_table.append(row)
     log(f"r6_hw tuned vs r5_hw base: fall-rate losses={losses or 'none'}, "
         f"flat yaw_rms tuned={tuned_yaw} vs base={baseline_yaw_rms:.2f}")
+    log(f"r6_hw vs scripted per category: "
+        f"{ {r['slug']: r.get('verdict_vs_scripted') for r in comparison_table} }")
     with open("trained/phase_r6_hw_gate_decision.json", "w") as f:
-        json.dump(dict(losses=losses, yaw_improved=yaw_improved,
+        json.dump(dict(losses=losses, yaw_improved=yaw_improved, comparison_table=comparison_table,
                        tuned_yaw_rms=tuned_yaw, base_yaw_rms=baseline_yaw_rms), f, indent=2)
     log(f"=== r6_hw yaw-tuning done -- losses={losses or 'none'}, "
         f"yaw_improved={yaw_improved} -- see {OUT_REPORT} ===")

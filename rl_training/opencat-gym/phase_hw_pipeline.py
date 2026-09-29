@@ -70,7 +70,7 @@ def main():
     if _stopped():
         return
 
-    run_tuning = gate["beats_or_ties_v21"] and gate["yaw_needs_work"]
+    run_tuning = bool(gate["beats_or_ties_v21"]) and gate["yaw_needs_work"]
     if run_tuning:
         log("Stage 2: r5_hw beats/ties V2.1 AND yaw still needs work -- "
             "launching phase_r6_hw_yaw.py (conditional tuning round)")
@@ -79,8 +79,12 @@ def main():
             log(f"Stage 2 FAILED (exit {r.returncode}) -- see trained/phase_r6_hw_yaw.log. "
                 "Final report will note the tuning stage did not complete.")
     else:
-        why = ("does not beat/tie Release_CandidateV2.1" if not gate["beats_or_ties_v21"]
-               else "yaw/drift is already at or better than Release_CandidateV2.1's own number")
+        if gate["beats_or_ties_v21"] is None:
+            why = "no Release_CandidateV2.1 comparison was possible (its report file wasn't found)"
+        elif not gate["beats_or_ties_v21"]:
+            why = "does not beat/tie Release_CandidateV2.1"
+        else:
+            why = "yaw/drift is already at or better than Release_CandidateV2.1's own number"
         log(f"Stage 2 SKIPPED -- {why}. Per user instruction: if we don't need the "
             "tuning run, skip it.")
 
@@ -104,6 +108,7 @@ def _write_final_report():
     report = dict(
         base_run=dict(
             interim_name="r5_hw_candidate",
+            comparison_table=gate1["comparison_table"],   # per-category: new vs V2.1 vs scripted
             verdicts_vs_v21=gate1["verdicts"],
             beats_or_ties_v21=gate1["beats_or_ties_v21"],
             yaw_rms=gate1["yaw_rms"],
@@ -114,6 +119,7 @@ def _write_final_report():
         tuning_run=(dict(
             ran=True,
             interim_name="r6_hw_yaw_candidate",
+            comparison_table=gate2["comparison_table"],   # per-category: tuned vs scripted
             losses_vs_base=gate2["losses"],
             yaw_improved=gate2["yaw_improved"],
             tuned_yaw_rms=gate2["tuned_yaw_rms"],
@@ -121,6 +127,8 @@ def _write_final_report():
             report_path="trained/phase_r6_hw_yaw_report.json",
         ) if tuning_ran else dict(ran=False)),
         still_needs_tuning=still_needs_tuning,
+        final_gait=("r6_hw_yaw_candidate" if tuning_ran and gate2 is not None
+                   and not gate2["losses"] and gate2["yaw_improved"] else "r5_hw_candidate"),
     )
     with open("trained/phase_hw_pipeline_final.json", "w") as f:
         json.dump(report, f, indent=2)
