@@ -597,7 +597,9 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       serial doesn't). Per Petoi's Raspberry Pi serial docs:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
     data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](hardware/pi-power.md).
-  - Install the 5-pin Pi socket on BiBoard V1; use Petoi's back-cover STL with
+  - [x] Install the 5-pin Pi socket on BiBoard V1 — **soldered 2026-09-29**
+    (`docs/build/biboard-pi-connector.md` Step 2). Still need: the actual
+    RX/TX/GND jumpers to the Pi (Step 3), and use Petoi's back-cover STL with
     the Pi cutout.
   - Petoi's official Pi standoff bracket (`Pi_StandOffRegular.stl`) does
     **not** work as-is for this stack — see status line below.
@@ -611,10 +613,11 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       (the single build manual, Steps 1-5) and the
       [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
       — that's the canonical reference, not this checklist.
-  - Step 1 (Pi+PiSugar) is done and needed no mount. Steps 2-4 are also
-    hardware-blocked, though — not just the mount (Step 5) — since BiBoard
-    ships as part of the frame kit **unassembled**; see "Assemble Bittle X
-    V2" above, the actual first blocker.
+  - Step 1 (Pi+PiSugar) is done and needed no mount. **Step 2 (solder BiBoard's
+    5-pin Pi header) done 2026-09-29** — the frame-unassembled blocker that held
+    up Steps 2-4 is resolved (frame's been assembled since 2026-09-28). Steps
+    3-4 (actual jumper wiring, dry-fit) still open; Step 5 (mount) still
+    unresolved.
   - Cover on hold until the mount approach is decided.
   - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
     "Screws to buy."
@@ -629,8 +632,14 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Serial device: likely `/dev/ttyS0` on the Pi Zero 2 W (Pi-3-family SoC);
       confirm once wired.
 - [ ] Use `ardSerial.py` from the OpenCat repo as the reference serial commander.
-- [ ] Set up the AI Vision Camera Module: mount at the head, connect to the Grove
-      socket, upload firmware via Petoi Desktop App or Arduino IDE.
+- [x] Set up the AI Vision Camera Module: mount at the head, connect to the Grove
+      socket, upload firmware via Petoi Desktop App or Arduino IDE. **Mounted +
+      connected 2026-09-29** — firmware/model upload was already done pre-arrival
+      (bench bring-up, Phase 8). Physically tight fit getting the connector into
+      the Grove socket at the head — worth noting for anyone redoing this later.
+      Done despite the Pi+PiSugar mount mechanism (below) still being unresolved;
+      that decision is now more constrained since the camera's cable routing at
+      the same head-adjacent edge is already committed.
 
 ## Phase 5 — Basic programming & control
 

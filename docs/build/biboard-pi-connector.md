@@ -207,6 +207,8 @@ If it isn't already populated, solder a 5-pin header there. Left to right:
 | 4 | +5V |
 | 5 | +5V |
 
+**Done 2026-09-29** — 5-pin female header soldered to BiBoard.
+
 ## Step 3 — Wire the Pi to BiBoard
 
 Three wires, crossed — one board's "sending" line goes to the other's
