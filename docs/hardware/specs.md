@@ -90,6 +90,22 @@ mirror) · `fl` / `fr` = record / replay a hand-puppeted skill · `c16` = auto
 joint calibration. The higher-level modes need **all** joints to be feedback
 servos.
 
+**CONFIRMED ON REAL HARDWARE, 2026-09-28** — this is exactly the "30-second
+check on arrival" above, just run later than day-1. `check_serial send f`
+returned a real 9-value row; querying again after moving one leg by hand
+(no move command sent) changed exactly that leg's two joints by ~150° and
+~98°, every other value moving less than 1° (noise) — real per-servo
+position sensing, not an echo of the last commanded angle. Latency
+measured clean (single connection, drained + spaced 0.15s apart, 19/20
+good reads): **mean 112 ms, min 51.6 ms, max 248 ms** (~4-19 Hz depending
+on the read) — squarely inside the ~5-20 Hz predicted above, and the
+periodic slow reads (~230-250ms, roughly every 3rd query) aren't yet
+explained. Confirms the "not a control-rate signal" conclusion below is
+correct in practice, not just in research. Tooling:
+`pi_pipeline.link.check_serial feedback` (one-connection before/after
+test, avoids the reboot-per-invocation confound of testing this with two
+separate CLI calls).
+
 **Implications for our work:**
 - → **The RL policy must not depend on fast measured joint angles.** Good news:
   in **residual mode** (the whole resid + survive line) `opencat_gym_env.py`

@@ -8,6 +8,23 @@
 > specific reasons the sim can't reproduce it) and memory
 > `project_g2_no_self_righting`.
 
+> **CONFIRMED ON G2 ITSELF, 2026-09-28:** tested directly on our own unit
+> (off the USB tether, on its own battery) — the recovery keyframes worked,
+> **including a full self-right from fully flipped (supine/on-its-back)**.
+> This is the strongest confirmation yet: not a video of someone else's
+> unit, our actual hardware. Directly contradicts the "does not self-right
+> from a supine fall" limitation below, which was sourced from a *different*
+> community project (`MarcHesse/mhflocke`), not ours. **Open concern raised
+> by the user, not yet resolved:** once the Pi is wired in (Phase 1) and
+> `pi_pipeline`'s own `RecoveryFSM` (`pi_pipeline/link/recovery.py`) starts
+> making recovery decisions, this may stop working as cleanly — that module
+> already has `RecoveryConfig` flags marked `HARDWARE-GATED` anticipating a
+> conflict between the firmware's own autonomous IMU-flip-triggered `rc`
+> and our FSM's decisions, but they've never been tuned against a real
+> flip because there was no hardware until now. Revisit specifically when
+> Phase 1 wiring happens — don't assume today's untethered success carries
+> over unchanged once the Pi is in the loop.
+
 How this relates to what the project has already found: **Run 6 (RL, in sim)
 showed that a policy driving only the 8 walking joints, in *our current sim*,
 did not learn to right the robot from a full tip-over** — 0% recovered across

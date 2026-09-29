@@ -49,9 +49,14 @@ and [`docs/hardware/specs.md`](docs/hardware/specs.md).
 
 ## Project Status
 
-The Pi Zero 2, PiSugar S, microSD card, and power supply have arrived; the Bittle
-X and camera are still a few weeks out. Everything runs software-only or with the
-hardware mocked for now.
+**2026-09-28: the Bittle X body has arrived.** Assembled, zero-point
+calibrated, and base stock-firmware functions tested — all normal, including
+`wkF` (the gait the trained policy is layered on). One stock gait, `vtF`
+("step"), stumbles toward the back-right leg, but it isolates cleanly to
+that gait alone and isn't part of our deployment path, so it's parked (see
+[`docs/project-plan.md`](docs/project-plan.md) Phase 4). Everything else
+below was built and validated software-only or with the hardware mocked,
+ahead of this point.
 
 - **RL locomotion** (`rl_training/opencat-gym/`) — a PyBullet + Stable-Baselines3
   pipeline. The gait is a learned *residual* on Bittle's scripted `wkF` walk,

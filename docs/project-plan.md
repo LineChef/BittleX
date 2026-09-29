@@ -164,6 +164,11 @@ should we work on next."
 - Confirm the back cover fits once the Pi is mounted.
 - BiBoard V1's onboard voice-recognition module + speaker: decide whether the
   wake trigger / offline fallback commands use it instead of the Pi (Phase 7).
+  **2026-09-28**: confirmed present and controllable over serial (`X<letter>`
+  commands, `docs/hardware/petoi-firmware-reference.md`) — found stuck
+  defaulting to Chinese with voice unresponsive (no identified trigger,
+  matches a known Petoi community incident), fixed via `XAc`/`XAb`/`XAa`.
+  Can apparently get stuck again; the reset sequence is documented if so.
 
 ### Power awareness — G2 warns when it thinks it's running low
 
@@ -535,17 +540,47 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Point `RecoveryFSM` at the real IMU (read roll/pitch over serial), wire
       `ACTION_COMMANDS` through `SerialLink` with a wait between skills, and tune
       the thresholds (`fall_rad`, `supine_rad`, `getup_timeout_s`).
+- [x] Test the stock `rc`/`rl` against a real flip — **done 2026-09-28,
+      untethered (off USB, on battery), before the Pi was ever wired in**:
+      worked, including a full self-right from fully flipped (supine).
+      Strongest confirmation yet (our own hardware, not a video) — updates
+      `docs/hardware/self-righting.md`'s "does not self-right from supine"
+      caveat, which was sourced from a different community project.
+      **Risk flagged, not yet resolved:** this tested firmware's *own*
+      autonomous IMU-flip auto-`rc`, with `RecoveryFSM` not in the loop at
+      all. Once the Pi is wired and `RecoveryFSM` starts deciding
+      recovery actions too, the two could conflict — that's exactly what
+      `firmware_autorecover_on` and the other `HARDWARE-GATED` flags above
+      exist for, but none have been tuned against a real flip yet. Don't
+      assume today's success carries over unchanged; retest specifically
+      once the Pi is in the loop.
 
 ## Phase 4 — Hardware assembly
 
-- [ ] **Assemble Bittle X V2 (~40–90 min) — current blocker, frame ships
-      unassembled.** Pi+PiSugar wiring/bring-up (Steps 2-4,
-      `docs/build/biboard-pi-connector.md`) and the mount redesign (Step 5)
-      both need BiBoard, which only exists once this is built — not
-      available standalone.
-- [ ] Check servo calibration — pre-assembled units ship calibrated, so this is a
-      check/fine-tune, not an assumed step. Only dig in if movement looks off.
-- [ ] Get it moving on stock firmware first, before any custom code.
+- [x] **Assemble Bittle X V2 — done 2026-09-28.** Pi+PiSugar wiring/bring-up
+      (Steps 2-4, `docs/build/biboard-pi-connector.md`) and the mount
+      redesign (Step 5) are now unblocked — BiBoard exists.
+- [x] Check servo calibration — done 2026-09-28, standard zero-point
+      calibration only (no full per-joint ROM pass yet — see stand note
+      above). **Finding to chase**: the stock `vtF` ("step") gait stumbles
+      toward the back-right leg, 100% reproducible every run; every other
+      tested command (postures, other gaits) looked normal. Ruled out so
+      far: by-hand resistance on the back-right shoulder/knee (normal, no
+      binding/gear-protection stiffness); individual per-joint `m<idx>`
+      nudges on all 8 leg joints + head via `check_serial send` (all
+      normal, no stuck/defective servo); `kbalance` (the documented
+      calibration-check pose, all 8 joints to a symmetric 30°) — back-right
+      leg sat symmetric with the other three, ruling out a per-leg
+      zero-point offset too; **`kwkF`** (the gait the trained policy is
+      actually layered on) — back-right leg looked normal, no stumble.
+      **Conclusion: isolated to `vtF` specifically, does not affect `wkF`.**
+      Deprioritized — `vtF` isn't used anywhere in our deployment path, so
+      this is parked as an unexplained quirk of that one stock gait rather
+      than something to keep chasing; revisit only if it turns out to
+      correlate with something that does matter (e.g. shows up again once
+      the Pi/payload is mounted, or in `wkF` under load/turns).
+- [ ] Get it moving on stock firmware first, before any custom code — base
+      firmware functions tested 2026-09-28 (see calibration finding above).
 - [x] Set up the Pi Zero 2 WH: pre-configure Wi-Fi + SSH in Raspberry Pi Imager
       (headless), confirm SSH access. **Done (2026-09-02)** — card flashed
       (`~/pi-setup/flash-pi.sh`, custom hostname/user/Wi-Fi/SSH-key baked into
@@ -1528,6 +1563,16 @@ only renumbered.
 > at most a flailing leg, not a fall or a walk off an edge. The floor is
 > earned once `--openloop` confirms the servo signs are right — that's the one
 > thing that actually requires ground contact to test honestly (H1, step 13b).
+>
+> **2026-09-28 — stand mismatch.** Petoi shipped the Nybble calibration
+> stand, not the Bittle one; it doesn't fit G2 cleanly. Order the correct
+> one in parallel. In the meantime, the actual hazard this rule guards
+> against is *our own* joint commands with an unknown servo sign
+> (`run_gait.py --openloop`, the RL joint-control bench) — stock-firmware
+> postures/gaits like `vtF` are Petoi-designed for normal floor operation,
+> so observing those on the floor is a reasonable stand-in for now. Keep
+> the no-floor-time rule for anything past step 13a (our own control code)
+> until a stand (correct or improvised) is in place.
 
 **Diagnostics-mode impact of the Phase-0 split.** Checked this directly
 against `pi_pipeline/diag/core.py` and `check_serial.py` rather than assuming:

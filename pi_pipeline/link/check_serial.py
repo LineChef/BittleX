@@ -3,10 +3,13 @@
     python -m pi_pipeline.link.check_serial ports              # list serial ports
     python -m pi_pipeline.link.check_serial ping               # open the configured port, poke it
     python -m pi_pipeline.link.check_serial send kbalance       # send one command, print the reply
+    python -m pi_pipeline.link.check_serial burst kwkR --seconds 1.5  # run a gait briefly, then auto-rest -- one connection, no reboot mid-move
     python -m pi_pipeline.link.check_serial skills              # cycle the conversational skill set
     python -m pi_pipeline.link.check_serial rest                # send 'd' (safe state)
+    python -m pi_pipeline.link.check_serial feedback            # before/after 'f' reads around a hand-moved leg, one connection -- is servo feedback real?
     python -m pi_pipeline.link.check_serial firstmove           # guided, confirmed first movement
     python -m pi_pipeline.link.check_serial allmoves            # cycle EVERY known move + log voltage/latency
+    python -m pi_pipeline.link.check_serial allmoves --skip-gaits --skip-recovery  # stationary moves only
 """
 from __future__ import annotations
 
@@ -69,6 +72,45 @@ def _firstmove(link: SerialLink, *, deg: float, walk_s: float) -> None:
         print("sent 'd' (rest) -- first-move check done.")
 
 
+def _burst(link: SerialLink, token: str, seconds: float) -> None:
+    """Run one command for a fixed duration then auto-rest, in a single
+    connection. Two separate `check_serial send` calls (move, then a second
+    process sending `d`) each open their own connection -- and opening the
+    port reboots the BiBoard (SerialLink's reset_wait), which could land
+    mid-stride. This does move+hold+rest without a second reboot in between."""
+    print(f"Sending {token!r} for {seconds:g}s, then rest.")
+    link.send(token, read_reply=False)
+    time.sleep(seconds)
+    link.send(opencat.REST, read_reply=False)
+    print("sent 'd' (rest)")
+
+
+def _feedback_check(link: SerialLink) -> None:
+    """Query 'f' (T_SERVO_FEEDBACK) once, then again after the user manually
+    repositions a leg -- in ONE connection, so a board reboot between reads
+    (every separate check_serial invocation reboots the board -- see _burst)
+    can't confound whether a difference reflects a real sensor read vs just
+    post-reboot state. If the second reading tracks the hand-moved position,
+    feedback is real; if it's unchanged, that's consistent with a fallback to
+    the last commanded angle rather than a true sensor read -- see the
+    connectedFeedbackServo note in docs/hardware/petoi-firmware-reference.md."""
+    link.drain(0.3)
+    before = (link.send(opencat.SERVO_FEEDBACK) or "").strip()
+    print(f"reading 1 (before): {before!r}")
+    input("\nNow move one leg by hand to a clearly different position, "
+         "then press Enter... ")
+    link.drain(0.3)
+    after = (link.send(opencat.SERVO_FEEDBACK) or "").strip()
+    print(f"reading 2 (after) : {after!r}")
+    if before and after and before != after:
+        print("Different -- consistent with real position feedback.")
+    elif before and after:
+        print("Same/unchanged -- consistent with NOT real feedback "
+             "(likely just reporting the last commanded angle).")
+    else:
+        print("Inconclusive -- one or both reads came back empty.")
+
+
 def _all_moves() -> list:
     """(name, token, kind) for every distinct movement G2 knows how to
     perform, deduped by the resulting serial token. Two catalogues that don't
@@ -76,14 +118,17 @@ def _all_moves() -> list:
     conversation) and `behavior/gestures.py` (what the autonomous behaviour
     layer fires on its own -- greetings, idle fidgets, the excited hop) --
     plus sleep, the carpet gait, and the recovery/get-up keyframes, none of
-    which either catalogue covers. `kind` is one of skill/gesture/sleep/
-    carpet/recovery; recovery keyframes are always last."""
+    which either catalogue covers. `kind` is one of gait/skill/gesture/sleep/
+    carpet/recovery -- `gait` is any continuous locomotion skill (walk/trot/
+    crawl) per `Skill.continuous`, so it can be filtered out as a group
+    (`--skip-gaits`) same as recovery keyframes; recovery keyframes are
+    always last."""
     from ..behavior.gestures import GESTURE_TOKEN
 
     seen: dict = {}
-    for name in skillcat.SKILLS:
+    for name, sk_ in skillcat.SKILLS.items():
         tok = skillcat.serial_command(name)
-        seen.setdefault(tok, (name, tok, "skill"))
+        seen.setdefault(tok, (name, tok, "gait" if sk_.continuous else "skill"))
     for g, tok in GESTURE_TOKEN.items():
         seen.setdefault(tok, (g.value, tok, "gesture"))
     seen.setdefault(opencat.SLEEP, ("sleep", opencat.SLEEP, "sleep"))
@@ -96,6 +141,24 @@ def _all_moves() -> list:
         ("drop-recover", opencat.DROP_RECOVER, "recovery"),
     ]
     return ordered
+
+
+def _read_voltage(link: SerialLink, *, attempts: int = 4, drain_s: float = 0.2) -> str:
+    """Query battery voltage, draining before each attempt and retrying past
+    any stray non-voltage line still in flight. Confirmed on real hardware
+    2026-09-28 that one drain() pass isn't always enough: some skills (wave,
+    push_ups, check_around, come_here, high_five) print a firmware debug line
+    (`imuException: 0`) with delay/timing that varies enough to still collide
+    with a single-shot read. Gives up after `attempts` and returns whatever
+    the last read was, even if it still doesn't look right, rather than
+    blocking forever."""
+    reading = ""
+    for _ in range(attempts):
+        link.drain(drain_s)
+        reading = (link.send(opencat.PRINT_VOLTAGE) or "").strip()
+        if reading.startswith("Voltage"):
+            return reading
+    return reading
 
 
 _RULE = "=" * 60
@@ -116,8 +179,8 @@ def _announce(i: int, total: int, name: str, kind: str, token: str, *,
 
 
 def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
-              skip_recovery: bool, announce_s: float = 1.5,
-              bell: bool = True) -> None:
+              skip_recovery: bool, skip_gaits: bool = False,
+              announce_s: float = 1.5, bell: bool = True) -> None:
     """Cycle every named movement G2 knows, reading back battery voltage
     (against a logged idle baseline, so a reviewer sees sag, not just an
     absolute number) and the reply latency after each one, logging both to
@@ -135,12 +198,16 @@ def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
     (step 13a) hasn't confirmed yet at this point in the runbook, so it isn't
     wired in here. Always ends at `d` (rest)."""
     moves = _all_moves()
-    total = len(moves) - (3 if skip_recovery else 0)
+    skip_kinds = {"recovery"} if skip_recovery else set()
+    if skip_gaits:
+        skip_kinds |= {"gait", "carpet"}
+    total = sum(1 for _, _, kind in moves if kind not in skip_kinds)
     print(f"Cycling {total} known moves ({hold:g}s hold each; recovery "
-         f"keyframes get {recovery_hold:g}s and a confirm first).\n")
+         f"keyframes get {recovery_hold:g}s and a confirm first)."
+         + (" Gaits/carpet-walk skipped." if skip_gaits else "") + "\n")
 
     t0 = time.perf_counter()
-    baseline = (link.send(opencat.PRINT_VOLTAGE) or "").strip()
+    baseline = _read_voltage(link)
     diag.event("check_serial", "INFO", "sweep.baseline", voltage=baseline,
               elapsed_s=round(time.perf_counter() - t0, 3))
     if baseline:
@@ -150,6 +217,8 @@ def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
     done = 0
     try:
         for name, token, kind in moves:
+            if kind in ("gait", "carpet") and skip_gaits:
+                continue
             if kind == "recovery":
                 if skip_recovery:
                     continue
@@ -167,8 +236,14 @@ def _allmoves(link: SerialLink, *, hold: float, recovery_hold: float,
             hold_s = recovery_hold if kind == "recovery" else hold
             print(f"  running -- watch now ({hold_s:g}s)")
             time.sleep(hold_s)
+            # The move command was sent with read_reply=False, so whatever the
+            # firmware echoed/printed for it is still sitting unread -- and
+            # some skills print an extra debug line (`imuException: 0`) with
+            # enough timing variance that one drain pass doesn't always clear
+            # it either (confirmed on real hardware 2026-09-28). _read_voltage
+            # drains-and-retries past either, instead of trusting one line.
             t0 = time.perf_counter()
-            voltage = (link.send(opencat.PRINT_VOLTAGE) or "").strip()
+            voltage = _read_voltage(link)
             elapsed = round(time.perf_counter() - t0, 3)
             diag.event("check_serial", "INFO", "move.done",
                       move=name, token=token, kind=kind, voltage=voltage,
@@ -191,8 +266,13 @@ def main() -> None:
     sub.add_parser("ports")
     sub.add_parser("ping")
     p_send = sub.add_parser("send"); p_send.add_argument("command")
+    bu = sub.add_parser("burst")
+    bu.add_argument("token", help="serial token to run, e.g. kwkR")
+    bu.add_argument("--seconds", type=float, default=1.5,
+                    help="how long to run before auto-rest")
     sk = sub.add_parser("skills"); sk.add_argument("--hold", type=float, default=2.5)
     sub.add_parser("rest")
+    sub.add_parser("feedback")
     fm = sub.add_parser("firstmove")
     fm.add_argument("--deg", type=float, default=15.0, help="degrees to nudge each joint")
     fm.add_argument("--walk-s", type=float, default=2.0, help="seconds to run wkF before auto-rest")
@@ -202,6 +282,8 @@ def main() -> None:
                     help="seconds to hold each recovery keyframe (they're longer sequences)")
     am.add_argument("--skip-recovery", action="store_true",
                     help="skip the self-right / roll / drop-recover keyframes")
+    am.add_argument("--skip-gaits", action="store_true",
+                    help="skip continuous locomotion gaits (walk/trot/crawl) + carpet-walk")
     am.add_argument("--announce-s", type=float, default=1.5,
                     help="pause after announcing a move, before it fires -- "
                          "time to look up from the terminal to the robot")
@@ -232,6 +314,11 @@ def main() -> None:
                     print(f"refusing unsafe command {args.command!r}")
                     return
                 print("reply:", link.send(args.command) or "(no reply)")
+            elif args.cmd == "burst":
+                if not opencat.is_safe(args.token):
+                    print(f"refusing unsafe command {args.token!r}")
+                    return
+                _burst(link, args.token, args.seconds)
             elif args.cmd == "skills":
                 for name, sk_ in skillcat.SKILLS.items():
                     cmd = skillcat.serial_command(name)
@@ -242,12 +329,14 @@ def main() -> None:
             elif args.cmd == "rest":
                 link.send(opencat.REST, read_reply=False)
                 print("sent 'd' (rest)")
+            elif args.cmd == "feedback":
+                _feedback_check(link)
             elif args.cmd == "firstmove":
                 _firstmove(link, deg=args.deg, walk_s=args.walk_s)
             elif args.cmd == "allmoves":
                 _allmoves(link, hold=args.hold, recovery_hold=args.recovery_hold,
-                         skip_recovery=args.skip_recovery, announce_s=args.announce_s,
-                         bell=not args.no_bell)
+                         skip_recovery=args.skip_recovery, skip_gaits=args.skip_gaits,
+                         announce_s=args.announce_s, bell=not args.no_bell)
         finally:
             link.close()
 

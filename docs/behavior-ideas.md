@@ -182,6 +182,19 @@ above, not a replacement: could inform *where* a scripted `cmh` places a
 foot, or give a learned residual a slow, discrete correction opportunity
 between the fast continuous corrections it already makes.
 
+**That validation step is now done, 2026-09-28 — real hardware confirms
+both halves.** `check_serial feedback` (one connection, before/after a
+hand-moved leg) showed a real position-sensing signal: exactly the moved
+leg's two joints changed (~150° and ~98°), everything else within noise,
+with no move command sent — not a fallback to a commanded angle. Latency
+measured clean at **mean 112 ms / min 51.6 ms / max 248 ms** (~4-19 Hz),
+matching the ~5-20 Hz predicted in `specs.md`. This confirms: (1) too slow
+for the 80 Hz gait loop, ruling out continuous blind climbing as before,
+and (2) genuinely fast enough for *this* slow, deliberate probe-then-decide
+idea, which was always designed around exactly this rate. Full detail +
+tooling: `docs/hardware/specs.md`'s "Servo position feedback" section,
+`pi_pipeline.link.check_serial feedback`.
+
 **Closed, step-down case, negative result (2026-09-19) — see
 [`rl/foot-probing-log.md`](rl/foot-probing-log.md) for the full campaign.**
 The sensing mechanism itself (joint tracking error reveals real ground

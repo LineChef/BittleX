@@ -1,6 +1,7 @@
 """On-Pi control loop: run the deployed gait policy (residual_policy.DEFAULT_POLICY) on the real robot.
 
-    python -m pi_pipeline.gait.run_gait --probe-imu           # see what the BiBoard streams
+    python -m pi_pipeline.gait.run_gait --probe-imu           # see what the BiBoard streams (idle bus)
+    python -m pi_pipeline.gait.run_gait --probe-imu-load      # same, but under real 80 Hz command load
     python -m pi_pipeline.gait.run_gait --openloop            # play wkf_ref.npy, no policy (calibration)
     python -m pi_pipeline.gait.run_gait --cmd 0.10            # walk forward at 0.10 m/s
     python -m pi_pipeline.gait.run_gait --cmd 0.0 --seconds 5 # stand + hold
@@ -138,8 +139,48 @@ def probe_imu(lk, seconds):
             n += 1
         time.sleep(0.01)
     _send(lk, "gp")
-    print(f"{n} IMU lines in {seconds:.0f} s = {n / seconds:.1f} Hz (stock firmware caps this at 5 Hz)")
+    print(f"{n} IMU lines in {seconds:.0f} s = {n / seconds:.1f} Hz")
     print("stream stopped ('gp'). Match parse_imu_line() to the format above.")
+    print("NOTE: this is a passive/idle measurement (nothing else was sent to the "
+          "board). Real hardware measured ~249 Hz here 2026-09-28, contradicting "
+          "the documented 5 Hz cap -- see docs/hardware/petoi-firmware-reference.md. "
+          "Run --probe-imu-load too before trusting this number for the real "
+          "control loop, which shares the same UART with 80 Hz command traffic.")
+
+
+def probe_imu_under_load(lk, seconds, hz=CONTROL_HZ):
+    """Same measurement as probe_imu, but with the control loop's other half of
+    the traffic actually running: sends the neutral stand pose at `hz` (the real
+    deployment rate) while counting IMU lines, instead of just listening
+    quietly. probe_imu measures a best case (idle bus); this measures the
+    shared-bus condition run_gait's real control loop operates under -- sending
+    and receiving on the same UART at once. Added 2026-09-28 after probe_imu's
+    249 Hz idle measurement contradicted the documented 5 Hz cap: that number
+    alone wasn't enough to trust, since it never exercised simultaneous 80 Hz
+    command traffic. Leaves the robot in a neutral stand + rest on exit."""
+    cmd = deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG)
+    print(f"sending 'gP' + neutral stand at {hz:g} Hz for {seconds:g}s "
+         "(real control-loop load, not idle); counting IMU lines")
+    _send(lk, "gP")
+    dt = 1.0 / hz
+    t0 = time.time()
+    t_next = time.perf_counter()
+    n = 0
+    while time.time() - t0 < seconds:
+        _send(lk, cmd)
+        for _ in lk.poll_imu():
+            n += 1
+        t_next += dt
+        slack = t_next - time.perf_counter()
+        if slack > 0:
+            time.sleep(slack)
+        else:
+            t_next = time.perf_counter()
+    _send(lk, "gp")
+    _send(lk, "d")
+    print(f"{n} IMU lines in {seconds:.0f} s = {n / seconds:.1f} Hz under {hz:g} Hz "
+         "command load -- compare against the passive --probe-imu number")
+    return n
 
 
 def openloop(lk, cycles, hz):
@@ -605,6 +646,10 @@ def main():
                     help="roll/pitch rate fed to the policy: fd = finite difference of "
                          "consecutive 5 Hz IMU frames, zero = none (stream has no gyro)")
     ap.add_argument("--probe-imu", action="store_true")
+    ap.add_argument("--probe-imu-load", action="store_true",
+                    help="like --probe-imu, but sends the neutral stand at --hz while "
+                         "counting IMU lines, matching the real control loop's shared-bus "
+                         "traffic instead of a quiet/idle bus")
     ap.add_argument("--openloop", action="store_true")
     ap.add_argument("--dry-run", action="store_true",
                     help="full loop with synthetic IMU and no serial -- rate check")
@@ -686,6 +731,8 @@ def main():
     try:
         if args.probe_imu:
             probe_imu(lk, 5.0)
+        elif args.probe_imu_load:
+            probe_imu_under_load(lk, 5.0, args.hz)
         elif args.openloop:
             openloop(lk, args.cycles, args.hz)
         else:

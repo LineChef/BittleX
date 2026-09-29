@@ -28,13 +28,79 @@ forum MuJoCo/Isaac efforts. Our fork is already the canonical community base.
 
 Newline-terminated ASCII over UART. Confirmed set:
 
+**Confirmed against the real BiBoard 2026-09-28: commands produce more than
+one reply line.** `check_serial.py`'s `allmoves` sends each move with
+`read_reply=False` (fire-and-forget), then queries `P` afterward and reads
+one line back. Real-hardware logs showed the "voltage" field cycling
+through move-name fragments instead of `Voltage: X.XX V` on a steady 1-in-4
+pattern — the unread reply/echo from each move command was sitting in the
+buffer, so the next single-line read (the `P` query) picked up that stale
+backlog instead of its own reply, and the real voltage line surfaced later,
+misattributed to a subsequent move. Not a hardware fault — fixed by
+draining (`SerialLink.drain()`) immediately before every voltage read in
+`_allmoves()`. Practical implication for any new code that fires a command
+with `read_reply=False` and later expects a clean single-line read: drain
+first, don't assume the buffer is empty.
+
+**Second layer confirmed the same day: a real, previously-undocumented
+debug line, `imuException: <code>`.** After the drain fix above, most reads
+came back clean, but `wave`/`push_ups`/`check_around`/`come_here`/
+`high_five` still intermittently returned `imuException: \t0` instead of
+voltage — `0` per `getImuException()`'s documented codes above means no
+exception, so nothing bad happened during those moves, but the line's
+timing is variable enough (one case took ~1s, near the read timeout) that
+a single `drain()` pass doesn't reliably clear it either. `check_serial.py`
+now retries the voltage query itself (`_read_voltage()`: drain, query,
+check for a `Voltage:` prefix, retry up to 4 attempts) rather than trusting
+one line no matter what. Not yet known which skills trigger this print or
+why the delay varies — flag if it recurs somewhere that matters.
+
+## Onboard voice-recognition module (`X<letter>` commands)
+
+BiBoard V1 carries a built-in offline voice-recognition module + speaker
+(`project-plan.md`'s parts notes), separate from the `T_*` command parser
+above and not decoded from our own firmware source — confirmed instead
+from [Petoi's official docs](https://docs.petoi.com/extensible-modules/voice-command-module)
+and against the real board 2026-09-28:
+
+| command | action |
+|---|---|
+| `XAa` | set English as default language |
+| `XAb` | set Chinese as default language |
+| `XAc` | enable the voice module |
+| `XAd` | disable the voice module |
+| `XAe` | enter learning mode |
+
+Not blocked by `opencat.is_safe()` (only `c`/`cd` are). There's also a
+physical dial switch on the bottom of the BiBoard extension hat (Bittle X
+only) that must be set to "Voice Command" — unchecked here since the
+module was otherwise responsive. Voice commands: "play sound" tests
+liveness (replies with a "Do-Re-Mi" tone, works regardless of language --
+tests only that it's not muted); "be quiet" mutes it; "bing bing" is the
+spoken equivalent of `XAa` (switch to English).
+
+**2026-09-28 incident: module found stuck defaulting to Chinese, with
+voice commands unresponsive, for no identified trigger (nothing bumped/
+dropped, unrelated to our serial link work, broken before this session
+started).** Matches a closed PetoiCamp/OpenCatEsp32-Quadruped-Robot PR
+(#51) where an identical symptom on BiBoard V1.0 was root-caused to the
+module getting stuck in a bad persistent armed state that survives
+reboots/reflashes -- not a firmware bug, and the author's own code-level
+fix attempt was a red herring. Recovered here by sending `XAc` (enable),
+waiting ~1.2s, `XAb` (confirmed via its own reply: `Default language:
+Chinese` -- so this *was* the stuck state), waiting ~1.2s, then `XAa`
+(confirmed via reply: `Default language: English`). Verified working
+after (both "play sound" and an actual English command). If this recurs,
+this sequence is the first thing to try again before assuming a deeper
+fault.
+
 | token | name | meaning |
 |---|---|---|
 | `k<skill>` | `T_SKILL` | run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF` |
 | `m<idx> <deg> …` | `T_INDEXED_SIMULTANEOUS_ASC` | move joint(s), chainable — `m0 30 8 -35` |
 | `b<tone> <ms> …` | `T_BEEP` | buzzer melody |
 | `d` | `T_REST` | rest posture, servos off (ends a looping gait) |
-| `P` | `T_POWER` | **print battery voltage** ← the query the link README couldn't find |
+| `P` | `T_POWER` | **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack) |
 | `j` / `j <idx>` | `T_JOINTS` | **return all joint angles / one joint** |
 | `f` | `T_SERVO_FEEDBACK` | servo position feedback (if the servo chip supports it) |
 | `g` | `T_GYRO` | gyro function toggle (bare `g`) |
@@ -104,6 +170,46 @@ derives roll/pitch rate by finite-differencing consecutive frames;
 `SerialLink.poll_imu()` (non-blocking; IMU lines are split out of command
 replies). What that costs the gait policy in sim:
 `rl_training/opencat-gym/resilience_imu_rate.py`.
+
+**⚠ CONTRADICTED BY REAL HARDWARE, 2026-09-28 — needs resolution before
+trusting the 5 Hz premise further.** `run_gait.py --probe-imu` against the
+real BiBoard measured **249.2 Hz** raw line rate (1246 lines / 5 s), not
+"at most 5 Hz." This isn't just the same stale line reprinted fast: of
+those 1246 lines, 500 carried a genuinely distinct 6-axis value (~100 Hz
+distinct-sample rate), each repeated ~2.5x before the next update — real
+fresh data arriving far above the documented cap, not a read-loop
+artifact. Chip prefix confirmed `ICM:` (ICM42670, not MPU6050) — resolves
+the "don't assume MPU6050" open question above. Also: `az` read ~9.9 at
+rest, consistent with **m/s²**, not "g" as stated above — worth
+rechecking whether `snprintf`'s comment or this doc mis-stated the unit.
+
+This is a big deal if it holds up: **the entire `hw1_20m` training
+campaign was built on modeling a hard 5 Hz IMU throttle as the defining
+real-hardware constraint** ([[project_imu_feedback_rate_priority]] memory,
+`docs/rl/hw1-log.md`). Possible explanations, not yet distinguished:
+this specific unit's firmware build differs from the `main` source
+reviewed 2026-09-07/09-20 (vendor may ship an older/different build than
+what's on GitHub now); the source reading of `PRINT6AXIS_MIN_INTERVAL`
+was wrong or attributed to the wrong call site; or something else. Don't
+act on this (retrain, redesign) until it's confirmed — re-run
+`--probe-imu`, and check the actual firmware version/build string on this
+board if there's a way to read one, before concluding the 5 Hz constraint
+was unnecessary.
+
+**Cross-validated under real load, same day — confidence raised.** The
+249 Hz number above was measured idle (nothing else sent to the board).
+Ran `run_gait.py --probe-imu-load` next, which sends the neutral stand
+pose at 80 Hz (the real deployment rate) on the same UART while counting
+IMU lines — i.e. the actual shared-bus condition the control loop runs
+under, not a quiet bus. Result: **93.0 Hz** (465 lines / 5 s) — same
+ballpark as the idle test's ~100 Hz distinct-sample rate, not the raw
+249 Hz (duplicate reprints don't help under load, as expected), and still
+nowhere near 5 Hz. Two different test conditions landing in the same
+range is real cross-validation, not a single fluke reading. Still
+unresolved *why* this contradicts the source-derived 5 Hz cap (see
+explanations above), but the measurement itself is now much better
+supported. Tooling: `probe_imu_under_load()` / `--probe-imu-load` in
+`run_gait.py`.
 
 ### Exception detection (`imu.h` `getImuException()`)
 

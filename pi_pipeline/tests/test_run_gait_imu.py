@@ -50,6 +50,41 @@ def test_icm_prefix_also_recognised(rg):
     assert roll == pytest.approx(2.0 * math.pi / 180.0)
 
 
+# -------------------------------------------------------- probe_imu_under_load
+
+class _FakeLink:
+    """sent: every command passed to _send(). poll_imu(): returns one canned
+    IMU line per call so a bounded loop terminates instead of spinning on
+    wall-clock time in a test."""
+
+    def __init__(self, imu_lines_per_poll=1):
+        self.sent = []
+        self._n = imu_lines_per_poll
+
+    def send(self, cmd, read_reply=True, settle=0.0):
+        self.sent.append(cmd)
+        return ""
+
+    def poll_imu(self):
+        return ["ICM:  0.10  0.20  0.98   10.0   -5.0    2.0"] * self._n
+
+
+def test_probe_imu_under_load_sends_stand_pose_and_counts_imu_lines(rg, monkeypatch):
+    lk = _FakeLink(imu_lines_per_poll=2)
+    monkeypatch.setattr(rg.time, "sleep", lambda s: None)
+    n = rg.probe_imu_under_load(lk, seconds=0.05, hz=rg.CONTROL_HZ)
+    assert lk.sent[0] == "gP"          # start the continuous IMU stream first
+    assert lk.sent[-2] == "gp"         # stop it
+    assert lk.sent[-1] == "d"          # always leaves the robot resting
+    # everything sent in between is the same neutral-stand command, matching
+    # the real control loop's actual command (not a walking gait)
+    stand_cmd = rg.deploy_map.policy_deg_to_move_cmd(rg.STAND_URDF_DEG)
+    assert all(c == stand_cmd for c in lk.sent[1:-2])
+    n_stand_cmds = len(lk.sent) - 3   # excludes 'gP', 'gp', 'd'
+    assert n_stand_cmds > 0           # at least one stand command was actually sent
+    assert n == n_stand_cmds * 2      # 2 IMU lines counted per poll, matching _FakeLink
+
+
 def test_mcu_prefix_does_not_smuggle_accel_into_gyro_slot(rg):
     """The real stream carries acceleration, not angular velocity -- the
     gyro slot must come back zero, never populated with accel data, so a
