@@ -186,15 +186,25 @@ rechecking whether `snprintf`'s comment or this doc mis-stated the unit.
 This is a big deal if it holds up: **the entire `hw1_20m` training
 campaign was built on modeling a hard 5 Hz IMU throttle as the defining
 real-hardware constraint** ([[project_imu_feedback_rate_priority]] memory,
-`docs/rl/hw1-log.md`). Possible explanations, not yet distinguished:
-this specific unit's firmware build differs from the `main` source
-reviewed 2026-09-07/09-20 (vendor may ship an older/different build than
-what's on GitHub now); the source reading of `PRINT6AXIS_MIN_INTERVAL`
-was wrong or attributed to the wrong call site; or something else. Don't
-act on this (retrain, redesign) until it's confirmed — re-run
-`--probe-imu`, and check the actual firmware version/build string on this
-board if there's a way to read one, before concluding the 5 Hz constraint
-was unnecessary.
+`docs/rl/hw1-log.md`).
+
+**Likely explained, 2026-09-29 — firmware version mismatch.** Read the
+real board's `?` banner properly (it's two lines; a naive single-read
+grabs only the first and leaves the second as backlog for whatever reads
+next — same class of bug as the `allmoves` desync above): line 1 is
+`Bittle X`, line 2 is a version string, **`B10_251121`** — read as a
+2025-11-21 build date. Our source review of `PetoiCamp/OpenCatEsp32`'s
+`main` branch was done 2026-09-07/09-20, **~10 months later**. Couldn't
+pin down the exact commit that changed IMU print timing (GitHub's commit
+history for `imu.h` didn't render conclusively either way via fetch), but
+the version gap itself is a solid, direct, well-grounded explanation —
+this board is very plausibly running firmware from before (or after) a
+change to `PRINT6AXIS_MIN_INTERVAL`/the print-rate throttle that `main`
+has now. Not a measurement error, not a misread source — just a real
+build-vs-source mismatch. The retrain already underway
+(`IMU_HOLD_STEPS` 16→1, see `docs/rl/` campaign logs) remains the right
+call regardless: it matches *this* board's actual measured behavior,
+which is what matters for deployment.
 
 **Cross-validated under real load, same day — confidence raised.** The
 249 Hz number above was measured idle (nothing else sent to the board).
