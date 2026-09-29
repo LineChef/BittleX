@@ -18,7 +18,9 @@ measurements, and anything that differed from the original plan.
 Bittle X and the camera module have arrived and are assembled (2026-09-28/29):
 frame assembled, zero-point calibrated, camera mounted + connected to
 BiBoard's G1 Grove socket (tight fit at the head), BiBoard's 5-pin Pi header
-soldered. Still open: the actual Pi↔BiBoard jumper wiring (Step 3) and the
-Pi+PiSugar mount mechanism (Step 5, unresolved — see
-[`biboard-pi-connector.md`](biboard-pi-connector.md)). Next entries will
-cover Pi provisioning and servo calibration once those land.
+soldered. Still open: the actual Pi↔BiBoard jumper wiring (Step 3). Step 5
+(Pi+PiSugar mount) has an interim solution — PiSugar's own official case
+velcroed to the outside of a modified back cover, not enclosed inside it
+(the case is thicker than the cover's internal cavity) — not the final
+mount; see [`biboard-pi-connector.md`](biboard-pi-connector.md). Next
+entries will cover Pi provisioning and servo calibration once those land.

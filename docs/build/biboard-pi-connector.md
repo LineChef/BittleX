@@ -331,6 +331,23 @@ power switch lands under the Pi's mini-HDMI-port edge once correctly oriented
 (Step 1) — whatever mount/cover design happens here should keep that edge
 reachable, or accept leaving PiSugar always powered on as a fallback.
 
+**Interim solution in place, 2026-09-29 — not the final mount, sidesteps the
+depth problem rather than solving it.** The frame has arrived; parts sourced:
+PiSugar's own official case set ([`JdaieLin/PiSugar`](https://github.com/JdaieLin/PiSugar)
+model repo) — `pisugar_case_shell_xl` (the 1200 mAh variant, matching our
+PiSugar S), `pisugar_case_common_cap`, `pisugar_case_pin_cap` — plus the
+stock `Bittle_Cover_with_hole_for_Pi.stl`, modified to expose the PiSugar's
+button/switch and widen the SD card port. Measured (binary STL bbox parse):
+the PiSugar case shell is **75.00 × 31.00 × 36.00 mm** — its 31 mm housing
+dimension is nearly double the stock cover's 18.6 mm internal cavity depth
+(re-confirmed: `71.24 × 18.60 × 73.91 mm`, matches the 2026-09-16
+measurement exactly), so the enclosed case genuinely cannot fit *inside*
+that cavity. Current fix: velcro the PiSugar case to the *outside* of the
+modified cover/lid instead of trying to enclose it — avoids the depth
+conflict rather than resolving it. 3D-printed parts were on order at time
+of writing; this note will need a follow-up once they're in hand and fitted
+for real.
+
 <details>
 <summary>Superseded: "The mount, decided" — back-edge clip theory, before the chip-clearance finding</summary>
 

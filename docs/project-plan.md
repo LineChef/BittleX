@@ -616,9 +616,15 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
   - Step 1 (Pi+PiSugar) is done and needed no mount. **Step 2 (solder BiBoard's
     5-pin Pi header) done 2026-09-29** — the frame-unassembled blocker that held
     up Steps 2-4 is resolved (frame's been assembled since 2026-09-28). Steps
-    3-4 (actual jumper wiring, dry-fit) still open; Step 5 (mount) still
-    unresolved.
-  - Cover on hold until the mount approach is decided.
+    3-4 (actual jumper wiring, dry-fit) still open. **Step 5 (mount): interim
+    solution in place, 2026-09-29** — PiSugar's own official case
+    (`pisugar_case_shell_xl`, the 1200 mAh variant) + a modified stock back
+    cover, velcroed to the outside of the lid rather than enclosed inside it
+    (measured: the case is 31mm thick, the cover's internal cavity is only
+    18.6mm deep — doesn't fit inside, so this sidesteps rather than solves
+    that). Not the final mount; parts were 3D-printing at time of writing.
+    Full detail: `docs/build/biboard-pi-connector.md`.
+  - Cover modified (button/switch + SD card access) rather than on hold now.
   - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
     "Screws to buy."
 - [ ] `sudo raspi-config` → Interface Options → Serial Port → disable the serial
