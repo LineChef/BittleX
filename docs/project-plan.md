@@ -560,9 +560,16 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [x] **Assemble Bittle X V2 — done 2026-09-28.** Pi+PiSugar wiring/bring-up
       (Steps 2-4, `docs/build/biboard-pi-connector.md`) and the mount
       redesign (Step 5) are now unblocked — BiBoard exists.
-- [x] Check servo calibration — done 2026-09-28, standard zero-point
-      calibration only (no full per-joint ROM pass yet — see stand note
-      above). **Finding to chase**: the stock `vtF` ("step") gait stumbles
+- [ ] **Check servo calibration — RESET 2026-09-29, needs redoing.** The
+      2026-09-28 zero-point calibration below was wiped by the same-night
+      firmware reflash (`esptool erase_flash`, required to fix the
+      camera-kills-IMU bug — see `docs/hardware/petoi-firmware-reference.md`).
+      Nothing meaningful was lost
+      (it was a minimal power-on-on-its-side calibration, no full ROM pass),
+      but a real calibration pass is now pending, along with re-applying the
+      voice module's English-default fix (`XAc`/`XAb`/`XAa`, also EEPROM-
+      wiped by the erase).
+      Prior finding (2026-09-28, pre-reflash): the stock `vtF` ("step") gait stumbles
       toward the back-right leg, 100% reproducible every run; every other
       tested command (postures, other gaits) looked normal. Ruled out so
       far: by-hand resistance on the back-right shoulder/knee (normal, no

@@ -171,55 +171,128 @@ derives roll/pitch rate by finite-differencing consecutive frames;
 replies). What that costs the gait policy in sim:
 `rl_training/opencat-gym/resilience_imu_rate.py`.
 
-**⚠ CONTRADICTED BY REAL HARDWARE, 2026-09-28 — needs resolution before
-trusting the 5 Hz premise further.** `run_gait.py --probe-imu` against the
-real BiBoard measured **249.2 Hz** raw line rate (1246 lines / 5 s), not
-"at most 5 Hz." This isn't just the same stale line reprinted fast: of
-those 1246 lines, 500 carried a genuinely distinct 6-axis value (~100 Hz
-distinct-sample rate), each repeated ~2.5x before the next update — real
-fresh data arriving far above the documented cap, not a read-loop
-artifact. Chip prefix confirmed `ICM:` (ICM42670, not MPU6050) — resolves
-the "don't assume MPU6050" open question above. Also: `az` read ~9.9 at
-rest, consistent with **m/s²**, not "g" as stated above — worth
-rechecking whether `snprintf`'s comment or this doc mis-stated the unit.
+**RESOLVED, 2026-09-28/29 — was a stale-firmware artifact, fixed by a
+reflash. Full story, in order:**
 
-This is a big deal if it holds up: **the entire `hw1_20m` training
-campaign was built on modeling a hard 5 Hz IMU throttle as the defining
-real-hardware constraint** ([[project_imu_feedback_rate_priority]] memory,
-`docs/rl/hw1-log.md`).
+1. **2026-09-28, `run_gait.py --probe-imu` against the real BiBoard
+   measured 249.2 Hz** raw line rate (1246 lines / 5 s), not "at most
+   5 Hz." Checked it wasn't the same stale line reprinted fast: of those
+   1246 lines, 500 carried a genuinely distinct 6-axis value (~100 Hz
+   distinct-sample rate). Chip prefix confirmed `ICM:` (ICM42670, not
+   MPU6050). Also noted `az` read ~9.9 at rest, consistent with **m/s²**,
+   not "g" as this doc used to say.
+2. **Cross-validated under real load same day**: `--probe-imu-load`
+   (sends the neutral stand pose at 80 Hz on the same UART while
+   counting IMU lines, the actual shared-bus condition the control loop
+   runs under) measured **93.0 Hz** — same ballpark, still nowhere near
+   5 Hz, ruling out a fluke/burst reading.
+3. **2026-09-29, read BiBoard's full two-line `?` banner properly**
+   (a naive single-read grabs only line 1, leaving line 2 as backlog for
+   whatever reads next — same class of bug as the `allmoves` desync
+   documented below): line 1 `Bittle X`, line 2 a version string,
+   **`B10_251121`** — read as a 2025-11-21 build, ~10 months older than
+   our `main`-branch source review (2026-09-07/09-20). Strong
+   circumstantial evidence the stale build had different IMU timing.
+4. **Separately that same night**, found and fixed a real firmware bug
+   (below) requiring a full flash erase + reflash to Petoi's *current*
+   official firmware via the Desktop App.
+5. **After the reflash, re-ran `--probe-imu`: exactly 5.0 Hz** (25 lines /
+   5 s) — matching the documented `PRINT6AXIS_MIN_INTERVAL` cap exactly,
+   on the nose. Confirms step 3's theory directly rather than just
+   circumstantially: the stale ~10-month-old build genuinely had
+   different (much faster) IMU print timing than current firmware.
 
-**Likely explained, 2026-09-29 — firmware version mismatch.** Read the
-real board's `?` banner properly (it's two lines; a naive single-read
-grabs only the first and leaves the second as backlog for whatever reads
-next — same class of bug as the `allmoves` desync above): line 1 is
-`Bittle X`, line 2 is a version string, **`B10_251121`** — read as a
-2025-11-21 build date. Our source review of `PetoiCamp/OpenCatEsp32`'s
-`main` branch was done 2026-09-07/09-20, **~10 months later**. Couldn't
-pin down the exact commit that changed IMU print timing (GitHub's commit
-history for `imu.h` didn't render conclusively either way via fetch), but
-the version gap itself is a solid, direct, well-grounded explanation —
-this board is very plausibly running firmware from before (or after) a
-change to `PRINT6AXIS_MIN_INTERVAL`/the print-rate throttle that `main`
-has now. Not a measurement error, not a misread source — just a real
-build-vs-source mismatch. The retrain already underway
-(`IMU_HOLD_STEPS` 16→1, see `docs/rl/` campaign logs) remains the right
-call regardless: it matches *this* board's actual measured behavior,
-which is what matters for deployment.
+**Practical upshot:** `hw1_20m`/`Release_CandidateV2`/`V2.1` were all
+trained under the *correct* assumption (`IMU_HOLD_STEPS=16`, 5 Hz) for
+G2's real, current firmware. A same-night retrain campaign built around
+the stale 93-249 Hz reading (`docs/rl/hw1-log.md` Round 5) was abandoned
+once this closed out — not a wasted detour exactly, since it's what led
+to catching the reflash-worthy bug, but its premise no longer holds.
 
-**Cross-validated under real load, same day — confidence raised.** The
-249 Hz number above was measured idle (nothing else sent to the board).
-Ran `run_gait.py --probe-imu-load` next, which sends the neutral stand
-pose at 80 Hz (the real deployment rate) on the same UART while counting
-IMU lines — i.e. the actual shared-bus condition the control loop runs
-under, not a quiet bus. Result: **93.0 Hz** (465 lines / 5 s) — same
-ballpark as the idle test's ~100 Hz distinct-sample rate, not the raw
-249 Hz (duplicate reprints don't help under load, as expected), and still
-nowhere near 5 Hz. Two different test conditions landing in the same
-range is real cross-validation, not a single fluke reading. Still
-unresolved *why* this contradicts the source-derived 5 Hz cap (see
-explanations above), but the measurement itself is now much better
-supported. Tooling: `probe_imu_under_load()` / `--probe-imu-load` in
-`run_gait.py`.
+## Onboard voice module + camera: EEPROM-persisted module state (`moduleManager.h`)
+
+Separate from the serial tokens above — a status/enable table for
+BiBoard's extension modules, confirmed from `src/moduleManager.h`:
+
+| letter | module | | letter | module |
+|---|---|---|---|---|
+| `S` | Serial (Grove_Serial, i.e. Pi/UART2) | | `B` | Backtouch |
+| `A` | Voice | | `U` | Ultrasonic |
+| `T` | Touch | | `G` | Gesture |
+| `L` | Light | | `C` | Camera |
+| `D` | infrared Distance | | `Q` | Quick_demo |
+
+Printed as `?`'s status dump: a header row of these letters, then a `0`/`1`
+row (also reachable via `X`+letter, e.g. `XC`'s enable prints it). **`G`
+here is Gesture, not Gyro/IMU** — easy to misread and chase the wrong flag
+(done once, 2026-09-28, before finding the real mechanism below).
+
+**Confirmed from `reconfigureTheActiveModule()`'s literal source**: `X` +
+uppercase letter enables that module; `X` + lowercase letter disables only
+that one (bare, not `X`-prefixed, single lowercase/uppercase letters seem
+intended for a different -- untested -- calling convention; **do not test
+bare lowercase `c` to find out, see below**). Enabled/disabled state is
+persisted — `i2c_eeprom_write_byte()` if an external I2C EEPROM is present,
+else the ESP32's own `config.putBytes("moduleState", ...)` (NVS/Preferences)
+as fallback. **This means enabling a module isn't just a runtime toggle —
+it survives power cycles**, and `initModuleManager()` re-runs `initModule()`
+for every module still marked enabled on *every boot*.
+
+**The bug this caused, 2026-09-28: enabling Camera (`XC`) permanently
+kills the IMU streaming task, with zero restore path anywhere in the
+firmware, and re-triggers on every boot because the enabled state
+persists.** Confirmed from `camera.h`'s `groveVisionSetup()`, called by
+`moduleManager.h`'s `EXTENSION_CAMERA` case: it unconditionally sets
+`updateGyroQ = false` and `vTaskDelete()`s the IMU task, with no code
+anywhere that recreates it. Because `moduleActivatedQ[Camera]` persists
+to EEPROM/NVS, `initModuleManager()`'s boot loop calls this every single
+boot from then on — explaining why the IMU stream stayed dead through
+multiple full power cycles (USB *and* battery disconnected) that night.
+Sending `Xc` (disable) produced only an ambiguous/garbled reply and did
+not fix it (either not the right disable path on this firmware version,
+or a reply-capture issue — never fully resolved). **Fix that worked**:
+full `esptool erase_flash` (wipes the persisted module state along with
+everything else in NVS/EEPROM) + reflash via Petoi Desktop App's Firmware
+Uploader, Standard mode, BiBoard V1. Confirmed clean afterward: `gP`
+streams real `ICM:` data again.
+
+**Reflash gotchas hit in practice** (Petoi Desktop App, Mac):
+- The Product dropdown defaults to **"Bittle"** (the older NyBoard/AVR
+  line) — must be explicitly changed to **"Bittle X"**, which unlocks
+  **BiBoard V1** as a Board-version option (that dropdown doesn't
+  auto-update when Product changes, and silently keeps whatever board
+  was previously selected).
+- The Serial port dropdown may default to **`cu.debug-console`** even
+  with the right board plugged in and detected — must be explicitly
+  reselected to the actual device (`cu.usbmodem*`).
+- A blank/erased board's port may show with a "non-preferred port"
+  warning in the app — harmless, use it anyway; the raw OS-level device
+  is unaffected by the erase (a separate USB bridge chip's own
+  enumeration, independent of what's flashed to the ESP32's own flash).
+- `esptool` (installed via `pip install esptool` into a throwaway venv)
+  talks to this board fine as `ESP32-U4WDH (revision v3.1)` for the raw
+  `chip_id`/`erase_flash` steps; the actual application reflash still
+  needs Petoi's Desktop App (has the correct partition layout + all 4
+  files: bootloader/partitions/`boot_app0`/application).
+- Petoi's own documented recovery if a flash gets interrupted: power off,
+  hold the BOOT button, power on while still holding it, to force ESP32
+  download mode.
+
+**Also confirmed, same investigation: bare lowercase `c` is the real
+OpenCat calibration-mode trigger** (matches Petoi's official docs — one
+of several documented entry methods), **not** a module-disable shortcut.
+Sending it produces a `calib` banner + a 16-joint offset table, not a
+"disable Camera" message. Don't send it outside an intentional
+calibration flow — `opencat.is_safe()` already blocks it for exactly this
+reason.
+
+**Post-reflash state, 2026-09-29**: BiBoard is on current official
+firmware (no longer `B10_251121`); NVS/EEPROM is fully blank, meaning
+**calibration needs to be done for real** (the only calibration ever done
+before this was the boot-gesture entry with no actual +/- adjustments
+saved, so nothing of value was lost) and **the onboard voice module will
+very likely need its English-default fix re-applied** (`XAc`/`XAb`/`XAa`,
+see the voice module section above) since that was EEPROM-persisted too.
 
 ### Exception detection (`imu.h` `getImuException()`)
 

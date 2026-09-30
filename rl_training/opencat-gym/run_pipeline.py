@@ -84,14 +84,15 @@ PHASE_A_TAG = "base2_20m"
 PHASE_C_TAG = "r2_consolidated"   # 2026-09-24: renamed from r2_phaseC_dress -- this run is scheduled
                                    # for the real 20M from the start (10M dress-rehearsal gate, not a
                                    # separate run), so its name should reflect what it actually is
-BASE = dict(G2E_IMU_HOLD_STEPS="1", G2E_IMU_RATE_ZERO="1", G2E_CMD_PATH="i",
-            # 2026-09-28: real BiBoard measured ~93-249 Hz IMU stream (idle AND
-            # under real 80 Hz command load, cross-validated -- see
-            # docs/hardware/petoi-firmware-reference.md), not the 5 Hz this "16"
-            # modeled (IMU_HOLD_STEPS=16 @ 80 Hz control = 5 Hz refresh). 1 = every
-            # control step gets a fresh reading, matching the measured rate being
-            # ~= or > the 80 Hz control rate. IMU_RATE_ZERO stays True -- the
-            # printed line still carries no gyro, independent of print rate.
+BASE = dict(G2E_IMU_HOLD_STEPS="16", G2E_IMU_RATE_ZERO="1", G2E_CMD_PATH="i",
+            # 2026-09-28: real BiBoard measured ~93-249 Hz IMU stream, contradicting
+            # the 5 Hz this "16" models -- briefly changed to "1" to match it (see
+            # docs/rl/hw1-log.md Round 5). 2026-09-29: that measurement turned out to
+            # be a stale-firmware artifact (board was on a ~10-month-old build,
+            # confirmed via its version banner). After a full erase + reflash to
+            # current official firmware, the real rate measured exactly 5.0 Hz --
+            # matching this "16" all along. Reverted; the retrain built on the stale
+            # reading was abandoned, keeping Release_CandidateV2.1 as-is.
             G2E_CMD_PATH_EXTRA_MS_MAX="4", G2E_BODY_MASS_SCALE="1.12",
             G2E_IMU_BIAS_DEG="2", G2E_JOINT_OFFSET_DEG="2", G2E_SLOPE_TARGET_PROB="0.3",
             G2E_SERVO_RATE_LIMIT_DEG_S="137",   # explicit for traceability -- module default is now 137 too
@@ -173,7 +174,7 @@ def flat_gate(tag, step=GATE_STEP):
     env = OpenCatGymEnv()
     env.set_command(fwd=0.10, yaw=0.0)
     B._apply({})
-    E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 1, True, "i"   # 2026-09-28: match BASE, real-hw rate
+    E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 16, True, "i"   # match BASE (reverted 2026-09-29, see hw1-log.md Round 5)
     E.CMD_SEND_EVERY_N = 3   # match BASE's G2E_CMD_SEND_EVERY_N -- eval must match training (2026-09-25 fix)
     E.EPISODE_LENGTH = 250
     m = _load_learned(f"trained/checkpoints/{tag}_{step}_steps")
@@ -304,7 +305,7 @@ def _score_checkpoint(tag, step, all_cells):
     env = OpenCatGymEnv()
     env.set_command(fwd=0.10, yaw=0.0)
     B._apply({})
-    E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 1, True, "i"   # 2026-09-28: match BASE, real-hw rate
+    E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 16, True, "i"   # match BASE (reverted 2026-09-29, see hw1-log.md Round 5)
     E.CMD_SEND_EVERY_N = 3   # match BASE's G2E_CMD_SEND_EVERY_N -- eval must match training (2026-09-25 fix)
     E.EPISODE_LENGTH = 250
     s, _ = _bench(env, m, 20, 1000)
@@ -315,7 +316,7 @@ def _score_checkpoint(tag, step, all_cells):
     for cid in all_cells:
         knobs = {k: v for k, v in cells_all[cid][4].items() if not k.startswith("_")}
         B._apply(knobs)
-        E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 1, True, "i"   # 2026-09-28: match BASE, real-hw rate
+        E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO, E.CMD_PATH = 16, True, "i"   # match BASE (reverted 2026-09-29, see hw1-log.md Round 5)
         E.CMD_SEND_EVERY_N = 3   # match BASE's G2E_CMD_SEND_EVERY_N -- eval must match training (2026-09-25 fix)
         E.EPISODE_LENGTH = 250
         s, _ = _bench(env, m, 20, 1000)

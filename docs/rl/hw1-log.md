@@ -554,6 +554,63 @@ uptick; T5.3 (40mm, already known as the ledge-height capability ceiling)
 got worse on yaw RMS (15.61°→22.84°) though tied on fell rate. Full report +
 GIFs: [Yaw-Tuning Round artifact](https://claude.ai/artifact/WM5k6QG7p3vT9p6bzStt9p).
 
+## Round 5: real-hardware-IMU retrain, abandoned after a firmware reflash changed the premise (2026-09-29)
+
+G2's body arrived 2026-09-28. That night's hardware bring-up measured the
+real BiBoard's IMU stream at ~93-249 Hz, contradicting the 5 Hz cap
+(`IMU_HOLD_STEPS=16`) every real-path run since `hw1_20m` had assumed. Ran
+a full retrain campaign on that measurement: `phase_r5_hw_sequential.py`
+(V2.1's staged-mechanic recipe, `IMU_HOLD_STEPS` 16→1 to match the real
+rate) → `phase_r7_holdsteps_probe.py` (a 3M diagnostic after r5_hw showed
+elevated yaw/drift, testing whether tick-to-tick observation noise was the
+cause — confirmed: `IMU_HOLD_STEPS=4` recovered most of it) →
+`phase_r8_holdsteps4_consolidate.py` (10M consolidation of that fix,
+running when the next finding landed).
+
+**2026-09-29: the 93-249 Hz measurement turned out to be a stale-firmware
+artifact, not real hardware's actual behavior.** A separate bug that same
+night (BiBoard's onboard camera-enable command permanently kills the IMU
+task, persisted to EEPROM, surviving power cycles — see
+`docs/hardware/petoi-firmware-reference.md`) forced a full flash erase +
+reflash to Petoi's current official firmware. Read BiBoard's version
+banner before the reflash: `B10_251121` — a 2025-11-21 build, ~10 months
+stale. **After reflashing to current firmware, the IMU rate measured
+exactly 5.0 Hz** — matching the *original* `hw1_20m`/`Release_CandidateV2`/
+`V2.1` assumption all along, not the stale board's anomalous fast rate.
+
+**Decision: abandoned the r5_hw/r7/r8 lineage, keeping `Release_CandidateV2.1`
+as the release candidate.** The premise motivating this whole retrain —
+"the sim's IMU assumption doesn't match real hardware" — was itself an
+artifact of running stale firmware; on current official firmware, V2.1's
+original `IMU_HOLD_STEPS=16` is correct. `run_pipeline.py`'s `BASE` was
+reverted back to `G2E_IMU_HOLD_STEPS=16`. No checkpoints from this round
+were promoted; `r5_hw_candidate`'s benchmark numbers (tied with V2.1 on
+4/5 categories, lost on ledges, worse yaw/drift) are moot against a
+premise that no longer holds, not a real regression to chase.
+
+**Worth a future check, not urgent:** `hw1_20m` (the currently deployed
+policy) has never been re-benchmarked against G2's *current* firmware —
+it was trained and validated under the same 5 Hz assumption, so it's
+very likely still fine, but hasn't been directly reconfirmed since the
+reflash.
+
+**Post-mortem transparency note on the sim/benchmark config, checked
+2026-09-29 after the abandon decision:** confirmed every training/scoring
+script for full consistency. `run_pipeline.py` needed reverting (its
+`BASE` dict plus three hardcoded `E.IMU_HOLD_STEPS, E.IMU_RATE_ZERO,
+E.CMD_PATH` eval-matching lines, all now back to `16, True, "i"`).
+`phase_c_report.py` and `benchmark_decathlon.py` were never touched
+during this round — both were already hardcoded to `16` throughout, so
+no revert was needed there. That also means one thing is worth flagging
+honestly: `r5_hw_candidate`'s benchmark comparison above (the "tied on
+4/5, lost on ledges" numbers) was scored via `phase_c_report.py`'s
+unchanged `16`, while that checkpoint was actually trained under
+`IMU_HOLD_STEPS=1`/`4` — an internal train/eval mismatch in that one
+comparison, on top of the whole lineage's premise not holding up. Doesn't
+change the decision (the lineage is abandoned either way) but the
+specific numbers reported for `r5_hw_candidate` shouldn't be read as a
+clean apples-to-apples benchmark.
+
 ## Deploying a policy
 
 `export_onnx.py --model trained/<run>_ppo` → `<run>_ppo.onnx` + `.onnx.json`;

@@ -50,10 +50,17 @@ and [`docs/hardware/specs.md`](docs/hardware/specs.md).
 ## Project Status
 
 **2026-09-28: the Bittle X body has arrived.** Assembled, zero-point
-calibrated, and base stock-firmware functions tested — all normal, including
-`wkF` (the gait the trained policy is layered on). One stock gait, `vtF`
-("step"), stumbles toward the back-right leg, but it isolates cleanly to
-that gait alone and isn't part of our deployment path, so it's parked (see
+calibrated, base stock-firmware functions tested (all normal, including
+`wkF`, the gait the trained policy is layered on — one stock gait, `vtF`
+("step"), stumbles toward the back-right leg but isolates cleanly to that
+gait alone and isn't part of our deployment path, so it's parked), and the
+Pi deployed onto it over serial. **2026-09-29:** a firmware bug (enabling
+the onboard camera module permanently kills IMU streaming) required a full
+erase + reflash to current official firmware — this also resolved a real
+IMU-rate puzzle (the pre-reflash board was a ~10-month-stale build; the
+real rate is exactly 5 Hz, matching the deployed policy's training
+assumption all along). The reflash reset calibration and the voice
+module's language setting, both pending a redo (see
 [`docs/project-plan.md`](docs/project-plan.md) Phase 4). Everything else
 below was built and validated software-only or with the hardware mocked,
 ahead of this point.
