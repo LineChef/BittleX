@@ -808,6 +808,32 @@ holding the Pi assembly clear of BiBoard and both mounted to a shared frame:
 
 ![Illustrative side-view diagram: BiBoard mounted to the frame, a printed standoff rising from the same frame to hold PiSugar and the Pi above it, wires routed from the Pi's header down past the standoff to BiBoard's header](images/biboard-pi-connector/assembled-side.png)
 
+## Open: speaker for Pi-side TTS (Phase 7 gap, not yet built)
+
+`pi_pipeline`'s TTS currently has nowhere to output audio on the robot
+itself — see `docs/research/community-projects.md` Finding 7 and
+`project_voice_speaker_gap` memory for the full research (BiBoard's own
+speaker can't be repurposed for this; no community project has solved it
+either). Candidate parts, not yet bought/wired:
+
+- **Amp**: [Adafruit MAX98357A I2S breakout](https://www.adafruit.com/product/3006)
+  — 19.4 × 17.8 × 3.0mm, needs 3-4 GPIO pins (I2S BCLK/LRCLK/DIN + power),
+  distinct from the UART pins (14/15) already used for BiBoard — no
+  conflict expected, not yet confirmed against a real pinout diagram.
+- **Speaker**: candidate [eMagTech 8Ω 1W, 20×30mm](https://www.amazon.com/eMagTech-Magnetic-Replacement-Compatible-Raspberry/dp/B0DLKLY669)
+  — right impedance/power match for the amp; exact thickness unconfirmed
+  (Amazon's product pages aren't fetchable from here — verify on the
+  listing before buying).
+
+**Mounting: doesn't need to fit inside the Pi cover.** Initially flagged
+as a concern given the cover's cavity is already over budget (PiSugar's
+own case doesn't fit inside it either, see below) — resolved: the header
+pins are exposed at the case's top cap, so the amp+speaker pair can be
+wired out and mounted elsewhere on the frame entirely, same as any other
+external accessory. Exact frame location not yet decided — pick
+somewhere away from the head (matches the existing `HEAD_MASS_NOM`
+balance budget reasoning used for Pi/PiSugar placement above).
+
 ## Reference
 
 Full pinout, both boards:
