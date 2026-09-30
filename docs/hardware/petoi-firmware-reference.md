@@ -287,12 +287,46 @@ calibration flow — `opencat.is_safe()` already blocks it for exactly this
 reason.
 
 **Post-reflash state, 2026-09-29**: BiBoard is on current official
-firmware (no longer `B10_251121`); NVS/EEPROM is fully blank, meaning
-**calibration needs to be done for real** (the only calibration ever done
-before this was the boot-gesture entry with no actual +/- adjustments
-saved, so nothing of value was lost) and **the onboard voice module will
-very likely need its English-default fix re-applied** (`XAc`/`XAb`/`XAa`,
-see the voice module section above) since that was EEPROM-persisted too.
+firmware (no longer `B10_251121`, now `B10_260527` — read via `?`'s
+version banner); NVS/EEPROM is fully blank, meaning **calibration needs
+to be done for real** (the only calibration ever done before this was the
+boot-gesture entry with no actual +/- adjustments saved, so nothing of
+value was lost) and **the onboard voice module will very likely need its
+English-default fix re-applied** (`XAc`/`XAb`/`XAa`, see the voice module
+section above) since that was EEPROM-persisted too.
+
+**Checked GitHub `main` the same night for anything worth catching up
+on — nothing urgent, one thing to know about.** `B10_260527` (2026-05-27)
+is ~6 weeks behind `main`'s newest firmware-code commit (`DATE "260717"`,
+2026-07-17); every commit in that gap was reviewed directly via the
+GitHub API. None of it matters for us: the camera-kills-IMU bug above is
+still present unfixed on `main` (a `camera.h` commit in the gap is a
+comment-only clarification); a `moduleManager.h` refactor that also
+touches Serial2 init resolves to the same pins (9/10) for
+`BiBoard_V1_0` either way — no pinout regression; the rest is an
+Xiaozhi-voice-UART echo feature (not applicable, we don't use a Xiaozhi
+module) and unrelated marketing/README commits.
+
+**One real, small thing this surfaced: the voice-module Chinese-default
+bug (see the voice module section above, first hit 2026-09-28) has an
+actual upstream root-cause fix — but it lands one day after our build.**
+`main` commit `9cf4e8d` (2026-05-28) changes `configConstants.h`'s
+factory EEPROM default for `EEPROM_CURRENT_LAN` from `'b'` (Chinese) to
+`'a'` (English); a same-day commit (`b189c34`) simplifies
+`voiceSyncAtStartup()`'s language-sync logic (the `Ac->Ab->Aa` special
+case for English, matching our own manual workaround, is replaced with a
+single `A<lan>` send). **Checked whether the Petoi Desktop App could get
+us this fix: its release feed (`PetoiCamp/DesktopAppRelease`) tops out at
+v1.2.9, published 2026-05-28 — the same version already installed and
+used for tonight's reflash — so re-running it would just re-flash the
+identical `260527` build, not the newer one.** Reaching the fix would
+require building from raw GitHub source, which this project has
+explicitly decided against (see `project_no_firmware_fork` memory: stock
+firmware only, app layer over serial). **Decision: stay on `260527`,
+keep applying the manual `XAc`/`XAb`/`XAa` workaround after every EEPROM
+wipe** (already a known, working fix) rather than chase a one-day-newer
+build that isn't packaged anywhere yet. Revisit only if Petoi ships a
+Desktop App release newer than 1.2.9.
 
 ### Exception detection (`imu.h` `getImuException()`)
 
