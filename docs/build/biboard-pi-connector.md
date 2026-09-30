@@ -808,31 +808,70 @@ holding the Pi assembly clear of BiBoard and both mounted to a shared frame:
 
 ![Illustrative side-view diagram: BiBoard mounted to the frame, a printed standoff rising from the same frame to hold PiSugar and the Pi above it, wires routed from the Pi's header down past the standoff to BiBoard's header](images/biboard-pi-connector/assembled-side.png)
 
-## Open: speaker for Pi-side TTS (Phase 7 gap, not yet built)
+## Speaker + mic for Pi-side voice I/O — parts ORDERED 2026-09-29, not yet wired
 
-`pi_pipeline`'s TTS currently has nowhere to output audio on the robot
-itself — see `docs/research/community-projects.md` Finding 7 and
+`pi_pipeline`'s TTS/STT currently have nowhere to play/capture audio on the
+robot itself — see `docs/research/community-projects.md` Finding 7 and
 `project_voice_speaker_gap` memory for the full research (BiBoard's own
-speaker can't be repurposed for this; no community project has solved it
-either). Candidate parts, not yet bought/wired:
+speaker/mic module can't be repurposed for this — its only interfaces are
+`T_BEEP`, a fixed buzzer-melody format, and `XAa`-`XAe`, canned command
+language switching; neither is a raw audio channel. No community project
+has solved this either).
 
-- **Amp**: [Adafruit MAX98357A I2S breakout](https://www.adafruit.com/product/3006)
-  — 19.4 × 17.8 × 3.0mm, needs 3-4 GPIO pins (I2S BCLK/LRCLK/DIN + power),
-  distinct from the UART pins (14/15) already used for BiBoard — no
-  conflict expected, not yet confirmed against a real pinout diagram.
-- **Speaker**: candidate [eMagTech 8Ω 1W, 20×30mm](https://www.amazon.com/eMagTech-Magnetic-Replacement-Compatible-Raspberry/dp/B0DLKLY669)
-  — right impedance/power match for the amp; exact thickness unconfirmed
-  (Amazon's product pages aren't fetchable from here — verify on the
-  listing before buying).
+**Went with GPIO-wired I2S, not USB** — the Pi's one USB data port is
+reserved for the Grove Vision camera's raw-frame path (`docs/hardware/
+specs.md`: detections travel over UART, live frames over USB, never both
+at once), so a USB sound card (the simpler option otherwise) was ruled
+out. Two boards ordered, both wiring directly onto the Pi's bare 40-pin
+header, no adapter needed:
+
+- **Speaker**: [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5)
+  — amp + matched speaker sold together, MAX98357A-compatible pinout
+  (`VIN`, `GND`, `BCLK`, `LRCLK`, `DIN`, plus the speaker's own leads into
+  the amp board's output terminals, not the Pi).
+- **Microphone**: [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62)
+  — the SPH0645LM4H MEMS mic chip itself, on a small breakout (`VIN`,
+  `GND`, `BCLK`, `LRCLK`, `DOUT`). **Runs at 1.6&ndash;3.6V only** (confirmed
+  against Adafruit's own guide for the same chip) — its `VIN` must go to
+  a Pi 3.3V pin, not the 5V pin the amp uses, or it risks damage.
+
+**Full pinout, confirmed no conflicts with each other or with BiBoard's
+existing wiring above:**
+
+| Signal | Pi pin | Used by |
+|---|---|---|
+| BiBoard GND | 6 | already wired |
+| BiBoard RX2 | 8 (GPIO14/TXD) | already wired |
+| BiBoard TX2 | 10 (GPIO15/RXD) | already wired |
+| Mic `VIN` | 1 or 17 (3.3V) | mic only — **not the amp's 5V pin** |
+| Amp `VIN` | 2 (5V) | amp only |
+| Amp/Mic `GND` | 9 (or any other free ground pin) | shared — all Pi ground pins are one common net |
+| Amp/Mic `BCLK` | 12 (GPIO18) | shared **by design** — one I2S clock line, both boards listen to it |
+| Amp/Mic `LRCLK` | 35 (GPIO19) | shared **by design**, same reasoning |
+| Mic `DOUT` | 38 (GPIO20) | mic only, audio data mic → Pi |
+| Amp `DIN` | 40 (GPIO21) | amp only, audio data Pi → amp |
+
+Running both directions (playback + capture) at once on the Pi's one I2S
+bus needs a "duplex" audio device-tree overlay in `/boot/firmware/
+config.txt` — a well-documented DIY-assistant pattern, just a real extra
+software step beyond the wiring itself, not yet done.
 
 **Mounting: doesn't need to fit inside the Pi cover.** Initially flagged
 as a concern given the cover's cavity is already over budget (PiSugar's
 own case doesn't fit inside it either, see below) — resolved: the header
-pins are exposed at the case's top cap, so the amp+speaker pair can be
-wired out and mounted elsewhere on the frame entirely, same as any other
-external accessory. Exact frame location not yet decided — pick
-somewhere away from the head (matches the existing `HEAD_MASS_NOM`
-balance budget reasoning used for Pi/PiSugar placement above).
+pins are exposed at the case's top cap, so both boards can be wired out
+and mounted elsewhere on the frame entirely, same as any other external
+accessory. Two open questions, not yet decided:
+- **Where**: somewhere away from the head (matches the existing
+  `HEAD_MASS_NOM` balance budget reasoning used for Pi/PiSugar placement
+  above), close enough to the Pi's header to keep the 5 signal wires per
+  board short.
+- **How**: check whether either board has its own mounting holes first —
+  a zip tie through them, or a small screw into a printed standoff, holds
+  up to a walking robot's repeated footfall vibration much better than
+  adhesive alone. If neither has holes, foam tape (not plain velcro,
+  which can work loose under that kind of repeated shock) is the fallback,
+  with a proper printed carrier as the eventual upgrade.
 
 ## Reference
 
