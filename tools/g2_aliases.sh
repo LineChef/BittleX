@@ -70,6 +70,36 @@ EOF
 g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped" || echo "nothing running"; }
 g2cam-info() { _g2py tools/camera_preview.py --info; }   # serial port + which model is on the module
 
+# ---- camera MOUNTED on G2 (plugged into the Pi, not the Mac) ----
+# Needs  export G2_PI=<user>@g2pi.local  in your shell profile (kept out of the repo).
+# g2pcam <name> [session]  -- run the preview on the Pi, tunnel it to localhost:8080,
+#                             open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/
+g2pcam() {
+  local name="${1:-self}" sess="${2:-1}" host="${G2_PI:?set G2_PI=<user>@g2pi.local (see docs/guides/cheatsheet.md)}"
+  local out="g2_cap/$name/session_$sess"
+  g2pcam-stop >/dev/null 2>&1
+  ssh -o BatchMode=yes "$host" 'mkdir -p ~/bittleX/tools' \
+    && scp -q "$G2_ROOT/tools/camera_preview.py" "$host:bittleX/tools/" || { echo "cannot reach $host"; return 1; }
+  ( ssh -o BatchMode=yes -L 8080:127.0.0.1:8080 "$host" \
+      "mkdir -p ~/$out; G2_CAP_OUT=~/$out G2_CAP_LABEL=$name ~/bittleX/pi_pipeline/.venv/bin/python -W ignore ~/bittleX/tools/camera_preview.py" \
+      > /tmp/g2pcam.log 2>&1 & )
+  local i; for i in $(seq 1 40); do curl -s -m 1 -o /dev/null http://localhost:8080/ && break; sleep 0.5; done
+  open http://localhost:8080      # must open within ~10s or the preview stops itself
+  echo "preview -> http://localhost:8080   saving on the Pi to ~/$out"
+  echo "closing the tab stops it.  then:  g2pcam-pull $name $sess   (copy to the Mac for g2curate)"
+}
+# g2pcam-pull <name> [session]  -- copy a Pi capture to $G2_CAP_ROOT/<name>/session_<n>/ (then g2curate/g2auto as usual)
+g2pcam-pull() {
+  local name="${1:?usage: g2pcam-pull <name> [session]}" sess="${2:-1}" host="${G2_PI:?set G2_PI=<user>@g2pi.local}"
+  mkdir -p "$G2_CAP_ROOT/$name/session_$sess" \
+    && rsync -av "$host:g2_cap/$name/session_$sess/" "$G2_CAP_ROOT/$name/session_$sess/"
+}
+g2pcam-stop() {   # kill the tunnel + the preview process on the Pi
+  pkill -f "ssh .*-L 8080:127.0.0.1:8080" 2>/dev/null
+  [ -n "$G2_PI" ] && ssh -o BatchMode=yes "$G2_PI" 'ps -eo pid,comm,args | awk "\$2 ~ /^python/ && /camera_preview/ {print \$1}" | xargs -r kill' 2>/dev/null
+  echo "pi preview stopped"
+}
+
 # g2curate <name> [session] [rotate]  -- filter a raw capture -> <session>/curated/
 #   (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera
 #   mounted upright); use 90/180/270 if the contact sheet comes out rotated.

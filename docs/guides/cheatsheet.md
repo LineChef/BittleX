@@ -180,6 +180,9 @@ standard pose set.
 | `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
 | `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
 | `g2cam-info` | print the serial port + which model is on the module |
+| `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
+| `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
+| `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
 | `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
 | `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
 | `g2promote <class> [session]` | copy a reviewed `curated/` session into the persistent library `~/Desktop/g2_vision_library/<class>/`, updating `_MANIFEST.md` |
@@ -242,6 +245,7 @@ Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at
 |---|---|
 | `python tools/curate_captures.py --help` | all curate flags |
 | `python tools/camera_preview.py --info` | port + loaded model, no server |
+| `ssh -L 8080:127.0.0.1:8080 $G2_PI 'G2_CAP_OUT=~/g2_cap ~/bittleX/pi_pipeline/.venv/bin/python ~/bittleX/tools/camera_preview.py'` | what `g2pcam` does under the hood; open `localhost:8080` within 10 s or the preview stops itself. The Pi's camera is `/dev/ttyACM0` |
 | `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
 
 
