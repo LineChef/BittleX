@@ -812,8 +812,18 @@ Pi Zero 2 W voice-stack benchmark.
       / `wake_word.py` `sounddevice` path). Health-monitor for the audio + serial
       worker threads is built (`pi_pipeline/util/supervisor.py`).
   - Bookworm's PEP 668 blocks plain `pip install` on-device — use the venv.
-- [ ] Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out).
-- [ ] Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out).
+- [ ] **Text-to-speech through the robot's speaker (`PiperTTS` → Pi audio out) —
+      blocked on real speaker hardware, confirmed 2026-09-29.** No mic or
+      speaker is wired to the Pi yet (per the user's own check of the physical
+      unit). Researched whether BiBoard's onboard speaker could be a shortcut:
+      it can't — its only serial interface is `T_BEEP` (a fixed buzzer-melody
+      format), not an audio-playback channel, and no community project (Petoi's
+      own official ChatGPT-Bittle example included) has actually routed
+      synthesized speech through it either — they all play audio from
+      whatever computer runs the script, same as our own `--tts mac` test.
+      Full research: `docs/research/community-projects.md` Finding 7. Needs a
+      real speaker on the Pi (a USB speaker or an I2S amp+speaker breakout are
+      the standard low-cost Pi Zero options) before this checkbox can close.
 - [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard, confirm
       the skill commands land.
 - [ ] Confirm this runs independently of the 35+ built-in voice commands (they're

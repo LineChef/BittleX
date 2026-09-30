@@ -19,6 +19,8 @@ reviewed at all.
 | Classroom Bittle V2 session | One-line gist only, via a third-party blog mention | No — not project-relevant regardless |
 | "I used an LLM to control the Petoi..." | Reddit — blocked, not pasted | No |
 | "Tutorial to use Claude Code to develop Bittle's..." | Reddit — blocked, never revisited | No |
+| `ocolakoglu/PetoiBittleChatGPT` + Petoi's official ChatGPT blog post | `Text2SpeechEn.py` fetched directly (2026-09-29, researching voice output) | Yes |
+| FinoBot (Bittle X + Pi + ROS2, person-following) | Petoi blog post fetched directly | Yes |
 
 ---
 
@@ -225,3 +227,66 @@ finding is.
   knobs; noted as a reminder that "looks slippery" can be a solver
   artifact, not always a friction-coefficient question.
 - TypeFly's lack of documented safety mechanisms — contrast, not a model.
+
+## Finding 7 — nobody has actually gotten LLM speech to play through Bittle's own body (researched 2026-09-29)
+
+Prompted by hitting this directly: `pi_pipeline`'s Claude conversation loop
+works end-to-end (real API calls confirmed live, see `hw1-log`-adjacent
+session notes), but its spoken replies (Piper/`say`) only play through
+whichever computer is running the process — there's no speaker wired to
+the Pi yet, and BiBoard's onboard speaker turns out not to be usable for
+this at all.
+
+**Why BiBoard's speaker is a dead end for this**: its only serial
+interface is `T_BEEP` (`b<tone> <ms> ...`, `OpenCat.h`) — a buzzer-melody
+format (tone-index + duration pairs), not an audio-playback channel. The
+onboard voice module's own spoken replies are canned firmware phrase
+banks (English/Chinese), not something arbitrary text can be routed into.
+There is no serial command anywhere in `PetoiCamp/OpenCatEsp32` that
+accepts a WAV/PCM stream for BiBoard to play back.
+
+**Checked whether anyone else solved this — no one has, as far as public
+projects show:**
+- Petoi's own official example, ["Talk to Bittle Robot Dog with
+  ChatGPT"](https://www.petoi.com/blogs/blog/talk-to-bittle-robot-dog-with-chatgpt),
+  links to [`ocolakoglu/PetoiBittleChatGPT`](https://github.com/ocolakoglu/PetoiBittleChatGPT).
+  Read `Text2SpeechEn.py` directly: it calls Google Cloud TTS, decodes the
+  MP3 response, and plays it with `pydub`'s `play(sound)` — straight to
+  whatever computer is running the script's own sound device. Same
+  architecture as our `MacTTS`/`--tts mac` test, not routed through Bittle
+  at all; the "robot talking" in the demo videos is audio from a nearby
+  laptop.
+- [FinoBot](https://www.petoi.com/blogs/blog/finobot-ai-robot-dog-bittle-x-follows-someone)
+  (Bittle X + Pi + ROS2, person-following) adds a Pi mic for voice *input*
+  but documents no speaker or audio-output hardware at all — voice-in
+  only, no spoken replies.
+- Petoi's own upcoming **Quaddle** robot (successor product, per its
+  2026-09 announcement) ships with an *optional second ESP32-S3 "AI core"
+  board*, separate from its motion controller, specifically to handle
+  voice/LLM features — i.e., Petoi's own hardware team concluded the main
+  motion board isn't sufficient for this and built a dedicated second
+  board for it. Confirms the constraint is structural, not a `pi_pipeline`
+  gap to code around.
+- A related firmware thread: a 2026-07 `OpenCatEsp32` commit
+  (`f93cdbf`, "Echo motion completion tokens to Xiaozhi voice UART") adds
+  a one-byte echo of motion-complete tokens onto `SERIAL_VOICE` — the
+  *same* UART already used for the onboard voice module, gated on
+  `moduleActivatedQ[1]` (the Voice module flag). This suggests Petoi is
+  positioning the onboard voice-module slot as pairable with
+  [`xiaozhi-esp32`](https://github.com/78/xiaozhi-esp32) (a real
+  open-source ASR+LLM+TTS ESP32 project with its own mic/speaker) as a
+  firmware swap on that daughterboard — worth a closer look later if a
+  from-scratch voice-hardware rebuild is ever on the table, since it could
+  put speech *before* the serial link rather than needing the Pi at all.
+  Not pursued now — no confirmed reports of anyone actually doing this on
+  Bittle specifically, and it would mean reflashing that sub-board with
+  third-party firmware, a bigger step than this project's stock-firmware
+  convention.
+
+**Conclusion — the gap is real, not a missed config.** Getting Claude's
+actual voice out of G2's own body needs a real speaker wired to the Pi
+(a cheap USB speaker, or an I2S amp+speaker breakout like a MAX98357,
+are the standard low-cost options for a Pi Zero — not researched in
+depth here, just the general Pi-audio pattern) — there's no shortcut
+through BiBoard's existing hardware. Logged as an open bring-up gap, not
+solved by any known community project.
