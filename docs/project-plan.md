@@ -102,7 +102,7 @@ should we work on next."
 | Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
 | PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
 | Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 | — |
-| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (Step 3, `docs/build/biboard-pi-connector.md`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run | — |
+| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (Step 3, `blueprints/biboard-pi-connector.md`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run | — |
 | [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera) | — |
 | [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above) | — |
 
@@ -121,7 +121,7 @@ should we work on next."
   18.6 mm is the full outer depth (shell walls included), same clearance
   bottleneck as the standoff clips below, just from the enclosure side. A
   custom-modified version is now planned alongside the clips — see "Build:
-  modified standoff clips + cover" below and `docs/build/biboard-pi-connector.md`
+  modified standoff clips + cover" below and `blueprints/biboard-pi-connector.md`
   for the full plan.
 - **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
@@ -141,7 +141,7 @@ should we work on next."
 - ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved 2026-09-14**: it's a
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
   official board diagram. Data-only wiring is straightforward. Full pinout +
-  annotated photos: [`build/biboard-pi-connector.md`](build/biboard-pi-connector.md).
+  annotated photos: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md).
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.
@@ -158,7 +158,7 @@ should we work on next."
   defaults to `/dev/ttyS0` — same underlying serial architecture as the one
   family Petoi *does* confirm works, not an unconsidered edge case. Also
   found: Petoi's own Pi-mounting bracket (`Pi_StandOffRegular.stl`, already
-  in use — see `build/biboard-pi-connector.md`) is Zero-specific, which
+  in use — see `blueprints/biboard-pi-connector.md`) is Zero-specific, which
   at minimum confirms Petoi designed real hardware for this board, even if
   that speaks to mechanical fit more than to serial compatibility. Net: good
   reason to expect it works, still worth the ~30-second confirmation once
@@ -560,7 +560,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 ## Phase 4 — Hardware assembly
 
 - [x] **Assemble Bittle X V2 — done 2026-09-28.** Pi+PiSugar wiring/bring-up
-      (Steps 2-4, `docs/build/biboard-pi-connector.md`) and the mount
+      (Steps 2-4, `blueprints/biboard-pi-connector.md`) and the mount
       redesign (Step 5) are now unblocked — BiBoard exists.
 - [x] **Check servo calibration — redone for real, 2026-09-29, post-reflash.**
       The 2026-09-28 zero-point calibration below was wiped by the same-night
@@ -573,7 +573,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       it was sent). Full procedure + a finding worth knowing (the bracket
       step targets frame-relative leg angle, not floor contact — front feet
       sitting slightly off the ground during that step is expected
-      geometry, not miscalibration) in `docs/build/calibration.md`.
+      geometry, not miscalibration) in `blueprints/calibration.md`.
       Voice module's English-default fix (`XAc`/`XAb`/`XAa`, also
       EEPROM-wiped by the erase) reapplied same day — confirmed recurred
       (stuck on Chinese again, same as the pre-reflash incident) and fixed
@@ -615,7 +615,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
     data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](hardware/pi-power.md).
   - [x] Install the 5-pin Pi socket on BiBoard V1 — **soldered 2026-09-29**
-    (`docs/build/biboard-pi-connector.md` Step 2). Still need: the actual
+    (`blueprints/biboard-pi-connector.md` Step 2). Still need: the actual
     RX/TX/GND jumpers to the Pi (Step 3), and use Petoi's back-cover STL with
     the Pi cutout.
   - Petoi's official Pi standoff bracket (`Pi_StandOffRegular.stl`) does
@@ -626,7 +626,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       findings (PiSugar orientation fix, confirmed pogo-pin/header contact
       mechanism, why the corner-clip and screw-through-bracket approaches
       were both ruled out, and the candidate options being weighed) live in
-      [`docs/build/biboard-pi-connector.md`](build/biboard-pi-connector.md)
+      [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md)
       (the single build manual, Steps 1-5) and the
       [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
       — that's the canonical reference, not this checklist.
@@ -640,7 +640,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
     (measured: the case is 31mm thick, the cover's internal cavity is only
     18.6mm deep — doesn't fit inside, so this sidesteps rather than solves
     that). Not the final mount; parts were 3D-printing at time of writing.
-    Full detail: `docs/build/biboard-pi-connector.md`.
+    Full detail: `blueprints/biboard-pi-connector.md`.
   - Cover modified (button/switch + SD card access) rather than on hold now.
   - Screws to buy (M2 pan-head self-tapping assortment) — see the build doc's
     "Screws to buy."
@@ -839,7 +839,7 @@ Pi Zero 2 W voice-stack benchmark.
     this wiring, confirmed against its own device-tree source, not
     inferred) plus a verify-each-step checklist before wiring
     `pi_pipeline` to it — fully spec'd in
-    `docs/build/biboard-pi-connector.md`, nothing left to research at
+    `blueprints/biboard-pi-connector.md`, nothing left to research at
     install time. Mounting location and method (zip-tie through mounting
     holes if present, else foam tape — not plain velcro, given repeated
     footfall vibration on a walking robot) still open, pending the parts
@@ -1685,7 +1685,7 @@ mechanically," not a guess.
    (`~/g2_logs/<session_id>/`) as the pre-Pi baseline to diff against later.
    *(In parallel, off-frame: bench dry-fit the Pi + PiSugar + clip assembly to
    de-risk that build independently — see
-   [`build/biboard-pi-connector.md`](build/biboard-pi-connector.md).)*
+   [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md).)*
 
 **Phase 1 — the Pi is now physically wired to the frame**
 4. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera
@@ -1775,7 +1775,7 @@ mechanically," not a guess.
 
 > **2026-09-15 — no flipping/rolling tricks, mounted-payload risk.** The Pi +
 > PiSugar stack (~61–78 g) rides on a printed standoff off the rear frame, not
-> the molded body shell (`docs/build/biboard-pi-connector.md`) — not
+> the molded body shell (`blueprints/biboard-pi-connector.md`) — not
 > impact-rated for a hard tumble, and the elevated mass shifts G2's moment of
 > inertia off what these tricks were tuned for on a bare unit. `flip`/`flipD`/
 > `flipF`/`bf`/`tbl`/`rl`(as a trick)/`bx`/`lucky` excluded from any

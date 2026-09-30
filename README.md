@@ -261,6 +261,7 @@ pi_pipeline/
   power/       # Pi power-management helpers (governor, Wi-Fi, peripherals)
 tools/      # Report generators and other standalone utilities
 docs/       # Project plan, run logs, research notes
+blueprints/ # Hardware build record + wiring diagrams
 ```
 
 ## Setup

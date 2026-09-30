@@ -45,15 +45,13 @@
 | [`petoi-skills-survey.md`](hardware/petoi-skills-survey.md) | Which OpenCat built-in skills are worth pulling into G2. |
 | [`calibration-and-bringup-research.md`](hardware/calibration-and-bringup-research.md) | Petoi's official calibration/first-power-on docs, cross-checked against our bring-up plan. |
 
-## `build/` — the physical assembly record
+## Hardware build blueprints
 
-Reproducible step-by-step documentation of the actual hardware build (wiring,
-soldering, mounting, calibration, real measurements) — separate from
-`hardware/`'s specs and pre-build research. See [`build/README.md`](build/README.md).
-
-| | |
-|---|---|
-| [`biboard-pi-connector.md`](build/biboard-pi-connector.md) | The single build reference for the Pi + PiSugar + BiBoard assembly: wiring steps 1-4 with annotated real board photos, the standoff clip mechanism investigation, the mm-accurate installation diagram, and the modified-clip STLs (`cad/`). One doc to build from, start to finish. |
+Moved out to [`/blueprints`](../blueprints/) at the repo root — the physical
+assembly record (wiring, soldering, mounting, calibration, real measurements)
+and the wiring diagrams now live there as their own top-level folder, not
+nested under `docs/`. Still separate from `hardware/`'s specs and pre-build
+research above. See [`blueprints/README.md`](../blueprints/README.md).
 
 No other entries yet; the rest starts once Bittle X and the camera arrive.
 

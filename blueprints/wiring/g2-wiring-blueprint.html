@@ -1,0 +1,328 @@
+<title>G2 Wiring Blueprint</title>
+<style>
+/* layout: topology overview up top, physical 40-pin header grid as the core reference, per-device pull tables below */
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --fg:#1b1f27; --muted:#667085; --border:#e3e6ec;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;
+
+  --biboard:#2563eb;      --biboard-bg:rgba(37,99,235,.10);
+  --audio:#7c3aed;        --audio-bg:rgba(124,58,237,.10);
+  --screen:#b45309;       --screen-bg:rgba(180,83,9,.08);
+  --pisugar:#0d9488;      --pisugar-bg:rgba(13,148,136,.10);
+  --reserved-bg:rgba(120,120,130,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12141a; --panel:#1b1e26; --fg:#e7e9ee; --muted:#97a0ad; --border:#2a2e38;
+    --biboard:#6aa8ff;   --biboard-bg:rgba(106,168,255,.14);
+    --audio:#b794f6;     --audio-bg:rgba(183,148,246,.14);
+    --screen:#f5b942;    --screen-bg:rgba(245,185,66,.12);
+    --pisugar:#3fd8c9;   --pisugar-bg:rgba(63,216,201,.14);
+    --reserved-bg:rgba(200,200,210,.08);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12141a; --panel:#1b1e26; --fg:#e7e9ee; --muted:#97a0ad; --border:#2a2e38;
+  --biboard:#6aa8ff;   --biboard-bg:rgba(106,168,255,.14);
+  --audio:#b794f6;     --audio-bg:rgba(183,148,246,.14);
+  --screen:#f5b942;    --screen-bg:rgba(245,185,66,.12);
+  --pisugar:#3fd8c9;   --pisugar-bg:rgba(63,216,201,.14);
+  --reserved-bg:rgba(200,200,210,.08);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);padding-inline:16px;padding-block:28px 60px;max-width:920px;margin:0 auto}
+h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em}
+.subtitle{color:var(--muted);font-size:.92rem;margin:0 0 28px;max-width:60ch}
+h2{font-size:1.05rem;margin:0 0 4px;letter-spacing:-.005em}
+.section-note{color:var(--muted);font-size:.85rem;margin:0 0 14px;max-width:68ch}
+section{margin-bottom:40px}
+
+/* --- legend chips, reused above both diagrams --- */
+.legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:14px 0 22px;font-size:.8rem}
+.legend-item{display:flex;align-items:center;gap:7px;color:var(--muted)}
+.swatch{width:12px;height:12px;border-radius:3px;flex:none}
+.swatch.dashed{background:none;border:1.6px dashed currentColor}
+.swatch.dotted{background:none;border:1.6px dotted currentColor}
+
+/* --- topology figure --- */
+figure{margin:0}
+figure svg{width:100%;height:auto;display:block}
+figcaption{color:var(--muted);font-size:.82rem;margin-top:10px;max-width:68ch}
+
+/* --- 40-pin header grid --- */
+.header-frame{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 16px;overflow-x:auto}
+.header-title-row{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;font:600 .68rem var(--sans);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 4px 8px;text-align:center}
+.pin-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;min-width:420px}
+.pin{border-radius:8px;padding:6px 9px;background:var(--reserved-bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:1px;min-height:40px;justify-content:center}
+.pin .row1{display:flex;align-items:baseline;gap:6px;font-family:var(--mono);font-size:.72rem}
+.pin .pnum{font-weight:700;color:var(--fg)}
+.pin .gpio{color:var(--muted)}
+.pin .label{font-size:.72rem;color:var(--fg);font-weight:500;line-height:1.15}
+.pin .label.muted{color:var(--muted);font-weight:400;font-style:italic}
+.pin.right{text-align:right}
+.pin.right .row1{flex-direction:row-reverse}
+.pin.right{align-items:flex-end}
+
+.pin--biboard{background:var(--biboard-bg);border-color:color-mix(in srgb, var(--biboard) 45%, var(--border))}
+.pin--audio{background:var(--audio-bg);border-color:color-mix(in srgb, var(--audio) 45%, var(--border))}
+.pin--audio-opt{background:var(--audio-bg);border:1px dashed color-mix(in srgb, var(--audio) 55%, var(--border))}
+.pin--screen{background:var(--screen-bg);border:1px dashed color-mix(in srgb, var(--screen) 55%, var(--border))}
+.pin--pisugar-extra::after{content:"";display:none}
+.pin--reserved{background:var(--reserved-bg);opacity:.6}
+.pin-tag{display:inline-block;font-size:.6rem;font-weight:700;letter-spacing:.03em;padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:middle}
+.tag-pisugar{background:var(--pisugar-bg);color:var(--pisugar)}
+
+/* --- device pull-tables --- */
+table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+caption{caption-side:top;text-align:left;font-weight:600;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.95rem}
+th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+td.mono, th.mono{font-family:var(--mono)}
+.badge{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.02em}
+.badge-mic{background:var(--audio-bg);color:var(--audio)}
+.badge-amp{background:var(--audio-bg);color:var(--audio)}
+.badge-both{background:var(--audio-bg);color:var(--audio);border:1px dashed var(--audio)}
+.badge-fanout{background:none;color:var(--audio);border:1px solid var(--audio)}
+.badge-either{background:none;color:var(--muted);border:1px solid var(--border)}
+.subrow td{color:var(--muted);font-size:.78rem;padding-top:0;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.table-wrap{overflow-x:auto}
+.tables-grid{display:grid;gap:22px}
+@media (min-width:720px){ .tables-grid.two-col{grid-template-columns:1fr 1fr} }
+.tables-grid.two-col > .table-wrap{min-width:0}
+
+/* --- callouts --- */
+.note{border:1px solid var(--border);background:var(--panel);border-radius:10px;padding:12px 16px;font-size:.85rem;color:var(--fg)}
+.note + .note{margin-top:10px}
+.note b{color:var(--fg)}
+.note .k{color:var(--muted)}
+
+footer{color:var(--muted);font-size:.78rem;margin-top:44px;border-top:1px solid var(--border);padding-top:16px}
+footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5px;border-radius:4px}
+</style>
+
+<h1>G2 Wiring Blueprint</h1>
+<p class="subtitle">Every jumper between the Pi Zero 2 W, BiBoard, PiSugar, the mic/amp pair, and the reserved screen slot — one page to check against before unplugging anything, and to rewire from after.</p>
+
+<section>
+  <h2>Overview</h2>
+  <p class="section-note">This is the real physical stack, not just a wiring hub: PiSugar mounts directly under the Pi today, and the planned screen goes one layer further out, under PiSugar. BiBoard and the mic/amp pair aren't part of that stack — they're jumpered off to the side, mounted elsewhere on the frame.</p>
+  <figure role="img" aria-label="Physical stack, top to bottom: the Pi Zero 2 W, then PiSugar mounted directly under it via pogo-pin contact as it is today, then the planned screen mounted under PiSugar, not yet built. The screen's wires have to run from the Pi's header down past PiSugar's footprint to reach it. BiBoard and the mic-plus-amp pair connect to the Pi's header separately, off to the side, by jumper wires.">
+    <svg viewBox="0 0 700 460" xmlns="http://www.w3.org/2000/svg">
+      <!-- BiBoard, left -->
+      <rect x="15" y="45" width="140" height="55" rx="10" fill="none" stroke="var(--biboard)" stroke-width="1.6"/>
+      <text x="85" y="68" text-anchor="middle" font-size="12" font-weight="700" fill="var(--biboard)">BiBoard</text>
+      <text x="85" y="83" text-anchor="middle" font-size="9.5" fill="var(--biboard)" opacity=".8">mounted on frame</text>
+      <line x1="155" y1="72" x2="280" y2="65" stroke="var(--biboard)" stroke-width="1.8"/>
+      <text x="205" y="55" text-anchor="middle" font-size="10" fill="var(--biboard)">3 wires</text>
+
+      <!-- Pi, top of stack -->
+      <rect x="280" y="30" width="180" height="65" rx="10" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <text x="370" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">Pi Zero 2 W</text>
+      <text x="370" y="75" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">40-pin header</text>
+
+      <!-- Audio, right -->
+      <rect x="545" y="45" width="140" height="55" rx="10" fill="none" stroke="var(--audio)" stroke-width="1.6"/>
+      <text x="615" y="68" text-anchor="middle" font-size="12" font-weight="700" fill="var(--audio)">Mic + Amp</text>
+      <text x="615" y="83" text-anchor="middle" font-size="9.5" fill="var(--audio)" opacity=".8">mounted on frame</text>
+      <line x1="545" y1="72" x2="460" y2="65" stroke="var(--audio)" stroke-width="1.8"/>
+      <text x="510" y="55" text-anchor="middle" font-size="10" fill="var(--audio)">7 wires</text>
+
+      <!-- Pi -> PiSugar: direct pogo contact, stays as-is -->
+      <line x1="370" y1="95" x2="370" y2="150" stroke="var(--pisugar)" stroke-width="1.8" stroke-dasharray="2 3"/>
+      <text x="440" y="126" text-anchor="middle" font-size="10" fill="var(--pisugar)">pogo contact — unchanged</text>
+
+      <!-- PiSugar, middle of stack -->
+      <rect x="280" y="150" width="180" height="60" rx="10" fill="none" stroke="var(--pisugar)" stroke-width="1.8" stroke-dasharray="2 3"/>
+      <text x="370" y="176" text-anchor="middle" font-size="13" font-weight="700" fill="var(--pisugar)">PiSugar S</text>
+      <text x="370" y="193" text-anchor="middle" font-size="10" fill="var(--pisugar)" opacity=".85">under the Pi, as today</text>
+
+      <!-- Vertical gap callout: new cap mod space -->
+      <rect x="300" y="222" width="140" height="86" rx="8" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1 4" opacity=".35"/>
+      <text x="370" y="252" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".55">printed cap adds</text>
+      <text x="370" y="265" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".55">clearance here —</text>
+      <text x="370" y="278" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".55">not yet built</text>
+
+      <!-- Screen, bottom of stack, under PiSugar -->
+      <rect x="280" y="318" width="180" height="60" rx="10" fill="none" stroke="var(--screen)" stroke-width="1.8" stroke-dasharray="4 3"/>
+      <text x="370" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="var(--screen)">Screen (TBD)</text>
+      <text x="370" y="361" text-anchor="middle" font-size="10" fill="var(--screen)" opacity=".85">under PiSugar — planned</text>
+
+      <!-- Wire routed from Pi header down past PiSugar to the screen -->
+      <polyline points="460,60 560,60 560,348 460,348" fill="none" stroke="var(--screen)" stroke-width="1.8" stroke-dasharray="4 3"/>
+      <text x="617" y="204" text-anchor="middle" font-size="10" fill="var(--screen)" transform="rotate(90 617 204)">8 wires, routed past PiSugar</text>
+    </svg>
+  </figure>
+  <figcaption>Dotted = PiSugar's pogo-pin contact, not a wire you can unplug from the top. Dashed = the screen's reserved pins and the cable run for them, planned but not built. Solid = jumper wires in place today. The screen sitting behind/under PiSugar means its 8 wires need enough slack to run from the header, around PiSugar's footprint, to wherever the cap ends up mounting it — plan that length once the cap is printed, not before.</figcaption>
+</section>
+
+<section>
+  <h2>Pi header, pin by pin</h2>
+  <p class="section-note">Laid out the way the physical board reads: pin 1 top-left, pin 2 top-right, running down to 39/40 at the far end. Match this against the header before you touch a wire.</p>
+
+  <div class="legend">
+    <span class="legend-item"><span class="swatch" style="background:var(--biboard-bg);border:1px solid var(--biboard)"></span>BiBoard</span>
+    <span class="legend-item"><span class="swatch" style="background:var(--audio-bg);border:1px solid var(--audio)"></span>Mic / Amp</span>
+    <span class="legend-item"><span class="swatch dashed" style="color:var(--audio)"></span>Mic / Amp — unconfirmed</span>
+    <span class="legend-item"><span class="swatch dashed" style="color:var(--screen)"></span>Screen — reserved</span>
+    <span class="legend-item"><span class="pin-tag tag-pisugar">PS</span>also touched by PiSugar (underside, inferred)</span>
+    <span class="legend-item"><span class="swatch" style="background:var(--reserved-bg);border:1px solid var(--border)"></span>free / reserved</span>
+  </div>
+
+  <div class="header-frame">
+    <div class="header-title-row"><div>Left column</div><div>Right column</div></div>
+    <div class="pin-grid">
+
+      <div class="pin pin--audio"><div class="row1"><span class="pnum">1</span><span class="gpio">3V3</span></div><div class="label">Mic VIN</div></div>
+      <div class="pin pin--audio right"><div class="row1"><span class="pnum">2</span><span class="gpio">5V</span></div><div class="label">Amp VIN <span class="pin-tag tag-pisugar">PS</span></div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">3</span><span class="gpio">GPIO2 · SDA</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--pisugar right" style="background:var(--pisugar-bg);border-color:color-mix(in srgb, var(--pisugar) 45%, var(--border))"><div class="row1"><span class="pnum">4</span><span class="gpio">5V</span></div><div class="label">PiSugar contact <span class="pin-tag tag-pisugar">PS</span></div></div>
+
+      <div class="pin pin--pisugar" style="background:var(--pisugar-bg);border-color:color-mix(in srgb, var(--pisugar) 45%, var(--border))"><div class="row1"><span class="pnum">5</span><span class="gpio">GPIO3 · SCL</span></div><div class="label">PiSugar auto-start tap</div></div>
+      <div class="pin pin--biboard right"><div class="row1"><span class="pnum">6</span><span class="gpio">GND</span></div><div class="label">BiBoard GND <span class="pin-tag tag-pisugar">PS</span></div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">7</span><span class="gpio">GPIO4</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--biboard right"><div class="row1"><span class="pnum">8</span><span class="gpio">GPIO14 · TXD</span></div><div class="label">BiBoard RX2</div></div>
+
+      <div class="pin pin--audio"><div class="row1"><span class="pnum">9</span><span class="gpio">GND</span></div><div class="label">Mic or Amp GND (either — any free GND works)</div></div>
+      <div class="pin pin--biboard right"><div class="row1"><span class="pnum">10</span><span class="gpio">GPIO15 · RXD</span></div><div class="label">BiBoard TX2</div></div>
+
+      <div class="pin pin--screen"><div class="row1"><span class="pnum">11</span><span class="gpio">GPIO17</span></div><div class="label">Screen RST (reserved)</div></div>
+      <div class="pin pin--audio right"><div class="row1"><span class="pnum">12</span><span class="gpio">GPIO18</span></div><div class="label">BCLK — hand-built 3-wire splice (see below)</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">13</span><span class="gpio">GPIO27</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">14</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">15</span><span class="gpio">GPIO22</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">16</span><span class="gpio">GPIO23</span></div><div class="label muted">free</div></div>
+
+      <div class="pin pin--screen"><div class="row1"><span class="pnum">17</span><span class="gpio">3V3</span></div><div class="label">Screen VCC (reserved)</div></div>
+      <div class="pin pin--screen right"><div class="row1"><span class="pnum">18</span><span class="gpio">GPIO24</span></div><div class="label">Screen backlight (reserved)</div></div>
+
+      <div class="pin pin--screen"><div class="row1"><span class="pnum">19</span><span class="gpio">GPIO10 · MOSI</span></div><div class="label">Screen DIN (reserved)</div></div>
+      <div class="pin pin--screen right"><div class="row1"><span class="pnum">20</span><span class="gpio">GND</span></div><div class="label">Screen GND (reserved)</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">21</span><span class="gpio">GPIO9 · MISO</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--screen right"><div class="row1"><span class="pnum">22</span><span class="gpio">GPIO25</span></div><div class="label">Screen DC (reserved)</div></div>
+
+      <div class="pin pin--screen"><div class="row1"><span class="pnum">23</span><span class="gpio">GPIO11 · SCLK</span></div><div class="label">Screen CLK (reserved)</div></div>
+      <div class="pin pin--screen right"><div class="row1"><span class="pnum">24</span><span class="gpio">GPIO8 · CE0</span></div><div class="label">Screen CS (reserved)</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">25</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">26</span><span class="gpio">GPIO7 · CE1</span></div><div class="label muted">free</div></div>
+
+      <div class="pin pin--reserved"><div class="row1"><span class="pnum">27</span><span class="gpio">ID_SD</span></div><div class="label muted">reserved — HAT EEPROM, don't use</div></div>
+      <div class="pin pin--reserved right"><div class="row1"><span class="pnum">28</span><span class="gpio">ID_SC</span></div><div class="label muted">reserved — HAT EEPROM, don't use</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">29</span><span class="gpio">GPIO5</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">30</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">31</span><span class="gpio">GPIO6</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">32</span><span class="gpio">GPIO12</span></div><div class="label muted">free</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">33</span><span class="gpio">GPIO13</span></div><div class="label muted">free</div></div>
+      <div class="pin right"><div class="row1"><span class="pnum">34</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+
+      <div class="pin pin--audio"><div class="row1"><span class="pnum">35</span><span class="gpio">GPIO19</span></div><div class="label">LRCLK — hand-built 3-wire splice (see below)</div></div>
+      <div class="pin pin--audio-opt right"><div class="row1"><span class="pnum">36</span><span class="gpio">GPIO16</span></div><div class="label">Amp CTRL? (board photos show no such pin — likely unneeded)</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">37</span><span class="gpio">GPIO26</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--audio right"><div class="row1"><span class="pnum">38</span><span class="gpio">GPIO20</span></div><div class="label">Mic DOUT</div></div>
+
+      <div class="pin"><div class="row1"><span class="pnum">39</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--audio right"><div class="row1"><span class="pnum">40</span><span class="gpio">GPIO21</span></div><div class="label">Amp DIN</div></div>
+
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Device-to-device lookup</h2>
+  <p class="section-note">The other end of each wire — what's silkscreened on the accessory board, matched to the Pi pin it runs to. This is the direction you'll actually read it in when re-wiring: board in hand, find the label, find the pin.</p>
+
+  <div class="tables-grid two-col">
+    <div class="table-wrap">
+      <table>
+        <caption style="color:var(--biboard)">BiBoard ↔ Pi <span style="font-weight:400;color:var(--muted);font-size:.78rem">— 3 wires, TX/RX crossed</span></caption>
+        <thead><tr><th>BiBoard pin</th><th>Pi pin</th><th class="mono">Signal</th></tr></thead>
+        <tbody>
+          <tr><td>TX2</td><td class="mono">10</td><td class="mono">GPIO15 · RXD</td></tr>
+          <tr><td>RX2</td><td class="mono">8</td><td class="mono">GPIO14 · TXD</td></tr>
+          <tr><td>GND</td><td class="mono">6</td><td class="mono">GND</td></tr>
+          <tr><td style="color:var(--muted)">+5V, +5V</td><td style="color:var(--muted)">— not wired —</td><td style="color:var(--muted)">PiSugar powers the Pi</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption style="color:var(--audio)">Mic + Amp ↔ Pi <span style="font-weight:400;color:var(--muted);font-size:.78rem">— I2S, BCLK/LRCLK shared</span></caption>
+        <thead><tr><th>Board pin</th><th>Pi pin</th><th class="mono">Signal</th></tr></thead>
+        <tbody>
+          <tr><td>Mic VIN <span class="badge badge-mic">MIC</span></td><td class="mono">1</td><td class="mono">3V3</td></tr>
+          <tr><td>Amp VIN <span class="badge badge-amp">AMP</span></td><td class="mono">2</td><td class="mono">5V</td></tr>
+          <tr><td>GND, GND <span class="badge badge-either">EITHER PIN</span></td><td class="mono">9 — or any two free GND pins</td><td class="mono">GND</td></tr>
+          <tr class="subrow"><td colspan="3">Each board grounds independently — all 8 of the Pi's GND pins are one net, so mic and amp don't need the same physical pin.</td></tr>
+          <tr><td>BCLK, BCLK <span class="badge badge-fanout">HAND-SPLICE</span></td><td class="mono">12</td><td class="mono">GPIO18</td></tr>
+          <tr class="subrow"><td colspan="3">Build a splitter from 3 stock jumper wires, spliced at one soldered joint away from either board: a female-to-female wire (its female end → Pi pin 12), a second female-to-female wire (its female end → mic's header pin), and a female-to-male wire (its male end → straight into the amp cable's BCLK wire, which is female). Strip the other end of all three, twist, solder, insulate. Cheaper and faster than sourcing a pre-made splitter, and the solder joint is sturdier under a walking robot's vibration anyway.</td></tr>
+          <tr><td>LRCLK, LRCLK <span class="badge badge-fanout">HAND-SPLICE</span></td><td class="mono">35</td><td class="mono">GPIO19</td></tr>
+          <tr class="subrow"><td colspan="3">Same technique, second splice, onto the amp cable's LRCLK wire.</td></tr>
+          <tr><td>Mic DOUT <span class="badge badge-mic">MIC</span></td><td class="mono">38</td><td class="mono">GPIO20</td></tr>
+          <tr><td>Amp DIN <span class="badge badge-amp">AMP</span></td><td class="mono">40</td><td class="mono">GPIO21</td></tr>
+          <tr><td style="color:var(--muted)">Amp CTRL <span class="badge badge-amp">AMP</span></td><td style="color:var(--muted)">36?</td><td class="mono" style="color:var(--muted)">GPIO16 — vendor docs mention a "CTRL" pin, but the board's own photos show no separate control pin on its connector; likely nothing to wire here</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption style="color:var(--screen)">Screen ↔ Pi <span style="font-weight:400;color:var(--muted);font-size:.78rem">— reserved, model not chosen</span></caption>
+        <thead><tr><th>Screen pin</th><th>Pi pin</th><th class="mono">Signal</th></tr></thead>
+        <tbody>
+          <tr><td>VCC</td><td class="mono">17</td><td class="mono">3V3</td></tr>
+          <tr><td>GND</td><td class="mono">20</td><td class="mono">GND</td></tr>
+          <tr><td>DIN / MOSI</td><td class="mono">19</td><td class="mono">GPIO10</td></tr>
+          <tr><td>CLK / SCLK</td><td class="mono">23</td><td class="mono">GPIO11</td></tr>
+          <tr><td>CS</td><td class="mono">24</td><td class="mono">GPIO8 · CE0</td></tr>
+          <tr><td>DC</td><td class="mono">22</td><td class="mono">GPIO25</td></tr>
+          <tr><td>RST</td><td class="mono">11</td><td class="mono">GPIO17</td></tr>
+          <tr><td>BL (backlight)</td><td class="mono">18</td><td class="mono">GPIO24</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption style="color:var(--pisugar)">PiSugar ↔ Pi <span style="font-weight:400;color:var(--muted);font-size:.78rem">— direct contact, not jumpers</span></caption>
+        <thead><tr><th>PiSugar pogo pin</th><th>Pi pin (inferred)</th></tr></thead>
+        <tbody>
+          <tr><td>5V</td><td class="mono">2</td></tr>
+          <tr><td>5V</td><td class="mono">4</td></tr>
+          <tr><td>SCL (auto-start)</td><td class="mono">5</td></tr>
+          <tr><td>GND</td><td class="mono">6</td></tr>
+          <tr><td>GND</td><td class="mono">6 or nearby</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Notes for future-you</h2>
+  <div class="note"><span class="k">"Fan-out" vs "either pin" —</span> two different things look similar in the table but aren't. <b>GND</b> is flexible: every GND pin on the Pi is the same electrical net, so mic and amp can each use a different free ground pin — nothing forces them onto pin 9 specifically. <b>BCLK/LRCLK are not flexible</b>: the Pi's I2S hardware only drives those clocks out of GPIO18/GPIO19 specifically, and both boards only ever listen — they never drive the line themselves. One driver with two listeners isn't a conflict, but it does mean both boards physically need to reach that exact pin.</div>
+  <div class="note"><span class="k">How the BCLK/LRCLK split is actually made —</span> hand-built from 3 stock jumper wires per signal, not a purchased splitter (a pre-made 1-pin female-to-2-female splitter exists and would have worked, but wasn't worth a 2-week/$10-shipping order for a 99-cent part) and not soldering directly onto the mic's tiny pads (which would've meant permanently sacrificing the rewireable point of this whole reference) and not stacking two connectors on one pin (mechanically marginal — a standard header pin is ~8-8.5mm exposed, two female socket housings need ~8-10mm combined to seat reliably). The actual build: take a female-to-female wire (keep its female end → Pi's pin), a second female-to-female wire (keep its female end → mic's header pin), and a female-to-male wire (keep its male end → straight into the amp cable's matching wire, which is female — confirmed from the amp's product photos, its cable is 5 separate individual wires, not one molded block). Strip the other end of all three, twist together, solder, insulate with heat-shrink or tape. One joint per signal, away from either board — electrically identical to a factory splitter, and the solder joint holds up to vibration better than a friction-fit one would have anyway.</div>
+  <div class="note"><span class="k">PiSugar mapping —</span> the 2/4/5/6 pin range is confirmed by PiSugar's own PCB legend and FAQ, but the exact pin-by-pin match isn't independently verified. If the Pi ever fails to power on after reseating PiSugar, orientation is the first thing to check — it bolts on in two 180° rotations and only one lands the pogo pins on the header.</div>
+  <div class="note"><span class="k">Pin 2 carries two things —</span> PiSugar feeds 5V in here, and the amp draws 5V from the same pin. That's normal — it's a shared power rail, not a conflict — but if you ever unplug the amp's VIN wire, don't read a live pin 2 as "amp still connected."</div>
+  <div class="note"><span class="k">Amp CTRL (pin 36), soft-resolved —</span> the vendor's docs (github.com/nulllaborg/i2s_audio_amplifier_module) mention a "CTRL pin for level setting," but the amp's own product photos show only the one 5-pin I2S connector — no separate control pin or pad visible anywhere on the board. Leaning toward nothing to wire here; the "smart software tuning" marketing claim likely lives inside the NS4168's own I2S-based logic. Not 100% certain without the datasheet, but non-blocking — the overlay works the same with pin 36 unwired either way.</div>
+  <div class="note"><span class="k">Mounting —</span> amp: confirmed M4 mounting holes, Lego-compatible, straight from its product photos — a real screw mount, better than adhesive. Mic: no equivalent confirmation yet; foam tape is the fallback if it turns out to have none.</div>
+  <div class="note"><span class="k">Screen section is a placeholder —</span> pins 11/17/18/19/20/22/23/24 are reserved so nothing else claims them, not because a screen is wired yet. Whatever SPI display you land on, `DIN/CLK/CS/DC/RST/BL` are all software-assignable — this is a suggested layout, not something imposed by the display itself.</div>
+</section>
+
+<footer>
+  Source of truth: <code>docs/build/biboard-pi-connector.md</code>. If that file and this page ever disagree, the file wins — update this page to match.
+</footer>

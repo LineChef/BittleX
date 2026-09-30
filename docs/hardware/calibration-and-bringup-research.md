@@ -5,7 +5,7 @@ bring-up plan (`pi_pipeline/bringup.py`, `docs/project-plan.md` "When the
 hardware arrives") against Petoi's official Bittle X V2 user manual and doc
 center, to catch gaps before the stand-only bring-up starts. Genuinely new
 findings only; anything already correctly captured elsewhere (e.g. BiBoard
-V1 vs V0 wiring, already right in `build/biboard-pi-connector.md`) isn't
+V1 vs V0 wiring, already right in `blueprints/biboard-pi-connector.md`) isn't
 repeated here.
 
 ## 1. "Ships calibrated" is optimistic — it's actually "coarse-tuned"
