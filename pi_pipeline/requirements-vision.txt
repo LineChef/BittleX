@@ -1,0 +1,5 @@
+# Optional: only for tools/camera_preview.py (live camera feed + capture).
+# The app itself does not need it -- detections arrive as JSON over serial.
+#
+#   pip install -r pi_pipeline/requirements-vision.txt
+Pillow>=10
