@@ -35,7 +35,7 @@ on the camera being physically mounted on the frame.
 ```bash
 python -m pi_pipeline.vision demo               # obstacle approaching dead ahead
 python -m pi_pipeline.vision demo --bearing 0.2 # ...from the left
-python -m pi_pipeline.vision serial /dev/ttyAMA1   # real feed (hardware)
+python -m pi_pipeline.vision serial /dev/ttyACM0   # real feed (hardware)
 ```
 
 The demo prints each frame's scene summary and the avoidance decision, showing

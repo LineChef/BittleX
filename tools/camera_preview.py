@@ -13,7 +13,7 @@ pre-labels.
     python tools/camera_preview.py --help
 
 Environment variables (all optional):
-    G2_CAM_PORT    serial device      (default: first /dev/cu.usbmodem*)
+    G2_CAM_PORT    serial device      (default: first /dev/cu.usbmodem* or /dev/ttyACM*)
     G2_CAP_OUT     where to save       (default: ~/Desktop/g2_face_capture)
     G2_CAP_LABEL   filename prefix     (default: self)  -> <label>_0001.jpg
     G2_CAM_RES     sensor option       0=240x240  1=480x480 (default)  2=640x480
@@ -40,7 +40,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import serial
 from PIL import Image, ImageDraw
 
-_ports = glob.glob("/dev/cu.usbmodem*")
+# macOS names the camera /dev/cu.usbmodem*; on the Pi it is /dev/ttyACM*.
+_ports = glob.glob("/dev/cu.usbmodem*") or sorted(glob.glob("/dev/ttyACM*"))
 PORT_SERIAL = os.environ.get("G2_CAM_PORT") or (_ports[0] if _ports else "/dev/cu.usbmodem58FA1045341")
 BAUD = 921600
 HTTP_PORT = 8080
@@ -323,9 +324,10 @@ def main():
     if "--info" in sys.argv:
         info_and_exit(); return
     if not _ports:
-        print("no /dev/cu.usbmodem* -- plug the camera in, or close the "
+        print("no /dev/cu.usbmodem* or /dev/ttyACM* -- plug the camera in, or close the "
               "SenseCraft/Chrome tab that owns the port.")
         return
+    os.makedirs(OUT, exist_ok=True)
     threading.Thread(target=serial_loop, daemon=True).start()
     threading.Thread(target=_idle_watchdog, daemon=True).start()
     print(f"preview -> http://localhost:{HTTP_PORT}   saving to {OUT}   "

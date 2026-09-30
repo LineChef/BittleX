@@ -2,7 +2,7 @@
 
     python -m pi_pipeline.vision demo            # an object approaching dead ahead
     python -m pi_pipeline.vision demo --bearing 0.2   # ...from the left
-    python -m pi_pipeline.vision serial /dev/ttyAMA1  # real feed (hardware)
+    python -m pi_pipeline.vision serial /dev/ttyACM0  # real feed (hardware)
     python -m pi_pipeline.vision eval /dev/cu.usbmodemXXX --label person --secs 30
         # timed measurement: detection rate / confidence / floor / flicker --
         # the numbers for the dataset-size threshold experiment. Re-run with
