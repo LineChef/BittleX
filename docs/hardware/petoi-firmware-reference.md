@@ -94,6 +94,15 @@ after (both "play sound" and an actual English command). If this recurs,
 this sequence is the first thing to try again before assuming a deeper
 fault.
 
+**Recurred 2026-09-29, as expected — the full erase/reflash wipes this
+too.** Same symptom, same fix, applied right after the reflash + servo
+recalibration: `XAc` → `XAb` (confirmed stuck: `Default language:
+Chinese`) → `XAa` (confirmed: `Default language: English`), then verified
+live by voice again ("play sound" + an actual command). Not a new
+incident — this module's state lives in the same EEPROM/NVS wiped by
+`esptool erase_flash`, so re-applying this sequence is now an expected
+step after any future full reflash, not a fault to re-diagnose.
+
 | token | name | meaning |
 |---|---|---|
 | `k<skill>` | `T_SKILL` | run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF` |

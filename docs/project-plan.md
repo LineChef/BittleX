@@ -572,8 +572,11 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
       step targets frame-relative leg angle, not floor contact — front feet
       sitting slightly off the ground during that step is expected
       geometry, not miscalibration) in `docs/build/calibration.md`.
-      Still pending: re-applying the voice module's English-default fix
-      (`XAc`/`XAb`/`XAa`), also EEPROM-wiped by the erase.
+      Voice module's English-default fix (`XAc`/`XAb`/`XAa`, also
+      EEPROM-wiped by the erase) reapplied same day — confirmed recurred
+      (stuck on Chinese again, same as the pre-reflash incident) and fixed
+      the same way; verified live via voice ("play sound" + an actual
+      English command).
       Prior finding (2026-09-28, pre-reflash): the stock `vtF` ("step") gait stumbles
       toward the back-right leg, 100% reproducible every run; every other
       tested command (postures, other gaits) looked normal. Ruled out so
