@@ -100,8 +100,8 @@ class SensorHub:
             frame = self._feed_source() or []
         except Exception:  # noqa: BLE001
             return False
-        want = self.cfg.person_labels
-        return any(getattr(d, "label", "") in want
+        want = {w.lower() for w in self.cfg.person_labels}
+        return any(getattr(d, "label", "").lower() in want
                    and getattr(d, "confidence", 0.0) >= self.cfg.person_min_conf
                    for d in frame)
 

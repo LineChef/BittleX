@@ -241,3 +241,30 @@ def test_background_frame_source_reports_reader_death():
     src = BackgroundFrameSource(_Broken()).start()
     src._thread.join(timeout=2.0)
     assert src() == [] and "unplugged" in src.failed
+
+
+def test_sensor_hub_person_present_is_case_insensitive_and_roster_aware():
+    named = Detection("Alex", 0.9, 0.1, 0.1, 0.3, 0.3)
+    dog = Detection("dog", 0.9, 0.1, 0.1, 0.3, 0.3)
+    cfg = SensorConfig(person_labels=("person", "face", "alex"))
+    assert SensorHub(feed_source=lambda: [named], cfg=cfg).sample()["person_present"]
+    assert not SensorHub(feed_source=lambda: [dog], cfg=cfg).sample()["person_present"]
+    assert not SensorHub(feed_source=lambda: [named]).sample()["person_present"]   # default labels only
+
+
+def test_build_runtime_counts_bonded_people_but_not_pets(monkeypatch):
+    from pi_pipeline.app import __main__ as app_main
+    from pi_pipeline.personality.bonds import Bond, Bonds
+
+    monkeypatch.setattr(app_main.Bonds, "from_settings",
+                        staticmethod(lambda s: Bonds([Bond("alex", kind="person"),
+                                                      Bond("rex", kind="pet")])))
+    seen = {}
+    real = app_main.SensorHub
+
+    def spy(*a, **k):
+        seen["cfg"] = k["cfg"]
+        return real(*a, **k)
+    monkeypatch.setattr(app_main, "SensorHub", spy)
+    app_main._build_runtime(None, hz=0)
+    assert "alex" in seen["cfg"].person_labels and "rex" not in seen["cfg"].person_labels

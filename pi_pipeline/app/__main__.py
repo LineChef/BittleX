@@ -27,7 +27,7 @@ from ..behavior import BehaviorDriver, BehaviorRuntime
 from ..config import settings
 from ..features import features, log_summary
 from ..personality import Bonds, Personality
-from .sensors import SensorHub
+from .sensors import SensorConfig, SensorHub
 from .sinks import LockedLink, build_bindings
 
 log = logging.getLogger("g2.app")
@@ -96,7 +96,12 @@ def _build_runtime(link, *, hz: float, memory=None, frame_source=None):
                             chirps=features.sound_cues,
                             object_gallery_enabled=features.object_gallery)
     bindings = build_bindings(link, dry_run_power=link is None)
-    hub = SensorHub(link, feed_source=frame_source)
+    # a bonded *person* is a person even though the model's class for them is a
+    # name, not "person"/"face"; pets in the roster must not count
+    person_labels = SensorConfig().person_labels + tuple(
+        b.label for b in bonds if b.kind == "person")
+    hub = SensorHub(link, feed_source=frame_source,
+                    cfg=SensorConfig(person_labels=person_labels))
     if link is not None:
         hub.start_stream()   # nothing else turns the IMU print on in app mode
     # B11 place memory: "the dog is often to the left" -> a durable fact
