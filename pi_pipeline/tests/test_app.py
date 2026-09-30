@@ -197,3 +197,47 @@ def test_build_voice_shares_the_serial_link_when_given_one():
     assert isinstance(loop._act, SerialActuator)
     assert loop._act._link is lk
     assert not loop._act._owns_link
+
+
+# ------------------------------- vision feed + CliffGuard wiring (2026-09-30)
+def test_background_frame_source_returns_latest_and_goes_stale():
+    from pi_pipeline.vision.feed import BackgroundFrameSource
+
+    class _Feed:
+        def __init__(self):
+            self.closed = False
+
+        def frames(self):
+            yield [Detection("face", 0.9, 0.1, 0.1, 0.2, 0.2)]
+            yield [Detection("dog", 0.8, 0.3, 0.3, 0.2, 0.2)]
+
+        def close(self):
+            self.closed = True
+
+    t = [0.0]
+    feed = _Feed()
+    src = BackgroundFrameSource(feed, max_age_s=1.0, clock=lambda: t[0])
+    assert src() == []                              # nothing read yet
+    src.start()
+    src._thread.join(timeout=2.0)
+    assert [d.label for d in src()] == ["dog"]      # newest frame wins
+    t[0] = 5.0
+    assert src() == []                              # stale -> "nothing seen"
+    src.close()
+    assert feed.closed
+
+
+def test_background_frame_source_reports_reader_death():
+    from pi_pipeline.vision.feed import BackgroundFrameSource
+
+    class _Broken:
+        def frames(self):
+            raise OSError("camera unplugged")
+            yield []
+
+        def close(self):
+            pass
+
+    src = BackgroundFrameSource(_Broken()).start()
+    src._thread.join(timeout=2.0)
+    assert src() == [] and "unplugged" in src.failed

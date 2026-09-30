@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Protocol
@@ -214,3 +215,55 @@ class SerialDetectionFeed:
             self._ser.close()
         except Exception:  # noqa: BLE001
             pass
+
+
+class BackgroundFrameSource:
+    """Non-blocking "latest frame" view of a `DetectionFeed`.
+
+    `SerialDetectionFeed.frames()` blocks in `readline()` (up to 1 s per call),
+    which would stall a fixed-rate behaviour loop that asks for a frame every
+    tick. This reads the feed on a daemon thread and keeps only the newest
+    frame; calling the instance returns it instantly.
+
+    A frame older than `max_age_s` is reported as `[]` ("nothing seen"), so a
+    dead or unplugged camera degrades to no detections rather than a frozen
+    last-seen scene. `failed` is set if the reader thread dies.
+    """
+
+    def __init__(self, feed, *, max_age_s: float = 1.0, clock=time.monotonic):
+        self._feed = feed
+        self._max_age_s = max_age_s
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._frame: Frame = []
+        self._at: float | None = None
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self.failed: str | None = None
+
+    def start(self) -> "BackgroundFrameSource":
+        self._thread = threading.Thread(target=self._run, name="vision-feed", daemon=True)
+        self._thread.start()
+        return self
+
+    def _run(self) -> None:
+        try:
+            for frame in self._feed.frames():
+                if self._stop.is_set():
+                    return
+                with self._lock:
+                    self._frame, self._at = frame, self._clock()
+        except Exception as e:  # noqa: BLE001 -- a reader death must not kill the app
+            if not self._stop.is_set():
+                self.failed = repr(e)
+                log.error("vision feed reader died: %r", e)
+
+    def __call__(self) -> Frame:
+        with self._lock:
+            if self._at is None or self._clock() - self._at > self._max_age_s:
+                return []
+            return list(self._frame)
+
+    def close(self) -> None:
+        self._stop.set()
+        self._feed.close()

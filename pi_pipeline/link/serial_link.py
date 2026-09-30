@@ -17,6 +17,7 @@ log = logging.getLogger("g2.link")
 # `print6Axis()`). Kept identical to gait/imu_parse.py's prefixes -- a test
 # asserts they match.
 IMU_PREFIXES = ("MCU:", "ICM:")
+_IMU_PREFIXES_B = tuple(p.encode() for p in IMU_PREFIXES)
 
 
 def is_imu_line(line: str) -> bool:
@@ -194,11 +195,35 @@ class SerialLink:
             if line:
                 return line
 
+    def _pop_record(self) -> bytes | None:
+        """One complete record off the receive buffer, or None if incomplete.
+
+        Records end at a newline -- except IMU frames: over UART2 (the Pi's
+        link) the BiBoard terminates each `MCU:`/`ICM:` frame with a TAB, not a
+        newline (measured 2026-09-30), so a newline-only split glues every frame
+        since the last reply into one giant "line". Over USB they end in a
+        newline and this changes nothing. Non-IMU replies can legitimately
+        contain tabs (e.g. the `X?` module table), so only IMU frames split on
+        them."""
+        nl = self._rx.find(b"\n")
+        if self._rx.lstrip().startswith(_IMU_PREFIXES_B):
+            tab = self._rx.find(b"\t")
+            if tab != -1 and (nl == -1 or tab < nl):
+                raw, self._rx = self._rx[:tab], self._rx[tab + 1:]
+                return raw
+        if nl == -1:
+            return None
+        raw, self._rx = self._rx[:nl], self._rx[nl + 1:]
+        return raw
+
     def _next_line(self, block_until: float | None) -> str | None:
         """Next complete line with IMU frames routed to the IMU buffer (returned
         as ''), or None if no complete line is available -- immediately when
         `block_until` is None, else once that monotonic deadline passes."""
-        while b"\n" not in self._rx:
+        while True:
+            raw = self._pop_record()
+            if raw is not None:
+                break
             waiting = self._ser.in_waiting
             if waiting:
                 self._rx += self._ser.read(waiting)
@@ -208,7 +233,6 @@ class SerialLink:
             chunk = self._ser.read(1)          # blocks up to the 20 ms port timeout
             if chunk:
                 self._rx += chunk
-        raw, self._rx = self._rx.split(b"\n", 1)
         line = raw.decode("utf-8", "replace").strip()
         if is_imu_line(line):
             self._imu.append(line)

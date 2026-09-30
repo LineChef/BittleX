@@ -108,3 +108,22 @@ def test_read_line_times_out_on_its_own_deadline():
     t0 = time.monotonic()
     assert lk.read_line() == ""
     assert time.monotonic() - t0 < 0.2
+
+
+# Over the Pi's UART2 link the BiBoard ends IMU frames with a TAB, not a newline
+# (real capture 2026-09-30); only the trailing `gP` echo carries "\r\n".
+ICM_TAB = b"ICM:  0.20  0.17 10.4717640.5    1.1    0.9\t"
+
+
+def test_poll_imu_splits_tab_terminated_frames():
+    lk = _link_with(ICM_TAB * 3 + b"g\r\n" + ICM_TAB + b"ICM:  0.2")
+    assert lk.poll_imu() == [ICM_TAB.decode().strip()] * 4     # 4 whole frames, 1 partial kept
+    assert lk.read_line() == ""                               # the `g` echo is not a reply
+    lk._ser.buf += b"0  0.17 10.4717640.5    1.1    0.9\t"
+    assert len(lk.poll_imu()) == 1                             # the partial frame completes
+
+
+def test_tab_inside_a_non_imu_reply_is_not_split():
+    lk = _link_with(b"S,\tA,\tT,\t\r\n1,\t1,\t0,\t\r\n")
+    assert lk.read_line() == "S,\tA,\tT,"
+    assert lk.read_line() == "1,\t1,\t0,"

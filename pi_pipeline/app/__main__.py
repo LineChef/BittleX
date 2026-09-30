@@ -68,7 +68,27 @@ def _make_memory():
     return Memory(settings)
 
 
-def _build_runtime(link, *, hz: float, memory=None):
+def _make_vision_source():
+    """Start the camera's detection feed on a background thread, or None.
+
+    Only on real hardware with `features.vision` on; a missing/unplugged camera
+    degrades to "no vision" rather than stopping the app.
+    """
+    from ..vision.feed import BackgroundFrameSource, SerialDetectionFeed
+    try:
+        feed = SerialDetectionFeed(
+            settings.vision_serial_port, settings.vision_serial_baud,
+            frame_px=settings.vision_frame_px, labels=settings.vision_labels,
+            min_score=settings.vision_min_score,
+            sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump)
+    except Exception:  # noqa: BLE001
+        log.exception("vision feed unavailable on %s -- continuing without vision",
+                      settings.vision_serial_port)
+        return None
+    return BackgroundFrameSource(feed).start()
+
+
+def _build_runtime(link, *, hz: float, memory=None, frame_source=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
     driver = BehaviorDriver(personality.behavior_params(),
@@ -76,7 +96,7 @@ def _build_runtime(link, *, hz: float, memory=None):
                             chirps=features.sound_cues,
                             object_gallery_enabled=features.object_gallery)
     bindings = build_bindings(link, dry_run_power=link is None)
-    hub = SensorHub(link)
+    hub = SensorHub(link, feed_source=frame_source)
     if link is not None:
         hub.start_stream()   # nothing else turns the IMU print on in app mode
     # B11 place memory: "the dog is often to the left" -> a durable fact
@@ -84,6 +104,7 @@ def _build_runtime(link, *, hz: float, memory=None):
     rt = BehaviorRuntime(
         driver, bindings,
         sensors=hub.sample,
+        frame_source=frame_source,
         roster=lambda: frozenset(b.label for b in bonds),
         on_observation=on_obs,
         hz=hz,
@@ -174,7 +195,10 @@ def main() -> None:
     memory = _make_memory()
     link = _make_link(args.serial, trace_path=args.trace)
     voice_link = None if args.bench else link   # --bench: voice actuator stays mock too
-    rt = None if args.no_behavior else _build_runtime(link, hz=args.hz, memory=memory)
+    vision = _make_vision_source() if (link is not None and features.vision
+                                       and not args.no_behavior) else None
+    rt = None if args.no_behavior else _build_runtime(
+        link, hz=args.hz, memory=memory, frame_source=vision)
     on_event = rt.post if rt is not None else None
     voice = None if args.no_voice else _build_voice(on_event, memory=memory, link=voice_link)
 
@@ -217,6 +241,8 @@ def main() -> None:
             rt_thread.join(timeout=2.0)
         if memory is not None:
             memory.close()
+        if vision is not None:
+            vision.close()
         if link is not None:
             if rt is not None:
                 link.send("gp", read_reply=False, settle=0.0)   # IMU print off

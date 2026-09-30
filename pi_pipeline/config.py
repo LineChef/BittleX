@@ -147,7 +147,7 @@ class Settings:
     serial_baud: int = field(default_factory=lambda: _env_int("G2_SERIAL_BAUD", 115200))
 
     # --- Vision (Phase 8; used on hardware) ---
-    vision_serial_port: str = field(default_factory=lambda: _env("VISION_SERIAL_PORT", "/dev/ttyAMA1"))
+    vision_serial_port: str = field(default_factory=lambda: _env("VISION_SERIAL_PORT", "/dev/ttyACM0"))
     vision_serial_baud: int = field(default_factory=lambda: _env_int("VISION_SERIAL_BAUD", 921600))
     vision_frame_px: int = field(default_factory=lambda: _env_int("VISION_FRAME_PX", 240))
     # sensor capture option: 0=240x240, 1=480x480, 2=640x480. 1 gives a cleaner
