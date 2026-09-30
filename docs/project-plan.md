@@ -650,8 +650,9 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [ ] Disable Wi-Fi power-save (`sudo iw wlan0 set power_save off`) proactively —
       the `brcmfmac` power-save bug drops SSH under CPU load and is a nightmare to
       diagnose later.
-- [ ] On the BiBoard: serial command `XS` (or edit `OpenCat.h` and reflash) to
-      enable Serial-2 working mode.
+- [x] On the BiBoard: serial command `XS` to enable Serial-2 working mode —
+      **done 2026-09-30** (over USB; `X?` shows the module table `S=1`, persisted
+      across resets; a reflash wipes it, so redo `XS` after any reflash).
 - [ ] Serial device: likely `/dev/ttyS0` on the Pi Zero 2 W (Pi-3-family SoC);
       confirm once wired.
 - [ ] Use `ardSerial.py` from the OpenCat repo as the reference serial commander.
@@ -844,8 +845,10 @@ Pi Zero 2 W voice-stack benchmark.
     holes if present, else foam tape — not plain velcro, given repeated
     footfall vibration on a walking robot) still open, pending the parts
     physically arriving.
-- [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard, confirm
-      the skill commands land.
+- [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard —
+      **Pi↔BiBoard link confirmed 2026-09-30** (chirp from the Pi beeps G2, ping
+      returns the banner, IMU 5.0 Hz over the Pi's UART). Still to do: confirm
+      skill commands land, then the full app run.
 - [ ] Confirm this runs independently of the 35+ built-in voice commands (they're
       a separate firmware path; these commands go over serial).
 - [ ] A buzzer-pattern / posture implementation of the state cue.

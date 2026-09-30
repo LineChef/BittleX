@@ -410,3 +410,23 @@ hand-tuned "high-step" `PAW_Z_TARGET` — it's a real firmware trajectory with t
 largest limb-coordination difference from wkF, so it's the clearest yes/no on
 "can a frozen base + adapter acquire a new skill." `tr` (trot) is the natural
 second skill for the 2-skill control run. See `docs/rl/adapter-skill-probe-spec.md`.
+
+
+## Pi UART (Serial-2) link — bring-up findings, 2026-09-30
+
+- The BiBoard ignores the Pi's UART until the Serial module is enabled: send
+  `XS` once over USB. `X?` prints the module table (`S,A,T,L,D,I,B,U,G,C,Q` and a
+  `0/1` row); `S=1` means Serial-2 is on. It is persisted, so a reflash/erase
+  wipes it -- redo `XS` (same class of post-reflash step as the voice-module fix).
+  `XS` itself only echoes `X`; don't read silence as failure, check with `X?`.
+- Serial-2 is `Serial2.begin(115200, SERIAL_8N1, UART_RX2=9, UART_TX2=10)` on
+  BiBoard V1; when active it takes priority over USB for reading commands.
+- Fastest link test, no motion: send `b16 10 12 12` from the Pi -- G2 chirps and
+  the reply `b` comes back on the Pi's RX.
+- **Framing differs from USB.** Over the Pi's UART the IMU stream's frames
+  (`ICM: ...`) are terminated by a TAB, not a newline; only the `gP` echo line
+  carries `\r\n`. `SerialLink._pop_record` splits IMU frames on tabs (non-IMU
+  replies such as the `X?` table contain tabs and are left alone).
+- Measured over the Pi's UART with the camera plugged into the Pi's USB: IMU
+  exactly 5.0 Hz, so the camera on the Pi does not disturb the IMU (the
+  camera-kills-IMU bug needs the BiBoard's own `XC` camera module).
