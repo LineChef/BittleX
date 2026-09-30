@@ -44,6 +44,7 @@ class SensorConfig:
     imu_format: str = "auto"
     person_labels: tuple = ("person", "face")  # detection labels that count as a person
     person_min_conf: float = 0.35
+    person_hold_s: float = 1.5       # keep person_present true this long after the last sighting (the detector flickers near its cutoff)
     stale_after_s: float = 1.5       # no IMU frame for this long -> assume level/stable
 
 
@@ -58,6 +59,7 @@ class SensorHub:
         self._level = True
         self._stable = True
         self._unlevel_since: float | None = None
+        self._person_seen_at: float | None = None
 
     # --- IMU --------------------------------------------------------------
     def start_stream(self) -> None:
@@ -96,14 +98,18 @@ class SensorHub:
 
     # --- vision ---------------------------------------------------------
     def _person_present(self) -> bool:
+        now = self._clock()
         try:
             frame = self._feed_source() or []
         except Exception:  # noqa: BLE001
-            return False
+            frame = []
         want = {w.lower() for w in self.cfg.person_labels}
-        return any(getattr(d, "label", "").lower() in want
-                   and getattr(d, "confidence", 0.0) >= self.cfg.person_min_conf
-                   for d in frame)
+        if any(getattr(d, "label", "").lower() in want
+               and getattr(d, "confidence", 0.0) >= self.cfg.person_min_conf
+               for d in frame):
+            self._person_seen_at = now
+        return (self._person_seen_at is not None
+                and now - self._person_seen_at <= self.cfg.person_hold_s)
 
     # --- the one call BehaviorRuntime makes ---------------------------------
     def sample(self) -> dict:

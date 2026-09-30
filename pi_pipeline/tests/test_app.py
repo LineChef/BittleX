@@ -268,3 +268,26 @@ def test_build_runtime_counts_bonded_people_but_not_pets(monkeypatch):
     monkeypatch.setattr(app_main, "SensorHub", spy)
     app_main._build_runtime(None, hz=0)
     assert "alex" in seen["cfg"].person_labels and "rex" not in seen["cfg"].person_labels
+
+
+def test_person_present_is_held_briefly_after_the_last_sighting():
+    t = [0.0]
+    frames = [[Detection("person", 0.9, 0.1, 0.1, 0.3, 0.3)]]
+    hub = SensorHub(feed_source=lambda: frames[0], clock=lambda: t[0],
+                    cfg=SensorConfig(person_hold_s=1.5))
+    assert hub.sample()["person_present"]
+    frames[0] = []                                   # detector flickers out
+    t[0] = 1.0
+    assert hub.sample()["person_present"]            # still held
+    t[0] = 2.0
+    assert not hub.sample()["person_present"]        # hold expired
+
+
+def test_attentive_follow_matches_named_person_class_case_insensitively():
+    from pi_pipeline.behavior.attentive import AttentiveConfig, AttentiveLook
+    from pi_pipeline.behavior.novelty import Novelty
+
+    a = AttentiveLook(Novelty(), AttentiveConfig(person_labels=("person", "alex")))
+    frame = [Detection("Alex", 0.9, 0.6, 0.3, 0.3, 0.3)]
+    assert a._nearest_person(frame) is frame[0]
+    assert a._nearest_person([Detection("dog", 0.9, 0.6, 0.3, 0.3, 0.3)]) is None

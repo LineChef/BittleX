@@ -76,11 +76,14 @@ class AttentiveLook:
     def _bearing(self, det) -> float:
         return (det.center_x - 0.5) * 2.0 * self.cfg.fov_half_rad
 
+    def _is_person(self, label: str) -> bool:
+        return (label or "").lower() in {p.lower() for p in self.cfg.person_labels}
+
     def _nearest_person(self, frame):
         # largest confident person/face detection in frame
         best, best_area = None, 0.0
         for d in frame:
-            if getattr(d, "label", "") not in self.cfg.person_labels:
+            if not self._is_person(getattr(d, "label", "")):
                 continue
             if d.confidence < self.cfg.min_conf or d.area < self.cfg.min_area:
                 continue
@@ -93,7 +96,7 @@ class AttentiveLook:
         best, best_area = None, 0.0
         for d in frame:
             lab = getattr(d, "label", "")
-            if not lab or lab in self.cfg.person_labels:
+            if not lab or self._is_person(lab):
                 continue
             if d.confidence < self.cfg.min_conf or d.area < self.cfg.min_area:
                 continue

@@ -24,6 +24,7 @@ import tempfile
 import threading
 
 from ..behavior import BehaviorDriver, BehaviorRuntime
+from ..behavior.attentive import AttentiveConfig
 from ..config import settings
 from ..features import features, log_summary
 from ..personality import Bonds, Personality
@@ -91,15 +92,16 @@ def _make_vision_source():
 def _build_runtime(link, *, hz: float, memory=None, frame_source=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
-    driver = BehaviorDriver(personality.behavior_params(),
-                            vision_available=features.vision,
-                            chirps=features.sound_cues,
-                            object_gallery_enabled=features.object_gallery)
-    bindings = build_bindings(link, dry_run_power=link is None)
     # a bonded *person* is a person even though the model's class for them is a
     # name, not "person"/"face"; pets in the roster must not count
     person_labels = SensorConfig().person_labels + tuple(
         b.label for b in bonds if b.kind == "person")
+    driver = BehaviorDriver(personality.behavior_params(),
+                            attentive_cfg=AttentiveConfig(person_labels=person_labels),
+                            vision_available=features.vision,
+                            chirps=features.sound_cues,
+                            object_gallery_enabled=features.object_gallery)
+    bindings = build_bindings(link, dry_run_power=link is None)
     hub = SensorHub(link, feed_source=frame_source,
                     cfg=SensorConfig(person_labels=person_labels))
     if link is not None:
