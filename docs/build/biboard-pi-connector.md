@@ -851,10 +851,58 @@ existing wiring above:**
 | Mic `DOUT` | 38 (GPIO20) | mic only, audio data mic → Pi |
 | Amp `DIN` | 40 (GPIO21) | amp only, audio data Pi → amp |
 
+### Software config — the exact overlay, confirmed, not a research task for later
+
 Running both directions (playback + capture) at once on the Pi's one I2S
-bus needs a "duplex" audio device-tree overlay in `/boot/firmware/
-config.txt` — a well-documented DIY-assistant pattern, just a real extra
-software step beyond the wiring itself, not yet done.
+bus needs a duplex-capable overlay. **This exact pairing already has one,
+built into stock Raspberry Pi OS — no custom device tree work needed.**
+`googlevoicehat-soundcard` was written for Google's AIY Voice HAT, which
+is the same MAX98357-family-amp + I2S-mic combination as what's ordered
+here, and its **pin assignments are an exact match for the table above**
+(BCLK GPIO18/pin12, LRCLK GPIO19/pin35, mic `DOUT` GPIO20/pin38, amp `DIN`
+GPIO21/pin40) — confirmed against the overlay's own source
+(`googlevoicehat-soundcard-overlay.dts`, `raspberrypi/linux`), not
+inferred. Confirmed still shipping and working on Raspberry Pi OS
+**Bookworm** (this project's target OS, `docs/guides/pi-bring-up.md`).
+
+Add to `/boot/firmware/config.txt`:
+```
+dtparam=i2s=on
+dtoverlay=googlevoicehat-soundcard
+```
+**Don't also add `dtoverlay=max98357a`** — stacking multiple I2S overlays
+is a documented footgun (only the last one in the file actually loads).
+`googlevoicehat-soundcard` alone covers both the amp and the mic.
+
+One pin the overlay optionally uses that isn't in the table above: **GPIO16
+(physical pin 36) as an amp-mute/shutdown control line**, matching the
+`SD` pin some MAX98357-family boards break out. Not yet confirmed whether
+the NS4168 kit's specific board exposes this pin at all (its "distortion
+prevention"/high-pass-filter feature, mentioned in its listing, may use a
+different single-wire control scheme than a plain MAX98357's `SD` pin) —
+**check the physical board's silkscreen/datasheet once it arrives**; if
+there's no such pin, the amp just runs unmuted by default and the overlay
+works the same without it.
+
+**Verify each step before moving to the next, don't wire everything then
+debug all at once:**
+1. After adding the two lines and rebooting: `aplay -l` and `arecord -l`
+   should both list a card (playback and capture respectively) — this
+   confirms the overlay loaded and the kernel sees the hardware, before
+   testing actual sound.
+2. `speaker-test -t wav -c 2` (or `aplay` a known WAV file) to confirm the
+   amp+speaker actually produces sound.
+3. `arecord -D plughw:0,0 -f cd -d 5 test.wav` then play it back to
+   confirm the mic captures real audio, not silence/noise.
+4. **Only then** point `pi_pipeline` at it. Its code
+   (`voice/stt.py`/`voice/tts.py`) uses `sounddevice`'s *default* device,
+   not an explicit device name — with the Pi Zero having no other audio
+   hardware, this new I2S card should become the sole/default ALSA device
+   automatically once the overlay loads, needing no extra config. If
+   `python -m pi_pipeline.voice --mode voice` doesn't find it, check
+   `python -c "import sounddevice as sd; print(sd.query_devices())"`
+   first to confirm what the OS considers default before assuming
+   `pi_pipeline` itself has a bug.
 
 **Mounting: doesn't need to fit inside the Pi cover.** Initially flagged
 as a concern given the cover's cavity is already over budget (PiSugar's

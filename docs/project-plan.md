@@ -833,11 +833,17 @@ Pi Zero 2 W voice-stack benchmark.
     (amp + matched speaker, MAX98357A-compatible)
   - Mic: [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62)
   - Full pinout (confirmed no conflicts with BiBoard's existing 6/8/10, and
-    the mic's 3.3V-only power requirement) in
-    `docs/build/biboard-pi-connector.md`. Mounting location and method
-    (zip-tie through mounting holes if present, else foam tape — not plain
-    velcro, given repeated footfall vibration on a walking robot) still
-    open, pending the parts physically arriving.
+    the mic's 3.3V-only power requirement) **and the exact software config
+    to run both directions at once** — `dtoverlay=googlevoicehat-soundcard`
+    (a stock Bookworm overlay whose pin assignments are an exact match for
+    this wiring, confirmed against its own device-tree source, not
+    inferred) plus a verify-each-step checklist before wiring
+    `pi_pipeline` to it — fully spec'd in
+    `docs/build/biboard-pi-connector.md`, nothing left to research at
+    install time. Mounting location and method (zip-tie through mounting
+    holes if present, else foam tape — not plain velcro, given repeated
+    footfall vibration on a walking robot) still open, pending the parts
+    physically arriving.
 - [ ] `SerialActuator` end-to-end: `XS` "Serial-2" mode on the BiBoard, confirm
       the skill commands land.
 - [ ] Confirm this runs independently of the 35+ built-in voice commands (they're
