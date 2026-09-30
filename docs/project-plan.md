@@ -560,15 +560,20 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [x] **Assemble Bittle X V2 — done 2026-09-28.** Pi+PiSugar wiring/bring-up
       (Steps 2-4, `docs/build/biboard-pi-connector.md`) and the mount
       redesign (Step 5) are now unblocked — BiBoard exists.
-- [ ] **Check servo calibration — RESET 2026-09-29, needs redoing.** The
-      2026-09-28 zero-point calibration below was wiped by the same-night
+- [x] **Check servo calibration — redone for real, 2026-09-29, post-reflash.**
+      The 2026-09-28 zero-point calibration below was wiped by the same-night
       firmware reflash (`esptool erase_flash`, required to fix the
       camera-kills-IMU bug — see `docs/hardware/petoi-firmware-reference.md`).
-      Nothing meaningful was lost
-      (it was a minimal power-on-on-its-side calibration, no full ROM pass),
-      but a real calibration pass is now pending, along with re-applying the
-      voice module's English-default fix (`XAc`/`XAb`/`XAa`, also EEPROM-
-      wiped by the erase).
+      Nothing meaningful was lost (it was a minimal power-on-on-its-side
+      calibration, no full ROM pass). Redone properly this time via the
+      Petoi Desktop App's Joint Calibrator + the L-shaped bracket, one leg
+      at a time; verified with `kbalance` (all four feet level both times
+      it was sent). Full procedure + a finding worth knowing (the bracket
+      step targets frame-relative leg angle, not floor contact — front feet
+      sitting slightly off the ground during that step is expected
+      geometry, not miscalibration) in `docs/build/calibration.md`.
+      Still pending: re-applying the voice module's English-default fix
+      (`XAc`/`XAb`/`XAa`), also EEPROM-wiped by the erase.
       Prior finding (2026-09-28, pre-reflash): the stock `vtF` ("step") gait stumbles
       toward the back-right leg, 100% reproducible every run; every other
       tested command (postures, other gaits) looked normal. Ruled out so
