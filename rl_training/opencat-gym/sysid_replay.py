@@ -50,8 +50,17 @@ import pybullet_data
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(HERE)
-PAYLOAD_MASS = 0.075
-PAYLOAD_POS = (-0.020, 0.0, 0.025)
+# Payload -- mirrors opencat_gym_env.py (keep in sync by hand): spine (Pi + PiSugar) and head
+# (camera) welded to the torso. 2026-10-01: these are built with REAL box inertia and no
+# collisions, as the env has since b086208. The old shapeless bodies have zero rotational
+# inertia, which Bullet treats as "cannot rotate", so the replayed body never tilted and every
+# tilt gap this script printed before this fix was just the real tilt itself.
+PAYLOAD_MASS = 0.061
+PAYLOAD_POS = (-0.022, 0.0, 0.025)
+PAYLOAD_BOX_HALF = (0.033, 0.015, 0.008)
+HEAD_MASS = 0.015
+HEAD_POS = (0.055, 0.0, 0.020)
+HEAD_BOX_HALF = (0.010, 0.012, 0.010)
 SUBSTEP_HZ = 240.0
 
 # Mirrors opencat_gym_env.py's `_carpet_floor` block. Training randomizes each
@@ -129,10 +138,13 @@ def build_sim(gui=False, surface="hard", carpet_soft=0.3, carpet_friction=_CARPE
                      flags=p.URDF_USE_SELF_COLLISION)
     jids = [j for j in range(p.getNumJoints(rid))
             if p.getJointInfo(rid, j)[2] in (p.JOINT_REVOLUTE, p.JOINT_PRISMATIC)]
-    pl = p.createMultiBody(baseMass=PAYLOAD_MASS, baseCollisionShapeIndex=-1,
-                           basePosition=[PAYLOAD_POS[0], PAYLOAD_POS[1], 0.08 + PAYLOAD_POS[2]])
-    c = p.createConstraint(rid, -1, pl, -1, p.JOINT_FIXED, [0, 0, 0], list(PAYLOAD_POS), [0, 0, 0])
-    p.changeConstraint(c, maxForce=5e3)
+    for mass, half, pos in ((PAYLOAD_MASS, PAYLOAD_BOX_HALF, PAYLOAD_POS), (HEAD_MASS, HEAD_BOX_HALF, HEAD_POS)):
+        cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
+        pl = p.createMultiBody(baseMass=mass, baseCollisionShapeIndex=cs,
+                               basePosition=[pos[0], pos[1], 0.08 + pos[2]])
+        p.setCollisionFilterGroupMask(pl, -1, 0, 0)          # inertia from the box, touches nothing
+        c = p.createConstraint(rid, -1, pl, -1, p.JOINT_FIXED, [0, 0, 0], list(pos), [0, 0, 0])
+        p.changeConstraint(c, maxForce=5e3)
     return cid, rid, jids, plane_id
 
 

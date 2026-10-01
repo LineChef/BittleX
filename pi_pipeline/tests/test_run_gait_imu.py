@@ -139,7 +139,7 @@ def test_loop_ticks_at_control_rate_not_imu_print_rate(rg, monkeypatch):
     monkeypatch.setattr(rg, "diag", None)
     lk = _FiveHzImuLink()
     rg.run(lk, 0.10, 1.0, 80.0, "auto", disable_firmware_balance=True,
-           thermal_guard=False)
+           thermal_guard=False, send_every=1)      # every tick: isolates tick rate from send cadence
     moves = [c for c in lk.sent if c.startswith("i") and " " in c]
     assert len(moves) >= 70            # ~80 ticks in 1 s, minus the stand pose
     assert lk._emitted <= 16           # while only ~5 IMU frames/s arrived (incl. setup pauses)
@@ -154,3 +154,212 @@ def test_gait_move_command_is_simultaneous_i_not_sequential_m():
     from pi_pipeline.gait import deploy_map
     cmd = deploy_map.policy_deg_to_move_cmd([50, 0, 50, 0, 50, 0, 50, 0])
     assert cmd == "i8 50 12 0 9 50 13 0 10 50 14 0 11 50 15 0"
+
+
+def test_send_every_n_thins_joint_commands_and_policy_path_is_accepted(rg, monkeypatch):
+    """`--send-every 3` is what Release_CandidateV2/V2.1 were trained with (i@27):
+    the loop still ticks at 80 Hz but sends a joint command only every 3rd tick."""
+    pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(rg, "diag", None)
+    every1, every3 = _FiveHzImuLink(), _FiveHzImuLink()
+    import residual_policy
+    path = residual_policy.default_policy_path()       # --policy PATH, here the default file
+    rg.run(every1, 0.10, 1.0, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, policy_path=path, send_every=1)
+    rg.run(every3, 0.10, 1.0, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, policy_path=path, send_every=3)
+    n1 = len([c for c in every1.sent if c.startswith("i") and " " in c])
+    n3 = len([c for c in every3.sent if c.startswith("i") and " " in c])
+    assert n3 < n1 * 0.5 and n3 >= 20                  # ~1/3 as many (+ the stand pose)
+
+
+def test_default_policy_sends_at_its_trained_cadence(rg, monkeypatch):
+    """The deployed policy's sidecar says how often it was trained to send joint
+    commands (V2.1: every 3rd tick); the loop follows that unless --send-every is given."""
+    pytest.importorskip("onnxruntime")
+    import residual_policy
+    monkeypatch.setattr(rg, "diag", None)
+    expect = residual_policy.send_every_for(residual_policy.default_policy_path())
+    assert expect == 3, "deployed V2.1 sidecar should carry cmd_send_every_n=3"
+    lk = _FiveHzImuLink()
+    rg.run(lk, 0.10, 1.0, 80.0, "auto", disable_firmware_balance=True, thermal_guard=False)
+    moves = [c for c in lk.sent if c.startswith("i") and " " in c]
+    assert 20 <= len(moves) <= 40
+
+
+class _FallenLink:
+    """Reports a steady 90-degree roll (G2 on its side) on every poll."""
+
+    def __init__(self):
+        self.sent = []
+
+    def send(self, cmd, **kw):
+        self.sent.append(cmd)
+        return ""
+
+    def poll_imu(self):
+        return ["MCU:  0.00  0.00  1.00    0.0   0.0  90.0"]
+
+
+def test_fall_guard_rests_and_stops_the_loop_when_tilted_past_the_limit(rg, monkeypatch):
+    pytest.importorskip("onnxruntime")
+    import time
+    monkeypatch.setattr(rg, "diag", None)
+    lk = _FallenLink()
+    t0 = time.monotonic()
+    rg.run(lk, 0.10, 5.0, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, send_every=1)             # asked for 5 s
+    assert time.monotonic() - t0 < 3.0                    # ...but it stopped after ~0.3 s of tilt
+    assert lk.sent[-2:] == ["d", "gB"] or lk.sent[-1] == "d" or "d" in lk.sent[-3:]
+    moves = [c for c in lk.sent if c.startswith("i") and " " in c]
+    assert len(moves) < 60                                # not 400 ticks of driving a fallen robot
+
+
+def test_fall_guard_can_be_disabled(rg, monkeypatch):
+    pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(rg, "diag", None)
+    lk = _FallenLink()
+    rg.run(lk, 0.10, 0.5, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, send_every=1, fall_abort_deg=0)
+    assert len([c for c in lk.sent if c.startswith("i") and " " in c]) >= 30   # ran its full 0.5 s
+
+
+def test_openloop_lift_scale_widens_the_swing_and_logs_the_imu(rg, tmp_path):
+    import numpy as np
+
+    class _Lk:
+        def __init__(self):
+            self.sent = []
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return ["MCU:  0.00  0.00  1.00    0.0   1.0   2.0"]
+
+    def moves(scale, log=None):
+        lk = _Lk()
+        rg.openloop(lk, 1, 80.0, lift_scale=scale, log_path=log, sleep=lambda s: None,
+                    balance_off=True)
+        cmds = [c for c in lk.sent if c.startswith("i") and " " in c][1:]     # drop the stand pose
+        return lk, np.array([[int(x) for x in c[1:].split()[1::2]] for c in cmds])
+
+    _, base = moves(1.0)
+    lk, wide = moves(1.6, str(tmp_path / "ol.csv"))
+    assert (wide.max(0) - wide.min(0)).sum() > 1.4 * (base.max(0) - base.min(0)).sum()
+    assert lk.sent[0] == "gb" and lk.sent[-1] == "d" and "gP" in lk.sent
+    assert len((tmp_path / "ol.csv").read_text().splitlines()) > 50
+
+
+def test_openloop_stops_when_fallen(rg):
+    class _Lk:
+        sent = []
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return ["MCU:  0.00  0.00  1.00    0.0   0.0  90.0"]
+
+    lk = _Lk()
+    lk.sent = []
+    t = [0.0]
+
+    def clk():
+        return t[0]
+
+    def slp(s):
+        t[0] += max(s, 0.01)
+
+    rg.openloop(lk, 6, 80.0, sleep=slp, clock=clk)
+    assert t[0] < 8.0                      # a full 6-cycle run is 7.5 s + the 2 s stand; it stopped early
+    assert lk.sent[-1] == "d"
+
+
+def test_openloop_knees_only_leaves_the_shoulder_swing_alone(rg):
+    import numpy as np
+
+    class _Lk:
+        def __init__(self):
+            self.sent = []
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return []
+
+    def swing(**kw):
+        lk = _Lk()
+        rg.openloop(lk, 1, 80.0, sleep=lambda s: None, fall_abort_deg=0, **kw)
+        c = [x for x in lk.sent if x.startswith("i") and " " in x][1:]
+        a = np.array([[int(v) for v in x[1:].split()[1::2]] for x in c])
+        return a.max(0) - a.min(0)                       # per-joint swing, URDF order
+
+    base = swing()
+    knees = swing(lift_scale=2.0, lift_joints="knees")
+    both = swing(lift_scale=2.0, lift_joints="knees", shoulder_scale=0.7)
+    sh, kn = [0, 2, 4, 6], [1, 3, 5, 7]
+    assert np.allclose(knees[sh], base[sh], atol=1)                  # shoulders untouched
+    assert (knees[kn] > 1.8 * base[kn]).all()                        # knees ~x2
+    assert (both[sh] < 0.8 * base[sh]).all()                         # shoulders shrunk
+
+
+def test_openloop_ramp_starts_as_plain_wkf_and_reaches_the_scaled_gait(rg):
+    import numpy as np
+
+    class _Lk:
+        def __init__(self):
+            self.sent = []
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return []
+
+    def frames(**kw):
+        lk = _Lk()
+        rg.openloop(lk, 3, 80.0, sleep=lambda s: None, fall_abort_deg=0, **kw)
+        c = [x for x in lk.sent if x.startswith("i") and " " in x][1:]
+        return np.array([[int(v) for v in x[1:].split()[1::2]] for x in c])
+
+    plain = frames()
+    ramped = frames(lift_scale=2.0, lift_joints="knees", ramp_cycles=1.0)
+    assert np.allclose(ramped[:5], plain[:5], atol=1)                      # first frames == plain wkF
+    knees = [1, 3, 5, 7]
+    last = slice(200, 300)                                                  # cycle 3: fully ramped
+    assert (np.ptp(ramped[last][:, knees], axis=0) > 1.8 * np.ptp(plain[last][:, knees], axis=0)).all()
+
+
+def test_openloop_logs_battery_voltage_during_the_walk(rg, tmp_path):
+    class _Lk:
+        def __init__(self):
+            self.sent, self._other, self.n = [], [], 0
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+            if cmd == "P":
+                self._other.append("Voltage: 7.55 V")
+
+        def poll_imu(self):
+            return ["MCU:  0.00  0.00  1.00    0.0   1.0   2.0"]
+
+        def pop_other(self):
+            out, self._other = self._other, []
+            return out
+
+    t = [0.0]
+
+    def clk():
+        return t[0]
+
+    def slp(s):
+        t[0] += max(s, 0.0125)
+
+    lk = _Lk()
+    rg.openloop(lk, 2, 80.0, log_path=str(tmp_path / "v.csv"), volt_every_s=0.5,
+                sleep=slp, clock=clk, fall_abort_deg=0)
+    rows = (tmp_path / "v.csv").read_text().splitlines()
+    assert rows[1].endswith(",volt") and "P" in lk.sent
+    assert any(r.endswith(",7.55") for r in rows[2:])

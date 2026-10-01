@@ -57,7 +57,7 @@ RESIDUAL_SCALE_DEG = 22          # LEGACY default: run20m_ppo's scale. Newer pol
                                  # own in a sidecar `<policy>.onnx.json` (export_onnx.py writes it);
                                  # see residual_scale_for(). A mismatch silently applies every
                                  # correction at the wrong size.
-DEFAULT_POLICY = "hw1_20m_ppo.onnx"  # the deployed policy (release candidate 2026-09-23); promoting a new one changes this line
+DEFAULT_POLICY = "Release_CandidateV2.1_ppo.onnx"  # the deployed policy (V2.1, set 2026-10-01; was hw1_20m_ppo.onnx); promoting a new one changes this line
 STAND_FWD_THRESH = 0.025
 ANG_FACTOR = 0.10
 LEN_JOINT_HISTORY = 30
@@ -106,6 +106,17 @@ def residual_scale_for(onnx_path):
     return float(RESIDUAL_SCALE_DEG)
 
 
+def send_every_for(onnx_path):
+    """Joint-command cadence the policy was trained with: sidecar `cmd_send_every_n`
+    (V2/V2.1 = 3, i.e. i@27), else 1 (send every control tick)."""
+    import json
+    side = str(onnx_path) + ".json"
+    if os.path.exists(side):
+        with open(side) as f:
+            return max(1, int(json.load(f).get("cmd_send_every_n", 1)))
+    return 1
+
+
 class ResidualGaitPolicy:
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort
@@ -118,6 +129,7 @@ class ResidualGaitPolicy:
                 f"rl_training/opencat-gym/trained/). Run export_onnx.py, or pass onnx_path=")
         self.onnx_path = onnx_path
         self.residual_scale_deg = residual_scale_for(onnx_path)
+        self.send_every = send_every_for(onnx_path)
         so = ort.SessionOptions()
         so.intra_op_num_threads = int(intra_op_threads)
         self._sess = ort.InferenceSession(onnx_path, so, providers=["CPUExecutionProvider"])

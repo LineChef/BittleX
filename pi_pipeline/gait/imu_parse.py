@@ -19,6 +19,26 @@ import math
 IMU_PREFIXES = ("MCU:", "ICM:")
 
 
+_FIELD_WIDTHS = (6, 6, 6, 7, 7, 7)       # %6.2f x3 (accel), %7.1f x3 (yaw, pitch, roll)
+
+
+def _fixed_width_fields(body):
+    """Slice the firmware's fixed-width `MCU:`/`ICM:` fields when whitespace
+    splitting fails. The yaw field is the accumulated yaw since the BiBoard last
+    booted; once |yaw| reaches 10000 deg (or <= -1000) its 7 characters fill the
+    column and it runs into accel-Z with no space (`10.4017640.5`), so a plain
+    split yields 5 numbers. Seen 2026-10-01: a BiBoard left powered for a while
+    printed yaw ~19000. Returns the 6 numbers, or None if the line isn't that shape."""
+    try:
+        out, i = [], 0
+        for w in _FIELD_WIDTHS:
+            out.append(float(body[i:i + w]))
+            i += w
+        return out if not body[i:].strip() else None
+    except ValueError:
+        return None
+
+
 def parse_imu_line(line, fmt="auto", deg_in=True):
     """Return (roll, pitch, yaw [rad], gx, gy, gz [rad/s]) or None if this line
     isn't an IMU frame.
@@ -81,9 +101,11 @@ def parse_imu_line(line, fmt="auto", deg_in=True):
             try:
                 nums = [float(x) for x in s[len(prefix):].split()]
             except ValueError:
-                return None
+                nums = []
             if len(nums) != 6:
-                return None
+                nums = _fixed_width_fields(line.strip()[len(prefix):])
+                if nums is None:
+                    return None
             _ax, _ay, _az, neg_yaw, pitch, roll = nums  # accel not used -- see docstring gap
             yaw = -neg_yaw
             return (roll * k, pitch * k, yaw * k, 0.0, 0.0, 0.0)

@@ -52,6 +52,10 @@ def main():
                     help="scale the policy was TRAINED with, written to the <out>.json sidecar the Pi "
                          "reads (default: opencat_gym_env.RESIDUAL_SCALE_DEG, which honours "
                          "G2E_RESIDUAL_SCALE_DEG -- set that for a checkpoint trained at another scale)")
+    ap.add_argument("--cmd-send-every-n", type=int, default=1,
+                    help="joint-command cadence the policy was TRAINED with (G2E_CMD_SEND_EVERY_N; "
+                         "Release_CandidateV2/V2.1 = 3), written to the sidecar so run_gait.py "
+                         "sends at the same cadence by default")
     args = ap.parse_args()
     out = args.out or (args.model + ".onnx")
 
@@ -103,7 +107,8 @@ def main():
         import opencat_gym_env
         scale = float(opencat_gym_env.RESIDUAL_SCALE_DEG)
     with open(out + ".json", "w") as f:
-        json.dump({"residual_scale_deg": scale, "checkpoint": os.path.basename(args.model),
+        json.dump({"residual_scale_deg": scale, "cmd_send_every_n": args.cmd_send_every_n,
+                   "checkpoint": os.path.basename(args.model),
                    "exported": datetime.date.today().isoformat()}, f, indent=1)
     print(f"wrote {out}.json  (residual_scale_deg={scale:g})")
 

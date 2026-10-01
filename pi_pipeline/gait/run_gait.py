@@ -105,6 +105,7 @@ def euler_to_quat(roll, pitch, yaw):
 
 
 # --------------------------------------------------------------------- loop
+FALL_ABORT_S = 0.3                                # how long a >fall_abort_deg tilt must persist before the loop rests
 STAND_URDF_DEG = [50, 0, 50, 0, 50, 0, 50, 0]     # matches env.reset() start pose
 IMU_STALE_S = 0.6     # no IMU frame for this long (3 missed 5 Hz prints) -> stop
 
@@ -183,19 +184,89 @@ def probe_imu_under_load(lk, seconds, hz=CONTROL_HZ):
     return n
 
 
-def openloop(lk, cycles, hz):
+def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
+             balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, *,
+             sleep=time.sleep, clock=time.monotonic):
     """Replays the scripted wkF walk with no policy/IMU -- a firmware/servo
-    sanity check before running the real control loop."""
+    sanity check before running the real control loop.
+
+    `lift_scale` multiplies every joint's swing around its cycle mean (1.3 -> ~14 mm peak
+    foot lift instead of ~10; 1.6 -> ~21; 2.0 -> ~31, estimated with the sim's robot model),
+    for finding how much lift a surface needs. `log_path` records the IMU (same columns as
+    the policy loop's log); the fall guard rests after a sustained tilt past
+    `fall_abort_deg`. `balance_off` sends `gb` first, so it is purely scripted.
+    `lift_joints="knees"` applies `lift_scale` to the knees only (the stride barely changes,
+    unlike scaling every joint, which lengthens it ~1.5-1.9x at x1.6-2.0); `shoulder_scale`
+    scales the shoulder swing (<1 shortens the stride: knees x2.0 + shoulders x0.7 is ~26 mm
+    lift at ~the original ~75 mm stride, est. with the sim's robot model). `ramp_cycles`
+    blends the scaling in from x1 over that many cycles, so the first frames match plain
+    wkF (a scaled gait jumps further from the stand pose and can topple G2 at the start).
+    `volt_every_s` > 0 asks the BiBoard for the battery voltage (`P`) that often during the
+    walk and records the latest reading in the log's `volt` column."""
     ref = np.load(os.path.join(_HERE, "wkf_ref.npy"))          # (100,8) rad, URDF order
+    m = ref.mean(axis=0)
+    scale = np.ones(8)
+    scale[[1, 3, 5, 7] if lift_joints == "knees" else slice(None)] = lift_scale
+    scale[[0, 2, 4, 6]] *= shoulder_scale if lift_joints == "knees" else 1.0
+    base = ref
+    ref = m + (ref - m) * scale
+    ramp_n = int(ramp_cycles * len(ref))
     dt = 1.0 / hz
-    print(f"open-loop wkF playback: {cycles} cycles, {hz} Hz. Ctrl-C to stop.")
+    print(f"open-loop wkF playback: {cycles} cycles, {hz} Hz, lift x{lift_scale:g}"
+          f"{' (knees only' + (f', shoulders x{shoulder_scale:g}' if shoulder_scale != 1.0 else '') + ')' if lift_joints == 'knees' else ''}"
+          f"{', balance off' if balance_off else ''}. Ctrl-C to stop.")
+    log = open(log_path, "w") if log_path else None
+    t_start, tilt_since, fell = clock(), None, False
     try:
+        if balance_off:
+            _send(lk, "gb")
+            sleep(0.2)
+        _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))   # stand first: no jump from rest into mid-stride
+        sleep(2.0)
+        if log:
+            log.write(f"# openloop wkF  cycles={cycles} hz={hz} lift_scale={lift_scale:g} balance_off={balance_off}\n")
+            log.write("t,roll,pitch,yaw,gx,gy,gz,guard_state,volt\n")
+            _send(lk, "gP")
+            sleep(0.3)
+            t_start = clock()
+        step, volt, next_volt = 0, float("nan"), 0.0
         for c in range(cycles):
-            for frame in ref:
+            for fi, frame in enumerate(ref):
+                if ramp_n and step < ramp_n:                    # blend plain wkF -> the scaled gait
+                    frame = base[fi] + (frame - base[fi]) * (step / ramp_n)
+                step += 1
                 deg = np.rint(np.rad2deg(frame)).astype(int)
                 _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
-                time.sleep(dt)
+                if volt_every_s and clock() - t_start >= next_volt:
+                    _send(lk, "P")
+                    next_volt = clock() - t_start + volt_every_s
+                if log or fall_abort_deg:
+                    for line in lk.poll_imu():
+                        r = parse_imu_line(line)
+                        if r is None:
+                            continue
+                        if volt_every_s:
+                            for o in getattr(lk, "pop_other", lambda: [])():
+                                if o.startswith("Voltage"):
+                                    try:
+                                        volt = float(o.split(":")[1].split()[0])
+                                    except (IndexError, ValueError):
+                                        pass
+                        if log:
+                            log.write(f"{clock() - t_start:.4f},{r[0]:.5f},{r[1]:.5f},{r[2]:.5f},0,0,0,ok,{volt:.2f}\n")
+                        if fall_abort_deg and max(abs(r[0]), abs(r[1])) > math.radians(fall_abort_deg):
+                            tilt_since = tilt_since if tilt_since is not None else clock()
+                            fell = fell or (clock() - tilt_since >= FALL_ABORT_S)
+                        else:
+                            tilt_since = None
+                if fell:
+                    print("!! fallen -- resting", flush=True)
+                    return
+                sleep(dt)
     finally:
+        if log:
+            log.close()
+            _send(lk, "gp")
         _send(lk, "d")
     print("done (sent rest).")
 
@@ -368,8 +439,11 @@ def _make_vision_feed(kind, port, baud):
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
-        turn_burst_s=1.0, carpet=False, imu_rate="zero"):
-    pol = ResidualGaitPolicy()
+        turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0):
+    pol = ResidualGaitPolicy(onnx_path=policy_path)
+    send_every = max(1, send_every if send_every else pol.send_every)   # explicit flag wins; else what the policy was trained with
+    print(f"policy: {os.path.basename(pol.onnx_path)}"
+          f"  (joint command every {send_every} tick{'s' if send_every != 1 else ''})", flush=True)
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
@@ -456,6 +530,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     lat = []
     print(f"loop: cmd_fwd={cmd_fwd} m/s, {hz} Hz, {'forever' if n is None else str(n)+' ticks'}"
           + (f", logging -> {log_path}" if log_path else "") + ". Ctrl-C to stop.")
+    tilt_since = None                 # fall guard: when |roll| or |pitch| first exceeded fall_abort_deg
     try:
         i = 0
         while n is None or i < n:
@@ -470,6 +545,17 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 break
             else:
                 r, p_, y, gx, gy, gz = feed.frame
+                if fall_abort_deg and max(abs(r), abs(p_)) > math.radians(fall_abort_deg):
+                    tilt_since = tilt_since if tilt_since is not None else now
+                    if now - tilt_since >= FALL_ABORT_S:       # down and staying down: stop driving the legs
+                        print(f"!! fallen (tilt {math.degrees(max(abs(r), abs(p_))):.0f} deg > "
+                              f"{fall_abort_deg:g} for {FALL_ABORT_S:g} s) -- resting", flush=True)
+                        if diag is not None:
+                            diag.event("gait", "ERROR", "fall.abort",
+                                       roll_deg=round(math.degrees(r), 1), pitch_deg=round(math.degrees(p_), 1))
+                        break
+                else:
+                    tilt_since = None
                 y = math.remainder(y - yaw0, 2.0 * math.pi)
                 q = euler_to_quat(r, p_, y)
                 t0 = time.perf_counter()
@@ -544,7 +630,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
 
                 snap = guard.update(joint_deg, dt)
                 joint_deg = guard.apply_soft(joint_deg, snap)   # Petoi-style per-joint ease-off (no-op unless a joint is stalling)
-                _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
+                if i % send_every == 0:      # V2/V2.1 were trained sending every 3rd tick (i@27)
+                    _send(lk, deploy_map.policy_deg_to_move_cmd(joint_deg))
                 if wd is not None:
                     wd.beat()
 
@@ -640,6 +727,14 @@ def main():
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--hz", type=float, default=CONTROL_HZ)
     ap.add_argument("--cmd", type=float, default=0.10, help="forward speed command, m/s")
+    ap.add_argument("--policy", default=None, metavar="ONNX",
+                    help="policy .onnx to run instead of residual_policy.DEFAULT_POLICY "
+                         "(its .onnx.json sidecar must sit next to it). Does not change the default.")
+    ap.add_argument("--fall-abort-deg", type=float, default=60.0, metavar="DEG",
+                    help="rest and stop if |roll| or |pitch| stays above DEG for 0.3 s (a fall); 0 disables")
+    ap.add_argument("--send-every", type=int, default=None, metavar="N",
+                    help="send a joint command every Nth control tick. Default: what the policy "
+                         "was trained with (its .onnx.json `cmd_send_every_n`; V2/V2.1 = 3, i@27)")
     ap.add_argument("--seconds", type=float, default=0.0, help="0 = run until Ctrl-C")
     ap.add_argument("--imu-format", default="auto", choices=("auto", "ypr", "rpy", "6axis"))
     ap.add_argument("--imu-rate", default="zero", choices=("fd", "zero"),
@@ -654,6 +749,18 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="full loop with synthetic IMU and no serial -- rate check")
     ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
+    ap.add_argument("--lift-scale", type=float, default=1.0, metavar="K",
+                    help="--openloop: scale the wkF swing about its mean (1.3/1.6/2.0 -> ~14/21/31 mm foot lift, est.)")
+    ap.add_argument("--lift-joints", default="all", choices=("all", "knees"),
+                    help="--openloop: which joints --lift-scale applies to (knees keeps the stride ~unchanged)")
+    ap.add_argument("--shoulder-scale", type=float, default=1.0, metavar="S",
+                    help="--openloop with --lift-joints knees: scale the shoulder swing (0.7 holds the stride near wkF's)")
+    ap.add_argument("--volt-every", type=float, default=0.0, metavar="S",
+                    help="--openloop: log the battery voltage every S seconds during the walk (0 = off)")
+    ap.add_argument("--ramp-cycles", type=float, default=0.0, metavar="N",
+                    help="--openloop: blend the lift/shoulder scaling in from x1 over N cycles (avoids a jump from the stand pose)")
+    ap.add_argument("--openloop-balance-off", action="store_true",
+                    help="--openloop: send gb first so the walk is purely scripted (no firmware gyro assist)")
     ap.add_argument("--keep-firmware-balance", action="store_true",
                     help="do NOT send 'gb' -- leave the firmware gyro-assist layer on under the policy")
     ap.add_argument("--log", default=None,
@@ -734,12 +841,17 @@ def main():
         elif args.probe_imu_load:
             probe_imu_under_load(lk, 5.0, args.hz)
         elif args.openloop:
-            openloop(lk, args.cycles, args.hz)
+            openloop(lk, args.cycles, args.hz, lift_scale=args.lift_scale, log_path=args.log,
+                     fall_abort_deg=args.fall_abort_deg, balance_off=args.openloop_balance_off,
+                     lift_joints=args.lift_joints, shoulder_scale=args.shoulder_scale,
+                     ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
-                turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate)
+                turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
+                policy_path=args.policy, send_every=args.send_every,
+                fall_abort_deg=args.fall_abort_deg)
     finally:
         try:
             lk.close()

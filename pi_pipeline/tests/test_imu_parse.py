@@ -87,3 +87,18 @@ def test_feed_passes_a_true_gyro_through():
     f = ImuFeed()
     f.update(["10 20 30 1 2 3"], now=0.0)                  # legacy ypr+gyro shape
     assert f.frame[3:] == (_rad(1.0), _rad(2.0), _rad(3.0))
+
+
+def test_glued_fixed_width_fields_parse_when_yaw_fills_its_column():
+    """Real line from G2's BiBoard (2026-10-01): accumulated yaw ~17640 deg is
+    7 chars wide, so it touches accel-Z with no space between them."""
+    import math
+    from pi_pipeline.gait.imu_parse import parse_imu_line
+    r = parse_imu_line("ICM:  0.20  0.17 10.4717640.5    1.1    0.9")
+    assert r is not None
+    roll, pitch, yaw, *_ = r
+    assert roll == pytest.approx(0.9 * math.pi / 180) and pitch == pytest.approx(1.1 * math.pi / 180)
+    assert yaw == pytest.approx(-17640.5 * math.pi / 180)
+    # a negative yaw that fills the column (-1000.0 or beyond) glues the same way
+    assert parse_imu_line("MCU:  0.02 -0.01  1.00-1234.5   45.6  -78.9") is not None
+    assert parse_imu_line("ICM: garbage") is None

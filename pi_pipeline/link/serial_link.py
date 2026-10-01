@@ -47,6 +47,7 @@ class SerialLink:
         # handing them back as a reply; `poll_imu()` collects them.
         self._rx = b""
         self._imu = collections.deque(maxlen=64)
+        self._other = collections.deque(maxlen=64)      # non-IMU lines seen by poll_imu(), see pop_other()
 
     @staticmethod
     def _diag(level: str, name: str, **kv) -> None:
@@ -161,13 +162,20 @@ class SerialLink:
                     if line is None:
                         break
                     if line:
-                        log.debug("poll_imu dropped non-IMU line %r", line)
+                        log.debug("poll_imu kept non-IMU line %r", line)
+                        self._other.append(line)
             except Exception as e:  # noqa: BLE001
                 log.warning("serial read failed (%s); marking disconnected", e)
                 self.close()
                 self._mark_down(f"read failed: {e}")
         out = list(self._imu)
         self._imu.clear()
+        return out
+
+    def pop_other(self) -> list[str]:
+        """Non-IMU lines (e.g. a `Voltage:` reply) that `poll_imu()` saw since the last call."""
+        out = list(self._other)
+        self._other.clear()
         return out
 
     def drain(self, seconds: float = 0.3) -> str:
