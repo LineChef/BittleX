@@ -20,8 +20,10 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 - Pi <-> BiBoard link works (needed `XS` over USB once; wires TX2->pin 10, RX2->pin 8). IMU reads
   the stock 5.0 Hz on the Pi's UART. Camera is on the Pi's USB (`/dev/ttyACM0`, mounted rotated
   90 deg so it must be turned upright) and was **not** used in the walks.
-- IMU calibrated with `gc` (see `hardware/petoi-firmware-reference.md`). **Not yet confirmed to
-  survive a full power cycle** -- check the tilt after the next one.
+- IMU calibrated with `gc` (see `hardware/petoi-firmware-reference.md`). **Confirmed to survive a full
+  power cycle (2026-10-01):** after the BiBoard and Pi were powered off and on, balance-on `kbalance`
+  reads roll 1.0 / pitch -1.1 (std 0.1), balance-off 0.8 / -1.0, at rest -2.8 / 0.0. `XS` also persisted
+  (the Pi link worked straight away).
 - Walk loop has a fall guard (`--fall-abort-deg`, default 60 deg for 0.3 s -> rest).
 
 **Open questions, in the order I would take them**
@@ -39,7 +41,7 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 4. After those: choose a direction for carpet (nothing decided): a higher-lift/shorter-stride gait
    base, Petoi's `carpetF`, or a retrain with a pile/drag model (H10).
 5. When the rest of the hardware is on and weighed: re-set the payload model and **retrain**
-   (backlog H2); today's runs are the baseline for that. Re-do `XS`/`gc` after any reflash.
+   (backlog H2); today's runs are the baseline for that. Re-do `XS`/`gc` after any reflash (both persist across power cycles).
 
 **Uncommitted at the pause:** everything described here (code, tests, docs) is local. Nothing has
 been pushed since the camera/IMU-link work (`development` at `6a2e7e7`).
@@ -133,6 +135,12 @@ get below ~63 mm at knees x2.
 - **Front-right leg sags at rest** -- present since first power-on (before the Pi was connected, as
   far as known) and seen again after the IMU calibration. In `kbalance` with balance off the body
   is level, so it is not a servo offset in that pose.
+- **Later observation (user, after the IMU `gc`):** the firmware's own step gait no longer falls down;
+  it walks sideways a little toward the FR leg, and the FR sag at rest looks better. Nothing was done
+  to the servo calibration (no calibration commands were sent); the only BiBoard changes were `XS`,
+  `gc` and balance toggles, so `gc` (balance had been chasing a wrong IMU zero) is the likely cause,
+  unproven. The sag has come and gone between observations, which argues against a fixed servo offset.
+  User plans to re-calibrate the leg with Petoi's procedure; afterwards re-run the level check and walks.
 - Right-hand drift; large roll swing; the right side collapsing on carpet (above).
 - Firmware gyro balance was miscalibrated until `gc` (below).
 - Yaw sign convention vs the real board: positive = right was inferred from run 1 vs observation.
@@ -189,4 +197,3 @@ get below ~63 mm at knees x2.
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
 - Hard-floor controls for the lift/stride variants (see "Where we left off").
 - A hands-off run in a longer space; V2.1 carpet repeats with the fall guard.
-- Whether `gc` persists across a full power cycle.

@@ -442,8 +442,8 @@ second skill for the 2-skill control run. See `docs/rl/adapter-skill-probe-spec.
   short routine in which the body rocks between the front and back legs for several
   seconds (no reply is printed, and the IMU readings jump during it -- wait it out).
 - After: balance ON `kbalance` reads roll 0.8° / pitch -0.8° with std 0.2°; at rest the
-  zero moved ~4° in roll (+0.9 -> -3.2). Redo after any reflash/erase; re-verify after a
-  full power cycle (not yet confirmed that it persists).
+  zero moved ~4° in roll (+0.9 -> -3.2). Redo after any reflash/erase. **Persists across a full
+  power cycle** (checked 2026-10-01: balance-on `kbalance` still reads 1.0° / -1.1°).
 - Anything using firmware balance (the scripted `kwkF` contender with gyro assist, voice
   skills, the `gB` that `run_gait` restores on exit) depends on this being calibrated.
 
