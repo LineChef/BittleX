@@ -430,3 +430,32 @@ second skill for the 2-skill control run. See `docs/rl/adapter-skill-probe-spec.
 - Measured over the Pi's UART with the camera plugged into the Pi's USB: IMU
   exactly 5.0 Hz, so the camera on the Pi does not disturb the IMU (the
   camera-kills-IMU bug needs the BiBoard's own `XC` camera module).
+
+## IMU calibration (`gc`) — needed for the firmware's gyro balance, 2026-10-01
+
+- Symptom before calibrating: with firmware gyro balance ON (`gB`), `kbalance` made G2
+  push its FR foot out and tilt the body ~19° roll / ~11° pitch (IMU-measured, steady);
+  with balance OFF (`gb`) the same pose was level (roll -0.4°, pitch 1.7°). So the
+  legs/servo calibration were fine and balance was chasing a wrong IMU zero. The
+  `V2.1` learned-gait runs are unaffected -- `run_gait.py` turns balance off for the run.
+- Fix: `gc` (`C_GYRO_CALIBRATE`) with G2 standing level and still. It silently runs a
+  short routine in which the body rocks between the front and back legs for several
+  seconds (no reply is printed, and the IMU readings jump during it -- wait it out).
+- After: balance ON `kbalance` reads roll 0.8° / pitch -0.8° with std 0.2°; at rest the
+  zero moved ~4° in roll (+0.9 -> -3.2). Redo after any reflash/erase; re-verify after a
+  full power cycle (not yet confirmed that it persists).
+- Anything using firmware balance (the scripted `kwkF` contender with gyro assist, voice
+  skills, the `gB` that `run_gait` restores on exit) depends on this being calibrated.
+
+## More bring-up facts (2026-10-01)
+
+- `X?` prints the module table; the BiBoard's `?` prints only the name and version.
+- `P` prints the battery voltage (`Voltage: 7.81 V`); readings lag a little and the pack read
+  7.6-7.8 V (about half charge for a 2-cell pack) with no sag at a static stand.
+- `f` (servo feedback) returned only an echo on this build, with the servos relaxed and powered, so
+  real joint angles are not available through it.
+- Petoi's `kcarpetF` gait, decoded (`reference_gait/carpet_ref.npy`): peak foot lift ~27 mm and stride
+  ~36 mm vs scripted `wkF` ~9 mm / ~75 mm; it uses a different rest posture (shoulder mean ~61 deg,
+  knee mean ~-11 deg vs ~47-53 / +6). On the real G2 it walked forward on hard floor (~1 ft 9 in in
+  10 s) but walked in place on ~1/4 in carpet with the back-right leg sagging.
+- While `gc` is running the IMU readings swing wildly and the body rocks; wait before reading it.

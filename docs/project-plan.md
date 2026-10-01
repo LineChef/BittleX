@@ -91,6 +91,13 @@ should we work on next."
 
 ---
 
+
+> **2026-10-01 -- real-hardware bring-up of the walk (see [`rl/real-walk-log.md`](rl/real-walk-log.md)).**
+> Pi<->BiBoard serial link working (`XS`), camera on the Pi's USB working (module rotated upright), IMU
+> calibrated (`gc`), `Release_CandidateV2.1` exported and made the deployed policy
+> (`cmd_send_every_n: 3`). Six clean hard-floor V2.1 walks; every gait tried on the ~1/4 in carpet fails.
+> Paused with an open list in the walk log ("Where we left off"); nothing pushed since 6a2e7e7.
+
 ## Parts list (finalized — $567)
 
 | Item | Price |

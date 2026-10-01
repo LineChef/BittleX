@@ -1,5 +1,7 @@
 # hw1 — training under G2's real control path
 
+> **2026-10-01:** the deployed policy (`DEFAULT_POLICY`) is now `Release_CandidateV2.1` (see Round 4 below), exported with a `cmd_send_every_n: 3` sidecar. `hw1_20m` remains on the Pi as a baseline.
+
 **2026-09-22 → 23.** Started as the "IMU feedback rate" priority (stock firmware
 prints orientation at 5 Hz, the policy runs at 80 Hz). Tracing it through the
 firmware turned up a bigger gap in the joint-command path, two benchmark bugs,
