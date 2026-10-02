@@ -72,31 +72,62 @@ g2cam-info() { _g2py tools/camera_preview.py --info; }   # serial port + which m
 
 # ---- camera MOUNTED on G2 (plugged into the Pi, not the Mac) ----
 # Needs  export G2_PI=<user>@g2pi.local  in your shell profile (kept out of the repo).
+# Anything that fails or times out says so on the console with a "[g2]" line -- nothing fails silently.
+_g2log() { echo "[g2] $*" >&2; }
+
+# ssh with a 6 s connect timeout; reports it when the Pi can't be reached / the call times out (ssh rc 255)
+_g2ssh() {
+  local host="$1"; shift
+  ssh -o BatchMode=yes -o ConnectTimeout=6 "$host" "$@"; local rc=$?
+  [ $rc -eq 255 ] && _g2log "ssh to $host failed or timed out (6 s connect timeout) -- is the Pi on and on the network?"
+  return $rc
+}
+
+# start the camera preview on the Pi, tunnel it to localhost:8080, open it.  $1 host  $2 remote command  $3 local log
+_g2_preview() {
+  local host="$1" remote="$2" log="$3" i up=""
+  _g2ssh "$host" true || return 1
+  g2pcam-stop >/dev/null 2>&1
+  _g2ssh "$host" 'mkdir -p ~/bittleX/tools' || return 1
+  scp -q -o ConnectTimeout=6 "$G2_ROOT/tools/camera_preview.py" "$host:bittleX/tools/" \
+    || { _g2log "copying camera_preview.py to $host failed or timed out"; return 1; }
+  ( ssh -o BatchMode=yes -o ConnectTimeout=6 -L 8080:127.0.0.1:8080 "$host" "$remote" > "$log" 2>&1 & )
+  for i in $(seq 1 40); do curl -s -m 1 -o /dev/null http://localhost:8080/ && { up=1; break; }; sleep 0.5; done
+  if [ -z "$up" ]; then
+    _g2log "no camera feed after 20 s (timed out). Is the camera plugged into the Pi's data USB port? Last lines of $log:"
+    tail -3 "$log" >&2 2>/dev/null; g2pcam-stop >/dev/null 2>&1; return 1
+  fi
+  open http://localhost:8080      # must open within ~10s or the preview stops itself
+}
+
 # g2pcam <name> [session]  -- run the preview on the Pi, tunnel it to localhost:8080,
 #                             open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/
 g2pcam() {
   local name="${1:-self}" sess="${2:-1}" host="${G2_PI:?set G2_PI=<user>@g2pi.local (see docs/guides/cheatsheet.md)}"
   local out="g2_cap/$name/session_$sess"
-  g2pcam-stop >/dev/null 2>&1
-  ssh -o BatchMode=yes "$host" 'mkdir -p ~/bittleX/tools' \
-    && scp -q "$G2_ROOT/tools/camera_preview.py" "$host:bittleX/tools/" || { echo "cannot reach $host"; return 1; }
-  ( ssh -o BatchMode=yes -L 8080:127.0.0.1:8080 "$host" \
-      "mkdir -p ~/$out; G2_CAP_OUT=~/$out G2_CAP_LABEL=$name ~/bittleX/pi_pipeline/.venv/bin/python -W ignore ~/bittleX/tools/camera_preview.py" \
-      > /tmp/g2pcam.log 2>&1 & )
-  local i; for i in $(seq 1 40); do curl -s -m 1 -o /dev/null http://localhost:8080/ && break; sleep 0.5; done
-  open http://localhost:8080      # must open within ~10s or the preview stops itself
+  _g2_preview "$host" "mkdir -p ~/$out; G2_CAP_OUT=~/$out G2_CAP_LABEL=$name ~/bittleX/pi_pipeline/.venv/bin/python -W ignore ~/bittleX/tools/camera_preview.py" /tmp/g2pcam.log || return 1
   echo "preview -> http://localhost:8080   saving on the Pi to ~/$out"
   echo "closing the tab stops it.  then:  g2pcam-pull $name $sess   (copy to the Mac for g2curate)"
+}
+# g2see  -- just LOOK: live feed + detection boxes from the camera mounted on G2 (plugged into the Pi) at
+#           localhost:8080. No name, nothing saved, no capture folder. Closing the tab stops it. Same
+#           G2_PI requirement as g2pcam; stop early with g2pcam-stop.
+g2see() {
+  local host="${G2_PI:?set G2_PI=<user>@g2pi.local (see docs/guides/cheatsheet.md)}"
+  _g2_preview "$host" "G2_CAP_OUT=/tmp/g2_see ~/bittleX/pi_pipeline/.venv/bin/python -W ignore ~/bittleX/tools/camera_preview.py" /tmp/g2see.log || return 1
+  echo "live view -> http://localhost:8080   (close the tab to stop; g2pcam-stop kills it early)"
 }
 # g2pcam-pull <name> [session]  -- copy a Pi capture to $G2_CAP_ROOT/<name>/session_<n>/ (then g2curate/g2auto as usual)
 g2pcam-pull() {
   local name="${1:?usage: g2pcam-pull <name> [session]}" sess="${2:-1}" host="${G2_PI:?set G2_PI=<user>@g2pi.local}"
-  mkdir -p "$G2_CAP_ROOT/$name/session_$sess" \
-    && rsync -av "$host:g2_cap/$name/session_$sess/" "$G2_CAP_ROOT/$name/session_$sess/"
+  mkdir -p "$G2_CAP_ROOT/$name/session_$sess" || return 1
+  rsync -av -e "ssh -o BatchMode=yes -o ConnectTimeout=6" "$host:g2_cap/$name/session_$sess/" "$G2_CAP_ROOT/$name/session_$sess/" \
+    || { _g2log "rsync from $host failed or timed out (is the Pi on, and does ~/g2_cap/$name/session_$sess exist?)"; return 1; }
 }
 g2pcam-stop() {   # kill the tunnel + the preview process on the Pi
   pkill -f "ssh .*-L 8080:127.0.0.1:8080" 2>/dev/null
-  [ -n "$G2_PI" ] && ssh -o BatchMode=yes "$G2_PI" 'ps -eo pid,comm,args | awk "\$2 ~ /^python/ && /camera_preview/ {print \$1}" | xargs -r kill' 2>/dev/null
+  [ -n "$G2_PI" ] && { _g2ssh "$G2_PI" 'ps -eo pid,comm,args | awk "\$2 ~ /^python/ && /camera_preview/ {print \$1}" | xargs -r kill' \
+    || { _g2log "could not stop the preview on the Pi (tunnel closed locally)"; return 1; }; }
   echo "pi preview stopped"
 }
 

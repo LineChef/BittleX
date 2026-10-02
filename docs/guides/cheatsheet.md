@@ -180,6 +180,7 @@ standard pose set.
 | `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
 | `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
 | `g2cam-info` | print the serial port + which model is on the module |
+| `g2see` | **just look** -- live feed with detection boxes from the camera mounted on G2 (plugged into the Pi) at `localhost:8080`; no name, nothing saved. Close the tab to stop (or `g2pcam-stop`). Needs `G2_PI` exported; tells you if the camera isn't plugged in |
 | `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
 | `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
 | `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
