@@ -46,6 +46,45 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 **Uncommitted at the pause:** everything described here (code, tests, docs) is local. Nothing has
 been pushed since the camera/IMU-link work (`development` at `6a2e7e7`).
 
+## Servo troubleshooting -- where we left off (2026-10-02)
+
+Raw data and printed tables: [`real-walk-data/2026-10-02/`](real-walk-data/2026-10-02/README.md). Detail below
+under "Servo feedback tests".
+
+**Symptoms (user, after re-calibrating the limbs):** (1) the FR shoulder visibly lags/sags *after* the servos relax --
+the rest pose is right when the leg first drops into it; (2) the firmware step gait moved G2 laterally right (this
+**went away** after the IMU `gc` calibration + recalibration: `kvtF` now runs steadily, ~1 inch drift left, yaw -29 deg).
+
+**Findings so far**
+- **Front-left shoulder servo (servo 8) is faulty or mis-sensing -- the strongest result.** Loaded and unloaded it
+  keeps landing on ~42 deg whatever it is commanded to (44-60), sometimes reaching the target, with random readings
+  of 18-27. 8 deg low at the stand angle (50), which is the centre of every gait run. Reproducible; independent of load.
+  Not yet known whether the leg itself moves to the commanded angle (the user's view of a slow sweep was not recorded).
+- **Front-right shoulder (servo 9):** mostly accurate, but ~6 of 32 readings in a sweep were wild (-25..+17 at targets
+  40-65). Looks like feedback glitches, not movement. An earlier unloaded run showed the same.
+- **Back shoulders and all four knees track well unloaded.** Knees sag under load (rear knees ~20 deg short of 0 when
+  standing; FL knee erratic) -- load/torque/supply, to re-test on a full battery (pack read ~7.6-7.8 V).
+- The leg-to-servo map is right (8, 9, 10, 11 = FL, FR, BR, BL).
+- The FL shoulder is a *shoulder* servo, which on a Bittle X uses a **short** servo cable (Petoi assembly guide); the
+  joint index does not map to a PWM pin number, so find the connector by following the cable.
+- Suspects, not separated: worn/flat position sensor in servos 8 (and 9), a loose/damaged connector or cable on the
+  adjacent servo 8/9 channels, a slipped horn or screw, a stripped gear.
+
+**Next, in order**
+1. Ask what the FL leg physically did during the slow servo-8 sweep (smooth, stuck, or twitching) -- sensor fault vs
+   servo/mechanical fault.
+2. Wiggle test: stream servo 8 (and 9) feedback while gently wiggling each connector/cable (servo end, then BiBoard end).
+3. Reseat servos 8 and 9 connectors (power off, inspect pins); then swap servos 8 and 9 (or just their cables) and rerun
+   `tools/servo_static_test.py` -- does the fault follow the servo or stay with the leg?
+4. Hand check, servos relaxed, G2 upright: move each front shoulder by hand and compare.
+5. Full-battery rerun of the static test; capture the rest-relaxation (feedback from the moment `d` is sent) for the
+   FR shoulder -- needs a fixed `servo_response_test.py`.
+6. If servo 8 is the culprit: replace it (Petoi spare), recalibrate the joint, re-run the walk comparisons. Everything walk-wise
+   logged on 2026-10-01 was run with this leg's shoulder ~8 deg low, so re-check the hard-floor/carpet results afterwards.
+7. Remaining gait A/B not run: `kvtF` with balance off, `kwkF`, `kcrF` (step gait is fine now, so lower priority).
+- G2 must not be put on its back: the Pi and BiBoard are exposed. Unloaded tests are done by holding it upright in the air.
+- Protocol notes: feedback works only over the Mac USB cable (unplug it for untethered walks, plug it back for servo tests).
+
 ## What the hardware looks like now
 
 - **Hard floor, V2.1, 10 cycles (12.5 s, `--cmd 0.10`):** upright and steady in all 6 runs,
@@ -197,3 +236,38 @@ get below ~63 mm at knees x2.
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
 - Hard-floor controls for the lift/stride variants (see "Where we left off").
 - A hands-off run in a longer space; V2.1 carpet repeats with the fall guard.
+
+## Servo feedback tests, 2026-10-02 (after the user re-calibrated the limbs)
+
+User symptoms: some lag in the FR shoulder at rest, and the firmware step gait (`vtF`) moves G2 laterally
+to the right. Tools: `tools/servo_response_test.py`, `tools/servo_static_test.py` (data in
+`real-walk-data/2026-10-02/`). **Servo position feedback works over the BiBoard's USB** (`f` starts a
+~5 rows/s stream of 8 values = servos 8..15; any new command stops it, so restart it with `f`); over the
+Pi's UART `f` returned only an echo.
+
+- **Leg mapping confirmed by eye:** servos 8, 9, 10, 11 move FL, FR, BR, BL (the code's labels are right).
+- **At rest (relaxed):** shoulders left-right within 1 deg; FL knee ~6 deg less flexed than the other three.
+- **Standing on the floor, every joint commanded to the stand pose (shoulders 50, knees 0), 5 repeats:**
+  FL shoulder stays ~42 (8 deg low); FR/BR/BL shoulders 49-50; rear knees ~20 deg short of 0 (BR -21..-24,
+  BL -14..-22), FR knee drifts -3 -> -11, FL knee -1..-4. Not a timing effect.
+- **Unloaded (G2 held off the ground), per-joint staircase:** all four knees track perfectly (gain 0.96-0.98,
+  offset ~0), so the rear-knee droop and erratic FL knee are load-dependent (torque or supply; battery was
+  ~7.6-7.8 V, roughly half charge -- a full-battery rerun is still to do).
+- **FL shoulder (servo 8) is the real anomaly:** unloaded it follows some commands but intermittently sticks at
+  ~42 deg and will not go higher, even when commanded to 65; steady while stuck (no hunting). Sequence read
+  35->35, 45->44, 50->42, 55->47, 50->49, 65->42, 50->42, 40->40, 50->49. The stand angle (50) is the centre of
+  every gait run so far, so this leg's shoulder has probably sat ~8 deg low and had its swing clipped in all of
+  the walks logged. Suspects: slipping/stripped gear, slipped horn or screw, mechanical jam, cable/connector.
+- **FR shoulder (servo 9):** read -3.5 / -15 at commands 35 / 65 in one unloaded run but tracked perfectly
+  (34-35, 48-50, 63) when repeated; treated as a one-off glitch, still on the watch list.
+- Next: swap servos 8 and 9 (or their cables) and rerun `servo_static_test.py` to see whether the fault follows
+  the servo; hand-check the FL shoulder; full-battery rerun; then the gait A/B (`vtF` vs `kwkF`/`kcrF`).
+
+### Firmware step gait (`kvtF`), 2026-10-02, hard floor, untethered, balance on, 6 s
+
+Stayed up; roll +2.3 / std 1.4 (range 0..+5), pitch -1.2 / 1.2, yaw -29 deg (25/50/75/100%: -11 -15 -23 -29).
+User: "step gait looked good this time", drifted slightly **left** (~1 inch) instead of right. This agrees with
+the log (negative yaw = left) and confirms the yaw sign for the firmware IMU stream. The earlier lateral-right
+movement in the step gait (before the `gc` IMU calibration and the limb recalibration) is gone. The
+balance-off `vtF`, `kwkF` and `kcrF` comparisons were not run. The rest-pose symptom is unchanged: the pose is right
+when it first drops to rest and the FR shoulder visibly lags/sags *after* the servos relax.
