@@ -85,6 +85,19 @@ the rest pose is right when the leg first drops into it; (2) the firmware step g
 - G2 must not be put on its back: the Pi and BiBoard are exposed. Unloaded tests are done by holding it upright in the air.
 - Protocol notes: feedback works only over the Mac USB cable (unplug it for untethered walks, plug it back for servo tests).
 
+## Is the learned gait actually better than the scripted one? (evidence as of 2026-10-03)
+
+**Not proven.** The scored head-to-head on the real robot (H1) has not been run.
+
+- **In sim, after the payload-inertia fix:** `Release_CandidateV2` beat scripted on ledges (13.3 % vs 26.7 % falls) and was faster than V1 in every
+  category; `V2.1` (the deployed policy's lineage) is recorded as faster than scripted in every cell and with fewer falls on the 25 mm ledges
+  (10 % vs 40 %). The per-cell speed margins are not written in the text (they are in the linked report), so "how much" is unquantified here.
+- **Earlier sim numbers are suspect:** `hw1_20m` was measured on a tilt-locked body — flat ground 0.108 vs 0.101 m/s (+7 %), rough ground
+  0.038 vs 0.015, 20 mm obstacles 0.050 vs 0.015, 20° descent 0.069 vs 0.022 — big on hard terrain, small on flat; invalidated by the bug.
+- **On the real robot:** V2.1 on hard floor ~0.118 m/s vs the scripted open-loop walk ~0.12 m/s (different conditions, not a matched test), V2.1 drifts and
+  rolls ±6°, and both fail on carpet. The learned gait's unproven advantages are speed/heading command following, hard-terrain performance and
+  mid-walk catching; the firmware has no mid-walk catch.
+
 ## What the hardware looks like now
 
 - **Hard floor, V2.1, 10 cycles (12.5 s, `--cmd 0.10`):** upright and steady in all 6 runs,

@@ -84,6 +84,34 @@ Source: [AI conversation](https://guide.petoi.com/extensible-modules/ai-conversa
   lists or emoji. The default-reaction idea isn't covered: our voice skills have no explicit nod or shake-head entries (`knd` exists as a gesture),
   so it is a possible small addition, not done.
 
+### Losing the Pi, item by item (2026-10-03)
+
+"Gone" and "moves to the cloud" are different; this table keeps them apart. Assumes the head plus the BiBoard only, no Pi.
+
+| Capability | With the Pi today | Without it | Gone or different |
+|---|---|---|---|
+| Walking | learned policy (V2.1) at 80 Hz | Petoi's scripted gaits with the firmware's gyro balance | **gone** (the learned gait), replaced |
+| Reflexes | ours: fall guard, thermal guard, jam guard, carpet detector, watchdog, e-stop | Petoi's firmware reflexes remain (below), ours are gone | different: we lose the mid-walk catch, the heat estimate and the e-stop |
+| "Feels alive" behaviors | behavior runtime (attentive, roam, idle descent, sleep and wake, gestures, mood, enrollment) at ~8 Hz | no deterministic runtime on the head; the LLM can call skills but not run timers and sensor loops | **gone** unless rebuilt as server or tool logic |
+| Claude, personality, our memory | Claude API with SQLite memory and traits | XiaoZhi's LLM with its own platform memory; ours only if we host a backend | **different** — memory lives in their cloud (or ours); the design is not ours |
+| Speech | local Vosk and Piper, works offline | cloud speech-to-text and text-to-speech; needs Wi-Fi and the internet | different; offline is gone |
+| Vision into behavior | detections feed the behavior layer | the camera's stock path on the BiBoard (face detection model; `XC` on, `Xc` off) | different, and costly: enabling the camera mode kills the IMU task in current firmware |
+| Dev loop | SSH, Python, logs, rsync, tests | ESP-IDF serial logs on the head, USB on the BiBoard | different, much weaker |
+
+The firmware reflexes that stay (`imu.h`, `reaction.h`; `docs/hardware/petoi-firmware-reference.md`), all with gyro assist on:
+flipped (roll > 85° with accel-Z near zero) plays a fall sound and runs the get-up `rc` once, repeating until upright; lifted
+(pitch < −50° or > 75°), knocked, freefall and turning are detected; pushed runs a scripted side-step or forward/back corrective
+gait then stands, **but only while standing, not while walking**; an off-direction heading error triggers an automatic turn; and the
+servos have their own overheat protection and a low-battery cutoff (~7.0 V → rest, servos off).
+
+### Forking (2026-10-03)
+
+- **The head's firmware:** Petoi's source is not released yet. Today the closest public base is the upstream
+  [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) project (MIT, very active, "an MCP-based chatbot", ESP32-C3 supported); you would
+  also need the head's board definition (pins, audio codec), which only Petoi's release will give. Fork it, or Petoi's repo once public.
+- **The BiBoard firmware:** [OpenCatEsp32](https://github.com/PetoiCamp/OpenCatEsp32-Quadruped-Robot) (MIT) is a separate matter; the
+  project decision is to stay on stock firmware unless something truly can't be done from the Pi.
+
 ### What this does to the decision
 
 - **Replacing the Pi looks unrealistic.** The learned gait, the safety layers, the behavior runtime and the Claude/memory path all run on

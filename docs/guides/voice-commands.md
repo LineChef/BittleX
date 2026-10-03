@@ -60,7 +60,9 @@ commands -- they just nudge G2's mood toward subdued for a while.
 | wave / say hi | wave hello with a front leg |
 | do push-ups | push-ups |
 | scratch | scratch with a hind leg |
-| look around / check your surroundings | check-around head scan |
+| nod | nod — yes, agreement, understanding (`knd`) |
+| shake head | shake the head — no, disagreement, confusion (`kwh`) |
+| look around / check your surroundings | check-around head scan (`kck`; also Claude's "thinking" reaction) |
 | a beckoning / "come here" gesture mid-conversation | the `come_here` gesture (a wave-over, not a walk -- see note below) |
 | go to the zero position | move all joints to zero |
 

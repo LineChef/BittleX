@@ -40,7 +40,9 @@ SKILLS: dict[str, Skill] = {
     "wave":      Skill("hi",   "wave hello with a front leg", False),
     "push_ups":  Skill("pu",   "do push-ups", False),
     "scratch":   Skill("scrh", "scratch with a hind leg", False),
-    "check_around": Skill("ck", "look around, checking the surroundings", False),
+    "nod":       Skill("nd",  "nod: yes, agreement, understanding", False),
+    "shake_head": Skill("wh",  "shake the head: no, disagreement, confusion", False),
+    "check_around": Skill("ck", "look around, checking the surroundings (also: thinking, inspecting)", False),
     "come_here": Skill("cmh",  "beckoning / come-here gesture", False),
     "zero":      Skill("zero", "move all joints to the zero position", False),
 }

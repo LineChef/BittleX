@@ -32,3 +32,17 @@ def test_blocked_tokens_refused():
 def test_catalogue_for_prompt_lists_names():
     text = skills.catalogue_for_prompt()
     assert "walk_forward" in text and "sit" in text
+
+
+def test_head_reaction_skills_map_to_the_firmware_tokens():
+    # yes / no / thinking reactions (Petoi tokens knd, kwh, kck)
+    assert skills.serial_command("nod") == "knd"
+    assert skills.serial_command("shake_head") == "kwh"
+    assert skills.serial_command("check_around") == "kck"
+    text = skills.catalogue_for_prompt()
+    assert "nod" in text and "shake_head" in text
+
+
+def test_default_prompt_tells_claude_when_to_use_the_reactions():
+    from pi_pipeline.config import _DEFAULT_SYSTEM_PROMPT as p
+    assert "nod" in p and "shake_head" in p and "check_around" in p
