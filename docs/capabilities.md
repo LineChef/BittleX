@@ -15,9 +15,10 @@ the *what*, kept current as capabilities land.
 | 🧩 | **Built, hardware-gated** — code complete and tested against mocks; needs the physical robot or camera to exercise and tune |
 | 🔬 | **Researched / parked** — investigated, outcome recorded, not currently active |
 
-The robot frame and camera are still inbound, so most on-robot behaviour is 🧩:
-the logic exists and is unit-tested with the hardware mocked, waiting on bring-up.
-`pi_pipeline/` carries **599 passing tests**.
+Most on-robot behaviour is still 🧩: the logic exists and is unit-tested with the hardware
+mocked. What has actually been exercised on the robot, what is deployed, and what is
+broken right now is in [`STATUS.md`](STATUS.md) — this file does not repeat it. Run
+`pytest` for the current test results (no counts are quoted in the docs).
 
 ---
 
@@ -25,7 +26,7 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 
 | Domain | Headline | Status |
 |---|---|---|
-| Locomotion — learned | An RL walk that tracks speed/heading commands; deployed policy `hw1_20m` is trained under G2's real control path (5 Hz IMU, firmware `i` command timing) — see `docs/rl/hw1-log.md` | ✅ sim / 🧩 robot |
+| Locomotion — learned | An RL walk that tracks speed/heading commands, trained under G2's real control path (5 Hz IMU, firmware `i` command timing); which policy is deployed and how it does on the robot: [`STATUS.md`](STATUS.md) | ✅ sim / 🧩 robot |
 | Locomotion — scripted | ~20 OpenCat keyframe skills wired with friendly names (walk, turn, back up, carpet gait, jump, get-up, sit, stretch, expressive moves) | 🧩 |
 | Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography | 🧩 |
@@ -43,11 +44,11 @@ the logic exists and is unit-tested with the hardware mocked, waiting on bring-u
 ## Locomotion
 
 ### Learned gait (RL) — ✅ in sim, 🧩 on the robot
-- **`hw1_20m`** — the deployed policy (2026-09-23). Trained under a model of G2's
-  real control path: the stock firmware's 5 Hz IMU with no rate signal, the
+- **The deployed policy** (see [`STATUS.md`](STATUS.md)) is trained under a model of
+  G2's real control path: the stock firmware's 5 Hz IMU with no rate signal, the
   `i` joint command's execution timing, realistic body mass, and small IMU /
-  servo calibration errors. Full record: `docs/rl/hw1-log.md`.
-- **`run20m_ppo`** — the frozen deployment base. 20 M PPO steps from scratch in
+  servo calibration errors. Lineage and results: [`rl/hw1-log.md`](rl/hw1-log.md).
+- **`run20m_ppo`** — the original frozen base the later policies were compared against. 20 M PPO steps from scratch in
   PyBullet; a learned *residual* on Bittle's scripted `wkF` trot, IMU-corrected
   every control step.
   - Tracks forward-speed commands to **0.007 m/s** and heading commands.

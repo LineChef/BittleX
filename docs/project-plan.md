@@ -1468,7 +1468,7 @@ requiring a manual capture session, landed the mechanism itself, behind new
   already bench-bring-up-done (Phase 6 / Phase 8), just not mounted on the
   body — worth doing before wiring a model in, not after.
 - 22 new tests (`test_object_gallery.py`, `test_object_seek.py`, 4 in
-  `test_driver.py`) — 599 passing total.
+  `test_driver.py`) — all tests passing total.
 
 **Emergency stop — built 2026-09-10** (`behavior/emergency.py`, `EmergencyStop`).
 A latching manual freeze that outranks *everything* in `BehaviorDriver.tick()`

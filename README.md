@@ -109,7 +109,7 @@ ahead of this point.
   state machine, the on-robot gait loop, the autonomous behaviour layer
   (explore mode, idle-REST staged descent), a servo thermal guard, a
   black-box diagnostics logger, and Pi power-management helpers — all scaffolded
-  and running on a dev machine with the hardware mocked; **599 tests passing**.
+  and running on a dev machine with the hardware mocked; **the test suite passing**.
 - **On-device vision** — a custom 3-class detection model (household member +
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
