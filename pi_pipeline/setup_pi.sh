@@ -76,7 +76,7 @@ sudo apt-get install -y -qq git python3-venv python3-dev build-essential libport
 ok "installed: git python3-venv python3-dev build-essential libportaudio2"
 
 # --------------------------------------------------------------------------
-cyan "4/4  serial: disable Bluetooth, take the stable PL011 for the BiBoard link"
+cyan "4/4  serial: disable Bluetooth, take the stable PL011 for the BiBoard link; enable I2S audio"
 add_cfg() {   # append a line to config.txt at most once
   if grep -qxF "$1" "$BOOTCFG"; then
     ok "config.txt already has: $1"
@@ -88,6 +88,9 @@ add_cfg() {   # append a line to config.txt at most once
 }
 add_cfg "enable_uart=1"
 add_cfg "dtoverlay=disable-bt"
+# I2S mic (SPH0645) + amp (NS4168) on GPIO18-21; one duplex overlay covers both — do not add max98357a too
+add_cfg "dtparam=i2s=on"
+add_cfg "dtoverlay=googlevoicehat-soundcard"
 
 sudo systemctl disable --now hciuart.service            2>/dev/null || true
 sudo systemctl disable --now serial-getty@ttyAMA0.service 2>/dev/null || true
@@ -111,6 +114,7 @@ cyan "summary"
 echo "    RAM / swap:"
 free -h | sed 's/^/      /'
 echo "    serial:  /dev/ttyAMA0  (alias /dev/serial0)  once rebooted  —  BiBoard link @ 115200"
+echo "    audio:   I2S card (googlevoicehat) once rebooted  —  check with: arecord -l"
 echo
 if [ "$REBOOT_NEEDED" -eq 1 ]; then
   warn "config.txt / cmdline.txt changed  ->  REBOOT NOW:   sudo reboot"
