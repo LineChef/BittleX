@@ -53,6 +53,37 @@ settings such as Serial-2 (`XS`) mode.
 interaction, the Pi carries the learned walking policy, safety layers and behavior runtime. Some of the integrations we described need
 custom firmware development and testing.
 
+### From Petoi's AI Conversation guide (read in full 2026-10-03)
+
+Source: [AI conversation](https://guide.petoi.com/extensible-modules/ai-conversation) (raw text at `.md`), with the
+[BiBoard V1 guide](https://guide.petoi.com/biboard/biboard-v1-guide) and the
+[serial protocol](https://guide.petoi.com/apis/serial-protocol).
+
+- **Setup flow:** swap the stock head for the AI head on the head servo; wire it through Grove (the guide shows three diagrams — BiBoard V1
+  **without** the voice module, BiBoard V1 **with** the voice module, NyBoard V1; diagrams only, no text, so read them on the unit). Power on,
+  join the `Xiaozhi-…` hotspot, `http://192.168.4.1` opens, pick a **2.4 GHz** network (the module remembers several, retries each five times,
+  then tries the others, then says "Please configure the network"; a short **Boot** press re-enters network setup). Then activate at
+  [xiaozhi.me](https://xiaozhi.me/): **first-time users must register with a mobile phone number** (a privacy and throwaway-account issue
+  for the privacy gate), Console → Add Device → the 6-digit code.
+- **What the cloud console configures:** a **Role** tab (voice, introduction/prompt), **Model & Memory**, **Speaker Recognition** (not on the free
+  plan) and **Extensions**. The wake word is "Hi, Jason" (or Boot; Boot also stops the current conversation). No wake-word option is documented.
+- **How the LLM moves the robot:** through a tool named **`self.robot.send_command`** whose parameters are plain Petoi command codes (`ksit`,
+  `kwkF 3`); the prompt forbids descriptions like "sit down(ksit)". Petoi's default prompt makes the dog nod (`knd`), shake its head (`kwh`),
+  check (`kck`) or scratch (`kscrh`) when no action is requested, and send `d` (rest) before saying goodbye. The tool is generic, so the
+  command string is the LLM's to choose. The founder's reply expanded MCP as "Motion Control Program", but this tool-naming matches XiaoZhi's
+  **Model Context Protocol** — so a custom firmware or server could swap in, or add, tools (inference; check when the source is released).
+- **Documented UART facts:** BiBoard V1's Grove sockets are **G1 = UART2, G2 = I²C, G3/G4 = analog**, serial baud 115200 (CH343P USB chip).
+  G1 is the **only** UART-capable Grove socket, and it is the same UART2 as the 5-pin Pi header. If the camera's Grove cable is plugged into G1
+  (the 2026-09-29 build notes say it connects to the Grove socket at the head), the head and the camera would also fight over the socket — and
+  the camera now sends detections over USB, so check whether its Grove cable is needed at all, or can move to G2.
+- **Not on any of the pages:** the serial protocol's full token list and timing, the BiBoard V1 pin tables, the head's camera (none mentioned),
+  the firmware repository, and any list of available actions beyond the examples above.
+- **Useful for our own pipeline:** Petoi's role template tells the LLM to keep replies to two sentences and plain text for speech (no
+  markdown, asterisks, emoji or decorative punctuation), run several requested actions one by one with a short summary at the end, and pick a
+  fitting default reaction (nod, shake, check, scratch) when asked nothing explicit. Our default prompt already says short, spoken, no markdown,
+  lists or emoji. The default-reaction idea isn't covered: our voice skills have no explicit nod or shake-head entries (`knd` exists as a gesture),
+  so it is a possible small addition, not done.
+
 ### What this does to the decision
 
 - **Replacing the Pi looks unrealistic.** The learned gait, the safety layers, the behavior runtime and the Claude/memory path all run on
