@@ -39,6 +39,7 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 | [`pi-bring-up.md`](guides/pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
 | [`gait-deployment.md`](guides/gait-deployment.md) | The sim→real path (ONNX export, on-robot loop, bring-up steps). |
 | [`train-vision-model.md`](guides/train-vision-model.md) | The SenseCraft capture→train→deploy flow. |
+| [`swappable-llm.md`](guides/swappable-llm.md) | Change the Claude model, or use a cheaper/free OpenAI-style model alone or routed with Claude. |
 | [`api-setup.md`](guides/api-setup.md) | Anthropic API key, workspace + spend-limit checklist. |
 | [`feature-flags.md`](guides/feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
 | [`automated-testing-loop.md`](guides/automated-testing-loop.md) | Runbook for unattended RL reward iteration. |

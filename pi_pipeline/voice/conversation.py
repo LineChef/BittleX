@@ -24,6 +24,7 @@ from ..diag.core import last_failure, summarize_session
 from ..features import features
 from ..personality import Personality
 from . import skills
+from .llm import (LLMError, OpenAICompatLLM, history_for_claude, needs_claude)
 
 log = logging.getLogger("g2.conversation")
 
@@ -121,7 +122,16 @@ class AssistantTurn:
 class Conversation:
     def __init__(self, cfg: Settings, personality: Personality | None = None):
         self._cfg = cfg
-        self._client = anthropic.Anthropic(
+        if cfg.llm_mode not in ("claude", "fast", "routed"):
+            raise RuntimeError(f"G2_LLM_MODE must be claude, fast or routed (got {cfg.llm_mode!r})")
+        self._fast: OpenAICompatLLM | None = None
+        if cfg.llm_mode in ("fast", "routed"):
+            if not (cfg.fast_llm_base_url and cfg.fast_llm_model):
+                raise RuntimeError("G2_LLM_MODE=%s needs G2_FAST_LLM_BASE_URL and G2_FAST_LLM_MODEL (see .env.example)"
+                                   % cfg.llm_mode)
+            self._fast = OpenAICompatLLM(cfg.fast_llm_base_url, cfg.fast_llm_api_key, cfg.fast_llm_model,
+                                         cfg.claude_max_tokens, cfg.request_timeout_s)
+        self._client = None if cfg.llm_mode == "fast" else anthropic.Anthropic(
             api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s
         )
         self._base_system = cfg.system_prompt
@@ -207,6 +217,48 @@ class Conversation:
             raise ConversationError("rate", self._cfg.speech_api_rate) from last_err
         raise last_err  # type: ignore[misc]
 
+    def _fast_create(self):
+        """One call to the fast backend. Auth/billing/rate failures raise a spoken ConversationError in fast-only mode;
+        in routed mode every failure raises LLMError so the caller can fall back to Claude."""
+        try:
+            return self._fast.create(self._system_prompt, _TOOLS, self._history)
+        except LLMError as e:
+            if self._cfg.llm_mode == "fast" and e.kind in ("auth", "billing", "rate"):
+                log.error("fast LLM %s failure: %s", e.kind, e)
+                spoken = {"auth": self._cfg.speech_api_auth, "billing": self._cfg.speech_api_billing,
+                          "rate": self._cfg.speech_api_rate}[e.kind]
+                raise ConversationError(e.kind, spoken) from e
+            raise
+
+    def _complete(self, user_text: str, memory_context: str | None):
+        """Pick a backend for this turn and get its reply. Returns (response, backend name)."""
+        if self._fast is not None:
+            why = None
+            if self._cfg.llm_mode == "routed":
+                why = needs_claude(user_text, memory_context, sees_memory=self._cfg.fast_llm_sees_memory,
+                                   max_words=self._cfg.route_max_words, pattern=self._cfg.route_escalate_pattern)
+            if why is None:
+                try:
+                    resp = self._fast_create()
+                    if self._cfg.llm_mode == "fast" or any(
+                            b.type == "tool_use" or (b.type == "text" and b.text.strip()) for b in resp.content):
+                        return resp, "fast"
+                    log.warning("fast LLM returned an empty reply; falling back to Claude")
+                except LLMError as e:
+                    if self._cfg.llm_mode == "fast":
+                        raise
+                    log.warning("fast LLM failed (%s); falling back to Claude", e)
+            else:
+                log.info("routing to Claude: %s", why)
+        resp = self._create(
+            model=self._cfg.claude_model,
+            max_tokens=self._cfg.claude_max_tokens,
+            system=self._system_prompt,
+            tools=_TOOLS,
+            messages=history_for_claude(self._history),
+        )
+        return resp, "claude"
+
     def send(self, user_text: str, memory_context: str | None = None) -> AssistantTurn:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
@@ -221,14 +273,8 @@ class Conversation:
         self._history.append({"role": "user", "content": blocks})
 
         t0 = time.monotonic()
-        resp = self._create(
-            model=self._cfg.claude_model,
-            max_tokens=self._cfg.claude_max_tokens,
-            system=self._system_prompt,
-            tools=_TOOLS,
-            messages=self._history,
-        )
-        log.info("Claude replied in %.1fs (stop=%s)", time.monotonic() - t0, resp.stop_reason)
+        resp, backend = self._complete(user_text, memory_context)
+        log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
 
         self._history.append({"role": "assistant", "content": resp.content})
 

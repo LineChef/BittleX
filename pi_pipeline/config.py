@@ -79,6 +79,16 @@ class Settings:
         "I've hit my usage limit and can't chat right now."))
     claude_model: str = field(default_factory=lambda: _env("CLAUDE_MODEL", "claude-sonnet-5"))
     claude_max_tokens: int = field(default_factory=lambda: _env_int("CLAUDE_MAX_TOKENS", 400))
+    # --- Swappable LLM (see voice/llm.py, docs/guides/swappable-llm.md) ---
+    # claude (default) | fast (OpenAI-style backend only, no Anthropic key needed) | routed (fast for casual turns, Claude for the rest)
+    llm_mode: str = field(default_factory=lambda: _env("G2_LLM_MODE", "claude").lower())
+    fast_llm_base_url: str = field(default_factory=lambda: _env("G2_FAST_LLM_BASE_URL"))
+    fast_llm_api_key: str = field(default_factory=lambda: _env("G2_FAST_LLM_API_KEY"))
+    fast_llm_model: str = field(default_factory=lambda: _env("G2_FAST_LLM_MODEL"))
+    # Memory context is personal; by default it never goes to the fast backend (such turns go to Claude).
+    fast_llm_sees_memory: bool = field(default_factory=lambda: _env("G2_FAST_LLM_SEES_MEMORY").lower() in ("1", "true", "yes", "on"))
+    route_max_words: int = field(default_factory=lambda: _env_int("G2_ROUTE_MAX_WORDS", 25))
+    route_escalate_pattern: str = field(default_factory=lambda: _env("G2_ROUTE_ESCALATE_PATTERN"))
     request_timeout_s: float = field(default_factory=lambda: _env_float("CLAUDE_TIMEOUT_S", 30.0))
     system_prompt: str = field(default_factory=lambda: _env("G2_SYSTEM_PROMPT") or _DEFAULT_SYSTEM_PROMPT)
     history_turns: int = field(default_factory=lambda: _env_int("G2_HISTORY_TURNS", 12))
