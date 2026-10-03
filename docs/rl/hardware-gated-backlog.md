@@ -21,11 +21,6 @@ Status legend: 🔴 blocked on hardware · 🟡 partial sim work possible now ·
 
 ## H1 — Learned vs scripted head-to-head on the real robot  🔴
 
-> **Status 2026-10-01:** first real walks done -- the deployed `Release_CandidateV2.1` walked six
-> clean 10-cycle runs on hard floor (~0.118 m/s, steady, roll std ~6 deg, drifts right). The scripted
-> contender has only an open-loop run so far (~3 ft in 6 cycles, ~0.12 m/s); no matched SCR vs RL
-> scoring yet. Both fall on carpet. Details and the open list: [`real-walk-log.md`](real-walk-log.md).
-
 **The question the whole RL locomotion track hinges on.** Is a learned gait
 actually better than OpenCat's firmware `wkF` (which has a live gyro-balance
 layer the sim baseline doesn't) for plain walking on real ground?
@@ -39,10 +34,6 @@ layer the sim baseline doesn't) for plain walking on real ground?
   back to firmware gaits + a perception layer.
 
 ## H2 — Payload re-tuning  🟡
-
-> **Status 2026-10-01:** the real stack currently matches the V2.1 training payload, but it is only
-> **temporarily mounted** and can shift. Plan: once the remaining hardware is on, weigh it, update the
-> payload model and retrain; the 2026-10-01 walks are the baseline to compare against.
 
 `run20m_ppo` is **payload-conditioned** — trained with a single 75 g welded rear
 payload every episode. The gait's stability leans on that mass.
@@ -219,13 +210,6 @@ no BiBoard-V1 IR trigger.
   IR-trigger workaround for BiBoard V1.
 
 ## H10 — Carpet resistance sysid calibration  🔴
-
-> **Status 2026-10-01:** real carpet data exists (pile ~6.4 mm / 1/4 in). V2.1 and the scripted walk both
-> fall on it with the feet catching; Petoi's carpet gait (~27 mm lift, ~36 mm stride) stays up but walks
-> in place; lifting the scaled `wkF` higher did not help and some variants fall on hard floor too. Falls
-> are sideways to the right with pitch calm. `sysid_replay.py` had a zero-inertia payload bug (body
-> could not tilt) and is fixed; the actuator `--fit` was degenerate on this data. Foot lift/stride
-> estimates, the run table and the proposed sim changes are in [`real-walk-log.md`](real-walk-log.md).
 
 `CARPET_SOFT` (T8.1 house-carpet compliance/friction) is a **guess** — calibrated
 to a verbal description and three photos, never measured. Two resistance
