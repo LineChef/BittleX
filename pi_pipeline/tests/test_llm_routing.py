@@ -157,3 +157,11 @@ def test_fast_only_auth_failure_is_spoken(cfg):
     with pytest.raises(ConversationError) as e:
         conv.send("hello")
     assert e.value.kind == "auth"
+
+
+def test_claude_calls_carry_the_configured_effort(cfg, fake_anthropic):
+    Conversation(cfg).send("hello")
+    assert fake_anthropic.calls[-1]["output_config"] == {"effort": "low"}
+    object.__setattr__(cfg, "claude_effort", "")
+    Conversation(cfg).send("hello")
+    assert "output_config" not in fake_anthropic.calls[-1]

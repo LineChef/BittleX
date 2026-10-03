@@ -256,6 +256,7 @@ class Conversation:
             system=self._system_prompt,
             tools=_TOOLS,
             messages=history_for_claude(self._history),
+            **({"output_config": {"effort": self._cfg.claude_effort}} if self._cfg.claude_effort else {}),
         )
         return resp, "claude"
 

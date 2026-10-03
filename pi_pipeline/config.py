@@ -79,6 +79,9 @@ class Settings:
         "I've hit my usage limit and can't chat right now."))
     claude_model: str = field(default_factory=lambda: _env("CLAUDE_MODEL", "claude-sonnet-5-5"))
     claude_max_tokens: int = field(default_factory=lambda: _env_int("CLAUDE_MAX_TOKENS", 400))
+    # Thinking depth: low | medium | high | xhigh | max. "low" keeps spoken replies quick and stops thinking
+    # tokens from eating the small max_tokens budget. Empty = the model's own default.
+    claude_effort: str = field(default_factory=lambda: _env("CLAUDE_EFFORT", "low").lower())
     # --- Swappable LLM (see voice/llm.py, docs/guides/swappable-llm.md) ---
     # claude (default) | fast (OpenAI-style backend only, no Anthropic key needed) | routed (fast for casual turns, Claude for the rest)
     llm_mode: str = field(default_factory=lambda: _env("G2_LLM_MODE", "claude").lower())
