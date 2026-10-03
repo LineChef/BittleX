@@ -12,7 +12,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 | Raspberry Pi Zero 2 W + PiSugar S | Mounted temporarily (the payload can shift). Talks to the BiBoard over UART (`/dev/serial0`, 115200); IMU stream is the stock **5.0 Hz**. Powered by the PiSugar, not the BiBoard. Build record: [`blueprints/`](../blueprints/README.md) |
 | Camera (Grove Vision AI V2) | On the Pi's USB (`/dev/ttyACM0`), mounted rotated 90°, so the module has to be turned upright for the model to fire. Custom 3-class detector deployed on the camera. Vision-based navigation is gated **off** (`features.vision`, default False). See [`vision/`](vision/) |
 | Microphone + speaker | Parts ordered, not yet wired. Pinout and wiring: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md) |
-| Petoi AI Head | Ordered, arriving ~2026-10-10; whether it replaces the Pi is an open decision — [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) |
+| Petoi AI Head | Ordered, arriving ~2026-10-10. Petoi says it is an ESP32-C3 with a mic and speaker, firmware to be open-sourced, and expects it to complement the Pi, not replace it; whether to use it is open — [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) |
 | Battery | Reads ~7.6–7.8 V (roughly half charge for the 2-cell pack) |
 
 ## What is deployed

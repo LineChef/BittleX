@@ -4,11 +4,12 @@ Opened 2026-10-02. The head ([product page](https://www.petoi.com/products/bittl
 **ordered, arriving around 2026-10-10**. What isn't answered by Petoi's documentation we find out **first-hand** with the
 steps below. **Keeping the Pi is a fully valid outcome** if it earns its place.
 
-What the head is, as far as known: its own microphone, speaker and camera (the camera can be trained with new
-recognition models, per the owner's research); talks over Wi-Fi to the XiaoZhi cloud LLM; wake with "Hi, Jason" or the
-Boot button; needs internet and a free account; sends skill codes (`ksit`, `kwkF 3`) to the BiBoard through Grove;
-documented for BiBoard V1 / NyBoard V1. Everything else (processor, serial protocol, host interfaces, firmware access,
-power draw, offline behavior) is unknown until answered or measured.
+What the head is (Petoi, 2026-10-03): an **ESP32-C3** with a microphone and a speaker and 16 MB of flash, running firmware based on the
+ESP32 XiaoZhi project (Espressif ESP-IDF) that Petoi plans to open-source. It talks over Wi-Fi to the XiaoZhi cloud LLM by default,
+wakes on "Hi, Jason" or the Boot button, needs internet and a free account, sends Petoi serial-protocol commands (skill codes like
+`ksit`, `kwkF 3`) to the BiBoard through a Grove socket (UART2), and is documented for BiBoard V1 / NyBoard V1. **No camera is
+mentioned in Petoi's description** — recognition questions were answered by pointing to the separate Petoi AI Vision Module (the
+Grove Vision AI V2 we already own). Treat "the head has a camera" as unconfirmed, probably false, until the unit arrives.
 
 ## What has to be found out (open questions)
 
@@ -26,6 +27,51 @@ deleted; what data leaves the device and for how long; free-tier limits, later c
 changes. Mechanics: does the kit drive the head servo, how the camera is mounted and moves, and the mass (42 g vs the ~15 g the
 sim assumes for the camera head). BiBoard requirements: firmware version, module flags, and whether installing it changes stored
 settings such as Serial-2 (`XS`) mode.
+
+## What Petoi has told us (2026-10-03)
+
+| Topic | Answer | What it means for us |
+|---|---|---|
+| Hardware | ESP32-C3, microphone, speaker; 16 MB flash, about a third free, with a 4 MB OTA partition; ESP-IDF | single-core, no FPU: little headroom for our code next to Wi-Fi, audio and the LLM client |
+| Firmware | to be open-sourced (not released yet); you can modify it and write your own applications | everything below that says "modify the firmware" waits for the source |
+| Mic audio to a host | processed internally; could be modified to stream out | custom firmware work |
+| Speaker driven by a host | yes — define a protocol so a host sends text or audio playback commands | custom firmware work, but supported by design |
+| Own backend instead of the XiaoZhi cloud | yes, by modifying the firmware | a server we control could put Claude, memory and personality behind it |
+| Talk-only / motion redirected | yes, by modifying the MCP (motion control) | the Pi can keep sole control of motion |
+| Link to the BiBoard | the existing Petoi serial protocol, including joint-level commands; the BiBoard listens on the UART when `XS` is on; rate depends on the implementation | the same protocol the Pi uses |
+| Port | UART2 through the first Grove socket. **By default the Pi and the head share the same UART and can conflict.** Petoi has made some BiBoards without the built-in voice control module, so the head gets an independent serial port | our BiBoard has the voice module; see the UART options below |
+| IMU / battery / servo feedback | not sent to the head by default; could be added over the serial protocol | closed loops stay on the Pi |
+| An 80 Hz custom loop | "potentially" — 12.5 ms per iteration, depends on the cost and on resources shared with other tasks | doubtful on a single-core C3 running Wi-Fi and audio |
+| Offline / safety | the default firmware periodically reminds users to reconnect; Petoi recommends keeping the e-stop and watchdog on the BiBoard or another local controller | the Pi's safety layers stay |
+| Power | tested while moving, but no idle / speaking / peak figures; check the Grove 5 V and measure under load | we measure it (step 2) |
+| Updates and recovery | OTA is off by default; flash or recover over a wired connection | the "pin updates" worry is covered |
+| Logs | ESP-IDF serial logging; can add more | use the USB-C serial log to read what it sends |
+| Memory and data | memory is managed on xiaozhi.me; by default audio goes to a speech-to-text service, the text to the LLM server, the reply to a text-to-speech service; the provider's policies govern retention; Petoi sees no conversations; your own backend gives you control | privacy gate stands; a self-hosted backend is the privacy fix |
+| Camera and models | recognition runs locally on the Petoi AI Vision Module and works offline; forwarding detections to a host needs development; individual identification depends on the model | the camera question is about the Vision Module, which we already have |
+
+**Petoi's own view:** the head could **complement** the Raspberry Pi rather than replace it — the C3 suits lightweight audio and AI
+interaction, the Pi carries the learned walking policy, safety layers and behavior runtime. Some of the integrations we described need
+custom firmware development and testing.
+
+### What this does to the decision
+
+- **Replacing the Pi looks unrealistic.** The learned gait, the safety layers, the behavior runtime and the Claude/memory path all run on
+  the Pi; the head can't host them (single-core C3, no feedback data, no e-stop that doesn't depend on its software), so outcomes **C**
+  (head only with scripted gaits) and **D** (our logic on the head) are now long shots. Outcome **A** (keep the Pi) and **B** (Pi + head)
+  are the live ones.
+- **If the head is used (B), it is a voice front end for the Pi,** with two ways to connect it:
+  1. **Wi-Fi voice peripheral:** the head connects over Wi-Fi to a backend we control (the Pi, a laptop or a server speaking the XiaoZhi
+     protocol), which calls Claude with our memory and personality and handles speech recognition and synthesis. The Pi keeps sole control of
+     motion; the head's serial motion output is off, so there is no UART conflict (it would take power from a 5 V source, UART lines unused).
+     Needs the firmware source, and a backend we write.
+  2. **Independent serial port:** a BiBoard without the onboard voice module, so the head has its own UART (Petoi has made a few). Needs a
+     different BiBoard, or a way to free the voice-module UART on ours.
+- **Versus the I2S microphone and amplifier already ordered:** those work with the existing Pi pipeline with no custom firmware (mic and
+  speaker driven by the Pi). The head's advantages would be fewer wires, an integrated look and less loose hardware; its costs are custom
+  firmware and a backend before it does anything the Pi can't already do. Keep the I2S parts regardless.
+- **Open items for the hands-on tests:** confirm whether it has a camera; the exact UART/pins the Grove socket uses and whether it can sit
+  on a different port; whether the shipped firmware's server address can be changed without rebuilding; the power draw; and when the
+  source is released.
 
 ## How the decision will be judged
 
@@ -81,13 +127,15 @@ privacy problem.
 4. **Listen to its serial output to the BiBoard** with the Pi's UART or a USB-serial adapter as a passive listener, never
    connected as a second driver: baud, framing, message list. Speak commands and record exactly what it emits; look for
    anything beyond named skills (joint-level `i`/`m` moves, rates).
-5. **Connect it to G2 with the Pi still installed.** Which Grove port, which UART; does it collide with the Pi's Serial-2
+5. **Connect it to G2 with the Pi still installed.** Petoi says it uses UART2 on the first Grove socket, the same UART as the Pi header by default — so first
+   try it with the serial lines **unconnected** (power only) and check the Wi-Fi-only path works; read its USB-C serial log. Then which Grove port, which UART; does it collide with the Pi's Serial-2
    (`XS`) link on pins 9/10 or the onboard voice module? After connecting, re-verify the Pi link (`check_serial ping`, IMU
    at 5.0 Hz) and the voice module. Remove it again if anything breaks.
 6. **Motion arbitration.** What happens when the Pi and the head both command the BiBoard (the BiBoard keeps only the
    oldest queued command)? Is there a talk-only mode, or a way to turn motion output off or redirect it to the Pi?
-7. **Camera.** How models are trained and deployed, class count / input size / frame rate, whether it detects on-device or in
-   the cloud (and offline), per-person recognition, and whether a host can read detections or frames at all.
+7. **Camera.** First confirm whether the head has one at all (Petoi's answers describe an ESP32-C3 with only a microphone and speaker and refer
+   vision questions to the separate Vision Module). If it does: how models are trained and deployed, on-device vs cloud, and whether a host can read
+   detections or frames. If it doesn't: skip — the Grove Vision camera stays.
 8. **Audio access.** Raw microphone or speaker access from a host (UART, USB, I2S, WebSocket); transcripts out; text-to-speech
    in; whether the server can be changed (Wi-Fi page settings, OTA URL, firmware) so a backend we control — with Claude
    behind it — answers. Only try a self-hosted server if the terms allow it.

@@ -160,9 +160,9 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 
 ## Decision pending — Petoi AI Head vs the Raspberry Pi (opened 2026-10-02)
 
-The [Bittle AI Head](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g; own microphone, speaker and a trainable camera; cloud LLM)
-is **ordered, arriving ~2026-10-10**. It might replace the mic, speaker and camera parts, and perhaps the Pi itself. **Undecided; keeping the Pi
-is a fully valid outcome.** Criteria, behavior inventory, test steps and scorecard:
+The [Bittle AI Head](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g; an ESP32-C3 with its own microphone and speaker; cloud LLM; no camera mentioned by Petoi)
+is **ordered, arriving ~2026-10-10**. It might replace the mic and speaker parts; Petoi expects it to **complement** the Pi, not replace it (single-core C3, firmware to be open-sourced,
+UART shared with the Pi by default). **Undecided; keeping the Pi is a fully valid outcome.** Criteria, behavior inventory, test steps and scorecard:
 [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md).
 
 Judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
