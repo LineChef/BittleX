@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Three checks before every commit:
+# Four checks before every commit:
 #   1. Block a commit whose staged changes or commit message contain a
 #      private term. Term list: .gitprivacy-terms (gitignored -- one
 #      whole-word term per line, '#' comments, case-insensitive).
@@ -12,6 +12,8 @@
 #      file outside docs/ -- no GIFs (replay/training footage) ever get
 #      committed anywhere in the repo (see CLAUDE.md); docs/ is the one
 #      place real images (hardware photos, diagrams we make) belong.
+#   4. Doc checks (tools/check_docs.py): broken relative links, hard-coded test counts or the deployed
+#      policy name in the wrong page, a stale generated docs/backlog.md.
 # Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
@@ -53,6 +55,20 @@ if [ -n "$staged_images" ]; then
     git reset -q -- "$f"
     echo "pre-commit: unstaged image file (not under docs/): $f"
   done <<< "$staged_images"
+fi
+
+# --- 4. doc checks: broken links, volatile facts in the wrong page, a stale generated backlog ------
+# Runs when Markdown (or a doc-check input) is staged. If DEFAULT_POLICY changed, check every page, since the new policy name
+# may already be sitting in a page that is not staged. Details: tools/check_docs.py, docs/README.md "Where to update what".
+# Bypass a genuine false positive:  git commit --no-verify
+staged_all="$(git diff --cached --name-only --diff-filter=ACM)"
+if printf '%s\n' "$staged_all" | grep -qE '\.md$|^tools/(check_docs|gen_backlog)\.py$|^pi_pipeline/gait/residual_policy\.py$'; then
+  doc_mode="--staged"
+  printf '%s\n' "$staged_all" | grep -qE '^pi_pipeline/gait/residual_policy\.py$' && doc_mode=""
+  if ! python3 "$(git rev-parse --show-toplevel)/tools/check_docs.py" $doc_mode --quiet-warnings; then
+    echo "pre-commit: doc checks failed (ERROR lines above). Fix them, or bypass with --no-verify."
+    exit 1
+  fi
 fi
 
 repo_root="$(git rev-parse --show-toplevel)"
