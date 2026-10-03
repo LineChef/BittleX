@@ -135,11 +135,16 @@ servos have their own overheat protection and a low-battery cutoff (~7.0 V → r
 ### What the head buys alongside the Pi, and what a Pi-less G2 can do (2026-10-03)
 
 **Head plus Pi gains little today.**
-- The Pi cannot use the head's microphone or speaker (no host access to either), so the I2S microphone and amplifier are still needed.
+- With stock firmware the Pi cannot use the head's microphone or speaker (the head talks to its server over Wi-Fi, not to the Pi). Petoi says both can be
+  opened to a host by modifying the firmware, and the Wi-Fi route (point the head at a backend on the Pi) avoids the UART entirely — see
+  [`xiaozhi-esp32-review.md`](xiaozhi-esp32-review.md). Until that is built, the I2S microphone and amplifier are still needed.
   The head's motion control (LLM tool calls, synchronized nods) needs the UART2 line the Pi uses; sharing one UART between two command
   sources is untested and a hazard. So with the Pi in place the head is, at most, a standalone chat device. Petoi's promised open
   firmware could change this; that is a "watch for the release" item, not a reason to wait.
 - Plan: install the microphone and speaker first and bring up the full voice pipeline on the Pi; re-evaluate the head after it arrives.
+
+**Memory with a head-only build.** The default backend (xiaozhi.me) keeps its own memory. Memory stays ours if we host a backend (it can call
+Claude and use our SQLite memory), but that backend has to run on some machine — a laptop or cloud host if there is no Pi on G2.
 
 **The head's own conversation.** General chat ("how are you feeling today?") works through XiaoZhi's LLM with a role prompt. "What do you
 see?" does not: the head has no camera, and XiaoZhi has no vision input; it would need a custom tool that fetches detections from

@@ -47,7 +47,8 @@ model's frozen-firmware limits, and any sim-to-real gap not caused by the firmwa
 
 - **Removes real firmware ceilings** (items 1–6) that no Pi-side code can get around.
 - **MIT licence;** the code is public and already read by us (reaction thresholds, camera and module code are all understood).
-- **Enables the Pi-less path** (item 1 plus the head) as a real option, not just a thought experiment.
+- **Removes one blocker for a Pi-less build** (item 1 lets the camera and IMU coexist). The rest of a Pi-less build is still a large downgrade: no learned gait,
+  no behavior runtime, no memory design of our own, and no known way yet for the head to read the camera.
 - **Narrow patches are small:** most items are a few functions, and Petoi's own bugs (camera/IMU, buggy IR module) can be fixed rather than worked around.
 - **Opens head integration** if Petoi's firmware ships: a backend we control instead of a cloud we don't.
 
