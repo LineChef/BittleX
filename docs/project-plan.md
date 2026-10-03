@@ -130,6 +130,11 @@ offline. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 
 - [ ] Real-mic capture and the wake-word gate on the Pi (needs the microphone).
 - [ ] Text-to-speech and mic input through the robot's own body (parts ordered 2026-09-29, wiring in the build manual) — or the Petoi AI Head.
+- [ ] Free LLM instead of paying per turn (decided 2026-10-03: the provider will be the Petoi head's service, XiaoZhi). The swappable-LLM code is built
+      ([`guides/swappable-llm.md`](guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the
+      account at xiaozhi.me (phone-number registration; the privacy gate applies, use a throwaway number and no household names), then find out whether it offers
+      anything our code can call. Today it is reached through the head's audio pipeline, with no documented developer API, so the likely route is the self-hosted
+      backend in [`research/xiaozhi-esp32-review.md`](research/xiaozhi-esp32-review.md). Then measure its quality on G2's tools and personality.
 - [ ] `SerialActuator` end-to-end for voice skills (the link is confirmed); confirm it runs independently of the 35+ built-in voice commands.
 - [ ] A buzzer-pattern or posture implementation of the state cue; connect to Claude live and measure latency.
 
