@@ -1203,14 +1203,14 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       itself, with a restore step. Decide frequency and where it lands when the voice
       loop starts running live. Related: if the Petoi AI head ever replaces the Pi,
       memory would live in that vendor's backend (or on our own server) instead -- see
-      `docs/research/petoi-ai-head-questions.md`.
+      `docs/research/petoi-ai-head-evaluation.md`.
 
 ## Decision pending — Petoi AI Head vs the Raspberry Pi (opened 2026-10-02)
 
 **Status:** the [Bittle AI Head Upgrade Kit](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g) is
-**ordered, arriving around 2026-10-10**. Questions went to Petoi's founder on 2026-10-02; anything they don't answer we find out
-**first-hand**. Full question list: [`research/petoi-ai-head-questions.md`](research/petoi-ai-head-questions.md); the hands-on
-tests, behavior inventory and scorecard: [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md).
+**ordered, arriving around 2026-10-10**. What isn't answered by Petoi's documentation we find out **first-hand**. The open
+questions, hands-on tests, behavior inventory and scorecard are in
+[`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md).
 
 What it is, as known: a drop-in head with its own microphone, speaker and a camera that can be trained with new recognition
 models; it uses Wi-Fi and the XiaoZhi cloud LLM, sends skill codes to the BiBoard over Grove, and needs internet and a free
@@ -1239,7 +1239,7 @@ logic moved to a server or the head's own processor.
 
 **Steps to test it (when it arrives; detail in the evaluation doc)**
 - [ ] Privacy gate before powering it: throwaway account, no household faces/names, read the terms and data policy.
-- [ ] Unbox, inspect, weigh; record which sent questions the founder already answered.
+- [ ] Unbox, inspect, weigh; note which open questions Petoi's documentation already answers.
 - [ ] Power it alone and measure idle/speaking/peak current; decide if Grove 5 V can feed it.
 - [ ] Standalone bench bring-up (Wi-Fi, account, conversation, latency, wake word); then cut Wi-Fi and record what still works.
 - [ ] Passively listen to its serial output to the BiBoard: baud, framing, message list, any joint-level tokens.

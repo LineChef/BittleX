@@ -1,15 +1,31 @@
 # Petoi Bittle AI Head — evaluation plan: replace the Raspberry Pi, sit alongside it, or skip it
 
 Opened 2026-10-02. The head ([product page](https://www.petoi.com/products/bittle-ai-head-upgrade-kit), $39, 42 g) is
-**ordered, arriving around 2026-10-10**. Questions went to Petoi's founder (see
-[`petoi-ai-head-questions.md`](petoi-ai-head-questions.md)); whatever they don't answer we find out **first-hand**
-with the steps below. **Keeping the Pi is a fully valid outcome** if it earns its place.
+**ordered, arriving around 2026-10-10**. What isn't answered by Petoi's documentation we find out **first-hand** with the
+steps below. **Keeping the Pi is a fully valid outcome** if it earns its place.
 
 What the head is, as far as known: its own microphone, speaker and camera (the camera can be trained with new
 recognition models, per the owner's research); talks over Wi-Fi to the XiaoZhi cloud LLM; wake with "Hi, Jason" or the
 Boot button; needs internet and a free account; sends skill codes (`ksit`, `kwkF 3`) to the BiBoard through Grove;
 documented for BiBoard V1 / NyBoard V1. Everything else (processor, serial protocol, host interfaces, firmware access,
 power draw, offline behavior) is unknown until answered or measured.
+
+## What has to be found out (open questions)
+
+Access: does the head give a host its microphone audio, a way to play audio or text through its speaker, camera detections or
+frames, transcripts and tool calls? Can its backend be changed to one we control, and is its motion output switchable to
+"talk-only" or redirectable? Protocol and ports: exactly what it sends to and receives from the BiBoard (port, baud, framing,
+message list, joint-level moves and rates), which Grove port and UART it uses, and whether it coexists with a Pi on the 5-pin
+Serial-2 header and the onboard voice module. Compute and firmware: is the firmware open, how much CPU/RAM/flash is free for our
+code, can an 80 Hz loop run on it, which toolchain, can OTA updates be pinned, and what is the recovery path. Robot data: does it
+receive the BiBoard's IMU, battery or servo feedback. Failure and power: behavior when Wi-Fi or the cloud is down, an e-stop that
+doesn't depend on the cloud, and its current draw and supply. Camera: how models are trained and deployed, on-device vs cloud and
+offline, class/input/frame-rate limits, per-person recognition. Voice: microphone performance with servo noise, wake word,
+languages, latency, interruptibility. Memory and data: where conversation memory lives and whether it can be read, exported and
+deleted; what data leaves the device and for how long; free-tier limits, later cost, terms, and what happens if the service
+changes. Mechanics: does the kit drive the head servo, how the camera is mounted and moves, and the mass (42 g vs the ~15 g the
+sim assumes for the camera head). BiBoard requirements: firmware version, module flags, and whether installing it changes stored
+settings such as Serial-2 (`XS`) mode.
 
 ## How the decision will be judged
 
@@ -56,7 +72,7 @@ privacy problem.
    use a throwaway account, do not enroll household faces or names, keep personal details out of prompts, read the terms and
    data policy, and decide what is acceptable to say near it. (Applies to every step that uses its cloud.)
 1. **Unbox and inspect, off the robot.** Photos, weigh it, measure it, list connectors and visible chips, compare with the
-   parts the founder described. Record which of the 20 questions are already answered.
+   the parts Petoi's documentation describes, and note which open questions below it already answers.
 2. **Power it alone and measure.** From a bench USB supply or a USB meter: idle, speaking and peak current. Decide whether
    the BiBoard's Grove 5 V could feed it without sagging the servo pack.
 3. **Standalone bring-up on the bench.** Hotspot, Wi-Fi (2.4 GHz), account, activation, a conversation. Time the latency,
@@ -100,3 +116,15 @@ privacy problem.
 **Outcomes:** A) keep the Pi, ignore or sell the head; B) keep the Pi and use the head as an audio/vision front end (only if it
 exposes them to a host); C) head only, using Petoi's scripted gaits (gives up the learned policy and the custom safety
 layers); D) head only, with our own logic moved to a server or onto the head's own processor. Decide only after steps 3–10.
+
+## How to read what we learn
+
+| If we find | Then |
+|---|---|
+| Raw mic and speaker access, or a configurable server | **Extendable.** The head can be the audio front end, or a self-hosted server can put Claude behind it |
+| Talk-only or motion redirected to a host, plus transcripts or an MCP/HTTP tool hook | **Partly extendable.** Voice front end while the Pi keeps control of motion |
+| Camera detections or frames reach a host | The head's camera could replace the Grove Vision camera (one part fewer) |
+| Open firmware, free compute for user code, real-time loop and IMU access | **It could replace the Pi.** A large rewrite from Python to embedded code, but possible |
+| Only fixed skill codes to the BiBoard, closed firmware | **Canned behavior.** It would compete with the Pi, bypass Claude, memory and personality, and give up the learned gait and safety layers |
+| Shares UART2/Serial-2 with the Pi header and can't coexist | Don't connect it without a port plan |
+| Cloud-only with no offline or safety fallback | Not acceptable as the only controller of a walking robot |
