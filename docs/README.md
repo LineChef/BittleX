@@ -34,7 +34,7 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 
 | | |
 |---|---|
-| [`cheatsheet.md`](guides/cheatsheet.md) | Curated quick-reference — command tables + full step sequences. |
+| [`cheatsheet.md`](guides/cheatsheet.md) | Curated quick-reference, grouped by task (setup, robot, BiBoard tokens, walking, deploying, camera, voice, sim/RL) — command tables + full step sequences. |
 | [`voice-commands.md`](guides/voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills. |
 | [`pi-bring-up.md`](guides/pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
 | [`gait-deployment.md`](guides/gait-deployment.md) | The sim→real path (ONNX export, on-robot loop, bring-up steps). |

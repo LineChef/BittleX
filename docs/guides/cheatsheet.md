@@ -1,18 +1,212 @@
 # Command Cheat Sheet
 
-The single command reference for the project — quick tables **and** the full
-step sequences (RL runs by hand, env setup, …). Add to it by telling me
-"add this to the cheat sheet".
+The single command reference for the project, **grouped by task** — quick tables and the full step sequences (RL runs by hand, env
+setup). Add to it by telling me "add this to the cheat sheet"; put a command in the group where you would look for it.
 
-Shell helpers: RL (`g2train`, `g2watch`) in `~/.bash_profile`; companion +
-camera (`g2cam`, `g2curate`, …) in `tools/g2_aliases.sh` — `source` it (see
-"Companion pipeline & camera" below). Every companion alias except `g2` /
-`g2rl` runs from any directory and leaves your cwd unchanged. RL commands run
-from `rl_training/opencat-gym/`.
+**Find it:** [1 Setup and everyday](#1-setup-and-everyday) · [2 The robot: run, stop, safety](#2-the-robot-run-stop-safety) ·
+[3 BiBoard serial and firmware tokens](#3-biboard-serial-and-firmware-tokens) · [4 Walking the real robot](#4-walking-the-real-robot) ·
+[5 Deploying to the Pi](#5-deploying-to-the-pi) · [6 Camera and vision](#6-camera-and-vision) ·
+[7 Voice, memory and config](#7-voice-memory-and-config) · [8 Simulation and RL](#8-simulation-and-rl) · [9 Quick checks and git](#9-quick-checks-and-git)
+
+Shell helpers: RL (`g2train`, `g2watch`) in `~/.bash_profile`; companion + camera helpers (`g2cam`, `g2see`, `g2pcam`, …) in
+`tools/g2_aliases.sh`. Every companion alias except `g2` / `g2rl` runs from any directory and leaves your cwd unchanged. RL commands
+run from `rl_training/opencat-gym/`. The `!` prefix in Claude Code runs each line in a fresh shell, so `source` and `g2*` on separate lines
+won't work — use one line (`source …/g2_aliases.sh && g2see`) or your own Terminal.
 
 ---
 
-## Training / the automated loop
+## 1. Setup and everyday
+
+Load the helpers once (add to `~/.zshrc`): `source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh`.
+`g2help` prints the list; [`SOLO.md`](SOLO.md) is the solo-operation guide.
+
+| Command | Does |
+|---|---|
+| `g2` | cd repo + activate `pi_pipeline/.venv` |
+| `g2rl` | cd `rl_training/opencat-gym/` + activate the RL `.venv` |
+| `g2test` | run the `pi_pipeline` test suite |
+| `g2back` | return to the directory you were in before `g2` / `g2rl` |
+| `g2help` | list these helpers · `g2docs` list the key docs |
+| `export G2_PI=<user>@g2pi.local` | in `~/.zshrc`: the Pi login the `g2see` / `g2pcam` aliases use (kept out of the repo) |
+| `python tools/check_docs.py` | doc checks: broken links, hard-coded test counts, the deployed policy name in the wrong page (runs in the pre-commit hook; `--staged` = staged files only) |
+| `python tools/gen_backlog.py` | regenerate `docs/backlog.md` after changing an item's status heading (`--check` to verify) |
+| `git commit --no-verify` | bypass the hooks for a genuine false positive |
+
+Where each kind of change gets written down: [`../README.md`](../README.md#where-to-update-what).
+
+## 2. The robot: run, stop, safety
+
+| Command | Does |
+|---|---|
+| `python -m pi_pipeline.doctor` | **bring-up readiness checklist** — `.env`, API key + expiry, model files, deps, serial port, audio, disk. `--serial` also pings the board. Non-zero exit on any hard FAIL |
+| `python -m pi_pipeline.app` | the whole robot — voice loop + behaviour runtime, side by side. Mock by default; `--serial` talks to the BiBoard |
+| `python -m pi_pipeline.app --bench` | **stand/bench mode** — no autonomous movement, voice actuator = mock. Use while running calibration / `check_serial` / `--probe-imu` |
+| `python -m pi_pipeline.app --halt` / `--release` | **EMERGENCY STOP** a running app (freeze + hold) / clear it. Also `kill -USR1 <pid>` / `-USR2`, or _say_ "emergency stop" / "freeze" / "resume" |
+| `python -m pi_pipeline.behavior` | behaviour runtime alone vs mocks — prints the effect stream (idle → sit → rest → sleep → wake) |
+| `python -m pi_pipeline.bringup` | **guided, resumable bring-up checklist** — the 20-step hardware sequence (Phase 0 bare hardware → Phase 1+ with the Pi wired in, stand-only through step 13a; 13b is the first floor test, gated by an explicit confirm), one step at a time. `--list` / `--restart` / `--from <id>` |
+| `python -m pi_pipeline.app --trace <path>` | log every serial command sent to a timestamped file |
+| `python -m pi_pipeline.link.trace replay <path> [--dry-run]` | replay a trace at the same relative pacing |
+| `g2power [status\|headless\|interactive\|governor <n>]` | Pi power-management helpers |
+
+## 3. BiBoard serial and firmware tokens
+
+The BiBoard's serial tokens worth remembering (full reference: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md)).
+Servo numbers: 8, 9, 10, 11 = FL, FR, BR, BL shoulders; 12–15 = the same order for the knees. Send with `check_serial send <token>` / `g2serial send <token>`, or
+over the Mac's USB cable.
+
+| Command | Does |
+|---|---|
+| `g2serial [ports\|ping\|send <cmd>\|skills\|rest\|firstmove\|allmoves]` | BiBoard serial link checks; `firstmove` = guided one-joint-at-a-time first movement (confirmed, always ends at rest); `allmoves` = cycles every known move (skills + gestures + sleep + carpet gait + recovery keyframes), logging voltage + reply latency per move to diag |
+| `XS` | enable Serial-2 so the BiBoard listens on the Pi's UART — **once**; it persists, redo after any reflash/erase |
+| `X?` | print the module table (`S,A,T,…` and a `0/1` row); plain `?` prints only the name and version |
+| `gc` | calibrate the IMU — G2 standing level and still; the body rocks for several seconds and no reply prints; persists, redo after a reflash |
+| `gb` / `gB` | firmware gyro balance **off** / **on** (bare `g` toggles — avoid) |
+| `kbalance` | the calibration / stand pose, all four legs identical — with balance off it should read level |
+| `P` | battery voltage (`Voltage: 7.8 V`; ~8.4 V is full for the 2-cell pack) |
+| `f` | servo position feedback: a stream of 8 values (servos 8–15), ~5 rows/s. **USB only** (the Pi UART only echoes); any new command stops it, so restart with `f` |
+| `i8 50 12 0 9 50 13 0 10 50 14 0 11 50 15 0` | the policy's stand pose (shoulders 50°, knees 0°) as one simultaneous move; `i<servo> <deg>` moves one joint |
+| `b16 10 12 12` | chirp — G2 beeps if the Pi→BiBoard path works |
+| `d` | rest (servos relax) |
+
+Mac USB cable: **plug it in** for feedback / servo tests, **unplug it** for untethered walks (it tethers G2 and the Pi UART is the real link).
+
+## 4. Walking the real robot
+
+Pi side, from `~/bittleX` (`pi_pipeline/.venv`). Logs go to `~/g2_runs/` on the Pi. Never put G2 on its back for a test.
+
+| Command | Does |
+|---|---|
+| `python bench_real.py` | Time the real `run20m_ppo.onnx` end-to-end (ONNX + obs build) — the per-tick cost |
+| `python run_gait.py --dry-run --seconds 5` | Full 80 Hz loop, synthetic IMU, no serial — rate check |
+| `python run_gait.py --probe-imu` | Print raw BiBoard `V` IMU stream — check `parse_imu_line` matches the format |
+| `python run_gait.py --openloop` | Play `wkf_ref.npy` open-loop (on a cradle) — verify servo signs, set `deploy_map.SERVO_SIGN` |
+| `python run_gait.py --cmd 0.10` | The learned gait on the real robot (firmware balance off) |
+| `python run_gait.py --cmd 0.10 --keep-firmware-balance --log run.csv` | + firmware gyro-assist underneath, logging per-tick for `sysid_replay` |
+| `python run_gait.py --cmd 0.10 --carpet` | + carpet-slip detector (BOOST_CMD / `kcarpetF` hand-off). Inert until body-X accel is plumbed through `parse_imu_line` + thresholds tuned on real carpet |
+| `python sysid_collect.py --log sysid.csv` | Policy-free calibration sequence (loaded poses + slow wkF) → log for `sysid_replay` |
+| `python h1_score.py --template > runs.json` then `python h1_score.py --from runs.json` | Score the H1 head-to-head from measured numbers → verdict |
+| `python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 12.5 --log ~/g2_runs/x.csv` | the deployed policy for ~10 gait cycles, logged. The fall guard (`--fall-abort-deg`, default 60°) rests G2 if it goes over. The policy's send cadence follows its sidecar; `--policy <onnx>` and `--send-every N` override |
+| `python pi_pipeline/gait/run_gait.py --openloop --cycles 6 [--lift-scale K --lift-joints knees --shoulder-scale S --ramp-cycles 1 --openloop-balance-off --volt-every 0.5 --log x.csv]` | scripted `wkF` playback with optional lift/stride scaling, a ramp-in, battery logging and IMU logging |
+| `python pi_pipeline/gait/fw_skill_log.py kcarpetF --seconds 10 --log x.csv` | run a firmware gait for N seconds with IMU logging, then rest |
+| `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |
+
+Analyze runs (dev machine):
+
+| Command | Does |
+|---|---|
+| `scp $G2_PI:g2_runs/<file>.csv ~/g2_runs/` | copy a run log off the Pi (the robot never needs to plug into the Mac for logs) |
+| `python tools/walk_log_summary.py <csv…>` | summarize logs: roll/pitch/yaw, the first fall, battery voltage |
+| `python tools/servo_static_test.py [--out x.csv]` | per-joint offset and gain from servo feedback — G2 standing, balance off, **Mac USB plugged in** |
+| `python tools/servo_response_test.py` | stand↔rest and shoulder-step feedback (caution: it cuts moves short; see its docstring) |
+| `python sim_vs_real_walk.py [logs]` | replay real logs open-loop in the sim and compare roll/pitch/distance (from `rl_training/opencat-gym/`, RL venv) |
+| `python sysid_replay.py --log <real_log.csv>` | Replay a real robot log's joint commands open-loop in a sim mirror; report the sim-to-real tilt/rate gap |
+| `python sysid_replay.py --log <real_log.csv> --fit` | + sweep motor force / PD gains / `CMD_LATENCY_STEPS` to close the gap; prints the env edits |
+
+## 5. Deploying to the Pi
+
+Deploying is `rsync`, never `git clone` ([`pi-bring-up.md`](pi-bring-up.md) §7, [`gait-deployment.md`](gait-deployment.md)).
+
+| Command | Does |
+|---|---|
+| `rsync -az --delete --exclude .venv --exclude __pycache__ --exclude .pytest_cache pi_pipeline/ $G2_PI:~/bittleX/pi_pipeline/` | push the Pi code — the excludes protect the Pi's own venv |
+| `rsync -az rl_training/opencat-gym/trained/<policy>_ppo.onnx rl_training/opencat-gym/trained/<policy>_ppo.onnx.json $G2_PI:~/bittleX/rl_training/opencat-gym/trained/` | push a policy **and** its sidecar |
+| `bash pi_pipeline/setup_pi.sh` | one-shot idempotent Pi OS setup (run on the Pi over SSH) |
+| `bash pi_pipeline/fetch_models.sh` | download the Vosk / Piper models into `./models/` |
+| `python -m pi_pipeline.benchmark_pi [--skip-api] [--skip-stress]` | full voice-pipeline benchmark on the Pi |
+| `python export_onnx.py --model trained/<run>_ppo --cmd-send-every-n 3` | export with the command cadence recorded in the sidecar (the Pi loop follows it) |
+
+Mac side, from `rl_training/opencat-gym/`:
+
+| Command | Does |
+|---|---|
+| `python export_onnx.py --model trained/run20m_ppo --out trained/run20m_ppo.onnx` | Export the deterministic policy to ONNX (drops value net + noise) |
+| `python export_onnx.py --model trained/<run>_ppo` | Export a policy: writes `<run>_ppo.onnx` **and** the `.onnx.json` sidecar with its residual scale (ship both to the Pi) |
+| `python verify_onnx.py --model trained/run20m_ppo --onnx trained/run20m_ppo.onnx` | Parity check: ONNX vs PyTorch actions across gaussian + a real rollout |
+| `python validate_deploy.py` | Drive `pi_pipeline/gait/residual_policy.py` from the sim in lockstep with `model.predict` — asserts obs + joint targets match bit-for-bit |
+| `python validate_deploy.py --onnx trained/<run>_ppo.onnx` | Same check for a specific policy — must print `residual scale: <N> deg` from its sidecar and `ALL OK` |
+| `python resilience_imu_rate.py` / `python resilience_joint_cmd.py` | What the stock 5 Hz IMU / the `m` vs `i` joint command cost the deployed policy in sim |
+
+## 6. Camera and vision
+
+Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision/capture-checklist.md`](../vision/capture-checklist.md),
+[`../vision/capture-progress.md`](../vision/capture-progress.md) (the multi-class capture library; point capture at the raw root first:
+`export G2_CAP_ROOT=~/Desktop/g2_capture_raw`).
+
+**Look at / capture from the camera mounted on G2** (plugged into the Pi; needs `G2_PI`)
+
+| Command | Does |
+|---|---|
+| `g2see` | **just look** -- live feed with detection boxes from the camera mounted on G2 (plugged into the Pi) at `localhost:8080`; no name, nothing saved. Close the tab to stop (or `g2pcam-stop`). Needs `G2_PI` exported; tells you if the camera isn't plugged in |
+| `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
+| `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
+| `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
+
+**Camera plugged into the Mac**
+
+| Command | Does |
+|---|---|
+| `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
+| `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
+| `g2cam-info` | print the serial port + which model is on the module |
+
+**Curate captures and build the model library**
+
+| Command | Does |
+|---|---|
+| `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
+| `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
+| `g2promote <class> [session]` | copy a reviewed `curated/` session into the persistent library `~/Desktop/g2_vision_library/<class>/`, updating `_MANIFEST.md` |
+| `g2libcombine [classes]` | build `~/Desktop/g2_vision_library/upload/` from the library (default `person,dog,cat,ledge`); rewrites label class-ids from the class order |
+| `g2libstatus` | print the library `_MANIFEST.md` (per-class counts) |
+
+**Vision runtime**
+
+| Command | Does |
+|---|---|
+| `g2vision [labels]` | run the detection pipeline over serial, print live detections. e.g. `g2vision person,alex` |
+| `g2vision-demo` | mock detection feed, no hardware |
+| `g2visioneval [label] [secs]` | timed measurement — detection rate / confidence / p10 floor / flicker + VERDICT (for the dataset-size threshold test). 3rd arg `empty` + clear scene → false-fire check |
+
+**Raw (no alias)**
+
+| Command | Does |
+|---|---|
+| `python tools/curate_captures.py --help` | all curate flags |
+| `python tools/camera_preview.py --info` | port + loaded model, no server |
+| `ssh -L 8080:127.0.0.1:8080 $G2_PI 'G2_CAP_OUT=~/g2_cap ~/bittleX/pi_pipeline/.venv/bin/python ~/bittleX/tools/camera_preview.py'` | what `g2pcam` does under the hood; open `localhost:8080` within 10 s or the preview stops itself. The Pi's camera is `/dev/ttyACM0` |
+
+## 7. Voice, memory and config
+
+**Voice / conversation**
+
+| Command | Does |
+|---|---|
+| `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
+| `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
+| `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
+| `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
+| `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
+| _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
+| _say_ "go ahead and look around" / "exploration mode" ⟷ "that's enough" / "come back" | arm / disarm **Tier 1 roam** (walking explore — voice-armed only; leg-budget leash; audible "roaming" chirp; disarms on exit). Tier 0 "attentive" (stationary sound-turn + gaze-follow-with-satiation + reactions) is always on |
+| _say_ "come here" / "come to me" | **directed walk toward you** (`Mode.APPROACH`) — stops close, gives up (confused chirp) if it loses sight. Distinct from "come back" |
+| _say_ "shut down" / "power down" / "go dormant" | **graceful shutdown** — G2 lies flat (`d`), holds ~2 s, then goes dormant (power-save + camera off). "go to sleep" is the lighter curl variant; "emergency stop" is the freeze |
+
+**Memory / config / diagnostics**
+
+| Command | Does |
+|---|---|
+| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
+| `python -m pi_pipeline.memory.webui` | local web UI to browse / prune memory — `http://127.0.0.1:8899` |
+| `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
+| `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |
+| `g2diag [list\|summarize sid\|tail sid\|replay sid]` | read a diagnostics session |
+| Command | Does |
+|---|---|
+| `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
+
+## 8. Simulation and RL
+
+### Training / the automated loop
 
 | Command | Does |
 |---|---|
@@ -24,7 +218,7 @@ from `rl_training/opencat-gym/`.
 | `pkill -f "train.py"` | Stop all training runs |
 | `tail -f rl_training/opencat-gym/trained/<tag>_console.log` | Watch a run's live SB3 output |
 
-## Watching a policy (PyBullet GUI — run from your own terminal)
+### Watching a policy (PyBullet GUI — run from your own terminal)
 
 > GUI windows do **not** appear when launched from a background/detached process.
 > Run these in an interactive terminal. Every run is a fresh randomised episode
@@ -63,7 +257,7 @@ from `rl_training/opencat-gym/`.
 | `python watch_trained.py trained/<ckpt> --dr-terrain 0.012` / `--dr-push 0.35` | Replay on one held-out disturbance |
 | `pkill -f watch_trained.py` | Close it |
 
-## TensorBoard
+### TensorBoard
 
 | Command | Does |
 |---|---|
@@ -73,7 +267,7 @@ from `rl_training/opencat-gym/`.
 
 Run → `PPO_N` mapping is in the per-run logs (`docs/auto-iteration-log*.md`).
 
-## Evaluating a policy — scored, headless
+### Evaluating a policy — scored, headless
 
 All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20m_ppo`.
 
@@ -83,7 +277,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `... --dr-terrain 0.012` / `--dr-push 0.35` / `--dr-friction 0.3` / `--dr-mass 0.15` / `--dr-gyro 0.02` | Grade on one held-out disturbance (any `--dr-*` zeroes all knobs first) |
 | `... --frames-dir eval_frames/<name>` | Also dump ~30 frames for a look |
 
-### The decathlon — the graded easy→brutal ladder, learned vs scripted
+#### The decathlon — the graded easy→brutal ladder, learned vs scripted
 
 | Command | Does |
 |---|---|
@@ -99,7 +293,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 > No single-cell flag on the decathlon — for one challenge use `watch.py --challenge <name>`
 > (visual) or `evaluate_policy.py --dr-<knob>` (scored, single knob).
 
-### Other scored benchmarks
+#### Other scored benchmarks
 
 | Command | Does |
 |---|---|
@@ -110,36 +304,7 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python render_showcase.py --learned <ckpt> --out showcase.gif` | One annotated GIF of every skill back-to-back (cruise / creep / fast / stand / shoves / slopes / gauntlet / thresholds / steps). `--scripted-balance 0.5` for the scripted version |
 | `python render_gif.py <ckpt> out.gif --steps 250 --stride 2` | One episode → animated GIF |
 
-## Deployment / sim-to-real  (see `docs/guides/gait-deployment.md`, `docs/rl/h1-rubric.md`)
-
-**Mac side** (`rl_training/opencat-gym/`):
-
-| Command | Does |
-|---|---|
-| `python export_onnx.py --model trained/run20m_ppo --out trained/run20m_ppo.onnx` | Export the deterministic policy to ONNX (drops value net + noise) |
-| `python export_onnx.py --model trained/<run>_ppo` | Export a policy: writes `<run>_ppo.onnx` **and** the `.onnx.json` sidecar with its residual scale (ship both to the Pi) |
-| `python verify_onnx.py --model trained/run20m_ppo --onnx trained/run20m_ppo.onnx` | Parity check: ONNX vs PyTorch actions across gaussian + a real rollout |
-| `python validate_deploy.py` | Drive `pi_pipeline/gait/residual_policy.py` from the sim in lockstep with `model.predict` — asserts obs + joint targets match bit-for-bit |
-| `python validate_deploy.py --onnx trained/<run>_ppo.onnx` | Same check for a specific policy — must print `residual scale: <N> deg` from its sidecar and `ALL OK` |
-| `python resilience_imu_rate.py` / `python resilience_joint_cmd.py` | What the stock 5 Hz IMU / the `m` vs `i` joint command cost the deployed policy in sim |
-| `python sysid_replay.py --log <real_log.csv>` | Replay a real robot log's joint commands open-loop in a sim mirror; report the sim-to-real tilt/rate gap |
-| `python sysid_replay.py --log <real_log.csv> --fit` | + sweep motor force / PD gains / `CMD_LATENCY_STEPS` to close the gap; prints the env edits |
-
-**Pi side** (`pi_pipeline/gait/`, in a venv with onnxruntime):
-
-| Command | Does |
-|---|---|
-| `python bench_real.py` | Time the real `run20m_ppo.onnx` end-to-end (ONNX + obs build) — the per-tick cost |
-| `python run_gait.py --dry-run --seconds 5` | Full 80 Hz loop, synthetic IMU, no serial — rate check |
-| `python run_gait.py --probe-imu` | Print raw BiBoard `V` IMU stream — check `parse_imu_line` matches the format |
-| `python run_gait.py --openloop` | Play `wkf_ref.npy` open-loop (on a cradle) — verify servo signs, set `deploy_map.SERVO_SIGN` |
-| `python run_gait.py --cmd 0.10` | The learned gait on the real robot (firmware balance off) |
-| `python run_gait.py --cmd 0.10 --keep-firmware-balance --log run.csv` | + firmware gyro-assist underneath, logging per-tick for `sysid_replay` |
-| `python run_gait.py --cmd 0.10 --carpet` | + carpet-slip detector (BOOST_CMD / `kcarpetF` hand-off). Inert until body-X accel is plumbed through `parse_imu_line` + thresholds tuned on real carpet |
-| `python sysid_collect.py --log sysid.csv` | Policy-free calibration sequence (loaded poses + slow wkF) → log for `sysid_replay` |
-| `python h1_score.py --template > runs.json` then `python h1_score.py --from runs.json` | Score the H1 head-to-head from measured numbers → verdict |
-
-## wkF reference gait (imitation reward)
+### wkF reference gait (imitation reward)
 
 | Command | Does |
 |---|---|
@@ -149,116 +314,15 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python reference_gait/build_skill_reference.py rc rl` | Decode any OpenCat skill from `InstinctBittleESP.h` → `<name>_ref.npy` |
 | `python reference_gait/verify_getup_reference.py --gif --sheet` | Replay the firmware `rc`/`rl` get-up in PyBullet (H9). 0/2 recover — see `docs/rl/getup-sim-replay.md` |
 
+### RL training — detail
 
-## Companion pipeline & camera (`pi_pipeline/`)
-
-Shell helpers: `tools/g2_aliases.sh`. Load with
-`source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh`
-(add to `~/.zshrc` to make permanent). `g2help` prints the list; `docs/guides/SOLO.md`
-is the solo-operation guide; `docs/guides/train-vision-model.md` is the full
-camera-model walkthrough; `docs/vision/capture-checklist.md` has the
-standard pose set.
-
-> The `!` prefix in Claude Code runs each line in a fresh shell, so `source` +
-> `g2*` on separate lines won't work — use one line
-> (`source ...g2_aliases.sh && g2cam alex 1`) or your own Terminal.
-
-**Environment**
-
-| Command | Does |
-|---|---|
-| `g2` | cd repo + activate `pi_pipeline/.venv` |
-| `g2rl` | cd `rl_training/opencat-gym/` + activate the RL `.venv` |
-| `g2test` | run the `pi_pipeline` test suite |
-| `g2back` | return to the directory you were in before `g2` / `g2rl` |
-| `g2help` | list these helpers · `g2docs` list the key docs |
-
-**Camera capture + model training** (`docs/guides/train-vision-model.md`)
-
-| Command | Does |
-|---|---|
-| `g2cam <name> [session]` | start the live capture preview at `localhost:8080`, saving to `~/Desktop/g2_face_capture/<name>/session_<n>/` |
-| `g2cam-stop` | stop the preview (`pkill -f camera_preview.py`) |
-| `g2cam-info` | print the serial port + which model is on the module |
-| `g2see` | **just look** -- live feed with detection boxes from the camera mounted on G2 (plugged into the Pi) at `localhost:8080`; no name, nothing saved. Close the tab to stop (or `g2pcam-stop`). Needs `G2_PI` exported; tells you if the camera isn't plugged in |
-| `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
-| `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
-| `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
-| `g2curate <name> [session] [rotate]` | filter a raw capture → `<session>/curated/` (score, de-dup, rotate upright, YOLO pre-labels); prints usable count + running total. `rotate` default 0 |
-| `g2combine <name>` | gather every session's `curated/` into `<name>/upload/` (per-session subdirs) |
-| `g2promote <class> [session]` | copy a reviewed `curated/` session into the persistent library `~/Desktop/g2_vision_library/<class>/`, updating `_MANIFEST.md` |
-| `g2libcombine [classes]` | build `~/Desktop/g2_vision_library/upload/` from the library (default `person,dog,cat,ledge`); rewrites label class-ids from the class order |
-| `g2libstatus` | print the library `_MANIFEST.md` (per-class counts) |
-
-Multi-class capture library: `docs/vision/capture-progress.md`. Point capture at the raw root first: `export G2_CAP_ROOT=~/Desktop/g2_capture_raw`.
-
-**Vision runtime**
-
-| Command | Does |
-|---|---|
-| `g2vision [labels]` | run the detection pipeline over serial, print live detections. e.g. `g2vision person,alex` |
-| `g2vision-demo` | mock detection feed, no hardware |
-| `g2visioneval [label] [secs]` | timed measurement — detection rate / confidence / p10 floor / flicker + VERDICT (for the dataset-size threshold test). 3rd arg `empty` + clear scene → false-fire check |
-
-**Voice / conversation**
-
-| Command | Does |
-|---|---|
-| `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
-| `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
-| `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
-| `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
-| `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
-| _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
-| _say_ "go ahead and look around" / "exploration mode" ⟷ "that's enough" / "come back" | arm / disarm **Tier 1 roam** (walking explore — voice-armed only; leg-budget leash; audible "roaming" chirp; disarms on exit). Tier 0 "attentive" (stationary sound-turn + gaze-follow-with-satiation + reactions) is always on |
-| _say_ "come here" / "come to me" | **directed walk toward you** (`Mode.APPROACH`) — stops close, gives up (confused chirp) if it loses sight. Distinct from "come back" |
-| _say_ "shut down" / "power down" / "go dormant" | **graceful shutdown** — G2 lies flat (`d`), holds ~2 s, then goes dormant (power-save + camera off). "go to sleep" is the lighter curl variant; "emergency stop" is the freeze |
-
-**Memory / config / diagnostics**
-
-| Command | Does |
-|---|---|
-| `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
-| `python -m pi_pipeline.memory.webui` | local web UI to browse / prune memory — `http://127.0.0.1:8899` |
-| `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
-| `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |
-| `g2diag [list\|summarize sid\|tail sid\|replay sid]` | read a diagnostics session |
-
-**Robot (on hardware)**
-
-| Command | Does |
-|---|---|
-| `python -m pi_pipeline.doctor` | **bring-up readiness checklist** — `.env`, API key + expiry, model files, deps, serial port, audio, disk. `--serial` also pings the board. Non-zero exit on any hard FAIL |
-| `python -m pi_pipeline.app` | the whole robot — voice loop + behaviour runtime, side by side. Mock by default; `--serial` talks to the BiBoard |
-| `python -m pi_pipeline.app --bench` | **stand/bench mode** — no autonomous movement, voice actuator = mock. Use while running calibration / `check_serial` / `--probe-imu` |
-| `python -m pi_pipeline.app --halt` / `--release` | **EMERGENCY STOP** a running app (freeze + hold) / clear it. Also `kill -USR1 <pid>` / `-USR2`, or _say_ "emergency stop" / "freeze" / "resume" |
-| `python -m pi_pipeline.behavior` | behaviour runtime alone vs mocks — prints the effect stream (idle → sit → rest → sleep → wake) |
-| `python -m pi_pipeline.bringup` | **guided, resumable bring-up checklist** — the 20-step hardware sequence (Phase 0 bare hardware → Phase 1+ with the Pi wired in, stand-only through step 13a; 13b is the first floor test, gated by an explicit confirm), one step at a time. `--list` / `--restart` / `--from <id>` |
-| `g2serial [ports\|ping\|send <cmd>\|skills\|rest\|firstmove\|allmoves]` | BiBoard serial link checks; `firstmove` = guided one-joint-at-a-time first movement (confirmed, always ends at rest); `allmoves` = cycles every known move (skills + gestures + sleep + carpet gait + recovery keyframes), logging voltage + reply latency per move to diag |
-| `python -m pi_pipeline.app --trace <path>` | log every serial command sent to a timestamped file |
-| `python -m pi_pipeline.link.trace replay <path> [--dry-run]` | replay a trace at the same relative pacing |
-| `g2gait [--dry-run\|--openloop\|...]` | the on-robot gait control loop |
-| `g2power [status\|headless\|interactive\|governor <n>]` | Pi power-management helpers |
-
-**Raw (no alias)**
-
-| Command | Does |
-|---|---|
-| `python tools/curate_captures.py --help` | all curate flags |
-| `python tools/camera_preview.py --info` | port + loaded model, no server |
-| `ssh -L 8080:127.0.0.1:8080 $G2_PI 'G2_CAP_OUT=~/g2_cap ~/bittleX/pi_pipeline/.venv/bin/python ~/bittleX/tools/camera_preview.py'` | what `g2pcam` does under the hood; open `localhost:8080` within 10 s or the preview stops itself. The Pi's camera is `/dev/ttyACM0` |
-| `python -m pi_pipeline --profiles` | list feature-flag bring-up stages |
-
-
-## RL training — detail
-
-### Common rules for `rl_training/opencat-gym/`
+#### Common rules for `rl_training/opencat-gym/`
 
 - **Run from that directory** (scripts import `opencat_gym_env` locally, load `models/` by relative path).
 - **Use the RL venv**: `source .venv/bin/activate` from the repo root, or call `../../.venv/bin/python`.
 - **Every run needs a unique `<tag>`** — it names `trained/<tag>_ppo.zip`, `trained/checkpoints/<tag>_<steps>_steps.zip`, `trained/<tag>_console.log`. Reusing a tag overwrites. Convention: `v6`, `v7`, ….
 
-### Start a run by hand (when `g2train` isn't available)
+#### Start a run by hand (when `g2train` isn't available)
 
 ```bash
 cd rl_training/opencat-gym
@@ -271,9 +335,9 @@ nohup ../../.venv/bin/python train.py --tag <tag> > trained/<tag>_console.log 2>
 echo "PID $!"                                    #    write this down
 tail -n 20 trained/<tag>_console.log             # 7. verify: "Logging to ...PPO_N", ep_rew_mean a real number, fps in the hundreds
 ```
-When it finishes: `g2watch`, then record the result under Phase 3 in `docs/project-plan.md`.
+When it finishes: `g2watch`, then record the result in the matching log under `docs/rl/`.
 
-### `start_run.sh` flags (from `rl_training/opencat-gym/`)
+#### `start_run.sh` flags (from `rl_training/opencat-gym/`)
 
 | Command | Effect |
 |---|---|
@@ -281,7 +345,7 @@ When it finishes: `g2watch`, then record the result under Phase 3 in `docs/proje
 | `./start_run.sh v8 --steps 20000` | short run — extra args pass to `train.py` |
 | `./start_run.sh v8 --force` | allow a tag whose files already exist (overwrites) |
 
-### Continue a run (reward function UNCHANGED)
+#### Continue a run (reward function UNCHANGED)
 
 ```bash
 cd rl_training/opencat-gym
@@ -291,14 +355,14 @@ nohup ../../.venv/bin/python continue_train.py > trained/<name>_console.log 2>&1
 ```
 2M more steps with `reset_num_timesteps=False`. Reward change -> fresh `g2train` instead.
 
-### RL "tests" (no pytest on the RL side)
+#### RL "tests" (no pytest on the RL side)
 
 | Command (from `rl_training/opencat-gym/`) | Verifies |
 |---|---|
 | `../../.venv/bin/python smoke_train.py` | whole pipeline at 20K steps (~90s): env, PPO loop, logging, checkpoint |
 | `../../.venv/bin/python -c "from stable_baselines3.common.env_checker import check_env; from opencat_gym_env import OpenCatGymEnv; check_env(OpenCatGymEnv()); print('OK')"` | env spaces / shapes / return types |
 
-### One-time env setup
+#### One-time env setup
 
 ```bash
 # RL venv (repo root) — Homebrew python@3.11; macOS system Python too old
@@ -308,7 +372,9 @@ CPPFLAGS="-Dfdopen=fdopen" pip install -r requirements.txt   # CPPFLAGS mandator
 python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_pipeline/requirements.txt
 ```
 
-## Git landmarks
+## 9. Quick checks and git
+
+### Git landmarks
 
 | Command | Does |
 |---|---|
@@ -317,7 +383,7 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `g2watch trained/phase3-gait_ppo` | Replay the locked Phase 3 gait |
 | `git for-each-ref refs/backup/` | Pre-history-rewrite backup refs |
 
-## Quick checks
+### Quick checks
 
 | Command | Does |
 |---|---|
