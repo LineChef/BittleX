@@ -132,6 +132,53 @@ servos have their own overheat protection and a low-battery cutoff (~7.0 V → r
   on a different port; whether the shipped firmware's server address can be changed without rebuilding; the power draw; and when the
   source is released.
 
+### What the head buys alongside the Pi, and what a Pi-less G2 can do (2026-10-03)
+
+**Head plus Pi gains little today.**
+- The Pi cannot use the head's microphone or speaker (no host access to either), so the I2S microphone and amplifier are still needed.
+  The head's motion control (LLM tool calls, synchronized nods) needs the UART2 line the Pi uses; sharing one UART between two command
+  sources is untested and a hazard. So with the Pi in place the head is, at most, a standalone chat device. Petoi's promised open
+  firmware could change this; that is a "watch for the release" item, not a reason to wait.
+- Plan: install the microphone and speaker first and bring up the full voice pipeline on the Pi; re-evaluate the head after it arrives.
+
+**The head's own conversation.** General chat ("how are you feeling today?") works through XiaoZhi's LLM with a role prompt. "What do you
+see?" does not: the head has no camera, and XiaoZhi has no vision input; it would need a custom tool that fetches detections from
+something that can read the camera. The stock Bittle head position has been removed, and the camera mounts separately from the head
+servo, so there is **no head/camera mounting conflict**; the weight question is unchanged (step 12).
+
+**The camera without the Pi.**
+- Petoi's firmware (`camera.h`, OpenCatEsp32 `main`) reads the Grove Vision AI V2 over Grove and tracks the first detection with head
+  pan/tilt; with `#define WALK` it also walks toward or away (`wkF`/`wkL`/`wkR`/`bk`). The Grove Vision path treats detections
+  generically (no per-class logic), so our classes would need firmware edits.
+- **Cost:** entering camera mode deletes the IMU task (`groveVisionSetup()`), with no restore path, and the enabled state persists
+  across reboots. No IMU means no gyro balance, no fall/flip detection and none of the firmware reflexes. The 2026-09-28 `Xc` disable did
+  not restore it; only an erase + reflash did.
+- **Camera only while stationary** would need a small firmware patch (recreate the IMU task when the camera is disabled), i.e. a narrow
+  fork. Not supported by stock firmware. With the Pi in the build none of this applies: the camera is on the Pi's USB and the IMU
+  streams at 5.0 Hz.
+- Unverified (test with the head): whether the head's firmware can read the Grove camera at all, and how `camera.h` behaves on our
+  firmware build.
+
+**Exploration with the head alone.** Only a basic version. The camera code gives follow/approach, not roaming; real exploration (leash,
+ledges, voice arming, memory) is our Pi-side `explore` code. Ways to build it without the Pi: an LLM calling movement tools through
+XiaoZhi MCP (seconds of latency, no sensor feedback unless built), firmware edits, or the firmware's own obstacle modules. Our camera
+has only a face model, so any exploration would be blind to obstacles and ledges.
+
+**The firmware's built-in distance modules** (from OpenCatEsp32 `main`, summarized by a fetch tool, not a line-by-line read; check the
+source before relying on thresholds). Neither is owned.
+
+| Module | Hardware | Behavior |
+|---|---|---|
+| Ultrasonic (`XU` on, `Xu` off) | RGB ultrasonic on the first Grove socket (UART2 — the same UART as the Pi header and the head) | A reactive demo, not navigation. By distance: idle > 60 cm; LED colors and gaze/attentive posture 30–60 cm; random `wkL`/`wkR`/sit 15–30 cm; sit and twitch 10–15 cm; meows and servo adjustments 5–10 cm; under 5 cm a random backward step (`bkL`/`bkR`), sniff or sit |
+| Dual IR distance | two IR sensors on ANALOG1/ANALOG2 (no UART conflict) | Real avoidance. Walk mode (`IR_WALK_AVOID`): clear path `trF`; under 4 cm turn in place (`vtR`/`vtL`); 4–10 cm back up then turn; uneven readings turn toward the clearer side; detection threshold about 20 cm. Sit mode (`IR_SIT_TRACK`): head-only tracking. The module manager notes bugs in it |
+
+Neither detects a ledge, and neither has a leash, memory, voice arming or camera integration. A Pi-less G2 could get a bumper-style
+wander with the IR pair, not our exploration.
+
+**Corrected summary.** Head plus Pi: little gain today. Head instead of the Pi: G2 keeps stock gaits (gyro balance on), cloud chat,
+tool-based custom behavior, and a camera that tracks with the head but disables the IMU; it loses the learned gait, our reflexes, the
+behavior runtime and our memory design.
+
 ## How the decision will be judged
 
 1. **Is the scripted gait about as good as the learned gait?** If it is, an RL policy may not be needed for walking —
@@ -192,7 +239,7 @@ privacy problem.
    at 5.0 Hz) and the voice module. Remove it again if anything breaks.
 6. **Motion arbitration.** What happens when the Pi and the head both command the BiBoard (the BiBoard keeps only the
    oldest queued command)? Is there a talk-only mode, or a way to turn motion output off or redirect it to the Pi?
-7. **Camera.** First confirm whether the head has one at all (Petoi's answers describe an ESP32-C3 with only a microphone and speaker and refer
+7. **Camera.** Also test whether the head's firmware can read the Grove camera at all. First confirm whether the head has one at all (Petoi's answers describe an ESP32-C3 with only a microphone and speaker and refer
    vision questions to the separate Vision Module). If it does: how models are trained and deployed, on-device vs cloud, and whether a host can read
    detections or frames. If it doesn't: skip — the Grove Vision camera stays.
 8. **Audio access.** Raw microphone or speaker access from a host (UART, USB, I2S, WebSocket); transcripts out; text-to-speech

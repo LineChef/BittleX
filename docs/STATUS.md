@@ -1,6 +1,6 @@
 # Current status
 
-**The one place for "what is true right now."** Last verified 2026-10-02. Everything volatile — what is deployed, what has
+**The one place for "what is true right now."** Last verified 2026-10-03. Everything volatile — what is deployed, what has
 been exercised on the robot, open problems, next steps — lives here; the README, capabilities list and plan link to this
 file instead of restating it. History and data live in the dated logs, not here. Update rules: [`README.md`](README.md#where-to-update-what).
 
@@ -45,6 +45,6 @@ file instead of restating it. History and data live in the dated logs, not here.
 1. Diagnose the FL shoulder servo (wiggle test, reseat, swap 8 and 9, full-battery rerun), then re-run the walk comparisons.
 2. Hard-floor controls for the lift/stride variants, then carpet; hands-off drift runs in a larger space.
 3. When the AI Head arrives: run the evaluation steps, then decide.
-4. Install the microphone and speaker if the Pi stays; first full-app run on the robot.
+4. This week: install the microphone and speaker and bring up the full voice pipeline on the Pi (first full-app run on the robot). Next week: re-evaluate the head once it arrives.
 
 Open work by item ID: [`backlog.md`](backlog.md). Roadmap and decisions: [`project-plan.md`](project-plan.md).
