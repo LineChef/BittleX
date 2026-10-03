@@ -49,6 +49,14 @@ and [`docs/hardware/specs.md`](docs/hardware/specs.md).
 
 ## Project Status
 
+**2026-10-02:** first real walks done (details in [`docs/rl/real-walk-log.md`](docs/rl/real-walk-log.md)). The deployed
+gait (`Release_CandidateV2.1`) walks steadily on hard floor (~0.118 m/s, about the scripted walk's speed) and every gait tried
+fails on ~1/4 in carpet. The Pi talks to the BiBoard over UART, the IMU reads the stock 5 Hz, and the camera works on the Pi.
+Servo-level troubleshooting is in progress (a front-left shoulder servo that sticks). A **Petoi AI Head** (own mic, speaker and a
+trainable camera, cloud LLM) is on order for ~2026-10-10; whether it could replace the Raspberry Pi, work alongside it, or be
+skipped is an open decision with defined criteria and test steps in
+[`docs/project-plan.md`](docs/project-plan.md) and [`docs/research/petoi-ai-head-evaluation.md`](docs/research/petoi-ai-head-evaluation.md).
+
 **2026-09-28: the Bittle X body has arrived.** Assembled, zero-point
 calibrated, base stock-firmware functions tested (all normal, including
 `wkF`, the gait the trained policy is layered on — one stock gait, `vtF`
@@ -60,7 +68,7 @@ erase + reflash to current official firmware — this also resolved a real
 IMU-rate puzzle (the pre-reflash board was a ~10-month-stale build; the
 real rate is exactly 5 Hz, matching the deployed policy's training
 assumption all along). The reflash reset calibration and the voice
-module's language setting, both pending a redo (see
+module's language setting, both since redone (see
 [`docs/project-plan.md`](docs/project-plan.md) Phase 4). Everything else
 below was built and validated software-only or with the hardware mocked,
 ahead of this point.

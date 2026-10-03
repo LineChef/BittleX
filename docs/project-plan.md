@@ -1194,6 +1194,65 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       runs live (needs an API key / hardware) — and at that point re-check
       whether recall quality, the fact cap, and the decay ordering feel right on
       genuine history rather than test data.
+- [ ] **Back up the memory DB off the robot — NOTED 2026-10-02, NOT IMPLEMENTED.**
+      On the robot the whole memory is one SQLite file on the Pi's SD card (default
+      `~/.local/share/g2/g2_memory.db`, set by `G2_MEMORY_DB`), so a failed or
+      corrupted card loses every fact and exchange, and nothing copies it anywhere.
+      Idea: a periodic copy to the dev machine (use SQLite's online backup /
+      `.backup`, not a plain `cp` of a live file), kept outside the repo like the DB
+      itself, with a restore step. Decide frequency and where it lands when the voice
+      loop starts running live. Related: if the Petoi AI head ever replaces the Pi,
+      memory would live in that vendor's backend (or on our own server) instead -- see
+      `docs/research/petoi-ai-head-questions.md`.
+
+## Decision pending — Petoi AI Head vs the Raspberry Pi (opened 2026-10-02)
+
+**Status:** the [Bittle AI Head Upgrade Kit](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g) is
+**ordered, arriving around 2026-10-10**. Questions went to Petoi's founder on 2026-10-02; anything they don't answer we find out
+**first-hand**. Full question list: [`research/petoi-ai-head-questions.md`](research/petoi-ai-head-questions.md); the hands-on
+tests, behavior inventory and scorecard: [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md).
+
+What it is, as known: a drop-in head with its own microphone, speaker and a camera that can be trained with new recognition
+models; it uses Wi-Fi and the XiaoZhi cloud LLM, sends skill codes to the BiBoard over Grove, and needs internet and a free
+account. It looks like a one-part replacement for the mic, speaker and camera we planned to wire to the Pi — and possibly
+for the Pi itself. **How it would be implemented in our plan, and whether it replaces the Raspberry Pi altogether, is
+undecided.** Keeping the Pi is a fully valid outcome if it gives the build real value.
+
+**Criteria for the "does it replace the Pi" call**
+1. **Is the scripted gait about as good as the learned gait?** If it is, an RL walking policy may not be needed — though the
+   owner would prefer to keep it (it is interesting, and its potential isn't fully tapped). This is the open H1 comparison
+   ([`rl/real-walk-log.md`](rl/real-walk-log.md)): so far V2.1 ~0.118 m/s on hard floor vs scripted ~0.12, both fail on carpet,
+   and the FL shoulder servo fault must be fixed before a fair comparison.
+2. **Can G2 still do most of the behaviors that make it feel alive** (attentive gaze/sound/novelty reactions, roam and come-here,
+   idle-descent/sleep/wake, gestures and chirps, enrollment and recognition, Claude conversation with memory and personality)?
+   If yes, that is a point for replacing the Pi. Inventory in the evaluation doc.
+3. **The trade-off.** The Pi build means a lot of soldering, wires and mounting, and a heavier body with exposed boards and
+   connections (Pi + PiSugar ~61–78 g on a printed standoff, plus mic, amp, camera and wiring still to add) — more vulnerable.
+   The head is a single ~42 g module and much more streamlined. The wiring work has been worthwhile as learning and would carry
+   to future robots, but robustness and simplicity count. What would be lost in exchange: custom on-robot control and safety
+   layers, our Claude/memory path unless the head can be redirected or extended, offline/local voice, the SSH/Python dev loop,
+   and data privacy (audio/camera to a third-party cloud), plus cost and vendor dependence.
+
+**Possible outcomes:** A) keep the Pi (head unused); B) Pi + head (head as audio/vision front end, only if it exposes them to a
+host); C) head only with Petoi's scripted gaits (gives up the learned policy and our safety layers); D) head only, with our own
+logic moved to a server or the head's own processor.
+
+**Steps to test it (when it arrives; detail in the evaluation doc)**
+- [ ] Privacy gate before powering it: throwaway account, no household faces/names, read the terms and data policy.
+- [ ] Unbox, inspect, weigh; record which sent questions the founder already answered.
+- [ ] Power it alone and measure idle/speaking/peak current; decide if Grove 5 V can feed it.
+- [ ] Standalone bench bring-up (Wi-Fi, account, conversation, latency, wake word); then cut Wi-Fi and record what still works.
+- [ ] Passively listen to its serial output to the BiBoard: baud, framing, message list, any joint-level tokens.
+- [ ] Connect it to G2 with the Pi still installed; check Grove/UART collision with the Pi's Serial-2 (`XS`) link and the voice
+      module; re-verify the Pi link and the IMU afterwards.
+- [ ] Motion arbitration (Pi and head both commanding the BiBoard); talk-only mode or redirecting its motion output.
+- [ ] Camera: training/deployment path, on-device vs cloud and offline, class/input/fps limits, per-person recognition, host access.
+- [ ] Audio access: raw mic/speaker from a host, transcripts, text-to-speech in, changing the server (only if the terms allow).
+- [ ] Compute and real-time: free CPU/RAM/flash, toolchain, an 80 Hz loop with jitter measured, a small model.
+- [ ] Safety and recovery: Wi-Fi drop mid-motion, e-stop independent of the cloud, firmware recovery path before experimenting.
+- [ ] Dev loop: logs, debug console, OTA pinning.
+- [ ] Weight and balance for each candidate build; update the payload model (H2).
+- [ ] Fill the scorecard and decide (A/B/C/D). Do not remove the Pi from the build before then.
 
 ## Phase 10 — Full integration
 
