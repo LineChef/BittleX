@@ -10,7 +10,7 @@ the walk log ([`../rl/real-walk-log.md`](../rl/real-walk-log.md)) and a read of 
 | Fork | Licence | Status |
 |---|---|---|
 | **OpenCatEsp32** — the BiBoard firmware that runs G2's servos, IMU and serial protocol | MIT | public; Petoi ships frequent releases (G2 runs B10_260527) |
-| **The AI Head's firmware** — XiaoZhi-based, on the head's ESP32-C3 | upstream xiaozhi-esp32 is MIT; Petoi's head build is not released yet | board definition and pin map unknown until Petoi publishes |
+| **The AI Head's firmware** — XiaoZhi-based, on the head's ESP32-C3 | upstream xiaozhi-esp32 is MIT; Petoi's head build is not released yet | a separate project from the BiBoard firmware (different chip and toolchain). Upstream has no Petoi board in `main/boards`; where Petoi will publish is unconfirmed. Review: [`xiaozhi-esp32-review.md`](xiaozhi-esp32-review.md) |
 
 Both are separable decisions. Most of the list below needs only the first.
 
@@ -66,7 +66,10 @@ model's frozen-firmware limits, and any sim-to-real gap not caused by the firmwa
 
 ## How to keep it cheap if we do it
 
-- Keep a **small patch series on top of a pinned upstream tag** (not a long-lived diverging fork), so each Petoi release is a rebase.
+- Keep a **small patch series on top of a pinned upstream tag** so each Petoi release is a rebase. This is the same mechanism as a fork, applied with discipline: the
+  changes are few and separate, and are re-applied on each new tag instead of merged into a diverging copy. Two ways to hold it: (a) a GitHub fork or local
+  clone holding the commits; or (b) `.patch` files kept in this repo and applied by a script to a clean checkout of the pinned tag, with no fork at all.
+  Offering patches upstream as pull requests would remove the maintenance, if Petoi accepts them.
 - Start with the highest value-to-effort patches: **#1** (camera/IMU restore), then **#3** (recovery handoff), then **#2** (mid-walk reflex).
   Leave **#4** until the hardware comparison says a faster IMU would help.
 - Prove the build and flash path on the BiBoard first (a no-op build flashed and `gc`-verified) before writing any patch.
