@@ -1,7 +1,7 @@
 # Calibration & first-power-on: research from Petoi's official docs
 
 Pre-build research (Bittle X hasn't arrived yet) — cross-checking our own
-bring-up plan (`pi_pipeline/bringup.py`, `docs/project-plan.md` "When the
+bring-up plan (`pi_pipeline/bringup.py`, `docs/guides/bring-up-sequence.md`, "When the
 hardware arrives") against Petoi's official Bittle X V2 user manual and doc
 center, to catch gaps before the stand-only bring-up starts. Genuinely new
 findings only; anything already correctly captured elsewhere (e.g. BiBoard

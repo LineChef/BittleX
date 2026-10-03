@@ -16,7 +16,7 @@ IMU-rate puzzle (the pre-reflash board was a ~10-month-stale build; the
 real rate is exactly 5 Hz, matching the deployed policy's training
 assumption all along). The reflash reset calibration and the voice
 module's language setting, both since redone (see
-[`docs/project-plan.md`](docs/project-plan.md) Phase 4). Everything else
+[`project-plan.md`](project-plan.md) Phase 4). Everything else
 below was built and validated software-only or with the hardware mocked,
 ahead of this point.
 
@@ -25,7 +25,7 @@ ahead of this point.
   IMU-corrected every control step, conditioned on speed/heading commands and the
   mounted Pi/camera payload. **Deployed policy (2026-09-23): `hw1_20m`**, trained
   under G2's real control path — the stock firmware's 5 Hz IMU and its `i`
-  joint-command timing (see [`docs/rl/hw1-log.md`](docs/rl/hw1-log.md)). Before
+  joint-command timing (see [`docs/rl/hw1-log.md`](rl/hw1-log.md)). Before
   that the base was `run20m_resid30_ppo`, and before that **`run20m_ppo`** (20 M
   steps from scratch: tracks speed commands to 0.007 m/s, climbs a 24° slope,
   0 % falls on the payload-on decathlon), exported to ONNX and sim-validated
@@ -49,8 +49,8 @@ ahead of this point.
   no longer deferred — Phase F found climbing was a sim-fidelity wall, not a
   real-hardware limit, so it's scheduled once the body arrives, starting
   scripted (no sensor needed for that first step) before exploring a learned
-  residual. See [`docs/rl/`](docs/rl/) and
-  [`docs/rl/hardware-gated-backlog.md`](docs/rl/hardware-gated-backlog.md) H7.
+  residual. See [`docs/rl/`](rl/) and
+  [`docs/rl/hardware-gated-backlog.md`](rl/hardware-gated-backlog.md) H7.
 - **Companion pipeline** (`pi_pipeline/`) — voice conversation, persistent
   memory, vision / obstacle-avoidance, the BiBoard serial link + fall-recovery
   state machine, the on-robot gait loop, the autonomous behaviour layer
@@ -61,15 +61,43 @@ ahead of this point.
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
   export toolchain until we pinned `ultralytics==8.2.8` + a local arm64 export)
-  is in [`docs/vision/custom-model-recipe.md`](docs/vision/custom-model-recipe.md),
+  is in [`docs/vision/custom-model-recipe.md`](vision/custom-model-recipe.md),
   with tooling in `tools/gv2/`.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent
   provisioning script, a model fetcher, and a voice-pipeline benchmark harness are
   ready to run the moment the SD adapter and robot arrive:
-  [`docs/guides/pi-bring-up.md`](docs/guides/pi-bring-up.md).
+  [`docs/guides/pi-bring-up.md`](guides/pi-bring-up.md).
 
 A full inventory of what G2 can do, with per-item status, is in
-[`docs/capabilities.md`](docs/capabilities.md). For a plain-language tour of how
-each part works, see [`docs/how-it-works.md`](docs/how-it-works.md). The ordered
-day-1 bring-up sequence is in [`docs/project-plan.md`](docs/project-plan.md)
-("When the hardware arrives").
+[`docs/capabilities.md`](capabilities.md). For a plain-language tour of how
+each part works, see [`docs/how-it-works.md`](how-it-works.md). The ordered
+day-1 bring-up sequence is in [`docs/guides/bring-up-sequence.md`](guides/bring-up-sequence.md).
+
+
+---
+
+## Gait state as of 2026-09-23 (moved from the plan banner)
+
+> **Current state of the gait (2026-09-23): the IMU-rate priority is resolved;
+> `hw1_20m` is deployed but stale, a fresh baseline is training now.**
+> Tracing the 5 Hz IMU issue through OpenCatEsp32 found a bigger gap: the Pi was
+> sending `m`, which moves joints one at a time (G2 wouldn't walk at all); it now
+> sends `i`. The 5 Hz IMU itself costs nothing measurable in sim. Four pipeline
+> bugs (5 Hz loop, dead pickup detection, IMU stream never started in app mode,
+> 1 s lock stall), two benchmark bugs (distorted scripted baseline, payload
+> leaking between cells) and a sim-vs-hardware audit were fixed along the way.
+> `hw1_20m` — trained with the 5 Hz IMU, the `i` command timing, realistic mass
+> and small calibration errors — is still `DEFAULT_POLICY` on disk, but its
+> "0% falls, faster than scripted on every cell" result **was measured before
+> the payload-lock bug below was found**, on a tilt-locked body — it does not
+> hold under corrected physics. Re-scored on the rebuilt 21-cell benchmark
+> (`--hw i`, real control path) it falls 15% even on flat, calm ground and
+> catastrophically on most other cells, because it never learned to handle a
+> body that can actually tilt. It is **not being used as Phase B's learned
+> comparator.** `base1_20m` — a fresh run under corrected payload physics, the
+> post-limp-removal reward set, and no new course mechanics yet — is training
+> now as the real baseline; the four new course mechanics + a re-test of
+> ledges wait behind it as Phase B (`phase_b_orchestrator.py`, 7 candidate
+> rounds). Full record: [`rl/hw1-log.md`](rl/hw1-log.md).
+> Still hardware-gated: firmware version check (step 8a), roll/pitch sign (13a),
+> JamGuard strain test. Climb work paused (how G2 decides to climb is open).

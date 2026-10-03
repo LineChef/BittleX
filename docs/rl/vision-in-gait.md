@@ -62,7 +62,7 @@ variant (INSPECT bow to get a better near read) tested **negative**.
 
 **Phase F — learned CLIMB skill: sim-fidelity wall.** *(2026-09-15: need
 confirmed — this is scheduled hardware-gated work now, not a closed idea. See
-[H7](hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--) and
+[H7](hardware-gated-backlog.md) and
 [B13](../behavior-ideas.md) for the reference gif and the on-hardware plan.)*
 Full harness built
 (`climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`). Nothing

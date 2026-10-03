@@ -120,8 +120,8 @@ cmd/feedback traces; the constants wait for the bench.
 demo, [`step.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif)
 — front paws reach up onto a raised box, body hauls up and over, ends standing
 fully on top. This is exactly what Phase F tried in sim and hit a wall on (see
-[H7](rl/hardware-gated-backlog.md#h7--climb-as-a-separate-skill-policy--) and
-[`vision-in-gait.md`](rl/vision-in-gait.md#phase-f)) — **a sim-fidelity limit
+[H7](rl/hardware-gated-backlog.md) and
+[`vision-in-gait.md`](rl/vision-in-gait.md)) — **a sim-fidelity limit
 on the training harness, not evidence the real robot can't do it.** Scheduled
 to build for real once the body is in hand; not gated on "is there a concrete
 need" any more.
@@ -913,7 +913,7 @@ the empirical limit, reset when placed on the charger. Optional later upgrade:
 an ADC on a BiBoard Grove analog pin (G3/G4) reading pack voltage for a true
 signal. Needs battery-life data first (idle / walking / talking / vision-on runs
 to brown-out, repeated). Software on the voice pipeline + memory.
-See the "Power awareness" note in `docs/project-plan.md`.
+See the "Power awareness" note in `docs/hardware/parts-and-decisions.md`.
 
 ### B18 — Idle power management + "feels alive" idle behaviour  🟡
 Runtime-maximising measures + the lifelike idle layer they hang off. Full

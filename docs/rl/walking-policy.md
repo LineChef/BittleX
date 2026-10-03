@@ -124,7 +124,7 @@ or stalls; the accepted fix is a *discrete* reaction layered outside the walk
 policy (vision picks a scripted response, not a learned one), built and
 sim-validated but waiting on a real forward sensor. It also does not self-right
 or jump (a jump is planned as a separate on-command skill,
-[`docs/behavior-ideas.md`](docs/behavior-ideas.md) B14), and does not climb —
+[`docs/behavior-ideas.md`](../behavior-ideas.md) B14), and does not climb —
 though unlike the others, climbing a single ledge is now a **confirmed,
 scheduled** goal (B13) once the body arrives, not a maybe: Phase F's sim
 attempt hit a contact-physics wall, not proof the real robot can't do it.

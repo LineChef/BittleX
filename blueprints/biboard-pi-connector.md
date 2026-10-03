@@ -579,7 +579,7 @@ copies grouped for efficient printing), **not their real installed spacing
 on the frame** — there's no way to read "does this reach all 4 corners of a
 Pi Zero" off the file itself. That question — and the related open item
 that BiBoard's own spec lists Pi compatibility as "3A+, 4, 5," not Zero
-2 W (see `project-plan.md` → "Open (check when hardware arrives)") — both
+2 W (see `docs/hardware/parts-and-decisions.md` → "Open (check when hardware arrives)") — both
 stay genuinely unresolved until real parts are test-fit. Worth having in
 mind: Petoi *does* publish a Zero-specific standoff (this file) separate
 from the 3A+ one (`Pi3A_standOff.stl`), so the mismatch, if there is one, is

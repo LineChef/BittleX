@@ -199,7 +199,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
     (`vcgencmd`) and `read_battery_v` are `# HARDWARE` stubs returning `None`,
     so it's a no-op on a dev machine. Emits `battery.sag` / `pi.thermal_throttle`
     (rate-limited) once real readings exist.
-  - 13 tests. **Still hardware-gated:** validating the black box captures a real
+  - Unit-tested. **Still hardware-gated:** validating the black box captures a real
     fall / link drop; the battery ADC source.
 - **Phase 3 — as needed:** live Wi-Fi stream + laptop listener, longer-term
   trend rollups across sessions.

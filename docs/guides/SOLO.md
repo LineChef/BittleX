@@ -121,7 +121,7 @@ nothing.
 | One-slot / multi-model detection architecture | `docs/vision/detection-layer.md` |
 | Measured module behaviour + AE-lift finding | `docs/vision/detector-bench.md` |
 | Staged bring-up flags | `docs/guides/feature-flags.md` |
-| Day-1 bring-up sequence | `docs/project-plan.md` ("When the hardware arrives") |
+| Day-1 bring-up sequence | `docs/guides/bring-up-sequence.md` |
 | RL/gait history + backlog | `docs/rl/` |
 | Everything else | `docs/project-plan.md`, `docs/how-it-works.md` |
 | All commands | `docs/guides/cheatsheet.md` |

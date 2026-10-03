@@ -94,7 +94,7 @@ RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
 forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
 from Petoi's own official board diagram, plus annotated photos:
-[`biboard-pi-connector.md`](biboard-pi-connector.md).
+[`biboard-pi-connector.md`](../../blueprints/biboard-pi-connector.md).
 
 ---
 
@@ -165,7 +165,7 @@ So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 - **Forward-looking caution, found on Petoi's community forum archive,
   2026-09-16:** if a *real* OS-level power-off is ever added (not needed
   today — G2's "shut down" voice command is deliberately not an OS power-off,
-  see `project-plan.md` "Graceful shutdown"), a community member
+  see `plan-detail/phase10-integration.md` "Graceful shutdown"), a community member
   ([petoi.camp, "Next Steps: Pogo Pins..." thread](https://www.petoi.camp/))
   reported `sudo shutdown -h now` **just reboots** the Raspberry Pi when
   attached to a Petoi board via the 2×5 socket, rather than powering off —

@@ -144,7 +144,7 @@ scenario.
   stretch goal** — IMU-based flip detection plus a dedicated recovery policy,
   along the lines of quadruped-robotics research. Not a Phase 1 requirement.
   This is the "recovery sub-policy" option raised in the Run 7 wrap-up (see the
-  Training history in `docs/project-plan.md`).
+  Training history in `docs/plan-detail/phase3-rl-training.md`).
 - **Self-right trigger is now known:** IMU flip-detect → `rc` skill, wired in
   `reaction.h`. Serial tokens `krc` (recover) / `krl` (roll). Add both to
   `pi_pipeline/link/opencat.py`. On hardware, test the stock `rc`/`rl` and, if
