@@ -58,7 +58,7 @@ Build record and wiring: [`../blueprints/`](../blueprints/README.md).
 Open:
 - [ ] Mount the Pi/PiSugar stack properly (currently a temporary mount; the printed standoff is not impact-rated). See the build manual.
 - [ ] Confirm the back cover closes over the mounted Pi (measured too shallow for Pi + PiSugar; a modified cover/clips is planned).
-- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build.
+- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03** (clear capture over I2S, [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md)); speaker/amp still to wire.
 - [ ] Battery-aware behavior: get real runtime data (idle/walking/talking on a full charge) before building the low-charge warning.
 
 ## Phase 1 — Repo setup ✅

@@ -11,7 +11,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 | Bittle X V2 body, BiBoard V1_0, alloy feedback servos | Assembled, calibrated, running current official firmware (OpenCat B10_260527). Firmware module flags set: Serial-2 (`XS`) and the onboard voice module. The IMU is calibrated (`gc`); both persist across power cycles. See [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
 | Raspberry Pi Zero 2 W + PiSugar S | Mounted temporarily (the payload can shift). Talks to the BiBoard over UART (`/dev/serial0`, 115200); IMU stream is the stock **5.0 Hz**. Powered by the PiSugar, not the BiBoard. Build record: [`blueprints/`](../blueprints/README.md) |
 | Camera (Grove Vision AI V2) | On the Pi's USB (`/dev/ttyACM0`), mounted rotated 90°, so the module has to be turned upright for the model to fire. Custom 3-class detector deployed on the camera. Vision-based navigation is gated **off** (`features.vision`, default False). See [`vision/`](vision/) |
-| Microphone + speaker | Parts ordered, not yet wired. Pinout and wiring: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md) |
+| Microphone + speaker | **Microphone wired and verified on the Pi (2026-10-03):** captures clear speech over I2S, left channel only. Speaker/amp not yet wired. Pinout, wiring and the bring-up record: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md) |
 | Petoi AI Head | Ordered, arriving ~2026-10-10. Petoi says it is an ESP32-C3 with a mic and speaker, firmware to be open-sourced, and expects it to complement the Pi, not replace it; whether to use it is open — [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) |
 | Battery | Reads ~7.6–7.8 V (roughly half charge for the 2-cell pack) |
 
@@ -25,7 +25,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 
 - **Hard-floor walking (V2.1):** six clean 10-cycle runs, ~0.118 m/s, steady; drifts right and rolls ~±6° ([`rl/real-walk-log.md`](rl/real-walk-log.md)).
 - **Firmware step gait (`vtF`):** steady after the IMU calibration. **Pi serial link, 5 Hz IMU, fall guard, camera feed:** working.
-- **Not yet run on the robot:** the full app (`python -m pi_pipeline.app --serial`), live voice (no audio hardware yet), live memory, the
+- **Not yet run on the robot:** the full app (`python -m pi_pipeline.app --serial`), live voice (the mic works, no speaker yet), live memory, the
   behavior runtime, and vision-based reflexes. `CliffGuard` and `Avoider` are not wired into the app (deliberately; see the plan).
 
 ## Open problems

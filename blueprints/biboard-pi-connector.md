@@ -808,7 +808,7 @@ holding the Pi assembly clear of BiBoard and both mounted to a shared frame:
 
 ![Illustrative side-view diagram: BiBoard mounted to the frame, a printed standoff rising from the same frame to hold PiSugar and the Pi above it, wires routed from the Pi's header down past the standoff to BiBoard's header](images/biboard-pi-connector/assembled-side.png)
 
-## Speaker + mic for Pi-side voice I/O — parts + header pins ORDERED, not yet wired
+## Speaker + mic for Pi-side voice I/O — mic wired and verified 2026-10-03, speaker/amp not yet wired
 
 `pi_pipeline`'s TTS/STT currently have nowhere to play/capture audio on the
 robot itself — see `docs/research/community-projects.md` Finding 7 and
@@ -876,10 +876,15 @@ amp's PH2.0 cable both already have finished connectors; the existing
 female-to-female Dupont jumpers already on hand cover every connection
 once the mic's header is on.
 
-**`SEL` doesn't go to the Pi.** It's the mic's channel-select pin (Left
-vs Right, for stereo setups) — strap it locally to `GND` or `3V` (either
-works, just pick one) with a short jumper between two of the mic's own
-header pins, not a run to the Pi.
+**`SEL` must be tied to a fixed level, not left floating.** It's the mic's
+channel-select pin (Left vs Right, for stereo setups); tie it to `GND`
+(left channel) or `3V` (right). A floating `SEL` can leave the mic's data
+line undriven. **As built (2026-10-03): `SEL` runs to Pi pin 39 (a GND
+pin)** — every Pi ground pin is the same net, and this avoids stacking a
+second socket on the mic's own `GND` header pin. The mic therefore speaks
+on the **left channel only**; the right channel records as silence, so
+capture software has to read the left channel (or the stereo pair
+averaged) as mono.
 
 **BCLK/LRCLK fan-out, final plan — build the splitter by hand from stock
 jumper wires, not by buying one.** Superseded two earlier ideas once the
@@ -946,6 +951,37 @@ overlay works the same with pin 36 unwired.
 — physical 40-pin header layout, device-to-device lookup tables, and the
 same fan-out/SEL notes above, laid out for quick reference when
 unplugging/rewiring at the bench.
+
+### Mic bring-up — verified 2026-10-03
+
+Mic wired per the pinout above (3V → pin 1, GND → pin 9, BCLK → pin 12,
+LRCL → pin 35, DOUT → pin 38, SEL → pin 39); amp not yet connected.
+
+1. `/boot/firmware/config.txt` got `dtparam=i2s=on` and
+   `dtoverlay=googlevoicehat-soundcard` (original saved alongside as
+   `config.txt.bak-pre-i2s`), then a reboot. `arecord -l` listed the
+   `googlevoicehat` capture card.
+2. **First captures were a flat constant** (every sample identical on both
+   channels), meaning no data reached the Pi. Diagnosis: with GPIO20
+   (pin 38, `PCM_DIN`) switched to a plain input with the pull-down on
+   (`pinctrl set 20 ip pd`, then `pinctrl get 20`), it stayed **high**, while every
+   other spare GPIO fell low. A DOUT wire connected to nothing follows the
+   pull-down, so something was driving the line high — a **solder bridge
+   between two pads on the mic's new header** (the first header soldered
+   on this project). Reflowing/removing the bridge fixed it.
+3. **After the fix:** GPIO20 reads low under the pull-down, and
+   `arecord -D plughw:0,0 -f S32_LE -r 48000 -c 2 -d 8` captured clear
+   speech on channel 0 (about 15,000 distinct sample values, peak roughly a
+   quarter of full scale); channel 1 is silent as expected from `SEL` → GND.
+   Played back on the Mac (left channel, DC offset removed, gain applied):
+   loud and clear.
+
+**Signature to remember:** a capture where every sample on both channels is
+the same value means the data line isn't being driven (no mic power, `SEL`
+floating, `DOUT` open or shorted, or a solder bridge). The pull-down test in
+step 2 separates "open" (reads low) from "shorted/driven" (stays high).
+Before powering a freshly soldered header, check each pair of neighboring
+pins for continuity.
 
 ### Software config — the exact overlay, confirmed, not a research task for later
 
