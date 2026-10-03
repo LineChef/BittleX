@@ -6,7 +6,7 @@ backend for casual turns and Claude for the rest. The goal is to run G2 without 
 ## Change the Claude model
 
 Set `CLAUDE_MODEL` in `.env` (default in `pi_pipeline/config.py`), e.g. `CLAUDE_MODEL=<model id>`. No code change. `CLAUDE_MAX_TOKENS` and
-`CLAUDE_TIMEOUT_S` sit beside it. `CLAUDE_EFFORT` (default `low`) sets how long Claude thinks before answering; thinking tokens count toward
+`CLAUDE_TIMEOUT_S` sit beside it. `G2_CLAUDE_EFFORT` (default `low`) sets how long Claude thinks before answering; thinking tokens count toward
 `CLAUDE_MAX_TOKENS`, so a low effort keeps replies quick and un-truncated. Empty means the model's own default.
 
 ## Modes (`G2_LLM_MODE` in `.env`)
