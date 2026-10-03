@@ -321,6 +321,24 @@ Mac baseline (x86, for reference — the Pi will be much slower): Piper+Vosk
 loaded = ~300 MB RSS, Piper synth 0.06x realtime, Vosk transcribe 0.19x,
 Piper→Vosk word recall ~90%. It measures the things the plan flags as untested:
 
+**Measured on the real Pi Zero 2 W, 2026-10-03** (`en_US-ryan-low` + the small Vosk model, no API key set so the Claude round-trip was skipped,
+robot not involved):
+
+| Measure | Result | Verdict |
+|---|---|---|
+| RAM total / baseline process | 416 MB / 15 MB | |
+| Piper loaded | +114 MB, 10 s to load | |
+| Vosk loaded | +240 MB, 5.6 s to load | |
+| Peak free memory with both loaded | 71 MB | OK (above the ~40 MB floor) |
+| Piper synth | 1.72× realtime (9.9 s for 5.8 s of audio) | **WARN — slower than speech** |
+| Vosk transcribe | 2.22× realtime (12.9 s for 5.8 s of audio) | **WARN** |
+| Piper→Vosk word recall | 83% | |
+| 60 s all-core load | 40.8 → 51.5 °C, throttle flags 0x0, scheduler jitter 10 ms | OK |
+
+That is roughly 30× (Piper) and 12× (Vosk) slower than the Mac baseline above. The Vosk number is a whole-file batch run, so the live
+streaming path should lag less after you stop speaking, but it is not measured yet. Open: re-run with the Claude API section enabled,
+measure streaming latency, and try the `x_low` voice and a lighter recognizer if spoken replies stay slower than real time.
+
 - **RAM baseline**: `free -h` idle after boot; after importing the voice stack;
   during a live STT+TTS exchange. Flag if headroom < ~40 MB.
 - **Vosk STT**: wall-time to transcribe a fixed 3–5 s WAV with the small model;

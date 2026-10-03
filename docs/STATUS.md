@@ -25,6 +25,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 
 - **Hard-floor walking (V2.1):** six clean 10-cycle runs, ~0.118 m/s, steady; drifts right and rolls ~±6° ([`rl/real-walk-log.md`](rl/real-walk-log.md)).
 - **Firmware step gait (`vtF`):** steady after the IMU calibration. **Pi serial link, 5 Hz IMU, fall guard, camera feed:** working.
+- **Voice benchmark on the Pi (2026-10-03):** RAM fits, thermals fine, but Piper and Vosk both run slower than real time — numbers in [`guides/pi-bring-up.md`](guides/pi-bring-up.md) §8. Mic capture works; the Claude round-trip from the Pi is not measured yet.
 - **Not yet run on the robot:** the full app (`python -m pi_pipeline.app --serial`), live voice (the mic works, no speaker yet), live memory, the
   behavior runtime, and vision-based reflexes. `CliffGuard` and `Avoider` are not wired into the app (deliberately; see the plan).
 
