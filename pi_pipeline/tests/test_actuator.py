@@ -33,3 +33,32 @@ def test_make_actuator_serial_passes_the_shared_link_through():
 def test_make_actuator_mock_ignores_link():
     act = make_actuator("mock", port="ignored", baud=0, link=FakeLink())
     assert isinstance(act, MockActuator)
+
+
+def test_gait_cap_stops_a_looping_gait():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk, max_continuous_s=0.05)
+    act.perform("walk_forward")
+    time.sleep(0.2)
+    assert lk.sent == ["kwkF", "d"]      # the cap fired the stop command
+
+
+def test_gait_cap_ignores_one_shot_skills_and_cancels_on_stop():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk, max_continuous_s=0.05)
+    act.perform("sit")                    # not a looping gait: no timer
+    act.perform("walk_forward")
+    act.stop()                            # explicit stop cancels the pending cap
+    time.sleep(0.2)
+    assert lk.sent == ["ksit", "kwkF", "d"]
+
+
+def test_gait_cap_off_by_default():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk)
+    act.perform("walk_forward")
+    time.sleep(0.1)
+    assert lk.sent == ["kwkF"]

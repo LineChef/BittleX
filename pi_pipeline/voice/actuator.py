@@ -8,6 +8,7 @@ serial).
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Protocol
 
 from . import skills
@@ -49,10 +50,17 @@ class SerialActuator:
     Pass an existing `link` (e.g. `pi_pipeline.app`'s shared `LockedLink`) to
     reuse one connection across callers instead of opening a second one on the
     same port; omit it to open a private `SerialLink` as before.
+
+    `max_continuous_s` (default off) bounds a looping gait: after a continuous
+    skill starts, a timer sends the stop command that many seconds later unless
+    another skill or `stop()` arrives first.
     """
 
-    def __init__(self, port: str, baud: int, *, link=None):
+    def __init__(self, port: str, baud: int, *, link=None, max_continuous_s: float = 0.0):
         from ..link import opencat
+
+        self._max_continuous_s = max_continuous_s
+        self._cap_timer: threading.Timer | None = None
 
         self._opencat = opencat
         self._owns_link = link is None   # only close a link we opened ourselves
@@ -72,17 +80,34 @@ class SerialActuator:
             return
         cmd = skills.serial_command(skill_name)
         log.info("G2 perform %s -> %r", skill_name, cmd)
+        self._cancel_cap()
         self._link.send(cmd, read_reply=False)
+        if self._max_continuous_s > 0 and skills.SKILLS[skill_name].continuous:
+            self._cap_timer = threading.Timer(self._max_continuous_s, self._cap_expired, args=(skill_name,))
+            self._cap_timer.daemon = True
+            self._cap_timer.start()
+
+    def _cancel_cap(self) -> None:
+        if self._cap_timer is not None:
+            self._cap_timer.cancel()
+            self._cap_timer = None
+
+    def _cap_expired(self, skill_name: str) -> None:
+        log.warning("G2 %s hit the %.1fs gait cap -- stopping", skill_name, self._max_continuous_s)
+        self._cap_timer = None
+        self._link.send(self._opencat.REST, read_reply=False)
 
     def stop(self) -> None:
+        self._cancel_cap()
         self._link.send(self._opencat.REST, read_reply=False)
 
     def close(self) -> None:
+        self._cancel_cap()
         if self._owns_link:
             self._link.close()   # a shared link's lifecycle belongs to whoever built it
 
 
-def make_actuator(mode: str, *, port: str, baud: int, link=None) -> Actuator:
+def make_actuator(mode: str, *, port: str, baud: int, link=None, max_continuous_s: float = 0.0) -> Actuator:
     if mode == "serial":
-        return SerialActuator(port, baud, link=link)
+        return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s)
     return MockActuator()

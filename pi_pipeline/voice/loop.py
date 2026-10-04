@@ -117,6 +117,7 @@ class VoiceLoop:
         self._cue.set("listening")
         timeout = self._follow_up_s if self._in_session else None
         user_text = self._stt.listen(timeout_s=timeout).strip()
+        log.debug("heard: %r", user_text)
 
         if not user_text:
             if self._in_session:
