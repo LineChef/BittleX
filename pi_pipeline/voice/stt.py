@@ -34,7 +34,7 @@ class TextSTT:
 
 
 class VoskSTT:
-    def __init__(self, model_path: str, sample_rate: int = 16000, silence_s: float = 0.75):
+    def __init__(self, model_path: str, sample_rate: int = 16000, silence_s: float = 0.5):
         import sounddevice as sd
         from vosk import KaldiRecognizer, Model
 
@@ -59,7 +59,8 @@ class VoskSTT:
             q.put(bytes(indata))
 
         said_anything = False
-        trailing_silence = 0
+        quiet_blocks = 0          # blocks since the partial transcript last changed
+        last_partial = ""
         t_start = time.monotonic()
         with self._sd.RawInputStream(
             samplerate=self._rate, blocksize=4000, dtype="int16",
@@ -71,16 +72,18 @@ class VoskSTT:
                 except queue.Empty:
                     data = None
                 if data is not None:
-                    if rec.AcceptWaveform(data):
+                    if rec.AcceptWaveform(data):          # Vosk's own endpointer fired
                         text = json.loads(rec.Result()).get("text", "").strip()
                         if text:
                             return text
                     partial = json.loads(rec.PartialResult()).get("partial", "").strip()
-                    if partial:
-                        said_anything, trailing_silence = True, 0
+                    if partial and partial != last_partial:
+                        said_anything, quiet_blocks, last_partial = True, 0, partial
                     elif said_anything:
-                        trailing_silence += 1
-                        if trailing_silence >= self._silence_blocks:
+                        # the partial stopped changing (or emptied): you have stopped talking. Vosk's
+                        # endpointer would wait 0.75-1.1 s of silence; this ends the turn sooner.
+                        quiet_blocks += 1
+                        if quiet_blocks >= self._silence_blocks:
                             return json.loads(rec.FinalResult()).get("text", "").strip()
                 if (not said_anything and timeout_s is not None
                         and time.monotonic() - t_start > timeout_s):

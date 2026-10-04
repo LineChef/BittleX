@@ -112,9 +112,13 @@ audio-time, not CPU, so it carries over to the Pi). Vosk ends an utterance with 
   endpoint, so that setting rarely does anything. Changing it from 1.2 to 0.75 buys little.
 - Halving the rules (0.3/0.45/0.6 s in `model.conf`) brought the endpoint to **0.66-0.85 s** (about 0.2-0.3 s faster), but a 0.7 s mid-sentence
   pause then split one utterance in two ("ah" + "forward"); the default rules did not split pauses up to 0.7 s.
-- Options, not yet done: (a) tune `model.conf` on the Pi (a middle set such as 0.4/0.6/0.8 gains ~0.1-0.25 s with little split risk);
-  (b) make the loop end on "partial unchanged for N s" (~0.1 s + N, so 0.5 would end at ~0.6 s, about 0.3-0.5 s faster) which also makes the
-  setting effective; (c) the installed Vosk 0.3.44 has no `SetEndpointerMode` call, so a newer vosk would be needed for the API route.
+- **Done 2026-10-04: end the turn when the partial transcript stops changing** for `G2_STT_SILENCE_S` (default 0.5 s, counted in 0.25 s blocks;
+  Vosk's own endpointer still wins if it fires first). Measured the same way: 0.5 s ends the turn **0.65-0.74 s after you stop** (the endpointer alone
+  took 0.8-1.1 s), about 0.2-0.35 s faster. Cost: a 0.4 s mid-sentence pause survives, a 0.6 s pause cuts the utterance short; at 0.75 s the
+  gain shrinks to ~0.1-0.2 s but pauses up to 0.6 s survive. Raise it in `.env` if it clips you.
+- **Upgrading Vosk for `SetEndpointerMode` is not practical.** That API exists only in vosk-api 0.3.50 (source); the newest aarch64 wheel on PyPI/GitHub is
+  0.3.44 (the one installed), and 0.3.50 has no prebuilt wheels. Building Kaldi + vosk on a Pi Zero 2 W (512 MB RAM) or cross-compiling is a
+  large job. Editing `models/vosk/conf/model.conf` (`--endpoint.rule2/3/4.min-trailing-silence`) gives the same control with the installed version.
 
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
