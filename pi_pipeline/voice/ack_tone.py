@@ -23,8 +23,9 @@ CONTOUR = [
     (1.18, 1947, 0.06),
 ]
 
-# Peak level as a fraction of full scale. 0.6 was the level chosen first; turned down 25% on 2026-10-04.
-DEFAULT_PEAK = 0.45
+# Peak level as a fraction of full scale. 0.6 was the first level; 0.45 after a 25% cut; settled by ear on 2026-10-04 at 5% of that
+# (0.0225), since the speaker is loud at close range.
+DEFAULT_PEAK = 0.0225
 
 
 def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:

@@ -10,8 +10,8 @@ def test_whistle_is_one_second_and_a_bit_at_the_requested_level():
     assert abs(np.abs(y).max() / 32767 - 0.45) < 0.01
 
 
-def test_default_level_is_25_percent_below_the_first_choice():
-    assert abs(ack_tone.DEFAULT_PEAK - 0.6 * 0.75) < 1e-9
+def test_default_level_is_5_percent_of_the_0_45_level():
+    assert abs(ack_tone.DEFAULT_PEAK - 0.45 * 0.05) < 1e-9
 
 
 def _peak_hz(y, t0, t1, rate=48000):

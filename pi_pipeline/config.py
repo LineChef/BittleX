@@ -160,7 +160,7 @@ class Settings:
     # What acknowledges a command that goes to Claude: whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "whistle"))
-    ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.45))   # fraction of full scale
+    ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
