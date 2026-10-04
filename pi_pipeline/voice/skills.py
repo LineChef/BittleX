@@ -64,6 +64,20 @@ def serial_command(name: str) -> str:
     return "k" + skill.token
 
 
+MAX_GAIT_SECONDS = 60.0   # longest a voice-started looping gait may run; longer requests are clamped
+
+
+def clamp_seconds(value) -> float | None:
+    """A positive, finite number of seconds clamped to MAX_GAIT_SECONDS, else None."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not (v > 0) or v != v or v == float("inf"):
+        return None
+    return min(v, MAX_GAIT_SECONDS)
+
+
 def catalogue_for_prompt() -> str:
     """A compact list of skill names + descriptions, for the tool schema / prompt."""
     return "\n".join(f"- {name}: {s.description}" for name, s in SKILLS.items())

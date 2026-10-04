@@ -119,3 +119,22 @@ def test_diagnostics_query_result_flushed_on_next_turn(cfg, fake_anthropic):
     last_user_blocks = fake_anthropic.calls[-1]["messages"][-1]["content"]
     assert any(b.get("type") == "tool_result" and b["tool_use_id"] == "d1"
                for b in last_user_blocks)
+
+
+def test_perform_skill_seconds_are_carried_and_clamped(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(
+        Block("tool_use", name="perform_skill", id="a", input={"skill": "walk_forward", "seconds": 8}),
+        Block("tool_use", name="perform_skill", id="b", input={"skill": "walk_forward", "seconds": 9999}),
+        Block("tool_use", name="perform_skill", id="c", input={"skill": "wave"}),
+    ))
+    turn = Conversation(cfg).send("walk for eight seconds")
+    assert turn.actions == ["walk_forward", "walk_forward", "wave"]
+    assert turn.action_seconds == [8.0, 60.0, None]
+
+
+def test_perform_skill_tool_schema_offers_seconds(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="ok")))
+    Conversation(cfg).send("hi")
+    tools = {t["name"]: t for t in fake_anthropic.calls[-1]["tools"]}
+    assert "seconds" in tools["perform_skill"]["input_schema"]["properties"]
+    assert tools["perform_skill"]["input_schema"]["required"] == ["skill"]

@@ -43,7 +43,17 @@ _PERFORM_SKILL_TOOL = {
                 "type": "string",
                 "enum": list(skills.SKILLS.keys()),
                 "description": "The skill to perform.",
-            }
+            },
+            "seconds": {
+                "type": "number",
+                "description": (
+                    "Only for looping gaits (walk, trot, crawl): how many seconds to keep "
+                    f"going before stopping, at most {int(skills.MAX_GAIT_SECONDS)}. Use it "
+                    "when the person says how long or how far (\"walk for ten seconds\"; "
+                    "estimate seconds for a distance). Omit for one-shot skills and for "
+                    "open-ended requests."
+                ),
+            },
         },
         "required": ["skill"],
     },
@@ -117,6 +127,7 @@ class AssistantTurn:
     speech: str
     actions: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
+    action_seconds: list[float | None] = field(default_factory=list)   # parallel to `actions`
 
 
 class Conversation:
@@ -281,6 +292,7 @@ class Conversation:
 
         speech_parts: list[str] = []
         actions: list[str] = []
+        action_seconds: list[float | None] = []
         facts: list[str] = []
         for block in resp.content:
             if block.type == "text":
@@ -290,6 +302,7 @@ class Conversation:
                 ok = skills.is_valid(name)
                 if ok:
                     actions.append(name)
+                    action_seconds.append(skills.clamp_seconds((block.input or {}).get("seconds")))
                 else:
                     log.warning("Claude asked for unknown skill %r", name)
                 self._ack(block.id, "done" if ok else f"unknown skill {name!r}")
@@ -314,7 +327,8 @@ class Conversation:
 
         self._trim()
         return AssistantTurn(
-            speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts
+            speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts,
+            action_seconds=action_seconds,
         )
 
     def _ack(self, tool_use_id: str, content: str) -> None:

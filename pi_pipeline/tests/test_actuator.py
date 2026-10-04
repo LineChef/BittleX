@@ -73,3 +73,41 @@ def test_gait_cap_follows_the_env_setting_when_not_passed(monkeypatch):
     assert make_actuator("serial", port="x", baud=0, link=lk)._max_continuous_s == 7.0
     assert make_actuator("serial", port="x", baud=0, link=lk, max_continuous_s=2.0)._max_continuous_s == 2.0
     assert make_actuator("serial", port="x", baud=0, link=lk, max_continuous_s=0.0)._max_continuous_s == 0.0
+
+
+def test_requested_seconds_stop_a_looping_gait_after_that_long():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk)            # no standing cap
+    act.perform("walk_forward", seconds=0.05)
+    time.sleep(0.2)
+    assert lk.sent == ["kwkF", "d"]
+
+
+def test_standing_cap_is_a_ceiling_over_a_longer_request():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk, max_continuous_s=0.05)
+    act.perform("walk_forward", seconds=30)                # asks for much longer than the cap
+    time.sleep(0.2)
+    assert lk.sent == ["kwkF", "d"]
+
+
+def test_seconds_ignored_for_one_shot_skills_and_bad_values():
+    import time
+    lk = FakeLink()
+    act = SerialActuator("ignored", 0, link=lk)
+    act.perform("sit", seconds=0.05)                       # not a looping gait
+    act.perform("walk_forward", seconds="soon")            # not a number
+    act.perform("walk_forward", seconds=-3)                # not positive
+    time.sleep(0.15)
+    assert lk.sent == ["ksit", "kwkF", "kwkF"]             # no stop was scheduled
+
+
+def test_clamp_seconds():
+    from pi_pipeline.voice import skills
+    assert skills.clamp_seconds(8) == 8.0
+    assert skills.clamp_seconds(500) == skills.MAX_GAIT_SECONDS
+    assert skills.clamp_seconds(None) is None
+    assert skills.clamp_seconds(0) is None
+    assert skills.clamp_seconds(float("nan")) is None

@@ -86,9 +86,12 @@ What we learned:
   63 s gap in a mock run was just the speaker waiting to talk.
 - **A conversation stays open for ~60 s** after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
   straight to Claude. That is why "stand up" said right after another command still made G2 stand.
-- **Claude cannot count steps.** `perform_skill` takes only a skill name, and `walk_forward` is a continuous gait that runs until a stop
-  command. Asked for "10 steps", Claude picked `walk_forward` and said it couldn't count (one run in four picked `rest`). A step-count or duration
-  parameter, mapped to gait cycles on the Pi, would be needed.
+- **Claude cannot count steps, but it can now set a duration (added 2026-10-03).** `perform_skill` takes an optional `seconds`
+  for looping gaits (walk, trot, crawl): "walk forward for eight seconds" sends `kwkF` and the actuator sends the stop 8 s later. Without
+  `seconds` the walk runs until stopped, as before. Values are clamped to 60 s (`skills.MAX_GAIT_SECONDS`); a standing gait cap
+  (`G2_MAX_GAIT_S`), if set, is a hard ceiling over any requested duration; one-shot skills ignore it. Checked with the live API and the mock
+  actuator only, not yet on G2. Distances are not calibrated: asked to "walk about two metres", Claude guessed 8 s. A real distance needs G2's
+  measured walking speed (tape-measured runs at a few durations), then a metres → seconds conversion.
 - **The gait cap is an optional switch, off by default.** It makes the serial actuator send the stop after N seconds unless another skill
   or `stop()` arrives first (the stop token is `d`, rest posture, servos off). Turn it on per run with `--max-gait-s 5`, or for every
   run (voice loop and the full app) with `G2_MAX_GAIT_S=5` in `.env`; the flag overrides the setting, and `0` means off. Keep it on while
@@ -111,7 +114,7 @@ Open / next:
   listening was inconclusive (the Pi misheard "rest" as "stress" and sent `stretch`, then `rest`).
 - Decide how a Claude-started walk gets interrupted: the module's "rest" is instant and offline (the Pi's own "emergency stop" has to
   go through slow recognition), and "stop" is not one of its commands.
-- Add a duration or step-count parameter to `perform_skill` if "walk 10 steps" should work.
+- Calibrate walking speed so "walk N metres" maps to a real duration (duration itself is done, see above).
 - Measure streaming speech-recognition latency, and try a smaller/faster voice or recogniser; replies will be slow to start once the speaker works.
 - Speaker and amp (still to wire) unlock spoken replies and the full voice loop; then re-run this test with real TTS.
 - Make the voice loop start on boot only once the above stop path is settled; for now it is started by hand.

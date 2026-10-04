@@ -130,7 +130,7 @@ offline. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 
 - [x] Real-mic capture and the wake-word gate on the Pi — done 2026-10-03, including a first voice → Claude → walk run on the real G2
       ([`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md)).
-- [ ] Settle how a Claude-started walk is stopped (the onboard module's "rest", a gait cap, or both) and whether `perform_skill` gets a step/duration parameter.
+- [ ] Settle how a Claude-started walk is stopped (the onboard module's "rest", a gait cap, or both) (`perform_skill` now takes an optional duration in seconds; a calibrated distance is still open).
 - [ ] Text-to-speech and mic input through the robot's own body (parts ordered 2026-09-29, wiring in the build manual) — or the Petoi AI Head.
 - [ ] Free LLM instead of paying per turn (decided 2026-10-03: the provider will be the Petoi head's service, XiaoZhi). The swappable-LLM code is built
       ([`guides/swappable-llm.md`](guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the

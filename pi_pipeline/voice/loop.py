@@ -273,8 +273,13 @@ class VoiceLoop:
             self._tts.speak(turn.speech)
         elif turn.actions:
             self._tts.speak("Okay.")          # never move silently -- always a spoken ack
-        for skill in turn.actions:
-            self._act.perform(skill)
+        secs = list(getattr(turn, "action_seconds", None) or [])
+        for i, skill in enumerate(turn.actions):
+            seconds = secs[i] if i < len(secs) else None
+            if seconds is None:
+                self._act.perform(skill)
+            else:
+                self._act.perform(skill, seconds=seconds)
 
         if self._memory:
             try:

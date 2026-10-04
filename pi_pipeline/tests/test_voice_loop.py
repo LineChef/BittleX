@@ -221,3 +221,14 @@ def test_narration_level_sets_hint_not_claude():
     assert conv.narration_hints[0] != conv.narration_hints[1]
     assert all(conv.narration_hints)                 # both non-empty hints
     assert "level 1" in tts.said[0] and "level 5" in tts.said[1]
+
+
+def test_loop_passes_seconds_to_the_actuator():
+    lp, w, stt, conv, tts = _loop(["walk for eight seconds", ""])
+    conv.send = lambda text, memory_context=None: types.SimpleNamespace(
+        speech="", actions=["walk_forward", "wave"], facts=[], action_seconds=[8.0, None])
+    calls = []
+    lp._act = types.SimpleNamespace(
+        perform=lambda skill, seconds=None: calls.append((skill, seconds)), stop=lambda: None)
+    _run(lp, 2)
+    assert calls == [("walk_forward", 8.0), ("wave", None)]
