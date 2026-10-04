@@ -145,6 +145,13 @@ class VoiceLoop:
         # recency from; harmless without one (stays NEUTRAL -> empty hint).
         self._mood = MoodModel()
 
+    def _speak(self, text: str) -> None:
+        """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""
+        try:
+            self._tts.speak(text)
+        except Exception:  # noqa: BLE001
+            log.exception("speech failed")
+
     def run_forever(self) -> None:
         self._cue.set("idle")
         log.info("G2 voice loop ready")
@@ -178,7 +185,7 @@ class VoiceLoop:
         personality on the live Conversation and persists it for next start."""
         self._cue.set("speaking")
         if cc is None:
-            self._tts.speak("I didn't catch which mode you meant.")
+            self._speak("I didn't catch which mode you meant.")
             return
         p = self._conv.personality
         if cc.on:
@@ -187,12 +194,12 @@ class VoiceLoop:
             character_state.save(cc.name, lvl)
             n = gir.nearest_level(lvl)   # echo back *what* the level does, not just the number
             log.info("character mode %s ON at %.2f (level %d)", cc.name, lvl, n)
-            self._tts.speak(f"Okay, {cc.name} mode on, {gir.describe_level(n)}.")
+            self._speak(f"Okay, {cc.name} mode on, {gir.describe_level(n)}.")
         else:
             self._conv.set_personality(p.without_character(cc.name))
             character_state.clear()
             log.info("character mode %s OFF", cc.name)
-            self._tts.speak(f"Okay, {cc.name} mode off.")
+            self._speak(f"Okay, {cc.name} mode off.")
 
     def _one_turn(self) -> None:
         trace = TurnTrace()
@@ -237,14 +244,14 @@ class VoiceLoop:
             log.warning("EMERGENCY STOP (voice command %r)", user_text)
             self._events(halt=True)
             self._cue.set("speaking")
-            self._tts.speak("Stopping.")
+            self._speak("Stopping.")
             self._end_session()
             return
         if cmd == "resume":
             log.info("emergency stop released (voice)")
             self._events(release=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, moving again.")
+            self._speak("Okay, moving again.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -252,7 +259,7 @@ class VoiceLoop:
             log.info("explore armed (voice)")
             self._events(arm_explore=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, looking around. Make sure I'm on the floor.")
+            self._speak("Okay, looking around. Make sure I'm on the floor.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -260,7 +267,7 @@ class VoiceLoop:
             log.info("explore disarmed (voice)")
             self._events(disarm_explore=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, coming back.")
+            self._speak("Okay, coming back.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -268,7 +275,7 @@ class VoiceLoop:
             log.info("come-here (voice)")
             self._events(come_here=True)
             self._cue.set("speaking")
-            self._tts.speak("Coming.")
+            self._speak("Coming.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -276,14 +283,14 @@ class VoiceLoop:
             log.info("shutdown requested (voice) -- lie down then dormant")
             self._events(shutdown=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, lying down and shutting down. Wake me when you need me.")
+            self._speak("Okay, lying down and shutting down. Wake me when you need me.")
             self._end_session()
             return
         if cmd == "sleep":
             log.info("'go to sleep' -- ending session")
             self._events(told_sleep=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, going quiet. Say the wake word when you need me.")
+            self._speak("Okay, going quiet. Say the wake word when you need me.")
             self._end_session()
             return
         if cmd == "forget":
@@ -291,9 +298,9 @@ class VoiceLoop:
             log.info("'forget that' -- dropped %d exchange(s), %d fact(s)", n_ex, n_fa)
             self._cue.set("speaking")
             if n_ex or n_fa:
-                self._tts.speak("Okay, I've forgotten that.")
+                self._speak("Okay, I've forgotten that.")
             else:
-                self._tts.speak("There's nothing new to forget.")
+                self._speak("There's nothing new to forget.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -306,7 +313,7 @@ class VoiceLoop:
             log.info("chirps enabled (voice)")
             self._events(chirps_on=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, chirps on.")
+            self._speak("Okay, chirps on.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -314,7 +321,7 @@ class VoiceLoop:
             log.info("chirps disabled (voice)")
             self._events(chirps_off=True)
             self._cue.set("speaking")
-            self._tts.speak("Okay, chirps off.")
+            self._speak("Okay, chirps off.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -323,10 +330,10 @@ class VoiceLoop:
             log.info("narration verbosity level %s (voice)", n)
             self._cue.set("speaking")
             if n is None:
-                self._tts.speak(f"Narration levels go 1 to {narration.LEVELS} -- which one?")
+                self._speak(f"Narration levels go 1 to {narration.LEVELS} -- which one?")
             else:
                 self._conv.set_narration_hint(narration.hint_for_level(n))
-                self._tts.speak(f"Okay, narration level {n}: {narration.describe_level(n)}.")
+                self._speak(f"Okay, narration level {n}: {narration.describe_level(n)}.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -378,7 +385,7 @@ class VoiceLoop:
             if speaker:
                 speaker.finish()
             self._cue.set("speaking")
-            self._tts.speak(e.spoken)
+            self._speak(e.spoken)
             self._set_session()
             self._cue.set("idle")
             return
@@ -387,7 +394,7 @@ class VoiceLoop:
             if speaker:
                 speaker.finish()
             self._cue.set("speaking")
-            self._tts.speak("Sorry, I glitched. Say that again?")
+            self._speak("Sorry, I glitched. Say that again?")
             self._set_session()
             self._cue.set("idle")
             return
@@ -417,9 +424,9 @@ class VoiceLoop:
             if turn.speech or turn.actions:
                 trace.stamp("voice_start")
             if turn.speech:
-                self._tts.speak(turn.speech)
+                self._speak(turn.speech)
             elif turn.actions:
-                self._tts.speak("Okay.")
+                self._speak("Okay.")
         if "claude_start" in trace.times:
             trace.meta["actions"] = len(turn.actions)
             trace.meta["streamed"] = bool(getattr(turn, "streamed", False))

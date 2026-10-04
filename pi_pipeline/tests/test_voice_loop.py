@@ -339,6 +339,15 @@ def test_speech_worker_falls_back_to_plain_speak_without_prepare_and_play():
     assert said == ["a", "b"]
 
 
+def test_a_failing_speaker_does_not_crash_a_turn_that_falls_back_to_plain_speak():
+    lp, w, stt, conv, tts = _loop(["hello", ""])
+    def boom(*a, **k):
+        raise RuntimeError("Device unavailable")
+    conv.send = boom                     # unexpected failure -> "Sorry, I glitched" path
+    tts.speak = boom                     # ...and the speaker is broken too
+    lp._one_turn()                       # must not raise
+
+
 def test_after_a_question_the_loop_listens_briefly_without_the_wake_word():
     lp, w, stt, conv, tts = _loop(["are you ok", "yes I am", ""])
     lp._follow_up_s, lp._question_window_s = 0.0, 8.0
