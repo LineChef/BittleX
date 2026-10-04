@@ -436,7 +436,7 @@ here.
 
 ### B5 — Emotive sound (chirp vocabulary)  — BUILT + WIRED 2026-09-10
 `pi_pipeline/behavior/chirps.py` — `ChirpMood` (happy / confused / alert /
-sleepy / question / greeting) → `b<tone> <ms> …` sequences via `opencat.beep`;
+sleepy / question / greeting) → `b<note> <duration> …` sequences via `opencat.beep` (duration = a divisor of a second, not ms);
 `cue_chirp(stage)` maps the voice listening/thinking/speaking cue; `Chirper`
 rate-limits (`ready()` / `fired()` added so the driver can emit an abstract
 effect without building the string). **Wired 2026-09-10:** `BehaviorDriver`

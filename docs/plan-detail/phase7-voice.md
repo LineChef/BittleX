@@ -98,36 +98,14 @@ What we learned:
   testing walks by voice; whether to keep it long term is undecided.
 - **Logging the heard transcript is opt-in.** `G2_LOG_HEARD=1` writes each recognised utterance to the log at INFO; without it the
   transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
-- **Buzzer cues (added 2026-10-04).** With the real actuator, the voice loop beeps G2's buzzer at each stage so you can tell it heard you
-  with no speaker: two sharp beeps when it starts listening (after the wake word, and after each reply), a rising "?" when it has your words and is
-  asking Claude, a quick blip for a recognised local command. The cue melodies are `LOW_CUES` in `voice/cues.py` (not the behavior chirps): the buzzer is clearly louder at low notes. Listening test on the real buzzer 2026-10-04: notes 26/30 were faint, +7 and +14 semitones were not heard at all, lower was louder, and the pair 4 and 8 was loudest of a 3-semitone sweep from 22 down to 4, so listening = two beeps on note 8, thinking = 4 then 9, heard = 4 then 8. `G2_BUZZER_SHIFT` (semitones) and `G2_BUZZER_LEN` (times longer) adjust them; firmware beep durations are a divisor of one second (`b4 3` = 1/3 s), so a longer note is a *smaller* number. They are off with the `sound_cues` feature flag. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token interrupts the gait, so you
-  won't hear acknowledgements mid-walk. Not yet heard on the robot. The end-of-speech window `G2_STT_SILENCE_S` (default 0.75 s) is counted in 0.25 s blocks.
-**End-of-speech detection, measured 2026-10-04** (synthesized speech streamed in real time into the same small Vosk model, local machine; the timing is
-audio-time, not CPU, so it carries over to the Pi). Vosk ends an utterance with its own endpointer (rules in `models/vosk/conf/model.conf`:
-`--endpoint.rule2/3/4.min-trailing-silence` = 0.5 / 0.75 / 1.0 s), and the loop returns the moment it fires:
-- Default rules: the endpoint arrives **0.75-1.1 s after you stop talking** (longer for short phrases).
-- The partial transcript stops changing only ~0.1-0.16 s after speech ends, so Vosk's decode lag is small; the wait is the rule thresholds.
-- The loop's own silence counter (`G2_STT_SILENCE_S`) advances only while the partial is *empty*. In 2 of 3 phrases it never emptied before the
-  endpoint, so that setting rarely does anything. Changing it from 1.2 to 0.75 buys little.
-- Halving the rules (0.3/0.45/0.6 s in `model.conf`) brought the endpoint to **0.66-0.85 s** (about 0.2-0.3 s faster), but a 0.7 s mid-sentence
-  pause then split one utterance in two ("ah" + "forward"); the default rules did not split pauses up to 0.7 s.
-- **Done 2026-10-04: end the turn when the partial transcript stops changing** for `G2_STT_SILENCE_S` (default 0.5 s, counted in 0.25 s blocks;
-  Vosk's own endpointer still wins if it fires first). Measured the same way: 0.5 s ends the turn **0.65-0.74 s after you stop** (the endpointer alone
-  took 0.8-1.1 s), about 0.2-0.35 s faster. Cost: a 0.4 s mid-sentence pause survives, a 0.6 s pause cuts the utterance short; at 0.75 s the
-  gain shrinks to ~0.1-0.2 s but pauses up to 0.6 s survive. Raise it in `.env` if it clips you.
-- **Upgrading Vosk for `SetEndpointerMode` is not practical.** That API exists only in vosk-api 0.3.50 (source); the newest aarch64 wheel on PyPI/GitHub is
-  0.3.44 (the one installed), and 0.3.50 has no prebuilt wheels. Building Kaldi + vosk on a Pi Zero 2 W (512 MB RAM) or cross-compiling is a
-  large job. Editing `models/vosk/conf/model.conf` (`--endpoint.rule2/3/4.min-trailing-silence`) gives the same control with the installed version.
-
-**Round-trip speed work, started 2026-10-04.** Settings are in `.env.example`; each can be switched off to compare.
-- **Per-turn timing:** every Claude turn logs one `turn-timing` line (no transcript text): speech end → transcript, the Claude call (and time to
-  first token), voice start, move sent. Summarise a run: `journalctl -u g2-voice -o cat | python -m pi_pipeline.voice.timing`.
-- **Connection warm-up:** a 300 s keep-alive on the API connection (`G2_API_KEEPALIVE_S`; the SDK default is 5 s, shorter than a pause between turns) and a
-  free, token-less lookup fired at the wake word (`G2_API_WARMUP`). A cold connection costs ~0.4-0.6 s on the Pi (measured 1.7-2.1 s cold vs 1.25-1.45 s warm).
-- **Move first, then talk, and streamed replies** (`G2_STREAM`): the loop sends the skill the moment the tool call is complete and speaks each finished sentence
-  on a worker thread, so a move is never held behind speech. Measured against the live API: for a command that is only a tool call there is no gain (the tool
-  call completes at the same moment the message ends); for a 26-word spoken answer the first sentence arrived ~0.6-0.8 s before the full reply.
-
+- **Buzzer cues (added 2026-10-04).** With the real actuator, the voice loop beeps G2's buzzer when a command is on its way to Claude (stage `thinking`), so you
+  can tell it heard you with no speaker. The sound is a low rising two-note blip (note 4 then 9, `LOW_CUES` in
+  `voice/cues.py`); a longer whistle-style cue was drafted and set aside for now. **Only Claude-bound commands beep by default** (`G2_CUE_STAGES=thinking`); the wake word and local commands like "chirps on" are silent, and
+  `listening` / `heard` can be switched back on in that setting. The buzzer volume is set to 10 at start (`G2_BUZZER_VOLUME`, 0 = leave it). Notes are semitone numbers
+  (C3 = 14) in the low range because the buzzer is loudest there; listening test 2026-10-04: notes 26/30 faint, 33 and up not heard, 4/8 loudest. Durations are a
+  divisor of one second, so a longer note is a *smaller* number. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token
+  interrupts the gait. More background and a plan for a larger sound set: [`research/buzzer-sounds.md`](../research/buzzer-sounds.md).
+  The end-of-speech window `G2_STT_SILENCE_S` (default 0.5 s) is counted in 0.25 s blocks.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it

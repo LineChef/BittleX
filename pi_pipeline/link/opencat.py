@@ -102,10 +102,23 @@ def move_joints(pairs: list[tuple[int, int]]) -> str:
 
 
 def beep(notes: list[tuple[int, int]]) -> str:
-    """[(12, 8), (14, 8)] -> 'b12 8 14 8'  (tone index, duration units)."""
+    """[(14, 4), (21, 4)] -> 'b14 4 21 4'.
+
+    Each pair is (note, duration). Note: a semitone number, C3 = 14 and C4 = 26; 1-35 is the range the buzzer
+    reproduces well (the low end is the loudest), and 0 or -1 is a rest. Duration: the note lasts 1/duration
+    seconds (4 = a quarter second, 20 = 50 ms), so a LONGER note is a SMALLER number.
+    """
     if not notes:
         raise ValueError("no notes given")
     return "b" + " ".join(f"{tone} {dur}" for tone, dur in notes)
+
+
+def buzzer_volume(level: int) -> str:
+    """The token that sets the buzzer volume, 1-10 (`b10` = loudest). A bare `b` would TOGGLE mute, so it is
+    never built here, and 0 is rejected."""
+    if not 1 <= int(level) <= 10:
+        raise ValueError("buzzer volume is 1-10")
+    return f"b{int(level)}"
 
 
 def is_safe(command: str) -> bool:

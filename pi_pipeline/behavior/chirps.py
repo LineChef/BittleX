@@ -1,15 +1,17 @@
 """Emotive chirp vocabulary (behaviour-ideas B5).
 
-Short buzzer melodies over the OpenCat `b<tone> <ms> ...` serial token, one per
+Short buzzer melodies over the OpenCat `b<note> <duration> ...` serial token, one per
 mood. Cheap personality, and doubles as the Phase 7 voice state cue (listening /
 thinking / speaking).
 
   chirp_for(ChirpMood.HAPPY)  -> "b24 6 27 6 31 8"   (a serial string via opencat.beep)
   Chirper(...).maybe(mood)    -> the string, or None if still in cooldown
 
-Tone/duration values are a FIRST CUT -- tune by ear on the real buzzer. Tone is
-an index into the firmware's note table; duration is in the firmware's ~10 ms
-units.
+Note/duration values are a FIRST CUT -- tune by ear on the real buzzer. A note is a
+semitone number (C3 = 14, C4 = 26); the buzzer reproduces 1-35 and is loudest at the LOW
+end (notes above ~30 are faint, above ~35 inaudible). A duration is a divisor of one
+second (4 = a quarter second), so a longer note is a SMALLER number. These moods sit in
+the upper range; the voice-loop cues live in `voice/cues.py` (`LOW_CUES`) instead.
 """
 from __future__ import annotations
 

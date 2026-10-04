@@ -150,6 +150,10 @@ class Settings:
     # Stream Claude's reply: speak each finished sentence and send each skill as soon as it is complete, instead of
     # waiting for the whole reply. 0 = off (the old whole-reply behaviour, for A/B timing).
     stream_replies: bool = field(default_factory=lambda: _env("G2_STREAM", "1").lower() not in ("0", "false", "off", "no"))
+    # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
+    cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "thinking"))
+    # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
+    buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
     buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 0.0))

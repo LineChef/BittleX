@@ -119,7 +119,7 @@ step after any future full reflash, not a fault to re-diagnose.
 |---|---|---|
 | `k<skill>` | `T_SKILL` | run a named skill — `kwkF`, `ksit`, `kbalance`, `kcrF`, `ktrF` |
 | `m<idx> <deg> …` | `T_INDEXED_SIMULTANEOUS_ASC` | move joint(s), chainable — `m0 30 8 -35` |
-| `b<tone> <ms> …` | `T_BEEP` | buzzer melody |
+| `b<note> <dur> …` | `T_BEEP` | buzzer melody: pairs of (note, duration). Note = semitone number, C3 = 14, C4 = 26, **1-35 is the usable range (loudest at the low end)**, 0 or -1 = rest. Duration = a divisor of one second (`b14 4` = note 14 for 1/4 s, **not milliseconds**), so a longer note is a smaller number. Chain as many pairs as fit; keep a token short (~60 chars). `b<1-10>` on its own sets the volume per Petoi's serial-protocol page (unconfirmed on this board, see the research note); a bare `b` toggles mute -- never send it |
 | `d` | `T_REST` | rest posture, servos off (ends a looping gait) |
 | `P` | `T_POWER` | **print battery voltage** — confirmed against the real BiBoard 2026-09-28 (`check_serial send P` → `Voltage: 8.02 V`, healthy for the 7.4 V 2S pack) |
 | `j` / `j <idx>` | `T_JOINTS` | **return all joint angles / one joint** |
