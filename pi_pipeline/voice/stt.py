@@ -34,7 +34,7 @@ class TextSTT:
 
 
 class VoskSTT:
-    def __init__(self, model_path: str, sample_rate: int = 16000, silence_s: float = 1.0):
+    def __init__(self, model_path: str, sample_rate: int = 16000, silence_s: float = 0.75):
         import sounddevice as sd
         from vosk import KaldiRecognizer, Model
 

@@ -131,7 +131,7 @@ class Settings:
     # doesn't change which voice model is used, just post-processes its
     # output. G2_VOICE_ROBOT_EFFECT=0 to turn it off.
     voice_robot_effect: bool = field(default_factory=lambda: _env("G2_VOICE_ROBOT_EFFECT", "1") not in ("0", "false", "no"))
-    stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.0))
+    stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 0.75))
     # After a reply, keep the mic open this long for a follow-up before requiring
     # the wake word again. Resets on every exchange, so a normal back-and-forth
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".

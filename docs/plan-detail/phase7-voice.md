@@ -102,7 +102,20 @@ What we learned:
   with no speaker: two sharp beeps when it starts listening (after the wake word, and after each reply), a rising "?" when it has your words and is
   asking Claude, a quick blip for a recognised local command. The melodies are `behavior/chirps.py`'s; they are off with the `sound_cues`
   feature flag. Pitch and length are tunable for volume (`G2_BUZZER_SHIFT`, default +14 semitones, and `G2_BUZZER_LEN`, default 1.6x): a small piezo is loudest around 2-4 kHz. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token interrupts the gait, so you
-  won't hear acknowledgements mid-walk. Not yet heard on the robot. The end-of-speech window `G2_STT_SILENCE_S` (default 1.0 s) is counted in 0.25 s blocks, so 1.2 behaved as 1.0 and 0.75 is the next step down; whether Vosk's own endpointer ends utterances first is unchecked.
+  won't hear acknowledgements mid-walk. Not yet heard on the robot. The end-of-speech window `G2_STT_SILENCE_S` (default 0.75 s) is counted in 0.25 s blocks.
+**End-of-speech detection, measured 2026-10-04** (synthesized speech streamed in real time into the same small Vosk model, local machine; the timing is
+audio-time, not CPU, so it carries over to the Pi). Vosk ends an utterance with its own endpointer (rules in `models/vosk/conf/model.conf`:
+`--endpoint.rule2/3/4.min-trailing-silence` = 0.5 / 0.75 / 1.0 s), and the loop returns the moment it fires:
+- Default rules: the endpoint arrives **0.75-1.1 s after you stop talking** (longer for short phrases).
+- The partial transcript stops changing only ~0.1-0.16 s after speech ends, so Vosk's decode lag is small; the wait is the rule thresholds.
+- The loop's own silence counter (`G2_STT_SILENCE_S`) advances only while the partial is *empty*. In 2 of 3 phrases it never emptied before the
+  endpoint, so that setting rarely does anything. Changing it from 1.2 to 0.75 buys little.
+- Halving the rules (0.3/0.45/0.6 s in `model.conf`) brought the endpoint to **0.66-0.85 s** (about 0.2-0.3 s faster), but a 0.7 s mid-sentence
+  pause then split one utterance in two ("ah" + "forward"); the default rules did not split pauses up to 0.7 s.
+- Options, not yet done: (a) tune `model.conf` on the Pi (a middle set such as 0.4/0.6/0.8 gains ~0.1-0.25 s with little split risk);
+  (b) make the loop end on "partial unchanged for N s" (~0.1 s + N, so 0.5 would end at ~0.6 s, about 0.3-0.5 s faster) which also makes the
+  setting effective; (c) the installed Vosk 0.3.44 has no `SetEndpointerMode` call, so a newer vosk would be needed for the API route.
+
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it
