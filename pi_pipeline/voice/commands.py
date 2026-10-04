@@ -96,6 +96,10 @@ _CMDMODE_OFF = (
     "stop command mode", "exit command mode", "basic commands off", "disable basic commands",
 )
 
+# Short phrases the STT re-checks with a grammar-restricted second pass (open-vocabulary Vosk
+# mishears them). Keep this list small and low-stakes: a grammar pass can over-match.
+CONTROL_PHRASES = ("command mode on", "command mode off")
+
 # The small Vosk model often mishears "command" ("man mode off"), so accept near-misses of the
 # first word when the phrase ends in "mode on/off". "of" is a common mishearing of "off".
 _CMDMODE_FIRST = {"command", "commands", "commandmode", "comand", "commend", "commander",

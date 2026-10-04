@@ -136,3 +136,11 @@ def test_chirps_and_narration_dont_collide_with_rebuff():
     assert looks_like_rebuff("be quiet")
     assert not looks_like_rebuff("turn off your chirps")
     assert not looks_like_rebuff("narrate less")
+
+
+def test_control_phrase_pass_overrides_only_a_real_control_phrase():
+    from pi_pipeline.voice.stt import pick_control_phrase
+    phrases = ("command mode on", "command mode off")
+    assert pick_control_phrase("the man load off", "command mode off", phrases) == "command mode off"
+    assert pick_control_phrase("walk forward", "[unk]", phrases) == "walk forward"
+    assert pick_control_phrase("walk forward", "", phrases) == "walk forward"
