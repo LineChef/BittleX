@@ -96,6 +96,21 @@ _CMDMODE_OFF = (
     "stop command mode", "exit command mode", "basic commands off", "disable basic commands",
 )
 
+# The small Vosk model often mishears "command" ("man mode off"), so accept near-misses of the
+# first word when the phrase ends in "mode on/off". "of" is a common mishearing of "off".
+_CMDMODE_FIRST = {"command", "commands", "commandmode", "comand", "commend", "commander",
+                  "commando", "comman", "man", "mand", "common", "comment", "coming"}
+
+
+def _command_mode_toggle(n: str) -> str | None:
+    t = n.split()
+    if len(t) >= 3 and t[-2] == "mode" and t[-1] in ("on", "off", "of") and t[-3] in _CMDMODE_FIRST:
+        return "off" if t[-1] in ("off", "of") else "on"
+    if len(t) == 2 and t[0] in _CMDMODE_FIRST and t[1] == "mode":
+        return "on"
+    return None
+
+
 # chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
 # not backed by it (that flag is boot-time only; this is a runtime override).
 _CHIRPS_ON = (
@@ -250,9 +265,10 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
-    if _hit(n, _CMDMODE_OFF):
+    _cm = _command_mode_toggle(n)
+    if _cm == "off" or _hit(n, _CMDMODE_OFF):
         return "command_mode_off"
-    if _hit(n, _CMDMODE_ON):
+    if _cm == "on" or _hit(n, _CMDMODE_ON):
         return "command_mode_on"
     if _hit(n, _CHIRPS_ON):
         return "chirps_on"

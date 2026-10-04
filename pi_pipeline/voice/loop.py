@@ -15,6 +15,7 @@ Session / privacy behaviour:
 from __future__ import annotations
 
 import logging
+import os
 
 from ..personality import character_state
 from ..personality import gir
@@ -117,7 +118,8 @@ class VoiceLoop:
         self._cue.set("listening")
         timeout = self._follow_up_s if self._in_session else None
         user_text = self._stt.listen(timeout_s=timeout).strip()
-        log.debug("heard: %r", user_text)
+        if os.environ.get("G2_LOG_HEARD"):   # opt-in: transcripts stay out of the logs otherwise
+            log.info("heard: %r", user_text)
 
         if not user_text:
             if self._in_session:

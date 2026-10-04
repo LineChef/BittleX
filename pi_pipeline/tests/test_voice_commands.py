@@ -110,6 +110,14 @@ def test_command_mode_phrases():
         assert _mlc(p) == "command_mode_off", p
 
 
+def test_command_mode_tolerates_the_mishearings_vosk_makes():
+    for p in ("man mode off", "gee two man mode off", "command mode of", "commands mode off"):
+        assert _mlc(p) == "command_mode_off", p
+    for p in ("man mode on", "man mode"):
+        assert _mlc(p) == "command_mode_on", p
+    assert _mlc("gir mode off") == "character"   # other '<x> mode' phrases are untouched
+
+
 def test_narration_level_phrases():
     from pi_pipeline.voice.commands import parse_narration_command as _pnc
     for p in ("narration level 1", "set verbosity to level 5", "narration level 3"):
