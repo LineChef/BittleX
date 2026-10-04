@@ -171,7 +171,7 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
     <span class="legend-item"><span class="swatch dashed"></span>Not wired</span>
   </div>
 
-  <figure role="img" aria-label="Wire map with the Pi header standing up: pin 1 top-left, pin 2 top-right, down to pins 39 and 40. BiBoard, on the left, connects to pins 6 (GND), 8 (TXD) and 10 (RXD) with wires that loop over the top of the header. On the right, the mic connects to pins 1 (3V), 9 (GND) and 38 (DOUT) and the amp to pins 2 (5V), 14 (GND) and 40 (DIN). BCLK on pin 12 and LRCLK on pin 35 each split at a splice into one wire to the mic and one to the amp. The mic SEL pin is strapped to its own GND, not to the Pi.">
+  <figure role="img" aria-label="Wire map with the Pi header standing up: pin 1 top-left, pin 2 top-right, down to pins 39 and 40. BiBoard, on the left, connects to pins 6 (GND), 8 (TXD) and 10 (RXD) with wires that loop over the top of the header. On the right, the mic connects to pins 1 (3V), 9 (GND) and 38 (DOUT) and the amp to pins 2 (5V), 14 (GND) and 40 (DIN). BCLK on pin 12 and LRCLK on pin 35 each split at a splice into one wire to the mic and one to the amp. The mic SEL pin is tied to ground by a wire to Pi pin 39, a GND pin.">
     <svg viewBox="0 0 900 740" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="11">
 <rect x="370.0" y="41.0" width="196" height="654" rx="8" fill="none" stroke="currentColor" stroke-width="1.8"/>
 <text x="468.0" y="715.0" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="currentColor">Pi Zero 2 W — 40-pin header</text>
@@ -290,8 +290,8 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
 <rect x="474.0" y="627.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
 <text x="482.0" y="644" font-size="10.5" font-weight="700" fill="currentColor">38</text>
 <text x="550.0" y="644" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G20</text>
-<rect x="378.0" y="659.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
-<text x="386.0" y="676" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">39</text>
+<rect x="378.0" y="659.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="386.0" y="676" font-size="10.5" font-weight="700" fill="currentColor">39</text>
 <text x="454.0" y="676" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
 <rect x="474.0" y="659.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
 <text x="482.0" y="676" font-size="10.5" font-weight="700" fill="currentColor">40</text>
@@ -345,8 +345,9 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
 <circle cx="770" cy="606" r="3.5" fill="var(--audio)"/>
 <text x="780" y="639.5" text-anchor="start" font-size="10" fill="var(--audio)">DIN</text>
 <circle cx="770" cy="636" r="3.5" fill="var(--audio)"/>
-<polyline points="832,112 866,112 866,232 832,232" fill="none" stroke="var(--audio)" stroke-width="1.3" stroke-linejoin="round"/>
-<text x="874" y="172.0" text-anchor="middle" font-size="9" fill="var(--audio)" transform="rotate(-90 874 172.0)">SEL→GND</text>
+<polyline points="462,672 468,672 468,688 752,688 752,112 770,112" fill="none" stroke="var(--audio)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="462" cy="672" r="3.5" fill="var(--audio)"/>
+<text x="764" y="704" text-anchor="start" font-size="9.5" fill="var(--audio)">mic SEL → pin 39 (GND)</text>
 <polyline points="558.0,64 680,64 680,546 770,546" fill="none" stroke="var(--audio)" stroke-width="1.8" stroke-linejoin="round"/>
 <circle cx="558.0" cy="64" r="3.5" fill="var(--audio)"/>
 <polyline points="558.0,256 644,256 644,516 770,516" fill="none" stroke="var(--audio)" stroke-width="1.8" stroke-linejoin="round"/>
@@ -373,7 +374,7 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
 <text x="583" y="641.5" text-anchor="start" font-size="10" fill="var(--audio)">×2</text>
 </svg>
   </figure>
-  <figcaption>Pin squares are colored by owner; pins 2, 4, 5 and 6 also touch PiSugar's pogo contacts (teal dot or fill). BiBoard's three wires land on pins 6, 8 and 10 in the right column, so they loop over the top of the header to reach it. The Pi drives BCLK and LRCLK only from pins 12 and 35, so each feeds a splice (thick wire, dot, ×2) that fans out to both the mic and the amp. Amp G is shown on pin 14, but any free GND pin works. The mic's SEL pin is strapped to its own GND and never goes to the Pi. Board ports are in the order printed on each board (mic top to bottom as you read it; amp in plug order), so wires cross where those orders disagree with the header's pin order.</figcaption>
+  <figcaption>Pin squares are colored by owner; pins 2, 4, 5 and 6 also touch PiSugar's pogo contacts (teal dot or fill). BiBoard's three wires land on pins 6, 8 and 10 in the right column, so they loop over the top of the header to reach it. The Pi drives BCLK and LRCLK only from pins 12 and 35, so each feeds a splice (thick wire, dot, ×2) that fans out to both the mic and the amp. Amp G is shown on pin 14, but any free GND pin works. The mic's SEL pin is tied to ground with a wire to pin 39 (a GND pin) — it is a fixed channel-select level, not a data signal. Board ports are in the order printed on each board (mic top to bottom as you read it; amp in plug order), so wires cross where those orders disagree with the header's pin order.</figcaption>
 </section>
 
 <section>
@@ -450,7 +451,7 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
       <div class="pin"><div class="row1"><span class="pnum">37</span><span class="gpio">GPIO26</span></div><div class="label muted">free</div></div>
       <div class="pin pin--audio right"><div class="row1"><span class="pnum">38</span><span class="gpio">GPIO20</span></div><div class="label">Mic DOUT</div></div>
 
-      <div class="pin"><div class="row1"><span class="pnum">39</span><span class="gpio">GND</span></div><div class="label muted">free</div></div>
+      <div class="pin pin--audio"><div class="row1"><span class="pnum">39</span><span class="gpio">GND</span></div><div class="label">Mic SEL (tied to ground)</div></div>
       <div class="pin pin--audio right"><div class="row1"><span class="pnum">40</span><span class="gpio">GPIO21</span></div><div class="label">Amp DIN</div></div>
 
     </div>
@@ -489,6 +490,7 @@ footer code{font-family:var(--mono);background:var(--reserved-bg);padding:1px 5p
           <tr><td>LRCLK, LRCLK <span class="badge badge-fanout">HAND-SPLICE</span></td><td class="mono">35</td><td class="mono">GPIO19</td></tr>
           <tr class="subrow"><td colspan="3">Same technique, second splice, onto the amp cable's LRCLK wire.</td></tr>
           <tr><td>Mic DOUT <span class="badge badge-mic">MIC</span></td><td class="mono">38</td><td class="mono">GPIO20</td></tr>
+          <tr><td>Mic SEL <span class="badge badge-mic">MIC</span></td><td class="mono">39</td><td class="mono">GND — picks the left channel</td></tr>
           <tr><td>Amp DIN <span class="badge badge-amp">AMP</span></td><td class="mono">40</td><td class="mono">GPIO21</td></tr>
           <tr><td style="color:var(--muted)">Amp CTRL <span class="badge badge-amp">AMP</span></td><td style="color:var(--muted)">36?</td><td class="mono" style="color:var(--muted)">GPIO16 — vendor docs mention a "CTRL" pin, but the board's own photos show no separate control pin on its connector; likely nothing to wire here</td></tr>
         </tbody>
