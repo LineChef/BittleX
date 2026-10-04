@@ -40,6 +40,9 @@ class MockActuator:
     def send_token(self, token: str) -> None:
         log.info("[mock] G2 would send %r", token)
 
+    def read_voltage(self) -> float | None:
+        return None                      # no robot, no battery
+
     def close(self) -> None:  # nothing to release
         pass
 
@@ -123,6 +126,14 @@ class SerialActuator:
             log.debug("skipping %r while a gait is running", token)
             return
         self._link.send(token, read_reply=False)
+
+    def read_voltage(self) -> float | None:
+        """Battery volts via the firmware's `P` command, or None while a gait is running (the reading sags under load, and the
+        serial line is busy)."""
+        if self._gait_active:
+            return None
+        from ..power.battery import read_voltage
+        return read_voltage(self._link)
 
     def close(self) -> None:
         self._cancel_cap()

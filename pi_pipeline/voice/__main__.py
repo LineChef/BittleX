@@ -83,6 +83,8 @@ def main() -> None:
         else:
             cue = LogCue()
 
+        watcher = _start_battery_watch(args.actuator, actuator, play_siren=voice and tts_mode != "print")
+
         loop = VoiceLoop(
             wake_word=make_wake_word(
                 "vosk" if use_wake else "none",
@@ -106,8 +108,43 @@ def main() -> None:
         try:
             loop.run_forever()
         finally:
+            if watcher:
+                watcher.stop()
             if memory:
                 memory.close()
+
+
+def _start_battery_watch(actuator_mode: str, actuator, *, play_siren: bool):
+    """Watch the robot's battery and play the star_trek_red_alert siren when it is low. Reads the voltage through the serial
+    actuator, or, when the actuator is a mock (G2 is not allowed to move), through a read-only link of its own, since asking
+    for the voltage moves nothing. No serial port (e.g. a laptop) means no watch."""
+    import os
+
+    from ..power.battery import BatteryMonitor, BatteryWatcher, read_voltage
+
+    if not settings.battery_watch:
+        return None
+    if actuator_mode == "serial":
+        reader = actuator.read_voltage
+    elif os.path.exists(settings.serial_port):
+        link_box: list = []
+
+        def reader():
+            if not link_box:
+                from ..link.serial_link import SerialLink
+                link_box.append(SerialLink(settings.serial_port, settings.serial_baud, reset_wait=0.5))
+            return read_voltage(link_box[0])
+    else:
+        return None
+
+    def on_alert(level, volts):
+        diag.event("sys", "WARN", "battery.low", level=level.name.lower(), volts=round(volts, 2))
+        if play_siren:
+            from . import star_trek_red_alert
+            star_trek_red_alert.play(count=2)
+
+    monitor = BatteryMonitor(settings.battery_low_v, settings.battery_critical_v)
+    return BatteryWatcher(reader, on_alert, monitor=monitor, poll_s=settings.battery_poll_s).start()
 
 
 if __name__ == "__main__":

@@ -159,6 +159,11 @@ class Settings:
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
     # What acknowledges a command that goes to Claude: star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
+    # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the star_trek_red_alert siren.
+    battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
+    battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.0))
+    battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 6.6))
+    battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 60.0))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "star_trek_whistle"))
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
