@@ -121,6 +121,7 @@ VOICES = {
     "monotone": lambda a, r: monotone(a, r, 110.0),
     "metal": lambda a, r: comb(monotone(a, r, 125.0), r, 5.0, 0.55, 0.55),
     "retro": lambda a, r: robot_voice(bitcrush(a, 6, 2), r, carrier_hz=45.0, mix=0.3),
+    "mid": lambda a, r: comb(monotone(pitch_shift(a, -1.5), r, 105.0), r, 6.0, 0.52, 0.52),           # between metal and deep
     "deep": lambda a, r: comb(monotone(pitch_shift(a, -3.0), r, 85.0), r, 7.0, 0.5, 0.5),
 }
 
