@@ -114,6 +114,8 @@ What we learned:
   previous one plays on another (`_SpeechWorker`, `PiperTTS.prepare/play`), so a long answer starts after the first sentence and then runs without gaps. The first
   sentence still waits for its own synthesis (Piper is ~1.7x slower than speech on this Pi). While G2 speaks, the BiBoard's own voice module can hear it, so a
   reply containing one of its command words could trigger it; say "be quiet" to G2 first to switch the module off for a session.
+- **One shared Vosk model (2026-10-04).** The wake-word detector and the speech-to-text recogniser each used to load their own copy of the acoustic model, the biggest
+  thing in the Pi's 416 MB. They now share one (`voice/vosk_model.py`). Before: ~296 MB used, 119 MB available, 308 MB of swap in use with the voice service, Piper and Vosk loaded.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it

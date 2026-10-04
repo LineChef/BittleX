@@ -45,7 +45,9 @@ def _parse_phrases(phrase: str | list[str]) -> list[str]:
 class VoskWakeWord:
     def __init__(self, model_path: str, phrase: str | list[str], sample_rate: int = 16000):
         import sounddevice as sd
-        from vosk import KaldiRecognizer, Model
+        from vosk import KaldiRecognizer
+
+        from .vosk_model import get_model
 
         p = Path(model_path)
         if not p.exists():
@@ -55,7 +57,7 @@ class VoskWakeWord:
         self._phrases = _parse_phrases(phrase)
         if not self._phrases:
             raise ValueError("no wake phrase given (G2_WAKE_WORD is empty)")
-        self._model = Model(str(p))
+        self._model = get_model(str(p))      # shared with the speech-to-text recogniser
         # restrict the recogniser to the wake phrases + [unk] -> very low CPU
         self._grammar = json.dumps([*self._phrases, "[unk]"])
         self._Recognizer = KaldiRecognizer

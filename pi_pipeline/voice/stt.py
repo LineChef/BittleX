@@ -36,7 +36,9 @@ class TextSTT:
 class VoskSTT:
     def __init__(self, model_path: str, sample_rate: int = 16000, silence_s: float = 0.5):
         import sounddevice as sd
-        from vosk import KaldiRecognizer, Model
+        from vosk import KaldiRecognizer
+
+        from .vosk_model import get_model
 
         p = Path(model_path)
         if not p.exists():
@@ -47,7 +49,7 @@ class VoskSTT:
         self._rate = sample_rate
         self._silence_blocks = max(1, int(silence_s * sample_rate / 4000))
         self.last_speech_t: float | None = None   # monotonic time the partial transcript last changed (~ end of speech)
-        self._model = Model(str(p))
+        self._model = get_model(str(p))      # shared with the wake-word detector
         self._Recognizer = KaldiRecognizer
 
     def listen(self, timeout_s: float | None = None) -> str:
@@ -99,9 +101,11 @@ class VoskSTT:
         For offline validation and batch transcription."""
         import wave
 
-        from vosk import KaldiRecognizer, Model
+        from vosk import KaldiRecognizer
 
-        m = Model(str(model_path))
+        from .vosk_model import get_model
+
+        m = get_model(str(model_path))
         with wave.open(str(wav_path), "rb") as w:
             if w.getnchannels() != 1 or w.getsampwidth() != 2:
                 raise ValueError("transcribe_wav wants mono 16-bit PCM")
