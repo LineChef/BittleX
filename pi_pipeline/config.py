@@ -157,9 +157,9 @@ class Settings:
     # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
     cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "thinking"))
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
-    # What acknowledges a command that goes to Claude: whistle (continuous tone through the Pi speaker; default), buzzer (the old
+    # What acknowledges a command that goes to Claude: star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
-    ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "whistle"))
+    ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "star_trek_whistle"))
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.

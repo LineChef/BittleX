@@ -37,15 +37,15 @@ DEFAULT_STAGES = ("thinking",)       # only commands that go to Claude get a sou
 
 
 class SpeakerCue:
-    """Plays the acknowledgement whistle (`ack_tone`) through the Pi's speaker on the chosen stages, and logs every stage.
+    """Plays the acknowledgement whistle (`star_trek_whistle`) through the Pi's speaker on the chosen stages, and logs every stage.
     Replaces the buzzer blip for those stages, since the buzzer can only beep in separate notes."""
 
     def __init__(self, inner: Cue | None = None, *, stages=DEFAULT_STAGES, peak: float | None = None, player=None):
-        from . import ack_tone
+        from . import star_trek_whistle
 
         self._inner = inner or LogCue()
         self._stages = set(stages)
-        self._play = player or (lambda: ack_tone.play(peak if peak is not None else ack_tone.DEFAULT_PEAK))
+        self._play = player or (lambda: star_trek_whistle.play(peak if peak is not None else star_trek_whistle.DEFAULT_PEAK))
 
     def set(self, stage: Stage) -> None:
         self._inner.set(stage)

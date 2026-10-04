@@ -74,7 +74,7 @@ def main() -> None:
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
         stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
-        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone == "whistle":
+        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone == "star_trek_whistle":
             cue = SpeakerCue(stages=stages, peak=settings.ack_peak)
         elif settings.ack_tone != "off" and args.actuator == "serial" and features.sound_cues:
             cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length,
