@@ -84,6 +84,18 @@ _COME = (
     "come over here",
 )
 
+# "command mode" -- turns the BiBoard's own offline voice-command module on or off
+# (it listens independently of the Pi, no wake word). On = its basic commands work
+# (instant, no network); off = the Pi/Claude path is the only listener.
+_CMDMODE_ON = (
+    "command mode", "command mode on", "enable command mode", "turn on command mode",
+    "start command mode", "basic commands on", "enable basic commands",
+)
+_CMDMODE_OFF = (
+    "command mode off", "disable command mode", "turn off command mode",
+    "stop command mode", "exit command mode", "basic commands off", "disable basic commands",
+)
+
 # chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
 # not backed by it (that flag is boot-time only; this is a runtime override).
 _CHIRPS_ON = (
@@ -216,7 +228,7 @@ def looks_like_rebuff(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
-    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"command_mode_on"``, ``"command_mode_off"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -238,6 +250,10 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
+    if _hit(n, _CMDMODE_OFF):
+        return "command_mode_off"
+    if _hit(n, _CMDMODE_ON):
+        return "command_mode_on"
     if _hit(n, _CHIRPS_ON):
         return "chirps_on"
     if _hit(n, _CHIRPS_OFF):

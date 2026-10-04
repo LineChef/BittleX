@@ -101,6 +101,15 @@ def test_chirps_on_and_off_phrases():
         assert _mlc(p) == "chirps_on", p
 
 
+def test_command_mode_phrases():
+    for p in ("command mode", "G2 command mode", "enable command mode", "command mode on",
+              "turn on command mode"):
+        assert _mlc(p) == "command_mode_on", p
+    for p in ("command mode off", "disable command mode", "turn off command mode",
+              "stop command mode"):
+        assert _mlc(p) == "command_mode_off", p
+
+
 def test_narration_level_phrases():
     from pi_pipeline.voice.commands import parse_narration_command as _pnc
     for p in ("narration level 1", "set verbosity to level 5", "narration level 3"):
