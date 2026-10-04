@@ -180,3 +180,21 @@ def test_send_records_the_call_window(cfg, fake_anthropic):
     conv = Conversation(cfg)
     conv.send("hello")
     assert conv.last_call["end"] >= conv.last_call["start"] and conv.last_call["backend"]
+
+
+def test_a_reply_ending_in_a_question_expects_an_answer(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="I'm resting. Do you want me to stand up?")))
+    assert Conversation(cfg).send("how are you").expects_reply is True
+    fake_anthropic.set_reply(Resp(Block("text", text='He said "why?"')))
+    assert Conversation(cfg).send("hm").expects_reply is True        # a closing quote after the ? still counts
+    fake_anthropic.set_reply(Resp(Block("text", text="Sure. Standing up now.")))
+    assert Conversation(cfg).send("stand up").expects_reply is False
+
+
+def test_the_await_reply_tool_marks_an_answer_expected_and_is_acknowledged(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="Let me know what you think."),
+                                  Block("tool_use", name="await_reply", id="w1", input={})))
+    conv = Conversation(cfg)
+    turn = conv.send("review this")
+    assert turn.expects_reply is True
+    assert any(r["tool_use_id"] == "w1" for r in conv._pending_tool_results)

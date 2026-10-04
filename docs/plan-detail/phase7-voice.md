@@ -114,6 +114,10 @@ What we learned:
   previous one plays on another (`_SpeechWorker`, `PiperTTS.prepare/play`), so a long answer starts after the first sentence and then runs without gaps. The first
   sentence still waits for its own synthesis (Piper is ~1.7x slower than speech on this Pi). While G2 speaks, the BiBoard's own voice module can hear it, so a
   reply containing one of its command words could trigger it; say "be quiet" to G2 first to switch the module off for a session.
+- **Question window (2026-10-04).** With the general follow-up window off, G2 listens on without the wake word only after it asks a question, for `G2_QUESTION_WINDOW_S` (default 8 s),
+  starting when it finishes speaking, for that one turn. It counts as a question when the reply ends in a "?", or when Claude calls the new `await_reply` tool (for
+  questions without a "?" such as "let me know what you think"). Checked against the live API: "how are you feeling today?" and "I'm bored" opened the window, "wave hello" did not.
+  A basic G2 command said inside that window would still go to Claude, which is acceptable mid-conversation.
 - **One shared Vosk model (2026-10-04).** The wake-word detector and the speech-to-text recogniser each used to load their own copy of the acoustic model, the biggest
   thing in the Pi's 416 MB. They now share one (`voice/vosk_model.py`). Before: ~296 MB used, 119 MB available, 308 MB of swap in use with the voice service, Piper and Vosk loaded.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken

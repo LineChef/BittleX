@@ -124,7 +124,19 @@ _DIAGNOSTICS_TOOL = {
     },
 }
 
-_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL]
+_AWAIT_REPLY_TOOL = {
+    "name": "await_reply",
+    "description": (
+        "Call this when you have just asked the person a question (or are otherwise waiting for their answer), so G2 keeps "
+        "listening for a few seconds without needing the wake word. Do not call it for statements or rhetorical questions. "
+        "You can reply in the same turn."
+    ),
+    "input_schema": {"type": "object", "properties": {}},
+}
+
+_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL]
+
+_ENDS_WITH_QUESTION = re.compile(r"\?[\"')\]\s]*$")
 
 
 class ConversationError(RuntimeError):
@@ -163,6 +175,7 @@ class AssistantTurn:
     actions: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
     action_seconds: list[float | None] = field(default_factory=list)   # parallel to `actions`
+    expects_reply: bool = False   # G2 asked a question: listen briefly for the answer without the wake word
     streamed: bool = False   # True when `on_action`/`on_speech` already delivered the speech and actions as they arrived
 
 
@@ -388,6 +401,7 @@ class Conversation:
         actions: list[str] = []
         action_seconds: list[float | None] = []
         facts: list[str] = []
+        expects_reply = False
         for block in resp.content:
             if block.type == "text":
                 speech_parts.append(block.text.strip())
@@ -400,6 +414,9 @@ class Conversation:
                 else:
                     log.warning("Claude asked for unknown skill %r", name)
                 self._ack(block.id, "done" if ok else f"unknown skill {name!r}")
+            elif block.type == "tool_use" and block.name == "await_reply":
+                expects_reply = True
+                self._ack(block.id, "listening for the answer")
             elif block.type == "tool_use" and block.name == "remember":
                 fact = (block.input or {}).get("fact", "").strip()
                 if fact:
@@ -420,9 +437,12 @@ class Conversation:
                 self._ack(block.id, result)
 
         self._trim()
+        speech = " ".join(p for p in speech_parts if p)
+        if speech and _ENDS_WITH_QUESTION.search(speech):
+            expects_reply = True                 # the reply ends in a question
         return AssistantTurn(
-            speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts,
-            action_seconds=action_seconds, streamed=self._streamed,
+            speech=speech, actions=actions, facts=facts,
+            action_seconds=action_seconds, streamed=self._streamed, expects_reply=expects_reply,
         )
 
     @property

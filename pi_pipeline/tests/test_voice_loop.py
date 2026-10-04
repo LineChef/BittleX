@@ -337,3 +337,30 @@ def test_speech_worker_falls_back_to_plain_speak_without_prepare_and_play():
     w.say("b")
     w.finish()
     assert said == ["a", "b"]
+
+
+def test_after_a_question_the_loop_listens_briefly_without_the_wake_word():
+    lp, w, stt, conv, tts = _loop(["are you ok", "yes I am", ""])
+    lp._follow_up_s, lp._question_window_s = 0.0, 8.0
+    answers = iter([types.SimpleNamespace(speech="Want me to stand?", actions=[], facts=[], action_seconds=[], expects_reply=True),
+                    types.SimpleNamespace(speech="Standing.", actions=[], facts=[], action_seconds=[], expects_reply=False)])
+    conv.send = lambda text, memory_context=None: next(answers)
+    waits = []
+    lp._wake.wait = lambda: waits.append(1)
+    timeouts = []
+    orig = stt.listen
+    stt.listen = lambda timeout_s=None: (timeouts.append(timeout_s), orig(timeout_s))[1]
+    lp._one_turn()                       # wake word + the first question
+    assert lp._in_session and lp._session_window == 8.0
+    lp._one_turn()                       # the answer: no wake word, 8 s window
+    assert len(waits) == 1 and timeouts == [None, 8.0]
+    assert not lp._in_session            # the second reply asked nothing: back to needing the wake word
+
+
+def test_no_question_means_the_wake_word_is_needed_again():
+    lp, w, stt, conv, tts = _loop(["stand up", ""])
+    lp._follow_up_s, lp._question_window_s = 0.0, 8.0
+    conv.send = lambda text, memory_context=None: types.SimpleNamespace(
+        speech="Standing.", actions=[], facts=[], action_seconds=[], expects_reply=False)
+    lp._one_turn()
+    assert not lp._in_session

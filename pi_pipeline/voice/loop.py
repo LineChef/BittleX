@@ -124,6 +124,7 @@ class VoiceLoop:
         cue: Cue,
         memory=None,  # Phase 9: object with .recall(text) -> str and .record(user, reply)
         follow_up_s: float = 0.0,
+        question_window_s: float = 0.0,  # how long to keep listening after G2 asks a question (0 = never)
         on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
     ):
         self._wake = wake_word
@@ -134,6 +135,8 @@ class VoiceLoop:
         self._cue = cue
         self._memory = memory
         self._follow_up_s = max(0.0, follow_up_s)
+        self._question_window_s = max(0.0, question_window_s)
+        self._session_window = self._follow_up_s
         self._in_session = False
         # bridge to the behaviour runtime (if running alongside); no-op otherwise
         self._events = on_event or (lambda **_kw: None)
@@ -154,6 +157,16 @@ class VoiceLoop:
         finally:
             self._act.stop()
             self._act.close()
+
+    def _set_session(self, expects_reply: bool = False) -> None:
+        """Decide whether the next turn needs the wake word. G2 listens on without it only for the short question window
+        (when its reply asked something) or the general follow-up window (off on the robot)."""
+        if expects_reply and self._question_window_s > 0:
+            self._in_session, self._session_window = True, self._question_window_s
+        elif self._follow_up_s > 0:
+            self._in_session, self._session_window = True, self._follow_up_s
+        else:
+            self._in_session = False
 
     def _end_session(self) -> None:
         self._in_session = False
@@ -194,7 +207,7 @@ class VoiceLoop:
                 self._memory.mark_session_start()
 
         self._cue.set("listening")
-        timeout = self._follow_up_s if self._in_session else None
+        timeout = self._session_window if self._in_session else None
         user_text = self._stt.listen(timeout_s=timeout).strip()
         trace.stamp("transcript")
         speech_end = getattr(self._stt, "last_speech_t", None)
@@ -232,7 +245,7 @@ class VoiceLoop:
             self._events(release=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, moving again.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "explore":
@@ -240,7 +253,7 @@ class VoiceLoop:
             self._events(arm_explore=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, looking around. Make sure I'm on the floor.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "unexplore":
@@ -248,7 +261,7 @@ class VoiceLoop:
             self._events(disarm_explore=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, coming back.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "come":
@@ -256,7 +269,7 @@ class VoiceLoop:
             self._events(come_here=True)
             self._cue.set("speaking")
             self._tts.speak("Coming.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "shutdown":
@@ -281,12 +294,12 @@ class VoiceLoop:
                 self._tts.speak("Okay, I've forgotten that.")
             else:
                 self._tts.speak("There's nothing new to forget.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "character":
             self._handle_character(parse_character_command(user_text))
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "chirps_on":
@@ -294,7 +307,7 @@ class VoiceLoop:
             self._events(chirps_on=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, chirps on.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "chirps_off":
@@ -302,7 +315,7 @@ class VoiceLoop:
             self._events(chirps_off=True)
             self._cue.set("speaking")
             self._tts.speak("Okay, chirps off.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         if cmd == "narration_level":
@@ -314,7 +327,7 @@ class VoiceLoop:
             else:
                 self._conv.set_narration_hint(narration.hint_for_level(n))
                 self._tts.speak(f"Okay, narration level {n}: {narration.describe_level(n)}.")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
 
@@ -366,7 +379,7 @@ class VoiceLoop:
                 speaker.finish()
             self._cue.set("speaking")
             self._tts.speak(e.spoken)
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
         except Exception:  # noqa: BLE001 -- one bad turn must not kill the loop
@@ -375,7 +388,7 @@ class VoiceLoop:
                 speaker.finish()
             self._cue.set("speaking")
             self._tts.speak("Sorry, I glitched. Say that again?")
-            self._in_session = self._follow_up_s > 0
+            self._set_session()
             self._cue.set("idle")
             return
 
@@ -418,5 +431,5 @@ class VoiceLoop:
             except Exception:  # noqa: BLE001
                 log.exception("memory.record failed")
 
-        self._in_session = self._follow_up_s > 0
+        self._set_session(bool(getattr(turn, "expects_reply", False)))
         self._cue.set("idle")

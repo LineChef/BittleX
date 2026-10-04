@@ -98,6 +98,7 @@ def main() -> None:
             cue=cue,
             memory=memory,
             follow_up_s=settings.follow_up_s if voice else 0.0,
+            question_window_s=settings.question_window_s if voice else 0.0,
         )
         try:
             loop.run_forever()
