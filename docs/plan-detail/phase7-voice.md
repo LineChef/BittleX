@@ -101,8 +101,8 @@ What we learned:
 - **Buzzer cues (added 2026-10-04).** With the real actuator, the voice loop beeps G2's buzzer at each stage so you can tell it heard you
   with no speaker: two sharp beeps when it starts listening (after the wake word, and after each reply), a rising "?" when it has your words and is
   asking Claude, a quick blip for a recognised local command. The melodies are `behavior/chirps.py`'s; they are off with the `sound_cues`
-  feature flag. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token interrupts the gait, so you
-  won't hear acknowledgements mid-walk. Not yet heard on the robot.
+  feature flag. Pitch and length are tunable for volume (`G2_BUZZER_SHIFT`, default +14 semitones, and `G2_BUZZER_LEN`, default 1.6x): a small piezo is loudest around 2-4 kHz. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token interrupts the gait, so you
+  won't hear acknowledgements mid-walk. Not yet heard on the robot. The end-of-speech window `G2_STT_SILENCE_S` (default 1.0 s) is counted in 0.25 s blocks, so 1.2 behaved as 1.0 and 0.75 is the next step down; whether Vosk's own endpointer ends utterances first is unchecked.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it

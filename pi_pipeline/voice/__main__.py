@@ -70,7 +70,7 @@ def main() -> None:
             max_continuous_s=args.max_gait_s,
         )
         # buzzer cues on the real robot (the sound_cues feature flag turns them off)
-        cue = BuzzerCue(actuator) if (args.actuator == "serial" and features.sound_cues) else LogCue()
+        cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length) if (args.actuator == "serial" and features.sound_cues) else LogCue()
 
         loop = VoiceLoop(
             wake_word=make_wake_word(

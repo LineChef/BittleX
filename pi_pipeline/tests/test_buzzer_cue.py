@@ -43,3 +43,13 @@ def test_serial_actuator_skips_beeps_while_a_gait_runs():
     act.stop()
     act.send_token("b19 5 26 8")           # allowed again after the stop
     assert lk.sent == ["b26 3 30 3", "kwkF", "d", "b19 5 26 8"]
+
+
+def test_shift_and_length_raise_and_stretch_the_melody():
+    sent = []
+    plain = BuzzerCue(types.SimpleNamespace(send_token=sent.append))
+    loud = BuzzerCue(types.SimpleNamespace(send_token=sent.append), shift=14, length=2.0)
+    plain.set("heard")
+    loud.set("heard")
+    assert sent[0] == "b26 3 30 3"                 # the raw ACK blip
+    assert sent[1] == "b40 6 44 6"                 # +14 semitones, twice as long

@@ -131,7 +131,7 @@ class Settings:
     # doesn't change which voice model is used, just post-processes its
     # output. G2_VOICE_ROBOT_EFFECT=0 to turn it off.
     voice_robot_effect: bool = field(default_factory=lambda: _env("G2_VOICE_ROBOT_EFFECT", "1") not in ("0", "false", "no"))
-    stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.2))
+    stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 1.0))
     # After a reply, keep the mic open this long for a follow-up before requiring
     # the wake word again. Resets on every exchange, so a normal back-and-forth
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".
@@ -140,6 +140,10 @@ class Settings:
     # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
     # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
     tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))
+    # Voice-loop buzzer cues: raise every note by this many semitones and stretch each note by this factor.
+    # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
+    buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 14.0))
+    buzzer_length: float = field(default_factory=lambda: _env_float("G2_BUZZER_LEN", 1.6))
     # Auto-stop a looping gait (walk/trot/crawl) started by voice after this many seconds. 0 = off.
     max_gait_s: float = field(default_factory=lambda: _env_float("G2_MAX_GAIT_S", 0.0))
 
