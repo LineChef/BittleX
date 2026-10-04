@@ -84,7 +84,10 @@ What we learned:
   live streaming latency after you stop speaking is still unmeasured.
 - **Timing, from the logs:** wake word heard, then the utterance, then about 2 s from "heard" to the walk starting (Claude 2.6 s). A first
   63 s gap in a mock run was just the speaker waiting to talk.
-- **A conversation stays open for ~60 s** after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
+- **Set `G2_FOLLOW_UP_S=0` on the robot (done 2026-10-04).** With the follow-up window open, a basic command meant for G2's own voice module (e.g. "stand up") that
+  is said within the window is also heard by the Pi, sent to Claude and acknowledged with the Claude beep. At 0, Claude only ever hears speech that begins
+  with "gee two", and the beep means a command went to Claude. The cost is saying "gee two" for every turn.
+- **A conversation stays open for ~60 s** (the default when `G2_FOLLOW_UP_S` is unset) after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
   straight to Claude. That is why "stand up" said right after another command still made G2 stand.
 - **Claude cannot count steps, but it can now set a duration (added 2026-10-03).** `perform_skill` takes an optional `seconds`
   for looping gaits (walk, trot, crawl): "walk forward for eight seconds" sends `kwkF` and the actuator sends the stop 8 s later. Without
