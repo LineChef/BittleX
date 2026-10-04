@@ -104,6 +104,11 @@ What we learned:
 
 Open / next:
 
+- **Resume here (paused 2026-10-03): the "rest" interrupt test.** Goal: confirm G2's own voice module can stop a walk that Claude started.
+  Clean version, so the Pi can't also act: (1) the BiBoard module is on (say "play sound", hear the tone); (2) start the Pi loop with
+  `--actuator serial --max-gait-s 20` as a backstop; (3) say "gee two", pause, "walk forward"; (4) the moment `walk_forward` is logged,
+  kill the Pi loop; (5) say "rest" and note how fast G2 stops; if it doesn't, send `d` over serial. A first attempt with the Pi still
+  listening was inconclusive (the Pi misheard "rest" as "stress" and sent `stretch`, then `rest`).
 - Decide how a Claude-started walk gets interrupted: the module's "rest" is instant and offline (the Pi's own "emergency stop" has to
   go through slow recognition), and "stop" is not one of its commands.
 - Add a duration or step-count parameter to `perform_skill` if "walk 10 steps" should work.
