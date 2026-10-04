@@ -17,7 +17,7 @@ from ..memory.memory import Memory
 from ..util.disk import start_disk_watch
 from .actuator import make_actuator
 from .conversation import Conversation
-from .cues import BuzzerCue, LogCue
+from .cues import BuzzerCue, LogCue, SpeakerCue
 from .loop import VoiceLoop
 from .stt import make_stt
 from .tts import make_tts
@@ -71,9 +71,12 @@ def main() -> None:
             args.actuator, port=settings.serial_port, baud=settings.serial_baud,
             max_continuous_s=args.max_gait_s,
         )
-        # buzzer cues on the real robot (the sound_cues feature flag turns them off)
-        if args.actuator == "serial" and features.sound_cues:
-            stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
+        # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
+        # is one, else the buzzer cues on the real robot
+        stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
+        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone == "whistle":
+            cue = SpeakerCue(stages=stages, peak=settings.ack_peak)
+        elif settings.ack_tone != "off" and args.actuator == "serial" and features.sound_cues:
             cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length,
                             stages=stages, volume=settings.buzzer_volume)
             cue.prime()

@@ -103,7 +103,7 @@ What we learned:
   transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
 - **Buzzer cues (added 2026-10-04).** With the real actuator, the voice loop beeps G2's buzzer when a command is on its way to Claude (stage `thinking`), so you
   can tell it heard you with no speaker. The sound is a low rising two-note blip (note 4 then 9, `LOW_CUES` in
-  `voice/cues.py`); a longer whistle-style cue was drafted and set aside for now. **Only Claude-bound commands beep by default** (`G2_CUE_STAGES=thinking`); the wake word and local commands like "chirps on" are silent, and
+  `voice/cues.py`); a longer whistle-style cue was drafted and set aside for now. **Update 2026-10-04: with the speaker working, the acknowledgement for a Claude-bound command is now a continuous whistle played through the speaker (`voice/ack_tone.py`, `G2_ACK_TONE`, level `G2_ACK_PEAK`), because the buzzer can only beep in separate notes.** **Only Claude-bound commands beep by default** (`G2_CUE_STAGES=thinking`); the wake word and local commands like "chirps on" are silent, and
   `listening` / `heard` can be switched back on in that setting. The buzzer volume is set to 10 at start (`G2_BUZZER_VOLUME`, 0 = leave it). Notes are semitone numbers
   (C3 = 14) in the low range because the buzzer is loudest there; listening test 2026-10-04: notes 26/30 faint, 33 and up not heard, 4/8 loudest. Durations are a
   divisor of one second, so a longer note is a *smaller* number. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token
