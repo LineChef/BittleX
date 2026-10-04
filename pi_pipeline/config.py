@@ -137,6 +137,8 @@ class Settings:
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".
     # 0 = every turn needs the wake word (most private).
     follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 60.0))
+    # Auto-stop a looping gait (walk/trot/crawl) started by voice after this many seconds. 0 = off.
+    max_gait_s: float = field(default_factory=lambda: _env_float("G2_MAX_GAIT_S", 0.0))
 
     # --- Memory (Phase 9) ---
     memory_enabled: bool = field(default_factory=lambda: _env("G2_MEMORY", "1") not in ("0", "false", "no"))

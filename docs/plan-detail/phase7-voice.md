@@ -68,7 +68,7 @@ command line — that killed the shell twice):
 ```
 cd ~/bittleX
 G2_LOG_HEARD=1 nohup pi_pipeline/.venv/bin/python -m pi_pipeline.voice --mode voice \
-    --actuator serial --max-gait-s 5 --tts print --no-memory > ~/voice.log 2>&1 &
+    --actuator serial --max-gait-s 5 --tts print --no-memory > ~/voice.log 2>&1 &   # drop --max-gait-s to run uncapped
 echo $! > ~/voice.pid          # stop it with: kill $(cat ~/voice.pid)
 ```
 
@@ -89,8 +89,10 @@ What we learned:
 - **Claude cannot count steps.** `perform_skill` takes only a skill name, and `walk_forward` is a continuous gait that runs until a stop
   command. Asked for "10 steps", Claude picked `walk_forward` and said it couldn't count (one run in four picked `rest`). A step-count or duration
   parameter, mapped to gait cycles on the Pi, would be needed.
-- **The 5 s cap is a real safeguard, not a hack.** `--max-gait-s` (off by default) makes the serial actuator send the stop after N seconds
-  unless another skill or `stop()` arrives first; the stop token is `d` (rest posture, servos off).
+- **The gait cap is an optional switch, off by default.** It makes the serial actuator send the stop after N seconds unless another skill
+  or `stop()` arrives first (the stop token is `d`, rest posture, servos off). Turn it on per run with `--max-gait-s 5`, or for every
+  run (voice loop and the full app) with `G2_MAX_GAIT_S=5` in `.env`; the flag overrides the setting, and `0` means off. Keep it on while
+  testing walks by voice; whether to keep it long term is undecided.
 - **Logging the heard transcript is opt-in.** `G2_LOG_HEARD=1` writes each recognised utterance to the log at INFO; without it the
   transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken

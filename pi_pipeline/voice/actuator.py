@@ -107,7 +107,11 @@ class SerialActuator:
             self._link.close()   # a shared link's lifecycle belongs to whoever built it
 
 
-def make_actuator(mode: str, *, port: str, baud: int, link=None, max_continuous_s: float = 0.0) -> Actuator:
+def make_actuator(mode: str, *, port: str, baud: int, link=None,
+                  max_continuous_s: float | None = None) -> Actuator:
     if mode == "serial":
+        if max_continuous_s is None:           # not given: use the G2_MAX_GAIT_S setting (default off)
+            from ..config import settings
+            max_continuous_s = settings.max_gait_s
         return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s)
     return MockActuator()

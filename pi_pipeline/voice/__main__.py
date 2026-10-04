@@ -27,8 +27,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="pi_pipeline.voice")
     ap.add_argument("--mode", choices=["text", "voice"], default="text")
     ap.add_argument("--actuator", choices=["mock", "serial"], default="mock")
-    ap.add_argument("--max-gait-s", type=float, default=0.0,
-                    help="serial actuator: auto-stop a looping gait (walk/trot/crawl) after this many seconds; 0 = off")
+    ap.add_argument("--max-gait-s", type=float, default=None,
+                    help="serial actuator: auto-stop a looping gait (walk/trot/crawl) after this many seconds; "
+                         "0 = off. Default: the G2_MAX_GAIT_S setting (off unless set in .env)")
     ap.add_argument("--tts", choices=["auto", "mac", "piper", "print"], default="auto")
     ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")

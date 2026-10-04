@@ -62,3 +62,14 @@ def test_gait_cap_off_by_default():
     act.perform("walk_forward")
     time.sleep(0.1)
     assert lk.sent == ["kwkF"]
+
+
+def test_gait_cap_follows_the_env_setting_when_not_passed(monkeypatch):
+    import dataclasses
+
+    import pi_pipeline.config as cfg
+    lk = FakeLink()
+    monkeypatch.setattr(cfg, "settings", dataclasses.replace(cfg.settings, max_gait_s=7.0))
+    assert make_actuator("serial", port="x", baud=0, link=lk)._max_continuous_s == 7.0
+    assert make_actuator("serial", port="x", baud=0, link=lk, max_continuous_s=2.0)._max_continuous_s == 2.0
+    assert make_actuator("serial", port="x", baud=0, link=lk, max_continuous_s=0.0)._max_continuous_s == 0.0
