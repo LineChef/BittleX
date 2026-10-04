@@ -93,7 +93,7 @@ def main() -> None:
             ),
             conversation=Conversation(settings),
             tts=make_tts(tts_mode, piper_model_path=settings.piper_model_path,
-                        robot_effect=settings.voice_robot_effect),
+                        style=settings.voice_style),
             actuator=actuator,
             cue=cue,
             memory=memory,

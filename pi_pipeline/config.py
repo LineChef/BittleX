@@ -130,6 +130,10 @@ class Settings:
     # after hearing several options -- see voice/effects.py). On by default;
     # doesn't change which voice model is used, just post-processes its
     # output. G2_VOICE_ROBOT_EFFECT=0 to turn it off.
+    # Which robot voice to use: plain | current | dalek | monotone | metal | retro | deep (see voice/effects.py VOICES).
+    # Defaults to `metal` (chosen by listening 2026-10-04); G2_VOICE_ROBOT_EFFECT=0 still means plain.
+    voice_style: str = field(default_factory=lambda: _env("G2_VOICE_STYLE") or (
+        "plain" if _env("G2_VOICE_ROBOT_EFFECT", "1") in ("0", "false", "no") else "metal"))
     voice_robot_effect: bool = field(default_factory=lambda: _env("G2_VOICE_ROBOT_EFFECT", "1") not in ("0", "false", "no"))
     stt_silence_s: float = field(default_factory=lambda: _env_float("G2_STT_SILENCE_S", 0.5))
     # After a reply, keep the mic open this long for a follow-up before requiring

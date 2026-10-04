@@ -118,6 +118,10 @@ What we learned:
   starting when it finishes speaking, for that one turn. It counts as a question when the reply ends in a "?", or when Claude calls the new `await_reply` tool (for
   questions without a "?" such as "let me know what you think"). Checked against the live API: "how are you feeling today?" and "I'm bored" opened the window, "wave hello" did not.
   A basic G2 command said inside that window would still go to Claude, which is acceptable mid-conversation.
+- **Robot voice (2026-10-04).** G2's replies use a robot voice chosen by listening to seven candidates on the real speaker: `metal` (the winner) is the speech flattened to a
+  steady ~125 Hz buzz (each frame's phase is discarded and the frames are laid down at a fixed period, so the words survive but the melody does not) plus a short metallic
+  feedback ring. Runners-up: `deep` (lower and slower, a bigger robot, harder to follow). `G2_VOICE_STYLE` picks any of `plain | current | dalek | monotone | metal | retro | deep`
+  (`voice/effects.py` `VOICES`); the old `G2_VOICE_ROBOT_EFFECT=0` still means plain. The effect runs on each sentence after Piper synthesises it.
 - **One shared Vosk model (2026-10-04).** The wake-word detector and the speech-to-text recogniser each used to load their own copy of the acoustic model, the biggest
   thing in the Pi's 416 MB. They now share one (`voice/vosk_model.py`). Before: ~296 MB used, 119 MB available, 308 MB of swap in use with the voice service, Piper and Vosk loaded.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken

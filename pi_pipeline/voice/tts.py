@@ -46,7 +46,7 @@ class PiperTTS:
     """Local neural TTS via Piper (piper-tts >= 1.7), played through the default
     output device."""
 
-    def __init__(self, model_path: str, robot_effect: bool = False):
+    def __init__(self, model_path: str, robot_effect: bool = False, style: str | None = None):
         from piper.voice import PiperVoice  # piper-tts
         import sounddevice as sd
 
@@ -59,7 +59,7 @@ class PiperTTS:
         self._voice = PiperVoice.load(str(p))
         self._sd = sd
         self._rate = self._voice.config.sample_rate
-        self._robot_effect = robot_effect
+        self._style = style or ("current" if robot_effect else "plain")   # a name from effects.VOICES
 
     def _synth(self, text: str):
         import numpy as np
@@ -68,9 +68,9 @@ class PiperTTS:
             return None, self._rate
         audio = np.concatenate([c.audio_int16_array for c in chunks])
         rate = chunks[0].sample_rate
-        if self._robot_effect:
-            from .effects import robot_voice
-            audio = robot_voice(audio, rate)
+        if self._style != "plain":
+            from .effects import apply_style
+            audio = apply_style(self._style, audio, rate)
         return audio, rate
 
     def prepare(self, text: str):
@@ -108,9 +108,9 @@ class PiperTTS:
         return rate, n
 
 
-def make_tts(mode: str, *, piper_model_path: str, robot_effect: bool = False) -> TTS:
+def make_tts(mode: str, *, piper_model_path: str, robot_effect: bool = False, style: str | None = None) -> TTS:
     if mode == "piper":
-        return PiperTTS(piper_model_path, robot_effect=robot_effect)
+        return PiperTTS(piper_model_path, robot_effect=robot_effect, style=style)
     if mode == "print":
         return PrintTTS()
     try:

@@ -53,8 +53,8 @@ def _stt() -> None:
 def _tts(text: str, model: str | None, robot: bool | None) -> None:
     from .tts import PiperTTS
 
-    effect = settings.voice_robot_effect if robot is None else robot
-    PiperTTS(model or settings.piper_model_path, robot_effect=effect).speak(text)
+    style = settings.voice_style if robot is None else ("metal" if robot else "plain")
+    PiperTTS(model or settings.piper_model_path, style=style).speak(text)
 
 
 def main() -> None:
