@@ -144,8 +144,14 @@ def _check_audio() -> list:
 
 
 def _check_disk() -> list:
-    free_gb = shutil.disk_usage(".").free / 1e9
-    return [_r("free disk", OK if free_gb > 1.0 else WARN, f"{free_gb:.1f} GB")]
+    from .config import settings
+    from .util.disk import disk_status, warning_text
+
+    limit = getattr(settings, "disk_warn_pct", 85.0)
+    pct, free_gb = disk_status(".")
+    over = warning_text(pct, free_gb, limit)
+    ok = free_gb > 1.0 and over is None
+    return [_r("free disk", OK if ok else WARN, f"{free_gb:.1f} GB free, {pct:.0f}% used" + (f" -- over {limit:.0f}%" if over else ""))]
 
 
 def _check_features(s) -> list:

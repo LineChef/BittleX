@@ -206,3 +206,11 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 Phase 1 is not hardware-gated and pairs naturally with the ONNX-export /
 Pi-bring-up work already queued.
+
+## Disk-space warning (added 2026-10-04)
+
+`pi_pipeline/util/disk.py` warns when the SD card passes `G2_DISK_WARN_PCT` (default 85%): the voice service checks at startup and every 30 minutes,
+logs a WARNING (journal) and writes a `disk.full` event to the diagnostics log, and repeats at most every 6 hours while it stays above; dropping
+back below re-arms it. `python -m pi_pipeline.doctor` shows the same figure. The systemd journal is separately capped at 50 MB
+(`/etc/systemd/journald.conf.d/persistent.conf` on the Pi). The unbounded folders are `~/g2_logs` (one small folder per service start, ~20 KB each),
+`~/g2_runs` and `~/g2_cap`; there is no automatic cleanup of them yet.

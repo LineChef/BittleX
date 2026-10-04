@@ -140,6 +140,8 @@ class Settings:
     # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
     # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
     tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))
+    # Warn (log + diagnostics event) when the SD card is this percent full or more.
+    disk_warn_pct: float = field(default_factory=lambda: _env_float("G2_DISK_WARN_PCT", 85.0))
     # Claude API connection: keep the pooled HTTPS connection alive this long (the SDK default is 5 s, which
     # is shorter than a human pause between turns, so most turns pay a fresh TCP+TLS handshake), and open it
     # in the background the moment the wake word is heard.

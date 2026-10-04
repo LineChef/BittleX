@@ -14,6 +14,7 @@ from ..config import settings
 from ..diag import diag
 from ..features import features, log_summary
 from ..memory.memory import Memory
+from ..util.disk import start_disk_watch
 from .actuator import make_actuator
 from .conversation import Conversation
 from .cues import BuzzerCue, LogCue
@@ -43,6 +44,7 @@ def main() -> None:
     )
 
     log_summary()
+    start_disk_watch(settings.disk_warn_pct)
 
     _lvl, _msg = settings.api_key_expiry_status()
     if _msg:
