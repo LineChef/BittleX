@@ -16,7 +16,7 @@ from ..features import features, log_summary
 from ..memory.memory import Memory
 from .actuator import make_actuator
 from .conversation import Conversation
-from .cues import LogCue
+from .cues import BuzzerCue, LogCue
 from .loop import VoiceLoop
 from .stt import make_stt
 from .tts import make_tts
@@ -65,6 +65,13 @@ def main() -> None:
         if settings.memory_enabled and not args.no_memory and features.memory:
             memory = Memory(settings)
 
+        actuator = make_actuator(
+            args.actuator, port=settings.serial_port, baud=settings.serial_baud,
+            max_continuous_s=args.max_gait_s,
+        )
+        # buzzer cues on the real robot (the sound_cues feature flag turns them off)
+        cue = BuzzerCue(actuator) if (args.actuator == "serial" and features.sound_cues) else LogCue()
+
         loop = VoiceLoop(
             wake_word=make_wake_word(
                 "vosk" if use_wake else "none",
@@ -79,11 +86,8 @@ def main() -> None:
             conversation=Conversation(settings),
             tts=make_tts(tts_mode, piper_model_path=settings.piper_model_path,
                         robot_effect=settings.voice_robot_effect),
-            actuator=make_actuator(
-                args.actuator, port=settings.serial_port, baud=settings.serial_baud,
-                max_continuous_s=args.max_gait_s,
-            ),
-            cue=LogCue(),
+            actuator=actuator,
+            cue=cue,
             memory=memory,
             follow_up_s=settings.follow_up_s if voice else 0.0,
         )

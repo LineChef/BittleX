@@ -37,6 +37,9 @@ class MockActuator:
     def stop(self) -> None:
         log.info("[mock] G2 would stop (serial 'd')")
 
+    def send_token(self, token: str) -> None:
+        log.info("[mock] G2 would send %r", token)
+
     def close(self) -> None:  # nothing to release
         pass
 
@@ -64,6 +67,7 @@ class SerialActuator:
 
         self._max_continuous_s = max_continuous_s
         self._cap_timer: threading.Timer | None = None
+        self._gait_active = False     # a looping gait was started and not yet stopped
 
         self._opencat = opencat
         self._owns_link = link is None   # only close a link we opened ourselves
@@ -85,6 +89,7 @@ class SerialActuator:
         log.info("G2 perform %s -> %r", skill_name, cmd)
         self._cancel_cap()
         self._link.send(cmd, read_reply=False)
+        self._gait_active = skills.SKILLS[skill_name].continuous
         if skills.SKILLS[skill_name].continuous:
             # a requested duration bounds the walk; if a standing cap is set it is a hard ceiling on top
             duration = skills.clamp_seconds(seconds)
@@ -103,11 +108,21 @@ class SerialActuator:
     def _cap_expired(self, skill_name: str, duration: float) -> None:
         log.warning("G2 %s ran its %.1fs -- stopping", skill_name, duration)
         self._cap_timer = None
+        self._gait_active = False
         self._link.send(self._opencat.REST, read_reply=False)
 
     def stop(self) -> None:
         self._cancel_cap()
+        self._gait_active = False
         self._link.send(self._opencat.REST, read_reply=False)
+
+    def send_token(self, token: str) -> None:
+        """Send one raw OpenCat token (used for buzzer cues). Skipped while a looping gait is
+        running: whether a non-skill token interrupts the gait has not been checked on the robot."""
+        if self._gait_active:
+            log.debug("skipping %r while a gait is running", token)
+            return
+        self._link.send(token, read_reply=False)
 
     def close(self) -> None:
         self._cancel_cap()
