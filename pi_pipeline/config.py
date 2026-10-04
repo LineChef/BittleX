@@ -140,6 +140,11 @@ class Settings:
     # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
     # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
     tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))
+    # Claude API connection: keep the pooled HTTPS connection alive this long (the SDK default is 5 s, which
+    # is shorter than a human pause between turns, so most turns pay a fresh TCP+TLS handshake), and open it
+    # in the background the moment the wake word is heard.
+    api_keepalive_s: float = field(default_factory=lambda: _env_float("G2_API_KEEPALIVE_S", 300.0))
+    api_warmup: bool = field(default_factory=lambda: _env("G2_API_WARMUP", "1").lower() not in ("0", "false", "off", "no"))
     # Voice-loop buzzer cues: raise every note by this many semitones and stretch each note by this factor.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
     buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 14.0))

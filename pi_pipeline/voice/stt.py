@@ -46,6 +46,7 @@ class VoskSTT:
         self._sd = sd
         self._rate = sample_rate
         self._silence_blocks = max(1, int(silence_s * sample_rate / 4000))
+        self.last_speech_t: float | None = None   # monotonic time the partial transcript last changed (~ end of speech)
         self._model = Model(str(p))
         self._Recognizer = KaldiRecognizer
 
@@ -58,6 +59,7 @@ class VoskSTT:
                 log.debug("audio status: %s", status)
             q.put(bytes(indata))
 
+        self.last_speech_t = None
         said_anything = False
         quiet_blocks = 0          # blocks since the partial transcript last changed
         last_partial = ""
@@ -79,6 +81,7 @@ class VoskSTT:
                     partial = json.loads(rec.PartialResult()).get("partial", "").strip()
                     if partial and partial != last_partial:
                         said_anything, quiet_blocks, last_partial = True, 0, partial
+                        self.last_speech_t = time.monotonic()
                     elif said_anything:
                         # the partial stopped changing (or emptied): you have stopped talking. Vosk's
                         # endpointer would wait 0.75-1.1 s of silence; this ends the turn sooner.

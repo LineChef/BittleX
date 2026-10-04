@@ -138,3 +138,45 @@ def test_perform_skill_tool_schema_offers_seconds(cfg, fake_anthropic):
     tools = {t["name"]: t for t in fake_anthropic.calls[-1]["tools"]}
     assert "seconds" in tools["perform_skill"]["input_schema"]["properties"]
     assert tools["perform_skill"]["input_schema"]["required"] == ["skill"]
+
+
+def test_warm_up_opens_the_connection_in_the_background(cfg, fake_anthropic):
+    import dataclasses
+    import time
+    import types
+
+    calls = []
+    conv = Conversation(dataclasses.replace(cfg, api_warmup=True))
+    conv._client = types.SimpleNamespace(models=types.SimpleNamespace(list=lambda **kw: calls.append(kw)))
+    conv.warm_up()
+    for _ in range(50):
+        if conv.warm_info.get("running") is False:
+            break
+        time.sleep(0.02)
+    assert calls == [{"limit": 1}] and conv.warm_info["ok"] is True
+
+
+def test_warm_up_is_off_when_disabled_and_failures_are_swallowed(cfg, fake_anthropic):
+    import dataclasses
+    import time
+    import types
+
+    off = Conversation(dataclasses.replace(cfg, api_warmup=False))
+    off._client = types.SimpleNamespace(models=types.SimpleNamespace(list=lambda **kw: 1 / 0))
+    off.warm_up()
+    assert off.warm_info == {}
+    on = Conversation(dataclasses.replace(cfg, api_warmup=True))
+    on._client = types.SimpleNamespace(models=types.SimpleNamespace(list=lambda **kw: 1 / 0))
+    on.warm_up()
+    for _ in range(50):
+        if on.warm_info.get("running") is False:
+            break
+        time.sleep(0.02)
+    assert on.warm_info["ok"] is False
+
+
+def test_send_records_the_call_window(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="hi")))
+    conv = Conversation(cfg)
+    conv.send("hello")
+    assert conv.last_call["end"] >= conv.last_call["start"] and conv.last_call["backend"]

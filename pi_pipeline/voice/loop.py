@@ -31,6 +31,7 @@ from .conversation import Conversation, ConversationError
 _DEFAULT_CHARACTER_LEVEL = gir.level_to_intensity(gir.DEFAULT_LEVEL)
 from .cues import Cue
 from .stt import STT
+from .timing import TurnTrace
 from .tts import TTS
 from .wake_word import WakeWord
 
@@ -109,8 +110,13 @@ class VoiceLoop:
             self._tts.speak(f"Okay, {cc.name} mode off.")
 
     def _one_turn(self) -> None:
+        trace = TurnTrace()
         if not self._in_session:
             self._wake.wait()
+            trace.stamp("wake")
+            warm = getattr(self._conv, "warm_up", None)
+            if callable(warm):
+                warm()           # open the API connection in the background while the person is still speaking
             self._events(wake_word=True)
             if self._memory:
                 self._memory.mark_session_start()
@@ -118,6 +124,10 @@ class VoiceLoop:
         self._cue.set("listening")
         timeout = self._follow_up_s if self._in_session else None
         user_text = self._stt.listen(timeout_s=timeout).strip()
+        trace.stamp("transcript")
+        speech_end = getattr(self._stt, "last_speech_t", None)
+        if speech_end is not None:
+            trace.stamp("speech_end", speech_end)
         if os.environ.get("G2_LOG_HEARD"):   # opt-in: transcripts stay out of the logs otherwise
             log.info("heard: %r", user_text)
 
@@ -268,18 +278,32 @@ class VoiceLoop:
             self._cue.set("idle")
             return
 
+        call = getattr(self._conv, "last_call", None) or {}
+        if "start" in call:
+            trace.stamp("claude_start", call["start"])
+            trace.stamp("claude_end", call["end"])
+            warm = getattr(self._conv, "warm_info", None) or {}
+            if warm:
+                trace.meta["warm"] = bool(warm.get("ok") and warm.get("t_end", float("inf")) <= call["start"])
         self._cue.set("speaking")
+        if turn.speech or turn.actions:
+            trace.stamp("voice_start")
         if turn.speech:
             self._tts.speak(turn.speech)
         elif turn.actions:
             self._tts.speak("Okay.")          # never move silently -- always a spoken ack
         secs = list(getattr(turn, "action_seconds", None) or [])
         for i, skill in enumerate(turn.actions):
+            if i == 0:
+                trace.stamp("move_sent")
             seconds = secs[i] if i < len(secs) else None
             if seconds is None:
                 self._act.perform(skill)
             else:
                 self._act.perform(skill, seconds=seconds)
+        if "claude_start" in trace.times:
+            trace.meta["actions"] = len(turn.actions)
+            log.info(trace.line())
 
         if self._memory:
             try:

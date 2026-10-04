@@ -232,3 +232,11 @@ def test_loop_passes_seconds_to_the_actuator():
         perform=lambda skill, seconds=None: calls.append((skill, seconds)), stop=lambda: None)
     _run(lp, 2)
     assert calls == [("walk_forward", 8.0), ("wave", None)]
+
+
+def test_wake_word_triggers_the_api_warm_up_once_per_session():
+    lp, w, stt, conv, tts = _loop(["hello", "again", ""])
+    warmed = []
+    conv.warm_up = lambda: warmed.append(1)
+    _run(lp, 3)
+    assert len(warmed) == 1              # one wake word; the follow-up turns reuse the warm connection

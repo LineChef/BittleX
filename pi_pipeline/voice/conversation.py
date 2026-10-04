@@ -14,6 +14,7 @@ Design notes:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -27,6 +28,20 @@ from . import skills
 from .llm import (LLMError, OpenAICompatLLM, history_for_claude, needs_claude)
 
 log = logging.getLogger("g2.conversation")
+
+
+def _http_client_kwargs(keepalive_s: float) -> dict:
+    """`http_client=` for anthropic.Anthropic with a longer keep-alive; {} (SDK default) if anything is off."""
+    try:
+        try:
+            import httpx2 as httpx
+        except ImportError:
+            import httpx
+        return {"http_client": anthropic.DefaultHttpxClient(
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=2, keepalive_expiry=keepalive_s))}
+    except Exception:  # noqa: BLE001
+        log.debug("custom keep-alive unavailable; using the SDK default connection pool", exc_info=True)
+        return {}
 
 _PERFORM_SKILL_TOOL = {
     "name": "perform_skill",
@@ -143,8 +158,11 @@ class Conversation:
             self._fast = OpenAICompatLLM(cfg.fast_llm_base_url, cfg.fast_llm_api_key, cfg.fast_llm_model,
                                          cfg.claude_max_tokens, cfg.request_timeout_s)
         self._client = None if cfg.llm_mode == "fast" else anthropic.Anthropic(
-            api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s
+            api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s,
+            **_http_client_kwargs(cfg.api_keepalive_s),
         )
+        self.last_call: dict = {}          # {"start", "end", "backend"} of the most recent turn (monotonic seconds)
+        self.warm_info: dict = {}          # result of the last background connection warm-up
         self._base_system = cfg.system_prompt
         p = personality or Personality.from_settings(cfg)
         self._personality = p
@@ -286,6 +304,7 @@ class Conversation:
 
         t0 = time.monotonic()
         resp, backend = self._complete(user_text, memory_context)
+        self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
 
         self._history.append({"role": "assistant", "content": resp.content})
@@ -330,6 +349,29 @@ class Conversation:
             speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts,
             action_seconds=action_seconds,
         )
+
+    def warm_up(self) -> None:
+        """Open the API connection in the background (a free model-list lookup, no tokens), so the
+        TCP+TLS handshake happens while the person is still speaking. Safe to call every wake word."""
+        if self._client is None or not self._cfg.api_warmup:
+            return
+        if self.warm_info.get("running"):
+            return
+        self.warm_info = {"running": True, "t_start": time.monotonic()}
+
+        def _go() -> None:
+            info = self.warm_info
+            try:
+                self._client.models.list(limit=1)
+                info["ok"] = True
+            except Exception as e:  # noqa: BLE001 -- warming is best-effort
+                info["ok"] = False
+                log.debug("api warm-up failed: %s", e)
+            info["t_end"] = time.monotonic()
+            info["running"] = False
+            log.debug("api warm-up %.2fs ok=%s", info["t_end"] - info["t_start"], info["ok"])
+
+        threading.Thread(target=_go, name="api-warmup", daemon=True).start()
 
     def _ack(self, tool_use_id: str, content: str) -> None:
         self._pending_tool_results.append({
