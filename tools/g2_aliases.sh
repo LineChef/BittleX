@@ -126,6 +126,8 @@ g2pcam-pull() {
 }
 # g2membackup  -- snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups); needs G2_PI
 g2membackup() { bash "$G2_ROOT/tools/g2_memory_backup.sh"; }
+# g2wifi list|status|scan|add <ssid>|remove <ssid>  -- manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI
+g2wifi() { bash "$G2_ROOT/tools/g2_wifi.sh" "$@"; }
 g2pcam-stop() {   # kill the tunnel + the preview process on the Pi
   pkill -f "ssh .*-L 8080:127.0.0.1:8080" 2>/dev/null
   [ -n "$G2_PI" ] && { _g2ssh "$G2_PI" 'ps -eo pid,comm,args | awk "\$2 ~ /^python/ && /camera_preview/ {print \$1}" | xargs -r kill' \

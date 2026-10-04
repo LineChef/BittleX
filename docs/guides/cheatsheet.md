@@ -141,6 +141,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
 | `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
 | `g2membackup` | copy the Pi's memory DB (conversation log + facts) to the Mac, integrity-checked; lands outside the repo in `$G2_BACKUP_DIR` (default `~/Desktop/OneFolder/G2/memory-backups`). Needs `G2_PI` |
+| `g2wifi list` / `status` / `scan` / `add <ssid>` / `remove <ssid>` | manage the Wi-Fi networks the Pi auto-joins. `add` asks for the password and saves the network as a backup (priority 50, below home's 100), so away from home the Pi joins e.g. your phone hotspot by itself. Do the `add` while the Pi is still reachable. Needs `G2_PI` |
 
 **Camera plugged into the Mac**
 

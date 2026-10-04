@@ -101,6 +101,23 @@ iw dev wlan0 get power_save     # want: "Power save: off"
 Without this, SSH sessions freeze for seconds-to-forever whenever the CPU is
 busy — which is *all the time* once training/inference runs.
 
+## 3a. Away from home: a backup Wi-Fi network (phone hotspot)
+
+The Pi remembers every network NetworkManager has saved and joins the highest-priority one in range (home = 100, from the Imager).
+Save a backup *while the Pi is still reachable*:
+
+```bash
+g2wifi add "<hotspot name>"      # asks for the password (sent over ssh, stored on the Pi); priority 50
+g2wifi list                      # saved networks and which is active
+g2wifi scan                      # is the hotspot in range right now? (turn it on and check)
+```
+
+Away from home: turn the hotspot on, power G2, and join the **Mac to the same hotspot**; `g2pi.local` then resolves as at home
+(`G2_PI` is unchanged). Limits: guest / client-isolation Wi-Fi blocks `g2pi.local`; captive-portal networks (hotels, cafés)
+and WPA2-Enterprise networks can't be joined headlessly. Claude replies need internet, so the hotspot must have data.
+Helper: `tools/g2_wifi.sh` (alias `g2wifi`). If the Pi can join nothing, it has no fallback access point; plug in the Imager
+SD card route (§2) or a keyboard/monitor to recover.
+
 ## 4. Swap / zram (needed — see §0)
 
 Bookworm ships **no** `dphys-swapfile` by default and `zram-generator` is the
