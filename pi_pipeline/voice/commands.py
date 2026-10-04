@@ -84,37 +84,6 @@ _COME = (
     "come over here",
 )
 
-# "command mode" -- turns the BiBoard's own offline voice-command module on or off
-# (it listens independently of the Pi, no wake word). On = its basic commands work
-# (instant, no network); off = the Pi/Claude path is the only listener.
-_CMDMODE_ON = (
-    "command mode", "command mode on", "enable command mode", "turn on command mode",
-    "start command mode", "basic commands on", "enable basic commands",
-)
-_CMDMODE_OFF = (
-    "command mode off", "disable command mode", "turn off command mode",
-    "stop command mode", "exit command mode", "basic commands off", "disable basic commands",
-)
-
-# Short phrases the STT re-checks with a grammar-restricted second pass (open-vocabulary Vosk
-# mishears them). Keep this list small and low-stakes: a grammar pass can over-match.
-CONTROL_PHRASES = ("command mode on", "command mode off")
-
-# The small Vosk model often mishears "command" ("man mode off"), so accept near-misses of the
-# first word when the phrase ends in "mode on/off". "of" is a common mishearing of "off".
-_CMDMODE_FIRST = {"command", "commands", "commandmode", "comand", "commend", "commander",
-                  "commando", "comman", "man", "mand", "common", "comment", "coming"}
-
-
-def _command_mode_toggle(n: str) -> str | None:
-    t = n.split()
-    if len(t) >= 3 and t[-2] == "mode" and t[-1] in ("on", "off", "of") and t[-3] in _CMDMODE_FIRST:
-        return "off" if t[-1] in ("off", "of") else "on"
-    if len(t) == 2 and t[0] in _CMDMODE_FIRST and t[1] == "mode":
-        return "on"
-    return None
-
-
 # chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
 # not backed by it (that flag is boot-time only; this is a runtime override).
 _CHIRPS_ON = (
@@ -247,7 +216,7 @@ def looks_like_rebuff(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
-    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"command_mode_on"``, ``"command_mode_off"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -269,11 +238,6 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
-    _cm = _command_mode_toggle(n)
-    if _cm == "off" or _hit(n, _CMDMODE_OFF):
-        return "command_mode_off"
-    if _cm == "on" or _hit(n, _CMDMODE_ON):
-        return "command_mode_on"
     if _hit(n, _CHIRPS_ON):
         return "chirps_on"
     if _hit(n, _CHIRPS_OFF):

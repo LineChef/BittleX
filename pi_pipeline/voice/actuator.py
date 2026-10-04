@@ -36,10 +36,6 @@ class MockActuator:
     def stop(self) -> None:
         log.info("[mock] G2 would stop (serial 'd')")
 
-    def set_voice_module(self, enabled: bool) -> None:
-        log.info("[mock] G2 would %s the BiBoard voice module (serial %r)",
-                 "enable" if enabled else "disable", "XAc" if enabled else "XAd")
-
     def close(self) -> None:  # nothing to release
         pass
 
@@ -104,13 +100,6 @@ class SerialActuator:
     def stop(self) -> None:
         self._cancel_cap()
         self._link.send(self._opencat.REST, read_reply=False)
-
-    def set_voice_module(self, enabled: bool) -> None:
-        """Turn the BiBoard's onboard voice-command module on (`XAc`) or off (`XAd`).
-        The firmware persists this in EEPROM, so it survives a reboot."""
-        token = "XAc" if enabled else "XAd"
-        log.info("G2 voice module %s -> %r", "on" if enabled else "off", token)
-        self._link.send(token, read_reply=False)
 
     def close(self) -> None:
         self._cancel_cap()

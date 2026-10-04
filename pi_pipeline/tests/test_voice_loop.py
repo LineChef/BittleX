@@ -212,15 +212,6 @@ def test_chirps_on_off_post_events_not_claude():
     assert "chirps_off" in kinds and "chirps_on" in kinds
 
 
-def test_command_mode_toggles_the_voice_module_not_claude():
-    lp, w, stt, conv, tts = _loop(["command mode", "disable command mode", ""])
-    calls = []
-    lp._act = types.SimpleNamespace(set_voice_module=calls.append)
-    _run(lp, 3)
-    assert conv.sent == []            # never reached Claude
-    assert calls == [True, False]
-
-
 def test_narration_level_sets_hint_not_claude():
     # levels 1 and 5 (not 3, the default -- its hint is deliberately empty)
     lp, w, stt, conv, tts = _loop(["narration level 1", "narration level 5", ""])

@@ -62,11 +62,3 @@ def test_gait_cap_off_by_default():
     act.perform("walk_forward")
     time.sleep(0.1)
     assert lk.sent == ["kwkF"]
-
-
-def test_set_voice_module_sends_the_enable_and_disable_tokens():
-    lk = FakeLink()
-    act = SerialActuator("ignored", 0, link=lk)
-    act.set_voice_module(True)
-    act.set_voice_module(False)
-    assert lk.sent == ["XAc", "XAd"]

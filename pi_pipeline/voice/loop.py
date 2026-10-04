@@ -207,18 +207,6 @@ class VoiceLoop:
             self._in_session = self._follow_up_s > 0
             self._cue.set("idle")
             return
-        if cmd in ("command_mode_on", "command_mode_off"):
-            on = cmd == "command_mode_on"
-            log.info("command mode %s (voice)", "on" if on else "off")
-            setter = getattr(self._act, "set_voice_module", None)
-            if setter is not None:
-                setter(on)
-            self._cue.set("speaking")
-            self._tts.speak("Okay, command mode on. My basic voice commands are listening." if on
-                            else "Okay, command mode off. Only I am listening.")
-            self._in_session = self._follow_up_s > 0
-            self._cue.set("idle")
-            return
         if cmd == "chirps_on":
             log.info("chirps enabled (voice)")
             self._events(chirps_on=True)

@@ -101,23 +101,6 @@ def test_chirps_on_and_off_phrases():
         assert _mlc(p) == "chirps_on", p
 
 
-def test_command_mode_phrases():
-    for p in ("command mode", "G2 command mode", "enable command mode", "command mode on",
-              "turn on command mode"):
-        assert _mlc(p) == "command_mode_on", p
-    for p in ("command mode off", "disable command mode", "turn off command mode",
-              "stop command mode"):
-        assert _mlc(p) == "command_mode_off", p
-
-
-def test_command_mode_tolerates_the_mishearings_vosk_makes():
-    for p in ("man mode off", "gee two man mode off", "command mode of", "commands mode off"):
-        assert _mlc(p) == "command_mode_off", p
-    for p in ("man mode on", "man mode"):
-        assert _mlc(p) == "command_mode_on", p
-    assert _mlc("gir mode off") == "character"   # other '<x> mode' phrases are untouched
-
-
 def test_narration_level_phrases():
     from pi_pipeline.voice.commands import parse_narration_command as _pnc
     for p in ("narration level 1", "set verbosity to level 5", "narration level 3"):
@@ -136,11 +119,3 @@ def test_chirps_and_narration_dont_collide_with_rebuff():
     assert looks_like_rebuff("be quiet")
     assert not looks_like_rebuff("turn off your chirps")
     assert not looks_like_rebuff("narrate less")
-
-
-def test_control_phrase_pass_overrides_only_a_real_control_phrase():
-    from pi_pipeline.voice.stt import pick_control_phrase
-    phrases = ("command mode on", "command mode off")
-    assert pick_control_phrase("the man load off", "command mode off", phrases) == "command mode off"
-    assert pick_control_phrase("walk forward", "[unk]", phrases) == "walk forward"
-    assert pick_control_phrase("walk forward", "", phrases) == "walk forward"
