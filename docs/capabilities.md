@@ -31,7 +31,7 @@ broken right now is in [`STATUS.md`](STATUS.md) — this file does not repeat it
 | Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography | 🧩 |
 | Personality | Composable traits (curiosity, playfulness, "Gir" character mode), mood model, per-person bonds — all `.env`-driven | ✅ |
-| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down | ✅ (mocked audio) / 🧩 mic+speaker |
+| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03 | ✅ mic + Claude control verified / 🧩 speaker |
 | Memory | Persistent fact store with recall, a CLI, and a localhost web UI | ✅ |
 | Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed | ✅ model / 🧩 mounted camera |
 | Safety reflexes | Jam reflex, servo thermal guard + governor, cliff/edge guard, watchdog, sleep mode, carpet detector | 🧩 |

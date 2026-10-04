@@ -79,6 +79,12 @@ liveness (replies with a "Do-Re-Mi" tone, works regardless of language --
 tests only that it's not muted); "be quiet" mutes it; "bing bing" is the
 spoken equivalent of `XAa` (switch to English).
 
+**Switching it on and off (confirmed 2026-10-03):** speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
+**"play sound"** turns them back on (Do-Re-Mi tone). The `X`-token serial route does **not** do this on this board: `XAd`, `Xa` and
+even `XAa` only get an echo of `X` back (no "Default language" line any more), and "rest" kept working after `XAd`/`Xa`. Per Petoi's
+docs the module listens continuously with **no wake word**, has 40 fixed commands (two languages) plus up to 10 you record yourself in
+learning mode; **"rest" is one of the fixed commands, "stop" is not.** While it is on, a phrase meant for the Pi can also trigger it.
+
 **2026-09-28 incident: module found stuck defaulting to Chinese, with
 voice commands unresponsive, for no identified trigger (nothing bumped/
 dropped, unrelated to our serial link work, broken before this session

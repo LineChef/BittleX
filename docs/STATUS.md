@@ -26,7 +26,8 @@ file instead of restating it. History and data live in the dated logs, not here.
 - **Hard-floor walking (V2.1):** six clean 10-cycle runs, ~0.118 m/s, steady; drifts right and rolls ~±6° ([`rl/real-walk-log.md`](rl/real-walk-log.md)).
 - **Firmware step gait (`vtF`):** steady after the IMU calibration. **Pi serial link, 5 Hz IMU, fall guard, camera feed:** working.
 - **Voice benchmark on the Pi (2026-10-03):** RAM fits, thermals fine, but Piper and Vosk both run slower than real time — numbers in [`guides/pi-bring-up.md`](guides/pi-bring-up.md) §8. Mic capture works; the Claude round-trip from the Pi is not measured yet.
-- **Not yet run on the robot:** the full app (`python -m pi_pipeline.app --serial`), live voice (the mic works, no speaker yet), live memory, the
+- **Voice → Claude → walk (2026-10-03):** wake word, speech-to-text, a Claude call and a real `walk_forward` on G2 all worked end to end (hard floor, 5 s gait cap, replies printed because there is no speaker yet). Speech recognition is the weak spot. Detail and findings: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md). The microphone is wired and verified ([`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md)).
+- **Not yet run on the robot:** the full app (`python -m pi_pipeline.app --serial`), spoken replies (no speaker yet), live memory, the
   behavior runtime, and vision-based reflexes. `CliffGuard` and `Avoider` are not wired into the app (deliberately; see the plan).
 
 ## Open problems
@@ -39,6 +40,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 
 ## Decisions pending
 
+- **How to stop a Claude-started walk, and who owns the voice:** G2's own offline voice module (switch: say "be quiet" / "play sound" to G2) versus the Pi + Claude path; options in [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 - **Petoi AI Head vs the Raspberry Pi** — criteria and test steps in the evaluation doc above; do not remove the Pi before the scorecard is filled.
 
 ## Next steps (in order)
@@ -46,6 +48,6 @@ file instead of restating it. History and data live in the dated logs, not here.
 1. Diagnose the FL shoulder servo (wiggle test, reseat, swap 8 and 9, full-battery rerun), then re-run the walk comparisons.
 2. Hard-floor controls for the lift/stride variants, then carpet; hands-off drift runs in a larger space.
 3. When the AI Head arrives: run the evaluation steps, then decide.
-4. This week: install the microphone and speaker and bring up the full voice pipeline on the Pi (first full-app run on the robot). Next week: re-evaluate the head once it arrives.
+4. Wire the speaker and amp, then re-run the voice → Claude → walk test with spoken replies and the full app (first full-app run on the robot). Next week: re-evaluate the head once it arrives.
 
 Open work by item ID: [`backlog.md`](backlog.md). Roadmap and decisions: [`project-plan.md`](project-plan.md).

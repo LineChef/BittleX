@@ -49,10 +49,64 @@ Pi Zero 2 W voice-stack benchmark.
       (Piper synth → Vosk transcribe) that **passes** — the STT/TTS path works
       end-to-end with no mic/speaker. Still hardware: real mic capture on the Pi,
       speaker playback, and the Pi Zero 2 WH RAM/latency check (`benchmark_pi.py`).
-- [ ] Speech-to-text — real-mic capture + wake-word gate on the Pi (`voice/stt.py`
-      / `wake_word.py` `sounddevice` path). Health-monitor for the audio + serial
+- [x] Speech-to-text — real-mic capture + wake-word gate on the Pi (`voice/stt.py`
+      / `wake_word.py` `sounddevice` path) — **working on the real Pi 2026-10-03**
+      (see the first-run section below). Health-monitor for the audio + serial
       worker threads is built (`pi_pipeline/util/supervisor.py`).
   - Bookworm's PEP 668 blocks plain `pip install` on-device — use the venv.
+
+#### First voice → Claude → walk run on the real G2 — 2026-10-03
+
+**Result: it works end to end.** "gee two" (wake word) → "walk forward" → Vosk transcript → Claude chose `walk_forward` (about 2.6 s for
+the API call) → the Pi sent `kwkF` over `/dev/serial0` → G2 walked → a 5 s gait cap sent the stop command exactly 5.0 s later. G2 was
+standing on hard floor. No speaker yet, so replies were printed (`--tts print`); the mic is the SPH0645 on I2S (left channel only,
+see `blueprints/biboard-pi-connector.md`).
+
+Run it (on the Pi; start the process in the background and track its pid, don't `pkill -f` a pattern that also appears in your own
+command line — that killed the shell twice):
+
+```
+cd ~/bittleX
+G2_LOG_HEARD=1 nohup pi_pipeline/.venv/bin/python -m pi_pipeline.voice --mode voice \
+    --actuator serial --max-gait-s 5 --tts print --no-memory > ~/voice.log 2>&1 &
+echo $! > ~/voice.pid          # stop it with: kill $(cat ~/voice.pid)
+```
+
+`--actuator mock` runs the same loop but only logs the serial command it would send (nothing moves) — use it first. The Pi needs
+`ANTHROPIC_API_KEY` in `~/bittleX/.env` and the Vosk + Piper models copied to `~/bittleX/models/` (rsync, not git).
+
+What we learned:
+
+- **Speech recognition is the weak link.** The small Vosk model mishears short phrases: "command mode off" came out as "man mode off",
+  "the man load off". "walk forward", "stand up" and the wake word "gee two" were all heard correctly. A second recognition pass
+  limited to a few phrases fixed the mishearing on synthesized speech, but it was removed along with the command-mode feature.
+  Measured on the Pi: Vosk runs 2.22x slower than real time on a whole file and Piper 1.72x ([`guides/pi-bring-up.md`](../guides/pi-bring-up.md) §8);
+  live streaming latency after you stop speaking is still unmeasured.
+- **Timing, from the logs:** wake word heard, then the utterance, then about 2 s from "heard" to the walk starting (Claude 2.6 s). A first
+  63 s gap in a mock run was just the speaker waiting to talk.
+- **A conversation stays open for ~60 s** after any exchange (the follow-up window), so the next thing you say needs no wake word and goes
+  straight to Claude. That is why "stand up" said right after another command still made G2 stand.
+- **Claude cannot count steps.** `perform_skill` takes only a skill name, and `walk_forward` is a continuous gait that runs until a stop
+  command. Asked for "10 steps", Claude picked `walk_forward` and said it couldn't count (one run in four picked `rest`). A step-count or duration
+  parameter, mapped to gait cycles on the Pi, would be needed.
+- **The 5 s cap is a real safeguard, not a hack.** `--max-gait-s` (off by default) makes the serial actuator send the stop after N seconds
+  unless another skill or `stop()` arrives first; the stop token is `d` (rest posture, servos off).
+- **Logging the heard transcript is opt-in.** `G2_LOG_HEARD=1` writes each recognised utterance to the log at INFO; without it the
+  transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
+- **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
+  command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
+  **"play sound"** brings them back (with a Do-Re-Mi tone). The serial route does not work on this board; details in
+  [`hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md). Leave it on ("play sound") when a test ends.
+  A voice command to toggle it from the Pi was built and reverted.
+
+Open / next:
+
+- Decide how a Claude-started walk gets interrupted: the module's "rest" is instant and offline (the Pi's own "emergency stop" has to
+  go through slow recognition), and "stop" is not one of its commands.
+- Add a duration or step-count parameter to `perform_skill` if "walk 10 steps" should work.
+- Measure streaming speech-recognition latency, and try a smaller/faster voice or recogniser; replies will be slow to start once the speaker works.
+- Speaker and amp (still to wire) unlock spoken replies and the full voice loop; then re-run this test with real TTS.
+- Make the voice loop start on boot only once the above stop path is settled; for now it is started by hand.
 - [ ] **Text-to-speech + mic input through the robot's own body — parts ORDERED
       2026-09-29, not yet wired.** No mic or speaker was wired to the Pi yet
       (confirmed by the user's own physical check); researched whether
