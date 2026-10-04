@@ -47,12 +47,13 @@ class BuzzerCue:
             log.debug("buzzer cue %r failed", stage, exc_info=True)
 
     def _token(self, stage: Stage) -> str | None:
-        """The `b...` string for a stage: the chirp melody, raised by `shift` semitones and stretched by `length`."""
+        """The `b...` string for a stage: the chirp melody, raised by `shift` semitones and made `length` times longer."""
         from ..behavior.chirps import _CUE_MOOD, CHIRP
         from ..link import opencat
 
         mood = _CUE_MOOD.get(stage)
         if mood is None:
             return None
-        return opencat.beep([(max(1, tone + self._shift), max(1, round(dur * self._length)))
+        # `dur` is a divisor of one second (4 = a quarter second), so a LONGER note is a SMALLER number
+        return opencat.beep([(max(1, tone + self._shift), max(1, int(dur / self._length + 0.5)))
                              for tone, dur in CHIRP[mood]])

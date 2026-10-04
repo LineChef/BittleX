@@ -150,9 +150,9 @@ class Settings:
     # Stream Claude's reply: speak each finished sentence and send each skill as soon as it is complete, instead of
     # waiting for the whole reply. 0 = off (the old whole-reply behaviour, for A/B timing).
     stream_replies: bool = field(default_factory=lambda: _env("G2_STREAM", "1").lower() not in ("0", "false", "off", "no"))
-    # Voice-loop buzzer cues: raise every note by this many semitones and stretch each note by this factor.
+    # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
-    buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 14.0))
+    buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 0.0))
     buzzer_length: float = field(default_factory=lambda: _env_float("G2_BUZZER_LEN", 1.6))
     # Auto-stop a looping gait (walk/trot/crawl) started by voice after this many seconds. 0 = off.
     max_gait_s: float = field(default_factory=lambda: _env_float("G2_MAX_GAIT_S", 0.0))
