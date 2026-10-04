@@ -240,3 +240,51 @@ def test_wake_word_triggers_the_api_warm_up_once_per_session():
     conv.warm_up = lambda: warmed.append(1)
     _run(lp, 3)
     assert len(warmed) == 1              # one wake word; the follow-up turns reuse the warm connection
+
+
+def test_non_streamed_turn_moves_before_it_talks():
+    order = []
+    lp, w, stt, conv, tts = _loop(["sit down", ""])
+    conv.send = lambda text, memory_context=None: types.SimpleNamespace(
+        speech="Sitting.", actions=["sit"], facts=[], action_seconds=[None])
+    lp._act = types.SimpleNamespace(perform=lambda s, seconds=None: order.append("move"), stop=lambda: None)
+    orig = tts.speak
+    tts.speak = lambda t: (order.append("talk"), orig(t))[1]
+    _run(lp, 2)
+    assert order[:2] == ["move", "talk"]
+
+
+def test_streamed_turn_speaks_each_sentence_and_acts_immediately():
+    order = []
+    lp, w, stt, conv, tts = _loop(["walk", ""])
+    conv.supports_streaming = True
+
+    def send(text, memory_context=None, on_action=None, on_speech=None):
+        on_speech("Okay.")
+        on_action("walk_forward", 5.0)
+        on_speech("Off I go.")
+        return types.SimpleNamespace(speech="Okay. Off I go.", actions=["walk_forward"], facts=[],
+                                     action_seconds=[5.0], streamed=True)
+
+    conv.send = send
+    lp._act = types.SimpleNamespace(perform=lambda s, seconds=None: order.append(("move", s, seconds)), stop=lambda: None)
+    orig = tts.speak
+    tts.speak = lambda t: (order.append(("say", t)), orig(t))[1]
+    _run(lp, 2)
+    moves = [o for o in order if o[0] == "move"]
+    says = [o[1] for o in order if o[0] == "say"]
+    assert moves == [("move", "walk_forward", 5.0)] and says[:2] == ["Okay.", "Off I go."]
+
+
+def test_streamed_action_without_speech_still_says_okay():
+    lp, w, stt, conv, tts = _loop(["sit", ""])
+    conv.supports_streaming = True
+
+    def send(text, memory_context=None, on_action=None, on_speech=None):
+        on_action("sit", None)
+        return types.SimpleNamespace(speech="", actions=["sit"], facts=[], action_seconds=[None], streamed=True)
+
+    conv.send = send
+    lp._act = types.SimpleNamespace(perform=lambda s, seconds=None: None, stop=lambda: None)
+    _run(lp, 2)
+    assert "Okay." in tts.said

@@ -145,6 +145,9 @@ class Settings:
     # in the background the moment the wake word is heard.
     api_keepalive_s: float = field(default_factory=lambda: _env_float("G2_API_KEEPALIVE_S", 300.0))
     api_warmup: bool = field(default_factory=lambda: _env("G2_API_WARMUP", "1").lower() not in ("0", "false", "off", "no"))
+    # Stream Claude's reply: speak each finished sentence and send each skill as soon as it is complete, instead of
+    # waiting for the whole reply. 0 = off (the old whole-reply behaviour, for A/B timing).
+    stream_replies: bool = field(default_factory=lambda: _env("G2_STREAM", "1").lower() not in ("0", "false", "off", "no"))
     # Voice-loop buzzer cues: raise every note by this many semitones and stretch each note by this factor.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.
     buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 14.0))

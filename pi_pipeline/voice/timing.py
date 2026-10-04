@@ -22,6 +22,7 @@ import time
 INTERVALS = (
     ("stt_wait", "speech_end", "transcript"),
     ("pre_claude", "transcript", "claude_start"),
+    ("ttft", "claude_start", "claude_first"),
     ("claude", "claude_start", "claude_end"),
     ("to_voice", "claude_end", "voice_start"),
     ("to_move", "claude_end", "move_sent"),

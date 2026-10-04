@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import logging
 import os
+import queue
+import threading
 
 from ..personality import character_state
 from ..personality import gir
@@ -38,6 +40,42 @@ from .wake_word import WakeWord
 log = logging.getLogger("g2.loop")
 
 _QUIT = {"/quit", "/exit", "goodbye g2", "bye g2"}
+
+
+class _SpeechWorker:
+    """Speaks queued sentences one at a time on a background thread, so a streamed reply's actions are never held
+    up behind speech. `finish()` waits until everything queued has been spoken."""
+
+    def __init__(self, tts, on_first=None):
+        self._tts = tts
+        self._on_first = on_first
+        self._q: "queue.Queue[str | None]" = queue.Queue()
+        self.said = False
+        self._thread = threading.Thread(target=self._run, name="speech", daemon=True)
+        self._thread.start()
+
+    def say(self, text: str) -> None:
+        self._q.put(text)
+
+    def _run(self) -> None:
+        first = True
+        while True:
+            text = self._q.get()
+            if text is None:
+                return
+            if first:
+                first = False
+                if self._on_first:
+                    self._on_first()
+            self.said = True
+            try:
+                self._tts.speak(text)
+            except Exception:  # noqa: BLE001 -- a TTS failure must not take the turn down
+                log.exception("speech failed")
+
+    def finish(self) -> None:
+        self._q.put(None)
+        self._thread.join()
 
 
 class VoiceLoop:
@@ -260,11 +298,38 @@ class VoiceLoop:
         # thinking cue tell you G2 registered it.
         self._events(ack=True)
         self._cue.set("thinking")
+        streaming = bool(getattr(self._conv, "supports_streaming", False))
+        done: list[str] = []
+        speaker = _SpeechWorker(self._tts, on_first=lambda: trace.stamp("voice_start")) if streaming else None
+
+        def _do(skill: str, seconds) -> None:
+            if not done:
+                trace.stamp("move_sent")
+            done.append(skill)
+            if seconds is None:
+                self._act.perform(skill)
+            else:
+                self._act.perform(skill, seconds=seconds)
+
+        def _on_action(skill: str, seconds) -> None:    # streamed: runs the moment the tool call is complete
+            self._cue.set("speaking")
+            _do(skill, seconds)
+
+        def _on_speech(sentence: str) -> None:           # streamed: one finished sentence at a time
+            self._cue.set("speaking")
+            speaker.say(sentence)
+
         try:
             context = self._memory.recall(user_text) if self._memory else None
-            turn = self._conv.send(user_text, memory_context=context)
+            if streaming:
+                turn = self._conv.send(user_text, memory_context=context,
+                                       on_action=_on_action, on_speech=_on_speech)
+            else:
+                turn = self._conv.send(user_text, memory_context=context)
         except ConversationError as e:      # known reason -> say it plainly
             log.warning("Claude call failed (%s): %s", e.kind, e.spoken)
+            if speaker:
+                speaker.finish()
             self._cue.set("speaking")
             self._tts.speak(e.spoken)
             self._in_session = self._follow_up_s > 0
@@ -272,6 +337,8 @@ class VoiceLoop:
             return
         except Exception:  # noqa: BLE001 -- one bad turn must not kill the loop
             log.exception("turn failed")
+            if speaker:
+                speaker.finish()
             self._cue.set("speaking")
             self._tts.speak("Sorry, I glitched. Say that again?")
             self._in_session = self._follow_up_s > 0
@@ -282,27 +349,33 @@ class VoiceLoop:
         if "start" in call:
             trace.stamp("claude_start", call["start"])
             trace.stamp("claude_end", call["end"])
+            if call.get("first") is not None:
+                trace.stamp("claude_first", call["first"])
             warm = getattr(self._conv, "warm_info", None) or {}
             if warm:
                 trace.meta["warm"] = bool(warm.get("ok") and warm.get("t_end", float("inf")) <= call["start"])
-        self._cue.set("speaking")
-        if turn.speech or turn.actions:
-            trace.stamp("voice_start")
-        if turn.speech:
-            self._tts.speak(turn.speech)
-        elif turn.actions:
-            self._tts.speak("Okay.")          # never move silently -- always a spoken ack
-        secs = list(getattr(turn, "action_seconds", None) or [])
-        for i, skill in enumerate(turn.actions):
-            if i == 0:
-                trace.stamp("move_sent")
-            seconds = secs[i] if i < len(secs) else None
-            if seconds is None:
-                self._act.perform(skill)
-            else:
-                self._act.perform(skill, seconds=seconds)
+
+        if getattr(turn, "streamed", False):
+            # the speech and the moves were already delivered while the reply streamed in
+            if done and not speaker.said:
+                speaker.say("Okay.")                     # never move silently -- always a spoken ack
+            speaker.finish()
+        else:
+            if speaker:
+                speaker.finish()
+            self._cue.set("speaking")
+            secs = list(getattr(turn, "action_seconds", None) or [])
+            for i, skill in enumerate(turn.actions):     # move first, then talk
+                _do(skill, secs[i] if i < len(secs) else None)
+            if turn.speech or turn.actions:
+                trace.stamp("voice_start")
+            if turn.speech:
+                self._tts.speak(turn.speech)
+            elif turn.actions:
+                self._tts.speak("Okay.")
         if "claude_start" in trace.times:
             trace.meta["actions"] = len(turn.actions)
+            trace.meta["streamed"] = bool(getattr(turn, "streamed", False))
             log.info(trace.line())
 
         if self._memory:

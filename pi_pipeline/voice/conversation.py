@@ -14,6 +14,7 @@ Design notes:
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -137,12 +138,32 @@ class ConversationError(RuntimeError):
         self.spoken = spoken
 
 
+class SentenceSplitter:
+    """Turns streamed text deltas into whole sentences, so speech can start before the reply is finished."""
+
+    _END = re.compile(r"(?<=[.!?])\s+")
+
+    def __init__(self):
+        self._buf = ""
+
+    def feed(self, text: str) -> list[str]:
+        self._buf += text
+        parts = self._END.split(self._buf)
+        self._buf = parts.pop()          # the unfinished tail (or "" right after a sentence end + space)
+        return [p.strip() for p in parts if p.strip()]
+
+    def flush(self) -> str:
+        rest, self._buf = self._buf.strip(), ""
+        return rest
+
+
 @dataclass
 class AssistantTurn:
     speech: str
     actions: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
     action_seconds: list[float | None] = field(default_factory=list)   # parallel to `actions`
+    streamed: bool = False   # True when `on_action`/`on_speech` already delivered the speech and actions as they arrived
 
 
 class Conversation:
@@ -161,6 +182,8 @@ class Conversation:
             api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s,
             **_http_client_kwargs(cfg.api_keepalive_s),
         )
+        self._streamed = False
+        self._first_event_t = None
         self.last_call: dict = {}          # {"start", "end", "backend"} of the most recent turn (monotonic seconds)
         self.warm_info: dict = {}          # result of the last background connection warm-up
         self._base_system = cfg.system_prompt
@@ -221,11 +244,13 @@ class Conversation:
             while self._history and self._history[0]["role"] != "user":
                 self._history.pop(0)
 
-    def _create(self, **kw):
+    def _call_with_retries(self, call, delivered=lambda: False):
+        """Run `call()` with the retry / spoken-error policy. Once `delivered()` is true the caller has already
+        acted on part of a streamed reply, so a failure is raised instead of retried (no repeated moves or speech)."""
         last_err: Exception | None = None
         for attempt in range(3):
             try:
-                return self._client.messages.create(**kw)
+                return call()
             except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
                 log.error("Claude auth failed (%s) -- key invalid/expired/blocked", type(e).__name__)
                 raise ConversationError("auth", self._cfg.speech_api_auth) from e
@@ -235,16 +260,60 @@ class Conversation:
                     raise ConversationError("billing", self._cfg.speech_api_billing) from e
                 raise
             except anthropic.RateLimitError as e:
+                if delivered():
+                    raise
                 last_err = e
                 log.warning("Claude rate-limited; attempt %d/3", attempt + 1)
                 time.sleep(2.0 * (attempt + 1))
             except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+                if delivered():
+                    raise
                 last_err = e
                 log.warning("Claude call failed (%s); attempt %d/3", type(e).__name__, attempt + 1)
                 time.sleep(1.0 + attempt)
         if isinstance(last_err, anthropic.RateLimitError):
             raise ConversationError("rate", self._cfg.speech_api_rate) from last_err
         raise last_err  # type: ignore[misc]
+
+    def _create(self, **kw):
+        return self._call_with_retries(lambda: self._client.messages.create(**kw))
+
+    def _create_stream(self, kw, on_action, on_speech):
+        """Stream one Claude reply. Each completed sentence goes to `on_speech` and each `perform_skill` call to
+        `on_action` the moment it is complete; the finished message is returned for history and bookkeeping."""
+        state = {"delivered": False}
+
+        def _once():
+            splitter = SentenceSplitter()
+            self._first_event_t = None
+            with self._client.messages.stream(**kw) as stream:
+                for ev in stream:
+                    if self._first_event_t is None:
+                        self._first_event_t = time.monotonic()
+                    if ev.type == "text":
+                        for sentence in splitter.feed(ev.text):
+                            state["delivered"] = True
+                            on_speech(sentence)
+                    elif ev.type == "content_block_stop":
+                        blk = getattr(ev, "content_block", None)
+                        if getattr(blk, "type", None) == "text":      # the text block is done: speak its last sentence now
+                            rest = splitter.flush()
+                            if rest:
+                                state["delivered"] = True
+                                on_speech(rest)
+                        elif getattr(blk, "type", None) == "tool_use" and getattr(blk, "name", "") == "perform_skill":
+                            inp = blk.input or {}
+                            name = inp.get("skill", "")
+                            if skills.is_valid(name):
+                                state["delivered"] = True
+                                on_action(name, skills.clamp_seconds(inp.get("seconds")))
+                rest = splitter.flush()
+                if rest:
+                    state["delivered"] = True
+                    on_speech(rest)
+                return stream.get_final_message()
+
+        return self._call_with_retries(_once, delivered=lambda: state["delivered"])
 
     def _fast_create(self):
         """One call to the fast backend. Auth/billing/rate failures raise a spoken ConversationError in fast-only mode;
@@ -259,8 +328,10 @@ class Conversation:
                 raise ConversationError(e.kind, spoken) from e
             raise
 
-    def _complete(self, user_text: str, memory_context: str | None):
-        """Pick a backend for this turn and get its reply. Returns (response, backend name)."""
+    def _complete(self, user_text: str, memory_context: str | None, on_action=None, on_speech=None):
+        """Pick a backend for this turn and get its reply. Returns (response, backend name). With both callbacks
+        given, a Claude reply is streamed through them (`self._streamed` says whether that happened)."""
+        self._streamed = False
         if self._fast is not None:
             why = None
             if self._cfg.llm_mode == "routed":
@@ -279,7 +350,7 @@ class Conversation:
                     log.warning("fast LLM failed (%s); falling back to Claude", e)
             else:
                 log.info("routing to Claude: %s", why)
-        resp = self._create(
+        kw = dict(
             model=self._cfg.claude_model,
             max_tokens=self._cfg.claude_max_tokens,
             system=self._system_prompt,
@@ -287,9 +358,12 @@ class Conversation:
             messages=history_for_claude(self._history),
             **({"output_config": {"effort": self._cfg.claude_effort}} if self._cfg.claude_effort else {}),
         )
-        return resp, "claude"
+        if on_action is not None and on_speech is not None and hasattr(self._client.messages, "stream"):
+            self._streamed = True
+            return self._create_stream(kw, on_action, on_speech), "claude"
+        return self._create(**kw), "claude"
 
-    def send(self, user_text: str, memory_context: str | None = None) -> AssistantTurn:
+    def send(self, user_text: str, memory_context: str | None = None, *, on_action=None, on_speech=None) -> AssistantTurn:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
         blocks: list[dict] = list(self._pending_tool_results)
@@ -303,8 +377,9 @@ class Conversation:
         self._history.append({"role": "user", "content": blocks})
 
         t0 = time.monotonic()
-        resp, backend = self._complete(user_text, memory_context)
-        self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend}
+        resp, backend = self._complete(user_text, memory_context, on_action, on_speech)
+        self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
+                          "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
 
         self._history.append({"role": "assistant", "content": resp.content})
@@ -347,8 +422,13 @@ class Conversation:
         self._trim()
         return AssistantTurn(
             speech=" ".join(p for p in speech_parts if p), actions=actions, facts=facts,
-            action_seconds=action_seconds,
+            action_seconds=action_seconds, streamed=self._streamed,
         )
+
+    @property
+    def supports_streaming(self) -> bool:
+        """True when replies can be streamed (the Claude client is in use)."""
+        return bool(self._cfg.stream_replies) and self._client is not None and hasattr(self._client.messages, "stream")
 
     def warm_up(self) -> None:
         """Open the API connection in the background (a free model-list lookup, no tokens), so the

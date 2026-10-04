@@ -120,6 +120,15 @@ audio-time, not CPU, so it carries over to the Pi). Vosk ends an utterance with 
   0.3.44 (the one installed), and 0.3.50 has no prebuilt wheels. Building Kaldi + vosk on a Pi Zero 2 W (512 MB RAM) or cross-compiling is a
   large job. Editing `models/vosk/conf/model.conf` (`--endpoint.rule2/3/4.min-trailing-silence`) gives the same control with the installed version.
 
+**Round-trip speed work, started 2026-10-04.** Settings are in `.env.example`; each can be switched off to compare.
+- **Per-turn timing:** every Claude turn logs one `turn-timing` line (no transcript text): speech end → transcript, the Claude call (and time to
+  first token), voice start, move sent. Summarise a run: `journalctl -u g2-voice -o cat | python -m pi_pipeline.voice.timing`.
+- **Connection warm-up:** a 300 s keep-alive on the API connection (`G2_API_KEEPALIVE_S`; the SDK default is 5 s, shorter than a pause between turns) and a
+  free, token-less lookup fired at the wake word (`G2_API_WARMUP`). A cold connection costs ~0.4-0.6 s on the Pi (measured 1.7-2.1 s cold vs 1.25-1.45 s warm).
+- **Move first, then talk, and streamed replies** (`G2_STREAM`): the loop sends the skill the moment the tool call is complete and speaks each finished sentence
+  on a worker thread, so a move is never held behind speech. Measured against the live API: for a command that is only a tool call there is no gain (the tool
+  call completes at the same moment the message ends); for a 26-word spoken answer the first sentence arrived ~0.6-0.8 s before the full reply.
+
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it
