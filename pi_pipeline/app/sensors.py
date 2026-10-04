@@ -50,8 +50,11 @@ class SensorConfig:
 
 class SensorHub:
     def __init__(self, link=None, feed_source=None, cfg: SensorConfig | None = None,
-                 *, clock=time.monotonic):
+                 *, clock=time.monotonic, edge_source=None):
         self._link = link
+        # edge_source() -> EdgeReading | None, the floor-vs-edge classifier's latest read for CliffGuard. No real
+        # detector exists yet (it needs training on the mounted camera view), so None means "no edge sensing".
+        self._edge_source = edge_source
         self._feed_source = feed_source or (lambda: [])
         self.cfg = cfg or SensorConfig()
         self._clock = clock
@@ -115,11 +118,14 @@ class SensorHub:
     def sample(self) -> dict:
         now = self._clock()
         self._ingest_imu(now)
-        return {
+        out = {
             "imu_level": self._level,
             "imu_stable": self._stable,
             "held": self._held(now),
             "person_present": self._person_present(),
         }
+        if self._edge_source is not None:
+            out["edge"] = self._edge_source()
+        return out
 
     __call__ = sample

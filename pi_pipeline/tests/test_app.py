@@ -291,3 +291,34 @@ def test_attentive_follow_matches_named_person_class_case_insensitively():
     frame = [Detection("Alex", 0.9, 0.6, 0.3, 0.3, 0.3)]
     assert a._nearest_person(frame) is frame[0]
     assert a._nearest_person([Detection("dog", 0.9, 0.6, 0.3, 0.3, 0.3)]) is None
+
+
+# ------------------------------------------------------------- CliffGuard wiring
+
+def test_sensor_hub_reports_an_edge_only_when_it_has_an_edge_source():
+    from pi_pipeline.vision.cliff_guard import EdgeReading
+    assert "edge" not in SensorHub(None).sample()
+    close = EdgeReading(present=True, dist_norm=0.1, bearing_norm=0.0)
+    assert SensorHub(None, edge_source=lambda: close).sample()["edge"] is close
+
+
+def test_a_close_edge_from_the_edge_source_stops_the_runtime(monkeypatch):
+    from pi_pipeline.app.__main__ import _build_runtime
+    from pi_pipeline.behavior.driver import EffectKind
+    from pi_pipeline.features import features
+    from pi_pipeline.vision.cliff_guard import EdgeReading
+    monkeypatch.setattr(features, "vision", True)
+    monkeypatch.setattr(features, "vision_safety", True)
+    rt = _build_runtime(None, hz=0, edge_source=lambda: EdgeReading(True, 0.1, 0.0))
+    kinds = [e.kind for e in rt.tick().effects]
+    assert EffectKind.STOP in kinds
+
+
+def test_no_edge_source_means_the_cliff_reflex_stays_inert(monkeypatch):
+    from pi_pipeline.app.__main__ import _build_runtime
+    from pi_pipeline.behavior.driver import EffectKind
+    from pi_pipeline.features import features
+    monkeypatch.setattr(features, "vision", True)
+    monkeypatch.setattr(features, "vision_safety", True)
+    rt = _build_runtime(None, hz=0)
+    assert EffectKind.STOP not in [e.kind for e in rt.tick().effects]

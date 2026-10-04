@@ -28,6 +28,7 @@ from ..behavior.attentive import AttentiveConfig
 from ..config import settings
 from ..features import features, log_summary
 from ..personality import Bonds, Personality
+from ..vision.cliff_guard import CliffGuard
 from .sensors import SensorConfig, SensorHub
 from .sinks import LockedLink, build_bindings
 
@@ -89,7 +90,7 @@ def _make_vision_source():
     return BackgroundFrameSource(feed).start()
 
 
-def _build_runtime(link, *, hz: float, memory=None, frame_source=None):
+def _build_runtime(link, *, hz: float, memory=None, frame_source=None, edge_source=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
     # a bonded *person* is a person even though the model's class for them is a
@@ -100,10 +101,13 @@ def _build_runtime(link, *, hz: float, memory=None, frame_source=None):
                             attentive_cfg=AttentiveConfig(person_labels=person_labels),
                             vision_available=features.vision,
                             chirps=features.sound_cues,
-                            object_gallery_enabled=features.object_gallery)
+                            object_gallery_enabled=features.object_gallery,
+                            # the cliff reflex is built whenever vision_safety is on, but does nothing until an
+                            # edge_source (a trained floor-vs-edge classifier) supplies readings
+                            cliff=CliffGuard() if features.vision_safety else None)
     bindings = build_bindings(link, dry_run_power=link is None)
     hub = SensorHub(link, feed_source=frame_source,
-                    cfg=SensorConfig(person_labels=person_labels))
+                    cfg=SensorConfig(person_labels=person_labels), edge_source=edge_source)
     if link is not None:
         hub.start_stream()   # nothing else turns the IMU print on in app mode
     # B11 place memory: "the dog is often to the left" -> a durable fact

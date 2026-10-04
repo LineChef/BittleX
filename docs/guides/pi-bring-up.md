@@ -241,7 +241,9 @@ sudo apt install -y python3-venv python3-dev build-essential \
 # the mkdir is one-time setup: unlike the first rsync (which creates its own
 # destination tree), a single-file rsync needs that directory to already exist.
 ssh g2pi@g2pi.local mkdir -p ~/bittleX/rl_training/opencat-gym/trained
-rsync -avz --delete pi_pipeline/ g2pi@g2pi.local:~/bittleX/pi_pipeline/
+# NO --delete here: it would remove the Pi-only .venv, __pycache__ and memory/data inside pi_pipeline/.
+rsync -avz --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache \
+      pi_pipeline/ g2pi@g2pi.local:~/bittleX/pi_pipeline/
 POLICY=$(python3 -c "import sys; sys.path.insert(0, 'pi_pipeline/gait'); import residual_policy as r; print(r.DEFAULT_POLICY)")
 rsync -avz rl_training/opencat-gym/trained/$POLICY rl_training/opencat-gym/trained/$POLICY.json \
       g2pi@g2pi.local:~/bittleX/rl_training/opencat-gym/trained/

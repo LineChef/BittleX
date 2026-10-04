@@ -140,6 +140,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
 | `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
 | `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
+| `g2membackup` | copy the Pi's memory DB (conversation log + facts) to the Mac, integrity-checked; lands outside the repo in `$G2_BACKUP_DIR` (default `~/Desktop/OneFolder/G2/memory-backups`). Needs `G2_PI` |
 
 **Camera plugged into the Mac**
 

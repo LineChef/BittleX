@@ -154,10 +154,10 @@ Open / next:
   go through slow recognition), and "stop" is not one of its commands.
 - Calibrate walking speed so "walk N metres" maps to a real duration (duration itself is done, see above).
 - Measure streaming speech-recognition latency, and try a smaller/faster voice or recogniser; replies will be slow to start once the speaker works.
-- Speaker and amp (still to wire) unlock spoken replies and the full voice loop; then re-run this test with real TTS.
-- Make the voice loop start on boot only once the above stop path is settled; for now it is started by hand.
-- [ ] **Text-to-speech + mic input through the robot's own body — parts ORDERED
-      2026-09-29, not yet wired.** No mic or speaker was wired to the Pi yet
+- Speaker and amp are wired and spoken replies work (2026-10-04); re-run the "rest" interrupt test with real TTS.
+- The voice loop now starts on boot (`g2-voice`); the stop path is still the open question above.
+- [x] **Text-to-speech + mic input through the robot's own body — wired and
+      working 2026-10-04 (history below: parts ordered 2026-09-29).** No mic or speaker was wired to the Pi yet
       (confirmed by the user's own physical check); researched whether
       BiBoard's onboard speaker/mic module could be a shortcut for either
       direction — it can't for either: its only serial interfaces are `T_BEEP`
@@ -213,7 +213,7 @@ Open / next:
   - Split Claude's response into spoken text + structured action commands
     (PiDog's pattern) — maps onto the OpenCat serial interface, so one reply can
     both talk and trigger a skill.
-- [ ] Text-to-speech through the robot's speaker.
+- [x] Text-to-speech through the robot's speaker (2026-10-04).
 - [ ] Confirm this runs independently of the 35+ built-in voice commands (two
       separate systems).
 - [ ] A simple state cue (buzzer pattern or posture) for listening / thinking /

@@ -124,6 +124,8 @@ g2pcam-pull() {
   rsync -av -e "ssh -o BatchMode=yes -o ConnectTimeout=6" "$host:g2_cap/$name/session_$sess/" "$G2_CAP_ROOT/$name/session_$sess/" \
     || { _g2log "rsync from $host failed or timed out (is the Pi on, and does ~/g2_cap/$name/session_$sess exist?)"; return 1; }
 }
+# g2membackup  -- snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups); needs G2_PI
+g2membackup() { bash "$G2_ROOT/tools/g2_memory_backup.sh"; }
 g2pcam-stop() {   # kill the tunnel + the preview process on the Pi
   pkill -f "ssh .*-L 8080:127.0.0.1:8080" 2>/dev/null
   [ -n "$G2_PI" ] && { _g2ssh "$G2_PI" 'ps -eo pid,comm,args | awk "\$2 ~ /^python/ && /camera_preview/ {print \$1}" | xargs -r kill' \

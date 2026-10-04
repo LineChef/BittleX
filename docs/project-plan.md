@@ -58,7 +58,7 @@ Build record and wiring: [`../blueprints/`](../blueprints/README.md).
 Open:
 - [ ] Mount the Pi/PiSugar stack properly (currently a temporary mount; the printed standoff is not impact-rated). See the build manual.
 - [ ] Confirm the back cover closes over the mounted Pi (measured too shallow for Pi + PiSugar; a modified cover/clips is planned).
-- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03** (clear capture over I2S, [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md)); speaker/amp still to wire.
+- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md)).
 - [ ] Battery-aware behavior: get real runtime data (idle/walking/talking on a full charge) before building the low-charge warning.
 
 ## Phase 1 — Repo setup ✅
@@ -131,7 +131,7 @@ offline. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 - [x] Real-mic capture and the wake-word gate on the Pi — done 2026-10-03, including a first voice → Claude → walk run on the real G2
       ([`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md)).
 - [ ] Settle how a Claude-started walk is stopped (the onboard module's "rest", a gait cap, or both) (`perform_skill` now takes an optional duration in seconds; a calibrated distance is still open).
-- [ ] Text-to-speech and mic input through the robot's own body (parts ordered 2026-09-29, wiring in the build manual) — or the Petoi AI Head.
+- [x] Text-to-speech and mic input through the robot's own body — done 2026-10-04 (mic + speaker on the Pi; the Petoi AI Head is still to be evaluated).
 - [ ] Free LLM instead of paying per turn (decided 2026-10-03: the provider will be the Petoi head's service, XiaoZhi). The swappable-LLM code is built
       ([`guides/swappable-llm.md`](guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the
       account at xiaozhi.me (phone-number registration; the privacy gate applies, use a throwaway number and no household names), then find out whether it offers
@@ -160,7 +160,7 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 
 - [ ] Semantic recall (embeddings) if keyword matching feels too literal.
 - [ ] Exercise it across real multi-session conversations once the voice loop runs live.
-- [ ] **Back up the memory DB off the robot** (noted 2026-10-02, not implemented). It is one SQLite file on the Pi's SD card
+- [x] **Back up the memory DB off the robot** — manual `g2membackup` built 2026-10-04 (periodic scheduling still open). It is one SQLite file on the Pi's SD card
       (`~/.local/share/g2/g2_memory.db`, `G2_MEMORY_DB`); a bad card loses everything. Idea: a periodic copy to the dev machine with SQLite's
       online backup (not a plain `cp`), kept outside the repo, with a restore step. If the AI Head replaces the Pi, memory would live in its backend or
       on our own server instead.

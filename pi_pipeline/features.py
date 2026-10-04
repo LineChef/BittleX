@@ -129,7 +129,7 @@ class Features:
                     avoidance_act=False, explore=False)
                 notes.append("no vision hardware (features.vision off) -> vision_safety, "
                              "vision_perception, avoidance_act and explore all held "
-                             "(only a single-class face model is deployed). Re-enable "
+                             "(no obstacle/edge detector is deployed yet). Re-enable "
                              "the stack with G2_FEATURES=\"+vision\".")
 
         if not f.vision_safety and (f.avoidance_act or f.explore):
