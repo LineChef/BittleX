@@ -97,7 +97,8 @@ What we learned:
   transcript is not logged (a debug-level line is filtered out by the diag logger's INFO floor).
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
-  **"play sound"** brings them back (with a Do-Re-Mi tone). The serial route does not work on this board; details in
+  **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it
+  (module said "ok" but the body ignored commands) until an uppercase `XA` restored it; details in
   [`hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md). Leave it on ("play sound") when a test ends.
   A voice command to toggle it from the Pi was built and reverted.
 

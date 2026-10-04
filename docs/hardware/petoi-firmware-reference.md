@@ -80,10 +80,16 @@ tests only that it's not muted); "be quiet" mutes it; "bing bing" is the
 spoken equivalent of `XAa` (switch to English).
 
 **Switching it on and off (confirmed 2026-10-03):** speak to G2. **"Be quiet"** makes the module ignore basic commands such as "rest";
-**"play sound"** turns them back on (Do-Re-Mi tone). The `X`-token serial route does **not** do this on this board: `XAd`, `Xa` and
-even `XAa` only get an echo of `X` back (no "Default language" line any more), and "rest" kept working after `XAd`/`Xa`. Per Petoi's
-docs the module listens continuously with **no wake word**, has 40 fixed commands (two languages) plus up to 10 you record yourself in
-learning mode; **"rest" is one of the fixed commands, "stop" is not.** While it is on, a phrase meant for the Pi can also trigger it.
+**"play sound"** turns them back on (Do-Re-Mi tone). Per Petoi's docs the module listens continuously with **no wake word**, has 40 fixed
+commands (two languages) plus up to 10 you record yourself in learning mode; **"rest" is one of the fixed commands, "stop" is not.**
+While it is on, a phrase meant for the Pi can also trigger it.
+
+**Do NOT send `Xa` (lowercase) — or `XAd` — to "disable" it over serial.** The board only ever replies `X` to these, so there is no
+confirmation, and the module's on/off state is saved in the board's settings across reboots. After `Xa` was sent on 2026-10-03 the module
+kept listening and said "ok" to "stand up", but G2 did nothing, even after a reboot: voice commands had silently stopped working.
+**`XA` (uppercase) fixed it** (voice commands worked again right after). Rule of thumb from `moduleManager.h`: `X` + uppercase letter
+enables a module, `X` + lowercase disables it, and neither prints anything useful. Use the spoken switch above instead. Symptom to
+remember: module answers "ok" but the body does not move → send `XA`, and check the dial on the hat is on "Voice Command".
 
 **2026-09-28 incident: module found stuck defaulting to Chinese, with
 voice commands unresponsive, for no identified trigger (nothing bumped/
