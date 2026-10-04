@@ -30,7 +30,8 @@ def main() -> None:
     ap.add_argument("--max-gait-s", type=float, default=None,
                     help="serial actuator: auto-stop a looping gait (walk/trot/crawl) after this many seconds; "
                          "0 = off. Default: the G2_MAX_GAIT_S setting (off unless set in .env)")
-    ap.add_argument("--tts", choices=["auto", "mac", "piper", "print"], default="auto")
+    ap.add_argument("--tts", choices=["auto", "mac", "piper", "print"], default=None,
+                    help="speech output; default: the G2_TTS setting (auto)")
     ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
@@ -55,7 +56,7 @@ def main() -> None:
                 "features: mic is off -- falling back to --mode text")
             voice = False
         tts_mode = {"auto": "piper" if voice else "mac", "mac": "mac",
-                    "piper": "piper", "print": "print"}[args.tts]
+                    "piper": "piper", "print": "print"}[args.tts or settings.tts_mode]
         if not features.tts:
             tts_mode = "print"
         use_wake = voice and features.wake_word

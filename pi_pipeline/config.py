@@ -137,6 +137,9 @@ class Settings:
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".
     # 0 = every turn needs the wake word (most private).
     follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 60.0))
+    # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
+    # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
+    tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))
     # Auto-stop a looping gait (walk/trot/crawl) started by voice after this many seconds. 0 = off.
     max_gait_s: float = field(default_factory=lambda: _env_float("G2_MAX_GAIT_S", 0.0))
 
