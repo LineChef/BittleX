@@ -23,6 +23,15 @@ class LogCue:
         log.info("[%s]", stage)
 
 
+# Cue melodies as (tone, duration divisor). The buzzer is clearly louder at LOW notes -- on 2026-10-04 notes 26/30 were faint,
+# +7 and +14 semitones were not heard at all, and the pair 4 and 8 was the loudest of a sweep -- so all cues live down there.
+LOW_CUES: dict[str, list[tuple[int, int]]] = {
+    "listening": [(8, 3), (8, 3)],     # two equal beeps: ready, say your command
+    "thinking": [(4, 4), (9, 2)],      # a rising "?": got your words, asking Claude
+    "heard": [(4, 3), (8, 3)],         # quick "got it" for a recognised local command
+}
+
+
 class BuzzerCue:
     """Logs each stage and also beeps it on G2's buzzer, so you can hear that G2 heard the wake
     word, got your command, or recognised a local command. Melodies are the ones in
@@ -47,13 +56,13 @@ class BuzzerCue:
             log.debug("buzzer cue %r failed", stage, exc_info=True)
 
     def _token(self, stage: Stage) -> str | None:
-        """The `b...` string for a stage: the chirp melody, raised by `shift` semitones and made `length` times longer."""
-        from ..behavior.chirps import _CUE_MOOD, CHIRP
+        """The `b...` string for a stage: its melody from LOW_CUES, raised by `shift` semitones and made `length`
+        times longer (both default to no change)."""
         from ..link import opencat
 
-        mood = _CUE_MOOD.get(stage)
-        if mood is None:
+        notes = LOW_CUES.get(stage)
+        if not notes:
             return None
         # `dur` is a divisor of one second (4 = a quarter second), so a LONGER note is a SMALLER number
         return opencat.beep([(max(1, tone + self._shift), max(1, int(dur / self._length + 0.5)))
-                             for tone, dur in CHIRP[mood]])
+                             for tone, dur in notes])

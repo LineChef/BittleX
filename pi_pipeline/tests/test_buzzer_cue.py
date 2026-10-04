@@ -45,11 +45,18 @@ def test_serial_actuator_skips_beeps_while_a_gait_runs():
     assert lk.sent == ["b26 3 30 3", "kwkF", "d", "b19 5 26 8"]
 
 
-def test_shift_raises_and_length_lengthens_the_melody():
+def test_cue_melodies_sit_in_the_audible_low_range():
     sent = []
-    plain = BuzzerCue(types.SimpleNamespace(send_token=sent.append))
-    loud = BuzzerCue(types.SimpleNamespace(send_token=sent.append), shift=14, length=2.0)
-    plain.set("heard")
-    loud.set("heard")
-    assert sent[0] == "b26 3 30 3"                 # the raw ACK blip: 1/3 s per note
-    assert sent[1] == "b40 2 44 2"                 # +14 semitones, and 1/2 s per note: a smaller divisor is longer
+    cue = BuzzerCue(types.SimpleNamespace(send_token=sent.append))
+    for stage in ("listening", "thinking", "heard"):
+        cue.set(stage)
+    assert sent == ["b8 3 8 3", "b4 4 9 2", "b4 3 8 3"]
+
+
+def test_shift_and_length_still_adjust_the_melody():
+    sent = []
+    BuzzerCue(types.SimpleNamespace(send_token=sent.append), shift=3, length=2.0).set("heard")
+    assert sent == ["b7 2 11 2"]                   # +3 semitones, 1/2 s per note (a smaller divisor is longer)
+    sent.clear()
+    BuzzerCue(types.SimpleNamespace(send_token=sent.append), shift=-10).set("heard")
+    assert sent == ["b1 3 1 3"]                    # never below tone 1
