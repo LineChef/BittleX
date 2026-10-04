@@ -107,6 +107,18 @@ What we learned:
 
 Open / next:
 
+- **Paused 2026-10-03 night: G2 ran out of power; resume after a recharge.** State when it stopped:
+  - The boot service is **installed and enabled** on the Pi (`pi_pipeline/install_voice_service.sh`, unit `g2-voice`; speech output set
+    to print via `G2_TTS=print` in the Pi's `.env`; no gait cap set). It had been stopped by hand for the pause, but it is enabled, so
+    **it will start by itself on the next boot and G2 will act on "gee two" commands** (watch logs: `journalctl -u g2-voice -f`; stop:
+    `sudo systemctl stop g2-voice`). Not yet verified that it comes up on its own after a power cycle.
+  - **The BiBoard's own basic voice commands stopped responding** late in the session (after working earlier), and G2 then lost power.
+    Not diagnosed: it may simply have been low battery. After recharging, first say "play sound" (tone = module on); if there is no
+    tone, say it again closer, then power-cycle the whole body, then check the dial on the hat ("Voice Command"). Idea not yet tried: unplug
+    the Pi's TX2/RX2 jumpers to see if the shared serial line interferes. Never send `X` tokens for this (see the warning in the
+    firmware reference).
+  - Still to do, in order: confirm the module works after the recharge; the "rest" interrupt test above; verify the service starts on boot;
+    decide on the gait cap; speaker and amp, then `G2_TTS=piper`.
 - **Resume here (paused 2026-10-03): the "rest" interrupt test.** Goal: confirm G2's own voice module can stop a walk that Claude started.
   Clean version, so the Pi can't also act: (1) the BiBoard module is on (say "play sound", hear the tone); (2) start the Pi loop with
   `--actuator serial --max-gait-s 20` as a backstop; (3) say "gee two", pause, "walk forward"; (4) the moment `walk_forward` is logged,
