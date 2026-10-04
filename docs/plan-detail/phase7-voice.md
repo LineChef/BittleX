@@ -109,6 +109,11 @@ What we learned:
   divisor of one second, so a longer note is a *smaller* number. Beeps are skipped while a looping gait is running, because it is unchecked whether a non-skill token
   interrupts the gait. More background and a plan for a larger sound set: [`research/buzzer-sounds.md`](../research/buzzer-sounds.md).
   The end-of-speech window `G2_STT_SILENCE_S` (default 0.5 s) is counted in 0.25 s blocks.
+- **Spoken replies on (2026-10-04).** The amp and speaker work (a spoken test phrase and a 440 Hz tone both played through card 0, the voiceHAT/I2S card, which is also the
+  ALSA default). Set `G2_TTS=piper` in the Pi's `.env` for spoken replies. The voice is streamed: each finished sentence is synthesised by Piper on one thread while the
+  previous one plays on another (`_SpeechWorker`, `PiperTTS.prepare/play`), so a long answer starts after the first sentence and then runs without gaps. The first
+  sentence still waits for its own synthesis (Piper is ~1.7x slower than speech on this Pi). While G2 speaks, the BiBoard's own voice module can hear it, so a
+  reply containing one of its command words could trigger it; say "be quiet" to G2 first to switch the module off for a session.
 - **Two listeners:** G2's BiBoard has its own offline voice module that listens continuously with no wake word. While it is on, a spoken
   command can reach it as well as the Pi. Its switch is spoken to G2 directly: **"be quiet"** makes it ignore basic commands like "rest",
   **"play sound"** brings them back (with a Do-Re-Mi tone). Do not use the serial route: a lowercase `Xa` silently broke it

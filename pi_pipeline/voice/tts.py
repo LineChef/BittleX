@@ -73,15 +73,24 @@ class PiperTTS:
             audio = robot_voice(audio, rate)
         return audio, rate
 
-    def speak(self, text: str) -> None:
+    def prepare(self, text: str):
+        """Synthesise `text` without playing it: returns an item for `play()`, or None. Lets the loop synthesise the
+        next sentence while the previous one is still playing."""
         if not text:
-            return
-        print(f"\n  G2: {text}\n")
+            return None
         audio, rate = self._synth(text)
-        if audio is None:
+        return None if audio is None else (text, audio, rate)
+
+    def play(self, item) -> None:
+        if item is None:
             return
+        text, audio, rate = item
+        print(f"\n  G2: {text}\n")
         self._sd.play(audio, rate)
         self._sd.wait()
+
+    def speak(self, text: str) -> None:
+        self.play(self.prepare(text))
 
     def synth_to_wav(self, text: str, out_path) -> tuple[int, int]:
         """Synthesise `text` to a mono 16-bit WAV file -- no playback, no

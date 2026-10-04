@@ -43,39 +43,73 @@ _QUIT = {"/quit", "/exit", "goodbye g2", "bye g2"}
 
 
 class _SpeechWorker:
-    """Speaks queued sentences one at a time on a background thread, so a streamed reply's actions are never held
-    up behind speech. `finish()` waits until everything queued has been spoken."""
+    """Speaks queued sentences in order on background threads, so a streamed reply's actions are never held up behind
+    speech. When the TTS can `prepare()` and `play()` separately (Piper), the next sentence is synthesised while the
+    previous one is still playing; otherwise each sentence is spoken in turn. `finish()` waits until all is spoken."""
 
     def __init__(self, tts, on_first=None):
         self._tts = tts
         self._on_first = on_first
-        self._q: "queue.Queue[str | None]" = queue.Queue()
+        self._first = True
         self.said = False
-        self._thread = threading.Thread(target=self._run, name="speech", daemon=True)
-        self._thread.start()
+        self._text_q: "queue.Queue[str | None]" = queue.Queue()
+        self._pipelined = hasattr(tts, "prepare") and hasattr(tts, "play")
+        if self._pipelined:
+            self._audio_q: "queue.Queue[object]" = queue.Queue()
+            self._threads = [threading.Thread(target=self._synth_loop, name="synth", daemon=True),
+                             threading.Thread(target=self._play_loop, name="speech", daemon=True)]
+        else:
+            self._threads = [threading.Thread(target=self._speak_loop, name="speech", daemon=True)]
+        for t in self._threads:
+            t.start()
 
     def say(self, text: str) -> None:
-        self._q.put(text)
+        self.said = True
+        self._text_q.put(text)
 
-    def _run(self) -> None:
-        first = True
+    def _begin(self) -> None:
+        if self._first:
+            self._first = False
+            if self._on_first:
+                self._on_first()
+
+    def _speak_loop(self) -> None:
         while True:
-            text = self._q.get()
+            text = self._text_q.get()
             if text is None:
                 return
-            if first:
-                first = False
-                if self._on_first:
-                    self._on_first()
-            self.said = True
+            self._begin()
             try:
                 self._tts.speak(text)
             except Exception:  # noqa: BLE001 -- a TTS failure must not take the turn down
                 log.exception("speech failed")
 
+    def _synth_loop(self) -> None:
+        while True:
+            text = self._text_q.get()
+            if text is None:
+                self._audio_q.put(None)
+                return
+            try:
+                self._audio_q.put(self._tts.prepare(text))
+            except Exception:  # noqa: BLE001
+                log.exception("speech synthesis failed")
+
+    def _play_loop(self) -> None:
+        while True:
+            item = self._audio_q.get()
+            if item is None:
+                return
+            self._begin()
+            try:
+                self._tts.play(item)
+            except Exception:  # noqa: BLE001
+                log.exception("speech playback failed")
+
     def finish(self) -> None:
-        self._q.put(None)
-        self._thread.join()
+        self._text_q.put(None)
+        for t in self._threads:
+            t.join()
 
 
 class VoiceLoop:

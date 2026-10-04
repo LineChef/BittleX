@@ -288,3 +288,52 @@ def test_streamed_action_without_speech_still_says_okay():
     lp._act = types.SimpleNamespace(perform=lambda s, seconds=None: None, stop=lambda: None)
     _run(lp, 2)
     assert "Okay." in tts.said
+
+
+def test_speech_worker_synthesises_the_next_sentence_while_the_previous_plays():
+    import threading
+    import time
+
+    from pi_pipeline.voice.loop import _SpeechWorker
+
+    events, lock = [], threading.Lock()
+
+    def log_(e):
+        with lock:
+            events.append((round(time.monotonic() - t0, 2), e))
+
+    class _Tts:
+        def prepare(self, text):
+            log_(f"synth start {text}")
+            time.sleep(0.2)
+            log_(f"synth end {text}")
+            return text
+
+        def play(self, item):
+            log_(f"play start {item}")
+            time.sleep(0.3)
+            log_(f"play end {item}")
+
+    t0 = time.monotonic()
+    w = _SpeechWorker(_Tts(), on_first=lambda: log_("first"))
+    for t in ("one", "two", "three"):
+        w.say(t)
+    assert w.said
+    w.finish()
+    names = [e for _t, e in events]
+    plays = [e for e in names if e.startswith("play start")]
+    assert plays == ["play start one", "play start two", "play start three"]     # in order
+    # sentence two was synthesised while sentence one was still playing
+    assert names.index("synth end two") < names.index("play end one")
+    assert names.count("first") == 1 and names[0].startswith("synth start one")
+
+
+def test_speech_worker_falls_back_to_plain_speak_without_prepare_and_play():
+    from pi_pipeline.voice.loop import _SpeechWorker
+
+    said = []
+    w = _SpeechWorker(types.SimpleNamespace(speak=said.append))
+    w.say("a")
+    w.say("b")
+    w.finish()
+    assert said == ["a", "b"]
