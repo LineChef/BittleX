@@ -339,6 +339,12 @@ That is roughly 30× (Piper) and 12× (Vosk) slower than the Mac baseline above.
 streaming path should lag less after you stop speaking, but it is not measured yet. Open: re-run with the Claude API section enabled,
 measure streaming latency, and try the `x_low` voice and a lighter recognizer if spoken replies stay slower than real time.
 
+**Freeing graphics memory on a headless Pi (done 2026-10-04, takes effect after a reboot).** The Zero 2 W has 512 MB, of which ~416 MB is visible; 64 MB is
+reserved for graphics and the `vc4-kms-v3d` display driver sets aside a further 256 MB pool. G2 has no HDMI screen and its camera is the USB Grove Vision AI
+(serial, `/dev/ttyACM0`, which does not touch the GPU), so `/boot/firmware/config.txt` now has `gpu_mem=16` and the `vc4-kms-v3d` overlay commented out (backup:
+`config.txt.bak-pre-gpumem` beside it). To get a display or a CSI ribbon camera back: restore the overlay line (or copy the backup over `config.txt`), remove or
+raise `gpu_mem`, and reboot. An SPI screen needs neither. The voice model is also loaded once and shared (`voice/vosk_model.py`), which cut swap use from 308 to 175 MB.
+
 - **RAM baseline**: `free -h` idle after boot; after importing the voice stack;
   during a live STT+TTS exchange. Flag if headroom < ~40 MB.
 - **Vosk STT**: wall-time to transcribe a fixed 3–5 s WAV with the small model;
