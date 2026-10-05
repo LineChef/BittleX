@@ -219,6 +219,19 @@ _REBUFF = (
 )
 
 
+# Powering the Pi off is costlier to get wrong than lying down, so the OS shutdown needs a clear, short command: not a question, not a
+# negation, not part of a longer sentence ("why did you shut down", "don't shut down", "tell the story about when the robot shut down").
+_NOT_A_COMMAND = {"dont", "do", "not", "never", "why", "how", "what", "when", "did", "does", "was", "were", "will", "would", "could",
+                  "should", "if", "because", "stop", "cant", "wont", "isnt", "arent", "no"}
+
+
+def is_clear_shutdown(text: str) -> bool:
+    """True only for a short imperative like "shut down", "G2 shut down", "please shut yourself down", "power off"."""
+    n = _normalize(text)
+    words = n.split()
+    return 0 < len(words) <= 5 and not (set(words) & _NOT_A_COMMAND) and not (text or "").strip().endswith("?")
+
+
 def looks_like_rebuff(text: str) -> bool:
     """True for a short 'that's enough / leave me alone' style correction."""
     n = _normalize(text)

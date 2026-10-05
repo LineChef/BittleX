@@ -191,7 +191,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
 | _say_ "go ahead and look around" / "exploration mode" ⟷ "that's enough" / "come back" | arm / disarm **Tier 1 roam** (walking explore — voice-armed only; leg-budget leash; audible "roaming" chirp; disarms on exit). Tier 0 "attentive" (stationary sound-turn + gaze-follow-with-satiation + reactions) is always on |
 | _say_ "come here" / "come to me" | **directed walk toward you** (`Mode.APPROACH`) — stops close, gives up (confused chirp) if it loses sight. Distinct from "come back" |
-| _say_ "shut down" / "power down" / "go dormant" | **graceful shutdown** — G2 lies flat (`d`), holds ~2 s, then goes dormant (power-save + camera off). "go to sleep" is the lighter curl variant; "emergency stop" is the freeze |
+| _say_ "shut down" / "power down" / "power off" (a short, clear command) | **lies G2 down AND shuts the Pi down cleanly** (`sudo shutdown -h now`): he says he will switch the computer off in 6 s and you can say **"cancel"** (or stop / wait / no / never mind) to keep it on, then "Goodbye." and the Pi powers down. A longer or unclear sentence ("shut down but not the whole computer...") keeps the old behavior: lie flat (`d`), hold ~2 s, go dormant (power-save, camera off). The PiSugar may keep its power rail on after the Pi halts (not verified): switch it off if its light stays on. `G2_POWEROFF_ON_SHUTDOWN=0` turns the OS shutdown off; `G2_SHUTDOWN_CONFIRM_S` sets the cancel window. "go to sleep" is the lighter curl variant; "emergency stop" is the freeze | 
 
 **Memory / config / diagnostics**
 

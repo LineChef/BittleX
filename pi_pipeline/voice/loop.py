@@ -26,7 +26,7 @@ from ..personality.mood import MoodModel
 from . import narration
 from .actuator import Actuator
 from .commands import (
-    looks_like_rebuff, match_local_command, parse_character_command,
+    is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
     parse_narration_command,
 )
 from .conversation import Conversation, ConversationError
@@ -66,6 +66,13 @@ def asks_g2_to_learn_his_looks(text: str) -> bool:
     if _RECALL_LOOKS_RE.search(t):
         return False
     return bool(_REMEMBER_LOOKS_RE.search(t))
+
+
+_CANCEL_WORDS = {"cancel", "stop", "wait", "no", "dont", "never", "mind", "abort", "hold"}
+
+
+def _normalize_words(text: str) -> set[str]:
+    return set(re.sub(r"[^a-z\s]", " ", re.sub(r"['’`]", "", (text or "").lower())).split())
 
 
 _SILENT_LOOK = "I looked, but I'm not sure how to put it into words. Ask me again?"
@@ -163,6 +170,8 @@ class VoiceLoop:
         on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
         camera=None,  # object with .snapshot() -> Snapshot | None; a picture is attached when the user asks what G2 sees
         on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
+        on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
+        shutdown_confirm_s: float = 6.0,
     ):
         self._wake = wake_word
         self._stt = stt
@@ -173,6 +182,8 @@ class VoiceLoop:
         self._memory = memory
         self._camera = camera
         self._on_power = on_power
+        self._on_poweroff = on_poweroff
+        self._shutdown_confirm_s = shutdown_confirm_s
         self._last_look = None                         # the Snapshot of the look in progress, for the sighting note
         self._follow_up_s = max(0.0, follow_up_s)
         self._question_window_s = max(0.0, question_window_s)
@@ -360,6 +371,22 @@ class VoiceLoop:
             log.info("shutdown requested (voice) -- lie down then dormant")
             self._events(shutdown=True)
             self._cue.set("speaking")
+            if self._on_poweroff is not None and is_clear_shutdown(user_text):
+                self._speak(f"Okay, lying down and switching the computer off in {int(self._shutdown_confirm_s)} seconds. Say cancel to stop me.")
+                reply = (self._stt.listen(timeout_s=self._shutdown_confirm_s) or "") if self._shutdown_confirm_s > 0 else ""
+                if any(w in _normalize_words(reply) for w in _CANCEL_WORDS):
+                    log.info("power-off cancelled (voice): %r", reply)
+                    self._speak("Okay, staying on.")
+                    self._end_session()
+                    return
+                self._speak("Goodbye.")
+                self._end_session()
+                try:
+                    self._on_poweroff()
+                except Exception:  # noqa: BLE001 -- say so rather than fail silently
+                    log.exception("power-off failed")
+                    self._speak("I lay down, but I couldn't switch the computer off.")
+                return
             self._speak("Okay, lying down and shutting down. Wake me when you need me.")
             self._end_session()
             return

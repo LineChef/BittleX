@@ -209,6 +209,10 @@ class Settings:
     # "boot" (default): the Pi-battery warning counts from boot ("you're plugged in" pauses it, "you're unplugged" restarts the count);
     # "manual": it counts only after you say "you're unplugged".
     pi_battery_arm: str = field(default_factory=lambda: _env("G2_PI_BATTERY_ARM", "boot").lower())
+    # "Shut down": G2 lies down AND the Pi powers itself off cleanly (sudo shutdown -h now), after a short chance to say "cancel". Only for a
+    # clear, short command; anything else keeps the old lie-down-and-go-dormant behaviour. 0 turns the OS shutdown off.
+    poweroff_on_shutdown: bool = field(default_factory=lambda: _env("G2_POWEROFF_ON_SHUTDOWN", "1") not in ("0", "false", "no"))
+    shutdown_confirm_s: float = field(default_factory=lambda: _env_float("G2_SHUTDOWN_CONFIRM_S", 6.0))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

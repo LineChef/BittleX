@@ -154,6 +154,8 @@ def main() -> None:
             camera=camera,
             on_event=(lambda **kw: watcher_c.nudge() if watcher_c and kw.get("told_sleep") else None),
             on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
+            on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),
+            shutdown_confirm_s=settings.shutdown_confirm_s,
         )
         try:
             loop.run_forever()
@@ -232,6 +234,27 @@ def _start_pi_battery_watch(*, tts, audible: bool):
                              require_arm=settings.pi_battery_arm == "manual").start()
     import types
     return types.SimpleNamespace(stop=watcher.stop, set_on_battery=lambda on: tracker.arm_now() if on else tracker.disarm())
+
+
+def power_off_pi(actuator, *, run=None, platform=None, sleep=None) -> None:
+    """Lie G2 down, then shut the Pi down cleanly (`sudo -n shutdown -h now`; systemd stops this service on the way, so the memory database
+    and logs are closed properly). On anything but Linux (a laptop) it only logs. Raises if the shutdown command fails."""
+    import subprocess
+    import sys
+    import time
+
+    platform = platform or sys.platform
+    run = run or subprocess.run
+    sleep = sleep or time.sleep
+    try:
+        actuator.stop()                                    # `d`: rest posture, servos off (a no-op for the mock actuator)
+    except Exception:  # noqa: BLE001
+        pass
+    sleep(3.0)                                             # let him settle
+    if platform != "linux":
+        logging.getLogger("g2.voice").warning("power-off requested, but this is not a Pi (%s): not shutting anything down", platform)
+        return
+    run(["sudo", "-n", "shutdown", "-h", "now"], check=True, timeout=20)
 
 
 def _open_shared_link(actuator_mode: str):
