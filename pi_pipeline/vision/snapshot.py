@@ -237,7 +237,8 @@ class CameraSnapshotter:
             log.debug("saving the picture failed", exc_info=True)
 
     def warm_async(self) -> None:
-        """Start opening the camera in the background (the wake word was just heard, so a picture request may follow)."""
+        """Start opening the camera in the background. Not used on the wake word any more (it competed with the microphone for the Pi's
+        CPU); `snapshot()` warms the camera itself right before a picture."""
         threading.Thread(target=self.warm, name="camera-warm", daemon=True).start()
 
     def _meter(self) -> None:
@@ -339,6 +340,9 @@ class CameraSnapshotter:
         try:
             with self._lock:
                 self._open()
+                # warm up right before the shot (not on the wake word): settle the exposure if the light was not measured recently
+                if self._exposure_check and self._clock() - self._metered_at > self._meter_every_s:
+                    self._meter()
                 snap = self._grab_one()
                 if snap is None:
                     return None

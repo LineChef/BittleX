@@ -276,8 +276,6 @@ class VoiceLoop:
         trace = TurnTrace()
         if not self._in_session:
             self._wake.wait()
-            if self._camera is not None:
-                self._camera.warm_async()           # ready by the time a "what do you see" request is understood
             trace.stamp("wake")
             warm = getattr(self._conv, "warm_up", None)
             if callable(warm):

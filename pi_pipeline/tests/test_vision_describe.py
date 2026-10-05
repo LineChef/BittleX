@@ -76,6 +76,7 @@ def make_cam(ser, **kw):
     t = [0.0]
     ser.clock = t
     def sleep(s): t[0] += s
+    kw.setdefault("exposure_check", False)         # these tests script exactly one frame; test_exposure covers the metering
     return CameraSnapshotter("x", labels=["person_a"], serial_factory=lambda: ser, sleep=sleep, clock=lambda: t[0], idle_close_s=0, **kw)
 
 
@@ -160,7 +161,7 @@ def test_asking_what_g2_sees_attaches_a_picture_and_the_detector_hint():
     lp, conv = make_loop(cam, ["what do you see"])
     lp._one_turn()
     text, kw = conv.calls[0]
-    assert kw["image"] == JPEG and "person_a 90% (center, close)" in kw["image_note"] and cam.snapshots == 1 and cam.warms == 1
+    assert kw["image"] == JPEG and "person_a 90% (center, close)" in kw["image_note"] and cam.snapshots == 1 and cam.warms == 0
 
 
 def test_other_requests_take_no_picture():
@@ -305,7 +306,7 @@ def test_a_recall_question_takes_no_picture():
     cam = _Cam(Snapshot(JPEG, 240, 240))
     lp, conv = make_loop(cam, ["do you remember what you look like"])
     lp._one_turn()
-    assert conv.calls[0][1] == {} and cam.snapshots == 0 and cam.warms == 1        # (the camera still warms on the wake word)
+    assert conv.calls[0][1] == {} and cam.snapshots == 0 and cam.warms == 0        # (the camera is only opened when a picture is wanted)
 
 
 def test_learning_his_looks_attaches_a_picture_with_the_remember_instruction():

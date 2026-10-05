@@ -119,8 +119,16 @@ def test_score_prefers_fewer_blown_out_pixels_over_a_perfect_mean():
 
 def test_a_well_lit_scene_takes_one_picture_and_leaves_the_exposure_alone():
     c, cam = make("fine", ae_bump=0)
+    c.warm()
+    n = cam.invokes
     assert c.snapshot() is not None
-    assert cam.invokes == 1 and c._bump == 0
+    assert cam.invokes - n == 1 and c._bump == 0
+
+
+def test_a_cold_snapshot_warms_up_first_then_takes_the_picture():
+    c, cam = make("fine", ae_bump=0)
+    assert c.snapshot() is not None                                              # no warm() call: the snapshot meters by itself
+    assert cam.invokes >= 2 and c._metered_at > 0
 
 
 def test_a_bright_scene_is_retaken_with_a_lower_exposure_and_the_better_frame_wins():
@@ -229,8 +237,10 @@ def test_metering_is_skipped_when_the_light_was_measured_recently_and_when_the_c
 
 def test_a_dim_room_frame_is_lifted_in_software_without_any_retry():
     c, cam = make("dim", ae_bump=0)
+    c.warm()
+    n = cam.invokes
     snap = c.snapshot()
-    assert cam.invokes == 1                                                      # mean 54 is not "too dark": no register retries
+    assert cam.invokes - n == 1                                                    # mean 54 is not "too dark": no register retries
     assert exposure_stats(snap.jpeg).mean > 85                                   # but it is lifted toward ~100 (was 54)
 
 
