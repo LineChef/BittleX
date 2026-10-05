@@ -45,6 +45,9 @@ def main() -> None:
 
     log_summary()
     start_disk_watch(settings.disk_warn_pct)
+    if settings.clear_captures:
+        from ..util.tidy import clear_folder
+        clear_folder(settings.capture_dir)
     if settings.tidy_days > 0:
         from ..diag.core import _log_root
         from ..util.tidy import tidy_startup

@@ -153,6 +153,9 @@ def _is_thinking_binding_error(e: Exception) -> bool:
     return type(e).__name__ == "BadRequestError" and "thinking" in text and ("signature" in text or "bound to a different conversation" in text)
 
 
+_SPEAK_NOW = ("[You said nothing out loud. Answer the person now, out loud, in words only (no tools). If there was a picture, "
+              "describe what you see in it.]")
+
 _TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL]
 
 # When the user asks what G2 sees, the voice loop attaches a picture from G2's own camera to that message.
@@ -377,7 +380,8 @@ class Conversation:
                 raise ConversationError(e.kind, spoken) from e
             raise
 
-    def _complete(self, user_text: str, memory_context: str | None, on_action=None, on_speech=None, force_claude: bool = False):
+    def _complete(self, user_text: str, memory_context: str | None, on_action=None, on_speech=None, force_claude: bool = False,
+                  tool_choice: dict | None = None):
         """Pick a backend for this turn and get its reply. Returns (response, backend name). With both callbacks
         given, a Claude reply is streamed through them (`self._streamed` says whether that happened)."""
         self._streamed = False
@@ -406,62 +410,16 @@ class Conversation:
             tools=_TOOLS,
             messages=history_for_claude(self._history),
             **({"output_config": {"effort": self._cfg.claude_effort}} if self._cfg.claude_effort else {}),
+            **({"tool_choice": tool_choice} if tool_choice else {}),
         )
         if on_action is not None and on_speech is not None and hasattr(self._client.messages, "stream"):
             self._streamed = True
             return self._create_stream(kw, on_action, on_speech), "claude"
         return self._create(**kw), "claude"
 
-    def send(self, user_text: str, memory_context: str | None = None, *, on_action=None, on_speech=None,
-             image: bytes | None = None, image_note: str | None = None) -> AssistantTurn:
-        # one turn: sends the user text (+ any pending tool acks), then sorts
-        # the reply into speech + skills to perform + facts to remember
-        acks = list(self._pending_tool_results)
-        blocks: list[dict] = list(acks)
-        self._pending_tool_results = []
-        if memory_context:
-            blocks.append({
-                "type": "text",
-                "text": f"[Memory of past conversations]\n{memory_context}",
-            })
-        picture = None
-        if image is not None:                       # a snapshot from G2's camera, sent with this one message only
-            import base64
-            picture = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
-                                                   "data": base64.b64encode(image).decode("ascii")}}
-            blocks.append(picture)
-        if image_note:
-            blocks.append({"type": "text", "text": image_note})
-        blocks.append({"type": "text", "text": user_text})
-        self._history.append({"role": "user", "content": blocks})
-
-        t0 = time.monotonic()
-        try:
-            try:
-                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
-                                               force_claude=image is not None or bool(image_note))
-            except Exception as e:  # noqa: BLE001
-                if not _is_thinking_binding_error(e):
-                    raise
-                # a thinking block no longer matches the history before it: drop them all and try once more
-                log.warning("API rejected a thinking block (%s); dropping thinking blocks from the history and retrying", e)
-                self._strip_thinking()
-                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
-                                               force_claude=image is not None or bool(image_note))
-        except Exception:
-            # a failed turn must not poison the history: take this user message back out and keep its tool acks for next time
-            if self._history and self._history[-1] is not None and self._history[-1].get("content") is blocks:
-                self._history.pop()
-            self._pending_tool_results = acks + self._pending_tool_results
-            raise
-        finally:
-            if picture is not None and picture in blocks:     # never keep (or resend) the picture in the history
-                blocks[blocks.index(picture)] = {"type": "text", "text": "[a picture from G2's camera was shown here]"}
-        self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
-                          "first": getattr(self, "_first_event_t", None) if self._streamed else None}
-        log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
-        log.info("reply blocks: %s", ", ".join(_describe_block(b) for b in resp.content) or "none")
-
+    def _digest(self, resp, picture) -> tuple[list[str], list[str], list, list[str], bool]:
+        """Store an assistant reply in the history and sort it into (speech parts, skills to perform, their seconds, facts to remember,
+        whether a reply is expected). Tool calls are acknowledged for the next user message."""
         stored = resp.content
         if picture is not None:
             # a thinking block is bound to everything before it, and the picture in this turn's user message is about to be
@@ -508,6 +466,76 @@ class Conversation:
                     result = "diagnostics lookup failed -- nothing usable to report."
                 self._ack(block.id, result)
 
+        return speech_parts, actions, action_seconds, facts, expects_reply
+
+    def send(self, user_text: str, memory_context: str | None = None, *, on_action=None, on_speech=None,
+             image: bytes | None = None, image_note: str | None = None) -> AssistantTurn:
+        # one turn: sends the user text (+ any pending tool acks), then sorts
+        # the reply into speech + skills to perform + facts to remember
+        acks = list(self._pending_tool_results)
+        blocks: list[dict] = list(acks)
+        self._pending_tool_results = []
+        if memory_context:
+            blocks.append({
+                "type": "text",
+                "text": f"[Memory of past conversations]\n{memory_context}",
+            })
+        picture = None
+        if image is not None:                       # a snapshot from G2's camera, sent with this one message only
+            import base64
+            picture = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                   "data": base64.b64encode(image).decode("ascii")}}
+            blocks.append(picture)
+        if image_note:
+            blocks.append({"type": "text", "text": image_note})
+        blocks.append({"type": "text", "text": user_text})
+        self._history.append({"role": "user", "content": blocks})
+
+        t0 = time.monotonic()
+        try:
+            try:
+                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
+                                               force_claude=image is not None or bool(image_note))
+            except Exception as e:  # noqa: BLE001
+                if not _is_thinking_binding_error(e):
+                    raise
+                # a thinking block no longer matches the history before it: drop them all and try once more
+                log.warning("API rejected a thinking block (%s); dropping thinking blocks from the history and retrying", e)
+                self._strip_thinking()
+                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
+                                               force_claude=image is not None or bool(image_note))
+        except Exception:
+            # a failed turn must not poison the history: take this user message back out and keep its tool acks for next time
+            if self._history and self._history[-1] is not None and self._history[-1].get("content") is blocks:
+                self._history.pop()
+            self._pending_tool_results = acks + self._pending_tool_results
+            raise
+        self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
+                          "first": getattr(self, "_first_event_t", None) if self._streamed else None}
+        log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
+        log.info("reply blocks: %s", ", ".join(_describe_block(b) for b in resp.content) or "none")
+
+        speech_parts, actions, action_seconds, facts, expects_reply = self._digest(resp, picture)
+        if not any(speech_parts) and (picture is not None or not actions):
+            # nothing was said and no move answered the request: ask once more for words only, so a question is never left unanswered
+            log.warning("reply had no speech (%s); asking once more for words only",
+                        ", ".join(_describe_block(b) for b in resp.content) or "empty")
+            retry_blocks = list(self._pending_tool_results) + [{"type": "text", "text": _SPEAK_NOW}]
+            self._pending_tool_results = []
+            self._history.append({"role": "user", "content": retry_blocks})
+            try:
+                resp2, _ = self._complete(user_text, memory_context, on_action, on_speech, force_claude=True,
+                                          tool_choice={"type": "none"})
+                log.info("retry reply blocks: %s", ", ".join(_describe_block(b) for b in resp2.content) or "none")
+                s2, a2, sec2, f2, e2 = self._digest(resp2, picture)
+                speech_parts += s2; actions += a2; action_seconds += sec2; facts += f2; expects_reply = expects_reply or e2
+            except Exception:  # noqa: BLE001 -- the first reply stands; take the retry message back out and keep its acks
+                log.warning("the words-only retry failed", exc_info=True)
+                if self._history and self._history[-1].get("content") is retry_blocks:
+                    self._history.pop()
+                self._pending_tool_results = [b for b in retry_blocks if b.get("type") == "tool_result"] + self._pending_tool_results
+        if picture is not None and picture in blocks:         # never keep (or resend) the picture in the history
+            blocks[blocks.index(picture)] = {"type": "text", "text": "[a picture from G2's camera was shown here]"}
         self._trim()
         speech = " ".join(p for p in speech_parts if p)
         if speech and _ENDS_WITH_QUESTION.search(speech):

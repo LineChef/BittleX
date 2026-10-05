@@ -186,6 +186,9 @@ class Settings:
     # Tidy-up at service start: delete diagnostic session folders and walk logs older than this many days (0 = never).
     tidy_days: float = field(default_factory=lambda: _env_float("G2_TIDY_DAYS", 30.0))
     runs_dir: str = field(default_factory=lambda: os.path.expanduser(_env("G2_RUNS_DIR", "~/g2_runs")))
+    # Camera-preview captures (~/g2_cap) are meant to be pulled to the Mac (g2pcam-pull) and then forgotten: cleared at every service start.
+    capture_dir: str = field(default_factory=lambda: os.path.expanduser(_env("G2_CAP_DIR", "~/g2_cap")))
+    clear_captures: bool = field(default_factory=lambda: _env("G2_CLEAR_CAPTURES", "1") not in ("0", "false", "no"))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

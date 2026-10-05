@@ -112,6 +112,20 @@ def scrub_text(text: str, extra_terms: list[str] | None = None) -> str:
     return out
 
 
+# How G2 looks is a single slot: "I look like ..." facts replace each other. Other facts are only skipped when they are rewordings of one
+# already stored (word overlap this high or more); "has a cat named Biscuit" vs "has a dog named Biscuit" (0.67) must stay two facts.
+_SELF_LOOK = re.compile(r"^\s*i look like\b", re.I)
+NEAR_DUPLICATE = 0.85
+_STOPWORDS = frozenset("i a an the and of on with my me to is are in it its that this from up out like they their he she we you".split())
+
+
+def similarity(a: str, b: str) -> float:
+    """Jaccard overlap of the content words of two facts (0..1)."""
+    ta = {w for w in re.findall(r"[a-z0-9']+", a.lower()) if w not in _STOPWORDS}
+    tb = {w for w in re.findall(r"[a-z0-9']+", b.lower()) if w not in _STOPWORDS}
+    return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
+
+
 def _fts_query(text: str) -> str:
     """Turn free text into a safe FTS5 OR-query of its content words."""
     words = [w for w in re.findall(r"[a-zA-Z0-9]{3,}", text.lower()) if w not in _STOPWORDS]
@@ -192,6 +206,18 @@ class Store:
             # what the household does when.
             log.info("fact rejected (date/time/schedule detail): %s", fact)
             return False
+        existing = self.list_facts()
+        if _SELF_LOOK.match(fact):
+            # one slot for how G2 looks: the newest description replaces the older ones
+            old = [r["id"] for r in existing if _SELF_LOOK.match(r["fact"]) and r["fact"] != fact]
+            if old:
+                self._db.executemany("DELETE FROM facts WHERE id = ?", [(i,) for i in old])
+                log.info("replaced %d older self-description fact(s)", len(old))
+        else:
+            for r in existing:
+                if similarity(fact, r["fact"]) >= NEAR_DUPLICATE:
+                    log.info("fact skipped (near-duplicate of #%d): %s", r["id"], fact)
+                    return False
         cur = self._db.execute(
             "INSERT OR IGNORE INTO facts (ts, fact) VALUES (?, ?)", (_now(), fact)
         )

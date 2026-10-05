@@ -50,5 +50,37 @@ def tidy_old(folder, days: float, *, now: float | None = None) -> list[str]:
     return removed
 
 
+def clear_folder(folder, *, min_age_s: float = 600.0, now: float | None = None) -> list[str]:
+    """Delete EVERY direct child of `folder` (any age) except things modified in the last `min_age_s` seconds, so a capture session that
+    is still being written is not wiped. For the camera preview's capture folder: captures are meant to be pulled to the Mac and then
+    forgotten. Same safety rules as `tidy_old` (direct children only, never dot-files or symlinks). Never raises."""
+    removed: list[str] = []
+    now = time.time() if now is None else now
+    try:
+        root = Path(folder).expanduser()
+        if not root.is_dir() or root.is_symlink():
+            return removed
+        for child in root.iterdir():
+            if child.name.startswith(".") or child.is_symlink():
+                continue
+            try:
+                if now - child.stat().st_mtime < min_age_s:
+                    continue
+                if child.is_dir():
+                    shutil.rmtree(child)
+                elif child.is_file():
+                    child.unlink()
+                else:
+                    continue
+                removed.append(child.name)
+            except OSError:
+                log.debug("could not remove %s", child, exc_info=True)
+    except Exception:  # noqa: BLE001
+        log.debug("clearing %s failed", folder, exc_info=True)
+    if removed:
+        log.info("cleared %d capture item(s) from %s", len(removed), folder)
+    return removed
+
+
 def tidy_startup(folders, days: float) -> dict[str, int]:
     return {str(f): len(tidy_old(f, days)) for f in folders}
