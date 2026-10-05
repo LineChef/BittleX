@@ -84,3 +84,23 @@ def test_tidy_is_off_at_zero_days_and_safe_on_a_missing_folder(tmp_path):
     assert tidy_old(tmp_path, 0) == [] and f.exists()
     assert tidy_old(tmp_path / "missing", 30) == []
     assert tidy_startup([tmp_path, tmp_path / "missing"], 30) == {str(tmp_path): 1, str(tmp_path / "missing"): 0}
+
+
+def test_prune_old_deletes_every_picture_older_than_the_limit_and_nothing_else(tmp_path):
+    from pi_pipeline.vision.pictures import prune_old
+    old = tmp_path / "look_old.jpg"; old.write_bytes(jpeg("left")); age(old, 8)
+    edge = tmp_path / "look_edge.jpg"; edge.write_bytes(jpeg("top")); age(edge, 6)
+    new = tmp_path / "look_new.jpg"; new.write_bytes(jpeg("diag"))
+    other = tmp_path / "notes.txt"; other.write_text("x"); age(other, 400)
+    assert prune_old(tmp_path, 7) == ["look_old.jpg"]
+    assert edge.exists() and new.exists() and other.exists() and not old.exists()
+    assert prune_old(tmp_path, 0) == [] and prune_old(tmp_path / "missing", 7) == []
+
+
+def test_the_capture_clear_skips_anything_touched_in_the_last_hour(tmp_path):
+    from pi_pipeline.util.tidy import clear_folder
+    recent = tmp_path / "session_recent"; recent.mkdir()
+    t = time.time() - 1800; os.utime(recent, (t, t))                     # half an hour ago: inside the hour, so it survives
+    stale = tmp_path / "session_stale"; stale.mkdir()
+    t = time.time() - 7200; os.utime(stale, (t, t))
+    assert clear_folder(tmp_path, min_age_s=3600) == ["session_stale"] and recent.exists()

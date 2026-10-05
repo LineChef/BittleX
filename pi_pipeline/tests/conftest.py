@@ -27,6 +27,7 @@ def cfg(tmp_path):
         "memory_recall_exchanges": 2,
         "history_turns": 2,
         "claude_max_tokens": 100,
+        "usage_path": "",                 # tests never write usage counts into the real home folder
     }
     for k, v in over.items():
         object.__setattr__(s, k, v)

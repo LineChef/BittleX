@@ -75,9 +75,55 @@ def parse_invoke_line(line: str, labels: list[str] | None = None) -> Snapshot | 
     return Snapshot(jpeg, int(w), int(h), dets)
 
 
+# ---- exposure: the camera's auto-exposure target can be raised (dim rooms) or lowered (bright rooms, lamps) with `ae_bump`
+BUMP_MIN, BUMP_MAX = -24, 64            # offsets from the module's stock target registers
+CLIP_HIGH_PX, CLIP_LOW_PX = 245, 10      # luminance counted as blown out / crushed
+TOO_BRIGHT_CLIP = 0.08                   # more than this share of blown-out pixels = too bright
+TOO_DARK_MEAN, TOO_DARK_CLIP = 45.0, 0.45
+TARGET_MEAN = 115.0
+
+
+@dataclass
+class ExposureStats:
+    mean: float          # average luminance 0..255
+    clip_high: float     # share of pixels at or above CLIP_HIGH_PX
+    clip_low: float      # share of pixels at or below CLIP_LOW_PX
+
+
+def exposure_stats(jpeg: bytes) -> ExposureStats | None:
+    """Brightness statistics of a frame (needs Pillow; None if it cannot be read)."""
+    try:
+        import io
+
+        from PIL import Image
+        h = Image.open(io.BytesIO(jpeg)).convert("L").histogram()
+        total = float(sum(h)) or 1.0
+        return ExposureStats(sum(i * n for i, n in enumerate(h)) / total, sum(h[CLIP_HIGH_PX:]) / total, sum(h[:CLIP_LOW_PX + 1]) / total)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def exposure_score(s: ExposureStats) -> float:
+    """Lower is better: blown-out pixels cost the most (no detail is recoverable), then crushed ones, then distance from mid-grey."""
+    return s.clip_high * 2.0 + s.clip_low * 1.0 + abs(s.mean - TARGET_MEAN) / 255.0
+
+
+def next_bump(bump: int, s: ExposureStats) -> int | None:
+    """Where to move the exposure target for the next try given the last frame, or None if the frame is fine or there is no room left.
+    The step grows with how bad the frame is, so a blown-out room is fixed in one move and a mild case gets a gentle nudge."""
+    if s.clip_high > TOO_BRIGHT_CLIP and s.clip_high >= s.clip_low:
+        nb = max(BUMP_MIN, bump - (32 if s.clip_high > 0.20 else 16))
+    elif s.mean < TOO_DARK_MEAN or s.clip_low > TOO_DARK_CLIP:
+        nb = min(BUMP_MAX, bump + (32 if s.mean < 25 or s.clip_low > 0.8 else 16))
+    else:
+        return None
+    return None if nb == bump else nb
+
+
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
-                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, serial_factory=None,
+                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 7.0, exposure_check: bool = True,
+                 max_exposure_retries: int = 2, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
@@ -86,6 +132,10 @@ class CameraSnapshotter:
         self._lock = threading.Lock()
         self._idle_close_s = idle_close_s
         self._on_capture = on_capture                      # called once per picture taken (the shutter sound)
+        self._keep_days = keep_days
+        self._exposure_check, self._max_exposure_retries = exposure_check, max_exposure_retries
+        self._ae_default = ae_bump
+        self._bump = ae_bump                               # the exposure offset in use now; adapts to the lighting and is remembered between looks
         self._save_dir = save_dir                          # opt-in: keep each picture here (for building a test set); normally None
         self._idle_timer: threading.Timer | None = None
 
@@ -110,12 +160,17 @@ class CameraSnapshotter:
         self._ser.write(_BREAK); self._sleep(0.2)         # clear any inference loop left running
         if self._sensor_opt in (0, 1, 2):
             self._ser.write(f"AT+SENSOR=1,1,{self._sensor_opt}\r\n".encode()); self._sleep(0.8)
-        if self._ae_bump:
-            for addr, val in _AE_REGS:
-                self._ser.write(f'AT+SETREG="0x{addr}","0x{min(0xF0, val + self._ae_bump):02X}"\r\n'.encode()); self._sleep(0.25)
+        if self._bump:
+            self._apply_ae(self._bump)
         self._ser.reset_input_buffer()
-        log.info("camera ready on %s (sensor_opt=%s, ae_bump=%s)", self._port, self._sensor_opt, self._ae_bump)
+        log.info("camera ready on %s (sensor_opt=%s, ae_bump=%s)", self._port, self._sensor_opt, self._bump)
         self._arm_idle_close()
+
+    def _apply_ae(self, bump: int) -> None:
+        """Move the auto-exposure target to the stock registers plus `bump` (clamped to values the sensor accepts)."""
+        for addr, val in _AE_REGS:
+            self._ser.write(f'AT+SETREG="0x{addr}","0x{max(0x08, min(0xF0, val + bump)):02X}"\r\n'.encode())
+            self._sleep(0.25)
 
     def warm(self) -> None:
         """Open the camera now (a few seconds) so the first snapshot is quick. Never raises."""
@@ -136,7 +191,8 @@ class CameraSnapshotter:
             with open(os.path.join(self._save_dir, name), "wb") as f:
                 f.write(snap.jpeg)
             log.info("saved picture to %s/%s", self._save_dir, name)
-            from .pictures import prune_duplicates
+            from .pictures import prune_duplicates, prune_old
+            prune_old(self._save_dir, self._keep_days)    # rule: pictures are deleted after a week
             prune_duplicates(self._save_dir)              # rule: near-duplicate pictures are pruned, earliest kept
         except Exception:  # noqa: BLE001
             log.debug("saving the picture failed", exc_info=True)
@@ -145,31 +201,77 @@ class CameraSnapshotter:
         """Start opening the camera in the background (the wake word was just heard, so a picture request may follow)."""
         threading.Thread(target=self.warm, name="camera-warm", daemon=True).start()
 
+    def _grab_one(self) -> Snapshot | None:
+        """One inference with its picture, or None if the module does not answer in time. Caller holds the lock."""
+        self._ser.reset_input_buffer()
+        self._ser.write(_ONE_SHOT)
+        deadline = self._clock() + self._timeout_s
+        while self._clock() < deadline:
+            raw = self._ser.readline()
+            if not raw:
+                continue
+            snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
+            if snap is not None:
+                return snap
+        log.warning("camera gave no picture within %.0f s", self._timeout_s)
+        return None
+
+    def _balance_exposure(self, first: Snapshot) -> Snapshot:
+        """Check the frame's exposure and, if it is blown out or too dark, retry with the exposure target moved toward better light: a
+        bright room lowers it, a dim room raises it, by an amount that grows with how bad the frame is. At most `max_exposure_retries`
+        retries; the best-scoring frame wins, and its setting is kept for the next look in the same room."""
+        stats = exposure_stats(first.jpeg)
+        if stats is None:
+            return first
+        log.info("exposure: mean %.0f, blown-out %.0f%%, crushed %.0f%% (bump %d)", stats.mean, 100 * stats.clip_high,
+                 100 * stats.clip_low, self._bump)
+        best, best_stats, best_bump, cur = first, stats, self._bump, stats
+        for attempt in range(1, self._max_exposure_retries + 1):
+            nb = next_bump(self._bump, cur)
+            if nb is None:
+                break
+            self._apply_ae(nb)
+            self._bump = nb
+            self._sleep(0.5)
+            if self._grab_one() is None:                    # let auto-exposure settle on the new target (this frame is thrown away)
+                break
+            frame = self._grab_one()
+            st = exposure_stats(frame.jpeg) if frame else None
+            if st is None:
+                break
+            log.info("exposure retry %d: bump %d -> mean %.0f, blown-out %.0f%%, crushed %.0f%%", attempt, nb, st.mean,
+                     100 * st.clip_high, 100 * st.clip_low)
+            better = exposure_score(st) < exposure_score(best_stats) - 0.02
+            if exposure_score(st) < exposure_score(best_stats):
+                best, best_stats, best_bump = frame, st, nb
+            cur = st
+            if not better:                                  # no real gain from this move: stop trying
+                break
+        if best_bump != self._bump:
+            self._apply_ae(best_bump)                       # leave the camera at the best setting found
+            self._bump = best_bump
+        return best
+
     def snapshot(self) -> Snapshot | None:
-        """One picture, or None if the camera is unavailable or does not answer in time. Never raises."""
+        """One picture (re-taken in better light if the first is badly exposed), or None if the camera is unavailable or does not answer
+        in time. Never raises."""
         try:
             with self._lock:
                 self._open()
-                self._ser.reset_input_buffer()
-                self._ser.write(_ONE_SHOT)
-                deadline = self._clock() + self._timeout_s
-                while self._clock() < deadline:
-                    raw = self._ser.readline()
-                    if not raw:
-                        continue
-                    snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
-                    if snap is not None:
-                        log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg),
-                                 len(snap.detections))
-                        self._arm_idle_close()
-                        self._save(snap)
-                        if self._on_capture:
-                            try:
-                                self._on_capture()
-                            except Exception:  # noqa: BLE001
-                                log.debug("on_capture handler raised", exc_info=True)
-                        return snap
-                log.warning("camera gave no picture within %.0f s", self._timeout_s)
+                snap = self._grab_one()
+                if snap is None:
+                    return None
+                if self._exposure_check:
+                    snap = self._balance_exposure(snap)
+                log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg), len(snap.detections))
+                self._arm_idle_close()
+                self._save(snap)
+                if self._on_capture:
+                    try:
+                        self._on_capture()
+                    except Exception:  # noqa: BLE001
+                        log.debug("on_capture handler raised", exc_info=True)
+                return snap
         except Exception:  # noqa: BLE001
             log.warning("camera snapshot failed", exc_info=True)
             self._ser = None                               # reopen next time
@@ -187,6 +289,7 @@ class CameraSnapshotter:
                 except Exception:  # noqa: BLE001
                     pass
                 self._ser = None
+            self._bump = self._ae_default                  # the module resets when the port reopens, and the light may have changed
 
 
 def main() -> None:
@@ -200,6 +303,8 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--sensor-opt", type=int, default=None, help="0=240x240, 1=480x480, 2=640x480 (default: the VISION_SENSOR_OPT setting)")
     args = ap.parse_args()
+    import logging
+    logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     opt = settings.vision_sensor_opt if args.sensor_opt is None else args.sensor_opt
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=opt,
                             ae_bump=settings.vision_ae_bump)

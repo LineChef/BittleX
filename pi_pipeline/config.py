@@ -189,6 +189,12 @@ class Settings:
     # Camera-preview captures (~/g2_cap) are meant to be pulled to the Mac (g2pcam-pull) and then forgotten: cleared at every service start.
     capture_dir: str = field(default_factory=lambda: os.path.expanduser(_env("G2_CAP_DIR", "~/g2_cap")))
     clear_captures: bool = field(default_factory=lambda: _env("G2_CLEAR_CAPTURES", "1") not in ("0", "false", "no"))
+    # Per-day Claude API call/token counts, including how often the words-only retry fires (python -m pi_pipeline.voice.usage).
+    usage_path: str = field(default_factory=lambda: os.path.expanduser(_env("G2_USAGE_FILE", "~/.local/share/g2/api_usage.json")))
+    picture_keep_days: float = field(default_factory=lambda: _env_float("G2_PICTURE_KEEP_DAYS", 7.0))   # saved pictures older than this are deleted
+    capture_keep_s: float = field(default_factory=lambda: _env_float("G2_CAPTURE_KEEP_S", 3600.0))      # preview captures touched this recently survive the start-up clear
+    # Re-take a look picture in better light when the first is blown out or too dark (moves the camera's exposure target; see vision/snapshot.py).
+    vision_exposure_check: bool = field(default_factory=lambda: _env("G2_EXPOSURE_CHECK", "1") not in ("0", "false", "no"))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

@@ -1,4 +1,5 @@
-"""Housekeeping for pictures G2 keeps (only when G2_VISION_SAVE_DIR is set): near-duplicate pruning.
+"""Housekeeping for pictures G2 keeps (only when G2_VISION_SAVE_DIR is set): every picture is deleted after `days` (default 7), and
+near-duplicates are pruned as they are saved. Saved pictures have little value to G2 (he cannot recall an image), so they do not pile up.
 
 A picture is a duplicate of an earlier one when their 256-bit average hashes differ in at most `max_distance` bits (the same gate
 `tools/camera_preview.py` uses to skip repeated capture frames). The earliest picture of each cluster is kept; later near-copies are
@@ -7,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import time
 from pathlib import Path
 
 log = logging.getLogger("g2.pictures")
@@ -28,6 +30,29 @@ def ahash(jpeg: bytes, side: int = 16) -> int:
 
 def hamming(a: int, b: int) -> int:
     return bin(a ^ b).count("1")
+
+
+def prune_old(folder, days: float = 7.0, pattern: str = "look_*.jpg", *, now: float | None = None) -> list[str]:
+    """Delete every picture in `folder` older than `days` days (0 or less = keep forever). Returns the names removed. Never raises."""
+    removed: list[str] = []
+    if days <= 0:
+        return removed
+    cutoff = (time.time() if now is None else now) - days * 86400.0
+    try:
+        for f in Path(folder).glob(pattern):
+            if f.is_symlink() or not f.is_file():
+                continue
+            try:
+                if f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    removed.append(f.name)
+            except OSError:
+                log.debug("could not remove %s", f, exc_info=True)
+    except Exception:  # noqa: BLE001
+        log.debug("old-picture cleanup failed", exc_info=True)
+    if removed:
+        log.info("deleted %d picture(s) older than %.0f days", len(removed), days)
+    return removed
 
 
 def prune_duplicates(folder, max_distance: int = DEFAULT_MAX_DISTANCE, pattern: str = "look_*.jpg") -> list[str]:

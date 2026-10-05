@@ -46,14 +46,26 @@ _LOOK_RE = re.compile(
     r"what('s| is) (that|this)|look (at|around|over)|can you see|do you see|describe (what|the|your)|tell me what you see)\b", re.I)
 
 
-# "remember what you look like", "that's you in the mirror", "this is a mirror", "can you see yourself"
-_LEARN_LOOKS_RE = re.compile(
-    r"\b(remember what you look like|what you look like|what do you look like|this is (what )?you|that('s| is) (what )?you|"
-    r"look(ing)? in the mirror|(this|that|it)('s| is) a mirror|in (the|a) mirror|see yourself|your reflection)\b", re.I)
+# Teaching G2 how he looks (take a picture of him in a mirror and keep a note) versus asking him from memory (NO picture):
+#   teach:  "this is a mirror", "that's you in the mirror", "can you see yourself", "your reflection", "remember what you look like"
+#   recall: "do you remember what you look like?", "what do you look like?", "describe yourself" -> answered from memory
+# Order matters: a mirror word always teaches; a question about it recalls; the bare command "remember what you look like" teaches.
+_MIRROR_RE = re.compile(
+    r"\b(this is (what )?you|that('s| is) (what )?you|look(ing)? in the mirror|(this|that|it)('s| is) a mirror|in (the|a) mirror|"
+    r"see yourself|your reflection)\b", re.I)
+_RECALL_LOOKS_RE = re.compile(
+    r"\b((do|did|can|could|would|will) you (still |even )?(remember|know) what you look like|what do you look like|"
+    r"describe yourself|how do you look)\b", re.I)
+_REMEMBER_LOOKS_RE = re.compile(r"\bremember what you look like\b", re.I)
 
 
 def asks_g2_to_learn_his_looks(text: str) -> bool:
-    return bool(_LEARN_LOOKS_RE.search(text or ""))
+    t = text or ""
+    if _MIRROR_RE.search(t):
+        return True
+    if _RECALL_LOOKS_RE.search(t):
+        return False
+    return bool(_REMEMBER_LOOKS_RE.search(t))
 
 
 _SILENT_LOOK = "I looked, but I'm not sure how to put it into words. Ask me again?"

@@ -79,6 +79,7 @@ The physical assembly record (wiring, soldering, mounting, calibration, real mea
 | [`petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) | The Petoi AI Head: whether it replaces the Pi — criteria, behavior inventory, test steps, scorecard. |
 | [`xiaozhi-esp32-review.md`](research/xiaozhi-esp32-review.md) | Review of the upstream XiaoZhi project the AI Head is built on: protocol, MCP tools, self-hosted servers, and what it means for a backend we control. |
 | [`firmware-fork-case.md`](research/firmware-fork-case.md) | What forking the BiBoard (or AI Head) firmware would unblock, with pros, cons and decision triggers. |
+| [`robot-memory-patterns.md`](research/robot-memory-patterns.md) | Memory designs that have worked for robots and companion agents (scored retrieval, reflection, core/recall/archival tiers, sleep-time consolidation, observation logs) mapped onto G2's memory, with a ranked list of what to adopt. |
 | [`community-projects.md`](research/community-projects.md) | Findings from reviewing other Bittle/Petoi community projects (BittleJuice, bittle-mujoco, MH-FLOCKE, TypeFly) + the incorporation plan. |
 
 ## `rl/` — gait training: conclusions, backlogs, specs, real-robot logs

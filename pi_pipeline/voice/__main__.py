@@ -47,7 +47,10 @@ def main() -> None:
     start_disk_watch(settings.disk_warn_pct)
     if settings.clear_captures:
         from ..util.tidy import clear_folder
-        clear_folder(settings.capture_dir)
+        clear_folder(settings.capture_dir, min_age_s=settings.capture_keep_s)
+    if settings.vision_save_dir:
+        from ..vision.pictures import prune_old
+        prune_old(settings.vision_save_dir, settings.picture_keep_days)
     if settings.tidy_days > 0:
         from ..diag.core import _log_root
         from ..util.tidy import tidy_startup
@@ -115,7 +118,9 @@ def main() -> None:
                     on_capture = lambda: camera_sounds.play("shutter", settings.camera_peak)  # noqa: E731
                 camera = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0,
                                            ae_bump=settings.vision_ae_bump, on_capture=on_capture,
-                                           save_dir=settings.vision_save_dir or None)
+                                           save_dir=settings.vision_save_dir or None,
+                                           keep_days=settings.picture_keep_days,
+                                           exposure_check=settings.vision_exposure_check)
 
         loop = VoiceLoop(
             wake_word=make_wake_word(

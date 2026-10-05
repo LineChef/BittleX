@@ -284,13 +284,28 @@ def test_the_picture_note_tells_claude_to_speak_and_not_to_move(cfg, fake_anthro
     assert "Always speak the description first" in system and "check_around" in system
 
 
-def test_phrases_that_ask_g2_to_learn_what_he_looks_like():
+def test_phrases_that_teach_g2_how_he_looks_take_a_picture():
     from pi_pipeline.voice.loop import asks_g2_to_learn_his_looks
-    for text in ("remember what you look like", "that's you in the mirror", "this is a mirror", "can you see yourself",
-                 "do you know what you look like", "look in the mirror", "that is your reflection"):
+    for text in ("remember what you look like", "that's you in the mirror", "this is a mirror", "can you see yourself", "look in the mirror",
+                 "that is your reflection", "this is a mirror, do you remember what you look like", "this is you"):
         assert asks_g2_to_learn_his_looks(text), text
+
+
+def test_questions_about_how_he_looks_are_answered_from_memory_without_a_picture():
+    from pi_pipeline.voice.loop import asks_g2_to_learn_his_looks
+    for text in ("do you remember what you look like", "can you remember what you look like?", "do you know what you look like",
+                 "what do you look like", "describe yourself", "tell me what you look like", "how do you look"):
+        assert not asks_g2_to_learn_his_looks(text), text
+        assert not asks_what_g2_sees(text), text
     for text in ("what do you see", "walk forward", "I look tired", "tell me a joke"):
         assert not asks_g2_to_learn_his_looks(text), text
+
+
+def test_a_recall_question_takes_no_picture():
+    cam = _Cam(Snapshot(JPEG, 240, 240))
+    lp, conv = make_loop(cam, ["do you remember what you look like"])
+    lp._one_turn()
+    assert conv.calls[0][1] == {} and cam.snapshots == 0 and cam.warms == 1        # (the camera still warms on the wake word)
 
 
 def test_learning_his_looks_attaches_a_picture_with_the_remember_instruction():

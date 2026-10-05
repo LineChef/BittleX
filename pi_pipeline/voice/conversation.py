@@ -165,7 +165,8 @@ _PICTURE_NOTE = (
     "camera has already taken the picture, so do not use the check_around skill or any other move to \"look\" -- just say what you see. "
     "A note next to the picture says what "
     "the small on-device detector thought it saw; treat that as a hint only. If a note says the camera could not take a picture, "
-    "say so plainly. If the picture shows a small robot (for example in a mirror), that is you, G2: say so and describe how you look. "
+    "say so plainly. If someone asks what you look like and there is no picture, answer from the \"I look like ...\" note you remember; if "
+    "you do not remember, say so and suggest showing you a mirror -- do not invent. If the picture shows a small robot (for example in a mirror), that is you, G2: say so and describe how you look. "
     "Never invent things you cannot see.")
 
 _ENDS_WITH_QUESTION = re.compile(r"\?[\"')\]\s]*$")
@@ -241,6 +242,8 @@ class Conversation:
             log.info("personality: %s", p.describe())
         self._history: list[dict] = []
         self._pending_tool_results: list[dict] = []
+        from .usage import UsageTracker
+        self._usage = UsageTracker(cfg.usage_path) if getattr(cfg, "usage_path", "") else None
 
     @property
     def personality(self) -> Personality:
@@ -514,6 +517,8 @@ class Conversation:
                           "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
         log.info("reply blocks: %s", ", ".join(_describe_block(b) for b in resp.content) or "none")
+        if self._usage is not None and backend == "claude":
+            self._usage.record("turn", getattr(resp, "usage", None))
 
         speech_parts, actions, action_seconds, facts, expects_reply = self._digest(resp, picture)
         if not any(speech_parts) and (picture is not None or not actions):
@@ -527,6 +532,8 @@ class Conversation:
                 resp2, _ = self._complete(user_text, memory_context, on_action, on_speech, force_claude=True,
                                           tool_choice={"type": "none"})
                 log.info("retry reply blocks: %s", ", ".join(_describe_block(b) for b in resp2.content) or "none")
+                if self._usage is not None:
+                    self._usage.record("retry", getattr(resp2, "usage", None))
                 s2, a2, sec2, f2, e2 = self._digest(resp2, picture)
                 speech_parts += s2; actions += a2; action_seconds += sec2; facts += f2; expects_reply = expects_reply or e2
             except Exception:  # noqa: BLE001 -- the first reply stands; take the retry message back out and keep its acks
