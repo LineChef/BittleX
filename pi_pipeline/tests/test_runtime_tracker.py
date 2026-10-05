@@ -111,4 +111,4 @@ def test_pi_alert_sounds_the_siren_then_names_the_pi_battery():
     tts = type("T", (), {"speak": lambda self, t: events.append(("say", t))})()
     on_alert = make_pi_battery_alert(tts, audible=True, sound=lambda: events.append("siren"))
     on_alert(BatteryLevel.LOW, 0.8)
-    assert events == ["siren", ("say", "My Pi battery is at about twenty percent.")]
+    assert events == ["siren", ("say", "Pi battery is low.")]
