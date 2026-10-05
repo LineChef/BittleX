@@ -108,6 +108,30 @@ def exposure_score(s: ExposureStats) -> float:
     return s.clip_high * 2.0 + s.clip_low * 1.0 + abs(s.mean - TARGET_MEAN) / 255.0
 
 
+BRIGHTEN_TARGET = 100.0
+
+
+def brighten(jpeg: bytes, mean: float, target: float = BRIGHTEN_TARGET) -> bytes:
+    """Lift the shadows of a dark frame in software (a gamma curve that moves its average luminance toward `target`). Measured on the real
+    camera 2026-10-05: in a dim room the exposure-target registers change nothing (the sensor is already at its limit), so this is the only
+    lever that works for a dark scene. Returns the input unchanged if it is not dark or cannot be processed."""
+    try:
+        import io
+        import math
+
+        from PIL import Image
+        if mean >= target - 5 or mean <= 0:
+            return jpeg
+        gamma = max(0.4, min(1.0, math.log(target / 255.0) / math.log(max(mean, 1.0) / 255.0)))
+        lut = [round(255 * (i / 255.0) ** gamma) for i in range(256)]
+        im = Image.open(io.BytesIO(jpeg)).convert("RGB").point(lut * 3)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        return jpeg
+
+
 def next_bump(bump: int, s: ExposureStats) -> int | None:
     """Where to move the exposure target for the next try given the last frame, or None if the frame is fine or there is no room left.
     The step grows with how bad the frame is, so a blown-out room is fixed in one move and a mild case gets a gentle nudge."""
@@ -250,6 +274,12 @@ class CameraSnapshotter:
         if best_bump != self._bump:
             self._apply_ae(best_bump)                       # leave the camera at the best setting found
             self._bump = best_bump
+        if best_stats.mean < TOO_DARK_MEAN:                 # still dark: the sensor is at its limit, so lift the shadows in software
+            lifted = brighten(best.jpeg, best_stats.mean)
+            if lifted is not best.jpeg:
+                new = exposure_stats(lifted)
+                log.info("dark frame brightened in software: mean %.0f -> %.0f", best_stats.mean, new.mean if new else 0)
+                best = Snapshot(lifted, best.width, best.height, best.detections)
         return best
 
     def snapshot(self) -> Snapshot | None:

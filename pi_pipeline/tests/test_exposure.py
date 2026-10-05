@@ -151,3 +151,27 @@ def test_the_learned_exposure_carries_to_the_next_look_and_resets_when_the_camer
 def test_the_check_can_be_turned_off():
     c, cam = make("bright", ae_bump=32, exposure_check=False)
     assert c.snapshot() is not None and cam.invokes == 1 and c._bump == 32
+
+
+# ---- a dark frame the sensor cannot fix is lifted in software
+
+def test_brighten_lifts_a_dark_frame_toward_the_target_and_leaves_normal_frames_alone():
+    from pi_pipeline.vision.snapshot import brighten
+    dark = make_jpeg([40] * 1024)
+    lifted = brighten(dark, exposure_stats(dark).mean)
+    assert 80 < exposure_stats(lifted).mean < 130
+    fine = make_jpeg([115] * 1024)
+    assert brighten(fine, 115.0) is fine
+    assert brighten(b"not a jpeg", 20.0) == b"not a jpeg"
+
+
+def test_a_scene_too_dark_for_any_exposure_setting_is_brightened_in_software():
+    SimCamera_scene = scene
+    import pi_pipeline.tests.test_exposure as me
+    me.scene = lambda kind: [5.0] * 1024 if kind == "very-dark" else SimCamera_scene(kind)   # radiance so low even bump +64 stays dark
+    try:
+        c, cam = make("very-dark", ae_bump=0)
+        snap = c.snapshot()
+    finally:
+        me.scene = SimCamera_scene
+    assert exposure_stats(snap.jpeg).mean > 60                                      # lifted from ~13 at the best exposure setting
