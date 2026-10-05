@@ -43,3 +43,12 @@ def test_run_sends_no_motion_commands_and_logs(tmp_path):
     assert set(lk.sent) <= {"gP", "gp", "P"}                       # only the IMU print on/off and the voltage query
     text = log.read_text()
     assert ",imu," in text and ",volt,,,,7.80" in text
+
+
+def test_accel_tilt_from_gravity_alone():
+    from pi_pipeline.gait.stand_log import _accel_g, accel_tilt_deg
+    assert accel_tilt_deg(0.0, 0.0, 1.0) == (0.0, 0.0)
+    r, p = accel_tilt_deg(0.0, 0.1736, 0.9848)          # ~10 degrees of roll
+    assert abs(r - 10) < 0.1 and abs(p) < 0.01
+    assert _accel_g("ICM:  0.01  0.17  0.98   12.3    1.0    2.0") == (0.01, 0.17, 0.98)
+    assert _accel_g("hello") is None

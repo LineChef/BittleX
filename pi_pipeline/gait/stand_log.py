@@ -26,6 +26,28 @@ from imu_parse import parse_imu_line   # noqa: E402
 IMU_HZ = 5.0
 
 
+def _accel_g(line: str):
+    """The (ax, ay, az) accelerometer triplet (in g) of an `ICM:`/`MCU:` line, or None. parse_imu_line leaves accel out."""
+    s = line.strip()
+    if s[:4] not in ("ICM:", "MCU:"):
+        return None
+    body = s[4:]
+    try:
+        nums = [float(x) for x in body.split()]
+        if len(nums) != 6:
+            nums = [float(body[i:i + 6]) for i in (0, 6, 12)] + [0, 0, 0]
+        return nums[0], nums[1], nums[2]
+    except ValueError:
+        return None
+
+
+def accel_tilt_deg(ax: float, ay: float, az: float):
+    """(roll, pitch) in degrees from gravity alone: a tilt estimate that does not depend on the firmware's sensor fusion."""
+    roll = math.degrees(math.atan2(ay, az))
+    pitch = math.degrees(math.atan2(-ax, math.hypot(ay, az)))
+    return roll, pitch
+
+
 def summarize(rolls_deg: list[float], pitches_deg: list[float], hz: float = IMU_HZ) -> dict:
     """One window of IMU samples -> swing, mean and strongest oscillation frequency."""
     def stats(v):
@@ -53,18 +75,25 @@ def summarize(rolls_deg: list[float], pitches_deg: list[float], hz: float = IMU_
     return {"n": len(rolls_deg), "roll": r, "pitch": p, "roll_hz": dominant_hz(rolls_deg), "pitch_hz": dominant_hz(pitches_deg)}
 
 
+def acc_std(v):
+    if len(v) < 3:
+        return None
+    m = sum(v) / len(v)
+    return math.sqrt(sum((x - m) ** 2 for x in v) / len(v))
+
+
 def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, sleep=time.sleep, clock=time.monotonic,
-        out=print) -> list[dict]:
+        out=lambda *a: print(*a, flush=True)) -> list[dict]:
     from pi_pipeline.power.battery import read_voltage
 
     lk.send("gP", read_reply=False, settle=0.0)
     sleep(0.5)
-    log = open(log_path, "w") if log_path else None
+    log = open(log_path, "w", buffering=1) if log_path else None   # line-buffered: readable while it runs
     if log:
-        log.write(f"# stand_log minutes={minutes}\nt,kind,roll_deg,pitch_deg,yaw_deg,volts\n")
-    rows, window_r, window_p, windows = 0, [], [], []
+        log.write(f"# stand_log minutes={minutes}\nt,kind,roll_deg,pitch_deg,yaw_deg,volts,ax,ay,az,acc_roll_deg,acc_pitch_deg\n")
+    rows, window_r, window_p, window_ar, window_ap, windows = 0, [], [], [], [], []
     t0 = clock(); next_min = 60.0; next_volt = 0.0; volts = None
-    out("minute samples | roll mean  std  p2p | pitch mean  std  p2p | osc Hz r/p | volts")
+    out("minute samples | roll mean  std  p2p | pitch mean  std  p2p | osc Hz r/p | accel-only std r/p | volts")
     try:
         while clock() - t0 < minutes * 60:
             now = clock() - t0
@@ -73,7 +102,7 @@ def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, s
                 if v is not None:
                     volts = v
                     if log:
-                        log.write(f"{now:.2f},volt,,,,{v:.2f}\n")
+                        log.write(f"{now:.2f},volt,,,,{v:.2f},,,,,\n")
                 next_volt = now + volt_every
             for line in lk.poll_imu():
                 r = parse_imu_line(line)
@@ -81,8 +110,13 @@ def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, s
                     continue
                 roll, pitch, yaw = (math.degrees(a) for a in r[:3])
                 window_r.append(roll); window_p.append(pitch); rows += 1
+                acc = _accel_g(line)
+                if acc is not None:
+                    ar, ap = accel_tilt_deg(*acc)
+                    window_ar.append(ar); window_ap.append(ap)
                 if log:
-                    log.write(f"{clock() - t0:.3f},imu,{roll:.3f},{pitch:.3f},{yaw:.3f},\n")
+                    extra = f"{acc[0]:.3f},{acc[1]:.3f},{acc[2]:.3f},{ar:.2f},{ap:.2f}" if acc is not None else ",,,,"
+                    log.write(f"{clock() - t0:.3f},imu,{roll:.3f},{pitch:.3f},{yaw:.3f},,{extra}\n")
             if now >= next_min:
                 s = summarize(window_r, window_p); s["minute"] = int(next_min // 60); s["volts"] = volts
                 windows.append(s)
@@ -90,10 +124,11 @@ def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, s
                     f = lambda x: "  -- " if x is None else f"{x:5.2f}"
                     out(f"{s['minute']:>5} {s['n']:>7} | {s['roll'][0]:8.2f} {s['roll'][1]:5.2f} {s['roll'][2]:5.1f} | "
                         f"{s['pitch'][0]:9.2f} {s['pitch'][1]:5.2f} {s['pitch'][2]:5.1f} | "
-                        f"{f(s['roll_hz'])}/{f(s['pitch_hz'])} | {'--' if volts is None else f'{volts:.2f}'}")
+                        f"{f(s['roll_hz'])}/{f(s['pitch_hz'])} | {f(acc_std(window_ar))}/{f(acc_std(window_ap))} | "
+                        f"{'--' if volts is None else f'{volts:.2f}'}")
                 else:
                     out(f"{int(next_min // 60):>5}  no IMU data in this minute")
-                window_r, window_p = [], []
+                window_r, window_p, window_ar, window_ap = [], [], [], []
                 next_min += 60.0
             sleep(0.05)
     finally:
