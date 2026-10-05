@@ -33,6 +33,14 @@ Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/rob
   `python -m pi_pipeline.memory consolidate` (a dry run); add `--apply` to do it. `G2_CONSOLIDATE=0` turns it off. The call is counted in
   `python -m pi_pipeline.voice.usage`.
 
+* **Which memory shaped a reply** (`python -m pi_pipeline.memory usage`). Per fact it counts how often it was injected, how often G2 named it
+  (`declared`) and how often the reply echoed its content words (`matched`), plus the share of turns where memory was used and a list of
+  facts injected 20+ times that never mattered. Counters only: no conversation text is stored. `G2_MEMORY_USE_LOG=match` (default) is
+  free: the code compares each reply with the notes it was given. `declare` also tags every note ([#12] fact, [s3] sighting) and gives G2 a
+  `memory_used` tool to name the notes that mattered: richer (it sees influence with no shared words), but in a measured test the model
+  skipped speaking more often (the words-only retry fired on about 3 of 8 question turns), which costs extra API calls: use it for a trial
+  window and watch `python -m pi_pipeline.voice.usage`. `off` records nothing.
+
 **Recall** (before each Claude call): `recall(user_text)` returns a context block
 — the current fact set plus up to `G2_MEMORY_RECALL` older exchanges that match
 the input (BM25-ranked, excluding the recent turns `conversation.py` still has

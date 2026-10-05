@@ -80,7 +80,7 @@ def test_orphan_tool_result_is_dropped():
 
 def test_tools_translate_to_function_format():
     t = llm.to_openai_tools(_TOOLS)
-    assert {x["function"]["name"] for x in t} == {"perform_skill", "remember", "diagnostics_query", "await_reply"}
+    assert {x["function"]["name"] for x in t} == {"perform_skill", "remember", "diagnostics_query", "await_reply", "memory_used"}   # the full list; memory_used is offered only when G2_MEMORY_USE_LOG=declare
     assert t[0]["type"] == "function" and "properties" in t[0]["function"]["parameters"]
 
 

@@ -4,6 +4,7 @@
     python -m pi_pipeline.memory pin 3                 # make fact #3 core (always injected); unpin 3 undoes it
     python -m pi_pipeline.memory sightings [N]         # what G2 saw when he looked (text, date only)
     python -m pi_pipeline.memory consolidate [--apply] # the idle-time tidy-up: dry run by default
+    python -m pi_pipeline.memory usage                 # which facts shape G2's replies (injected / declared / matched counts)
     python -m pi_pipeline.memory log [N]               # last N exchanges (default 20)
     python -m pi_pipeline.memory search "cat"          # relevance search the log
     python -m pi_pipeline.memory recall "tell me about my cat"   # what recall() would inject
@@ -48,6 +49,7 @@ def main() -> None:
     p_unpin = sub.add_parser("unpin"); p_unpin.add_argument("id", type=int)
     p_si = sub.add_parser("sightings"); p_si.add_argument("n", type=int, nargs="?", default=10)
     p_co = sub.add_parser("consolidate"); p_co.add_argument("--apply", action="store_true")
+    sub.add_parser("usage")
     p_log = sub.add_parser("log"); p_log.add_argument("n", type=int, nargs="?", default=20)
     p_se = sub.add_parser("search"); p_se.add_argument("query")
     p_re = sub.add_parser("recall"); p_re.add_argument("query")
@@ -76,6 +78,10 @@ def main() -> None:
         for r in reversed(rows):
             print(f"  {r['ts']}  {r['caption']}" + (f"   [detector: {r['labels']}]" if r["labels"] else ""))
         print(f"  {len(rows)} sighting(s)")
+
+    elif args.cmd == "usage":
+        from .use_log import format_report
+        print(format_report(Store(db)))
 
     elif args.cmd == "consolidate":
         import json as _json

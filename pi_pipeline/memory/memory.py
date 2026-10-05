@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 from ..config import Settings
 from .store import Store
+from .use_log import overlap_used, parse_tags
 
 log = logging.getLogger("g2.memory")
 
@@ -42,6 +43,8 @@ class Memory:
         self._store = Store(cfg.memory_db_path)
         self._max_facts = cfg.memory_max_facts
         self._core_max = getattr(cfg, "memory_core_max", 12)
+        self._mode = getattr(cfg, "memory_use_log", "match")     # "match" | "declare" | "off"
+        self._last_injected: dict | None = None        # what the last recall() put in the prompt, to pair with the reply in record()
         pruned = self._store.prune_observations(getattr(cfg, "observation_days", 30.0))
         if pruned:
             log.info("pruned %d old sighting(s)", pruned)
@@ -94,22 +97,27 @@ class Memory:
             log.info("forgot session: %d exchange(s), %d fact(s)", n_ex, n_fa)
         return n_ex, n_fa
 
+    def _tag(self, kind: str, nid: int) -> str:
+        """The [#12] / [s3] tag G2 is shown only when he can name notes (G2_MEMORY_USE_LOG=declare)."""
+        return f"[{kind}{nid}] " if self._mode == "declare" else ""
+
     def recall(self, user_text: str) -> str:
         parts: list[str] = []
 
         core = self._store.list_core(self._core_max)
         if core:
-            parts.append("About you and your people (always true):\n" + "\n".join(f"- {f['fact']}" for f in core))
+            parts.append("About you and your people (always true):\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in core))
         facts = self._store.list_ranked(self._max_facts)          # importance + recency; the core facts are already above
         if facts:
-            parts.append("What you know:\n" + "\n".join(f"- {f['fact']}" for f in facts))
+            parts.append("What you know:\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in facts))
         self._store.touch_facts([f["id"] for f in core] + [f["id"] for f in facts])
 
         seen: list = []
         if _PAST_SIGHT_RE.search(user_text or ""):
             seen = self._store.search_observations(user_text, limit=3) or self._store.recent_observations(3)
             if seen:
-                lines = [f"- ({_when(r['ts'])}) {r['caption']}" + (f" [detector: {r['labels']}]" if r["labels"] else "") for r in seen]
+                lines = [f"- {self._tag('s', r['id'])}({_when(r['ts'])}) {r['caption']}" + (f" [detector: {r['labels']}]" if r["labels"] else "")
+                         for r in seen]
                 parts.append("Things you saw earlier:\n" + "\n".join(lines))
 
         older = self._store.search_exchanges(
@@ -122,12 +130,39 @@ class Memory:
             ]
             parts.append("Relevant past moments:\n" + "\n".join(lines))
 
+        self._last_injected = {"facts": {f["id"]: f["fact"] for f in core + facts}, "sights": {r["id"]: r["caption"] for r in seen}}
         ctx = "\n\n".join(parts)
         if ctx:
             log.info("recall: %d core, %d facts, %d sightings, %d past moments", len(core), len(facts), len(seen), len(older))
         return ctx
 
+    def _measure_use(self, turn) -> None:
+        """Pair the notes the last recall() injected with the reply: which ones G2 named (`memory_used`) and which ones the reply echoes."""
+        inj, self._last_injected = self._last_injected, None
+        if self._mode == "off" or not inj or not (inj["facts"] or inj["sights"]):
+            return
+        decl_f, decl_s = parse_tags(getattr(turn, "memory_used", []))
+        decl_f &= set(inj["facts"]); decl_s &= set(inj["sights"])
+        match_f = overlap_used(turn.speech, inj["facts"])
+        match_s = overlap_used(turn.speech, inj["sights"])
+        self._store.record_fact_use(list(inj["facts"]), decl_f, match_f)
+        self._store.incr_meta("use_turns")
+        if decl_f or decl_s:
+            self._store.incr_meta("use_turns_declared")
+        if match_f or match_s:
+            self._store.incr_meta("use_turns_matched")
+        if decl_f or decl_s or match_f or match_s:
+            self._store.incr_meta("use_turns_any")
+        self._store.incr_meta("sight_injected", len(inj["sights"]))
+        self._store.incr_meta("sight_declared", len(decl_s))
+        self._store.incr_meta("sight_matched", len(match_s))
+        if decl_f or decl_s or match_f or match_s:
+            log.info("memory shaped the reply: declared %s | matched %s",
+                     sorted([f"#{i}" for i in decl_f] + [f"s{i}" for i in decl_s]) or "-",
+                     sorted([f"#{i}" for i in match_f] + [f"s{i}" for i in match_s]) or "-")
+
     def record(self, user_text: str, turn) -> None:
+        self._measure_use(turn)
         self._store.log_exchange(user_text, turn.speech, list(turn.actions))
         self._last_exchange_at = self._clock()
         self._session_exchanges += 1

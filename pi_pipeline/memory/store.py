@@ -71,6 +71,13 @@ END;
 CREATE TRIGGER IF NOT EXISTS observations_ad AFTER DELETE ON observations BEGIN
     INSERT INTO observations_fts(observations_fts, rowid, caption, labels) VALUES ('delete', old.id, old.caption, old.labels);
 END;
+CREATE TABLE IF NOT EXISTS fact_use (
+    fact_id   INTEGER PRIMARY KEY,
+    injected  INTEGER NOT NULL DEFAULT 0,
+    declared  INTEGER NOT NULL DEFAULT 0,
+    matched   INTEGER NOT NULL DEFAULT 0,
+    last_used TEXT
+);
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -393,6 +400,34 @@ class Store:
     def exchanges_after(self, exchange_id: int, limit: int = 40) -> list[sqlite3.Row]:
         return list(self._db.execute("SELECT * FROM exchanges WHERE id > ? ORDER BY id LIMIT ?", (exchange_id, limit)))
 
+    # --- which memory shaped a reply (counters only; see memory/use_log.py) ----------------
+
+    def record_fact_use(self, injected: list[int], declared: set[int], matched: set[int]) -> None:
+        for i in injected:
+            self._db.execute("INSERT INTO fact_use (fact_id, injected) VALUES (?, 1) "
+                             "ON CONFLICT(fact_id) DO UPDATE SET injected = injected + 1", (i,))
+        for i in declared | matched:
+            self._db.execute("INSERT INTO fact_use (fact_id, declared, matched, last_used) VALUES (?, ?, ?, ?) "
+                             "ON CONFLICT(fact_id) DO UPDATE SET declared = declared + ?, matched = matched + ?, last_used = ?",
+                             (i, int(i in declared), int(i in matched), _today(), int(i in declared), int(i in matched), _today()))
+        self._db.commit()
+
+    def incr_meta(self, key: str, n: int = 1) -> None:
+        self._db.execute("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + ?",
+                         (key, str(n), n))
+        self._db.commit()
+
+    def fact_use_rows(self) -> list[sqlite3.Row]:
+        """Every fact with its use counters (zeros if it was never injected), most-used first."""
+        return list(self._db.execute(
+            """
+            SELECT f.id, f.fact, f.core, f.importance, f.source,
+                   COALESCE(u.injected, 0) AS injected, COALESCE(u.declared, 0) AS declared,
+                   COALESCE(u.matched, 0) AS matched, u.last_used
+            FROM facts f LEFT JOIN fact_use u ON u.fact_id = f.id
+            ORDER BY COALESCE(u.declared, 0) + COALESCE(u.matched, 0) DESC, COALESCE(u.injected, 0) DESC, f.id
+            """))
+
     def get_meta(self, key: str, default: str = "") -> str:
         r = self._db.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
         return r["value"] if r else default
@@ -420,7 +455,7 @@ class Store:
 
     def wipe(self) -> None:
         self._db.executescript(
-            "DELETE FROM exchanges; DELETE FROM facts; DELETE FROM observations; DELETE FROM meta; "
+            "DELETE FROM exchanges; DELETE FROM facts; DELETE FROM observations; DELETE FROM meta; DELETE FROM fact_use; "
             "INSERT INTO exchanges_fts(exchanges_fts) VALUES ('rebuild');"
         )
         self._db.commit()

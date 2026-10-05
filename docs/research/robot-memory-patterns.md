@@ -27,7 +27,7 @@ BM25 for older relevant turns, plus short facts G2 saves himself with the `remem
 
 ## Status (2026-10-05)
 Items 1-4 are built (importance, pinned core block, sleep-time consolidation, text-only sightings log); see `pi_pipeline/memory/README.md`.
-Items 5 (retrieval of old moments) and 6 (a log of which facts shape answers) are not built.
+Item 6 (a log of which facts shape answers) is built: `python -m pi_pipeline.memory usage`. Item 5 (better retrieval of old moments) is not built.
 
 ## Cautions that apply here
 * Importance and reflection add API calls; track them with `python -m pi_pipeline.voice.usage` before and after.

@@ -122,3 +122,29 @@ def test_clear_folder_removes_everything_except_what_is_still_being_written(tmp_
 
 def test_clear_folder_on_a_missing_folder_is_a_no_op(tmp_path):
     assert clear_folder(tmp_path / "nope") == []
+
+
+# ---- a question gets words, not just a move
+
+def move_only(skill="nod"):
+    return Resp(Block("tool_use", name="perform_skill", id="s1", input={"skill": skill}), stop_reason="tool_use")
+
+
+def test_a_question_answered_with_only_a_move_gets_the_words_only_retry(cfg, fake_anthropic):
+    sequence(fake_anthropic, move_only(), says("Your dog is called Biscuit."))
+    turn = Conversation(cfg).send("tell me about my dog")
+    assert turn.speech == "Your dog is called Biscuit." and turn.actions == ["nod"] and len(fake_anthropic.calls) == 2
+
+
+def test_a_command_answered_with_a_move_is_left_alone(cfg, fake_anthropic):
+    sequence(fake_anthropic, move_only("wave"))
+    turn = Conversation(cfg).send("wave hello")
+    assert turn.actions == ["wave"] and len(fake_anthropic.calls) == 1
+
+
+def test_question_detection():
+    from pi_pipeline.voice.conversation import _looks_like_question
+    for text in ("tell me about my dog", "what do you know about me", "do you remember what I like", "who am I", "you like jazz?", "how are you"):
+        assert _looks_like_question(text), text
+    for text in ("wave hello", "walk forward", "sit down", "go to sleep", "stop", ""):
+        assert not _looks_like_question(text), text

@@ -161,12 +161,42 @@ def _is_thinking_binding_error(e: Exception) -> bool:
     return type(e).__name__ == "BadRequestError" and "thinking" in text and ("signature" in text or "bound to a different conversation" in text)
 
 
+_MEMORY_USED_TOOL = {
+    "name": "memory_used",
+    "description": (
+        "Memory notes in your prompt are tagged like [#12] (a fact) or [s3] (something you saw). Call this ONLY when a tagged note "
+        "actually shaped what you just said or did, naming its tag(s), e.g. [\"#12\", \"s3\"]. Do not call it when no note mattered. "
+        "Never say a tag out loud. This tool NEVER replaces answering: you must still say your answer out loud in the same turn."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"notes": {"type": "array", "items": {"type": "string"},
+                                 "description": "The tags of the notes that shaped your reply, e.g. [\"#12\"]."}},
+        "required": ["notes"],
+    },
+}
+
+# A question gets words, not just a move: "tell me about my dog" answered with only a nod leaves it unanswered.
+_QUESTION_RE = re.compile(
+    r"(\?\s*$|^\s*(what|who|whom|whose|where|when|why|how|which|tell me|do you|did you|can you|could you|would you|will you|are you|"
+    r"is |does |have you|describe|explain|remember))", re.I)
+
+
+def _looks_like_question(text: str) -> bool:
+    return bool(_QUESTION_RE.search(text or ""))
+
+
 _SPEAK_NOW = ("[You said nothing out loud. Answer the person now, out loud, in words only (no tools). If there was a picture, "
               "describe what you see in it.]")
 
-_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL]
+_TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL, _MEMORY_USED_TOOL]
 
 # When the user asks what G2 sees, the voice loop attaches a picture from G2's own camera to that message.
+_MEMORY_NOTE = (
+    "Your memory notes appear in the prompt tagged like [#12] or [s3]. The tags are bookkeeping: never say them aloud. Use a note naturally "
+    "when it helps, and when one genuinely shaped your reply, name its tag with the memory_used tool (only then). Naming a tag is an extra: "
+    "you still answer every question out loud in words, never with a move alone.")
+
 _PICTURE_NOTE = (
     "Sometimes the user's message comes with a small picture from your own camera (low resolution, often dim). When it does, describe "
     "what you actually see in one or two short spoken sentences, from your own point of view. Always speak the description first: the "
@@ -216,6 +246,7 @@ class AssistantTurn:
     actions: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
     action_seconds: list[float | None] = field(default_factory=list)   # parallel to `actions`
+    memory_used: list = field(default_factory=list)    # tags of the memory notes G2 said shaped this reply (see memory/use_log.py)
     fact_details: list = field(default_factory=list)   # (fact, importance 1-5, core) for each `remember` call, parallel to `facts`
     expects_reply: bool = False   # G2 asked a question: listen briefly for the answer without the wake word
     streamed: bool = False   # True when `on_action`/`on_speech` already delivered the speech and actions as they arrived
@@ -241,7 +272,9 @@ class Conversation:
         self._first_event_t = None
         self.last_call: dict = {}          # {"start", "end", "backend"} of the most recent turn (monotonic seconds)
         self.warm_info: dict = {}          # result of the last background connection warm-up
-        self._base_system = cfg.system_prompt.rstrip() + "\n\n" + _PICTURE_NOTE
+        self._declare = getattr(cfg, "memory_use_log", "match") == "declare"
+        self._tools = _TOOLS if self._declare else [t for t in _TOOLS if t["name"] != "memory_used"]
+        self._base_system = cfg.system_prompt.rstrip() + "\n\n" + _PICTURE_NOTE + (("\n\n" + _MEMORY_NOTE) if self._declare else "")
         p = personality or Personality.from_settings(cfg)
         self._personality = p
         self._mood_hint = ""
@@ -252,6 +285,7 @@ class Conversation:
         self._history: list[dict] = []
         self._pending_tool_results: list[dict] = []
         self._fact_details: list = []
+        self._memory_used: list = []
         from .usage import UsageTracker
         self._usage = UsageTracker(cfg.usage_path) if getattr(cfg, "usage_path", "") else None
 
@@ -384,7 +418,7 @@ class Conversation:
         """One call to the fast backend. Auth/billing/rate failures raise a spoken ConversationError in fast-only mode;
         in routed mode every failure raises LLMError so the caller can fall back to Claude."""
         try:
-            return self._fast.create(self._system_prompt, _TOOLS, self._history)
+            return self._fast.create(self._system_prompt, self._tools, self._history)
         except LLMError as e:
             if self._cfg.llm_mode == "fast" and e.kind in ("auth", "billing", "rate"):
                 log.error("fast LLM %s failure: %s", e.kind, e)
@@ -420,7 +454,7 @@ class Conversation:
             model=self._cfg.claude_model,
             max_tokens=self._cfg.claude_max_tokens,
             system=self._system_prompt,
-            tools=_TOOLS,
+            tools=self._tools,
             messages=history_for_claude(self._history),
             **({"output_config": {"effort": self._cfg.claude_effort}} if self._cfg.claude_effort else {}),
             **({"tool_choice": tool_choice} if tool_choice else {}),
@@ -457,6 +491,10 @@ class Conversation:
                 else:
                     log.warning("Claude asked for unknown skill %r", name)
                 self._ack(block.id, "done" if ok else f"unknown skill {name!r}")
+            elif block.type == "tool_use" and block.name == "memory_used":
+                notes = (block.input or {}).get("notes") or []
+                self._memory_used += [str(n) for n in notes] if isinstance(notes, list) else []
+                self._ack(block.id, "noted")
             elif block.type == "tool_use" and block.name == "await_reply":
                 expects_reply = True
                 self._ack(block.id, "listening for the answer")
@@ -492,6 +530,7 @@ class Conversation:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
         self._fact_details = []
+        self._memory_used = []
         acks = list(self._pending_tool_results)
         blocks: list[dict] = list(acks)
         self._pending_tool_results = []
@@ -538,7 +577,7 @@ class Conversation:
             self._usage.record("turn", getattr(resp, "usage", None))
 
         speech_parts, actions, action_seconds, facts, expects_reply = self._digest(resp, picture)
-        if not any(speech_parts) and (picture is not None or not actions):
+        if not any(speech_parts) and (picture is not None or not actions or _looks_like_question(user_text)):
             # nothing was said and no move answered the request: ask once more for words only, so a question is never left unanswered
             log.warning("reply had no speech (%s); asking once more for words only",
                         ", ".join(_describe_block(b) for b in resp.content) or "empty")
@@ -566,6 +605,7 @@ class Conversation:
             expects_reply = True                 # the reply ends in a question
         return AssistantTurn(
             speech=speech, actions=actions, facts=facts, fact_details=list(self._fact_details),
+            memory_used=list(self._memory_used),
             action_seconds=action_seconds, streamed=self._streamed, expects_reply=expects_reply,
         )
 
