@@ -93,8 +93,9 @@ def test_stats_see_blown_out_and_crushed_pixels():
 
 
 def test_next_bump_goes_down_when_too_bright_up_when_too_dark_and_stays_when_fine():
-    assert next_bump(32, ExposureStats(220, 0.5, 0.0)) == 0                    # badly blown out: a big step
-    assert next_bump(32, ExposureStats(150, 0.12, 0.0)) == 16                  # mildly: a gentle one
+    assert next_bump(32, ExposureStats(220, 0.5, 0.0)) == -16                  # badly blown out: the biggest step (48)
+    assert next_bump(32, ExposureStats(146, 0.206, 0.0)) == -12                # the measured desk-lamp case: 20.6% blown out -> about -14, in one move
+    assert next_bump(32, ExposureStats(150, 0.12, 0.0)) == 12                  # mildly: a gentle one
     assert next_bump(0, ExposureStats(20, 0.0, 0.7)) == 16 or next_bump(0, ExposureStats(20, 0.0, 0.7)) == 32
     assert next_bump(0, ExposureStats(10, 0.0, 0.95)) == 32                    # very dark: a big step up
     assert next_bump(10, ExposureStats(115, 0.01, 0.02)) is None               # fine

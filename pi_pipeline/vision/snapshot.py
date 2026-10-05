@@ -132,11 +132,17 @@ def brighten(jpeg: bytes, mean: float, target: float = BRIGHTEN_TARGET) -> bytes
         return jpeg
 
 
+BRIGHT_CLIP_GOAL = 0.06                  # aim a bit under the "too bright" line so one move is enough
+CLIP_PER_BUMP = 0.0032                   # measured 2026-10-05 with a desk lamp in view: each offset step changed the blown-out share by ~0.32%
+
+
 def next_bump(bump: int, s: ExposureStats) -> int | None:
     """Where to move the exposure target for the next try given the last frame, or None if the frame is fine or there is no room left.
-    The step grows with how bad the frame is, so a blown-out room is fixed in one move and a mild case gets a gentle nudge."""
+    For a bright frame the step is sized from how much of it is blown out (using the measured effect of one offset step), so a glaring
+    lamp is fixed in one move and a mild case gets a gentle nudge; a dark frame gets a fixed step up."""
     if s.clip_high > TOO_BRIGHT_CLIP and s.clip_high >= s.clip_low:
-        nb = max(BUMP_MIN, bump - (32 if s.clip_high > 0.20 else 16))
+        step = max(8, min(48, 4 * round((s.clip_high - BRIGHT_CLIP_GOAL) / CLIP_PER_BUMP / 4)))
+        nb = max(BUMP_MIN, bump - step)
     elif s.mean < TOO_DARK_MEAN or s.clip_low > TOO_DARK_CLIP:
         nb = min(BUMP_MAX, bump + (32 if s.mean < 25 or s.clip_low > 0.8 else 16))
     else:
