@@ -134,6 +134,12 @@ _AWAIT_REPLY_TOOL = {
     "input_schema": {"type": "object", "properties": {}},
 }
 
+def _is_thinking_binding_error(e: Exception) -> bool:
+    """The API's 400 for a thinking block whose signature no longer matches the conversation before it."""
+    text = str(e).lower()
+    return type(e).__name__ == "BadRequestError" and "thinking" in text and ("signature" in text or "bound to a different conversation" in text)
+
+
 _TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL]
 
 # When the user asks what G2 sees, the voice loop attaches a picture from G2's own camera to that message.
@@ -255,6 +261,13 @@ class Conversation:
         if hint != self._narration_hint:
             self._narration_hint = hint
             self._rebuild_system()
+
+    def _strip_thinking(self) -> None:
+        """Remove thinking / redacted_thinking blocks from every stored assistant message."""
+        for m in self._history:
+            if m["role"] == "assistant" and isinstance(m["content"], list):
+                m["content"] = [b for b in m["content"]
+                                if (b.get("type") if isinstance(b, dict) else getattr(b, "type", None)) not in ("thinking", "redacted_thinking")]
 
     def _trim(self) -> None:
         max_msgs = max(2, self._cfg.history_turns * 2)
@@ -387,7 +400,8 @@ class Conversation:
              image: bytes | None = None, image_note: str | None = None) -> AssistantTurn:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
-        blocks: list[dict] = list(self._pending_tool_results)
+        acks = list(self._pending_tool_results)
+        blocks: list[dict] = list(acks)
         self._pending_tool_results = []
         if memory_context:
             blocks.append({
@@ -407,16 +421,36 @@ class Conversation:
 
         t0 = time.monotonic()
         try:
-            resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
-                                           force_claude=image is not None or bool(image_note))
+            try:
+                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
+                                               force_claude=image is not None or bool(image_note))
+            except Exception as e:  # noqa: BLE001
+                if not _is_thinking_binding_error(e):
+                    raise
+                # a thinking block no longer matches the history before it: drop them all and try once more
+                log.warning("API rejected a thinking block (%s); dropping thinking blocks from the history and retrying", e)
+                self._strip_thinking()
+                resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
+                                               force_claude=image is not None or bool(image_note))
+        except Exception:
+            # a failed turn must not poison the history: take this user message back out and keep its tool acks for next time
+            if self._history and self._history[-1] is not None and self._history[-1].get("content") is blocks:
+                self._history.pop()
+            self._pending_tool_results = acks + self._pending_tool_results
+            raise
         finally:
-            if picture is not None:                 # never keep (or resend) the picture in the history
+            if picture is not None and picture in blocks:     # never keep (or resend) the picture in the history
                 blocks[blocks.index(picture)] = {"type": "text", "text": "[a picture from G2's camera was shown here]"}
         self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
                           "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
 
-        self._history.append({"role": "assistant", "content": resp.content})
+        stored = resp.content
+        if picture is not None:
+            # a thinking block is bound to everything before it, and the picture in this turn's user message is about to be
+            # replaced by a placeholder: keep no thinking blocks from a picture turn
+            stored = [b for b in resp.content if getattr(b, "type", None) not in ("thinking", "redacted_thinking")]
+        self._history.append({"role": "assistant", "content": stored})
 
         speech_parts: list[str] = []
         actions: list[str] = []

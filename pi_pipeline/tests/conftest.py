@@ -42,6 +42,9 @@ class Block:
         self.name = kw.get("name", "")
         self.id = kw.get("id", "")
         self.input = kw.get("input", None)
+        for k, v in kw.items():                   # any other field a test passes (e.g. a thinking block's signature)
+            if k not in ("text", "name", "id", "input"):
+                setattr(self, k, v)
 
 
 class Resp:

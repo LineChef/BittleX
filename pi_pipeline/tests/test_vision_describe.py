@@ -181,3 +181,87 @@ def test_no_camera_means_no_picture_and_no_note():
     lp, conv = make_loop(None, ["what do you see"])
     lp._one_turn()
     assert conv.calls[0][1] == {}
+
+
+# ---- regression: thinking blocks are bound to the content before them (2026-10-04: every turn after a picture failed)
+
+class BadRequestError(Exception):          # stands in for anthropic.BadRequestError (matched by name)
+    pass
+
+
+def _prefix_key(messages, upto):
+    def blk(b):
+        d = b if isinstance(b, dict) else vars(b)
+        return json.dumps({k: v for k, v in d.items() if k not in ("signature", "thinking")}, sort_keys=True, default=str)
+    return json.dumps([[m["role"], [blk(b) for b in m["content"]] if isinstance(m["content"], list) else m["content"]]
+                       for m in messages[:upto]], sort_keys=True)
+
+
+def make_binding_client(monkeypatch):
+    """A fake API that, like the real one, gives each thinking block a signature of the conversation before it and rejects a
+    request in which that prefix has changed."""
+    import anthropic
+    seen = {"calls": []}
+
+    def _create(**kw):
+        msgs = kw["messages"]
+        seen["calls"].append(kw)
+        for i, m in enumerate(msgs):
+            if m["role"] == "assistant" and isinstance(m["content"], list):
+                for b in m["content"]:
+                    if getattr(b, "type", None) == "thinking" and b.signature != _prefix_key(msgs, i):
+                        raise BadRequestError("messages.%d.content.0: Invalid `signature` in `thinking` block. The block is bound to "
+                                              "a different conversation." % i)
+        sig = _prefix_key(msgs, len(msgs))
+        return Resp(Block("thinking", thinking="hm", signature=sig), Block("text", text="I see a desk."))
+
+    monkeypatch.setattr(anthropic, "Anthropic", lambda **k: types.SimpleNamespace(messages=types.SimpleNamespace(create=_create)))
+    return seen
+
+
+def test_a_turn_after_a_picture_turn_survives_a_thinking_block(cfg, monkeypatch):
+    import dataclasses
+    seen = make_binding_client(monkeypatch)
+    cfg = dataclasses.replace(cfg, history_turns=12)
+    conv = Conversation(cfg)
+    assert conv.send("what do you see", image=JPEG, image_note="[pic]").speech == "I see a desk."
+    again = conv.send("and now?", image=JPEG, image_note="[pic]")      # used to raise the 400 and say "I glitched"
+    assert again.speech == "I see a desk."
+    assert not any(getattr(b, "type", None) == "thinking" for m in conv._history[:-1] if isinstance(m["content"], list)
+                   for b in m["content"] if not isinstance(b, dict))
+
+
+def test_a_picture_turn_stores_no_thinking_blocks_so_replacing_the_picture_cannot_break_the_next_turn(cfg, monkeypatch):
+    import dataclasses
+    make_binding_client(monkeypatch)
+    conv = Conversation(dataclasses.replace(cfg, history_turns=12))
+    conv.send("what do you see", image=JPEG, image_note="[pic]")
+    assert not any(getattr(b, "type", None) == "thinking" for m in conv._history if m["role"] == "assistant" for b in m["content"])
+    assert conv.send("and now?").speech == "I see a desk."          # a plain turn after it: no 400, and no retry was needed
+
+
+def test_the_self_heal_strips_thinking_blocks_and_retries_when_the_api_rejects_one(cfg, monkeypatch):
+    import dataclasses
+    seen = make_binding_client(monkeypatch)
+    conv = Conversation(dataclasses.replace(cfg, history_turns=12))
+    conv.send("hello")                                              # a plain turn: the (fake) model returns a thinking block
+    assert any(getattr(b, "type", None) == "thinking" for m in conv._history if m["role"] == "assistant" for b in m["content"])
+    conv._history[0]["content"].append({"type": "text", "text": "edited after the fact"})      # break the binding
+    n = len(seen["calls"])
+    assert conv.send("again").speech == "I see a desk."
+    assert len(seen["calls"]) == n + 2                              # one rejected, one retried after stripping
+
+
+def test_a_failed_turn_does_not_poison_the_history_and_keeps_its_tool_acks(cfg, monkeypatch):
+    import anthropic
+    conv = Conversation(cfg)
+    conv._pending_tool_results = [{"type": "tool_result", "tool_use_id": "s1", "content": "done"}]
+
+    def boom(**kw):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(conv._client.messages, "create", boom, raising=False)
+    import pytest
+    with pytest.raises(Exception):
+        conv.send("hello")
+    assert conv._history == [] and conv._pending_tool_results == [{"type": "tool_result", "tool_use_id": "s1", "content": "done"}]

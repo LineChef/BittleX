@@ -1,6 +1,7 @@
 """Sounds that say the camera is in use, so G2 never looks without you hearing it (2026-10-04).
 
-  * shutter:         a short click-chirp, once for every picture taken (e.g. when you ask what G2 sees).
+  * shutter:         a short click-chirp played twice in a row (so it is easy to notice), for every picture taken (e.g. when you ask
+                     what G2 sees).
   * recording:       a rising two-note chirp when continuous camera capture starts (the vision detection feed), repeated as a reminder
                      every `reminder_s` while it runs.
   * recording_stop:  the same two notes falling, when it stops.
@@ -26,9 +27,10 @@ def _note(freq: float, dur: float, rate: int, attack: float = 0.005, release: fl
 
 def render(name: str, rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     gap = np.zeros(int(0.02 * rate))
-    if name == "shutter":                      # a tick, then a short falling chirp: "click-brrp"
-        y = np.concatenate([_note(3200, 0.012, rate, 0.001, 0.008, (1.0,)), np.zeros(int(0.012 * rate)),
-                            _note(1800, 0.05, rate, 0.003, 0.03, (1.0, 0.3))])
+    if name == "shutter":                      # a tick, then a short falling chirp: "click-brrp", twice
+        one = np.concatenate([_note(3200, 0.012, rate, 0.001, 0.008, (1.0,)), np.zeros(int(0.012 * rate)),
+                              _note(1800, 0.05, rate, 0.003, 0.03, (1.0, 0.3))])
+        y = np.concatenate([one, np.zeros(int(0.09 * rate)), one])             # twice, 90 ms apart
     elif name == "recording":                  # low note then a higher one: rising
         y = np.concatenate([_note(660, 0.09, rate), gap, _note(990, 0.14, rate)])
     elif name == "recording_stop":             # the same two notes, falling

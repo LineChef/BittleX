@@ -12,7 +12,7 @@ def dominant_hz(y, rate=48000, t0=0.0, t1=None):
 
 def test_each_sound_has_its_own_length_and_the_requested_level():
     lens = {n: len(cs.render(n)) / 48000 for n in ("shutter", "recording", "recording_stop")}
-    assert lens["shutter"] < 0.1 and 0.2 < lens["recording"] < 0.35 and abs(lens["recording"] - lens["recording_stop"]) < 1e-6
+    assert 0.2 < lens["shutter"] < 0.3 and 0.2 < lens["recording"] < 0.35 and abs(lens["recording"] - lens["recording_stop"]) < 1e-6
     for n in lens:
         assert abs(np.abs(cs.render(n, peak=0.045)).max() / 32767 - 0.045) < 0.002
 
@@ -52,3 +52,12 @@ def test_snapshot_calls_on_capture_once_per_picture_and_not_on_failure():
     assert ok.snapshot() is not None and calls == [1]
     bad = make_cam(FakeSerial([]), on_capture=lambda: calls.append(1))
     assert bad.snapshot() is None and calls == [1]
+
+
+def test_the_shutter_is_the_click_chirp_twice_in_a_row_with_a_gap():
+    y = cs.render("shutter", peak=0.045).astype(float)
+    env = np.abs(y) > 0.1 * np.abs(y).max()
+    starts = np.where(np.diff(env.astype(int)) == 1)[0]
+    # two bursts of sound: find a long silent stretch (the 90 ms gap) between them
+    gap = np.convolve(~env, np.ones(int(0.06 * 48000)), "valid") >= int(0.06 * 48000)
+    assert gap.any() and len(y) / 48000 < 0.3
