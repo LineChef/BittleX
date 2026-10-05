@@ -55,6 +55,12 @@ ALERT_MESSAGES = {
 }
 
 
+PI_ALERT_MESSAGES = {
+    BatteryLevel.LOW: "My Pi battery is at about twenty percent.",
+    BatteryLevel.CRITICAL: "My Pi battery is almost empty. Please charge me.",
+}
+
+
 class BatteryMonitor:
     """Feed it voltage readings; it returns a `BatteryLevel` when an alert should fire, else None.
 

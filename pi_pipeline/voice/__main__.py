@@ -84,7 +84,12 @@ def main() -> None:
             cue = LogCue()
 
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
-        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=voice and tts_mode != "print")
+        audible = voice and tts_mode != "print"
+        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible)
+        stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
+        # an OS shutdown sends SIGTERM: exit through the finally below so the runtime tracker can record it as a clean shutdown
+        import signal
+        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(SystemExit(0)))
 
         loop = VoiceLoop(
             wake_word=make_wake_word(
@@ -110,26 +115,60 @@ def main() -> None:
         finally:
             if watcher:
                 watcher.stop()
+            if stop_pi_watch:
+                stop_pi_watch()
             if memory:
                 memory.close()
 
 
+def _siren_then_say(tts, text: str, siren=None) -> None:
+    """The star_trek_red_alert siren twice (blocking), then `text` in G2's robot voice. `siren` replaces the real siren in tests."""
+    if siren is None:
+        from . import star_trek_red_alert
+        star_trek_red_alert.play(count=2, wait=True)
+    else:
+        siren()
+    tts.speak(text)
+
+
 def make_battery_alert(tts, audible: bool, siren=None):
-    """The low-battery alert: a diag event, then (when `audible`) the star_trek_red_alert siren twice, then G2 says so in its
-    robot voice. `siren` is a callable that plays the siren and returns when it ends (default: the real one)."""
+    """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the siren and a spoken line."""
     from ..power.battery import ALERT_MESSAGES
 
     def on_alert(level, volts):
         diag.event("sys", "WARN", "battery.low", battery_level=level.name.lower(), volts=round(volts, 2))
-        if not audible:
-            return
-        if siren is None:
-            from . import star_trek_red_alert
-            star_trek_red_alert.play(count=2, wait=True)
-        else:
-            siren()
-        tts.speak(ALERT_MESSAGES[level])
+        if audible:
+            _siren_then_say(tts, ALERT_MESSAGES[level], siren)
     return on_alert
+
+
+def make_pi_battery_alert(tts, audible: bool, siren=None):
+    """The Pi's battery is probably about 80% used (estimated from uptime): the same siren, then a line saying which battery."""
+    from ..power.battery import PI_ALERT_MESSAGES
+
+    def on_alert(level, used_fraction):
+        diag.event("sys", "WARN", "pi_battery.low", battery_level=level.name.lower(), used=round(used_fraction, 2))
+        if audible:
+            _siren_then_say(tts, PI_ALERT_MESSAGES[level], siren)
+    return on_alert
+
+
+def _start_pi_battery_watch(*, tts, audible: bool):
+    """Record how long the Pi stays up on each charge and warn near the end of it. Linux/Pi only. Returns a stopper or None."""
+    import sys
+
+    if sys.platform != "linux" or not settings.pi_battery_watch:
+        return None
+    from ..power.runtime_tracker import RuntimeTracker, RuntimeWatcher
+
+    tracker = RuntimeTracker(settings.pi_runtime_log).start()
+    watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible),
+                             full_runtime_s=settings.pi_full_runtime_s or None).start()
+
+    def stop() -> None:
+        watcher.stop()
+        tracker.stop()
+    return stop
 
 
 def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool):
