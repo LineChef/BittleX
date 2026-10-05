@@ -181,6 +181,8 @@ class Settings:
     camera_sounds: bool = field(default_factory=lambda: _env("G2_CAMERA_SOUNDS", "1") not in ("0", "false", "no"))
     camera_peak: float = field(default_factory=lambda: _env_float("G2_CAMERA_PEAK", 0.045))
     camera_reminder_s: float = field(default_factory=lambda: _env_float("G2_CAMERA_REMINDER_S", 60.0))
+    # Opt-in: keep every camera picture in this folder (empty = never save, the default). For collecting a test set; delete afterwards.
+    vision_save_dir: str = field(default_factory=lambda: os.path.expanduser(_env("G2_VISION_SAVE_DIR", "")))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

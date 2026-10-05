@@ -107,7 +107,8 @@ def main() -> None:
                     from . import camera_sounds
                     on_capture = lambda: camera_sounds.play("shutter", settings.camera_peak)  # noqa: E731
                 camera = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0,
-                                           ae_bump=settings.vision_ae_bump, on_capture=on_capture)
+                                           ae_bump=settings.vision_ae_bump, on_capture=on_capture,
+                                           save_dir=settings.vision_save_dir or None)
 
         loop = VoiceLoop(
             wake_word=make_wake_word(

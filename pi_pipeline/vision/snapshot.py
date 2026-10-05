@@ -77,7 +77,7 @@ def parse_invoke_line(line: str, labels: list[str] | None = None) -> Snapshot | 
 
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
-                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, serial_factory=None,
+                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
@@ -86,6 +86,7 @@ class CameraSnapshotter:
         self._lock = threading.Lock()
         self._idle_close_s = idle_close_s
         self._on_capture = on_capture                      # called once per picture taken (the shutter sound)
+        self._save_dir = save_dir                          # opt-in: keep each picture here (for building a test set); normally None
         self._idle_timer: threading.Timer | None = None
 
     def _arm_idle_close(self) -> None:
@@ -125,6 +126,19 @@ class CameraSnapshotter:
             log.warning("camera could not be opened on %s", self._port, exc_info=True)
             self._ser = None
 
+    def _save(self, snap: Snapshot) -> None:
+        if not self._save_dir:
+            return
+        try:
+            import os
+            os.makedirs(self._save_dir, exist_ok=True)
+            name = time.strftime("look_%Y%m%d_%H%M%S") + f"_{int((time.time() % 1) * 1000):03d}.jpg"
+            with open(os.path.join(self._save_dir, name), "wb") as f:
+                f.write(snap.jpeg)
+            log.info("saved picture to %s/%s", self._save_dir, name)
+        except Exception:  # noqa: BLE001
+            log.debug("saving the picture failed", exc_info=True)
+
     def warm_async(self) -> None:
         """Start opening the camera in the background (the wake word was just heard, so a picture request may follow)."""
         threading.Thread(target=self.warm, name="camera-warm", daemon=True).start()
@@ -146,6 +160,7 @@ class CameraSnapshotter:
                         log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg),
                                  len(snap.detections))
                         self._arm_idle_close()
+                        self._save(snap)
                         if self._on_capture:
                             try:
                                 self._on_capture()

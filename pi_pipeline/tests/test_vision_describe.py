@@ -315,3 +315,12 @@ def test_reply_block_log_shows_thinking_text():
     assert _describe_block(Block("thinking", thinking="")) == "thinking(0)"
     assert _describe_block(Block("text", text="hello")) == "text(5)"
     assert _describe_block(Block("tool_use", name="remember")) == "tool_use:remember"
+
+
+def test_pictures_are_saved_only_when_a_save_dir_is_set(tmp_path):
+    ok = make_cam(FakeSerial([invoke_line()]), save_dir=str(tmp_path / "frames"))
+    assert ok.snapshot() is not None
+    saved = list((tmp_path / "frames").glob("look_*.jpg"))
+    assert len(saved) == 1 and saved[0].read_bytes() == JPEG
+    off = make_cam(FakeSerial([invoke_line()]))
+    assert off.snapshot() is not None and not (tmp_path / "nothing").exists()
