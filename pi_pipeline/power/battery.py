@@ -57,7 +57,7 @@ ALERT_MESSAGES = {
 
 PI_ALERT_MESSAGES = {
     BatteryLevel.LOW: "Pi battery is low.",
-    BatteryLevel.CRITICAL: "My Pi battery is almost empty. Please charge me.",
+    BatteryLevel.CRITICAL: "Pi battery is critically low.",
 }
 
 
