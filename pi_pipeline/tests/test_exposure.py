@@ -24,6 +24,10 @@ def scene(kind: str):
         return [20.0] * n
     if kind == "fine":
         return [115.0] * n
+    if kind == "dim":                          # a dim room that is not crushed (the real room measured mean 54)
+        return [54.0] * n
+    if kind == "dim-low":                      # dark enough to ask for a higher target, but the sensor will not respond
+        return [30.0] * n
     if kind == "lamp-only":                    # blown out whatever the exposure: nothing to gain
         return [2000.0] * n
     raise ValueError(kind)
@@ -32,8 +36,8 @@ def scene(kind: str):
 class SimCamera:
     """A serial-like fake: tracks the exposure registers it is sent and answers each one-shot invoke with a picture whose brightness
     follows the exposure offset (gain = 2 ** (bump / 32)). The first picture after a register write is stale (auto-exposure lag)."""
-    def __init__(self, kind, start_bump=32):
-        self.kind, self.bump, self.stale = kind, start_bump, False
+    def __init__(self, kind, start_bump=32, inert=False):
+        self.kind, self.bump, self.stale, self.inert = kind, start_bump, False, inert
         self._lines, self.invokes, self.clock = [], 0, [0.0]
         self.written = []
 
@@ -53,7 +57,7 @@ class SimCamera:
             self.invokes += 1
             bump = self.stale_bump if self.stale else self.bump
             self.stale = False
-            gain = 2 ** (bump / 32.0)
+            gain = 1.0 if self.inert else 2 ** (bump / 32.0)
             vals = [min(255, int(v * gain)) for v in scene(self.kind)]
             data = {"count": 0, "resolution": [32, 32], "boxes": [], "image": base64.b64encode(make_jpeg(vals)).decode()}
             self._lines.append(json.dumps({"type": 1, "name": "INVOKE", "code": 0, "data": data}))
@@ -68,8 +72,8 @@ class SimCamera:
         pass
 
 
-def make(kind, ae_bump=32, **kw):
-    cam = SimCamera(kind)
+def make(kind, ae_bump=32, inert=False, **kw):
+    cam = SimCamera(kind, inert=inert)
     cam.bump = ae_bump
     cam._pending = ae_bump
     t = cam.clock
@@ -176,3 +180,62 @@ def test_a_scene_too_dark_for_any_exposure_setting_is_brightened_in_software():
     finally:
         me.scene = SimCamera_scene
     assert exposure_stats(snap.jpeg).mean > 60                                      # lifted from ~13 at the best exposure setting
+
+
+# ---- metering during the wake-word warm-up: the look itself needs no retry
+
+def test_warming_the_camera_meters_the_light_so_the_look_is_one_picture():
+    c, cam = make("dark", ae_bump=0)
+    c.warm()                                                                     # runs while the person is still speaking
+    assert c._bump > 0 and cam.invokes >= 3                                      # metered and raised the exposure target
+    before = cam.invokes
+    snap = c.snapshot()
+    assert cam.invokes - before == 1                                             # the look took exactly one picture: no retry
+    assert exposure_stats(snap.jpeg).mean > 40
+
+
+def test_a_hopeless_scene_is_not_retried_again_at_the_look():
+    c, cam = make("lamp-only", ae_bump=32)
+    c.warm()
+    after_warm = cam.invokes
+    c.snapshot()
+    assert cam.invokes - after_warm == 1                                         # the metering already found the best it could do
+
+
+def test_the_light_changing_after_metering_still_triggers_the_retry_backup():
+    c, cam = make("dark", ae_bump=0)
+    c.warm()
+    cam.kind = "bright"                                                          # someone switches the lamp on after the wake word
+    before = cam.invokes
+    c.snapshot()
+    assert cam.invokes - before > 1                                              # the backup retry fired
+
+
+def test_metering_is_skipped_when_the_light_was_measured_recently_and_when_the_check_is_off():
+    c, cam = make("fine", ae_bump=0)
+    c.warm(); n = cam.invokes
+    c.warm()                                                                     # a second wake word within 30 s: no new metering
+    assert cam.invokes == n
+    off, cam2 = make("bright", ae_bump=32, exposure_check=False)
+    off.warm()
+    assert cam2.invokes == 0
+
+
+# ---- a dim (not crushed) frame is lifted, and an inert exposure target is remembered
+
+def test_a_dim_room_frame_is_lifted_in_software_without_any_retry():
+    c, cam = make("dim", ae_bump=0)
+    snap = c.snapshot()
+    assert cam.invokes == 1                                                      # mean 54 is not "too dark": no register retries
+    assert exposure_stats(snap.jpeg).mean > 85                                   # but it is lifted toward ~100 (was 54)
+
+
+def test_when_raising_the_target_changes_nothing_it_is_remembered_and_not_tried_again():
+    c, cam = make("dim-low", ae_bump=0, inert=True)
+    c.warm()
+    assert c._dark_pinned
+    n = cam.invokes
+    c.snapshot()
+    assert cam.invokes - n == 1                                                  # the look takes a single picture
+    c.close()
+    assert not c._dark_pinned                                                    # forgotten when the camera closes (the light may change)

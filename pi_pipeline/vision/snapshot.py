@@ -109,6 +109,8 @@ def exposure_score(s: ExposureStats) -> float:
 
 
 BRIGHTEN_TARGET = 100.0
+LIFT_BELOW = 85.0                        # frames darker than this are lifted in software (a mean-54 dim-room frame shows far more detail
+                                         # lifted to ~100; compared by eye 2026-10-05)
 
 
 def brighten(jpeg: bytes, mean: float, target: float = BRIGHTEN_TARGET) -> bytes:
@@ -153,7 +155,7 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
                  ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 7.0, exposure_check: bool = True,
-                 max_exposure_retries: int = 2, serial_factory=None,
+                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
@@ -164,6 +166,10 @@ class CameraSnapshotter:
         self._on_capture = on_capture                      # called once per picture taken (the shutter sound)
         self._keep_days = keep_days
         self._exposure_check, self._max_exposure_retries = exposure_check, max_exposure_retries
+        self._meter_every_s = meter_every_s
+        self._metered_at = float("-inf")                   # when the light was last measured (by a look or by the wake-word metering)
+        self._dark_pinned = False                          # a step up changed nothing: the sensor is at its limit in this light
+        self._settled: ExposureStats | None = None         # the exposure result the camera is currently set up for
         self._ae_default = ae_bump
         self._bump = ae_bump                               # the exposure offset in use now; adapts to the lighting and is remembered between looks
         self._save_dir = save_dir                          # opt-in: keep each picture here (for building a test set); normally None
@@ -203,10 +209,13 @@ class CameraSnapshotter:
             self._sleep(0.25)
 
     def warm(self) -> None:
-        """Open the camera now (a few seconds) so the first snapshot is quick. Never raises."""
+        """Open the camera now (a few seconds) and, if the light was not measured recently, meter it and set the exposure, so the first
+        picture is already right and needs no retry. Runs while the person is still speaking. Never raises."""
         try:
             with self._lock:
                 self._open()
+                if self._exposure_check and self._clock() - self._metered_at > self._meter_every_s:
+                    self._meter()
         except Exception:  # noqa: BLE001
             log.warning("camera could not be opened on %s", self._port, exc_info=True)
             self._ser = None
@@ -231,6 +240,13 @@ class CameraSnapshotter:
         """Start opening the camera in the background (the wake word was just heard, so a picture request may follow)."""
         threading.Thread(target=self.warm, name="camera-warm", daemon=True).start()
 
+    def _meter(self) -> None:
+        """Take a throwaway frame and settle the exposure on it (nothing is saved, sent or announced). Caller holds the lock."""
+        frame = self._grab_one()
+        if frame is not None:
+            self._balance_exposure(frame, finish=False)
+        self._metered_at = self._clock()
+
     def _grab_one(self) -> Snapshot | None:
         """One inference with its picture, or None if the module does not answer in time. Caller holds the lock."""
         self._ser.reset_input_buffer()
@@ -246,7 +262,7 @@ class CameraSnapshotter:
         log.warning("camera gave no picture within %.0f s", self._timeout_s)
         return None
 
-    def _balance_exposure(self, first: Snapshot) -> Snapshot:
+    def _balance_exposure(self, first: Snapshot, finish: bool = True) -> Snapshot:
         """Check the frame's exposure and, if it is blown out or too dark, retry with the exposure target moved toward better light: a
         bright room lowers it, a dim room raises it, by an amount that grows with how bad the frame is. At most `max_exposure_retries`
         retries; the best-scoring frame wins, and its setting is kept for the next look in the same room."""
@@ -255,11 +271,20 @@ class CameraSnapshotter:
             return first
         log.info("exposure: mean %.0f, blown-out %.0f%%, crushed %.0f%% (bump %d)", stats.mean, 100 * stats.clip_high,
                  100 * stats.clip_low, self._bump)
+        s0 = self._settled
+        if s0 is not None and abs(stats.mean - s0.mean) < 12 and abs(stats.clip_high - s0.clip_high) < 0.04 \
+                and abs(stats.clip_low - s0.clip_low) < 0.04:
+            # the light is what the camera was already set up for (by the wake-word metering or the last look): no retries
+            log.info("exposure unchanged since it was set; keeping the picture")
+            return self._finish(first, stats) if finish else first
         best, best_stats, best_bump, cur = first, stats, self._bump, stats
         for attempt in range(1, self._max_exposure_retries + 1):
             nb = next_bump(self._bump, cur)
             if nb is None:
                 break
+            if nb > self._bump and self._dark_pinned:      # raising the target is known to do nothing in this light
+                break
+            prev_bump = self._bump
             self._apply_ae(nb)
             self._bump = nb
             self._sleep(0.5)
@@ -271,6 +296,9 @@ class CameraSnapshotter:
                 break
             log.info("exposure retry %d: bump %d -> mean %.0f, blown-out %.0f%%, crushed %.0f%%", attempt, nb, st.mean,
                      100 * st.clip_high, 100 * st.clip_low)
+            if nb > prev_bump and abs(st.mean - cur.mean) < 2.0:
+                self._dark_pinned = True                    # raised the target and the picture did not change
+                log.info("exposure target has no effect in this light (sensor at its limit); will lift dark frames in software instead")
             better = exposure_score(st) < exposure_score(best_stats) - 0.02
             if exposure_score(st) < exposure_score(best_stats):
                 best, best_stats, best_bump = frame, st, nb
@@ -280,13 +308,19 @@ class CameraSnapshotter:
         if best_bump != self._bump:
             self._apply_ae(best_bump)                       # leave the camera at the best setting found
             self._bump = best_bump
-        if best_stats.mean < TOO_DARK_MEAN:                 # still dark: the sensor is at its limit, so lift the shadows in software
-            lifted = brighten(best.jpeg, best_stats.mean)
-            if lifted is not best.jpeg:
+        self._settled = best_stats                          # the camera is now set up for this light
+        return self._finish(best, best_stats) if finish else best
+
+    def _finish(self, snap: Snapshot, stats: ExposureStats) -> Snapshot:
+        """The last touch on the picture that will be sent: a dim frame (below LIFT_BELOW) is lifted in software, because in a dim room the
+        sensor is at its limit and no exposure setting can brighten it."""
+        if stats.mean < LIFT_BELOW:
+            lifted = brighten(snap.jpeg, stats.mean)
+            if lifted is not snap.jpeg:
                 new = exposure_stats(lifted)
-                log.info("dark frame brightened in software: mean %.0f -> %.0f", best_stats.mean, new.mean if new else 0)
-                best = Snapshot(lifted, best.width, best.height, best.detections)
-        return best
+                log.info("dark frame brightened in software: mean %.0f -> %.0f", stats.mean, new.mean if new else 0)
+                return Snapshot(lifted, snap.width, snap.height, snap.detections)
+        return snap
 
     def snapshot(self) -> Snapshot | None:
         """One picture (re-taken in better light if the first is badly exposed), or None if the camera is unavailable or does not answer
@@ -299,6 +333,7 @@ class CameraSnapshotter:
                     return None
                 if self._exposure_check:
                     snap = self._balance_exposure(snap)
+                    self._metered_at = self._clock()
                 log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg), len(snap.detections))
                 self._arm_idle_close()
                 self._save(snap)
@@ -326,6 +361,7 @@ class CameraSnapshotter:
                     pass
                 self._ser = None
             self._bump = self._ae_default                  # the module resets when the port reopens, and the light may have changed
+            self._settled, self._metered_at, self._dark_pinned = None, float("-inf"), False
 
 
 def main() -> None:
