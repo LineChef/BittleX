@@ -162,6 +162,7 @@ class VoiceLoop:
         question_window_s: float = 0.0,  # how long to keep listening after G2 asks a question (0 = never)
         on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
         camera=None,  # object with .snapshot() -> Snapshot | None; a picture is attached when the user asks what G2 sees
+        on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
     ):
         self._wake = wake_word
         self._stt = stt
@@ -171,6 +172,7 @@ class VoiceLoop:
         self._cue = cue
         self._memory = memory
         self._camera = camera
+        self._on_power = on_power
         self._last_look = None                         # the Snapshot of the look in progress, for the sighting note
         self._follow_up_s = max(0.0, follow_up_s)
         self._question_window_s = max(0.0, question_window_s)
@@ -312,6 +314,21 @@ class VoiceLoop:
             self._events(release=True)
             self._cue.set("speaking")
             self._speak("Okay, moving again.")
+            self._set_session()
+            self._cue.set("idle")
+            return
+        if cmd in ("unplugged", "plugged"):
+            on_battery = cmd == "unplugged"
+            log.info("told %s", "he is on battery" if on_battery else "he is plugged in")
+            if self._on_power is not None:
+                self._on_power(on_battery)
+            self._cue.set("speaking")
+            if self._on_power is None:
+                self._speak("Okay. I can't track my battery here, though.")
+            elif on_battery:
+                self._speak("Okay, I'm on battery. I'll count from now and warn you before I run low.")
+            else:
+                self._speak("Okay, I'm charging. I'll pause my battery warning.")
             self._set_session()
             self._cue.set("idle")
             return

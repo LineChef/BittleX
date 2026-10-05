@@ -10,9 +10,11 @@ The heartbeat writes the Pi's uptime to a small file every 30 s. After a power l
 the test is how long that charge lasted. If the Pi is instead shut down or rebooted cleanly during a test, the test is discarded (the
 battery state afterwards is unknown), so reboots can't be mistaken for an empty battery. `cancel` ends a test by hand.
 
-`RuntimeWatcher` is on by default (G2_PI_BATTERY_WATCH=0 turns it off) but stays silent until a timed test has measured a full runtime;
-then it warns when this boot's uptime reaches 80% of it (about 20% battery left) and again at 95%. It counts uptime since boot, so it
-assumes each boot starts on a full charge: a reboot resets it."""
+`RuntimeWatcher` is on by default (G2_PI_BATTERY_WATCH=0 turns it off) but stays silent until a timed test has measured a full runtime.
+Then it warns at 80% of that runtime (about 20% left) and again at 95%, counting from boot (a Pi is normally booted on a full battery and then
+unplugged). The Pi cannot sense a charger, so you can tell it: "you're plugged in" (or `runtime plugged`) pauses the warning for this boot,
+and "you're unplugged" (or `runtime unplugged`) restarts the count from that moment. G2_PI_BATTERY_ARM=manual counts only after "unplugged".
+A reboot forgets both."""
 from __future__ import annotations
 
 import json
@@ -168,6 +170,29 @@ class RuntimeTracker:
     def uptime_s(self) -> float:
         return self._uptime()
 
+    # -- "running on battery": the Pi cannot sense a charger, so the person says so ---------------------------------
+    def arm_now(self) -> None:
+        """"You're unplugged": count battery time from this moment (for this boot)."""
+        data = self._load()
+        data["armed"] = {"boot_id": self._boot_id(), "uptime_s": self._uptime(), "paused": False}
+        self._save(data)
+
+    def disarm(self) -> None:
+        """"You're plugged in": pause the warning for this boot."""
+        data = self._load()
+        data["armed"] = {"boot_id": self._boot_id(), "uptime_s": self._uptime(), "paused": True}
+        self._save(data)
+
+    def armed_elapsed_s(self, from_boot: bool = False) -> float | None:
+        """Seconds on battery to count for the warning in THIS boot: since "unplugged" if the person said so; None while paused by
+        "plugged in"; and with nothing said, since boot if `from_boot` (else None, meaning not armed)."""
+        a = self._load().get("armed")
+        if a and a.get("boot_id") == self._boot_id():
+            if a.get("paused"):
+                return None
+            return max(0.0, self._uptime() - a["uptime_s"])
+        return self._uptime() if from_boot else None
+
     def runs(self) -> list[dict]:
         return list(self._load()["runs"])
 
@@ -197,8 +222,9 @@ class RuntimeWatcher:
     a full runtime is known (`full_runtime_s` from settings, else the mean of the recorded runs)."""
 
     def __init__(self, tracker: RuntimeTracker, on_alert, *, full_runtime_s=None, poll_s: float = 60.0, repeat_s: float = 300.0,
-                 clock=time.monotonic):
+                 clock=time.monotonic, require_arm: bool = False):
         self._tracker, self._on_alert = tracker, on_alert
+        self._require_arm = require_arm
         self._override = full_runtime_s or None
         self._poll_s, self._repeat_s, self._clock = poll_s, repeat_s, clock
         self.level = BatteryLevel.OK
@@ -213,7 +239,11 @@ class RuntimeWatcher:
         full = self.full_runtime_s()
         if not full:
             return None
-        used = self._tracker.uptime_s() / full
+        elapsed = self._tracker.armed_elapsed_s(from_boot=not self._require_arm)
+        if elapsed is None:
+            self.level, self._last_alert = BatteryLevel.OK, None
+            return None                                     # not told he is on battery (this boot): stay silent
+        used = elapsed / full
         seen = BatteryLevel.CRITICAL if used >= CRITICAL_FRACTION else BatteryLevel.LOW if used >= WARN_FRACTION else BatteryLevel.OK
         now = self._clock()
         if seen == BatteryLevel.OK:

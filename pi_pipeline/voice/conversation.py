@@ -338,10 +338,24 @@ class Conversation:
     def _trim(self) -> None:
         max_msgs = max(2, self._cfg.history_turns * 2)
         if len(self._history) > max_msgs:
-            # drop whole turns from the front; never start on an assistant msg
             self._history = self._history[-max_msgs:]
-            while self._history and self._history[0]["role"] != "user":
-                self._history.pop(0)
+            # the history must start on a user message that carries no tool_result: a tool_result whose tool_use was trimmed away is
+            # rejected by the API ("unexpected tool_use_id"), and every later turn would fail the same way
+            while self._history:
+                first = self._history[0]
+                if first["role"] != "user":
+                    self._history.pop(0)
+                    continue
+                content = first["content"]
+                if isinstance(content, list):
+                    kept = [b for b in content if not (isinstance(b, dict) and b.get("type") == "tool_result")]
+                    if len(kept) != len(content):
+                        if kept:
+                            first["content"] = kept
+                        else:
+                            self._history.pop(0)
+                            continue
+                break
 
     def _call_with_retries(self, call, delivered=lambda: False):
         """Run `call()` with the retry / spoken-error policy. Once `delivered()` is true the caller has already
@@ -472,6 +486,9 @@ class Conversation:
             # a thinking block is bound to everything before it, and the picture in this turn's user message is about to be
             # replaced by a placeholder: keep no thinking blocks from a picture turn
             stored = [b for b in resp.content if getattr(b, "type", None) not in ("thinking", "redacted_thinking")]
+        if not stored:
+            # the API rejects an empty assistant message on the next request: keep a placeholder so the history stays valid
+            stored = [{"type": "text", "text": "(no reply)"}]
         self._history.append({"role": "assistant", "content": stored})
 
         speech_parts: list[str] = []
@@ -491,6 +508,9 @@ class Conversation:
                 else:
                     log.warning("Claude asked for unknown skill %r", name)
                 self._ack(block.id, "done" if ok else f"unknown skill {name!r}")
+            elif block.type == "tool_use" and block.name not in ("perform_skill", "await_reply", "remember", "diagnostics_query", "memory_used"):
+                log.warning("Claude called an unknown tool %r", block.name)
+                self._ack(block.id, f"unknown tool {block.name!r}")      # every tool call must be answered or the next request is rejected
             elif block.type == "tool_use" and block.name == "memory_used":
                 notes = (block.input or {}).get("notes") or []
                 self._memory_used += [str(n) for n in notes] if isinstance(notes, list) else []

@@ -74,7 +74,7 @@ def test_watcher_is_silent_until_a_runtime_is_known_then_warns_at_80_and_95_perc
     t = m.tracker(tmp_path / "rt.json")
     alerts = []
     now = [0.0]
-    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300)
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300, require_arm=False)
     m.up = 99999.0
     assert w.poll_once() is None                        # nothing measured yet: stays quiet
     t.add_run(10000, source="test")
@@ -91,7 +91,7 @@ def test_a_configured_full_runtime_overrides_the_recorded_mean(tmp_path):
     m = Boot(up=1800.0)
     t = m.tracker(tmp_path / "rt.json"); t.add_run(100000, source="test")
     alerts = []
-    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=2000).poll_once()
+    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=2000, require_arm=False).poll_once()
     assert alerts == [BatteryLevel.LOW]
 
 
@@ -101,7 +101,7 @@ def test_the_watcher_is_on_by_default_but_ignores_rough_manual_readings(tmp_path
     m = Boot(up=99999.0)
     t = m.tracker(tmp_path / "rt.json"); t.add_run(6414)           # a manual reading: counted in the mean, not used to warn
     alerts = []
-    RuntimeWatcher(t, lambda lv, u: alerts.append(lv)).poll_once()
+    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), require_arm=False).poll_once()
     assert alerts == [] and t.mean_runtime_s() == 6414
 
 
@@ -112,3 +112,68 @@ def test_pi_alert_sounds_the_siren_then_names_the_pi_battery():
     on_alert = make_pi_battery_alert(tts, audible=True, sound=lambda: events.append("siren"))
     on_alert(BatteryLevel.LOW, 0.8)
     assert events == ["siren", ("say", "Pi battery is low.")]
+
+
+# ---- "running on battery": the warning counts only after the person says so
+
+def test_by_default_the_warning_counts_from_boot_and_plugged_in_pauses_it_and_unplugged_restarts_the_count(tmp_path):
+    m = Boot("b1", up=0.0)
+    t = m.tracker(tmp_path / "rt.json")
+    t.add_run(10000, source="test")
+    alerts, now = [], [0.0]
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300)    # counts from boot
+    m.up = 7900.0; now[0] += 60
+    assert w.poll_once() is None
+    m.up = 8100.0; now[0] += 60
+    assert w.poll_once() is BatteryLevel.LOW and alerts == [(BatteryLevel.LOW, 0.81)]               # 81% since boot
+    t.disarm()                                                        # "you're plugged in": charging, pause
+    m.up = 9800.0; now[0] += 400
+    assert w.poll_once() is None and w.level is BatteryLevel.OK
+    t.arm_now()                                                       # "you're unplugged" at uptime 9800: count from here
+    m.up = 9800.0 + 7000; now[0] += 60
+    assert w.poll_once() is None
+    m.up = 9800.0 + 8200; now[0] += 60
+    assert w.poll_once() is BatteryLevel.LOW
+
+
+def test_manual_mode_stays_silent_until_the_person_says_unplugged(tmp_path):
+    m = Boot("b1", up=9000.0)
+    t = m.tracker(tmp_path / "rt.json"); t.add_run(10000, source="test")
+    alerts, now = [], [0.0]
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append(lv), clock=lambda: now[0], require_arm=True)
+    assert w.poll_once() is None and alerts == []                     # 9000 s up, but not told he is on battery
+    t.arm_now(); m.up += 8100
+    assert w.poll_once() is BatteryLevel.LOW
+
+
+def test_the_plugged_in_and_unplugged_state_belongs_to_one_boot(tmp_path):
+    p = tmp_path / "rt.json"
+    m = Boot("b1", up=500.0)
+    t = m.tracker(p)
+    t.disarm()
+    assert t.armed_elapsed_s(from_boot=True) is None                   # paused this boot
+    m2 = Boot("b2", up=60.0)                                          # next boot: counting from boot again
+    assert m2.tracker(p).armed_elapsed_s(from_boot=True) == 60.0
+
+
+def test_voice_phrases_for_unplugged_and_plugged_in():
+    from pi_pipeline.voice.commands import match_local_command
+    for text in ("you're unplugged", "I unplugged you", "you are on battery", "you're running on battery"):
+        assert match_local_command(text) == "unplugged", text
+    for text in ("you're plugged in", "I plugged you in", "you are charging", "I put you on the charger"):
+        assert match_local_command(text) == "plugged", text
+    for text in ("walk forward", "what do you see", "tell me about the charger"):
+        assert match_local_command(text) not in ("unplugged", "plugged"), text
+
+
+def test_telling_g2_he_is_unplugged_arms_the_warning_and_he_says_so():
+    import types as _t
+    from pi_pipeline.voice.loop import VoiceLoop
+    said, flags = [], []
+    stt = _t.SimpleNamespace(listen=lambda timeout_s=None: "you're unplugged")
+    lp = VoiceLoop(wake_word=_t.SimpleNamespace(wait=lambda: None), stt=stt, conversation=_t.SimpleNamespace(
+                       send=lambda *a, **k: None, set_mood_hint=lambda h: None, set_narration_hint=lambda h: None),
+                   tts=_t.SimpleNamespace(speak=said.append), actuator=_t.SimpleNamespace(perform=lambda *a, **k: None, stop=lambda: None),
+                   cue=_t.SimpleNamespace(set=lambda s: None), follow_up_s=0.0, on_power=flags.append)
+    lp._one_turn()
+    assert flags == [True] and said and "on battery" in said[0]

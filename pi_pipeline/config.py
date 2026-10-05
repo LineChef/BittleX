@@ -206,6 +206,9 @@ class Settings:
     # (free, always on); "declare" = also give G2 a memory_used tool to name the notes that mattered (richer, but in a measured test the
     # model skipped speaking more often, so the words-only retry fired on ~3 of 8 question turns: extra API calls); "off" = neither.
     memory_use_log: str = field(default_factory=lambda: _env("G2_MEMORY_USE_LOG", "match").lower())
+    # "boot" (default): the Pi-battery warning counts from boot ("you're plugged in" pauses it, "you're unplugged" restarts the count);
+    # "manual": it counts only after you say "you're unplugged".
+    pi_battery_arm: str = field(default_factory=lambda: _env("G2_PI_BATTERY_ARM", "boot").lower())
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

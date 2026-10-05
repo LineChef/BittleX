@@ -84,6 +84,17 @@ _COME = (
     "come over here",
 )
 
+# "You're unplugged" / "you're plugged in": the Pi cannot sense its charger, so the person says when it is running on battery. The Pi-battery
+# warning (power/runtime_tracker.py) counts only from that moment.
+_UNPLUGGED = (
+    "you are unplugged", "youre unplugged", "i unplugged you", "i have unplugged you", "unplugged you",
+    "you are on battery", "youre on battery", "you are running on battery", "youre running on battery",
+)
+_PLUGGED = (
+    "you are plugged in", "youre plugged in", "i plugged you in", "i have plugged you in", "plugged you in",
+    "you are charging", "youre charging", "i put you on the charger", "i put you on charge",
+)
+
 # chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
 # not backed by it (that flag is boot-time only; this is a runtime override).
 _CHIRPS_ON = (
@@ -216,7 +227,7 @@ def looks_like_rebuff(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
-    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -238,6 +249,10 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
+    if _hit(n, _UNPLUGGED):
+        return "unplugged"
+    if _hit(n, _PLUGGED):
+        return "plugged"
     if _hit(n, _CHIRPS_ON):
         return "chirps_on"
     if _hit(n, _CHIRPS_OFF):

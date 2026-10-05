@@ -153,6 +153,7 @@ def main() -> None:
             question_window_s=settings.question_window_s if voice else 0.0,
             camera=camera,
             on_event=(lambda **kw: watcher_c.nudge() if watcher_c and kw.get("told_sleep") else None),
+            on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
         )
         try:
             loop.run_forever()
@@ -168,7 +169,7 @@ def main() -> None:
             if link is not None:
                 link.close()
             if stop_pi_watch:
-                stop_pi_watch()
+                stop_pi_watch.stop()
             if memory:
                 memory.close()
 
@@ -227,9 +228,10 @@ def _start_pi_battery_watch(*, tts, audible: bool):
     tracker.collect()
     if not settings.pi_battery_watch:
         return None
-    watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible),
-                             full_runtime_s=settings.pi_full_runtime_s or None).start()
-    return watcher.stop
+    watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible), full_runtime_s=settings.pi_full_runtime_s or None,
+                             require_arm=settings.pi_battery_arm == "manual").start()
+    import types
+    return types.SimpleNamespace(stop=watcher.stop, set_on_battery=lambda on: tracker.arm_now() if on else tracker.disarm())
 
 
 def _open_shared_link(actuator_mode: str):

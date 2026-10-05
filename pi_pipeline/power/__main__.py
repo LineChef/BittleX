@@ -38,6 +38,16 @@ def _runtime(a):
     sub = a[0] if a else "list"
     if sub == "test":
         return _runtime_test(t, a[1:])
+    if sub in ("unplugged", "plugged"):
+        if sub == "unplugged":
+            t.arm_now()
+            full = t.mean_runtime_s(sources=("test",))
+            print("counting from now (this boot only)" + (f"; the warning fires after {0.8 * full / 3600:.2f} h on battery" if full else
+                                                        "; no timed-test runtime yet, so no warning"))
+        else:
+            t.disarm()
+            print("charging: the battery warning is paused for this boot")
+        return
     if sub == "path":
         print(t.path)
     elif sub == "add" and len(a) > 1:
@@ -50,7 +60,12 @@ def _runtime(a):
         for i, r in enumerate(runs):
             print(f"{i}: {r['runtime_s'] / 3600:5.2f} h  {r.get('source', '?'):9s} {'counted' if r.get('counted', True) else 'IGNORED'}")
         mean = t.mean_runtime_s()
-        print(f"mean of counted runs: {mean / 3600:.2f} h  (warns at {0.8 * mean / 3600:.2f} h up)" if mean else "no runs recorded yet")
+        print(f"mean of counted runs: {mean / 3600:.2f} h" if mean else "no runs recorded yet")
+        timed = t.mean_runtime_s(sources=("test",))
+        el = t.armed_elapsed_s()
+        print((f"the warning uses timed-test runs only: {timed / 3600:.2f} h, so it fires after {0.8 * timed / 3600:.2f} h on battery"
+               if timed else "the warning uses timed-test runs only: none yet, so it is silent")
+              + ("; armed, " + f"{el / 3600:.2f} h on battery so far" if el is not None else "; NOT armed (say \"you're unplugged\")"))
 
 
 def _runtime_test(t, a):
