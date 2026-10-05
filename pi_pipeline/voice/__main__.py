@@ -45,6 +45,10 @@ def main() -> None:
 
     log_summary()
     start_disk_watch(settings.disk_warn_pct)
+    if settings.tidy_days > 0:
+        from ..diag.core import _log_root
+        from ..util.tidy import tidy_startup
+        tidy_startup([_log_root(), settings.runs_dir], settings.tidy_days)
 
     _lvl, _msg = settings.api_key_expiry_status()
     if _msg:

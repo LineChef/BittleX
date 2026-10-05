@@ -136,6 +136,8 @@ class CameraSnapshotter:
             with open(os.path.join(self._save_dir, name), "wb") as f:
                 f.write(snap.jpeg)
             log.info("saved picture to %s/%s", self._save_dir, name)
+            from .pictures import prune_duplicates
+            prune_duplicates(self._save_dir)              # rule: near-duplicate pictures are pruned, earliest kept
         except Exception:  # noqa: BLE001
             log.debug("saving the picture failed", exc_info=True)
 
