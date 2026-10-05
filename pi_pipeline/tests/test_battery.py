@@ -74,7 +74,7 @@ def test_alert_plays_the_siren_then_speaks_the_matching_line():
     from pi_pipeline.voice.__main__ import make_battery_alert
     events, said = [], []
     tts = type("T", (), {"speak": lambda self, t: events.append(("say", t))})()
-    on_alert = make_battery_alert(tts, audible=True, siren=lambda: events.append(("siren",)))
+    on_alert = make_battery_alert(tts, audible=True, sound=lambda: events.append(("siren",)))
     on_alert(BatteryLevel.LOW, 6.9)
     on_alert(BatteryLevel.CRITICAL, 6.5)
     assert events == [("siren",), ("say", "My battery is low."), ("siren",),
@@ -85,7 +85,7 @@ def test_a_silent_setup_neither_sounds_the_siren_nor_speaks():
     from pi_pipeline.voice.__main__ import make_battery_alert
     events = []
     tts = type("T", (), {"speak": lambda self, t: events.append(t)})()
-    make_battery_alert(tts, audible=False, siren=lambda: events.append("siren"))(BatteryLevel.LOW, 6.9)
+    make_battery_alert(tts, audible=False, sound=lambda: events.append("siren"))(BatteryLevel.LOW, 6.9)
     assert events == []
 
 

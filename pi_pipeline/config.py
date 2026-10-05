@@ -157,7 +157,7 @@ class Settings:
     # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
     cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "thinking"))
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
-    # What acknowledges a command that goes to Claude: star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
+    # What acknowledges a command that goes to Claude: short_tone (one short blip through the speaker; default), star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
     # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the star_trek_red_alert siren.
     battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
@@ -170,7 +170,9 @@ class Settings:
     # the 80%-of-runtime warning: on, but silent until a timed battery test has measured a runtime (it counts uptime since boot,
     # so a reboot resets it). 0 turns it off.
     pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
-    ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "star_trek_whistle"))
+    ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
+    # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
+    alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.

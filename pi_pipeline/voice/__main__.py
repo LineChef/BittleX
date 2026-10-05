@@ -74,8 +74,8 @@ def main() -> None:
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
         stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
-        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone == "star_trek_whistle":
-            cue = SpeakerCue(stages=stages, peak=settings.ack_peak)
+        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone in ("short_tone", "star_trek_whistle"):
+            cue = SpeakerCue(stages=stages, peak=settings.ack_peak, tone=settings.ack_tone)
         elif settings.ack_tone != "off" and args.actuator == "serial" and features.sound_cues:
             cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length,
                             stages=stages, volume=settings.buzzer_volume)
@@ -118,35 +118,43 @@ def main() -> None:
                 memory.close()
 
 
-def _siren_then_say(tts, text: str, siren=None) -> None:
-    """The star_trek_red_alert siren twice (blocking), then `text` in G2's robot voice. `siren` replaces the real siren in tests."""
-    if siren is None:
-        from . import star_trek_red_alert
-        star_trek_red_alert.play(count=2, wait=True)
-    else:
-        siren()
+def _play_whistle() -> None:
+    from . import star_trek_whistle
+    star_trek_whistle.play(peak=settings.alert_peak, wait=True)
+
+
+def _play_siren() -> None:
+    from . import star_trek_red_alert
+    star_trek_red_alert.play(peak=settings.alert_peak, count=2, wait=True)
+
+
+def _sound_then_say(tts, text: str, sound) -> None:
+    """Play an alert sound (a blocking callable), then say `text` in G2's robot voice."""
+    sound()
     tts.speak(text)
 
 
-def make_battery_alert(tts, audible: bool, siren=None):
-    """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the siren and a spoken line."""
+def make_battery_alert(tts, audible: bool, sound=None):
+    """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the star_trek_whistle and a spoken line.
+    `sound` replaces the whistle in tests."""
     from ..power.battery import ALERT_MESSAGES
 
     def on_alert(level, volts):
         diag.event("sys", "WARN", "battery.low", battery_level=level.name.lower(), volts=round(volts, 2))
         if audible:
-            _siren_then_say(tts, ALERT_MESSAGES[level], siren)
+            _sound_then_say(tts, ALERT_MESSAGES[level], sound or _play_whistle)
     return on_alert
 
 
-def make_pi_battery_alert(tts, audible: bool, siren=None):
-    """The Pi's battery is probably about 80% used (estimated from uptime): the same siren, then a line saying which battery."""
+def make_pi_battery_alert(tts, audible: bool, sound=None):
+    """The Pi's battery is probably about 80% used (estimated from uptime): the star_trek_red_alert siren twice, then a line saying
+    which battery. `sound` replaces the siren in tests."""
     from ..power.battery import PI_ALERT_MESSAGES
 
     def on_alert(level, used_fraction):
         diag.event("sys", "WARN", "pi_battery.low", battery_level=level.name.lower(), used=round(used_fraction, 2))
         if audible:
-            _siren_then_say(tts, PI_ALERT_MESSAGES[level], siren)
+            _sound_then_say(tts, PI_ALERT_MESSAGES[level], sound or _play_siren)
     return on_alert
 
 
