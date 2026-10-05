@@ -130,6 +130,10 @@ def _normalize(text: str) -> str:
     return " ".join(w for w in t.split() if w not in _STRIP_TOKENS)
 
 
+# "turn off" / "shut off" are also used about other things ("turn off the music"), so only the bare forms count
+_SHUTDOWN_EXACT = {"turn off", "shut off", "turn yourself off", "shut yourself off", "switch off", "switch yourself off"}
+
+
 def _hit(norm: str, phrases: tuple[str, ...]) -> bool:
     return any(norm == p or norm.startswith(p + " ") for p in phrases)
 
@@ -255,7 +259,7 @@ def match_local_command(text: str) -> str | None:
         return "halt"
     if _has_verb(n, _RESUME):
         return "resume"
-    if _hit(n, _SHUTDOWN) or _has_verb(n, ("shutdown",)):
+    if _hit(n, _SHUTDOWN) or n in _SHUTDOWN_EXACT or _has_verb(n, ("shutdown",)):
         return "shutdown"
     if _hit(n, _COME):
         return "come"

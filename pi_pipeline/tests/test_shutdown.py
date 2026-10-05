@@ -85,3 +85,11 @@ def test_misheard_wake_word_variants_before_shutdown():
     from pi_pipeline.voice.commands import match_local_command
     for t in ("she to shut down", "jee too shut down", "hey gee to shut down"):
         assert match_local_command(t) == "shutdown"
+
+
+def test_more_shutdown_triggers_but_not_other_turn_offs():
+    from pi_pipeline.voice.commands import match_local_command
+    for t in ("power down", "power off", "shut off", "turn off", "gee two turn off", "turn yourself off"):
+        assert match_local_command(t) == "shutdown", t
+    assert match_local_command("turn off the music") != "shutdown"
+    assert match_local_command("shut off the light") != "shutdown"
