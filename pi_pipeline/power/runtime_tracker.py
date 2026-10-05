@@ -10,9 +10,9 @@ The heartbeat writes the Pi's uptime to a small file every 30 s. After a power l
 the test is how long that charge lasted. If the Pi is instead shut down or rebooted cleanly during a test, the test is discarded (the
 battery state afterwards is unknown), so reboots can't be mistaken for an empty battery. `cancel` ends a test by hand.
 
-`RuntimeWatcher` is separate and OFF by default: when enabled (G2_PI_BATTERY_WATCH=1) and a full runtime is known, it warns when this
-boot's uptime reaches 80% of it (about 20% battery left) and again at 95%. It counts uptime since boot, so it assumes each boot starts
-on a full charge: a reboot resets it."""
+`RuntimeWatcher` is on by default (G2_PI_BATTERY_WATCH=0 turns it off) but stays silent until a timed test has measured a full runtime;
+then it warns when this boot's uptime reaches 80% of it (about 20% battery left) and again at 95%. It counts uptime since boot, so it
+assumes each boot starts on a full charge: a reboot resets it."""
 from __future__ import annotations
 
 import json
@@ -171,8 +171,10 @@ class RuntimeTracker:
     def runs(self) -> list[dict]:
         return list(self._load()["runs"])
 
-    def mean_runtime_s(self) -> float | None:
-        vals = [r["runtime_s"] for r in self.runs() if r.get("counted", True)]
+    def mean_runtime_s(self, sources: tuple | None = None) -> float | None:
+        """Mean of the counted runs (only those whose source is in `sources`, if given)."""
+        vals = [r["runtime_s"] for r in self.runs()
+                if r.get("counted", True) and (sources is None or r.get("source") in sources)]
         return sum(vals) / len(vals) if vals else None
 
     def add_run(self, runtime_s: float, source: str = "manual") -> None:
@@ -204,7 +206,8 @@ class RuntimeWatcher:
         self._stop = threading.Event()
 
     def full_runtime_s(self) -> float | None:
-        return self._override or self._tracker.mean_runtime_s()
+        # only runs from an intentional timed test count: a rough manual reading must not trigger siren warnings
+        return self._override or self._tracker.mean_runtime_s(sources=("test",))
 
     def poll_once(self) -> BatteryLevel | None:
         full = self.full_runtime_s()

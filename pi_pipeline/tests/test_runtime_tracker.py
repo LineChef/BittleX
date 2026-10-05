@@ -77,7 +77,7 @@ def test_watcher_is_silent_until_a_runtime_is_known_then_warns_at_80_and_95_perc
     w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300)
     m.up = 99999.0
     assert w.poll_once() is None                        # nothing measured yet: stays quiet
-    t.add_run(10000)
+    t.add_run(10000, source="test")
     for up in (7000, 7900, 8000, 8100):
         m.up = float(up); now[0] += 60; w.poll_once()
     assert alerts == [(BatteryLevel.LOW, 0.8)]          # once at 80%, not again within the repeat interval
@@ -89,15 +89,20 @@ def test_watcher_is_silent_until_a_runtime_is_known_then_warns_at_80_and_95_perc
 
 def test_a_configured_full_runtime_overrides_the_recorded_mean(tmp_path):
     m = Boot(up=1800.0)
-    t = m.tracker(tmp_path / "rt.json"); t.add_run(100000)
+    t = m.tracker(tmp_path / "rt.json"); t.add_run(100000, source="test")
     alerts = []
     RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=2000).poll_once()
     assert alerts == [BatteryLevel.LOW]
 
 
-def test_the_watcher_is_off_by_default():
+def test_the_watcher_is_on_by_default_but_ignores_rough_manual_readings(tmp_path):
     from pi_pipeline.config import Settings
-    assert Settings().pi_battery_watch is False
+    assert Settings().pi_battery_watch is True
+    m = Boot(up=99999.0)
+    t = m.tracker(tmp_path / "rt.json"); t.add_run(6414)           # a manual reading: counted in the mean, not used to warn
+    alerts = []
+    RuntimeWatcher(t, lambda lv, u: alerts.append(lv)).poll_once()
+    assert alerts == [] and t.mean_runtime_s() == 6414
 
 
 def test_pi_alert_sounds_the_siren_then_names_the_pi_battery():
