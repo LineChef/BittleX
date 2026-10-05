@@ -37,8 +37,10 @@ you last looked. Reply with ONLY a JSON object:
 Rules:
 - Merge only facts that say the same thing (or that update each other: keep the newer information). Never merge facts about different things.
 - drop_ids: only facts that are clearly trivial or one-off. Never drop a fact marked core. When unsure, keep it.
-- reflections: at most 3. Each is a short note about a STABLE preference or pattern the new material supports, starting "It seems". Never
-  include dates, times, days, schedules, routines, or where anyone is or was. Never invent: if nothing is supported, return none.
+- reflections: at most 3, and returning none is the normal outcome. Each is a short note about the PEOPLE, pets or home that G2 lives with
+  (a stable preference, interest or relationship), supported by at least two separate exchanges, starting "It seems". Do NOT write about how
+  G2 behaves or sounds, or about how people talk to G2 (voice commands, short requests, unclear speech): that is not worth remembering.
+  Never include dates, times, days, schedules, routines, or where anyone is or was. Never invent.
 - Keep every fact a short standalone sentence. If nothing needs changing, return {"merges": [], "drop_ids": [], "reflections": []}."""
 
 
@@ -159,6 +161,8 @@ class Consolidator:
                 continue
             if not text or len(text) > MAX_FACT_CHARS or _unsafe(text):
                 continue
+            if re.match(r"(it seems|probably)( that)? g2\b", text, re.I):
+                continue                                              # a note about the robot himself is not a fact about the household
             if not re.match(r"(it seems|probably)\b", text, re.I):
                 text = "It seems " + text[0].lower() + text[1:]
             reflections.append({"text": text, "importance": imp})

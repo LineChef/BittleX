@@ -154,3 +154,12 @@ def test_a_failing_pass_never_raises_into_the_service(tmp_path):
     con = Consolidator(st, boom, min_new_exchanges=3)
     w = ConsolidationWatcher(con, lambda: 9999.0, idle_s=10, clock=lambda: 0.0)
     assert w.tick() is None
+
+
+def test_reflections_about_the_robot_himself_are_rejected(tmp_path):
+    st = make_store(tmp_path)
+    plan = {"reflections": [{"text": "It seems G2 tends to respond with curiosity.", "importance": 2},
+                            {"text": "It seems they like showing G2 new things.", "importance": 2}]}
+    Consolidator(st, llm_returning(plan), min_new_exchanges=1).run(apply=True)
+    refl = [r["fact"] for r in st.list_facts() if r["source"] == "reflection"]
+    assert refl == ["It seems they like showing G2 new things."]
