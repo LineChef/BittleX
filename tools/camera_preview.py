@@ -236,7 +236,7 @@ def serial_loop():
 PAGE = """<!doctype html><meta charset=utf-8><title>G2 camera capture</title>
 <style>
  body{background:#111;color:#eee;font:14px system-ui;text-align:center;margin:0;padding:18px}
- #v{width:min(90vw,520px);border-radius:8px;transform:rotate(90deg);
+ #v{width:min(90vw,520px);border-radius:8px;transform:rotate(0deg);
     transform-origin:center;margin:40px 0}
  button{font:600 15px system-ui;padding:10px 18px;margin:4px;border:0;border-radius:8px;cursor:pointer}
  .go{background:#2f7d4f;color:#fff}.stop{background:#b23b34;color:#fff}.rot{background:#444;color:#eee}
@@ -251,13 +251,12 @@ PAGE = """<!doctype html><meta charset=utf-8><title>G2 camera capture</title>
  <button class=rot onclick="rot()">Rotate view</button>
 </div>
 <div id=s>...</div>
-<p class=hint>The preview is rotated so you look upright. Check whether the
-<b>raw</b> feed (rotate back to 0&deg;) is upright &mdash; if not, physically
-rotate the camera module so its native output is upright, and note that as the
-mount orientation. Frame your face to fill a good chunk; vary distance, angle,
+<p class=hint>The preview shows the <b>raw</b> feed (0&deg;). G2's module is mounted so
+its raw output is upright (USB port up), which is what the detector needs; if you
+mount it differently, "Rotate view" only turns this page, not the saved frames. Frame your face to fill a good chunk; vary distance, angle,
 lighting between short bursts.</p>
 <script>
- let r=90;
+ let r=0;
  function rot(){r=(r+90)%360;document.getElementById('v').style.transform='rotate('+r+'deg)'}
  async function u(res){let j=await res.json();
    let hr = j.tot_frames? (100*j.hit_frames/j.tot_frames).toFixed(0):'0';

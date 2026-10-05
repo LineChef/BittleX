@@ -136,6 +136,13 @@ _AWAIT_REPLY_TOOL = {
 
 _TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_TOOL]
 
+# When the user asks what G2 sees, the voice loop attaches a picture from G2's own camera to that message.
+_PICTURE_NOTE = (
+    "Sometimes the user's message comes with a small picture from your own camera (low resolution, often dim). When it does, describe "
+    "what you actually see in one or two short spoken sentences, from your own point of view. A note next to the picture says what "
+    "the small on-device detector thought it saw; treat that as a hint only. If a note says the camera could not take a picture, "
+    "say so plainly. Never invent things you cannot see.")
+
 _ENDS_WITH_QUESTION = re.compile(r"\?[\"')\]\s]*$")
 
 
@@ -199,7 +206,7 @@ class Conversation:
         self._first_event_t = None
         self.last_call: dict = {}          # {"start", "end", "backend"} of the most recent turn (monotonic seconds)
         self.warm_info: dict = {}          # result of the last background connection warm-up
-        self._base_system = cfg.system_prompt
+        self._base_system = cfg.system_prompt.rstrip() + "\n\n" + _PICTURE_NOTE
         p = personality or Personality.from_settings(cfg)
         self._personality = p
         self._mood_hint = ""
@@ -341,11 +348,11 @@ class Conversation:
                 raise ConversationError(e.kind, spoken) from e
             raise
 
-    def _complete(self, user_text: str, memory_context: str | None, on_action=None, on_speech=None):
+    def _complete(self, user_text: str, memory_context: str | None, on_action=None, on_speech=None, force_claude: bool = False):
         """Pick a backend for this turn and get its reply. Returns (response, backend name). With both callbacks
         given, a Claude reply is streamed through them (`self._streamed` says whether that happened)."""
         self._streamed = False
-        if self._fast is not None:
+        if self._fast is not None and not force_claude:      # a picture can only go to Claude
             why = None
             if self._cfg.llm_mode == "routed":
                 why = needs_claude(user_text, memory_context, sees_memory=self._cfg.fast_llm_sees_memory,
@@ -376,7 +383,8 @@ class Conversation:
             return self._create_stream(kw, on_action, on_speech), "claude"
         return self._create(**kw), "claude"
 
-    def send(self, user_text: str, memory_context: str | None = None, *, on_action=None, on_speech=None) -> AssistantTurn:
+    def send(self, user_text: str, memory_context: str | None = None, *, on_action=None, on_speech=None,
+             image: bytes | None = None, image_note: str | None = None) -> AssistantTurn:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
         blocks: list[dict] = list(self._pending_tool_results)
@@ -386,11 +394,24 @@ class Conversation:
                 "type": "text",
                 "text": f"[Memory of past conversations]\n{memory_context}",
             })
+        picture = None
+        if image is not None:                       # a snapshot from G2's camera, sent with this one message only
+            import base64
+            picture = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                                   "data": base64.b64encode(image).decode("ascii")}}
+            blocks.append(picture)
+        if image_note:
+            blocks.append({"type": "text", "text": image_note})
         blocks.append({"type": "text", "text": user_text})
         self._history.append({"role": "user", "content": blocks})
 
         t0 = time.monotonic()
-        resp, backend = self._complete(user_text, memory_context, on_action, on_speech)
+        try:
+            resp, backend = self._complete(user_text, memory_context, on_action, on_speech,
+                                           force_claude=image is not None or bool(image_note))
+        finally:
+            if picture is not None:                 # never keep (or resend) the picture in the history
+                blocks[blocks.index(picture)] = {"type": "text", "text": "[a picture from G2's camera was shown here]"}
         self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
                           "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)

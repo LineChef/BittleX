@@ -61,7 +61,8 @@ def fake_anthropic(monkeypatch):
     def _create(**kw):
         # snapshot messages: conv._history is mutated (assistant reply appended)
         # right after this returns, so a live reference would mislead assertions
-        rec.calls.append({**kw, "messages": [dict(m) for m in kw["messages"]]})
+        rec.calls.append({**kw, "messages": [{**m, "content": list(m["content"]) if isinstance(m["content"], list) else m["content"]}
+                                                   for m in kw["messages"]]})
         return rec._next() if callable(rec._next) else rec._next
 
     fake = types.SimpleNamespace(messages=types.SimpleNamespace(create=_create))

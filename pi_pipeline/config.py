@@ -174,6 +174,13 @@ class Settings:
     # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.
     balance_off_idle: bool = field(default_factory=lambda: _env("G2_BALANCE_OFF_IDLE", "1") not in ("0", "false", "no"))
     stand_guard: bool = field(default_factory=lambda: _env("G2_STAND_GUARD", "1") not in ("0", "false", "no"))
+    # Describe what G2 sees: when the user asks, a picture from G2's camera goes to Claude with that message (never saved or kept).
+    vision_describe: bool = field(default_factory=lambda: _env("G2_VISION_DESCRIBE", "1") not in ("0", "false", "no"))
+    # Sounds that say the camera is in use: a shutter chirp per picture, a rising chirp when continuous capture starts (repeated as a
+    # reminder), a falling one when it stops. See voice/camera_sounds.py.
+    camera_sounds: bool = field(default_factory=lambda: _env("G2_CAMERA_SOUNDS", "1") not in ("0", "false", "no"))
+    camera_peak: float = field(default_factory=lambda: _env_float("G2_CAMERA_PEAK", 0.045))
+    camera_reminder_s: float = field(default_factory=lambda: _env_float("G2_CAMERA_REMINDER_S", 60.0))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

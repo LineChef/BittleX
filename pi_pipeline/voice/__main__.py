@@ -96,6 +96,19 @@ def main() -> None:
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
+        camera = None
+        if voice and features.vision and settings.vision_describe:
+            import os
+            if os.path.exists(settings.vision_serial_port):
+                from ..vision.snapshot import CameraSnapshotter
+                # 240x240: the module truncates the 480x480 jpeg; ae_bump brightens a dim room as the detection feed does
+                on_capture = None
+                if settings.camera_sounds and tts_mode != "print":
+                    from . import camera_sounds
+                    on_capture = lambda: camera_sounds.play("shutter", settings.camera_peak)  # noqa: E731
+                camera = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0,
+                                           ae_bump=settings.vision_ae_bump, on_capture=on_capture)
+
         loop = VoiceLoop(
             wake_word=make_wake_word(
                 "vosk" if use_wake else "none",
@@ -114,6 +127,7 @@ def main() -> None:
             memory=memory,
             follow_up_s=settings.follow_up_s if voice else 0.0,
             question_window_s=settings.question_window_s if voice else 0.0,
+            camera=camera,
         )
         try:
             loop.run_forever()
@@ -122,6 +136,8 @@ def main() -> None:
                 watcher.stop()
             if guard:
                 guard.stop()
+            if camera:
+                camera.close()
             if link is not None:
                 link.close()
             if stop_pi_watch:

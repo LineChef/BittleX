@@ -87,7 +87,17 @@ def _make_vision_source():
         log.exception("vision feed unavailable on %s -- continuing without vision",
                       settings.vision_serial_port)
         return None
-    return BackgroundFrameSource(feed).start()
+    src = BackgroundFrameSource(feed).start()
+    if settings.camera_sounds:                           # say out loud that the camera is running, and when it stops
+        from ..voice.camera_sounds import CameraActivityIndicator
+        indicator = CameraActivityIndicator(peak=settings.camera_peak, reminder_s=settings.camera_reminder_s).start()
+        _close = src.close
+
+        def close() -> None:
+            indicator.stop()
+            _close()
+        src.close = close
+    return src
 
 
 def _build_runtime(link, *, hz: float, memory=None, frame_source=None, edge_source=None):

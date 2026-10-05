@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import re
 import threading
 
 from ..personality import character_state
@@ -38,6 +39,15 @@ from .tts import TTS
 from .wake_word import WakeWord
 
 log = logging.getLogger("g2.loop")
+
+# "what do you see", "what are you looking at", "look around", "can you see ...", "describe what you see", "what's in front of you"
+_LOOK_RE = re.compile(
+    r"\b(what (do|can|are) you (see|seeing|looking at)|what('s| is| are) (in front of|around|ahead of|near) you|"
+    r"what('s| is) (that|this)|look (at|around|over)|can you see|do you see|describe (what|the|your)|tell me what you see)\b", re.I)
+
+
+def asks_what_g2_sees(text: str) -> bool:
+    return bool(_LOOK_RE.search(text or ""))
 
 _QUIT = {"/quit", "/exit", "goodbye g2", "bye g2"}
 
@@ -126,6 +136,7 @@ class VoiceLoop:
         follow_up_s: float = 0.0,
         question_window_s: float = 0.0,  # how long to keep listening after G2 asks a question (0 = never)
         on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
+        camera=None,  # object with .snapshot() -> Snapshot | None; a picture is attached when the user asks what G2 sees
     ):
         self._wake = wake_word
         self._stt = stt
@@ -134,6 +145,7 @@ class VoiceLoop:
         self._act = actuator
         self._cue = cue
         self._memory = memory
+        self._camera = camera
         self._follow_up_s = max(0.0, follow_up_s)
         self._question_window_s = max(0.0, question_window_s)
         self._session_window = self._follow_up_s
@@ -144,6 +156,17 @@ class VoiceLoop:
         # note + (on the robot) idle-timing bias. Needs a memory to read
         # recency from; harmless without one (stays NEUTRAL -> empty hint).
         self._mood = MoodModel()
+
+    def _look(self, user_text: str) -> dict:
+        """kwargs for Conversation.send: a camera picture plus the detector's hint when the user asks what G2 sees; {} otherwise.
+        If the camera fails, a note says so, so Claude does not make something up."""
+        if self._camera is None or not asks_what_g2_sees(user_text):
+            return {}
+        self._cue.set("thinking")
+        snap = self._camera.snapshot()
+        if snap is None:
+            return {"image_note": "[G2's camera could not take a picture right now.]"}
+        return {"image": snap.jpeg, "image_note": f"[Picture from G2's camera.] {snap.hint()}"}
 
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""
@@ -205,6 +228,8 @@ class VoiceLoop:
         trace = TurnTrace()
         if not self._in_session:
             self._wake.wait()
+            if self._camera is not None:
+                self._camera.warm_async()           # ready by the time a "what do you see" request is understood
             trace.stamp("wake")
             warm = getattr(self._conv, "warm_up", None)
             if callable(warm):
@@ -375,11 +400,12 @@ class VoiceLoop:
 
         try:
             context = self._memory.recall(user_text) if self._memory else None
+            pic = self._look(user_text)
             if streaming:
                 turn = self._conv.send(user_text, memory_context=context,
-                                       on_action=_on_action, on_speech=_on_speech)
+                                       on_action=_on_action, on_speech=_on_speech, **pic)
             else:
-                turn = self._conv.send(user_text, memory_context=context)
+                turn = self._conv.send(user_text, memory_context=context, **pic)
         except ConversationError as e:      # known reason -> say it plainly
             log.warning("Claude call failed (%s): %s", e.kind, e.spoken)
             if speaker:
