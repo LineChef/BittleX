@@ -120,8 +120,8 @@ _CHAR_OFF = ("disable", "turn off", "switch off", "deactivate", "stop", "exit",
              "leave", "quit", "cancel", "end")
 
 
-# the recognizer often writes the wake word as "gee to" / "gee too" when it runs into the command
-_LEADING_WAKE = re.compile(r"^\s*(?:(?:hey|ok|okay)\s+)?(?:gee|g)\s+(?:to|too|2)\b")
+# the recognizer often writes the wake word as "gee to" / "she to" when it runs into the command
+_LEADING_WAKE = re.compile(r"^\s*(?:(?:hey|ok|okay)\s+)?(?:gee|g|she|jee|ji|gi|jeez|key)\s+(?:to|too|2)\b")
 
 
 def _normalize(text: str) -> str:

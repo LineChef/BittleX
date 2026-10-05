@@ -79,3 +79,9 @@ def test_gee_to_wake_word_run_into_command():
     from pi_pipeline.voice.commands import match_local_command, is_clear_shutdown
     assert match_local_command("gee to shut down") == "shutdown"
     assert is_clear_shutdown("gee to shut down")
+
+
+def test_misheard_wake_word_variants_before_shutdown():
+    from pi_pipeline.voice.commands import match_local_command
+    for t in ("she to shut down", "jee too shut down", "hey gee to shut down"):
+        assert match_local_command(t) == "shutdown"
