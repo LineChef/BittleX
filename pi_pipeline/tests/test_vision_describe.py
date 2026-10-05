@@ -265,3 +265,20 @@ def test_a_failed_turn_does_not_poison_the_history_and_keeps_its_tool_acks(cfg, 
     with pytest.raises(Exception):
         conv.send("hello")
     assert conv._history == [] and conv._pending_tool_results == [{"type": "tool_result", "tool_use_id": "s1", "content": "done"}]
+
+
+def test_a_silent_reply_to_a_picture_is_replaced_by_a_spoken_fallback():
+    cam = _Cam(Snapshot(JPEG, 240, 240))
+    lp, conv = make_loop(cam, ["what do you see right now"])
+    conv.send = lambda text, memory_context=None, **kw: types.SimpleNamespace(speech="", actions=["check_around"], facts=[])
+    said = []
+    lp._tts = types.SimpleNamespace(speak=said.append)
+    lp._one_turn()
+    assert said and "put it into words" in said[0]
+
+
+def test_the_picture_note_tells_claude_to_speak_and_not_to_move(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="ok")))
+    Conversation(cfg).send("hi")
+    system = fake_anthropic.calls[-1]["system"]
+    assert "Always speak the description first" in system and "check_around" in system

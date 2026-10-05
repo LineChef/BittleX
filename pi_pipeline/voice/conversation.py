@@ -145,7 +145,9 @@ _TOOLS = [_PERFORM_SKILL_TOOL, _REMEMBER_TOOL, _DIAGNOSTICS_TOOL, _AWAIT_REPLY_T
 # When the user asks what G2 sees, the voice loop attaches a picture from G2's own camera to that message.
 _PICTURE_NOTE = (
     "Sometimes the user's message comes with a small picture from your own camera (low resolution, often dim). When it does, describe "
-    "what you actually see in one or two short spoken sentences, from your own point of view. A note next to the picture says what "
+    "what you actually see in one or two short spoken sentences, from your own point of view. Always speak the description first: the "
+    "camera has already taken the picture, so do not use the check_around skill or any other move to \"look\" -- just say what you see. "
+    "A note next to the picture says what "
     "the small on-device detector thought it saw; treat that as a hint only. If a note says the camera could not take a picture, "
     "say so plainly. Never invent things you cannot see.")
 
@@ -444,6 +446,8 @@ class Conversation:
         self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
                           "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
+        log.info("reply blocks: %s", ", ".join(
+            (f"text({len(b.text)})" if b.type == "text" else f"{b.type}:{getattr(b, 'name', '')}") for b in resp.content) or "none")
 
         stored = resp.content
         if picture is not None:

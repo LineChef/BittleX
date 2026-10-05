@@ -46,6 +46,9 @@ _LOOK_RE = re.compile(
     r"what('s| is) (that|this)|look (at|around|over)|can you see|do you see|describe (what|the|your)|tell me what you see)\b", re.I)
 
 
+_SILENT_LOOK = "I looked, but I'm not sure how to put it into words. Ask me again?"
+
+
 def asks_what_g2_sees(text: str) -> bool:
     return bool(_LOOK_RE.search(text or ""))
 
@@ -166,7 +169,7 @@ class VoiceLoop:
         snap = self._camera.snapshot()
         if snap is None:
             return {"image_note": "[G2's camera could not take a picture right now.]"}
-        return {"image": snap.jpeg, "image_note": f"[Picture from G2's camera.] {snap.hint()}"}
+        return {"image": snap.jpeg, "image_note": f"[Picture from G2's camera. Describe what you see out loud now.] {snap.hint()}"}
 
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""
@@ -437,7 +440,9 @@ class VoiceLoop:
 
         if getattr(turn, "streamed", False):
             # the speech and the moves were already delivered while the reply streamed in
-            if done and not speaker.said:
+            if pic.get("image") and not speaker.said:
+                speaker.say(_SILENT_LOOK)                # asked what G2 sees, a picture was taken, nothing was said
+            elif done and not speaker.said:
                 speaker.say("Okay.")                     # never move silently -- always a spoken ack
             speaker.finish()
         else:
@@ -451,6 +456,8 @@ class VoiceLoop:
                 trace.stamp("voice_start")
             if turn.speech:
                 self._speak(turn.speech)
+            elif pic.get("image"):
+                self._speak(_SILENT_LOOK)
             elif turn.actions:
                 self._speak("Okay.")
         if "claude_start" in trace.times:
