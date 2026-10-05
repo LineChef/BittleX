@@ -282,3 +282,36 @@ def test_the_picture_note_tells_claude_to_speak_and_not_to_move(cfg, fake_anthro
     Conversation(cfg).send("hi")
     system = fake_anthropic.calls[-1]["system"]
     assert "Always speak the description first" in system and "check_around" in system
+
+
+def test_phrases_that_ask_g2_to_learn_what_he_looks_like():
+    from pi_pipeline.voice.loop import asks_g2_to_learn_his_looks
+    for text in ("remember what you look like", "that's you in the mirror", "this is a mirror", "can you see yourself",
+                 "do you know what you look like", "look in the mirror", "that is your reflection"):
+        assert asks_g2_to_learn_his_looks(text), text
+    for text in ("what do you see", "walk forward", "I look tired", "tell me a joke"):
+        assert not asks_g2_to_learn_his_looks(text), text
+
+
+def test_learning_his_looks_attaches_a_picture_with_the_remember_instruction():
+    cam = _Cam(Snapshot(JPEG, 240, 240))
+    lp, conv = make_loop(cam, ["this is a mirror remember what you look like"])
+    lp._one_turn()
+    kw = conv.calls[0][1]
+    assert kw["image"] == JPEG and "shows YOU, G2" in kw["image_note"] and "remember tool" in kw["image_note"]
+
+
+def test_remember_tool_and_system_prompt_cover_g2s_own_appearance(cfg, fake_anthropic):
+    fake_anthropic.set_reply(Resp(Block("text", text="ok")))
+    Conversation(cfg).send("hi")
+    call = fake_anthropic.calls[-1]
+    assert "that is you, G2" in call["system"]
+    assert any("what you look like" in t["description"] for t in call["tools"] if t["name"] == "remember")
+
+
+def test_reply_block_log_shows_thinking_text():
+    from pi_pipeline.voice.conversation import _describe_block
+    assert _describe_block(Block("thinking", thinking="I see my reflection")) == "thinking(19): 'I see my reflection'"
+    assert _describe_block(Block("thinking", thinking="")) == "thinking(0)"
+    assert _describe_block(Block("text", text="hello")) == "text(5)"
+    assert _describe_block(Block("tool_use", name="remember")) == "tool_use:remember"

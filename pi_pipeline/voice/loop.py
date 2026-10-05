@@ -46,6 +46,16 @@ _LOOK_RE = re.compile(
     r"what('s| is) (that|this)|look (at|around|over)|can you see|do you see|describe (what|the|your)|tell me what you see)\b", re.I)
 
 
+# "remember what you look like", "that's you in the mirror", "this is a mirror", "can you see yourself"
+_LEARN_LOOKS_RE = re.compile(
+    r"\b(remember what you look like|what you look like|what do you look like|this is (what )?you|that('s| is) (what )?you|"
+    r"look(ing)? in the mirror|(this|that|it)('s| is) a mirror|in (the|a) mirror|see yourself|your reflection)\b", re.I)
+
+
+def asks_g2_to_learn_his_looks(text: str) -> bool:
+    return bool(_LEARN_LOOKS_RE.search(text or ""))
+
+
 _SILENT_LOOK = "I looked, but I'm not sure how to put it into words. Ask me again?"
 
 
@@ -163,13 +173,20 @@ class VoiceLoop:
     def _look(self, user_text: str) -> dict:
         """kwargs for Conversation.send: a camera picture plus the detector's hint when the user asks what G2 sees; {} otherwise.
         If the camera fails, a note says so, so Claude does not make something up."""
-        if self._camera is None or not asks_what_g2_sees(user_text):
+        learn = asks_g2_to_learn_his_looks(user_text)
+        if self._camera is None or not (learn or asks_what_g2_sees(user_text)):
             return {}
         self._cue.set("thinking")
         snap = self._camera.snapshot()
         if snap is None:
             return {"image_note": "[G2's camera could not take a picture right now.]"}
-        return {"image": snap.jpeg, "image_note": f"[Picture from G2's camera. Describe what you see out loud now.] {snap.hint()}"}
+        if learn:
+            note = ("[Picture from G2's camera. The user says this shows YOU, G2 (a small robot, probably in a mirror). Describe your own "
+                    "appearance out loud in one or two sentences, and save one short fact about it with the remember tool, written as "
+                    "\"I look like ...\". Describe only yourself, not any people.]")
+        else:
+            note = "[Picture from G2's camera. Describe what you see out loud now.]"
+        return {"image": snap.jpeg, "image_note": f"{note} {snap.hint()}"}
 
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""

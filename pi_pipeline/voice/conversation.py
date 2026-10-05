@@ -83,6 +83,8 @@ _REMEMBER_TOOL = {
         "situations, stable preferences. Not small talk or one-off details. "
         "Write it as a standalone sentence (\"Their name is Sam.\", \"They have "
         "a cat named Biscuit.\"). "
+        "Also use it for lasting facts about YOU, G2 -- for example what you look like once you have seen yourself in a mirror "
+        "(\"I look like ...\"). "
         "NEVER record dates, clock times, schedules, routines, or anyone's "
         "comings and goings / whereabouts over time -- keep stable facts about "
         "people and preferences, not a timeline of their lives. "
@@ -134,6 +136,17 @@ _AWAIT_REPLY_TOOL = {
     "input_schema": {"type": "object", "properties": {}},
 }
 
+def _describe_block(b) -> str:
+    """One short token per reply block for the log. A thinking block shows the start of its text: this model writes its short
+    between-tool updates there, and a reply that is only a thinking block plus a tool call is a silent reply."""
+    if b.type == "text":
+        return f"text({len(b.text)})"
+    if b.type == "thinking":
+        t = (getattr(b, "thinking", "") or "").strip().replace("\n", " ")
+        return f"thinking({len(t)}){': ' + repr(t[:100]) if t else ''}"
+    return f"{b.type}:{getattr(b, 'name', '')}"
+
+
 def _is_thinking_binding_error(e: Exception) -> bool:
     """The API's 400 for a thinking block whose signature no longer matches the conversation before it."""
     text = str(e).lower()
@@ -149,7 +162,8 @@ _PICTURE_NOTE = (
     "camera has already taken the picture, so do not use the check_around skill or any other move to \"look\" -- just say what you see. "
     "A note next to the picture says what "
     "the small on-device detector thought it saw; treat that as a hint only. If a note says the camera could not take a picture, "
-    "say so plainly. Never invent things you cannot see.")
+    "say so plainly. If the picture shows a small robot (for example in a mirror), that is you, G2: say so and describe how you look. "
+    "Never invent things you cannot see.")
 
 _ENDS_WITH_QUESTION = re.compile(r"\?[\"')\]\s]*$")
 
@@ -446,8 +460,7 @@ class Conversation:
         self.last_call = {"start": t0, "end": time.monotonic(), "backend": backend,
                           "first": getattr(self, "_first_event_t", None) if self._streamed else None}
         log.info("%s replied in %.1fs (stop=%s)", backend, time.monotonic() - t0, resp.stop_reason)
-        log.info("reply blocks: %s", ", ".join(
-            (f"text({len(b.text)})" if b.type == "text" else f"{b.type}:{getattr(b, 'name', '')}") for b in resp.content) or "none")
+        log.info("reply blocks: %s", ", ".join(_describe_block(b) for b in resp.content) or "none")
 
         stored = resp.content
         if picture is not None:
