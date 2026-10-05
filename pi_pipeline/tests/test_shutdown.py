@@ -93,3 +93,9 @@ def test_more_shutdown_triggers_but_not_other_turn_offs():
         assert match_local_command(t) == "shutdown", t
     assert match_local_command("turn off the music") != "shutdown"
     assert match_local_command("shut off the light") != "shutdown"
+
+
+def test_a_stray_leading_to_from_the_wake_word_is_ignored():
+    from pi_pipeline.voice.commands import match_local_command
+    assert match_local_command("to power down") == "shutdown"
+    assert match_local_command("to shut down") == "shutdown"

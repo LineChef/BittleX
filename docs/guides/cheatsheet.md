@@ -187,6 +187,10 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
 | `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
 | `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
+| _say_ "shut off" / "turn off" (bare phrases only) | same as "shut down" above; "turn off the music" does not trigger it |
+| _say_ "you're unplugged" / "you're plugged in" | start / pause the Pi-battery runtime count (the PiSugar S has no telemetry, so G2 only warns while counting) |
+| `G2_LOG_HEARD=1` in the Pi's `.env` | log every transcript the speech recognizer produced (`journalctl -u g2-voice \| grep heard:`) |
+| `G2_STT_COMMAND_GRAMMAR=0` in the Pi's `.env` | turn off the second recognizer that rescues misheard stop / shut-down commands |
 | `python -m pi_pipeline.benchmark_pi --skip-api` | RAM / Piper synth / Vosk transcribe timings + Piper→Vosk recall (run on the Pi) |
 | _say_ "enable gir mode" / "disable gir mode" / "set gir to 70" | toggle the opt-in character mode at runtime (persists to `character.json`, outranks `G2_CHARACTER`) |
 | _say_ "go ahead and look around" / "exploration mode" ⟷ "that's enough" / "come back" | arm / disarm **Tier 1 roam** (walking explore — voice-armed only; leg-budget leash; audible "roaming" chirp; disarms on exit). Tier 0 "attentive" (stationary sound-turn + gaze-follow-with-satiation + reactions) is always on |
@@ -198,6 +202,10 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | Command | Does |
 |---|---|
 | `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
+| `g2mem usage` / `consolidate [--apply]` / `pin N` / `unpin N` / `sightings [N]` | per-fact use counters, the sleep-time consolidation pass (dry-run without `--apply`), keep a fact in the core block, the sightings log |
+| `python -m pi_pipeline.power runtime test start\|collect\|cancel` / `runtime list\|add\|forget\|plugged\|unplugged` | the Pi battery runtime test (start from a FULL charge, then unplug) and its recorded runs |
+| `python pi_pipeline/gait/stand_log.py --minutes 20 --log x.csv` | passively log G2 standing (roll/pitch swing, dominant frequency, voltage) to catch a posture wobble; stop `g2-voice` first |
+| `python -m pi_pipeline.vision.exposure_sweep --label bright --out /tmp/ae` | measure how the camera's exposure offset changes a scene's brightness (run with the lamp on, then off) |
 | `python -m pi_pipeline.memory.webui` | local web UI to browse / prune memory — `http://127.0.0.1:8899` |
 | `g2feat [--profiles]` | resolve `G2_FEATURES` / list the staged bring-up profiles |
 | `g2traits [spec]` | resolve `G2_TRAITS` → prompt / behaviour / bonds |

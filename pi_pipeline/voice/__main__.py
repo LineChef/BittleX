@@ -133,17 +133,21 @@ def main() -> None:
                 lambda: memory.recency()[0], idle_s=settings.consolidate_idle_s,
                 min_interval_s=settings.consolidate_min_interval_s).start()
 
+        wake = make_wake_word(
+            "vosk" if use_wake else "none",
+            vosk_model_path=settings.vosk_model_path,
+            phrase=settings.wake_word,
+        )
+        stt = make_stt(
+            "vosk" if voice else "text",
+            vosk_model_path=settings.vosk_model_path,
+            silence_s=settings.stt_silence_s,
+        )
+        if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
+            stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
         loop = VoiceLoop(
-            wake_word=make_wake_word(
-                "vosk" if use_wake else "none",
-                vosk_model_path=settings.vosk_model_path,
-                phrase=settings.wake_word,
-            ),
-            stt=make_stt(
-                "vosk" if voice else "text",
-                vosk_model_path=settings.vosk_model_path,
-                silence_s=settings.stt_silence_s,
-            ),
+            wake_word=wake,
+            stt=stt,
             conversation=Conversation(settings),
             tts=tts,
             actuator=actuator,

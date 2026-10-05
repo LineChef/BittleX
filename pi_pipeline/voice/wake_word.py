@@ -61,8 +61,38 @@ class VoskWakeWord:
         # restrict the recogniser to the wake phrases + [unk] -> very low CPU
         self._grammar = json.dumps([*self._phrases, "[unk]"])
         self._Recognizer = KaldiRecognizer
+        self._live = None
+
+    def _close_live(self) -> None:
+        live, self._live = self._live, None
+        if live is not None:
+            try:
+                live[0].stop()
+                live[0].close()
+            except Exception:  # noqa: BLE001
+                log.debug("closing the wake-word stream failed", exc_info=True)
+
+    def hand_over(self):
+        """After a wake word the microphone stream is left open, with the audio heard since the wake word waiting in its queue, so the
+        speech recogniser can carry on from the same stream (the card cannot be opened twice, and closing and re-opening it loses the first
+        words of a command said straight after the wake word). Returns ``(queue, close)`` or None."""
+        live = self._live
+        if live is None:
+            return None
+        self._live = None
+        stream, q = live
+
+        def close():
+            try:
+                stream.stop()
+                stream.close()
+            except Exception:  # noqa: BLE001
+                log.debug("closing the handed-over stream failed", exc_info=True)
+
+        return q, close
 
     def wait(self) -> None:
+        self._close_live()                    # a stream nobody took over last time
         rec = self._Recognizer(self._model, self._rate, self._grammar)
         q: "queue.Queue[bytes]" = queue.Queue()
 
@@ -71,13 +101,14 @@ class VoskWakeWord:
                 log.debug("audio status: %s", status)
             q.put(bytes(indata))
 
-        with self._sd.RawInputStream(
+        stream = self._sd.RawInputStream(
             samplerate=self._rate, blocksize=4000, dtype="int16",
             channels=1, callback=cb,
-        ):
+        )
+        stream.start()
+        try:
             while True:
                 data = q.get()
-                heard = ""
                 if rec.AcceptWaveform(data):
                     heard = json.loads(rec.Result()).get("text", "")
                 else:
@@ -86,7 +117,12 @@ class VoskWakeWord:
                 hit = next((p for p in self._phrases if p in heard), None)
                 if hit:
                     log.info("wake word heard (%r)", hit)
+                    self._live = (stream, q)      # keep listening on this stream; the recogniser picks it up
                     return
+        finally:
+            if self._live is None:
+                stream.stop()
+                stream.close()
 
 
 def make_wake_word(mode: str, *, vosk_model_path: str, phrase: str | list[str]) -> WakeWord:

@@ -7,11 +7,13 @@
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import queue
 import time
+import types
 from pathlib import Path
 from typing import Protocol
 
@@ -84,10 +86,17 @@ class VoskSTT:
         quiet_blocks = 0          # blocks since the partial transcript last changed
         last_partial = ""
         t_start = time.monotonic()
-        with self._sd.RawInputStream(
-            samplerate=self._rate, blocksize=4000, dtype="int16",
-            channels=1, callback=cb,
-        ):
+        source = getattr(self, "audio_source", None)         # the wake-word detector's still-open stream, if any
+        handover = source() if callable(source) else None
+        if handover is not None:
+            q, close = handover                                # audio since the wake word is already queued: no gap
+            stream_cm = contextlib.closing(types.SimpleNamespace(close=close))
+        else:
+            stream_cm = self._sd.RawInputStream(
+                samplerate=self._rate, blocksize=4000, dtype="int16",
+                channels=1, callback=cb,
+            )
+        with stream_cm:
             while True:
                 try:
                     data = q.get(timeout=0.5)

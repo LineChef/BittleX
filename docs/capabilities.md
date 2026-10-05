@@ -195,6 +195,24 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
   a spoken "Okay"). Makes a misheard command obvious so you can cancel it.
 - **Memory seam** — every turn pulls memory context before the API call and
   writes back after.
+- **Real mic + speaker** — ✅ the I2S mic and amp are wired and in daily use on the Pi; wake word, Vosk, Claude and Piper run
+  end to end. Wiring and bring-up: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md).
+- **Never silent** — a turn that would end with no spoken words (a tool call only, or an empty reply) is retried once with
+  tools disabled to force a sentence, then falls back to a short spoken line; API errors in conversation history are
+  self-healed (orphaned tool calls, thinking blocks). Fuzz-tested.
+- **Shut down also powers the Pi off** — "shut down", "power down", "power off", "shut off", "turn off" (the last two only as the
+  bare phrase) lie G2 down, announce a short countdown ("say cancel to stop me"), then run `sudo shutdown -h now` so the memory
+  database and logs close cleanly. Only a short, non-question command powers the Pi off; anything longer just lies G2 down. The
+  PiSugar S keeps powering the halted Pi, so G2's goodbye asks for the battery switch to be flipped by hand. The BiBoard has no
+  software power-off.
+- **Speech-recognition hardening** — a second Vosk recognizer limited to the stop / shut-down phrases hears the same audio and
+  overrides a short misheard transcript (never a long sentence); a mis-transcribed wake word run into a command ("gee to shut
+  down", "she to power down") is stripped before matching. `G2_LOG_HEARD=1` logs every transcript; `G2_STT_COMMAND_GRAMMAR=0`
+  turns the grammar recognizer off.
+- **Sounds** — a single short tone acknowledges a command; a double tick marks a real camera picture; `star_trek_whistle` is
+  the BiBoard low-battery alarm and `star_trek_red_alert` the Pi's (each followed by a spoken line, at ~10 % volume).
+- **API usage counter** — calls and tokens are counted per day in `~/.local/share/g2/api_usage.json`
+  (`voice/usage.py`).
 - **Graceful degradation** — auth / rate-limit / billing failures each map to a
   spoken line instead of a crash; rate-limits retry with backoff.
 - **API-key expiry warning** — startup warns when `ANTHROPIC_API_KEY_EXPIRES` is
@@ -212,6 +230,13 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
 - **CLI** — `python -m pi_pipeline.memory` to add / recall / forget / list.
 - **Web UI** — `python -m pi_pipeline.memory.webui`, a localhost-only page to
   browse, add, forget, and (confirmed) wipe.
+- **Importance and a core block** — facts carry an importance and a core flag; core facts are always in the prompt, the rest are
+  recalled by relevance. A privacy rule keeps dates, times and schedules out of facts.
+- **Sightings and consolidation** — a date-only, text-only sightings log; a sleep-time consolidation pass merges and prunes
+  facts with an audit log (`python -m pi_pipeline.memory consolidate`; only dry-run so far).
+- **Memory-use log** — per-fact counters of how often a fact was injected, declared and matched, with a report
+  (`python -m pi_pipeline.memory usage`); the free `match` mode is on, the `declare` mode costs extra API calls and is opt-in.
+- **Backup** — `tools/g2_memory_backup.sh` (`g2membackup`) copies the Pi's database to the Mac.
 
 ---
 
@@ -237,6 +262,11 @@ that need the camera mounted on the frame for a real point of view.
   override.
 - **"What do you see"** — detections summarised to a sentence and handed to Claude
   through the voice layer's callable.
+- **Camera look** — ✅ asking what G2 sees takes one 240x240 picture from the Grove Vision AI V2 over USB and sends it to Claude
+  with the detector's hint; the camera warms up (opens and settles the exposure) right before a picture, never on the wake word.
+  Exposure is metered first, lifted in software for dim rooms and re-taken at a lower register setting for bright ones. A
+  mirror phrase teaches G2 what he looks like (saved as a memory fact); recall questions are answered from memory with no
+  picture. Pictures are saved only if `G2_VISION_SAVE_DIR` is set, with duplicates pruned and a 7-day expiry.
 - **Cliff / edge guard** — a reflex whose input is a table-edge detector (the
   detector itself is the main remaining vision work).
 - **Object recognition gallery** (B20, `vision/object_gallery.py` +
@@ -362,6 +392,15 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   longer G2 is idle.
 - **On-demand vision** — camera powered only when perception is needed.
 - **Sleep mode hook** — deepest tier, shared with the behaviour sleep FSM.
+- **BiBoard battery alerts** — the voice service reads the pack voltage once a minute and sounds the alarm plus a spoken line at
+  low (7.2 V) and critical (6.6 V).
+- **Pi battery estimate** — the PiSugar S has no telemetry, so the Pi's runtime is learned from deliberate timed tests
+  (`python -m pi_pipeline.power runtime test start|collect|cancel`, `runtime list|add|forget`); the warning fires at 80 % and
+  95 % of the measured runtime, counted from boot. "You're unplugged" / "you're plugged in" start and pause the count.
+- **Wi-Fi fallback** — `tools/g2_wifi.sh` (`g2wifi`) manages a backup phone-hotspot network on the Pi.
+- **Standing-wobble guard** — the firmware's gyro balance, run on a 5 Hz IMU, can sit in a ~1.9 Hz limit cycle when G2 stands.
+  The voice service keeps `gb` (balance off) while G2 is idle, re-sends it every minute, and trips the guard if the IMU shows the
+  wobble (`gait/stand_guard.py`, `gait/stand_log.py`). Diagnosis: [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md).
 
 ---
 
