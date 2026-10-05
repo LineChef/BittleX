@@ -154,3 +154,19 @@ def test_locked_link_passes_drain_through():
         def drain(self, s=0.3):
             return f"drained {s}"
     assert LockedLink(L()).drain(0.1) == "drained 0.1"
+
+
+def test_guard_warns_and_retries_gP_if_no_imu_frames_ever_arrive():
+    link, clock = FakeLink(), Clock()
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False)
+    for _ in range(int(40 / 0.2)):
+        clock.t += 0.2; g.tick()
+    assert g.frames == 0 and link.sent.count("gP") == 1 and g._warned_no_frames
+
+
+def test_guard_counts_frames():
+    link, clock = FakeLink(), Clock()
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, balance_off_idle=False)
+    link.queue = [imu_line(0, 0)] * 3
+    clock.t = 1.0; g.tick()
+    assert g.frames == 3

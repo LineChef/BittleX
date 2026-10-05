@@ -102,6 +102,9 @@ class StandGuard:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.trips = 0
+        self.frames = 0                      # IMU frames seen so far
+        self._started_at = clock()
+        self._warned_no_frames = False
 
     def note_activity(self) -> None:
         self._quiet_until = self._clock() + self._quiet_s
@@ -147,6 +150,17 @@ class StandGuard:
             lines = self._link.poll_imu() if self._guard else []
         except Exception:  # noqa: BLE001
             lines = []
+        if lines:
+            if self.frames == 0:
+                log.info("stand guard is receiving the IMU stream")
+            self.frames += len(lines)
+        elif self._guard and self.frames == 0 and not self._warned_no_frames and now - self._started_at > 30.0:
+            self._warned_no_frames = True
+            log.warning("stand guard: no IMU frames after 30 s -- the wobble guard cannot see G2 (re-sending gP)")
+            try:
+                self._link.send("gP", read_reply=False, settle=0.0)
+            except Exception:  # noqa: BLE001
+                pass
         if self._is_busy():
             self._quiet_until = now + self._quiet_s
             self._det.reset()
