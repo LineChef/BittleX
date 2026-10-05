@@ -25,6 +25,10 @@ BM25 for older relevant turns, plus short facts G2 saves himself with the `remem
 5. **Better retrieval of old moments.** Today it matches the person's words, which speech recognition garbles ("being", "today"). Options: search the assistant's side more, require two matching words, or have Claude rewrite the query. Embeddings (semantic search) are the standard answer but are heavy on a Pi Zero 2 W; hold them back until the cheaper fixes are measured.
 6. **Make memory visibly shape answers.** Memory is only useful if it is used: keep the instruction that facts are for natural use, and add a "did this fact come up" log line per turn to see which facts are actually influencing replies (it also finds facts that never matter).
 
+## Status (2026-10-05)
+Items 1-4 are built (importance, pinned core block, sleep-time consolidation, text-only sightings log); see `pi_pipeline/memory/README.md`.
+Items 5 (retrieval of old moments) and 6 (a log of which facts shape answers) are not built.
+
 ## Cautions that apply here
 * Importance and reflection add API calls; track them with `python -m pi_pipeline.voice.usage` before and after.
 * Reflections are model-written conclusions about people: keep them labelled as inferred, easy to see (`python -m pi_pipeline.memory facts`) and easy to delete ("forget that"), and never infer schedules or whereabouts (the existing rule in the `remember` tool).

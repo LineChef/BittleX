@@ -195,6 +195,13 @@ class Settings:
     capture_keep_s: float = field(default_factory=lambda: _env_float("G2_CAPTURE_KEEP_S", 3600.0))      # preview captures touched this recently survive the start-up clear
     # Re-take a look picture in better light when the first is blown out or too dark (moves the camera's exposure target; see vision/snapshot.py).
     vision_exposure_check: bool = field(default_factory=lambda: _env("G2_EXPOSURE_CHECK", "1") not in ("0", "false", "no"))
+    # Memory: how many identity-level ("core") facts are always injected, how long sightings are kept, and idle-time consolidation.
+    memory_core_max: int = field(default_factory=lambda: _env_int("G2_MEMORY_CORE_MAX", 12))
+    observation_days: float = field(default_factory=lambda: _env_float("G2_OBSERVATION_DAYS", 30.0))
+    consolidate: bool = field(default_factory=lambda: _env("G2_CONSOLIDATE", "1") not in ("0", "false", "no"))
+    consolidate_idle_s: float = field(default_factory=lambda: _env_float("G2_CONSOLIDATE_IDLE_S", 1200.0))
+    consolidate_min_exchanges: int = field(default_factory=lambda: _env_int("G2_CONSOLIDATE_MIN_EXCHANGES", 6))
+    consolidate_min_interval_s: float = field(default_factory=lambda: _env_float("G2_CONSOLIDATE_MIN_INTERVAL_S", 21600.0))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

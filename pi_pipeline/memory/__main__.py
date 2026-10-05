@@ -1,6 +1,9 @@
 """Inspect and edit G2's memory.  No API key needed.
 
-    python -m pi_pipeline.memory facts                 # list durable facts
+    python -m pi_pipeline.memory facts                 # list durable facts (importance, core, reflections marked)
+    python -m pi_pipeline.memory pin 3                 # make fact #3 core (always injected); unpin 3 undoes it
+    python -m pi_pipeline.memory sightings [N]         # what G2 saw when he looked (text, date only)
+    python -m pi_pipeline.memory consolidate [--apply] # the idle-time tidy-up: dry run by default
     python -m pi_pipeline.memory log [N]               # last N exchanges (default 20)
     python -m pi_pipeline.memory search "cat"          # relevance search the log
     python -m pi_pipeline.memory recall "tell me about my cat"   # what recall() would inject
@@ -41,6 +44,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="pi_pipeline.memory")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("facts")
+    p_pin = sub.add_parser("pin"); p_pin.add_argument("id", type=int)
+    p_unpin = sub.add_parser("unpin"); p_unpin.add_argument("id", type=int)
+    p_si = sub.add_parser("sightings"); p_si.add_argument("n", type=int, nargs="?", default=10)
+    p_co = sub.add_parser("consolidate"); p_co.add_argument("--apply", action="store_true")
     p_log = sub.add_parser("log"); p_log.add_argument("n", type=int, nargs="?", default=20)
     p_se = sub.add_parser("search"); p_se.add_argument("query")
     p_re = sub.add_parser("recall"); p_re.add_argument("query")
@@ -54,10 +61,34 @@ def main() -> None:
     print(f"[{db}]")
 
     if args.cmd == "facts":
-        rows = Store(db).list_facts()
+        st = Store(db)
+        rows = st.list_core() + [r for r in st.list_ranked(10_000)]
         for r in rows:
-            print(f"  #{r['id']}  {r['fact']}   (added {r['ts'][:10]})")
+            tags = ("core " if r["core"] else "") + f"imp {r['importance']}" + (" reflection" if r["source"] == "reflection" else "")
+            print(f"  #{r['id']}  {r['fact']}   ({tags}; added {r['ts'][:10]})")
         print(f"  {len(rows)} fact(s)")
+
+    elif args.cmd in ("pin", "unpin"):
+        print("  done" if Store(db).set_core(args.id, args.cmd == "pin") else "  no such fact")
+
+    elif args.cmd == "sightings":
+        rows = Store(db).recent_observations(args.n)
+        for r in reversed(rows):
+            print(f"  {r['ts']}  {r['caption']}" + (f"   [detector: {r['labels']}]" if r["labels"] else ""))
+        print(f"  {len(rows)} sighting(s)")
+
+    elif args.cmd == "consolidate":
+        import json as _json
+
+        from ..voice.usage import UsageTracker
+        from .consolidate import Consolidator, make_llm
+        st = Store(db)
+        con = Consolidator(st, make_llm(settings), usage=UsageTracker(settings.usage_path) if settings.usage_path else None,
+                           audit_path="~/.local/share/g2/memory_consolidation.jsonl", min_new_exchanges=settings.consolidate_min_exchanges)
+        out = con.run(apply=args.apply)
+        print(_json.dumps(out, indent=2, default=str))
+        if out.get("ok") and not out.get("applied"):
+            print("  (dry run: nothing changed; add --apply to do it)")
 
     elif args.cmd == "log":
         for r in reversed(Store(db).recent_exchanges(args.n)):

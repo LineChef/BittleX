@@ -1,7 +1,7 @@
 """Counts G2's Claude API use per day, and how much of it is the "words-only" retry, so retries can't quietly inflate the bill.
 
-Each Claude call is recorded as a `turn` (the normal reply to the person) or a `retry` (the automatic follow-up when a reply came back
-with no speech), with the input/output tokens the API reported. Stored as small JSON, one bucket per day:
+Each Claude call is recorded as a `turn` (the normal reply to the person), a `retry` (the automatic follow-up when a reply came back
+with no speech) or a `consolidation` (the idle-time memory tidy-up), with the input/output tokens the API reported. Stored as small JSON, one bucket per day:
     ~/.local/share/g2/api_usage.json      (G2_USAGE_FILE)
 Read it with:   python -m pi_pipeline.voice.usage [--days 7]
 Set G2_PRICE_IN_PER_MTOK / G2_PRICE_OUT_PER_MTOK (dollars per million tokens) to also see an estimated cost."""
@@ -16,7 +16,7 @@ from pathlib import Path
 
 log = logging.getLogger("g2.usage")
 
-_FIELDS = ("turns", "retries", "in_tokens", "out_tokens", "retry_in_tokens", "retry_out_tokens")
+_FIELDS = ("turns", "retries", "in_tokens", "out_tokens", "retry_in_tokens", "retry_out_tokens", "consolidations")
 
 
 class UsageTracker:
@@ -47,6 +47,8 @@ class UsageTracker:
                     day.setdefault(k, 0)
                 if kind == "retry":
                     day["retries"] += 1; day["retry_in_tokens"] += tin; day["retry_out_tokens"] += tout
+                elif kind == "consolidation":
+                    day["consolidations"] += 1                       # the memory tidy-up pass (its tokens are in the totals)
                 else:
                     day["turns"] += 1
                 day["in_tokens"] += tin; day["out_tokens"] += tout
@@ -66,7 +68,7 @@ def summarize(tracker: UsageTracker, days: int = 7, price_in: float = 0.0, price
     rows = tracker.days(days)
     if not rows:
         return "no API usage recorded yet"
-    lines = ["day         turns retries  retry%   in-tok   out-tok  retry-tok(share)" + ("   est.$" if price_in or price_out else "")]
+    lines = ["day         turns retries  retry%   in-tok   out-tok  retry-tok(share)  consol" + ("   est.$" if price_in or price_out else "")]
     tot = {k: 0 for k in _FIELDS}
     for day, d in rows:
         calls = d.get("turns", 0) + d.get("retries", 0)
@@ -75,14 +77,14 @@ def summarize(tracker: UsageTracker, days: int = 7, price_in: float = 0.0, price
         cost = (d.get("in_tokens", 0) * price_in + d.get("out_tokens", 0) * price_out) / 1e6
         lines.append(f"{day}  {d.get('turns', 0):>5} {d.get('retries', 0):>7}  {100 * d.get('retries', 0) / max(1, calls):5.1f}%  "
                      f"{d.get('in_tokens', 0):>7} {d.get('out_tokens', 0):>8}  {rtok:>7} ({100 * rtok / max(1, alltok):4.1f}%)"
-                     + (f"  {cost:6.3f}" if price_in or price_out else ""))
+                     f"  {d.get('consolidations', 0):>6}" + (f"  {cost:6.3f}" if price_in or price_out else ""))
         for k in _FIELDS:
             tot[k] += d.get(k, 0)
     calls = tot["turns"] + tot["retries"]
     rtok = tot["retry_in_tokens"] + tot["retry_out_tokens"]
     alltok = tot["in_tokens"] + tot["out_tokens"]
     lines.append(f"total       {tot['turns']:>5} {tot['retries']:>7}  {100 * tot['retries'] / max(1, calls):5.1f}%  "
-                 f"{tot['in_tokens']:>7} {tot['out_tokens']:>8}  {rtok:>7} ({100 * rtok / max(1, alltok):4.1f}%)")
+                 f"{tot['in_tokens']:>7} {tot['out_tokens']:>8}  {rtok:>7} ({100 * rtok / max(1, alltok):4.1f}%)  {tot['consolidations']:>6}")
     return "\n".join(lines)
 
 

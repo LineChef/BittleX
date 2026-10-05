@@ -92,7 +92,15 @@ _REMEMBER_TOOL = {
     ),
     "input_schema": {
         "type": "object",
-        "properties": {"fact": {"type": "string", "description": "The fact to remember."}},
+        "properties": {
+            "fact": {"type": "string", "description": "The fact to remember."},
+            "importance": {"type": "integer", "minimum": 1, "maximum": 5,
+                           "description": "How much this will matter later: 5 = identity-level (names, who lives here, pets, allergies, "
+                                          "how you look), 3 = ordinary preference or situation, 1 = barely worth keeping."},
+            "core": {"type": "boolean",
+                     "description": "true only for identity-level facts that should ALWAYS be in mind and never rotate out: who lives here, "
+                                    "the pets' names, what you look like. Most facts are not core."},
+        },
         "required": ["fact"],
     },
 }
@@ -208,6 +216,7 @@ class AssistantTurn:
     actions: list[str] = field(default_factory=list)
     facts: list[str] = field(default_factory=list)
     action_seconds: list[float | None] = field(default_factory=list)   # parallel to `actions`
+    fact_details: list = field(default_factory=list)   # (fact, importance 1-5, core) for each `remember` call, parallel to `facts`
     expects_reply: bool = False   # G2 asked a question: listen briefly for the answer without the wake word
     streamed: bool = False   # True when `on_action`/`on_speech` already delivered the speech and actions as they arrived
 
@@ -242,6 +251,7 @@ class Conversation:
             log.info("personality: %s", p.describe())
         self._history: list[dict] = []
         self._pending_tool_results: list[dict] = []
+        self._fact_details: list = []
         from .usage import UsageTracker
         self._usage = UsageTracker(cfg.usage_path) if getattr(cfg, "usage_path", "") else None
 
@@ -454,6 +464,12 @@ class Conversation:
                 fact = (block.input or {}).get("fact", "").strip()
                 if fact:
                     facts.append(fact)
+                    inp = block.input or {}
+                    try:
+                        importance = max(1, min(5, int(inp.get("importance", 3))))
+                    except (TypeError, ValueError):
+                        importance = 3
+                    self._fact_details.append((fact, importance, bool(inp.get("core", False))))
                 self._ack(block.id, "saved" if fact else "empty fact, not saved")
             elif block.type == "tool_use" and block.name == "diagnostics_query":
                 topic = (block.input or {}).get("topic", "summary")
@@ -475,6 +491,7 @@ class Conversation:
              image: bytes | None = None, image_note: str | None = None) -> AssistantTurn:
         # one turn: sends the user text (+ any pending tool acks), then sorts
         # the reply into speech + skills to perform + facts to remember
+        self._fact_details = []
         acks = list(self._pending_tool_results)
         blocks: list[dict] = list(acks)
         self._pending_tool_results = []
@@ -548,7 +565,7 @@ class Conversation:
         if speech and _ENDS_WITH_QUESTION.search(speech):
             expects_reply = True                 # the reply ends in a question
         return AssistantTurn(
-            speech=speech, actions=actions, facts=facts,
+            speech=speech, actions=actions, facts=facts, fact_details=list(self._fact_details),
             action_seconds=action_seconds, streamed=self._streamed, expects_reply=expects_reply,
         )
 

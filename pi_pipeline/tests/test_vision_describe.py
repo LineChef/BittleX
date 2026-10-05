@@ -145,14 +145,14 @@ class _Cam:
         self.warms += 1
 
 
-def make_loop(camera, script):
+def make_loop(camera, script, memory=None):
     stt = types.SimpleNamespace(listen=lambda timeout_s=None: script.pop(0) if script else "")
     wake = types.SimpleNamespace(wait=lambda: None)
     tts = types.SimpleNamespace(speak=lambda t: None)
     act = types.SimpleNamespace(perform=lambda s, **k: None, stop=lambda: None, close=lambda: None)
     cue = types.SimpleNamespace(set=lambda s: None)
     conv = _Conv()
-    return VoiceLoop(wake_word=wake, stt=stt, conversation=conv, tts=tts, actuator=act, cue=cue, follow_up_s=0.0, camera=camera), conv
+    return VoiceLoop(wake_word=wake, stt=stt, conversation=conv, tts=tts, actuator=act, cue=cue, follow_up_s=0.0, camera=camera, memory=memory), conv
 
 
 def test_asking_what_g2_sees_attaches_a_picture_and_the_detector_hint():
@@ -339,3 +339,53 @@ def test_pictures_are_saved_only_when_a_save_dir_is_set(tmp_path):
     assert len(saved) == 1 and saved[0].read_bytes() == JPEG
     off = make_cam(FakeSerial([invoke_line()]))
     assert off.snapshot() is not None and not (tmp_path / "nothing").exists()
+
+
+
+# ---- sightings: what G2 saw is noted in memory (text only), after a successful look
+
+class _Mem:
+    def __init__(self):
+        self.obs, self.recorded = [], []
+
+    def mark_session_start(self):
+        pass
+
+    def recall(self, text):
+        return ""
+
+    def record(self, text, turn):
+        self.recorded.append(text)
+
+    def record_observation(self, caption, labels=""):
+        self.obs.append((caption, labels))
+
+    def forget_session(self):
+        return 0, 0
+
+    def recency(self):
+        return None, 0
+
+
+def test_a_successful_look_notes_a_sighting_with_the_confident_labels():
+    cam = _Cam(Snapshot(JPEG, 240, 240, [("person_a", 0.9, 0.5, 0.5, 0.6, 0.6), ("dog", 0.2, 0.1, 0.1, 0.1, 0.1)]))
+    mem = _Mem()
+    lp, conv = make_loop(cam, ["what do you see"], memory=mem)
+    lp._one_turn()
+    assert mem.obs == [("ok", "person_a")]                                       # the low-confidence dog is not listed
+
+
+def test_no_sighting_for_ordinary_turns_failed_cameras_or_silent_replies():
+    mem = _Mem()
+    lp, conv = make_loop(_Cam(Snapshot(JPEG, 240, 240)), ["walk forward"], memory=mem)
+    lp._one_turn()
+    assert mem.obs == []
+    mem2 = _Mem()
+    lp2, conv2 = make_loop(_Cam(None), ["what do you see"], memory=mem2)           # camera failed
+    lp2._one_turn()
+    assert mem2.obs == []
+    mem3 = _Mem()
+    lp3, conv3 = make_loop(_Cam(Snapshot(JPEG, 240, 240)), ["what do you see"], memory=mem3)
+    conv3.send = lambda text, memory_context=None, **kw: types.SimpleNamespace(speech="", actions=[], facts=[])
+    lp3._one_turn()
+    assert mem3.obs == []                                                        # nothing was said, so there is nothing to note

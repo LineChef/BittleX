@@ -171,6 +171,7 @@ class VoiceLoop:
         self._cue = cue
         self._memory = memory
         self._camera = camera
+        self._last_look = None                         # the Snapshot of the look in progress, for the sighting note
         self._follow_up_s = max(0.0, follow_up_s)
         self._question_window_s = max(0.0, question_window_s)
         self._session_window = self._follow_up_s
@@ -186,10 +187,12 @@ class VoiceLoop:
         """kwargs for Conversation.send: a camera picture plus the detector's hint when the user asks what G2 sees; {} otherwise.
         If the camera fails, a note says so, so Claude does not make something up."""
         learn = asks_g2_to_learn_his_looks(user_text)
+        self._last_look = None
         if self._camera is None or not (learn or asks_what_g2_sees(user_text)):
             return {}
         self._cue.set("thinking")
         snap = self._camera.snapshot()
+        self._last_look = snap
         if snap is None:
             return {"image_note": "[G2's camera could not take a picture right now.]"}
         if learn:
@@ -497,6 +500,9 @@ class VoiceLoop:
         if self._memory:
             try:
                 self._memory.record(user_text, turn)
+                if pic.get("image") and turn.speech and self._last_look is not None and hasattr(self._memory, "record_observation"):
+                    labels = ", ".join(sorted({d[0] for d in self._last_look.detections if d[1] >= 0.4}))
+                    self._memory.record_observation(turn.speech, labels)
             except Exception:  # noqa: BLE001
                 log.exception("memory.record failed")
 

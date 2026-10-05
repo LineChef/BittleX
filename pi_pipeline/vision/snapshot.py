@@ -242,7 +242,16 @@ class CameraSnapshotter:
 
     def _meter(self) -> None:
         """Take a throwaway frame and settle the exposure on it (nothing is saved, sent or announced). Caller holds the lock."""
-        frame = self._grab_one()
+        frame, prev = None, None
+        for _ in range(4):                                  # just after the camera opens, auto-exposure is still ramping: wait until it stops
+            frame = self._grab_one()
+            st = exposure_stats(frame.jpeg) if frame is not None else None
+            if st is None:
+                break
+            if prev is not None and abs(st.mean - prev) < 6.0:
+                break
+            prev = st.mean
+            self._sleep(0.4)
         if frame is not None:
             self._balance_exposure(frame, finish=False)
         self._metered_at = self._clock()

@@ -13,6 +13,26 @@ SQLite (`pi_pipeline/memory/data/g2_memory.db`, gitignored). Two kinds of memory
 | **Exchanges** | the full log, one row per turn, mirrored into an FTS5 index | relevance-searched at recall time for *older* turns related to what was just said |
 | **Facts** | short durable notes G2 chose to keep ("Their name is Sam.") | the top `G2_MEMORY_MAX_FACTS` (by recency of creation/use) are injected every turn |
 
+### Importance, core facts, sightings, consolidation (2026-10-05)
+
+Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/robot-memory-patterns.md).
+
+* **Importance.** The `remember` tool takes an `importance` (1-5; 5 = names, who lives here, pets, how G2 looks). Injected facts are
+  ranked by importance plus a recency bonus that halves every two weeks, so a name outranks a passing remark when the 30-slot cap bites.
+* **Core facts** (`core` flag, set by Claude for identity-level facts or by you with `python -m pi_pipeline.memory pin <id>`): always
+  injected in their own block ("About you and your people"), up to `G2_MEMORY_CORE_MAX` (12), never rotated out. "I look like ..." is
+  always core, importance 5, and is a single slot (the newest replaces the older).
+* **Sightings.** When G2 looks, his spoken description and the detector's labels are kept as a sighting (text only, date only, no
+  picture), searchable, pruned after `G2_OBSERVATION_DAYS` (30). They join the prompt only when you ask about the past ("what did you see
+  earlier", "did you notice...", "last time"). `python -m pi_pipeline.memory sightings`. "Forget that" removes the session's sightings too.
+* **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or you tell him to go to sleep, and at least
+  `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
+  (importance 1-2), and may write up to 3 reflections ("It seems ...", stored with source `reflection`, no dates or routines). At most
+  one pass per `G2_CONSOLIDATE_MIN_INTERVAL_S` (6 h) per run of the service. Core facts are never dropped, at most 5 facts are removed per
+  pass, and every change is logged (old text included) to `~/.local/share/g2/memory_consolidation.jsonl`. Try it first with
+  `python -m pi_pipeline.memory consolidate` (a dry run); add `--apply` to do it. `G2_CONSOLIDATE=0` turns it off. The call is counted in
+  `python -m pi_pipeline.voice.usage`.
+
 **Recall** (before each Claude call): `recall(user_text)` returns a context block
 — the current fact set plus up to `G2_MEMORY_RECALL` older exchanges that match
 the input (BM25-ranked, excluding the recent turns `conversation.py` still has

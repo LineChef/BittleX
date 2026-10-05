@@ -24,6 +24,8 @@ def scene(kind: str):
         return [20.0] * n
     if kind == "fine":
         return [115.0] * n
+    if kind == "room-lit":                     # half the frame is a bright wall: blown out once auto-exposure has converged
+        return [300.0] * (n // 2) + [60.0] * (n - n // 2)
     if kind == "dim":                          # a dim room that is not crushed (the real room measured mean 54)
         return [54.0] * n
     if kind == "dim-low":                      # dark enough to ask for a higher target, but the sensor will not respond
@@ -36,8 +38,9 @@ def scene(kind: str):
 class SimCamera:
     """A serial-like fake: tracks the exposure registers it is sent and answers each one-shot invoke with a picture whose brightness
     follows the exposure offset (gain = 2 ** (bump / 32)). The first picture after a register write is stale (auto-exposure lag)."""
-    def __init__(self, kind, start_bump=32, inert=False):
+    def __init__(self, kind, start_bump=32, inert=False, ramp=()):
         self.kind, self.bump, self.stale, self.inert = kind, start_bump, False, inert
+        self.ramp = list(ramp)                 # auto-exposure warming up after the camera opens: gain multipliers for the first frames
         self._lines, self.invokes, self.clock = [], 0, [0.0]
         self.written = []
 
@@ -58,6 +61,7 @@ class SimCamera:
             bump = self.stale_bump if self.stale else self.bump
             self.stale = False
             gain = 1.0 if self.inert else 2 ** (bump / 32.0)
+            gain *= self.ramp.pop(0) if self.ramp else 1.0
             vals = [min(255, int(v * gain)) for v in scene(self.kind)]
             data = {"count": 0, "resolution": [32, 32], "boxes": [], "image": base64.b64encode(make_jpeg(vals)).decode()}
             self._lines.append(json.dumps({"type": 1, "name": "INVOKE", "code": 0, "data": data}))
@@ -72,8 +76,8 @@ class SimCamera:
         pass
 
 
-def make(kind, ae_bump=32, inert=False, **kw):
-    cam = SimCamera(kind, inert=inert)
+def make(kind, ae_bump=32, inert=False, ramp=(), **kw):
+    cam = SimCamera(kind, inert=inert, ramp=ramp)
     cam.bump = ae_bump
     cam._pending = ae_bump
     t = cam.clock
@@ -242,3 +246,13 @@ def test_when_raising_the_target_changes_nothing_it_is_remembered_and_not_tried_
     cam.kind = "fine"                                                            # ...until the room is bright enough to measure well again
     c.warm()
     assert not c._dark_pinned
+
+
+def test_metering_waits_for_auto_exposure_to_settle_before_judging_the_light():
+    # right after opening, auto-exposure is still ramping (0.4, 0.7, then full gain): judging the first frame would call this scene fine
+    c, cam = make("room-lit", ae_bump=32, ramp=(0.4, 0.7))
+    c.warm()
+    assert c._bump < 32 and cam.invokes >= 4                                     # it waited, saw the converged (blown-out) frame, and corrected
+    before = cam.invokes
+    snap = c.snapshot()
+    assert cam.invokes - before == 1 and exposure_stats(snap.jpeg).clip_high < 0.2

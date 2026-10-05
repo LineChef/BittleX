@@ -122,6 +122,17 @@ def main() -> None:
                                            keep_days=settings.picture_keep_days,
                                            exposure_check=settings.vision_exposure_check)
 
+        watcher_c = None
+        if memory and settings.consolidate and settings.anthropic_api_key:
+            from ..memory.consolidate import Consolidator, ConsolidationWatcher, make_llm
+            from .usage import UsageTracker
+            watcher_c = ConsolidationWatcher(
+                Consolidator(memory.store, make_llm(settings), usage=UsageTracker(settings.usage_path) if settings.usage_path else None,
+                             audit_path="~/.local/share/g2/memory_consolidation.jsonl",
+                             min_new_exchanges=settings.consolidate_min_exchanges),
+                lambda: memory.recency()[0], idle_s=settings.consolidate_idle_s,
+                min_interval_s=settings.consolidate_min_interval_s).start()
+
         loop = VoiceLoop(
             wake_word=make_wake_word(
                 "vosk" if use_wake else "none",
@@ -141,6 +152,7 @@ def main() -> None:
             follow_up_s=settings.follow_up_s if voice else 0.0,
             question_window_s=settings.question_window_s if voice else 0.0,
             camera=camera,
+            on_event=(lambda **kw: watcher_c.nudge() if watcher_c and kw.get("told_sleep") else None),
         )
         try:
             loop.run_forever()
@@ -151,6 +163,8 @@ def main() -> None:
                 guard.stop()
             if camera:
                 camera.close()
+            if watcher_c:
+                watcher_c.stop()
             if link is not None:
                 link.close()
             if stop_pi_watch:
