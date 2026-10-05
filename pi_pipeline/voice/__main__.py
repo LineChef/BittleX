@@ -87,9 +87,6 @@ def main() -> None:
         audible = voice and tts_mode != "print"
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible)
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
-        # an OS shutdown sends SIGTERM: exit through the finally below so the runtime tracker can record it as a clean shutdown
-        import signal
-        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(SystemExit(0)))
 
         loop = VoiceLoop(
             wake_word=make_wake_word(
@@ -154,21 +151,22 @@ def make_pi_battery_alert(tts, audible: bool, siren=None):
 
 
 def _start_pi_battery_watch(*, tts, audible: bool):
-    """Record how long the Pi stays up on each charge and warn near the end of it. Linux/Pi only. Returns a stopper or None."""
+    """Startup hook for the Pi-battery work (Linux/Pi only). Settles a battery test left from the previous boot, if one was started
+    on purpose (nothing happens when there is none), and, only if G2_PI_BATTERY_WATCH=1, starts the 80%-of-runtime warning.
+    Returns a stopper or None."""
     import sys
 
-    if sys.platform != "linux" or not settings.pi_battery_watch:
+    if sys.platform != "linux":
         return None
     from ..power.runtime_tracker import RuntimeTracker, RuntimeWatcher
 
-    tracker = RuntimeTracker(settings.pi_runtime_log).start()
+    tracker = RuntimeTracker(settings.pi_runtime_log)
+    tracker.collect()
+    if not settings.pi_battery_watch:
+        return None
     watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible),
                              full_runtime_s=settings.pi_full_runtime_s or None).start()
-
-    def stop() -> None:
-        watcher.stop()
-        tracker.stop()
-    return stop
+    return watcher.stop
 
 
 def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool):

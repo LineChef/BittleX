@@ -167,7 +167,8 @@ class Settings:
     # The Pi's own battery can't be read, so its charge is estimated from uptime against the measured runtime per charge.
     pi_runtime_log: str = field(default_factory=lambda: os.path.expanduser(_env("G2_PI_RUNTIME_LOG", "~/.local/share/g2/pi_runtime.json")))
     pi_full_runtime_s: float = field(default_factory=lambda: _env_float("G2_PI_FULL_RUNTIME_S", 0.0))   # 0 = use the mean of the logged runs
-    pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
+    # the 80%-of-runtime warning is OFF until you turn it on (it counts uptime since boot, so a reboot resets it)
+    pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "0") in ("1", "true", "yes"))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "star_trek_whistle"))
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))

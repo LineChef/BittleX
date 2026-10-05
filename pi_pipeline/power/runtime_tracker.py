@@ -1,17 +1,24 @@
-"""How long the Pi runs on one charge, measured automatically, and a warning when the charge is probably about 80% used.
+"""Measuring how long the Pi runs on one charge, as an intentional test, and an optional warning near the end of that runtime.
 
-The Pi's battery (a PiSugar S) can't report its level, so we estimate it from time. A heartbeat is written to a small file every
-30 s with the Pi's uptime. If the next boot finds that the previous boot never marked a clean shutdown, the Pi lost power: the last
-heartbeat's uptime is how long that charge lasted, and it is logged as a run. Averaging the logged runs gives the full runtime;
-`RuntimeWatcher` then warns when uptime reaches 80% of it (about 20% battery left) and again near the end.
+The Pi's battery (a PiSugar S) can't report its level, so we measure time instead. Nothing here runs unless you start a test:
 
-Assumes each boot starts on a full charge. A hard reset or a pulled plug also looks like "ran out", and a boot on a part-charged
-battery gives a short run: use `python -m pi_pipeline.power runtime forget N` to drop a bad one."""
+    python -m pi_pipeline.power runtime test start     # after a FULL charge, before unplugging: starts a heartbeat
+    ... let the Pi run until the battery dies ...
+    (power it again)  -> the next voice-service start, or `runtime test collect`, records the run
+
+The heartbeat writes the Pi's uptime to a small file every 30 s. After a power loss, the last heartbeat minus the uptime at the start of
+the test is how long that charge lasted. If the Pi is instead shut down or rebooted cleanly during a test, the test is discarded (the
+battery state afterwards is unknown), so reboots can't be mistaken for an empty battery. `cancel` ends a test by hand.
+
+`RuntimeWatcher` is separate and OFF by default: when enabled (G2_PI_BATTERY_WATCH=1) and a full runtime is known, it warns when this
+boot's uptime reaches 80% of it (about 20% battery left) and again at 95%. It counts uptime since boot, so it assumes each boot starts
+on a full charge: a reboot resets it."""
 from __future__ import annotations
 
 import json
 import logging
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -55,8 +62,6 @@ class RuntimeTracker:
         self._beat_s = beat_s
         self._boot_id, self._uptime, self._shutting_down, self._wall = boot_id, uptime, shutting_down, wall
         self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-        self._lock = threading.Lock()
 
     # -- storage ----------------------------------------------------------
     def _load(self) -> dict:
@@ -64,10 +69,11 @@ class RuntimeTracker:
             data = json.loads(self.path.read_text())
             if isinstance(data, dict):
                 data.setdefault("runs", [])
+                data.setdefault("test", None)
                 return data
         except (OSError, ValueError):
             pass
-        return {"current": None, "runs": []}
+        return {"test": None, "runs": []}
 
     def _save(self, data: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,55 +84,85 @@ class RuntimeTracker:
             os.fsync(f.fileno())
         os.replace(tmp, self.path)           # atomic: a power cut leaves the old file, never half of one
 
-    # -- the boot bookkeeping ---------------------------------------------
-    def start(self) -> "RuntimeTracker":
-        with self._lock:
-            data = self._load()
-            cur, now_boot = data.get("current"), self._boot_id()
-            if cur and cur.get("boot_id") != now_boot:       # a previous boot: how did it end?
-                if cur.get("clean"):
-                    log.info("previous boot ended cleanly (%.1f h up): not a battery run", cur["uptime_s"] / 3600)
-                else:
-                    run = {"runtime_s": round(cur["uptime_s"]), "ended": cur.get("wall"), "source": "heartbeat", "counted": True}
-                    data["runs"].append(run)
-                    log.warning("previous boot lost power after %.2f h: logged as a battery run", run["runtime_s"] / 3600)
-                cur = None
-            if cur is None:
-                cur = {"boot_id": now_boot, "uptime_s": self._uptime(), "wall": self._wall(), "clean": False}
-            data["current"] = cur
-            self._save(data)
-        self._thread = threading.Thread(target=self._run, name="runtime-beat", daemon=True)
-        self._thread.start()
-        return self
+    # -- the intentional test ---------------------------------------------
+    def test(self) -> dict | None:
+        """The test in progress (or waiting to be collected), or None."""
+        return self._load()["test"]
 
-    def _run(self) -> None:
-        while not self._stop.wait(self._beat_s):
-            self.beat()
+    def arm(self, pid: int | None = None) -> bool:
+        """Start a test now. False if one is already running on this boot."""
+        data = self._load()
+        t = data["test"]
+        if t and t.get("boot_id") == self._boot_id():
+            return False
+        up = self._uptime()
+        data["test"] = {"boot_id": self._boot_id(), "start_uptime_s": up, "last_uptime_s": up, "wall": self._wall(),
+                        "started": self._wall(), "ended_clean": False, "pid": pid}
+        self._save(data)
+        return True
+
+    def set_pid(self, pid: int) -> None:
+        data = self._load()
+        if data["test"]:
+            data["test"]["pid"] = pid
+            self._save(data)
 
     def beat(self) -> None:
-        with self._lock:
-            data = self._load()
-            cur = data.get("current") or {"boot_id": self._boot_id()}
-            cur.update(uptime_s=self._uptime(), wall=self._wall(), clean=False)
-            data["current"] = cur
+        data = self._load()
+        t = data["test"]
+        if t and t.get("boot_id") == self._boot_id():
+            t.update(last_uptime_s=self._uptime(), wall=self._wall())
             try:
                 self._save(data)
             except OSError:
                 log.debug("runtime heartbeat write failed", exc_info=True)
 
-    def stop(self) -> None:
-        """Stop beating. If the OS is shutting down, record this boot as a clean shutdown (not a battery run)."""
-        self._stop.set()
-        with self._lock:
+    def run_heartbeat(self) -> None:
+        """Beat every `beat_s` until stopped (blocking). On SIGTERM during an OS shutdown the test is flagged clean, i.e. discarded."""
+        def _term(*_):
+            self._stop.set()
+        signal.signal(signal.SIGTERM, _term)
+        while not self._stop.is_set():
+            self.beat()
+            self._stop.wait(self._beat_s)
+        if self._shutting_down():
             data = self._load()
-            cur = data.get("current")
-            if cur and self._shutting_down():
-                cur["clean"] = True
-                cur["uptime_s"] = self._uptime()
-                try:
-                    self._save(data)
-                except OSError:
-                    log.debug("runtime clean-shutdown write failed", exc_info=True)
+            if data["test"] and data["test"].get("boot_id") == self._boot_id():
+                data["test"]["ended_clean"] = True
+                self._save(data)
+
+    def collect(self) -> str | None:
+        """Settle a test left over from a previous boot: a run if the power was lost, nothing if it was shut down cleanly.
+        Returns a one-line summary, or None if there was nothing to settle (no test, or one still running on this boot)."""
+        data = self._load()
+        t = data["test"]
+        if not t or t.get("boot_id") == self._boot_id():
+            return None
+        data["test"] = None
+        if t.get("ended_clean"):
+            msg = "battery test discarded: the Pi was shut down cleanly, so the battery state afterwards is unknown"
+        else:
+            runtime = max(0.0, t["last_uptime_s"] - t["start_uptime_s"])
+            data["runs"].append({"runtime_s": round(runtime), "ended": t.get("wall"), "source": "test", "counted": True})
+            msg = f"battery test recorded: the Pi ran {runtime / 3600:.2f} h on that charge"
+        self._save(data)
+        log.warning(msg)
+        return msg
+
+    def cancel(self) -> bool:
+        data = self._load()
+        t = data["test"]
+        if not t:
+            return False
+        pid = t.get("pid")
+        if pid:
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+            except (OSError, ValueError):
+                pass
+        data["test"] = None
+        self._save(data)
+        return True
 
     # -- readouts ---------------------------------------------------------
     def uptime_s(self) -> float:
@@ -140,25 +176,23 @@ class RuntimeTracker:
         return sum(vals) / len(vals) if vals else None
 
     def add_run(self, runtime_s: float, source: str = "manual") -> None:
-        with self._lock:
-            data = self._load()
-            data["runs"].append({"runtime_s": round(runtime_s), "ended": None, "source": source, "counted": True})
-            self._save(data)
+        data = self._load()
+        data["runs"].append({"runtime_s": round(runtime_s), "ended": None, "source": source, "counted": True})
+        self._save(data)
 
     def forget_run(self, index: int) -> bool:
-        with self._lock:
-            data = self._load()
-            if not 0 <= index < len(data["runs"]):
-                return False
-            data["runs"][index]["counted"] = False
-            self._save(data)
-            return True
+        data = self._load()
+        if not 0 <= index < len(data["runs"]):
+            return False
+        data["runs"][index]["counted"] = False
+        self._save(data)
+        return True
 
 
 class RuntimeWatcher:
     """Checks every `poll_s` how much of the full runtime this boot has used, and calls `on_alert(level, fraction_used)`.
     LOW at 80% used (about 20% battery left), CRITICAL at 95%; repeats every `repeat_s` while it stays that high. Silent until
-    a full runtime is known (`full_runtime_s` from settings, else the mean of the logged runs)."""
+    a full runtime is known (`full_runtime_s` from settings, else the mean of the recorded runs)."""
 
     def __init__(self, tracker: RuntimeTracker, on_alert, *, full_runtime_s=None, poll_s: float = 60.0, repeat_s: float = 300.0,
                  clock=time.monotonic):

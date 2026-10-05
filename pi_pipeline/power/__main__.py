@@ -1,5 +1,6 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
-                               | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime path"""
+                               | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime path
+                               | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
 from __future__ import annotations
 
 import json
@@ -35,6 +36,8 @@ def _runtime(a):
     from .runtime_tracker import RuntimeTracker
     t = RuntimeTracker(settings.pi_runtime_log)
     sub = a[0] if a else "list"
+    if sub == "test":
+        return _runtime_test(t, a[1:])
     if sub == "path":
         print(t.path)
     elif sub == "add" and len(a) > 1:
@@ -48,6 +51,37 @@ def _runtime(a):
             print(f"{i}: {r['runtime_s'] / 3600:5.2f} h  {r.get('source', '?'):9s} {'counted' if r.get('counted', True) else 'IGNORED'}")
         mean = t.mean_runtime_s()
         print(f"mean of counted runs: {mean / 3600:.2f} h  (warns at {0.8 * mean / 3600:.2f} h up)" if mean else "no runs recorded yet")
+
+
+def _runtime_test(t, a):
+    import subprocess
+    import sys
+    action = a[0] if a else "status"
+    if action == "start":
+        if not t.arm():
+            print("a test is already running on this boot (see `runtime test status`, or `runtime test cancel`)")
+            return
+        log = open(str(t.path) + ".heartbeat.log", "a")
+        p = subprocess.Popen([sys.executable, "-m", "pi_pipeline.power", "runtime", "test", "run"],
+                             stdout=log, stderr=log, start_new_session=True)
+        t.set_pid(p.pid)
+        print("battery test started. Unplug the charger and let the Pi run until the battery dies; power it again afterwards and "
+              "the result is recorded (at the next voice-service start, or `runtime test collect`).\n"
+              "Start it only from a FULL charge. A clean shutdown or reboot discards the test; `runtime test cancel` ends it by hand.")
+    elif action == "run":                      # the heartbeat itself (started by `start`)
+        t.run_heartbeat()
+    elif action == "collect":
+        print(t.collect() or "nothing to collect")
+    elif action == "cancel":
+        print("test cancelled" if t.cancel() else "no test in progress")
+    else:
+        cur = t.test()
+        if not cur:
+            print("no battery test in progress")
+        else:
+            up = (t.uptime_s() - cur["start_uptime_s"]) if cur.get("boot_id") == t._boot_id() else None
+            print(f"test in progress; this boot has run {up / 3600:.2f} h of it" if up is not None
+                  else "a test from a previous boot is waiting to be collected (`runtime test collect`)")
 
 
 if __name__ == "__main__":
