@@ -67,10 +67,18 @@ def main() -> None:
         if settings.memory_enabled and not args.no_memory and features.memory:
             memory = Memory(settings)
 
+        link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
         actuator = make_actuator(
-            args.actuator, port=settings.serial_port, baud=settings.serial_baud,
-            max_continuous_s=args.max_gait_s,
+            args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
+            max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle,
         )
+        guard = None
+        if link is not None and (settings.stand_guard or settings.balance_off_idle):
+            from ..gait.stand_guard import StandGuard
+            guard = StandGuard(link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
+                               balance_off_idle=settings.balance_off_idle,
+                               reenable_after_s=None if settings.balance_off_idle else 300.0).start()
+            actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
         stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
@@ -85,7 +93,7 @@ def main() -> None:
 
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         audible = voice and tts_mode != "print"
-        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible)
+        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
         loop = VoiceLoop(
@@ -112,6 +120,10 @@ def main() -> None:
         finally:
             if watcher:
                 watcher.stop()
+            if guard:
+                guard.stop()
+            if link is not None:
+                link.close()
             if stop_pi_watch:
                 stop_pi_watch()
             if memory:
@@ -177,7 +189,22 @@ def _start_pi_battery_watch(*, tts, audible: bool):
     return watcher.stop
 
 
-def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool):
+def _open_shared_link(actuator_mode: str):
+    """The one serial link the voice service shares (actuator, battery watch, stand guard), locked for threads; None if there is no
+    serial port to open (e.g. a laptop) or nothing needs it."""
+    import os
+
+    needed = actuator_mode == "serial" or settings.battery_watch or settings.stand_guard or settings.balance_off_idle
+    if not needed or not os.path.exists(settings.serial_port):
+        return None
+    from ..link.locked import LockedLink
+    from ..link.serial_link import SerialLink
+
+    lk = SerialLink(settings.serial_port, settings.serial_baud, reset_wait=0.5)
+    return LockedLink(lk) if lk.connect() else None
+
+
+def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, link=None):
     """Watch the robot's battery and play the star_trek_red_alert siren when it is low. Reads the voltage through the serial
     actuator, or, when the actuator is a mock (G2 is not allowed to move), through a read-only link of its own, since asking
     for the voltage moves nothing. No serial port (e.g. a laptop) means no watch."""
@@ -189,14 +216,9 @@ def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool):
         return None
     if actuator_mode == "serial":
         reader = actuator.read_voltage
-    elif os.path.exists(settings.serial_port):
-        link_box: list = []
-
+    elif link is not None:
         def reader():
-            if not link_box:
-                from ..link.serial_link import SerialLink
-                link_box.append(SerialLink(settings.serial_port, settings.serial_baud, reset_wait=0.5))
-            return read_voltage(link_box[0])
+            return read_voltage(link)
     else:
         return None
 

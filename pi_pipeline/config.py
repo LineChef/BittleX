@@ -170,6 +170,10 @@ class Settings:
     # the 80%-of-runtime warning: on, but silent until a timed battery test has measured a runtime (it counts uptime since boot,
     # so a reboot resets it). 0 turns it off.
     pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
+    # G2's standing wobble (firmware gyro balance going unstable on a 5 Hz IMU, see gait/stand_guard.py): keep balance off while idle
+    # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.
+    balance_off_idle: bool = field(default_factory=lambda: _env("G2_BALANCE_OFF_IDLE", "1") not in ("0", "false", "no"))
+    stand_guard: bool = field(default_factory=lambda: _env("G2_STAND_GUARD", "1") not in ("0", "false", "no"))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))

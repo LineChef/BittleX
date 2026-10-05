@@ -80,12 +80,15 @@ class SerialActuator:
     when it is on, and never beyond `skills.MAX_GAIT_SECONDS`.
     """
 
-    def __init__(self, port: str, baud: int, *, link=None, max_continuous_s: float = 0.0):
+    def __init__(self, port: str, baud: int, *, link=None, max_continuous_s: float = 0.0, balance_off_idle: bool = False):
         from ..link import opencat
 
         self._max_continuous_s = max_continuous_s
         self._cap_timer: threading.Timer | None = None
         self._gait_active = False     # a looping gait was started and not yet stopped
+        # firmware gyro balance is only wanted around a firmware gait: `gB` just before one, `gb` just after (see gait/stand_guard.py)
+        self._balance_off_idle = balance_off_idle
+        self.on_command = None        # optional callback: called whenever a command is sent (the stand guard opens a quiet window)
 
         self._opencat = opencat
         self._lock = threading.RLock()   # the voice loop, the gait-cap timer and the battery watcher all talk to the one link
@@ -104,6 +107,15 @@ class SerialActuator:
         with self._lock:
             return self._link.send(*args, **kw)
 
+    @property
+    def busy(self) -> bool:
+        """A looping gait is running."""
+        return self._gait_active
+
+    def _balance(self, on: bool) -> None:
+        if self._balance_off_idle:
+            self._send("gB" if on else "gb", read_reply=False)
+
     def perform(self, skill_name: str, seconds: float | None = None) -> None:
         if not skills.is_valid(skill_name):
             log.warning("unknown skill %r -- ignoring", skill_name)
@@ -111,8 +123,15 @@ class SerialActuator:
         cmd = skills.serial_command(skill_name)
         log.info("G2 perform %s -> %r", skill_name, cmd)
         self._cancel_cap()
+        if self.on_command:
+            self.on_command()
+        continuous = skills.SKILLS[skill_name].continuous
+        if continuous:
+            self._balance(True)            # the firmware gaits are tuned with balance on
         self._send(cmd, read_reply=False)
-        self._gait_active = skills.SKILLS[skill_name].continuous
+        if not continuous:
+            self._balance(False)           # a posture or trick: balance stays off
+        self._gait_active = continuous
         if skills.SKILLS[skill_name].continuous:
             # a requested duration bounds the walk; if a standing cap is set it is a hard ceiling on top
             duration = skills.clamp_seconds(seconds)
@@ -133,11 +152,15 @@ class SerialActuator:
         self._cap_timer = None
         self._gait_active = False
         self._send(self._opencat.REST, read_reply=False)
+        self._balance(False)
 
     def stop(self) -> None:
         self._cancel_cap()
         self._gait_active = False
+        if self.on_command:
+            self.on_command()
         self._send(self._opencat.REST, read_reply=False)
+        self._balance(False)
 
     def send_token(self, token: str) -> None:
         """Send one raw OpenCat token (used for buzzer cues). Skipped while a looping gait is
@@ -162,10 +185,10 @@ class SerialActuator:
 
 
 def make_actuator(mode: str, *, port: str, baud: int, link=None,
-                  max_continuous_s: float | None = None) -> Actuator:
+                  max_continuous_s: float | None = None, balance_off_idle: bool = False) -> Actuator:
     if mode == "serial":
         if max_continuous_s is None:           # not given: use the G2_MAX_GAIT_S setting (default off)
             from ..config import settings
             max_continuous_s = settings.max_gait_s
-        return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s)
+        return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s, balance_off_idle=balance_off_idle)
     return MockActuator()

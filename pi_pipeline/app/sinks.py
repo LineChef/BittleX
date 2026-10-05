@@ -22,34 +22,7 @@ _HEAD_IDX = 0
 _HEAD_PAN_DEG = 45.0
 
 
-class LockedLink:
-    """Serialises access to a `SerialLink` shared by the voice loop and the
-    behaviour runtime (they run on separate threads). Pass-through otherwise."""
-
-    def __init__(self, link):
-        self._link = link
-        self._lock = threading.Lock()
-
-    def send(self, command: str, **kw) -> str:
-        with self._lock:
-            return self._link.send(command, **kw)
-
-    def read_line(self) -> str:
-        with self._lock:
-            return self._link.read_line()
-
-    def poll_imu(self) -> list:
-        """Non-blocking, so holding the lock here never delays a send."""
-        with self._lock:
-            return self._link.poll_imu()
-
-    @property
-    def is_connected(self) -> bool:
-        return getattr(self._link, "is_connected", False)
-
-    def close(self) -> None:
-        with self._lock:
-            self._link.close()
+from ..link.locked import LockedLink  # noqa: E402,F401 -- moved to link/locked.py so the voice service can share it
 
 
 class SerialActuatorSink:
