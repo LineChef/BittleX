@@ -28,9 +28,14 @@ The full roadmap and decision log are in
   can't just walk over, and swap in the right scripted response (step over,
   climb, back out) before handing back to the walk policy.
 - **Voice**: natural spoken conversation powered by the Claude API (speech-to-text
-  → Claude → text-to-speech), with movement used as body language.
-- **Memory**: persistent context across conversations, and a sense of place
-  (which room it's in) built up over time.
+  → Claude → text-to-speech), with movement used as body language. Running on the Pi
+  with a real microphone and speaker; "shut down" lies G2 down and powers the Pi off.
+  It can also take a picture and describe what it sees.
+- **Memory**: persistent context across conversations (facts ranked by importance,
+  a sleep-time consolidation pass, and a log of which facts shape answers), and a
+  sense of place (which room it's in) built up over time.
+- **Power awareness**: low-battery alerts for G2's pack, a measured runtime estimate
+  for the Pi's battery, and a Wi-Fi fallback to a phone hotspot.
 - **Autonomy**: Claude as a slow deliberative layer on top of the reactive
   control — deciding where to go, what to look at, and whether to approach
   something, from what it sees and remembers.

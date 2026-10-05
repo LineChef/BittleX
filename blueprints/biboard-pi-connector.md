@@ -808,7 +808,7 @@ holding the Pi assembly clear of BiBoard and both mounted to a shared frame:
 
 ![Illustrative side-view diagram: BiBoard mounted to the frame, a printed standoff rising from the same frame to hold PiSugar and the Pi above it, wires routed from the Pi's header down past the standoff to BiBoard's header](images/biboard-pi-connector/assembled-side.png)
 
-## Speaker + mic for Pi-side voice I/O — mic wired and verified 2026-10-03, speaker/amp not yet wired
+## Speaker + mic for Pi-side voice I/O — mic verified 2026-10-03, speaker/amp verified 2026-10-04
 
 `pi_pipeline`'s TTS/STT currently have nowhere to play/capture audio on the
 robot itself — see `docs/research/community-projects.md` Finding 7 and
@@ -955,7 +955,7 @@ unplugging/rewiring at the bench.
 ### Mic bring-up — verified 2026-10-03
 
 Mic wired per the pinout above (3V → pin 1, GND → pin 9, BCLK → pin 12,
-LRCL → pin 35, DOUT → pin 38, SEL → pin 39); amp not yet connected.
+LRCL → pin 35, DOUT → pin 38, SEL → pin 39); the amp was connected on 2026-10-04 (next section).
 
 1. `/boot/firmware/config.txt` got `dtparam=i2s=on` and
    `dtoverlay=googlevoicehat-soundcard` (original saved alongside as
@@ -982,6 +982,25 @@ floating, `DOUT` open or shorted, or a solder bridge). The pull-down test in
 step 2 separates "open" (reads low) from "shorted/driven" (stays high).
 Before powering a freshly soldered header, check each pair of neighboring
 pins for continuity.
+
+### Speaker bring-up — verified 2026-10-04
+
+Amp wired per the pinout table above (5 V → pin 2, GND → pin 9, BCLK → pin 12, LRCLK → pin 35, DIN → pin 40), with the speaker on the amp's
+2-pin PH2.0 output.
+
+1. `/boot/firmware/config.txt` on the Pi now contains `dtparam=i2s=on`, `dtparam=audio=on` and `dtoverlay=googlevoicehat-soundcard` (alongside
+   `dtoverlay=disable-bt`, `enable_uart=1`, `dtoverlay=dwc2,dr_mode=host`, `gpu_mem=16`). No second I2S overlay is loaded.
+2. The Pi lists one duplex ALSA card, `Google voiceHAT SoundCard`, as card 0: it is both the playback device (amp + speaker) and the capture
+   device (mic). Playback and capture work at the same time on that card.
+3. `pi_pipeline` uses the default ALSA device through `sounddevice`, with no explicit device name; the voice loop plays Piper speech, the
+   acknowledgement tone and the battery alarms through the amp, and listens through the mic (mic is left channel only, because `SEL` is on GND).
+4. The card **cannot be opened twice for capture at once** (a second input stream fails with "Device unavailable"), so the wake-word detector
+   and the speech recognizer share one microphone stream (`VoskWakeWord.hand_over`).
+5. The amp's volume is set in software: the acknowledgement tone, the battery alarms and the camera ticks play at a few percent of full scale (defaults in
+   `pi_pipeline/config.py`: `G2_ACK_PEAK` 0.0225, `G2_ALERT_PEAK` 0.045, `G2_CAMERA_PEAK` 0.045); the ALSA mixer levels were not recorded.
+
+**Mounting (as of 2026-10-05): both boards are mounted temporarily.** The mic and the speaker/amp are held in place only provisionally until the
+Pi case arrives; their final positions and fixings are not yet decided or recorded here.
 
 ### Software config — the exact overlay, confirmed, not a research task for later
 

@@ -32,9 +32,9 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 | 4 Hardware assembly | 🔧 assembled and bring-up done; Pi mount is temporary | [`plan-detail/phase4-hardware-assembly.md`](plan-detail/phase4-hardware-assembly.md) |
 | 5 Basic control | ✅ | [`plan-detail/phase5-basic-control.md`](plan-detail/phase5-basic-control.md) |
 | 6 Sim-to-real deployment | 🔧 loop and safety layers built; first walks done | [`plan-detail/phase6-sim-to-real.md`](plan-detail/phase6-sim-to-real.md) |
-| 7 Voice + Claude | 🧩 built; audio hardware not wired | [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md) |
-| 8 Perception | 🧩 model on the camera; navigation reflexes gated off | [`plan-detail/phase8-perception.md`](plan-detail/phase8-perception.md) |
-| 9 Memory | ✅ built; real use pending | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
+| 7 Voice + Claude | ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned | [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md) |
+| 8 Perception | 🧩 model on the camera and "what do you see" works; navigation reflexes gated off | [`plan-detail/phase8-perception.md`](plan-detail/phase8-perception.md) |
+| 9 Memory | ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
 | 10 Integration | 🧩 runtime built; not yet run on the robot | [`plan-detail/phase10-integration.md`](plan-detail/phase10-integration.md) |
 | Petoi AI Head vs the Pi | ⬜ decision pending, head arriving ~2026-10-10 | below |
 
@@ -125,13 +125,17 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
 
 ## Phase 7 — Voice + Claude 🧩
 
-Built: config-driven Claude client, `perform_skill` and `remember` tools, state cues, command acknowledgement, audio backends validated
-offline. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
+Built: config-driven Claude client, `perform_skill` and `remember` tools, state cues, command acknowledgement, the real mic and speaker
+(running on the Pi since 2026-10-04), a "shut down" that also powers the Pi off, battery alerts, and speech-recognition hardening for stop and
+shut-down commands. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 
 - [x] Real-mic capture and the wake-word gate on the Pi — done 2026-10-03, including a first voice → Claude → walk run on the real G2
       ([`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md)).
 - [ ] Settle how a Claude-started walk is stopped (the onboard module's "rest", a gait cap, or both) (`perform_skill` now takes an optional duration in seconds; a calibrated distance is still open).
 - [x] Text-to-speech and mic input through the robot's own body — done 2026-10-04 (mic + speaker on the Pi; the Petoi AI Head is still to be evaluated).
+- [x] Shut down also powers the Pi off cleanly (2026-10-05; the PiSugar S keeps powering the halted Pi, so the battery switch is flipped by hand).
+- [ ] Reliable command recognition: three fixes deployed 2026-10-05 (wake word run into the command, first word lost at the wake-word handover,
+      a stop / shut-down grammar recognizer). Collect transcripts (`G2_LOG_HEARD`); if misses continue, cost out a larger Vosk model, then cloud STT for open conversation only.
 - [ ] Free LLM instead of paying per turn (decided 2026-10-03: the provider will be the Petoi head's service, XiaoZhi). The swappable-LLM code is built
       ([`guides/swappable-llm.md`](guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the
       account at xiaozhi.me (phone-number registration; the privacy gate applies, use a throwaway number and no household names), then find out whether it offers
@@ -142,7 +146,8 @@ offline. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 
 ## Phase 8 — Perception 🧩
 
-Built: obstacle-avoidance reflex (not wired into the app), camera serial format, custom detector on the camera (3 classes), scene description.
+Built: obstacle-avoidance reflex (not wired into the app), camera serial format, custom detector on the camera (3 classes), scene description, and
+the camera look (2026-10-04: a 240x240 picture goes to Claude when asked what G2 sees; exposure metered first; the camera warms up right before a picture).
 Vision-based navigation is gated off (`features.vision`). Target capability and detail:
 [`plan-detail/phase8-perception.md`](plan-detail/phase8-perception.md); detection-layer notes: [`vision/detection-layer.md`](vision/detection-layer.md).
 
@@ -158,6 +163,7 @@ Vision-based navigation is gated off (`features.vision`). Target capability and 
 SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI and a localhost web UI. Detail:
 [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md).
 
+- [x] Importance, a core block, sightings log, sleep-time consolidation and a memory-use log (2026-10-05); consolidation has only been dry-run.
 - [ ] Semantic recall (embeddings) if keyword matching feels too literal.
 - [ ] Exercise it across real multi-session conversations once the voice loop runs live.
 - [x] **Back up the memory DB off the robot** — manual `g2membackup` built 2026-10-04 (periodic scheduling still open). It is one SQLite file on the Pi's SD card
