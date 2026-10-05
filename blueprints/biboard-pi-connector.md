@@ -990,14 +990,14 @@ Amp wired per the pinout table above (5 V → pin 2, GND → pin 9, BCLK → pin
 
 1. `/boot/firmware/config.txt` on the Pi now contains `dtparam=i2s=on`, `dtparam=audio=on` and `dtoverlay=googlevoicehat-soundcard` (alongside
    `dtoverlay=disable-bt`, `enable_uart=1`, `dtoverlay=dwc2,dr_mode=host`, `gpu_mem=16`). No second I2S overlay is loaded.
-2. The Pi lists one duplex ALSA card, `Google voiceHAT SoundCard`, as card 0: it is both the playback device (amp + speaker) and the capture
+2. The Pi lists one duplex ALSA card (`snd_rpi_googlevoicehat_soundcar`, "Google voiceHAT SoundCard HiFi") as card 0, device 0, with no `/etc/asound.conf` or `~/.asoundrc`: it is both the playback device (amp + speaker) and the capture
    device (mic). Playback and capture work at the same time on that card.
 3. `pi_pipeline` uses the default ALSA device through `sounddevice`, with no explicit device name; the voice loop plays Piper speech, the
    acknowledgement tone and the battery alarms through the amp, and listens through the mic (mic is left channel only, because `SEL` is on GND).
 4. The card **cannot be opened twice for capture at once** (a second input stream fails with "Device unavailable"), so the wake-word detector
    and the speech recognizer share one microphone stream (`VoskWakeWord.hand_over`).
 5. The amp's volume is set in software: the acknowledgement tone, the battery alarms and the camera ticks play at a few percent of full scale (defaults in
-   `pi_pipeline/config.py`: `G2_ACK_PEAK` 0.0225, `G2_ALERT_PEAK` 0.045, `G2_CAMERA_PEAK` 0.045); the ALSA mixer levels were not recorded.
+   `pi_pipeline/config.py`: `G2_ACK_PEAK` 0.0225, `G2_ALERT_PEAK` 0.045, `G2_CAMERA_PEAK` 0.045); the card exposes no ALSA mixer controls (`amixer` printed none).
 
 **Mounting (as of 2026-10-05): both boards are mounted temporarily.** The mic and the speaker/amp are held in place only provisionally until the
 Pi case arrives; their final positions and fixings are not yet decided or recorded here.
