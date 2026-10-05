@@ -379,7 +379,7 @@ class VoiceLoop:
                     self._speak("Okay, staying on.")
                     self._end_session()
                     return
-                self._speak("Goodbye.")
+                self._speak("Goodbye. Please flip my battery switch off.")   # the PiSugar S keeps powering the Pi after it halts
                 self._end_session()
                 try:
                     self._on_poweroff()

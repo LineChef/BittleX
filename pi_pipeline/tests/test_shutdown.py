@@ -29,7 +29,7 @@ def test_a_clear_shut_down_lies_down_waits_for_a_cancel_then_powers_off():
     lp._one_turn()
     assert {"shutdown": True} in events
     assert any("switching the computer off" in s and "cancel" in s for s in said)
-    assert said[-2:] == ["Goodbye.", "<POWER OFF>"]                                  # goodbye is spoken BEFORE the power goes
+    assert said[-2:] == ["Goodbye. Please flip my battery switch off.", "<POWER OFF>"]      # the goodbye is spoken BEFORE the power goes
 
 
 def test_saying_cancel_in_the_window_keeps_the_pi_on():
