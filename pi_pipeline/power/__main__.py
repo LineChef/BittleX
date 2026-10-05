@@ -62,10 +62,12 @@ def _runtime(a):
         mean = t.mean_runtime_s()
         print(f"mean of counted runs: {mean / 3600:.2f} h" if mean else "no runs recorded yet")
         timed = t.mean_runtime_s(sources=("test",))
-        el = t.armed_elapsed_s()
-        print((f"the warning uses timed-test runs only: {timed / 3600:.2f} h, so it fires after {0.8 * timed / 3600:.2f} h on battery"
-               if timed else "the warning uses timed-test runs only: none yet, so it is silent")
-              + ("; armed, " + f"{el / 3600:.2f} h on battery so far" if el is not None else "; NOT armed (say \"you're unplugged\")"))
+        state, secs = t.battery_state()
+        now = {"paused": "PAUSED for this boot (you said plugged in; say \"you're unplugged\" to restart the count)",
+               "since_unplugged": f"counting since you said unplugged: {(secs or 0) / 3600:.2f} h so far",
+               "since_boot": f"counting from boot: {(secs or 0) / 3600:.2f} h so far"}[state]
+        print((f"the warning uses timed-test runs only: {timed / 3600:.2f} h, so it fires after {0.8 * timed / 3600:.2f} h on battery; "
+               if timed else "the warning uses timed-test runs only: none yet, so it is silent; ") + now)
 
 
 def _runtime_test(t, a):

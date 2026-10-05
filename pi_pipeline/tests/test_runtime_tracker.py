@@ -177,3 +177,13 @@ def test_telling_g2_he_is_unplugged_arms_the_warning_and_he_says_so():
                    cue=_t.SimpleNamespace(set=lambda s: None), follow_up_s=0.0, on_power=flags.append)
     lp._one_turn()
     assert flags == [True] and said and "on battery" in said[0]
+
+
+def test_battery_state_reports_paused_unplugged_or_since_boot(tmp_path):
+    m = Boot("b1", up=1000.0)
+    t = m.tracker(tmp_path / "rt.json")
+    assert t.battery_state() == ("since_boot", 1000.0)
+    t.disarm()
+    assert t.battery_state() == ("paused", None)
+    t.arm_now(); m.up = 1600.0
+    assert t.battery_state() == ("since_unplugged", 600.0)

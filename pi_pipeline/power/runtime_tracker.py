@@ -183,6 +183,15 @@ class RuntimeTracker:
         data["armed"] = {"boot_id": self._boot_id(), "uptime_s": self._uptime(), "paused": True}
         self._save(data)
 
+    def battery_state(self) -> tuple[str, float | None]:
+        """("paused" | "since_unplugged" | "since_boot", seconds counted) for this boot, for display."""
+        a = self._load().get("armed")
+        if a and a.get("boot_id") == self._boot_id():
+            if a.get("paused"):
+                return "paused", None
+            return "since_unplugged", max(0.0, self._uptime() - a["uptime_s"])
+        return "since_boot", self._uptime()
+
     def armed_elapsed_s(self, from_boot: bool = False) -> float | None:
         """Seconds on battery to count for the warning in THIS boot: since "unplugged" if the person said so; None while paused by
         "plugged in"; and with nothing said, since boot if `from_boot` (else None, meaning not armed)."""
