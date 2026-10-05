@@ -73,3 +73,9 @@ def test_power_off_pi_lies_g2_down_then_runs_the_shutdown_only_on_linux():
     bad = types.SimpleNamespace(stop=lambda: (_ for _ in ()).throw(RuntimeError("serial gone")))
     power_off_pi(bad, run=lambda *a, **k: ran.append(1), platform="linux", sleep=lambda s: None)
     assert ran == [1]                                                                 # a failing stop() does not prevent the shutdown
+
+
+def test_gee_to_wake_word_run_into_command():
+    from pi_pipeline.voice.commands import match_local_command, is_clear_shutdown
+    assert match_local_command("gee to shut down") == "shutdown"
+    assert is_clear_shutdown("gee to shut down")
