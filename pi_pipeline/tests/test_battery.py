@@ -94,3 +94,33 @@ def test_the_real_diag_event_call_does_not_raise():
     from pi_pipeline.voice.__main__ import make_battery_alert
     tts = type("T", (), {"speak": lambda self, t: None})()
     make_battery_alert(tts, audible=False)(BatteryLevel.LOW, 6.9)
+
+
+def test_serial_actuator_serialises_a_voltage_read_with_commands():
+    import threading
+    import time
+
+    from pi_pipeline.voice.actuator import SerialActuator
+
+    order, in_send = [], threading.Lock()
+
+    class SlowLink:
+        def send(self, cmd, **kw):
+            assert in_send.acquire(blocking=False), "two threads were inside the link at once"
+            try:
+                order.append(cmd); time.sleep(0.03)
+            finally:
+                in_send.release()
+            return "Voltage: 7.5 V" if cmd == "P" else ""
+
+        def drain(self, s=0.2):
+            assert in_send.acquire(blocking=False), "two threads were inside the link at once"
+            in_send.release(); return ""
+
+    act = SerialActuator("x", 1, link=SlowLink())
+    t = threading.Thread(target=lambda: [act.read_voltage() for _ in range(4)])
+    t.start()
+    for _ in range(4):
+        act.send_token("b1 4")
+    t.join()
+    assert "P" in order and "b1 4" in order

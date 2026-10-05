@@ -471,3 +471,16 @@ second skill for the 2-skill control run. See `docs/rl/adapter-skill-probe-spec.
   knee mean ~-11 deg vs ~47-53 / +6). On the real G2 it walked forward on hard floor (~1 ft 9 in in
   10 s) but walked in place on ~1/4 in carpet with the back-right leg sagging.
 - While `gc` is running the IMU readings swing wildly and the body rocks; wait before reading it.
+
+
+## Standing wobble (2026-10-04)
+
+**Symptom:** standing on the calibration stand, G2 is steady at first (roll/pitch noise about 0.1 degrees), then (most often after rest, then stand; also after a nudge) swings in roll and pitch for a minute or more. It sometimes stops by itself.
+
+**Measured with `gait/stand_log.py`** (passive: IMU print `gP` plus a `P` voltage read, no motion commands; the `g2-voice` service stopped so only one process uses the port). Logs: `~/g2_runs/stand01..05*.csv` on the Pi.
+- Episodes: roll up to ~4-6 degrees and pitch up to ~9-11 degrees peak-to-peak; one sustained run settled into a steady cycle at **about 1.9 Hz** (roll, pitch and the accelerometer all agree), pitch ~±5 degrees by the accelerometer. At 5 Hz sampling, 1.9 Hz could also be an alias of ~3.1 Hz.
+- It is **real body motion**, not an IMU glitch: a tilt computed from the accelerometer alone (gravity direction, independent of the firmware's fusion) swings as much or more than the fused roll/pitch.
+- **Not the battery** (7.86-7.94 V throughout) and **not the Pi's periodic `P` read** (the service was off).
+- **A/B with firmware gyro balance off (`gb`):** calm from the first second, and a deliberate nudge (6.7 degrees peak-to-peak) died out in under 10 seconds. With balance on, comparable nudges ring for 40+ seconds.
+- Conclusion: the balance feedback loop, fed by an IMU that updates at 5 Hz (see the IMU rate notes above), is marginally stable and locks into a limit cycle once disturbed; some starts (a stand-up from rest) disturb it without any touch.
+- Side notes: the firmware's accumulated yaw counter can jump by exactly 360 degrees mid-episode (an unwrap artifact; the wrapped yaw is unchanged), and the front-left shoulder servo's faults (see `rl/real-walk-log.md`) may make it easier to excite but are not needed to explain it.

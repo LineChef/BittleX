@@ -22,6 +22,21 @@ class Actuator(Protocol):
     def close(self) -> None: ...
 
 
+class _Locked:
+    """A link whose `drain` and `send` each hold the actuator's lock, so a background voltage read can't interleave with a command."""
+
+    def __init__(self, link, lock):
+        self._link, self._lock = link, lock
+
+    def drain(self, *a, **kw):
+        with self._lock:
+            return self._link.drain(*a, **kw)
+
+    def send(self, *a, **kw):
+        with self._lock:
+            return self._link.send(*a, **kw)
+
+
 class MockActuator:
     """Logs the command instead of sending it. Default on a dev machine."""
 
@@ -73,6 +88,7 @@ class SerialActuator:
         self._gait_active = False     # a looping gait was started and not yet stopped
 
         self._opencat = opencat
+        self._lock = threading.RLock()   # the voice loop, the gait-cap timer and the battery watcher all talk to the one link
         self._owns_link = link is None   # only close a link we opened ourselves
         if link is not None:
             self._link = link
@@ -84,6 +100,10 @@ class SerialActuator:
         else:
             log.warning("serial actuator: %s not open yet (will retry on send)", port)
 
+    def _send(self, *args, **kw):
+        with self._lock:
+            return self._link.send(*args, **kw)
+
     def perform(self, skill_name: str, seconds: float | None = None) -> None:
         if not skills.is_valid(skill_name):
             log.warning("unknown skill %r -- ignoring", skill_name)
@@ -91,7 +111,7 @@ class SerialActuator:
         cmd = skills.serial_command(skill_name)
         log.info("G2 perform %s -> %r", skill_name, cmd)
         self._cancel_cap()
-        self._link.send(cmd, read_reply=False)
+        self._send(cmd, read_reply=False)
         self._gait_active = skills.SKILLS[skill_name].continuous
         if skills.SKILLS[skill_name].continuous:
             # a requested duration bounds the walk; if a standing cap is set it is a hard ceiling on top
@@ -112,12 +132,12 @@ class SerialActuator:
         log.warning("G2 %s ran its %.1fs -- stopping", skill_name, duration)
         self._cap_timer = None
         self._gait_active = False
-        self._link.send(self._opencat.REST, read_reply=False)
+        self._send(self._opencat.REST, read_reply=False)
 
     def stop(self) -> None:
         self._cancel_cap()
         self._gait_active = False
-        self._link.send(self._opencat.REST, read_reply=False)
+        self._send(self._opencat.REST, read_reply=False)
 
     def send_token(self, token: str) -> None:
         """Send one raw OpenCat token (used for buzzer cues). Skipped while a looping gait is
@@ -125,7 +145,7 @@ class SerialActuator:
         if self._gait_active:
             log.debug("skipping %r while a gait is running", token)
             return
-        self._link.send(token, read_reply=False)
+        self._send(token, read_reply=False)
 
     def read_voltage(self) -> float | None:
         """Battery volts via the firmware's `P` command, or None while a gait is running (the reading sags under load, and the
@@ -133,7 +153,7 @@ class SerialActuator:
         if self._gait_active:
             return None
         from ..power.battery import read_voltage
-        return read_voltage(self._link)
+        return read_voltage(_Locked(self._link, self._lock))
 
     def close(self) -> None:
         self._cancel_cap()
