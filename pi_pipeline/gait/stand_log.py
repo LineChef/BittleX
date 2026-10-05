@@ -2,7 +2,8 @@
 
     python pi_pipeline/gait/stand_log.py --minutes 20 --log ~/g2_runs/stand01.csv
 
-Sends NO motion commands. It turns on the firmware's 5 Hz IMU print (`gP`), reads roll/pitch, asks for the battery voltage (`P`)
+Sends NO motion commands (and changes nothing unless you pass `--balance off`, which sends `gb` at the start and restores `gB` at the end:
+the firmware's gyro balance, for an A/B test of whether the balance loop is what wobbles). It turns on the firmware's 5 Hz IMU print (`gP`), reads roll/pitch, asks for the battery voltage (`P`)
 every `--volt-every` seconds, and prints a one-line summary per minute: how far roll/pitch swing (standard deviation and
 peak-to-peak, in degrees), their mean (a drifting mean means the posture is slowly tilting), the strongest oscillation frequency
 (the IMU only reports at 5 Hz, so anything above 2.5 Hz is not resolved) and the battery voltage. Stand G2 yourself (voice "stand up")
@@ -27,16 +28,20 @@ IMU_HZ = 5.0
 
 
 def _accel_g(line: str):
-    """The (ax, ay, az) accelerometer triplet (in g) of an `ICM:`/`MCU:` line, or None. parse_imu_line leaves accel out."""
+    """The (ax, ay, az) accelerometer triplet of an `ICM:`/`MCU:` line, or None. parse_imu_line leaves accel out. The firmware prints
+    fixed-width columns (6, 6, 6, 7, 7, 7), which can run together when a value is wide, so slice by width first and fall back to
+    whitespace splitting."""
     s = line.strip()
     if s[:4] not in ("ICM:", "MCU:"):
         return None
-    body = s[4:]
+    body = line.strip()[4:]
+    try:
+        return tuple(float(body[i:i + 6]) for i in (0, 6, 12))
+    except ValueError:
+        pass
     try:
         nums = [float(x) for x in body.split()]
-        if len(nums) != 6:
-            nums = [float(body[i:i + 6]) for i in (0, 6, 12)] + [0, 0, 0]
-        return nums[0], nums[1], nums[2]
+        return (nums[0], nums[1], nums[2]) if len(nums) >= 6 else None
     except ValueError:
         return None
 
@@ -82,10 +87,13 @@ def acc_std(v):
     return math.sqrt(sum((x - m) ** 2 for x in v) / len(v))
 
 
-def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, sleep=time.sleep, clock=time.monotonic,
+def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, balance: str = "leave", sleep=time.sleep, clock=time.monotonic,
         out=lambda *a: print(*a, flush=True)) -> list[dict]:
     from pi_pipeline.power.battery import read_voltage
 
+    if balance == "off":
+        lk.send("gb", read_reply=False, settle=0.0)       # firmware gyro balance off (restored in `finally`)
+        sleep(0.3)
     lk.send("gP", read_reply=False, settle=0.0)
     sleep(0.5)
     log = open(log_path, "w", buffering=1) if log_path else None   # line-buffered: readable while it runs
@@ -135,6 +143,8 @@ def run(lk, minutes: float, log_path: str | None, volt_every: float = 15.0, *, s
         if log:
             log.close()
         lk.send("gp", read_reply=False, settle=0.0)
+        if balance == "off":
+            lk.send("gB", read_reply=False, settle=0.0)   # put the firmware's balance back
     return windows
 
 
@@ -142,6 +152,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--minutes", type=float, default=20.0)
     ap.add_argument("--log", default=None)
+    ap.add_argument("--balance", choices=("leave", "off"), default="leave",
+                    help="'off' sends gb (firmware gyro balance off) for the run and gB afterwards; default leaves it alone")
     ap.add_argument("--volt-every", type=float, default=15.0)
     ap.add_argument("--port", default="/dev/serial0")
     ap.add_argument("--baud", type=int, default=115200)
@@ -151,7 +163,7 @@ def main():
     if not lk.connect():
         raise SystemExit(f"could not open {args.port} @ {args.baud}")
     try:
-        run(lk, args.minutes, args.log, args.volt_every)
+        run(lk, args.minutes, args.log, args.volt_every, balance=args.balance)
     finally:
         lk.close()
 
