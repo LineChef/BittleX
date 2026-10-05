@@ -271,6 +271,8 @@ class CameraSnapshotter:
             return first
         log.info("exposure: mean %.0f, blown-out %.0f%%, crushed %.0f%% (bump %d)", stats.mean, 100 * stats.clip_high,
                  100 * stats.clip_low, self._bump)
+        if stats.mean >= LIFT_BELOW:
+            self._dark_pinned = False                       # the room is brighter now: the target may work again, so try it when needed
         s0 = self._settled
         if s0 is not None and abs(stats.mean - s0.mean) < 12 and abs(stats.clip_high - s0.clip_high) < 0.04 \
                 and abs(stats.clip_low - s0.clip_low) < 0.04:
@@ -361,7 +363,7 @@ class CameraSnapshotter:
                     pass
                 self._ser = None
             self._bump = self._ae_default                  # the module resets when the port reopens, and the light may have changed
-            self._settled, self._metered_at, self._dark_pinned = None, float("-inf"), False
+            self._settled, self._metered_at = None, float("-inf")      # (the "target does nothing when it is dim" fact is kept: see below)
 
 
 def main() -> None:

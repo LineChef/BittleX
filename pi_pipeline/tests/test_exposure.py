@@ -238,4 +238,7 @@ def test_when_raising_the_target_changes_nothing_it_is_remembered_and_not_tried_
     c.snapshot()
     assert cam.invokes - n == 1                                                  # the look takes a single picture
     c.close()
-    assert not c._dark_pinned                                                    # forgotten when the camera closes (the light may change)
+    assert c._dark_pinned                                                        # kept across a camera close: it is a fact about dim light
+    cam.kind = "fine"                                                            # ...until the room is bright enough to measure well again
+    c.warm()
+    assert not c._dark_pinned
