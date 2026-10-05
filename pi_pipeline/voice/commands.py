@@ -234,6 +234,26 @@ _NOT_A_COMMAND = {"dont", "do", "not", "never", "why", "how", "what", "when", "d
                   "should", "if", "because", "stop", "cant", "wont", "isnt", "arent", "no"}
 
 
+def grammar_phrases() -> list[str]:
+    """The short safety-critical commands (stop, shut down), bare and after the wake word, for a second, tightly
+    constrained recognizer that listens alongside the full one."""
+    base = [*_HALT, *_SHUTDOWN, *_SHUTDOWN_EXACT]
+    return base + [f"gee two {p}" for p in base]
+
+
+def pick_command_hypothesis(full: str, grammar: str) -> str:
+    """Choose between the full recognizer's transcript and the command-grammar recognizer's.
+
+    The grammar result wins only when it is a clean command (no [unk]), the full transcript was not already a command,
+    and the full transcript is short -- a long sentence that merely contains "shut down" stays a conversation."""
+    g = (grammar or "").strip()
+    if not g or "[unk]" in g or match_local_command(g) is None:
+        return full
+    if match_local_command(full) is not None or len(full.split()) > 6:
+        return full
+    return g
+
+
 def is_clear_shutdown(text: str) -> bool:
     """True only for a short imperative like "shut down", "G2 shut down", "please shut yourself down", "power off"."""
     n = _normalize(text)

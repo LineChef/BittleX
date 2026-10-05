@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import queue
 import time
 from pathlib import Path
@@ -51,10 +52,27 @@ class VoskSTT:
         self.last_speech_t: float | None = None   # monotonic time the partial transcript last changed (~ end of speech)
         self._model = get_model(str(p))      # shared with the wake-word detector
         self._Recognizer = KaldiRecognizer
+        # a second recognizer limited to the stop / shut-down phrases hears the same audio; see pick_command_hypothesis
+        self._grammar: str | None = None
+        if os.environ.get("G2_STT_COMMAND_GRAMMAR", "1") != "0":
+            from .commands import grammar_phrases
+            self._grammar = json.dumps([*grammar_phrases(), "[unk]"])
 
     def listen(self, timeout_s: float | None = None) -> str:
         rec = self._Recognizer(self._model, self._rate)
+        grammar = getattr(self, "_grammar", None)
+        grec = self._Recognizer(self._model, self._rate, grammar) if grammar else None
         q: "queue.Queue[bytes]" = queue.Queue()
+
+        def finish(full: str) -> str:
+            if grec is None:
+                return full
+            from .commands import pick_command_hypothesis
+            heard = json.loads(grec.FinalResult()).get("text", "").strip()
+            chosen = pick_command_hypothesis(full, heard)
+            if chosen != full:
+                log.info("command grammar overrode %r with %r", full, chosen)
+            return chosen
 
         def cb(indata, _frames, _t, status):
             if status:
@@ -76,10 +94,12 @@ class VoskSTT:
                 except queue.Empty:
                     data = None
                 if data is not None:
+                    if grec is not None:
+                        grec.AcceptWaveform(data)
                     if rec.AcceptWaveform(data):          # Vosk's own endpointer fired
                         text = json.loads(rec.Result()).get("text", "").strip()
                         if text:
-                            return text
+                            return finish(text)
                     partial = json.loads(rec.PartialResult()).get("partial", "").strip()
                     if partial and partial != last_partial:
                         said_anything, quiet_blocks, last_partial = True, 0, partial
@@ -89,7 +109,7 @@ class VoskSTT:
                         # endpointer would wait 0.75-1.1 s of silence; this ends the turn sooner.
                         quiet_blocks += 1
                         if quiet_blocks >= self._silence_blocks:
-                            return json.loads(rec.FinalResult()).get("text", "").strip()
+                            return finish(json.loads(rec.FinalResult()).get("text", "").strip())
                 if (not said_anything and timeout_s is not None
                         and time.monotonic() - t_start > timeout_s):
                     return ""
