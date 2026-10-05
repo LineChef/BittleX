@@ -83,7 +83,8 @@ def main() -> None:
         else:
             cue = LogCue()
 
-        watcher = _start_battery_watch(args.actuator, actuator, play_siren=voice and tts_mode != "print")
+        tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=voice and tts_mode != "print")
 
         loop = VoiceLoop(
             wake_word=make_wake_word(
@@ -97,8 +98,7 @@ def main() -> None:
                 silence_s=settings.stt_silence_s,
             ),
             conversation=Conversation(settings),
-            tts=make_tts(tts_mode, piper_model_path=settings.piper_model_path,
-                        style=settings.voice_style),
+            tts=tts,
             actuator=actuator,
             cue=cue,
             memory=memory,
@@ -114,7 +114,25 @@ def main() -> None:
                 memory.close()
 
 
-def _start_battery_watch(actuator_mode: str, actuator, *, play_siren: bool):
+def make_battery_alert(tts, audible: bool, siren=None):
+    """The low-battery alert: a diag event, then (when `audible`) the star_trek_red_alert siren twice, then G2 says so in its
+    robot voice. `siren` is a callable that plays the siren and returns when it ends (default: the real one)."""
+    from ..power.battery import ALERT_MESSAGES
+
+    def on_alert(level, volts):
+        diag.event("sys", "WARN", "battery.low", battery_level=level.name.lower(), volts=round(volts, 2))
+        if not audible:
+            return
+        if siren is None:
+            from . import star_trek_red_alert
+            star_trek_red_alert.play(count=2, wait=True)
+        else:
+            siren()
+        tts.speak(ALERT_MESSAGES[level])
+    return on_alert
+
+
+def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool):
     """Watch the robot's battery and play the star_trek_red_alert siren when it is low. Reads the voltage through the serial
     actuator, or, when the actuator is a mock (G2 is not allowed to move), through a read-only link of its own, since asking
     for the voltage moves nothing. No serial port (e.g. a laptop) means no watch."""
@@ -137,14 +155,8 @@ def _start_battery_watch(actuator_mode: str, actuator, *, play_siren: bool):
     else:
         return None
 
-    def on_alert(level, volts):
-        diag.event("sys", "WARN", "battery.low", level=level.name.lower(), volts=round(volts, 2))
-        if play_siren:
-            from . import star_trek_red_alert
-            star_trek_red_alert.play(count=2)
-
     monitor = BatteryMonitor(settings.battery_low_v, settings.battery_critical_v)
-    return BatteryWatcher(reader, on_alert, monitor=monitor, poll_s=settings.battery_poll_s).start()
+    return BatteryWatcher(reader, make_battery_alert(tts, audible), monitor=monitor, poll_s=settings.battery_poll_s).start()
 
 
 if __name__ == "__main__":

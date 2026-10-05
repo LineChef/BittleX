@@ -68,3 +68,29 @@ def test_a_failing_alert_handler_does_not_break_the_watcher():
         raise RuntimeError("no speaker")
     w = BatteryWatcher(lambda: 6.0, boom, monitor=BatteryMonitor(confirm=1), poll_s=1)
     assert w.poll_once(now=0.0) is BatteryLevel.CRITICAL
+
+
+def test_alert_plays_the_siren_then_speaks_the_matching_line():
+    from pi_pipeline.voice.__main__ import make_battery_alert
+    events, said = [], []
+    tts = type("T", (), {"speak": lambda self, t: events.append(("say", t))})()
+    on_alert = make_battery_alert(tts, audible=True, siren=lambda: events.append(("siren",)))
+    on_alert(BatteryLevel.LOW, 6.9)
+    on_alert(BatteryLevel.CRITICAL, 6.5)
+    assert events == [("siren",), ("say", "My battery is low."), ("siren",),
+                      ("say", "My battery is critically low. Please charge me.")]
+
+
+def test_a_silent_setup_neither_sounds_the_siren_nor_speaks():
+    from pi_pipeline.voice.__main__ import make_battery_alert
+    events = []
+    tts = type("T", (), {"speak": lambda self, t: events.append(t)})()
+    make_battery_alert(tts, audible=False, siren=lambda: events.append("siren"))(BatteryLevel.LOW, 6.9)
+    assert events == []
+
+
+def test_the_real_diag_event_call_does_not_raise():
+    # regression: a keyword named `level` clashed with Diag.event's own `level` argument, so the siren never sounded
+    from pi_pipeline.voice.__main__ import make_battery_alert
+    tts = type("T", (), {"speak": lambda self, t: None})()
+    make_battery_alert(tts, audible=False)(BatteryLevel.LOW, 6.9)
