@@ -121,6 +121,14 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
 
 - [ ] Real sim-to-real gap work: re-score on the real path, the scripted-vs-learned comparison ([`rl/h1-rubric.md`](rl/h1-rubric.md)),
       sysid against real logs, and retrain if warranted. Blocked first on the FL shoulder servo.
+- [ ] **Fresh hardware measurements, then a new 20M training run on them (planned 2026-10-06; do not launch until asked).** G2 now has the case, camera,
+      microphone and speaker mounted and weighs about 422 g, against the sim's roughly 377 g. (1) Measure: weigh the body and the Pi stack separately, find the
+      balance point, and take a fresh set of six logged hard-floor V2.1 walks (`tools/g2_baseline.sh`, with the voltage logged under load) once the pack is charged.
+      (2) Update the sim from the data in [`rl/real-walk-log.md`](rl/real-walk-log.md) "Candidate sim changes": the measured payload mass and position (backlog H2),
+      more body-roll disturbance (real roll swing is about 1.7x the sim's), heading-drift randomization, a wider IMU bias range, and a friction / foot-slip check
+      (the real robot travels about 16% farther). (3) Train a fresh from-scratch 20M run (not a fine-tune of V2.1), judged on its own 3M checkpoint against the
+      previous 20M run's 3M checkpoint, then scored through the real path (`benchmark_decathlon.py --hw i`) and walked on G2 against V2.1.
+      Goal: a sim that matches the real hardware more closely, and a better gait.
 - [ ] Find and test the self-right trigger command for BiBoard V1 (serial, not the IR remote).
 
 ## Phase 7 — Voice + Claude 🧩
