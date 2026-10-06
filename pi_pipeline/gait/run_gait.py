@@ -745,10 +745,12 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             wd.stop()
         if not in_service:
             _send(lk, "gp")    # stream off (lowercase C_PRINT_OFF, not a toggle)
-        if getattr(stop_event, "rest", True):
-            _send(lk, "d")     # rest
         if disable_firmware_balance and not in_service:
-            _send(lk, "gB")    # restore the firmware default (balance + reflexes on)
+            _send(lk, "gB")    # restore the firmware default (balance + reflexes on) BEFORE the rest: sent right after `d` it left G2 standing
+            time.sleep(0.3)
+        if getattr(stop_event, "rest", True):
+            _send(lk, "d")     # rest, last, then a pause so the board has it before the port closes
+            time.sleep(0.5)
         if vision is not None:
             vision.close()
         if logf:

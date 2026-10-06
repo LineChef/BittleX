@@ -193,7 +193,7 @@ def test_loop_ticks_at_control_rate_not_imu_print_rate(rg, monkeypatch):
     assert lk._emitted <= 16           # while only ~5 IMU frames/s arrived (incl. setup pauses)
     # balance off is the explicit "gb" (bare "g" toggles), restored on exit
     assert "g" not in lk.sent and lk.sent.index("gb") < lk.sent.index("gP")
-    assert lk.sent[-1] == "gB"
+    assert lk.sent[-1] == "d" and lk.sent[-2] == "gB"     # balance restored first, the rest LAST (gB right after d left G2 standing, 2026-10-06)
 
 
 def test_gait_move_command_is_simultaneous_i_not_sequential_m():
