@@ -31,6 +31,13 @@ CONTROL_HZ = 80.0
 
 # Factors to weight rewards and penalties.
 PENALTY_STEPS = 5e5       # Increase of penalty by step_counter/PENALTY_STEPS -- was 2e6 (exactly equal to total training length in every run so far, v1-v4), meaning the penalty was still shifting the reward landscape for the entire run. Lowered so it reaches full, stable strength at 25% through a 2M-step run, leaving most of training to converge under a non-shifting reward.
+# RAMP_MODE (2026-10-06 fix): PENALTY_STEPS / DR_RAMP_STEPS above count ONE env's own steps, and train.py runs 8 envs, so both ramps
+# reached full strength only at 8 x 5e5 = 4M total steps (every 3M screening run trained and was judged at ~0.75x), and the counter
+# restarts at 0 whenever an env is created, so every --from continuation re-ramped from zero. "total" (default): when the trainer
+# reports the run's total step count (set_ramp_steps, called by train.py's RampSync callback), both ramps run over RAMP_TOTAL_STEPS
+# total steps, and a continuation starts at full strength. Without a trainer (probes, benchmarks, older scripts) nothing reports
+# a count and the per-env "legacy" ramp applies unchanged. "legacy" forces the old behaviour everywhere.
+RAMP_TOTAL_STEPS = 1e6
 PENALTY_RAMP_CAP = 1.0    # 2026-09-23: cap on penalty_scale (steps / PENALTY_STEPS, per env). It was
                           # uncapped, so shaping penalties grew ~5x by the end of a 20M run with 8
                           # envs -- the comment above intends "full, stable strength", and every
@@ -720,6 +727,8 @@ CARPET_SOFT        = _g2e("CARPET_SOFT", CARPET_SOFT)
 CARPET_SWELL       = _g2e("CARPET_SWELL", CARPET_SWELL)
 SERVO_RATE_LIMIT_DEG_S = _g2e("SERVO_RATE_LIMIT_DEG_S", SERVO_RATE_LIMIT_DEG_S)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
+RAMP_MODE          = _g2e("RAMP_MODE", "total")                      # "total" | "legacy" (see RAMP_TOTAL_STEPS)
+RAMP_TOTAL_STEPS   = _g2e("RAMP_TOTAL_STEPS", RAMP_TOTAL_STEPS)
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
@@ -809,6 +818,7 @@ class OpenCatGymEnv(gym.Env):
     def __init__(self):
         self.step_counter = 0
         self.step_counter_session = 0
+        self._train_total_steps = None   # set by the trainer (set_ramp_steps); None = legacy per-env ramp
         self._dr = 0.0            # domain-randomization ramp for the current episode
         self._push_curr = 0.55   # adaptive push-magnitude multiplier (surv_r12)
         self._ep_outcomes = []   # last few episodes: 1 survived to length, 0 fell
@@ -1175,6 +1185,12 @@ class OpenCatGymEnv(gym.Env):
         if IMU_RATE_ZERO:
             obs_vel_clip = np.zeros(2)
             ang_acc = np.zeros(2)
+        # Probe-only yaw-convention check (drift_probe.py yawflip / yawzero): the policy sees its
+        # yaw times this sign (0 = always straight ahead). Obs only; default 1.0 = unchanged.
+        _yaw_sign = getattr(self, '_obs_yaw_sign', 1.0)
+        if _yaw_sign != 1.0:
+            _e = p.getEulerFromQuaternion(obs_ang)
+            obs_ang = p.getQuaternionFromEuler([_e[0], _e[1], _yaw_sign * _e[2]])
         # R2 (resiliency campaign): persistent per-episode roll/pitch bias --
         # mount tilt or IMU calibration error -- distinct from RANDOM_GYRO's
         # zero-mean per-step noise below. Applied before the noise layer (bias
@@ -1382,7 +1398,7 @@ class OpenCatGymEnv(gym.Env):
         else:
             _dir = np.sign(self._cmd_fwd)
             capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
-        penalty_scale = self.step_counter_session / PENALTY_STEPS
+        penalty_scale = self._ramp(PENALTY_STEPS)
         if PENALTY_RAMP_CAP > 0:
             penalty_scale = min(penalty_scale, PENALTY_RAMP_CAP)
         # Scripted-gait lessons (docs/rl/gait-benchmark.md): keep feet on the ground
@@ -1685,6 +1701,16 @@ class OpenCatGymEnv(gym.Env):
         if yaw is not None:
             self._cmd_yaw = float(np.clip(yaw, -CMD_YAW_MAX, CMD_YAW_MAX))
 
+    def set_ramp_steps(self, total_steps):
+        """Trainer hook (train.py RampSync): the run's total env steps so far, for the penalty / DR ramps."""
+        self._train_total_steps = float(total_steps)
+
+    def _ramp(self, per_env_steps):
+        """Ramp progress, uncapped (callers cap it). See RAMP_MODE."""
+        if RAMP_MODE == "legacy" or self._train_total_steps is None:
+            return self.step_counter_session / per_env_steps
+        return self._train_total_steps / RAMP_TOTAL_STEPS
+
     def set_goal(self, bearing=None, dist=None):
         """Force this episode's goal (eval). bearing rad (0=ahead, +=left), dist m.
         set_goal(None, None) clears the forced goal; pass bearing='none' for a
@@ -1792,7 +1818,7 @@ class OpenCatGymEnv(gym.Env):
         if DR_EVAL_FULL or DR_RAMP_STEPS <= 0:
             self._dr = 1.0
         else:
-            self._dr = min(1.0, self.step_counter_session / DR_RAMP_STEPS)
+            self._dr = min(1.0, self._ramp(DR_RAMP_STEPS))
         p.resetSimulation()
         # Disable rendering during loading.
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)

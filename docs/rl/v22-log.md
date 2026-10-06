@@ -1,5 +1,8 @@
 # v2.2: fixing the drift to one side on the 422 g robot (2026-10-06)
 
+> **CLOSED 2026-10-06 (12:45 PM): no round passed and the 20M run was not started. Superseded by [`v3-retrain-plan.md`](v3-retrain-plan.md),
+> which also records R3's result and why the drift-torque approach was dropped.** Kept as the record of what was tried.
+
 **Starting a new session? Read [`v22-handoff.md`](v22-handoff.md) first** (what was tried, what remains, state snapshot). Plan, findings and round results for the next policy. Status of the run itself is in [`../STATUS.md`](../STATUS.md); this is the working log.
 
 ## Why

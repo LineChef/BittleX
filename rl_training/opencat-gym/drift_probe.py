@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--lever", default="", help="a fixed asymmetry for EVERY episode, ';'-separated: offset:J:DEG (servo zero), stroke:J:SCALE (swing amplitude "
                     "of shoulder/hip J), torque:J:SCALE (motor force of joint J), fric:L:SCALE (lateral friction of foot link L), clip:J:DEG (servo J cannot go above DEG: a sticking servo), yawtorque:NM (constant "
-                    "yaw torque on the body), payy:M (payload sideways shift, metres). Joints: 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn")
+                    "yaw torque on the body), yawflip / yawzero (the policy sees its yaw negated / always 0: the real loop's yaw-sign question), payy:M (payload sideways shift, metres). Joints: 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn")
     a = ap.parse_args()
     levers = [x.split(":") for x in a.lever.split(";") if x]
     np.random.seed(a.seed)
@@ -64,6 +64,10 @@ def main():
                 env._motor_max[int(lv[1])] = np.deg2rad(float(lv[2]))
             elif kind == "yawtorque":
                 yaw_torque = float(lv[1])
+            elif kind == "yawflip":
+                env._obs_yaw_sign = -1.0
+            elif kind == "yawzero":
+                env._obs_yaw_sign = 0.0
             elif kind == "payy":
                 if env._payload_id is not None:
                     for c in range(p.getNumConstraints()):

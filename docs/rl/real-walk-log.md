@@ -109,8 +109,9 @@ the rest pose is right when the leg first drops into it; (2) the firmware step g
   every V2.1 run. The sim body rolls ~4 deg std in the same replay (see "Sim vs real").
 - **Heading drifts right** (log yaw positive = right; includes hand corrections). Run 1 (before the
   IMU calibration) was a steady ~10 deg/s right turn (+132 deg); later runs wander a few degrees
-  because the user steered them back; hands-off run 6 drifted +16 deg. The loop discards the IMU
-  yaw, so nothing holds a heading.
+  because the user steered them back; hands-off run 6 drifted +16 deg. (Corrected 2026-10-06: the loop
+  does feed the rebased yaw to the policy, since `79da931`, but with the opposite sign to the sim's and V2.1
+  ignores it, so nothing holds a heading; see [`v3-retrain-plan.md`](v3-retrain-plan.md) §1.1.)
 - **Distance is consistent run to run**; drift is the part that varies.
 - **Policy command bias (from the logs):** averaged over the hard-floor runs V2.1 commands the
   back-left shoulder ~+7.5 deg and back-right knee ~-7.8 deg off the scripted pose (the uneven

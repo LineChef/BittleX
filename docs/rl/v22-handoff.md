@@ -1,5 +1,7 @@
 # v2.2 hand-off: fixing G2's drift to the right (written 2026-10-06, 12:07 PM ET)
 
+> **CLOSED 2026-10-06: do not resume this campaign.** The current work is [`v3-retrain-plan.md`](v3-retrain-plan.md) (start at §0).
+
 For a new session picking this up. Read this, then [`v22-log.md`](v22-log.md) (working log, round table, resume commands) and [`../STATUS.md`](../STATUS.md). Snapshot copies of the run's JSON and log
 are in [`v22-data/`](v22-data/) (the live files are in `rl_training/opencat-gym/trained/`, which git ignores).
 
