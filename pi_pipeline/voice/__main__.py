@@ -295,7 +295,9 @@ def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, li
         return None
 
     monitor = BatteryMonitor(settings.battery_low_v, settings.battery_critical_v)
-    return BatteryWatcher(reader, make_battery_alert(tts, audible), monitor=monitor, poll_s=settings.battery_poll_s).start()
+    from ..power.battery import make_voltage_log
+    return BatteryWatcher(reader, make_battery_alert(tts, audible), monitor=monitor, poll_s=settings.battery_poll_s,
+                          record=make_voltage_log(settings.battery_log), record_every_s=settings.battery_log_every_s).start()
 
 
 if __name__ == "__main__":

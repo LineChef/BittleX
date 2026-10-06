@@ -124,3 +124,30 @@ def test_serial_actuator_serialises_a_voltage_read_with_commands():
         act.send_token("b1 4")
     t.join()
     assert "P" in order and "b1 4" in order
+
+
+def test_voltage_history_is_recorded_at_most_every_interval_and_never_stops_the_watch(tmp_path):
+    from pi_pipeline.power.battery import BatteryWatcher, make_voltage_log
+
+    t = [0.0]
+    path = tmp_path / "v.csv"
+    w = BatteryWatcher(lambda: 7.84, lambda *a: None, record=make_voltage_log(str(path)), record_every_s=300, clock=lambda: t[0])
+    for step in (0, 60, 120, 300, 360, 600):
+        t[0] = step
+        w.poll_once()
+    lines = path.read_text().splitlines()
+    assert lines[0] == "time,volts" and len(lines) == 1 + 3          # at 0 s, 300 s and 600 s
+    assert lines[1].endswith(",7.84")
+
+    bad = BatteryWatcher(lambda: 7.8, lambda *a: None, record=lambda v: 1 / 0)
+    assert bad.poll_once() is None and bad.last_volts == 7.8
+
+
+def test_voltage_log_rotates_when_large(tmp_path):
+    from pi_pipeline.power.battery import make_voltage_log
+
+    rec = make_voltage_log(str(tmp_path / "v.csv"), max_bytes=40)
+    for _ in range(5):
+        rec(7.5)
+    assert (tmp_path / "v.csv.1").exists()
+    assert make_voltage_log("") is None

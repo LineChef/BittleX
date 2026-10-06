@@ -104,7 +104,10 @@ class BatteryWatcher:
     """Polls `read_voltage()` every `poll_s` on a daemon thread and calls `on_alert(level, volts)` when the monitor says to.
     `read_voltage` returns volts or None (e.g. a gait is running, or no link): None readings are skipped."""
 
-    def __init__(self, read_voltage, on_alert, *, monitor: BatteryMonitor | None = None, poll_s: float = 60.0):
+    def __init__(self, read_voltage, on_alert, *, monitor: BatteryMonitor | None = None, poll_s: float = 60.0,
+                 record=None, record_every_s: float = 300.0, clock=time.monotonic):
+        self._record, self._record_every_s, self._clock = record, record_every_s, clock
+        self._last_recorded: float | None = None
         self._read = read_voltage
         self._on_alert = on_alert
         self.monitor = monitor or BatteryMonitor()
@@ -122,6 +125,7 @@ class BatteryWatcher:
         if v is None:
             return None
         self.last_volts = v
+        self._maybe_record(v)
         level = self.monitor.update(v, now)
         if level is not None:
             log.warning("battery %s: %.2f V", level.name.lower(), v)
@@ -130,6 +134,19 @@ class BatteryWatcher:
             except Exception:  # noqa: BLE001 -- an alert failing must not stop the watch
                 log.debug("battery alert handler raised", exc_info=True)
         return level
+
+    def _maybe_record(self, v: float) -> None:
+        """Hand the reading to `record` at most once per `record_every_s` (the history of the discharge curve)."""
+        if self._record is None:
+            return
+        t = self._clock()
+        if self._last_recorded is not None and t - self._last_recorded < self._record_every_s:
+            return
+        self._last_recorded = t
+        try:
+            self._record(v)
+        except Exception:  # noqa: BLE001 -- the history must never stop the watch
+            log.debug("battery record raised", exc_info=True)
 
     def start(self) -> "BatteryWatcher":
         def _run() -> None:
@@ -143,3 +160,25 @@ class BatteryWatcher:
 
     def stop(self) -> None:
         self._stop.set()
+
+
+def make_voltage_log(path: str, max_bytes: int = 1_000_000):
+    """A `record(volts)` callable that appends `local ISO time,volts` lines to `path` (created with a header; rotated to `path + ".1"` past
+    `max_bytes`). Returns None for an empty path."""
+    if not path:
+        return None
+    import os
+
+    path = os.path.expanduser(path)
+
+    def record(volts: float) -> None:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        if os.path.exists(path) and os.path.getsize(path) > max_bytes:
+            os.replace(path, path + ".1")
+        new = not os.path.exists(path)
+        with open(path, "a") as f:
+            if new:
+                f.write("time,volts\n")
+            f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')},{volts:.2f}\n")
+
+    return record

@@ -164,6 +164,9 @@ class Settings:
     battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.2))   # ~20% of a 2S Li-ion pack at rest
     battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 6.6))
     battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 60.0))
+    # G2's pack voltage history, one line per `battery_log_every_s` (empty path = off)
+    battery_log: str = field(default_factory=lambda: _env("G2_BATTERY_LOG", "~/.local/share/g2/battery_voltage.csv"))
+    battery_log_every_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOG_EVERY_S", 300.0))
     # The Pi's own battery can't be read, so its charge is estimated from uptime against the measured runtime per charge.
     pi_runtime_log: str = field(default_factory=lambda: os.path.expanduser(_env("G2_PI_RUNTIME_LOG", "~/.local/share/g2/pi_runtime.json")))
     pi_full_runtime_s: float = field(default_factory=lambda: _env_float("G2_PI_FULL_RUNTIME_S", 0.0))   # 0 = use the mean of the logged runs
