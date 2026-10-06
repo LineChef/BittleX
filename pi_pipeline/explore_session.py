@@ -16,9 +16,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import queue
 import signal
 import threading
 import time
+import types
 
 log = logging.getLogger("g2.explore_session")
 CMD_FILE = os.path.expanduser("~/.g2_explore_cmd")
@@ -61,7 +63,11 @@ def main() -> None:
         if link is None:
             raise SystemExit("no serial link to the BiBoard")
         vision = _make_vision_source() if features.vision else None
-        rt = _build_runtime(link, hz=args.hz, memory=None, frame_source=vision)     # no memory: place notes would name bonded people
+        # place notes ("the dog is often to the left") come from the behavior thread, but the memory database belongs to this one:
+        # queue them and write them from the main loop below
+        notes: "queue.Queue[str]" = queue.Queue()
+        deferred = types.SimpleNamespace(store=types.SimpleNamespace(add_fact=notes.put)) if memory is not None else None
+        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision)
 
         # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
         from dataclasses import replace
@@ -124,6 +130,11 @@ def main() -> None:
         try:
             while t.is_alive() and not stop_flag.is_set() and time.monotonic() - started < args.max_s:
                 time.sleep(0.5)
+                while memory is not None and not notes.empty():
+                    try:
+                        memory.store.add_fact(notes.get_nowait())
+                    except Exception:  # noqa: BLE001
+                        log.exception("saving a place note failed")
                 cmd = _read_command()
                 if cmd == "stop":
                     break
