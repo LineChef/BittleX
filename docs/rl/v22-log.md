@@ -20,12 +20,16 @@ Six real hard-floor V2.1 walks on the case (2026-10-06, [`real-walk-log.md`](rea
   shoulder servo, the mount, ...); it teaches "steer back when the heading error grows", which helps whatever the cause is. No new observation, so the deployed code and export are unchanged.
 
 ## Method
-At most five fresh 3M-step rounds (`phase_v22.py`, queue in `trained/v22_queue.json`), each judged against the frozen V2.1 in the same sim: calm flat walk (falls, speed),
+At most six fresh 3M-step rounds (`phase_v22.py`, queue in `trained/v22_queue.json`), each judged against the frozen V2.1 in the same sim: calm flat walk (falls, speed),
 the same walk under a reference yaw disturbance (heading error), yaw rate, and seven decathlon cells. A round passes if the calm walk does not regress and the drift
 under the disturbance is at least halved. Then one 20M run with the best recipe plus the hard levels raised 10% (`G2E_HARD_SCALE=1.10`: shoves, slope range, overheat
 cutback, obstacle and rubble heights; the nominal walk is not scaled), gated at 3M and 5M. The benchmark reports V2.1 and the new policy on the original ladder and on a
 ladder with the hardest rung of each category raised 10%; results from the harder levels are marked and not compared with older runs' numbers.
 Promotion to V2.2 and deployment happen only if the 20M run finishes and passes the final checks (see the plan given to the user, 2026-10-06).
+
+Round budget (user, 2026-10-06): up to six rounds. Rounds 1-5 test one lever at a time (drift fixes and yaw-wobble fixes); the last round tests the best drift fix and
+the best yaw fix together. The better of that combined round and the best single-lever round goes to the hardware check-in (testing pauses before the 20M run so the
+best 3M policy can be walked on G2; the user will also swap the front-left shoulder servo around then).
 
 ## Rounds
 (filled in as they finish)
