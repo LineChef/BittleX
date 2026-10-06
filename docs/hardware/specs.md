@@ -170,6 +170,21 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
   — weigh each sub-assembly, balance it on an edge for its CoM — and set
   `PAYLOAD_*` / `HEAD_*` to the measured values.
 
+## G2 weights as used in the sim (2026-10-06)
+
+One measurement, the rest assumed. **Do not look these up again; re-weigh and edit this table if anything changes.**
+
+| Part | Mass | Basis | In the sim (`PAYLOAD_PROFILE=case`) |
+|---|---|---|---|
+| **Whole G2** with case, Pi stack, camera, microphone and speaker | **422 g** | **measured** (one weighing, 2026-10-06) | total = 301 + 86 + 15 + 20 |
+| Base robot (Bittle X V2, alloy servos, battery) | about 301 g | assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare. | URDF links |
+| Camera cluster (Grove Vision AI V2 + OV5647 + case + cable) | 15 g | estimate; Seeed publishes no weight for the module | front body at (0.055, 0, 0.020) m, 15 +/- 5 g |
+| Speaker + amp (NS4168 kit) | 20 g | estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit | rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g |
+| Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring | 86 g | derived: 422 - 301 - 15 - 20 | spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g |
+
+All of it is attached to the case, which sits on the middle of the spine: camera at the front, speaker at the very back, microphone on top of the lid.
+The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
+
 ## Bittle X body + battery
 
 | Spec | Value |
