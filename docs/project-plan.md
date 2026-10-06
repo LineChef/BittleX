@@ -121,7 +121,11 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
 
 - [ ] Real sim-to-real gap work: re-score on the real path, the scripted-vs-learned comparison ([`rl/h1-rubric.md`](rl/h1-rubric.md)),
       sysid against real logs, and retrain if warranted. Blocked first on the FL shoulder servo.
-- [ ] **Fresh hardware measurements, then a new 20M training run on them (planned 2026-10-06; do not launch until asked).** G2 now has the case, camera,
+- [ ] **V3 gait retrain: plan approved 2026-10-06 — [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) (start at §0).** It replaces the item
+      below and the closed v2.2 campaign: calibrate the sim to G2, single-lever 3M screens (incl. mirror symmetry and a turning gate), a staged
+      chain, a hardware check-in, then one 20M run with gait checks at 3M/5M/10M and no planned tuning runs after it. Why V2.1 drifts:
+      [`rl/real-walk-log.md`](rl/real-walk-log.md) "Why V2.1 drifts right".
+- [ ] *(Superseded by the V3 plan above; kept for its measurement list.)* **Fresh hardware measurements, then a new 20M training run on them (planned 2026-10-06; do not launch until asked).** G2 now has the case, camera,
       microphone and speaker mounted and weighs about 422 g, against the sim's roughly 377 g. (1) Measure: the six logged hard-floor V2.1 walks are done (2026-10-06, `tools/g2_baseline.sh`, voltage logged under load);
       still to do: weigh the body and the Pi stack separately and find the balance point.
       (2) Update the sim from the data in [`rl/real-walk-log.md`](rl/real-walk-log.md) "Candidate sim changes": the measured payload mass and position (backlog H2),

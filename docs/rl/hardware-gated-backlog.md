@@ -35,6 +35,8 @@ layer the sim baseline doesn't) for plain walking on real ground?
 
 ## H2 — Payload re-tuning  🟡
 
+> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](v3-retrain-plan.md):** the measured 422 g `case` payload goes into the V3 base recipe.
+
 `run20m_ppo` is **payload-conditioned** — trained with a single 75 g welded rear
 payload every episode. The gait's stability leans on that mass.
 
@@ -89,6 +91,8 @@ setup, not the reward: this, and the original Run 6/7 conclusion.
   in eval).
 
 ## H5 — Command-conditioned turning (yaw)  🔴
+
+> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](v3-retrain-plan.md) as lever Y4, gated:** trained only if the contact-calibrated sim can turn the firmware `wkL`/`wkR` at least 50% as fast as G2 does (Phase 1).
 
 Turning was **dropped in G4** — `cmd_yaw` is always 0, heading-hold only. Firmware
 turn gaits (`wkL`/`wkR`) work today.
@@ -292,6 +296,8 @@ mitigation layers, and the arXiv:2605.27046 residual-policy blueprint in
 
 ## H12 — Training-course redesign  🟡  ⚪
 
+> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](v3-retrain-plan.md):** the sharp box obstacles come back in the V3 course.
+
 The redesigned rubble-primary / wider-slope course was tested head-to-head as a
 fresh 20M (`run20m_newcourse`, 2026-09-05). **Negative result** — equivalent on
 the core payload-on ladder, but large clean regressions on bare-robot, ledges/
@@ -314,6 +320,8 @@ generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
   eventually; tabled while gait training is paused pre-hardware.
 
 ## H13 — Servo response characterization (τ, speed ceiling)  🟡
+
+> **Picked up 2026-10-06 by [`v3-retrain-plan.md`](v3-retrain-plan.md) (Phase 0 step 4):** removing the 137 deg/s limit makes the sim's roll swing match G2's ([`real-walk-log.md`](real-walk-log.md) "Why V2.1 drifts right"), so G2's real servo speed is measured and calibrated in before training.
 
 Found reviewing community Bittle/Petoi projects (2026-09-24,
 [`../research/community-projects.md`](../research/community-projects.md)):

@@ -13,6 +13,10 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 
 ## Where we left off
 
+> **2026-10-06:** the gait's next steps are in [`v3-retrain-plan.md`](v3-retrain-plan.md) (start at §0), which supersedes the open questions
+> below for walking. The drift is explained as far as the data allows in "Why V2.1 drifts right" further down. Carpet questions (3-4 below)
+> are deferred to their own session. The "Uncommitted at the pause" note at the end of this list is out of date (everything is pushed).
+
 **State of the robot**
 - Deployed gait: `Release_CandidateV2.1` (`DEFAULT_POLICY`; sidecar `cmd_send_every_n: 3`, so the
   loop sends a joint command every 3rd tick, as it was trained). Firmware balance is turned off
@@ -267,6 +271,60 @@ spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs
 - **Battery under load:** 9 readings during the walks, 8.07 to 8.45 V (diag event `gait/battery.load`); the pack sat at 8.51 V before and 8.34 V after. So walking
   sags a full pack by about 0.3-0.45 V. The sag on a nearly empty pack is not measured; G2 browned out walking at a resting 7.58 V (2026-10-06, 12:12 AM).
 - **Not measured:** distance walked (no tape measure this time) and a weight breakdown (body vs Pi stack) and balance point.
+
+## Why V2.1 drifts right (investigation, 2026-10-06)
+
+The six walks above all turned about +142 deg right in 12.7 s. This section is the record of what was tested and what it shows; the plan
+built on it is [`v3-retrain-plan.md`](v3-retrain-plan.md). Raw results and the exact commands: [`v3-data/`](v3-data/README.md).
+
+**Ruled out: the Pi's yaw sign.**
+- The firmware stream reports + yaw for a right turn (confirmed with `kvtF` on 10-02, below). PyBullet, where the policy was trained,
+  reports + yaw for a left turn. `run_gait.py` fed the rebased yaw into the policy unflipped from `79da931` (2026-09-23) until 2026-10-06,
+  so the policy's heading input on G2 had the wrong sign.
+- In the sim, V2.1 drifts the same however heading is fed (`drift_probe.py --lever yawflip|yawzero`, 422 g, 24 x 12.5 s). Mean heading
+  change: normal +9.4 deg, negated +8.4, always 0 +9.1; 0 falls in all three; joint means equal to 0.1 deg. **V2.1 doesn't use heading**,
+  so the sign couldn't cause the turn.
+- Offline replay of these six walks through the ONNX policy (`replay_real_obs.py`) reproduces 100% of the logged joint commands, so the Pi
+  ran V2.1 exactly. Negating yaw moves the commands only 1-4 deg, and only once G2 is already far off course.
+- Why V2.1 ignores heading:
+  - Training episodes are 3.1 s, so heading error barely builds up.
+  - Nothing pushed it off course in training.
+  - Heading is only available inside the orientation quaternion.
+  - The quadratic heading penalty is nearly flat near straight.
+- **Fixed anyway on 2026-10-06** (`run_gait.POLICY_YAW_SIGN`, `c292431`): any policy that does learn heading would otherwise steer the wrong
+  way. Logs keep the firmware convention (+ = right).
+
+**What causes it, as far as the data goes: an asymmetry V2.1 learned in the sim.**
+- The scripted walk is left/right symmetric: mean URDF deg `[46.9 6.0 46.9 6.0 53.0 8.2 53.0 8.2]` (FLsh FLel FRsh FRel BRhip BRkn BLhip
+  BLkn). Mirrored and shifted half a cycle it matches itself to within 4.2 deg.
+- V2.1 holds a fixed asymmetry, BL hip about 60 deg vs BR about 53, in the sim (`[49.1 2.4 48.0 1.3 53.8 2.6 60.2 3.8]`) and on G2 (these six
+  walks: `[47.2 5.3 49.2 3.1 52.9 1.0 60.1 4.8]`).
+- The scripted walk curves **left**, both in the sim (`hw1-log.md` Round 4, called a solver artifact there) and on G2 (open-loop, 10-01
+  table above). V2.1 learned a constant correction against that pull. In the sim it nets a slight left turn (+9 deg / 12.5 s); on G2's real
+  floor the same correction steers far harder (about 140 deg right).
+- Consistent with:
+  - G2 turns at full rate from the first second (run 2: +35 / +72 / +111 / +150 deg at 25/50/75/100%), before any heading error exists.
+  - An open-loop sim replay of these commands also turns right (-30..-37 deg, "Sim vs real" above).
+  - The sim travels about 16% short on the same commands, so its foot contact differs.
+  - `hw1-log.md` Round 4 warned that countering a sim bias could produce the opposite bias on real hardware.
+- **Status: leading hypothesis, not yet confirmed.** The check is the V3 plan's Phase 1: a sim whose contact/friction is calibrated to G2
+  should turn V2.1 right as well. The fix in V3 is structural: a left/right mirror-symmetry loss in training, so a one-sided bias can only
+  be corrected through feedback.
+- **Servo 8 (FL shoulder) is not ruled out, and its fault is not confirmed.** The scripted walk drives it above its ~42 deg sticking point
+  63% of each cycle and still curved left. The user is replacing it, then these six walks get repeated.
+
+**Other sim-vs-G2 gaps measured the same day** (V2.1, calm, 422 g, 12.5 s; `v3-data/drift_probe_sp_*.json`):
+
+| Measure | G2 | Sim as trained | No servo speed limit | No command/servo model | Send every tick |
+|---|---|---|---|---|---|
+| Roll std (deg) | 5.7-6.2 | 3.05 | 5.56 | 7.36 | 3.34 |
+| Pitch std (deg) | 1.9-2.7 | 2.42 | 5.06 | 5.13 | 2.48 |
+| Speed (m/s) | ~0.118 (10-01 taped) | 0.053 | 0.051 | 0.057 | 0.052 |
+| Falls | 0 / 6 | 0 / 8 | 1 / 8 | 2 / 8 | 0 / 8 |
+
+- The 137 deg/s servo speed limit (borrowed from another project, never measured on G2) is the likeliest cause of the roll gap.
+- The sim is about half G2's speed. Part is contact; part is V2.1 slowing past its 3.1 s training length (0.074 m/s over 250 steps vs
+  0.053 over 1000), which G2 doesn't do.
 
 ## Not done / not measured
 

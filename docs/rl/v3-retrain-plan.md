@@ -16,7 +16,8 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 - **4 torch threads** in `train.py` (§4 optimization 1).
 - Probe tools: `drift_probe.py` levers `yawflip` / `yawzero`, `replay_real_obs.py`, `train_throughput.py`.
 - v2.2 closed: its runner exited by itself at 12:45 PM after no round passed; stale log watchers were killed. Nothing is training.
-
+- **Why the drift happens** is recorded in [`real-walk-log.md`](real-walk-log.md) "Why V2.1 drifts right", with raw results in
+  [`v3-data/`](v3-data/README.md). STATUS open problem 3, `project-plan.md`, `hw1-log.md` Round 4 and backlog H2/H5/H12/H13 point here.
 - **Yaw-sign fix (Phase 0 step 1, code DONE 2026-10-06, NOT yet rsynced to the Pi):**
   - `POLICY_YAW_SIGN = -1.0` and `policy_quat()` in `pi_pipeline/gait/run_gait.py`, used for the policy's input in `run()` (reset and every
     tick). The CSV / ring-buffer `yaw` column stays in the firmware convention (+ = right); `imu_parse.py` is unchanged.
@@ -36,59 +37,30 @@ V2.1 baseline walks are repeated to see whether anything changed. The user will 
 
 ## 1. Findings (2026-10-06)
 
-### 1.1 The yaw-sign mismatch is real but doesn't explain V2.1's drift
-- G2's IMU (via `imu_parse.py`) reports + yaw for a RIGHT turn (confirmed 10-02 with `kvtF`, `real-walk-log.md`). PyBullet reports + yaw
-  for a LEFT turn (z up). `run_gait.py:591-592` passes the rebased yaw straight into `euler_to_quat` → the policy, so the policy's heading
-  input on G2 has the wrong sign.
-- **Sim test**: `G2E_PAYLOAD_PROFILE=case python drift_probe.py trained/Release_CandidateV2.1_ppo --episodes 24 --lever yawflip` (and
-  `yawzero`, and none). T1.1 environment, 12.5 s. Mean heading change: normal +9.4 deg, negated +8.4, zero +9.1, all 0/24 falls, joint means
-  equal to 0.1 deg. The hook was verified to change what the policy sees (+27 / -25 / 0 deg). **V2.1 ignores heading.**
-- **Offline replay** of the six 10-06 walks (`python replay_real_obs.py`, defaults to `docs/rl/real-walk-data/2026-10-06/*.csv`):
-  - The logged IMU through the ONNX policy reproduces **100%** of the logged joint commands, so the Pi runs V2.1 exactly.
-  - Negating yaw moves the commands 1-4 deg, growing with heading: shoulder L-R difference shift 0.7 deg at 5-30 deg off course, ~3.7 deg past
-    100 deg.
-  - At large headings the quaternion's x/y parts mix roll and pitch (out of training distribution).
-- **The fix is still required**: any policy that learns to use heading would steer the wrong way on G2.
-- Out-of-date line found: `real-walk-log.md` (10-01 section) says "the loop discards the IMU yaw". The loop has fed yaw since `79da931`
-  (2026-09-23).
+**The evidence (tests, numbers, commands) is recorded in [`real-walk-log.md`](real-walk-log.md) "Why V2.1 drifts right (investigation,
+2026-10-06)"; raw results in [`v3-data/`](v3-data/README.md).** Summary:
+
+### 1.1 The yaw-sign mismatch is real but doesn't explain the drift
+- The Pi fed the policy yaw with the opposite sign to the sim's (firmware + = right, PyBullet + = left). V2.1 doesn't use heading
+  (yawflip / yawzero sim tests: +9.4 / +8.4 / +9.1 deg, identical joints), so this didn't cause the turn.
+- **Fixed anyway** (`run_gait.POLICY_YAW_SIGN`, `c292431`), because a heading-aware policy would steer the wrong way. Offline replay of
+  the six 10-06 walks reproduces 100% of the logged commands, so the Pi ran V2.1 exactly.
 
 ### 1.2 What the drift is, as far as the data goes
-- `wkF` is left/right symmetric: mean URDF deg `[46.9 6.0 46.9 6.0 53.0 8.2 53.0 8.2]` (FLsh FLel FRsh FRel BRhip BRkn BLhip BLkn).
-  Mirrored (swap L/R) and shifted half a cycle (50 of 100 frames) it matches itself to within 4.2 deg max.
-- **V2.1 has learned a fixed asymmetry:**
-  - Sim joint means `[49.1 2.4 48.0 1.3 53.8 2.6 60.2 3.8]`; G2 `[47.2 5.3 49.2 3.1 52.9 1.0 60.1 4.8]`.
-  - BL hip about 60 vs BR about 53, in both.
-- Scripted `wkF` curves LEFT in the sim (the 2026-09-26 "solver artifact", `hw1-log.md` Round 4) and also curved left on G2 (10-01, open
-  loop, `real-walk-log.md` hard-floor table). V2.1 learned a constant counter-steer: it nets +9 deg (left) in the sim, but about -140 deg
-  (right) on G2.
-- Supporting evidence:
-  - G2 turns ~11 deg/s from the first second (yaw at 25/50/75/100%: +35 +72 +111 +150 in run 2), so it isn't heading feedback.
-  - An open-loop sim replay of G2's commands turns the sim right too (-30..-37 deg, `sim_vs_real_walk.py`).
-  - The sim travels ~16% short on the same commands (contact differs).
-  - `hw1-log.md` Round 4 warned that counter-steering a sim bias could produce the opposite bias on real hardware.
-- **Main hypothesis:** a constant L/R asymmetry learned against the sim's left bias, which over-steers on G2's real contact. Phase 1 tests
-  it (a calibrated sim should turn V2.1 right). The cure is structural: mirror symmetry (R1), so a bias can only be corrected through
-  feedback.
-- **Servo 8 is NOT confirmed bad.** It reads stuck near 42 deg in `servo_static_test.py` (`real-walk-log.md` "Servo troubleshooting"), but
-  the scripted walk drives it above 42 deg 63% of each cycle and still curved left. The user is replacing it; the walks get repeated
-  afterwards.
-- v2.2's last round (R3, 3M control, case payload, nothing else): calm falls 0.08, speed 0.040, heading error under the reference
-  disturbance 39.8 deg, yaw rms 0.178. All three v2.2 rounds failed. Results: `trained/v22_results.json`, snapshot in `v22-data/`.
+- **Leading hypothesis (not yet confirmed):**
+  - The scripted walk is left/right symmetric, but it curves left in the sim and on G2.
+  - V2.1 learned a constant counter-steer: BL hip ~60 vs BR ~53 deg, in the sim and on G2.
+  - That correction nets +9 deg (left) in the sim, but about 140 deg right on G2's real floor.
+- Phase 1 checks it: a calibrated sim should turn V2.1 right too. The structural fix is mirror symmetry (R1).
+- **Servo 8 is NOT confirmed bad;** the user is replacing it, then the walks are repeated.
+- v2.2's last round (R3, 3M control, case payload): calm falls 0.08, speed 0.040, heading error under the reference disturbance 39.8 deg.
+  All three v2.2 rounds failed (`v22-data/`).
 
-### 1.3 Gaps between the sim and G2 (V2.1, calm hard floor, case payload; `drift_probe.py`, 8-24 episodes of 12.5 s)
-
-| Measure | G2 | Sim as trained | `G2E_SERVO_RATE_LIMIT_DEG_S=0` | `G2E_CMD_PATH=` + no rate limit | `G2E_CMD_SEND_EVERY_N=1` |
-|---|---|---|---|---|---|
-| Roll std (deg) | 5.7-6.2 | 3.05-3.3 | **5.56** | 7.36 | 3.34 |
-| Pitch std (deg) | 1.9-2.7 | 2.4-2.6 | 5.06 | 5.13 | 2.48 |
-| Speed (m/s) | ~0.118 (10-01 taped) | 0.053 (12.5 s) | 0.051 | 0.057 | 0.052 |
-| Heading change, 12.5 s | +142 deg right | +9 left | +6 | -17 | +10.5 |
-| Falls | 0 / 6 | 0 / 24 | 1 / 8 | 2 / 8 | 0 / 8 |
-
-More measurements:
-- Old 377 g payload (`estimate`): speed 0.058, heading +2.9, roll 3.08.
-- Case payload with 250-step episodes: speed 0.074 (vs 0.053 over 1000 steps). **V2.1 slows past the 3.1 s it was trained on; G2
-  doesn't.**
+### 1.3 Gaps between the sim and G2
+- With the 137 deg/s servo limit removed, the sim's roll std (5.56 deg) matches G2's (5.7-6.2) but pitch overshoots (5.06 vs 1.9-2.7).
+  As trained, the sim shows 3.05 roll / 2.42 pitch.
+- Speed: sim 0.053 m/s over 12.5 s (0.074 over 3.1 s) vs G2 ~0.118. The command path doesn't explain it (send every tick: 0.052; ideal
+  path: 0.057).
 
 What follows:
 - **Servo speed** (`SERVO_RATE_LIMIT_DEG_S` 137, from BittleJuice, never measured on G2, backlog H13): without it the sim matches G2's roll,
@@ -241,7 +213,7 @@ Not adopted: early-stopping collapsed screens at 2M (optimization 6, left out by
 screens, fewer scoring episodes (all change quality).
 
 ### Phase 0: real measurements (user on G2, about 2 h total; me: code)
-1. Yaw-sign fix + unit test (§0 next step 1); roll/pitch sign check: hand-tilt G2 (nose down, then right side down, G2 upright, never on its
+1. Yaw-sign fix + tests (**code done**, `c292431`; rsync to the Pi pending); roll/pitch sign check: hand-tilt G2 (nose down, then right side down, G2 upright, never on its
    back) under `python -m pi_pipeline.gait.run_gait --probe-imu`, compare with PyBullet's conventions (roll + = right side down about +x;
    check in PyBullet first).
 2. Six V2.1 walks (`bash tools/g2_baseline.sh start 6 <label>`, needs `G2_PI`) **with distance taped**, plus six scripted `wkF` walks

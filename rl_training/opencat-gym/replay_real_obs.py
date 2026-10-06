@@ -4,8 +4,9 @@
 
 For each `run_gait.py --log` CSV (default: docs/rl/real-walk-data/2026-10-06/*.csv) the logged roll/pitch/yaw rows are fed through
 `ResidualGaitPolicy` the way `run_gait.run` does it (reset on the first frame with yaw 0, then one `step` per logged tick, rate obs zero).
-Pass 1 uses the yaw as logged: if it reproduces the logged joint commands, the replay is faithful. Pass 2 negates the yaw (the PyBullet
-convention, + = left, if the firmware's + = right). Prints, per pass, the match against the log and the left/right bias of the commands.
+Pass 1 uses the yaw as logged, which is what the Pi fed the policy before the 2026-10-06 sign fix (run_gait.POLICY_YAW_SIGN): if it
+reproduces the logged joint commands, the replay is faithful. Pass 2 negates the yaw (the PyBullet convention, + = left; what the Pi
+feeds since the fix). Prints, per pass, the match against the log and the left/right bias of the commands.
 The policy's joint history comes from its own outputs, so the replay is closed in the joints but open in the body: pass 2 shows what the
 policy would have commanded at the same moments, not where G2 would then have gone.
 """

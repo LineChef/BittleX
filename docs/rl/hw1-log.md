@@ -518,6 +518,9 @@ artifact, not something the policy learned. Squared-penalty reward terms
 can't fix a one-directional bias regardless — tuning against it risked
 teaching the policy to counter-steer a sim-only bug, which could introduce
 the opposite bias on real hardware. Skipped.
+*(2026-10-06: the policy appears to have learned such a counter-steer anyway, a fixed BL-hip offset of about 7 deg, which turns G2 about
+140 deg right on the real floor. See [`real-walk-log.md`](real-walk-log.md) "Why V2.1 drifts right"; V3 adds a mirror-symmetry loss
+against it.)*
 
 Yaw wobble was tested with three 3M-step continuations from
 Release_CandidateV2, each isolating one lever: R1 (`FAC_YAW_TRACK` 9→12
