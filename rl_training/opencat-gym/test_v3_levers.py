@@ -1,0 +1,154 @@
+"""Checks for the V3 retrain levers (docs/rl/v3-retrain-plan.md). Run from rl_training/opencat-gym with the RL venv:
+
+    ../../.venv/bin/python -m pytest test_v3_levers.py -q
+"""
+import os
+import sys
+
+os.environ.setdefault("G2E_PAYLOAD_PROFILE", "case")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import numpy as np
+import pybullet as p
+import pytest
+import torch as th
+
+import mirror as M
+
+WKF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "pi_pipeline", "gait", "wkf_ref.npy")
+
+
+@pytest.mark.parametrize("dim", [278, 280])
+def test_mirror_obs_is_an_involution(dim):
+    obs = np.random.default_rng(0).uniform(-1, 1, (5, dim))
+    obs[:, 9] = np.random.default_rng(1).uniform(0, 1, 5)
+    again = M.mirror_obs(M.mirror_obs(obs))
+    assert np.allclose(again, obs, atol=1e-9)
+    t = th.as_tensor(obs, dtype=th.float32)
+    assert th.allclose(M.mirror_obs(t), th.as_tensor(M.mirror_obs(obs), dtype=th.float32), atol=1e-6)
+
+
+def test_mirror_act_swaps_left_right_joints_and_is_an_involution():
+    a = np.arange(8.0)
+    assert np.array_equal(M.mirror_act(a), [2, 3, 0, 1, 6, 7, 4, 5])
+    assert np.array_equal(M.mirror_act(M.mirror_act(a)), a)
+
+
+def test_quaternion_mirror_equals_the_quaternion_of_the_mirrored_euler_angles():
+    """Mirror across the x-z plane: roll and yaw flip sign, pitch stays."""
+    obs = np.zeros(278)
+    for r, pi, y in ((0.2, -0.1, 0.7), (-0.3, 0.25, -1.1)):
+        obs[:4] = p.getQuaternionFromEuler([r, pi, y])
+        want = p.getQuaternionFromEuler([-r, pi, -y])
+        got = M.mirror_obs(obs)[:4]
+        assert np.allclose(got, want, atol=1e-9) or np.allclose(got, -np.array(want), atol=1e-9)
+
+
+def test_gravity_and_phase_and_command_mirror():
+    obs = np.zeros(278)
+    obs[6:9] = [0.1, 0.3, -0.9]
+    obs[PH := 9] = 0.8
+    obs[36:38] = [0.5, 0.4]
+    m = M.mirror_obs(obs)
+    assert np.allclose(m[6:9], [0.1, -0.3, -0.9])
+    assert m[PH] == pytest.approx(0.3)
+    assert np.allclose(m[36:38], [0.5, -0.4])
+
+
+def test_wkf_joint_history_mirrors_to_half_a_cycle_later():
+    """The scripted gait, mirrored left-right, equals itself 50 frames later to within ~4 deg: the joint swap and phase shift are consistent."""
+    w = np.degrees(np.load(WKF))                         # (100, 8) URDF deg
+    mirrored = w[:, M.JOINT_SWAP]
+    assert np.abs(np.roll(mirrored, -50, axis=0) - w).max() < 5.0
+
+
+def test_mirror_gap_is_zero_for_a_symmetric_policy_and_positive_for_a_biased_one():
+    class _Dist:
+        def __init__(self, mean):
+            self.distribution = type("D", (), {"mean": mean})()
+
+    class _Pol:
+        def __init__(self, bias):
+            self.bias = th.as_tensor(bias, dtype=th.float32)
+
+        def get_distribution(self, obs):
+            # a mirror-symmetric mean: the roll tilt (index 10 pair) drives left and right joints oppositely
+            mu = th.zeros(obs.shape[0], 8)
+            mu[:, 0] = -obs[:, 10]
+            mu[:, 2] = obs[:, 10]
+            return _Dist(mu + self.bias)
+
+    class _Model:
+        def __init__(self, bias):
+            self.policy = _Pol(bias)
+
+    obs = np.random.default_rng(2).uniform(-1, 1, (16, 278)).astype(np.float32)
+    assert M.mirror_gap(_Model(np.zeros(8)), obs) == pytest.approx(0.0, abs=1e-6)
+    assert M.mirror_gap(_Model([0, 0, 0, 0, 0, 0, 0.3, 0]), obs) > 0.05     # a fixed back-left hip offset is detected
+
+
+# ----------------------------------------------------------------------------- benchmark_v4 helpers
+def test_hard_scaled_scales_only_the_difficulty_knobs_and_caps_the_cutback():
+    import benchmark_v4 as B4
+    out = B4.hard_scaled({"IMPULSE_PUSH": 1.0, "TORQUE_CUTBACK": 0.6, "SLOPE_FIXED_RP": (0.0, -0.2), "RUBBLE_N": 400, "LEDGE_PROB": 1.0}, 1.1)
+    assert out["IMPULSE_PUSH"] == pytest.approx(1.1)
+    assert out["TORQUE_CUTBACK"] == pytest.approx(0.66)
+    assert out["SLOPE_FIXED_RP"] == pytest.approx((0.0, -0.22))
+    assert out["RUBBLE_N"] == 400 and out["LEDGE_PROB"] == 1.0                   # counts and probabilities are not difficulty
+    assert B4.hard_scaled({"TORQUE_CUTBACK": 0.88}, 1.1)["TORQUE_CUTBACK"] == pytest.approx(0.9)
+
+
+def test_episode_counts_scale_with_the_requested_episodes():
+    import benchmark_v4 as B4
+    assert B4.n_episodes(None, 40) == 40 and B4.n_episodes(None, 6) == 6
+    assert B4.n_episodes(40, 40) == 40 and B4.n_episodes(8, 40) == 8
+    assert B4.n_episodes(40, 4) == 4 and B4.n_episodes(8, 4) == 2                # never below 2
+
+
+def test_cell_selection_and_hard_scale_naming():
+    import benchmark_v4 as B4
+    rows = B4.cell_table(1.1)
+    ids = [r[0] for r in rows]
+    assert "T2.2+10%" in ids and "T2.1" in ids and "N1" in ids and "T10.1" in ids
+    assert {r[0] for r in B4.select(rows, "core", 1.1)} >= {"T1.1", "N1", "T2.2+10%", "T8.1+10%"}
+    stage = {r[0] for r in B4.select(B4.cell_table(), "stage:s2_step")}
+    assert {"T1.1", "T4.1", "T4.2"} <= stage and "T5.1" not in stage             # cumulative up to that stage
+    assert dict((r[0], r[6]) for r in B4.cell_table())["T10.1"] == "info"          # carpet is never gated
+
+
+def test_v4_metrics_asymmetry_and_decay():
+    import benchmark_v4 as B4
+    n = 600
+    rec = {"x": list(np.linspace(0, 0.5, n)), "yaw": list(np.linspace(0, -1.0, n)), "roll": [0.0] * n, "pitch": [0.0] * n,
+           "yaw_rate": [0.0] * n, "joint": [np.deg2rad([50, 0, 50, 0, 53, 0, 60, 0])] * n}
+    m = B4.v4_metrics([(rec, {"servo_over": [0.2] * n}, n, False, 0)])
+    assert m["heading_mean_deg"] == pytest.approx(np.degrees(-1.0), abs=0.1)
+    assert m["lr_asym_deg"]["hip_BR-BL"] == pytest.approx(-7.0, abs=1e-6) and m["lr_asym_max_deg"] == pytest.approx(7.0, abs=1e-6)
+    assert m["servo_over_frac"] == pytest.approx(0.2) and m["fell_fraction"] == 0.0 and abs(m["speed_decay"]) < 0.05
+
+
+def test_mirror_ppo_single_pass_matches_sb3_evaluate_actions():
+    """MirrorPPO evaluates [obs, mirrored obs] in one pass; its real-half outputs must equal SB3's evaluate_actions on obs alone."""
+    import gymnasium as gym
+    from stable_baselines3 import PPO
+
+    class _Env(gym.Env):
+        observation_space = gym.spaces.Box(-1, 1, (278,), dtype=np.float32)
+        action_space = gym.spaces.Box(-1, 1, (8,), dtype=np.float32)
+
+        def reset(self, seed=None, options=None):
+            return np.zeros(278, dtype=np.float32), {}
+
+        def step(self, a):
+            return np.zeros(278, dtype=np.float32), 0.0, False, False, {}
+
+    m = M.MirrorPPO("MlpPolicy", _Env(), n_steps=64, batch_size=32, policy_kwargs=dict(net_arch=[64, 64]), seed=0)
+    obs = th.as_tensor(np.random.default_rng(3).uniform(-1, 1, (32, 278)), dtype=th.float32)
+    act = th.as_tensor(np.random.default_rng(4).uniform(-1, 1, (32, 8)), dtype=th.float32)
+    v0, lp0, en0 = m.policy.evaluate_actions(obs, act)
+    feats = m.policy.extract_features(th.cat([obs, M.mirror_obs(obs)], 0))
+    lat_pi, lat_vf = m.policy.mlp_extractor(feats)
+    mean = m.policy.action_net(lat_pi)
+    d = m.policy.action_dist.proba_distribution(mean[:32], m.policy.log_std)
+    assert th.allclose(d.log_prob(act), lp0, atol=1e-5) and th.allclose(d.entropy(), en0, atol=1e-5)
+    assert th.allclose(m.policy.value_net(lat_vf)[:32].flatten(), v0.flatten(), atol=1e-5)

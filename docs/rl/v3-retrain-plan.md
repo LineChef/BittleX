@@ -8,32 +8,29 @@ campaign this replaces), [`hw1-log.md`](hw1-log.md) (how V2 / V2.1 were trained)
 new lever is screened alone, the ones that pass are combined and built into a staged chain, and the 20M run is the last training run.
 Tuning runs stay possible later if the result needs them, but none are planned.
 
-## 0. Where to resume (state at the end of 2026-10-06)
+## 0. Where to resume (state at ~2:30 PM ET, 2026-10-06)
+
+**Phase 2 code is DONE and committed** (details §6); nothing is training; the Mac is idle. The user replaced and recalibrated the FL shoulder servo
+(servo 8) at about 2:15 PM and is about to do the Phase 0 hardware steps. G2's Pi was not yet reachable at 2:25 PM (still powering up).
 
 **Done:**
-- Investigation and plan (this page).
-- **Ramp fix** (§2.1) in `opencat_gym_env.py` + `train.py`, smoke-tested.
-- **4 torch threads** in `train.py` (§4 optimization 1).
-- Probe tools: `drift_probe.py` levers `yawflip` / `yawzero`, `replay_real_obs.py`, `train_throughput.py`.
-- v2.2 closed: its runner exited by itself at 12:45 PM after no round passed; stale log watchers were killed. Nothing is training.
-- **Why the drift happens** is recorded in [`real-walk-log.md`](real-walk-log.md) "Why V2.1 drifts right", with raw results in
-  [`v3-data/`](v3-data/README.md). STATUS open problem 3, `project-plan.md`, `hw1-log.md` Round 4 and backlog H2/H5/H12/H13 point here.
-- **Yaw-sign fix (Phase 0 step 1, code DONE 2026-10-06, NOT yet rsynced to the Pi):**
-  - `POLICY_YAW_SIGN = -1.0` and `policy_quat()` in `pi_pipeline/gait/run_gait.py`, used for the policy's input in `run()` (reset and every
-    tick). The CSV / ring-buffer `yaw` column stays in the firmware convention (+ = right); `imu_parse.py` is unchanged.
-  - `dry_run()` feeds random synthetic yaw, so the sign doesn't matter there.
-  - Tests in `pi_pipeline/tests/test_run_gait_imu.py`: the sign unit test, plus a loop test that a real 20-deg right turn reaches the policy
-    as -20 deg while the log keeps +20. Full `pi_pipeline` suite passes.
-  - No behaviour change for V2.1, which ignores heading. **To do:** rsync to the Pi when G2 is online.
+- Investigation, plan, ramp fix, 4 torch threads, the yaw-sign fix (deployed to the Pi, `g2-voice` restarted).
+- Servo step-test tool (`tools/servo_step_test.py`); the Phase 2 code: `g2_profile.py`, `benchmark_v4.py`, `phase_v3.py` (rehearsed end to end on
+  tiny jobs: training, parallel scoring, pass/fail, combo, stage chain, resume), `mirror.py`, and all levers behind flags (inert when off, checked).
+- **Two findings that changed the plan** (§1.3, §2.3): (1) the sim's 137 deg/s servo-speed limit is the dominant sim-vs-G2 gap: at ~250 deg/s the
+  sim's roll swing matches G2's and V2.1 turns RIGHT; (2) `drift_probe.py` did not force the command, so its speeds were wrong (now fixed; the old
+  JSONs are marked superseded). Also: the trot-symmetry term and the joint-smoothness terms are inert, so R5 was revised.
+- Mirror-loss cost measured: 757 steps/s vs 892 plain (+18% time) after restructuring to one forward pass; a test checks the single pass equals SB3's.
 
-**Next, in order** (Phase 0 code work is mine; the user's hardware steps can run in parallel):
-1. **rsync the yaw-sign fix to the Pi** when G2 is online (`docs/guides/pi-bring-up.md` §7).
-2. **Servo step-test mode** (Phase 0 step 4): command a 40-60 deg step on one joint while reading servo feedback (feedback works, mean
-   112 ms / ~9 Hz per read; see `real-walk-log.md` "Servo feedback tests" and `tools/servo_static_test.py`). Logs to CSV.
-3. Then Phase 2 code (it doesn't need the hardware data), while the user does Phase 0's hardware steps.
-
-**What the user is doing in parallel:** replacing servo 8 (front-left shoulder). That it is bad is **not confirmed**; after the swap the six
-V2.1 baseline walks are repeated to see whether anything changed. The user will report when it's done.
+**Next, in order:**
+1. **User, Phase 0 hardware (about 2-2.5 h; commands in §4 Phase 0):** roll/pitch sign check, `servo_static_test.py` on the new servo, **`servo_step_test.py`**
+   (shoulder and knee), six V2.1 baseline walks with distance taped, six scripted `wkF` walks, `kwkL` / `kwkR` turn rates. Then record the results in
+   `real-walk-log.md` and copy the raw logs into `real-walk-data/2026-10-0X/`.
+2. **Me, Phase 1 (about 4 h after the data):** calibrate the sim (servo speed first, then foot contact, motor strength vs voltage), decide the turning
+   gate and the roll-match flag, write the calibrated values into `g2_profile.CALIBRATION`, re-score V2.1 (`phase_v3.py` does it: `ref`).
+3. **Me, start the screening runner:** `cd rl_training/opencat-gym && ../../.venv/bin/python phase_v3.py init && nohup ../../.venv/bin/python phase_v3.py run &`
+   (create `trained/v3_turning_gate_pass` / `trained/v3_roll_matched` first if Phase 1 earned them), and arm a watcher on `trained/phase_v3.log`.
+4. Hardware check-in (the runner pauses: `touch trained/v3_go_hardware_checkin` continues it), then the 20M, then Phase 7.
 
 ## 1. Findings (2026-10-06)
 
@@ -56,21 +53,20 @@ V2.1 baseline walks are repeated to see whether anything changed. The user will 
 - v2.2's last round (R3, 3M control, case payload): calm falls 0.08, speed 0.040, heading error under the reference disturbance 39.8 deg.
   All three v2.2 rounds failed (`v22-data/`).
 
-### 1.3 Gaps between the sim and G2
-- With the 137 deg/s servo limit removed, the sim's roll std (5.56 deg) matches G2's (5.7-6.2) but pitch overshoots (5.06 vs 1.9-2.7).
-  As trained, the sim shows 3.05 roll / 2.42 pitch.
-- Speed: sim 0.053 m/s over 12.5 s (0.074 over 3.1 s) vs G2 ~0.118. The command path doesn't explain it (send every tick: 0.052; ideal
-  path: 0.057).
-
-What follows:
-- **Servo speed** (`SERVO_RATE_LIMIT_DEG_S` 137, from BittleJuice, never measured on G2, backlog H13): without it the sim matches G2's roll,
-  but pitch overshoots. Measure it (Phase 0).
-- **Speed:** the sim is ~half of G2. The command path doesn't explain it; contact (16% short on replay) and the long-walk slowdown do.
-- **Episode length:** training episodes AND every benchmark cell are 250 steps (3.1 s); G2 walks 12.5 s to minutes.
-- **Payload:** the 422 g profile (`G2E_PAYLOAD_PROFILE=case`, spine 86 g / camera 15 g front / speaker 20 g rear) isn't in
-  `run_pipeline.BASE` or the benchmark.
-- **Carpet:** the sim's T10.1 passes; every gait fails on G2's carpet (guessed model, H10).
-- **Battery sag:** 0.3-0.45 V under load; not modeled.
+### 1.3 Gaps between the sim and G2 (corrected 2026-10-06 afternoon)
+- **Correction:** the first gap numbers (speed 0.053, "slows down past 3.1 s", servo-limit comparison) came from `drift_probe.py`, which did not
+  force the commanded speed, so the env redrew the command ~9 times per 1000 steps. Re-measured with a forced command: V2.1 walks 0.089 m/s over
+  12.5 s with no slow-down (G2 ~0.118, so ~25% short, not half). `drift_probe.py` now forces the command; the old JSONs are marked superseded.
+- **The sim's servo-speed limit is the dominant gap.** Sweep of `SERVO_RATE_LIMIT_DEG_S` (N1, 20 episodes, [table in the log](real-walk-log.md)):
+  at 137 (assumed) roll std 2.6 deg and a +9 deg LEFT drift; at 250 (the firmware's own easing) roll 5.9 (G2 5.7-6.2) and a -11 deg RIGHT turn;
+  with no limit roll 6.5 and -23 deg. 137 was borrowed from another project and never measured on G2. Pitch overshoots at 250 (4.0 vs 1.9-2.7),
+  falls are 10% (G2 0 / 6) and the turn is still far short of -142: more parameters to calibrate (foot contact, motor strength).
+- **Phase 0 step 4 (the servo step test) is therefore the most valuable measurement.** If G2's servos keep up with the firmware's 250 deg/s, the
+  limit goes to ~250 or off and V2.1's drift appears in the sim, so the sim can then be used to fix it.
+- Episode length: training episodes AND every benchmark cell were 250 steps (3.1 s); G2 walks 12.5 s to minutes (benchmark v4 adds long cells).
+- Payload: the 422 g profile matters little in the sim (377 g gives the same speed and roll); it is in the profile now.
+- Carpet: the sim's T10.1 passes; every gait fails on G2's carpet (guessed model, H10). Not gated.
+- Battery sag: 0.3-0.45 V under load; the sim has a motor-strength knob for it now (N4 cell, `MOTOR_SCALE_*`).
 
 ### 1.4 Why V2.1 ignores heading
 1. Episodes are 3.1 s, so heading error barely builds up.
@@ -132,6 +128,11 @@ What follows:
   overheat cutback, obstacle/rubble heights; nominal walk unchanged) in the final stage and the 20M.
 
 ### 2.3 Reward levers (each screened alone)
+Measured reward budget of a calm V2.1 walk (per step, penalty ramp full; 1500 steps): imitation +15.3, speed +4.3, speed-track -0.72, foot-phase
+-0.69, jitter -0.36, progress +0.30, arm contact -0.11, residual smoothing -0.10, residual cost -0.09, body stability -0.06, power -0.016, upright
+-0.011, **heading -0.006**, paw slip -0.002, joint smoothness -0.001, trot symmetry +0.001. About 95% of the signal is imitation of `wkF` and
+speed tracking, which is why V2.1 stays close to the scripted walk and why small terms (like the smoothing term) still steer it. Lever weights
+below were calibrated to these magnitudes on V2.1's walk (R3 5.0 -> -0.31, R6 25 -> -0.12, R2 3.0 -> -0.11 per step).
 
 | # | Change | Why |
 |---|---|---|
@@ -139,7 +140,7 @@ What follows:
 | R2 | **Heading reward shape:** replace `FAC_HEADING·err²` with a bounded tracking reward `exp(-(err/10°)²)` | A real gradient near straight |
 | R3 | **Servo-feasibility penalty:** soft penalty on commanded joint speed above the measured servo ceiling (H13: 26% of `base1_20m`'s commands exceeded 137 deg/s) | Commands the servos can follow; smaller sim/real gap |
 | R4 | **Potential-based balance reward** γΦ(s') - Φ(s) with Φ = -(tilt + k·tilt rate); review `FAC_SURVIVE_BONUS` (scales with peak tilt) | `FAC_BALANCE` pays every drop in tilt and never charges the rise (code: `max(0, prev_tilt - tilt)`), so a wobble is paid on each down-swing. Only active above 0.5 rad |
-| R5 | **Bounded trot term:** `FAC_GAIT_SYMMETRY` = `-Δdiag_a·Δdiag_b` (raw product of joint velocities, unramped); use a bounded correlation, or rely on the contact-based `FAC_FOOT_PHASE` | Bigger, faster swings earn more, against every smoothness term |
+| R5 (revised) | **Activate the inert joint-smoothness terms:** `FAC_SMOOTH_1/2` 0.3 -> 15 | Measured 2026-10-06: they contribute -0.0013 per step in a calm walk (the trot term +0.0012 is inert too, so the premise of the first R5 was wrong); the V2 -> V2.1 lever `FAC_RESID_SMOOTH` sits at -0.10 per step and measurably cut yaw wobble, so a smoothness term of that size on the commanded joints is the same kind of lever |
 | R6 | **Softer footfalls:** small penalty on foot vertical speed at touchdown | Impacts drive roll swing. Only if Phase 1 reproduced G2's roll swing |
 | R7 | Discount γ 0.99 → 0.995 (horizon 1.25 → 2.5 s) | Low priority; only if K3 still drifts on long walks |
 
@@ -220,7 +221,8 @@ screens, fewer scoring episodes (all change quality).
    (`python pi_pipeline/gait/run_gait.py --openloop --cycles 10 --log ~/g2_runs/<x>.csv`). The 10-06 walks already cover V2.1 except
    distance.
 3. Real turn rate of the firmware turns: `python pi_pipeline/gait/fw_skill_log.py kwkL --seconds 10 --log ...` and the same for `kwkR`.
-4. Servo speed (H13): the step-test mode (§0 next step 2); phone slow-motion video if feedback is too coarse.
+4. **Servo speed (H13), the most valuable measurement (§1.3):** `pi_pipeline/.venv/bin/python tools/servo_step_test.py --joint FL-sh` (and a knee, e.g. `--joint FL-kn`; the RL `.venv` has no pyserial) over the
+   Mac USB cable, G2 held upright in the air, charged pack; phone slow-motion video as a cross-check. Built 2026-10-06 (`pi_pipeline/gait/servo_step.py` fits it).
 5. Servo 8 replacement (user, in parallel, not blocking training); then repeat the six V2.1 walks.
 
 ### Phase 1: calibrate the sim (me, ~half a day, no training)
@@ -294,6 +296,33 @@ screens, fewer scoring episodes (all change quality).
 **Totals:** ~25 h of training wall time (was ~38 h before the optimizations), ~3-4 days elapsed. The user's hands-on time is Phase 0
 (~2 h) and Phase 5 (~1 h).
 
+## 4b. Schedule and timing estimates (written 2026-10-06 2:30 PM ET; times are Eastern)
+
+Per-run costs on the Mac (measured): plain PPO 892 steps/s -> a 3M run 56 min + 4 min parallel scoring = **60 min**; with the mirror loss 757
+steps/s -> 66 + 4 = **70 min**; the 20M with the mirror loss 7.3 h (+ the three gait checks, ~7.5 h). A full v4 scoring of one policy takes 5 min on 8
+workers (the 60 s endurance cell is the long pole); 2 workers while a training is running.
+
+| Step | Duration | Case A: Phase 0 data in by ~4:45 PM today | Case B: Phase 0 tomorrow, done by ~11 AM Wed |
+|---|---|---|---|
+| Phase 0 hardware (user) | ~2-2.5 h | Tue 2:30 - 4:45 PM | Wed 8:30 - 11:00 AM |
+| Phase 1 sim calibration (me; sweeps run in the background) | ~4 h | Tue 4:45 - 9:00 PM | Wed 11:00 AM - 3:00 PM |
+| V2.1 reference + C0 control | 65 min | Tue 9:00 - 10:05 PM | Wed 3:00 - 4:05 PM |
+| S1 mirror | 70 min | to 11:15 PM | to 5:15 PM |
+| S2, S3, S4, S6, S7, S8, S9, S10 (S5 turn only if its gate passes: +1 h) | 8 x 60 min | to Wed 7:15 AM | to Thu 1:15 AM |
+| K3 (all passing levers; also stage s0) | 70 min | to 8:25 AM | to 2:25 AM |
+| Stages s1-s4 (+ s5 turn range if kept) + s6 full strength | 5-6 x 70 min | to Wed ~2:15 PM (3:25 PM with turn) | to Thu ~8:15 AM (9:25 AM) |
+| Hardware check-in (runner pauses; user ~1 h, me ~20 min) | ~1.3 h | Wed ~2:30 - 4:00 PM | Thu ~9:30 - 11:00 AM |
+| 20M consolidation (gait checks at 3M, 5M, 10M) | ~7.5 h | Wed 4:00 - 11:30 PM | Thu 11:00 AM - 6:30 PM |
+| Final scoring (both ladders), `validate_deploy`, export | ~30 min | Wed ~midnight | Thu ~7:00 PM |
+| Deploy + six real walks (user) | ~1.5 h | Thu 9:00 - 10:30 AM | Fri 9:00 - 10:30 AM |
+| **Estimated completion** | | **Thu Oct 8, ~10:30 AM** | **Fri Oct 9, ~10:30 AM** |
+
+Training/scoring wall time, unattended: about **25 h** (S5 skipped) to **27 h** (every lever). **Contingencies** (not in the table): the K3
+combination fails and the runner splits it (+2 h20); a stage needs the one retry (+70 min each); a screening round must be repeated or a lever
+re-tuned (+60-70 min each); the 20M stops at a gait check and a fallback is taken. Realistic upper bound: add 4-6 h, i.e. Thu Oct 8 afternoon
+(Case A) or Fri Oct 9 afternoon (Case B). The human steps (Phase 0, check-in, final walks) set the calendar: unattended work is continuous from the
+moment calibration ends. A phase that overruns moves everything after it by the same amount.
+
 ## 5. Decisions (user, 2026-10-06)
 - Everything learned from tuning goes into the base training; no planned tuning runs after the 20M.
 - No separate dress rehearsal: one 20M run with gait checks at 3M / 5M / 10M.
@@ -305,19 +334,27 @@ screens, fewer scoring episodes (all change quality).
 - Servo 8: unconfirmed; the user replaces it during training; re-test afterwards.
 - v2.2 closed (no round passed); its tools carry over (drift probe, `case` payload, `HARD_SCALE`, `DRIFT_TORQUE`).
 
-## 6. Files and tools from this session (2026-10-06)
-- `rl_training/opencat-gym/opencat_gym_env.py`:
-  - ramp fix (`RAMP_MODE`, `RAMP_TOTAL_STEPS`, `set_ramp_steps`, `_ramp`)
-  - probe-only `_obs_yaw_sign` hook (default 1.0)
-- `rl_training/opencat-gym/train.py`: `RampSync` callback, `--re-ramp`, 4 torch threads (`G2E_TORCH_THREADS`).
-- `rl_training/opencat-gym/drift_probe.py`: levers `yawflip`, `yawzero`.
-- `rl_training/opencat-gym/replay_real_obs.py`: real walk logs → policy, offline (as logged / yaw negated).
-- `rl_training/opencat-gym/train_throughput.py`: collection vs update timing.
+## 6. Files and tools built 2026-10-06 (all under `rl_training/opencat-gym/` unless noted)
+- `opencat_gym_env.py`: the ramp fix; probe-only `_obs_yaw_sign`; every V3 lever behind a default-off flag (`HEADING_OBS`, `LONG_EP_*`, `FAULT_*`,
+  `MOTOR_SCALE_*`, `FAC_HEADING_B`, `FAC_SERVO_FEAS`, `FAC_BALANCE_PBRS`, `FAC_SMOOTH_1/2` overrides, `FAC_TOUCHDOWN`) and the Phase 1 calibration
+  knobs (`GROUND_FRICTION`, `FOOT_FRICTION`, `MOTOR_FORCE`, `SERVO_KP`, `SERVO_KD`). Checked inert with every flag off (identical rewards and
+  observations to the committed version over 753 steps).
+- `train.py`: `RampSync`, `--re-ramp`, 4 torch threads, `--mirror-loss` / `G2E_MIRROR_LOSS`.
+- `mirror.py`: mirror maps (observation, action), `mirror_gap()`, and `MirrorPPO` (SB3's PPO plus the mirror loss).
+- `g2_profile.py`: the one G2 setup (RECIPE, CALIBRATION, LEVERS, STAGES, `env_for`, `scoring_env`).
+- `benchmark_v4.py`: the v4 ladder, parallel (`--jobs`), `--env` overrides, `--hard-scale`; ~5 min for all 28 cells on 8 workers.
+- `phase_v3.py`: the unattended runner (`init`, `run`, `status`, `run --test` rehearsal).
+- `test_v3_levers.py`: mirror-map tests (run with the RL venv). `drift_probe.py` (forced command; `yawflip` / `yawzero`), `replay_real_obs.py`,
+  `train_throughput.py`.
+- `tools/servo_step_test.py` + `pi_pipeline/gait/servo_step.py` + `pi_pipeline/tests/test_servo_step.py`: the servo speed measurement.
+- `pi_pipeline/gait/run_gait.py`: `POLICY_YAW_SIGN` (deployed to the Pi 2026-10-06).
 
 ## 7. Gotchas
 - Scripts that start `SubprocVecEnv` workers must run from a file, not stdin (workers re-import `__main__`).
 - `G2E_` env vars set training knobs (`_g2e` in the env). `DR_EVAL_FULL` is a module attribute, not an env var.
 - `G2E_CMD_PATH=` (empty) means the default `""` (ideal path); `drift_probe.py` only sets defaults it doesn't find in the environment.
+- The env redraws the commanded speed ~9 times per 1000 steps unless `env.set_command()` forces it; every probe and benchmark must force it.
+- `evaluate_policy.run_episode` calls any episode that ends after 250 steps "not fell" (`EPISODE_CAP`); benchmark_v4 lifts the cap in its workers.
 - Kill runners by pid, never `pkill -f <name>` (it also kills watchers whose command line contains the name).
 - Closing the Mac's lid pauses training; a Monitor expires after 30 min (re-arm it).
 - `trained/` is gitignored; snapshot result JSONs into `docs/rl/` when they back a decision. Never commit GIFs.

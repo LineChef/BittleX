@@ -1,0 +1,65 @@
+{
+ "bench_version": 4,
+ "policy": "trained/Release_CandidateV2.1_ppo",
+ "episodes": 20,
+ "seed": 1000,
+ "hard_scale": null,
+ "levers": [],
+ "profile": {
+  "G2E_IMU_HOLD_STEPS": "16",
+  "G2E_IMU_RATE_ZERO": "1",
+  "G2E_CMD_PATH": "i",
+  "G2E_CMD_PATH_EXTRA_MS_MAX": "4",
+  "G2E_CMD_SEND_EVERY_N": "1",
+  "G2E_BODY_MASS_SCALE": "1.12",
+  "G2E_PAYLOAD_PROFILE": "case",
+  "G2E_IMU_BIAS_DEG": "2",
+  "G2E_JOINT_OFFSET_DEG": "2",
+  "G2E_SERVO_RATE_LIMIT_DEG_S": "137",
+  "G2E_FAC_YAW_TRACK": "9.0",
+  "G2E_FAC_RESID_SMOOTH": "10.5"
+ },
+ "mirror_gap": 0.17234428226947784,
+ "wall_seconds": 64.2,
+ "cells": [
+  {
+   "id": "N1",
+   "label": "Calm flat walk, 12.5 s (as G2 is tested)",
+   "tag": "gate",
+   "knobs": {},
+   "episodes": 20,
+   "steps": 1000,
+   "seconds": 58.2,
+   "n": 20,
+   "fell_fraction": 0.0,
+   "speed_mps": 0.08898608132455862,
+   "speed_early_mps": 0.08884739927130705,
+   "speed_late_mps": 0.08879569818992607,
+   "speed_decay": 0.0005819087762277686,
+   "heading_mean_deg": 10.922550730210961,
+   "heading_abs_mean_deg": 11.089139334964962,
+   "heading_std_deg": 9.352628044319605,
+   "yaw_rate_rms": 0.07369937999486953,
+   "roll_std_deg": 2.6468400392232114,
+   "pitch_std_deg": 1.680297212161312,
+   "lr_asym_deg": {
+    "shoulder_FL-FR": -2.3374258943107478,
+    "elbow_FL-FR": 1.446742230977038,
+    "hip_BR-BL": -6.939736455365342,
+    "knee_BR-BL": -3.195948069525284
+   },
+   "lr_asym_max_deg": 6.939736455365342,
+   "servo_over_frac": 0.17618631368631368,
+   "joint_mean_deg": [
+    49.83380571680625,
+    2.965147739976002,
+    52.171231611117,
+    1.5184055089989639,
+    55.58667864585688,
+    1.2944755969510076,
+    62.52641510122222,
+    4.490423666476292
+   ]
+  }
+ ]
+}

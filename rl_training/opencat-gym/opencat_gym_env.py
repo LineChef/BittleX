@@ -729,6 +729,56 @@ SERVO_RATE_LIMIT_DEG_S = _g2e("SERVO_RATE_LIMIT_DEG_S", SERVO_RATE_LIMIT_DEG_S)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 RAMP_MODE          = _g2e("RAMP_MODE", "total")                      # "total" | "legacy" (see RAMP_TOTAL_STEPS)
 RAMP_TOTAL_STEPS   = _g2e("RAMP_TOTAL_STEPS", RAMP_TOTAL_STEPS)
+
+# --- V3 retrain levers (docs/rl/v3-retrain-plan.md). Every one defaults OFF, so older checkpoints and scripts replay unchanged. ---
+# Y2 HEADING_OBS: the observation's raw quaternion becomes a yaw-FREE quaternion (roll / pitch only) and two inputs are appended,
+#    sin and cos of (heading - commanded heading). Observation size +2 (a fresh run only; the Pi needs the same inputs).
+HEADING_OBS = _g2e("HEADING_OBS", False)
+# Y3 LONG_EP_*: this fraction of episodes runs LONG_EP_LEN steps instead of EPISODE_LENGTH, so drift and slow-down can build up in training.
+LONG_EP_PROB = _g2e("LONG_EP_PROB", 0.0)
+LONG_EP_LEN = _g2e("LONG_EP_LEN", 1000)
+# Y5 FAULT_*: persistent one-sided faults, drawn per episode (each on its own probability), the real-robot failure modes:
+#    STUCK: a shoulder / hip servo cannot go above a ceiling (real servo 8 sticks near 42 deg). FAULT_STUCK_DEG 0 = ceiling drawn 38..50.
+#    WEAK: one joint's motor force scaled by uniform(FAULT_WEAK_MIN, 0.9).   OFFSET: one joint's zero shifted by up to FAULT_OFFSET_DEG.
+#    The existing DRIFT_TORQUE / DRIFT_PROB (constant yaw torque) is the fourth fault. Scaled by the DR ramp; DR_EVAL_FULL gives full strength.
+FAULT_STUCK_PROB = _g2e("FAULT_STUCK_PROB", 0.0)
+FAULT_STUCK_JOINT = _g2e("FAULT_STUCK_JOINT", -1)       # -1 = random among the four shoulder / hip joints (0, 2, 4, 6)
+FAULT_STUCK_DEG = _g2e("FAULT_STUCK_DEG", 0.0)
+FAULT_WEAK_PROB = _g2e("FAULT_WEAK_PROB", 0.0)
+FAULT_WEAK_MIN = _g2e("FAULT_WEAK_MIN", 0.5)
+FAULT_OFFSET_PROB = _g2e("FAULT_OFFSET_PROB", 0.0)
+FAULT_OFFSET_DEG = _g2e("FAULT_OFFSET_DEG", 6.0)
+# Battery sag: every motor's force x MOTOR_SCALE_ALL x (1 - uniform(0, MOTOR_SCALE_RAND) * dr). A full pack sags 0.3-0.45 V walking.
+MOTOR_SCALE_ALL = _g2e("MOTOR_SCALE_ALL", 1.0)
+MOTOR_SCALE_RAND = _g2e("MOTOR_SCALE_RAND", 0.0)
+# R2 FAC_HEADING_B: >0 replaces the quadratic FAC_HEADING*err^2 with a bounded penalty B*(1 - exp(-(err/sigma)^2)), which is 20x steeper near
+#    straight (V2.1's calm heading term is only -0.006 per step against +20 of positive reward) and can't explode at large headings.
+FAC_HEADING_B = _g2e("FAC_HEADING_B", 0.0)
+HEADING_SIGMA_DEG = _g2e("HEADING_SIGMA_DEG", 10.0)
+# R3 FAC_SERVO_FEAS: penalty on commanded joint speed above SERVO_CEIL_DEG_S (speed over the last 3 control steps, matching the send-every-3
+#    cadence): mean over joints of ((speed - ceiling) / ceiling)^2. Also reported as info["servo_over"] (the fraction of joints over the ceiling).
+FAC_SERVO_FEAS = _g2e("FAC_SERVO_FEAS", 0.0)
+SERVO_CEIL_DEG_S = _g2e("SERVO_CEIL_DEG_S", 137.0)
+# R4 FAC_BALANCE_PBRS: >0 replaces FAC_BALANCE's one-sided "paid for every drop in tilt" with potential-based shaping,
+#    w * (gamma*phi(s') - phi(s)), phi = -(tilt + PBRS_RATE_K * |tilt change|), active while the body is past BALANCE_TILT_ON: it can't be farmed.
+FAC_BALANCE_PBRS = _g2e("FAC_BALANCE_PBRS", 0.0)
+PBRS_RATE_K = _g2e("PBRS_RATE_K", 0.5)
+PBRS_GAMMA = 0.99                  # PPO's default discount in train.py
+# R5 (revised 2026-10-06): the joint-smoothness terms are inert in a calm walk (FAC_SMOOTH_1/2 0.3 -> -0.0013 per step), so they can be
+#    raised to a measurable size with these overrides (the V2 -> V2.1 lever FAC_RESID_SMOOTH sits at -0.1 per step).
+FAC_SMOOTH_1 = _g2e("FAC_SMOOTH_1", FAC_SMOOTH_1)
+FAC_SMOOTH_2 = _g2e("FAC_SMOOTH_2", FAC_SMOOTH_2)
+# R6 FAC_TOUCHDOWN: penalty on a paw's downward speed (m/s) at the step it touches down (impacts drive the roll swing).
+FAC_TOUCHDOWN = _g2e("FAC_TOUCHDOWN", 0.0)
+# Phase 1 calibration knobs (sim -> G2). Defaults reproduce the current behaviour exactly.
+#   GROUND_FRICTION: base ground lateral friction (the +/-RANDOM_FRICTION draw is around it; 1.0 now).   FOOT_FRICTION: >0 sets every paw's
+#   lateral friction (0 = the URDF's).   MOTOR_FORCE: joint motor force limit in N*m (0.2 now; 0.5 while recovering is unchanged).
+#   SERVO_KP / SERVO_KD: >0 sets the position / velocity gains of the joint motors (0 = pybullet's defaults).
+GROUND_FRICTION = _g2e("GROUND_FRICTION", 1.0)
+FOOT_FRICTION = _g2e("FOOT_FRICTION", 0.0)
+MOTOR_FORCE = _g2e("MOTOR_FORCE", 0.2)
+SERVO_KP = _g2e("SERVO_KP", 0.0)
+SERVO_KD = _g2e("SERVO_KD", 0.0)
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
@@ -860,7 +910,8 @@ class OpenCatGymEnv(gym.Env):
 
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
-        _n_obs = SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0) + (3 if CLIFF else 0)
+        _n_obs = (SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0) + (3 if CLIFF else 0)
+                  + (2 if HEADING_OBS else 0))
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
 
@@ -987,6 +1038,15 @@ class OpenCatGymEnv(gym.Env):
         joint_angsDeg = np.rad2deg(joint_angs.astype(np.float64))
         joint_angsDegRounded = joint_angsDeg.round()
         joint_angs = np.deg2rad(joint_angsDegRounded)
+        # R3: commanded joint speed over the last 3 control steps vs the servo ceiling (the real cadence sends every 3rd tick)
+        self._cmd_hist.append(joint_angsDegRounded.copy())
+        if len(self._cmd_hist) > 4:
+            self._cmd_hist.pop(0)
+        servo_feas, servo_over = 0.0, 0.0
+        if len(self._cmd_hist) == 4 and SERVO_CEIL_DEG_S > 0:
+            _spd = np.abs(self._cmd_hist[-1] - self._cmd_hist[0]) / (3.0 / CONTROL_HZ)
+            servo_over = float(np.mean(_spd > SERVO_CEIL_DEG_S))
+            servo_feas = float(np.mean((np.maximum(0.0, _spd - SERVO_CEIL_DEG_S) / SERVO_CEIL_DEG_S) ** 2))
 
         # Simulate delay for data transfer. Delay has to be modeled to close 
         # "reality gap").
@@ -1020,11 +1080,14 @@ class OpenCatGymEnv(gym.Env):
         # reward the forward x-distance that foot covered since its previous
         # touchdown. That is a real stride and can't be gamed by fast air-flicks.
         stride_reward = 0.0
+        touchdown_cost = 0.0
         for i, idx in enumerate(paw_idx):
             fx = p.getLinkState(self.robot_id, idx)[0][0]
             if paw_contact[i] and not self._foot_prev_contact[i]:
                 stride_reward += max(0.0, fx - self._foot_td_x[i])
                 self._foot_td_x[i] = fx
+                if FAC_TOUCHDOWN > 0:      # R6: downward speed of the paw as it lands
+                    touchdown_cost += max(0.0, -p.getLinkState(self.robot_id, idx, computeLinkVelocity=1)[6][2])
             self._foot_prev_contact[i] = paw_contact[i]
 
         # Check if elbows or lower arm are in contact with ground
@@ -1095,7 +1158,8 @@ class OpenCatGymEnv(gym.Env):
                                     self.joint_id,
                                     p.POSITION_CONTROL,
                                     _motor_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
-                                    forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
+                                    forces=np.ones(8)*(0.5 if self._in_recovery else MOTOR_FORCE)*self._torque_scale,
+                                    **({"positionGains": [SERVO_KP] * 8, "velocityGains": [SERVO_KD or SERVO_KP * 10] * 8} if SERVO_KP > 0 else {}))
         self._drift_push()
         p.stepSimulation() # Delay of data transfer
         # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
@@ -1204,6 +1268,12 @@ class OpenCatGymEnv(gym.Env):
             obs_ang = p.getQuaternionFromEuler(
                 [_true_euler[0] + _imu_bias[0], _true_euler[1] + _imu_bias[1], _true_euler[2]])
             _biased_euler = obs_euler + _imu_bias
+        _heading_extra = []
+        if HEADING_OBS:                 # Y2: yaw-free quaternion + sin/cos of (heading - commanded heading), from the same held / biased IMU reading
+            _e = p.getEulerFromQuaternion(obs_ang)
+            _he = (_e[2] - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+            obs_ang = p.getQuaternionFromEuler([_e[0], _e[1], 0.0])
+            _heading_extra = [float(np.sin(_he)), float(np.cos(_he))]
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
         if gyro_n:
             obs_ang = np.clip(np.array(obs_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
@@ -1223,7 +1293,8 @@ class OpenCatGymEnv(gym.Env):
         self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
                                            self.tilt_history, ang_acc,
                                            [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
-                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)],
+                                           _heading_extra))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
 
         # Penalty and reward
@@ -1280,7 +1351,10 @@ class OpenCatGymEnv(gym.Env):
             heading_penalty = FAC_HEADING_GOAL * _herr ** 2
         else:
             _herr = (heading_error_clip - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
-            heading_penalty = FAC_HEADING * _herr ** 2
+            if FAC_HEADING_B > 0:      # R2: bounded, steep near straight
+                heading_penalty = FAC_HEADING_B * (1.0 - np.exp(-(_herr / np.deg2rad(HEADING_SIGMA_DEG)) ** 2))
+            else:
+                heading_penalty = FAC_HEADING * _herr ** 2
 
         # Imitation reward: match Bittle's built-in wkF walk at the current gait
         # phase. DeepMimic-style exp(-sharpness * sum sq per-joint error), in
@@ -1313,13 +1387,18 @@ class OpenCatGymEnv(gym.Env):
         # held upright in the near-tipping band (SURVIVE_BAND_LO..1.3 rad).
         survive_step_reward = FAC_SURVIVE_STEP if SURVIVE_BAND_LO < tilt < 1.3 else 0.0
         balance_reward = 0.0
-        if FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
+        _phi = -(tilt + PBRS_RATE_K * tilt_rate)
+        if FAC_BALANCE_PBRS > 0:       # R4: replaces FAC_BALANCE below
+            if self._prev_phi is not None and max(self._prev_tilt, tilt) > BALANCE_TILT_ON and tilt < 1.3:
+                balance_reward = FAC_BALANCE_PBRS * (PBRS_GAMMA * _phi - self._prev_phi)
+        elif FAC_BALANCE > 0 and BALANCE_TILT_ON < tilt < 1.3:
             balance_reward = FAC_BALANCE * (
                 BALANCE_W_ANGLE * max(0.0, self._prev_tilt - tilt)
                 + BALANCE_W_RATE * max(0.0, self._prev_tilt_rate - tilt_rate)
                 + BALANCE_W_FEET * (sum(paw_contact) / 4.0))
         self._prev_tilt_rate = tilt_rate
         self._prev_tilt = tilt
+        self._prev_phi = _phi
 
         # Target-speed tracking bonus (Run 7): [0,1] * FAC_SPEED, peaking at
         # TARGET_SPEED, from a base-x velocity averaged over SPEED_WINDOW steps
@@ -1527,6 +1606,8 @@ class OpenCatGymEnv(gym.Env):
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
                     + obs_bump_pen
+                    + FAC_SERVO_FEAS * servo_feas
+                    + FAC_TOUCHDOWN * touchdown_cost
                     + FAC_POWER * power_use))
 
         # Set state of the current state.
@@ -1569,6 +1650,9 @@ class OpenCatGymEnv(gym.Env):
             "phase_step0": self._phase_step0,
             "base_height_m": base_clearance,
             "r_power": -penalty_scale * FAC_POWER * power_use,
+            "r_servo_feas": -penalty_scale * FAC_SERVO_FEAS * servo_feas,
+            "servo_over": servo_over,
+            "r_touchdown": -penalty_scale * FAC_TOUCHDOWN * touchdown_cost,
             "r_obs_bump": -penalty_scale * obs_bump_pen,
             "r_obs_clear": obs_clear_rew,
             "r_obs_stop": obs_stop_rew,
@@ -1790,6 +1874,8 @@ class OpenCatGymEnv(gym.Env):
         self._prev_upright = 1.0
         self._prev_tilt = 0.0
         self._prev_tilt_rate = 0.0
+        self._prev_phi = None            # R4 potential-based balance
+        self._cmd_hist = []              # R3: last commanded joint targets (deg)
         self._peak_tilt = 0.0            # surv_r1: roughest moment survived, for FAC_SURVIVE_BONUS
         self._recovered_count = 0
         self._approached_tall = False    # OBSTACLE_REWARD: walked up to a tall obstacle this episode
@@ -1814,6 +1900,8 @@ class OpenCatGymEnv(gym.Env):
         self.tilt_history = np.zeros(LENGTH_TILT_HISTORY * 2)
         # Per-episode step budget; a fall extends it (see RECOVERY_RESUME_STEPS).
         self._step_budget = EPISODE_LENGTH
+        if LONG_EP_PROB > 0 and np.random.rand() < LONG_EP_PROB:       # Y3: some episodes long enough for drift to show
+            self._step_budget = LONG_EP_LEN
         # Domain-randomization ramp for this episode.
         if DR_EVAL_FULL or DR_RAMP_STEPS <= 0:
             self._dr = 1.0
@@ -1971,7 +2059,9 @@ class OpenCatGymEnv(gym.Env):
         self._plane_id = plane_id            # for _recolor_scene (GUI black-floor fix)
         if RANDOM_FRICTION > 0:
             p.changeDynamics(plane_id, -1, lateralFriction=max(0.1,
-                1.0 + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
+                GROUND_FRICTION + np.random.uniform(-RANDOM_FRICTION, RANDOM_FRICTION) * self._dr))
+        elif GROUND_FRICTION != 1.0:
+            p.changeDynamics(plane_id, -1, lateralFriction=GROUND_FRICTION)
         if _carpet_floor:
             # Flat, compliant, carpet-typical friction -- overrides the generic
             # RANDOM_FRICTION draw just above for this episode. Compliance
@@ -2111,6 +2201,21 @@ class OpenCatGymEnv(gym.Env):
             _k = np.random.choice([0, 2, 4, 6], np.random.randint(1, 5), replace=False)      # FL shoulder, FR shoulder, BR hip, BL hip
             self._joint_offset = self._joint_offset.copy()
             self._joint_offset[_k] += np.random.uniform(-DRIFT_SHOULDER_DEG, DRIFT_SHOULDER_DEG, len(_k)) * np.deg2rad(1.0) * self._dr
+        # Y5 persistent faults (V3 plan): a servo stuck below a ceiling, a weak joint, a zero offset; plus battery sag on every motor
+        if FAULT_STUCK_PROB > 0 and self._dr > 0 and np.random.rand() < FAULT_STUCK_PROB:
+            _j = FAULT_STUCK_JOINT if FAULT_STUCK_JOINT >= 0 else int(np.random.choice([0, 2, 4, 6]))
+            _cap = FAULT_STUCK_DEG if FAULT_STUCK_DEG > 0 else float(np.random.uniform(38.0, 50.0))
+            self._motor_max = np.full(8, 10.0)
+            self._motor_max[_j] = np.deg2rad(_cap)
+        if FAULT_WEAK_PROB > 0 and self._dr > 0 and np.random.rand() < FAULT_WEAK_PROB:
+            self._torque_scale = self._torque_scale.copy()
+            self._torque_scale[int(np.random.randint(8))] *= np.random.uniform(FAULT_WEAK_MIN, 0.9)
+        if FAULT_OFFSET_PROB > 0 and self._dr > 0 and np.random.rand() < FAULT_OFFSET_PROB:
+            self._joint_offset = self._joint_offset.copy()
+            self._joint_offset[int(np.random.randint(8))] += np.random.uniform(-FAULT_OFFSET_DEG, FAULT_OFFSET_DEG) * np.deg2rad(1.0) * self._dr
+        _sag = MOTOR_SCALE_ALL * (1.0 - (np.random.uniform(0.0, MOTOR_SCALE_RAND) * self._dr if (MOTOR_SCALE_RAND > 0 and self._dr > 0) else 0.0))
+        if _sag != 1.0:
+            self._torque_scale = self._torque_scale * _sag
         # real control path (IMU_HOLD_STEPS / CMD_PATH); inert by default
         self._imu_held = None
         self._imu_hold_k = int(np.random.randint(IMU_HOLD_STEPS)) if IMU_HOLD_STEPS > 0 else 0
@@ -2139,6 +2244,9 @@ class OpenCatGymEnv(gym.Env):
                 # Limiting motor dynamics. Although bittle's dynamics seem to
                 # be be quite high like up to 7 rad/s.
                 p.changeDynamics(self.robot_id, j, maxJointVelocity = np.pi*10)
+        if FOOT_FRICTION > 0:
+            for _paw in (3, 6, 9, 12):
+                p.changeDynamics(self.robot_id, _paw, lateralFriction=FOOT_FRICTION)
 
         # Per-episode link-mass randomization (URDF masses are estimates; the
         # real robot's battery/wiring shift the distribution).
@@ -2183,14 +2291,21 @@ class OpenCatGymEnv(gym.Env):
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         _rot = np.asarray(p.getMatrixFromQuaternion(state_ang)).reshape(3, 3)
         proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)
-        self.state_robot = np.concatenate((state_ang,
+        _q0, _heading_extra = state_ang, []
+        if HEADING_OBS:                 # Y2 (see step()): yaw-free quaternion; heading error starts at 0
+            _e0 = p.getEulerFromQuaternion(state_ang)
+            _q0 = p.getQuaternionFromEuler([_e0[0], _e0[1], 0.0])
+            _he0 = (_e0[2] - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+            _heading_extra = [float(np.sin(_he0)), float(np.cos(_he0))]
+        self.state_robot = np.concatenate((_q0,
                                            np.clip(state_vel, -1, 1),
                                            proj_grav,
                                            [time_obs],
                                            self.tilt_history,      # all zeros at reset (level)
                                            np.zeros(2),            # ang accel
                                            [np.clip(self._cmd_fwd / CMD_FWD_MAX, -1, 1),
-                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)]))
+                                            np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)],
+                                           _heading_extra))
 
 
         # Initialize robot state history with reset position

@@ -46,7 +46,8 @@ def main():
     out = dict(heading_deg=[], yaw_rate_rms=[], roll_std=[], pitch_std=[], fell=0, steps=[])
     for ep in range(a.episodes):
         obs, _ = env.reset(seed=a.seed + ep)
-        env._cmd_fwd, env._cmd_yaw = 0.10, 0.0            # straight at the walked speed
+        env.set_command(fwd=0.10, yaw=0.0)                # straight at the walked speed, FORCED (2026-10-06: before this the env's
+                                                          # CMD_RESAMPLE_PROB redrew the command ~9 times per 1000 steps, so speeds were too low)
         yaw_torque = 0.0
         for lv in levers:
             kind = lv[0]

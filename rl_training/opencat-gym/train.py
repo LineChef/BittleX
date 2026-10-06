@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime
 
 from stable_baselines3 import PPO
@@ -67,6 +68,9 @@ if __name__ == "__main__":
     parser.add_argument("--finetune-target-kl", type=float, default=0.05,
                         help="SB3 aborts an update once approx_kl exceeds this (finetune only) -- "
                              "a hard backstop against the divergence above")
+    parser.add_argument("--mirror-loss", type=float, default=float(os.environ.get("G2E_MIRROR_LOSS", "0") or 0),
+                        help="V3 lever R1: weight of the left/right mirror-symmetry loss (mirror.py MirrorPPO); 0 = plain PPO. "
+                             "Env default G2E_MIRROR_LOSS. Value-loss weight: G2E_MIRROR_VALUE_LOSS (default 0.1)")
     parser.add_argument("--re-ramp", action="store_true",
                         help="with --from: ramp penalties / domain randomization up from zero again "
                              "(default: a continuation starts at full strength)")
@@ -74,7 +78,6 @@ if __name__ == "__main__":
 
     # PPO update threads (2026-10-06): on the M1 Pro the default 8 threads made the update 14.4 s per
     # rollout vs 9.6 s at 4 (686 -> 862 steps/s overall, same math). G2E_TORCH_THREADS overrides.
-    import os
     import torch
     torch.set_num_threads(int(os.environ.get("G2E_TORCH_THREADS", "4")))
 
@@ -96,6 +99,13 @@ if __name__ == "__main__":
         name_prefix=args.tag,
     )
     import opencat_gym_env as _E
+    if args.mirror_loss > 0:
+        from mirror import MirrorPPO
+        PPOCls = MirrorPPO
+        print(f"mirror-symmetry loss ON: policy weight {args.mirror_loss}, value weight "
+              f"{float(os.environ.get('G2E_MIRROR_VALUE_LOSS', '0.1'))}", flush=True)
+    else:
+        PPOCls = PPO
     ramp_offset = _E.RAMP_TOTAL_STEPS if (args.from_ckpt and not args.re_ramp) else 0.0
     checkpoint_callback = CallbackList([RampSync(ramp_offset), checkpoint_callback])
 
@@ -106,20 +116,25 @@ if __name__ == "__main__":
         # ~0.99); see --finetune-lr help.
         print(f"finetuning from {args.from_ckpt}  "
               f"(lr={args.finetune_lr}, target_kl={args.finetune_target_kl})")
-        model = PPO.load(args.from_ckpt, env=env,
+        model = PPOCls.load(args.from_ckpt, env=env,
                          n_steps=int(2048*8/parallel_env),
                          learning_rate=args.finetune_lr,
                          target_kl=args.finetune_target_kl,
                          tensorboard_log=None)
+        if args.mirror_loss > 0:
+            model.mirror_w, model.mirror_wv = args.mirror_loss, float(os.environ.get("G2E_MIRROR_VALUE_LOSS", "0.1"))
         model.learn(args.steps, callback=checkpoint_callback,
                     reset_num_timesteps=True)
     else:
-        model = PPO('MlpPolicy', env, seed=42,
+        model = PPOCls('MlpPolicy', env, seed=42,
                     policy_kwargs=custom_arch,
                     n_steps=int(2048*8/parallel_env),
                     learning_rate=linear_schedule(3e-4),
                     verbose=1,
-                    tensorboard_log=None).learn(args.steps, callback=checkpoint_callback)
+                    tensorboard_log=None)
+        if args.mirror_loss > 0:
+            model.mirror_w, model.mirror_wv = args.mirror_loss, float(os.environ.get("G2E_MIRROR_VALUE_LOSS", "0.1"))
+        model.learn(args.steps, callback=checkpoint_callback)
 
     model.save(f"trained/{args.tag}_ppo")
 

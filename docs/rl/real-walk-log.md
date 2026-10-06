@@ -313,18 +313,30 @@ built on it is [`v3-retrain-plan.md`](v3-retrain-plan.md). Raw results and the e
 - **Servo 8 (FL shoulder) is not ruled out, and its fault is not confirmed.** The scripted walk drives it above its ~42 deg sticking point
   63% of each cycle and still curved left. The user is replacing it, then these six walks get repeated.
 
-**Other sim-vs-G2 gaps measured the same day** (V2.1, calm, 422 g, 12.5 s; `v3-data/drift_probe_sp_*.json`):
+**Update 2026-10-06 (afternoon): the sim's servo-speed limit is the dominant sim-vs-G2 gap, and it hides the right turn.** The first version of this
+section used `drift_probe.py`, which did not force the commanded speed (the env redrew the command ~9 times per 1000 steps), so its speeds were too
+low and its "V2.1 slows down on long walks" reading was wrong. Re-measured with a forced command (`benchmark_v4.py`, V2.1, 422 g, the 12.5 s calm
+walk "N1", 20 episodes; raw results in [`v3-data/`](v3-data/README.md)):
 
-| Measure | G2 | Sim as trained | No servo speed limit | No command/servo model | Send every tick |
+| Sim servo speed limit (deg/s) | Falls | Speed (m/s) | Heading change over 12.5 s | Roll std | Pitch std |
 |---|---|---|---|---|---|
-| Roll std (deg) | 5.7-6.2 | 3.05 | 5.56 | 7.36 | 3.34 |
-| Pitch std (deg) | 1.9-2.7 | 2.42 | 5.06 | 5.13 | 2.48 |
-| Speed (m/s) | ~0.118 (10-01 taped) | 0.053 | 0.051 | 0.057 | 0.052 |
-| Falls | 0 / 6 | 0 / 8 | 1 / 8 | 2 / 8 | 0 / 8 |
+| 90 | 0% | 0.067 | +7.3 (left) | 2.26 | 1.44 |
+| **137 (what V2/V2.1 and the V3 profile assume)** | 0% | 0.089 | **+9.3 (left)** | **2.64** | 1.70 |
+| 180 | 0% | 0.091 | +1.8 | 3.83 | 2.27 |
+| 250 (the firmware's own `i` easing) | 10% | 0.086 | **-10.8 (right)** | **5.92** | 3.97 |
+| 400 | 10% | 0.081 | -15.8 | 6.68 | 4.89 |
+| none | 5% | 0.081 | -23.3 | 6.51 | 4.77 |
+| **G2 (six walks)** | 0 / 6 | ~0.118 (10-01 taped) | **-142 (right)** | **5.7-6.2** | 1.9-2.7 |
 
-- The 137 deg/s servo speed limit (borrowed from another project, never measured on G2) is the likeliest cause of the roll gap.
-- The sim is about half G2's speed. Part is contact; part is V2.1 slowing past its 3.1 s training length (0.074 m/s over 250 steps vs
-  0.053 over 1000), which G2 doesn't do.
+- Raising the limit from 137 to 250 deg/s moves the sim's roll swing onto G2's and turns V2.1 **right** for the first time. The 137 figure
+  was borrowed from another project (never measured on G2), and the firmware's own easing is already 250 deg/s, so the extra limit probably
+  over-damps the sim's legs. This is the first thing Phase 0 / Phase 1 of the V3 plan measures (`tools/servo_step_test.py`).
+- The sim still does not reach -142 deg, its pitch swing overshoots at 250 (3.97 vs 1.9-2.7), and it falls 10% where G2 fell 0 / 6; other
+  parameters (foot contact, motor strength) are still to calibrate.
+- Speed with a forced command: sim 0.089 vs G2 ~0.118 (about 25% short, not half as first reported); no slow-down over 12.5 s (0.09 early vs
+  0.09 late). The command path doesn't explain the gap: sending every tick gives 0.089, an ideal path 0.083. The old 377 g payload gives the same
+  as the 422 g one (0.090).
+- Not yet reproduced by the sim: G2's turn rate from the first second (the sim's yaw rate at 250 deg/s is much smaller than -11 deg/s).
 
 ## Not done / not measured
 

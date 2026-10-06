@@ -60,7 +60,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 
 ## Open problems
 
-1. **Front-left shoulder servo (servo 8) is faulty or mis-sensing:** sticks near 42° and misses its commands; the FR shoulder shows
+1. **Front-left shoulder servo (servo 8) is faulty or mis-sensing (being replaced 2026-10-06; the post-swap re-test steps are in [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) §0):** sticks near 42° and misses its commands; the FR shoulder shows
    occasional glitch readings. Findings and ordered next steps: [`rl/real-walk-log.md`](rl/real-walk-log.md) ("Servo troubleshooting").
 2. **Carpet:** every gait tried (V2.1, scripted, lift/stride variants) fails on ~1/4 in pile; falls are sideways to the right.
 3. **Heading drift to the right** (~140 deg per 12.5 s with V2.1) and a large roll swing while walking; the FR leg sags after the servos relax at rest.

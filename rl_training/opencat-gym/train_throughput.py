@@ -23,6 +23,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from opencat_gym_env import OpenCatGymEnv
+from mirror import MirrorPPO
 
 
 class _Timer(BaseCallback):
@@ -47,7 +48,10 @@ if __name__ == "__main__":
     print("torch threads", torch.get_num_threads(), "batch", bs)
     env = make_vec_env(OpenCatGymEnv, n_envs=8, vec_env_cls=SubprocVecEnv)
     cb = _Timer()
-    m = PPO("MlpPolicy", env, seed=42, policy_kwargs=dict(net_arch=[256, 256]), n_steps=2048, batch_size=bs, verbose=0)
+    algo = MirrorPPO if os.environ.get("MIRROR") else PPO              # MIRROR=1 times the mirror-symmetry loss's extra cost
+    m = algo("MlpPolicy", env, seed=42, policy_kwargs=dict(net_arch=[256, 256]), n_steps=2048, batch_size=bs, verbose=0)
+    if algo is MirrorPPO:
+        m.mirror_w, m.mirror_wv = 1.0, 0.1
     t0 = time.time()
     m.learn(16384 * 3, callback=cb)
     tot = time.time() - t0
