@@ -244,6 +244,29 @@ get below ~63 mm at knees x2.
    (`IMU_BIAS_DEG`). One data point, not enough to change the default yet.
 6. Re-set the payload model to the measured final build (H2) before the next run.
 
+## Fresh hard-floor baseline on the sturdier mount (2026-10-06)
+
+The case was installed (camera at the front, speaker at the very back, microphone on the lid, G2 about 422 g, 2026-10-06). Six closed-loop
+`Release_CandidateV2.1` walks on the same hard floor, `run_gait.py --cmd 0.10 --seconds 12.5`, fall guard on, hands off, G2 put back at the same start
+spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs: `real-walk-data/2026-10-06/`. Fresh, fully charged pack (8.51 V at rest).
+
+| run | roll mean / std (deg) | roll range | pitch std | yaw change at 25 / 50 / 75 / 100 % (deg, + = right) |
+|---|---|---|---|---|
+| 1 | +0.2 / 5.9 | -13 .. +11 | 2.7 | +35 +85 +130 -108 (wrapped or hand-corrected; ignore the last value) |
+| 2 | +0.8 / 5.8 | -11 .. +9 | 1.9 | +35 +72 +111 +150 |
+| 3 | +0.8 / 6.2 | -10 .. +10 | 2.4 | +44 +87 +129 +176 |
+| 4 | +1.4 / 5.7 | -10 .. +11 | 2.3 | +31 +68 +101 +144 |
+| 5 | +1.0 / 5.9 | -10 .. +11 | 2.2 | +34 +69 +101 +136 |
+| 6 | +1.3 / 6.0 | -9 .. +10 | 2.5 | +15 +44 +64 +103 |
+
+- **No falls, no stops**; the policy step took about 1.85 ms on average. The user saw a clear drift to the right on every walk; the yaw trace agrees
+  (runs 2-6: +103 to +176 deg over 12.7 s, mean about +142, so roughly 8-14 deg/s).
+- **Against the temporary mount** (six runs 2026-10-01/02, roll std 6.6-7.0, pitch std about 3.5): roll swing is about 12% lower (5.7-6.2) and pitch swing about
+  one third lower (1.9-2.7). The drift to the right is unchanged. The sim's roll std is 3.6-4.1 (open-loop replay), so the roll gap is still about 1.5x.
+- **Battery under load:** 9 readings during the walks, 8.07 to 8.45 V (diag event `gait/battery.load`); the pack sat at 8.51 V before and 8.34 V after. So walking
+  sags a full pack by about 0.3-0.45 V. The sag on a nearly empty pack is not measured; G2 browned out walking at a resting 7.58 V (2026-10-06, 12:12 AM).
+- **Not measured:** distance walked (no tape measure this time) and a weight breakdown (body vs Pi stack) and balance point.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
