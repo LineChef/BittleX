@@ -84,6 +84,15 @@ def baseline():
     return b
 
 
+def gate_reference(base, results):
+    """The reference a 3M round is judged against: the 3M control round (same payload, nothing else changed) when it has finished, else V2.1.
+    V2.1 has had ~30M steps, so it is only the context line, not a fair bar for a 3M policy."""
+    for t, r in results.items():
+        if t.endswith("_control") and "result" in r:
+            return r["result"], f"3M control {t}"
+    return base, "V2.1"
+
+
 def verdict(res, base):
     why = []
     if res["calm_falls"] > min(FLAT_FELL_MAX, base["calm_falls"] + FLAT_FELL_MARGIN):
@@ -111,10 +120,11 @@ def run_round(i, rnd, base, results):
         log(f"ROUND {i} HALT {tag}: {reason}")
         return None
     res = evaluate(f"trained/{tag}_ppo.zip")
-    passed, why = verdict(res, base)
+    ref, ref_name = gate_reference(base, results)
+    passed, why = verdict(res, ref)
     results[tag] = dict(round=i, desc=rnd["desc"], extra=rnd["extra"], result=res, passed=passed, why=why)
     json.dump(results, open(RESULTS, "w"), indent=1)
-    log(f"ROUND {i} DONE {tag} {'PASS' if passed else 'FAIL'} {why or ''} | drift {res['ref_heading_abs']:.1f} deg (V2.1 {base['ref_heading_abs']:.1f}), "
+    log(f"ROUND {i} DONE {tag} {'PASS' if passed else 'FAIL'} (vs {ref_name}) {why or ''} | drift {res['ref_heading_abs']:.1f} deg (V2.1 {base['ref_heading_abs']:.1f}), "
         f"calm falls {res['calm_falls']:.2f} (V2.1 {base['calm_falls']:.2f}), speed {res['calm_speed']:.3f} (V2.1 {base['calm_speed']:.3f}), "
         f"yawrms {res['calm_yawrms']:.3f} (V2.1 {base['calm_yawrms']:.3f}), cells {res.get('cells')}")
     return results[tag]
@@ -169,9 +179,12 @@ def main():
             time.sleep(20)
         if len(read_queue()["rounds"]) <= i:
             break
+    ref, ref_name = gate_reference(base, results)
+    for t, r in results.items():                      # re-judge every round against the final reference (the control may have finished after it)
+        r["passed"], r["why"] = verdict(r["result"], ref) if not t.endswith("_control") else (False, ["the control is the reference"])
     passing = [(r["result"]["ref_heading_abs"], t) for t, r in results.items() if r["passed"]]
     if not passing:
-        log("NO ROUND PASSED the gates -- the final 20M run is NOT started. Needs a decision.")
+        log("NO ROUND PASSED the gates -- the final 20M run is NOT started. HW CHECKIN: needs a decision (the user is told).")
         return
     best_tag = min(passing)[1]
     log(f"best passing round: {best_tag} (drift {results[best_tag]['result']['ref_heading_abs']:.1f} deg)")

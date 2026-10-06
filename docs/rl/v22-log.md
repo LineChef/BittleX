@@ -38,7 +38,15 @@ best 3M policy can be walked on G2; the user will also swap the front-left shoul
 |---|---|---|
 | V2.1 reference (same sim) | frozen `Release_CandidateV2.1` | calm walk: 29% falls, 0.043 m/s (probe), roll std 6.0 deg; under the reference yaw disturbance (torque up to 0.5): heading error 49 deg, 58% falls; cells fell T2.2 0.20, T3.2 0.30, T5.2 0.20, T7.2 0.20, T8.1 1.00, T10.1 0.20, T10.2 0.25 |
 | R1 `v22_r1_drift` | yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else | **FAIL** (10:12 AM): drift under the reference disturbance 56 deg (V2.1 49), calm walk 50% falls (V2.1 29%), speed 0.024 m/s (V2.1 0.043), yaw rms 0.271 (V2.1 0.183). Cells fell: T2.2 0.0, T3.2 0.8, T5.2 0.2, T7.2 0.0, T8.1 0.8, T10.1 0.0, T10.2 0.05 (the new payload weights alone help several cells). Reading: training episodes are 250 steps (3.1 s) while real walks and the probe are 12.5 s, so a drift disturbance barely accumulates in training and 12.5 s stability is never trained. |
-| R2 `v22_r2_len` | training episodes 1000 steps (12.5 s), 422 g payload, no drift torque (single lever) | started 10:12 AM; expected done about 11:25 AM |
+| R2 `v22_r2_len` | training episodes 1000 steps (12.5 s), 422 g payload, no drift torque (single lever) | **FAIL** (11:20 AM): under the first (too harsh) probe calm falls 54% / drift 80 deg. Re-scored with the corrected probe: calm falls 1/24, heading error 24.8 deg, speed 0.044; under the disturbance 8/24 fall, heading error 62 deg (V2.1: 27 deg, 1/24). Longer episodes alone did not help. |
+| R3 `v22_r3_control` | CONTROL: 422 g payload, standard episodes, no drift torque | started 11:20 AM; expected done about 12:27 PM, scored about 12:35 PM. The 3M reference for every round (V2.1 has had ~30M steps, so it is context only) |
+
+## Probe correction and a scoring lesson (2026-10-06, 11:30 AM)
+The first probe turned on every default random hazard of the training sim (ground tilt up to 14 deg, rubble, ledges), so its "calm walk" was not calm: V2.1 fell 29% on it, R1 50%, R2 54%.
+`drift_probe.py` now applies the decathlon's T1.1 environment (`benchmark_decathlon._apply({})`: pushes, terrain, rubble, slope and cutback zeroed, robot randomization fully on). Corrected V2.1: calm 0/24 falls, heading error 9.7 deg,
+speed 0.051 m/s, roll std 3.3 deg; under the reference yaw torque (up to 0.5) heading error 26.9 deg, 1/24 falls. (The sim's calm roll swing is 3.3 deg against 5.9 on the real robot, and its calm heading error 10 deg against about 140 real,
+so the sim still does not reproduce the real drift.) Because V2.1 has ~30M steps and each round only 3M, rounds are now judged against a **3M control** (round 3: new payload, nothing else changed), with V2.1 as context:
+a round passes if its calm falls are no more than the control's + 0.05 (and <= 0.15), its calm speed is at least 90% of the control's, and its heading error under the disturbance is at most half the control's.
 
 ## Where to resume (written 2026-10-06 ~9:50 AM, for a new session)
 - **Everything runs on the Mac in `rl_training/opencat-gym/`**: the runner `phase_v22.py` (log `trained/phase_v22.log`, output `trained/phase_v22.stdout`), the training
@@ -52,8 +60,8 @@ best 3M policy can be walked on G2; the user will also swap the front-left shoul
 - **Hardware check-in:** after the rounds the runner logs `HW CHECKIN` and PAUSES (no 20M run). Export the best round's policy (`export_onnx.py`, with its `.onnx.json` sidecar), put
   it on the Pi WITHOUT making it the default (`run_gait.py --policy <onnx>`), ask the user to walk it (the user will have swapped the front-left shoulder servo by then). To go on:
   `echo <round tag, or nothing> > trained/v22_final_go`; the runner then starts `v22_20m` (20M, `G2E_HARD_SCALE=1.10`, gates at 3M and 5M that stop the run on a regression).
-- **Pass bar for a round:** calm falls <= min(0.15, V2.1 + 0.05) and speed >= 90% of V2.1, and heading error under the reference disturbance at least 50% below V2.1's. (V2.1 itself
-  falls 29% on the calm walk in this sim, so the 0.15 bar is demanding; if no round passes the runner does NOT start the final run and says so.)
+- **Pass bar for a round:** judged against the 3M control round (see "Probe correction" above): calm falls <= min(0.15, control + 0.05), speed >= 90% of the control's, heading error under the reference disturbance <= 50% of the control's.
+  If no round passes, the runner does NOT start the final run and says so (HW CHECKIN line).
 - **Pitfall:** `pkill -f phase_v22.py` also kills any watcher whose command line contains that text. Kill the runner by pid
   (`ps -axo pid,command | awk '/Python phase_v22/ && !/awk/ {print $1}'`); the training is a separate process and is not affected. The runner resumes a round that is already training.
 - **Mac sleep:** closing the lid sleeps the Mac and pauses training (`caffeinate -i` only stops idle sleep). Keep the lid open or use clamshell mode on power.

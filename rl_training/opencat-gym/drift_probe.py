@@ -22,12 +22,10 @@ import pybullet as p
 
 import opencat_gym_env
 opencat_gym_env.GUI_MODE = False
-# "flat, calm, payload on" like the decathlon's payload mode: full domain randomization of the robot (mass, offsets, IMU) but no pushes, rough ground or torque cutback
-opencat_gym_env.DR_EVAL_FULL = True
-opencat_gym_env.PAYLOAD_PROB = 1.0
-for _k, _v in (("ROUGH_TERRAIN", 0.0), ("TORQUE_CUTBACK", 0.0), ("RANDOM_PUSH", 0.0), ("RANDOM_TERRAIN_PROB", 0.0), ("RANDOM_FRICTION", 0.0)):
-    if hasattr(opencat_gym_env, _k):
-        setattr(opencat_gym_env, _k, _v)
+# "flat, calm, payload on": exactly the decathlon's T1.1 environment (benchmark_decathlon._apply zeroes the push / terrain / rubble / slope / cutback knobs
+# and turns domain randomization of the robot itself (mass, offsets, IMU) fully on), so a "calm" number here means what the project's T1.1 gate means.
+import benchmark_decathlon as _B
+_B._apply({})
 from opencat_gym_env import OpenCatGymEnv
 from stable_baselines3 import PPO
 
