@@ -401,3 +401,22 @@ the log (negative yaw = left) and confirms the yaw sign for the firmware IMU str
 movement in the step gait (before the `gc` IMU calibration and the limb recalibration) is gone. The
 balance-off `vtF`, `kwkF` and `kcrF` comparisons were not run. The rest-pose symptom is unchanged: the pose is right
 when it first drops to rest and the FR shoulder visibly lags/sags *after* the servos relax.
+
+## Firmware turn rates, 2026-10-06 (V3 Phase 0 step 3)
+
+`tools/g2_turns.sh start 6` (kbalance stand, then the firmware skill for 10 s, IMU logged, hard floor; raw CSVs in `v3-data/turns/`).
+Yaw rate is a least-squares line through the unwrapped IMU yaw (firmware convention, + = right):
+
+| Skill | Runs (deg/s) | Mean |
+|---|---|---|
+| `kwkL` | -10.9, -13.4, -12.1 | -12.1 |
+| `kwkR` | +18.7, +18.1, +19.0 | +18.6 |
+
+Right turns are about 50% faster than left, repeatably (spread about 1 deg/s per side): a steady rightward bias of about 3 deg/s, the same size as V2.1's
+right drift, in a scripted firmware gait with no policy running. The bias belongs to G2's body / servos, not to the learned gait.
+
+**Turning gate (plan Phase 1): fails.** `turn_gate_probe.py` runs the calibrated sim open-loop (zero residual, `TURN_BLEND`, payload on, 4 episodes per
+direction, nominal cadence): sim `wkL` -0.8 deg/s and `wkR` +0.5 deg/s, i.e. 7% and 3% of the real rates (gate: 50%). The blended pose is applied
+(left-leg swing about 1/3 of wkF's) and G2 walks 0.48 m in 10 s, but the sim body hardly yaws where the real one turns 120-190 degrees. So Y4 (turn
+curriculum), Y6 and the S5 screen stay off (`trained/v3_turning_gate_pass` not created); turns stay firmware tokens and straightness rests on the
+mirror loss plus heading feedback.
