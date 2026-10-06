@@ -37,15 +37,25 @@ def main():
     ap.add_argument("--joint", default="FL-sh", choices=NAMES)
     ap.add_argument("--start", type=float, default=None, help="deg (default 30 for a shoulder, -20 for a knee)")
     ap.add_argument("--end", type=float, default=None, help="deg (default 70 for a shoulder, 30 for a knee)")
+    ap.add_argument("--also", default=None, choices=NAMES,
+                    help="move this second joint at the SAME instant with the same angles (e.g. --joint FL-sh --also FR-sh); each joint is fitted "
+                         "separately, so a joint that lags its mirror shows up as a larger lag / lower rate")
+    ap.add_argument("--no-stand", action="store_true",
+                    help="do not send the whole stand pose first or rest at the end: only the chosen joint(s) are ever commanded (G2 held in the air)")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--label", default="unloaded", help="free text saved in the CSV: unloaded / loaded")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     j = NAMES.index(args.joint)
     idx = 8 + j
+    j2 = NAMES.index(args.also) if args.also else None
+    idx2 = 8 + j2 if j2 is not None else None
+    if j2 is not None and (j2 < 4) != (j < 4):
+        raise SystemExit("--also must be the same kind of joint (both shoulders or both knees): the angles are shared")
     a = args.start if args.start is not None else (30.0 if j < 4 else -20.0)
     b = args.end if args.end is not None else (70.0 if j < 4 else 30.0)
-    out = args.out or os.path.expanduser(f"~/g2_runs/servo_step_{args.joint}_{args.label}.csv")
+    out = args.out or os.path.expanduser(f"~/g2_runs/servo_step_{args.joint}{'+' + args.also if args.also else ''}_{args.label}.csv")
+    both = lambda angle: f"i{idx} {angle:g}" + (f" {idx2} {angle:g}" if idx2 is not None else "")
     delays = [d / 1000.0 for d in range(0, 200, 10)]
 
     s = serial.Serial(args.port, 115200, timeout=0.01)
@@ -71,7 +81,7 @@ def main():
         return got
 
     def settle(angle):
-        tx(f"i{idx} {angle:g}")
+        tx(both(angle))
         rows_until(time.monotonic() + 1.4)
         buf_clear()
 
@@ -82,47 +92,60 @@ def main():
 
     tx("gb")
     rows_until(time.monotonic() + 0.5)
-    tx(STAND)
-    rows_until(time.monotonic() + 3.0)
+    if not args.no_stand:
+        tx(STAND)
+        rows_until(time.monotonic() + 3.0)
     print(f"{args.joint}: {a:g} <-> {b:g} deg, {args.repeats} repeats x {len(delays)} delays x 2 directions "
           f"(about {int(args.repeats * len(delays) * 2 * 3.3)} s)")
 
     trials = {"up": [], "down": []}
+    trials2 = {"up": [], "down": []}                    # the --also joint
     for rep in range(args.repeats):
         for d in delays:
             for name, (p0, p1) in (("up", (a, b)), ("down", (b, a))):
                 settle(p0)
                 t0 = time.monotonic()
-                tx(f"i{idx} {p1:g}")
+                tx(both(p1))
                 rows_until(t0 + d)                      # (nothing should arrive before `f`; drains stray rows)
                 buf_clear()
                 tx("f")
                 got = rows_until(t0 + d + 1.0, want=5)  # ~5 rows/s: the first few trace the end of the move
                 trials[name].append([(t - t0, v[j]) for t, v in got])
-    tx(f"i{idx} {50 if j < 4 else 0}")
+                if j2 is not None:
+                    trials2[name].append([(t - t0, v[j2]) for t, v in got])
+    tx(both(50 if j < 4 else 0))
     rows_until(time.monotonic() + 1.0)
-    tx("d")
+    if not args.no_stand:
+        tx("d")
     s.close()
 
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["joint", "label", "direction", "start", "end", "t_s", "reading_deg"])
-        for name, ts in trials.items():
-            p0, p1 = (a, b) if name == "up" else (b, a)
-            for tr in ts:
-                for t, v in tr:
-                    w.writerow([args.joint, args.label, name, p0, p1, f"{t:.4f}", f"{v:.2f}"])
+        for jn, tdict in ((args.joint, trials), (args.also, trials2)):
+            if jn is None:
+                continue
+            for name, ts in tdict.items():
+                p0, p1 = (a, b) if name == "up" else (b, a)
+                for tr in ts:
+                    for t, v in tr:
+                        w.writerow([jn, args.label, name, p0, p1, f"{t:.4f}", f"{v:.2f}"])
     print(f"samples -> {out}")
-    for name, ts in trials.items():
-        p0, p1 = (a, b) if name == "up" else (b, a)
-        try:
-            r = servo_step.fit_rate(servo_step.pool(ts), p0, p1)
-        except ValueError as e:
-            print(f"  {name}: {e}")
+    for jn, tdict in ((args.joint, trials), (args.also, trials2)):
+        if jn is None:
             continue
-        print(f"  {name:4s} {p0:g} -> {p1:g}: rate {r['rate_deg_s']:.0f} deg/s, lag {r['lag_s'] * 1000:.0f} ms, "
-              f"fit rms {r['rms_deg']:.1f} deg, {r['n']} samples   (firmware easing {servo_step.FIRMWARE_EASE_DEG_S:.0f}, sim assumes 137)")
+        for name, ts in tdict.items():
+            p0, p1 = (a, b) if name == "up" else (b, a)
+            try:
+                r = servo_step.fit_rate(servo_step.pool(ts), p0, p1)
+            except ValueError as e:
+                print(f"  {jn} {name}: {e}")
+                continue
+            ends = [v for tr in ts for t, v in tr if t > 0.9]
+            end_txt = f", settles at {np.median(ends):.1f} deg" if ends else ""
+            print(f"  {jn:6s} {name:4s} {p0:g} -> {p1:g}: rate {r['rate_deg_s']:.0f} deg/s, lag {r['lag_s'] * 1000:.0f} ms, "
+                  f"fit rms {r['rms_deg']:.1f} deg, {r['n']} samples{end_txt}   (firmware easing {servo_step.FIRMWARE_EASE_DEG_S:.0f}, sim assumes 137)")
 
 
 if __name__ == "__main__":

@@ -35,7 +35,14 @@ RECIPE = {
 }
 
 # --- Phase 1 output: parameters fitted so the sim matches the real walks. Empty until Phase 1 runs. ---
-CALIBRATION: dict[str, str] = {}
+CALIBRATION: dict[str, str] = {
+    # 2026-10-06 (Phase 1, fast pass): V2.1 on benchmark_v4 cell N1 (12.5 s calm walk) matched to the 14 post-servo-swap real walks
+    # (roll std 5.14, pitch std 2.41, 0 falls, heading +36 +- 25 right). Sweep data: docs/rl/v3-data/calibration/. Chosen 200 deg/s + 0.15 N*m:
+    # 0% falls, roll 4.59 (-11%), pitch 2.57 (+7%), speed 0.090 (G2 ~0.120: a known residual gap, handled by scaling the commanded speed on the Pi),
+    # heading -4 (G2 -36 +- 25). Raising ground / foot friction or the servo gains did not help (stiffer gains made every episode fall).
+    "G2E_SERVO_RATE_LIMIT_DEG_S": "200",
+    "G2E_MOTOR_FORCE": "0.15",
+}
 
 # --- screening levers: one per 3M round (docs/rl/v3-retrain-plan.md sections 2.3-2.5) ---
 LEVERS = {
@@ -46,7 +53,7 @@ LEVERS = {
     "turn": {"G2E_TRAIN_YAW": "0.15"},                                                         # Y4 (only if Phase 1's turning gate passes)
     "faults": {"G2E_FAULT_STUCK_PROB": "0.10", "G2E_FAULT_WEAK_PROB": "0.10", "G2E_FAULT_OFFSET_PROB": "0.10",   # Y5
                "G2E_MOTOR_SCALE_RAND": "0.12", "G2E_DRIFT_TORQUE": "0.25", "G2E_DRIFT_PROB": "0.10"},
-    "servo_feas": {"G2E_FAC_SERVO_FEAS": "5.0", "G2E_SERVO_CEIL_DEG_S": "137"},                # R3 (ceiling follows the measured servo speed)
+    "servo_feas": {"G2E_FAC_SERVO_FEAS": "5.0", "G2E_SERVO_CEIL_DEG_S": "200"},                # R3 (ceiling = the calibrated servo speed)
     "balance_pbrs": {"G2E_FAC_BALANCE_PBRS": "4.0"},                                           # R4
     "smooth": {"G2E_FAC_SMOOTH_1": "15", "G2E_FAC_SMOOTH_2": "15"},                            # R5 (revised: the old terms are inert)
     "touchdown": {"G2E_FAC_TOUCHDOWN": "25"},                                                  # R6
