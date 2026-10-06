@@ -31,7 +31,10 @@ RECIPE = {
     # reward tuning: yaw tracking 9 (V2.1). The residual-smoothing weight is 8.2 for FRESH runs and 10.5 from the continuation stages on (stage_extra): the V2 -> V2.1 value
     # was tuned on an already-quiet policy; on a young one (exploration noise std 0.5-1.0) it costs -4 to -7 per step and swamps the reward (C0 run 1, 2026-10-06).
     "G2E_FAC_YAW_TRACK": "9.0", "G2E_FAC_RESID_SMOOTH": "8.2",
-    "G2E_RAMP_PENALTY_STEPS": "4e6", "G2E_RAMP_TOTAL_STEPS": "1e6",
+    # Both ramps (the reward penalties and the generic randomization: IMU noise and bias, mass, friction, calibration error ...) run over 4M total steps, the pace every
+    # validated run actually had (the old per-env ramp reached 1.0 only at 8 x 5e5 total steps). C0 run 2 with the randomization at full strength from 1M steps survived only
+    # 56% of clean-floor episodes at 1.4M steps. Continuation stages start at full strength (train.py ramp offset).
+    "G2E_RAMP_PENALTY_STEPS": "4e6", "G2E_RAMP_TOTAL_STEPS": "4e6",
     # the V2 course minus carpet (carpet is out of every gate and out of training; its own session later)
     "G2E_LEDGE_HEIGHT": "0.035", "G2E_LEDGE_RANDOMIZE": "1",
     "G2E_SURFACE_TRANSITION_PROB": "0", "G2E_SNAG_OBSTACLE_PROB": "0", "G2E_LEDGE_PROB": "0",
@@ -43,6 +46,7 @@ RECIPE = {
     # >= ~0.75M steps even for a perfect policy). Continuation stages and the 20M climb carefully (see stage_extra): +0.05 after TWO good windows of 8 (~200k steps each).
     "G2E_LEVEL_WINDOW_C": "6", "G2E_LEVEL_STEP_C": "0.10", "G2E_LEVEL_PROMOTE_WINDOWS": "1",
     # Competence is measured by a deterministic probe every 98k steps (6 episodes per category), not from the noisy training episodes: see train.py Curriculum.
+    # The probe score is RELATIVE to the same policy's clean-floor score (same randomization), so up/down thresholds judge hazard handling only.
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "6", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
 

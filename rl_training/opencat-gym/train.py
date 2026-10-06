@@ -68,14 +68,17 @@ class Curriculum(BaseCallback):
     exploration noise, for `episodes` episodes on each hazard category at its current level (the others at 0; random training commands); the category's mean episode
     score (survived x fraction of commanded distance covered) is compared with LEVEL_UP_SCORE / LEVEL_DOWN_SCORE: LEVEL_PROMOTE_WINDOWS consecutive good probes raise the
     category by LEVEL_STEP_C, one bad probe lowers it. The new levels are pushed to every training env. `start` is the level every category starts at."""
-    def __init__(self, every=98304, episodes=6, start=0.0, verbose=1):
+    def __init__(self, every=98304, episodes=6, start=0.0, ramp_offset=0.0, verbose=1):
         super().__init__(verbose)
         self.every, self.episodes = int(every), int(episodes)
+        self.ramp_offset = float(ramp_offset)
         import opencat_gym_env as E
         self.E = E
         self.levels = {c: float(start) for c in E.CATS}
         self.streak = {c: 0 for c in E.CATS}
         self.last = {c: float("nan") for c in E.CATS}
+        self.raw = {c: float("nan") for c in E.CATS}
+        self.base = float("nan")
         self.env = None
         self._next = self.every
 
@@ -86,8 +89,11 @@ class Curriculum(BaseCallback):
         self.training_env.env_method("set_category_levels", self.levels)
 
     def _probe(self, cat):
+        """Mean episode score (survived x fraction of commanded distance) of the deterministic policy with `cat` at its level and every other category at 0.
+        cat=None: the clean-floor baseline (all categories 0). The probe env gets the SAME generic-randomization ramp as the training envs."""
         import pybullet as p
-        self.E.CATEGORY_OVERRIDE = {cat: self.levels[cat]}
+        self.E.CATEGORY_OVERRIDE = {cat if cat else "terrain": self.levels[cat] if cat else 0.0}
+        self.env.set_ramp_steps(self.ramp_offset + self.num_timesteps)
         scores = []
         for k in range(self.episodes):
             obs, _ = self.env.reset(seed=int(self.num_timesteps) % 100000 + k)
@@ -111,9 +117,12 @@ class Curriculum(BaseCallback):
             return
         self._next += self.every
         E = self.E
+        base = self._probe(None)                         # what this policy scores on a clean floor under the same randomization: hazards are judged relative to it
+        self.base = base
         for c in E.CATS:
-            m = self._probe(c)
-            self.last[c] = m
+            raw = self._probe(c)
+            m = min(1.0, raw / max(base, 0.30))          # RELATIVE score: a slow walker, or one limited by the randomization, is not penalized for it
+            self.last[c], self.raw[c] = m, raw
             if m >= E.LEVEL_UP_SCORE:
                 self.streak[c] += 1
                 if self.streak[c] >= E.LEVEL_PROMOTE_WINDOWS:
@@ -124,8 +133,8 @@ class Curriculum(BaseCallback):
                 if m <= E.LEVEL_DOWN_SCORE:
                     self.levels[c] = max(0.0, self.levels[c] - E.LEVEL_STEP_C)
         self.training_env.env_method("set_category_levels", self.levels)
-        print(f"[probe] steps {self.num_timesteps:.0f}  deterministic score by category (new level): "
-              + "  ".join(f"{c} {self.last[c]:.2f} ({self.levels[c]:.2f})" for c in E.CATS), flush=True)
+        print(f"[probe] steps {self.num_timesteps:.0f}  clean-floor score {self.base:.2f}; relative score by category (raw) -> new level: "
+              + "  ".join(f"{c} {self.last[c]:.2f} ({self.raw[c]:.2f}) -> {self.levels[c]:.2f}" for c in E.CATS), flush=True)
 
 
 if __name__ == "__main__":
@@ -193,7 +202,7 @@ if __name__ == "__main__":
     cbs = [RampSync(ramp_offset), checkpoint_callback]
     if _E.LEVEL_EXTERNAL and _E.ADAPTIVE_LEVEL and _E.CATEGORY_LEVELS:
         cbs.append(Curriculum(every=int(os.environ.get("G2E_PROBE_EVERY", "98304")), episodes=int(os.environ.get("G2E_PROBE_EPISODES", "6")),
-                              start=_E.LEVEL_FIXED if _E.LEVEL_FIXED >= 0 else _E.LEVEL_START))
+                              start=_E.LEVEL_FIXED if _E.LEVEL_FIXED >= 0 else _E.LEVEL_START, ramp_offset=ramp_offset))
     checkpoint_callback = CallbackList(cbs)
 
     if args.from_ckpt:
