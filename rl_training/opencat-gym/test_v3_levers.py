@@ -378,3 +378,26 @@ def test_episode_score_is_the_fraction_of_commanded_distance(cat_env):
     assert env._episode_score() == pytest.approx(0.6, abs=0.02)
     env._lvl_cmd_sum = 0.0                                                                         # a stand command scores 1
     assert env._episode_score() == 1.0
+
+
+# ----------------------------------------------------------------------------- ramps: generic randomization vs difficulty vs penalties
+def test_category_mode_keeps_the_generic_time_ramp_and_penalties_use_their_own_length(cat_env, monkeypatch):
+    E, env = cat_env
+    monkeypatch.setattr(E, "RAMP_MODE", "total")
+    monkeypatch.setattr(E, "RAMP_TOTAL_STEPS", 1e6)
+    monkeypatch.setattr(E, "RAMP_PENALTY_STEPS", 4e6)
+    env._levels = {c: 0.1 for c in E.CATS}                     # the difficulty levels are low ...
+    env.set_ramp_steps(2e6)                                   # ... but 2M steps have passed
+    env.reset(seed=0)
+    assert env._dr == 1.0                                     # the generic randomization (IMU, mass, friction ...) is at full strength by time, not tied to difficulty
+    assert env._ramp(E.PENALTY_STEPS, E.RAMP_PENALTY_STEPS) == pytest.approx(0.5)     # the reward penalties are only half in at 2M steps (full at 4M)
+    env.set_ramp_steps(5e5)
+    env.reset(seed=0)
+    assert env._dr == pytest.approx(0.5)
+
+
+def test_global_level_mode_still_drives_dr_from_the_level(lvl_env):
+    E, env = lvl_env
+    env._level = 0.35
+    env.reset(seed=0)
+    assert env._dr == pytest.approx(0.35)

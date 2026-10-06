@@ -28,7 +28,10 @@ RECIPE = {
     "G2E_SERVO_RATE_LIMIT_DEG_S": "137",       # borrowed from another project; Phase 0 step 4 measures G2's (backlog H13)
     "G2E_SLOPE_TARGET_PROB": "0.3",
     # validated reward tuning (V2 -> V2.1): yaw tracking 9, residual smoothing 10.5
-    "G2E_FAC_YAW_TRACK": "9.0", "G2E_FAC_RESID_SMOOTH": "10.5",
+    # reward tuning: yaw tracking 9 (V2.1). The residual-smoothing weight is 8.2 for FRESH runs and 10.5 from the continuation stages on (stage_extra): the V2 -> V2.1 value
+    # was tuned on an already-quiet policy; on a young one (exploration noise std 0.5-1.0) it costs -4 to -7 per step and swamps the reward (C0 run 1, 2026-10-06).
+    "G2E_FAC_YAW_TRACK": "9.0", "G2E_FAC_RESID_SMOOTH": "8.2",
+    "G2E_RAMP_PENALTY_STEPS": "4e6", "G2E_RAMP_TOTAL_STEPS": "1e6",
     # the V2 course minus carpet (carpet is out of every gate and out of training; its own session later)
     "G2E_LEDGE_HEIGHT": "0.035", "G2E_LEDGE_RANDOMIZE": "1",
     "G2E_SURFACE_TRANSITION_PROB": "0", "G2E_SNAG_OBSTACLE_PROB": "0", "G2E_LEDGE_PROB": "0",
@@ -91,6 +94,7 @@ def stage_extra(stage: str, levers) -> dict:
     if stage != "s0_flat":
         out["G2E_LEVEL_START"] = "0.8" if stage != "s6_full_strength" else "1.0"     # a continuation must not restart from an empty floor
         out.update({"G2E_LEVEL_WINDOW_C": "8", "G2E_LEVEL_STEP_C": "0.05", "G2E_LEVEL_PROMOTE_WINDOWS": "2"})   # the careful pace: +0.05 after 2 good probes in a row
+        out["G2E_FAC_RESID_SMOOTH"] = "10.5"                  # the V2.1 smoothing weight, now that the policy is quiet
     if stage in LATE_STAGES:
         if "turn" in levers:
             out["G2E_TRAIN_YAW"] = "0.45"

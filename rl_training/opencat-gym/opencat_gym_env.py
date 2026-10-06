@@ -729,6 +729,10 @@ SERVO_RATE_LIMIT_DEG_S = _g2e("SERVO_RATE_LIMIT_DEG_S", SERVO_RATE_LIMIT_DEG_S)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
 RAMP_MODE          = _g2e("RAMP_MODE", "total")                      # "total" | "legacy" (see RAMP_TOTAL_STEPS)
 RAMP_TOTAL_STEPS   = _g2e("RAMP_TOTAL_STEPS", RAMP_TOTAL_STEPS)
+# RAMP_PENALTY_STEPS: total steps over which the reward PENALTIES reach full strength (default = RAMP_TOTAL_STEPS, the domain-randomization ramp). The V3 recipe sets it
+# to 4M, the pace every validated run actually had (the old per-env ramp reached 1.0 only at 8 x 5e5 = 4M total steps): a young policy's exploration noise makes the
+# residual-smoothing penalty alone -4 to -7 per step at full strength, so full penalties at 1M steps turned the total reward negative (and falling attractive).
+RAMP_PENALTY_STEPS = _g2e("RAMP_PENALTY_STEPS", RAMP_TOTAL_STEPS)
 
 # --- V3 retrain levers (docs/rl/v3-retrain-plan.md). Every one defaults OFF, so older checkpoints and scripts replay unchanged. ---
 # Y2 HEADING_OBS: the observation's raw quaternion becomes a yaw-FREE quaternion (roll / pitch only) and two inputs are appended,
@@ -978,7 +982,6 @@ class OpenCatGymEnv(gym.Env):
             self._focus = None
         elif CATEGORY_LEVELS and ADAPTIVE_LEVEL and not DR_EVAL_FULL and LEVEL_FIXED < 0:
             lv = self._levels
-            self._dr = float(np.mean(list(lv.values())))
             r = np.random.rand()
             if r < LEVEL_EASY_PROB:                                   # an anchor episode: always passable, never used to adapt
                 self._focus, d = None, {c: 0.0 for c in CATS}
@@ -1603,7 +1606,7 @@ class OpenCatGymEnv(gym.Env):
         else:
             _dir = np.sign(self._cmd_fwd)
             capped_forward = min(_dir * movement_forward, abs(self._cmd_fwd) / CONTROL_HZ)
-        penalty_scale = self._ramp(PENALTY_STEPS)
+        penalty_scale = self._ramp(PENALTY_STEPS, RAMP_PENALTY_STEPS)
         if PENALTY_RAMP_CAP > 0:
             penalty_scale = min(penalty_scale, PENALTY_RAMP_CAP)
         # Scripted-gait lessons (docs/rl/gait-benchmark.md): keep feet on the ground
@@ -1917,11 +1920,11 @@ class OpenCatGymEnv(gym.Env):
         """Trainer hook (train.py RampSync): the run's total env steps so far, for the penalty / DR ramps."""
         self._train_total_steps = float(total_steps)
 
-    def _ramp(self, per_env_steps):
-        """Ramp progress, uncapped (callers cap it). See RAMP_MODE."""
+    def _ramp(self, per_env_steps, total=None):
+        """Ramp progress, uncapped (callers cap it). See RAMP_MODE. `total`: the total-step length to use in "total" mode (default RAMP_TOTAL_STEPS)."""
         if RAMP_MODE == "legacy" or self._train_total_steps is None:
             return self.step_counter_session / per_env_steps
-        return self._train_total_steps / RAMP_TOTAL_STEPS
+        return self._train_total_steps / (total if total else RAMP_TOTAL_STEPS)
 
     def set_goal(self, bearing=None, dist=None):
         """Force this episode's goal (eval). bearing rad (0=ahead, +=left), dist m.
@@ -2036,8 +2039,8 @@ class OpenCatGymEnv(gym.Env):
             self._dr = 1.0
         else:
             self._dr = min(1.0, self._ramp(DR_RAMP_STEPS))
-        if not DR_EVAL_FULL and (ADAPTIVE_LEVEL or LEVEL_FIXED >= 0):
-            self._dr = float(LEVEL_FIXED if LEVEL_FIXED >= 0 else self._level)
+        if not DR_EVAL_FULL and (LEVEL_FIXED >= 0 or (ADAPTIVE_LEVEL and not CATEGORY_LEVELS)):
+            self._dr = float(LEVEL_FIXED if LEVEL_FIXED >= 0 else self._level)     # global-level mode; in CATEGORY mode _dr stays the time ramp (IMU, mass, friction ... are not difficulty)
         self._assign_category_levels()
         p.resetSimulation()
         # Disable rendering during loading.

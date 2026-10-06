@@ -189,7 +189,7 @@ if __name__ == "__main__":
               f"{float(os.environ.get('G2E_MIRROR_VALUE_LOSS', '0.1'))}", flush=True)
     else:
         PPOCls = PPO
-    ramp_offset = _E.RAMP_TOTAL_STEPS if (args.from_ckpt and not args.re_ramp) else 0.0
+    ramp_offset = max(_E.RAMP_TOTAL_STEPS, _E.RAMP_PENALTY_STEPS) if (args.from_ckpt and not args.re_ramp) else 0.0
     cbs = [RampSync(ramp_offset), checkpoint_callback]
     if _E.LEVEL_EXTERNAL and _E.ADAPTIVE_LEVEL and _E.CATEGORY_LEVELS:
         cbs.append(Curriculum(every=int(os.environ.get("G2E_PROBE_EVERY", "98304")), episodes=int(os.environ.get("G2E_PROBE_EPISODES", "6")),

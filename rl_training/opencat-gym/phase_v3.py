@@ -204,7 +204,14 @@ def finish(job, results, ctrl_res):
         return False
     levers = job.get("levers", [])
     res = score(f"trained/{tag}_ppo", levers)
-    rec = dict(kind=kind, levers=levers, summary=summary(res), result_file=f"trained/v3_score_{tag}.json")
+    reached = ""
+    try:                                              # the difficulty levels the curriculum had reached when the run ended (last probe line)
+        probes = [l for l in open(f"trained/{tag}_console.log") if l.startswith("[probe]")]
+        if probes:
+            reached = probes[-1].strip().split("(new level):", 1)[-1].strip()
+    except OSError:
+        pass
+    rec = dict(kind=kind, levers=levers, summary=summary(res) + (f" | levels reached: {reached}" if reached else ""), result_file=f"trained/v3_score_{tag}.json")
     save(rec["result_file"], res)
     if tag == CONTROL:
         why = [f"T1.1 falls {cellmap(res)['T1.1']['fell_fraction']:.2f} > {CALM_FELL_MAX}"] if cellmap(res)["T1.1"]["fell_fraction"] > CALM_FELL_MAX else []
