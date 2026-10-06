@@ -79,12 +79,13 @@ def main() -> None:
 
         link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
         fan = policy_walker = None
+        battery_alert = {"fn": None}                      # filled in once the speaker exists (below)
         if link is not None and args.actuator == "serial":
             from ..link.fanout import ImuFanout
             fan = ImuFanout(link)                          # the stand guard and the learned walk each get their own copy of the IMU stream
             if features.gait != "off" and settings.default_gait == "policy":
                 from ..gait.policy_walker import PolicyWalker
-                policy_walker = PolicyWalker(fan.consumer())
+                policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v))
         actuator = make_actuator(
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
             max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,
@@ -110,6 +111,7 @@ def main() -> None:
 
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         audible = voice and tts_mode != "print"
+        battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 

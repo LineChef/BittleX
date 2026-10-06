@@ -182,3 +182,29 @@ def make_voltage_log(path: str, max_bytes: int = 1_000_000):
             f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')},{volts:.2f}\n")
 
     return record
+
+
+class LoadVoltageCheck:
+    """Battery voltage taken WHILE G2 walks: asks (`P`) every `every_s`, picks the reply out of the link's non-IMU lines on later ticks and
+    returns the alert level when one should fire. `send(cmd)` is fire-and-forget; `pop_other()` yields the non-IMU lines seen."""
+
+    def __init__(self, send, pop_other, monitor: BatteryMonitor, *, every_s: float = 5.0, on_reading=None):
+        self._send, self._pop, self.monitor, self._every = send, pop_other, monitor, every_s
+        self._next = 0.0
+        self._on_reading = on_reading
+
+    def tick(self, now: float) -> tuple[BatteryLevel, float] | None:
+        if now >= self._next:
+            self._send("P")
+            self._next = now + self._every
+        result = None
+        for line in self._pop() or []:
+            v = parse_voltage(line) if str(line).startswith("Voltage") else None
+            if v is None:
+                continue
+            if self._on_reading:
+                self._on_reading(v)
+            lvl = self.monitor.update(v, now)
+            if lvl is not None and (result is None or lvl > result[0]):
+                result = (lvl, v)
+        return result

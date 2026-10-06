@@ -161,8 +161,11 @@ class Settings:
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
     # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the star_trek_red_alert siren.
     battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
-    battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.2))   # ~20% of a 2S Li-ion pack at rest
-    battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 6.6))
+    battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.6))   # ~20% of a 2S Li-ion pack at rest
+    battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 7.4))
+    # thresholds for readings taken WHILE walking (the voltage sags under load); first guesses, refine from the logged readings (events.jsonl, name gait/battery.load)
+    battery_load_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_LOW_V", 7.2))
+    battery_load_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_CRITICAL_V", 6.8))
     # G2's forward gait: "policy" = the deployed learned walk (default), "firmware" = the stock scripted wkF. Turning and the other gaits stay firmware.
     default_gait: str = field(default_factory=lambda: _env("G2_DEFAULT_GAIT", "policy").strip().lower())
     # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns

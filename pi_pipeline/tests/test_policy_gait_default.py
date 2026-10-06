@@ -87,7 +87,7 @@ def test_explore_walker_uses_policy_straight_and_firmware_for_turns():
 def test_policy_walker_runs_the_loop_in_a_thread_and_stops_it():
     started, ended = threading.Event(), []
 
-    def fake_run(lk, cmd, seconds, hz, fmt, balance_off, stop_event=None, in_service=False):
+    def fake_run(lk, cmd, seconds, hz, fmt, balance_off, stop_event=None, in_service=False, on_battery=None):
         started.set()
         assert in_service and balance_off and cmd == 0.10
         while not stop_event.is_set():

@@ -151,3 +151,21 @@ def test_voltage_log_rotates_when_large(tmp_path):
         rec(7.5)
     assert (tmp_path / "v.csv.1").exists()
     assert make_voltage_log("") is None
+
+
+def test_load_voltage_check_asks_periodically_and_alerts_on_a_sagging_pack():
+    from pi_pipeline.power.battery import BatteryLevel, BatteryMonitor, LoadVoltageCheck
+
+    sent, lines, seen = [], [], []
+    chk = LoadVoltageCheck(sent.append, lambda: [lines.pop(0)] if lines else [], BatteryMonitor(7.2, 6.8, confirm=2), every_s=5,
+                           on_reading=seen.append)
+    assert chk.tick(0.0) is None and sent == ["P"]
+    assert chk.tick(2.0) is None and sent == ["P"]                 # not yet time to ask again
+    lines.append("Voltage: 7.50 V"); assert chk.tick(5.0) is None and sent == ["P", "P"]
+    lines.append("Voltage: 7.10 V"); assert chk.tick(6.0) is None            # one low reading is not enough (confirm=2)
+    lines.append("Voltage: 7.05 V"); assert chk.tick(7.0) == (BatteryLevel.LOW, 7.05)
+    lines.append("echo of a joint command"); assert chk.tick(8.0) is None   # non-voltage lines are ignored
+    lines.append("Voltage: 6.70 V"); lines.append("Voltage: 6.60 V")
+    assert chk.tick(9.0) is None
+    assert chk.tick(10.0) == (BatteryLevel.CRITICAL, 6.6)
+    assert seen[0] == 7.5 and 6.6 in seen

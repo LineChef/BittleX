@@ -69,10 +69,11 @@ def main() -> None:
         deferred = types.SimpleNamespace(store=types.SimpleNamespace(add_fact=notes.put)) if memory is not None else None
         from .link.fanout import ImuFanout
         fan = ImuFanout(link)                              # the sensor hub, the stand guard and the learned walk each get their own IMU stream
+        alert = {"fn": None}                              # the battery alarm, set once the speaker exists
         policy_walker = None
         if features.gait != "off" and settings.default_gait == "policy":
             from .gait.policy_walker import PolicyWalker
-            policy_walker = PolicyWalker(fan.consumer())
+            policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v))
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer())
 
         # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
@@ -93,6 +94,8 @@ def main() -> None:
 
             tts = _Locked()
             say = tts.speak
+            from .voice.__main__ import make_battery_alert
+            alert["fn"] = make_battery_alert(tts, True)
             from .personality.bonds import Bonds
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
             attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
@@ -103,6 +106,13 @@ def main() -> None:
         guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            balance_off_idle=True, reenable_after_s=None).start()
 
+        # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
+        # the walk loop checks the voltage under load)
+        from .power.battery import BatteryMonitor, BatteryWatcher, make_voltage_log, read_voltage
+        watcher = BatteryWatcher(lambda: None if (policy_walker is not None and policy_walker.busy) else read_voltage(link),
+                                 lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
+                                 monitor=BatteryMonitor(settings.battery_low_v, settings.battery_critical_v), poll_s=settings.battery_poll_s,
+                                 record=make_voltage_log(settings.battery_log), record_every_s=settings.battery_log_every_s).start()
         stop_flag = threading.Event()
         listener = None
         if features.mic and features.wake_word:
@@ -195,6 +205,7 @@ def main() -> None:
             rt.stop()
             t.join(timeout=2.0)
             guard.stop()
+            watcher.stop()
             if vision is not None:
                 vision.close()
             if memory is not None:

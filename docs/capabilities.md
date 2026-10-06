@@ -393,7 +393,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 - **On-demand vision** — camera powered only when perception is needed.
 - **Sleep mode hook** — deepest tier, shared with the behaviour sleep FSM.
 - **BiBoard battery alerts** — the voice service reads the pack voltage once a minute and sounds the alarm plus a spoken line at
-  low (7.2 V) and critical (6.6 V).
+  low (7.6 V) and critical (7.4 V) at rest, also in the exploration sessions, and checks the voltage every 5 s WHILE walking (low 7.2 V, critical 6.8 V under load; a critical reading rests the legs before the board browns out).
 - **Pi battery estimate** — the PiSugar S has no telemetry, so the Pi's runtime is learned from deliberate timed tests
   (`python -m pi_pipeline.power runtime test start|collect|cancel`, `runtime list|add|forget`); the warning fires at 80 % and
   95 % of the measured runtime, counted from boot. "You're unplugged" / "you're plugged in" start and pause the count.

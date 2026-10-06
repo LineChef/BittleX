@@ -29,6 +29,10 @@ class LockedLink:
         with self._lock:
             return self._link.poll_imu()
 
+    def pop_other(self) -> list:
+        with self._lock:
+            return getattr(self._link, "pop_other", lambda: [])()
+
     @property
     def is_connected(self) -> bool:
         return getattr(self._link, "is_connected", False)

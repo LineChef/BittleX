@@ -440,8 +440,10 @@ def _make_vision_feed(kind, port, baud):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False):
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None):
     """`stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
+    `volt_every_s` > 0 reads the battery voltage (`P`) that often WHILE walking, logs each reading (diag `gait/battery.load`), calls
+    `on_battery(level, volts)` on a low reading (default: speak it) and rests the legs on a critical one before the board browns out.
     `in_service=True` is for a caller that owns the diagnostics session and the IMU stream (the voice service): this loop then neither
     starts/closes a diag session nor turns the stream off or restores firmware balance when it ends."""
     pol = ResidualGaitPolicy(onnx_path=policy_path)
@@ -535,6 +537,17 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     print(f"loop: cmd_fwd={cmd_fwd} m/s, {hz} Hz, {'forever' if n is None else str(n)+' ticks'}"
           + (f", logging -> {log_path}" if log_path else "") + ". Ctrl-C to stop.")
     tilt_since = None                 # fall guard: when |roll| or |pitch| first exceeded fall_abort_deg
+    volt_chk = None
+    if volt_every_s:
+        try:
+            from pi_pipeline.config import settings as _st
+            _lo, _cr = _st.battery_load_low_v, _st.battery_load_critical_v
+        except Exception:  # noqa: BLE001
+            _lo, _cr = 7.2, 6.8
+        from pi_pipeline.power.battery import BatteryLevel, BatteryMonitor, LoadVoltageCheck
+        volt_chk = LoadVoltageCheck(lambda c: _send(lk, c), getattr(lk, "pop_other", lambda: []),
+                                    BatteryMonitor(_lo, _cr, confirm=2, hysteresis_v=0.15, repeat_s=60.0), every_s=volt_every_s,
+                                    on_reading=(lambda v: diag.event("gait", "INFO", "battery.load", volts=round(v, 2)) if diag is not None else None))
     try:
         i = 0
         while n is None or i < n:
@@ -542,6 +555,19 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 break
             # never wait on the IMU: take what has arrived, step on the held frame
             now = time.monotonic()
+            if volt_chk is not None:
+                hit = volt_chk.tick(now)
+                if hit is not None:
+                    lvl, v = hit
+                    print(f"!! battery {lvl.name.lower()} under load: {v:.2f} V", flush=True)
+                    try:
+                        (on_battery or (lambda l, vv: _speak_best_effort(
+                            "My battery is critically low. Please charge me." if l is BatteryLevel.CRITICAL else "My battery is low.")))(lvl, v)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if lvl is BatteryLevel.CRITICAL:
+                        print("!! stopping before the battery browns out", flush=True)
+                        break
             feed.update(lk.poll_imu(), now)
             imu_age = feed.age(now)
             if imu_age > IMU_STALE_S:
