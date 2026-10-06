@@ -27,3 +27,5 @@ the robot: [`../STATUS.md`](../STATUS.md).
 The per-round training logs (Runs 2–7, the automated loops, the survive loop)
 were removed 2026-09-10; their conclusions are condensed in
 [`../plan-detail/phase3-rl-training.md`](../plan-detail/phase3-rl-training.md) "Training history" and git history has the full text.
+
+- [`v22-log.md`](v22-log.md): the v2.2 run (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.

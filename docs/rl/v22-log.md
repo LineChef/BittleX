@@ -32,4 +32,33 @@ the best yaw fix together. The better of that combined round and the best single
 best 3M policy can be walked on G2; the user will also swap the front-left shoulder servo around then).
 
 ## Rounds
-(filled in as they finish)
+(filled in as they finish; machine-readable results: `rl_training/opencat-gym/trained/v22_results.json`)
+
+| Round | Recipe | State |
+|---|---|---|
+| V2.1 reference (same sim) | frozen `Release_CandidateV2.1` | calm walk: 29% falls, 0.043 m/s (probe), roll std 6.0 deg; under the reference yaw disturbance (torque up to 0.5): heading error 49 deg, 58% falls; cells fell T2.2 0.20, T3.2 0.30, T5.2 0.20, T7.2 0.20, T8.1 1.00, T10.1 0.20, T10.2 0.25 |
+| R1 `v22_r1_drift` | yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else | started 9:03 AM 2026-10-06; 3M steps ends about 10:10 AM, scored about 10:25 AM |
+
+## Where to resume (written 2026-10-06 ~9:50 AM, for a new session)
+- **Everything runs on the Mac in `rl_training/opencat-gym/`**: the runner `phase_v22.py` (log `trained/phase_v22.log`, output `trained/phase_v22.stdout`), the training
+  (`trained/<tag>_console.log`), the queue `trained/v22_queue.json`, results `trained/v22_results.json`, V2.1 reference `trained/v22_baseline.json`.
+  `ps -axo pid,etime,command | grep -E "[t]rain.py --tag|Python phase_v22"` shows what is alive. The runner and the training survive the Claude session ending.
+- **Notifications belong to the Claude session that armed them.** A new session will NOT be told when a round finishes: read `trained/phase_v22.log` (lines starting
+  `[v22 ...]`: `ROUND n START/DONE PASS|FAIL`, `HW CHECKIN`, `FINAL ...`) or arm a new Monitor on it.
+- **To add the next round** (after a `ROUND n DONE` line) append an entry to `rounds` in `trained/v22_queue.json`: `{"tag": "v22_r2_...", "desc": "...", "extra": {"G2E_...": "..."}}`.
+  The runner reads the file between rounds and waits 12 minutes for a new entry; with none it goes to the hardware check-in with the best passing round.
+  Cap: six rounds (`MAX_ROUNDS`). Plan: rounds 1-5 single levers (drift, then yaw wobble e.g. `G2E_FAC_YAW_TRACK` 9 -> 12 and `G2E_FAC_HEADING` 5 -> 8); round 6 the best of each together.
+- **Hardware check-in:** after the rounds the runner logs `HW CHECKIN` and PAUSES (no 20M run). Export the best round's policy (`export_onnx.py`, with its `.onnx.json` sidecar), put
+  it on the Pi WITHOUT making it the default (`run_gait.py --policy <onnx>`), ask the user to walk it (the user will have swapped the front-left shoulder servo by then). To go on:
+  `echo <round tag, or nothing> > trained/v22_final_go`; the runner then starts `v22_20m` (20M, `G2E_HARD_SCALE=1.10`, gates at 3M and 5M that stop the run on a regression).
+- **Pass bar for a round:** calm falls <= min(0.15, V2.1 + 0.05) and speed >= 90% of V2.1, and heading error under the reference disturbance at least 50% below V2.1's. (V2.1 itself
+  falls 29% on the calm walk in this sim, so the 0.15 bar is demanding; if no round passes the runner does NOT start the final run and says so.)
+- **Pitfall:** `pkill -f phase_v22.py` also kills any watcher whose command line contains that text. Kill the runner by pid
+  (`ps -axo pid,command | awk '/Python phase_v22/ && !/awk/ {print $1}'`); the training is a separate process and is not affected. The runner resumes a round that is already training.
+- **Mac sleep:** closing the lid sleeps the Mac and pauses training (`caffeinate -i` only stops idle sleep). Keep the lid open or use clamshell mode on power.
+- **After a successful 20M run** (finished, gates passed): export, benchmark V2.1 and the new policy on the original ladder AND on a ladder with the hardest rungs raised 10%
+  (add a `--hard-scale` option to `benchmark_decathlon.py` first; not built yet), validate the deploy path (`validate_deploy.py --onnx`), then name it `Release_CandidateV2.2`, set
+  `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py`, commit, `rsync` to the Pi, and walk it with the user once G2 is online. Promote only if the user's pass checks (see
+  below) hold; otherwise stop and report.
+- **Promotion checks (agreed 2026-10-06):** calm flat falls <= 0.15 and speed >= 95% of V2.1 on the original ladder; drift under the reference disturbance at least 50% below V2.1's;
+  no category worse than V2.1 by more than 0.10 in falls on the original ladder.
