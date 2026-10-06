@@ -811,6 +811,14 @@ LEVEL_EASY_PROB = _g2e("LEVEL_EASY_PROB", 0.10)
 # LEVEL_EXTERNAL: the levels are set from outside (train.py's Curriculum callback probes the DETERMINISTIC policy periodically and calls set_category_levels on every
 # env), so the envs do not adapt themselves from their noisy training episodes (exploration noise makes a young policy's sampled score far lower than its real skill).
 LEVEL_EXTERNAL = _g2e("LEVEL_EXTERNAL", False)
+# Guards on the probe-driven levels (train.py Curriculum), added after C0 run 3 (2026-10-06): the relative score hid a falling clean-floor score and the levels outran the
+# policy (0.9-1.0 by 1.1M steps while clean-floor survival fell 92% -> 58%).
+#   LEVEL_CAP_BY_TIME: no category may exceed (total steps so far) / RAMP_TOTAL_STEPS: the levels can run slower than the validated 4M-step pace, never faster.
+#   LEVEL_MIN_BASELINE: no promotion while the policy's clean-floor score is below this (a weak baseline = not ready for more).
+#   LEVEL_COLLAPSE_BASELINE: when the clean-floor score is below this, every category drops one step.
+LEVEL_CAP_BY_TIME = _g2e("LEVEL_CAP_BY_TIME", False)
+LEVEL_MIN_BASELINE = _g2e("LEVEL_MIN_BASELINE", 0.5)
+LEVEL_COLLAPSE_BASELINE = _g2e("LEVEL_COLLAPSE_BASELINE", 0.35)
 CATS = ("terrain", "ledge", "slope", "fault")
 CATEGORY_OVERRIDE = {}                          # tests / audits: {"slope": 0.8, ...} pins those categories (the others get 0) for every reset
 LEVEL_PROGRESS_MIN = _g2e("LEVEL_PROGRESS_MIN", 0.5)   # an episode only counts toward a level-up if it also covered this fraction of the commanded distance (standing still never falls)

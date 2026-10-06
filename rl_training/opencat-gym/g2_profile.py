@@ -47,6 +47,7 @@ RECIPE = {
     "G2E_LEVEL_WINDOW_C": "6", "G2E_LEVEL_STEP_C": "0.10", "G2E_LEVEL_PROMOTE_WINDOWS": "1",
     # Competence is measured by a deterministic probe every 98k steps (6 episodes per category), not from the noisy training episodes: see train.py Curriculum.
     # The probe score is RELATIVE to the same policy's clean-floor score (same randomization), so up/down thresholds judge hazard handling only.
+    "G2E_LEVEL_CAP_BY_TIME": "1", "G2E_LEVEL_MIN_BASELINE": "0.5", "G2E_LEVEL_COLLAPSE_BASELINE": "0.35",
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "6", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
 

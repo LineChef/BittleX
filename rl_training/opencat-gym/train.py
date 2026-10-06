@@ -119,21 +119,17 @@ class Curriculum(BaseCallback):
         E = self.E
         base = self._probe(None)                         # what this policy scores on a clean floor under the same randomization: hazards are judged relative to it
         self.base = base
+        cap = min(1.0, (self.ramp_offset + self.num_timesteps) / E.RAMP_TOTAL_STEPS) if E.LEVEL_CAP_BY_TIME else 1.0
+        rel = {}
         for c in E.CATS:
             raw = self._probe(c)
-            m = min(1.0, raw / max(base, 0.30))          # RELATIVE score: a slow walker, or one limited by the randomization, is not penalized for it
-            self.last[c], self.raw[c] = m, raw
-            if m >= E.LEVEL_UP_SCORE:
-                self.streak[c] += 1
-                if self.streak[c] >= E.LEVEL_PROMOTE_WINDOWS:
-                    self.levels[c] = min(1.0, self.levels[c] + E.LEVEL_STEP_C)
-                    self.streak[c] = 0
-            else:
-                self.streak[c] = 0
-                if m <= E.LEVEL_DOWN_SCORE:
-                    self.levels[c] = max(0.0, self.levels[c] - E.LEVEL_STEP_C)
+            rel[c] = min(1.0, raw / max(base, 0.30))      # RELATIVE score: a slow walker, or one limited by the randomization, is not penalized for it
+            self.last[c], self.raw[c] = rel[c], raw
+        from curriculum import update_levels
+        update_levels(self.levels, self.streak, rel, base, cap, E.LEVEL_UP_SCORE, E.LEVEL_DOWN_SCORE, E.LEVEL_STEP_C, E.LEVEL_PROMOTE_WINDOWS,
+                      E.LEVEL_MIN_BASELINE, E.LEVEL_COLLAPSE_BASELINE)
         self.training_env.env_method("set_category_levels", self.levels)
-        print(f"[probe] steps {self.num_timesteps:.0f}  clean-floor score {self.base:.2f}; relative score by category (raw) -> new level: "
+        print(f"[probe] steps {self.num_timesteps:.0f}  clean-floor score {self.base:.2f} (cap {cap:.2f}); relative score by category (raw) -> new level: "
               + "  ".join(f"{c} {self.last[c]:.2f} ({self.raw[c]:.2f}) -> {self.levels[c]:.2f}" for c in E.CATS), flush=True)
 
 

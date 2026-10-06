@@ -401,3 +401,40 @@ def test_global_level_mode_still_drives_dr_from_the_level(lvl_env):
     env._level = 0.35
     env.reset(seed=0)
     assert env._dr == pytest.approx(0.35)
+
+
+# ----------------------------------------------------------------------------- curriculum.update_levels (the probe-driven rule, with the guards)
+def _ul(levels, rel, base, cap=1.0, streak=None, **kw):
+    import curriculum
+    cats = ("terrain", "ledge", "slope", "fault")
+    lv = dict(zip(cats, levels))
+    st = streak if streak is not None else {c: 0 for c in cats}
+    args = dict(up=0.8, down=0.5, step=0.1, windows=1, min_base=0.5, collapse_base=0.35)
+    args.update(kw)
+    curriculum.update_levels(lv, st, dict(zip(cats, rel)), base, cap, **args)
+    return [round(lv[c], 3) for c in cats], st
+
+
+def test_good_probes_promote_bad_ones_demote_and_the_middle_holds():
+    assert _ul([0.3] * 4, [0.9, 0.9, 0.9, 0.9], 0.8)[0] == [0.4] * 4
+    assert _ul([0.3] * 4, [0.9, 0.65, 0.4, 0.5], 0.8)[0] == [0.4, 0.3, 0.2, 0.2]    # 0.65 holds, 0.4 and 0.5 (<= down) drop
+
+
+def test_a_weak_clean_floor_blocks_promotion_and_a_collapsed_one_drops_everything():
+    assert _ul([0.3] * 4, [1.0] * 4, 0.45)[0] == [0.3] * 4              # relative scores perfect, but the baseline is below min_base: hold
+    assert _ul([0.3] * 4, [1.0] * 4, 0.30)[0] == [0.2] * 4              # baseline below collapse_base: every category backs off one step
+    assert _ul([0.0] * 4, [1.0] * 4, 0.10)[0] == [0.0] * 4              # and never below 0
+
+
+def test_levels_never_exceed_the_time_cap():
+    assert _ul([0.3] * 4, [1.0] * 4, 0.9, cap=0.35)[0] == [0.35] * 4
+    assert _ul([0.9] * 4, [1.0] * 4, 0.9, cap=0.5)[0] == [0.5] * 4      # an existing level above a (new, lower) cap is pulled down to it
+
+
+def test_two_good_probes_in_a_row_are_needed_when_windows_is_two():
+    lv, st = _ul([0.3] * 4, [0.9] * 4, 0.8, windows=2)
+    assert lv == [0.3] * 4
+    lv, st = _ul(lv, [0.9] * 4, 0.8, windows=2, streak=st)
+    assert lv == [0.4] * 4
+    lv, st = _ul(lv, [0.9] * 4, 0.8, windows=2, streak=st)              # the streak restarted after the promotion
+    assert lv == [0.4] * 4 and all(v == 1 for v in st.values())
