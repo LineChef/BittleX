@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for `pi_pipe
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
+import heading_hold as _hh                                    # noqa: E402  -- optional steering on the policy's joint targets (--heading-hold)
 from imu_parse import ImuFeed, parse_imu_line                 # noqa: E402  -- shared with app/sensors.py
 
 try:                                                          # carpet mode (optional)
@@ -451,8 +452,9 @@ def _make_vision_feed(kind, port, baud):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None):
-    """`stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False):
+    """`heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
+    `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
     `volt_every_s` > 0 reads the battery voltage (`P`) that often WHILE walking, logs each reading (diag `gait/battery.load`), calls
     `on_battery(level, volts)` on a low reading (default: speak it) and rests the legs on a critical one before the board browns out.
     `in_service=True` is for a caller that owns the diagnostics session and the IMU stream (the voice service): this loop then neither
@@ -502,7 +504,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s policy_yaw_sign=%+g\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on", POLICY_YAW_SIGN))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
-                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s\n")
+                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if heading_hold else "") + "\n")
+    hold = _hh.HeadingHold() if heading_hold else None
+    steer_u = 0.0
 
     if disable_firmware_balance:
         # firmware balance OFF -> policy has full control. "gb", not bare "g":
@@ -603,6 +607,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 q = policy_quat(r, p_, y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
+                if hold is not None:                 # steer by making one side's strides longer; yaw here is right-positive (the firmware convention)
+                    steer_u = hold.update(y, dt, active=abs(cmd_fwd) >= 0.025)
+                    joint_deg = np.array(_hh.apply_stride_difference(joint_deg, steer_u), dtype=int)
                 lat.append(time.perf_counter() - t0)
 
                 if skill_layer is not None:
@@ -715,11 +722,11 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                     t_next = time.perf_counter()
 
                 if logf:
-                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s,%s,%d,%d,%.3f,%.0f\n" % (
+                    logf.write("%.4f,%.5f,%.5f,%.5f,%.5f,%.5f,%.5f,%s,%s,%d,%d,%.3f,%.0f%s\n" % (
                         time.perf_counter() - t_start, r, p_, y, gx, gy, gz,
                         ",".join(str(int(v)) for v in joint_deg),
                         snap.state, snap.hottest_j, int(snap.hottest_tier),
-                        snap.hottest_frac, snap.duty_s))
+                        snap.hottest_frac, snap.duty_s, (",%.4f" % steer_u) if hold is not None else ""))
             t_next += dt
             slack = t_next - time.perf_counter()
             if slack > 0:
@@ -775,6 +782,8 @@ def main():
     ap.add_argument("--policy", default=None, metavar="ONNX",
                     help="policy .onnx to run instead of residual_policy.DEFAULT_POLICY "
                          "(its .onnx.json sidecar must sit next to it). Does not change the default.")
+    ap.add_argument("--heading-hold", action="store_true",
+                    help="steer back toward the starting heading by lengthening one side's strides (gait/heading_hold.py); off by default")
     ap.add_argument("--fall-abort-deg", type=float, default=60.0, metavar="DEG",
                     help="rest and stop if |roll| or |pitch| stays above DEG for 0.3 s (a fall); 0 disables")
     ap.add_argument("--send-every", type=int, default=None, metavar="N",
@@ -896,7 +905,7 @@ def main():
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
-                fall_abort_deg=args.fall_abort_deg)
+                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold)
     finally:
         try:
             lk.close()
