@@ -37,7 +37,8 @@ best 3M policy can be walked on G2; the user will also swap the front-left shoul
 | Round | Recipe | State |
 |---|---|---|
 | V2.1 reference (same sim) | frozen `Release_CandidateV2.1` | calm walk: 29% falls, 0.043 m/s (probe), roll std 6.0 deg; under the reference yaw disturbance (torque up to 0.5): heading error 49 deg, 58% falls; cells fell T2.2 0.20, T3.2 0.30, T5.2 0.20, T7.2 0.20, T8.1 1.00, T10.1 0.20, T10.2 0.25 |
-| R1 `v22_r1_drift` | yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else | started 9:03 AM 2026-10-06; 3M steps ends about 10:10 AM, scored about 10:25 AM |
+| R1 `v22_r1_drift` | yaw torque up to 0.5 N*m on 70% of episodes, 422 g payload, nothing else | **FAIL** (10:12 AM): drift under the reference disturbance 56 deg (V2.1 49), calm walk 50% falls (V2.1 29%), speed 0.024 m/s (V2.1 0.043), yaw rms 0.271 (V2.1 0.183). Cells fell: T2.2 0.0, T3.2 0.8, T5.2 0.2, T7.2 0.0, T8.1 0.8, T10.1 0.0, T10.2 0.05 (the new payload weights alone help several cells). Reading: training episodes are 250 steps (3.1 s) while real walks and the probe are 12.5 s, so a drift disturbance barely accumulates in training and 12.5 s stability is never trained. |
+| R2 `v22_r2_len` | training episodes 1000 steps (12.5 s), 422 g payload, no drift torque (single lever) | started 10:12 AM; expected done about 11:25 AM |
 
 ## Where to resume (written 2026-10-06 ~9:50 AM, for a new session)
 - **Everything runs on the Mac in `rl_training/opencat-gym/`**: the runner `phase_v22.py` (log `trained/phase_v22.log`, output `trained/phase_v22.stdout`), the training
