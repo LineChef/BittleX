@@ -999,8 +999,7 @@ Amp wired per the pinout table above (5 V → pin 2, GND → pin 9, BCLK → pin
 5. The amp's volume is set in software: the acknowledgement tone, the battery alarms and the camera ticks play at a few percent of full scale (defaults in
    `pi_pipeline/config.py`: `G2_ACK_PEAK` 0.0225, `G2_ALERT_PEAK` 0.045, `G2_CAMERA_PEAK` 0.045); the card exposes no ALSA mixer controls (`amixer` printed none).
 
-**Mounting (as of 2026-10-05): both boards are mounted temporarily.** The mic and the speaker/amp are held in place only provisionally until the
-Pi case arrives; their final positions and fixings are not yet decided or recorded here.
+**Mounting (2026-10-06): everything is attached to the Pi case.** The camera is at the front, the speaker at the very back, and the microphone sits on top of the lid, so the weight goes down the spine of the robot. Total weighed mass of G2 with the case, Pi stack, camera, mic and speaker: about 422 g (one weighing, 2026-10-06).
 
 ### Software config — the exact overlay, confirmed, not a research task for later
 
