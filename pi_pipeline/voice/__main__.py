@@ -78,14 +78,21 @@ def main() -> None:
             memory = Memory(settings)
 
         link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
+        fan = policy_walker = None
+        if link is not None and args.actuator == "serial":
+            from ..link.fanout import ImuFanout
+            fan = ImuFanout(link)                          # the stand guard and the learned walk each get their own copy of the IMU stream
+            if features.gait != "off" and settings.default_gait == "policy":
+                from ..gait.policy_walker import PolicyWalker
+                policy_walker = PolicyWalker(fan.consumer())
         actuator = make_actuator(
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
-            max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle,
+            max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,
         )
         guard = None
         if link is not None and (settings.stand_guard or settings.balance_off_idle):
             from ..gait.stand_guard import StandGuard
-            guard = StandGuard(link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
+            guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
                                balance_off_idle=settings.balance_off_idle,
                                reenable_after_s=None if settings.balance_off_idle else 300.0).start()
             actuator.on_command = guard.note_activity

@@ -439,7 +439,11 @@ def _make_vision_feed(kind, port, baud):
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
-        turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0):
+        turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
+        stop_event=None, in_service=False):
+    """`stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
+    `in_service=True` is for a caller that owns the diagnostics session and the IMU stream (the voice service): this loop then neither
+    starts/closes a diag session nor turns the stream off or restores firmware balance when it ends."""
     pol = ResidualGaitPolicy(onnx_path=policy_path)
     send_every = max(1, send_every if send_every else pol.send_every)   # explicit flag wins; else what the policy was trained with
     print(f"policy: {os.path.basename(pol.onnx_path)}"
@@ -457,7 +461,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
 
     ring = None
     wd = None
-    if diag is not None:
+    if diag is not None and not in_service:
         diag.start_session("gait", policy_path=getattr(pol, "onnx_path", None),
                            extra={"cmd_fwd": cmd_fwd, "hz": hz})
         diag.install_excepthook()
@@ -534,6 +538,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     try:
         i = 0
         while n is None or i < n:
+            if stop_event is not None and stop_event.is_set():
+                break
             # never wait on the IMU: take what has arrived, step on the held frame
             now = time.monotonic()
             feed.update(lk.poll_imu(), now)
@@ -693,16 +699,18 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     finally:
         if wd is not None:
             wd.stop()
-        _send(lk, "gp")    # stream off (lowercase C_PRINT_OFF, not a toggle)
-        _send(lk, "d")     # rest
-        if disable_firmware_balance:
+        if not in_service:
+            _send(lk, "gp")    # stream off (lowercase C_PRINT_OFF, not a toggle)
+        if getattr(stop_event, "rest", True):
+            _send(lk, "d")     # rest
+        if disable_firmware_balance and not in_service:
             _send(lk, "gB")    # restore the firmware default (balance + reflexes on)
         if vision is not None:
             vision.close()
         if logf:
             logf.close()
             print(f"log written: {log_path}")
-        if diag is not None:
+        if diag is not None and not in_service:
             diag.close()
     if lat:
         a = np.array(lat) * 1e3

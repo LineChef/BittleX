@@ -80,8 +80,11 @@ class SerialActuator:
     when it is on, and never beyond `skills.MAX_GAIT_SECONDS`.
     """
 
-    def __init__(self, port: str, baud: int, *, link=None, max_continuous_s: float = 0.0, balance_off_idle: bool = False):
+    def __init__(self, port: str, baud: int, *, link=None, max_continuous_s: float = 0.0, balance_off_idle: bool = False,
+                 policy_walker=None):
         from ..link import opencat
+
+        self._policy_walker = policy_walker     # the learned V2.1 walk: used for `walk_forward` instead of the firmware gait
 
         self._max_continuous_s = max_continuous_s
         self._cap_timer: threading.Timer | None = None
@@ -110,7 +113,7 @@ class SerialActuator:
     @property
     def busy(self) -> bool:
         """A looping gait is running."""
-        return self._gait_active
+        return self._gait_active or (self._policy_walker is not None and self._policy_walker.busy)
 
     def _balance(self, on: bool) -> None:
         if self._balance_off_idle:
@@ -123,9 +126,19 @@ class SerialActuator:
         cmd = skills.serial_command(skill_name)
         log.info("G2 perform %s -> %r", skill_name, cmd)
         self._cancel_cap()
+        if self._policy_walker is not None:
+            self._policy_walker.stop(rest=False)       # whatever comes next replaces a running policy walk
         if self.on_command:
             self.on_command()
         continuous = skills.SKILLS[skill_name].continuous
+        if skill_name == "walk_forward" and self._policy_walker is not None:
+            duration = skills.clamp_seconds(seconds)
+            if self._max_continuous_s > 0:
+                duration = min(duration, self._max_continuous_s) if duration else self._max_continuous_s
+            log.info("G2 perform walk_forward with the learned policy")
+            self._gait_active = False
+            self._policy_walker.walk(duration or None)
+            return
         if continuous:
             self._balance(True)            # the firmware gaits are tuned with balance on
         self._send(cmd, read_reply=False)
@@ -156,6 +169,8 @@ class SerialActuator:
 
     def stop(self) -> None:
         self._cancel_cap()
+        if self._policy_walker is not None:
+            self._policy_walker.stop(rest=True)
         self._gait_active = False
         if self.on_command:
             self.on_command()
@@ -165,7 +180,7 @@ class SerialActuator:
     def send_token(self, token: str) -> None:
         """Send one raw OpenCat token (used for buzzer cues). Skipped while a looping gait is
         running: whether a non-skill token interrupts the gait has not been checked on the robot."""
-        if self._gait_active:
+        if self.busy:
             log.debug("skipping %r while a gait is running", token)
             return
         self._send(token, read_reply=False)
@@ -173,7 +188,7 @@ class SerialActuator:
     def read_voltage(self) -> float | None:
         """Battery volts via the firmware's `P` command, or None while a gait is running (the reading sags under load, and the
         serial line is busy)."""
-        if self._gait_active:
+        if self.busy:
             return None
         from ..power.battery import read_voltage
         return read_voltage(_Locked(self._link, self._lock))
@@ -185,10 +200,11 @@ class SerialActuator:
 
 
 def make_actuator(mode: str, *, port: str, baud: int, link=None,
-                  max_continuous_s: float | None = None, balance_off_idle: bool = False) -> Actuator:
+                  max_continuous_s: float | None = None, balance_off_idle: bool = False, policy_walker=None) -> Actuator:
     if mode == "serial":
         if max_continuous_s is None:           # not given: use the G2_MAX_GAIT_S setting (default off)
             from ..config import settings
             max_continuous_s = settings.max_gait_s
-        return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s, balance_off_idle=balance_off_idle)
+        return SerialActuator(port, baud, link=link, max_continuous_s=max_continuous_s, balance_off_idle=balance_off_idle,
+                              policy_walker=policy_walker)
     return MockActuator()

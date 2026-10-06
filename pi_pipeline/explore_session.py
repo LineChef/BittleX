@@ -67,7 +67,13 @@ def main() -> None:
         # queue them and write them from the main loop below
         notes: "queue.Queue[str]" = queue.Queue()
         deferred = types.SimpleNamespace(store=types.SimpleNamespace(add_fact=notes.put)) if memory is not None else None
-        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision)
+        from .link.fanout import ImuFanout
+        fan = ImuFanout(link)                              # the sensor hub, the stand guard and the learned walk each get their own IMU stream
+        policy_walker = None
+        if features.gait != "off" and settings.default_gait == "policy":
+            from .gait.policy_walker import PolicyWalker
+            policy_walker = PolicyWalker(fan.consumer())
+        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer())
 
         # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
         from dataclasses import replace
@@ -94,7 +100,7 @@ def main() -> None:
             say("Exploration test starting. I will stay put and look around first.")
 
         from .gait.stand_guard import StandGuard
-        guard = StandGuard(link, is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH), guard=settings.stand_guard,
+        guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            balance_off_idle=True, reenable_after_s=None).start()
 
         stop_flag = threading.Event()
@@ -184,6 +190,8 @@ def main() -> None:
                 say("Exploration test finished.")
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
+            if policy_walker is not None:
+                policy_walker.stop(rest=True)
             rt.stop()
             t.join(timeout=2.0)
             guard.stop()

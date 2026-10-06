@@ -30,8 +30,9 @@ class SerialActuatorSink:
     string (a `k<skill>` token, `d`, an `m0 <deg>` head move, a `b<tone>…`
     chirp); calibration / factory commands are refused by `opencat.is_safe`."""
 
-    def __init__(self, link):
+    def __init__(self, link, *, policy_walker=None):
         self._link = link
+        self._policy = policy_walker
 
     def perform(self, command: str) -> None:
         cmd = str(command).strip()
@@ -40,9 +41,13 @@ class SerialActuatorSink:
         if not opencat.is_safe(cmd):
             log.warning("refusing unsafe serial command %r", cmd)
             return
+        if self._policy is not None and self._policy.busy and cmd[0] in ("k", "d"):
+            self._policy.stop(rest=False)            # a skill replaces a running learned walk (chirps and head moves do not)
         self._link.send(cmd, read_reply=False)
 
     def stop(self) -> None:
+        if self._policy is not None:
+            self._policy.stop(rest=True)
         self._link.send(opencat.REST, read_reply=False)
 
 
@@ -78,17 +83,29 @@ class WalkerSink:
     loop is `gait/run_gait.py`, run separately). `walk(bias)` goes forward;
     `turn(rad)` uses the curved-walk L/R tokens."""
 
-    def __init__(self, link, *, turn_threshold: float = 0.15):
+    def __init__(self, link, *, turn_threshold: float = 0.15, policy_walker=None):
         self._link = link
         self._thr = turn_threshold
         self._last = ""
+        self._policy = policy_walker         # straight-ahead walking uses the learned policy when given; turns stay firmware tokens
 
     def _send_once(self, token: str) -> None:
         if token != self._last:            # firmware gaits are continuous
             self._link.send(token, read_reply=False)
             self._last = token
 
+    def _firmware(self) -> None:
+        if self._policy is not None and self._policy.busy:
+            self._policy.stop(rest=False)       # hand over to a firmware gait without lying down in between
+            self._last = ""
+
     def walk(self, bias: float = 0.0) -> None:
+        if self._policy is not None and -self._thr < bias < self._thr:
+            if not self._policy.busy:
+                self._last = ""
+                self._policy.walk(None)
+            return
+        self._firmware()
         if bias >= self._thr:
             self._send_once(opencat.WALK_RIGHT)
         elif bias <= -self._thr:
@@ -97,9 +114,12 @@ class WalkerSink:
             self._send_once(opencat.skill("wkF"))
 
     def turn(self, rad: float) -> None:
+        self._firmware()
         self._send_once(opencat.WALK_RIGHT if float(rad) >= 0 else opencat.WALK_LEFT)
 
     def stop(self) -> None:
+        if self._policy is not None:
+            self._policy.stop(rest=True)
         self._link.send(opencat.REST, read_reply=False)
         self._last = ""
 
@@ -142,17 +162,17 @@ class CameraSink:
 
 
 def build_bindings(link, *, dry_run_power: bool | None = None,
-                   camera_toggle=None) -> DriverBindings:
+                   camera_toggle=None, policy_walker=None) -> DriverBindings:
     """Wire a `DriverBindings` to the real sinks. `link` is a `SerialLink` /
     `LockedLink` (or None -> serial sinks become no-ops via a null link)."""
     link = link or _NullLink()
-    act = SerialActuatorSink(link)
+    act = SerialActuatorSink(link, policy_walker=policy_walker)
     return DriverBindings(
         actuator=act,
         tts=None,                       # the voice loop owns TTS; SPEAK effects are rare here
         camera=CameraSink(camera_toggle),
         cue=None,
-        walker=WalkerSink(link),
+        walker=WalkerSink(link, policy_walker=policy_walker),
         head=HeadSink(link),
         power=PowerSink(dry_run=dry_run_power),
         on_diag=_diag_event,
