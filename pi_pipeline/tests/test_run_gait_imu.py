@@ -50,6 +50,54 @@ def test_icm_prefix_also_recognised(rg):
     assert roll == pytest.approx(2.0 * math.pi / 180.0)
 
 
+# -------------------------------------------------------- yaw sign into the policy
+
+def test_policy_quat_turns_a_firmware_right_turn_into_a_sim_negative_yaw(rg):
+    """Firmware yaw (after imu_parse) is + for a RIGHT turn; PyBullet, where the policy
+    was trained, is + for a LEFT turn. The policy must see the sim's sign."""
+    import residual_policy
+    r, p, y = residual_policy.quat_to_euler(rg.policy_quat(0.05, -0.03, math.radians(20.0)))
+    assert y == pytest.approx(-math.radians(20.0))
+    assert r == pytest.approx(0.05) and p == pytest.approx(-0.03)   # roll/pitch untouched
+
+
+class _TurningRightLink:
+    """First IMU frame heading 0, then G2 has turned 20 deg right. The line prints
+    yaw negated (firmware `-ypr[0]`), so a +20 deg right turn prints -20.0."""
+
+    def __init__(self):
+        self.sent, self._n = [], 0
+
+    def send(self, cmd, **kw):
+        self.sent.append(cmd)
+        return ""
+
+    def poll_imu(self):
+        self._n += 1
+        return ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0" if self._n == 1
+                else "MCU:  0.00  0.00  1.00  -20.0   0.0   0.0"]
+
+
+def test_loop_feeds_the_policy_sim_signed_yaw_and_logs_firmware_yaw(rg, monkeypatch, tmp_path):
+    pytest.importorskip("onnxruntime")
+    import residual_policy
+    monkeypatch.setattr(rg, "diag", None)
+    seen = []
+    real_step = rg.ResidualGaitPolicy.step
+
+    def spy(self, q, g):
+        seen.append(residual_policy.quat_to_euler(q)[2])
+        return real_step(self, q, g)
+
+    monkeypatch.setattr(rg.ResidualGaitPolicy, "step", spy)
+    log = tmp_path / "walk.csv"
+    rg.run(_TurningRightLink(), 0.10, 0.2, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, send_every=1, log_path=str(log))
+    assert seen and seen[-1] == pytest.approx(-math.radians(20.0), abs=1e-6)
+    rows = [r for r in log.read_text().splitlines() if r[:1].isdigit()]
+    assert float(rows[-1].split(",")[3]) == pytest.approx(math.radians(20.0), abs=1e-4)   # log: + = right
+
+
 # -------------------------------------------------------- probe_imu_under_load
 
 class _FakeLink:

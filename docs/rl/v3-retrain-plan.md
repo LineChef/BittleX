@@ -17,12 +17,16 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 - Probe tools: `drift_probe.py` levers `yawflip` / `yawzero`, `replay_real_obs.py`, `train_throughput.py`.
 - v2.2 closed: its runner exited by itself at 12:45 PM after no round passed; stale log watchers were killed. Nothing is training.
 
+- **Yaw-sign fix (Phase 0 step 1, code DONE 2026-10-06, NOT yet rsynced to the Pi):**
+  - `POLICY_YAW_SIGN = -1.0` and `policy_quat()` in `pi_pipeline/gait/run_gait.py`, used for the policy's input in `run()` (reset and every
+    tick). The CSV / ring-buffer `yaw` column stays in the firmware convention (+ = right); `imu_parse.py` is unchanged.
+  - `dry_run()` feeds random synthetic yaw, so the sign doesn't matter there.
+  - Tests in `pi_pipeline/tests/test_run_gait_imu.py`: the sign unit test, plus a loop test that a real 20-deg right turn reaches the policy
+    as -20 deg while the log keeps +20. Full `pi_pipeline` suite passes.
+  - No behaviour change for V2.1, which ignores heading. **To do:** rsync to the Pi when G2 is online.
+
 **Next, in order** (Phase 0 code work is mine; the user's hardware steps can run in parallel):
-1. **Yaw-sign fix on the Pi** (Phase 0 step 1): `POLICY_YAW_SIGN = -1.0` in `pi_pipeline/gait/run_gait.py` applied to the rebased yaw before
-   `euler_to_quat` in both `run()` (line ~591) and `dry_run()`. Keep the CSV/ring-buffer `yaw` column in the firmware convention (+ = right)
-   so logs stay comparable. Do NOT change `imu_parse.py` (`app/sensors.py`, logs and `walk_log_summary.py` use + = right). Add a test in
-   `pi_pipeline/tests/`: a positive (right) firmware yaw must give a negative yaw from `residual_policy.quat_to_euler`. Then the full
-   `pi_pipeline` test suite. rsync to the Pi when G2 is online.
+1. **rsync the yaw-sign fix to the Pi** when G2 is online (`docs/guides/pi-bring-up.md` §7).
 2. **Servo step-test mode** (Phase 0 step 4): command a 40-60 deg step on one joint while reading servo feedback (feedback works, mean
    112 ms / ~9 Hz per read; see `real-walk-log.md` "Servo feedback tests" and `tools/servo_static_test.py`). Logs to CSV.
 3. Then Phase 2 code (it doesn't need the hardware data), while the user does Phase 0's hardware steps.

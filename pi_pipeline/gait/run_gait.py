@@ -10,7 +10,7 @@ Pipeline per tick (~80 Hz):
     ImuFeed <- every IMU line received since last tick (non-blocking poll)
       -> latest (roll,pitch,yaw rad) held between the firmware's 5 Hz prints,
          roll/pitch rate = 0 (--imu-rate fd: finite difference; no better in sim)
-    quat = euler_to_quat(rpy)
+    quat = policy_quat(rpy)        # yaw sign flipped to the sim's convention (POLICY_YAW_SIGN)
     joint_deg_urdf = ResidualGaitPolicy.step(quat, gyro)
     "i8 <d> 12 <d> ..."  = deploy_map.policy_deg_to_move_cmd(joint_deg_urdf)
     serial.send(cmd)
@@ -102,6 +102,17 @@ def euler_to_quat(roll, pitch, yaw):
         cr * cp * cy + sr * sp * sy,
     ])
 
+
+# The firmware IMU stream (imu_parse) reports + yaw for a RIGHT turn (confirmed on G2 2026-10-02); the policy was
+# trained in PyBullet, where + yaw is a LEFT turn (z up). Until 2026-10-06 the rebased yaw went into the policy with
+# the wrong sign: harmless for V2.1 (it ignores heading, docs/rl/v3-retrain-plan.md §1.1), wrong for any policy that
+# uses it. Logs keep the firmware convention (+ = right); only the policy's input is flipped.
+POLICY_YAW_SIGN = -1.0
+
+
+def policy_quat(roll, pitch, yaw_fw):
+    """IMU (roll, pitch, rebased firmware yaw) rad -> the quaternion the policy expects (PyBullet yaw sign)."""
+    return euler_to_quat(roll, pitch, POLICY_YAW_SIGN * yaw_fw)
 
 
 # --------------------------------------------------------------------- loop
@@ -526,7 +537,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     # 2026-09-22), but rebasing keeps any policy on the distribution it saw.
     yaw0 = y
     y = 0.0
-    q = euler_to_quat(r, p_, y)
+    q = policy_quat(r, p_, y)
     pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
 
     dt = 1.0 / hz
@@ -588,8 +599,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         break
                 else:
                     tilt_since = None
-                y = math.remainder(y - yaw0, 2.0 * math.pi)
-                q = euler_to_quat(r, p_, y)
+                y = math.remainder(y - yaw0, 2.0 * math.pi)     # firmware convention, + = right (logged as is)
+                q = policy_quat(r, p_, y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
                 lat.append(time.perf_counter() - t0)
