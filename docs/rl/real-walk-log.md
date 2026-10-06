@@ -420,3 +420,20 @@ direction, nominal cadence): sim `wkL` -0.8 deg/s and `wkR` +0.5 deg/s, i.e. 7% 
 (left-leg swing about 1/3 of wkF's) and G2 walks 0.48 m in 10 s, but the sim body hardly yaws where the real one turns 120-190 degrees. So Y4 (turn
 curriculum), Y6 and the S5 screen stay off (`trained/v3_turning_gate_pass` not created); turns stay firmware tokens and straightness rests on the
 mirror loss plus heading feedback.
+
+## Pi-side heading hold A/B, 2026-10-06 (V3 Phase 0)
+
+`tools/g2_baseline.sh start 16 hold_v21 --hold abba` (V2.1, 0.10 m/s, 12.5 s, hard floor, pack charged; hold off, on, on, off, off, on, on, off ...; raw logs in
+`v3-data/hold_ab/`; filenames carry the condition). Heading change over the walk, firmware convention (+ = right):
+
+| Hold | n | Mean | Sd | Range | Roll std |
+|---|---|---|---|---|---|
+| OFF | 8 | +65 deg | 18 | +43 .. +100 | 5.6 deg |
+| ON | 8 | +82 deg | 19 | +57 .. +115 | 4.1 deg |
+
+The hold did **not** reduce the drift: ON turned about 17 degrees MORE to the right (difference of means 17 deg, standard error about 9, so suggestive, not
+conclusive). The controller output was pinned at its limit (u = -0.20, longer left strides) for the whole of every ON run, so it asked for the most correction it
+can give and the heading still went right. Either the stride-scaling lever has the opposite sign on the real G2 from the sim (`steer_probe.py`: u = -0.2 -> +27 deg left),
+or it has far less authority there (the policy sees the changed joint history and may undo it). The roll std fell from 5.6 to 4.1 deg with the hold on, so the lever
+does change the walk. Drift also grew over the series (OFF runs: 43, 49, 46, 66, 69, 85, 100, 66 deg), which the alternating order balances across the two conditions.
+Next: measure the real authority and sign directly with constant u (no feedback), e.g. u = -0.2 / 0 / +0.2, a few runs each.
