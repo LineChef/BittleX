@@ -5,8 +5,10 @@
     bash tools/g2_explore.sh disarm         # end the roam bout
     bash tools/g2_explore.sh stop           # end the session
 
-Control is a file (`~/.g2_explore_cmd`, one word: arm / disarm / halt / release / stop). Safety nets: the roam bout disarms by itself after
-`--roam-s`, the whole session ends after `--max-s`, `kill -USR1 <pid>` or `halt` is the emergency stop, and G2's own fall guard is on.
+Control is a file (`~/.g2_explore_cmd`, one word: arm / disarm / halt / release / stop). Roaming has no time cap (`--roam-s N` adds one); the whole session
+ends after `--max-s` (2 h). Voice works after the wake word: "emergency stop", "resume", "go ahead and look around", "that's enough",
+"tell me what you see" (what the detector sees, no API call), "shut down" (ends the session only). `kill -USR1 <pid>` or `halt` is the
+emergency stop, and G2's own fall guard is on.
 There is NO edge detector: never run this on a desk, a table or the stand.
 """
 from __future__ import annotations
@@ -34,8 +36,8 @@ def _read_command() -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
-    ap.add_argument("--roam-s", type=float, default=60.0, help="a roam bout disarms itself after this long")
-    ap.add_argument("--max-s", type=float, default=900.0, help="the whole session ends after this long")
+    ap.add_argument("--roam-s", type=float, default=0.0, help="a roam bout disarms itself after this long (0 = no cap)")
+    ap.add_argument("--max-s", type=float, default=7200.0, help="the whole session ends after this long, so a forgotten session cannot keep the voice service off")
     ap.add_argument("--no-narrate", action="store_true")
     ap.add_argument("--hz", type=float, default=8.0)
     args = ap.parse_args()
@@ -59,19 +61,48 @@ def main() -> None:
         vision = _make_vision_source() if features.vision else None
         rt = _build_runtime(link, hz=args.hz, memory=None, frame_source=vision)     # no memory: place notes would name bonded people
 
+        # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
+        from dataclasses import replace
+        rt.driver.explorer.cfg = replace(rt.driver.explorer.cfg, max_legs=10 ** 9)
+
         tts = None
+        say = lambda text: None  # noqa: E731
         if not args.no_narrate:
             from .voice.tts import make_tts
-            tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+            raw = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+            lock = threading.Lock()
+
+            class _Locked:                                                    # narration and replies never talk over each other
+                def speak(self, text):
+                    with lock:
+                        raw.speak(text)
+
+            tts = _Locked()
+            say = tts.speak
             from .personality.bonds import Bonds
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
             attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
             rt.bindings.tts = tts
-            tts.speak("Exploration test starting. I will stay put and look around first.")
+            say("Exploration test starting. I will stay put and look around first.")
 
         from .gait.stand_guard import StandGuard
         guard = StandGuard(link, is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH), guard=settings.stand_guard,
                            balance_off_idle=True, reenable_after_s=None).start()
+
+        stop_flag = threading.Event()
+        listener = None
+        if features.mic and features.wake_word:
+            from .behavior.explore_listener import ExploreListener
+            from .voice.stt import make_stt
+            from .voice.wake_word import make_wake_word
+            wake = make_wake_word("vosk", vosk_model_path=settings.vosk_model_path, phrase=settings.wake_word)
+            stt = make_stt("vosk", vosk_model_path=settings.vosk_model_path, silence_s=settings.stt_silence_s)
+            if hasattr(wake, "hand_over"):
+                stt.audio_source = wake.hand_over
+            listener = ExploreListener(wake, stt, say, rt, lambda: rt._frame_source(),
+                                       on_arm=lambda: link.send("gB", read_reply=False, settle=0.0),
+                                       on_stop=stop_flag.set).start()
+            log.info("voice commands on: wake word, then arm/disarm roam, stop, resume, \"tell me what you see\", shut down (ends the session)")
 
         signal.signal(signal.SIGUSR1, lambda *_: rt.halt())
         signal.signal(signal.SIGUSR2, lambda *_: rt.release())
@@ -83,7 +114,7 @@ def main() -> None:
         started = time.monotonic()
         armed_at: float | None = None
         try:
-            while t.is_alive() and time.monotonic() - started < args.max_s:
+            while t.is_alive() and not stop_flag.is_set() and time.monotonic() - started < args.max_s:
                 time.sleep(0.5)
                 cmd = _read_command()
                 if cmd == "stop":
@@ -101,20 +132,21 @@ def main() -> None:
                     rt.halt()
                 elif cmd == "release":
                     rt.release()
-                if armed_at is not None and time.monotonic() - armed_at > args.roam_s:
+                if args.roam_s > 0 and armed_at is not None and time.monotonic() - armed_at > args.roam_s:
                     rt.post(disarm_explore=True)
                     armed_at = None
                     log.warning("roam bout over (%.0f s): disarmed", args.roam_s)
         except KeyboardInterrupt:
             pass
         finally:
+            if listener is not None:
+                listener.stop()
             log.info("ending the exploration session")
             try:
                 rt.post(disarm_explore=True)
                 time.sleep(1.0)
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
-                if tts is not None:
-                    tts.speak("Exploration test finished.")
+                say("Exploration test finished.")
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
             rt.stop()
