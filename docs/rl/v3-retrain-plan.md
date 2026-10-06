@@ -329,6 +329,18 @@ re-tuned (+60-70 min each); the 20M stops at a gait check and a fallback is take
 (Case A) or Fri Oct 9 afternoon (Case B). The human steps (Phase 0, check-in, final walks) set the calendar: unattended work is continuous from the
 moment calibration ends. A phase that overruns moves everything after it by the same amount.
 
+## 5b. Decisions and status, evening of 2026-10-06 (user)
+- **Pi-side heading hold** (`pi_pipeline/gait/heading_hold.py`, `--heading-hold`, off by default; sim-validated): its 16-run interleaved A/B on G2 (`g2_baseline.sh start 16 hold_v21 --hold abba`)
+  resumes when G2 is back online (he is charging). If it helps it goes into the sim for **scoring only first**, not training.
+- **Turning screen (S5):** measure the real `kwkL` / `kwkR` turn rates when the Pi is back on G2, before S5 comes up in the queue; the result sets `trained/v3_turning_gate_pass`.
+- **Difficulty curriculum (built and being tested; training stays stopped until it is shown to help):** the base recipe now trains on per-category difficulty levels
+  (terrain, ledge, slope, fault) that start at a clean passable floor and rise only where a deterministic probe (every 98k steps, 6 episodes per category) shows the policy
+  is ready (score >= 0.80 to rise, <= 0.50 to drop); focus episodes stretch 0.1 above the level, 10% anchor episodes stay at level 0, 25% combos use every level. Two paces:
+  +0.10 per good probe for the 3M screens, +0.05 after two good probes for the stages and the 20M (stages start at 0.8, the last at 1.0). Evidence required before relaunch:
+  curriculum run vs the old fixed-ramp scheme at equal steps, scored at full difficulty. Code: `opencat_gym_env.py` (CATEGORY_LEVELS, LEVEL_EXTERNAL, ...), `train.py` (Curriculum),
+  tests in `test_v3_levers.py`, checks `difficulty_check.py` / `difficulty_audit.py`. The earlier "no ramp for ledges / rubble" statement was wrong: most hazards already scaled
+  with a step-count ramp; the changes are the per-category, competence-driven levels and the three severities that ignored the ramp.
+
 ## 5. Decisions (user, 2026-10-06)
 - Everything learned from tuning goes into the base training; no planned tuning runs after the 20M.
 - No separate dress rehearsal: one 20M run with gait checks at 3M / 5M / 10M.

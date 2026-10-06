@@ -2,6 +2,8 @@ import argparse
 import os
 from datetime import datetime
 
+import numpy as np
+
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback, CallbackList, CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
@@ -41,8 +43,89 @@ class RampSync(BaseCallback):
     def _on_rollout_start(self):
         self.training_env.env_method("set_ramp_steps", self.offset + self.num_timesteps)
 
+    def _on_rollout_end(self):
+        try:
+            lv = np.array(self.training_env.get_attr("_level"), dtype=float)
+            cats = self.training_env.get_attr("_levels")               # one dict per env: {category: level}
+            if lv.size:
+                self.logger.record("curriculum/level_mean", float(lv.mean()))
+                per = {c: float(np.mean([d[c] for d in cats])) for c in cats[0]}
+                scs = self.training_env.get_attr("_cat_score")
+                sc = {c: float(np.nanmean([d[c] for d in scs])) if not all(np.isnan(d[c]) for d in scs) else float("nan") for c in scs[0]}
+                for c, v in per.items():
+                    self.logger.record(f"curriculum/{c}", v)
+                print(f"[level] steps {self.offset + self.num_timesteps:.0f}  mean level {lv.mean():.2f} (min {lv.min():.2f}, max {lv.max():.2f})  by category (level, last window score): "
+                      + "  ".join(f"{c} {v:.2f} ({sc[c]:.2f})" for c, v in per.items()), flush=True)
+        except Exception:
+            pass
+
     def _on_step(self):
         return True
+
+
+class Curriculum(BaseCallback):
+    """Difficulty curriculum driven by a DETERMINISTIC probe (opencat_gym_env LEVEL_EXTERNAL). Every `every` training steps the current policy is run, without
+    exploration noise, for `episodes` episodes on each hazard category at its current level (the others at 0; random training commands); the category's mean episode
+    score (survived x fraction of commanded distance covered) is compared with LEVEL_UP_SCORE / LEVEL_DOWN_SCORE: LEVEL_PROMOTE_WINDOWS consecutive good probes raise the
+    category by LEVEL_STEP_C, one bad probe lowers it. The new levels are pushed to every training env. `start` is the level every category starts at."""
+    def __init__(self, every=98304, episodes=6, start=0.0, verbose=1):
+        super().__init__(verbose)
+        self.every, self.episodes = int(every), int(episodes)
+        import opencat_gym_env as E
+        self.E = E
+        self.levels = {c: float(start) for c in E.CATS}
+        self.streak = {c: 0 for c in E.CATS}
+        self.last = {c: float("nan") for c in E.CATS}
+        self.env = None
+        self._next = self.every
+
+    def _on_training_start(self):
+        self.E.GUI_MODE = False
+        self.E.CATEGORY_OVERRIDE = {}
+        self.env = self.E.OpenCatGymEnv()
+        self.training_env.env_method("set_category_levels", self.levels)
+
+    def _probe(self, cat):
+        import pybullet as p
+        self.E.CATEGORY_OVERRIDE = {cat: self.levels[cat]}
+        scores = []
+        for k in range(self.episodes):
+            obs, _ = self.env.reset(seed=int(self.num_timesteps) % 100000 + k)
+            peak = 0.0
+            while True:
+                act, _ = self.model.predict(obs, deterministic=True)
+                obs, _r, te, tr, _i = self.env.step(act)
+                rr, pp, _y = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(self.env.robot_id)[1])
+                peak = max(peak, abs(rr), abs(pp))
+                if te or tr:
+                    break
+            scores.append(self.env._episode_score() if peak <= 1.3 else 0.0)
+        self.E.CATEGORY_OVERRIDE = {}
+        return float(np.mean(scores))
+
+    def _on_step(self):
+        return True
+
+    def _on_rollout_end(self):
+        if self.num_timesteps < self._next:
+            return
+        self._next += self.every
+        E = self.E
+        for c in E.CATS:
+            m = self._probe(c)
+            self.last[c] = m
+            if m >= E.LEVEL_UP_SCORE:
+                self.streak[c] += 1
+                if self.streak[c] >= E.LEVEL_PROMOTE_WINDOWS:
+                    self.levels[c] = min(1.0, self.levels[c] + E.LEVEL_STEP_C)
+                    self.streak[c] = 0
+            else:
+                self.streak[c] = 0
+                if m <= E.LEVEL_DOWN_SCORE:
+                    self.levels[c] = max(0.0, self.levels[c] - E.LEVEL_STEP_C)
+        self.training_env.env_method("set_category_levels", self.levels)
+        print(f"[probe] steps {self.num_timesteps:.0f}  deterministic score by category (new level): "
+              + "  ".join(f"{c} {self.last[c]:.2f} ({self.levels[c]:.2f})" for c in E.CATS), flush=True)
 
 
 if __name__ == "__main__":
@@ -107,7 +190,11 @@ if __name__ == "__main__":
     else:
         PPOCls = PPO
     ramp_offset = _E.RAMP_TOTAL_STEPS if (args.from_ckpt and not args.re_ramp) else 0.0
-    checkpoint_callback = CallbackList([RampSync(ramp_offset), checkpoint_callback])
+    cbs = [RampSync(ramp_offset), checkpoint_callback]
+    if _E.LEVEL_EXTERNAL and _E.ADAPTIVE_LEVEL and _E.CATEGORY_LEVELS:
+        cbs.append(Curriculum(every=int(os.environ.get("G2E_PROBE_EVERY", "98304")), episodes=int(os.environ.get("G2E_PROBE_EPISODES", "6")),
+                              start=_E.LEVEL_FIXED if _E.LEVEL_FIXED >= 0 else _E.LEVEL_START))
+    checkpoint_callback = CallbackList(cbs)
 
     if args.from_ckpt:
         # Finetune: load the policy and nudge it with a low CONSTANT LR plus a

@@ -32,6 +32,15 @@ RECIPE = {
     # the V2 course minus carpet (carpet is out of every gate and out of training; its own session later)
     "G2E_LEDGE_HEIGHT": "0.035", "G2E_LEDGE_RANDOMIZE": "1",
     "G2E_SURFACE_TRANSITION_PROB": "0", "G2E_SNAG_OBSTACLE_PROB": "0", "G2E_LEDGE_PROB": "0",
+    # difficulty scaling (2026-10-06): every hazard scales with a per-category level that rises only where the policy is ready (terrain / ledge / slope / fault),
+    # starting from a clean passable floor; see opencat_gym_env CATEGORY_LEVELS. 8 focus episodes per +0.05 step, up at >= 85% survived-with-progress, down at <= 60%.
+    "G2E_ADAPTIVE_LEVEL": "1", "G2E_CATEGORY_LEVELS": "1", "G2E_SCALE_ALL_HAZARDS": "1",
+    # Pace of the climb, per category (a window = that category's focus episodes; ~16% of all episodes are focus episodes of any one category). The screening runs are
+    # only 3M steps, so they climb quickly: +0.10 after ONE good window of 6 (the hold at each new level is one window, ~75k steps across 8 envs; full difficulty needs
+    # >= ~0.75M steps even for a perfect policy). Continuation stages and the 20M climb carefully (see stage_extra): +0.05 after TWO good windows of 8 (~200k steps each).
+    "G2E_LEVEL_WINDOW_C": "6", "G2E_LEVEL_STEP_C": "0.10", "G2E_LEVEL_PROMOTE_WINDOWS": "1",
+    # Competence is measured by a deterministic probe every 98k steps (6 episodes per category), not from the noisy training episodes: see train.py Curriculum.
+    "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "6", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
 
 # --- Phase 1 output: parameters fitted so the sim matches the real walks. Empty until Phase 1 runs. ---
@@ -79,6 +88,9 @@ def stage_extra(stage: str, levers) -> dict:
     """Course-stage settings (cumulative) for any stage name, including the late ones. s5 widens the turn range (needs the turn lever);
     s6 is full-strength faults (needs the faults lever), the wide turn range, and the +10% hard levels."""
     out = dict(dict(STAGES)["s4_ledge"]) if stage in LATE_STAGES else dict(dict(STAGES)[stage])
+    if stage != "s0_flat":
+        out["G2E_LEVEL_START"] = "0.8" if stage != "s6_full_strength" else "1.0"     # a continuation must not restart from an empty floor
+        out.update({"G2E_LEVEL_WINDOW_C": "8", "G2E_LEVEL_STEP_C": "0.05", "G2E_LEVEL_PROMOTE_WINDOWS": "2"})   # the careful pace: +0.05 after 2 good probes in a row
     if stage in LATE_STAGES:
         if "turn" in levers:
             out["G2E_TRAIN_YAW"] = "0.45"
@@ -90,7 +102,7 @@ def stage_extra(stage: str, levers) -> dict:
 
 
 # settings that only make sense while training; scoring never uses them
-TRAIN_ONLY_PREFIXES = ("G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
+TRAIN_ONLY_PREFIXES = ("G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_ALL", "G2E_LEVEL_", "G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
                        "G2E_SLOPE_TARGET_PROB", "G2E_LEDGE_", "G2E_SURFACE_", "G2E_SNAG_", "G2E_TRAIN_YAW")
 
 

@@ -152,3 +152,229 @@ def test_mirror_ppo_single_pass_matches_sb3_evaluate_actions():
     d = m.policy.action_dist.proba_distribution(mean[:32], m.policy.log_std)
     assert th.allclose(d.log_prob(act), lp0, atol=1e-5) and th.allclose(d.entropy(), en0, atol=1e-5)
     assert th.allclose(m.policy.value_net(lat_vf)[:32].flatten(), v0.flatten(), atol=1e-5)
+
+
+# ----------------------------------------------------------------------------- adaptive difficulty level
+@pytest.fixture()
+def lvl_env(monkeypatch):
+    import opencat_gym_env as E
+    E.GUI_MODE = False
+    monkeypatch.setattr(E, "ADAPTIVE_LEVEL", True)
+    monkeypatch.setattr(E, "LEVEL_FIXED", -1.0)
+    monkeypatch.setattr(E, "LEVEL_WINDOW", 4)
+    monkeypatch.setattr(E, "LEVEL_STEP", 0.1)
+    monkeypatch.setattr(E, "LEVEL_UP_RATE", 0.75)
+    monkeypatch.setattr(E, "LEVEL_DOWN_RATE", 0.25)
+    monkeypatch.setattr(E, "LEVEL_START", 0.0)
+    env = E.OpenCatGymEnv()
+    env._level = 0.0
+    return E, env
+
+
+def _feed(env, outcomes):
+    for o in outcomes:
+        env._record_outcome(o)
+
+
+def test_level_rises_one_step_per_window_of_mostly_survived_episodes(lvl_env):
+    E, env = lvl_env
+    _feed(env, [1, 1, 1, 1])
+    assert env._level == pytest.approx(0.1)
+    _feed(env, [1, 1, 1, 0])                    # 75% = the threshold: still counts as a rise
+    assert env._level == pytest.approx(0.2)
+    _feed(env, [1, 1])                          # an incomplete window changes nothing
+    assert env._level == pytest.approx(0.2)
+
+
+def test_level_holds_in_the_middle_band_and_falls_when_mostly_failing(lvl_env):
+    E, env = lvl_env
+    env._level = 0.5
+    _feed(env, [1, 1, 0, 0])                    # 50%: between the two thresholds
+    assert env._level == pytest.approx(0.5)
+    _feed(env, [0, 0, 0, 1])                    # 25%: falls
+    assert env._level == pytest.approx(0.4)
+
+
+def test_level_is_clamped_to_zero_and_one_and_a_climb_needs_many_windows(lvl_env):
+    E, env = lvl_env
+    _feed(env, [0] * 40)
+    assert env._level == 0.0
+    _feed(env, [1] * 4 * 5)
+    assert env._level == pytest.approx(0.5)     # 5 windows -> 5 steps: it cannot jump
+    _feed(env, [1] * 4 * 20)
+    assert env._level == 1.0
+
+
+def test_dr_follows_the_level_in_training_and_is_full_in_evaluation(lvl_env, monkeypatch):
+    E, env = lvl_env
+    env._level = 0.35
+    env.reset(seed=0)
+    assert env._dr == pytest.approx(0.35)
+    monkeypatch.setattr(E, "DR_EVAL_FULL", True)
+    env.reset(seed=0)
+    assert env._dr == 1.0
+    monkeypatch.setattr(E, "DR_EVAL_FULL", False)
+    monkeypatch.setattr(E, "LEVEL_FIXED", 0.6)
+    env.reset(seed=0)
+    assert env._dr == pytest.approx(0.6)
+    _feed(env, [1] * 8)
+    assert env._level == pytest.approx(0.35)    # a pinned level never adapts
+
+
+def test_level_zero_has_no_hazards_and_no_randomization(lvl_env):
+    E, env = lvl_env
+    env._level = 0.0
+    env.reset(seed=1)
+    assert env._dr == 0.0 and env._ledge_h == 0.0 and env._motor_max is None and env._drift_torque == 0.0
+    assert np.allclose(env._torque_scale, 1.0) and np.allclose(env._joint_offset, 0.0)
+
+
+def test_a_level_up_needs_progress_not_just_survival(lvl_env):
+    E, env = lvl_env
+    for _ in range(4):
+        env._record_outcome(1, progress_ok=False)      # survived but stood still / crawled
+    assert env._level == 0.0
+    for _ in range(4):
+        env._record_outcome(1, progress_ok=True)
+    assert env._level == pytest.approx(0.1)
+
+
+def test_progress_check_on_a_real_episode(lvl_env):
+    import pybullet as p
+    E, env = lvl_env
+    env.set_command(fwd=0.10, yaw=0.0)
+    env.reset(seed=3)
+    for _ in range(120):
+        env.step(np.zeros(8))
+    assert isinstance(env._progress_ok(), (bool, np.bool_))
+    env._lvl_cmd_sum, env._lvl_steps = 0.0, 100         # a near-zero command always passes
+    assert env._progress_ok() is True
+    env._lvl_cmd_sum = 0.10 * 100
+    env._lvl_x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0] + 10.0     # as if it had gone backwards
+    assert env._progress_ok() is False
+
+
+# ----------------------------------------------------------------------------- per-category levels
+@pytest.fixture()
+def cat_env(monkeypatch):
+    import opencat_gym_env as E
+    E.GUI_MODE = False
+    for k, v in dict(ADAPTIVE_LEVEL=True, CATEGORY_LEVELS=True, LEVEL_FIXED=-1.0, LEVEL_WINDOW_C=4, LEVEL_STEP_C=0.1, LEVEL_UP_SCORE=0.75, LEVEL_DOWN_SCORE=0.45,
+                     LEVEL_PROMOTE_WINDOWS=2, LEVEL_STRETCH=0.1, LEVEL_BASE=0.25, LEVEL_COMBO_PROB=0.25, LEVEL_EASY_PROB=0.10, DR_EVAL_FULL=False).items():
+        monkeypatch.setattr(E, k, v)
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {})
+    env = E.OpenCatGymEnv()
+    return E, env
+
+
+def _win(env, scores, survived=True):
+    for sc in scores:
+        env._record_outcome(1 if survived else 0, True, sc)
+
+
+def test_episode_mix_focus_stretch_base_anchor_and_combo(cat_env):
+    E, env = cat_env
+    env._levels = {c: 0.8 for c in E.CATS}
+    np.random.seed(0)
+    n, kinds, focus_counts = 4000, {"anchor": 0, "combo": 0, "focus": 0}, {c: 0 for c in E.CATS}
+    for _ in range(n):
+        env._assign_category_levels()
+        d = dict(terrain=env._d_terrain, ledge=env._d_ledge, slope=env._d_slope, fault=env._d_fault)
+        if env._focus is None and all(v == 0.0 for v in d.values()):
+            kinds["anchor"] += 1                                                   # an always-passable anchor episode
+        elif env._focus is None:
+            kinds["combo"] += 1
+            assert all(v == pytest.approx(0.8) for v in d.values())              # a combo: every category at its own level
+        else:
+            kinds["focus"] += 1
+            focus_counts[env._focus] += 1
+            assert 0.8 <= d[env._focus] <= 0.9 + 1e-9                             # the focus category practices a little past its level
+            assert all(v == pytest.approx(0.25) for c, v in d.items() if c != env._focus)   # the others held at the base level
+    assert abs(kinds["anchor"] / n - 0.10) < 0.02 and abs(kinds["combo"] / n - 0.25) < 0.03 and abs(kinds["focus"] / n - 0.65) < 0.03
+    assert all(abs(c / kinds["focus"] - 0.25) < 0.04 for c in focus_counts.values())      # the four categories take turns evenly
+
+
+def test_stretch_is_capped_at_level_one(cat_env):
+    E, env = cat_env
+    env._levels = {c: 1.0 for c in E.CATS}
+    np.random.seed(1)
+    for _ in range(300):
+        env._assign_category_levels()
+        assert max(env._d_terrain, env._d_ledge, env._d_slope, env._d_fault) <= 1.0 + 1e-12
+
+
+def test_promotion_needs_two_good_windows_in_a_row(cat_env):
+    E, env = cat_env
+    env._levels = {c: 0.5 for c in E.CATS}
+    env._focus = "slope"
+    _win(env, [0.9] * 4)                                    # one good window: not yet
+    assert env._levels["slope"] == pytest.approx(0.5)
+    _win(env, [0.8] * 4)                                    # a second in a row: promoted
+    assert env._levels["slope"] == pytest.approx(0.6)
+    _win(env, [0.9] * 4)
+    _win(env, [0.6] * 4)                                    # a middling window resets the streak
+    _win(env, [0.9] * 4)
+    assert env._levels["slope"] == pytest.approx(0.6)
+    _win(env, [0.9] * 4)
+    assert env._levels["slope"] == pytest.approx(0.7)
+    assert all(env._levels[c] == 0.5 for c in E.CATS if c != "slope")           # the other categories never moved
+
+
+def test_a_survived_but_slow_window_does_not_promote_and_a_bad_one_demotes_at_once(cat_env):
+    E, env = cat_env
+    env._levels = {c: 0.5 for c in E.CATS}
+    env._focus = "ledge"
+    for _ in range(3):
+        _win(env, [0.6] * 4)                                # survived but only 60% of the distance: in the hold band
+    assert env._levels["ledge"] == pytest.approx(0.5)
+    _win(env, [0.2, 0.3, 0.4, 0.5])                         # mean 0.35 <= 0.45: down immediately
+    assert env._levels["ledge"] == pytest.approx(0.4)
+    env._focus = "fault"
+    _win(env, [0.9] * 4, survived=False)                    # falls score 0 whatever the distance
+    assert env._levels["fault"] == pytest.approx(0.4)
+
+
+def test_anchor_and_combo_episodes_never_adapt_and_the_mean_level_follows(cat_env):
+    E, env = cat_env
+    env._levels = {c: 0.5 for c in E.CATS}
+    env._focus = None
+    _win(env, [0.0] * 40)
+    assert all(v == 0.5 for v in env._levels.values())
+    env._focus = "terrain"
+    _win(env, [0.9] * 8)
+    assert env._level == pytest.approx(np.mean(list(env._levels.values())))
+    assert env._cat_score["terrain"] == pytest.approx(0.9)
+
+
+def test_override_pins_categories_for_audits(cat_env, monkeypatch):
+    E, env = cat_env
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {"slope": 1.0})
+    env._assign_category_levels()
+    assert env._d_slope == 1.0 and env._d_terrain == 0.0 and env._d_ledge == 0.0 and env._d_fault == 0.0
+
+
+def test_a_real_reset_uses_the_category_levels(cat_env, monkeypatch):
+    E, env = cat_env
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {"ledge": 1.0})
+    monkeypatch.setattr(E, "LEDGE_HEIGHT", 0.035)
+    monkeypatch.setattr(E, "LEDGE_PROB", 1.0)
+    monkeypatch.setattr(E, "LEDGE_RANDOMIZE", True)
+    heights = []
+    for k in range(12):
+        env.reset(seed=k)
+        heights.append(env._ledge_h)
+    assert max(heights) > 0.012 and env._d_slope == 0.0 and env._slope_rp == (0.0, 0.0)     # ledges appear, slopes do not
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {"ledge": 0.0})
+    env.reset(seed=1)
+    assert env._ledge_h == 0.0                                                              # a category at 0 contributes nothing
+
+
+def test_episode_score_is_the_fraction_of_commanded_distance(cat_env):
+    import pybullet as p
+    E, env = cat_env
+    env.reset(seed=2)
+    env._lvl_steps, env._lvl_cmd_sum = 100, 0.10 * 100
+    env._lvl_x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0] - 0.10 * (100 / 80.0) * 0.6      # it covered 60% of the commanded distance
+    assert env._episode_score() == pytest.approx(0.6, abs=0.02)
+    env._lvl_cmd_sum = 0.0                                                                         # a stand command scores 1
+    assert env._episode_score() == 1.0
