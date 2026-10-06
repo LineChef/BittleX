@@ -163,6 +163,9 @@ class Settings:
     battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.2))   # ~20% of a 2S Li-ion pack at rest
     battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 6.6))
+    # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns
+    explore_handover: bool = field(default_factory=lambda: _env("G2_EXPLORE_HANDOVER", "1") not in ("0", "false", "no"))
+    explore_roam_s: float = field(default_factory=lambda: _env_float("G2_EXPLORE_ROAM_S", 600.0))
     battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 60.0))
     # G2's pack voltage history, one line per `battery_log_every_s` (empty path = off)
     battery_log: str = field(default_factory=lambda: _env("G2_BATTERY_LOG", "~/.local/share/g2/battery_voltage.csv"))

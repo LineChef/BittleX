@@ -36,7 +36,9 @@ def _read_command() -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
-    ap.add_argument("--roam-s", type=float, default=0.0, help="a roam bout disarms itself after this long (0 = no cap)")
+    ap.add_argument("--roam-s", type=float, default=600.0, help="a roam bout disarms itself after this long (0 = no cap)")
+    ap.add_argument("--arm-on-start", action="store_true", help="start roaming at once (the voice service handed over after \"look around\")")
+    ap.add_argument("--exit-when-roam-ends", action="store_true", help="end the session (the voice service comes back) when roaming ends")
     ap.add_argument("--max-s", type=float, default=7200.0, help="the whole session ends after this long, so a forgotten session cannot keep the voice service off")
     ap.add_argument("--no-narrate", action="store_true")
     ap.add_argument("--hz", type=float, default=8.0)
@@ -113,6 +115,12 @@ def main() -> None:
 
         started = time.monotonic()
         armed_at: float | None = None
+        was_exploring, left_at = False, None
+        if args.arm_on_start:
+            link.send("gB", read_reply=False, settle=0.0)
+            rt.post(arm_explore=True)
+            armed_at = started
+            say("Okay, exploring.")
         try:
             while t.is_alive() and not stop_flag.is_set() and time.monotonic() - started < args.max_s:
                 time.sleep(0.5)
@@ -136,6 +144,22 @@ def main() -> None:
                     rt.post(disarm_explore=True)
                     armed_at = None
                     log.warning("roam bout over (%.0f s): disarmed", args.roam_s)
+                    if args.exit_when_roam_ends:
+                        break
+                if args.exit_when_roam_ends:                       # roaming ended some other way ("that's enough", picked up, ...)
+                    mode = rt.driver.mode.mode
+                    if mode in (Mode.EXPLORE, Mode.APPROACH):
+                        was_exploring, left_at = True, None
+                    elif was_exploring:
+                        left_at = left_at or time.monotonic()
+                        if time.monotonic() - left_at > 4.0:
+                            log.info("roaming ended: leaving the exploration session")
+                            break
+                    elif armed_at is not None and time.monotonic() - armed_at > 90.0:
+                        log.warning("roaming never started: leaving the exploration session")
+                        break
+                    elif armed_at is None and not was_exploring:
+                        break
         except KeyboardInterrupt:
             pass
         finally:

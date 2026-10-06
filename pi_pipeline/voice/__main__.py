@@ -145,6 +145,15 @@ def main() -> None:
         )
         if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
             stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
+        def on_event(**kw):
+            if watcher_c and kw.get("told_sleep"):
+                watcher_c.nudge()
+            if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":
+                # the voice service has no behavior runtime: hand over to an exploration session once the spoken reply is finished
+                import threading
+                from ..explore_launch import launch
+                threading.Timer(5.0, lambda: launch(settings.explore_roam_s)).start()
+
         loop = VoiceLoop(
             wake_word=wake,
             stt=stt,
@@ -156,7 +165,7 @@ def main() -> None:
             follow_up_s=settings.follow_up_s if voice else 0.0,
             question_window_s=settings.question_window_s if voice else 0.0,
             camera=camera,
-            on_event=(lambda **kw: watcher_c.nudge() if watcher_c and kw.get("told_sleep") else None),
+            on_event=on_event,
             on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),
             shutdown_confirm_s=settings.shutdown_confirm_s,
