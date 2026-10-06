@@ -189,6 +189,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
 | _say_ "shut off" / "turn off" (bare phrases only) | same as "shut down" above; "turn off the music" does not trigger it |
 | _say_ "you're unplugged" / "you're plugged in" | start / pause the Pi-battery runtime count (the PiSugar S has no telemetry, so G2 only warns while counting) |
+| `bash tools/g2_explore.sh start [ROAM_S]` / `arm` / `disarm` / `halt` / `release` / `stop` / `status` / `logs` | supervised exploration test on the floor: stops `g2-voice`, runs the behavior runtime with narration (Tier 0 stationary from the start, Tier 1 roam on `arm`, auto-disarm after ROAM_S), and ALWAYS restarts `g2-voice` when it ends. No edge detector: never on a desk or the stand. Needs `G2_PI` |
 | `G2_LOG_HEARD=1` in the Pi's `.env` | log every transcript the speech recognizer produced (`journalctl -u g2-voice \| grep heard:`) |
 | `cat ~/.local/share/g2/battery_voltage.csv` (on the Pi) | G2's pack voltage history, one line per 5 minutes (`G2_BATTERY_LOG`, `G2_BATTERY_LOG_EVERY_S`; empty path = off) |
 | `G2_STT_COMMAND_GRAMMAR=0` in the Pi's `.env` | turn off the second recognizer that rescues misheard stop / shut-down commands |
