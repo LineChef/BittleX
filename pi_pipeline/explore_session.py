@@ -64,7 +64,8 @@ def main() -> None:
             from .voice.tts import make_tts
             tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
             from .personality.bonds import Bonds
-            attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)]))
+            hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
+            attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
             rt.bindings.tts = tts
             tts.speak("Exploration test starting. I will stay put and look around first.")
 
