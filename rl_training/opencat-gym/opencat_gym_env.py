@@ -457,6 +457,33 @@ PAYLOAD_INERTIA = "box"   # 2026-09-23 BUG FIX. The welded payload bodies were c
                           # collisions off. "legacy": the old zero-inertia bodies (reproduce past runs only).
 PAYLOAD_BOX_HALF = (0.033, 0.015, 0.008)   # spine: Pi Zero 2 W + PiSugar S stack, ~66 x 30 x 16 mm
 HEAD_BOX_HALF = (0.010, 0.012, 0.010)      # head: camera cluster, ~20 x 24 x 20 mm
+# 2026-10-06: G2 with the case, camera, mic and speaker mounted weighs 422 g (one weighing). PAYLOAD_PROFILE="case" models that as THREE welded bodies:
+#   SPINE = everything on the case that sits on the middle of the spine (Pi, PiSugar, case, mic, wiring) = 422 - base - camera - speaker
+#   HEAD  = camera cluster, front;  REAR = speaker + amp, very back.
+# Base robot taken as ~301 g (URDF 269 g x BODY_MASS_SCALE 1.12); camera 15 g and speaker 20 g are ESTIMATES (see docs/hardware/specs.md).
+# Default "estimate" keeps the 2026-09-03 BOM numbers, so earlier runs stay reproducible.
+REAR_MASS_NOM = 0.0       # kg -- speaker + amp at the very back (0 = none)
+REAR_MASS_RAND = 0.0
+REAR_MASS_POS = (-0.068, 0.0, 0.030)
+REAR_BOX_HALF = (0.012, 0.012, 0.008)
+PAYLOAD_PROFILE = os.environ.get("G2E_PAYLOAD_PROFILE", "estimate").strip().lower()
+if PAYLOAD_PROFILE == "case":
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
+    REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
+# DRIFT_SHOULDER_DEG: per-episode persistent zero offset on a random subset of the four shoulder / hip joints, +/- this many degrees each.
+# The real G2 turns right at ~8-14 deg/s with the policy commanding straight (a leg that sits off its zero, e.g. the front-left shoulder); the
+# policy sees its heading (the quaternion) but, with nothing pushing it off course in training, learned to ignore it. This gives it something to fix.
+DRIFT_SHOULDER_DEG = float(os.environ.get("G2E_DRIFT_SHOULDER_DEG", "0") or 0)
+DRIFT_PROB = float(os.environ.get("G2E_DRIFT_PROB", "0.8") or 0.8)
+# DRIFT_STROKE: per-episode one or two legs whose shoulder / hip swings with a SMALLER amplitude (scale drawn from 1 - this .. 1): a servo that is weak, sticky or
+# lagging (the real front-left shoulder sticks and misses commands). That makes a steady one-sided turn, which is what the real G2 shows.
+DRIFT_STROKE = float(os.environ.get("G2E_DRIFT_STROKE", "0") or 0)
+# DRIFT_TORQUE: a per-episode CONSTANT yaw torque on the body (N*m, applied on every physics substep), random sign, strength uniform in 0..this.
+# Single-leg asymmetries (offset / stroke / torque / friction, probed 2026-10-06) do not turn V2.1 more than ~20 deg in 12.5 s in the sim, where the real G2
+# turns ~140 deg; a direct yaw disturbance does, and it forces the policy to use the heading it already observes, whatever the real cause is.
+DRIFT_TORQUE = float(os.environ.get("G2E_DRIFT_TORQUE", "0") or 0)
+DRIFT_STROKE_CENTRE_DEG = 50.0    # the stance angle of the shoulder / hip joints (run_gait.STAND_URDF_DEG)
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
@@ -760,6 +787,18 @@ OBS_REWARD_DIST   = _g2e("OBS_REWARD_DIST", 0.28)    # dist_norm gate: below thi
 OBS_STOP_DIST     = _g2e("OBS_STOP_DIST", 0.15)      # dist_norm: this close to a tall obstacle before a stop is rewarded
 OBS_SWING_NOMINAL = _g2e("OBS_SWING_NOMINAL", 0.018) # m; swing-foot height treated as normal -- lift above it is what's rewarded
 
+# HARD_SCALE (2026-10-06): scales the hardest training disturbances by this factor (default 1.0 = off). 1.10 = "5-10% harder at the top end" for the v2.2 run:
+# shove sizes, slope range, overheat cutback, obstacle / rubble height caps. Nominal-walk knobs are deliberately NOT scaled (earlier rounds showed that
+# a harder nominal makes the policy over-cautious). The benchmark scores both the original ladder and a +10% ladder (benchmark_decathlon.py --hard-scale).
+HARD_SCALE = float(os.environ.get("G2E_HARD_SCALE", "1.0") or 1.0)
+if HARD_SCALE != 1.0:
+    RANDOM_PUSH *= HARD_SCALE
+    IMPULSE_PUSH *= HARD_SCALE
+    SLOPE_MAX_DEG *= HARD_SCALE
+    TORQUE_CUTBACK = min(0.9, TORQUE_CUTBACK * HARD_SCALE)
+    RANDOM_TERRAIN_MAX_H *= HARD_SCALE
+    RUBBLE_MAX_H *= HARD_SCALE
+
 
 class OpenCatGymEnv(gym.Env):
     """ Gymnasium environment (stable baselines 3) for OpenCat robots.
@@ -941,6 +980,7 @@ class OpenCatGymEnv(gym.Env):
 
         # Simulate delay for data transfer. Delay has to be modeled to close 
         # "reality gap").
+        self._drift_push()
         p.stepSimulation()
 
         # Check for friction of paws, to prevent slipping while training.
@@ -1034,11 +1074,17 @@ class OpenCatGymEnv(gym.Env):
                 _delta = np.clip(_motor_angs - self._servo_prev_angs, -_max_step, _max_step)
                 _motor_angs = self._servo_prev_angs + _delta
             self._servo_prev_angs = _motor_angs.copy()
+        if self._stroke_scale is not None:
+            _c = np.deg2rad(DRIFT_STROKE_CENTRE_DEG)
+            _motor_angs = np.asarray(_motor_angs, dtype=float).copy()
+            for _j in (0, 2, 4, 6):
+                _motor_angs[_j] = _c + self._stroke_scale[_j] * (_motor_angs[_j] - _c)
         p.setJointMotorControlArray(self.robot_id,
                                     self.joint_id,
                                     p.POSITION_CONTROL,
                                     _motor_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
                                     forces=np.ones(8)*(0.5 if self._in_recovery else 0.2)*self._torque_scale)
+        self._drift_push()
         p.stepSimulation() # Delay of data transfer
         # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
         _js = p.getJointStates(self.robot_id, self.joint_id)
@@ -1069,6 +1115,7 @@ class OpenCatGymEnv(gym.Env):
 
         # Read robot state (pitch, roll and their derivatives of the torso).
         state_pos, state_ang = p.getBasePositionAndOrientation(self.robot_id)
+        self._drift_push()
         p.stepSimulation() # Emulated delay of data transfer via serial port
         state_ang_euler = np.asarray(p.getEulerFromQuaternion(state_ang)[0:2])
         state_vel_raw = np.asarray(p.getBaseVelocity(self.robot_id)[1])
@@ -1686,6 +1733,12 @@ class OpenCatGymEnv(gym.Env):
         else:              # backward
             self._cmd_fwd = np.random.uniform(-0.09, -0.03)
 
+    def _drift_push(self) -> None:
+        """DRIFT_TORQUE: the per-episode constant yaw torque (0 when off)."""
+        t = getattr(self, "_drift_torque", 0.0)
+        if t:
+            p.applyExternalTorque(self.robot_id, -1, [0.0, 0.0, t], p.LINK_FRAME)
+
     @staticmethod
     def _payload_body(mass, half, pos):
         """A welded payload body. "box": real inertia from a non-colliding box; "legacy":
@@ -1968,6 +2021,7 @@ class OpenCatGymEnv(gym.Env):
         # so the fore/aft CoM split matches the real fully-loaded robot.
         self._payload_id = None
         self._head_id = None
+        self._rear_id = None
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3)
@@ -1986,6 +2040,16 @@ class OpenCatGymEnv(gym.Env):
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
                 p.changeConstraint(_hc, maxForce=5e3)
+            self._rear_id = None
+            if REAR_MASS_NOM > 0:
+                rm = REAR_MASS_NOM + np.random.uniform(-REAR_MASS_RAND, REAR_MASS_RAND)
+                rj = np.random.uniform(-0.003, 0.003, 3)
+                roff = [REAR_MASS_POS[0] + rj[0], REAR_MASS_POS[1] + rj[1], REAR_MASS_POS[2] + rj[2]]
+                self._rear_id = self._payload_body(rm, REAR_BOX_HALF,
+                    [start_pos[0] + roff[0], start_pos[1] + roff[1], start_pos[2] + roff[2]])
+                _rc = p.createConstraint(self.robot_id, -1, self._rear_id, -1,
+                                         p.JOINT_FIXED, [0, 0, 0], roff, [0, 0, 0])
+                p.changeConstraint(_rc, maxForce=5e3)
 
         # gait-refinement G3: per-joint motor-force scale (overheat cutback)
         self._torque_scale = np.ones(8)
@@ -2006,6 +2070,18 @@ class OpenCatGymEnv(gym.Env):
         if JOINT_OFFSET_DEG > 0 and self._dr > 0:
             self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
                                   * np.deg2rad(1.0) * self._dr)
+        self._drift_torque = 0.0
+        if DRIFT_TORQUE > 0 and self._dr > 0 and np.random.rand() < DRIFT_PROB:
+            self._drift_torque = float(np.random.uniform(-DRIFT_TORQUE, DRIFT_TORQUE) * self._dr)
+        self._stroke_scale = None
+        if DRIFT_STROKE > 0 and self._dr > 0 and np.random.rand() < DRIFT_PROB:
+            self._stroke_scale = np.ones(8)
+            for _j in np.random.choice([0, 2, 4, 6], np.random.randint(1, 3), replace=False):
+                self._stroke_scale[_j] = np.random.uniform(1.0 - DRIFT_STROKE, 1.0)
+        if DRIFT_SHOULDER_DEG > 0 and self._dr > 0 and np.random.rand() < DRIFT_PROB:
+            _k = np.random.choice([0, 2, 4, 6], np.random.randint(1, 5), replace=False)      # FL shoulder, FR shoulder, BR hip, BL hip
+            self._joint_offset = self._joint_offset.copy()
+            self._joint_offset[_k] += np.random.uniform(-DRIFT_SHOULDER_DEG, DRIFT_SHOULDER_DEG, len(_k)) * np.deg2rad(1.0) * self._dr
         # real control path (IMU_HOLD_STEPS / CMD_PATH); inert by default
         self._imu_held = None
         self._imu_hold_k = int(np.random.randint(IMU_HOLD_STEPS)) if IMU_HOLD_STEPS > 0 else 0
@@ -2130,7 +2206,7 @@ class OpenCatGymEnv(gym.Env):
         negligible even over a 20M run -- so it always runs. Scattered obstacles
         get a warmer tone than the ground so they read as obstacles in a replay."""
         skip = {self.robot_id}
-        for _a in ("_payload_id", "_head_id"):
+        for _a in ("_payload_id", "_head_id", "_rear_id"):
             _v = getattr(self, _a, None)
             if _v is not None:
                 skip.add(_v)
@@ -2165,6 +2241,8 @@ class OpenCatGymEnv(gym.Env):
             ignore.add(self._payload_id)
         if getattr(self, "_head_id", None) is not None:
             ignore.add(self._head_id)
+        if getattr(self, "_rear_id", None) is not None:
+            ignore.add(self._rear_id)
         _self = ignore - {0}                          # everything but the ground plane
         fov = np.deg2rad(TERRAIN_FOV_DEG)
         bearings = np.linspace(-fov, fov, 9)
