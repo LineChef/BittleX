@@ -101,8 +101,11 @@ def read_queue():
 
 def run_round(i, rnd, base, results):
     tag = rnd["tag"]
-    log(f"ROUND {i} START {tag}: {rnd['desc']}  extra={rnd['extra']}")
-    RP.launch(tag, {"G2E_PAYLOAD_PROFILE": "case", **rnd["extra"]}, steps="3e6")
+    if RP.training(tag) or os.path.exists(f"trained/{tag}_ppo.zip"):
+        log(f"ROUND {i} RESUME {tag}: already running or finished, not relaunching")
+    else:
+        log(f"ROUND {i} START {tag}: {rnd['desc']}  extra={rnd['extra']}")
+        RP.launch(tag, {"G2E_PAYLOAD_PROFILE": "case", **rnd["extra"]}, steps="3e6")
     ok, reason = RP.wait_for_finish(tag)
     if not ok:
         log(f"ROUND {i} HALT {tag}: {reason}")
@@ -172,6 +175,16 @@ def main():
         return
     best_tag = min(passing)[1]
     log(f"best passing round: {best_tag} (drift {results[best_tag]['result']['ref_heading_abs']:.1f} deg)")
+    # HARDWARE CHECK-IN (user request, 2026-10-06): testing pauses here, before the 20M run, so the best 3M policy can be walked on G2.
+    # Resume by creating trained/v22_final_go (optionally containing a different round tag to use for the final run).
+    go = "trained/v22_final_go"
+    log(f"HW CHECKIN: best 3M round is {best_tag}. PAUSED before the final 20M run until {go} exists (the user tests the policy on G2 first)")
+    while not os.path.exists(go):
+        time.sleep(20)
+    chosen = open(go).read().strip()
+    if chosen in results:
+        best_tag = chosen
+    log(f"HW CHECKIN done: starting the final run from round {best_tag}")
     final_run(results[best_tag]["extra"], base)
 
 

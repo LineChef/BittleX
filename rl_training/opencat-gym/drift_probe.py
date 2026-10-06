@@ -38,7 +38,7 @@ def main():
     ap.add_argument("--episodes", type=int, default=12)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--lever", default="", help="a fixed asymmetry for EVERY episode, ';'-separated: offset:J:DEG (servo zero), stroke:J:SCALE (swing amplitude "
-                    "of shoulder/hip J), torque:J:SCALE (motor force of joint J), fric:L:SCALE (lateral friction of foot link L), yawtorque:NM (constant "
+                    "of shoulder/hip J), torque:J:SCALE (motor force of joint J), fric:L:SCALE (lateral friction of foot link L), clip:J:DEG (servo J cannot go above DEG: a sticking servo), yawtorque:NM (constant "
                     "yaw torque on the body), payy:M (payload sideways shift, metres). Joints: 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn")
     a = ap.parse_args()
     levers = [x.split(":") for x in a.lever.split(";") if x]
@@ -61,6 +61,9 @@ def main():
                 env._torque_scale[int(lv[1])] = float(lv[2])
             elif kind == "fric":
                 p.changeDynamics(env.robot_id, int(lv[1]), lateralFriction=float(lv[2]))
+            elif kind == "clip":
+                env._motor_max = np.full(8, 10.0) if getattr(env, "_motor_max", None) is None else env._motor_max
+                env._motor_max[int(lv[1])] = np.deg2rad(float(lv[2]))
             elif kind == "yawtorque":
                 yaw_torque = float(lv[1])
             elif kind == "payy":
@@ -70,6 +73,7 @@ def main():
         p0, o0 = p.getBasePositionAndOrientation(env.robot_id)
         yaw0 = p.getEulerFromQuaternion(o0)[2]
         yaws, rolls, pitches, rates = [], [], [], []
+        jsum = np.zeros(8)
         n = 0
         while True:
             act, _ = model.predict(obs, deterministic=True)
@@ -81,6 +85,7 @@ def main():
             rl, pt, yw = p.getEulerFromQuaternion(o)
             yaws.append(yw); rolls.append(rl); pitches.append(pt)
             rates.append(p.getBaseVelocity(env.robot_id)[1][2])
+            jsum += np.array([j[0] for j in p.getJointStates(env.robot_id, env.joint_id)])
             if term or trunc or n >= 1000:
                 break
         if term and (max(abs(np.array(rolls))) > 0.9 or max(abs(np.array(pitches))) > 0.9):
@@ -91,13 +96,14 @@ def main():
         out["roll_std"].append(round(float(np.degrees(np.std(rolls))), 2))
         out["pitch_std"].append(round(float(np.degrees(np.std(pitches))), 2))
         out["steps"].append(n)
+        out.setdefault("jmean", []).append(np.degrees(jsum / n))
         pe, _ = p.getBasePositionAndOrientation(env.robot_id)
         out.setdefault("speed", []).append(round(float((pe[0] - p0[0]) / (n / opencat_gym_env.CONTROL_HZ)), 4))
     h = np.array(out["heading_deg"])
     summ = dict(policy=os.path.basename(a.policy), episodes=a.episodes, falls=out["fell"],
                 heading_mean_deg=round(float(h.mean()), 1), heading_std_deg=round(float(h.std()), 1), heading_abs_mean_deg=round(float(np.abs(h).mean()), 1),
                 yaw_rate_rms=round(float(np.mean(out["yaw_rate_rms"])), 4), roll_std_deg=round(float(np.mean(out["roll_std"])), 2),
-                pitch_std_deg=round(float(np.mean(out["pitch_std"])), 2), mean_steps=int(np.mean(out["steps"])), speed_mps=round(float(np.mean(out["speed"])), 4),
+                pitch_std_deg=round(float(np.mean(out["pitch_std"])), 2), mean_steps=int(np.mean(out["steps"])), joint_mean_deg=[round(float(x), 1) for x in np.mean(out["jmean"], axis=0)], speed_mps=round(float(np.mean(out["speed"])), 4),
                 lever=a.lever, env=dict(payload=os.environ.get("G2E_PAYLOAD_PROFILE", "estimate"), drift_deg=os.environ.get("G2E_DRIFT_SHOULDER_DEG", "0")),
                 per_episode_heading_deg=out["heading_deg"])
     print(json.dumps(summ))

@@ -1074,6 +1074,8 @@ class OpenCatGymEnv(gym.Env):
                 _delta = np.clip(_motor_angs - self._servo_prev_angs, -_max_step, _max_step)
                 _motor_angs = self._servo_prev_angs + _delta
             self._servo_prev_angs = _motor_angs.copy()
+        if getattr(self, "_motor_max", None) is not None:           # a servo that sticks below a ceiling (the real FL shoulder sticks at ~42 deg)
+            _motor_angs = np.minimum(np.asarray(_motor_angs, dtype=float), self._motor_max)
         if self._stroke_scale is not None:
             _c = np.deg2rad(DRIFT_STROKE_CENTRE_DEG)
             _motor_angs = np.asarray(_motor_angs, dtype=float).copy()
@@ -2070,6 +2072,7 @@ class OpenCatGymEnv(gym.Env):
         if JOINT_OFFSET_DEG > 0 and self._dr > 0:
             self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
                                   * np.deg2rad(1.0) * self._dr)
+        self._motor_max = None
         self._drift_torque = 0.0
         if DRIFT_TORQUE > 0 and self._dr > 0 and np.random.rand() < DRIFT_PROB:
             self._drift_torque = float(np.random.uniform(-DRIFT_TORQUE, DRIFT_TORQUE) * self._dr)
