@@ -1,0 +1,25 @@
+{
+ "rounds": [
+  {
+   "tag": "v22_r1_drift",
+   "desc": "drift disturbance only (yaw torque up to 0.5 N*m on 70% of episodes) on the 422 g case payload",
+   "extra": {
+    "G2E_DRIFT_TORQUE": "0.5",
+    "G2E_DRIFT_PROB": "0.7"
+   }
+  },
+  {
+   "tag": "v22_r2_len",
+   "desc": "long training episodes only (1000 steps = 12.5 s, as in the real walks and the probe) on the 422 g payload, no drift torque",
+   "extra": {
+    "G2E_EPISODE_LENGTH": "1000"
+   }
+  },
+  {
+   "tag": "v22_r3_control",
+   "desc": "CONTROL: 422 g payload and nothing else (standard episodes, no drift torque) -- the 3M reference the other rounds are judged against",
+   "extra": {}
+  }
+ ],
+ "final": false
+}

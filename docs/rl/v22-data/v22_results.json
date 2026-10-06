@@ -1,0 +1,67 @@
+{
+ "v22_r1_drift": {
+  "round": 1,
+  "desc": "drift disturbance only (yaw torque up to 0.5 N*m on 70% of episodes) on the 422 g case payload",
+  "extra": {
+   "G2E_DRIFT_TORQUE": "0.5",
+   "G2E_DRIFT_PROB": "0.7"
+  },
+  "result": {
+   "calm_falls": 0.0,
+   "calm_speed": 0.0179,
+   "calm_roll": 4.3,
+   "calm_yawrms": 0.1035,
+   "ref_heading_abs": 34.5,
+   "ref_heading_mean": -5.8,
+   "ref_falls": 0.08333333333333333,
+   "ref_yawrms": 0.3015,
+   "cells": {
+    "T2.2": 0.0,
+    "T3.2": 0.8,
+    "T5.2": 0.2,
+    "T7.2": 0.0,
+    "T8.1": 0.8,
+    "T10.1": 0.0,
+    "T10.2": 0.05
+   }
+  },
+  "passed": false,
+  "why": [
+   "calm falls 0.50 > 0.15",
+   "calm speed 0.024 < 90% of V2.1's 0.043",
+   "drift 56.2 deg is not 50% below V2.1's 49.3"
+  ]
+ },
+ "v22_r2_len": {
+  "round": 2,
+  "desc": "long training episodes only (1000 steps = 12.5 s, as in the real walks and the probe) on the 422 g payload, no drift torque",
+  "extra": {
+   "G2E_EPISODE_LENGTH": "1000"
+  },
+  "result": {
+   "calm_falls": 0.041666666666666664,
+   "calm_speed": 0.044,
+   "calm_roll": 7.33,
+   "calm_yawrms": 0.1773,
+   "ref_heading_abs": 62.2,
+   "ref_heading_mean": 31.6,
+   "ref_falls": 0.3333333333333333,
+   "ref_yawrms": 0.6487,
+   "cells": {
+    "T2.2": 0.05,
+    "T3.2": 0.45,
+    "T5.2": 0.25,
+    "T7.2": 0.05,
+    "T8.1": 1.0,
+    "T10.1": 0.0,
+    "T10.2": 0.0
+   }
+  },
+  "passed": false,
+  "why": [
+   "calm falls 0.54 > 0.15",
+   "calm speed 0.029 < 90% of V2.1's 0.043",
+   "drift 79.6 deg is not 50% below V2.1's 49.3"
+  ]
+ }
+}

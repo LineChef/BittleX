@@ -29,3 +29,4 @@ were removed 2026-09-10; their conclusions are condensed in
 [`../plan-detail/phase3-rl-training.md`](../plan-detail/phase3-rl-training.md) "Training history" and git history has the full text.
 
 - [`v22-log.md`](v22-log.md): the v2.2 run (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.
+- [`v22-handoff.md`](v22-handoff.md): hand-off for the v2.2 campaign (state, everything tried, remaining steps, gotchas).

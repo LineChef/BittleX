@@ -1,6 +1,6 @@
 # v2.2: fixing the drift to one side on the 422 g robot (2026-10-06)
 
-Plan, findings and round results for the next policy. Status of the run itself is in [`../STATUS.md`](../STATUS.md); this is the working log.
+**Starting a new session? Read [`v22-handoff.md`](v22-handoff.md) first** (what was tried, what remains, state snapshot). Plan, findings and round results for the next policy. Status of the run itself is in [`../STATUS.md`](../STATUS.md); this is the working log.
 
 ## Why
 Six real hard-floor V2.1 walks on the case (2026-10-06, [`real-walk-log.md`](real-walk-log.md)): no falls, but a steady turn to the right of about +142 deg over 12.7 s

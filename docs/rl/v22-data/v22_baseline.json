@@ -1,0 +1,19 @@
+{
+ "calm_falls": 0.0,
+ "calm_speed": 0.0506,
+ "calm_roll": 3.27,
+ "calm_yawrms": 0.0791,
+ "ref_heading_abs": 26.9,
+ "ref_heading_mean": 8.5,
+ "ref_falls": 0.041666666666666664,
+ "ref_yawrms": 0.2763,
+ "cells": {
+  "T2.2": 0.2,
+  "T3.2": 0.3,
+  "T5.2": 0.2,
+  "T7.2": 0.2,
+  "T8.1": 1.0,
+  "T10.1": 0.2,
+  "T10.2": 0.25
+ }
+}
