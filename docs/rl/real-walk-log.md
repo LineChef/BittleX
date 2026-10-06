@@ -272,7 +272,30 @@ spot between runs (`tools/g2_baseline.sh`, runner `gait/baseline_runs.py`). Logs
   sags a full pack by about 0.3-0.45 V. The sag on a nearly empty pack is not measured; G2 browned out walking at a resting 7.58 V (2026-10-06, 12:12 AM).
 - **Not measured:** distance walked (no tape measure this time) and a weight breakdown (body vs Pi stack) and balance point.
 
+## After replacing the front-left shoulder servo (2026-10-06 afternoon)
+
+The user replaced and recalibrated servo 8 (FL shoulder). Same hard floor, same `run_gait.py --cmd 0.10 --seconds 12.5` walks, `Release_CandidateV2.1`, hands off,
+G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full charge). Logs: `real-walk-data/2026-10-06b/`. Yaw change over 12.7 s, + = right.
+
+| Series | Runs (deg) | Mean | vs before the swap |
+|---|---|---|---|
+| Before the swap (six walks, case mounted, 2026-10-06 morning) | +103, +136, +144, +150, +176 (run 1 unusable) | about +142 | |
+| After, series A (new yaw sign, deployed 1:17 PM) | +18, +7, +7, +40, +44, +77 | +32 | |
+| After, series B (ABBA: the yaw sign alternated, order sealed from the user) | NEW sign: +80, +64, +29, -5 / OLD sign: +15, +46, +37, +49 | NEW +42, OLD +37 | |
+
+- **The drift fell from about +142 to about +35-40 deg per 12.7 s after the servo swap and recalibration.**
+- **The yaw-sign fix is not what cured it:** with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (My first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
+- **Run-to-run spread is large** (-5 to +80 deg) with no steady trend in series B (series A drifted upward, +18 to +77, which did not repeat). The user's eye and the IMU agree: runs called "super straight" were +29 and -5; runs called "curved" were +37 and more. Roll std 4.9-5.4 deg and pitch std 2.3-2.7 are unchanged from before the swap.
+- Distances (user, series A): 4 ft 11 in, 4 ft 10 in, 4 ft 12 in for the first three (the rest curved and were not measured).
+- Series A early runs looked like the policy visibly steering back on course; the ABBA test shows that is not a sign effect.
+- **Conclusion:** the old servo 8 fault caused most (about 100 of the ~140 deg) of the drift. About +40 deg +- 27 remains, which is consistent with V2.1's small learned
+  asymmetry (the open lever in `v3-retrain-plan.md`). The direct servo readings (`servo_static_test.py`, `servo_step_test.py`) on the new servo are the next step.
+- Tooling added for this: `baseline_runs.py --yaw-sign {-1|+1|abba}` and `G2_POLICY_YAW_SIGN` (A/B tests only; the default is -1), logged in each CSV header.
+
 ## Why V2.1 drifts right (investigation, 2026-10-06)
+
+> **Update (afternoon):** the servo swap above removed about 100 of the 140 deg, so the drift was mostly the faulty servo 8. The analysis below (yaw sign, learned asymmetry,
+> sim servo-speed limit) is still the record of what was ruled out and what remains open for the residual +40 deg.
 
 The six walks above all turned about +142 deg right in 12.7 s. This section is the record of what was tested and what it shows; the plan
 built on it is [`v3-retrain-plan.md`](v3-retrain-plan.md). Raw results and the exact commands: [`v3-data/`](v3-data/README.md).

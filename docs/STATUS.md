@@ -63,7 +63,7 @@ file instead of restating it. History and data live in the dated logs, not here.
 1. **Front-left shoulder servo (servo 8) is faulty or mis-sensing (being replaced 2026-10-06; the post-swap re-test steps are in [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) §0):** sticks near 42° and misses its commands; the FR shoulder shows
    occasional glitch readings. Findings and ordered next steps: [`rl/real-walk-log.md`](rl/real-walk-log.md) ("Servo troubleshooting").
 2. **Carpet:** every gait tried (V2.1, scripted, lift/stride variants) fails on ~1/4 in pile; falls are sideways to the right.
-3. **Heading drift to the right** (~140 deg per 12.5 s with V2.1) and a large roll swing while walking; the FR leg sags after the servos relax at rest.
+3. **Heading drift to the right** (about +40 deg per 12.5 s with V2.1 since the FL shoulder servo was replaced 2026-10-06; it was ~140 deg before, and replacing the servo removed most of it, see [`rl/real-walk-log.md`](rl/real-walk-log.md) "After replacing the front-left shoulder servo") and a large roll swing while walking; the FR leg sags after the servos relax at rest.
    Leading explanation (2026-10-06, not yet confirmed): V2.1 learned a constant left/right correction against the sim's leftward pull that
    over-steers on the real floor; the Pi's yaw sign was also wrong but V2.1 ignores heading, so that wasn't the cause (fixed anyway). Evidence:
    [`rl/real-walk-log.md`](rl/real-walk-log.md) "Why V2.1 drifts right"; the fix is part of the V3 retrain ([`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md)).

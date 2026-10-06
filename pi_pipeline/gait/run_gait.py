@@ -107,7 +107,7 @@ def euler_to_quat(roll, pitch, yaw):
 # trained in PyBullet, where + yaw is a LEFT turn (z up). Until 2026-10-06 the rebased yaw went into the policy with
 # the wrong sign: harmless for V2.1 (it ignores heading, docs/rl/v3-retrain-plan.md §1.1), wrong for any policy that
 # uses it. Logs keep the firmware convention (+ = right); only the policy's input is flipped.
-POLICY_YAW_SIGN = -1.0
+POLICY_YAW_SIGN = float(os.environ.get("G2_POLICY_YAW_SIGN", "-1"))   # -1 is correct; +1 reproduces the pre-2026-10-06 behaviour, for A/B tests only
 
 
 def policy_quat(roll, pitch, yaw_fw):
@@ -499,8 +499,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     logf = None
     if log_path:
         logf = open(log_path, "w")
-        logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s\n"
-                   % (cmd_fwd, hz, "off" if disable_firmware_balance else "on"))
+        logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s policy_yaw_sign=%+g\n"
+                   % (cmd_fwd, hz, "off" if disable_firmware_balance else "on", POLICY_YAW_SIGN))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
                    + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s\n")
 

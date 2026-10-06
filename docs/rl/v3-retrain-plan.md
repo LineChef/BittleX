@@ -10,6 +10,12 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 
 ## 0. Where to resume (state at ~2:30 PM ET, 2026-10-06)
 
+**New result (2:55 PM): the replaced FL shoulder servo removed most of the drift** (about +142 -> +40 deg per 12.7 s; the interleaved yaw-sign test showed the sign
+fix is not the cause: NEW +42 vs OLD +37). Record: [`real-walk-log.md`](real-walk-log.md) "After replacing the front-left shoulder servo". Consequences: (1) the real
+post-swap baseline (heading +40 +- 27 deg, roll std ~5.0, pitch ~2.5, distance ~4 ft 10 in) is now the calibration target, not the broken-servo walks; (2) a stuck servo is a
+confirmed real failure mode, which supports the N3 cell and the faults lever (Y5); (3) the rest of the plan stands (robustness, smoothness, heading hold, sim calibration).
+The direct servo readings on the new servo (USB to the Mac) are next; then the rest of Phase 0.
+
 **Phase 2 code is DONE and committed** (details §6); nothing is training; the Mac is idle. The user replaced and recalibrated the FL shoulder servo
 (servo 8) at about 2:15 PM and is about to do the Phase 0 hardware steps. G2's Pi was not yet reachable at 2:25 PM (still powering up).
 

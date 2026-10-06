@@ -21,12 +21,21 @@ def main() -> None:
     ap.add_argument("--cmd", type=float, default=0.10)
     ap.add_argument("--seconds", type=float, default=12.5)
     ap.add_argument("--lead-s", type=float, default=20.0, help="spoken warning before a run")
+    ap.add_argument("--yaw-sign", default=None,
+                    help="A/B test only: the sign of the yaw fed to the policy (-1 = the corrected default, +1 = the pre-2026-10-06 behaviour), "
+                         "or 'abba' to alternate new, old, old, new, new, old, old, new ... so a drifting battery / servo warm-up hits both equally")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
     args = ap.parse_args()
 
     from pi_pipeline.config import settings
     from pi_pipeline.voice.tts import make_tts
 
+    def sign_for(k):
+        if args.yaw_sign is None:
+            return None
+        if args.yaw_sign == "abba":
+            return (-1.0, 1.0, 1.0, -1.0)[(k - 1) % 4]
+        return float(args.yaw_sign)
     tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
     out = os.path.expanduser("~/g2_runs")
     os.makedirs(out, exist_ok=True)
@@ -36,9 +45,11 @@ def main() -> None:
     for k in range(1, args.runs + 1):
         tts.speak(f"Baseline run {k} of {args.runs} in {int(args.lead_s)} seconds. Make sure I am on the hard floor with a clear lane ahead.")
         time.sleep(max(0.0, args.lead_s - 6.0))
-        path = os.path.join(out, f"{args.label}_{stamp}_run{k:02d}.csv")
+        sgn = sign_for(k)
+        path = os.path.join(out, f"{args.label}_{stamp}_run{k:02d}" + ("" if sgn is None else f"_sign{'P' if sgn > 0 else 'M'}") + ".csv")
+        child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
         rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--cmd", str(args.cmd), "--seconds", str(args.seconds),
-                              "--log", path])
+                              "--log", path], env=child_env)
         logs.append(path)
         print(f"run {k}: exit {rc} -> {path}", flush=True)
         if k < args.runs:
