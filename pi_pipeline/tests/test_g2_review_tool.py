@@ -103,3 +103,17 @@ def test_a_foreign_host_header_is_refused_and_bad_input_is_a_clean_error(server)
     code, body = req(url + "/api/delete", token="tok", body={"kind": "nope", "id": 1})
     assert code == 400 and "error" in json.loads(body)
     assert req(url + "/img/..%2F..%2Fetc%2Fpasswd.jpg?t=tok")[0] in (400, 404)
+
+
+def test_a_picture_without_its_end_marker_is_reported_as_cut_off(tmp_path):
+    import importlib.util, sys
+    spec = importlib.util.spec_from_file_location("g2_review_cutoff", str(__import__("pathlib").Path(__file__).resolve().parents[2] / "tools" / "g2_review.py"))
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    whole, cut, padded = tmp_path / "a.jpg", tmp_path / "b.jpg", tmp_path / "c.jpg"
+    whole.write_bytes(b"\xff\xd8\xff\xe0data\xff\xd9")
+    cut.write_bytes(b"\xff\xd8\xff\xe0data")
+    padded.write_bytes(b"\xff\xd8\xff\xe0data" + b"\x00" * 40)                                   # the camera pads a short buffer with zeros
+    assert mod.picture_is_cut_off(whole) is False and mod.picture_is_cut_off(cut) is True and mod.picture_is_cut_off(padded) is True
+    assert mod.picture_is_cut_off(tmp_path / "missing.jpg") is None

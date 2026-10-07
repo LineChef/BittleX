@@ -36,6 +36,15 @@ CACHE = Path(os.path.expanduser("~/g2_pictures/explore"))
 KINDS = ("facts", "exchanges", "observations")
 
 
+def picture_is_cut_off(path) -> bool | None:
+    """True when a saved JPEG ends without its end marker (the camera module cut the picture short; the rest shows as flat gray); None if the file is not here yet."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    return data.rstrip(b"\x00")[-2:] != b"\xff\xd9"
+
+
 class Remote:
     """The Pi side, over ssh. `runner(args: list[str]) -> str` can be replaced in tests."""
 
@@ -95,7 +104,10 @@ class App:
         return self.remote.memory("restore", str(int(trash_id)))
 
     def pictures(self):
-        return self.remote.pictures("list")
+        items = self.remote.pictures("list")
+        for p in items:
+            p["cut_off"] = picture_is_cut_off(CACHE / p["path"])
+        return items
 
     def trash_pictures(self, paths: list[str]):
         out = self.remote.pictures("trash", *[self._rel(p) for p in paths])
@@ -220,8 +232,8 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 .main{flex:1;min-width:0;overflow-wrap:anywhere}.meta{color:var(--muted);font-size:.8rem;margin-top:2px}.q{color:var(--ink2)}
 .x{flex:none;width:32px;height:32px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--x);font-size:1.25rem;line-height:1}.x:hover{background:var(--xbg);border-color:var(--x)}
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 12px}.btn.danger{color:var(--x);border-color:var(--x)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#000}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
 .card .x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.85)}.group{margin:16px 0 6px;font-weight:600;color:var(--ink2)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;gap:12px;align-items:center;max-width:90vw}
 .toast button{background:none;border:0;color:var(--bg);text-decoration:underline}.empty{color:var(--muted);padding:24px 0}
@@ -229,7 +241,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <h1>G2 Review</h1><div class="sub" id="status">connecting to the Pi…</div>
 <div class="tabs" role="tablist" id="tabs"></div>
 <div class="bar"><input id="q" type="search" placeholder="Filter this tab"><button class="btn" id="refresh">Refresh</button><span id="extra"></span></div>
-<div id="list"></div></div>
+<div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
 const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["trash","Trash"]];
@@ -256,6 +268,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
   for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.pose||p.name||"picture";
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||p.pose||"")+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
     c.append(el("div","cap",(p.name||p.pose||"")+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
