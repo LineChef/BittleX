@@ -361,6 +361,14 @@ walk "N1", 20 episodes; raw results in [`v3-data/`](v3-data/README.md)):
   as the 422 g one (0.090).
 - Not yet reproduced by the sim: G2's turn rate from the first second (the sim's yaw rate at 250 deg/s is much smaller than -11 deg/s).
 
+### Stationary yaw drift, 2026-10-07 12:51 AM (is the firmware yaw a usable heading?)
+
+`pi_pipeline/gait/yaw_drift_check.py --seconds 60` with G2 resting (`d`, servos off, balance off, untouched), 5 Hz IMU print, charged pack. Raw log: `v3-data/yaw_drift/yaw_drift_rest_01.csv`.
+
+- The firmware's accumulated yaw jumped by exactly -360 deg twice in 60 s (at 11.0 s and 41.8 s) with nothing moving. Walking logs wrap the yaw with `math.remainder`, so exact 360 jumps do not reach the controller.
+- With the jumps removed the yaw drifts **+0.14 deg/s** at rest (+7.5 deg over the last 55 s; the first 5 s show +5.5 deg as the legs settle after `d`). Scatter about the line 0.3 deg.
+- Against the walking drift at u = 0 (about 9.6 deg/s in the 2026-10-07 `recheck2` runs) that bias is about 1.5%: it adds roughly 2 deg to a 12.5 s walk, so a gyro bias at rest does **not** explain a disagreement between the log and what is seen on the floor. This does not test the yaw while walking (roll swing of about 5 deg at every stride could still leak into it).
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
