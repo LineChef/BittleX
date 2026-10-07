@@ -22,6 +22,7 @@ Status key: 🔴 blocked on hardware · 🟡 partial sim work possible now · �
 | [H11](rl/hardware-gated-backlog.md#h11--servo-thermal-management--) | Servo thermal management | 🟡 |
 | [H12](rl/hardware-gated-backlog.md#h12--training-course-redesign----) | Training-course redesign | 🟡 ⚪ |
 | [H13](rl/hardware-gated-backlog.md#h13--servo-response-characterization-τ-speed-ceiling--) | Servo response characterization (τ, speed ceiling) | 🟡 |
+| [H14](rl/hardware-gated-backlog.md#h14--actuator-net-a-learned-servo-model-for-the-sim----) | Actuator net: a learned servo model for the sim | 🟡 ⚪ |
 
 ## Robustness ablations
 

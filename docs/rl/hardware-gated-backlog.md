@@ -347,6 +347,19 @@ separate physical-servo-lag term on top.
   against double-counting lag if they're fit separately) rather than just
   adding a naive velocity clamp on top of what's already there.
 
+## H14 — Actuator net: a learned servo model for the sim  🟡  ⚪
+
+Requested 2026-10-07 as an investigation only (the user chose plain system identification first, see [`v3-decisions-log.md`](v3-decisions-log.md)).
+Instead of fitting a few numbers (`maxForce`, gains, latency), train a small network on logged hardware data to predict what a servo does for a given
+commanded angle and recent joint history, and have the sim call it in place of its simple position-control model.
+
+- **Trigger:** plain system identification (fit servo and body parameters to the logs) leaves a gap the few-number model cannot close, for example
+  load-dependent sag or the stuck-servo behavior seen on the FL shoulder.
+- **Limit to settle first:** servo feedback arrives at about 9 Hz (see H13), far below the 80 Hz loop, so the net would learn from sparse readings; check
+  how much step-response data H13 yields before building anything.
+- **Work (not started):** collect paired command / reading logs across loads (in the air, standing, walking), train, validate on held-out logs, then
+  plug into the env behind a default-off flag and compare against the system-identification model on the same benchmark cells.
+
 ---
 
 ## Do-now sim tasks (not hardware-gated)
