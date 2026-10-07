@@ -474,6 +474,7 @@ REAR_MASS_RAND = 0.0
 REAR_MASS_POS = (-0.068, 0.0, 0.030)
 REAR_BOX_HALF = (0.012, 0.012, 0.008)
 PAYLOAD_PROFILE = os.environ.get("G2E_PAYLOAD_PROFILE", "estimate").strip().lower()
+PAYLOAD_VISUAL = False    # renders only: draw the payload boxes (they are collision-only, so invisible otherwise); set True before reset()
 if PAYLOAD_PROFILE == "case":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
@@ -2006,7 +2007,8 @@ class OpenCatGymEnv(gym.Env):
         if PAYLOAD_INERTIA == "legacy":
             return p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=-1, basePosition=pos)
         cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
-        b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, basePosition=pos)
+        vs = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half), rgbaColor=[1.0, 0.55, 0.1, 0.6]) if PAYLOAD_VISUAL else -1
+        b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=pos)
         p.setCollisionFilterGroupMask(b, -1, 0, 0)     # inertia from the box; touches nothing
         return b
 
