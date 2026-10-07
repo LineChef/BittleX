@@ -411,3 +411,25 @@ def test_openloop_logs_battery_voltage_during_the_walk(rg, tmp_path):
     rows = (tmp_path / "v.csv").read_text().splitlines()
     assert rows[1].endswith(",volt") and "P" in lk.sent
     assert any(r.endswith(",7.55") for r in rows[2:])
+
+
+def test_openloop_holds_its_rate_when_sends_take_time_and_can_skip_frames(rg):
+    """The pacing is a deadline, not a sleep after the work; send_every=3 sends every 3rd frame (the policy loop's cadence)."""
+    clock_t = [0.0]
+
+    class _Lk:
+        sent = 0
+
+        def send(self, cmd, **kw):
+            if cmd.startswith("i"):
+                self.sent += 1
+                clock_t[0] += 0.005                      # a serial send blocks about 5 ms at 115200 baud
+
+        def poll_imu(self):
+            return []
+
+    lk = _Lk()
+    rg.openloop(lk, 2, 80.0, fall_abort_deg=0, send_every=3, sleep=lambda s: clock_t.__setitem__(0, clock_t[0] + s), clock=lambda: clock_t[0])
+    # 2 cycles = 200 frames = 2.5 s of walk, after the 2 s stand sleep(2.0) (also on this fake clock) plus the stand command's own 5 ms
+    assert 4.4 < clock_t[0] < 4.7
+    assert lk.sent == 1 + 67                                 # the stand command + every 3rd of 200 frames

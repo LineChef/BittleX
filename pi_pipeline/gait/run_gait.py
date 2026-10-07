@@ -197,7 +197,7 @@ def probe_imu_under_load(lk, seconds, hz=CONTROL_HZ):
 
 
 def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
-             balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, *,
+             balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, send_every=1, *,
              sleep=time.sleep, clock=time.monotonic):
     """Replays the scripted wkF walk with no policy/IMU -- a firmware/servo
     sanity check before running the real control loop.
@@ -214,7 +214,11 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
     blends the scaling in from x1 over that many cycles, so the first frames match plain
     wkF (a scaled gait jumps further from the stand pose and can topple G2 at the start).
     `volt_every_s` > 0 asks the BiBoard for the battery voltage (`P`) that often during the
-    walk and records the latest reading in the log's `volt` column."""
+    walk and records the latest reading in the log's `volt` column.
+
+    Pacing (2026-10-07): frames are scheduled against a deadline, the way the policy loop does, so the playback holds `hz` however long a send takes. It used to sleep `dt` AFTER
+    each frame's work (a serial send blocks about 5 ms at 115200 baud), which ran the walk at about 44 Hz instead of 80 (23 s for a 12.5 s walk). `send_every` sends only every Nth
+    frame (the policy loop sends every 3rd tick, `i@27`, the cadence the BiBoard is known to take without chattering); the frames in between are skipped, not queued."""
     ref = np.load(os.path.join(_HERE, "wkf_ref.npy"))          # (100,8) rad, URDF order
     m = ref.mean(axis=0)
     scale = np.ones(8)
@@ -242,13 +246,16 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
             sleep(0.3)
             t_start = clock()
         step, volt, next_volt = 0, float("nan"), 0.0
+        every = max(1, int(send_every))
+        t_next = clock()
         for c in range(cycles):
             for fi, frame in enumerate(ref):
                 if ramp_n and step < ramp_n:                    # blend plain wkF -> the scaled gait
                     frame = base[fi] + (frame - base[fi]) * (step / ramp_n)
                 step += 1
-                deg = np.rint(np.rad2deg(frame)).astype(int)
-                _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
+                if (step - 1) % every == 0:
+                    deg = np.rint(np.rad2deg(frame)).astype(int)
+                    _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
                 if volt_every_s and clock() - t_start >= next_volt:
                     _send(lk, "P")
                     next_volt = clock() - t_start + volt_every_s
@@ -274,7 +281,12 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
                 if fell:
                     print("!! fallen -- resting", flush=True)
                     return
-                sleep(dt)
+                t_next += dt
+                slack = t_next - clock()
+                if slack > 0:
+                    sleep(slack)
+                else:
+                    t_next = clock()                            # fell behind: do not try to catch up in a burst
     finally:
         if log:
             log.close()
@@ -908,7 +920,8 @@ def main():
             openloop(lk, args.cycles, args.hz, lift_scale=args.lift_scale, log_path=args.log,
                      fall_abort_deg=args.fall_abort_deg, balance_off=args.openloop_balance_off,
                      lift_joints=args.lift_joints, shoulder_scale=args.shoulder_scale,
-                     ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every)
+                     ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every,
+                     send_every=args.send_every if args.send_every else 3)   # default: the policy loop's cadence (i@27)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
