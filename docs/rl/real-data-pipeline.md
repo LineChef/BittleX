@@ -61,7 +61,8 @@ may drop beyond its noise. A change that fails is blocked.
 | A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded | **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks | at the next session after the proposal exists; always reviewed before a 20M go |
 | Harm check fails | **Blocked**, not approvable until the cause is understood | |
 
-A retrain never waits on approval: it uses the latest approved snapshot, logs any pending proposal it did not use, and Claude reports it before any 20M go. The cumulative cap stops many small auto-approvals from creeping.
+**No training run ever starts automatically from data or from an approval** (user, 2026-10-07: nothing large starts without his approval). Approving a snapshot only makes it *eligible*; launching any training (a 3M screen or the 20M) is a separate, explicit go from the user.
+When the user does launch one, the launch uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
 Snapshots are immutable and numbered; "current" is a pointer, so reverting is safe.
 
 ## Periodic audit ("is the data tidy and doing its job")
