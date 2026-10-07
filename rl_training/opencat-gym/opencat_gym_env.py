@@ -478,6 +478,15 @@ if PAYLOAD_PROFILE == "case":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
+elif PAYLOAD_PROFILE == "case2":
+    # 2026-10-07: the user weighed the whole payload (Pi, PiSugar, camera, speaker, mic, wiring and the lid they hang from) at 168 g, and measured it about 1.5 in (38 mm) tall and a
+    # little over half as wide as the 71 mm lid (taken as 40 mm). With the 422 g total unchanged, the base robot is 422 - 168 = 254 g (run with G2E_BODY_MASS_SCALE=0.944 = 254 / 269), not
+    # 301 g. 133 g on the spine = 168 - 15 camera - 20 speaker (both still estimates). The box sits with its bottom where the 16 mm "case" box's bottom was (17 mm up).
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.133, 0.020
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
+    REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
+    PAYLOAD_BOX_HALF = (0.033, 0.020, 0.019)
+    PAYLOAD_POS = (-0.022, 0.0, 0.036)
 # DRIFT_SHOULDER_DEG: per-episode persistent zero offset on a random subset of the four shoulder / hip joints, +/- this many degrees each.
 # The real G2 turns right at ~8-14 deg/s with the policy commanding straight (a leg that sits off its zero, e.g. the front-left shoulder); the
 # policy sees its heading (the quaternion) but, with nothing pushing it off course in training, learned to ignore it. This gives it something to fix.
