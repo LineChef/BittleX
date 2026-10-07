@@ -26,6 +26,8 @@ def main() -> None:
                          "or 'abba' to alternate new, old, old, new, new, old, old, new ... so a drifting battery / servo warm-up hits both equally")
     ap.add_argument("--hold", default=None, choices=("on", "off", "abba"),
                     help="A/B test of the Pi-side heading hold (gait/heading_hold.py): on, off, or 'abba' = off, on, on, off, off, on, on, off ...")
+    ap.add_argument("--hold-ff", type=float, default=None, help="feed-forward for the heading-hold runs (see run_gait --hold-ff)")
+    ap.add_argument("--hold-kp", type=float, default=None, help="proportional gain for the heading-hold runs")
     ap.add_argument("--const-u", default=None,
                     help="comma list of fixed stride differences, e.g. -0.2,0,0.2: run k uses the list walked forward then backward (a b c c b a ...), no feedback")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
@@ -70,7 +72,9 @@ def main() -> None:
                             + ("" if cu is None else f"_u{cu:+.2f}") + ".csv")
         child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
         rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--cmd", str(args.cmd), "--seconds", str(args.seconds),
-                              "--log", path] + (["--heading-hold"] if hold else []) + ([] if cu is None else ["--steer-const", str(cu)]), env=child_env)
+                              "--log", path] + (["--heading-hold"] if hold else [])
+                              + (["--hold-ff", str(args.hold_ff)] if hold and args.hold_ff is not None else [])
+                              + (["--hold-kp", str(args.hold_kp)] if hold and args.hold_kp is not None else []) + ([] if cu is None else ["--steer-const", str(cu)]), env=child_env)
         logs.append(path)
         print(f"run {k}: exit {rc} -> {path}", flush=True)
         if k < args.runs:

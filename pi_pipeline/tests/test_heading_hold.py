@@ -78,3 +78,13 @@ def test_fixed_u_mode_ignores_heading_and_is_slew_limited_and_clipped():
     for _ in range(4000):
         u = c.update(0.0, 0.0125)
     assert u == pytest.approx(hh.U_MAX)                                           # clipped at the same limit
+
+
+def test_feed_forward_starts_the_output_at_the_known_drift_and_feedback_still_acts():
+    c = hh.HeadingHold(ff=-0.15)
+    for _ in range(2000):
+        u = c.update(0.0, 0.0125)                                                 # on heading: the output settles at the feed-forward
+    assert u == pytest.approx(-0.15, abs=1e-6)
+    for _ in range(2000):
+        u = c.update(math.radians(-20.0), 0.0125)                                 # drifted LEFT of the target: feedback backs the correction off
+    assert u > -0.15

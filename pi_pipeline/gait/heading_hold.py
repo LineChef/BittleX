@@ -35,8 +35,9 @@ def wrap_deg(a: float) -> float:
 
 
 class HeadingHold:
-    def __init__(self, target_deg: float = 0.0, kp: float = KP, ki: float = KI, u_max: float = U_MAX, u_rate: float = U_RATE):
+    def __init__(self, target_deg: float = 0.0, kp: float = KP, ki: float = KI, u_max: float = U_MAX, u_rate: float = U_RATE, ff: float = 0.0):
         self.target_deg, self.kp, self.ki, self.u_max, self.u_rate = target_deg, kp, ki, u_max, u_rate
+        self.ff = ff                        # feed-forward stride difference added to the feedback (the known steady drift, so the integral term starts near the answer)
         self.integral = 0.0
         self.u = 0.0
         self.fixed_u = None                 # set to a number to hold that stride difference with no feedback (measures the lever's real sign / authority)
@@ -52,10 +53,10 @@ class HeadingHold:
         if self.fixed_u is not None:
             return self._slew(max(-self.u_max, min(self.u_max, self.fixed_u)), dt)
         e = wrap_deg(math.degrees(yaw_rad) - self.target_deg)
-        want = -(self.kp * e + self.ki * self.integral)
+        want = self.ff - (self.kp * e + self.ki * self.integral)
         if abs(want) < self.u_max:                       # anti-windup: only integrate while the output is not saturated
             self.integral += e * dt
-        want = max(-self.u_max, min(self.u_max, -(self.kp * e + self.ki * self.integral)))
+        want = max(-self.u_max, min(self.u_max, self.ff - (self.kp * e + self.ki * self.integral)))
         return self._slew(want, dt)
 
     def _slew(self, want: float, dt: float) -> float:
