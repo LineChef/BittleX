@@ -37,6 +37,15 @@ def _read_command() -> str:
         return ""
 
 
+def apply_roam_limits(driver, roam_s: float) -> None:
+    """Make the session's `--roam-s` the only limit on a roam bout. The behavior layer has two caps of its own that would end a bout early and drop G2 into the attentive idle
+    (a periodic look-around, then sit and rest, which looks like being stuck): the explorer's leg budget (8 legs) and the mode controller's 90 s cap on one armed bout.
+    The session ends the bout itself at `roam_s` (0 = no cap), so the controller's cap is set just above it."""
+    from dataclasses import replace
+    driver.explorer.cfg = replace(driver.explorer.cfg, max_legs=10 ** 9)
+    driver.mode.cfg = replace(driver.mode.cfg, explore_max_secs=(roam_s + 5.0) if roam_s > 0 else 1e9)
+
+
 def parse_args(argv=None):
     """Roaming (Tier 1) starts at once by default; `--stationary` is the opt-in stay-put mode (Tier 0 only, until `arm`)."""
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
@@ -93,9 +102,7 @@ def main() -> None:
             rt.driver.enable_survey()                  # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
             log.info("survey stops ON: pictures go to %s", saver._root)
 
-        # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
-        from dataclasses import replace
-        rt.driver.explorer.cfg = replace(rt.driver.explorer.cfg, max_legs=10 ** 9)
+        apply_roam_limits(rt.driver, args.roam_s)          # roaming lasts as long as --roam-s says, not the behavior layer's own short caps
 
         tts = None
         say = lambda text: None  # noqa: E731

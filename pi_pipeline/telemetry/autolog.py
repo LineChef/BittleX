@@ -35,7 +35,7 @@ def get_surface_info() -> tuple[str, float | None]:
         return "unknown", None
     label = (lines[0].strip() if lines else "") or "unknown"
     try:
-        age = (time.time() - float(lines[1])) / 3600.0
+        age = max(0.0, (time.time() - float(lines[1])) / 3600.0)            # the stored time is rounded to the millisecond, so it can sit a hair in the future
     except (IndexError, ValueError):
         age = None
     return label, age
@@ -108,10 +108,15 @@ def new_run(kind: str, *, policy: str | None = None, cmd_fwd: float | None = Non
         return None
 
 
+def run_sidecars(root: Path | None = None) -> list[Path]:
+    """Every run's sidecar, oldest first; the label files that sit beside them are not runs."""
+    return sorted(s for s in (root or base_dir()).glob("*/*.json") if not s.name.endswith(".labels.json"))
+
+
 def close_orphans(root: Path | None = None) -> int:
     """Flag the sidecars of runs that never finished (the service or the Pi stopped mid-run) so they are not mistaken for complete ones. Returns how many."""
     n = 0
-    for side in (root or base_dir()).glob("*/*.json"):
+    for side in run_sidecars(root):
         try:
             d = json.loads(side.read_text())
             if d.get("ended") is None and d.get("end_reason") is None:
@@ -132,7 +137,7 @@ def size_mb(root: Path | None = None) -> float:
 
 def find_run(stem: str, root: Path | None = None) -> Path | None:
     """The sidecar for a run named by its file stem or a unique part of it (for example `policy_walk_141700` or `141700`)."""
-    sides = sorted((root or base_dir()).glob("*/*.json"))
+    sides = run_sidecars(root)
     exact = [s for s in sides if s.stem == stem]
     hits = exact or [s for s in sides if stem in s.stem]
     return hits[0] if len(hits) == 1 else None

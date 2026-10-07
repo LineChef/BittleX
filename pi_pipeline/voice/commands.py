@@ -72,6 +72,11 @@ _EXPLORE = (
     "exploration mode", "explore", "go explore", "go and explore",
     "check things out", "go for a wander", "wander around",
 )
+# End exploration mode entirely (the exploration session closes and the normal voice service comes back), without the emergency-stop words.
+_END_EXPLORE = (
+    "end exploration mode", "end explore mode", "end exploring mode", "exit exploration mode", "exit explore mode", "stop exploration mode",
+    "leave exploration mode", "leave explore mode", "exploration mode off", "turn off exploration mode", "end exploration", "end exploring", "stop exploration",
+)
 _UNEXPLORE = (
     "stop exploring", "stop looking around", "stop wandering", "come back",
     "thats enough", "that will do",
@@ -269,7 +274,7 @@ def looks_like_rebuff(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
-    ``"unexplore"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -283,6 +288,8 @@ def match_local_command(text: str) -> str | None:
         return "shutdown"
     if _hit(n, _COME):
         return "come"
+    if _hit(n, _END_EXPLORE):
+        return "end_explore"                          # before "explore": "end exploration mode" must never arm it
     if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):
         return "explore"
     if _hit(n, _UNEXPLORE):

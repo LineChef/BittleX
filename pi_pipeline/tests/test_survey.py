@@ -200,3 +200,16 @@ def test_a_near_duplicate_is_not_saved_a_different_picture_is(tmp_path):
     assert saver("look_down") is not None
     assert saver("look_down") is None and saver.duplicates == 1                   # the same view again: not written
     assert saver("look_down") is not None and saver.count == 2                      # a different view: kept
+
+
+def test_end_exploration_mode_ends_the_session_and_never_arms_or_halts():
+    from pi_pipeline.voice.commands import match_local_command
+    for phrase in ("end exploration mode", "end explore mode", "exit exploration mode", "stop exploration mode", "exploration mode off", "end exploration mode please"):
+        assert match_local_command(phrase) == "end_explore", phrase
+    assert match_local_command("exploration mode") == "explore" and match_local_command("that's enough") == "unexplore"          # the existing commands are unchanged
+    ended, said, posts = [], [], []
+    rt = types.SimpleNamespace(post=lambda **kw: posts.append(kw), halt=lambda: posts.append("HALT"), release=lambda: None)
+    lst = ExploreListener(None, None, said.append, rt, lambda: [], on_stop=lambda: ended.append(1))
+    assert lst.handle("end exploration mode") == "Okay, ending exploration mode."
+    assert ended == [1] and posts == []                                              # the session closes; no halt, no arm, no disarm
+    assert lst.handle("that's enough") == "Okay, that's enough." and posts == [{"disarm_explore": True}] and ended == [1]

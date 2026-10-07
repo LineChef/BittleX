@@ -2,7 +2,7 @@
 
 Wake word, then one short command, checked against the local command table only -- no Claude, no API calls:
   "emergency stop" / "freeze" -> halt;  "resume" -> release;  "go ahead and look around" -> arm roam;  "that's enough" / "come back" -> disarm;
-  "shut down" -> end the session (never powers anything off);  "tell me what you see" -> say what the detector sees;
+  "end exploration mode" -> end the session (the voice service comes back; no emergency stop involved);  "shut down" -> end the session too (never powers anything off);  "tell me what you see" -> say what the detector sees;
   "this is a mug" / "remember this as my mug" -> look at it and take a picture saved under that name (the driver's survey, behavior/survey.py).
 """
 from __future__ import annotations
@@ -58,6 +58,10 @@ class ExploreListener:
         if cmd in ("unexplore", "sleep"):
             self._rt.post(disarm_explore=True)
             return self._reply("Okay, that's enough.")
+        if cmd == "end_explore":
+            if self._on_stop:
+                self._on_stop()                       # closes the session; the voice service comes back
+            return self._reply("Okay, ending exploration mode.")
         if cmd == "shutdown":
             if self._on_stop:
                 self._on_stop()

@@ -134,3 +134,20 @@ def test_a_run_can_be_excluded_by_a_part_of_its_name_and_the_log_is_kept(on):
     assert "excluded" not in json.load(open(b.csv_path[:-4] + ".json"))               # the neighbour is untouched
     assert autolog.exclude_run("policy_walk", "too vague") is None                       # two matches: refuses to guess
     assert autolog.exclude_run("999999", "no such run") is None
+
+
+def test_labels_sit_beside_the_run_and_a_machine_labeller_can_be_re_run(on):
+    from pi_pipeline.telemetry import labels
+    r = autolog.new_run("policy_walk", now=datetime(2026, 10, 7, 14, 44, 33).timestamp())
+    raw_before = open(r.csv_path[:-4] + ".json").read()
+    assert labels.add_labels("144433", [{"tag": "snag_candidate", "t0": 3.2, "t1": 3.6, "confidence": 0.6}], by="claude", method="signature-v1", version="1", root=on) == "policy_walk_144433"
+    assert labels.add_labels("144433", [{"tag": "snag_candidate", "t0": 5.0, "t1": 5.4, "confidence": 0.7}], by="claude", method="signature-v1", version="2", root=on)    # a re-run replaces its own earlier labels
+    assert labels.add_labels("144433", [{"tag": "fall", "note": "hit the fridge"}], by="user", method="manual", root=on)
+    got = labels.read_labels("144433", on)
+    assert [(x["tag"], x["by"]) for x in got] == [("snag_candidate", "claude"), ("fall", "user")] and got[0]["t0"] == 5.0
+    assert open(r.csv_path[:-4] + ".json").read() == raw_before                          # the sidecar (and the raw log) are untouched
+    assert labels.summary(on) == {"snag_candidate": 1, "fall": 1}
+    import pytest
+    with pytest.raises(ValueError):
+        labels.add_labels("144433", [{"tag": "made_up"}], by="user", method="manual", root=on)
+    assert labels.add_labels("999999", [{"tag": "fall"}], by="user", method="manual", root=on) is None

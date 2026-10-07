@@ -350,6 +350,14 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd == "end_explore":
+            log.info("end exploration mode (voice): not exploring in this service")
+            self._events(disarm_explore=True)
+            self._cue.set("speaking")
+            self._speak("Okay, no exploring.")
+            self._set_session()
+            self._cue.set("idle")
+            return
         if cmd == "unexplore":
             log.info("explore disarmed (voice)")
             self._events(disarm_explore=True)

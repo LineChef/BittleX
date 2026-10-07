@@ -36,3 +36,37 @@ def test_exploration_roams_by_default_and_stationary_is_the_opt_in():
     assert E.parse_args([]).arm_on_start is True                       # default: roam at once (Tier 1)
     assert E.parse_args(["--stationary"]).arm_on_start is False        # opt-in: stay put until `arm`
     assert E.parse_args(["--stationary", "--arm-on-start"]).arm_on_start is True
+
+
+def test_a_roam_bout_is_not_cut_off_by_the_behavior_layers_own_caps():
+    """On 2026-10-07 G2 stopped walking after exactly 90 s of roaming: the mode controller's own cap on one armed bout ended it, and he fell back to looking around, sitting and resting."""
+    import random
+    from pi_pipeline import explore_session as E
+    from pi_pipeline.behavior import BehaviorDriver, DriverInputs, Mode
+    from pi_pipeline.personality.traits import BehaviorParams
+
+    class Clk:
+        t = 1000.0
+
+        def __call__(self):
+            return self.t
+
+    def mode_after(seconds, limits):
+        c = Clk()
+        d = BehaviorDriver(BehaviorParams(), clock=c, rng=random.Random(0))
+        c.t += 11
+        if limits:
+            E.apply_roam_limits(d, 600.0)
+        d.tick(DriverInputs(arm_explore=True, frame=[]))
+        end = c.t + seconds
+        while c.t < end:
+            d.tick(DriverInputs(frame=[]))
+            c.t += 0.5
+        return d.mode.mode
+
+    assert mode_after(100.0, limits=False) is not Mode.EXPLORE          # the default: the bout is over after 90 s
+    assert mode_after(100.0, limits=True) is Mode.EXPLORE               # with the session's limits it keeps roaming
+    c = Clk()
+    d = BehaviorDriver(BehaviorParams(), clock=c, rng=random.Random(0))
+    E.apply_roam_limits(d, 0.0)
+    assert d.mode.cfg.explore_max_secs > 1e6 and d.explorer.cfg.max_legs > 10 ** 6
