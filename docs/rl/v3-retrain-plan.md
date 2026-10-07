@@ -10,6 +10,8 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 
 ## 0. Where to resume (state at ~2:30 PM ET, 2026-10-06)
 
+> **TODO next time G2 is online after charging (2026-10-06 evening):** redo the three-point steering check on a FULL pack before any more heading-hold tuning: fixed stride difference u = 0, -0.20, -0.28 (corrected sign, joints clamped by `heading_hold.JOINT_RANGE_DEG`), `g2_baseline.sh start 12 recheck --const-u=0,-0.20,-0.28`, user watches and reports left / right / straight per run. The right drift at u = 0 grew from +44 to +178 deg per 12.5 s as the resting pack voltage fell from 8.20 to 7.93 V, so everything tuned below about 8.0 V is suspect. Also confirm the yaw log matches what is seen (the end-of-run yaw jumps if G2 is picked up).
+
 **New result (2:55 PM): the replaced FL shoulder servo removed most of the drift** (about +142 -> +40 deg per 12.7 s; the interleaved yaw-sign test showed the sign
 fix is not the cause: NEW +42 vs OLD +37). Record: [`real-walk-log.md`](real-walk-log.md) "After replacing the front-left shoulder servo". Consequences: (1) the real
 post-swap baseline (heading +40 +- 27 deg, roll std ~5.0, pitch ~2.5, distance ~4 ft 10 in) is now the calibration target, not the broken-servo walks; (2) a stuck servo is a
