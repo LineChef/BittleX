@@ -114,3 +114,30 @@ def test_a_walk_that_ends_in_a_fall_calls_the_fall_handler_and_other_endings_do_
         while w.busy and time.time() < deadline:
             time.sleep(0.01)
         assert len(fell) == expect, reason
+
+
+def test_policy_walker_passes_the_foot_hold_and_respects_off(monkeypatch):
+    import time
+    from pi_pipeline.gait.policy_walker import PolicyWalker, default_foot_hold
+    seen = []
+
+    def fake_run(lk, cmd, seconds, hz, fmt, dis, **kw):
+        seen.append(kw.get("foot_hold", "absent"))
+        return "complete"
+
+    def legacy_run(lk, cmd, seconds, hz, fmt, dis, stop_event=None, in_service=False, on_battery=None):
+        seen.append("legacy")
+        return "complete"
+
+    monkeypatch.delenv("G2_FOOT_HOLD", raising=False)
+    assert default_foot_hold() == "fl"
+    for fn, hold in ((fake_run, "env"), (fake_run, None), (legacy_run, "env")):
+        w = PolicyWalker(object(), run_fn=fn, foot_hold=hold)
+        w.walk(1)
+        for _ in range(100):
+            if not w.busy:
+                break
+            time.sleep(0.01)
+    assert seen == ["fl", "absent", "legacy"]
+    monkeypatch.setenv("G2_FOOT_HOLD", "off")
+    assert default_foot_hold() is None

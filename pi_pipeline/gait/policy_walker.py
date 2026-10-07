@@ -10,7 +10,9 @@ firmware tokens.
 """
 from __future__ import annotations
 
+import inspect
 import logging
+import os
 import threading
 
 log = logging.getLogger("g2.policy_walker")
@@ -19,12 +21,20 @@ DEFAULT_CMD_FWD = 0.10        # m/s, the speed the policy has been walked at on 
 MAX_SECONDS = 120.0           # a walk with no stated length still ends
 
 
+def default_foot_hold() -> str | None:
+    """Which foot the everyday walks steer with: `G2_FOOT_HOLD` (default `fl`, the front-left foot, which turned G2 on the real robot 2026-10-07: a closed-loop hold kept V2.1 within
+    13-21 deg of its starting heading over 10 ft against +148 deg without). `off` / `none` / empty turns it off."""
+    v = os.environ.get("G2_FOOT_HOLD", "fl").strip().lower()
+    return None if v in ("", "off", "none", "0", "false") else v
+
+
 class _Stop(threading.Event):
     rest = True
 
 
 class PolicyWalker:
-    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None):
+    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env"):
+        self._foot_hold = default_foot_hold() if foot_hold == "env" else foot_hold
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
         self._on_battery = on_battery            # called with (level, volts) on a low reading while walking
         self._on_fall = on_fall                  # called when a walk ended because G2 fell (the exploration halts instead of walking on, 2026-10-07)
@@ -45,8 +55,13 @@ class PolicyWalker:
                 from .residual_policy import CONTROL_HZ
             else:
                 CONTROL_HZ = 80
+            extra = {}
+            if self._foot_hold:                       # a stand-in run_fn without the keyword (older tests) is called as before
+                params = inspect.signature(run).parameters
+                if "foot_hold" in params or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+                    extra["foot_hold"] = self._foot_hold
             reason = run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
-                         on_battery=self._on_battery)
+                         on_battery=self._on_battery, **extra)
             if reason == "fall" and self._on_fall is not None:
                 try:
                     self._on_fall()
