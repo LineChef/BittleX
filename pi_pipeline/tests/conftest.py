@@ -91,3 +91,9 @@ def _no_shutter_sound(monkeypatch):
 def _no_autolog(monkeypatch, tmp_path_factory):
     """Tests never write automatic run logs into the real ~/g2_runs/auto (the autolog tests turn it on and point it at a temp folder)."""
     monkeypatch.setenv("G2_AUTOLOG", "off")
+
+
+@pytest.fixture(autouse=True)
+def _no_detection_log(monkeypatch):
+    """Tests never write detection logs into the real ~/g2_runs/detections."""
+    monkeypatch.setenv("G2_DETECTION_LOG", "off")

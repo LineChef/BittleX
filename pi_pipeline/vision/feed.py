@@ -138,6 +138,7 @@ class SerialDetectionFeed:
         auto_start: bool = True,
         sensor_opt: int | None = None,   # 0=240 1=480 2=640x480; None = leave as-is
         ae_bump: int = 0,               # 0 = off; ~0x20 helps a dim room, over-exposes a bright one
+        detection_filter=None,          # frame -> frame, applied to every frame the feed yields (vision/detection_filter.py)
         snapshot_sensor_opt: int | None = 0,   # pictures are taken at this capture option (0 = 240 x 240), then detection goes back to `sensor_opt`; None = no switch
     ):
         import serial
@@ -149,6 +150,7 @@ class SerialDetectionFeed:
         self._labels = labels or []
         self._min_score = min_score
         self._sensor_opt, self._ae_bump, self._snap_opt = sensor_opt, ae_bump, snapshot_sensor_opt
+        self._filter = detection_filter
         self._t = 0.0
         if auto_start:
             time.sleep(2.5)              # let the module boot (port open resets it)
@@ -212,6 +214,8 @@ class SerialDetectionFeed:
                     ))
                 except (ValueError, TypeError):
                     continue
+            if self._filter is not None:
+                frame = self._filter(frame)
             yield frame
 
     def snapshot(self, timeout_s: float = 6.0):

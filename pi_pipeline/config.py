@@ -286,6 +286,11 @@ class Settings:
     # drop detections scoring below this (0-100). Raise if a model over-
     # fires (e.g. a single-class model trained without negatives). 0 = off.
     vision_min_score: int = field(default_factory=lambda: _env_int("VISION_MIN_SCORE", 0))
+    # fewer false cats and dogs (vision/detection_filter.py): animal classes need this score, a plausible box shape and this many frames in a row. Other classes pass untouched.
+    vision_animal_filter: str = field(default_factory=lambda: _env("VISION_ANIMAL_FILTER", "on"))
+    vision_animal_labels: str = field(default_factory=lambda: _env("VISION_ANIMAL_LABELS", "cat,dog"))
+    vision_animal_min_score: int = field(default_factory=lambda: _env_int("VISION_ANIMAL_MIN_SCORE", 60))
+    vision_animal_confirm_frames: int = field(default_factory=lambda: _env_int("VISION_ANIMAL_CONFIRM_FRAMES", 3))
     vision_labels: list[str] = field(default_factory=lambda: [
         s.strip() for s in _env("VISION_LABELS").split(",") if s.strip()
     ])  # deployed model's class names, in id order; empty -> "obj<id>"

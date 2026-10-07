@@ -77,13 +77,18 @@ def _make_vision_source():
     degrades to "no vision" rather than stopping the app.
     """
     from ..vision.feed import BackgroundFrameSource, SerialDetectionFeed
+    animal_filter = None
+    if settings.vision_animal_filter.strip().lower() not in ("off", "0", "false", "no"):
+        from ..vision.detection_filter import AnimalDetectionFilter, DetectionLog
+        animal_filter = AnimalDetectionFilter.from_settings(settings, on_event=DetectionLog())
     try:
         feed = SerialDetectionFeed(
             settings.vision_serial_port, settings.vision_serial_baud,
             frame_px=settings.vision_frame_px, labels=settings.vision_labels,
             min_score=settings.vision_min_score,
             sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump,
-            snapshot_sensor_opt=None if settings.vision_snapshot_sensor_opt < 0 else settings.vision_snapshot_sensor_opt)
+            snapshot_sensor_opt=None if settings.vision_snapshot_sensor_opt < 0 else settings.vision_snapshot_sensor_opt,
+            detection_filter=animal_filter)
     except Exception:  # noqa: BLE001
         log.exception("vision feed unavailable on %s -- continuing without vision",
                       settings.vision_serial_port)
