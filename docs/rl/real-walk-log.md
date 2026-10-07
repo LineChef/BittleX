@@ -461,3 +461,16 @@ right-positive:
   about this lever's direction is wrong for the real G2.
 - **Open:** the sim's steering sign is opposite to the real one. Until that is understood (a left/right leg mapping in the sim, or foot slip), do not use the sim to tune
   anything that steers by stride length.
+
+### Dial-in round 1: fixed stride difference near the cancel point (2026-10-06 8:16-8:25 PM, corrected sign: u < 0 = longer RIGHT strides = a left turn)
+
+`g2_baseline.sh start 12 dial1 --const-u=-0.10,-0.15,-0.20` (no feedback; raw logs `v3-data/dial1/`), heading change over 12.5 s, right-positive:
+
+| u | n | Mean | Sd | Runs (in run order) |
+|---|---|---|---|---|
+| -0.10 | 4 | +64 deg | 18 | 43, 62, 59, 93 |
+| -0.15 | 4 | +11 deg | 24 | -19, -5, 33, 37 |
+| -0.20 | 4 | +1 deg | 11 | -9, -7, 19, 3 |
+
+Straight walking needs u of about -0.19 (linear interpolation), at the old +-0.20 limit, so there is no headroom: the drift crept up through the series (within each u the later
+runs turn further right, about +30 deg over ten minutes), which a fixed offset cannot follow. The feedback needs more authority than +-0.20 (untested beyond it).
