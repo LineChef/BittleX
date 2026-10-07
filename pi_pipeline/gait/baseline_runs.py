@@ -33,6 +33,8 @@ def main() -> None:
     ap.add_argument("--const-u", default=None,
                     help="comma list of fixed stride differences, e.g. -0.2,0,0.2: run k uses the list walked forward then backward (a b c c b a ...), no feedback")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
+    ap.add_argument("--scripted-mix", default=None, choices=("abab",),
+                    help="abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
     args = ap.parse_args()
 
     from pi_pipeline.config import settings
@@ -73,6 +75,24 @@ def main() -> None:
                             + ("" if hold is None else f"_hold{'ON' if hold else 'OFF'}")
                             + ("" if cu is None else f"_u{cu:+.2f}") + ".csv")
         child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
+        scripted = args.scripted_mix == "abab" and k % 2 == 1
+        if args.scripted_mix:
+            path = path.replace(".csv", "_wkF.csv" if scripted else "_V21.csv")
+        if scripted:                     # the scripted wkF walk, no policy: the base the learned policy corrects (run_gait --openloop)
+            rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--openloop", "--cycles", "10", "--ramp-cycles", "1",
+                                  "--openloop-balance-off", "--log", path], env=child_env)
+            logs.append(path)
+            print(f"run {k}: exit {rc} (scripted wkF) -> {path}", flush=True)
+            if k < args.runs:
+                tts.speak("Run finished. Please put me back at the start of the lane.")
+                t0 = time.time()
+                while time.time() - t0 < args.reset_s and not os.path.exists(skip):
+                    time.sleep(0.5)
+                try:
+                    os.remove(skip)
+                except OSError:
+                    pass
+            continue
         rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--cmd", str(args.cmd), "--seconds", str(args.seconds),
                               "--log", path] + (["--heading-hold"] if hold else [])
                               + (["--hold-ff", str(args.hold_ff)] if hold and args.hold_ff is not None else [])
