@@ -42,13 +42,16 @@ def run(lk, seconds, log_path=None, stand=False, gyro_cal=False, *, sleep=time.s
     def tx(cmd):
         lk.send(cmd, read_reply=False, settle=0.0)
 
-    tx("gb")                                   # firmware balance OFF: nothing should move
-    sleep(0.3)
     if stand:
-        tx("kbalance")
+        tx("kbalance")                         # stand first: the kbalance skill can switch the firmware balance back on,
+        sleep(3.0)
+        tx("gb")                               # so turn it OFF afterwards (as the voice service does): nothing should move
+        sleep(1.5)
     else:
+        tx("gb")                               # firmware balance OFF
+        sleep(0.3)
         tx("d")
-    sleep(3.0)
+        sleep(3.0)
     if gyro_cal:
         tx("gc")
         sleep(4.0)

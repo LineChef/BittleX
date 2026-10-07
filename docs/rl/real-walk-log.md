@@ -419,6 +419,20 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 - Both walks drift more as the session goes on (scripted +2.7 deg/s in the first run, +7 to +8 in runs 7-11; V2.1 +5 to +12): something that changes over time (servo temperature, pack voltage 7.96 V at the start, wear in) moves the drift by a factor of 2-3 within 15 minutes.
 - Roll swing: scripted 4.3 deg sd, V2.1 5.6.
 
+### IMU after the gyro calibration (2026-10-07, about 9:30 AM)
+
+`gc` run through the Pi with G2 standing level and untouched (`yaw_drift_check.py`, raw logs in `real-walk-data/2026-10-07/imu/`). Firmware balance off for every reading.
+
+| | before `gc` | after `gc` |
+|---|---|---|
+| yaw drift at rest, 60 s | +0.14 deg/s (scatter 0.3 deg) | 0.000 deg/s (scatter 0.05 deg) |
+| rest pose mean roll / pitch | +0.59 / -1.22 deg | +0.24 / +1.69 deg |
+| standing (`kbalance`, then `gb`), 40 s, 185 frames | not measured | roll -0.69 deg, pitch -0.07 deg (zero error); sd 0.09 / 0.08 deg; yaw 0.00 deg/s |
+| IMU frame interval | | median 0.202 s (4.96 Hz) |
+
+- A first standing run read pitch sd 5.5 deg and a -4 deg mean: the user rested G2 during it; discarded. The standing order matters: `kbalance` can switch the firmware balance back on, so `gb` goes after it (`yaw_drift_check.py --stand` does that now).
+- Sim settings set from this: IMU roll/pitch zero error +-0.7 deg (was +-2), IMU noise 0.001 in the quaternion (was 0.02; the real sensor noise is about 0.09 deg = 0.0008), hold 16 steps unchanged (5 Hz). Everything not yet run uses them; earlier runs and the replicate set in the queue keep the old values (`g2_profile.IMU_WORLD_A`).
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.

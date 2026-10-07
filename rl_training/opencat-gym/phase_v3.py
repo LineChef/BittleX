@@ -29,7 +29,7 @@ QUEUE = "trained/v3_queue.json"
 RESULTS = "trained/v3_results.json"
 REF = "trained/v3_ref_v21.json"
 V21 = "trained/Release_CandidateV2.1_ppo"
-CONTROL = "v3_w2_c0"          # the control in the current world (case2 payload, 2026-10-07); the first world's control was "v3_c0" (C0)
+CONTROL = "v3_w3_c0"          # the control in the current world (case2 payload and the measured IMU, 2026-10-07); earlier controls: "v3_c0" (C0), "v3_w2_c0" (case2 payload, old IMU)
 K3 = "v3_k3"
 SCORE_JOBS = 8
 SCORE_JOBS_BUSY = 2
@@ -99,12 +99,12 @@ def policy_levers(levers):
     return tuple(l for l in levers if l == "heading_obs")
 
 
-def score(policy_path, levers, spec=None, busy=False, ladder=False, ladder_levers=()):
+def score(policy_path, levers, spec=None, busy=False, ladder=False, ladder_levers=(), extra_env=None):
     import benchmark_v4
     saved = dict(os.environ)                      # benchmark_v4.run puts the scoring profile in os.environ: keep it out of later training launches
     try:
         return benchmark_v4.run(policy_path, spec or SPEC, EPISODES, 1000, SCORE_JOBS_BUSY if busy else SCORE_JOBS, None,
-                                policy_levers(levers), None, mirror_gap=True, quiet=True, ladder=ladder, ladder_levers=tuple(ladder_levers))
+                                policy_levers(levers), None, mirror_gap=True, quiet=True, extra_env=extra_env, ladder=ladder, ladder_levers=tuple(ladder_levers))
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -203,7 +203,7 @@ def finish(job, results, ctrl_res):
         log(f"{tag} HALT: {reason}")
         return False
     levers = job.get("levers", [])
-    res = score(f"trained/{tag}_ppo", levers)
+    res = score(f"trained/{tag}_ppo", levers, extra_env={k: v for k, v in (job.get("extra") or {}).items() if k != "G2E_SEED"})   # a job pinned to an older world is scored in it
     reached = ""
     try:                                              # the difficulty levels the curriculum had reached when the run ended (last probe line)
         probes = [l for l in open(f"trained/{tag}_console.log") if l.startswith("[probe]")]

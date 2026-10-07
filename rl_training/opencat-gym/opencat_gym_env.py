@@ -845,6 +845,7 @@ MOTOR_FORCE = _g2e("MOTOR_FORCE", 0.2)
 SERVO_KP = _g2e("SERVO_KP", 0.0)
 SERVO_KD = _g2e("SERVO_KD", 0.0)
 IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU mount / calibration tilt
+RANDOM_GYRO         = _g2e("RANDOM_GYRO", RANDOM_GYRO)                # 2026-10-07: settable from the profile (g2_profile.RECIPE) so it can match the measured IMU noise
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
 # --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------

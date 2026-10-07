@@ -26,7 +26,10 @@ RECIPE = {
     # Runs started before 2026-10-07 used the old split ("case", scale 1.12: 301 g base + 121 g payload); see docs/rl/v3-decisions-log.md.
     "G2E_BODY_MASS_SCALE": "0.944", "G2E_PAYLOAD_PROFILE": "case2",
     # calibration error and mount tilt seen at bring-up
-    "G2E_IMU_BIAS_DEG": "2", "G2E_JOINT_OFFSET_DEG": "2",
+    # IMU, measured 2026-10-07 after the firmware gyro calibration (`gc`), G2 standing still with the firmware balance off (docs/rl/real-walk-log.md "IMU after the gyro calibration"):
+    # roll zero error -0.69 deg, pitch -0.07 deg, noise sd 0.09 / 0.08 deg (so about 0.0008 in the quaternion), yaw drift 0.000 deg/s at rest, frames every 0.20 s (5 Hz: IMU_HOLD_STEPS 16).
+    # Before that: bias +-2 deg, quaternion noise 0.02 (IMU_WORLD_A below). The joint offset is the servo calibration, unchanged.
+    "G2E_IMU_BIAS_DEG": "0.7", "G2E_RANDOM_GYRO": "0.001", "G2E_JOINT_OFFSET_DEG": "2",
     "G2E_SERVO_RATE_LIMIT_DEG_S": "137",       # borrowed from another project; Phase 0 step 4 measures G2's (backlog H13)
     "G2E_SLOPE_TARGET_PROB": "0.3",
     # validated reward tuning (V2 -> V2.1): yaw tracking 9, residual smoothing 10.5
@@ -52,6 +55,9 @@ RECIPE = {
     "G2E_LEVEL_CAP_BY_TIME": "1", "G2E_LEVEL_MIN_BASELINE": "0.5", "G2E_LEVEL_COLLAPSE_BASELINE": "0.35",
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "12", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
+
+# the IMU settings every run before 2026-10-07 (about 9:30 AM) used; queue jobs that must stay in that world set them through their "extra"
+IMU_WORLD_A = {"G2E_IMU_BIAS_DEG": "2", "G2E_RANDOM_GYRO": "0.02"}
 
 # --- Phase 1 output: parameters fitted so the sim matches the real walks. Empty until Phase 1 runs. ---
 CALIBRATION: dict[str, str] = {
