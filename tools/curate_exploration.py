@@ -6,7 +6,7 @@ Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `
 
   1. scores every picture: brightness, contrast, sharpness, clipped highlights / shadows;
   2. sets aside every picture with a person in it (user, 2026-10-07; not curated, not copied, listed in the manifest only), in layers: the camera's own detector, an outside person model (tools/person_filter.py, until the on-camera
-     model is trained), anything taken within 2 minutes of such a picture (legs and backs the models miss), and pictures marked "Person" by hand on the g2pics page (`people.json`);
+     model is trained), and pictures flagged "Person" by hand on the g2pics page (`people.json`; legs and backs the models miss are caught this way; there is deliberately no time-window rule, so clean pictures of the place are not lost);
   3. rejects survey pictures that are too dark, blown out, blurry, flat or truncated (the camera module cut the JPEG short, so the lower part is gray); named pictures are never rejected for quality, only flagged "weak";
   4. removes near-duplicates (256-bit average hash; 12 bits within one survey pose, 3 bits within one name), keeping the best-scoring picture of each cluster;
   5. writes `keep/` (same folder layout), `rejects/<reason>/`, a contact sheet per group (green = kept, orange = weak; the camera's own boxes are drawn),
@@ -52,7 +52,6 @@ class Config:
     person_detector: object = None     # callable(PIL image) -> best person score 0..1 (tools/person_filter.PersonDetector.best_score); None = the camera's own detections only
     person_threshold: float = 0.25     # eager on purpose: leaving a picture out costs little, keeping a person in the object library costs more
     object_detector: object = None     # callable(PIL image) -> [(class name, score, box)] (tools/person_filter.PersonDetector.objects): category hints and crop boxes for the kept pictures, never labels
-    person_window_s: float = 120.0     # pictures taken this close in time to a picture with a person are set aside too (legs and backs the models miss)
     named_min_keep: int = 5            # fewer kept pictures than this for a name gets a hint
     thumb: int = 150
     cols: int = 6
@@ -182,7 +181,7 @@ def _taken_epoch(p: Pic) -> float | None:
 
 
 def _person_reason(p: Pic, c: Config, marks: set) -> str:
-    """Layer 1: marked by hand, the camera's own detector, the outside person model."""
+    """Why this picture counts as having a person in it: marked by hand, the camera's own detector, or the outside person model ('' = none found)."""
     if p.rel in marks:
         return "marked as a person by hand"
     if _has_person(p, c):
@@ -196,22 +195,6 @@ def _person_reason(p: Pic, c: Config, marks: set) -> str:
         if p.person_score >= c.person_threshold:
             return f"person model found a person ({p.person_score:.2f})"
     return ""
-
-
-def _spread_person_flags(pics: list[Pic], c: Config) -> None:
-    """Layer 2: a picture taken within `person_window_s` of one with a person is set aside too, which catches the legs and backs that neither model sees."""
-    flagged = [(t, p) for p in pics if p.person_why and (t := _taken_epoch(p)) is not None]
-    if not flagged:
-        return
-    for p in pics:
-        if p.person_why:
-            continue
-        t = _taken_epoch(p)
-        if t is None:
-            continue
-        near = min(flagged, key=lambda tp: abs(tp[0] - t))
-        if abs(near[0] - t) <= c.person_window_s:
-            p.person_why = f"taken within {c.person_window_s:.0f} s of a picture with a person"
 
 
 def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = True) -> dict:
@@ -230,7 +213,6 @@ def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = 
             p.quality = round(p.quality * 0.5, 4)
         p.person_why = _person_reason(p, c, marks)
         measured.append(p)
-    _spread_person_flags(measured, c)
     for p in measured:
         if p.person_why:
             p.status, p.reason = "people", p.person_why
@@ -405,7 +387,6 @@ def main(argv=None) -> int:
     ap.add_argument("--person-model", default=os.path.expanduser("~/g2_data/models/yolox_s.onnx"), help="outside person model (ONNX) used until the on-camera model is trained; skipped if the file is missing")
     ap.add_argument("--no-person-model", action="store_true")
     ap.add_argument("--no-object-hints", action="store_true", help="skip the outside model's object class hints and boxes on the kept pictures")
-    ap.add_argument("--person-window-s", type=float, default=Config.person_window_s)
     ap.add_argument("--non-person-labels", default=",".join(Config.non_person_labels),
                     help="detection labels that do not make a picture a people picture (comma separated; any other detection does)")
     a = ap.parse_args(argv)
@@ -428,7 +409,6 @@ def main(argv=None) -> int:
                 print(f"person model not usable ({e}); using the camera's detections and hand marks only")
         else:
             print(f"no person model at {a.person_model}; using the camera's detections and hand marks only")
-    c.person_window_s = a.person_window_s
     m = curate(in_dir, out_dir, c)
     print(summary_text(m))
     print(f"written to {out_dir}  (keep/, rejects/, contact/, manifest.json, summary.txt)")
