@@ -24,6 +24,12 @@ STANCE_DEG = 50.0                       # the shoulder / hip stance angle the sw
 LEFT_JOINTS = (0, 6)                    # URDF order: 0 FLsh 1 FLel 2 FRsh 3 FRel 4 BRhip 5 BRkn 6 BLhip 7 BLkn
 RIGHT_JOINTS = (2, 4)
 
+# Largest / smallest target (degrees) a scaled joint may be sent: the range the UNSCALED V2.1 walk uses on that joint (logged on G2) plus a margin. Stretching the right
+# strides by 25-38% took the back-right hip to 86 deg (unscaled max 75) and the front-right shoulder to -5 / 91; at that reach the leg lies parallel to the floor and G2
+# lands on the leg instead of the foot (seen on G2, 2026-10-06, close to a fall). The stable runs (u = -0.20) reached 80-85 deg at the hip / shoulder.
+JOINT_MARGIN_DEG = 6.0
+JOINT_RANGE_DEG = {0: (11, 74), 2: (11, 80), 4: (22, 75), 6: (28, 85)}      # FL shoulder, FR shoulder, BR hip, BL hip: unscaled min / max
+
 KP = 0.02                               # u per degree of heading error
 KI = 0.004                              # u per degree-second of accumulated error
 U_MAX = 0.20                            # largest stride difference (fraction): cancels up to ~2.4 deg/s of steady drift (G2's is ~+3 deg/s on average)
@@ -74,4 +80,7 @@ def apply_stride_difference(joint_deg, u: float):
         out[j] = STANCE_DEG + (1.0 + u) * (out[j] - STANCE_DEG)
     for j in RIGHT_JOINTS:
         out[j] = STANCE_DEG + (1.0 - u) * (out[j] - STANCE_DEG)
+    for j in LEFT_JOINTS + RIGHT_JOINTS:                                  # never past the reach the walk itself uses (see JOINT_RANGE_DEG)
+        lo, hi = JOINT_RANGE_DEG[j]
+        out[j] = max(lo - JOINT_MARGIN_DEG, min(hi + JOINT_MARGIN_DEG, out[j]))
     return [int(round(v)) for v in out]

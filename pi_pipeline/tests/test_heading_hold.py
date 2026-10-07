@@ -95,3 +95,12 @@ def test_integral_contribution_is_clamped():
     for _ in range(8000):
         c.update(math.radians(10.0), 0.0125, active=True)                          # a long steady rightward error
     assert abs(c.ki * c.integral) <= 0.05 + 1e-9
+
+
+def test_scaled_joints_never_leave_the_reach_the_walk_uses():
+    swing = [11, 0, 80, 0, 75, 0, 85, 0]                       # the unscaled extremes of the four swing joints
+    out = hh.apply_stride_difference(swing, -0.38)              # right strides 38% longer
+    assert out[4] <= 75 + hh.JOINT_MARGIN_DEG and out[2] <= 80 + hh.JOINT_MARGIN_DEG    # the back-right hip / front-right shoulder stay off the floor
+    low = hh.apply_stride_difference([11, 0, 11, 0, 22, 0, 28, 0], -0.38)
+    assert low[2] >= 11 - hh.JOINT_MARGIN_DEG and low[4] >= 22 - hh.JOINT_MARGIN_DEG
+    assert hh.apply_stride_difference([50, 0, 50, 0, 50, 0, 50, 0], -0.38) == [50, 0, 50, 0, 50, 0, 50, 0]    # stance unchanged
