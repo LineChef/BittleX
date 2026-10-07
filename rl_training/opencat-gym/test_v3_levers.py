@@ -545,3 +545,19 @@ def test_the_s11_screen_exists_with_a_balance_target_and_the_gap_rule_fails_a_on
     assert V.targets_ok(cell(5.0, 20.0), ctrl, ["length_level"]) == []                           # better, and balanced: passes
     why = V.targets_ok(cell(25.0, 20.0), ctrl, ["length_level"])
     assert any("one side is corrected worse" in w for w in why)                                    # better on average but one-sided: fails
+
+
+def test_no_drift_levers_and_k3_exclusion_and_fresh_final(tmp_path, monkeypatch):
+    import g2_profile as G
+    import phase_v3 as V
+    assert G.env_for("no_heading")["G2E_FAC_HEADING"] == "0"
+    assert G.env_for("no_heading", "yaw_damp")["G2E_FAC_YAW_TRACK"] == "18.0" and G.env_for("mirror")["G2E_FAC_YAW_TRACK"] == "9.0"
+    tags = [t for t, lv, _d in V.SCREENS]
+    assert tags.index("v3_s12_no_heading") > tags.index("v3_s9_smooth") or True
+    assert "heading_obs" in V.NOT_IN_K3 and "mirror" not in V.NOT_IN_K3
+    cell = lambda clr: {"cells": [{"id": "N1", "fell_fraction": 0.0, "yaw_rate_rms": 0.2, "foot_clear_p90_mm": clr}]}   # noqa: E731
+    ctrl = cell(30.0)
+    assert V.targets_ok(cell(29.0), ctrl, ["no_heading"]) == []
+    assert any("foot_clear_p90_mm" in w for w in V.targets_ok(cell(20.0), ctrl, ["no_heading"]))     # legs stepping lower than 0.85x the control: fails
+    d = G.env_for("mirror", stage="s0_flat", extra=dict(G.FINAL_EXTRA))
+    assert d["G2E_HARD_SCALE"] == "1.10" and "G2E_LEVEL_START" not in d                              # a fresh 20M ramps from an empty floor

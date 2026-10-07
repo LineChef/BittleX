@@ -139,7 +139,7 @@ def cost(row, default_eps):
 # ------------------------------------------------------------------------------------------------ metrics
 def v4_metrics(eps_list):
     """eps_list: [(rec, per_term, steps, fell, recovered)] from benchmark_gaits._bench."""
-    heads, speeds, early, late, roll_s, pitch_s, jm, over, yrms, falls = [], [], [], [], [], [], [], [], [], []
+    heads, speeds, early, late, roll_s, pitch_s, jm, over, yrms, falls, clear = [], [], [], [], [], [], [], [], [], [], []
     for rec, pt, steps, fell, _ in eps_list:
         x = np.array(rec["x"])
         yaw = np.unwrap(np.array(rec["yaw"]))
@@ -153,6 +153,8 @@ def v4_metrics(eps_list):
         jm.append(np.degrees(np.mean(np.array(rec["joint"]), axis=0)))
         over.append(float(np.mean(pt.get("servo_over", [0.0]))))
         yrms.append(float(np.sqrt(np.mean(np.square(rec["yaw_rate"])))))
+        if rec.get("foot_z"):                    # swing clearance: the 90th percentile of each paw's height over the episode, mm, averaged over the four paws (a lever must not lower it)
+            clear.append(float(np.mean([np.percentile(np.array(fz), 90) for fz in rec["foot_z"] if len(fz)])) * 1000.0)
         tilt = np.maximum(np.abs(rec["roll"]), np.abs(rec["pitch"]))
         falls.append(bool(tilt.max() > 1.3))
     jm = np.mean(np.array(jm), axis=0)
@@ -169,6 +171,7 @@ def v4_metrics(eps_list):
         yaw_rate_rms=float(np.mean(yrms)), roll_std_deg=float(np.mean(roll_s)), pitch_std_deg=float(np.mean(pitch_s)),
         lr_asym_deg=dict(zip(PAIR_NAMES, asym)), lr_asym_max_deg=float(np.max(np.abs(asym))),
         servo_over_frac=float(np.mean(over)),
+        foot_clear_p90_mm=float(np.mean(clear)) if clear else 0.0,
         joint_mean_deg=[float(v) for v in jm],
     )
 

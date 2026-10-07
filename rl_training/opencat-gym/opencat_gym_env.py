@@ -770,6 +770,7 @@ MOTOR_SCALE_RAND = _g2e("MOTOR_SCALE_RAND", 0.0)
 # R2 FAC_HEADING_B: >0 replaces the quadratic FAC_HEADING*err^2 with a bounded penalty B*(1 - exp(-(err/sigma)^2)), which is 20x steeper near
 #    straight (V2.1's calm heading term is only -0.006 per step against +20 of positive reward) and can't explode at large headings.
 FAC_HEADING_B = _g2e("FAC_HEADING_B", 0.0)
+FAC_HEADING = _g2e("FAC_HEADING", FAC_HEADING)       # V3 no-drift run: 0 removes the accumulated-heading penalty (the command-drift reward)
 HEADING_SIGMA_DEG = _g2e("HEADING_SIGMA_DEG", 10.0)
 # R3 FAC_SERVO_FEAS: penalty on commanded joint speed above SERVO_CEIL_DEG_S (speed over the last 3 control steps, matching the send-every-3
 #    cadence): mean over joints of ((speed - ceiling) / ceiling)^2. Also reported as info["servo_over"] (the fraction of joints over the ceiling).

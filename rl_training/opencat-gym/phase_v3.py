@@ -55,6 +55,8 @@ SCREENS = [
     ("v3_s8_balance_pbrs", ["balance_pbrs"], "R4 potential-based balance reward"),
     ("v3_s9_smooth", ["smooth"], "R5 activate the inert joint-smoothness terms"),
     ("v3_s10_touchdown", ["touchdown"], "R6 softer footfalls (only if Phase 1 reproduced G2's roll swing)"),
+    ("v3_s12_no_heading", ["no_heading"], "A: no command-drift training: the accumulated-heading penalty off (user, 2026-10-07)"),
+    ("v3_s13_no_heading_yaw_damp", ["no_heading", "yaw_damp"], "B: A plus doubled yaw-rate damping (FAC_YAW_TRACK 9 -> 18)"),
 ]
 
 # per lever: (cell, metric, how, factor) -- the round's own target. "lower": value <= factor * control's. "abs_lower" compares |value|.
@@ -70,8 +72,11 @@ TARGETS = {
     "balance_pbrs": [("T8.1", "fell_fraction", "lower", 1.0), ("T11.1", "fell_fraction", "lower", 1.0)],
     "smooth": [("N1", "yaw_rate_rms", "lower", 0.9)],
     "touchdown": [("N1", "roll_std_deg", "lower", 0.9)],
+    "no_heading": [("N1", "fell_fraction", "lower", 1.0), ("N1", "foot_clear_p90_mm", "higher", 0.85)],
+    "yaw_damp": [("N1", "yaw_rate_rms", "lower", 0.85), ("N1", "fell_fraction", "lower", 1.0), ("N1", "foot_clear_p90_mm", "higher", 0.85)],
 }
 YAW_LEVERS = ("mirror", "heading_obs", "heading_shape", "long_episodes", "turn", "faults", "length_level")      # K1: the levers aimed at straightness
+NOT_IN_K3 = ("heading_obs", "heading_shape", "long_episodes", "turn", "faults", "length_level")      # the command-drift levers (S2 passed its screen; it is still left out)
 SMOOTH_LEVERS = ("servo_feas", "balance_pbrs", "smooth", "touchdown")                          # K2: the levers aimed at smoothness / resilience
 DECISION_CELLS = ["T1.1", "N1", "N3", "N5", "T2.2", "T3.2", "T5.2", "T7.2", "T8.1", "T9.1", "T10.2", "T11.1"]
 
@@ -123,6 +128,17 @@ def with_extra_cells(ctrl, tag=None):
             ctrl = dict(ctrl, cells=ctrl["cells"] + [c for c in extra if c["id"] not in have])
         except (OSError, ValueError, KeyError):
             pass
+    clr = f"trained/{tag}_clr.json"        # the control's N1 re-scored later with the foot-clearance metric (benchmark_v4 --cells N1): fill in the keys its first scoring lacks
+    if ctrl is not None and os.path.exists(clr):
+        try:
+            extra = {c["id"]: c for c in json.load(open(clr))["cells"]}
+            cells = []
+            for c in ctrl["cells"]:
+                e = extra.get(c["id"])
+                cells.append(dict(c, **{k: v for k, v in e.items() if k not in c}) if e else c)
+            ctrl = dict(ctrl, cells=cells)
+        except (OSError, ValueError, KeyError):
+            pass
     return ctrl
 
 
@@ -159,6 +175,8 @@ def targets_ok(res, ctrl, levers):
             x, y = a[cid][key], b[cid][key]
             if how == "lower" and not (abs(x) if key.startswith("heading") else x) <= f * (abs(y) if key.startswith("heading") else y) + 1e-9:
                 why.append(f"{lv}: {cid}.{key} {x:.3g} not <= {f} x control's {y:.3g}")
+            if how == "higher" and not x >= f * y - 1e-9:
+                why.append(f"{lv}: {cid}.{key} {x:.3g} below {f} x control's {y:.3g}")
             if how == "higher_abs" and not abs(x) >= f:
                 why.append(f"{lv}: {cid}.{key} {x:.2f} below {f}")
             if how == "lower_abs_gap" and not x <= f:                       # an absolute limit (degrees), not relative to the control: the left and right pushes must end within this of each other
@@ -199,6 +217,9 @@ def train(job, results):
     if kind == "stage":
         env = g2_profile.env_for(*levers, stage=job["stage"], extra=job.get("extra"))
         steps, from_ckpt = job.get("steps", SCREEN_STEPS), f"trained/{job['from']}_ppo"
+    elif kind == "final" and job.get("fresh"):      # a fresh 20M of the K3 recipe (no stage chain, no continuation): the ramp difficulty levels start from empty and the hardest levels are +10%
+        env = g2_profile.env_for(*levers, stage="s0_flat", extra=dict(g2_profile.FINAL_EXTRA, **(job.get("extra") or {})))
+        steps, from_ckpt = "20e6", None
     elif kind == "final":
         env = g2_profile.env_for(*levers, stage=job["stage"], extra=job.get("extra"))
         steps, from_ckpt = "20e6", f"trained/{job['from']}_ppo"
@@ -366,7 +387,10 @@ def run_queue():
             log("v3_s10_touchdown SKIPPED: Phase 1 has not confirmed the sim reproduces G2's roll swing (touch trained/v3_roll_matched if it does)")
             continue
         if kind == "combo":
-            levers = [lv for r in results.values() if r.get("kind") == "screen" and r.get("passed") for lv in r["levers"]]
+            levers = []
+            for r in results.values():              # no command-drift training (user, 2026-10-07): a lever that trains heading-keeping never enters the combined recipe, even if its screen passed
+                if r.get("kind") == "screen" and r.get("passed"):
+                    levers += [lv for lv in r["levers"] if lv not in NOT_IN_K3 and lv not in levers]
             if not levers:
                 log("v3_k3 SKIPPED: no screening round passed")
                 return

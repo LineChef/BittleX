@@ -82,7 +82,10 @@ LEVERS = {
     "balance_pbrs": {"G2E_FAC_BALANCE_PBRS": "4.0"},                                           # R4
     "smooth": {"G2E_FAC_SMOOTH_1": "15", "G2E_FAC_SMOOTH_2": "15"},                            # R5 (revised: the old terms are inert)
     "length_level": {"G2E_LENGTH_LEVEL": "1"},                                                    # S11 (2026-10-07): the length difficulty level, with a balanced yaw push on every long episode; see opencat_gym_env LENGTH_LEVEL
-    "touchdown": {"G2E_FAC_TOUCHDOWN": "25"},                                                  # R6
+    "touchdown": {"G2E_FAC_TOUCHDOWN": "25"},
+    # 2026-10-07 (user): no command-drift training. no_heading drops the accumulated-heading penalty; yaw_damp doubles the yaw-rate damping (FAC_YAW_TRACK is a pure yaw-rate penalty while cmd_yaw is 0: 9 -> 18).
+    "no_heading": {"G2E_FAC_HEADING": "0"},
+    "yaw_damp": {"G2E_FAC_YAW_TRACK": "18.0"},                                                  # R6
 }
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
