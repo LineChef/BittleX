@@ -485,3 +485,49 @@ def test_openloop_restores_balance_before_rest_and_waits_so_the_board_gets_it(rg
     t_gB, t_d = lk.sent[-2][1], lk.sent[-1][1]
     assert t_d - t_gB >= 0.3 - 1e-9                      # the balance command has time to take effect before the rest
     assert lk.t - t_d >= 0.5 - 1e-9                      # and the rest has time to reach the board before the process exits
+
+
+# -------------------------------------------------------- the extra log columns (--log-extra)
+
+def test_accel_is_parsed_from_the_same_line_and_kept_on_the_feed(rg):
+    import imu_parse
+    assert imu_parse.parse_imu_accel("MCU:  0.02 -0.01  1.00  -12.3  45.6  -78.9") == pytest.approx((0.02, -0.01, 1.0))
+    assert imu_parse.parse_imu_accel("ypr 1 2 3") is None
+    feed = imu_parse.ImuFeed("auto", rate_mode="zero")
+    assert feed.accel is None
+    feed.update(["ICM: 0.10 0.20 0.98  10.0 -5.0 2.0"], 100.0)
+    assert feed.accel == pytest.approx((0.10, 0.20, 0.98)) and feed.frames == 1
+    feed.update(["Voltage: 7.9 V"], 100.1)                          # a non-IMU line changes nothing
+    assert feed.frames == 1
+
+
+def test_extra_columns_mark_fresh_frames_and_are_empty_when_off(rg):
+    import imu_parse
+    feed = imu_parse.ImuFeed("auto", rate_mode="zero")
+    assert rg._extra_cols(feed, 1.0, 7.9, False) == ""
+    cols = rg._extra_cols(feed, 1.0, float("nan"), True).split(",")           # before the first frame: nan accel, frame 0, nan age
+    assert cols[0] == "" and cols[4] == "0" and cols[5] == "nan"
+    feed.update(["MCU:  0.02 -0.01  1.00  -12.3  45.6  -78.9"], 1.0)
+    a = rg._extra_cols(feed, 1.05, 7.9, True)
+    feed.update([], 1.1)
+    b = rg._extra_cols(feed, 1.1, 7.9, True)
+    assert a.startswith(",0.02,-0.01,1.00,1,0.050,7.90")
+    assert b.split(",")[4] == "1"                                                # same held frame: the counter did not move
+    feed.update(["MCU:  0.03 -0.01  1.00  -12.3  45.6  -78.0"], 1.2)
+    assert rg._extra_cols(feed, 1.2, 7.9, True).split(",")[4] == "2"            # a new frame: the counter moved
+
+
+def test_log_extra_adds_the_columns_to_a_real_loop_log_and_default_logs_are_unchanged(rg, monkeypatch, tmp_path):
+    pytest.importorskip("onnxruntime")
+    monkeypatch.setattr(rg, "diag", None)
+    plain, extra = tmp_path / "plain.csv", tmp_path / "extra.csv"
+    rg.run(_TurningRightLink(), 0.10, 0.2, 80.0, "auto", disable_firmware_balance=True, thermal_guard=False, send_every=1, log_path=str(plain))
+    rg.run(_TurningRightLink(), 0.10, 0.2, 80.0, "auto", disable_firmware_balance=True, thermal_guard=False, send_every=1, log_path=str(extra), log_extra=True)
+    head_p = plain.read_text().splitlines()[1].split(",")
+    lines_e = extra.read_text().splitlines()
+    head_e = lines_e[1].split(",")
+    assert head_e[:len(head_p)] == head_p and head_e[len(head_p):] == ["ax", "ay", "az", "imu_n", "imu_age_s", "volt"]
+    rows = [r.split(",") for r in lines_e if r[:1].isdigit()]
+    assert all(len(r) == len(head_e) for r in rows)
+    assert rows[-1][len(head_p) + 2] == "1.00"                                    # az in g
+    assert all(len(r.split(",")) == len(head_p) for r in plain.read_text().splitlines() if r[:1].isdigit())

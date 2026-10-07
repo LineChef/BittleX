@@ -464,12 +464,23 @@ def _make_vision_feed(kind, port, baud):
     raise SystemExit(f"unknown --skills-feed {kind!r} (want 'serial' or 'mock')")
 
 
+def _extra_cols(feed, now, volt, on):
+    """The `--log-extra` columns: accel in g, how many IMU frames have arrived so far (equal numbers on consecutive rows mean the same held
+    frame, so a fresh reading is the row where it changes), seconds since the latest frame, and the last pack voltage."""
+    if not on:
+        return ""
+    a = feed.accel if feed.accel is not None else (float("nan"),) * 3
+    age = feed.age(now)
+    return ",%.2f,%.2f,%.2f,%d,%.3f,%.2f" % (a[0], a[1], a[2], feed.frames, age if age != float("inf") else float("nan"), volt)
+
+
 # --------------------------------------------------------------------- loop
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None):
-    """`heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False):
+    """`log_extra=True` adds accel (g), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
+    `heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
     `volt_every_s` > 0 reads the battery voltage (`P`) that often WHILE walking, logs each reading (diag `gait/battery.load`), calls
     `on_battery(level, volts)` on a low reading (default: speak it) and rests the legs on a critical one before the board browns out.
@@ -520,7 +531,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s policy_yaw_sign=%+g\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on", POLICY_YAW_SIGN))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
-                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if (heading_hold or steer_const is not None) else "") + "\n")
+                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if (heading_hold or steer_const is not None) else "")
+                   + (",ax,ay,az,imu_n,imu_age_s,volt" if log_extra else "") + "\n")
     hold = (_hh.HeadingHold(ff=hold_ff, kp=_hh.KP if hold_kp is None else hold_kp, ki=_hh.KI if hold_ki is None else hold_ki, u_max=_hh.U_MAX if hold_umax is None else hold_umax) if (heading_hold or steer_const is not None) else None)
     if hold is not None and steer_const is not None:
         hold.fixed_u = float(steer_const)
@@ -571,6 +583,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
           + (f", logging -> {log_path}" if log_path else "") + ". Ctrl-C to stop.")
     tilt_since = None                 # fall guard: when |roll| or |pitch| first exceeded fall_abort_deg
     volt_chk = None
+    last_volt = [float("nan")]
+    if log_extra and not volt_every_s:
+        volt_every_s = 5.0                   # the pack voltage is part of the extra log
     if volt_every_s:
         try:
             from pi_pipeline.config import settings as _st
@@ -580,7 +595,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         from pi_pipeline.power.battery import BatteryLevel, BatteryMonitor, LoadVoltageCheck
         volt_chk = LoadVoltageCheck(lambda c: _send(lk, c), getattr(lk, "pop_other", lambda: []),
                                     BatteryMonitor(_lo, _cr, confirm=2, hysteresis_v=0.15, repeat_s=60.0), every_s=volt_every_s,
-                                    on_reading=(lambda v: diag.event("gait", "INFO", "battery.load", volts=round(v, 2)) if diag is not None else None))
+                                    on_reading=(lambda v: (last_volt.__setitem__(0, v), diag.event("gait", "INFO", "battery.load", volts=round(v, 2)) if diag is not None else None)))
     try:
         i = 0
         while n is None or i < n:
@@ -744,7 +759,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         time.perf_counter() - t_start, r, p_, y, gx, gy, gz,
                         ",".join(str(int(v)) for v in joint_deg),
                         snap.state, snap.hottest_j, int(snap.hottest_tier),
-                        snap.hottest_frac, snap.duty_s, (",%.4f" % steer_u) if hold is not None else ""))
+                        snap.hottest_frac, snap.duty_s, ((",%.4f" % steer_u) if hold is not None else "") + _extra_cols(feed, now, last_volt[0], log_extra)))
             t_next += dt
             slack = t_next - time.perf_counter()
             if slack > 0:
@@ -837,6 +852,8 @@ def main():
                     help="--openloop with --lift-joints knees: scale the shoulder swing (0.7 holds the stride near wkF's)")
     ap.add_argument("--volt-every", type=float, default=0.0, metavar="S",
                     help="--openloop: log the battery voltage every S seconds during the walk (0 = off)")
+    ap.add_argument("--log-extra", action="store_true",
+                    help="policy walks: also log accel (g), the IMU frame counter and age, and the pack voltage (asked every 5 s)")
     ap.add_argument("--ramp-cycles", type=float, default=0.0, metavar="N",
                     help="--openloop: blend the lift/shoulder scaling in from x1 over N cycles (avoids a jump from the stand pose)")
     ap.add_argument("--openloop-balance-off", action="store_true",
@@ -933,7 +950,8 @@ def main():
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
                 fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const,
-                hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki)
+                hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki,
+                log_extra=args.log_extra)
     finally:
         try:
             lk.close()

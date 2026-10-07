@@ -139,6 +139,23 @@ def _wrap(a):
     return (a + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def parse_imu_accel(line):
+    """(ax, ay, az) in g from an `MCU:`/`ICM:` frame, or None. The same fields parse_imu_line skips; used only for logging."""
+    s = line.strip()
+    for prefix in IMU_PREFIXES:
+        if s.startswith(prefix):
+            try:
+                nums = [float(x) for x in s[len(prefix):].replace(",", " ").split()]
+            except ValueError:
+                nums = []
+            if len(nums) != 6:
+                nums = _fixed_width_fields(s[len(prefix):])
+            if nums is None or len(nums) != 6:
+                return None
+            return (nums[0], nums[1], nums[2])
+    return None
+
+
 class ImuFeed:
     """Latest-frame holder for the firmware IMU stream.
 
@@ -164,6 +181,7 @@ class ImuFeed:
         self.frame = None            # (roll, pitch, yaw, gx, gy, gz) or None before the first frame
         self.stamp = None            # receive time of the latest frame
         self.frames = 0
+        self.accel = None            # (ax, ay, az) in g of the latest frame, when the line carries it
         self._prev = None            # (t, roll, pitch, yaw) of the frame the rate was last taken from
 
     def update(self, lines, now):
@@ -177,6 +195,9 @@ class ImuFeed:
             if line.lstrip().startswith(IMU_PREFIXES):
                 gx, gy, gz = self._rate(now, r, pi, y)
             self.frame = (r, pi, y, gx, gy, gz)
+            a = parse_imu_accel(line)
+            if a is not None:
+                self.accel = a
             self.stamp = now
             self.frames += 1
             fresh = True
