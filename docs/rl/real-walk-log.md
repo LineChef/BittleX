@@ -448,6 +448,24 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 - **The cancel point is about u = -0.16** now (drift +7.6 deg/s); the old estimate was -0.19 at +3.3 deg/s... the drift at u = 0 is about 2x what it was after the servo swap. The u = 0 runs did not keep rising this time (111, 108, 98, 64).
 - **Run-to-run spread at a fixed u is about 17-22 deg per 12.5 s** (+-1.5 deg/s), so a fixed correction lands anywhere in a 40 deg band; only feedback can narrow it.
 
+### Closed-loop heading hold works: six straight runs (2026-10-07 8:56 AM, `hold1`)
+
+`g2_baseline.sh start 6 hold1 --hold on --hold-ff=-0.16 --hold-kp 0.01 --hold-ki 0.001 --hold-umax 0.30` on the hardwood after the gyro calibration (pack 7.82 V; V2.1 with the Pi-side stride-difference hold; the hold's target is the heading at the start of each walk). Raw logs `real-walk-data/2026-10-07/hold1_*`.
+
+| run | final yaw (right +) | u mean | u range |
+|---|---|---|---|
+| 1 | -5.6 | -0.14 | -0.24 .. 0.00 |
+| 2 | -3.3 | -0.12 | -0.23 .. 0.00 |
+| 3 | -3.1 | -0.15 | -0.25 .. 0.00 |
+| 4 | -1.1 | -0.15 | -0.23 .. 0.00 |
+| 5 | -2.4 | -0.14 | -0.26 .. 0.00 |
+| 6 | -2.2 | -0.11 | -0.22 .. 0.00 |
+
+- Final heading mean -3.0 deg, sd 1.4 deg, every run within 6 deg of straight (the same walks with a fixed u had a 40 deg band, +111 to -65). The user saw slight left curves in most runs, none to the right, and called run 6 the straightest in a while: matches the log.
+- The output never reached its 0.30 limit (peak -0.26) and settled near -0.14, so the loop is not authority-limited at today's drift (+7.6 deg/s at u = 0). The slight left bias (-3 deg) says the -0.16 feed-forward is a touch strong; about -0.14 would center it.
+- Caveats: six runs, one session, 12.5 s walks, one pack level; the drift has moved 2-3x within a session before.
+- Meaning: the drift is correctable outside the policy with the lever measured on G2, with the yaw calibrated. Not yet the default: `--heading-hold` is off unless asked.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
