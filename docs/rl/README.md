@@ -29,5 +29,6 @@ were removed 2026-09-10; their conclusions are condensed in
 [`../plan-detail/phase3-rl-training.md`](../plan-detail/phase3-rl-training.md) "Training history" and git history has the full text.
 
 - **[`v3-retrain-plan.md`](v3-retrain-plan.md): the current gait work (approved 2026-10-06): findings on V2.1's drift, the sim-vs-G2 gaps, the reward review, and the V3 plan; start here to resume.**
+- [`v3-decisions-log.md`](v3-decisions-log.md): decisions made while the V3 queue runs unattended, newest last.
 - [`v22-log.md`](v22-log.md): the v2.2 run (closed 2026-10-06, superseded by the V3 plan) (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.
 - [`v22-handoff.md`](v22-handoff.md): hand-off for the v2.2 campaign (state, everything tried, remaining steps, gotchas).
