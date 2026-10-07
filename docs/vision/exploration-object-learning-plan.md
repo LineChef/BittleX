@@ -57,7 +57,7 @@ Thresholds are the capture tools' defaults and will need tuning on the first rea
    (chest raised, looking up), picture, stand, walk on. Skill names and delays are in `SurveyConfig` (the sit pose is a guess at "look up": judged from the
    pictures).
 3. Naming: wake word, then "this is a mug" / "remember this as my mug" / "call this the mug": G2 stops and takes the picture the same way as a survey stop (look down, look up, stand, settle, then one picture, saved under
-   that name; user, 2026-10-07: one picture sequence for every picture), says "Okay, I will remember the mug", and walks on. Works inside an exploration session, roaming or stationary.
+   that name; user, 2026-10-07: one picture sequence for every picture), says "Okay, I will remember the mug", and walks on. Works inside an exploration session (roaming or stationary) **and in plain voice mode** (no session needed; the voice service runs the same sequence and saves the picture the same way, with no Claude call; user, 2026-10-07: naming must always be available).
 4. Saving: `vision/exploration_pictures.py` writes each JPEG with a JSON sidecar (time, pose, what the on-camera detector saw, brightness) to
    `~/.local/share/g2/explore_pictures/survey/<date>/` and `.../named/<name>/`. No pruning of the survey pictures (they are the data set), a size warning
    in the log.

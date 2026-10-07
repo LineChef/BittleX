@@ -390,3 +390,43 @@ def test_no_sighting_for_ordinary_turns_failed_cameras_or_silent_replies():
     conv3.send = lambda text, memory_context=None, **kw: types.SimpleNamespace(speech="", actions=[], facts=[])
     lp3._one_turn()
     assert mem3.obs == []                                                        # nothing was said, so there is nothing to note
+
+
+# ---- naming an object by voice, outside an exploration session
+
+def _naming_loop(namer_result, script):
+    said, skills = [], []
+    stt = types.SimpleNamespace(listen=lambda timeout_s=None: script.pop(0) if script else "")
+    wake = types.SimpleNamespace(wait=lambda: None)
+    tts = types.SimpleNamespace(speak=lambda t: said.append(t))
+    act = types.SimpleNamespace(perform=lambda s, **k: skills.append(s), stop=lambda: None, close=lambda: None)
+    cue = types.SimpleNamespace(set=lambda s: None)
+    conv = _Conv()
+    shots = []
+    namer = lambda kind: (shots.append(kind), namer_result)[1]  # noqa: E731
+    lp = VoiceLoop(wake_word=wake, stt=stt, conversation=conv, tts=tts, actuator=act, cue=cue, follow_up_s=0.0, camera=None, namer=namer)
+    return lp, conv, said, skills, shots
+
+
+def test_this_is_the_dishwasher_takes_the_picture_sequence_and_confirms_without_asking_claude(monkeypatch):
+    import time
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    lp, conv, said, skills, shots = _naming_loop("/pics/named/dishwasher/x.jpg", ["this is the dishwasher"])
+    lp._one_turn()
+    assert conv.calls == []                                                           # no API call
+    assert skills == ["kbuttUp", "ksit", "kup"] and shots == ["name:dishwasher"]      # bow, look up, stand, then one picture saved under the name
+    assert said == ["Okay, let me look at the dishwasher.", "Okay, I will remember the dishwasher."]
+
+
+def test_a_picture_that_could_not_be_kept_is_not_confirmed(monkeypatch):
+    import time
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    lp, conv, said, skills, shots = _naming_loop(None, ["remember this as my red mug"])
+    lp._one_turn()
+    assert shots == ["name:red mug"] and "Okay, I will remember" not in " ".join(said) and "could not keep that picture" in said[-1]
+
+
+def test_ordinary_sentences_and_questions_are_not_mistaken_for_naming():
+    lp, conv, said, skills, shots = _naming_loop("x", ["what is this"])
+    lp._one_turn()
+    assert shots == [] and skills == [] and len(conv.calls) == 1                       # a question goes to Claude as before

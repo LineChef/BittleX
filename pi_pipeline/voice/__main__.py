@@ -135,6 +135,12 @@ def main() -> None:
                                            keep_days=settings.picture_keep_days,
                                            exposure_check=settings.vision_exposure_check)
 
+        namer = None
+        if camera is not None:                             # "this is the dishwasher" works in plain voice mode too, not only inside an exploration session
+            import os
+            from ..vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
+            namer = ExplorationPictureSaver(camera, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
+
         watcher_c = None
         if memory and settings.consolidate and settings.anthropic_api_key:
             from ..memory.consolidate import Consolidator, ConsolidationWatcher, make_llm
@@ -178,6 +184,7 @@ def main() -> None:
             follow_up_s=settings.follow_up_s if voice else 0.0,
             question_window_s=settings.question_window_s if voice else 0.0,
             camera=camera,
+            namer=namer,
             on_event=on_event,
             on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),

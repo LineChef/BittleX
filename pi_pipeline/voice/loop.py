@@ -25,6 +25,7 @@ from ..personality import gir
 from ..personality.mood import MoodModel
 from . import narration
 from .actuator import Actuator
+from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming
 from .commands import (
     is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
     parse_narration_command,
@@ -172,7 +173,9 @@ class VoiceLoop:
         on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
         on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
         shutdown_confirm_s: float = 6.0,
+        namer=None,  # object called with a picture kind ("name:mug") that takes and saves one picture and returns its path or None (vision.exploration_pictures.ExplorationPictureSaver)
     ):
+        self._namer = namer
         self._wake = wake_word
         self._stt = stt
         self._conv = conversation
@@ -246,6 +249,34 @@ class VoiceLoop:
         else:
             self._in_session = False
 
+    def _name_object(self, name: str) -> None:
+        """Naming an object by voice, outside an exploration session: the same picture sequence as a survey stop (look down, look up, stand, settle, picture), saved under the name
+        (`behavior/survey.naming_plan`), then the spoken confirmation. Runs here in the loop (about 8 s), so nothing else is said or moved meanwhile."""
+        import time
+        log.info("naming an object (voice): picture sequence")
+        self._cue.set("speaking")
+        self._speak(f"Okay, let me look at the {name}.")
+        saved = None
+        t0 = time.monotonic()
+        try:
+            for delay, kind, payload, _why in naming_plan(name, SurveyConfig()):
+                wait = delay - (time.monotonic() - t0)
+                if wait > 0:
+                    time.sleep(wait)
+                if kind == "skill":
+                    self._act.perform(payload)
+                elif kind == "shot":
+                    saved = self._namer(payload)
+        except Exception:  # noqa: BLE001 -- a failed picture must not end the voice loop
+            log.exception("naming picture failed")
+        self._cue.set("speaking")
+        if saved:
+            self._speak(f"Okay, I will remember the {name}.")
+        else:
+            self._speak("I could not keep that picture. It may be too like one I already have, or the camera did not answer.")
+        self._set_session()
+        self._cue.set("idle")
+
     def _restart_service(self) -> None:
         """Restart this voice service: ask systemd (`sudo -n systemctl restart g2-voice`); if that is not allowed, exit with an error so the unit's `Restart=on-failure` brings it back. Never returns when it works."""
         import subprocess
@@ -316,6 +347,13 @@ class VoiceLoop:
             raise KeyboardInterrupt
 
         cmd = match_local_command(user_text)
+        if cmd is None and self._namer is not None:
+            name = clean_name(parse_naming(user_text))
+            if name:                                       # "this is the dishwasher": the same picture sequence as in an exploration session, no Claude call
+                self._events(ack=True)
+                self._cue.set("heard")
+                self._name_object(name)
+                return
         if cmd is not None:
             # G2 always signals that he registered a command -- an instant "heard
             # you" chirp (+ cue), before the slower spoken reply. Makes a
