@@ -431,7 +431,7 @@ def test_openloop_holds_its_rate_when_sends_take_time_and_can_skip_frames(rg):
     lk = _Lk()
     rg.openloop(lk, 2, 80.0, fall_abort_deg=0, send_every=3, sleep=lambda s: clock_t.__setitem__(0, clock_t[0] + s), clock=lambda: clock_t[0])
     # 2 cycles = 200 frames = 2.5 s of walk, after the 2 s stand sleep(2.0) (also on this fake clock) plus the stand command's own 5 ms
-    assert 4.4 < clock_t[0] < 4.7
+    assert 4.9 < clock_t[0] < 5.2                           # + the 0.5 s the walk now waits at the end so the board gets the rest command
     assert lk.sent == 1 + 67                                 # the stand command + every 3rd of 200 frames
 
 
