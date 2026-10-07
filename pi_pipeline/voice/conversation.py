@@ -648,6 +648,8 @@ class Conversation:
             try:
                 self._client.models.list(limit=1)
                 info["ok"] = True
+                if self._usage is not None:
+                    self._usage.record("warmup")
             except Exception as e:  # noqa: BLE001 -- warming is best-effort
                 info["ok"] = False
                 log.debug("api warm-up failed: %s", e)

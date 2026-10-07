@@ -55,3 +55,16 @@ def test_a_normal_reply_records_no_retry(cfg, fake_anthropic, tmp_path):
     Conversation(dataclasses.replace(cfg, usage_path=str(tmp_path / "u.json"))).send("hello")
     (day, d), = UsageTracker(tmp_path / "u.json").days()
     assert d["turns"] == 1 and d["retries"] == 0
+
+
+def test_hourly_buckets_and_warmups_are_counted_separately(tmp_path):
+    hours = iter(["2026-10-07 01:00", "2026-10-07 01:00", "2026-10-07 02:00", "2026-10-07 02:00"])
+    t = UsageTracker(tmp_path / "u.json", today=lambda: "2026-10-07", hour=lambda: next(hours))
+    t.record("turn", usage(1000, 50)); t.record("warmup"); t.record("retry", usage(900, 20)); t.record("warmup")
+    (h1, a), (h2, b) = t.hours()
+    assert h1 == "2026-10-07 01:00" and a["turns"] == 1 and a["warmups"] == 1 and a["in_tokens"] == 1000
+    assert h2 == "2026-10-07 02:00" and b["retries"] == 1 and b["warmups"] == 1 and b["turns"] == 0
+    (_, d), = t.days()
+    assert d["turns"] == 1 and d["retries"] == 1 and "warmups" not in d          # a warm-up is not a billed call in the daily totals
+    from pi_pipeline.voice.usage import summarize_hours
+    assert "2026-10-07 02:00" in summarize_hours(t)
