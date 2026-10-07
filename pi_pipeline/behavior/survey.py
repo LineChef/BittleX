@@ -1,9 +1,9 @@
-"""Survey stops: while exploring, G2 stops at the end of a leg, bows (the inspect pose), stands again, takes one picture once the stance has settled, and walks on.
+"""Survey stops: while exploring, G2 stops at the end of a leg, looks down (the inspect bow) and up, stands again, takes one picture once the stance has settled, and walks on.
 
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   bow (`kbuttUp`, nose-down: the INSPECT pose) -> stand (`kup`) -> settle -> one picture
+  survey_plan   look down (`kbuttUp`, the INSPECT bow) -> look up (`ksit`) -> stand (`kup`) -> settle -> one picture
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -45,13 +45,16 @@ class Survey:
 
 
 def survey_plan(cfg: SurveyConfig) -> list:
-    """Bow (the inspect pose), stand again, and take the picture once the stance has settled (the look-down and look-up pictures were not good, 2026-10-07)."""
+    """Look down (the inspect bow), look up (`ksit`), stand again, and take the picture once the stance has settled (the pictures taken in the look-down and
+    look-up poses were not good, 2026-10-07, so the picture is taken standing, after both looks)."""
     t = 0.0
-    plan = [(t, "skill", cfg.look_down_skill, "survey: inspect bow (the walk stops, no rest)")]
+    plan = [(t, "skill", cfg.look_down_skill, "survey: look down, the inspect bow (the walk stops, no rest)")]
+    t += cfg.pose_settle_s
+    plan.append((t, "skill", cfg.look_up_skill, "survey: look up"))
     t += cfg.pose_settle_s
     plan.append((t, "skill", cfg.stand_skill, "survey: stand again"))
     t += cfg.stand_settle_s
-    plan.append((t, "shot", "after_bow", "survey: picture, standing after the bow"))
+    plan.append((t, "shot", "after_bow", "survey: picture, standing after looking down and up"))
     t += 0.4
     plan.append((t, "diag", "survey.done", "survey: finished, walking on"))
     return plan

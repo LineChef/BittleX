@@ -58,8 +58,8 @@ def test_survey_cooldown_and_plan_order():
     s.began(100.0)
     assert not s.ready(110.0) and s.ready(115.0)
     plan = survey_plan(SurveyConfig())
-    assert [k for _, k, _, _ in plan] == ["skill", "skill", "shot", "diag"]                # no stop / rest step: the bow replaces the walk
-    assert [p for _, k, p, _ in plan if k == "skill"] == ["kbuttUp", "kup"]                    # bow, stand again
+    assert [k for _, k, _, _ in plan] == ["skill", "skill", "skill", "shot", "diag"]                # no stop / rest step: the bow replaces the walk
+    assert [p for _, k, p, _ in plan if k == "skill"] == ["kbuttUp", "ksit", "kup"]            # look down, look up, stand again
     assert [p for _, k, p, _ in plan if k == "shot"] == ["after_bow"]
     delays = [d for d, *_ in plan]
     assert delays == sorted(delays)
@@ -82,10 +82,10 @@ def test_driver_surveys_at_the_end_of_a_leg_then_walks_on():
     assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["kbuttUp"]       # the first thing is the bow itself
     assert EffectKind.STOP not in [e.kind for e in t.effects]                               # never a rest in the middle of exploring
     walking(d)                                           # from now on the explorer would keep walking, if the choreography let it
-    during = run_for(d, c, 4.9)                         # the plan runs to 5.1 s: kup and the picture fall inside this window
+    during = run_for(d, c, 7.1)                         # the plan runs to 7.3 s: ksit, kup and the picture fall inside this window
     skills = [e.payload for e in during if e.kind is EffectKind.SKILL]
     shots = [e.payload for e in during if e.kind is EffectKind.CAPTURE]
-    assert skills == ["kup"] and shots == [("shot", "after_bow")]
+    assert skills == ["ksit", "kup"] and shots == [("shot", "after_bow")]
     assert not any(e.kind in (EffectKind.WALK, EffectKind.STOP) for e in during)          # no walking while looking, and no rest
     after = run_for(d, c, 3.0)
     assert any(e.kind is EffectKind.WALK for e in after)                                  # and it walks on afterwards
