@@ -45,10 +45,10 @@ RECIPE = {
     # only 3M steps, so they climb quickly: +0.10 after ONE good window of 6 (the hold at each new level is one window, ~75k steps across 8 envs; full difficulty needs
     # >= ~0.75M steps even for a perfect policy). Continuation stages and the 20M climb carefully (see stage_extra): +0.05 after TWO good windows of 8 (~200k steps each).
     "G2E_LEVEL_WINDOW_C": "6", "G2E_LEVEL_STEP_C": "0.10", "G2E_LEVEL_PROMOTE_WINDOWS": "1",
-    # Competence is measured by a deterministic probe every 98k steps (6 episodes per category), not from the noisy training episodes: see train.py Curriculum.
+    # Competence is measured by a deterministic probe every 98k steps (12 episodes per category from S2 on; C0 and S1 used 6, so their level paths are noisier), not from the noisy training episodes: see train.py Curriculum.
     # The probe score is RELATIVE to the same policy's clean-floor score (same randomization), so up/down thresholds judge hazard handling only.
     "G2E_LEVEL_CAP_BY_TIME": "1", "G2E_LEVEL_MIN_BASELINE": "0.5", "G2E_LEVEL_COLLAPSE_BASELINE": "0.35",
-    "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "6", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
+    "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "12", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
 
 # --- Phase 1 output: parameters fitted so the sim matches the real walks. Empty until Phase 1 runs. ---
