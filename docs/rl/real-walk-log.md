@@ -401,6 +401,24 @@ Mean commanded joint angle over a calm walk, degrees, URDF joint order (the sim'
 
 First scripted runs of the postcal batch (hardwood, pack 7.96 V): the scripted walk took 22.8 s for 10 cycles (a 12.5 s walk at 80 Hz), the user heard constant rapid clicking from the board (not the motors) the whole run, on both scripted runs and on neither V2.1 run (`~/g2_logs/postcal4/`, raw). Causes found in `run_gait.openloop`: it slept `dt` after each frame's work (a serial send blocks about 5 ms at 115200 baud), so frames ran at about 44 Hz, and it sent a joint command on every frame (about 44 per second) where the policy loop sends every 3rd tick (i@27). Fix: deadline pacing and `send_every=3` (CLI default for `--openloop`; `--send-every 1` restores the old cadence). After the fix one scripted run: normal speed, no clicking (user). So the faster command stream (and/or its uneven timing) is what makes the board click; V2.1's 27 Hz stream never did.
 
+### Scripted `wkF` against V2.1, interleaved, hardwood, after the user's joint calibration (2026-10-07 8:13 AM, `postcal5`)
+
+Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab`), pack about 7.9 V: odd runs the scripted open-loop `wkF` walk (10 cycles, 12.5 s, the fixed pacing), even runs V2.1 at u = 0 (no heading hold). Net yaw over the walk, degrees, right positive, firmware yaw. Raw logs: `real-walk-data/2026-10-07/`.
+
+| Pair | scripted | V2.1 next | V2.1 minus scripted |
+|---|---|---|---|
+| 1-2 | +34 | +65 | +30 |
+| 3-4 | +20 | +99 | +79 |
+| 5-6 | +62 | +117 | +56 |
+| 7-8 | +88 | +113 | +25 |
+| 9-10 | +97 | +118 | +21 |
+| 11-12 | +86 (raw -274: the firmware's yaw counter jumped by exactly -360 mid-walk; the scripted logs are not wrapped) | +153 | +66 |
+
+- Scripted mean +64 deg (about +5 deg/s), V2.1 mean +111 deg (about +8.7 deg/s). V2.1 is more to the right than the scripted walk in all six pairs, by about 46 deg per 12.5 s (+3.7 deg/s, range +21 to +79).
+- **The scripted walk is NOT straight on this floor**: it drifts right too. The early observation that it curves left (one qualitative open-loop test before the servo swap and the case) did not reproduce. Most of G2's right drift (about 5 of 8.7 deg/s) is in the hardware, floor or calibration; the policy adds about 40% on top.
+- Both walks drift more as the session goes on (scripted +2.7 deg/s in the first run, +7 to +8 in runs 7-11; V2.1 +5 to +12): something that changes over time (servo temperature, pack voltage 7.96 V at the start, wear in) moves the drift by a factor of 2-3 within 15 minutes.
+- Roll swing: scripted 4.3 deg sd, V2.1 5.6.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
