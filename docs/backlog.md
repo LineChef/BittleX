@@ -69,6 +69,7 @@ Status key: 🔴 hardware/camera-gated · 🟡 partial · ⚪ low priority · �
 | [B20](behavior-ideas.md#b20--generic-objects-recognition-a-6th-detector-class-or-a-separate-pi-side-layer---partially-built-2026-09-14-behind-featuresobject_gallery-localizer--embedding-model-still-hardware-gated) | Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer | PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated) |
 | [B11](behavior-ideas.md#b11--learn-its-way-around-the-house-topological-place-memory) | Learn its way around the house (topological place memory) | — |
 | [B10](behavior-ideas.md#b10--teach-me-a-trick) | Teach me a trick | — |
+| [B25](behavior-ideas.md#b25--kinesthetic-teaching-hand-guided-skills-recorded-from-g2s-own-joints--) | Kinesthetic teaching: hand-guided skills recorded from G2's own joints | 🟡 |
 | [B12](behavior-ideas.md#b12--im-running-low--power-awareness) | "I'm running low" — power awareness | — |
 | [B18](behavior-ideas.md#b18--idle-power-management--feels-alive-idle-behaviour--) | Idle power management + "feels alive" idle behaviour | 🟡 |
 | [B23](behavior-ideas.md#b23--bounded-self-modification-g2-adjusts-its-own-personality-knobs-from-experience) | Bounded self-modification: G2 adjusts its own personality knobs from experience | — |

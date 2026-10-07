@@ -902,6 +902,14 @@ order:
   collision with a built-in skill should be rejected or require confirmation,
   not silently shadow it.
 
+### B25 — Kinesthetic teaching: hand-guided skills recorded from G2's own joints  🟡
+Requested 2026-10-07: try teaching skills by moving G2's legs by hand and recording the joint angles, then replaying them as a skill. This is the
+"raw joint puppeteering" tier of [B10], promoted to its own item so it can be tried on the bench. Servos relaxed (`d`), joints polled with `j`
+(`READ_JOINTS`), keyframes saved under a name and replayed through the same path as any scripted skill. Fits sit, wave, shake, reach; playback has no
+balance feedback, so new poses are tried held in the air first (hardware safety rule). Reference video to study for technique:
+<https://www.youtube.com/watch?v=rRkVR3PO1o8> (not reviewed yet). Not started; waits for the user's go. Decision the same day: skills are **not**
+authored by an LLM writing keyframes.
+
 ---
 
 ## Self-awareness
