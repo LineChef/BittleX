@@ -397,6 +397,10 @@ Mean commanded joint angle over a calm walk, degrees, URDF joint order (the sim'
 - The scripted walk is exactly left/right symmetric. V2.1 holds the back-left hip about 7 degrees above the scripted value and the back-right hip only about 1 degree above it, a 6-7 degree one-sided offset that is the same in the sim and on G2 (same policy, similar inputs). With steering (u = -0.20) the hips read 55.4 and 58.4, because the stride scaling pulls the left hip in.
 - This is the learned asymmetry the leading drift hypothesis names. It confirms the policy adds a one-sided offset the scripted walk does not have; it does not show that the offset causes G2's right drift. That needs the scripted-versus-V2.1 comparison on G2 (six open-loop `wkF` walks against six V2.1 walks in one session), which is still undone.
 
+### Scripted `wkF` open-loop playback was slow and made the BiBoard click (2026-10-07), fixed
+
+First scripted runs of the postcal batch (hardwood, pack 7.96 V): the scripted walk took 22.8 s for 10 cycles (a 12.5 s walk at 80 Hz), the user heard constant rapid clicking from the board (not the motors) the whole run, on both scripted runs and on neither V2.1 run (`~/g2_logs/postcal4/`, raw). Causes found in `run_gait.openloop`: it slept `dt` after each frame's work (a serial send blocks about 5 ms at 115200 baud), so frames ran at about 44 Hz, and it sent a joint command on every frame (about 44 per second) where the policy loop sends every 3rd tick (i@27). Fix: deadline pacing and `send_every=3` (CLI default for `--openloop`; `--send-every 1` restores the old cadence). After the fix one scripted run: normal speed, no clicking (user). So the faster command stream (and/or its uneven timing) is what makes the board click; V2.1's 27 Hz stream never did.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
