@@ -88,3 +88,10 @@ def test_feed_forward_starts_the_output_at_the_known_drift_and_feedback_still_ac
     for _ in range(2000):
         u = c.update(math.radians(-20.0), 0.0125)                                 # drifted LEFT of the target: feedback backs the correction off
     assert u > -0.15
+
+
+def test_integral_contribution_is_clamped():
+    c = hh.HeadingHold(ki=0.004, i_lim=0.05)
+    for _ in range(8000):
+        c.update(math.radians(10.0), 0.0125, active=True)                          # a long steady rightward error
+    assert abs(c.ki * c.integral) <= 0.05 + 1e-9

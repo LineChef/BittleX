@@ -27,6 +27,7 @@ def main() -> None:
     ap.add_argument("--hold", default=None, choices=("on", "off", "abba"),
                     help="A/B test of the Pi-side heading hold (gait/heading_hold.py): on, off, or 'abba' = off, on, on, off, off, on, on, off ...")
     ap.add_argument("--hold-ff", type=float, default=None, help="feed-forward for the heading-hold runs (see run_gait --hold-ff)")
+    ap.add_argument("--hold-ki", type=float, default=None, help="integral gain for the heading-hold runs")
     ap.add_argument("--hold-umax", type=float, default=None, help="largest stride difference for the heading-hold runs")
     ap.add_argument("--hold-kp", type=float, default=None, help="proportional gain for the heading-hold runs")
     ap.add_argument("--const-u", default=None,
@@ -76,7 +77,8 @@ def main() -> None:
                               "--log", path] + (["--heading-hold"] if hold else [])
                               + (["--hold-ff", str(args.hold_ff)] if hold and args.hold_ff is not None else [])
                               + (["--hold-kp", str(args.hold_kp)] if hold and args.hold_kp is not None else [])
-                              + (["--hold-umax", str(args.hold_umax)] if args.hold_umax is not None else []) + ([] if cu is None else ["--steer-const", str(cu)]), env=child_env)
+                              + (["--hold-umax", str(args.hold_umax)] if args.hold_umax is not None else [])
+                              + (["--hold-ki", str(args.hold_ki)] if hold and args.hold_ki is not None else []) + ([] if cu is None else ["--steer-const", str(cu)]), env=child_env)
         logs.append(path)
         print(f"run {k}: exit {rc} -> {path}", flush=True)
         if k < args.runs:

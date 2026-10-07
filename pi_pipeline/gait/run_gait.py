@@ -452,7 +452,7 @@ def _make_vision_feed(kind, port, baud):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None):
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None):
     """`heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
     `volt_every_s` > 0 reads the battery voltage (`P`) that often WHILE walking, logs each reading (diag `gait/battery.load`), calls
@@ -500,12 +500,12 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
 
     logf = None
     if log_path:
-        logf = open(log_path, "w")
+        logf = open(log_path, "w", buffering=1)      # line-buffered: a run that is stopped keeps its data
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s policy_yaw_sign=%+g\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on", POLICY_YAW_SIGN))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
                    + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if (heading_hold or steer_const is not None) else "") + "\n")
-    hold = (_hh.HeadingHold(ff=hold_ff, kp=_hh.KP if hold_kp is None else hold_kp, u_max=_hh.U_MAX if hold_umax is None else hold_umax) if (heading_hold or steer_const is not None) else None)
+    hold = (_hh.HeadingHold(ff=hold_ff, kp=_hh.KP if hold_kp is None else hold_kp, ki=_hh.KI if hold_ki is None else hold_ki, u_max=_hh.U_MAX if hold_umax is None else hold_umax) if (heading_hold or steer_const is not None) else None)
     if hold is not None and steer_const is not None:
         hold.fixed_u = float(steer_const)
     steer_u = 0.0
@@ -788,6 +788,7 @@ def main():
                          "(its .onnx.json sidecar must sit next to it). Does not change the default.")
     ap.add_argument("--hold-ff", type=float, default=0.0, metavar="U", help="--heading-hold: feed-forward stride difference added to the feedback (u > 0 = longer LEFT strides = a right turn)")
     ap.add_argument("--hold-kp", type=float, default=None, metavar="K", help="--heading-hold: proportional gain, u per degree of heading error (default heading_hold.KP)")
+    ap.add_argument("--hold-ki", type=float, default=None, metavar="K", help="--heading-hold: integral gain, u per degree-second (default heading_hold.KI)")
     ap.add_argument("--hold-umax", type=float, default=None, metavar="U", help="--heading-hold / --steer-const: largest stride difference (default heading_hold.U_MAX = 0.20)")
     ap.add_argument("--steer-const", type=float, default=None, metavar="U",
                     help="hold the stride difference u fixed (no feedback, limited to +-0.20): + = longer right strides. Measures the lever's real sign / authority")
@@ -915,7 +916,7 @@ def main():
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
                 fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const,
-                hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax)
+                hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki)
     finally:
         try:
             lk.close()

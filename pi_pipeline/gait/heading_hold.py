@@ -35,8 +35,9 @@ def wrap_deg(a: float) -> float:
 
 
 class HeadingHold:
-    def __init__(self, target_deg: float = 0.0, kp: float = KP, ki: float = KI, u_max: float = U_MAX, u_rate: float = U_RATE, ff: float = 0.0):
+    def __init__(self, target_deg: float = 0.0, kp: float = KP, ki: float = KI, u_max: float = U_MAX, u_rate: float = U_RATE, ff: float = 0.0, i_lim: float = 0.08):
         self.target_deg, self.kp, self.ki, self.u_max, self.u_rate = target_deg, kp, ki, u_max, u_rate
+        self.i_lim = i_lim                  # the integral term's contribution to u is clamped to +-i_lim (it wound up on G2 and kept steering left after the heading was back)
         self.ff = ff                        # feed-forward stride difference added to the feedback (the known steady drift, so the integral term starts near the answer)
         self.integral = 0.0
         self.u = 0.0
