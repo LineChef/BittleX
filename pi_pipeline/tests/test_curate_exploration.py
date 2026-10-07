@@ -149,3 +149,16 @@ def test_people_are_set_aside_in_layers_the_model_the_time_window_and_hand_marks
     assert why["d_by_hand"] == ("people", "marked as a person by hand")
     assert why["c_clear"][0] == "kept" and why["e_weak_hit"][0] == "kept"
     assert not any("a_person" in f or "b_legs" in f or "d_by_hand" in f for _r, _d, fs in os.walk(tmp_path / "out") for f in fs)       # never copied
+
+
+def test_object_hints_are_recorded_for_kept_pictures_only_and_drawn_on_the_sheet(ce, tmp_path):
+    src = tmp_path / "in"
+    sv = str(src / "survey" / "20261007")
+    save(sv, "after_bow_1", blocky(1), time="2026-10-07 10:00:00")
+    save(sv, "after_bow_2", np.full((240, 240), 6, "uint8"), time="2026-10-07 10:30:00")                 # too dark: rejected, so no hints computed
+    cfg = ce.Config(object_detector=lambda im: [("chair", 0.43, (10.0, 20.0, 90.0, 120.0))])
+    m = ce.curate(str(src), str(tmp_path / "out"), cfg)
+    rows = {r["file"].split("/")[-1][:-4]: r for r in m["pictures"]}
+    assert rows["after_bow_1"]["object_hints"] == [{"class": "chair", "score": 0.43, "box": [10.0, 20.0, 90.0, 120.0]}] and rows["after_bow_2"]["object_hints"] == []
+    assert m["summary"]["object_hints"] == {"chair": 1} and "chair 1" in ce.summary_text(m)
+    assert (tmp_path / "out" / "contact" / "survey__20261007.jpg").exists()

@@ -51,6 +51,7 @@ class Config:
     person_min_score: float = 0.40
     person_detector: object = None     # callable(PIL image) -> best person score 0..1 (tools/person_filter.PersonDetector.best_score); None = the camera's own detections only
     person_threshold: float = 0.25     # eager on purpose: leaving a picture out costs little, keeping a person in the object library costs more
+    object_detector: object = None     # callable(PIL image) -> [(class name, score, box)] (tools/person_filter.PersonDetector.objects): category hints and crop boxes for the kept pictures, never labels
     person_window_s: float = 120.0     # pictures taken this close in time to a picture with a person are set aside too (legs and backs the models miss)
     named_min_keep: int = 5            # fewer kept pictures than this for a name gets a hint
     thumb: int = 150
@@ -80,6 +81,7 @@ class Pic:
     duplicate_of: str | None = None
     person_why: str = ""               # why this picture is treated as having a person in it ("" = none)
     person_score: float = 0.0
+    hints: list = field(default_factory=list)      # (class name, score, (x1, y1, x2, y2)) from the outside model: hints only
     cut_off: bool = False              # the JPEG has no end marker: the camera module cut it short (the rest decodes as flat gray)
 
     @property
@@ -247,6 +249,14 @@ def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = 
             kept_by_key[p.key].append(p)
         else:
             p.status, p.reason, p.duplicate_of = "duplicate", "near-duplicate of a better picture", twin.rel
+    if c.object_detector is not None:
+        for p in pics:
+            if p.status in ("kept", "weak"):
+                try:
+                    ImageFile.LOAD_TRUNCATED_IMAGES = True
+                    p.hints = list(c.object_detector(Image.open(p.path)))
+                except Exception:  # noqa: BLE001 -- hints are a bonus
+                    p.hints = []
     manifest = _manifest(pics, in_dir, out_dir, c)
     if write:
         _write(pics, in_dir, out_dir, c, manifest)
@@ -256,7 +266,8 @@ def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = 
 def _manifest(pics: list[Pic], in_dir: str, out_dir: str, c: Config) -> dict:
     rows = [dict(file=p.rel, group=p.group, pose=p.pose, name=p.name, time=p.taken, status=p.status, reason=p.reason, duplicate_of=p.duplicate_of,
                  brightness=round(p.bright, 1), contrast=round(p.contrast, 1), sharpness=round(p.sharp, 1), clip_high=round(p.clip_high, 3),
-                 clip_low=round(p.clip_low, 3), quality=p.quality, detections=p.dets) for p in sorted(pics, key=lambda x: x.rel)]
+                 clip_low=round(p.clip_low, 3), quality=p.quality, detections=p.dets,
+                 object_hints=[{"class": n, "score": round(s, 2), "box": [round(v, 1) for v in b]} for n, s, b in p.hints]) for p in sorted(pics, key=lambda x: x.rel)]
     return {"made": time.strftime("%Y-%m-%d %H:%M:%S"), "input": in_dir, "output": out_dir, "pictures": rows, "summary": _summary(pics, c)}
 
 
@@ -285,6 +296,12 @@ def _summary(pics: list[Pic], c: Config) -> dict:
             out["hints"].append(f"'{pose}' pictures: {s['duplicate']} of {n} are near-duplicates: the view barely changes between survey stops.")
         if s["people"]:
             out["hints"].append(f"'{pose}': {s['people']} picture(s) with a person or face were set aside (not copied).")
+    seen: dict[str, int] = {}
+    for p in pics:
+        for n, _s, _b in p.hints:
+            seen[n] = seen.get(n, 0) + 1
+    if seen:
+        out["object_hints"] = dict(sorted(seen.items(), key=lambda kv: -kv[1]))
     for name, n in out["by_name"].items():
         have = n["kept"] + n["weak"]
         if have < c.named_min_keep:
@@ -344,6 +361,10 @@ def _contact_sheet(items: list[Pic], path: str, title: str, c: Config) -> None:
             cx, cy, w, h = (float(det.get(k, 0.0)) for k in ("cx", "cy", "w", "h"))
             d.rectangle([x + (cx - w / 2) * t, y + (cy - h / 2) * t, x + (cx + w / 2) * t, y + (cy + h / 2) * t], outline=(255, 70, 70))
         edge = (230, 150, 40) if p.status in ("weak", "rejected") else (60, 200, 90)
+        for name, sc, (x1, y1, x2, y2) in p.hints:                 # the outside model's category hints, green, in the picture's own pixels
+            k = t / max(im.width, 1)
+            d.rectangle([x + x1 * k, y + y1 * k, x + x2 * k, y + y2 * k], outline=(60, 230, 120))
+            d.text((x + x1 * k + 2, y + y1 * k + 2), f"{name} {sc:.2f}", fill=(60, 230, 120))
         d.rectangle([x, y, x + t - 1, y + t - 1], outline=edge)
         label = f"{p.reason or p.pose} {p.quality:.2f}" if p.status in ("weak", "rejected") else f"{p.pose} {p.quality:.2f}"
         d.text((x + 2, y + t + 2), label[:26], fill=(200, 200, 200))
@@ -364,6 +385,8 @@ def summary_text(manifest: dict) -> str:
         lines.append("Named objects:")
         for name, v in sorted(s["by_name"].items()):
             lines.append(f"  {name}: kept {v['kept']}, weak {v['weak']}, duplicates {v['duplicate']}, people {v['people']}")
+    if s.get("object_hints"):
+        lines.append("Object hints from the outside model (categories only, unverified): " + ", ".join(f"{k} {v}" for k, v in s["object_hints"].items()))
     if s["hints"]:
         lines.append("Hints:")
         lines += [f"  - {h}" for h in s["hints"]]
@@ -381,6 +404,7 @@ def main(argv=None) -> int:
     ap.add_argument("--named-dup-bits", type=int, default=Config.named_dup_bits)
     ap.add_argument("--person-model", default=os.path.expanduser("~/g2_data/models/yolox_s.onnx"), help="outside person model (ONNX) used until the on-camera model is trained; skipped if the file is missing")
     ap.add_argument("--no-person-model", action="store_true")
+    ap.add_argument("--no-object-hints", action="store_true", help="skip the outside model's object class hints and boxes on the kept pictures")
     ap.add_argument("--person-window-s", type=float, default=Config.person_window_s)
     ap.add_argument("--non-person-labels", default=",".join(Config.non_person_labels),
                     help="detection labels that do not make a picture a people picture (comma separated; any other detection does)")
@@ -396,7 +420,10 @@ def main(argv=None) -> int:
         if os.path.isfile(os.path.expanduser(a.person_model)):
             try:
                 from person_filter import PersonDetector
-                c.person_detector = PersonDetector(os.path.expanduser(a.person_model), min_score=0.12).best_score
+                det = PersonDetector(os.path.expanduser(a.person_model), min_score=0.12)
+                c.person_detector = det.best_score
+                if not a.no_object_hints:
+                    c.object_detector = lambda im: det.objects(im, min_score=0.25)
             except Exception as e:  # noqa: BLE001
                 print(f"person model not usable ({e}); using the camera's detections and hand marks only")
         else:
