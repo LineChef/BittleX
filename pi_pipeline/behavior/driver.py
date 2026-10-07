@@ -493,7 +493,8 @@ class BehaviorDriver:
             if g is not Gesture.NONE:
                 fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "sniff a find"))
         elif d.action is ExploreAction.HOLD:
-            fx.append(Effect(EffectKind.STOP, None, d.reason))
+            if not (self.survey is not None and d.reason == "leg done"):      # surveying: a finished leg never rests; the next leg just starts (rest is for the end)
+                fx.append(Effect(EffectKind.STOP, None, d.reason))
 
         if (self.survey is not None and self._vision and d.action is ExploreAction.HOLD and d.reason == "leg done"
                 and self.survey.ready(now)):

@@ -137,7 +137,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | Command | Does |
 |---|---|
 | `g2see` | **just look** -- live feed with detection boxes from the camera mounted on G2 (plugged into the Pi) at `localhost:8080`; no name, nothing saved. Close the tab to stop (or `g2pcam-stop`). Needs `G2_PI` exported; tells you if the camera isn't plugged in |
-| `g2pics [status\|pull\|open]` | what pictures G2 saved while exploring (survey stops and objects you named): `status` = counts, disk use and the newest on the Pi; `pull` copies them to `~/g2_pictures/explore` on the Mac; `open` pulls and shows the folder in Finder. Pictures stay on the Pi until you pull them; only near-duplicates are ever deleted. |
+| `g2pics [open\|status\|pull\|stop]` | **the pictures G2 saved while exploring, as thumbnails in the review page** (survey stops and objects you named; an X on each moves it to the Trash with Undo; Trash tab restores; "Empty trash" is the only permanent delete and asks twice). Runs in the background, opens `http://127.0.0.1:8765`; `status` = text summary from the Pi, `pull` = copy to `~/g2_pictures/explore`, `stop` = end the page. Only near-duplicates are ever deleted automatically. |
 | `g2pcam <name> [session]` | preview/capture with the camera **mounted on G2** (plugged into the Pi): runs `camera_preview.py` on the Pi, tunnels it to `localhost:8080`, opens it. Saves on the Pi in `~/g2_cap/<name>/session_<n>/`. Closing the tab stops it. Needs `export G2_PI=<user>@g2pi.local` in your shell profile |
 | `g2pcam-pull <name> [session]` | copy that Pi capture to `$G2_CAP_ROOT/<name>/session_<n>/` so `g2curate` / `g2auto` work on it as usual |
 | `g2pcam-stop` | kill the tunnel and the preview process on the Pi |
@@ -207,8 +207,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | Command | Does |
 |---|---|
 | `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
-| `g2pimem [log N\|facts\|search q\|usage\|...]` | the same memory CLI against G2's **real** memory on the Pi (`g2mem` reads the Mac's copy); default `facts` = what he chose to keep; `log 20` is the transcript of recent turns (not memories); `sightings` = what he noticed |
-| `g2review` | a **review page** with an X on every record: facts, conversations, what G2 noticed, and the pictures he saved. X moves a record to the Trash (Undo for 9 s, Restore any time); "Empty trash" is the only permanent delete and asks twice. Runs on the Pi through ssh, opens `http://127.0.0.1:8765`, Ctrl-C stops it. A backup of the memory database is made before the first delete of each session. |
+| `g2pimem [facts\|log N\|search q\|usage\|stop]` | G2's **real** memory on the Pi in the same review page (opens on Facts; Conversations, Observations, Pictures and Trash are tabs; an X on every record, Undo, a backup before the first delete). With a subcommand it prints text instead (`facts`, `log 20` = transcript, `search q`, `usage`). `g2mem` reads the Mac's copy. |
 | `g2mem usage` / `consolidate [--apply]` / `pin N` / `unpin N` / `sightings [N]` | per-fact use counters, the sleep-time consolidation pass (dry-run without `--apply`), keep a fact in the core block, the sightings log |
 | `python -m pi_pipeline.power runtime test start\|collect\|cancel` / `runtime list\|add\|forget\|plugged\|unplugged` | the Pi battery runtime test (start from a FULL charge, then unplug) and its recorded runs |
 | `python pi_pipeline/gait/stand_log.py --minutes 20 --log x.csv` | passively log G2 standing (roll/pitch swing, dominant frequency, voltage) to catch a posture wobble; stop `g2-voice` first |

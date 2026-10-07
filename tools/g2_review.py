@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """A review page for G2's memory and saved pictures, with an X on every record.
 
-    python3 tools/g2_review.py            # or the `g2review` alias: starts the page on http://127.0.0.1:8765 and opens it in your browser
-    python3 tools/g2_review.py --no-open --port 8800
+    g2pimem            # opens this page on the Facts tab (g2pimem <subcommand> still prints text: log 20, search ..., usage)
+    g2pics             # opens this page on the Pictures tab (g2pics status / pull still print or copy)
+    python3 tools/g2_review.py [--tab facts|exchanges|observations|pictures|trash] [--no-open] [--stop]
+
+The page runs as a background server (so your terminal is free): the first call starts it, later calls just open the browser. `--stop` ends it. Log: ~/g2_logs/review_server.log.
 
 Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Trash. The X moves a record to the Trash
 (you get an Undo for a few seconds, and the Trash tab restores anything later); only "Empty trash" deletes for good, and it asks twice. A safe copy of the
@@ -18,10 +21,13 @@ import os
 import re
 import secrets
 import shlex
+import signal
 import subprocess
 import sys
 import threading
+import time
 import urllib.parse
+import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -147,6 +153,8 @@ def make_handler(app: App, token: str, port: int):
             qs = urllib.parse.parse_qs(u.query)
             if not self._ok_host():
                 return self._send(403, b"bad host", "text/plain")
+            if u.path == "/ping":
+                return self._json({"app": "g2review", "pid": os.getpid()})
             if u.path == "/":
                 return self._send(200, PAGE.replace("__TOKEN__", token).encode(), "text/html; charset=utf-8")
             if not self._authed(qs):
@@ -225,7 +233,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
 const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["trash","Trash"]];
-let tab=localStorage.getItem("g2tab")||"facts",data=[],undoFn=null,timer=null,confirmAt=0;
+let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts",data=[],undoFn=null,timer=null,confirmAt=0;
 const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
  const r=await fetch(path,o);const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||r.statusText);return j}
@@ -264,30 +272,84 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   else if(tab==="observations"){main.append(el("div","",r.caption),el("div","meta",r.ts+(r.labels?" · detector: "+r.labels:"")))}
   else{main.append(el("div","",r.fact),el("div","meta","#"+r.id+" · "+r.ts.slice(0,10)+(r.core?" · core":"")+" · importance "+r.importance))}
   row.append(main,xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
+window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;drawTabs();load();
 </script></body></html>"""
+
+
+PIDFILE = Path(os.path.expanduser("~/.g2_review.pid"))
+LOG = Path(os.path.expanduser("~/g2_logs/review_server.log"))
+
+
+def _ping(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/ping", timeout=1.5) as r:
+            return json.loads(r.read()).get("app") == "g2review"
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def serve(port: int) -> int:
+    pi = os.environ.get("G2_PI")
+    if not pi:
+        print("set G2_PI to user@host of the Pi (in ~/.zshrc)", file=sys.stderr, flush=True)
+        return 2
+    token = secrets.token_urlsafe(24)
+    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(App(Remote(pi)), token, port))
+    PIDFILE.write_text(str(os.getpid()))
+    signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=srv.shutdown, daemon=True).start())
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            PIDFILE.unlink()
+        except OSError:
+            pass
+    return 0
+
+
+def stop() -> int:
+    try:
+        pid = int(PIDFILE.read_text())
+        os.kill(pid, signal.SIGTERM)
+        print(f"review page stopped (pid {pid})", flush=True)
+    except (OSError, ValueError):
+        print("the review page is not running", flush=True)
+    return 0
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--tab", default="facts")
     ap.add_argument("--no-open", action="store_true")
+    ap.add_argument("--serve", action="store_true", help="(internal) run the server in the foreground")
+    ap.add_argument("--stop", action="store_true")
     a = ap.parse_args(argv)
-    pi = os.environ.get("G2_PI")
-    if not pi:
-        print("set G2_PI to user@host of the Pi (in ~/.zshrc)", file=sys.stderr)
+    if a.stop:
+        return stop()
+    if a.serve:
+        return serve(a.port)
+    if not os.environ.get("G2_PI"):
+        print("set G2_PI to user@host of the Pi (in ~/.zshrc)", file=sys.stderr, flush=True)
         return 2
-    token = secrets.token_urlsafe(24)
-    app = App(Remote(pi))
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(app, token, a.port))
-    url = f"http://127.0.0.1:{a.port}/"
-    print(f"G2 review page: {url}   (Ctrl-C to stop)")
-    if not a.no_open:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
+    if not _ping(a.port):                                   # first call: start the page as a background server, then wait for it
+        LOG.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "--serve", "--port", str(a.port)], stdout=open(LOG, "a"), stderr=subprocess.STDOUT,
+                         stdin=subprocess.DEVNULL, start_new_session=True)
+        for _ in range(40):
+            if _ping(a.port):
+                break
+            time.sleep(0.15)
+        else:
+            print(f"the review page did not start; see {LOG}", file=sys.stderr, flush=True)
+            return 1
+    url = f"http://127.0.0.1:{a.port}/#{a.tab}"
+    print(f"G2 review page: {url}   (stop it with: g2pics stop)", flush=True)
+    if not a.no_open and not os.environ.get("G2_REVIEW_NO_OPEN"):
+        webbrowser.open(url)
     return 0
 
 

@@ -3,8 +3,11 @@
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   stop -> stand -> look down (`kbuttUp`, nose-down bow: the INSPECT pose) -> picture -> look up (`ksit`, chest raised) -> picture -> stand
+  survey_plan   look down (`kbuttUp`, nose-down bow: the INSPECT pose) -> picture -> look up (`ksit`, chest raised) -> picture -> stand
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
+
+G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
+He rests only when the exploration session ends.
 
 Taking a picture is a camera call over USB: no network, no API call. How the pictures are saved and processed: `vision/exploration_pictures.py`,
 `tools/curate_exploration.py`.
@@ -19,8 +22,6 @@ from dataclasses import dataclass
 @dataclass
 class SurveyConfig:
     cooldown_s: float = 15.0        # at most one survey this often (the end of every leg is a chance, not a promise)
-    stand_s: float = 1.2            # after the walk stops, before standing up
-    stand_settle_s: float = 1.8     # standing up takes this long
     pose_settle_s: float = 2.2      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
     final_settle_s: float = 1.5     # after standing again, before the walk resumes
     look_down_skill: str = "kbuttUp"
@@ -44,11 +45,7 @@ class Survey:
 
 def survey_plan(cfg: SurveyConfig) -> list:
     t = 0.0
-    plan = [(t, "stop", None, "survey: stop walking")]
-    t += cfg.stand_s
-    plan.append((t, "skill", cfg.stand_skill, "survey: stand"))
-    t += cfg.stand_settle_s
-    plan.append((t, "skill", cfg.look_down_skill, "survey: look down"))
+    plan = [(t, "skill", cfg.look_down_skill, "survey: look down (the walk stops, no rest)")]
     t += cfg.pose_settle_s
     plan.append((t, "shot", "look_down", "survey: picture, looking down"))
     t += 0.4
@@ -74,11 +71,7 @@ def clean_name(text: str) -> str:
 
 def naming_plan(name: str, cfg: SurveyConfig) -> list:
     t = 0.0
-    plan = [(t, "stop", None, f"naming {name}: stop walking")]
-    t += cfg.stand_s
-    plan.append((t, "skill", cfg.stand_skill, "naming: stand"))
-    t += cfg.stand_settle_s
-    plan.append((t, "skill", cfg.look_down_skill, "naming: look down at it"))
+    plan = [(t, "skill", cfg.look_down_skill, f"naming {name}: look down at it (the walk stops, no rest)")]
     t += cfg.pose_settle_s
     plan.append((t, "shot", f"name:{name}", f"naming: picture of the {name}"))
     t += 0.3
@@ -86,7 +79,7 @@ def naming_plan(name: str, cfg: SurveyConfig) -> list:
     t += 0.4
     plan.append((t, "skill", cfg.stand_skill, "naming: stand again"))
     t += cfg.final_settle_s
-    plan.append((t, "diag", "naming.done", f"naming: finished, walking on"))
+    plan.append((t, "diag", "naming.done", "naming: finished, walking on"))
     return plan
 
 

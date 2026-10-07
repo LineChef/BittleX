@@ -262,25 +262,30 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]
 g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
-# g2pimem [facts | log N | search <q> | usage | sightings N | ...]  -- the same CLI against G2's REAL memory on the Pi (g2mem reads the Mac's copy). Default: his FACTS (the
-# things he chose to keep). `g2pimem log 20` is the conversation transcript, not memories; `g2pimem sightings` is what he noticed.
-g2pimem() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory ${*:-facts}"; }
-# g2review  -- the review page: facts, conversations, what G2 noticed and the pictures he saved, each with an X (goes to a Trash with Undo; "Empty trash" is the only
-# permanent delete). Opens http://127.0.0.1:8765 in your browser; Ctrl-C stops it. Needs G2_PI.
-g2review() { python3 "$G2_ROOT/tools/g2_review.py" "$@"; }
-# g2pics [status | pull | open]  -- what pictures G2 saved while exploring (survey stops, named objects): status = counts and the newest on the Pi (default);
-# pull = copy them to ~/g2_pictures on this Mac; open = pull, then show the folder in Finder. Pictures stay on the Pi until you pull them.
+# g2pimem  -- G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
+# "Empty trash" is the only permanent delete). It runs in the background: the first call starts it, later calls just open the browser. `g2pimem stop` ends it.
+# g2pimem <facts | log N | search <q> | usage | sightings N | ...>  prints text instead (the same CLI against the Pi; g2mem reads the Mac's copy).
+g2pimem() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  case "${1:-ui}" in
+    ui) python3 "$G2_ROOT/tools/g2_review.py" --tab facts ;;
+    stop) python3 "$G2_ROOT/tools/g2_review.py" --stop ;;
+    *) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory $*" ;;
+  esac
+}
+# g2pics  -- the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo).
+# g2pics status = text summary from the Pi; g2pics pull = copy them to ~/g2_pictures/explore; g2pics stop = end the page.
 g2pics() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
-  local cmd="${1:-status}" dest="$HOME/g2_pictures"
-  case "$cmd" in
+  case "${1:-ui}" in
+    ui|open) python3 "$G2_ROOT/tools/g2_review.py" --tab pictures ;;
+    stop) python3 "$G2_ROOT/tools/g2_review.py" --stop ;;
     status) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.exploration_pictures" ;;
-    pull|open)
+    pull)
       ssh "$G2_PI" 'test -d ~/.local/share/g2/explore_pictures' || { echo "no exploration pictures on the Pi yet"; return 0; }
-      mkdir -p "$dest/explore" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$dest/explore/" \
-        && echo "pictures copied to $dest/explore ($(find "$dest/explore" -name '*.jpg' | wc -l | tr -d ' ') jpg)" \
-        && { [ "$cmd" = open ] && open "$dest/explore"; true; } ;;
-    *) echo "usage: g2pics [status|pull|open]"; return 2 ;;
+      mkdir -p "$HOME/g2_pictures/explore" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$HOME/g2_pictures/explore/" \
+        && echo "pictures copied to $HOME/g2_pictures/explore ($(find "$HOME/g2_pictures/explore" -name '*.jpg' | wc -l | tr -d ' ') jpg)" ;;
+    *) echo "usage: g2pics [open|status|pull|stop]"; return 2 ;;
   esac
 }
 
