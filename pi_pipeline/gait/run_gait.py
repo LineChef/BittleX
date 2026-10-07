@@ -986,7 +986,7 @@ def main():
                 policy_path=args.policy, send_every=args.send_every,
                 fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trims(args.foot_trim), foot_hold=args.foot_hold, scripted=args.scripted,
                 hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki,
-                log_extra=args.log_extra)
+                log_extra=args.log_extra, **({"volt_every_s": args.volt_every} if args.volt_every > 0 else {}))
     finally:
         try:
             lk.close()
