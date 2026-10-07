@@ -465,7 +465,7 @@ def _make_vision_feed(kind, port, baud):
 
 
 def _extra_cols(feed, now, volt, on):
-    """The `--log-extra` columns: accel in g, how many IMU frames have arrived so far (equal numbers on consecutive rows mean the same held
+    """The `--log-extra` columns: accel in m/s^2, how many IMU frames have arrived so far (equal numbers on consecutive rows mean the same held
     frame, so a fresh reading is the row where it changes), seconds since the latest frame, and the last pack voltage."""
     if not on:
         return ""
@@ -479,7 +479,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
         stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False):
-    """`log_extra=True` adds accel (g), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
+    """`log_extra=True` adds accel (m/s^2, about 10 on az at rest), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
     `heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
     `volt_every_s` > 0 reads the battery voltage (`P`) that often WHILE walking, logs each reading (diag `gait/battery.load`), calls
@@ -873,7 +873,7 @@ def main():
     ap.add_argument("--volt-every", type=float, default=0.0, metavar="S",
                     help="--openloop: log the battery voltage every S seconds during the walk (0 = off)")
     ap.add_argument("--log-extra", action="store_true",
-                    help="policy walks: also log accel (g), the IMU frame counter and age, and the pack voltage (asked every 5 s)")
+                    help="policy walks: also log accel (m/s^2), the IMU frame counter and age, and the pack voltage (asked every 5 s)")
     ap.add_argument("--ramp-cycles", type=float, default=0.0, metavar="N",
                     help="--openloop: blend the lift/shoulder scaling in from x1 over N cycles (avoids a jump from the stand pose)")
     ap.add_argument("--openloop-balance-off", action="store_true",

@@ -140,7 +140,7 @@ def _wrap(a):
 
 
 def parse_imu_accel(line):
-    """(ax, ay, az) in g from an `MCU:`/`ICM:` frame, or None. The same fields parse_imu_line skips; used only for logging."""
+    """(ax, ay, az) as printed (about 10 on az at rest on G2, so m/s^2) from an `MCU:`/`ICM:` frame, or None. The same fields parse_imu_line skips; used only for logging."""
     s = line.strip()
     for prefix in IMU_PREFIXES:
         if s.startswith(prefix):
@@ -181,7 +181,7 @@ class ImuFeed:
         self.frame = None            # (roll, pitch, yaw, gx, gy, gz) or None before the first frame
         self.stamp = None            # receive time of the latest frame
         self.frames = 0
-        self.accel = None            # (ax, ay, az) in g of the latest frame, when the line carries it
+        self.accel = None            # (ax, ay, az) as printed (about 10 on az at rest: m/s^2) of the latest frame, when the line carries it
         self._prev = None            # (t, roll, pitch, yaw) of the frame the rate was last taken from
 
     def update(self, lines, now):

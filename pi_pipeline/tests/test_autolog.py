@@ -123,3 +123,14 @@ def test_the_surface_label_remembers_when_it_was_set_so_a_stale_label_can_be_ign
     real = _t.time
     monkeypatch.setattr(autolog.time, "time", lambda: real() + 13 * 3600)          # a day-ish later, nobody reset the floor
     assert autolog.get_surface_info()[1] > 12.9
+
+
+def test_a_run_can_be_excluded_by_a_part_of_its_name_and_the_log_is_kept(on):
+    a = autolog.new_run("policy_walk", now=datetime(2026, 10, 7, 14, 17, 0).timestamp())
+    b = autolog.new_run("policy_walk", now=datetime(2026, 10, 7, 14, 16, 45).timestamp())
+    assert autolog.exclude_run("141700", "hit the fridge") == "policy_walk_141700"
+    side = json.load(open(a.csv_path[:-4] + ".json"))
+    assert side["excluded"] is True and side["excluded_reason"] == "hit the fridge" and side["excluded_by"] == "user"
+    assert "excluded" not in json.load(open(b.csv_path[:-4] + ".json"))               # the neighbour is untouched
+    assert autolog.exclude_run("policy_walk", "too vague") is None                       # two matches: refuses to guess
+    assert autolog.exclude_run("999999", "no such run") is None

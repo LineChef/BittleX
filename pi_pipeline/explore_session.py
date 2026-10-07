@@ -1,7 +1,8 @@
 """A supervised exploration test: the behavior runtime on the real G2, with narration, and no voice loop.
 
-    bash tools/g2_explore.sh start          # from the Mac: stops g2-voice, runs this, and ALWAYS restarts g2-voice when it ends
-    bash tools/g2_explore.sh arm            # allow Tier 1 roam (Tier 0, the stationary "attentive" layer, is on from the start)
+    bash tools/g2_explore.sh start          # from the Mac: stops g2-voice, runs this, and ALWAYS restarts g2-voice when it ends; G2 starts ROAMING at once (Tier 1)
+    bash tools/g2_explore.sh stationary     # opt-in: stay put (Tier 0, the stationary "attentive" layer) until `arm`
+    bash tools/g2_explore.sh arm            # allow Tier 1 roam
     bash tools/g2_explore.sh disarm         # end the roam bout
     bash tools/g2_explore.sh stop           # end the session
 
@@ -36,15 +37,23 @@ def _read_command() -> str:
         return ""
 
 
-def main() -> None:
+def parse_args(argv=None):
+    """Roaming (Tier 1) starts at once by default; `--stationary` is the opt-in stay-put mode (Tier 0 only, until `arm`)."""
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
     ap.add_argument("--roam-s", type=float, default=600.0, help="a roam bout disarms itself after this long (0 = no cap)")
-    ap.add_argument("--arm-on-start", action="store_true", help="start roaming at once (the voice service handed over after \"look around\")")
+    ap.add_argument("--stationary", action="store_true", help="opt-in: stay put (Tier 0, the stationary attentive layer) until `arm`; the default is to start roaming at once")
+    ap.add_argument("--arm-on-start", action="store_true", help="start roaming at once (now the default; kept for the voice hand-over)")
     ap.add_argument("--exit-when-roam-ends", action="store_true", help="end the session (the voice service comes back) when roaming ends")
     ap.add_argument("--max-s", type=float, default=7200.0, help="the whole session ends after this long, so a forgotten session cannot keep the voice service off")
     ap.add_argument("--no-narrate", action="store_true")
     ap.add_argument("--hz", type=float, default=8.0)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+    args.arm_on_start = args.arm_on_start or not args.stationary
+    return args
+
+
+def main() -> None:
+    args = parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s", datefmt="%H:%M:%S")
     from .app.__main__ import _build_runtime, _make_link, _make_memory, _make_vision_source
@@ -108,7 +117,7 @@ def main() -> None:
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
             attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
             rt.bindings.tts = tts
-            say("Exploration test starting. I will stay put and look around first.")
+            say("Exploration test starting. I will stay put and look around first." if args.stationary else "Exploration test starting.")
 
         from .gait.stand_guard import StandGuard
         guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
@@ -141,6 +150,10 @@ def main() -> None:
         signal.signal(signal.SIGTERM, lambda *_: rt.stop())
         t = threading.Thread(target=rt.run_forever, name="behavior", daemon=True)
         t.start()
+        try:
+            os.remove(CMD_FILE)                              # a command left behind by an earlier session must not act on this one
+        except OSError:
+            pass
         log.info("exploration session running (Tier 0 on). commands via %s: arm / disarm / halt / release / stop", CMD_FILE)
 
         started = time.monotonic()

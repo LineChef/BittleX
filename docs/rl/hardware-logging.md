@@ -7,7 +7,7 @@ What `run_gait.py --log` writes, what the firmware can and cannot give us, and w
 | Log | Columns | Rate |
 |---|---|---|
 | Policy walk (`run_gait.py --log`) | `t, roll, pitch, yaw, gx, gy, gz, j0..j7, guard_state, hottest_j, hottest_tier, hottest_frac, duty_s` (+ `steer_u` with heading hold) | one row per control tick (80 Hz); `j0..j7` are the **commanded** joint angles; `gx..gz` are zero (rate mode `zero`) |
-| Same, with `--log-extra` | adds `ax, ay, az, imu_n, imu_age_s, volt` | `ax..az` in g from the IMU line; `imu_n` counts IMU frames received (rows with the same number share one held frame, so a fresh reading is where it changes); `volt` is the last pack voltage (asked every 5 s while walking, so it is stale between readings) |
+| Same, with `--log-extra` | adds `ax, ay, az, imu_n, imu_age_s, volt` | `ax..az` from the IMU line, in m/s^2 (the first kitchen logs show about 10 at rest on az, so the unit is m/s^2 and not g); `imu_n` counts IMU frames received (rows with the same number share one held frame, so a fresh reading is where it changes); `volt` is the last pack voltage (asked every 5 s while walking, so it is stale between readings) |
 | Open-loop `wkF` (`--openloop --log`) | `t, roll, pitch, yaw, gx, gy, gz, guard_state, volt` | the walk's own commands are not logged; `--volt-every S` sets the voltage rate |
 
 ## What cannot be logged during a walk

@@ -529,5 +529,5 @@ def test_log_extra_adds_the_columns_to_a_real_loop_log_and_default_logs_are_unch
     assert head_e[:len(head_p)] == head_p and head_e[len(head_p):] == ["ax", "ay", "az", "imu_n", "imu_age_s", "volt"]
     rows = [r.split(",") for r in lines_e if r[:1].isdigit()]
     assert all(len(r) == len(head_e) for r in rows)
-    assert rows[-1][len(head_p) + 2] == "1.00"                                    # az in g
+    assert rows[-1][len(head_p) + 2] == "1.00"                                    # az as printed
     assert all(len(r.split(",")) == len(head_p) for r in plain.read_text().splitlines() if r[:1].isdigit())

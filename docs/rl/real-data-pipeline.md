@@ -38,7 +38,7 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
 
-A run is usable for fitting only if all hold: file complete and time strictly increasing; control loop on time (dropped ticks under a limit); IMU frames arriving (no long stale stretch);
+A run is usable for fitting only if all hold: it is not flagged `excluded` (a person marks a run that must never be used, for example a collision or a pick-up, with `python -m pi_pipeline.telemetry exclude RUN WHY` on the Pi; the log is kept and the sidecar records who, when and why); file complete and time strictly increasing; control loop on time (dropped ticks under a limit); IMU frames arriving (no long stale stretch);
 no NaN or out-of-range values; the run's hardware epoch is current; surface label known; policy known; length above a minimum; the surface label was set within the last 12 hours (an older label is treated as unknown: the label stays on the Pi until someone changes it, so a stale one would mislabel the next session); no operator pick-up (accel / tilt spike) inside the window used;
 no fall or guard trip inside the window used (those runs still count for event rates); battery above the low-battery line, or tagged by voltage band and never mixed with full-pack data;
 the first seconds after the stand excluded; thermal cooldown stretches excluded.

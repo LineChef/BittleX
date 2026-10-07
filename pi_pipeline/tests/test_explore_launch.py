@@ -29,3 +29,10 @@ def test_launch_skips_off_a_pi_and_when_a_session_is_already_running():
     def boom(cmd, **k):
         raise OSError("no sudo")
     assert launch(platform="linux", run=boom) is False
+
+
+def test_exploration_roams_by_default_and_stationary_is_the_opt_in():
+    from pi_pipeline import explore_session as E
+    assert E.parse_args([]).arm_on_start is True                       # default: roam at once (Tier 1)
+    assert E.parse_args(["--stationary"]).arm_on_start is False        # opt-in: stay put until `arm`
+    assert E.parse_args(["--stationary", "--arm-on-start"]).arm_on_start is True

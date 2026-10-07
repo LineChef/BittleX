@@ -128,3 +128,22 @@ def size_mb(root: Path | None = None) -> float:
         return sum(f.stat().st_size for f in (root or base_dir()).rglob("*") if f.is_file()) / 1e6
     except OSError:
         return 0.0
+
+
+def find_run(stem: str, root: Path | None = None) -> Path | None:
+    """The sidecar for a run named by its file stem or a unique part of it (for example `policy_walk_141700` or `141700`)."""
+    sides = sorted((root or base_dir()).glob("*/*.json"))
+    exact = [s for s in sides if s.stem == stem]
+    hits = exact or [s for s in sides if stem in s.stem]
+    return hits[0] if len(hits) == 1 else None
+
+
+def exclude_run(stem: str, reason: str, *, by: str = "user", root: Path | None = None) -> str | None:
+    """Flag a run so it is never used for fitting (a collision, a pick-up, a bad surface label ...). Nothing is deleted: the log stays, the sidecar says why. Returns the run's name, or None if no single run matches."""
+    side = find_run(stem, root)
+    if side is None:
+        return None
+    d = json.loads(side.read_text())
+    d.update(excluded=True, excluded_reason=reason, excluded_by=by, excluded_at=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+    side.write_text(json.dumps(d, indent=1))
+    return side.stem
