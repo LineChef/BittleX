@@ -8,7 +8,7 @@ campaign this replaces), [`hw1-log.md`](hw1-log.md) (how V2 / V2.1 were trained)
 new lever is screened alone, the ones that pass are combined and built into a staged chain, and the 20M run is the last training run.
 Tuning runs stay possible later if the result needs them, but none are planned.
 
-## 0. Where to resume (state at ~2:30 PM ET, 2026-10-06)
+## 0. Where to resume (state at ~9:10 PM ET, 2026-10-06: queue running C0 done, S1 at 3M, then C0b, S2 ...; G2 charging)
 
 > **TODO next time G2 is online after charging (2026-10-06 evening):** redo the three-point steering check on a FULL pack before any more heading-hold tuning: fixed stride difference u = 0, -0.20, -0.28 (corrected sign, joints clamped by `heading_hold.JOINT_RANGE_DEG`), `g2_baseline.sh start 12 recheck --const-u=0,-0.20,-0.28`, user watches and reports left / right / straight per run. The right drift at u = 0 grew from +44 to +178 deg per 12.5 s as the resting pack voltage fell from 8.20 to 7.93 V, so everything tuned below about 8.0 V is suspect. Also confirm the yaw log matches what is seen (the end-of-run yaw jumps if G2 is picked up).
 
@@ -337,13 +337,21 @@ moment calibration ends. A phase that overruns moves everything after it by the 
   opposite sign..."). Sign fixed in the code; next is a round that dials the correction in (feed-forward near the measured cancel point plus the feedback) until the
   walk is a straight line, then it can go into the sim for **scoring only** (the sim's own steering sign must be understood first).
 - **Turning screen (S5):** measure the real `kwkL` / `kwkR` turn rates when the Pi is back on G2, before S5 comes up in the queue; the result sets `trained/v3_turning_gate_pass`.
-- **Difficulty curriculum (built and being tested; training stays stopped until it is shown to help):** the base recipe now trains on per-category difficulty levels
-  (terrain, ledge, slope, fault) that start at a clean passable floor and rise only where a deterministic probe (every 98k steps, 6 episodes per category) shows the policy
-  is ready (score >= 0.80 to rise, <= 0.50 to drop); focus episodes stretch 0.1 above the level, 10% anchor episodes stay at level 0, 25% combos use every level. Two paces:
-  +0.10 per good probe for the 3M screens, +0.05 after two good probes for the stages and the 20M (stages start at 0.8, the last at 1.0). Evidence required before relaunch:
-  curriculum run vs the old fixed-ramp scheme at equal steps, scored at full difficulty. Code: `opencat_gym_env.py` (CATEGORY_LEVELS, LEVEL_EXTERNAL, ...), `train.py` (Curriculum),
-  tests in `test_v3_levers.py`, checks `difficulty_check.py` / `difficulty_audit.py`. The earlier "no ramp for ledges / rubble" statement was wrong: most hazards already scaled
-  with a step-count ramp; the changes are the per-category, competence-driven levels and the three severities that ignored the ramp.
+- **Difficulty curriculum (built, tested and running in the V3 queue since 6:59 PM on 2026-10-06):** the base recipe trains on per-category difficulty levels
+  (terrain, ledge, slope, fault) driven by a deterministic probe every 98k steps (6 episodes per category for C0 and S1, **12 from S2 on**; the clean-floor reading was noisy,
+  0.23 to 0.90 in C0). A category rises after good probes (relative score >= 0.80), drops at <= 0.50; focus episodes stretch 0.1 above the level, 10% anchor episodes stay at
+  level 0, 25% combos use every level. Two paces: +0.10 per good probe for the 3M screens, +0.05 after two good probes for the stages and the 20M (stages start at 0.8, the
+  last at 1.0). **Guards** (added after three failed C0 attempts, see below), pure function `curriculum.update_levels`, tested in `test_v3_levers.py`: no level exceeds
+  steps / 4M (a time cap); no promotion while the clean-floor score is below 0.5; every category backs off one step if it falls below 0.35.
+  Randomization is separate from the levels (time ramp over 4M steps) and the smoothing penalty ramps over 4M with weight 8.2.
+  **Failed C0 attempts** (kept in `trained/failed_c0_run1|2|3`, data in `v3-data/c0_failed_run1`): run 1 reward -1000 and 45% falls on flat ground (smoothing penalty with a 1M ramp and
+  weight 10.5, randomization tied to the levels); run 2 survived 56% clean (randomization full by 1M) and the probe misread slow walking; run 3 relative scoring hid a declining
+  baseline so the levels outran the policy. **Result so far:** C0 (3M steps) passed the flat bar (T1.1 0% falls) with levels ending at 0.74 / 0.74 / 0.47 / 0.69 (terrain / ledge /
+  slope / fault; slope was held back), but N2 (60 s) falls 38%. In S1 the levels sit on the time cap in nearly every probe, so the schedule is effectively a linear ramp with the adaptive
+  part acting as a brake. Evidence that it beats the old fixed ramp: the 600k-step comparison (mean fall rate 21% against 38% at full difficulty, `v3-data/curriculum_vs_fixed_ramp/`);
+  at 3M, S1 against C0. **A second control `v3_c0b` (the same recipe, 12-episode probe) is queued right after S1 so S2 onward compare cleanly;** the runner's automatic verdicts still use `v3_c0`.
+  Code: `opencat_gym_env.py` (CATEGORY_LEVELS, LEVEL_EXTERNAL, ...), `train.py` (Curriculum), `curriculum.py`, checks `difficulty_check.py` / `difficulty_audit.py`. The earlier "no ramp for ledges /
+  rubble" statement was wrong: most hazards already scaled with a step-count ramp; the changes are the per-category, competence-driven levels and the three severities that ignored the ramp.
 
 ## 5. Decisions (user, 2026-10-06)
 - Everything learned from tuning goes into the base training; no planned tuning runs after the 20M.
