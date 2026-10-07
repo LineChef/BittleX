@@ -31,6 +31,21 @@ so it can learn things the camera model was never trained on.
 - **Not built:** saving and labelling the pictures, the exploration wiring, the processing tool, the embedding model, the localizer, recognition, the ask and
   announce.
 
+## How identifying a specific object works (plain words)
+
+1. **Every picture gets a fingerprint:** a small model turns a picture (or a crop of it) into a list of numbers; pictures of the same thing give similar lists.
+2. **Naming:** you say "this is a mug" with the mug in view. G2 saves that picture under the name and its fingerprint in the library, locked so it is never forgotten.
+3. **Recognizing:** a later picture whose fingerprint is close enough to a named one makes him say "I see the mug". A fingerprint that matches nothing becomes an unnamed entry, and he may ask
+   "What am I looking at?" (the ask, limited by cooldowns).
+4. **Boxes:** the first version needs none. It fingerprints the whole picture plus an overlapping grid of tiles (Phase 4, v0). Drawing a box around the object comes with the localizer (Phase 4, v1),
+   only if the tiles prove too coarse. The on-camera detector's own boxes (faces and the like) are already saved in each picture's sidecar, and the curation tool can draw those on contact sheets.
+
+## Status of the processing tool (checked 2026-10-07)
+
+What exists on the Pi today: **duplicate removal** (a near-duplicate is never written, see Retention) and a JSON sidecar per picture. What does **not** exist yet: the curation script
+(`tools/curate_exploration.py`, Phase 2): scoring brightness, contrast, sharpness and clipping, setting aside pictures with people, grouping named pictures, contact sheets, the manifest and the
+pull helper. The older `tools/curate_captures.py` is for the capture-session photo library, not for these pictures. Phase 2 is the next exploration build, after the first on-G2 test.
+
 ## Phases
 
 ### Phase 1: survey stops and voice-named pictures (code done, wiring in progress)

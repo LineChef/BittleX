@@ -119,7 +119,10 @@ cmd/feedback traces; the constants wait for the bench.
 **Decided need, not a deferred idea.** Reference motion: Petoi's own `cmh`
 demo, [`step.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif)
 — front paws reach up onto a raised box, body hauls up and over, ends standing
-fully on top. This is exactly what Phase F tried in sim and hit a wall on (see
+fully on top. (The same motion is Petoi's "Bittle Climbs a Step" video, reviewed 2026-10-07 from
+sampled frames: starts crouched low, rears up and plants both front feet on the box top, then the rear legs
+push the body up; a scripted keyframe motion with no balance feedback, and the frames do not resolve joint
+angles, so it is a strategy reference, not data.) This is exactly what Phase F tried in sim and hit a wall on (see
 [H7](rl/hardware-gated-backlog.md) and
 [`vision-in-gait.md`](rl/vision-in-gait.md)) — **a sim-fidelity limit
 on the training harness, not evidence the real robot can't do it.** Scheduled
@@ -907,7 +910,7 @@ Requested 2026-10-07: try teaching skills by moving G2's legs by hand and record
 "raw joint puppeteering" tier of [B10], promoted to its own item so it can be tried on the bench. Servos relaxed (`d`), joints polled with `j`
 (`READ_JOINTS`), keyframes saved under a name and replayed through the same path as any scripted skill. Fits sit, wave, shake, reach; playback has no
 balance feedback, so new poses are tried held in the air first (hardware safety rule). Reference video to study for technique:
-<https://www.youtube.com/watch?v=rRkVR3PO1o8> (not reviewed yet). Not started; waits for the user's go. Decision the same day: skills are **not**
+<https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Not started; waits for the user's go. Decision the same day: skills are **not**
 authored by an LLM writing keyframes.
 
 ---

@@ -21,8 +21,14 @@ Why and what is in or out: [`v3-decisions-log.md`](v3-decisions-log.md). What ea
 
 ## Ledge (after A; low heights only, G2 never above the floor)
 
-Books or boards at 12, 20 and 35 mm (the sim ranges to 35 mm). Three V2.1 runs into each, tape the end position, note success or failure and where it caught. Logged with `--log-extra`.
+One or two heights are enough (user, 2026-10-07), inside the sim's range (up to 35 mm), for example a book at about 12 mm and one at about 25 mm. Three V2.1 runs into each, tape the end position, note success or failure and where it caught. Logged with `--log-extra`.
 Not a climb test; the climb skill is a separate item (B13/H7).
+
+## How this relates to exploration mode (a separate capture)
+
+The exploration sessions ([`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md)) collect **pictures** for object learning; this plan collects **walk data** for the sim.
+They are different sessions with different goals. Exploration walks cross varied floors and make turns and hand interventions, so they are a poor controlled fit; they could serve later as a
+robustness check on the fit (different conditions), but only if the walk log is switched on during exploration, which is not wired today. A G2-on visit can do both back to back.
 
 ## After capture
 

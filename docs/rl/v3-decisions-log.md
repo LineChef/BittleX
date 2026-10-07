@@ -44,3 +44,9 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
   ranges and scores policies, and is never a source of drift. Logging change done (`--log-extra`: accel, IMU frame counter and age, pack voltage; the baseline runner turns it on by
   default). Joint readback is not logged during walks (the firmware's feedback stream stops at every new command), so measured joints come from bench tests. Plan:
   [`sysid-capture-plan.md`](sysid-capture-plan.md). The smoke test across the skills waits for this data.
+
+- **Clarifications (2026-10-07, after the capture plan):** (1) the system-identification capture sessions are separate from exploration-mode picture sessions; a G2-on visit can do both. (2) The
+  exploration picture curation script is **not built yet** (Phase 2); only duplicate skipping and the per-picture sidecar exist. How identification and boxes work is written up in
+  [`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md). (3) Ledge testing needs one or two heights, not three. (4) The Petoi step-climb video was reviewed from
+  sampled frames (strategy reference for B13; no joint data). (5) Correction to an earlier statement: the closed-loop policy-walk logs DO carry the commanded joint angles at 80 Hz; only the open-loop `wkF`
+  logs do not ([`hardware-logging.md`](hardware-logging.md)).
