@@ -62,3 +62,6 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
   right before any 20M; the 20M itself never starts without the user's go. No voice notes: the user will tell Claude about falls; snags (frequent on kitchen tile) are counted from signatures, not labelled. Details: [`real-data-pipeline.md`](real-data-pipeline.md).
 
 - **Idle-only rule (user, 2026-10-07):** the automatic 3M smoke test and the harm check run only when no other training or testing is in progress on the Mac, so nothing gets a random slowdown. Recorded in [`real-data-pipeline.md`](real-data-pipeline.md).
+
+- **Plan approved; kitchen session next (user, 2026-10-07):** the real-data pipeline plan is approved as written in [`real-data-pipeline.md`](real-data-pipeline.md), including the drift guards and the snag-detection approach (periodicity, tile versus hardwood, policy reaction). The first G2-on visit is the kitchen: test exploration, start the picture library and capture snag data on tile
+  (runbook in [`sysid-capture-plan.md`](sysid-capture-plan.md)). Open asks: the tile size and a same-day hardwood control walk. Not built yet: Phases 1 to 5 of the pipeline.

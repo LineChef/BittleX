@@ -24,6 +24,16 @@ Why and what is in or out: [`v3-decisions-log.md`](v3-decisions-log.md). What ea
 One or two heights are enough (user, 2026-10-07), inside the sim's range (up to 35 mm), for example a book at about 12 mm and one at about 25 mm. Three V2.1 runs into each, tape the end position, note success or failure and where it caught. Logged with `--log-extra`.
 Not a climb test; the climb skill is a separate item (B13/H7).
 
+## First kitchen session (the first G2-on visit; user, 2026-10-07)
+
+Three goals in one: test the exploration updates (wake chime, API tone, shutter click, the survey pose sequence), start the recognition library (the pictures), and capture real snag data on tile.
+1. Power G2 on. The deploy watcher installs the latest code (the capture hook included); a waiter then runs **`g2floor tile`** and shows the run-log status (Claude relays it). Check with `g2floor` (shows the floor) and `g2floor status`.
+2. Clear floor, about 2 m, **no edge or stairs** (there is no edge detector). `bash tools/g2_explore.sh start`, then `arm` (or "go ahead and look around"); say the wake word and "this is a mug" once with a mug on the floor.
+3. Every policy walk is captured automatically (floor tile, epoch hw-2026-10-07). Pick-ups are quarantined from fits; falls are recorded by the fall guard. **Tell Claude when a fall happens** (Claude notes the time); snags are not labelled.
+4. Optional but useful: a short same-battery control walk on hardwood (`g2floor hardwood` first, then back to `g2floor tile`) so the tile-versus-hardwood comparison is same-day. Tell Claude the tile size if known.
+5. `bash tools/g2_explore.sh stop`, then `g2pics pull` and `g2picscurate` for the pictures; Claude reads the first autolog run's loop timing (the first run with the capture hook on hardware) and the sidecars.
+6. Judge: the survey picture angle, the shutter volume, the chimes.
+
 ## How this relates to exploration mode (a separate capture)
 
 The exploration sessions ([`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md)) collect **pictures** for object learning; this plan collects **walk data** for the sim.

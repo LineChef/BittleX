@@ -1,4 +1,4 @@
-# Real-hardware data pipeline: capture every run, feed the sim only what helps (agreed 2026-10-07)
+# Real-hardware data pipeline: capture every run, feed the sim only what helps (plan approved by the user 2026-10-07)
 
 Goal (user): every run G2 makes is captured automatically, and every retrain inherits what has accumulated since the last one, so the sim gains data it would otherwise never have.
 Rule that overrides the goal: **only data that can help gait training reaches the sim; anything noisy or harmful is filtered, quarantined or left out, and the data is audited periodically.**
@@ -45,6 +45,28 @@ the first seconds after the stand excluded; thermal cooldown stretches excluded.
 Statistical screen: a run whose metrics sit outside the epoch's median by more than k x MAD is quarantined for review, not dropped.
 Per-parameter rules in the builder: a minimum number of supporting runs; fit on one half of the runs and check it on the other (a value that moves more than its own noise is not used); physical bounds;
 left-right symmetry for fitted *parameters* (approved 2026-10-07; see below); **no drift parameter exists in the builder** (drift direction and size never feed the sim; a test enforces it).
+
+## Keeping drift out of the sim (guards, agreed 2026-10-07)
+
+Hardware drift is not a stable property of G2 (it moved from about +142 to about +40 deg per 12.7 s with one servo swap and grew from +44 to +178 deg as the pack sagged); a sim trained against it learns a one-sided correction (the V2.1 problem). The guards:
+1. **Whitelist:** the builder's output has a fixed list of allowed parameters; any other key is rejected. There is no yaw, heading, lateral or drift entry (a test enforces it).
+2. **No yaw or heading input to any fit:** only yaw-free statistics (roll and pitch spread, timing, IMU noise at rest).
+3. **Mean lean excluded:** a steady roll or pitch offset is a mounting or calibration offset and correlates with one-sided leg differences; only the spread is used, never the mean. The IMU zero is estimated at rest and fed as a range.
+4. **Drift canary:** after a candidate snapshot, the reference policy runs in the new sim; if the sim's measured heading drift or the mirror gap changes beyond noise, the snapshot is leaking asymmetry and is blocked.
+5. **Proxy screen:** each parameter's per-run estimate is compared with that run's heading change; a parameter that tracks drift is dropped as a drift proxy.
+6. **Battery confound:** voltage bands are kept apart, because drift grew as the pack sagged.
+7. **Monitor-only drift channel:** per-run drift is stored for audits and is not visible to the builder.
+
+## Snag detection from the logs (hypothesis to test on the kitchen runs)
+
+Snags will be frequent on kitchen tile (feet catching on grout lines) and the user will not label them (no voice notes, no per-event labels). The sensor is the limit: the IMU gives a fresh frame only every 200 ms, so a brief catch may show in one frame or only through the policy's
+reaction; the logged joint angles are commands, not measurements. The approach, in order:
+1. **Look at distributions first**, before building any detector, and keep turns, pick-ups and ordinary gait impacts from being mistaken for snags.
+2. **Periodicity:** grout lines recur at the tile size, so at about 0.1 m/s disturbances should recur every (tile size / speed) seconds; a regular beat in roll and pitch spikes locked to that period is strong evidence. Needs the tile size (asked, not yet known).
+3. **Floor comparison:** the same policy on hardwood is the baseline; extra spikes, stalls and policy-correction jumps on tile are the snag effect, with no labels needed. A same-day, same-battery hardwood control walk makes this clean (asked).
+4. **Policy reaction:** a catch should make the policy's correction jump (logged at 80 Hz).
+Individual snags may not be identifiable; a **rate of snag-like events per metre walked, per floor** is what the sim's hazard setting needs, and the statistical view is enough for that. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower.
+Nothing from the kitchen reaches the sim until it passes the ingest gates and the audit.
 
 ## Calibration builder and the harm check
 
