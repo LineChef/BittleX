@@ -60,3 +60,5 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
 
 - **Training triggers, symmetry, labels (user, 2026-10-07):** the symmetry rule (parameters symmetric, events keep their side) is approved. A 3M screening run may start automatically when nothing else is training, and a 3M smoke test always runs
   right before any 20M; the 20M itself never starts without the user's go. No voice notes: the user will tell Claude about falls; snags (frequent on kitchen tile) are counted from signatures, not labelled. Details: [`real-data-pipeline.md`](real-data-pipeline.md).
+
+- **Idle-only rule (user, 2026-10-07):** the automatic 3M smoke test and the harm check run only when no other training or testing is in progress on the Mac, so nothing gets a random slowdown. Recorded in [`real-data-pipeline.md`](real-data-pipeline.md).

@@ -62,8 +62,8 @@ may drop beyond its noise. A change that fails is blocked.
 | Harm check fails | **Blocked**, not approvable until the cause is understood | |
 
 **Training launches (user, 2026-10-07).** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
-1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is training on the Mac, at most one per snapshot, and its result is reported.
-2. **Always before a 20M:** when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first (reused if one already finished for that snapshot) and its result is reported before the 20M starts.
+1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is running on the Mac (no training, benchmark or other test in progress, so nothing gets a random slowdown), at most one per snapshot, and its result is reported. The harm check (benchmark scoring, no training) follows the same idle-only rule.
+2. **Always before a 20M:** when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first, on an otherwise idle Mac (reused if one already finished for that snapshot), and its result is reported before the 20M starts.
 When the user launches a run, it uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
 
 ## Symmetry rule (approved 2026-10-07)
