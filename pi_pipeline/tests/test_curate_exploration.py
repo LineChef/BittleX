@@ -49,7 +49,8 @@ def build(root):
     save(sv, "after_bow_100300", np.full((240, 240), 6, "uint8"), time="2026-10-07 10:03:00")              # too dark
     save(sv, "after_bow_100400", np.full((240, 240), 252, "uint8"), time="2026-10-07 10:04:00")            # blown out
     save(sv, "after_bow_100500", np.tile(np.linspace(80, 140, 240).astype("uint8"), (240, 1)), time="2026-10-07 10:05:00")   # smooth gradient: blurry
-    save(sv, "after_bow_100600", textured(3), time="2026-10-07 10:06:00",
+    save(sv, "after_bow_100600", textured(3), time="2026-10-07 12:30:00",           # hours from the others, so the time window does not reach them
+         
          detections=[{"label": "face", "score": 0.9, "cx": 0.5, "cy": 0.5, "w": 0.2, "h": 0.2}])         # a person
     save(sv, "after_bow_100700", textured(4), time="2026-10-07 10:07:00",
          detections=[{"label": "dog", "score": 0.9, "cx": 0.5, "cy": 0.5, "w": 0.3, "h": 0.3}])          # a dog is not a person
@@ -122,3 +123,29 @@ def test_a_cut_off_picture_is_rejected_when_surveyed_and_only_flagged_when_named
     assert status_of(m, "after_bow_1")["status"] == "rejected" and status_of(m, "after_bow_1")["reason"] == "truncated"
     assert status_of(m, "mug_1")["status"] == "weak" and status_of(m, "mug_1")["reason"] == "truncated"
     assert (tmp_path / "out" / "rejects" / "truncated").exists()
+
+
+def test_people_are_set_aside_in_layers_the_model_the_time_window_and_hand_marks(ce, tmp_path):
+    from datetime import datetime
+    src = tmp_path / "in"
+    sv = str(src / "survey" / "20261007")
+    scores = {}
+
+    def pic(name, seed, hh, mm, ss, score=0.0):
+        save(sv, name, blocky(seed), time=f"2026-10-07 {hh:02d}:{mm:02d}:{ss:02d}")
+        scores[os.path.join(sv, name + ".jpg")] = score
+
+    pic("a_person", 1, 15, 0, 0, 0.6)             # the person model finds someone
+    pic("b_legs", 2, 15, 1, 0, 0.0)               # nothing found, but 60 s after a person: set aside by the time window
+    pic("c_clear", 3, 15, 9, 0, 0.0)              # 9 minutes later: kept
+    pic("d_by_hand", 4, 15, 20, 0, 0.0)           # no model finds anything, but you marked it by hand
+    pic("e_weak_hit", 5, 15, 30, 0, 0.2)          # under the threshold: kept
+    json.dump(["survey/20261007/d_by_hand.jpg"], open(src / "people.json", "w"))
+    cfg = ce.Config(person_detector=lambda im: scores[im.filename], person_window_s=120.0)
+    m = ce.curate(str(src), str(tmp_path / "out"), cfg)
+    why = {r["file"].split("/")[-1][:-4]: (r["status"], r["reason"]) for r in m["pictures"]}
+    assert why["a_person"][0] == "people" and "person model" in why["a_person"][1]
+    assert why["b_legs"][0] == "people" and "within 120 s" in why["b_legs"][1]
+    assert why["d_by_hand"] == ("people", "marked as a person by hand")
+    assert why["c_clear"][0] == "kept" and why["e_weak_hit"][0] == "kept"
+    assert not any("a_person" in f or "b_legs" in f or "d_by_hand" in f for _r, _d, fs in os.walk(tmp_path / "out") for f in fs)       # never copied

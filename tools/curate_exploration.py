@@ -5,7 +5,8 @@ Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `
 `named/<name>/*.jpg` from "this is a mug", each with a `.json` sidecar (pose, name, time, what the on-camera detector saw). It:
 
   1. scores every picture: brightness, contrast, sharpness, clipped highlights / shadows;
-  2. sets aside pictures where the on-camera detector saw a person or face (privacy decision 3: not curated, not copied, listed in the manifest only);
+  2. sets aside every picture with a person in it (user, 2026-10-07; not curated, not copied, listed in the manifest only), in layers: the camera's own detector, an outside person model (tools/person_filter.py, until the on-camera
+     model is trained), anything taken within 2 minutes of such a picture (legs and backs the models miss), and pictures marked "Person" by hand on the g2pics page (`people.json`);
   3. rejects survey pictures that are too dark, blown out, blurry, flat or truncated (the camera module cut the JPEG short, so the lower part is gray); named pictures are never rejected for quality, only flagged "weak";
   4. removes near-duplicates (256-bit average hash; 12 bits within one survey pose, 3 bits within one name), keeping the best-scoring picture of each cluster;
   5. writes `keep/` (same folder layout), `rejects/<reason>/`, a contact sheet per group (green = kept, orange = weak; the camera's own boxes are drawn),
@@ -48,6 +49,9 @@ class Config:
     target_brightness: float = 110.0
     non_person_labels: tuple = ("dog", "cat")     # detections with these labels do not make a picture a "people" picture
     person_min_score: float = 0.40
+    person_detector: object = None     # callable(PIL image) -> best person score 0..1 (tools/person_filter.PersonDetector.best_score); None = the camera's own detections only
+    person_threshold: float = 0.25     # eager on purpose: leaving a picture out costs little, keeping a person in the object library costs more
+    person_window_s: float = 120.0     # pictures taken this close in time to a picture with a person are set aside too (legs and backs the models miss)
     named_min_keep: int = 5            # fewer kept pictures than this for a name gets a hint
     thumb: int = 150
     cols: int = 6
@@ -74,6 +78,8 @@ class Pic:
     status: str = "kept"               # kept | weak | rejected | duplicate | people
     reason: str = ""
     duplicate_of: str | None = None
+    person_why: str = ""               # why this picture is treated as having a person in it ("" = none)
+    person_score: float = 0.0
     cut_off: bool = False              # the JPEG has no end marker: the camera module cut it short (the rest decodes as flat gray)
 
     @property
@@ -158,11 +164,61 @@ def _has_person(p: Pic, c: Config) -> bool:
     return any(float(d.get("score", 0.0)) >= c.person_min_score and str(d.get("label", "")).lower() not in c.non_person_labels for d in p.dets)
 
 
+def _read_marks(in_dir: str) -> set:
+    """Pictures a person marked as containing a person, by hand (the "Person" button on the g2pics page): `people.json`, a list of paths inside the pictures folder."""
+    try:
+        return set(json.load(open(os.path.join(in_dir, "people.json"))))
+    except (OSError, ValueError):
+        return set()
+
+
+def _taken_epoch(p: Pic) -> float | None:
+    try:
+        return time.mktime(time.strptime(p.taken, "%Y-%m-%d %H:%M:%S"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _person_reason(p: Pic, c: Config, marks: set) -> str:
+    """Layer 1: marked by hand, the camera's own detector, the outside person model."""
+    if p.rel in marks:
+        return "marked as a person by hand"
+    if _has_person(p, c):
+        return "on-camera detector saw a person or face"
+    if c.person_detector is not None:
+        try:
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            p.person_score = float(c.person_detector(Image.open(p.path)))
+        except Exception:  # noqa: BLE001 -- a detector failure must not stop the curation
+            return ""
+        if p.person_score >= c.person_threshold:
+            return f"person model found a person ({p.person_score:.2f})"
+    return ""
+
+
+def _spread_person_flags(pics: list[Pic], c: Config) -> None:
+    """Layer 2: a picture taken within `person_window_s` of one with a person is set aside too, which catches the legs and backs that neither model sees."""
+    flagged = [(t, p) for p in pics if p.person_why and (t := _taken_epoch(p)) is not None]
+    if not flagged:
+        return
+    for p in pics:
+        if p.person_why:
+            continue
+        t = _taken_epoch(p)
+        if t is None:
+            continue
+        near = min(flagged, key=lambda tp: abs(tp[0] - t))
+        if abs(near[0] - t) <= c.person_window_s:
+            p.person_why = f"taken within {c.person_window_s:.0f} s of a picture with a person"
+
+
 def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = True) -> dict:
     """Run the pipeline; returns the manifest dict. `write=False` computes it without copying anything."""
     c = c or Config()
     pics = _load(in_dir)
     live: list[Pic] = []
+    marks = _read_marks(in_dir)
+    measured: list[Pic] = []
     for p in pics:
         if not _measure(p):
             p.status, p.reason = "rejected", "unreadable"
@@ -170,8 +226,12 @@ def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = 
         p.quality = _quality(p, c)
         if p.cut_off:
             p.quality = round(p.quality * 0.5, 4)
-        if _has_person(p, c):
-            p.status, p.reason = "people", "on-camera detector saw a person or face"
+        p.person_why = _person_reason(p, c, marks)
+        measured.append(p)
+    _spread_person_flags(measured, c)
+    for p in measured:
+        if p.person_why:
+            p.status, p.reason = "people", p.person_why
             continue
         problem = "truncated" if p.cut_off else _quality_problem(p, c)
         if problem and p.named:
@@ -319,6 +379,9 @@ def main(argv=None) -> int:
     ap.add_argument("--min-contrast", type=float, default=Config.min_contrast)
     ap.add_argument("--survey-dup-bits", type=int, default=Config.survey_dup_bits)
     ap.add_argument("--named-dup-bits", type=int, default=Config.named_dup_bits)
+    ap.add_argument("--person-model", default=os.path.expanduser("~/g2_data/models/yolox_s.onnx"), help="outside person model (ONNX) used until the on-camera model is trained; skipped if the file is missing")
+    ap.add_argument("--no-person-model", action="store_true")
+    ap.add_argument("--person-window-s", type=float, default=Config.person_window_s)
     ap.add_argument("--non-person-labels", default=",".join(Config.non_person_labels),
                     help="detection labels that do not make a picture a people picture (comma separated; any other detection does)")
     a = ap.parse_args(argv)
@@ -329,6 +392,16 @@ def main(argv=None) -> int:
     out_dir = os.path.expanduser(a.out_dir) if a.out_dir else os.path.join(ROOT, "training_data", "exploration", time.strftime("%Y%m%d_%H%M"))
     c = Config(min_brightness=a.min_brightness, min_sharpness=a.min_sharpness, min_contrast=a.min_contrast, survey_dup_bits=a.survey_dup_bits,
                named_dup_bits=a.named_dup_bits, non_person_labels=tuple(x.strip().lower() for x in a.non_person_labels.split(",") if x.strip()))
+    if not a.no_person_model:
+        if os.path.isfile(os.path.expanduser(a.person_model)):
+            try:
+                from person_filter import PersonDetector
+                c.person_detector = PersonDetector(os.path.expanduser(a.person_model), min_score=0.12).best_score
+            except Exception as e:  # noqa: BLE001
+                print(f"person model not usable ({e}); using the camera's detections and hand marks only")
+        else:
+            print(f"no person model at {a.person_model}; using the camera's detections and hand marks only")
+    c.person_window_s = a.person_window_s
     m = curate(in_dir, out_dir, c)
     print(summary_text(m))
     print(f"written to {out_dir}  (keep/, rejects/, contact/, manifest.json, summary.txt)")

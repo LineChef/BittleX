@@ -117,3 +117,14 @@ def test_a_picture_without_its_end_marker_is_reported_as_cut_off(tmp_path):
     padded.write_bytes(b"\xff\xd8\xff\xe0data" + b"\x00" * 40)                                   # the camera pads a short buffer with zeros
     assert mod.picture_is_cut_off(whole) is False and mod.picture_is_cut_off(cut) is True and mod.picture_is_cut_off(padded) is True
     assert mod.picture_is_cut_off(tmp_path / "missing.jpg") is None
+
+
+def test_marking_a_picture_as_a_person_is_remembered_beside_the_pictures_and_is_reversible(tmp_path, monkeypatch):
+    monkeypatch.setattr(G, "CACHE", tmp_path)
+    app = G.App(G.Remote("pi", runner=FakePi()))
+    rel = "survey/20261007/after_bow_1.jpg"
+    assert app.mark_people([rel], True) == {"marked": [rel], "unmarked": []}
+    assert json.loads((tmp_path / "people.json").read_text()) == [rel] and G.read_people_marks() == {rel}
+    assert app.mark_people([rel], False) == {"marked": [], "unmarked": [rel]} and G.read_people_marks() == set()
+    with pytest.raises(ValueError):
+        app.mark_people(["../../etc/passwd.jpg"], True)                                              # paths are checked like every other picture action

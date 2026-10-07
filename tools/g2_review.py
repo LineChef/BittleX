@@ -36,6 +36,14 @@ CACHE = Path(os.path.expanduser("~/g2_pictures/explore"))
 KINDS = ("facts", "exchanges", "observations")
 
 
+def read_people_marks() -> set:
+    """Pictures marked by hand as containing a person (`people.json` in the pictures folder; the curation tool leaves them out of the object library)."""
+    try:
+        return set(json.loads((CACHE / "people.json").read_text()))
+    except (OSError, ValueError):
+        return set()
+
+
 def picture_is_cut_off(path) -> bool | None:
     """True when a saved JPEG ends without its end marker (the camera module cut the picture short; the rest shows as flat gray); None if the file is not here yet."""
     try:
@@ -105,9 +113,20 @@ class App:
 
     def pictures(self):
         items = self.remote.pictures("list")
+        marks = read_people_marks()
         for p in items:
             p["cut_off"] = picture_is_cut_off(CACHE / p["path"])
+            p["person"] = p["path"] in marks
         return items
+
+    def mark_people(self, paths: list[str], value: bool):
+        """Flag (or unflag) pictures as containing a person. Kept on this Mac only, next to the pictures; nothing is deleted."""
+        rels = [self._rel(p) for p in paths]
+        marks = read_people_marks()
+        marks = (marks | set(rels)) if value else (marks - set(rels))
+        CACHE.mkdir(parents=True, exist_ok=True)
+        (CACHE / "people.json").write_text(json.dumps(sorted(marks), indent=1))
+        return {"marked": rels if value else [], "unmarked": [] if value else rels}
 
     def trash_pictures(self, paths: list[str]):
         out = self.remote.pictures("trash", *[self._rel(p) for p in paths])
@@ -201,6 +220,8 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.restore(int(body["trash_id"])))
                 if u.path == "/api/pictures/trash":
                     return self._json(app.trash_pictures(list(body["paths"])))
+                if u.path == "/api/pictures/person":
+                    return self._json(app.mark_people(list(body["paths"]), bool(body["value"])))
                 if u.path == "/api/pictures/restore":
                     return self._json(app.restore_pictures(list(body["paths"])))
                 if u.path == "/api/pictures/sync":
@@ -233,7 +254,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 .x{flex:none;width:32px;height:32px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--x);font-size:1.25rem;line-height:1}.x:hover{background:var(--xbg);border-color:var(--x)}
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 12px}.btn.danger{color:var(--x);border-color:var(--x)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.pbtn{position:absolute;left:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.isperson img{opacity:.35}.isperson .pbtn{background:#b83227;color:#fff}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
 .card .x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.85)}.group{margin:16px 0 6px;font-weight:600;color:var(--ink2)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;gap:12px;align-items:center;max-width:90vw}
 .toast button{background:none;border:0;color:var(--bg);text-decoration:underline}.empty{color:var(--muted);padding:24px 0}
@@ -268,7 +289,8 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
   for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.pose||p.name||"picture";
-    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||p.pose||"")+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||p.pose||"")+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
+    const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title="Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render()}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
     c.append(el("div","cap",(p.name||p.pose||"")+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
