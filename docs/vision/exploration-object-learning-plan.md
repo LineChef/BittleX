@@ -28,8 +28,8 @@ so it can learn things the camera model was never trained on.
   voice service, the capture-session tools (`tools/curate_captures.py`, `tools/auto_process_captures.py`, `tools/optimize_library.py`).
 - **Built 2026-10-07 (Phase 1 code, tested with fakes, not yet on G2):** a one-picture call on the camera feed (`feed.snapshot()`), the survey stop and
   naming choreography (`behavior/survey.py`, driver, bindings), the "this is a <name>" parser.
-- **Not built:** saving and labelling the pictures, the exploration wiring, the processing tool, the embedding model, the localizer, recognition, the ask and
-  announce.
+- **Built since:** saving and labelling the pictures, the exploration wiring, and the processing tool (`tools/curate_exploration.py`, Phase 2).
+- **Not built:** the embedding model, the localizer, recognition, the ask and announce.
 
 ## How identifying a specific object works (plain words)
 
@@ -42,9 +42,12 @@ so it can learn things the camera model was never trained on.
 
 ## Status of the processing tool (checked 2026-10-07)
 
-What exists on the Pi today: **duplicate removal** (a near-duplicate is never written, see Retention) and a JSON sidecar per picture. What does **not** exist yet: the curation script
-(`tools/curate_exploration.py`, Phase 2): scoring brightness, contrast, sharpness and clipping, setting aside pictures with people, grouping named pictures, contact sheets, the manifest and the
-pull helper. The older `tools/curate_captures.py` is for the capture-session photo library, not for these pictures. Phase 2 is the next exploration build, after the first on-G2 test.
+What exists on the Pi today: **duplicate removal** (a near-duplicate is never written, see Retention) and a JSON sidecar per picture. **Built 2026-10-07 (tested with synthetic pictures, not yet run on real ones):** the curation script
+`tools/curate_exploration.py` (shell alias `g2picscurate`; `g2pics pull` is the pull helper): scores brightness, contrast, sharpness and clipped highlights; sets aside pictures with people (listed in the
+manifest, never copied); rejects too dark / blown out / blurry / flat survey pictures; flags weak named pictures instead of rejecting them; removes near-duplicates (12 bits within a survey pose, 3 within a name) keeping the
+**best-scoring** picture of each cluster (not the earliest, so the kept one has the best lighting and sharpness); writes `keep/`, `rejects/<reason>/`, a contact sheet per group (green = kept, orange = weak or rejected,
+the camera's own boxes in red), `manifest.json` and `summary.txt` with hints per pose and per name. The older `tools/curate_captures.py` is for the capture-session photo library, not for these pictures.
+Thresholds are the capture tools' defaults and will need tuning on the first real pictures (floor-level views are dim).
 
 ## Phases
 
@@ -64,7 +67,7 @@ pull helper. The older `tools/curate_captures.py` is for the capture-session pho
 
 **Checkpoint A (you are looped in):** Phase 1 built and tested, deployed to the Pi, the test script below ready. Nothing runs on G2 without your go.
 
-### Phase 2: process the exploration pictures like a capture session
+### Phase 2: process the exploration pictures like a capture session (built 2026-10-07; run it after the first real session)
 `tools/curate_exploration.py IN_DIR OUT_DIR`, run on the Mac after you OK copying the pictures:
 1. Score every picture (brightness, contrast, sharpness, clipped highlights) with the capture tools' functions; reject dark, blown, blurry, low contrast.
 2. Near-duplicate removal (average hash), keeping the earliest, as the capture tools do.

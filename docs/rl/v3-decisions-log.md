@@ -50,3 +50,6 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
   [`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md). (3) Ledge testing needs one or two heights, not three. (4) The Petoi step-climb video was reviewed from
   sampled frames (strategy reference for B13; no joint data). (5) Correction to an earlier statement: the closed-loop policy-walk logs DO carry the commanded joint angles at 80 Hz; only the open-loop `wkF`
   logs do not ([`hardware-logging.md`](hardware-logging.md)).
+
+- **Picture curation tool built (user go, 2026-10-07):** `tools/curate_exploration.py` / `g2picscurate`, details in [`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md). Tested on synthetic
+  pictures only; thresholds are the capture tools' defaults and get tuned on the first real session. The sys-id capture and the first exploration test are both a go for the next time G2 is on.
