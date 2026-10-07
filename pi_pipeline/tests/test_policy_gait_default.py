@@ -100,3 +100,17 @@ def test_policy_walker_runs_the_loop_in_a_thread_and_stops_it():
     w.stop(rest=False)
     assert not w.busy and ended == [False]
     w.stop()                                                    # stopping an idle walker is harmless
+
+
+def test_a_walk_that_ends_in_a_fall_calls_the_fall_handler_and_other_endings_do_not():
+    """On 2026-10-07 the exploration kept sending walks after G2 fell (three more, on his back). The walker now reports a fall so the session can halt."""
+    import time
+    from pi_pipeline.gait.policy_walker import PolicyWalker
+    for reason, expect in (("fall", 1), ("stopped", 0), ("complete", 0), (None, 0)):
+        fell = []
+        w = PolicyWalker(object(), run_fn=lambda *a, _r=reason, **k: _r, on_fall=lambda: fell.append(1))
+        w.walk(1.0)
+        deadline = time.time() + 2.0
+        while w.busy and time.time() < deadline:
+            time.sleep(0.01)
+        assert len(fell) == expect, reason

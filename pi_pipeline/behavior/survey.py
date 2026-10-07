@@ -44,17 +44,23 @@ class Survey:
         self._last = self._clock() if now is None else now
 
 
-def survey_plan(cfg: SurveyConfig) -> list:
-    """Look down (the inspect bow), look up (`ksit`), stand again, and take the picture once the stance has settled (the pictures taken in the look-down and
-    look-up poses were not good, 2026-10-07, so the picture is taken standing, after both looks)."""
+def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]:
+    """The one way G2 takes a picture while exploring (user, 2026-10-07: the same sequence every time): look down (the inspect bow), look up (`ksit`), stand again, and take the picture once
+    the stance has settled. Pictures taken in the look-down and look-up poses themselves were not good, so the picture is taken standing, after both looks. Returns the steps and the time of the shot."""
     t = 0.0
-    plan = [(t, "skill", cfg.look_down_skill, "survey: look down, the inspect bow (the walk stops, no rest)")]
+    plan = [(t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)")]
     t += cfg.pose_settle_s
-    plan.append((t, "skill", cfg.look_up_skill, "survey: look up"))
+    plan.append((t, "skill", cfg.look_up_skill, f"{why}: look up"))
     t += cfg.pose_settle_s
-    plan.append((t, "skill", cfg.stand_skill, "survey: stand again"))
+    plan.append((t, "skill", cfg.stand_skill, f"{why}: stand again"))
     t += cfg.stand_settle_s
-    plan.append((t, "shot", "after_bow", "survey: picture, standing after looking down and up"))
+    plan.append((t, "shot", kind, f"{why}: picture, standing after looking down and up"))
+    return plan, t
+
+
+def survey_plan(cfg: SurveyConfig) -> list:
+    """A survey stop: bow, look up, stand, settle, one picture, then walk on."""
+    plan, t = _picture_steps(cfg, "after_bow", "survey")
     t += 0.4
     plan.append((t, "diag", "survey.done", "survey: finished, walking on"))
     return plan
@@ -71,15 +77,11 @@ def clean_name(text: str) -> str:
 
 
 def naming_plan(name: str, cfg: SurveyConfig) -> list:
-    t = 0.0
-    plan = [(t, "skill", cfg.look_down_skill, f"naming {name}: look down at it (the walk stops, no rest)")]
-    t += cfg.pose_settle_s
-    plan.append((t, "shot", f"name:{name}", f"naming: picture of the {name}"))
+    """Naming an object by voice takes its picture the same way as a survey stop (bow, look up, stand, settle, picture), saved under the name; he then confirms aloud and walks on."""
+    plan, t = _picture_steps(cfg, f"name:{name}", f"naming {name}")
     t += 0.3
     plan.append((t, "speak", f"Okay, I will remember the {name}.", "naming: confirm"))
     t += 0.4
-    plan.append((t, "skill", cfg.stand_skill, "naming: stand again"))
-    t += cfg.final_settle_s
     plan.append((t, "diag", "naming.done", "naming: finished, walking on"))
     return plan
 

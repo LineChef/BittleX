@@ -815,6 +815,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         a = np.array(lat) * 1e3
         print(f"policy step: {a.mean():.2f} ms mean, {a.max():.2f} ms max ({len(lat)} ticks)")
     print("sent rest.")
+    return end_reason[0]            # complete / stopped / fall / imu_stale / battery_critical / interrupted / error / other
 
 
 def _latest_imu_line(lk):

@@ -71,7 +71,11 @@ def test_naming_phrases_and_names():
     assert parse_naming("that's a stapler") == "stapler"
     assert parse_naming("what is this") == "" and parse_naming("go ahead and look around") == "" and parse_naming("this is") == ""
     assert clean_name("A Red Mug!!") == "a red mug" and clean_name("  ") == ""
-    assert [k for _, k, _, _ in naming_plan("mug", SurveyConfig())].count("shot") == 1
+    named = naming_plan("mug", SurveyConfig())
+    assert [k for _, k, _, _ in named].count("shot") == 1
+    assert [p for _, k, p, _ in named if k == "skill"] == [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "skill"]            # one picture sequence for every picture
+    shot_t = next(d for d, k, _, _ in named if k == "shot")
+    assert [k for d, k, _, _ in named if d > shot_t] == ["speak", "diag"]                                                          # standing and settled before the picture, confirmation after
 
 
 def test_driver_surveys_at_the_end_of_a_leg_then_walks_on():
@@ -108,14 +112,14 @@ def test_survey_does_not_repeat_inside_the_cooldown_and_is_off_by_default():
     assert not any(e.kind is EffectKind.CAPTURE for e in run_for(off, c2, 12.0))
 
 
-def test_a_spoken_name_makes_one_look_down_picture_and_confirms_aloud():
+def test_a_spoken_name_takes_its_picture_like_a_survey_stop_and_confirms_aloud():
     d, c = mk()
     t = d.tick(DriverInputs(name_request="Mug", frame=[]))
-    effects = t.effects + run_for(d, c, 5.0)             # the plan is over at 4.4 s; a longer window would catch the idle posture descending
+    effects = t.effects + run_for(d, c, 7.3)             # bow, look up, stand, settle, picture, confirm: the plan is over at about 7.7 s
     assert EffectKind.STOP not in [e.kind for e in effects]
+    assert [e.payload for e in effects if e.kind is EffectKind.SKILL] == ["kbuttUp", "ksit", "kup"]          # the same sequence as the survey (user, 2026-10-07)
     assert [e.payload for e in effects if e.kind is EffectKind.CAPTURE] == [("shot", "name:mug")]
     assert [e.payload for e in effects if e.kind is EffectKind.SPEAK] == ["Okay, I will remember the mug."]
-    assert [e.payload for e in effects if e.kind is EffectKind.SKILL] == ["kbuttUp", "kup"]
     off, c2 = mk(survey=False)
     assert not any(e.kind is EffectKind.CAPTURE for e in off.tick(DriverInputs(name_request="mug", frame=[])).effects)       # needs enable_survey
 

@@ -89,9 +89,11 @@ def main() -> None:
         fan = ImuFanout(link)                              # the sensor hub, the stand guard and the learned walk each get their own IMU stream
         alert = {"fn": None}                              # the battery alarm, set once the speaker exists
         policy_walker = None
+        fall = {"fn": None}                               # set once the runtime and the voice exist: a fall halts the exploration
         if features.gait != "off" and settings.default_gait == "policy":
             from .gait.policy_walker import PolicyWalker
-            policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v))
+            policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
+                                         on_fall=lambda: fall["fn"] and fall["fn"]())
         saver = None
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
@@ -125,6 +127,12 @@ def main() -> None:
             attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
             rt.bindings.tts = tts
             say("Exploration test starting. I will stay put and look around first." if args.stationary else "Exploration test starting.")
+
+        def _on_fall():
+            log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
+            rt.halt()
+            say("I fell down. I have stopped.")
+        fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard
         guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,

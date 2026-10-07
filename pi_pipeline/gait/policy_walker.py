@@ -24,9 +24,10 @@ class _Stop(threading.Event):
 
 
 class PolicyWalker:
-    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None):
+    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None):
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
         self._on_battery = on_battery            # called with (level, volts) on a low reading while walking
+        self._on_fall = on_fall                  # called when a walk ended because G2 fell (the exploration halts instead of walking on, 2026-10-07)
         self._thread: threading.Thread | None = None
         self._stop = _Stop()
         self._lock = threading.Lock()
@@ -44,8 +45,13 @@ class PolicyWalker:
                 from .residual_policy import CONTROL_HZ
             else:
                 CONTROL_HZ = 80
-            run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
-                on_battery=self._on_battery)
+            reason = run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
+                         on_battery=self._on_battery)
+            if reason == "fall" and self._on_fall is not None:
+                try:
+                    self._on_fall()
+                except Exception:  # noqa: BLE001
+                    log.exception("the fall handler failed")
         except SystemExit as e:                       # run() reports "no IMU frame" and similar this way
             log.error("policy walk could not start: %s", e)
         except Exception:  # noqa: BLE001

@@ -28,8 +28,7 @@ def test_latch_and_entry_burst():
     kinds = [e.kind for e in burst]
     assert EffectKind.STOP in kinds and EffectKind.CHIRP in kinds
     assert any(e.kind is EffectKind.SKILL and e.payload == "kbalance" for e in burst)
-    later = es.effects()                            # subsequent ticks: just STOP
-    assert [e.kind for e in later] == [EffectKind.STOP]
+    assert es.effects() == []                       # the very next ticks send nothing (a STOP sends rest; every tick made the BiBoard click constantly)
     assert es.release() is True and not es.halted
 
 
@@ -48,8 +47,8 @@ def test_driver_halts_and_holds_until_released():
     assert EffectKind.CHIRP in _kinds(t)
 
     c.adv(1.0)
-    t = d.tick(DriverInputs())                      # still halted, no new input
-    assert t.halted and _kinds(t) == [EffectKind.STOP]
+    t = d.tick(DriverInputs())                      # still halted, no new input: nothing is re-sent every tick (it made the BiBoard click)
+    assert t.halted and _kinds(t) == []
 
     c.adv(1.0)
     t = d.tick(DriverInputs(release=True))
@@ -89,7 +88,11 @@ def test_runtime_halt_dispatches_even_when_paused():
     rt.halt()
     perf = [a[0] for n, a, _k in mb.calls if n == "actuator.perform"]
     assert "kbalance" in perf                       # the freeze went out despite pause
-    # and a subsequent tick still re-asserts the stop while paused+halted
+    # a subsequent tick inside the re-assert interval sends nothing more; once the interval has passed the stop is re-asserted while paused+halted
+    n_before = len(mb.calls)
+    rt.tick()
+    assert not any(n == "actuator.stop" for n, _a, _k in mb.calls[n_before:])
+    d.estop._last_stop -= 10.0                      # pretend the re-assert interval has elapsed
     n_before = len(mb.calls)
     rt.tick()
     assert any(n == "actuator.stop" for n, _a, _k in mb.calls[n_before:])
@@ -115,3 +118,15 @@ def test_voice_phrases_map_to_halt_and_resume():
         assert match_local_command(p) == "resume", p
     # an ordinary request is not a halt
     assert match_local_command("can you stop the kitchen timer") != "halt"
+
+
+def test_a_held_stop_is_re_asserted_only_every_few_seconds_not_every_tick():
+    t = [100.0]
+    es = EmergencyStop(reassert_s=5.0, clock=lambda: t[0])
+    es.halt()
+    es.effects()                                    # the entry burst
+    sent = 0
+    for _ in range(8 * 12):                         # twelve seconds of ticks at 8 Hz
+        t[0] += 0.125
+        sent += len(es.effects())
+    assert sent == 2                                # one re-assert at about 5 s and one at about 10 s, not 96
