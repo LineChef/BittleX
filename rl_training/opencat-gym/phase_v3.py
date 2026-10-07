@@ -17,6 +17,7 @@ AND its own target metric (TARGETS below) beats the control. The control itself 
 """
 import glob
 import json
+import shutil
 import os
 import sys
 import time
@@ -297,7 +298,16 @@ def do_report(job, results, last_stage, outdir=None, episodes=None, spec=None, l
     outdir = outdir or REPORT_DIR
     os.makedirs(outdir, exist_ok=True)
     kept = results[K3]["levers"] if K3 in results else []
-    policies = [("v21", V21, []), ("control", "trained/v3_c0b_ppo", []), ("k3", f"trained/{K3}_ppo", kept), ("final", f"trained/{last_stage}_ppo", kept)]
+    post = job.get("report_of")                  # a report of a finished run (the 20M): reuses the pre-20M report's scores of V2.1, the control and K3
+    final_path = f"trained/{post}_ppo" if post else f"trained/{last_stage}_ppo"
+    policies = [("v21", V21, []), ("control", "trained/v3_c0b_ppo", []), ("k3", f"trained/{K3}_ppo", kept), ("final", final_path, kept)]
+    if post:
+        for key in ("v21", "control", "k3"):
+            src, dst = f"{REPORT_DIR}/{key}.json", f"{outdir}/{key}.json"
+            if os.path.exists(src) and not os.path.exists(dst):
+                shutil.copy(src, dst)
+    elif last_stage == K3:                       # no stage chain: "final" would be K3 scored a second time
+        policies = policies[:3]
     log(f"REPORT scoring {len(policies)} policies on benchmark v5 with the difficulty ladder (world levers {kept}); about 10 min each -> done about {clock_in(10 * len(policies))}")
     out = {}
     for key, path, levers in policies:
@@ -319,10 +329,13 @@ def do_report(job, results, last_stage, outdir=None, episodes=None, spec=None, l
         save(f, res)
         out[key] = res
         log(f"REPORT scored {key} in {res['wall_seconds'] / 60:.0f} min | {summary(res)}")
+    if "final" not in out and "k3" in out:
+        out["final"] = out["k3"]
     training = load(RESULTS, {})
-    html_path = f"{outdir}/pre20m_report.html"
-    open(html_path, "w").write(v3_report.build(out, training))
-    log(f"REPORT ready: {html_path} (final stage = {last_stage}). Tell Claude to publish it; the 20M starts only on your go")
+    name = job.get("name", "pre20m_report")
+    html_path = f"{outdir}/{name}.html"
+    open(html_path, "w").write(v3_report.build(out, training, title="V3 vs V2.1 after the 20M" if post else "V3 Pre-20M Benchmark"))
+    log(f"REPORT ready: {html_path} (final = {post or last_stage}). Tell Claude to publish it")
     return html_path
 
 
@@ -366,10 +379,23 @@ def run_queue():
                 log(f"REF done | {summary(res)}")
             continue
         if kind == "report":
-            if not os.path.exists(f"{REPORT_DIR}/pre20m_report.html"):
-                do_report(job, results, last_stage)
+            outdir = f"{REPORT_DIR}_{job['report_of']}" if job.get("report_of") else REPORT_DIR
+            if not os.path.exists(f"{outdir}/{job.get('name', 'pre20m_report')}.html"):
+                do_report(job, results, last_stage, outdir=outdir)
             continue
         if kind == "pause":
+            if job.get("auto_go_min") is not None and not os.path.exists(f"trained/v3_go_{job['name']}"):
+                # unattended: continue by itself after a short veto window (touch trained/v3_hold_20m to keep it paused); the report before this pause is the evidence, K3 already passed its gate to get here
+                log(f"AUTO-GO in {job['auto_go_min']} min for {job['name']} unless trained/v3_hold_20m exists (touch it to hold)")
+                waited = 0
+                while waited < job["auto_go_min"] * 60 and not os.path.exists(f"trained/v3_go_{job['name']}"):
+                    time.sleep(30)
+                    waited += 30
+                if os.path.exists("trained/v3_hold_20m"):
+                    log("AUTO-GO held by trained/v3_hold_20m: waiting for the user (touch trained/v3_go_hardware_checkin to continue)")
+                else:
+                    open(f"trained/v3_go_{job['name']}", "w").write("auto\n")
+                    log(f"AUTO-GO: {job['name']} released")
             while not os.path.exists(f"trained/v3_go_{job['name']}"):
                 if not job.get("announced"):
                     log(f"PAUSE {job['name']}: waiting for the user (touch trained/v3_go_{job['name']} to continue). {job.get('note', '')}")
