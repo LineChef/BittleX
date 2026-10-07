@@ -121,8 +121,15 @@ and the carpet detector. For those, a tape-measured average speed per dedicated 
 | Phase | What | Status |
 |---|---|---|
 | 0 | Inventory, schema, epochs file, capture module with tests | **done 2026-10-07** (`pi_pipeline/telemetry/`, the hook in `run_gait.run()`, `g2floor`; tests in `test_autolog.py`; not yet on the Pi) |
-| 1 | Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi | not started; the policy-walk capture waits for the next deploy and one short hardware run to confirm the loop timing is unchanged |
-| 2 | Sync watcher, ingest gates, store, `g2data status` | not started |
+| 1 | Capture in every path (firmware-gait and rest IMU recorders, events), rotation, orphan cleanup at service start, overhead check on the Pi | **policy-walk capture done and verified on G2 (2026-10-07)**: 64 runs captured, loop timing unchanged (median tick 12.6 ms); firmware-gait and rest-IMU recorders, the event log, rotation and orphan cleanup not started |
+| 2 | Sync, ingest gates, store, `g2data status` | **built 2026-10-07** (`tools/g2_ingest.py`, `g2data sync|ingest|status`, tests in `test_g2_ingest.py`); sync is manual (`g2data sync`), not yet a watcher |
 | 3 | Calibration builder, harm check, snapshots, approval, `g2_profile` loading | not started |
 | 4 | Backfill of the 2026-10-01 to 10-07 logs by epoch | not started |
 | 5 | Retrain runner reads the snapshot; report in the pre-20M report | not started |
+
+## First result (2026-10-07, kitchen tile, hardware epoch `hw-2026-10-07`)
+
+`g2data` on the first 64 automatic runs (about 2 MB raw, about 0.7 MB in the store with the sidecars): **8 excluded** (the fridge collision, the falls, the runs after them), **29 quarantined**, **27 usable**, which is **91 s** of steady-state walking (68 s on a full pack, 23 s mid-charge).
+Why runs are not usable: 15 had a steady window under 2 s (exploration walks in 1 to 6 s segments, each starting from a stand, of which the first 1.5 s is skipped), 10 had fewer than 5 rows (a walk stopped at once), 8 excluded by hand, a few had 6 to 16% late ticks, one did not end cleanly, three were statistical outliers.
+**Lesson: exploration produces many short stop-and-go runs, so its usable steady-state data is small. The long dedicated walks in the capture plan (12.5 s each, tape distance, a hardwood control) are worth far more per minute.** A fit needs many more minutes than this.
+Roll and pitch spread from today's usable tile runs sit at about 5.5 and 2.7 deg, in line with the hardwood baselines (roll about 5, pitch about 2.5), so tile does not look different on these two measures yet; the snag analysis (tile versus hardwood, per metre walked) is the next step and needs more tile data plus a same-day hardwood control.

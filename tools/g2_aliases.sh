@@ -293,6 +293,20 @@ g2pics() {
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 
+# g2data [sync|ingest|status]  -- G2's automatic run logs on the Mac (docs/rl/real-data-pipeline.md). With no argument: sync, then ingest, then status.
+#   sync = copy the Pi's run logs and detection logs to ~/g2_data (the Pi keeps its copy); ingest = measure every run, apply the quality gates, store it compressed (nothing deleted; a run that fails a gate is quarantined with its reasons);
+#   status = how many runs are usable, by hardware epoch, floor and pack voltage, and why the others are not.
+g2data() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  _sync() { mkdir -p "$HOME/g2_data/raw_auto" "$HOME/g2_data/detections" && rsync -a "$G2_PI:g2_runs/auto/" "$HOME/g2_data/raw_auto/" && { rsync -a "$G2_PI:g2_runs/detections/" "$HOME/g2_data/detections/" 2>/dev/null; true; } && echo "synced: $(ls "$HOME"/g2_data/raw_auto/*/*.csv 2>/dev/null | wc -l | tr -d ' ') run logs in ~/g2_data/raw_auto"; }
+  case "${1:-all}" in
+    sync) _sync ;;
+    ingest|status) "$_G2_PY" "$G2_ROOT/tools/g2_ingest.py" ;;
+    all) _sync && "$_G2_PY" "$G2_ROOT/tools/g2_ingest.py" ;;
+    *) echo "usage: g2data [sync|ingest|status]"; return 2 ;;
+  esac
+}
+
 # g2reset [status|logs]  -- restart G2's voice loop on the Pi (prints "restarting voice loop..." then "voice loop restarted"; G2 also says "I am online." out loud when he is back) (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first.
 # It waits until the service says it is listening (about 30 s). g2reset status = what is running, since when, and the last thing G2 heard; g2reset logs = the last lines of the voice service log.
 g2reset() {

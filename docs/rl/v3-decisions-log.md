@@ -110,3 +110,6 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
 
 - **"I am online" (user, 2026-10-07):** the voice loop now says "I am online." once it has finished starting (after `g2reset`, the voice restart command, a deploy, power-up, or an exploration session handing the voice service back); `G2_ANNOUNCE_ONLINE=off` silences it. This replaces the one-shot restart marker I built earlier the same day (removed).
   The user found the console messages from `g2reset` (\"restarting voice loop...\", \"voice loop restarted: G2 is listening\") sufficient on the Mac side.
+
+- **Next steps for the captured data (2026-10-07, user: "start working on next steps for the training data we captured"):** built the Mac-side ingest (`tools/g2_ingest.py`, `g2data sync|ingest|status`): measures every run, applies the gates, stores logs gzip-compressed with nothing deleted, writes `manifest.json`; drift and mean lean are stored for audits only.
+  First result on the real data: 64 runs, 27 usable, 91 s of steady walking, all on tile in the current epoch ([`real-data-pipeline.md`](real-data-pipeline.md)). Pictures: 15 complete survey pictures curated; 0 named. Findings are written up in [`real-walk-log.md`](real-walk-log.md). Open: more long walks on tile and hardwood (the capture plan), named objects, and the calibration builder (Phase 3).

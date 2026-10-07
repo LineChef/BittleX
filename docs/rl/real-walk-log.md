@@ -579,3 +579,17 @@ right-positive:
 
 Straight walking needs u of about -0.19 (linear interpolation), at the old +-0.20 limit, so there is no headroom: the drift crept up through the series (within each u the later
 runs turn further right, about +30 deg over ten minutes), which a fixed offset cannot follow. The feedback needs more authority than +-0.20 (untested beyond it).
+
+## First kitchen exploration sessions on tile (2026-10-07, about 2:00 to 3:20 PM)
+
+Several exploration sessions in the kitchen (tile floor), hardware epoch `hw-2026-10-07`, V2.1 policy at 0.10 m/s, automatic capture on. What happened and what was learned (decisions and fixes: [`v3-decisions-log.md`](v3-decisions-log.md)):
+- **Data:** 64 automatic run logs (the walks come as 1 to 9 s segments between survey stops), loop timing unchanged by the capture (median tick 12.6 ms at 80 Hz, 99th percentile about 26 ms), pack voltage 8.4 V falling to a low-battery warning (7.94 V) by 3:14 PM. `g2data`: 27 usable runs, 91 s of steady-state walking.
+- **Falls:** a collision with the fridge and a fall at 2:17 PM (tilt 176 deg, on his back); two falls at about 3:01 PM (tilt 84 deg, then 178 deg). All three fall runs and the runs after them are excluded and labelled. Two falls of three ended on his back, not on his side.
+- **Crashes:** the exploration session crashed twice with a native segmentation fault seconds after narration started, while the speaker had a loose connection; fixed by reseating the connection; no further crashes with the fault trace on.
+- **Stalled after 90 s:** the behavior layer's own cap on one armed roam bout (90 s) ended the bout and dropped G2 into the attentive idle (looking around, sit, rest). Fixed: the session's `--roam-s` (600 s) is now the only limit.
+- **Constant clicking:** while halted, the behavior layer re-sent the stop (rest) command 8 times a second; the BiBoard clicked until the session ended. Fixed: the held stop re-asserts every 5 s.
+- **Camera:** pictures from the 480 x 480 capture were cut off by the module's roughly 5 KB picture buffer (only the top third to half real); pictures are now taken at 240 x 240 (complete) and detection stays at 480. The 15 pictures taken since are complete and good (floor-level kitchen views, tile and grout, appliances, the open dishwasher, a rug, a chair).
+- **False animals:** the camera model has no score cutoff and read bare tile as a cat or dog. A filter now drops animal detections that are low score, cover most of the frame, are flat wide strips, or are not seen in 3 frames in a row. Over the later part of the session it dropped 368 of 383 animal detections (232 for covering most of the frame, about 108 for score); 15 were kept and may include more false ones.
+- **Naming:** no named pictures were saved: naming did not exist in plain voice mode, and inside the stationary session the recognizer returned nothing after the wake word. Both fixed afterwards (naming works in plain voice mode; the session logs and says what it heard).
+- **Snags:** not labelled by hand (frequent on tile); to be counted statistically from IMU and correction signatures per metre walked, tile versus hardwood.
+- **Voice outage:** a stretch of unresponsive voice was caused by my own repeated service restarts and a deploy, not by the microphone (a speaker tone was heard clearly by the mic). `g2reset` and a voice command now restart the voice loop, and G2 says "I am online." when it is back.

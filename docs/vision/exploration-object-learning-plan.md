@@ -153,3 +153,9 @@ Rule from you: **no picture is deleted unless it is a duplicate, and he does not
 - Each picture pauses the detection feed for about a second: only at stops.
 - Pi CPU and battery: measured in Phase 3 and 7.
 - Personal data in pictures of the home: stays local; nothing is sent anywhere without asking.
+
+## Status after the first on-G2 sessions (2026-10-07)
+
+Phase 1 ran on G2 in the kitchen: survey stops (bow, look up, stand, settle, picture) work; after the camera fix (240 x 240, complete pictures) 15 survey pictures were curated by `tools/curate_exploration.py` (all kept: floor-level kitchen views, mean brightness 125, no duplicates, none cut off), the sheet is in `training_data/exploration/20261007_kitchen1/contact/`.
+**No named pictures yet** (0 objects): naming now works in plain voice mode and inside a session, with feedback. For Phase 3 (the embedding model comparison) we need several named objects with 5 or more pictures each, plus a few more survey sessions; the 15 survey pictures are enough to exercise the curation pipeline end to end and to start tuning its thresholds, not to choose a model.
+Camera lessons: the module's picture buffer cuts 480 x 480 pictures short (use 240 x 240 for pictures), and its detector reads bare floor as a cat or dog (filtered; see `vision/detection_filter.py`).
