@@ -1,0 +1,8 @@
+u -0.30: heading change   +32.0 +- 20.1 deg over 12.5 s (+2.56 deg/s), falls 6/12
+u -0.20: heading change   +35.1 +-  7.9 deg over 12.5 s (+2.81 deg/s), falls 0/12
+u -0.10: heading change   +17.3 +- 16.6 deg over 12.5 s (+1.39 deg/s), falls 0/12
+u +0.00: heading change    -2.3 +- 10.5 deg over 12.5 s (-0.18 deg/s), falls 0/12
+u +0.10: heading change   -16.4 +- 15.7 deg over 12.5 s (-1.31 deg/s), falls 0/12
+u +0.20: heading change   -29.4 +- 18.0 deg over 12.5 s (-2.35 deg/s), falls 1/12
+u +0.30: heading change   -47.3 +- 10.4 deg over 12.5 s (-3.79 deg/s), falls 1/12
+turn per unit u: -143 deg per 12.5 s, i.e. -11.5 deg/s per 1.0 of u (-1.15 deg/s per 10% stride difference)

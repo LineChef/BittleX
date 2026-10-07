@@ -369,6 +369,20 @@ walk "N1", 20 episodes; raw results in [`v3-data/`](v3-data/README.md)):
 - With the jumps removed the yaw drifts **+0.14 deg/s** at rest (+7.5 deg over the last 55 s; the first 5 s show +5.5 deg as the legs settle after `d`). Scatter about the line 0.3 deg.
 - Against the walking drift at u = 0 (about 9.6 deg/s in the 2026-10-07 `recheck2` runs) that bias is about 1.5%: it adds roughly 2 deg to a 12.5 s walk, so a gyro bias at rest does **not** explain a disagreement between the log and what is seen on the floor. This does not test the yaw while walking (roll swing of about 5 deg at every stride could still leak into it).
 
+### Sim steering sweep, 2026-10-07 (does the sim steer the way G2 does?)
+
+`steer_probe.py` on V2.1: a fixed stride difference u (left legs scaled by 1 - u, right legs by 1 + u, so u > 0 = longer RIGHT strides), 12 episodes of 12.5 s per value, both payload models. Raw output: `v3-data/steer_sweep/`. Heading change in degrees, sim sign + = left:
+
+| u (probe) | -0.30 | -0.20 | -0.10 | 0 | +0.10 | +0.20 | +0.30 |
+|---|---|---|---|---|---|---|---|
+| new payload (`case2`) | +32 (6/12 fell) | +35 | +17 | -2 | -16 | -29 | -47 |
+| old payload (`case`) | +20 (6/12 fell) | +27 | +18 | -3 | -21 | -32 | -42 |
+
+- **The sign is still opposite to G2's.** In the sim longer right strides turn the robot RIGHT; on G2 they turn it LEFT (u = -0.20 in the G2 convention, which is longer right strides, took +90 deg to +1 deg of right drift). The payload model does not change this.
+- **The sim's steering is 3 to 4 times weaker**: about 10-12 deg/s per unit u against about 40 deg/s per unit on G2 (the G2 figure from the 2026-10-07 `recheck2` runs: u = 0 drifts +9.6 deg/s, u = -0.20 about +1.3 deg/s).
+- Falls rise at |u| = 0.30 on the longer-left-strides side (6 of 12) in both models.
+- Consequence: a policy trained to steer in this sim learns a lever that points the wrong way on G2, so learned in-policy steering cannot be trusted on hardware until the sim's steering sign and strength are understood. The measured Pi-side lever stays the steering path. A cause for the sign difference is not found; candidates are foot-ground contact and how the real legs slip on the hardwood, which the sim models as a fixed friction.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
