@@ -218,7 +218,7 @@ if __name__ == "__main__":
         model.learn(args.steps, callback=checkpoint_callback,
                     reset_num_timesteps=True)
     else:
-        model = PPOCls('MlpPolicy', env, seed=42,
+        model = PPOCls('MlpPolicy', env, seed=int(os.environ.get("G2E_SEED", "42")),
                     policy_kwargs=custom_arch,
                     n_steps=int(2048*8/parallel_env),
                     learning_rate=linear_schedule(3e-4),
