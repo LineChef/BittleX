@@ -593,3 +593,33 @@ Several exploration sessions in the kitchen (tile floor), hardware epoch `hw-202
 - **Naming:** no named pictures were saved: naming did not exist in plain voice mode, and inside the stationary session the recognizer returned nothing after the wake word. Both fixed afterwards (naming works in plain voice mode; the session logs and says what it heard).
 - **Snags:** not labelled by hand (frequent on tile); to be counted statistically from IMU and correction signatures per metre walked, tile versus hardwood.
 - **Voice outage:** a stretch of unresponsive voice was caused by my own repeated service restarts and a deploy, not by the microphone (a speaker tone was heard clearly by the mic). `g2reset` and a voice command now restart the voice loop, and G2 says "I am online." when it is back.
+
+
+## Which foot steers G2, and the front-left heading hold (2026-10-07 evening, about 5:45 to 6:50 PM)
+
+Hard floor (hardwood) unless noted, pack 8.1 to 8.4 V, yaw right-positive, firmware yaw, one walk per setting. Raw logs on the Pi in `~/g2_runs/` (`feet_*`, `feet2_*`, `fhold_*`, `fholdv21_*`, `long_*`, `longhold_*`, `tilehold_*`).
+
+**1. Per-foot trim, scripted `wkF` walk, 12.5 s (`--foot-trim`, a fixed stretch of one foot's swing, no feedback).** Positive trim = a longer step.
+
+| Foot | -0.25 | none | +0.25 |
+|---|---|---|---|
+| front-left | +45 | +88 | +108 |
+| front-right | +106 | +88 | +54 |
+| back-left | +87 | +88 | +85 |
+| back-right | +88 | +88 | +85 |
+
+The **front** feet steer, with the ordinary vehicle sign (a longer step on one side swings G2 toward the other side); the back feet do nothing (within the ~3 deg walk-to-walk noise). The sim has it the other way round (rear legs steer, opposite sign). One front foot is worth about 9 to 10 deg/s per unit of trim. Second batch: no trim +78 / +68 (so the baseline is +68 to +88), `fl=-0.25` +43, `fl=-0.5` +21, front pair (`fl=-0.3`, `fr=+0.3`) +32 / +49 and a roll lean of about -3.7 deg (against -0.2 with no trim). Front-left alone gives the same correction without the lean. No falls in 15 walks.
+
+**2. Closed-loop hold on the front-left foot (`FootHold` in `gait/heading_hold.py`).** Trim = -(KP x error outside a 6 deg deadband + KI x integral + KD x turn rate), clamped to -0.6..+0.2 and slew-limited; the turn-rate term is the ease-off. Yaw after the walk:
+
+| Walk | No hold | Front-left hold |
+|---|---|---|
+| scripted, 12.8 s | +50, +71 | +18, +21 |
+| V2.1, 12.8 s | +96, +93 | +20, +18 |
+| V2.1, 25 s (about 10 ft) | +148 | +21, +13, +14 |
+
+Over 25 s the trim reached its clamp for only 2 to 3% of each walk, so the drift sits well inside one foot's authority. No falls in 7 held V2.1 walks on hardwood. A hold-trimmed walk leans mildly toward the shortened foot (roll mean about -3.4 deg). No-hold walks at 25 s drifted too far off the lane, so no further uncontrolled runs were made at that length (user).
+
+**3. Tile, hold on (4 V2.1 walks of 25 s).** Run 1 stopped at 18.9 s by the IMU-stall guard ("no IMU frame for 2.13 s"; no fall); run 2 clean (25.5 s, +20); run 3 fell at 15 s (a yaw kick from +10 to +56 deg at about 11 s, trim at its -0.6 clamp, then over); run 4 fell at 11.5 s from a calm state (yaw +7, trim -0.21). The earlier uncontrolled tile walking (the kitchen sessions, 64 automatic logs, 296 s, V2.1, no hold) has 3 falls, but its longest walk is 10.3 s and its median 6.3 s, so it never reached the 11 to 15 s where the held walks fell; the hold is neither shown to cause nor to prevent these falls. The user's judgement: G2 has caught a foot on tile in the same way before and fallen, so the falls are not attributed to the correction; keep it on. For the size of the uncorrected drift on tile, the hardwood no-hold walks stand in (user).
+
+**4. BiBoard clicking during runner-started walks.** From the 6:11 PM batch on, every walk started by `g2_baseline.sh` clicked rapidly (the user recognises it as the same click as the roughly 60 s tick, only faster); a voice-started walk does not. Ruled out: the walk's command timing (logs identical to the quiet morning walks), the `P` voltage query rate, the hold code, restarting the Pi and BiBoard. Not chased further (user); open item in [`../STATUS.md`](../STATUS.md).

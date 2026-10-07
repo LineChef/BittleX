@@ -850,8 +850,8 @@ def main():
     ap.add_argument("--hold-kp", type=float, default=None, metavar="K", help="--heading-hold: proportional gain, u per degree of heading error (default heading_hold.KP)")
     ap.add_argument("--hold-ki", type=float, default=None, metavar="K", help="--heading-hold: integral gain, u per degree-second (default heading_hold.KI)")
     ap.add_argument("--hold-umax", type=float, default=None, metavar="U", help="--heading-hold / --steer-const: largest stride difference (default heading_hold.U_MAX = 0.20)")
-    ap.add_argument("--foot-hold", default=None, metavar="FOOT", choices=tuple(_hh.FOOT_JOINT),
-                    help="closed-loop heading hold on ONE foot (proportional to heading error, with deadband and ease-off; gait/heading_hold.FootHold). fl is the measured steering foot")
+    ap.add_argument("--foot-hold", default=None, metavar="FOOT", choices=tuple(_hh.FOOT_JOINT) + ("off",),
+                    help="closed-loop heading hold on ONE foot (proportional to heading error, with deadband and ease-off; gait/heading_hold.FootHold). Default: ON, the front-left foot (G2_FOOT_HOLD); 'off' turns it off")
     ap.add_argument("--scripted", action="store_true", help="zero the learned residual: the scripted wkF walk through the full loop (IMU, logging, holds)")
     ap.add_argument("--foot-trim", default=None, metavar="FOOT=G",
                     help="scale ONE foot's step by (1 + G) with no feedback, e.g. bl=+0.25 (feet: fl fr br bl): the per-foot steering test. Also logs which foot in the sidecar.")
@@ -984,7 +984,7 @@ def main():
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
-                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trims(args.foot_trim), foot_hold=args.foot_hold, scripted=args.scripted,
+                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trims(args.foot_trim), foot_hold=(None if args.foot_hold == "off" else (args.foot_hold or _hh.default_foot_hold())), scripted=args.scripted,
                 hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki,
                 log_extra=args.log_extra, **({"volt_every_s": args.volt_every} if args.volt_every > 0 else {}))
     finally:

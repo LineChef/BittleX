@@ -116,7 +116,7 @@ def main() -> None:
         if args.foot_hold:
             fitems = [x.strip() for x in args.foot_hold.split(",") if x.strip()]
             fh = fitems[(k - 1) % len(fitems)]
-            fh = None if fh.lower() == "none" else fh
+            fh = "off" if fh.lower() in ("none", "off") else fh
         path = os.path.join(out, f"{args.label}_{stamp}_run{k:02d}" + ("" if sgn is None else f"_sign{'P' if sgn > 0 else 'M'}")
                             + ("" if hold is None else f"_hold{'ON' if hold else 'OFF'}")
                             + ("" if cu is None else f"_u{cu:+.2f}") + ("" if fh is None else "_fh" + fh) + ("" if ft is None else "_ft" + ft.replace("/", "_").replace("=", "").replace("+", "p").replace("-", "m")) + ".csv")

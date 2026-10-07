@@ -125,6 +125,14 @@ def apply_stride_difference(joint_deg, u: float):
     return [int(round(v)) for v in out]
 
 
+def default_foot_hold():
+    """Which foot every real-hardware policy walk steers with: `G2_FOOT_HOLD` (default `fl`, the front-left foot, which turned G2 on the real robot 2026-10-07: a closed-loop hold kept V2.1
+    within 13-21 deg of its starting heading over 10 ft against +148 deg without). `off` / `none` / empty turns it off. Returns the foot name or None."""
+    import os
+    v = os.environ.get("G2_FOOT_HOLD", "fl").strip().lower()
+    return None if v in ("", "off", "none", "0", "false") else v
+
+
 class FootHold:
     """Heading hold on ONE front foot (measured on G2, 2026-10-07, scripted walk): front-left alone takes ~9 deg/s of turn per unit of trim (-0.25 -> -35 deg, -0.5 -> -57 deg over
     12.5 s against ~78 deg of drift), the back feet do nothing, and a front pair adds a lean. Trim g scales that foot's swing (apply_foot_trim); a NEGATIVE g shortens the step and

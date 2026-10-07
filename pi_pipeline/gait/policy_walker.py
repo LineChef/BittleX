@@ -12,20 +12,14 @@ from __future__ import annotations
 
 import inspect
 import logging
-import os
 import threading
+
+from .heading_hold import default_foot_hold   # noqa: E402  -- re-exported: the everyday walks' default steering foot
 
 log = logging.getLogger("g2.policy_walker")
 
 DEFAULT_CMD_FWD = 0.10        # m/s, the speed the policy has been walked at on the robot
 MAX_SECONDS = 120.0           # a walk with no stated length still ends
-
-
-def default_foot_hold() -> str | None:
-    """Which foot the everyday walks steer with: `G2_FOOT_HOLD` (default `fl`, the front-left foot, which turned G2 on the real robot 2026-10-07: a closed-loop hold kept V2.1 within
-    13-21 deg of its starting heading over 10 ft against +148 deg without). `off` / `none` / empty turns it off."""
-    v = os.environ.get("G2_FOOT_HOLD", "fl").strip().lower()
-    return None if v in ("", "off", "none", "0", "false") else v
 
 
 class _Stop(threading.Event):

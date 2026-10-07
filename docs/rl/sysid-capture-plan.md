@@ -36,7 +36,9 @@ Three goals in one: test the exploration updates (wake chime, API tone, shutter 
 7. **Mats and the small rug stay out of the exploration area** (pull them aside or block them with boxes): carpet is G2's known weak spot (every gait stalled on the 6.4 mm house carpet, no pile model in the sim), exploration has no surface or edge detection, and a run that crosses between floors would carry one wrong floor label and contaminate the tile fits and the snag rate. If he heads for one, stop him (`g2_explore.sh stop` or `python -m pi_pipeline.app --halt`).
    Test them separately afterwards: tape the mat or rug down so it cannot slide on the tile, measure the edge height with a ruler, `g2floor mat` (or `rug`), then three or four head-on passes with the user present. An edge inside the sim's 12 to 35 mm ledge range can be one of the one or two ledge heights.
 
-## Per-foot steering test (hardware, user; proposed 2026-10-07, not yet run)
+## Per-foot steering test (hardware; RUN 2026-10-07: the front feet steer, results in `real-walk-log.md`)
+
+Result first: on G2 the front feet steer and the back feet do not (the sim has it the other way round); see [`real-walk-log.md`](real-walk-log.md) "Which foot steers G2". The original plan follows.
 
 Why: in the sim only the BACK feet steer (a longer step on a back foot turns the body toward that foot's side, about 4 deg/s per unit of trim; the front feet do nothing), while on G2 a longer RIGHT stride on both sides turns him LEFT and about 4 times harder, so which foot carries the steering on G2 is unknown. Measuring each foot alone also tests whether one foot is enough to steer without upsetting the gait.
 How: 9 walks on the floor with the Pi-side hold off, one trimmed foot per run (scales that foot's swing about the stance angle; positive = a longer step), 12.5 s, the same start spot, heading change by tape or the IMU yaw in the log:

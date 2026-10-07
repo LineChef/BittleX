@@ -412,3 +412,13 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 |---|---|
 | `ps aux \| grep -iE "python\|pybullet\|tensorboard" \| grep -v grep` | Everything RL-related that's running |
 | `../../.venv/bin/python smoke_train.py` | ~90 s pipeline sanity check (reward ~40–60, no NaN) |
+
+## Heading hold and per-foot tests (Pi walks)
+
+| Command | What it does |
+|---|---|
+| `bash tools/g2_baseline.sh start 4 NAME --foot-hold fl --hold-on-policy --seconds 25 --lead-s 5 --reset-s 5` | 4 logged V2.1 walks of 25 s (about 10 ft) with the front-left hold on |
+| `bash tools/g2_baseline.sh start 9 feet --scripted-mix scripted --foot-trim none,fl=-0.25,fl=+0.25,fr=-0.25,fr=+0.25 --lead-s 5 --reset-s 5` | per-foot fixed-trim test on the scripted walk (several feet at once: `fl=-0.3/fr=+0.3`) |
+| `G2_FOOT_HOLD=off` in the Pi `.env` | everyday walks without the heading hold (default: on, front-left) |
+| `python pi_pipeline/gait/run_gait.py --foot-hold off` | one walk with the hold off (the hold is on by default) |
+
