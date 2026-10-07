@@ -44,7 +44,7 @@ no fall or guard trip inside the window used (those runs still count for event r
 the first seconds after the stand excluded; thermal cooldown stretches excluded.
 Statistical screen: a run whose metrics sit outside the epoch's median by more than k x MAD is quarantined for review, not dropped.
 Per-parameter rules in the builder: a minimum number of supporting runs; fit on one half of the runs and check it on the other (a value that moves more than its own noise is not used); physical bounds;
-left-right symmetric application; **no drift parameter exists in the builder** (drift direction and size never feed the sim; a test enforces it).
+left-right symmetry for fitted *parameters* (approved 2026-10-07; see below); **no drift parameter exists in the builder** (drift direction and size never feed the sim; a test enforces it).
 
 ## Calibration builder and the harm check
 
@@ -61,8 +61,20 @@ may drop beyond its noise. A change that fails is blocked.
 | A change beyond noise, a new parameter, an epoch change, or the cumulative cap exceeded | **The user** (Claude never approves these): says "approve" in chat or runs `g2cal approve <id>` after reading the one-page diff and checks | at the next session after the proposal exists; always reviewed before a 20M go |
 | Harm check fails | **Blocked**, not approvable until the cause is understood | |
 
-**No training run ever starts automatically from data or from an approval** (user, 2026-10-07: nothing large starts without his approval). Approving a snapshot only makes it *eligible*; launching any training (a 3M screen or the 20M) is a separate, explicit go from the user.
-When the user does launch one, the launch uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
+**Training launches (user, 2026-10-07).** The **20M run never starts automatically**, and approving a snapshot starts nothing by itself. Two rules for the 3M screening run (the smoke test, in the same world as the snapshot, scored against the control):
+1. **Automatic when idle:** a 3M screen may start on its own for a new snapshot that passed the harm check and the drift canary, only when nothing else is training on the Mac, at most one per snapshot, and its result is reported.
+2. **Always before a 20M:** when the user gives a go for a 20M run, a 3M smoke test on the snapshot it would use runs first (reused if one already finished for that snapshot) and its result is reported before the 20M starts.
+When the user launches a run, it uses the latest approved snapshot instead of waiting on a pending proposal, logs any pending proposal it did not use, and Claude reports it before the go. The cumulative cap stops many small auto-approvals from creeping.
+
+## Symmetry rule (approved 2026-10-07)
+
+Fitted **parameters** (servo strength, latency, IMU noise, ...) are symmetric by default. A real left-right difference in the hardware (a weak servo) goes to the user as a maintenance flag and never into the sim as a fixed one-sided bias, which is how a policy learns a one-sided correction.
+**Events** keep their side in the log (a snag on one foot is a real event) and feed the sim's hazard rates, where the side is randomized: a right-foot snag teaches "snags happen at some rate on any foot".
+
+## Event labels
+
+No voice notes and no per-event labels (user, 2026-10-07). Falls are recorded by the log (`end_reason: fall`, the fall guard) and by the user telling Claude when one happened (Claude notes the time against the session). Snags will be frequent on kitchen tile, so they are counted
+statistically from their IMU and command signatures per metre walked and per floor, never labelled one by one.
 Snapshots are immutable and numbered; "current" is a pointer, so reverting is safe.
 
 ## Periodic audit ("is the data tidy and doing its job")
