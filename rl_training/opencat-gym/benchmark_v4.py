@@ -56,9 +56,12 @@ N_CELLS = [
     ("N5", "Constant yaw push (0..0.3 N*m, random sign), 12.5 s", {"DRIFT_TORQUE": 0.3, "DRIFT_PROB": 1.0}, 40, 1000, None),
     ("N6a", "Turn left at 0.20 rad/s, 6 s", {}, 20, 500, (0.10, 0.20)),
     ("N6b", "Turn right at 0.20 rad/s, 6 s", {}, 20, 500, (0.10, -0.20)),
+    # L1 (2026-10-07, the length level, docs/rl/v3-decisions-log.md): a 40 s straight walk under a constant yaw push of +/-0.25 N*m that ALTERNATES by episode (even episodes push right, odd push left), 16 episodes.
+    # Reports the heading change per side (heading_even_abs_mean_deg = right pushes, heading_odd_abs_mean_deg = left pushes) and their gap, so a policy that corrects only one direction shows it.
+    ("L1", "Long run, 40 s, alternating yaw push +/-0.25 N*m", {"LONG_RUN_PUSH": 0.25}, 16, 3200, None),
 ]
 NEW_KNOBS = ("EPISODE_LENGTH", "FAULT_STUCK_PROB", "FAULT_STUCK_JOINT", "FAULT_STUCK_DEG", "FAULT_WEAK_PROB", "FAULT_OFFSET_PROB",
-             "MOTOR_SCALE_ALL", "MOTOR_SCALE_RAND", "DRIFT_TORQUE", "DRIFT_PROB", "LONG_EP_PROB")
+             "MOTOR_SCALE_ALL", "MOTOR_SCALE_RAND", "DRIFT_TORQUE", "DRIFT_PROB", "LONG_EP_PROB", "LONG_RUN_PUSH")
 
 # "core" = a fast screen: the cells a screening round is judged on
 CORE = ["T1.1", "N1", "N3", "N5", "T2.2", "T3.2", "T5.2", "T7.2", "T8.1", "T9.1", "T10.2"]
@@ -155,11 +158,14 @@ def v4_metrics(eps_list):
     jm = np.mean(np.array(jm), axis=0)
     asym = [float(jm[a] - jm[b]) for a, b in JOINT_PAIRS]
     h = np.array(heads)
+    ev, od = (np.abs(h[0::2]), np.abs(h[1::2]))                       # alternating-sign cells (L1): even episodes = push right, odd = push left
     e, l = float(np.mean(early)), float(np.mean(late))
     return dict(
         n=len(eps_list), fell_fraction=float(np.mean(falls)), speed_mps=float(np.mean(speeds)),
         speed_early_mps=e, speed_late_mps=l, speed_decay=(1.0 - l / e) if e > 1e-6 else 0.0,
         heading_mean_deg=float(h.mean()), heading_abs_mean_deg=float(np.abs(h).mean()), heading_std_deg=float(h.std()),
+        heading_even_abs_mean_deg=float(ev.mean()) if len(ev) else 0.0, heading_odd_abs_mean_deg=float(od.mean()) if len(od) else 0.0,
+        heading_sign_gap_deg=abs(float(ev.mean()) - float(od.mean())) if len(ev) and len(od) else 0.0,
         yaw_rate_rms=float(np.mean(yrms)), roll_std_deg=float(np.mean(roll_s)), pitch_std_deg=float(np.mean(pitch_s)),
         lr_asym_deg=dict(zip(PAIR_NAMES, asym)), lr_asym_max_deg=float(np.max(np.abs(asym))),
         servo_over_frac=float(np.mean(over)),

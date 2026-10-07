@@ -72,6 +72,31 @@ class HeadingHold:
         return self.u
 
 
+FOOT_JOINT = {"fl": 0, "fr": 2, "br": 4, "bl": 6}        # one foot's shoulder / hip joint, URDF order (front-left, front-right, back-right, back-left)
+
+
+def parse_foot_trim(text: str):
+    """`bl=+0.25` -> ("bl", 0.25); None for an empty text. The foot's swing is scaled about the stance angle by (1 + that number): positive = a longer step on that foot."""
+    if not text:
+        return None
+    foot, _, val = text.partition("=")
+    foot = foot.strip().lower()
+    if foot not in FOOT_JOINT:
+        raise ValueError(f"unknown foot {foot!r}; use one of {', '.join(FOOT_JOINT)}")
+    return foot, float(val)
+
+
+def apply_foot_trim(joint_deg, foot: str, g: float):
+    """The policy's 8 joint targets (URDF order, degrees) with ONE foot's swing scaled about the stance angle by (1 + g) and every other joint left alone, clamped to the reach the walk itself
+    uses (JOINT_RANGE_DEG). A per-foot steering test (2026-10-07: in the sim only the back feet steer, and G2's steering is opposite and about 4 times stronger, so which foot steers on G2 is measured)."""
+    out = [float(v) for v in joint_deg]
+    j = FOOT_JOINT[foot]
+    out[j] = STANCE_DEG + (1.0 + g) * (out[j] - STANCE_DEG)
+    lo, hi = JOINT_RANGE_DEG[j]
+    out[j] = max(lo - JOINT_MARGIN_DEG, min(hi + JOINT_MARGIN_DEG, out[j]))
+    return [int(round(v)) for v in out]
+
+
 def apply_stride_difference(joint_deg, u: float):
     """The policy's 8 joint targets (URDF order, degrees) with the left swing scaled by (1 + u) and the right by (1 - u) about the stance angle
     (u > 0: longer left strides = a RIGHT turn on the real G2; measured, see the module docstring)."""

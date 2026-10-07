@@ -478,7 +478,7 @@ def _extra_cols(feed, now, volt, on):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False):
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False, foot_trim=None):
     """`log_extra=True` adds accel (m/s^2, about 10 on az at rest), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
     `heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
@@ -530,7 +530,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         try:
             from pi_pipeline.telemetry import autolog as _autolog
             autolog_run = _autolog.new_run("policy_walk", policy=os.path.basename(str(getattr(pol, "onnx_path", "") or "")) or None, cmd_fwd=cmd_fwd, hz=hz,
-                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const})
+                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const, "foot_trim": foot_trim})
         except Exception:  # noqa: BLE001 -- never let logging stop a walk
             autolog_run = None
         if autolog_run is not None:
@@ -654,6 +654,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 q = policy_quat(r, p_, y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
+                if foot_trim is not None:            # --foot-trim: ONE foot's steps scaled, a fixed amount, no feedback (the per-foot steering test)
+                    joint_deg = np.array(_hh.apply_foot_trim(joint_deg, foot_trim[0], foot_trim[1]), dtype=int)
                 if hold is not None:                 # steer by making one side's strides longer; yaw here is right-positive (the firmware convention)
                     steer_u = hold.update(y, dt, active=abs(cmd_fwd) >= 0.025)
                     joint_deg = np.array(_hh.apply_stride_difference(joint_deg, steer_u), dtype=int)
@@ -842,6 +844,8 @@ def main():
     ap.add_argument("--hold-kp", type=float, default=None, metavar="K", help="--heading-hold: proportional gain, u per degree of heading error (default heading_hold.KP)")
     ap.add_argument("--hold-ki", type=float, default=None, metavar="K", help="--heading-hold: integral gain, u per degree-second (default heading_hold.KI)")
     ap.add_argument("--hold-umax", type=float, default=None, metavar="U", help="--heading-hold / --steer-const: largest stride difference (default heading_hold.U_MAX = 0.20)")
+    ap.add_argument("--foot-trim", default=None, metavar="FOOT=G",
+                    help="scale ONE foot's step by (1 + G) with no feedback, e.g. bl=+0.25 (feet: fl fr br bl): the per-foot steering test. Also logs which foot in the sidecar.")
     ap.add_argument("--steer-const", type=float, default=None, metavar="U",
                     help="hold the stride difference u fixed (no feedback, limited to +-0.20): + = longer right strides. Measures the lever's real sign / authority")
     ap.add_argument("--heading-hold", action="store_true",
@@ -970,7 +974,7 @@ def main():
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
-                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const,
+                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trim(args.foot_trim),
                 hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki,
                 log_extra=args.log_extra)
     finally:

@@ -104,3 +104,23 @@ def test_scaled_joints_never_leave_the_reach_the_walk_uses():
     low = hh.apply_stride_difference([11, 0, 11, 0, 22, 0, 28, 0], -0.38)
     assert low[2] >= 11 - hh.JOINT_MARGIN_DEG and low[4] >= 22 - hh.JOINT_MARGIN_DEG
     assert hh.apply_stride_difference([50, 0, 50, 0, 50, 0, 50, 0], -0.38) == [50, 0, 50, 0, 50, 0, 50, 0]    # stance unchanged
+
+
+# ------------------------------------------------------------------ one-foot trim (the per-foot steering test, 2026-10-07)
+def test_a_foot_trim_scales_only_that_foots_swing_about_the_stance_and_clamps_it():
+    from pi_pipeline.gait import heading_hold as hh
+    base = [70, 40, 30, 55, 65, 40, 35, 30]                               # URDF order: FLsh FLel FRsh FRel BRhip BRkn BLhip BLkn
+    out = hh.apply_foot_trim(base, "bl", 0.25)
+    assert out[6] == round(50 + 1.25 * (35 - 50)) and [out[i] for i in range(8) if i != 6] == [base[i] for i in range(8) if i != 6]      # only the back-left hip moved
+    assert hh.apply_foot_trim(base, "fl", -0.25)[0] == round(50 + 0.75 * (70 - 50))
+    reach = hh.apply_foot_trim([50, 0, 50, 0, 50, 0, 80, 0], "bl", 1.0)                                         # a huge stretch never goes past the walk's own reach plus the margin
+    assert reach[6] == hh.JOINT_RANGE_DEG[6][1] + hh.JOINT_MARGIN_DEG
+    assert hh.apply_foot_trim(base, "br", 0.0) == [int(v) for v in base]                                      # zero changes nothing
+
+
+def test_foot_trim_text_is_parsed_and_a_bad_foot_is_refused():
+    from pi_pipeline.gait import heading_hold as hh
+    assert hh.parse_foot_trim("bl=+0.25") == ("bl", 0.25) and hh.parse_foot_trim("FR=-0.1") == ("fr", -0.1) and hh.parse_foot_trim("") is None
+    import pytest
+    with pytest.raises(ValueError):
+        hh.parse_foot_trim("rear=0.2")

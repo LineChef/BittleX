@@ -831,7 +831,19 @@ LEVEL_EXTERNAL = _g2e("LEVEL_EXTERNAL", False)
 LEVEL_CAP_BY_TIME = _g2e("LEVEL_CAP_BY_TIME", False)
 LEVEL_MIN_BASELINE = _g2e("LEVEL_MIN_BASELINE", 0.5)
 LEVEL_COLLAPSE_BASELINE = _g2e("LEVEL_COLLAPSE_BASELINE", 0.35)
-CATS = ("terrain", "ledge", "slope", "fault")
+# LENGTH LEVEL (user, 2026-10-07; docs/rl/v3-decisions-log.md): a fifth difficulty category, how LONG the episode runs, so the policy has to hold its course over a distance (training episodes are 250 steps = 3 s by default, but
+# G2's drift shows after 4 to 6 steps; a FIXED 25% mix of long episodes failed its screen, S4). Off by default (LENGTH_LEVEL). At level d a long episode lasts EPISODE_LENGTH + (LENGTH_MAX_STEPS - EPISODE_LENGTH) * d steps.
+#   Probe and focus episodes of this category are always long; in a combo episode the share of long episodes is LENGTH_SHARE_MAX * d (so at least 25% always stay short, the v2.2 lesson).
+#   Every long episode carries a constant yaw push of LENGTH_DRIFT_TORQUE * d N*m whose SIGN IS BALANCED: random 50/50 in training, strictly alternating in probes and benchmarks, so a policy that corrects only one side shows it.
+#   The probe score of the category is the survived x distance score times a heading factor (1 at no heading change, 0 at LENGTH_HEADING_TOL_DEG degrees), so a policy that drifts off course does not earn the level.
+#   LONG_RUN_PUSH > 0: the benchmark's L1 cell: every episode gets a push of +/-LONG_RUN_PUSH N*m, alternating by episode.
+LENGTH_LEVEL = _g2e("LENGTH_LEVEL", False)
+LENGTH_MAX_STEPS = _g2e("LENGTH_MAX_STEPS", 3200)
+LENGTH_SHARE_MAX = _g2e("LENGTH_SHARE_MAX", 0.75)
+LENGTH_DRIFT_TORQUE = _g2e("LENGTH_DRIFT_TORQUE", 0.30)
+LENGTH_HEADING_TOL_DEG = _g2e("LENGTH_HEADING_TOL_DEG", 30.0)
+LONG_RUN_PUSH = _g2e("LONG_RUN_PUSH", 0.0)
+CATS = ("terrain", "ledge", "slope", "fault") + (("length",) if LENGTH_LEVEL else ())
 CATEGORY_OVERRIDE = {}                          # tests / audits: {"slope": 0.8, ...} pins those categories (the others get 0) for every reset
 LEVEL_PROGRESS_MIN = _g2e("LEVEL_PROGRESS_MIN", 0.5)   # an episode only counts toward a level-up if it also covered this fraction of the commanded distance (standing still never falls)
 SCALE_ALL_HAZARDS = _g2e("SCALE_ALL_HAZARDS", False)
@@ -948,6 +960,7 @@ class OpenCatGymEnv(gym.Env):
         self._cat_streak = {c: 0 for c in CATS}
         self._focus = None
         self._d_terrain = self._d_ledge = self._d_slope = self._d_fault = 0.0
+        self._d_length, self._long_run, self._len_sign, self._len_drift, self._len_ep, self._lvl_yaw0 = 0.0, False, 0, 0.0, 0, 0.0
         self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
         self._stuck_joint = -1   # coverage loop: index of a currently-jammed leg joint (-1 = none)
         self._stuck_timer = 0
@@ -1015,6 +1028,24 @@ class OpenCatGymEnv(gym.Env):
             d = {c: self._dr for c in CATS}
             self._focus = None
         self._d_terrain, self._d_ledge, self._d_slope, self._d_fault = d["terrain"], d["ledge"], d["slope"], d["fault"]
+        self._d_length = d.get("length", 0.0)
+
+    def _begin_long_run(self) -> None:
+        """LENGTH LEVEL: decide whether this episode is a long one (and how long), and draw its yaw push with a balanced sign. See LENGTH_LEVEL."""
+        self._long_run, self._len_drift = False, 0.0
+        self._len_ep += 1
+        alternating = bool(CATEGORY_OVERRIDE) or LONG_RUN_PUSH > 0            # probes and benchmarks alternate the sign strictly, training draws it 50/50
+        sign = (1.0 if self._len_ep % 2 == 0 else -1.0) if alternating else float(np.random.choice([-1.0, 1.0]))
+        if LONG_RUN_PUSH > 0:                                               # the benchmark's L1 cell: every episode pushed by +/-LONG_RUN_PUSH
+            self._long_run, self._len_sign, self._len_drift = True, sign, sign * LONG_RUN_PUSH
+            return
+        if not (LENGTH_LEVEL and self._d_length > 0):
+            return
+        forced = self._focus == "length" or bool(CATEGORY_OVERRIDE.get("length"))
+        if forced or np.random.rand() < LENGTH_SHARE_MAX * self._d_length:
+            self._long_run, self._len_sign = True, sign
+            self._step_budget = int(EPISODE_LENGTH + (LENGTH_MAX_STEPS - EPISODE_LENGTH) * self._d_length)
+            self._len_drift = sign * LENGTH_DRIFT_TORQUE * self._d_length
 
     def _episode_score(self) -> float:
         """Fraction (0..1) of the distance the episode's commands asked for that it covered; stand / near-zero commands score 1. (Falls are scored 0 by the caller.)"""
@@ -1024,7 +1055,12 @@ class OpenCatGymEnv(gym.Env):
         if abs(cmd_mean) < 0.04:
             return 1.0
         v = (p.getBasePositionAndOrientation(self.robot_id)[0][0] - self._lvl_x0) / (self._lvl_steps / CONTROL_HZ)
-        return float(np.clip(v / cmd_mean, 0.0, 1.0))
+        score = float(np.clip(v / cmd_mean, 0.0, 1.0))
+        if self._long_run and self._d_length > 0:                        # LENGTH LEVEL: a long episode only counts if it also stayed on course
+            yaw = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(self.robot_id)[1])[2]
+            err = abs(np.degrees((yaw - self._lvl_yaw0 + np.pi) % (2 * np.pi) - np.pi))
+            score *= float(np.clip(1.0 - err / LENGTH_HEADING_TOL_DEG, 0.0, 1.0))
+        return score
 
     def _progress_ok(self) -> bool:
         """Did the episode that just ended cover at least LEVEL_PROGRESS_MIN of the distance its commands asked for? (the global-level rule)"""
@@ -1082,6 +1118,7 @@ class OpenCatGymEnv(gym.Env):
         self._phase_step0 = float(getattr(self, "_phase", 0.0))   # stride phase this step started at
         if self._lvl_steps == 0:                                  # ADAPTIVE_LEVEL bookkeeping: where the episode started, and the commanded speed over it
             self._lvl_x0 = p.getBasePositionAndOrientation(self.robot_id)[0][0]
+            self._lvl_yaw0 = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(self.robot_id)[1])[2]
         self._lvl_cmd_sum += self._cmd_fwd
         self._lvl_steps += 1
         # CMD_LATENCY_STEPS: FIFO command buffer -- apply the action from N steps
@@ -2064,6 +2101,7 @@ class OpenCatGymEnv(gym.Env):
         if not DR_EVAL_FULL and (LEVEL_FIXED >= 0 or (ADAPTIVE_LEVEL and not CATEGORY_LEVELS)):
             self._dr = float(LEVEL_FIXED if LEVEL_FIXED >= 0 else self._level)     # global-level mode; in CATEGORY mode _dr stays the time ramp (IMU, mass, friction ... are not difficulty)
         self._assign_category_levels()
+        self._begin_long_run()
         p.resetSimulation()
         # Disable rendering during loading.
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
@@ -2349,6 +2387,7 @@ class OpenCatGymEnv(gym.Env):
         self._drift_torque = 0.0
         if DRIFT_TORQUE > 0 and self._d_fault > 0 and np.random.rand() < DRIFT_PROB:
             self._drift_torque = float(np.random.uniform(-DRIFT_TORQUE, DRIFT_TORQUE) * self._d_fault)
+        self._drift_torque += self._len_drift                              # LENGTH LEVEL / L1: the long episode's balanced yaw push (0 otherwise)
         self._stroke_scale = None
         if DRIFT_STROKE > 0 and self._d_fault > 0 and np.random.rand() < DRIFT_PROB:
             self._stroke_scale = np.ones(8)

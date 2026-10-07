@@ -94,9 +94,10 @@ class Curriculum(BaseCallback):
         import pybullet as p
         self.E.CATEGORY_OVERRIDE = {cat if cat else "terrain": self.levels[cat] if cat else 0.0}
         self.env.set_ramp_steps(self.ramp_offset + self.num_timesteps)
-        scores = []
+        scores, signs = [], []
         for k in range(self.episodes):
             obs, _ = self.env.reset(seed=int(self.num_timesteps) % 100000 + k)
+            signs.append(getattr(self.env, "_len_sign", 0.0))
             peak = 0.0
             while True:
                 act, _ = self.model.predict(obs, deterministic=True)
@@ -107,6 +108,9 @@ class Curriculum(BaseCallback):
                     break
             scores.append(self.env._episode_score() if peak <= 1.3 else 0.0)
         self.E.CATEGORY_OVERRIDE = {}
+        if cat == "length":                              # the length level is only earned if BOTH push directions pass: the lower of the left and right means (the probe alternates the sign)
+            sides = [np.mean([s for s, g in zip(scores, signs) if g == sign]) for sign in (-1.0, 1.0) if any(g == sign for g in signs)]
+            return float(min(sides)) if sides else float(np.mean(scores))
         return float(np.mean(scores))
 
     def _on_step(self):

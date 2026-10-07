@@ -50,6 +50,7 @@ SCREENS = [
     ("v3_s4_long_eps", ["long_episodes"], "Y3 25% of episodes 12.5 s long"),
     ("v3_s5_turn", ["turn"], "Y4 turn-command curriculum (only if Phase 1's turning gate passed: touch trained/v3_turning_gate_pass)"),
     ("v3_s6_faults", ["faults"], "Y5 persistent faults (stuck servo, weak joint, offset, yaw push, battery sag)"),
+    ("v3_s11_length_level", ["length_level"], "S11 the length difficulty level (episodes grow from 3 s to 40 s as the gait earns it), balanced yaw push on long episodes, left and right must both pass"),
     ("v3_s7_servo_feas", ["servo_feas"], "R3 penalty on joint speeds above the servo ceiling"),
     ("v3_s8_balance_pbrs", ["balance_pbrs"], "R4 potential-based balance reward"),
     ("v3_s9_smooth", ["smooth"], "R5 activate the inert joint-smoothness terms"),
@@ -64,12 +65,13 @@ TARGETS = {
     "long_episodes": [("N2", "speed_decay", "lower", 0.7), ("N2", "fell_fraction", "lower", 1.0)],
     "turn": [("N6a", "turn_ratio", "higher_abs", 0.5), ("N6b", "turn_ratio", "higher_abs", 0.5), ("N1", "heading_abs_mean_deg", "lower", 1.3)],
     "faults": [("N3", "heading_abs_mean_deg", "lower", 0.7), ("N5", "heading_abs_mean_deg", "lower", 0.7)],
+    "length_level": [("L1", "heading_abs_mean_deg", "lower", 0.7), ("L1", "heading_sign_gap_deg", "lower_abs_gap", 10.0), ("L1", "fell_fraction", "lower", 1.0)],
     "servo_feas": [("N1", "servo_over_frac", "lower", 0.5), ("N1", "roll_std_deg", "lower", 1.1)],
     "balance_pbrs": [("T8.1", "fell_fraction", "lower", 1.0), ("T11.1", "fell_fraction", "lower", 1.0)],
     "smooth": [("N1", "yaw_rate_rms", "lower", 0.9)],
     "touchdown": [("N1", "roll_std_deg", "lower", 0.9)],
 }
-YAW_LEVERS = ("mirror", "heading_obs", "heading_shape", "long_episodes", "turn", "faults")      # K1: the levers aimed at straightness
+YAW_LEVERS = ("mirror", "heading_obs", "heading_shape", "long_episodes", "turn", "faults", "length_level")      # K1: the levers aimed at straightness
 SMOOTH_LEVERS = ("servo_feas", "balance_pbrs", "smooth", "touchdown")                          # K2: the levers aimed at smoothness / resilience
 DECISION_CELLS = ["T1.1", "N1", "N3", "N5", "T2.2", "T3.2", "T5.2", "T7.2", "T8.1", "T9.1", "T10.2", "T11.1"]
 
@@ -110,6 +112,20 @@ def score(policy_path, levers, spec=None, busy=False, ladder=False, ladder_lever
         os.environ.update(saved)
 
 
+def with_extra_cells(ctrl, tag=None):
+    """The control's result plus any cells scored for it later (`trained/<control>_L1.json`, run with benchmark_v4 --cells L1): a screen added after the control ran (S11, the length level) is judged on its own cell."""
+    tag = tag or CONTROL
+    path = f"trained/{tag}_L1.json"
+    if ctrl is not None and os.path.exists(path):
+        try:
+            extra = json.load(open(path))["cells"]
+            have = {c["id"] for c in ctrl["cells"]}
+            ctrl = dict(ctrl, cells=ctrl["cells"] + [c for c in extra if c["id"] not in have])
+        except (OSError, ValueError, KeyError):
+            pass
+    return ctrl
+
+
 def cellmap(res):
     out = {}
     for c in res["cells"]:
@@ -145,6 +161,8 @@ def targets_ok(res, ctrl, levers):
                 why.append(f"{lv}: {cid}.{key} {x:.3g} not <= {f} x control's {y:.3g}")
             if how == "higher_abs" and not abs(x) >= f:
                 why.append(f"{lv}: {cid}.{key} {x:.2f} below {f}")
+            if how == "lower_abs_gap" and not x <= f:                       # an absolute limit (degrees), not relative to the control: the left and right pushes must end within this of each other
+                why.append(f"{lv}: {cid}.{key} {x:.1f} deg is above {f:g} deg: one side is corrected worse than the other")
     return why
 
 
@@ -313,7 +331,7 @@ def run_queue():
     if queue is None:
         raise SystemExit(f"no {QUEUE}: run `python phase_v3.py init` first")
     results = load(RESULTS, {})
-    ctrl = json.load(open(results[CONTROL]["result_file"])) if CONTROL in results else None
+    ctrl = with_extra_cells(json.load(open(results[CONTROL]["result_file"]))) if CONTROL in results else None
     last_stage = K3                         # the stage chain continues from the last stage that actually ran (a skipped optional stage is not one)
     for job in queue:
         kind, tag = job["kind"], job.get("tag")
@@ -367,7 +385,7 @@ def run_queue():
         if not finish(job, results, ctrl):
             return
         if tag == CONTROL:
-            ctrl = json.load(open(results[CONTROL]["result_file"]))
+            ctrl = with_extra_cells(json.load(open(results[CONTROL]["result_file"])))
             if not results[CONTROL]["passed"]:
                 log("CONTROL did not clear the flat-ground bar: stopping so the calibrated sim / recipe can be reviewed before any lever is judged against it")
                 return

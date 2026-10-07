@@ -81,6 +81,7 @@ LEVERS = {
     "servo_feas": {"G2E_FAC_SERVO_FEAS": "5.0", "G2E_SERVO_CEIL_DEG_S": "200"},                # R3 (ceiling = the calibrated servo speed)
     "balance_pbrs": {"G2E_FAC_BALANCE_PBRS": "4.0"},                                           # R4
     "smooth": {"G2E_FAC_SMOOTH_1": "15", "G2E_FAC_SMOOTH_2": "15"},                            # R5 (revised: the old terms are inert)
+    "length_level": {"G2E_LENGTH_LEVEL": "1"},                                                    # S11 (2026-10-07): the length difficulty level, with a balanced yaw push on every long episode; see opencat_gym_env LENGTH_LEVEL
     "touchdown": {"G2E_FAC_TOUCHDOWN": "25"},                                                  # R6
 }
 

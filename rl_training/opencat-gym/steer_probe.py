@@ -14,6 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import g2_profile
 
 g2_profile.set_environ(g2_profile.scoring_env())
+for _kv in [x for x in os.environ.get("STEER_PROBE_SET", "").split(",") if x]:     # STEER_PROBE_SET="G2E_MOTOR_FORCE=0.4,G2E_SERVO_RATE_LIMIT_DEG_S=1000": overrides applied after the profile
+    os.environ[_kv.split("=", 1)[0]] = _kv.split("=", 1)[1]
 import numpy as np
 import opencat_gym_env as E
 
@@ -37,7 +39,13 @@ a = ap.parse_args()
 if a.closed_loop:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "pi_pipeline", "gait"))
     import heading_hold as HH
-model = PPO.load(a.policy)
+if a.policy == "scripted":                         # zero residual: the firmware walk alone, no policy reacting to the yaw (does the policy's own counter-steering explain the sign?)
+    class _Zero:
+        def predict(self, obs, deterministic=True):
+            return np.zeros(8), None
+    model = _Zero()
+else:
+    model = PPO.load(a.policy)
 env = OpenCatGymEnv()
 env.set_command(fwd=0.10, yaw=0.0)
 res = {}
@@ -47,8 +55,16 @@ for u in [float(x) for x in a.u.split(",")]:
         np.random.seed(1000 + ep)
         obs, _ = env.reset(seed=1000 + ep)
         sc = np.ones(8)
-        sc[0] = sc[6] = 1.0 - u          # left shoulder / hip
-        sc[2] = sc[4] = 1.0 + u          # right shoulder / hip
+        _legs = os.environ.get("STEER_LEGS", "all")          # "front" = only the front shoulders, "rear" = only the rear hips, "all" = both (the default and the real lever)
+        _foot = {"fl": 0, "fr": 2, "br": 4, "bl": 6}.get(_legs)         # a single foot: only that leg's shoulder / hip stroke is scaled by (1 + u): u > 0 = a longer step on that foot
+        if _foot is not None:
+            sc[_foot] = 1.0 + u
+        if _legs in ("all", "front"):
+            sc[0] = 1.0 - u                                   # left front shoulder
+            sc[2] = 1.0 + u                                   # right front shoulder
+        if _legs in ("all", "rear"):
+            sc[6] = 1.0 - u                                   # left rear hip
+            sc[4] = 1.0 + u                                   # right rear hip
         env._stroke_scale = sc
         y0 = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(env.robot_id)[1])[2]
         yaws, tmax = [], 0.0

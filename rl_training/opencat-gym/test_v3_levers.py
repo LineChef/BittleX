@@ -438,3 +438,110 @@ def test_two_good_probes_in_a_row_are_needed_when_windows_is_two():
     assert lv == [0.4] * 4
     lv, st = _ul(lv, [0.9] * 4, 0.8, windows=2, streak=st)              # the streak restarted after the promotion
     assert lv == [0.4] * 4 and all(v == 1 for v in st.values())
+
+
+# ----------------------------------------------------------------------------- the length level (S11, 2026-10-07)
+@pytest.fixture()
+def len_env(monkeypatch):
+    import opencat_gym_env as E
+    E.GUI_MODE = False
+    for k, v in dict(ADAPTIVE_LEVEL=True, CATEGORY_LEVELS=True, LEVEL_FIXED=-1.0, LENGTH_LEVEL=True, EPISODE_LENGTH=250, LENGTH_MAX_STEPS=3200, LENGTH_SHARE_MAX=0.75,
+                     LENGTH_DRIFT_TORQUE=0.30, LENGTH_HEADING_TOL_DEG=30.0, LONG_RUN_PUSH=0.0, DR_EVAL_FULL=False).items():
+        monkeypatch.setattr(E, k, v)
+    monkeypatch.setattr(E, "CATS", ("terrain", "ledge", "slope", "fault", "length"))
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {})
+    return E, E.OpenCatGymEnv()
+
+
+def test_the_length_category_is_off_by_default_and_changes_nothing():
+    import opencat_gym_env as E
+    assert E.LENGTH_LEVEL is False and "length" not in E.CATS and E.LONG_RUN_PUSH == 0.0
+
+
+def test_a_long_episode_grows_with_the_level_and_probes_alternate_the_push_sign(len_env, monkeypatch):
+    E, env = len_env
+    for level, steps in ((0.25, 250 + int(2950 * 0.25)), (0.5, 250 + int(2950 * 0.5)), (1.0, 3200)):
+        monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {"length": level})
+        signs = []
+        for _ in range(6):
+            env._assign_category_levels()
+            env._step_budget = 250
+            env._begin_long_run()
+            assert env._long_run and env._step_budget == steps                                  # a probe episode is always long, at the level's length
+            assert env._len_drift == pytest.approx(env._len_sign * 0.30 * level)
+            signs.append(env._len_sign)
+        assert signs == [signs[0], -signs[0]] * 3 and set(signs) == {-1.0, 1.0}                  # strictly alternating: left and right in equal numbers
+
+
+def test_training_keeps_a_floor_of_short_episodes_and_draws_the_sign_evenly(len_env):
+    E, env = len_env
+    env._levels = {c: 1.0 for c in E.CATS}
+    np.random.seed(0)
+    longs, signs, n = 0, [], 4000
+    for _ in range(n):
+        env._assign_category_levels()
+        env._step_budget = 250
+        env._begin_long_run()
+        if env._focus is None and env._d_length > 0:                                           # combo episodes: the long share is LENGTH_SHARE_MAX * level
+            longs += env._long_run
+        if env._long_run:
+            signs.append(env._len_sign)
+    assert 0.0 < longs / n < 0.75 and abs(np.mean(signs)) < 0.06                                # never all long; left and right push drawn about equally
+    env._d_length = 0.0
+    env._long_run = False
+    env._step_budget = 250
+    env._focus = None
+    env._begin_long_run()
+    assert env._step_budget == 250 and env._len_drift == 0.0                                     # level 0: a normal short episode with no push
+
+
+def test_a_long_episode_only_scores_if_it_stayed_on_course(len_env, monkeypatch):
+    E, env = len_env
+    monkeypatch.setattr(E, "CATEGORY_OVERRIDE", {"length": 0.5})
+    env.set_command(fwd=0.10, yaw=0.0)
+    env.reset(seed=3)
+    for _ in range(150):
+        env.step(np.zeros(8))
+    env._lvl_cmd_sum, env._lvl_steps = 0.10 * 100, 100
+    env._lvl_x0 = p.getBasePositionAndOrientation(env.robot_id)[0][0] - 10.0                     # as if it had covered the commanded distance
+    yaw_now = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(env.robot_id)[1])[2]
+    env._lvl_yaw0 = yaw_now                                                                      # no heading change: full score
+    assert env._episode_score() == pytest.approx(1.0)
+    env._lvl_yaw0 = yaw_now - np.radians(15.0)                                                   # 15 degrees off a 30 degree tolerance: half
+    assert env._episode_score() == pytest.approx(0.5, abs=0.02)
+    env._lvl_yaw0 = yaw_now - np.radians(45.0)                                                   # beyond the tolerance: nothing
+    assert env._episode_score() == 0.0
+
+
+def test_the_long_run_cell_pushes_every_episode_with_alternating_sign(len_env, monkeypatch):
+    E, env = len_env
+    monkeypatch.setattr(E, "LENGTH_LEVEL", False)
+    monkeypatch.setattr(E, "LONG_RUN_PUSH", 0.25)
+    pushes = []
+    for k in range(6):
+        env._assign_category_levels()
+        env._begin_long_run()
+        pushes.append(env._len_drift)
+    assert pushes == [pushes[0], -pushes[0]] * 3 and abs(pushes[0]) == 0.25
+
+
+def test_v4_metrics_reports_the_heading_of_each_push_side_and_their_gap():
+    import benchmark_v4 as B4
+    eps = []
+    for k, head in enumerate((10.0, 40.0, 14.0, 44.0)):                     # even episodes (push right) end near 12 deg, odd (push left) near 42
+        yaw = np.radians(np.linspace(0, head, 200))
+        rec = {"x": list(np.linspace(0, 1, 200)), "yaw": list(yaw), "roll": [0.0] * 200, "pitch": [0.0] * 200, "yaw_rate": [0.0] * 200, "joint": [[0.0] * 8] * 200}
+        eps.append((rec, {}, 200, False, False))
+    m = B4.v4_metrics(eps)
+    assert m["heading_even_abs_mean_deg"] == pytest.approx(12.0) and m["heading_odd_abs_mean_deg"] == pytest.approx(42.0) and m["heading_sign_gap_deg"] == pytest.approx(30.0)
+
+
+def test_the_s11_screen_exists_with_a_balance_target_and_the_gap_rule_fails_a_one_sided_policy():
+    import phase_v3 as V
+    assert any(tag == "v3_s11_length_level" and lv == ["length_level"] for tag, lv, _d in V.SCREENS)
+    assert [t for t in V.TARGETS["length_level"] if t[1] == "heading_sign_gap_deg"]
+    cell = lambda gap, absh: {"cells": [{"id": "L1", "heading_abs_mean_deg": absh, "heading_sign_gap_deg": gap, "fell_fraction": 0.0}]}   # noqa: E731
+    ctrl = cell(25.0, 40.0)
+    assert V.targets_ok(cell(5.0, 20.0), ctrl, ["length_level"]) == []                           # better, and balanced: passes
+    why = V.targets_ok(cell(25.0, 20.0), ctrl, ["length_level"])
+    assert any("one side is corrected worse" in w for w in why)                                    # better on average but one-sided: fails

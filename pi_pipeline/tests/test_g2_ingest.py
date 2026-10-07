@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import sys
+import zlib
 
 import numpy as np
 import pytest
@@ -28,7 +29,7 @@ def write_run(raw, stem, *, seconds=8.0, hz=80.0, end="stopped", epoch="e1", sur
     t = np.arange(n) / hz
     if late_every:
         t = t + (np.arange(n) // late_every) * 0.03
-    rng = np.random.default_rng(abs(hash(stem)) % 1000)
+    rng = np.random.default_rng(zlib.crc32(stem.encode()))                     # a fixed seed per run name (the built-in hash() changes from process to process)
     lines = ["# run_gait log", "t,roll,pitch,yaw,gx,gy,gz,j0,guard_state,ax,ay,az,imu_n,imu_age_s,volt"]
     for i in range(n):
         roll = roll_amp * np.sin(2 * np.pi * 1.2 * t[i]) + rng.normal(0, 0.005)
