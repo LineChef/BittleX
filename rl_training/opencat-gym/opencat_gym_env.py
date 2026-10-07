@@ -486,8 +486,9 @@ elif PAYLOAD_PROFILE == "case2":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.133, 0.020
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
-    PAYLOAD_BOX_HALF = (0.033, 0.020, 0.019)
-    PAYLOAD_POS = (-0.022, 0.0, 0.036)
+    # The block runs the full length of the lid: back edge on the hip-joint line (x = -0.055, as before), front edge flush with the camera's rear face (x = +0.045).
+    PAYLOAD_BOX_HALF = (0.050, 0.020, 0.019)
+    PAYLOAD_POS = (-0.005, 0.0, 0.036)
 # DRIFT_SHOULDER_DEG: per-episode persistent zero offset on a random subset of the four shoulder / hip joints, +/- this many degrees each.
 # The real G2 turns right at ~8-14 deg/s with the policy commanding straight (a leg that sits off its zero, e.g. the front-left shoulder); the
 # policy sees its heading (the quaternion) but, with nothing pushing it off course in training, learned to ignore it. This gives it something to fix.
