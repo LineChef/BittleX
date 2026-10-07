@@ -204,7 +204,7 @@ class Settings:
     clear_captures: bool = field(default_factory=lambda: _env("G2_CLEAR_CAPTURES", "1") not in ("0", "false", "no"))
     # Per-day Claude API call/token counts, including how often the words-only retry fires (python -m pi_pipeline.voice.usage).
     usage_path: str = field(default_factory=lambda: os.path.expanduser(_env("G2_USAGE_FILE", "~/.local/share/g2/api_usage.json")))
-    picture_keep_days: float = field(default_factory=lambda: _env_float("G2_PICTURE_KEEP_DAYS", 7.0))   # saved pictures older than this are deleted
+    picture_keep_days: float = field(default_factory=lambda: _env_float("G2_PICTURE_KEEP_DAYS", 0.0))   # 0 = keep forever (2026-10-07: pictures are only ever deleted as near-duplicates); >0 deletes older ones
     capture_keep_s: float = field(default_factory=lambda: _env_float("G2_CAPTURE_KEEP_S", 3600.0))      # preview captures touched this recently survive the start-up clear
     # Re-take a look picture in better light when the first is blown out or too dark (moves the camera's exposure target; see vision/snapshot.py).
     vision_exposure_check: bool = field(default_factory=lambda: _env("G2_EXPOSURE_CHECK", "1") not in ("0", "false", "no"))

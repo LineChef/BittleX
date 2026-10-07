@@ -154,7 +154,7 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
-                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 7.0, exposure_check: bool = True,
+                 ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
                  max_exposure_retries: int = 2, meter_every_s: float = 30.0, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
@@ -231,7 +231,7 @@ class CameraSnapshotter:
                 f.write(snap.jpeg)
             log.info("saved picture to %s/%s", self._save_dir, name)
             from .pictures import prune_duplicates, prune_old
-            prune_old(self._save_dir, self._keep_days)    # rule: pictures are deleted after a week
+            prune_old(self._save_dir, self._keep_days)    # rule (2026-10-07): no age limit by default (0 = keep); only near-duplicates are deleted
             prune_duplicates(self._save_dir)              # rule: near-duplicate pictures are pruned, earliest kept
         except Exception:  # noqa: BLE001
             log.debug("saving the picture failed", exc_info=True)

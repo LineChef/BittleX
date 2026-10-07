@@ -1,5 +1,6 @@
-"""Housekeeping for pictures G2 keeps (only when G2_VISION_SAVE_DIR is set): every picture is deleted after `days` (default 7), and
-near-duplicates are pruned as they are saved. Saved pictures have little value to G2 (he cannot recall an image), so they do not pile up.
+"""Housekeeping for pictures G2 keeps (only when G2_VISION_SAVE_DIR is set): near-duplicates are pruned as they are saved, and a picture is only
+deleted by age if `days` is set above 0 (the default since 2026-10-07 is 0: keep forever, because the pictures are the data set for the object
+library). The exploration pictures (`vision/exploration_pictures.py`) never use the age rule at all.
 
 A picture is a duplicate of an earlier one when their 256-bit average hashes differ in at most `max_distance` bits (the same gate
 `tools/camera_preview.py` uses to skip repeated capture frames). The earliest picture of each cluster is kept; later near-copies are

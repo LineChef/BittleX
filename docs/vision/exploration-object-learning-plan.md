@@ -103,6 +103,22 @@ Storage cap and tidy for the picture folders, battery and heat while the camera 
 3. Put a mug on the floor in front of him and say the wake word, then "this is a mug". Expect: he stops, bows, says "Okay, I will remember the mug", walks on.
 4. After about ten minutes: `bash tools/g2_explore.sh stop`, tell me, and I look at the pictures myself first.
 
+## Retention and garbage collection (decided 2026-10-07)
+
+Rule from you: **no picture is deleted unless it is a duplicate, and he does not forget what he has been taught.**
+
+- **Pictures:** kept forever (`G2_PICTURE_KEEP_DAYS` default is now 0, and the exploration pictures never use an age rule). The only deletion is a near-duplicate: a
+  picture whose 256-bit average hash is within 12 bits of one already saved for the same pose (3 bits for a named object, so its different views are kept)
+  is not written at all, the earliest of a cluster is kept. Disk: about 15 KB each, a few MB per exploring hour; the log warns at 2 GB.
+- **What he knows is the fingerprint index, not the pictures.** Entries you named, and entries locked as "enough data", are never evicted and do not count
+  against the cap. Only unnamed, unlocked candidates (things he noticed but nobody named) are capped, at 300; over the cap the oldest unnamed one is
+  forgotten, never a named one. Safety ceiling on all entries: 5,000 (new entries stop, nothing is removed). Samples per entry before it locks: 8.
+- **Forgetting an unnamed candidate never deletes its pictures**, so it can be re-learned: the library can always be rebuilt from the pictures (also what makes a
+  model change cheap).
+- **To add when recognition is wired (Phase 5):** a daily snapshot of the gallery index (last 14 kept) so a corrupted file cannot erase what he learned; copying
+  the index and named pictures to the Mac with `g2pics pull`; merging two unnamed candidates that converge (similarity above 0.85) instead of keeping both;
+  matching in numpy (the pure-Python comparison is fine for hundreds of entries, too slow for thousands).
+
 ## Decisions to settle together (proposals in brackets)
 1. How the look-up pose is done [`ksit`; replace after seeing the pictures].
 2. How often he surveys [end of a leg, at most every 15 s].

@@ -89,9 +89,11 @@ class GalleryEntry:
 
 @dataclass
 class ObjectGalleryConfig:
-    max_entries: int = 200               # entry-count cap; oldest unnamed/unlocked evicted over this
-    max_samples_per_entry: int = 5       # auto-lock once an entry has this many samples
-    max_total_mb: int = 200              # hard ceiling; caller measures real bytes and passes them in
+    max_entries: int = 300               # cap on UNNAMED, unlocked candidates only; the oldest of those is evicted over this. Named and locked
+                                         # entries are exempt and never evicted (2026-10-07: nothing he was taught is ever forgotten)
+    max_total_entries: int = 5000        # safety ceiling on every entry; at this size no new entry is added (matching would also slow down)
+    max_samples_per_entry: int = 8       # auto-lock once an entry has this many samples
+    max_total_mb: int = 0                # 0 = no byte ceiling (the pictures are kept forever, see vision/pictures.py); >0: a ceiling the caller enforces
     same_instance_threshold: float = 0.80   # cosine sim >= this -> "the same thing I've seen"
     near_duplicate_threshold: float = 0.93  # cosine sim >= this -> not worth another sample
     min_quality: float = 0.35            # quality score (0..1) below this is refused outright
@@ -142,9 +144,12 @@ class ObjectGallery:
                 entry.locked = True
             return self._done(GalleryDecision.ADD_SAMPLE, best_id)
 
-        over_byte_cap = (disk_bytes_used is not None
+        over_byte_cap = (self.cfg.max_total_mb > 0 and disk_bytes_used is not None
                         and disk_bytes_used >= self.cfg.max_total_mb * 1_000_000)
-        if len(self.entries) >= self.cfg.max_entries or over_byte_cap:
+        if len(self.entries) >= self.cfg.max_total_entries:
+            return self._done(GalleryDecision.REJECTED_AT_CAPACITY, None)
+        candidates = sum(1 for e in self.entries.values() if not e.labeled and not e.locked)
+        if candidates >= self.cfg.max_entries or over_byte_cap:
             if not self._evict_one():
                 return self._done(GalleryDecision.REJECTED_AT_CAPACITY, None)
 

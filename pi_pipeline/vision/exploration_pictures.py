@@ -28,12 +28,16 @@ def slug(text: str) -> str:
 
 
 class ExplorationPictureSaver:
-    def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 500.0, on_saved=None):
+    def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
+                 survey_distance: int = 12, named_distance: int = 3):
         self._source = source
         self._root = Path(os.path.expanduser(root))
         self._clock = clock
         self._warn_mb = warn_mb
         self._on_saved = on_saved                  # called with the saved path (a shutter tick, a counter)
+        self._survey_distance, self._named_distance = survey_distance, named_distance
+        self._hashes: dict = {}                    # (folder, prefix) -> hashes of the pictures already kept there
+        self.duplicates = 0
         self.count = 0
         self.last_path: str | None = None
         self.last_kind: str | None = None
@@ -53,7 +57,12 @@ class ExplorationPictureSaver:
         folder = self.folder_for(kind, now)
         folder.mkdir(parents=True, exist_ok=True)
         pose = "named" if kind.startswith("name:") else kind
-        base = (slug(kind[5:]) if kind.startswith("name:") else pose) + time.strftime("_%H%M%S", time.localtime(now)) + f"_{int((now % 1) * 1000):03d}"
+        prefix = slug(kind[5:]) if kind.startswith("name:") else pose
+        if self._is_duplicate(folder, prefix, snap.jpeg, self._named_distance if kind.startswith("name:") else self._survey_distance):
+            self.duplicates += 1
+            log.info("picture not kept: a near-duplicate of one already saved (%s)", kind)
+            return None
+        base = prefix + time.strftime("_%H%M%S", time.localtime(now)) + f"_{int((now % 1) * 1000):03d}"
         path = folder / (base + ".jpg")
         path.write_bytes(snap.jpeg)
         meta = {"file": path.name, "kind": kind, "pose": pose, "name": kind[5:] if kind.startswith("name:") else None,
@@ -78,6 +87,29 @@ class ExplorationPictureSaver:
                 log.debug("on_saved hook failed", exc_info=True)
         return str(path)
 
+    def _is_duplicate(self, folder: Path, prefix: str, jpeg: bytes, max_distance: int) -> bool:
+        """The ONLY reason a picture is not kept (retention policy 2026-10-07: nothing is deleted except duplicates): its 256-bit average hash is within
+        `max_distance` bits of one already saved for the same pose (or name) in this folder, the earliest of a cluster being kept. Fails open: without
+        Pillow nothing is ever treated as a duplicate."""
+        try:
+            from .pictures import ahash, hamming
+            h = ahash(jpeg)
+        except Exception:  # noqa: BLE001
+            return False
+        key = (str(folder), prefix)
+        if key not in self._hashes:                         # first use: learn the pictures already on disk for this pose / name
+            known = []
+            for f in sorted(folder.glob(prefix + "_*.jpg")):
+                try:
+                    known.append(ahash(f.read_bytes()))
+                except Exception:  # noqa: BLE001
+                    pass
+            self._hashes[key] = known
+        if any(hamming(h, k) <= max_distance for k in self._hashes[key]):
+            return True
+        self._hashes[key].append(h)
+        return False
+
     def _check_size(self) -> None:
         if self.count % 25:
             return
@@ -87,3 +119,54 @@ class ExplorationPictureSaver:
                 log.warning("exploration pictures use %.0f MB (warning at %.0f MB): copy them off and clear %s", total, self._warn_mb, self._root)
         except OSError:
             pass
+
+
+def status(root: str = DEFAULT_ROOT, newest: int = 8) -> str:
+    """A text summary of the saved exploration pictures: totals, per pose and day, per named object, disk use and the newest few."""
+    base = Path(os.path.expanduser(root))
+    if not base.exists():
+        return f"no exploration pictures yet ({base})"
+    jpgs = sorted(base.rglob("*.jpg"), key=lambda f: f.stat().st_mtime)
+    mb = sum(f.stat().st_size for f in jpgs) / 1e6
+    lines = [f"{len(jpgs)} pictures, {mb:.1f} MB in {base}"]
+    survey: dict = {}
+    for f in (base / "survey").rglob("*.jpg") if (base / "survey").exists() else []:
+        pose = f.name.split("_")[0] + "_" + f.name.split("_")[1]
+        survey.setdefault(f.parent.name, {}).setdefault(pose, 0)
+        survey[f.parent.name][pose] += 1
+    for day in sorted(survey):
+        lines.append(f"  survey {day}: " + ", ".join(f"{p} {n}" for p, n in sorted(survey[day].items())))
+    named = base / "named"
+    if named.exists():
+        for d in sorted(p for p in named.iterdir() if p.is_dir()):
+            lines.append(f"  named {d.name}: {len(list(d.glob('*.jpg')))}")
+    lines.append("newest:")
+    for f in jpgs[-newest:][::-1]:
+        meta = {}
+        try:
+            meta = json.loads(f.with_suffix(".json").read_text())
+        except (OSError, ValueError):
+            pass
+        ex = (meta.get("exposure") or {}).get("mean")
+        det = ",".join(sorted({d["label"] for d in meta.get("detections", [])})) or "-"
+        lines.append(f"  {meta.get('time', time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(f.stat().st_mtime)))}  {f.parent.name}/{f.name}"
+                     f"  brightness {ex if ex is not None else '?'}  detector: {det}")
+    try:
+        from ..config import settings
+        if settings.vision_save_dir and Path(settings.vision_save_dir).exists():
+            n = len(list(Path(settings.vision_save_dir).glob("look_*.jpg")))
+            lines.append(f"voice-service look pictures: {n} in {settings.vision_save_dir}")
+    except Exception:  # noqa: BLE001
+        pass
+    return "\n".join(lines)
+
+
+def main() -> None:
+    import argparse
+    ap = argparse.ArgumentParser(description="Summarize the pictures G2 saved while exploring")
+    ap.add_argument("--root", default=os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
+    print(status(ap.parse_args().root))
+
+
+if __name__ == "__main__":
+    main()

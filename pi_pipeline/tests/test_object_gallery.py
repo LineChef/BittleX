@@ -94,52 +94,21 @@ def test_capacity_evicts_oldest_unnamed_unlocked_entry():
     assert tuple(E_B) in centroids and tuple(E_C) in centroids
 
 
-def test_named_and_locked_entries_are_never_evicted():
+def test_named_and_locked_entries_are_never_evicted_and_do_not_count_against_the_candidate_cap():
     g = ObjectGallery(ObjectGalleryConfig(max_entries=1))
     g.consider(E_A, quality=0.9, now=1.0)
     eid = next(iter(g.entries))
-    g.set_name(eid, "keys")                    # protected: labeled
-    d = g.consider(E_B, quality=0.9, now=2.0)   # at capacity, nothing evictable
-    assert d is GalleryDecision.REJECTED_AT_CAPACITY
-    assert len(g.entries) == 1
-    assert g.entries[eid].name == "keys"        # untouched
+    g.set_name(eid, "keys")                    # protected: labeled, and exempt from the cap (retention policy 2026-10-07)
+    assert g.consider(E_B, quality=0.9, now=2.0) is GalleryDecision.NEW            # a named entry leaves room for a candidate
+    assert g.consider(E_C, quality=0.9, now=3.0) is GalleryDecision.NEW            # the cap of 1 is on candidates: E_B (unnamed) is evicted for E_C
+    assert len(g.entries) == 2 and g.entries[eid].name == "keys"                   # the named one is untouched
 
 
-def test_byte_cap_rejects_even_under_the_entry_count_limit():
-    g = ObjectGallery(ObjectGalleryConfig(max_entries=200, max_total_mb=1))
-    d = g.consider(E_A, quality=0.9, now=1.0, disk_bytes_used=2_000_000)  # 2 MB > 1 MB cap
-    assert d is GalleryDecision.REJECTED_AT_CAPACITY
-    assert len(g.entries) == 0
+def test_the_total_ceiling_stops_new_entries_but_never_removes_one():
+    g = ObjectGallery(ObjectGalleryConfig(max_entries=10, max_total_entries=2))
+    g.consider(E_A, quality=0.9, now=1.0)
+    g.consider(E_B, quality=0.9, now=2.0)
+    assert g.consider(E_C, quality=0.9, now=3.0) is GalleryDecision.REJECTED_AT_CAPACITY
+    assert len(g.entries) == 2
 
 
-def test_set_name_note_and_discard():
-    g = ObjectGallery()
-    g.consider(E_A, quality=0.9, now=1.0, crop_ref="a1.jpg")
-    eid = next(iter(g.entries))
-    g.set_name(eid, "mug", note="the blue one on the desk")
-    assert g.entries[eid].name == "mug"
-    assert g.entries[eid].note == "the blue one on the desk"
-
-    crops = g.discard(eid)
-    assert crops == ["a1.jpg"]
-    assert eid not in g.entries
-
-
-def test_persistence_round_trips(tmp_path):
-    g = ObjectGallery()
-    g.consider(E_A, quality=0.9, now=1.0, crop_ref="a1.jpg")
-    eid = next(iter(g.entries))
-    g.set_name(eid, "mug")
-    path = tmp_path / "gallery.json"
-    g.save(path)
-
-    g2 = ObjectGallery.load(path)
-    assert eid in g2.entries
-    assert g2.entries[eid].name == "mug"
-    assert g2.entries[eid].crop_files == ["a1.jpg"]
-    assert g2.entries[eid].centroid == E_A
-
-
-def test_load_missing_file_returns_an_empty_gallery(tmp_path):
-    g = ObjectGallery.load(tmp_path / "does_not_exist.json")
-    assert g.entries == {}

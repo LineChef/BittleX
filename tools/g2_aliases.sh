@@ -262,6 +262,23 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]
 g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
+# g2pimem [log N | facts | search <q> | usage | sightings N | ...]  -- the same CLI against G2's REAL memory on the Pi (g2mem reads the Mac's copy). Default: the last 20 exchanges.
+g2pimem() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory ${*:-log 20}"; }
+# g2pics [status | pull | open]  -- what pictures G2 saved while exploring (survey stops, named objects): status = counts and the newest on the Pi (default);
+# pull = copy them to ~/g2_pictures on this Mac; open = pull, then show the folder in Finder. Pictures stay on the Pi until you pull them.
+g2pics() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  local cmd="${1:-status}" dest="$HOME/g2_pictures"
+  case "$cmd" in
+    status) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.exploration_pictures" ;;
+    pull|open)
+      ssh "$G2_PI" 'test -d ~/.local/share/g2/explore_pictures' || { echo "no exploration pictures on the Pi yet"; return 0; }
+      mkdir -p "$dest/explore" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$dest/explore/" \
+        && echo "pictures copied to $dest/explore ($(find "$dest/explore" -name '*.jpg' | wc -l | tr -d ' ') jpg)" \
+        && { [ "$cmd" = open ] && open "$dest/explore"; true; } ;;
+    *) echo "usage: g2pics [status|pull|open]"; return 2 ;;
+  esac
+}
 
 # --------------------------------------------------------- config introspection
 
