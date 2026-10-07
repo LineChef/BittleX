@@ -64,3 +64,17 @@ def test_closed_loop_halves_a_g2_sized_push_and_removes_a_smaller_one():
 
 def test_wrap_deg():
     assert hh.wrap_deg(190.0) == pytest.approx(-170.0) and hh.wrap_deg(-190.0) == pytest.approx(170.0)
+
+
+def test_fixed_u_mode_ignores_heading_and_is_slew_limited_and_clipped():
+    c = hh.HeadingHold()
+    c.fixed_u = -0.15
+    first = c.update(math.radians(80.0), 0.0125)
+    assert first == pytest.approx(-hh.U_RATE * 0.0125)                            # slewed, not a jump, and the heading error is not used
+    for _ in range(2000):
+        u = c.update(math.radians(-80.0), 0.0125)
+    assert u == pytest.approx(-0.15)
+    c.fixed_u = 0.9
+    for _ in range(4000):
+        u = c.update(0.0, 0.0125)
+    assert u == pytest.approx(hh.U_MAX)                                           # clipped at the same limit

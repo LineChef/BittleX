@@ -38,6 +38,7 @@ class HeadingHold:
         self.target_deg, self.kp, self.ki, self.u_max, self.u_rate = target_deg, kp, ki, u_max, u_rate
         self.integral = 0.0
         self.u = 0.0
+        self.fixed_u = None                 # set to a number to hold that stride difference with no feedback (measures the lever's real sign / authority)
 
     def reset(self) -> None:
         self.integral = 0.0
@@ -47,6 +48,8 @@ class HeadingHold:
         """One control tick. yaw_rad: the rebased IMU yaw, right-positive. Returns the stride difference u to apply."""
         if not active:
             return self._slew(0.0, dt)
+        if self.fixed_u is not None:
+            return self._slew(max(-self.u_max, min(self.u_max, self.fixed_u)), dt)
         e = wrap_deg(math.degrees(yaw_rad) - self.target_deg)
         want = -(self.kp * e + self.ki * self.integral)
         if abs(want) < self.u_max:                       # anti-windup: only integrate while the output is not saturated
