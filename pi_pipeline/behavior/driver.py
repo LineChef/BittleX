@@ -47,6 +47,7 @@ from .idle_posture import (
 from .mode_controller import Mode, ModeConfig, ModeController
 from .novelty import Novelty, NoveltyConfig
 from .object_seek import ObjectSeek, ObjectSeekAction, ObjectSeekConfig
+from .survey import Survey, SurveyConfig, clean_name, naming_plan, survey_plan
 from .place_memory import PlaceMemory, PlaceMemoryConfig
 from .sleep_mode import SleepAction, SleepMode, SleepModeConfig, SleepState
 
@@ -110,6 +111,7 @@ class DriverInputs:
     nearby_motion: bool = False             # small sound/motion -> PEEK / glance toward it
     sound_bearing: float | None = None      # where a sound came from (rad, + = right), if known
     meet_name: str | None = None            # "G2, meet <name>" -> start enrollment
+    name_request: str = ""                  # "this is a <name>" -> look at it, take a picture, save it under that name (needs enable_survey)
     cancel_enroll: bool = False
     say_hi: bool = False                     # "say hi" / "wave" voice intent -> greeting gesture
     chirps_on: bool = False                  # "turn on your chirps" -> re-enable, live
@@ -214,6 +216,22 @@ class _Choreo:
         return out
 
 
+_PLAN_KINDS = {"stop": EffectKind.STOP, "skill": EffectKind.SKILL, "speak": EffectKind.SPEAK, "diag": EffectKind.DIAG}
+
+
+def _plan_steps(plan: list) -> list:
+    """survey.py's plain timed steps (delay, kind, payload, reason) -> the choreography player's (delay, Effect) pairs."""
+    steps = []
+    for delay, kind, payload, reason in plan:
+        if kind == "shot":
+            steps.append((delay, Effect(EffectKind.CAPTURE, ("shot", payload), reason)))
+        elif kind == "diag":
+            steps.append((delay, Effect(EffectKind.DIAG, (payload, reason), reason)))
+        else:
+            steps.append((delay, Effect(_PLAN_KINDS[kind], payload, reason)))
+    return steps
+
+
 class BehaviorDriver:
     """The composition root: owns every behaviour sub-module and ticks them
     in priority order (see the module docstring). No I/O -- tick() is a pure
@@ -293,6 +311,8 @@ class BehaviorDriver:
         self.cliff = cliff
         self._capture_root = capture_root
         self._choreo = _Choreo(clock=clock)
+        self.survey: Survey | None = None     # off until enable_survey(): stops at the end of exploration legs to look down and up and take pictures
+        self._clock_fn = clock
         self._session_dir: str | None = None
         self._session_name = ""
         self._explore_target = ""
@@ -446,6 +466,12 @@ class BehaviorDriver:
             fx.append(Effect(EffectKind.DIAG, ("enroll.abort", t.reason), t.reason))
         return fx
 
+    def enable_survey(self, cfg: SurveyConfig | None = None) -> Survey:
+        """Turn on survey stops (and voice naming of objects): at the end of an exploration leg G2 stops, looks down and up, takes a picture in each
+        pose (a CAPTURE ("shot", kind) effect for the camera binding) and walks on. See behavior/survey.py."""
+        self.survey = Survey(cfg, clock=self._clock_fn)
+        return self.survey
+
     # --- explore --------------------------------------------------------
     def _from_explore(self, i: DriverInputs, now: float) -> list:
         d = self.explorer.decide(list(i.frame), now)
@@ -468,6 +494,12 @@ class BehaviorDriver:
                 fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "sniff a find"))
         elif d.action is ExploreAction.HOLD:
             fx.append(Effect(EffectKind.STOP, None, d.reason))
+
+        if (self.survey is not None and self._vision and d.action is ExploreAction.HOLD and d.reason == "leg done"
+                and self.survey.ready(now)):
+            self.survey.began(now)
+            self._choreo.start("survey", _plan_steps(survey_plan(self.survey.cfg)), now=now)
+            return self._choreo.pump(now) + [Effect(EffectKind.DIAG, ("survey.start", "end of a leg"), "survey stop")]
 
         if self._object_gallery and self._vision:
             seek = self.object_seek.update(now, explore_action=d.action)
@@ -659,6 +691,14 @@ class BehaviorDriver:
             return self._finish(mode, effects, now, reason=self._last_reason)
 
         mode = self.mode.update(now)
+
+        # 2b. "this is a <name>" -- look at it, take a picture, save it under that name (voice naming; needs enable_survey and a camera)
+        nm = clean_name(i.name_request)
+        if nm and self.survey is not None and self._vision and mode is not Mode.CONVERSE:
+            self._choreo.start("naming", _plan_steps(naming_plan(nm, self.survey.cfg)), now=now)
+            effects += self._choreo.pump(now)
+            effects.append(Effect(EffectKind.DIAG, ("naming.start", nm), "naming request"))
+            return self._finish(mode, effects, now, reason=f"naming: {nm}")
 
         # 2c. "come here" -- a directed one-shot walk toward a person. Beats
         #     CONVERSE / EXPLORE / IDLE (it's a direct command); enrollment,

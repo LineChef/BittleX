@@ -2,7 +2,8 @@
 
 Wake word, then one short command, checked against the local command table only -- no Claude, no API calls:
   "emergency stop" / "freeze" -> halt;  "resume" -> release;  "go ahead and look around" -> arm roam;  "that's enough" / "come back" -> disarm;
-  "shut down" -> end the session (never powers anything off);  "tell me what you see" -> say what the detector sees.
+  "shut down" -> end the session (never powers anything off);  "tell me what you see" -> say what the detector sees;
+  "this is a mug" / "remember this as my mug" -> look at it and take a picture saved under that name (the driver's survey, behavior/survey.py).
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import threading
 from ..vision.describe_local import describe
 from ..voice.commands import match_local_command
 from ..voice.loop import asks_what_g2_sees
+from .survey import parse_naming
 
 log = logging.getLogger("g2.behavior.explore_listener")
 
@@ -60,6 +62,11 @@ class ExploreListener:
             if self._on_stop:
                 self._on_stop()
             return self._reply("Ending the exploration test.")
+        if cmd is None:
+            name = parse_naming(text)
+            if name:
+                self._rt.post(name_request=name)
+                return self._reply(f"Okay, let me look at the {name}.")
         if cmd is None and asks_what_g2_sees(text):
             return self._reply(describe(list(self._frame() or [])))
         return None

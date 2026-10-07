@@ -717,6 +717,8 @@ than "train another named class per object."
    frames (a timeshare with the detection stream on this hardware — can't have
    both at once) and its own compute budget on a 512 MB Pi with no GPU.
 
+**Build plan (2026-10-07): [`vision/exploration-object-learning-plan.md`](vision/exploration-object-learning-plan.md).**
+
 **Decided 2026-09-14: option 2, the separate Pi-side layer.** Precisely
 because it can't degrade the primary detection — option 1 (6th model class)
 is no longer under consideration.

@@ -146,9 +146,18 @@ class CameraSink:
     The vision module's own power line is hardware-specific, so this records the
     intent and calls an injected `on_toggle(on: bool, kind)` hook if given."""
 
-    def __init__(self, on_toggle=None):
+    def __init__(self, on_toggle=None, snap=None):
         self._on_toggle = on_toggle
+        self._snap = snap                    # injected: takes and saves one picture, snap(kind) (vision/exploration_pictures.py)
         self.capturing = False
+
+    def snapshot(self, kind=None) -> None:
+        log.info("camera snapshot (%s)", kind)
+        if self._snap:
+            try:
+                self._snap(kind)
+            except Exception:  # noqa: BLE001
+                log.exception("camera snapshot hook failed")
 
     def set_capture(self, on: bool, kind=None) -> None:
         self.capturing = bool(on)
@@ -162,7 +171,7 @@ class CameraSink:
 
 
 def build_bindings(link, *, dry_run_power: bool | None = None,
-                   camera_toggle=None, policy_walker=None) -> DriverBindings:
+                   camera_toggle=None, policy_walker=None, camera_snapshot=None) -> DriverBindings:
     """Wire a `DriverBindings` to the real sinks. `link` is a `SerialLink` /
     `LockedLink` (or None -> serial sinks become no-ops via a null link)."""
     link = link or _NullLink()
@@ -170,7 +179,7 @@ def build_bindings(link, *, dry_run_power: bool | None = None,
     return DriverBindings(
         actuator=act,
         tts=None,                       # the voice loop owns TTS; SPEAK effects are rare here
-        camera=CameraSink(camera_toggle),
+        camera=CameraSink(camera_toggle, camera_snapshot),
         cue=None,
         walker=WalkerSink(link, policy_walker=policy_walker),
         head=HeadSink(link),

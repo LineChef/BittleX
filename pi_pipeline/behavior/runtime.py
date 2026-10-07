@@ -76,12 +76,16 @@ class _Pending:
     """Discrete events accumulated since the last tick."""
     bools: dict = field(default_factory=dict)
     meet_name: str | None = None
+    name_request: str | None = None
 
     def merge(self, **events) -> None:
         for k, v in events.items():
             if k == "meet_name":
                 if v:
                     self.meet_name = str(v)
+            elif k == "name_request":
+                if v:
+                    self.name_request = str(v)
             elif k in _EVENT_BOOLS:
                 self.bools[k] = self.bools.get(k, False) or bool(v)
             else:
@@ -91,8 +95,11 @@ class _Pending:
         out = dict(self.bools)
         if self.meet_name is not None:
             out["meet_name"] = self.meet_name
+        if self.name_request is not None:
+            out["name_request"] = self.name_request
         self.bools = {}
         self.meet_name = None
+        self.name_request = None
         return out
 
 

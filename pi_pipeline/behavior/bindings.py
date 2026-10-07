@@ -110,6 +110,12 @@ class DriverBindings:
             return f"speak:{e.payload}"
         if k is EffectKind.CAPTURE:
             on, kind = (e.payload if isinstance(e.payload, (tuple, list)) else (e.payload, None))
+            if on == "shot":                      # take ONE picture now (survey / naming): a camera call, no network
+                fn = self.camera and _call(self.camera, "snapshot")
+                if not fn:
+                    return self._miss("snapshot")
+                fn(kind)
+                return f"snapshot:{kind}"
             fn = self.camera and _call(self.camera, "set_capture", "capture")
             if not fn:
                 return self._miss("capture")

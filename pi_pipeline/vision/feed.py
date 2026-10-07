@@ -142,6 +142,8 @@ class SerialDetectionFeed:
         import serial
 
         self._ser = serial.Serial(port, baud, timeout=1)
+        self._io_lock = threading.Lock()         # one reader or one snapshot on the port at a time
+        self._paused = threading.Event()         # set while snapshot() has the port: frames() waits
         self._frame_px = frame_px
         self._labels = labels or []
         self._min_score = min_score
@@ -176,7 +178,11 @@ class SerialDetectionFeed:
         # reads and parses one detection message per loop, skipping anything
         # that isn't a results-carrying INVOKE line
         while True:
-            raw = self._ser.readline().decode("utf-8", "replace").strip()
+            if self._paused.is_set():            # a picture is being taken on this port
+                time.sleep(0.05)
+                continue
+            with self._io_lock:
+                raw = self._ser.readline().decode("utf-8", "replace").strip()
             if not raw or not raw.startswith("{"):
                 continue
             try:
@@ -205,6 +211,38 @@ class SerialDetectionFeed:
                 except (ValueError, TypeError):
                     continue
             yield frame
+
+    def snapshot(self, timeout_s: float = 6.0):
+        """Take ONE picture on this feed's own port and go back to detecting: stops the detection loop, asks for a single inference that
+        comes back with its JPEG (`AT+INVOKE=1,0,0`), then restarts the loop. Returns a `vision.snapshot.Snapshot`, or None if the module
+        did not answer in time. The detection stream is dark for about a second. The pause is in the reader (`frames()`), so this is safe
+        to call from another thread while a `BackgroundFrameSource` is reading. No network, no API call."""
+        from .snapshot import parse_invoke_line
+        self._paused.set()
+        snap = None
+        try:
+            with self._io_lock:                  # waits for a readline() in progress (at most its 1 s timeout)
+                self._ser.write(self._STOP_CMD)
+                time.sleep(0.2)
+                self._ser.reset_input_buffer()
+                self._ser.write(b"AT+INVOKE=1,0,0\r\n")
+                deadline = time.monotonic() + timeout_s
+                while time.monotonic() < deadline:
+                    raw = self._ser.readline()
+                    if not raw:
+                        continue
+                    snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
+                    if snap is not None:
+                        break
+                if snap is None:
+                    log.warning("camera gave no picture within %.0f s", timeout_s)
+                self._ser.write(self._STOP_CMD)
+                time.sleep(0.2)
+                self._ser.reset_input_buffer()
+                self._ser.write(self._START_CMD)     # back to detections
+        finally:
+            self._paused.clear()
+        return snap
 
     def close(self) -> None:
         try:
@@ -263,6 +301,17 @@ class BackgroundFrameSource:
             if self._at is None or self._clock() - self._at > self._max_age_s:
                 return []
             return list(self._frame)
+
+    def snapshot(self, timeout_s: float = 6.0):
+        """One picture from the underlying feed (see `SerialDetectionFeed.snapshot`), or None if the feed cannot take pictures. The newest
+        detection frame is cleared so a stale one is not read as current right after the pause."""
+        fn = getattr(self._feed, "snapshot", None)
+        if fn is None:
+            return None
+        snap = fn(timeout_s)
+        with self._lock:
+            self._at = None
+        return snap
 
     def close(self) -> None:
         self._stop.set()

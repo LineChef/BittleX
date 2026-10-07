@@ -74,7 +74,15 @@ def main() -> None:
         if features.gait != "off" and settings.default_gait == "policy":
             from .gait.policy_walker import PolicyWalker
             policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v))
-        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer())
+        saver = None
+        if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
+            from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
+            saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
+        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
+                            camera_snapshot=saver)
+        if saver is not None:
+            rt.driver.enable_survey()                  # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
+            log.info("survey stops ON: pictures go to %s", saver._root)
 
         # no cap on how long roaming goes on: the explorer's own leg budget is lifted too
         from dataclasses import replace
