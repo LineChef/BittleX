@@ -56,4 +56,4 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
 
 - **Real-data pipeline (user, 2026-10-07):** semi-automatic approval, store outside the repo, every policy walk captured (voice and exploration included), everything kept compressed losslessly; the user tells Claude when hardware changes (a new
   epoch), and wants only data that can help gait training fed to the sim, with periodic audits. Design, ingest gates, the auto-approval rule (changes within noise that pass every check and the harm check; everything else needs the user)
-  and the audit schedule: [`real-data-pipeline.md`](real-data-pipeline.md). Phase 0 built (capture module, epochs, hook in `run_gait.run()`). Kitchen tile noted as a good place for ledge-like data (grout lines); grout depth unmeasured.
+  and the audit schedule: [`real-data-pipeline.md`](real-data-pipeline.md). Phase 0 built (capture module, epochs, hook in `run_gait.run()`). Kitchen tile noted as a good place for small-step / surface-roughness data (grout lines; not ledges in the sim's 12 to 35 mm sense); grout depth unmeasured.

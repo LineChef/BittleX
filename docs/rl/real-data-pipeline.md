@@ -33,7 +33,7 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 ## Hardware epochs and surfaces
 
 - **Epoch** (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
-- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi; every run records it. Fits are per surface, because friction differs (kitchen tile is a good ledge-like test floor: every grout line is a small step).
+- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi; every run records it. Fits are per surface, because friction differs (kitchen tile is a good floor for small-step and surface-roughness data: every grout line is a tiny step, not a ledge in the sim's 12 to 35 mm sense; closest to the sim's surface-transition and snag categories).
   Grout depth is unmeasured; the logs will show how often feet catch.
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
