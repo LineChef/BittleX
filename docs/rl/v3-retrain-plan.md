@@ -10,6 +10,12 @@ Tuning runs stay possible later if the result needs them, but none are planned.
 
 ## 0. Where to resume (state at ~9:10 PM ET, 2026-10-06: queue running C0 done, S1 at 3M, then C0b, S2 ...; G2 charging)
 
+### Update, 2026-10-07 (queue order changed; benchmark v5; read this before the hand-off below)
+
+- **Queue order now:** S3 (running), then the seed replicates (`kind: replicate`, `G2E_SEED` 43 and 44: control, S1, S2 at each), then the combined S1+S2 recipe at seeds 42, 43 and 44, then a **pause `review_replicates`** (`touch trained/v3_go_review_replicates` to continue into S4-S10, K3, the stage chain), then the `report` job, then the `hardware_checkin` pause, then the 20M. Replicate runs are not screens: they never feed K3's lever list, and they are read by hand (the runner prints no verdict). `train.py` takes the PPO seed from `G2E_SEED` (default 42).
+- **Benchmark version 5** (`benchmark_v4.py`, module name unchanged): adds the difficulty-level ladder (`--ladder`). Training's per-category levels (terrain, ledge, slope, fault) are scored on the finished policy at levels 0.25 / 0.5 / 0.75 / 1.0 plus a +10% hard rung, in the final stage's world (`g2_profile.env_for(..., stage="s6_full_strength")`), with the training probe's own score, relative score and 0.80 threshold. The T and N cells are unchanged, so version 4 results compare cell for cell.
+- **The `report` job** (`phase_v3.do_report`, `v3_report.py`) runs right before the hardware check-in: V2.1, the control (`v3_c0b`), K3 and the last finished stage are scored on all cells plus the ladder (about 10 min each), then `trained/v3_report/pre20m_report.html` is written (promotion check against V2.1, ladder charts, every cell, straightness, seed replicates, training history, caveats). Publish it as an Artifact for review before deciding on the 20M. Test it without the real policies: `python v3_report.py --demo --out /tmp/x.html`.
+
 ### Hand-off, evening of 2026-10-06 (read this first in a new session)
 
 **What is running (Mac, `rl_training/opencat-gym/`).** The V3 queue (`python phase_v3.py run`, log `trained/phase_v3.log`, queue `trained/v3_queue.json`): `v3_c0` (control) is DONE and passed

@@ -14,6 +14,16 @@ What changed from benchmark_decathlon.py (BENCH_VERSION 3):
   * --hard-scale F: the hardest rung of each category x F ("T2.2+10%" ...), labelled not comparable with older runs
   * --jobs N: cells are split across N worker processes (greedy by cost), results merged in ladder order
 Carpet cell T10.1 is reported, never gated (tag "info"). `gate_cells()` lists the cells that count.
+
+BENCH_VERSION 5 (2026-10-07) adds the DIFFICULTY-LEVEL LADDER (`--ladder`), the benchmark's version of training's difficulty levels:
+  * training raises four hazard categories (terrain, ledge, slope, fault) from 0 to 1 as the policy earns it (opencat_gym_env CATEGORY_LEVELS; the Curriculum probe in
+    train.py); the ladder scores the finished policy at fixed levels 0.25 / 0.5 / 0.75 / 1.0 of each category (the others at 0) plus a clean floor, in the SAME world
+    the final stage trains in (g2_profile.env_for(..., stage="s6_full_strength")), with the SAME measure as the probe (episode score = survived x fraction of the commanded
+    distance covered; a fall = peak tilt > 1.3 rad scores 0), the SAME relative score (raw / max(clean floor, 0.30)) and the SAME promotion threshold (LEVEL_UP_SCORE, 0.80)
+  * one more rung per category at level 1.0 with G2E_HARD_SCALE 1.10, the hardest world the 20M run trains in
+  * result: res["ladder"] = {"cells": [...], "summary": ladder_summary(...)}; summary["categories"][c]["competence"] = the highest level the policy is "ready for" in the
+    training sense (the level the curriculum would have reached), contiguous from 0.25
+  * the T / N cells are unchanged (a policy scored on version 4 compares cell for cell)
 """
 import argparse
 import json
@@ -31,7 +41,7 @@ import numpy as np
 import g2_profile
 
 D = math.radians
-BENCH_VERSION = 4
+BENCH_VERSION = 5
 STEPS_HZ = 80.0
 JOINT_PAIRS = ((0, 2), (1, 3), (4, 6), (5, 7))           # FLsh-FRsh, FLel-FRel, BRhip-BLhip, BRkn-BLkn (URDF order; L-R pairs)
 PAIR_NAMES = ("shoulder_FL-FR", "elbow_FL-FR", "hip_BR-BL", "knee_BR-BL")
@@ -163,6 +173,112 @@ def turn_metrics(eps_list, cmd_yaw):
     return dict(cmd_yaw=cmd_yaw, yaw_rate_mean=float(np.mean(rates)), yaw_rate_ratio=float(np.mean(rates)) / cmd_yaw if cmd_yaw else 0.0)
 
 
+
+# ------------------------------------------------------------------------------------------------ difficulty-level ladder
+LADDER_CATS = ("terrain", "ledge", "slope", "fault")        # opencat_gym_env.CATS
+LADDER_LEVELS = (0.25, 0.5, 0.75, 1.0)
+LADDER_HARD_LEVEL = 1.0                                     # the hard rung: this level with G2E_HARD_SCALE
+LADDER_HARD_SCALE = 1.10                                    # g2_profile.FINAL_EXTRA
+LADDER_UP = 0.80                                            # = LEVEL_UP_SCORE in g2_profile.RECIPE: a level counts as reached at a relative score >= this
+LADDER_BASE_FLOOR = 0.30                                    # train.py Curriculum: rel = raw / max(base, 0.30)
+LADDER_EPISODES = 20
+LADDER_STAGE = "s6_full_strength"                           # the world the 20M trains in
+
+
+def ladder_env(world_levers=(), obs_levers=(), hard=False):
+    """The G2E_* settings of the ladder's world: the base recipe + calibration + the kept levers' settings + the final stage's course (everything the training probe
+    sees), with only the observation-changing levers a policy needs (heading_obs) set per policy. hard=True adds the final run's +10% hardest levels."""
+    levers = [l for l in world_levers if l != "heading_obs"]
+    env = dict(g2_profile.env_for(*levers, stage=LADDER_STAGE))
+    for k in [k for k in env if k.startswith(("G2E_MIRROR", "G2E_RAMP"))]:      # training-only, never read at inference
+        del env[k]
+    if "heading_obs" in obs_levers:
+        env.update(g2_profile.LEVERS["heading_obs"])
+    if hard:
+        env.update(g2_profile.FINAL_EXTRA)
+    return env
+
+
+def ladder_cell_list(hard):
+    """[(category or None, level)]: the clean floor, then each category at each level (the hard group: only the top level)."""
+    cells = [(None, 0.0)]
+    cells += [(c, LADDER_HARD_LEVEL if hard else l) for c in LADDER_CATS for l in ((LADDER_HARD_LEVEL,) if hard else LADDER_LEVELS)]
+    return cells
+
+
+def _ladder_worker(job):
+    """Score ladder cells in a fresh process, the way train.py's Curriculum probes: deterministic policy, the env's own random commands, CATEGORY_OVERRIDE pinning one
+    category at a level (the others 0), generic randomization at full strength. job = dict(policy, env, cells=[(cat, level)], episodes, seed, hard)."""
+    for k in [k for k in os.environ if k.startswith("G2E_")]:
+        del os.environ[k]
+    os.environ.update({k: str(v) for k, v in job["env"].items()})
+    import opencat_gym_env as E
+    E.GUI_MODE = False
+    import pybullet as pb
+    from benchmark_gaits import ScriptedGait, _load_learned
+    env = E.OpenCatGymEnv()
+    env.set_ramp_steps(1e12)
+    if job["policy"] == "scripted":
+        E.CMD_SEND_EVERY_N = 1
+        model = ScriptedGait(env)
+    else:
+        model = _load_learned(job["policy"])
+    out = []
+    for cat, level in job["cells"]:
+        E.CATEGORY_OVERRIDE = {cat: float(level)} if cat else {"terrain": 0.0}
+        t0 = time.time()
+        scores, falls, speeds = [], [], []
+        for k in range(job["episodes"]):
+            if hasattr(model, "reset"):
+                model.reset()
+            obs, _ = env.reset(seed=job["seed"] + k)
+            x0 = pb.getBasePositionAndOrientation(env.robot_id)[0][0]
+            peak, steps = 0.0, 0
+            while True:
+                act, _ = model.predict(obs, deterministic=True)
+                obs, _r, te, tr, _i = env.step(act)
+                steps += 1
+                rr, pp, _y = pb.getEulerFromQuaternion(pb.getBasePositionAndOrientation(env.robot_id)[1])
+                peak = max(peak, abs(rr), abs(pp))
+                if te or tr:
+                    break
+            fell = peak > 1.3
+            scores.append(0.0 if fell else env._episode_score())
+            falls.append(fell)
+            speeds.append((pb.getBasePositionAndOrientation(env.robot_id)[0][0] - x0) / (steps / STEPS_HZ))
+        E.CATEGORY_OVERRIDE = {}
+        out.append(dict(category=cat, level=level, hard=bool(job["hard"]), episodes=job["episodes"], score=float(np.mean(scores)),
+                        fell_fraction=float(np.mean(falls)), speed_mps=float(np.mean(speeds)), seconds=round(time.time() - t0, 1)))
+        print(f"  [{os.getpid()}] ladder {cat or 'clean'} {level:.2f}{' hard' if job['hard'] else ''}: score {np.mean(scores):.2f}  fell {np.mean(falls):.0%}", flush=True)
+    return out
+
+
+def ladder_summary(cells):
+    """Per category: the relative score at each level and the competence (the highest level reached contiguously from 0.25 with relative score >= LADDER_UP), the way the
+    training curriculum judges a category; plus the hard rung. cells = res["ladder"]["cells"]."""
+    base = {h: next((c["score"] for c in cells if c["category"] is None and c["hard"] == h), None) for h in (False, True)}
+    base_n = base[False]
+    cats = {}
+    for cat in LADDER_CATS:
+        rows = sorted([c for c in cells if c["category"] == cat and not c["hard"]], key=lambda c: c["level"])
+        rel = {c["level"]: min(1.0, c["score"] / max(base_n or 0.0, LADDER_BASE_FLOOR)) for c in rows}
+        comp = 0.0
+        for c in rows:
+            if rel[c["level"]] >= LADDER_UP:
+                comp = c["level"]
+            else:
+                break
+        hard = next((c for c in cells if c["category"] == cat and c["hard"]), None)
+        cats[cat] = dict(competence=comp, rel=rel, fell={c["level"]: c["fell_fraction"] for c in rows}, score={c["level"]: c["score"] for c in rows},
+                         hard_rel=(min(1.0, hard["score"] / max(base[True] if base[True] is not None else (base_n or 0.0), LADDER_BASE_FLOOR)) if hard else None),
+                         hard_fell=(hard["fell_fraction"] if hard else None))
+    return dict(clean_score=base_n, clean_score_hard=base[True], up=LADDER_UP, categories=cats,
+                mean_competence=float(np.mean([v["competence"] for v in cats.values()])))
+
+
+def _dispatch(job):
+    return ("ladder", _ladder_worker(job)) if job.get("ladder") else ("cells", _worker(job))
+
 # ------------------------------------------------------------------------------------------------ worker
 def _worker(job):
     """Score a list of cells in a fresh process (spawn): own env, own policy copy. job = dict(policy, cells, episodes, seed, hard_scale)."""
@@ -246,14 +362,16 @@ def _mirror_gap(env, model, E):
 
 # ------------------------------------------------------------------------------------------------ driver
 def run(policy, spec="all", episodes=40, seed=1000, jobs=1, hard_scale=None, levers=(), json_out=None, mirror_gap=True, quiet=False,
-        extra_env=None):
+        extra_env=None, ladder=False, ladder_levers=(), ladder_episodes=LADDER_EPISODES):
     """Score `policy` on the selected cells; returns the result dict (and writes it if json_out). Safe to call from another script."""
     g2_profile.set_environ({**g2_profile.scoring_env(*levers), **(extra_env or {})})        # extra_env: a calibration sweep's overrides
-    rows = select(cell_table(hard_scale), spec, hard_scale)
-    if not rows:
+    rows = [] if spec in ("ladder", "none") else select(cell_table(hard_scale), spec, hard_scale)
+    if not rows and not (ladder or spec == "ladder"):
         raise SystemExit(f"no cells match {spec!r}")
+    ladder = ladder or spec == "ladder"
     rows.sort(key=lambda r: -cost(r, episodes))
-    buckets = [[] for _ in range(max(1, min(jobs, len(rows))))]
+    n_ladder = (2 if jobs >= 3 else 1) if ladder else 0           # worker processes reserved for the ladder
+    buckets = [[] for _ in range(max(1, min(max(1, jobs - n_ladder), len(rows)))) ] if rows else []
     load = [0] * len(buckets)
     for r in rows:                                              # greedy: biggest cell to the emptiest worker
         i = load.index(min(load))
@@ -264,19 +382,38 @@ def run(policy, spec="all", episodes=40, seed=1000, jobs=1, hard_scale=None, lev
         print(f"benchmark v4: {len(rows)} cells, {episodes} eps default, {len(buckets)} worker(s), policy {policy}", flush=True)
     jobs_list = [dict(policy=policy, cells=b, episodes=episodes, seed=seed, hard_scale=hard_scale, mirror_gap=(i == 0 and mirror_gap))
                  for i, b in enumerate(buckets)]
+    if ladder:                                      # the clean floor + 4 categories x 4 levels, and the hard rung group, split over the reserved workers
+        lad = [(False, c) for c in ladder_cell_list(False)] + [(True, c) for c in ladder_cell_list(True)]
+        groups = [[] for _ in range(max(1, n_ladder))]
+        for i, item in enumerate(lad):
+            groups[i % len(groups)].append(item)
+        for g in groups:
+            for hard in (False, True):
+                cells_g = [c for h, c in g if h == hard]
+                if cells_g:
+                    jobs_list.append(dict(ladder=True, policy=policy, hard=hard, cells=cells_g, episodes=ladder_episodes, seed=seed,
+                                          env={**ladder_env(ladder_levers, levers, hard), **(extra_env or {})}))
     if len(jobs_list) == 1:
-        results = [_worker(jobs_list[0])]
+        results = [_dispatch(jobs_list[0])]
     else:
         with mp.get_context("spawn").Pool(len(jobs_list)) as pool:
-            results = pool.map(_worker, jobs_list)
-    cells, gap = [], None
-    for out, mg in results:
+            results = pool.map(_dispatch, jobs_list)
+    cells, gap, lad_cells = [], None, []
+    for kind, payload in results:
+        if kind == "ladder":
+            lad_cells += payload
+            continue
+        out, mg = payload
         cells += out
         gap = mg if mg is not None else gap
     order = {r[0]: i for i, r in enumerate(cell_table(hard_scale))}
     cells.sort(key=lambda c: order[c["id"]])
     res = dict(bench_version=BENCH_VERSION, policy=policy, episodes=episodes, seed=seed, hard_scale=hard_scale, levers=list(levers),
                profile={**g2_profile.scoring_env(*levers), **(extra_env or {})}, mirror_gap=gap, wall_seconds=round(time.time() - t0, 1), cells=cells)
+    if ladder:
+        lad_cells.sort(key=lambda c: (c["hard"], c["category"] or "", c["level"]))
+        res["ladder"] = dict(world_levers=list(ladder_levers), stage=LADDER_STAGE, episodes=ladder_episodes, levels=list(LADDER_LEVELS), hard_scale=LADDER_HARD_SCALE,
+                             cells=lad_cells, summary=ladder_summary(lad_cells))
     if json_out:
         os.makedirs(os.path.dirname(os.path.abspath(json_out)), exist_ok=True)
         json.dump(res, open(json_out, "w"), indent=1)
@@ -301,6 +438,15 @@ def table(res, ref=None):
     return "\n".join(lines)
 
 
+def ladder_table(sm):
+    lines = [f"difficulty ladder (relative score; clean floor {sm['clean_score']:.2f}; '>' marks a level reached at >= {sm['up']:.2f}):",
+             f"{'category':9s} " + " ".join(f"{l:>6.2f}" for l in LADDER_LEVELS) + f" {'hard':>6s}  competence"]
+    for cat, v in sm["categories"].items():
+        lines.append(f"{cat:9s} " + " ".join(f"{v['rel'].get(l, float('nan')):>6.2f}" for l in LADDER_LEVELS)
+                     + f" {v['hard_rel'] if v['hard_rel'] is not None else float('nan'):>6.2f}  {v['competence']:.2f}")
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--policy", required=True, help="trained/<tag>_ppo (no .zip) or 'scripted'")
@@ -313,11 +459,18 @@ def main():
     ap.add_argument("--levers", default="", help="comma list of observation-changing levers the policy was trained with (heading_obs)")
     ap.add_argument("--env", action="append", default=[], metavar="G2E_KEY=VALUE",
                     help="override a profile setting for this run (repeatable), e.g. --env G2E_SERVO_RATE_LIMIT_DEG_S=0")
+    ap.add_argument("--ladder", action="store_true", help="also score the difficulty-level ladder (training's levels per hazard category, v5)")
+    ap.add_argument("--ladder-levers", default="", help="comma list of the levers the final recipe keeps (the ladder world's course settings)")
+    ap.add_argument("--ladder-episodes", type=int, default=LADDER_EPISODES)
     ap.add_argument("--reference", default=None, help="a previous result JSON to print next to this one")
     a = ap.parse_args()
     res = run(a.policy, a.cells, a.episodes, a.seed, a.jobs, a.hard_scale, tuple(x for x in a.levers.split(",") if x), a.json_out,
-              extra_env=dict(kv.split("=", 1) for kv in a.env))
-    print(table(res, json.load(open(a.reference)) if a.reference else None))
+              extra_env=dict(kv.split("=", 1) for kv in a.env), ladder=a.ladder, ladder_levers=tuple(x for x in a.ladder_levers.split(",") if x),
+              ladder_episodes=a.ladder_episodes)
+    if res["cells"]:
+        print(table(res, json.load(open(a.reference)) if a.reference else None))
+    if "ladder" in res:
+        print(ladder_table(res["ladder"]["summary"]))
 
 
 if __name__ == "__main__":

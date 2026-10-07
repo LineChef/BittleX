@@ -99,12 +99,12 @@ def policy_levers(levers):
     return tuple(l for l in levers if l == "heading_obs")
 
 
-def score(policy_path, levers, spec=None, busy=False):
+def score(policy_path, levers, spec=None, busy=False, ladder=False, ladder_levers=()):
     import benchmark_v4
     saved = dict(os.environ)                      # benchmark_v4.run puts the scoring profile in os.environ: keep it out of later training launches
     try:
         return benchmark_v4.run(policy_path, spec or SPEC, EPISODES, 1000, SCORE_JOBS_BUSY if busy else SCORE_JOBS, None,
-                                policy_levers(levers), None, mirror_gap=True, quiet=True)
+                                policy_levers(levers), None, mirror_gap=True, quiet=True, ladder=ladder, ladder_levers=tuple(ladder_levers))
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -247,6 +247,46 @@ def stage_gate(job, results):
     return why
 
 
+
+REPORT_DIR = "trained/v3_report"
+
+
+def do_report(job, results, last_stage, outdir=None, episodes=None, spec=None, ladder_episodes=None):
+    """The pre-20M benchmark: score the deployed V2.1, the V3 control, K3 and the last finished stage on benchmark v5 (every cell + the difficulty-level ladder, all in the
+    world the final stage trains in), then write the HTML report (v3_report.py). Resumable: a policy already scored in the report folder is not scored again."""
+    import v3_report
+    outdir = outdir or REPORT_DIR
+    os.makedirs(outdir, exist_ok=True)
+    kept = results[K3]["levers"] if K3 in results else []
+    policies = [("v21", V21, []), ("control", "trained/v3_c0b_ppo", []), ("k3", f"trained/{K3}_ppo", kept), ("final", f"trained/{last_stage}_ppo", kept)]
+    log(f"REPORT scoring {len(policies)} policies on benchmark v5 with the difficulty ladder (world levers {kept}); about 10 min each -> done about {clock_in(10 * len(policies))}")
+    out = {}
+    for key, path, levers in policies:
+        f = f"{outdir}/{key}.json"
+        if os.path.exists(f):
+            out[key] = json.load(open(f))
+            continue
+        if not os.path.exists(path + ".zip"):
+            log(f"REPORT skipping {key}: {path}.zip does not exist")
+            continue
+        import benchmark_v4
+        saved = dict(os.environ)
+        try:
+            res = benchmark_v4.run(path, spec or SPEC, episodes or EPISODES, 1000, SCORE_JOBS, None, policy_levers(levers), None, mirror_gap=True, quiet=True,
+                                   ladder=True, ladder_levers=tuple(kept), ladder_episodes=ladder_episodes or benchmark_v4.LADDER_EPISODES)
+        finally:
+            os.environ.clear()
+            os.environ.update(saved)
+        save(f, res)
+        out[key] = res
+        log(f"REPORT scored {key} in {res['wall_seconds'] / 60:.0f} min | {summary(res)}")
+    training = load(RESULTS, {})
+    html_path = f"{outdir}/pre20m_report.html"
+    open(html_path, "w").write(v3_report.build(out, training))
+    log(f"REPORT ready: {html_path} (final stage = {last_stage}). Tell Claude to publish it; the 20M starts only on your go")
+    return html_path
+
+
 def run_final(job, results):
     """20M with gait checks: each checkpoint is scored against the stage it continues from; a regression stops the run."""
     tag = job["tag"]
@@ -285,6 +325,10 @@ def run_queue():
                 res = score(V21, [])
                 save(REF, res)
                 log(f"REF done | {summary(res)}")
+            continue
+        if kind == "report":
+            if not os.path.exists(f"{REPORT_DIR}/pre20m_report.html"):
+                do_report(job, results, last_stage)
             continue
         if kind == "pause":
             while not os.path.exists(f"trained/v3_go_{job['name']}"):
@@ -358,6 +402,7 @@ def default_queue():
     chain = [(name, None) for name, _ in g2_profile.STAGES[1:]] + [("s5_turn_wide", "turn"), ("s6_full_strength", None)]
     for name, needs in chain:                      # "from" is filled in at run time (the last stage that ran)
         q.append(dict(kind="stage", tag=f"v3_{name}", stage=name, levers="K3", desc=f"stage {name}", **({"needs": needs} if needs else {})))
+    q.append({"kind": "report", "name": "pre20m_report"})
     q.append({"kind": "pause", "name": "hardware_checkin", "note": "Export the last stage, put it on the Pi without making it default, walk it six times."})
     q.append({"kind": "final", "tag": "v3_20m", "stage": "s6_full_strength", "levers": "K3",
               "desc": "20M consolidation, hard levels x1.10, gait checks at 3M/5M/10M"})
