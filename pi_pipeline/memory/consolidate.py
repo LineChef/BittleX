@@ -77,6 +77,8 @@ def make_llm(cfg):
 
     from ..voice.conversation import _http_client_kwargs
     client = anthropic.Anthropic(api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s, **_http_client_kwargs(cfg.api_keepalive_s))
+    from ..voice import api_log
+    api_log.instrument(client, "consolidate")
 
     def llm(system: str, user: str):
         resp = client.messages.create(

@@ -275,6 +275,8 @@ def sec_claude(out: Row, samples: int) -> None:
     try:
         import anthropic
         client = anthropic.Anthropic(api_key=key, timeout=settings.request_timeout_s)
+        from pi_pipeline.voice import api_log
+        api_log.instrument(client, "benchmark_pi")
         lat = []
         for i in range(samples):
             t0 = time.monotonic()

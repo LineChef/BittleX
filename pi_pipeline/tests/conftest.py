@@ -9,6 +9,12 @@ from pi_pipeline.config import Settings
 
 
 @pytest.fixture(autouse=True)
+def _isolate_api_log(tmp_path, monkeypatch):
+    """The Claude API call log goes to a per-test tmp file, never the developer's ~/.local/share/g2."""
+    monkeypatch.setenv("G2_API_LOG", str(tmp_path / "api_calls.jsonl"))
+
+
+@pytest.fixture(autouse=True)
 def _isolate_diag_logs(tmp_path, monkeypatch):
     """Any test that exercises a CLI `main()` (doctor, check_serial, voice, ...)
     may start a real `diag` session -- redirect it to a per-test tmp dir so the

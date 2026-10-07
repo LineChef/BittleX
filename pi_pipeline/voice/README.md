@@ -133,3 +133,10 @@ and an `ANTHROPIC_API_KEY` for the Claude leg.
 - Confirm the loop coexists with OpenCat's 35+ built-in voice commands (they're a
   separate firmware path; our commands go over serial).
 - Thread health-monitoring / auto-restart once mic + serial threads are real.
+
+## API call log
+
+Every call G2 makes to the Claude API, including the wake-word warm-up ping, is logged as JSON lines in `~/.local/share/g2/api_calls.jsonl` (`G2_API_LOG`, `off` to disable; rotated at 5 MB) and to the service journal (`g2.api`).
+Each call has a `start` line (what, which model, whether it carries a picture, which function made it) and a `done` or `error` line (seconds, token counts, stop reason). `source` says which part owns the client:
+`voice`, `consolidate`, `benchmark_pi`. Read it with `python -m pi_pipeline.voice.api_log --last 40`; the daily and hourly token totals are `python -m pi_pipeline.voice.usage [--days 7 | --hours 24]`.
+The code is `voice/api_log.py`; tests use fake clients and never call the real API (the one billed check, `test_livecheck.py`, needs `G2_LIVECHECK=1`).

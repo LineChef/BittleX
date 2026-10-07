@@ -268,6 +268,9 @@ class Conversation:
             api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s,
             **_http_client_kwargs(cfg.api_keepalive_s),
         )
+        if self._client is not None:
+            from . import api_log
+            api_log.instrument(self._client, "voice")     # one JSON line per Claude API call, incl. the warm-up ping (voice/api_log.py)
         self._streamed = False
         self._first_event_t = None
         self.last_call: dict = {}          # {"start", "end", "backend"} of the most recent turn (monotonic seconds)
