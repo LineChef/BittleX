@@ -55,7 +55,7 @@ def main() -> None:
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
     ap.add_argument("--no-log-extra", action="store_true", help="leave out the extra log columns (accel, IMU frame counter, pack voltage)")
     ap.add_argument("--no-preflight", action="store_true", help="skip the check that the BiBoard answers before the first run")
-    ap.add_argument("--scripted-mix", default=None, choices=("abab",),
+    ap.add_argument("--scripted-mix", default=None, choices=("abab", "scripted"),
                     help="abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
     args = ap.parse_args()
 
@@ -112,12 +112,12 @@ def main() -> None:
                             + ("" if hold is None else f"_hold{'ON' if hold else 'OFF'}")
                             + ("" if cu is None else f"_u{cu:+.2f}") + ("" if ft is None else "_ft" + ft.replace("=", "").replace("+", "p").replace("-", "m")) + ".csv")
         child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
-        scripted = args.scripted_mix == "abab" and k % 2 == 1
+        scripted = args.scripted_mix == "scripted" or (args.scripted_mix == "abab" and k % 2 == 1)
         if args.scripted_mix:
             path = path.replace(".csv", "_wkF.csv" if scripted else "_V21.csv")
         if scripted:                     # the scripted wkF walk, no policy: the base the learned policy corrects (run_gait --openloop)
             rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--openloop", "--cycles", "10", "--ramp-cycles", "1",
-                                  "--openloop-balance-off", "--log", path] + ([] if args.no_log_extra else ["--volt-every", "1"]), env=child_env)
+                                  "--openloop-balance-off", "--log", path] + ([] if ft is None else ["--foot-trim", ft]) + ([] if args.no_log_extra else ["--volt-every", "1"]), env=child_env)
             logs.append(path)
             print(f"run {k}: exit {rc} (scripted wkF) -> {path}", flush=True)
             if k < args.runs:

@@ -124,3 +124,9 @@ def test_foot_trim_text_is_parsed_and_a_bad_foot_is_refused():
     import pytest
     with pytest.raises(ValueError):
         hh.parse_foot_trim("rear=0.2")
+
+
+def test_openloop_applies_foot_trim():
+    import inspect
+    from pi_pipeline.gait import run_gait
+    assert "foot_trim" in inspect.signature(run_gait.openloop).parameters

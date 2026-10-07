@@ -197,7 +197,7 @@ def probe_imu_under_load(lk, seconds, hz=CONTROL_HZ):
 
 
 def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
-             balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, send_every=1, *,
+             balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, send_every=1, foot_trim=None, *,
              sleep=time.sleep, clock=time.monotonic):
     """Replays the scripted wkF walk with no policy/IMU -- a firmware/servo
     sanity check before running the real control loop.
@@ -255,6 +255,8 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
                 step += 1
                 if (step - 1) % every == 0:
                     deg = np.rint(np.rad2deg(frame)).astype(int)
+                    if foot_trim is not None:            # --foot-trim: one foot's swing scaled, fixed, no feedback
+                        deg = np.array(_hh.apply_foot_trim(deg, foot_trim[0], foot_trim[1]), dtype=int)
                     _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
                 if volt_every_s and clock() - t_start >= next_volt:
                     _send(lk, "P")
@@ -967,7 +969,8 @@ def main():
                      fall_abort_deg=args.fall_abort_deg, balance_off=args.openloop_balance_off,
                      lift_joints=args.lift_joints, shoulder_scale=args.shoulder_scale,
                      ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every,
-                     send_every=args.send_every if args.send_every else 3)   # default: the policy loop's cadence (i@27)
+                     send_every=args.send_every if args.send_every else 3,
+                     foot_trim=_hh.parse_foot_trim(args.foot_trim))   # default: the policy loop's cadence (i@27)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
