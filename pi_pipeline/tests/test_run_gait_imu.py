@@ -463,3 +463,25 @@ def test_openloop_always_ends_with_the_rest_command(rg, tmp_path):
     except RuntimeError:
         pass
     assert boom.sent[-1] == "d"
+
+
+def test_openloop_restores_balance_before_rest_and_waits_so_the_board_gets_it(rg, tmp_path):
+    class _Lk:
+        def __init__(self):
+            self.sent, self.t = [], 0.0
+
+        def send(self, cmd, **kw):
+            self.sent.append((cmd, self.t))
+
+        def poll_imu(self):
+            return []
+
+    lk = _Lk()
+    def slp(s):
+        lk.t += s
+    rg.openloop(lk, 1, 80.0, balance_off=True, log_path=str(tmp_path / "d.csv"), sleep=slp, clock=lambda: lk.t, fall_abort_deg=0, send_every=3)
+    cmds = [c for c, _ in lk.sent]
+    assert cmds[-3:] == ["gp", "gB", "d"]
+    t_gB, t_d = lk.sent[-2][1], lk.sent[-1][1]
+    assert t_d - t_gB >= 0.3 - 1e-9                      # the balance command has time to take effect before the rest
+    assert lk.t - t_d >= 0.5 - 1e-9                      # and the rest has time to reach the board before the process exits

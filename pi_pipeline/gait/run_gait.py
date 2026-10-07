@@ -291,7 +291,11 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         if log:
             log.close()
             _send(lk, "gp")
+        if balance_off:
+            _send(lk, "gB")       # restore the firmware balance BEFORE the rest, as the policy loop does: `d` sent right after left G2 standing
+            sleep(0.3)
         _send(lk, "d")
+        sleep(0.5)                # a pause so the board has the rest command before the port closes (2026-10-07: without it G2 stayed standing after a scripted walk)
     print("done (sent rest).")
 
 
