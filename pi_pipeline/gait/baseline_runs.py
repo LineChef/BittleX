@@ -14,6 +14,24 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+def preflight(open_link, speak, *, attempts: int = 3, sleep=time.sleep):
+    """Before the first run: does the BiBoard answer on the serial link? Returns the pack voltage, or None after saying so out loud. (2026-10-07: with the board switched off,
+    every run 'finished' without moving G2 and without a word about it.) `open_link()` returns a connected SerialLink-like object or None."""
+    from pi_pipeline.power.battery import read_voltage
+    for k in range(attempts):
+        lk = open_link()
+        try:
+            v = read_voltage(lk) if lk is not None else None
+        finally:
+            if lk is not None:
+                lk.close()
+        if v is not None:
+            return v
+        sleep(2.0)
+    speak("The board is not answering. Check that the BiBoard is switched on, then try again.")
+    return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=6)
@@ -33,6 +51,7 @@ def main() -> None:
     ap.add_argument("--const-u", default=None,
                     help="comma list of fixed stride differences, e.g. -0.2,0,0.2: run k uses the list walked forward then backward (a b c c b a ...), no feedback")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
+    ap.add_argument("--no-preflight", action="store_true", help="skip the check that the BiBoard answers before the first run")
     ap.add_argument("--scripted-mix", default=None, choices=("abab",),
                     help="abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
     args = ap.parse_args()
@@ -62,6 +81,16 @@ def main() -> None:
             return (-1.0, 1.0, 1.0, -1.0)[(k - 1) % 4]
         return float(args.yaw_sign)
     tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+    if not args.no_preflight:
+        def _open():
+            from pi_pipeline.link.serial_link import SerialLink
+            lk = SerialLink("/dev/serial0", baud=115200)
+            return lk if lk.connect() else None
+        volts = preflight(_open, tts.speak)
+        if volts is None:
+            print("PREFLIGHT FAILED: the BiBoard did not answer; no runs started", flush=True)
+            raise SystemExit(3)
+        print(f"preflight ok: pack {volts:.2f} V", flush=True)
     out = os.path.expanduser("~/g2_runs")
     os.makedirs(out, exist_ok=True)
     stamp = time.strftime("%Y%m%d")
