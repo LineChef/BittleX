@@ -433,6 +433,21 @@ Twelve walks in one batch (`g2_baseline.sh start 12 postcal5 --scripted-mix abab
 - A first standing run read pitch sd 5.5 deg and a -4 deg mean: the user rested G2 during it; discarded. The standing order matters: `kbalance` can switch the firmware balance back on, so `gb` goes after it (`yaw_drift_check.py --stand` does that now).
 - Sim settings set from this: IMU roll/pitch zero error +-0.7 deg (was +-2), IMU noise 0.001 in the quaternion (was 0.02; the real sensor noise is about 0.09 deg = 0.0008), hold 16 steps unchanged (5 Hz). Everything not yet run uses them; earlier runs and the replicate set in the queue keep the old values (`g2_profile.IMU_WORLD_A`).
 
+### More stride-difference authority, hardwood, after the gyro calibration (2026-10-07 8:45 AM, `auth2`)
+
+`g2_baseline.sh start 12 auth2 --const-u=0,-0.20,-0.30 --hold-umax 0.30` (interleaved order 0, -0.20, -0.30, -0.30, -0.20, 0, ...; pack 7.86 V; fixed u, no feedback; u < 0 = longer right strides = a left turn). Net yaw over 12.5 s, right positive. Raw logs `real-walk-data/2026-10-07/auth2_*`.
+
+| u (applied) | runs | net yaw per run | mean | sd |
+|---|---|---|---|---|
+| 0 | 1, 6, 7, 12 | +111, +108, +98, +64 | +95 deg (+7.6 deg/s) | 19 |
+| -0.20 (-0.19) | 2, 5, 8, 11 | +14, -27, -17, -48 | -20 deg (-1.6 deg/s) | 22 |
+| -0.30 (-0.28) | 3, 4, 9, 10 | -56, -24, -31, -65 | -44 deg (-3.5 deg/s) | 17 |
+
+- **The lever still works, and the signs are right**: more negative u turns G2 further left. No falls at -0.30; the back-right foot landing flat was not reported (the user did not track the runs).
+- **Authority flattens beyond -0.2**: from 0 to -0.19 the turn changes by -9.2 deg/s (about 48 deg/s per unit of u), from -0.19 to -0.28 by only -2 deg/s (about 22 deg/s per unit): the joint-range clamp (`heading_hold.JOINT_RANGE_DEG`) limits the stride change. So raising the limit from 0.20 to 0.30 buys about 2 more deg/s of left turn.
+- **The cancel point is about u = -0.16** now (drift +7.6 deg/s); the old estimate was -0.19 at +3.3 deg/s... the drift at u = 0 is about 2x what it was after the servo swap. The u = 0 runs did not keep rising this time (111, 108, 98, 64).
+- **Run-to-run spread at a fixed u is about 17-22 deg per 12.5 s** (+-1.5 deg/s), so a fixed correction lands anywhere in a 40 deg band; only feedback can narrow it.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
