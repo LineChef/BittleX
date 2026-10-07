@@ -21,8 +21,10 @@ RECIPE = {
     # the real control path: stock firmware's 5 Hz IMU print with no gyro, joints sent with `i` every 3rd control tick
     "G2E_IMU_HOLD_STEPS": "16", "G2E_IMU_RATE_ZERO": "1", "G2E_CMD_PATH": "i", "G2E_CMD_PATH_EXTRA_MS_MAX": "4",
     "G2E_CMD_SEND_EVERY_N": "3",
-    # the body: 269 g URDF x 1.12 (alloy servos) + the case payload (spine 86 g, camera 15 g front, speaker 20 g rear) = 422 g
-    "G2E_BODY_MASS_SCALE": "1.12", "G2E_PAYLOAD_PROFILE": "case",
+    # the body: the base robot plus the case payload, 422 g in total (one weighing); the split between base and payload is the line below
+    # 2026-10-07: the payload was weighed (168 g: Pi, PiSugar, camera, speaker, mic, wiring, lid; 100 x 40 x 38 mm block, centered): profile "case2", base 254 g = 269 g x 0.944.
+    # Runs started before 2026-10-07 used the old split ("case", scale 1.12: 301 g base + 121 g payload); see docs/rl/v3-decisions-log.md.
+    "G2E_BODY_MASS_SCALE": "0.944", "G2E_PAYLOAD_PROFILE": "case2",
     # calibration error and mount tilt seen at bring-up
     "G2E_IMU_BIAS_DEG": "2", "G2E_JOINT_OFFSET_DEG": "2",
     "G2E_SERVO_RATE_LIMIT_DEG_S": "137",       # borrowed from another project; Phase 0 step 4 measures G2's (backlog H13)
