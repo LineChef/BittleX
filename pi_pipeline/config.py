@@ -276,6 +276,9 @@ class Settings:
     # downscale to the model input at no serial cost. Boxes then come in that
     # frame; SerialDetectionFeed reads the per-message `resolution`.
     vision_sensor_opt: int = field(default_factory=lambda: _env_int("VISION_SENSOR_OPT", 1))
+    # pictures taken on the detection feed (exploration survey stops, named objects) use this option instead: the module's JPEG buffer holds only about 5 KB,
+    # so a 480 x 480 picture comes back cut off (the top third to half real, the rest gray) and a 240 x 240 one fits. -1 = no switch (take pictures at the detection option).
+    vision_snapshot_sensor_opt: int = field(default_factory=lambda: _env_int("VISION_SNAPSHOT_SENSOR_OPT", 0))
     # OV5647 auto-exposure lift for dim rooms (0 = off; ~32 helps a lot, ~48 is
     # aggressive). Runtime-only, re-applied on every open. TUNE on the mounted
     # camera under real lighting -- a fixed lift over-exposes bright scenes.

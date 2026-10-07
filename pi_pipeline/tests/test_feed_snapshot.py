@@ -111,3 +111,30 @@ def test_every_snapshot_makes_the_shutter_click_and_a_silent_module_does_not(fee
     ser.answer = False
     assert f.snapshot(timeout_s=0.3) is None
     assert clicks == [1]
+
+
+def test_a_picture_is_taken_at_240_then_detection_goes_back_to_its_own_capture_option(monkeypatch):
+    """The module's JPEG buffer cuts a 480 x 480 picture short, so the feed switches to the 240 option for the picture only."""
+    import sys
+    import types
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    fake = FakeSerial()
+    monkeypatch.setitem(sys.modules, "serial", types.SimpleNamespace(Serial=lambda *a, **k: fake))
+    f = SerialDetectionFeed("/dev/null", auto_start=False, labels=["face"], sensor_opt=1, ae_bump=0)
+    f._ser = fake
+    assert f.snapshot(timeout_s=2.0) is not None
+    w = fake.writes
+    assert w == [b"AT+BREAK\r\n", b"AT+SENSOR=1,1,0\r\n", b"AT+INVOKE=1,0,0\r\n", b"AT+BREAK\r\n", b"AT+SENSOR=1,1,1\r\n", b"AT+INVOKE=-1,0,1\r\n"]
+
+
+def test_no_switch_when_the_detection_option_is_already_the_picture_option_or_unknown(monkeypatch):
+    import sys
+    import types
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    for sensor_opt, snap_opt in ((0, 0), (None, 0), (1, None)):
+        fake = FakeSerial()
+        monkeypatch.setitem(sys.modules, "serial", types.SimpleNamespace(Serial=lambda *a, **k: fake))
+        f = SerialDetectionFeed("/dev/null", auto_start=False, labels=["face"], sensor_opt=sensor_opt, snapshot_sensor_opt=snap_opt)
+        f._ser = fake
+        f.snapshot(timeout_s=2.0)
+        assert not any(b"AT+SENSOR" in x for x in fake.writes)

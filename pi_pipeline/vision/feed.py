@@ -138,6 +138,7 @@ class SerialDetectionFeed:
         auto_start: bool = True,
         sensor_opt: int | None = None,   # 0=240 1=480 2=640x480; None = leave as-is
         ae_bump: int = 0,               # 0 = off; ~0x20 helps a dim room, over-exposes a bright one
+        snapshot_sensor_opt: int | None = 0,   # pictures are taken at this capture option (0 = 240 x 240), then detection goes back to `sensor_opt`; None = no switch
     ):
         import serial
 
@@ -147,6 +148,7 @@ class SerialDetectionFeed:
         self._frame_px = frame_px
         self._labels = labels or []
         self._min_score = min_score
+        self._sensor_opt, self._ae_bump, self._snap_opt = sensor_opt, ae_bump, snapshot_sensor_opt
         self._t = 0.0
         if auto_start:
             time.sleep(2.5)              # let the module boot (port open resets it)
@@ -218,12 +220,18 @@ class SerialDetectionFeed:
         did not answer in time. The detection stream is dark for about a second. The pause is in the reader (`frames()`), so this is safe
         to call from another thread while a `BackgroundFrameSource` is reading. No network, no API call."""
         from .snapshot import parse_invoke_line
+        switched = False
         self._paused.set()
         snap = None
         try:
             with self._io_lock:                  # waits for a readline() in progress (at most its 1 s timeout)
                 self._ser.write(self._STOP_CMD)
                 time.sleep(0.2)
+                switched = self._sensor_opt is not None and self._snap_opt is not None and self._snap_opt != self._sensor_opt
+                if switched:
+                    # the module's picture buffer holds only about 5 KB of JPEG: a 480 x 480 capture comes back cut off (only the top third to half is real, the rest gray),
+                    # a 240 x 240 one fits. So pictures are taken at 240 and detection goes back to its own capture option afterwards.
+                    self._apply_sensor(self._snap_opt, self._ae_bump)
                 self._ser.reset_input_buffer()
                 self._ser.write(b"AT+INVOKE=1,0,0\r\n")
                 deadline = time.monotonic() + timeout_s
@@ -238,6 +246,8 @@ class SerialDetectionFeed:
                     log.warning("camera gave no picture within %.0f s", timeout_s)
                 self._ser.write(self._STOP_CMD)
                 time.sleep(0.2)
+                if switched:
+                    self._apply_sensor(self._sensor_opt, self._ae_bump)
                 self._ser.reset_input_buffer()
                 self._ser.write(self._START_CMD)     # back to detections
         finally:

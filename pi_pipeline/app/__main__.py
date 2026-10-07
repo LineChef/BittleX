@@ -82,7 +82,8 @@ def _make_vision_source():
             settings.vision_serial_port, settings.vision_serial_baud,
             frame_px=settings.vision_frame_px, labels=settings.vision_labels,
             min_score=settings.vision_min_score,
-            sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump)
+            sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump,
+            snapshot_sensor_opt=None if settings.vision_snapshot_sensor_opt < 0 else settings.vision_snapshot_sensor_opt)
     except Exception:  # noqa: BLE001
         log.exception("vision feed unavailable on %s -- continuing without vision",
                       settings.vision_serial_port)
