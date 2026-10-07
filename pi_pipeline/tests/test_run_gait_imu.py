@@ -433,3 +433,33 @@ def test_openloop_holds_its_rate_when_sends_take_time_and_can_skip_frames(rg):
     # 2 cycles = 200 frames = 2.5 s of walk, after the 2 s stand sleep(2.0) (also on this fake clock) plus the stand command's own 5 ms
     assert 4.4 < clock_t[0] < 4.7
     assert lk.sent == 1 + 67                                 # the stand command + every 3rd of 200 frames
+
+
+def test_openloop_always_ends_with_the_rest_command(rg, tmp_path):
+    """After a scripted walk G2 is told to rest, on a normal finish, after a fall, and after an error mid-walk."""
+    class _Lk:
+        def __init__(self, level=True):
+            self.sent, self.level = [], level
+
+        def send(self, cmd, **kw):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return [] if self.level else ["MCU:  0.00  0.00  1.00    0.0   0.0  90.0"]
+
+    ok = _Lk()
+    rg.openloop(ok, 1, 80.0, log_path=str(tmp_path / "a.csv"), sleep=lambda s: None, send_every=3)
+    assert ok.sent[-2:] == ["gp", "d"]
+    fell = _Lk(level=False)
+    rg.openloop(fell, 3, 80.0, log_path=str(tmp_path / "b.csv"), sleep=lambda s: None, send_every=3)
+    assert fell.sent[-1] == "d"
+
+    class _Boom(_Lk):
+        def poll_imu(self):
+            raise RuntimeError("serial gone")
+    boom = _Boom()
+    try:
+        rg.openloop(boom, 1, 80.0, log_path=str(tmp_path / "c.csv"), sleep=lambda s: None)
+    except RuntimeError:
+        pass
+    assert boom.sent[-1] == "d"
