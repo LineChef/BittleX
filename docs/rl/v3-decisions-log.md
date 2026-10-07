@@ -31,3 +31,11 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
 - **Sounds and survey picture (2026-10-07):** wake chime right after the wake word; a distinct three-tick tone on every billed API call; a loud double shutter click on every picture in every mode (both picture paths call `voice/shutter.click()`). The survey now looks down (`kbuttUp`), looks up (`ksit`), stands (`kup`), and takes ONE picture after the stance settles (2.5 s), replacing the look-down and look-up pictures, which were not good. Judge the new angle from the first pictures.
 
 - **Fallback plan (user, 2026-10-07):** if we cannot train the curve out of G2's gait, train a new 20M run with the updated hardware settings. After the V3 gait is trained and deployed, compare the drift on hardware; if there is no significant improvement, train without adding any influence to command drift (no mirror loss, heading input or steering levers) and see where that lands. The 20M run still needs the user's go.
+
+- **Hardware logs, system identification and other training routes (user, 2026-10-07):** approved plain system identification against the hardware logs and a short
+  smoke test across the skills to decide whether the result goes into the 20M run or earlier. Declined: voice corrections as training data, LLM-written keyframes,
+  an actuator net for now (investigation only, backlog [H14](hardware-gated-backlog.md)). Kinesthetic teaching added as backlog item B25. Finding before running
+  anything: the Phase 1 calibration (200 deg/s servo rate, 0.15 N*m motor force, fitted to the 14 post-swap walks), the measured payload and the post-calibration IMU values are
+  already in `g2_profile.RECIPE` / `CALIBRATION`, so every V3 run already trains in a sim fitted to the walking logs. The logs carry no joint commands or
+  joint readings for the walks (IMU only), so a command replay is not possible from them; the servo step log (4.5 Hz readings) is too slow to resolve the servo
+  time constant (H13). No smoke test was started: it would share the Mac with the running V3 queue.
