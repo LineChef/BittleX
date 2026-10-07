@@ -88,3 +88,10 @@ rl_training/opencat-gym/.carpet_tex_cache.png
 *.pt
 docs/rl/reference-frames/*.png
 pi_pipeline/.deployed_commit
+
+# V3 training runner state, not source: its stdout, the pause-release markers (`touch trained/v3_go_<name>`), the phase gates it checks, and the kept failed attempts
+rl_training/opencat-gym/trained/*.stdout
+rl_training/opencat-gym/trained/v3_go_*
+rl_training/opencat-gym/trained/v3_roll_matched
+rl_training/opencat-gym/trained/v3_turning_gate_pass
+rl_training/opencat-gym/trained/failed_c0_run*/
