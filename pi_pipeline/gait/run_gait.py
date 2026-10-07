@@ -525,6 +525,16 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
               + ("" if vision is not None else " (no feed -- terrain always clear)"),
               flush=True)
 
+    autolog_run, end_reason = None, ["other"]
+    if not log_path:                     # no explicit --log: every policy walk (voice, exploration, command line) is captured automatically
+        try:
+            from pi_pipeline.telemetry import autolog as _autolog
+            autolog_run = _autolog.new_run("policy_walk", policy=os.path.basename(str(getattr(pol, "onnx_path", "") or "")) or None, cmd_fwd=cmd_fwd, hz=hz,
+                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const})
+        except Exception:  # noqa: BLE001 -- never let logging stop a walk
+            autolog_run = None
+        if autolog_run is not None:
+            log_path, log_extra = autolog_run.csv_path, True
     logf = None
     if log_path:
         logf = open(log_path, "w", buffering=1)      # line-buffered: a run that is stopped keeps its data
@@ -600,6 +610,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         i = 0
         while n is None or i < n:
             if stop_event is not None and stop_event.is_set():
+                end_reason[0] = "stopped"
                 break
             # never wait on the IMU: take what has arrived, step on the held frame
             now = time.monotonic()
@@ -615,6 +626,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         pass
                     if lvl is BatteryLevel.CRITICAL:
                         print("!! stopping before the battery browns out", flush=True)
+                        end_reason[0] = "battery_critical"
                         break
             feed.update(lk.poll_imu(), now)
             imu_age = feed.age(now)
@@ -622,6 +634,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 print(f"!! no IMU frame for {imu_age:.2f} s -- stopping")
                 if diag is not None:
                     diag.event("gait", "ERROR", "imu.stale", age_s=round(imu_age, 3))
+                end_reason[0] = "imu_stale"
                 break
             else:
                 r, p_, y, gx, gy, gz = feed.frame
@@ -633,6 +646,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                         if diag is not None:
                             diag.event("gait", "ERROR", "fall.abort",
                                        roll_deg=round(math.degrees(r), 1), pitch_deg=round(math.degrees(p_), 1))
+                        end_reason[0] = "fall"
                         break
                 else:
                     tilt_since = None
@@ -767,9 +781,13 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             else:
                 t_next = time.perf_counter()     # fell behind; resync
             i += 1
+        else:
+            end_reason[0] = "complete"       # the loop ran its full length without a break
     except KeyboardInterrupt:
+        end_reason[0] = "interrupted"
         print("\n^C")
     except BaseException as e:                       # noqa: BLE001 -- never leave servos loaded
+        end_reason[0] = "error"
         if diag is not None:
             diag.event("gait", "FATAL", "loop.exception", err=repr(e))
         raise
@@ -789,6 +807,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         if logf:
             logf.close()
             print(f"log written: {log_path}")
+        if autolog_run is not None:
+            autolog_run.finish(end_reason[0], last_volt_v=None if last_volt[0] != last_volt[0] else round(last_volt[0], 2))
         if diag is not None and not in_service:
             diag.close()
     if lat:

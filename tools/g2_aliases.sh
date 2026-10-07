@@ -293,6 +293,17 @@ g2pics() {
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 
+# g2floor [LABEL]  -- show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
+g2floor() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  case "${1:-show}" in
+    status) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.telemetry status" ;;
+    epochs) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.telemetry epochs" ;;
+    show) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.telemetry surface" ;;
+    *) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.telemetry surface '$*'" ;;
+  esac
+}
+
 # --------------------------------------------------------- config introspection
 
 g2feat()   { _g2py -m pi_pipeline "${@:---profiles}"; }         # resolve G2_FEATURES; `g2feat --profiles` lists bring-up stages

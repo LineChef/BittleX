@@ -85,3 +85,9 @@ def fake_anthropic(monkeypatch):
 def _no_shutter_sound(monkeypatch):
     """Tests never play the picture click through the dev machine's speaker (tests that check it patch `shutter.play`)."""
     monkeypatch.setenv("G2_SHUTTER", "off")
+
+
+@pytest.fixture(autouse=True)
+def _no_autolog(monkeypatch, tmp_path_factory):
+    """Tests never write automatic run logs into the real ~/g2_runs/auto (the autolog tests turn it on and point it at a temp folder)."""
+    monkeypatch.setenv("G2_AUTOLOG", "off")

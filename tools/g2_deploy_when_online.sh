@@ -25,6 +25,7 @@ say "the Pi answers; letting its services settle for 25 s"
 [ "$ONCE" = 1 ] || sleep 25
 reachable || { say "the Pi stopped answering; not deploying"; exit 1; }
 
+git -C "$ROOT" rev-parse --short HEAD > "$ROOT/pi_pipeline/.deployed_commit" 2>/dev/null || true     # recorded in every run log
 say "rsync pi_pipeline/"
 rsync -az --itemize-changes --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache --exclude .env \
       "$ROOT/pi_pipeline/" "$G2_PI:bittleX/pi_pipeline/" 2>&1 | tee -a "$LOG" | tail -n 25

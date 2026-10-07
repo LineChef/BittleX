@@ -1,0 +1,12 @@
+[
+  {"id": "hw-2026-09-28", "start": "2026-09-28T00:00", "fit_ok": false,
+   "note": "Body arrived, firmware reflashed, first bring-up. Limbs and IMU not yet calibrated."},
+  {"id": "hw-2026-10-02", "start": "2026-10-02T00:00", "fit_ok": false,
+   "note": "Limbs re-calibrated by the user and the IMU calibrated (gc). The FL shoulder servo was still faulty (large rightward drift)."},
+  {"id": "hw-2026-10-06a", "start": "2026-10-06T00:00", "fit_ok": false,
+   "note": "Sturdier case mounted (G2 about 422 g). FL shoulder servo still faulty. Start time approximate."},
+  {"id": "hw-2026-10-06b", "start": "2026-10-06T14:15", "fit_ok": true,
+   "note": "FL shoulder servo (servo 8) replaced and recalibrated; drift fell from about +142 to about +40 deg per 12.7 s. Start time approximate (about 2:15 PM, to confirm)."},
+  {"id": "hw-2026-10-07", "start": "2026-10-07T08:00", "fit_ok": true,
+   "note": "User's joint and gyro calibration (IMU zero re-measured about 9:30 AM). Start time approximate (to confirm)."}
+]

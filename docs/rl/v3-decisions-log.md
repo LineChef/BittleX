@@ -53,3 +53,7 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
 
 - **Picture curation tool built (user go, 2026-10-07):** `tools/curate_exploration.py` / `g2picscurate`, details in [`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md). Tested on synthetic
   pictures only; thresholds are the capture tools' defaults and get tuned on the first real session. The sys-id capture and the first exploration test are both a go for the next time G2 is on.
+
+- **Real-data pipeline (user, 2026-10-07):** semi-automatic approval, store outside the repo, every policy walk captured (voice and exploration included), everything kept compressed losslessly; the user tells Claude when hardware changes (a new
+  epoch), and wants only data that can help gait training fed to the sim, with periodic audits. Design, ingest gates, the auto-approval rule (changes within noise that pass every check and the harm check; everything else needs the user)
+  and the audit schedule: [`real-data-pipeline.md`](real-data-pipeline.md). Phase 0 built (capture module, epochs, hook in `run_gait.run()`). Kitchen tile noted as a good place for ledge-like data (grout lines); grout depth unmeasured.

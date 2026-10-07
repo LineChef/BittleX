@@ -87,3 +87,4 @@ models/
 rl_training/opencat-gym/.carpet_tex_cache.png
 *.pt
 docs/rl/reference-frames/*.png
+pi_pipeline/.deployed_commit
