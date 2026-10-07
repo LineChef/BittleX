@@ -262,8 +262,12 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]
 g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
-# g2pimem [log N | facts | search <q> | usage | sightings N | ...]  -- the same CLI against G2's REAL memory on the Pi (g2mem reads the Mac's copy). Default: the last 20 exchanges.
-g2pimem() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory ${*:-log 20}"; }
+# g2pimem [facts | log N | search <q> | usage | sightings N | ...]  -- the same CLI against G2's REAL memory on the Pi (g2mem reads the Mac's copy). Default: his FACTS (the
+# things he chose to keep). `g2pimem log 20` is the conversation transcript, not memories; `g2pimem sightings` is what he noticed.
+g2pimem() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.memory ${*:-facts}"; }
+# g2review  -- the review page: facts, conversations, what G2 noticed and the pictures he saved, each with an X (goes to a Trash with Undo; "Empty trash" is the only
+# permanent delete). Opens http://127.0.0.1:8765 in your browser; Ctrl-C stops it. Needs G2_PI.
+g2review() { python3 "$G2_ROOT/tools/g2_review.py" "$@"; }
 # g2pics [status | pull | open]  -- what pictures G2 saved while exploring (survey stops, named objects): status = counts and the newest on the Pi (default);
 # pull = copy them to ~/g2_pictures on this Mac; open = pull, then show the folder in Finder. Pictures stay on the Pi until you pull them.
 g2pics() {

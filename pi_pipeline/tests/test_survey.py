@@ -153,3 +153,47 @@ def test_listener_posts_a_naming_request_and_answers():
     assert lst.handle("this is my red mug") == "Okay, let me look at the red mug."
     assert posts == [{"name_request": "red mug"}] and said
     assert lst.handle("what is this") is None or posts == [{"name_request": "red mug"}]
+
+
+def test_pictures_can_be_trashed_restored_and_only_emptying_the_trash_deletes(tmp_path):
+    from pi_pipeline.vision import exploration_pictures as EP
+    snap = Snapshot(b"\xff\xd8\xff\xe0fake\xff\xd9", 240, 240, [])
+    saver = ExplorationPictureSaver(FakeSource(snap), str(tmp_path / "pics"), clock=lambda: 1791387600.5)
+    p = saver("name:Mug")
+    rel = EP.list_pictures(str(tmp_path / "pics"))[0]["path"]
+    assert rel.startswith("named/mug/") and EP.list_pictures(str(tmp_path / "pics"))[0]["name"] == "Mug"
+    assert EP.trash_pictures(str(tmp_path / "pics"), [rel]) == [rel]
+    assert EP.list_pictures(str(tmp_path / "pics")) == [] and len(EP.list_trash(str(tmp_path / "pics"))) == 1
+    assert not (tmp_path / "pics" / rel).exists() and (tmp_path / "pics_trash" / rel).exists() and (tmp_path / "pics_trash" / rel.replace(".jpg", ".json")).exists()
+    assert EP.restore_pictures(str(tmp_path / "pics"), [rel]) == [rel] and (tmp_path / "pics" / rel).exists() and (tmp_path / "pics" / rel.replace(".jpg", ".json")).exists()
+    EP.trash_pictures(str(tmp_path / "pics"), [rel])
+    assert EP.empty_trash(str(tmp_path / "pics")) == 1 and EP.list_trash(str(tmp_path / "pics")) == []
+    import pytest
+    with pytest.raises(ValueError):
+        EP.trash_pictures(str(tmp_path / "pics"), ["../../etc/passwd.jpg"])               # never outside the picture folder
+
+
+def test_a_near_duplicate_is_not_saved_a_different_picture_is(tmp_path):
+    pytest = __import__("pytest")
+    pytest.importorskip("PIL")
+    import io
+    from PIL import Image
+    def jpeg(pattern):
+        im = Image.new("L", (64, 64))
+        px = im.load()
+        for x in range(64):
+            for y in range(64):
+                px[x, y] = 255 if pattern(x, y) else 0
+        buf = io.BytesIO(); im.convert("RGB").save(buf, "JPEG"); return buf.getvalue()
+    left, top = jpeg(lambda x, y: x < 32), jpeg(lambda x, y: y < 32)
+    seq = iter([Snapshot(left, 64, 64, []), Snapshot(left, 64, 64, []), Snapshot(top, 64, 64, [])])
+    class Src:
+        def snapshot(self): return next(seq)
+    t = [1791387600.0]
+    def clock():
+        t[0] += 1.0
+        return t[0]
+    saver = ExplorationPictureSaver(Src(), str(tmp_path), clock=clock)
+    assert saver("look_down") is not None
+    assert saver("look_down") is None and saver.duplicates == 1                   # the same view again: not written
+    assert saver("look_down") is not None and saver.count == 2                      # a different view: kept

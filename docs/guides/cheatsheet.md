@@ -207,7 +207,8 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | Command | Does |
 |---|---|
 | `g2mem [facts\|log N\|search q\|recall q\|export [--scrub]\|wipe --yes]` | inspect / edit G2's memory (CLI) |
-| `g2pimem [log N\|facts\|search q\|usage\|...]` | the same memory CLI against G2's **real** memory on the Pi (`g2mem` reads the Mac's copy); default `log 20` = the last 20 exchanges |
+| `g2pimem [log N\|facts\|search q\|usage\|...]` | the same memory CLI against G2's **real** memory on the Pi (`g2mem` reads the Mac's copy); default `facts` = what he chose to keep; `log 20` is the transcript of recent turns (not memories); `sightings` = what he noticed |
+| `g2review` | a **review page** with an X on every record: facts, conversations, what G2 noticed, and the pictures he saved. X moves a record to the Trash (Undo for 9 s, Restore any time); "Empty trash" is the only permanent delete and asks twice. Runs on the Pi through ssh, opens `http://127.0.0.1:8765`, Ctrl-C stops it. A backup of the memory database is made before the first delete of each session. |
 | `g2mem usage` / `consolidate [--apply]` / `pin N` / `unpin N` / `sightings [N]` | per-fact use counters, the sleep-time consolidation pass (dry-run without `--apply`), keep a fact in the core block, the sightings log |
 | `python -m pi_pipeline.power runtime test start\|collect\|cancel` / `runtime list\|add\|forget\|plugged\|unplugged` | the Pi battery runtime test (start from a FULL charge, then unplug) and its recorded runs |
 | `python pi_pipeline/gait/stand_log.py --minutes 20 --log x.csv` | passively log G2 standing (roll/pitch swing, dominant frequency, voltage) to catch a posture wobble; stop `g2-voice` first |

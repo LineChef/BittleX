@@ -143,3 +143,34 @@ def test_recency_none_until_first_record_then_counts(cfg):
     assert m.recency()[1] == 2
     m.mark_session_start()                    # a new wake resets the session count
     assert m.recency()[1] == 0
+
+
+def test_command_only_turns_are_not_logged_but_still_count_as_interaction(cfg):
+    t = [100.0]
+    mem = Memory(cfg, clock=lambda: t[0])
+    mem.record("rest", _turn("Okay.", actions=["d"]))
+    mem.record("go ahead and walk forward", _turn("Walking.", actions=["wkF"]))
+    assert Store(cfg.memory_db_path).exchange_count() == 0
+    mem.record("tell me about the weather today", _turn("It looks sunny where you are."))            # a conversation: logged
+    mem.record("stand up", _turn("Okay.", actions=["kup"], facts=["They like it when G2 stands."]))   # a command that taught him something: logged
+    assert Store(cfg.memory_db_path).exchange_count() == 2
+
+
+def test_an_identical_repeat_within_ten_minutes_is_logged_once(cfg):
+    t = [0.0]
+    mem = Memory(cfg, clock=lambda: t[0])
+    mem.record("what do you see", _turn("A mug on the floor."))
+    t[0] = 120.0
+    mem.record("what do you see", _turn("A mug on the floor."))
+    assert Store(cfg.memory_db_path).exchange_count() == 1
+    mem.record("what do you see", _turn("Now there is a plant."))                                      # a different answer: logged
+    t[0] = 5000.0
+    mem.record("what do you see", _turn("Now there is a plant."))                                       # long after: logged again
+    assert Store(cfg.memory_db_path).exchange_count() == 3
+
+
+def test_the_old_behaviour_comes_back_with_the_setting(cfg):
+    import dataclasses
+    on = dataclasses.replace(cfg, memory_log_commands=True)
+    Memory(on).record("rest", _turn("Okay.", actions=["d"]))
+    assert Store(cfg.memory_db_path).exchange_count() == 1

@@ -28,6 +28,23 @@ _PAST_SIGHT_RE = re.compile(
     r"yesterday|a while ago|the other day)\b", re.I)
 
 
+_CMD_MAX_USER_WORDS, _CMD_MAX_REPLY_WORDS = 5, 10
+_REPEAT_WINDOW_S = 600.0
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[^a-z0-9 ]", "", (text or "").lower()).strip()
+
+
+def is_command_turn(user_text: str, turn) -> bool:
+    """A turn that was only a command: G2 did something (it carries actions), the request was a few words ("rest", "stand up", "walk forward") and his reply was
+    a short acknowledgement, and nothing worth remembering came of it (no fact). These are not conversation: logging them filled the exchange log with
+    movement requests that crowd out real older turns at recall time, and the consolidation pass reads the last 40 of them."""
+    if not list(getattr(turn, "actions", None) or []) or list(getattr(turn, "facts", None) or []):
+        return False
+    return len((user_text or "").split()) <= _CMD_MAX_USER_WORDS and len((getattr(turn, "speech", "") or "").split()) <= _CMD_MAX_REPLY_WORDS
+
+
 def _when(ts: str) -> str:
     today = datetime.now(timezone.utc).date()
     try:
@@ -41,6 +58,8 @@ class Memory:
     def __init__(self, cfg: Settings, *, clock=time.monotonic):
         self._cfg = cfg
         self._store = Store(cfg.memory_db_path)
+        self._log_commands = bool(getattr(cfg, "memory_log_commands", False))
+        self._last_logged: tuple | None = None          # (normalized user text, normalized reply, time): an exact repeat shortly after is not logged again
         self._max_facts = cfg.memory_max_facts
         self._core_max = getattr(cfg, "memory_core_max", 12)
         self._mode = getattr(cfg, "memory_use_log", "match")     # "match" | "declare" | "off"
@@ -163,7 +182,14 @@ class Memory:
 
     def record(self, user_text: str, turn) -> None:
         self._measure_use(turn)
-        self._store.log_exchange(user_text, turn.speech, list(turn.actions))
+        now = self._clock()
+        key = (_norm(user_text), _norm(turn.speech))
+        repeat = self._last_logged is not None and self._last_logged[:2] == key and now - self._last_logged[2] < _REPEAT_WINDOW_S
+        if (not self._log_commands and is_command_turn(user_text, turn)) or repeat:
+            log.info("exchange not logged (%s)", "repeat" if repeat else "command only")
+        else:
+            self._store.log_exchange(user_text, turn.speech, list(turn.actions))
+            self._last_logged = (*key, now)
         self._last_exchange_at = self._clock()
         self._session_exchanges += 1
         details = getattr(turn, "fact_details", None) or [(f, 3, False) for f in getattr(turn, "facts", [])]

@@ -219,6 +219,7 @@ class Settings:
     # (free, always on); "declare" = also give G2 a memory_used tool to name the notes that mattered (richer, but in a measured test the
     # model skipped speaking more often, so the words-only retry fired on ~3 of 8 question turns: extra API calls); "off" = neither.
     memory_use_log: str = field(default_factory=lambda: _env("G2_MEMORY_USE_LOG", "match").lower())
+    memory_log_commands: bool = field(default_factory=lambda: _env("G2_MEMORY_LOG_COMMANDS", "0").lower() in ("1", "true", "yes", "on"))   # log short command turns ("rest", "walk forward") in the exchange log too (default off, 2026-10-07)
     # "boot" (default): the Pi-battery warning counts from boot ("you're plugged in" pauses it, "you're unplugged" restarts the count);
     # "manual": it counts only after you say "you're unplugged".
     pi_battery_arm: str = field(default_factory=lambda: _env("G2_PI_BATTERY_ARM", "boot").lower())

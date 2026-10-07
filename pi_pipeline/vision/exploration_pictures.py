@@ -161,11 +161,117 @@ def status(root: str = DEFAULT_ROOT, newest: int = 8) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
+def _base(root: str) -> Path:
+    return Path(os.path.expanduser(root))
+
+
+def trash_root(root: str = DEFAULT_ROOT) -> Path:
+    b = _base(root)
+    return b.with_name(b.name + "_trash")
+
+
+def _inside(base: Path, rel: str) -> Path:
+    """`rel` (a path under `base`, as list_pictures() reports it) resolved and checked: it must stay inside `base` and be a .jpg."""
+    p = (base / rel).resolve()
+    if base.resolve() not in p.parents or p.suffix.lower() != ".jpg":
+        raise ValueError(f"not a picture inside {base}: {rel}")
+    return p
+
+
+def list_pictures(root: str = DEFAULT_ROOT) -> list[dict]:
+    """Every saved picture, newest first: its path under the root, what it is (survey pose or named object) and what its sidecar says."""
+    base = _base(root)
+    out = []
+    for f in sorted(base.rglob("*.jpg"), key=lambda f: f.stat().st_mtime, reverse=True) if base.exists() else []:
+        meta = {}
+        try:
+            meta = json.loads(f.with_suffix(".json").read_text())
+        except (OSError, ValueError):
+            pass
+        rel = str(f.relative_to(base))
+        out.append({"path": rel, "group": rel.split("/")[0], "folder": f.parent.name, "pose": meta.get("pose"), "name": meta.get("name"),
+                    "time": meta.get("time") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(f.stat().st_mtime)),
+                    "brightness": (meta.get("exposure") or {}).get("mean"), "detector": sorted({d["label"] for d in meta.get("detections", [])}),
+                    "bytes": f.stat().st_size})
+    return out
+
+
+def trash_pictures(root: str, rels: list[str]) -> list[str]:
+    """Move pictures (and their sidecars) into the trash folder next to the root, keeping their relative paths so `restore_pictures` can put them back.
+    Nothing is deleted. Returns the paths moved."""
+    base, tr, moved = _base(root), trash_root(root), []
+    for rel in rels:
+        src = _inside(base, rel)
+        if not src.exists():
+            continue
+        dst = tr / src.relative_to(base.resolve())
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.replace(dst)
+        side = src.with_suffix(".json")
+        if side.exists():
+            side.replace(dst.with_suffix(".json"))
+        moved.append(rel)
+    return moved
+
+
+def restore_pictures(root: str, rels: list[str]) -> list[str]:
+    base, tr, back = _base(root), trash_root(root), []
+    for rel in rels:
+        dst = _inside(base, rel)
+        src = tr / dst.relative_to(base.resolve())
+        if not src.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.replace(dst)
+        if src.with_suffix(".json").exists():
+            src.with_suffix(".json").replace(dst.with_suffix(".json"))
+        back.append(rel)
+    return back
+
+
+def list_trash(root: str = DEFAULT_ROOT) -> list[dict]:
+    tr = trash_root(root)
+    out = []
+    for f in sorted(tr.rglob("*.jpg"), key=lambda f: f.stat().st_mtime, reverse=True) if tr.exists() else []:
+        out.append({"path": str(f.relative_to(tr)), "bytes": f.stat().st_size})
+    return out
+
+
+def empty_trash(root: str = DEFAULT_ROOT) -> int:
+    """The only permanent delete of a picture (never automatic). Returns how many pictures were removed."""
+    import shutil
+    tr = trash_root(root)
+    n = len(list(tr.rglob("*.jpg"))) if tr.exists() else 0
+    if tr.exists():
+        shutil.rmtree(tr)
+    return n
+
+
+def main(argv=None) -> None:
     import argparse
-    ap = argparse.ArgumentParser(description="Summarize the pictures G2 saved while exploring")
+    ap = argparse.ArgumentParser(description="Summarize and manage the pictures G2 saved while exploring")
     ap.add_argument("--root", default=os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
-    print(status(ap.parse_args().root))
+    sub = ap.add_subparsers(dest="cmd")
+    sub.add_parser("status")
+    sub.add_parser("list").set_defaults(json=True)
+    for name in ("trash", "restore"):
+        sp = sub.add_parser(name)
+        sp.add_argument("paths", nargs="+")
+    sub.add_parser("trash-list")
+    sub.add_parser("empty-trash")
+    a = ap.parse_args(argv)
+    if a.cmd in (None, "status"):
+        print(status(a.root))
+    elif a.cmd == "list":
+        print(json.dumps(list_pictures(a.root)))
+    elif a.cmd == "trash":
+        print(json.dumps({"moved": trash_pictures(a.root, a.paths)}))
+    elif a.cmd == "restore":
+        print(json.dumps({"restored": restore_pictures(a.root, a.paths)}))
+    elif a.cmd == "trash-list":
+        print(json.dumps(list_trash(a.root)))
+    else:
+        print(json.dumps({"removed": empty_trash(a.root)}))
 
 
 if __name__ == "__main__":
