@@ -134,6 +134,7 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
       (the real robot travels about 16% farther). (3) Train a fresh from-scratch 20M run (not a fine-tune of V2.1), judged on its own 3M checkpoint against the
       previous 20M run's 3M checkpoint, then scored through the real path (`benchmark_decathlon.py --hw i`) and walked on G2 against V2.1.
       Goal: a sim that matches the real hardware more closely, and a better gait.
+- [ ] **Heading hold on the Pi (2026-10-07: works on G2).** The closed-loop stride-difference hold kept six V2.1 walks within 6 deg of straight (details: [`rl/real-walk-log.md`](rl/real-walk-log.md) "Closed-loop heading hold works"). To do: repeat on a fresh battery (feed-forward -0.14), 25 s walks, a turn command, then make it the default walking path in the app. Plan for the repeat: [`STATUS.md`](STATUS.md) Next steps item 0.
 - [ ] Find and test the self-right trigger command for BiBoard V1 (serial, not the IR remote).
 
 ## Phase 7 — Voice + Claude 🧩
