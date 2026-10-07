@@ -27,11 +27,22 @@ def base_dir() -> Path:
     return Path(os.path.expanduser(os.environ.get("G2_AUTOLOG_DIR", "~/g2_runs/auto")))
 
 
-def get_surface() -> str:
+def get_surface_info() -> tuple[str, float | None]:
+    """(label, hours since it was set). The file holds the label, then the time it was set; an old file with only a label has an unknown age."""
     try:
-        return Path(os.path.expanduser(SURFACE_FILE)).read_text().strip() or "unknown"
+        lines = Path(os.path.expanduser(SURFACE_FILE)).read_text().split("\n")
     except OSError:
-        return "unknown"
+        return "unknown", None
+    label = (lines[0].strip() if lines else "") or "unknown"
+    try:
+        age = (time.time() - float(lines[1])) / 3600.0
+    except (IndexError, ValueError):
+        age = None
+    return label, age
+
+
+def get_surface() -> str:
+    return get_surface_info()[0]
 
 
 def set_surface(label: str) -> str:
@@ -39,7 +50,7 @@ def set_surface(label: str) -> str:
     label = "-".join(str(label).strip().lower().split()) or "unknown"
     p = Path(os.path.expanduser(SURFACE_FILE))
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(label + "\n")
+    p.write_text(f"{label}\n{time.time():.3f}\n")
     return label
 
 
@@ -89,7 +100,7 @@ def new_run(kind: str, *, policy: str | None = None, cmd_fwd: float | None = Non
             csv_path = folder / f"{kind}_{started.strftime('%H%M%S')}_{n}.csv"
         ep = epoch_at(started)
         meta = {"kind": kind, "started": started.strftime("%Y-%m-%dT%H:%M:%S"), "epoch": ep["id"] if ep else None, "epoch_fit_ok": ep.get("fit_ok") if ep else None,
-                "surface": get_surface(), "policy": policy, "cmd_fwd": cmd_fwd, "hz": hz, "commit": deployed_commit(), "ended": None, "end_reason": None}
+                "surface": get_surface_info()[0], "surface_age_h": None if get_surface_info()[1] is None else round(get_surface_info()[1], 2), "policy": policy, "cmd_fwd": cmd_fwd, "hz": hz, "commit": deployed_commit(), "ended": None, "end_reason": None}
         meta.update(extra or {})
         return RunLog(csv_path, meta)
     except Exception:  # noqa: BLE001 -- logging must never stop a walk

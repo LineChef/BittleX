@@ -111,3 +111,15 @@ def test_an_explicit_log_path_is_left_alone(rg, on, monkeypatch, tmp_path):
            log_path=str(tmp_path / "mine.csv"))
     assert (tmp_path / "mine.csv").exists()
     assert not on.exists() or not list(on.rglob("*.csv"))                          # no second, automatic copy
+
+
+def test_the_surface_label_remembers_when_it_was_set_so_a_stale_label_can_be_ignored(on, monkeypatch):
+    autolog.set_surface("tile")
+    assert autolog.get_surface_info()[0] == "tile" and 0 <= autolog.get_surface_info()[1] < 0.01
+    r = autolog.new_run("policy_walk")
+    side = json.load(open(r.csv_path[:-4] + ".json"))
+    assert side["surface"] == "tile" and side["surface_age_h"] is not None and side["surface_age_h"] < 0.01
+    import time as _t
+    real = _t.time
+    monkeypatch.setattr(autolog.time, "time", lambda: real() + 13 * 3600)          # a day-ish later, nobody reset the floor
+    assert autolog.get_surface_info()[1] > 12.9

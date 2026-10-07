@@ -33,13 +33,13 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 ## Hardware epochs and surfaces
 
 - **Epoch** (`pi_pipeline/telemetry/hardware_epochs.json`): dated hardware changes (case mounted, servo replaced, ...). The user says when hardware changes; Claude adds the entry. Fits use the current epoch only; older epochs are kept and never fed unless a person says so.
-- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi; every run records it. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
+- **Surface** (hardwood, tile, carpet, ...): a label set with one command and stored on the Pi with the time it was set; every run records both. **Change it whenever G2 moves to another floor** (`g2floor hardwood`); the existing 2026-10-01 to 10-07 logs are hardwood (carpet runs: carpet) and are tagged that way at backfill. Kitchen data is its own `tile` category (user, 2026-10-07) and is never pooled with hardwood. Fits are per surface, because friction differs (kitchen tile is a good floor for real **snag** data: feet catching on grout lines. The sim's snag category is thin 10 mm cord-scale obstacles, two per episode; grout lines are probably lower, so this tests the low end).
   Grout depth is unmeasured; the logs will show how often feet catch. Snags are not detected on the robot today, so they appear in the log only as IMU and command signatures; a hand label would make them usable for hazard rates (offered to the user, not built).
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
 
 A run is usable for fitting only if all hold: file complete and time strictly increasing; control loop on time (dropped ticks under a limit); IMU frames arriving (no long stale stretch);
-no NaN or out-of-range values; the run's hardware epoch is current; surface label known; policy known; length above a minimum; no operator pick-up (accel / tilt spike) inside the window used;
+no NaN or out-of-range values; the run's hardware epoch is current; surface label known; policy known; length above a minimum; the surface label was set within the last 12 hours (an older label is treated as unknown: the label stays on the Pi until someone changes it, so a stale one would mislabel the next session); no operator pick-up (accel / tilt spike) inside the window used;
 no fall or guard trip inside the window used (those runs still count for event rates); battery above the low-battery line, or tagged by voltage band and never mixed with full-pack data;
 the first seconds after the stand excluded; thermal cooldown stretches excluded.
 Statistical screen: a run whose metrics sit outside the epoch's median by more than k x MAD is quarantined for review, not dropped.
