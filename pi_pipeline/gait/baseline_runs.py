@@ -56,7 +56,7 @@ def main() -> None:
     ap.add_argument("--no-log-extra", action="store_true", help="leave out the extra log columns (accel, IMU frame counter, pack voltage)")
     ap.add_argument("--no-preflight", action="store_true", help="skip the check that the BiBoard answers before the first run")
     ap.add_argument("--scripted-mix", default=None, choices=("abab", "scripted"),
-                    help="abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
+                    help="scripted: every run is the scripted wkF walk (the per-foot test base). abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
     args = ap.parse_args()
 
     from pi_pipeline.config import settings
