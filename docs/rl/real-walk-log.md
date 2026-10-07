@@ -383,6 +383,20 @@ walk "N1", 20 episodes; raw results in [`v3-data/`](v3-data/README.md)):
 - Falls rise at |u| = 0.30 on the longer-left-strides side (6 of 12) in both models.
 - Consequence: a policy trained to steer in this sim learns a lever that points the wrong way on G2, so learned in-policy steering cannot be trusted on hardware until the sim's steering sign and strength are understood. The measured Pi-side lever stays the steering path. A cause for the sign difference is not found; candidates are foot-ground contact and how the real legs slip on the hardwood, which the sim models as a fixed friction.
 
+### Hip angle offset: scripted `wkF` vs V2.1, sim and G2 (2026-10-07)
+
+Mean commanded joint angle over a calm walk, degrees, URDF joint order (the sim's N1 cell, 30 episodes of 12.5 s; G2 from the `recheck2` run 1 log at u = 0, after the first second; the scripted walk from `reference_gait/wkf_ref.npy`):
+
+| | FL sh | FR sh | BR hip | BL hip | BL - BR hip | BR kn | BL kn |
+|---|---|---|---|---|---|---|---|
+| scripted `wkF` | 46.9 | 46.9 | 53.0 | 53.0 | 0.0 | 8.2 | 8.2 |
+| V2.1 in the sim, old payload | 49.5 | 50.1 | 54.6 | 61.6 | +7.0 | 0.3 | 4.1 |
+| V2.1 in the sim, new payload | 49.3 | 50.3 | 54.5 | 61.6 | +7.2 | -0.3 | 3.9 |
+| V2.1 on G2, u = 0 | 49.6 | 49.3 | 54.2 | 60.4 | +6.2 | 0.4 | 4.8 |
+
+- The scripted walk is exactly left/right symmetric. V2.1 holds the back-left hip about 7 degrees above the scripted value and the back-right hip only about 1 degree above it, a 6-7 degree one-sided offset that is the same in the sim and on G2 (same policy, similar inputs). With steering (u = -0.20) the hips read 55.4 and 58.4, because the stride scaling pulls the left hip in.
+- This is the learned asymmetry the leading drift hypothesis names. It confirms the policy adds a one-sided offset the scripted walk does not have; it does not show that the offset causes G2's right drift. That needs the scripted-versus-V2.1 comparison on G2 (six open-loop `wkF` walks against six V2.1 walks in one session), which is still undone.
+
 ## Not done / not measured
 
 - Servo position feedback (`f` returns only an echo), real foot lift, per-leg load.
