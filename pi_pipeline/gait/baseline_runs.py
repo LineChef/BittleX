@@ -50,6 +50,8 @@ def main() -> None:
     ap.add_argument("--hold-kp", type=float, default=None, help="proportional gain for the heading-hold runs")
     ap.add_argument("--const-u", default=None,
                     help="comma list of fixed stride differences, e.g. -0.2,0,0.2: run k uses the list walked forward then backward (a b c c b a ...), no feedback")
+    ap.add_argument("--foot-hold", default=None, metavar="FOOT[,FOOT|none..]",
+                    help="closed-loop heading hold on one foot (fl = the measured steering foot), cycling per run like --foot-trim; the walk is the scripted wkF through the full loop (--scripted)")
     ap.add_argument("--foot-trim", default=None,
                     help="comma list of per-foot step trims, e.g. none,bl=+0.25,bl=-0.25,br=+0.25,br=-0.25,fl=+0.25,fl=-0.25,fr=+0.25,fr=-0.25: run k uses item k (cycling), 'none' = no trim. The per-foot steering test")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
@@ -108,9 +110,14 @@ def main() -> None:
             items = [x.strip() for x in args.foot_trim.split(",") if x.strip()]
             ft = items[(k - 1) % len(items)]
             ft = None if ft.lower() == "none" else ft
+        fh = None
+        if args.foot_hold:
+            fitems = [x.strip() for x in args.foot_hold.split(",") if x.strip()]
+            fh = fitems[(k - 1) % len(fitems)]
+            fh = None if fh.lower() == "none" else fh
         path = os.path.join(out, f"{args.label}_{stamp}_run{k:02d}" + ("" if sgn is None else f"_sign{'P' if sgn > 0 else 'M'}")
                             + ("" if hold is None else f"_hold{'ON' if hold else 'OFF'}")
-                            + ("" if cu is None else f"_u{cu:+.2f}") + ("" if ft is None else "_ft" + ft.replace("=", "").replace("+", "p").replace("-", "m")) + ".csv")
+                            + ("" if cu is None else f"_u{cu:+.2f}") + ("" if fh is None else "_fh" + fh) + ("" if ft is None else "_ft" + ft.replace("/", "_").replace("=", "").replace("+", "p").replace("-", "m")) + ".csv")
         child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
         scripted = args.scripted_mix == "scripted" or (args.scripted_mix == "abab" and k % 2 == 1)
         if args.scripted_mix:
@@ -135,7 +142,7 @@ def main() -> None:
                               + (["--hold-ff", str(args.hold_ff)] if hold and args.hold_ff is not None else [])
                               + (["--hold-kp", str(args.hold_kp)] if hold and args.hold_kp is not None else [])
                               + (["--hold-umax", str(args.hold_umax)] if args.hold_umax is not None else [])
-                              + (["--hold-ki", str(args.hold_ki)] if hold and args.hold_ki is not None else []) + ([] if cu is None else ["--steer-const", str(cu)]) + ([] if ft is None else ["--foot-trim", ft]), env=child_env)
+                              + (["--hold-ki", str(args.hold_ki)] if hold and args.hold_ki is not None else []) + ([] if cu is None else ["--steer-const", str(cu)]) + ([] if ft is None else ["--foot-trim", ft]) + ([] if fh is None else ["--scripted", "--foot-hold", fh]), env=child_env)
         logs.append(path)
         print(f"run {k}: exit {rc} -> {path}", flush=True)
         if k < args.runs:

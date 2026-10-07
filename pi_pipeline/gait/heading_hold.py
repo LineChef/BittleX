@@ -86,6 +86,20 @@ def parse_foot_trim(text: str):
     return foot, float(val)
 
 
+def parse_foot_trims(text: str):
+    """`fl=-0.3/fr=+0.3` -> [("fl", -0.3), ("fr", 0.3)]: several feet at once, "/"-separated; None for an empty text."""
+    if not text:
+        return None
+    return [parse_foot_trim(part) for part in text.split("/") if part.strip()] or None
+
+
+def apply_foot_trims(joint_deg, trims):
+    out = joint_deg
+    for foot, g in trims:
+        out = apply_foot_trim(out, foot, g)
+    return out
+
+
 def apply_foot_trim(joint_deg, foot: str, g: float):
     """The policy's 8 joint targets (URDF order, degrees) with ONE foot's swing scaled about the stance angle by (1 + g) and every other joint left alone, clamped to the reach the walk itself
     uses (JOINT_RANGE_DEG). A per-foot steering test (2026-10-07: in the sim only the back feet steer, and G2's steering is opposite and about 4 times stronger, so which foot steers on G2 is measured)."""
@@ -109,3 +123,54 @@ def apply_stride_difference(joint_deg, u: float):
         lo, hi = JOINT_RANGE_DEG[j]
         out[j] = max(lo - JOINT_MARGIN_DEG, min(hi + JOINT_MARGIN_DEG, out[j]))
     return [int(round(v)) for v in out]
+
+
+class FootHold:
+    """Heading hold on ONE front foot (measured on G2, 2026-10-07, scripted walk): front-left alone takes ~9 deg/s of turn per unit of trim (-0.25 -> -35 deg, -0.5 -> -57 deg over
+    12.5 s against ~78 deg of drift), the back feet do nothing, and a front pair adds a lean. Trim g scales that foot's swing (apply_foot_trim); a NEGATIVE g shortens the step and
+    turns G2 left, so a drift to the right (e > 0, right-positive) asks for g < 0.
+
+    g = -(KP * deadband(e) + KD * rate): the proportional term acts only outside +-DEADBAND_DEG; the rate term is the ease-off in both directions: it adds trim while the heading
+    is running away and takes it off as soon as the heading is already turning back (rate toward the target), so the correction does not overshoot while the 5 Hz IMU is still
+    reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited."""
+
+    def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
+                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4):
+        self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg
+        self.g_min, self.g_max, self.g_rate, self.rate_tau_s = g_min, g_max, g_rate, rate_tau_s
+        self.ki, self.i_lim, self.integral = ki, i_lim, 0.0      # the steady push a P term alone leaves as a standing heading error; cleared when the heading crosses the target
+        self.g = 0.0
+        self.rate_dps = 0.0                  # low-passed heading rate, deg/s, right-positive
+        self._last_yaw = None
+        self._last_t = 0.0
+        self._t = 0.0
+
+    def reset(self) -> None:
+        self.g, self.rate_dps, self._last_yaw = 0.0, 0.0, None
+
+    def update(self, yaw_rad: float, dt: float, active: bool = True) -> float:
+        self._t += dt
+        yaw = math.degrees(yaw_rad)
+        if self._last_yaw is None:
+            self._last_yaw, self._last_t = yaw, self._t
+        elif yaw != self._last_yaw:           # a new IMU sample (5 Hz): turn the change into a rate
+            span = max(1e-3, self._t - self._last_t)
+            raw = wrap_deg(yaw - self._last_yaw) / span
+            a = min(1.0, span / self.rate_tau_s)
+            self.rate_dps += a * (raw - self.rate_dps)
+            self._last_yaw, self._last_t = yaw, self._t
+        if not active:
+            return self._slew(0.0, dt)
+        e = wrap_deg(yaw - self.target_deg)
+        out = max(0.0, abs(e) - self.deadband_deg) * (1.0 if e >= 0 else -1.0)
+        if out == 0.0 or (self.integral != 0.0 and (out > 0) != (self.integral > 0)):
+            self.integral = 0.0                   # inside the deadband or past the target: drop the wound-up term (it kept steering after the heading was back on the old hold)
+        else:
+            self.integral = max(-self.i_lim / self.ki, min(self.i_lim / self.ki, self.integral + out * dt))
+        want = -(self.kp * out + self.ki * self.integral + self.kd * self.rate_dps)
+        return self._slew(max(self.g_min, min(self.g_max, want)), dt)
+
+    def _slew(self, want: float, dt: float) -> float:
+        step = self.g_rate * dt
+        self.g += max(-step, min(step, want - self.g))
+        return self.g

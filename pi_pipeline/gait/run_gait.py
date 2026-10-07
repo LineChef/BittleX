@@ -256,7 +256,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
                 if (step - 1) % every == 0:
                     deg = np.rint(np.rad2deg(frame)).astype(int)
                     if foot_trim is not None:            # --foot-trim: one foot's swing scaled, fixed, no feedback
-                        deg = np.array(_hh.apply_foot_trim(deg, foot_trim[0], foot_trim[1]), dtype=int)
+                        deg = np.array(_hh.apply_foot_trims(deg, foot_trim), dtype=int)
                     _send(lk, deploy_map.policy_deg_to_move_cmd(deg))
                 if volt_every_s and clock() - t_start >= next_volt:
                     _send(lk, "P")
@@ -480,7 +480,7 @@ def _extra_cols(feed, now, volt, on):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False, foot_trim=None):
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False, foot_trim=None, foot_hold=None, scripted=False):
     """`log_extra=True` adds accel (m/s^2, about 10 on az at rest), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
     `heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
@@ -489,6 +489,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     `in_service=True` is for a caller that owns the diagnostics session and the IMU stream (the voice service): this loop then neither
     starts/closes a diag session nor turns the stream off or restores firmware balance when it ends."""
     pol = ResidualGaitPolicy(onnx_path=policy_path)
+    if scripted:                       # --scripted: no learned correction at all, the scripted wkF walk through the same loop (IMU, logging, holds)
+        pol.residual_scale_deg = 0.0
     send_every = max(1, send_every if send_every else pol.send_every)   # explicit flag wins; else what the policy was trained with
     print(f"policy: {os.path.basename(pol.onnx_path)}"
           f"  (joint command every {send_every} tick{'s' if send_every != 1 else ''})", flush=True)
@@ -532,7 +534,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         try:
             from pi_pipeline.telemetry import autolog as _autolog
             autolog_run = _autolog.new_run("policy_walk", policy=os.path.basename(str(getattr(pol, "onnx_path", "") or "")) or None, cmd_fwd=cmd_fwd, hz=hz,
-                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const, "foot_trim": foot_trim})
+                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const, "foot_trim": foot_trim, "foot_hold": foot_hold, "scripted": bool(scripted)})
         except Exception:  # noqa: BLE001 -- never let logging stop a walk
             autolog_run = None
         if autolog_run is not None:
@@ -543,9 +545,11 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         logf.write("# run_gait log  cmd_fwd=%.3f hz=%.1f fw_balance=%s policy_yaw_sign=%+g\n"
                    % (cmd_fwd, hz, "off" if disable_firmware_balance else "on", POLICY_YAW_SIGN))
         logf.write("t,roll,pitch,yaw,gx,gy,gz," + ",".join(f"j{k}" for k in range(8))
-                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if (heading_hold or steer_const is not None) else "")
+                   + ",guard_state,hottest_j,hottest_tier,hottest_frac,duty_s" + (",steer_u" if (heading_hold or steer_const is not None or foot_hold) else "")
                    + (",ax,ay,az,imu_n,imu_age_s,volt" if log_extra else "") + "\n")
     hold = (_hh.HeadingHold(ff=hold_ff, kp=_hh.KP if hold_kp is None else hold_kp, ki=_hh.KI if hold_ki is None else hold_ki, u_max=_hh.U_MAX if hold_umax is None else hold_umax) if (heading_hold or steer_const is not None) else None)
+    if foot_hold:                        # --foot-hold FOOT: the proportional heading hold on one front foot (gait/heading_hold.FootHold)
+        hold = _hh.FootHold(foot=foot_hold)
     if hold is not None and steer_const is not None:
         hold.fixed_u = float(steer_const)
     steer_u = 0.0
@@ -657,10 +661,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
                 if foot_trim is not None:            # --foot-trim: ONE foot's steps scaled, a fixed amount, no feedback (the per-foot steering test)
-                    joint_deg = np.array(_hh.apply_foot_trim(joint_deg, foot_trim[0], foot_trim[1]), dtype=int)
+                    joint_deg = np.array(_hh.apply_foot_trims(joint_deg, foot_trim), dtype=int)
                 if hold is not None:                 # steer by making one side's strides longer; yaw here is right-positive (the firmware convention)
                     steer_u = hold.update(y, dt, active=abs(cmd_fwd) >= 0.025)
-                    joint_deg = np.array(_hh.apply_stride_difference(joint_deg, steer_u), dtype=int)
+                    joint_deg = np.array(_hh.apply_foot_trim(joint_deg, hold.foot, steer_u) if foot_hold else _hh.apply_stride_difference(joint_deg, steer_u), dtype=int)
                 lat.append(time.perf_counter() - t0)
 
                 if skill_layer is not None:
@@ -846,6 +850,9 @@ def main():
     ap.add_argument("--hold-kp", type=float, default=None, metavar="K", help="--heading-hold: proportional gain, u per degree of heading error (default heading_hold.KP)")
     ap.add_argument("--hold-ki", type=float, default=None, metavar="K", help="--heading-hold: integral gain, u per degree-second (default heading_hold.KI)")
     ap.add_argument("--hold-umax", type=float, default=None, metavar="U", help="--heading-hold / --steer-const: largest stride difference (default heading_hold.U_MAX = 0.20)")
+    ap.add_argument("--foot-hold", default=None, metavar="FOOT", choices=tuple(_hh.FOOT_JOINT),
+                    help="closed-loop heading hold on ONE foot (proportional to heading error, with deadband and ease-off; gait/heading_hold.FootHold). fl is the measured steering foot")
+    ap.add_argument("--scripted", action="store_true", help="zero the learned residual: the scripted wkF walk through the full loop (IMU, logging, holds)")
     ap.add_argument("--foot-trim", default=None, metavar="FOOT=G",
                     help="scale ONE foot's step by (1 + G) with no feedback, e.g. bl=+0.25 (feet: fl fr br bl): the per-foot steering test. Also logs which foot in the sidecar.")
     ap.add_argument("--steer-const", type=float, default=None, metavar="U",
@@ -970,14 +977,14 @@ def main():
                      lift_joints=args.lift_joints, shoulder_scale=args.shoulder_scale,
                      ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every,
                      send_every=args.send_every if args.send_every else 3,
-                     foot_trim=_hh.parse_foot_trim(args.foot_trim))   # default: the policy loop's cadence (i@27)
+                     foot_trim=_hh.parse_foot_trims(args.foot_trim))   # default: the policy loop's cadence (i@27)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,
                 thermal_guard=thermal_on, skill_layer=skill_layer, vision=vision,
                 turn_burst_s=args.skills_turn_burst, carpet=args.carpet, imu_rate=args.imu_rate,
                 policy_path=args.policy, send_every=args.send_every,
-                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trim(args.foot_trim),
+                fall_abort_deg=args.fall_abort_deg, heading_hold=args.heading_hold, steer_const=args.steer_const, foot_trim=_hh.parse_foot_trims(args.foot_trim), foot_hold=args.foot_hold, scripted=args.scripted,
                 hold_ff=args.hold_ff, hold_kp=args.hold_kp, hold_umax=args.hold_umax, hold_ki=args.hold_ki,
                 log_extra=args.log_extra)
     finally:

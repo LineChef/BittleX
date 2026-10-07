@@ -115,6 +115,9 @@ def gate(side: dict, labels: list, m: dict, epochs: dict) -> list[str]:
         return ["excluded: " + str(side.get("excluded_reason", "flagged by a person"))]
     if side.get("end_reason") not in GOOD_END:
         why.append(f"did not end cleanly ({side.get('end_reason')})")
+    applied = [k for k in ("heading_hold", "steer_const", "foot_trim", "foot_hold", "scripted") if side.get(k)]
+    if applied:                          # a test walk with a steering intervention or no learned correction: not G2's natural gait, never a fit source
+        why.append("steering test run (" + ", ".join(applied) + "): never fed to the sim")
     bad = sorted({x["tag"] for x in labels if x.get("tag") in BAD_LABELS})
     if bad:
         why.append("labelled " + ", ".join(bad))

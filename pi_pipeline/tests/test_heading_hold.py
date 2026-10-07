@@ -1,3 +1,5 @@
+import importlib.util
+import os
 """The Pi-side heading hold (gait/heading_hold.py): signs, limits and closed-loop behaviour on a simple plant."""
 import math
 
@@ -130,3 +132,56 @@ def test_openloop_applies_foot_trim():
     import inspect
     from pi_pipeline.gait import run_gait
     assert "foot_trim" in inspect.signature(run_gait.openloop).parameters
+
+
+def test_several_feet_trimmed_at_once():
+    from pi_pipeline.gait import heading_hold as hh
+    assert hh.parse_foot_trims("fl=-0.3/fr=+0.3") == [("fl", -0.3), ("fr", 0.3)] and hh.parse_foot_trims("") is None
+    base = [10, 20, 30, 40, 50, 60, 70, 80]
+    both = hh.apply_foot_trims(base, [("fl", -0.3), ("fr", 0.3)])
+    assert both[0] == hh.apply_foot_trim(base, "fl", -0.3)[0] and both[2] == hh.apply_foot_trim(base, "fr", 0.3)[2]
+
+
+def _plant(hold, drift_dps=7.0, gain_dps_per_g=9.0, seconds=12.5, imu_hz=5.0):
+    """Right-positive yaw plant: drifts at drift_dps, a trim g on the front-left foot adds gain_dps_per_g * g (negative = left). The hold sees the IMU at imu_hz, held in between."""
+    import math
+    yaw, seen, t, dt, trace = 0.0, 0.0, 0.0, 1 / 80, []
+    next_imu = 0.0
+    while t < seconds:
+        if t >= next_imu:
+            seen, next_imu = yaw, next_imu + 1 / imu_hz
+        g = hold.update(math.radians(seen), dt)
+        yaw += (drift_dps + gain_dps_per_g * g) * dt
+        t += dt
+        trace.append((yaw, g))
+    return trace
+
+
+def test_foot_hold_contains_drift_without_hunting():
+    from pi_pipeline.gait import heading_hold as hh
+    tr = _plant(hh.FootHold("fl"), drift_dps=6.0)
+    yaws = [y for y, _ in tr]
+    assert max(abs(y) for y in yaws) < 30 and abs(yaws[-1]) < 25           # open loop is +75 deg after 12.5 s
+    assert all(-0.6 <= g <= 0.2 for _, g in tr)
+    late = [g for _, g in tr[len(tr) // 2:]]
+    assert max(late) - min(late) < 0.35                                       # settles, no big swings
+
+
+def test_foot_hold_idle_inside_deadband_and_releases_when_inactive():
+    import math
+    from pi_pipeline.gait import heading_hold as hh
+    h = hh.FootHold("fl")
+    for _ in range(80):
+        assert abs(h.update(math.radians(3.0), 1 / 80)) < 1e-9               # 3 deg off, no drift rate: nothing
+    h.update(math.radians(40.0), 1 / 80)
+    for _ in range(400):
+        g = h.update(math.radians(40.0), 1 / 80, active=False)
+    assert abs(g) < 1e-9
+
+
+def test_ingest_gate_rejects_steering_test_runs():
+    spec = importlib.util.spec_from_file_location("g2_ingest_t", os.path.join(os.path.dirname(__file__), "..", "..", "tools", "g2_ingest.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    why = mod.gate({"foot_hold": "fl", "end_reason": "stopped"}, [], {"rows": 100}, {})
+    assert any("never fed to the sim" in w for w in why)
