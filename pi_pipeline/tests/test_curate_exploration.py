@@ -108,3 +108,17 @@ def test_a_pose_with_mostly_rejects_gets_a_hint(ce, tmp_path):
     m = ce.curate(str(src), str(tmp_path / "out"), write=False)
     assert not (tmp_path / "out").exists()                                                      # write=False copies nothing
     assert any("'look_up'" in h and "rejected" in h for h in m["summary"]["hints"])
+
+
+def test_a_cut_off_picture_is_rejected_when_surveyed_and_only_flagged_when_named(ce, tmp_path):
+    src = tmp_path / "in"
+    sv, nm = str(src / "survey" / "20261007"), str(src / "named" / "mug")
+    save(sv, "after_bow_1", blocky(1), time="2026-10-07 10:00:00")
+    save(nm, "mug_1", blocky(2), pose="named", name="Mug", time="2026-10-07 11:00:00")
+    for path in (os.path.join(sv, "after_bow_1.jpg"), os.path.join(nm, "mug_1.jpg")):
+        data = open(path, "rb").read()
+        open(path, "wb").write(data[: len(data) // 2] + bytes(40))                 # the camera's shape of failure: half the JPEG, then zeros
+    m = ce.curate(str(src), str(tmp_path / "out"))
+    assert status_of(m, "after_bow_1")["status"] == "rejected" and status_of(m, "after_bow_1")["reason"] == "truncated"
+    assert status_of(m, "mug_1")["status"] == "weak" and status_of(m, "mug_1")["reason"] == "truncated"
+    assert (tmp_path / "out" / "rejects" / "truncated").exists()

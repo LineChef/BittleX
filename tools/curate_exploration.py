@@ -6,7 +6,7 @@ Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `
 
   1. scores every picture: brightness, contrast, sharpness, clipped highlights / shadows;
   2. sets aside pictures where the on-camera detector saw a person or face (privacy decision 3: not curated, not copied, listed in the manifest only);
-  3. rejects survey pictures that are too dark, blown out, blurry or flat; named pictures are never rejected for quality, only flagged "weak";
+  3. rejects survey pictures that are too dark, blown out, blurry, flat or truncated (the camera module cut the JPEG short, so the lower part is gray); named pictures are never rejected for quality, only flagged "weak";
   4. removes near-duplicates (256-bit average hash; 12 bits within one survey pose, 3 bits within one name), keeping the best-scoring picture of each cluster;
   5. writes `keep/` (same folder layout), `rejects/<reason>/`, a contact sheet per group (green = kept, orange = weak; the camera's own boxes are drawn),
      `manifest.json` (every picture, its scores and its fate) and `summary.txt` (counts per pose and per name, with hints).
@@ -26,7 +26,7 @@ import time
 from dataclasses import dataclass, field
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -74,6 +74,7 @@ class Pic:
     status: str = "kept"               # kept | weak | rejected | duplicate | people
     reason: str = ""
     duplicate_of: str | None = None
+    cut_off: bool = False              # the JPEG has no end marker: the camera module cut it short (the rest decodes as flat gray)
 
     @property
     def named(self) -> bool:
@@ -108,11 +109,21 @@ def _load(in_dir: str) -> list[Pic]:
     return pics
 
 
-def _measure(p: Pic) -> bool:
+def _is_cut_off(path: str) -> bool:
     try:
+        with open(path, "rb") as f:
+            return f.read().rstrip(b"\x00")[-2:] != b"\xff\xd9"
+    except OSError:
+        return False
+
+
+def _measure(p: Pic) -> bool:
+    p.cut_off = _is_cut_off(p.path)
+    try:
+        ImageFile.LOAD_TRUNCATED_IMAGES = True              # a cut-off picture still decodes (the missing part is gray); it is flagged, not lost
         im = Image.open(p.path)
         im.load()
-    except Exception:  # noqa: BLE001 -- a truncated or unreadable file is a reject, not a crash
+    except Exception:  # noqa: BLE001 -- an unreadable file is a reject, not a crash
         return False
     p.width, p.height = im.size
     p.bright, p.contrast = brightness_contrast(im)
@@ -157,10 +168,12 @@ def curate(in_dir: str, out_dir: str, c: Config | None = None, *, write: bool = 
             p.status, p.reason = "rejected", "unreadable"
             continue
         p.quality = _quality(p, c)
+        if p.cut_off:
+            p.quality = round(p.quality * 0.5, 4)
         if _has_person(p, c):
             p.status, p.reason = "people", "on-camera detector saw a person or face"
             continue
-        problem = _quality_problem(p, c)
+        problem = "truncated" if p.cut_off else _quality_problem(p, c)
         if problem and p.named:
             p.status, p.reason = "weak", problem                  # named pictures are kept; the flag tells you which to retake
         elif problem:
