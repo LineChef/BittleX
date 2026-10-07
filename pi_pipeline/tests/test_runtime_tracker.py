@@ -187,3 +187,13 @@ def test_battery_state_reports_paused_unplugged_or_since_boot(tmp_path):
     assert t.battery_state() == ("paused", None)
     t.arm_now(); m.up = 1600.0
     assert t.battery_state() == ("since_unplugged", 600.0)
+
+
+def test_warn_fraction_is_configurable(tmp_path):
+    t = RuntimeTracker(tmp_path / "r.json")
+    alerts = []
+    now = [0.0]
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=1000, clock=lambda: now[0], warn_fraction=0.5, require_arm=False)
+    t.armed_elapsed_s = lambda from_boot=True: 600.0            # 60% of the runtime used: past a 0.5 warning, short of the default 0.8
+    w.poll_once()
+    assert alerts

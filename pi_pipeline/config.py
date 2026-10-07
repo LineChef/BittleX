@@ -180,6 +180,8 @@ class Settings:
     pi_full_runtime_s: float = field(default_factory=lambda: _env_float("G2_PI_FULL_RUNTIME_S", 0.0))   # 0 = use the mean of the logged runs
     # the 80%-of-runtime warning: on, but silent until a timed battery test has measured a runtime (it counts uptime since boot,
     # so a reboot resets it). 0 turns it off.
+    # the fraction of the measured runtime used at which the Pi warns "battery low" (0.80 = about 20% left; 0.50 = about half left)
+    pi_warn_fraction: float = field(default_factory=lambda: _env_float("G2_PI_WARN_FRACTION", 0.80))
     pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     # G2's standing wobble (firmware gyro balance going unstable on a 5 Hz IMU, see gait/stand_guard.py): keep balance off while idle
     # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.

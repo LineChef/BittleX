@@ -231,8 +231,9 @@ class RuntimeWatcher:
     a full runtime is known (`full_runtime_s` from settings, else the mean of the recorded runs)."""
 
     def __init__(self, tracker: RuntimeTracker, on_alert, *, full_runtime_s=None, poll_s: float = 60.0, repeat_s: float = 300.0,
-                 clock=time.monotonic, require_arm: bool = False):
+                 clock=time.monotonic, require_arm: bool = False, warn_fraction: float = WARN_FRACTION):
         self._tracker, self._on_alert = tracker, on_alert
+        self._warn_fraction = warn_fraction
         self._require_arm = require_arm
         self._override = full_runtime_s or None
         self._poll_s, self._repeat_s, self._clock = poll_s, repeat_s, clock
@@ -253,7 +254,7 @@ class RuntimeWatcher:
             self.level, self._last_alert = BatteryLevel.OK, None
             return None                                     # not told he is on battery (this boot): stay silent
         used = elapsed / full
-        seen = BatteryLevel.CRITICAL if used >= CRITICAL_FRACTION else BatteryLevel.LOW if used >= WARN_FRACTION else BatteryLevel.OK
+        seen = BatteryLevel.CRITICAL if used >= CRITICAL_FRACTION else BatteryLevel.LOW if used >= self._warn_fraction else BatteryLevel.OK
         now = self._clock()
         if seen == BatteryLevel.OK:
             self.level, self._last_alert = BatteryLevel.OK, None

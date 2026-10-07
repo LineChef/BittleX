@@ -252,7 +252,7 @@ def _start_pi_battery_watch(*, tts, audible: bool):
     tracker.collect()
     if not settings.pi_battery_watch:
         return None
-    watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible), full_runtime_s=settings.pi_full_runtime_s or None,
+    watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible), full_runtime_s=settings.pi_full_runtime_s or None, warn_fraction=settings.pi_warn_fraction,
                              require_arm=settings.pi_battery_arm == "manual").start()
     import types
     return types.SimpleNamespace(stop=watcher.stop, set_on_battery=lambda on: tracker.arm_now() if on else tracker.disarm())
