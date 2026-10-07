@@ -1,6 +1,6 @@
 """A series of logged, closed-loop V2.1 walks on the hard floor, for a fresh sim-vs-real baseline (run as `g2-baseline` by tools/g2_baseline.sh).
 
-Each run is the proven CLI path (`run_gait.py --cmd 0.10 --seconds 12.5 --log <csv>`, fall guard on). G2 speaks before each run and between runs, so
+Each run is the proven CLI path (`run_gait.py --cmd 0.10 --seconds 12.5 --log <csv> --log-extra`, fall guard on; `--no-log-extra` for the old columns). G2 speaks before each run and between runs, so
 whoever is with him can put him back at the start of the lane. `touch ~/.g2_baseline_skip` after hearing the prompt to skip the wait.
 """
 from __future__ import annotations
@@ -51,6 +51,7 @@ def main() -> None:
     ap.add_argument("--const-u", default=None,
                     help="comma list of fixed stride differences, e.g. -0.2,0,0.2: run k uses the list walked forward then backward (a b c c b a ...), no feedback")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
+    ap.add_argument("--no-log-extra", action="store_true", help="leave out the extra log columns (accel, IMU frame counter, pack voltage)")
     ap.add_argument("--no-preflight", action="store_true", help="skip the check that the BiBoard answers before the first run")
     ap.add_argument("--scripted-mix", default=None, choices=("abab",),
                     help="abab: odd runs are the scripted open-loop wkF walk (no policy, 10 cycles), even runs the learned policy, in one batch so a drift that changes over time hits both")
@@ -109,7 +110,7 @@ def main() -> None:
             path = path.replace(".csv", "_wkF.csv" if scripted else "_V21.csv")
         if scripted:                     # the scripted wkF walk, no policy: the base the learned policy corrects (run_gait --openloop)
             rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--openloop", "--cycles", "10", "--ramp-cycles", "1",
-                                  "--openloop-balance-off", "--log", path], env=child_env)
+                                  "--openloop-balance-off", "--log", path] + ([] if args.no_log_extra else ["--volt-every", "1"]), env=child_env)
             logs.append(path)
             print(f"run {k}: exit {rc} (scripted wkF) -> {path}", flush=True)
             if k < args.runs:
@@ -123,7 +124,7 @@ def main() -> None:
                     pass
             continue
         rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--cmd", str(args.cmd), "--seconds", str(args.seconds),
-                              "--log", path] + (["--heading-hold"] if hold else [])
+                              "--log", path] + ([] if args.no_log_extra else ["--log-extra"]) + (["--heading-hold"] if hold else [])
                               + (["--hold-ff", str(args.hold_ff)] if hold and args.hold_ff is not None else [])
                               + (["--hold-kp", str(args.hold_kp)] if hold and args.hold_kp is not None else [])
                               + (["--hold-umax", str(args.hold_umax)] if args.hold_umax is not None else [])

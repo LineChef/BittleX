@@ -39,3 +39,8 @@ Plan and hand-off: [`v3-retrain-plan.md`](v3-retrain-plan.md). Each entry: what 
   already in `g2_profile.RECIPE` / `CALIBRATION`, so every V3 run already trains in a sim fitted to the walking logs. The logs carry no joint commands or
   joint readings for the walks (IMU only), so a command replay is not possible from them; the servo step log (4.5 Hz readings) is too slow to resolve the servo
   time constant (H13). No smoke test was started: it would share the Mac with the running V3 queue.
+
+- **Data capture before the fit (user, 2026-10-07):** capture several sessions next time G2 is on, no video; ground truth by tape. Agreed rule: real data sets the sim's numbers and
+  ranges and scores policies, and is never a source of drift. Logging change done (`--log-extra`: accel, IMU frame counter and age, pack voltage; the baseline runner turns it on by
+  default). Joint readback is not logged during walks (the firmware's feedback stream stops at every new command), so measured joints come from bench tests. Plan:
+  [`sysid-capture-plan.md`](sysid-capture-plan.md). The smoke test across the skills waits for this data.
