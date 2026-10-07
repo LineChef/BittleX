@@ -33,6 +33,8 @@ Three goals in one: test the exploration updates (wake chime, API tone, shutter 
 4. Optional but useful: a short same-battery control walk on hardwood (`g2floor hardwood` first, then back to `g2floor tile`) so the tile-versus-hardwood comparison is same-day. Tell Claude the tile size if known.
 5. `bash tools/g2_explore.sh stop`, then `g2pics pull` and `g2picscurate` for the pictures; Claude reads the first autolog run's loop timing (the first run with the capture hook on hardware) and the sidecars.
 6. Judge: the survey picture angle, the shutter volume, the chimes.
+7. **Mats and the small rug stay out of the exploration area** (pull them aside or block them with boxes): carpet is G2's known weak spot (every gait stalled on the 6.4 mm house carpet, no pile model in the sim), exploration has no surface or edge detection, and a run that crosses between floors would carry one wrong floor label and contaminate the tile fits and the snag rate. If he heads for one, stop him (`g2_explore.sh stop` or `python -m pi_pipeline.app --halt`).
+   Test them separately afterwards: tape the mat or rug down so it cannot slide on the tile, measure the edge height with a ruler, `g2floor mat` (or `rug`), then three or four head-on passes with the user present. An edge inside the sim's 12 to 35 mm ledge range can be one of the one or two ledge heights.
 
 ## How this relates to exploration mode (a separate capture)
 
