@@ -228,3 +228,43 @@ def test_restart_voice_phrases_and_the_exploration_session_hands_back_to_a_fresh
     rt = types.SimpleNamespace(post=lambda **kw: None, halt=lambda: None, release=lambda: None)
     lst = ExploreListener(None, None, said.append, rt, lambda: [], on_stop=lambda: ended.append(1))
     assert lst.handle("restart your voice service") == "Okay, restarting my voice." and ended == [1]
+
+
+def test_the_exploration_listener_says_when_the_wake_word_registered_but_no_speech_was_caught(caplog):
+    import logging
+    heard = ["", "this is the dishwasher", "blah blah"]
+    said, posts = [], []
+    rt = types.SimpleNamespace(post=lambda **kw: posts.append(kw), halt=lambda: None, release=lambda: None)
+    holder = {}
+    calls = {"n": 0}
+
+    def wait():
+        calls["n"] += 1
+        if calls["n"] > 3:
+            holder["lst"].stop()
+
+    wake = types.SimpleNamespace(wait=wait)
+    stt = types.SimpleNamespace(listen=lambda timeout_s=None: heard.pop(0) if heard else "")
+    lst = ExploreListener(wake, stt, said.append, rt, lambda: [])
+    holder["lst"] = lst
+    with caplog.at_level(logging.INFO, logger="g2.behavior.explore_listener"):
+        lst._run()
+    text = caplog.text
+    assert "nothing recognized after the wake word" in text and "naming request: 'dishwasher'" in text and "not a command I know in exploration" in text
+    assert said == ["I didn't catch that.", "Okay, let me look at the dishwasher.", "I didn't understand that."]
+    assert posts == [{"name_request": "dishwasher"}]
+
+
+def test_the_voice_loop_says_i_am_online_when_it_is_ready_and_only_when_asked_to():
+    import types as _t
+    from pi_pipeline.voice.loop import VoiceLoop
+    for announce, expect in ((True, ["I am online."]), (False, [])):
+        said = []
+        stt = _t.SimpleNamespace(listen=lambda timeout_s=None: "")
+        wake = _t.SimpleNamespace(wait=lambda: (_ for _ in ()).throw(KeyboardInterrupt()))
+        tts = _t.SimpleNamespace(speak=lambda x: said.append(x))
+        act = _t.SimpleNamespace(perform=lambda s, **k: None, stop=lambda: None, close=lambda: None)
+        cue = _t.SimpleNamespace(set=lambda s: None)
+        lp = VoiceLoop(wake_word=wake, stt=stt, conversation=_t.SimpleNamespace(), tts=tts, actuator=act, cue=cue, announce_online=announce)
+        lp.run_forever()
+        assert said == expect, announce

@@ -293,7 +293,7 @@ g2pics() {
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 
-# g2reset [status|logs]  -- restart G2's voice service on the Pi (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first.
+# g2reset [status|logs]  -- restart G2's voice loop on the Pi (prints "restarting voice loop..." then "voice loop restarted"; G2 also says "I am online." out loud when he is back) (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first.
 # It waits until the service says it is listening (about 30 s). g2reset status = what is running, since when, and the last thing G2 heard; g2reset logs = the last lines of the voice service log.
 g2reset() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
@@ -301,12 +301,12 @@ g2reset() {
     status) ssh "$G2_PI" 'systemctl is-active g2-voice g2-explore g2-baseline | paste -sd" " ; systemctl show g2-voice -p ActiveEnterTimestamp --value; journalctl -u g2-voice --no-pager | grep -i "heard" | tail -2 | cut -c1-140' ;;
     logs) ssh "$G2_PI" 'journalctl -u g2-voice -n 40 --no-pager | grep -v VoskAPI | cut -c1-190' ;;
     restart)
-      echo "restarting G2's voice service..."
+      echo "restarting voice loop..."
       ssh "$G2_PI" 'if systemctl is-active --quiet g2-baseline; then echo "a baseline run is active: not restarting (g2_baseline.sh stop first)"; exit 3; fi
         systemctl is-active --quiet g2-explore && sudo systemctl stop g2-explore
         t=$(date +%H:%M:%S); sudo systemctl restart g2-voice; n=0
         until journalctl -u g2-voice --since "$t" --no-pager | grep -q "voice loop ready"; do n=$((n+1)); [ $n -ge 45 ] && { echo "not ready after 90 s: g2reset logs"; exit 1; }; sleep 2; done
-        echo "voice service ready: G2 is listening"' ;;
+        echo "voice loop restarted: G2 is listening"' ;;
     *) echo "usage: g2reset [status|logs]"; return 2 ;;
   esac
 }

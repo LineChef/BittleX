@@ -35,10 +35,21 @@ class ExploreListener:
         while not self._done.is_set():
             try:
                 self._wake.wait()
+                if self._done.is_set():
+                    break
+                log.info("wake word heard: listening for a command (%.0f s)", self._listen_s)
                 text = (self._stt.listen(timeout_s=self._listen_s) or "").strip()
-                if text:
-                    log.info("heard: %r", text)
-                    self.handle(text)
+                if not text:
+                    log.info("nothing recognized after the wake word")
+                    self._reply("I didn't catch that.")                  # so you can tell the wake word registered and the speech did not
+                    continue
+                log.info("heard: %r", text)
+                reply = self.handle(text)
+                if reply is None:
+                    log.info("not a command I know in exploration: %r", text)
+                    self._reply("I didn't understand that.")
+                else:
+                    log.info("answered: %r", reply)
             except Exception:  # noqa: BLE001 -- a listener hiccup must not end the session
                 log.exception("explore listener error")
 
@@ -73,6 +84,7 @@ class ExploreListener:
         if cmd is None:
             name = parse_naming(text)
             if name:
+                log.info("naming request: %r (bow, look up, stand, then one picture saved under that name)", name)
                 self._rt.post(name_request=name)
                 return self._reply(f"Okay, let me look at the {name}.")
         if cmd is None and asks_what_g2_sees(text):

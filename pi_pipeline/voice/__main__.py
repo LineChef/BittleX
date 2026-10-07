@@ -185,6 +185,7 @@ def main() -> None:
             question_window_s=settings.question_window_s if voice else 0.0,
             camera=camera,
             namer=namer,
+            announce_online=os.environ.get("G2_ANNOUNCE_ONLINE", "on").strip().lower() not in ("off", "0", "false", "no"),
             on_event=on_event,
             on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),

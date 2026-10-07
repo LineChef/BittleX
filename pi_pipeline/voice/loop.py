@@ -173,9 +173,11 @@ class VoiceLoop:
         on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
         on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
         shutdown_confirm_s: float = 6.0,
+        announce_online: bool = False,  # say "I am online." once the loop is ready (the voice service turns this on; G2_ANNOUNCE_ONLINE=off silences it)
         namer=None,  # object called with a picture kind ("name:mug") that takes and saves one picture and returns its path or None (vision.exploration_pictures.ExplorationPictureSaver)
     ):
         self._namer = namer
+        self._announce_online = announce_online
         self._wake = wake_word
         self._stt = stt
         self._conv = conversation
@@ -229,6 +231,9 @@ class VoiceLoop:
     def run_forever(self) -> None:
         self._cue.set("idle")
         log.info("G2 voice loop ready")
+        if self._announce_online:
+            from . import restart_notice
+            restart_notice.announce_online(self._speak)        # "I am online.": the loop has finished starting and is listening
         try:
             while True:
                 self._one_turn()
@@ -426,7 +431,7 @@ class VoiceLoop:
         if cmd == "restart_voice":
             log.info("voice service restart requested (voice)")
             self._cue.set("speaking")
-            self._speak("Okay, restarting my voice. I'll be back in about thirty seconds.")
+            self._speak("Restarting voice loop. I will say I am online when I am back.")
             self._restart_service()
             return
         if cmd == "shutdown":
