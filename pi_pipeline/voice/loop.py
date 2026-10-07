@@ -246,6 +246,17 @@ class VoiceLoop:
         else:
             self._in_session = False
 
+    def _restart_service(self) -> None:
+        """Restart this voice service: ask systemd (`sudo -n systemctl restart g2-voice`); if that is not allowed, exit with an error so the unit's `Restart=on-failure` brings it back. Never returns when it works."""
+        import subprocess
+        import sys
+        try:
+            subprocess.Popen(["sudo", "-n", "systemctl", "restart", "g2-voice"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return
+        except Exception:  # noqa: BLE001
+            log.warning("could not ask systemd to restart the voice service; exiting so it restarts", exc_info=True)
+        sys.exit(1)
+
     def _end_session(self) -> None:
         self._in_session = False
         self._cue.set("idle")
@@ -373,6 +384,12 @@ class VoiceLoop:
             self._speak("Coming.")
             self._set_session()
             self._cue.set("idle")
+            return
+        if cmd == "restart_voice":
+            log.info("voice service restart requested (voice)")
+            self._cue.set("speaking")
+            self._speak("Okay, restarting my voice. I'll be back in about thirty seconds.")
+            self._restart_service()
             return
         if cmd == "shutdown":
             log.info("shutdown requested (voice) -- lie down then dormant")

@@ -58,6 +58,10 @@ class ExploreListener:
         if cmd in ("unexplore", "sleep"):
             self._rt.post(disarm_explore=True)
             return self._reply("Okay, that's enough.")
+        if cmd == "restart_voice":
+            if self._on_stop:
+                self._on_stop()                       # closes the session; the voice service then starts fresh
+            return self._reply("Okay, restarting my voice.")
         if cmd == "end_explore":
             if self._on_stop:
                 self._on_stop()                       # closes the session; the voice service comes back
