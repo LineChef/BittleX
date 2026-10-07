@@ -79,3 +79,9 @@ def fake_anthropic(monkeypatch):
     monkeypatch.setattr(anthropic, "Anthropic", lambda **kw: fake)
     rec.set_reply = lambda r: setattr(rec, "_next", r)
     return rec
+
+
+@pytest.fixture(autouse=True)
+def _no_shutter_sound(monkeypatch):
+    """Tests never play the picture click through the dev machine's speaker (tests that check it patch `shutter.play`)."""
+    monkeypatch.setenv("G2_SHUTTER", "off")

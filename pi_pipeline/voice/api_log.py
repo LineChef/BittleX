@@ -22,6 +22,23 @@ log = logging.getLogger("g2.api")
 _LOCK = threading.Lock()
 _MAX_BYTES = 5 * 1024 * 1024
 _counter = 0
+_call_hook = None        # called as hook(api, source) just before a billed call (messages.create / messages.stream); never for the free models.list ping
+
+
+def set_call_hook(fn) -> None:
+    """Register what happens when G2 is about to call the Claude API (the voice service plays `api_tone` here). `None` removes it."""
+    global _call_hook
+    _call_hook = fn
+
+
+def _notify(api: str, source: str) -> None:
+    fn = _call_hook
+    if fn is None:
+        return
+    try:
+        fn(api, source)
+    except Exception:  # noqa: BLE001 -- a signal must never break a call
+        log.debug("api call hook failed", exc_info=True)
 
 
 def log_path() -> Path | None:
@@ -81,6 +98,7 @@ class _StreamManager:
     def __enter__(self):
         self._t0 = time.monotonic()
         log_event("start", self._source, id=self._id, caller=self._caller, **self._fields)
+        _notify(self._fields["api"], self._source)
         return self._inner.__enter__()
 
     def __exit__(self, exc_type, exc, tb):
@@ -106,6 +124,7 @@ def instrument(client, source: str):
         def create(*a, **kw):
             i, t0, fields = _next_id(), time.monotonic(), _request_fields("messages.create", kw)
             log_event("start", source, id=i, caller=_caller(), **fields)
+            _notify("messages.create", source)
             try:
                 resp = orig_create(*a, **kw)
             except Exception as e:

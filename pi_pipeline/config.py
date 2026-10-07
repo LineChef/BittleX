@@ -155,7 +155,7 @@ class Settings:
     # waiting for the whole reply. 0 = off (the old whole-reply behaviour, for A/B timing).
     stream_replies: bool = field(default_factory=lambda: _env("G2_STREAM", "1").lower() not in ("0", "false", "off", "no"))
     # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
-    cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "thinking"))
+    cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "awake"))
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
     # What acknowledges a command that goes to Claude: short_tone (one short blip through the speaker; default), star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
@@ -231,6 +231,8 @@ class Settings:
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
+    api_tone: str = field(default_factory=lambda: _env("G2_API_TONE", "on").lower())   # "on": a unique tone each time G2 calls the Claude API (not the free wake-word ping); "off" silences it
+    api_peak: float = field(default_factory=lambda: _env_float("G2_API_PEAK", 0.0225))
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.

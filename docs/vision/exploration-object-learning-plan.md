@@ -11,7 +11,7 @@ so it can learn things the camera model was never trained on.
 |---|---|
 | Does taking a snapshot make an API call? If not, use snapshots | **No.** A snapshot is one USB request to the camera (`AT+INVOKE=1,0,0`); the API is called only when a picture is attached to a message to Claude. Phase 1 uses snapshots only; nothing in this plan calls the API. Tests use fakes (standing rule, 2026-10-07). |
 | G2 walks a bit, stops, does the inspect pose, looks down and up | Phase 1: a survey stop at the end of each exploration leg |
-| One picture looking down, one looking up, then keep exploring | Phase 1: `survey_plan` (look-down picture, look-up picture, stand, walk on) |
+| One picture looking down, one looking up, then keep exploring | Phase 1: `survey_plan` (bow, stand, one picture once the stance settles, walk on) |
 | Name things by voice; you will try it in exploration testing | Phase 1 (saving a named picture) and Phase 5 (recognition from the saved names) |
 | Explain how naming would work | Phase 5, and the user test script below |
 | A routine to process the exploration pictures, like the capture sessions, so training data is good | Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates) |

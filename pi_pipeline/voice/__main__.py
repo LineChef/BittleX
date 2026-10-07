@@ -109,6 +109,10 @@ def main() -> None:
         else:
             cue = LogCue()
 
+        if features.sound_cues and voice and tts_mode == "piper" and settings.api_tone == "on":
+            from . import api_log, api_tone
+            api_log.set_call_hook(lambda api, source: api_tone.play(settings.api_peak))     # a unique tone on every billed Claude call
+
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         audible = voice and tts_mode != "print"
         battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking

@@ -242,6 +242,9 @@ class SerialDetectionFeed:
                 self._ser.write(self._START_CMD)     # back to detections
         finally:
             self._paused.clear()
+        if snap is not None:
+            from ..voice import shutter
+            shutter.click()                      # every picture taken makes the double click
         return snap
 
     def close(self) -> None:

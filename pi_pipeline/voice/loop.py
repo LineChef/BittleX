@@ -276,6 +276,7 @@ class VoiceLoop:
         trace = TurnTrace()
         if not self._in_session:
             self._wake.wait()
+            self._cue.set("awake")       # right after the wake word: the chime that says G2 is listening
             trace.stamp("wake")
             warm = getattr(self._conv, "warm_up", None)
             if callable(warm):

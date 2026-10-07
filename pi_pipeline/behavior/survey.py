@@ -1,9 +1,9 @@
-"""Survey stops: while exploring, G2 stops at the end of a leg, looks down and up, takes one picture in each pose, and walks on.
+"""Survey stops: while exploring, G2 stops at the end of a leg, bows (the inspect pose), stands again, takes one picture once the stance has settled, and walks on.
 
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   look down (`kbuttUp`, nose-down bow: the INSPECT pose) -> picture -> look up (`ksit`, chest raised) -> picture -> stand
+  survey_plan   bow (`kbuttUp`, nose-down: the INSPECT pose) -> stand (`kup`) -> settle -> one picture
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -23,6 +23,7 @@ from dataclasses import dataclass
 class SurveyConfig:
     cooldown_s: float = 15.0        # at most one survey this often (the end of every leg is a chance, not a promise)
     pose_settle_s: float = 2.2      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
+    stand_settle_s: float = 2.5     # after standing again from the bow, before the picture (the stance has to settle)
     final_settle_s: float = 1.5     # after standing again, before the walk resumes
     look_down_skill: str = "kbuttUp"
     look_up_skill: str = "ksit"
@@ -44,17 +45,14 @@ class Survey:
 
 
 def survey_plan(cfg: SurveyConfig) -> list:
+    """Bow (the inspect pose), stand again, and take the picture once the stance has settled (the look-down and look-up pictures were not good, 2026-10-07)."""
     t = 0.0
-    plan = [(t, "skill", cfg.look_down_skill, "survey: look down (the walk stops, no rest)")]
+    plan = [(t, "skill", cfg.look_down_skill, "survey: inspect bow (the walk stops, no rest)")]
     t += cfg.pose_settle_s
-    plan.append((t, "shot", "look_down", "survey: picture, looking down"))
-    t += 0.4
-    plan.append((t, "skill", cfg.look_up_skill, "survey: look up"))
-    t += cfg.pose_settle_s
-    plan.append((t, "shot", "look_up", "survey: picture, looking up"))
-    t += 0.4
     plan.append((t, "skill", cfg.stand_skill, "survey: stand again"))
-    t += cfg.final_settle_s
+    t += cfg.stand_settle_s
+    plan.append((t, "shot", "after_bow", "survey: picture, standing after the bow"))
+    t += 0.4
     plan.append((t, "diag", "survey.done", "survey: finished, walking on"))
     return plan
 

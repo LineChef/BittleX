@@ -44,6 +44,7 @@ CHIRP: dict[ChirpMood, list[tuple[int, int]]] = {
 
 # voice-loop cue stage -> a mood (or None to stay silent)
 _CUE_MOOD = {
+    "awake":     ChirpMood.ALERT,
     "listening": ChirpMood.ALERT,
     "heard":     ChirpMood.ACK,
     "thinking":  ChirpMood.QUESTION,

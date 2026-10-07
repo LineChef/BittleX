@@ -98,3 +98,16 @@ def test_a_snapshot_taken_while_the_background_reader_runs(feed):
         assert src()
     finally:
         src._stop.set()
+
+
+def test_every_snapshot_makes_the_shutter_click_and_a_silent_module_does_not(feed, monkeypatch):
+    from pi_pipeline.voice import shutter
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    clicks = []
+    monkeypatch.setattr(shutter, "click", lambda: clicks.append(1))
+    f, ser = feed
+    assert f.snapshot(timeout_s=2.0) is not None
+    assert clicks == [1]
+    ser.answer = False
+    assert f.snapshot(timeout_s=0.3) is None
+    assert clicks == [1]

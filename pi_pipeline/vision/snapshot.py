@@ -351,6 +351,8 @@ class CameraSnapshotter:
                     self._metered_at = self._clock()
                 log.info("camera snapshot: %dx%d, %d bytes, %d detections", snap.width, snap.height, len(snap.jpeg), len(snap.detections))
                 self._arm_idle_close()
+                from ..voice import shutter
+                shutter.click()                  # every picture taken makes the double click
                 self._save(snap)
                 if self._on_capture:
                     try:

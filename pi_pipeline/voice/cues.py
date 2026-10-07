@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Literal, Protocol
 
-Stage = Literal["idle", "listening", "heard", "thinking", "speaking"]
+Stage = Literal["idle", "awake", "listening", "heard", "thinking", "speaking"]
 
 log = logging.getLogger("g2.cue")
 
@@ -28,12 +28,13 @@ class LogCue:
 # "thinking" is the acknowledgement for a command that goes to Claude: a low rising two-note blip. (A bosun's-call style whistle was
 # drafted and dropped for now; see docs/research/buzzer-sounds.md.)
 LOW_CUES: dict[str, list[tuple[int, int]]] = {
+    "awake": [(8, 3), (8, 3)],         # the wake word was heard: the same two beeps as "listening" (used when there is no speaker)
     "listening": [(8, 3), (8, 3)],     # two equal beeps: ready, say your command
     "thinking": [(4, 4), (9, 2)],      # a low rising pair: got your words, asking Claude
     "heard": [(4, 3), (8, 3)],         # quick "got it" for a recognised local command
 }
 
-DEFAULT_STAGES = ("thinking",)       # only commands that go to Claude get a sound
+DEFAULT_STAGES = ("awake",)          # the sound is the wake chime, right after the wake word (2026-10-07); API calls have their own tone (voice/api_tone.py)
 
 
 class SpeakerCue:
@@ -43,17 +44,19 @@ class SpeakerCue:
 
     def __init__(self, inner: Cue | None = None, *, stages=DEFAULT_STAGES, peak: float | None = None, player=None,
                  tone: str = "short_tone"):
-        from . import short_tone, star_trek_whistle
+        from . import short_tone, star_trek_whistle, wake_chime
 
         module = {"short_tone": short_tone, "star_trek_whistle": star_trek_whistle}[tone]
         self._inner = inner or LogCue()
         self._stages = set(stages)
         self._play = player or (lambda: module.play(peak if peak is not None else module.DEFAULT_PEAK))
+        # the "awake" stage (right after the wake word) always has its own chime, whatever `tone` the other stages use
+        self._play_awake = player or (lambda: wake_chime.play(peak if peak is not None else wake_chime.DEFAULT_PEAK))
 
     def set(self, stage: Stage) -> None:
         self._inner.set(stage)
         if stage in self._stages:
-            self._play()
+            (self._play_awake if stage == "awake" else self._play)()
 
 
 def chunk_notes(notes: list[tuple[int, int]], max_chars: int = 60) -> list[list[tuple[int, int]]]:

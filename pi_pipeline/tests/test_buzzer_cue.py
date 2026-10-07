@@ -19,11 +19,11 @@ class _Link:
 def test_by_default_only_the_claude_stage_beeps():
     sent = []
     cue = BuzzerCue(types.SimpleNamespace(send_token=sent.append))
-    for stage in ("idle", "listening", "heard", "speaking"):
+    for stage in ("idle", "listening", "heard", "speaking", "thinking"):
         cue.set(stage)
-    assert sent == []                                   # no sound for the wake word or a local command
-    cue.set("thinking")
-    assert sent == ["b4 4 9 2"]
+    assert sent == []                                   # no sound for a local command or while thinking (the API has its own tone)
+    cue.set("awake")
+    assert sent == ["b8 3 8 3"]                         # the wake word: the chime
 
 
 def test_stages_are_configurable():
@@ -65,7 +65,7 @@ def test_cue_melodies_sit_in_the_audible_low_range():
 
 def test_the_claude_cue_is_the_low_rising_pair():
     sent = []
-    BuzzerCue(types.SimpleNamespace(send_token=sent.append)).set("thinking")
+    BuzzerCue(types.SimpleNamespace(send_token=sent.append), stages=("thinking",)).set("thinking")
     assert sent == ["b4 4 9 2"]
 
 

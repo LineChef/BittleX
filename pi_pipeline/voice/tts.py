@@ -17,6 +17,11 @@ from typing import Protocol
 log = logging.getLogger("g2.tts")
 
 
+# set while a spoken sentence is playing, so the short signal sounds (api_tone) wait instead of cutting the speech off
+import threading as _threading
+SPEAKING = _threading.Event()
+
+
 class TTS(Protocol):
     def speak(self, text: str) -> None: ...
 
@@ -86,8 +91,12 @@ class PiperTTS:
             return
         text, audio, rate = item
         print(f"\n  G2: {text}\n")
-        self._sd.play(audio, rate)
-        self._sd.wait()
+        SPEAKING.set()
+        try:
+            self._sd.play(audio, rate)
+            self._sd.wait()
+        finally:
+            SPEAKING.clear()
 
     def speak(self, text: str) -> None:
         self.play(self.prepare(text))
