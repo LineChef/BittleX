@@ -330,8 +330,10 @@ re-tuned (+60-70 min each); the 20M stops at a gait check and a fallback is take
 moment calibration ends. A phase that overruns moves everything after it by the same amount.
 
 ## 5b. Decisions and status, evening of 2026-10-06 (user)
-- **Pi-side heading hold** (`pi_pipeline/gait/heading_hold.py`, `--heading-hold`, off by default; sim-validated): its 16-run interleaved A/B on G2 (`g2_baseline.sh start 16 hold_v21 --hold abba`)
-  resumes when G2 is back online (he is charging). If it helps it goes into the sim for **scoring only first**, not training.
+- **Pi-side heading hold** (`pi_pipeline/gait/heading_hold.py`, `--heading-hold`, off by default): the first 16-run A/B on G2 (hold on drifted +82 deg, off +65) steered the
+  wrong way: the stride-difference lever has the OPPOSITE sign on the real G2 from the sim (fixed-u walks, `real-walk-log.md` "The stride-difference lever has the
+  opposite sign..."). Sign fixed in the code; next is a round that dials the correction in (feed-forward near the measured cancel point plus the feedback) until the
+  walk is a straight line, then it can go into the sim for **scoring only** (the sim's own steering sign must be understood first).
 - **Turning screen (S5):** measure the real `kwkL` / `kwkR` turn rates when the Pi is back on G2, before S5 comes up in the queue; the result sets `trained/v3_turning_gate_pass`.
 - **Difficulty curriculum (built and being tested; training stays stopped until it is shown to help):** the base recipe now trains on per-category difficulty levels
   (terrain, ledge, slope, fault) that start at a clean passable floor and rise only where a deterministic probe (every 98k steps, 6 episodes per category) shows the policy
@@ -368,6 +370,7 @@ moment calibration ends. A phase that overruns moves everything after it by the 
 - `pi_pipeline/gait/run_gait.py`: `POLICY_YAW_SIGN` (deployed to the Pi 2026-10-06).
 
 ## 7. Gotchas
+- **The heading lever's sign:** on the real G2 LONGER RIGHT strides turn him LEFT (measured 2026-10-06); `steer_probe.py` / the sim say the opposite. Never take the direction of a stride-length steering effect from the sim; measure it with fixed-u walks first.
 - Scripts that start `SubprocVecEnv` workers must run from a file, not stdin (workers re-import `__main__`).
 - `G2E_` env vars set training knobs (`_g2e` in the env). `DR_EVAL_FULL` is a module attribute, not an env var.
 - `G2E_CMD_PATH=` (empty) means the default `""` (ideal path); `drift_probe.py` only sets defaults it doesn't find in the environment.

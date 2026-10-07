@@ -437,3 +437,27 @@ can give and the heading still went right. Either the stride-scaling lever has t
 or it has far less authority there (the policy sees the changed joint history and may undo it). The roll std fell from 5.6 to 4.1 deg with the hold on, so the lever
 does change the walk. Drift also grew over the series (OFF runs: 43, 49, 46, 66, 69, 85, 100, 66 deg), which the alternating order balances across the two conditions.
 Next: measure the real authority and sign directly with constant u (no feedback), e.g. u = -0.2 / 0 / +0.2, a few runs each.
+
+### The stride-difference lever has the opposite sign on G2 from the sim (2026-10-06, fixed-u walks)
+
+**Longer RIGHT strides turn G2 LEFT** (as with a vehicle whose right wheel runs faster). The sim (`steer_probe.py`) and the first version of `heading_hold.py`
+had it the other way round, so the hold in the A/B above steered into the drift. Fixed-u walks (`g2_baseline.sh start 12 const_u --const-u=-0.2,0,0.2`, u as defined
+before the fix: u > 0 = longer right strides; no feedback; order -0.2, 0, +0.2, +0.2, 0, -0.2 ...; raw logs in `v3-data/const_u/`), heading change over 12.5 s,
+right-positive:
+
+| u | n | Mean | Sd | Runs |
+|---|---|---|---|---|
+| -0.20 (longer LEFT strides) | 4 | +114.5 deg | 3.0 | 118, 114, 117, 110 |
+| 0 | 4 | +90.0 deg | 13.6 | 68, 91, 106, 95 |
+| +0.20 (longer RIGHT strides) | 4 | -29.2 deg | 11.0 | -47, -30, -20, -20 |
+
+- **Authority is large:** u = +0.2 swings the walk by about 120 deg (about 10 deg/s) from the u = 0 drift, more than enough to cancel it. The response is not linear: from
+  0 to +0.2 it is about -600 deg per unit u, from -0.2 to 0 only about -120. The zero crossing of the drift is near u = +0.15 in the old sign (-0.15 in the
+  corrected sign, where u > 0 = longer LEFT strides = a right turn).
+- **The drift itself grew through the evening** (u = 0 runs: +44 deg in the first pilot run, +65 mean over the A/B, +90 here), so a fixed offset is not enough
+  and the feedback (integral) term is needed on top of any feed-forward.
+- **Fix:** `heading_hold.apply_stride_difference` now scales the left swing by (1 + u) and the right by (1 - u), so the controller's own logic is unchanged (a
+  rightward error gives a negative u, which is longer right strides, a left turn). The unit tests pin the sign. Anything written from the sim's `steer_probe`
+  about this lever's direction is wrong for the real G2.
+- **Open:** the sim's steering sign is opposite to the real one. Until that is understood (a left/right leg mapping in the sim, or foot slip), do not use the sim to tune
+  anything that steers by stride length.

@@ -11,17 +11,17 @@ def test_stride_difference_signs_and_stance_fixed_point():
     assert hh.apply_stride_difference(stand, 0.2) == stand                      # the stance angle is the fixed point
     swing = [70, 5, 30, -5, 30, 5, 70, -5]                                       # FLsh +20, FRsh -20, BRhip -20, BLhip +20 from stance
     out = hh.apply_stride_difference(swing, 0.1)
-    assert out[0] == 68 and out[6] == 68                                         # left legs x0.9: 50 + 0.9*20
-    assert out[2] == 28 and out[4] == 28                                         # right legs x1.1: 50 - 22
+    assert out[0] == 72 and out[6] == 72                                         # left legs x1.1: 50 + 1.1*20 (u > 0 = longer LEFT strides = a right turn on G2)
+    assert out[2] == 32 and out[4] == 32                                         # right legs x0.9: 50 - 18
     assert [out[i] for i in (1, 3, 5, 7)] == [5, -5, 5, -5]                      # knees untouched
 
 
-def test_a_rightward_drift_asks_for_longer_left_strides():
+def test_a_rightward_drift_asks_for_longer_right_strides():
     c = hh.HeadingHold()
     u = 0.0
     for _ in range(200):
         u = c.update(math.radians(20.0), 0.0125)                                 # +20 deg = drifted right
-    assert u < 0                                                                 # negative u: right legs shorter, left longer -> turns left
+    assert u < 0                                                                 # negative u: left legs shorter, right longer -> G2 turns left (measured 2026-10-06)
 
 
 def test_output_is_clipped_and_slew_limited():

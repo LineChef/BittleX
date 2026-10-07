@@ -4,16 +4,17 @@ Why not the policy's yaw command: V2.1 never learned to turn (benchmark_v4 turn 
 yaw input does nothing. A trotting robot does turn when the strides on one side are longer than on the other, so this scales the swing of the shoulder / hip
 joints about the stance angle:  left legs (FL shoulder, BL hip) x (1 - u), right legs (FR shoulder, BR hip) x (1 + u), applied to the policy's joint targets.
 
-Measured in the calibrated sim (rl_training/opencat-gym/steer_probe.py, V2.1, 12.5 s walks, 8 episodes per u):
-    u = -0.2 -> +27 deg (left),  -0.1 -> +15,  0 -> -4,  +0.1 -> -20,  +0.2 -> -32 (right):  linear, about 12 deg/s of right turn per unit u,
-    i.e. positive u = LONGER RIGHT strides = a RIGHT turn (the opposite of what one might guess).
+Sign, MEASURED ON THE REAL G2 (2026-10-06, fixed-u walks, 12.5 s, heading change: right-positive): the first version of this module (and the sim's
+steer_probe.py) took longer RIGHT strides to mean a RIGHT turn. On G2 it is the other way, as for a vehicle whose right wheel runs faster: longer right strides
+turn him LEFT. The first A/B (hold on, drift +82 vs off +65 deg) steered the wrong way for that reason. Fixed-u walks with the old sign: u = -0.2 -> +89 deg,
+0 -> +44, +0.2 -> -35 (about 25 deg/s of turn per unit of u, twice the sim's 12). So positive u here is now defined as a RIGHT turn again, which means
+LONGER LEFT strides: left legs (FL shoulder, BL hip) x (1 + u), right legs (FR shoulder, BR hip) x (1 - u), applied to the policy's joint targets.
 Heading here is the gait loop's rebased IMU yaw: + = RIGHT (the firmware convention, run_gait.POLICY_YAW_SIGN flips it only for the policy's input).
 
-Controller: u = -(KP * e + KI * integral(e)), e = heading error in degrees (right-positive), so a drift to the right gives a negative u (longer left strides,
-shorter right ones). u is clipped to +-U_MAX and slew-limited, the integral is frozen while u is saturated (anti-windup), and the hold releases (u -> 0)
+Controller: u = -(KP * e + KI * integral(e)), e = heading error in degrees (right-positive), so a drift to the right gives a negative u (longer right strides,
+shorter left ones: G2 turns left). u is clipped to +-U_MAX and slew-limited, the integral is frozen while u is saturated (anti-windup), and the hold releases (u -> 0)
 when asked to (standing, fallen). Default gains: loop gain 12 deg/s per u x KP 0.02 /deg = 0.24 /s (a ~4 s time constant) with a small integral term for
-the steady push. Authority is limited: a steady drift above ~2.4 deg/s (G2's average is ~+3) is only partly cancelled (about half), a smaller one is
-removed. Off unless run_gait is given --heading-hold.
+the steady push. Authority at u = 0.20 is about 5 deg/s on the real G2 (the sim said 2.4), more than G2's ~+3.3 deg/s average drift. Off unless run_gait is given --heading-hold.
 """
 from __future__ import annotations
 
@@ -64,10 +65,11 @@ class HeadingHold:
 
 
 def apply_stride_difference(joint_deg, u: float):
-    """The policy's 8 joint targets (URDF order, degrees) with the left swing scaled by (1 - u) and the right by (1 + u) about the stance angle."""
+    """The policy's 8 joint targets (URDF order, degrees) with the left swing scaled by (1 + u) and the right by (1 - u) about the stance angle
+    (u > 0: longer left strides = a RIGHT turn on the real G2; measured, see the module docstring)."""
     out = [float(v) for v in joint_deg]
     for j in LEFT_JOINTS:
-        out[j] = STANCE_DEG + (1.0 - u) * (out[j] - STANCE_DEG)
-    for j in RIGHT_JOINTS:
         out[j] = STANCE_DEG + (1.0 + u) * (out[j] - STANCE_DEG)
+    for j in RIGHT_JOINTS:
+        out[j] = STANCE_DEG + (1.0 - u) * (out[j] - STANCE_DEG)
     return [int(round(v)) for v in out]
