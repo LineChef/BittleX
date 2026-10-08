@@ -18,6 +18,7 @@ import types
 from pathlib import Path
 from typing import Protocol
 
+from . import mic_gain
 from .tts import SPEAKING
 
 log = logging.getLogger("g2.stt")
@@ -82,7 +83,7 @@ class VoskSTT:
         def cb(indata, _frames, _t, status):
             if status:
                 log.debug("audio status: %s", status)
-            q.put(bytes(indata))
+            q.put(mic_gain.boost(bytes(indata)))
 
         self.last_speech_t = None
         self.last_info = {}

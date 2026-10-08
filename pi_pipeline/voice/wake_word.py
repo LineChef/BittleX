@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
+from . import mic_gain
 from .tts import SPEAKING
 
 log = logging.getLogger("g2.wake")
@@ -85,7 +86,7 @@ class VoskWakeWord:
         def cb(indata, _frames, _t, status):
             if status:
                 log.debug("audio status: %s", status)
-            data = bytes(indata)
+            data = mic_gain.boost(bytes(indata))      # the microphone is very quiet (voice/mic_gain.py)
             try:
                 q.put_nowait(data)
             except queue.Full:                         # nobody is reading (G2 is talking or thinking): keep the newest audio
