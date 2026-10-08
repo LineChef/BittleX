@@ -253,7 +253,7 @@ g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" )
 g2climbwatch() { ( "$G2_ROOT/rl_training/opencat-gym/climbwatch" "$@" ); }
 
 
-# g2watchrun [TAG] [watch_trained args]  -- replay a training run in the PyBullet GUI from its newest checkpoint, in the G2 hardware world (the G2 profile the V3 runs train in).
+# g2watchrun [TAG] [watch_trained args]  -- watch a training run's newest checkpoint live in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges.  --calm = the flat scoring world instead.
 #   g2watchrun            the run that wrote the newest checkpoint (the one in progress)
 #   g2watchrun v3_20m     a given run;   g2watchrun v3_20m --dr-push 0.35   adds random shoves
 #   g2watchrun list       the runs with their newest checkpoint and how long ago it was written;   g2watchrun which   prints the tag it would watch
