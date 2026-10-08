@@ -5,6 +5,7 @@
 # `install` adds a launchd agent (~/Library/LaunchAgents/com.g2.curate.plist) that runs `run` on that interval and at login. Nothing is downloaded from
 # the internet: the pictures come from G2's Pi on the local network. A run is skipped when the Pi does not answer or an exploration session is active
 # (the Pi is memory-tight then). Log: ~/g2_logs/curate_auto.log.
+# NOTE: `install` (launchd) needs /bin/bash to have Full Disk Access, because macOS blocks launchd agents from scripts under ~/Desktop. The reliable way is tools/g2_bg_jobs.sh.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL=com.g2.curate

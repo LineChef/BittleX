@@ -37,6 +37,7 @@ MAX_IMU_AGE_S = 1.0
 MAX_SURFACE_AGE_H = 12.0
 GOOD_END = ("stopped", "complete")
 BAD_LABELS = ("fall", "collision", "pickup")
+MAX_HOLD_U = 0.30             # the front-foot heading hold (on in every walk since 2026-10-07) is active much of the time on tile (median mean |u| 0.19); above 0.30 it was doing most of the steering
 MIN_GROUP = 6
 OUTLIER_SIGMA = 4.0
 
@@ -96,6 +97,9 @@ def measure(csv_path: str) -> dict:
         c = column(head, rows, name)
         if c is not None and np.isnan(c).any():
             m["missing_values"] = True
+    u = column(head, rows, "steer_u")
+    if u is not None and steady.sum() > 2 and np.isfinite(u[steady]).any():
+        m["steer_u_mean_abs"] = round(float(np.nanmean(np.abs(u[steady]))), 3)            # how hard the heading hold worked in the steady window
     n, age, volt, az = (column(head, rows, c) for c in ("imu_n", "imu_age_s", "volt", "az"))
     if n is not None:
         m["imu_fresh_hz"] = round(float((np.diff(n) > 0).sum() / max(t[-1] - t[0], 1e-9)), 2)
@@ -108,16 +112,25 @@ def measure(csv_path: str) -> dict:
     return m
 
 
-def gate(side: dict, labels: list, m: dict, epochs: dict) -> list[str]:
+def floor_confirmed(side: dict, confirmed: list) -> bool:
+    """A person confirmed the floor for this run's time (`~/g2_data/floor_confirmed.json`: [{"from": "2026-10-08T08:00", "to": "2026-10-08T11:00", "surface": "tile"}]):
+    the label that was set earlier was still right, so its age does not matter."""
+    t = (side.get("started") or "")[:16]
+    return any(c.get("surface") == side.get("surface") and c["from"][:16] <= t <= c["to"][:16] for c in confirmed)
+
+
+def gate(side: dict, labels: list, m: dict, epochs: dict, confirmed: list | None = None) -> list[str]:
     """Reasons a run may not feed a fit (empty list = usable). 'excluded' means a person said so."""
     why: list[str] = []
     if side.get("excluded"):
         return ["excluded: " + str(side.get("excluded_reason", "flagged by a person"))]
     if side.get("end_reason") not in GOOD_END:
         why.append(f"did not end cleanly ({side.get('end_reason')})")
-    applied = [k for k in ("heading_hold", "steer_const", "foot_trim", "foot_hold", "scripted") if side.get(k)]
+    applied = [k for k in ("heading_hold", "steer_const", "foot_trim", "scripted") if side.get(k)]
     if applied:                          # a test walk with a steering intervention or no learned correction: not G2's natural gait, never a fit source
         why.append("steering test run (" + ", ".join(applied) + "): never fed to the sim")
+    if side.get("foot_hold") and m.get("steer_u_mean_abs", 0.0) > MAX_HOLD_U:
+        why.append(f"the front-foot heading hold worked hard (mean |u| {m['steer_u_mean_abs']:.2f} > {MAX_HOLD_U}): not G2's natural gait")
     bad = sorted({x["tag"] for x in labels if x.get("tag") in BAD_LABELS})
     if bad:
         why.append("labelled " + ", ".join(bad))
@@ -127,7 +140,7 @@ def gate(side: dict, labels: list, m: dict, epochs: dict) -> list[str]:
     if side.get("surface") in (None, "", "unknown"):
         why.append("floor not set")
     age = side.get("surface_age_h")
-    if age is not None and age > MAX_SURFACE_AGE_H:
+    if age is not None and age > MAX_SURFACE_AGE_H and not floor_confirmed(side, confirmed or []):
         why.append(f"floor label is {age:.0f} h old")
     if m.get("rows", 0) < 5:
         why.append(f"too few rows ({m.get('rows', 0)})")                 # a run stopped almost at once: nothing to judge, not a damaged log
@@ -167,6 +180,10 @@ def outliers(entries: list[dict]) -> None:
 
 def ingest(raw: str, store: str, epochs: dict | None = None) -> dict:
     epochs = epochs if epochs is not None else load_epochs()
+    try:
+        confirmed = json.load(open(os.path.join(os.path.dirname(os.path.abspath(raw)), "floor_confirmed.json")))
+    except (OSError, ValueError):
+        confirmed = []
     entries = []
     for day in sorted(d for d in os.listdir(raw) if os.path.isdir(os.path.join(raw, d))) if os.path.isdir(raw) else []:
         for fn in sorted(os.listdir(os.path.join(raw, day))):
@@ -181,7 +198,7 @@ def ingest(raw: str, store: str, epochs: dict | None = None) -> dict:
             lab_path = os.path.join(raw, day, stem + ".labels.json")
             labels = json.load(open(lab_path)) if os.path.isfile(lab_path) else []
             m = measure(csv_path) if os.path.isfile(csv_path) else {}
-            why = gate(side, labels, m, epochs) if m else ["no log file"]
+            why = gate(side, labels, m, epochs, confirmed) if m else ["no log file"]
             status = "excluded" if (why and why[0].startswith("excluded")) else "quarantined" if why else "usable"
             e = {"run": stem, "day": day, "kind": side.get("kind"), "policy": side.get("policy"), "epoch": side.get("epoch"), "surface": side.get("surface"), "volt_band": volt_band(m.get("volt_mean")),
                  "started": side.get("started"), "end_reason": side.get("end_reason"), "status": status, "reasons": why, "labels": sorted({x["tag"] for x in labels}),

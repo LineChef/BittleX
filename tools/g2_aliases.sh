@@ -319,6 +319,13 @@ g2pics() {
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 
+# g2cal [build|status|show [ID]|harm-check ID POLICY...|approve ID|revert|auto]  -- the real-data calibration builder (docs/rl/real-data-pipeline.md, Phase 3): fits what G2's run logs
+#   support, writes numbered snapshots, scores policies in the old and new world (idle Mac only), and applies the approval rules. The background loop (`g2bg status`) runs `auto` every 30 min.
+g2cal() { "$G2_ROOT/.venv/bin/python" "$G2_ROOT/tools/g2_calibrate.py" "$@"; }
+g2calauto() { bash "$G2_ROOT/tools/g2_cal_auto.sh" "$@"; }
+# g2bg [start [MIN]|stop|status|once]  -- the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again.
+g2bg() { bash "$G2_ROOT/tools/g2_bg_jobs.sh" "$@"; }
+
 # g2data [sync|ingest|status]  -- G2's automatic run logs on the Mac (docs/rl/real-data-pipeline.md). With no argument: sync, then ingest, then status.
 #   sync = copy the Pi's run logs and detection logs to ~/g2_data (the Pi keeps its copy); ingest = measure every run, apply the quality gates, store it compressed (nothing deleted; a run that fails a gate is quarantined with its reasons);
 #   status = how many runs are usable, by hardware epoch, floor and pack voltage, and why the others are not.

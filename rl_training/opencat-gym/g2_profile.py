@@ -132,6 +132,24 @@ TRAIN_ONLY_PREFIXES = ("G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_A
 WORLD2_CALIBRATION = {"G2E_PAYLOAD_LAYOUT": "spine"}      # (the 1.25 level ceiling is in RECIPE: every run started from now on may earn levels up to 1.25, user 2026-10-07)
 
 
+# --- the approved real-hardware calibration snapshot (tools/g2_calibrate.py, docs/rl/real-data-pipeline.md): fitted from G2's own logs, loaded only once approved ---
+CAL_WHITELIST = ("G2E_IMU_HOLD_STEPS", "G2E_CMD_PATH_EXTRA_MS_MAX")       # the builder's whole list; anything else in a snapshot file is ignored
+
+
+def calibration_snapshot() -> tuple[dict, str | None]:
+    """(settings, snapshot id) of the approved snapshot, or ({}, None): no snapshot approved, `G2_CAL_SNAPSHOT=off`, or any problem reading it."""
+    if os.environ.get("G2_CAL_SNAPSHOT", "on").lower() in ("off", "0", "no"):
+        return {}, None
+    try:
+        import json
+        base = os.path.join(os.path.expanduser(os.environ.get("G2_DATA_DIR", "~/g2_data")), "calibration")
+        cid = int(json.load(open(os.path.join(base, "current.json")))["id"])
+        env = json.load(open(os.path.join(base, "snapshots", f"{cid:04d}.json")))["env"]
+        return {k: str(v) for k, v in env.items() if k in CAL_WHITELIST}, f"{cid:04d}"
+    except Exception:  # noqa: BLE001 -- no snapshot is the normal case
+        return {}, None
+
+
 def world2() -> bool:
     return os.environ.get("G2_WORLD", "") == "2" or os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "trained", "v3_world2"))
 
@@ -140,6 +158,10 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
     """The G2E_* environment for a training run: RECIPE + CALIBRATION + levers + (a stage's course settings) + extra."""
     out = dict(RECIPE)
     out.update(CALIBRATION)
+    cal, cal_id = calibration_snapshot()
+    out.update(cal)
+    if cal_id:
+        out["G2_CAL_ID"] = cal_id                 # the run records which real-data calibration it trained in
     if world2():
         out.update(WORLD2_CALIBRATION)
     for name in lever_names:
@@ -154,7 +176,7 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 def scoring_env(*lever_names: str) -> dict:
     """The physical setup for scoring: RECIPE + CALIBRATION, minus training-only settings. Levers that change the observation or the
     reward geometry a policy was trained with (heading_obs) must be passed so the scoring env builds the same inputs."""
-    out = {k: v for k, v in {**RECIPE, **CALIBRATION, **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
+    out = {k: v for k, v in {**RECIPE, **CALIBRATION, **calibration_snapshot()[0], **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
     for name in lever_names:
         if name == "heading_obs":
             out.update(LEVERS[name])
