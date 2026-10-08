@@ -229,6 +229,55 @@ def restore_pictures(root: str, rels: list[str]) -> list[str]:
     return back
 
 
+def name_pictures(root: str, name: str, rels: list[str]) -> list[dict]:
+    """Give pictures a name by hand (the review page): each picture and its sidecar move to `named/<name>/` (where a voice naming would have put it) and the sidecar says so.
+    Returns [{"from": rel, "to": rel}]; `move_pictures` puts them back (the page's Undo). An unnamed survey picture and an already named one both work (a rename)."""
+    from ..behavior.survey import clean_name
+    nm = clean_name(name)
+    if not nm:
+        raise ValueError("give a name (letters, numbers, spaces and hyphens)")
+    base, out = _base(root), []
+    for rel in rels:
+        src = _inside(base, rel)
+        if not src.exists():
+            continue
+        dst_dir = base / "named" / slug(nm)
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        dst = dst_dir / src.name
+        n = 2
+        while dst.exists() and dst != src:
+            dst = dst_dir / f"{src.stem}_{n}{src.suffix}"
+            n += 1
+        meta = {}
+        try:
+            meta = json.loads(src.with_suffix(".json").read_text())
+        except (OSError, ValueError):
+            pass
+        meta.update(name=nm, pose="named", named_by="hand")
+        if dst != src:
+            src.replace(dst)
+            if src.with_suffix(".json").exists():
+                src.with_suffix(".json").unlink()
+        dst.with_suffix(".json").write_text(json.dumps(meta, indent=1))
+        out.append({"from": rel, "to": str(dst.relative_to(base))})
+    return out
+
+
+def move_pictures(root: str, pairs: list[tuple[str, str]]) -> list[dict]:
+    """Move pictures (with their sidecars) from one path under the root to another: the Undo of `name_pictures`."""
+    base, out = _base(root), []
+    for src_rel, dst_rel in pairs:
+        src, dst = _inside(base, src_rel), _inside(base, dst_rel)
+        if not src.exists() or dst.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.replace(dst)
+        if src.with_suffix(".json").exists():
+            src.with_suffix(".json").replace(dst.with_suffix(".json"))
+        out.append({"from": src_rel, "to": dst_rel})
+    return out
+
+
 def list_trash(root: str = DEFAULT_ROOT) -> list[dict]:
     tr = trash_root(root)
     out = []
@@ -257,6 +306,11 @@ def main(argv=None) -> None:
     for name in ("trash", "restore"):
         sp = sub.add_parser(name)
         sp.add_argument("paths", nargs="+")
+    sp = sub.add_parser("name")
+    sp.add_argument("name")
+    sp.add_argument("paths", nargs="+")
+    sp = sub.add_parser("move")
+    sp.add_argument("pairs", nargs="+", help="SRC:DST relative paths")
     sub.add_parser("trash-list")
     sub.add_parser("empty-trash")
     a = ap.parse_args(argv)
@@ -268,6 +322,10 @@ def main(argv=None) -> None:
         print(json.dumps({"moved": trash_pictures(a.root, a.paths)}))
     elif a.cmd == "restore":
         print(json.dumps({"restored": restore_pictures(a.root, a.paths)}))
+    elif a.cmd == "name":
+        print(json.dumps({"named": name_pictures(a.root, a.name, a.paths)}))
+    elif a.cmd == "move":
+        print(json.dumps({"moved": move_pictures(a.root, [tuple(x.split(":", 1)) for x in a.pairs])}))
     elif a.cmd == "trash-list":
         print(json.dumps(list_trash(a.root)))
     else:

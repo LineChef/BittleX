@@ -38,6 +38,10 @@ class FakePi:
             return json.dumps([])
         if rest[0] == "trash":
             return json.dumps({"moved": rest[1:]})
+        if rest[0] == "name":
+            return json.dumps({"named": [{"from": r, "to": "named/" + rest[1].replace(" ", "-") + "/" + r.split("/")[-1]} for r in rest[2:]]})
+        if rest[0] == "move":
+            return json.dumps({"moved": [{"from": x.split(":")[0], "to": x.split(":")[1]} for x in rest[1:]]})
         return json.dumps({"removed": 0} if rest[0] == "empty-trash" else [])
 
 
@@ -58,6 +62,20 @@ def test_picture_paths_are_checked_before_they_reach_the_pi():
         with pytest.raises(ValueError):
             app.trash_pictures([bad])
     assert app.trash_pictures(["survey/20261007/look_down_1.jpg"]) == {"moved": ["survey/20261007/look_down_1.jpg"]}
+
+
+def test_naming_a_picture_checks_paths_and_asks_for_a_name_and_can_be_undone():
+    pi = FakePi()
+    app = G.App(G.Remote("pi", runner=pi))
+    with pytest.raises(ValueError):
+        app.name_pictures(["survey/20261007/a.jpg"], "   ")
+    with pytest.raises(ValueError):
+        app.name_pictures(["../../x.jpg"], "mug")
+    out = app.name_pictures(["survey/20261007/look_down_1.jpg"], "dish washer")
+    assert out == {"named": [{"from": "survey/20261007/look_down_1.jpg", "to": "named/dish-washer/look_down_1.jpg"}]}
+    assert ["pi_pipeline.vision.exploration_pictures", "name", "dish washer", "survey/20261007/look_down_1.jpg"] in pi.calls
+    back = app.move_pictures([["named/dish-washer/look_down_1.jpg", "survey/20261007/look_down_1.jpg"]])
+    assert back["moved"][0]["to"] == "survey/20261007/look_down_1.jpg"
 
 
 @pytest.fixture

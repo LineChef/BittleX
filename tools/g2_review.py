@@ -128,6 +128,35 @@ class App:
         (CACHE / "people.json").write_text(json.dumps(sorted(marks), indent=1))
         return {"marked": rels if value else [], "unmarked": [] if value else rels}
 
+    def name_pictures(self, paths: list[str], name: str):
+        """Name pictures by hand: they move to named/<name>/ on the Pi (and here), where a voice naming would have put them. Returns the moves, for the Undo."""
+        rels = [self._rel(p) for p in paths]
+        nm = " ".join(str(name or "").split())
+        if not nm:
+            raise ValueError("give a name")
+        out = self.remote.pictures("name", nm, *rels)
+        for m in out.get("named", []):                        # the old local copy goes; the new one comes with the sync
+            f = CACHE / m["from"]
+            if m["from"] != m["to"]:
+                for g in (f, f.with_suffix(".json")):
+                    try:
+                        g.unlink()
+                    except OSError:
+                        pass
+        self.remote.sync_pictures()
+        return out
+
+    def move_pictures(self, pairs: list[list[str]]):
+        out = self.remote.pictures("move", *[f"{self._rel(a)}:{self._rel(b)}" for a, b in pairs])
+        for a, b in pairs:
+            for g in (CACHE / b, (CACHE / b).with_suffix(".json")):
+                try:
+                    g.unlink()
+                except OSError:
+                    pass
+        self.remote.sync_pictures()
+        return out
+
     def trash_pictures(self, paths: list[str]):
         out = self.remote.pictures("trash", *[self._rel(p) for p in paths])
         for p in paths:                                       # the local copy goes too
@@ -220,6 +249,10 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.restore(int(body["trash_id"])))
                 if u.path == "/api/pictures/trash":
                     return self._json(app.trash_pictures(list(body["paths"])))
+                if u.path == "/api/pictures/name":
+                    return self._json(app.name_pictures(list(body["paths"]), str(body["name"])))
+                if u.path == "/api/pictures/move":
+                    return self._json(app.move_pictures([list(x) for x in body["pairs"]]))
                 if u.path == "/api/pictures/person":
                     return self._json(app.mark_people(list(body["paths"]), bool(body["value"])))
                 if u.path == "/api/pictures/restore":
@@ -254,7 +287,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 .x{flex:none;width:32px;height:32px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--x);font-size:1.25rem;line-height:1}.x:hover{background:var(--xbg);border-color:var(--x)}
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 12px}.btn.danger{color:var(--x);border-color:var(--x)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.pbtn{position:absolute;left:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.isperson img{opacity:.35}.isperson .pbtn{background:#b83227;color:#fff}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.pbtn{position:absolute;left:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.nbtn{position:absolute;right:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.isperson img{opacity:.35}.isperson .pbtn{background:#b83227;color:#fff}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
 .card .x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.85)}.group{margin:16px 0 6px;font-weight:600;color:var(--ink2)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;gap:12px;align-items:center;max-width:90vw}
 .toast button{background:none;border:0;color:var(--bg);text-decoration:underline}.empty{color:var(--muted);padding:24px 0}
@@ -291,6 +324,8 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.pose||p.name||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||p.pose||"")+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title="Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render()}catch(e){toast("Failed: "+e.message)}};c.append(pb);
+    const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
+     try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
     c.append(el("div","cap",(p.name||p.pose||"")+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;

@@ -422,3 +422,10 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `G2_FOOT_HOLD=off` in the Pi `.env` | everyday walks without the heading hold (default: on, front-left) |
 | `python pi_pipeline/gait/run_gait.py --foot-hold off` | one walk with the hold off (the hold is on by default) |
 
+## Naming pictures by hand (g2pics page)
+
+| Command | What it does |
+|---|---|
+| `g2pics` | the Pictures tab of the review page; each picture has a **Name** button (type what it is: it moves into that object's folder in the library; Undo in the toast) and a **Person** flag |
+| `g2pics stop` then `g2pics` | restart the page after an update |
+
