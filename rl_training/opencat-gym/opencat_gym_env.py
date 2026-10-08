@@ -2250,10 +2250,14 @@ class OpenCatGymEnv(gym.Env):
             _a_lo, _a_hi = -1.0, _tx           # hard floor: well behind start -> the transition
             _b_lo, _b_hi = _tx, 3.0            # carpet-like: the transition -> well past any episode's reach
             _cs_a = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_a_hi - _a_lo) / 2, 0.4, 0.02])
-            plane_id = p.createMultiBody(0, _cs_a, basePosition=[(_a_hi + _a_lo) / 2, 0, -0.02], baseOrientation=_quat)
+            # Each slab's centre is rotated about the ORIGIN by the ground tilt (a body is rotated about its own centre, so placing both centres at their flat positions and then
+            # tilting them left the two slabs on different planes: with any tilt the junction was a wall, 11 cm at 3 deg and 29 cm at 8 deg, found 2026-10-08).
+            _pos_a, _ = p.multiplyTransforms([0, 0, 0], _quat, [(_a_hi + _a_lo) / 2, 0, -0.02], [0, 0, 0, 1])
+            plane_id = p.createMultiBody(0, _cs_a, basePosition=list(_pos_a), baseOrientation=_quat)
             _cs_b = p.createCollisionShape(p.GEOM_BOX, halfExtents=[(_b_hi - _b_lo) / 2, 0.4, 0.02])
             _step = SURFACE_TRANSITION_STEP_M * (self._d_ledge if SCALE_ALL_HAZARDS else 1.0)   # threshold-strip case: material change + a small ledge together
-            _seg_b = p.createMultiBody(0, _cs_b, basePosition=[(_b_hi + _b_lo) / 2, 0, -0.02 + _step], baseOrientation=_quat)
+            _pos_b, _ = p.multiplyTransforms([0, 0, 0], _quat, [(_b_hi + _b_lo) / 2, 0, -0.02 + _step], [0, 0, 0, 1])
+            _seg_b = p.createMultiBody(0, _cs_b, basePosition=list(_pos_b), baseOrientation=_quat)
             p.changeDynamics(_seg_b, -1, contactStiffness=6e4, contactDamping=900,
                              restitution=0.0, lateralFriction=1.1)   # carpet-typical, same spirit as CARPET_SOFT
             p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])   # box floors render near-black in the GUI otherwise

@@ -175,9 +175,14 @@ if __name__ == "__main__":
 
     # Set up number of parallel environments
     parallel_env = 8
+    _rec_kwargs = {}
+    if int(os.environ.get("G2E_RECORD_EVERY", "0") or 0) > 0:        # record real training episodes so they can be watched exactly (watch_training.py); off by default
+        from episode_recorder import RecordingWrapper
+        os.environ.setdefault("G2E_RECORD_DIR", f"trained/{args.tag}_episodes")
+        _rec_kwargs = dict(wrapper_class=RecordingWrapper)
     env = make_vec_env(OpenCatGymEnv,
                        n_envs=parallel_env,
-                       vec_env_cls=SubprocVecEnv)
+                       vec_env_cls=SubprocVecEnv, **_rec_kwargs)
 
     # Change architecture of neural network to two hidden layers of size 256
     custom_arch = dict(net_arch=[256, 256])

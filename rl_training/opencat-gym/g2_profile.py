@@ -53,6 +53,8 @@ RECIPE = {
     # Competence is measured by a deterministic probe every 98k steps (12 episodes per category from S2 on; C0 and S1 used 6, so their level paths are noisier), not from the noisy training episodes: see train.py Curriculum.
     # The probe score is RELATIVE to the same policy's clean-floor score (same randomization), so up/down thresholds judge hazard handling only.
     "G2E_LEVEL_CAP_BY_TIME": "1", "G2E_LEVEL_MAX": "1.25", "G2E_LEVEL_MIN_BASELINE": "0.5", "G2E_LEVEL_COLLAPSE_BASELINE": "0.35",
+    # record about one training episode in 50 so it can be watched exactly as it happened (episode_recorder.py, watch_training.py); the newest 80 are kept per run
+    "G2E_RECORD_EVERY": "50",
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "12", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
 }
 
@@ -123,7 +125,7 @@ def stage_extra(stage: str, levers) -> dict:
 
 
 # settings that only make sense while training; scoring never uses them
-TRAIN_ONLY_PREFIXES = ("G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_ALL", "G2E_LEVEL_", "G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
+TRAIN_ONLY_PREFIXES = ("G2E_RECORD", "G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_ALL", "G2E_LEVEL_", "G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
                        "G2E_SLOPE_TARGET_PROB", "G2E_LEDGE_", "G2E_SURFACE_", "G2E_SNAG_", "G2E_TRAIN_YAW")
 
 
