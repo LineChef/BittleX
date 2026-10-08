@@ -209,3 +209,7 @@ Fix: each slab's centre is rotated about the origin by the tilt (`p.multiplyTran
 ## 2026-10-08: training episodes can be recorded and watched exactly
 
 `rl_training/opencat-gym/episode_recorder.py` (a gym wrapper, enabled by `G2E_RECORD_EVERY`, set to 50 in the profile recipe; off in scoring) saves about one episode in 50 of every training env: the env settings, the ramp step count, the difficulty levels, the random generator state at the episode's start, and the policy's actions. `python watch_training.py <tag>` rebuilds that episode (same terrain, obstacles, slope, shoves) and feeds the same actions; a headless check reports whether the replay matches the recording (`test_episode_replay.py`: 3 of 3). The existing `watch_v3.sh` stays a live recreation (a fresh simulation with the run's settings), not the training's own episodes. Runs started before this change have no recorded episodes.
+
+## 2026-10-08: standing rule, difficulty never ramps above max capability (user)
+
+Every hazard category's ramp is limited to a measured top threshold (the largest magnitude the best available policy passes at least half the time), so the course stays "very hard but passable" and never impossible. Applies to every new hazard, range change, level ceiling and hard-scale factor; measure first with `passability_audit.py`. Details, method and results: [`passability-audit.md`](passability-audit.md).

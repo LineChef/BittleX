@@ -608,6 +608,13 @@ SLOPE_TARGET_PROB = 0.0   # hw2 (2026-09-23): this fraction of episodes gets a T
                           # never combined with rough/carpet heightfields (those reset the grade).
                           # Sign: pitch > 0 is DOWNHILL for forward walking, so climbs are negative.
 SIDEHILL_DEG = (3.0, 15.0)
+# TOP THRESHOLDS (user rule, 2026-10-08: difficulty never ramps above what a capable policy can pass; docs/rl/passability-audit.md). Each is the largest magnitude the best policy
+# was MEASURED to pass at least half the time (passability_audit.py capability). 0 = no cap. Training episodes only: benchmark cells that set an exact value (SLOPE_FIXED_RP, a
+# fixed ledge height) are never capped. Applied after the level and hard scaling, so no level ceiling or scale factor can push a hazard past what is passable.
+CAP_SIDEHILL_DEG = float(os.environ.get("G2E_CAP_SIDEHILL_DEG", "0") or 0)        # cross-slope roll
+CAP_UPHILL_DEG = float(os.environ.get("G2E_CAP_UPHILL_DEG", "0") or 0)            # climb
+CAP_DOWNHILL_DEG = float(os.environ.get("G2E_CAP_DOWNHILL_DEG", "0") or 0)        # descent
+CAP_LEDGE_M = float(os.environ.get("G2E_CAP_LEDGE_M", "0") or 0)                  # the step face the robot meets, tilt included
 UPHILL_DEG = (12.0, 24.0)
 # 2026-09-23: FAC_LEG_BALANCE / FAC_STANCE_HOVER / FAC_RESID_BIAS / FAC_CONTACT_IMITATION
 # (hw2/hw5/hw7/hw4) were built to fight the learned gaits' limp. Dropped: the limp turned
@@ -2151,6 +2158,15 @@ class OpenCatGymEnv(gym.Env):
             # this (see SLOPE_MAX_DEG) so that tail actually reaches "steep", not
             # just "gentle".
             self._slope_rp = (np.random.triangular(-m, 0.0, m), np.random.triangular(-m, 0.0, m))
+        if SLOPE_FIXED_RP is None and (CAP_SIDEHILL_DEG > 0 or CAP_UPHILL_DEG > 0 or CAP_DOWNHILL_DEG > 0):
+            _r, _pt = self._slope_rp                  # pitch < 0 is a climb, pitch > 0 a descent (see SLOPE_TARGET_PROB)
+            if CAP_SIDEHILL_DEG > 0:
+                _r = float(np.clip(_r, -np.deg2rad(CAP_SIDEHILL_DEG), np.deg2rad(CAP_SIDEHILL_DEG)))
+            if CAP_UPHILL_DEG > 0:
+                _pt = max(_pt, -float(np.deg2rad(CAP_UPHILL_DEG)))
+            if CAP_DOWNHILL_DEG > 0:
+                _pt = min(_pt, float(np.deg2rad(CAP_DOWNHILL_DEG)))
+            self._slope_rp = (float(_r), float(_pt))
         # CARPET (bump heightfield) is an UNEVEN floor covering -- a bunched rug,
         # a rough mat, a transition edge -- not fitted wall-to-wall carpet. Real
         # fitted carpet is flat at the scale that matters for foot placement
@@ -2325,6 +2341,10 @@ class OpenCatGymEnv(gym.Env):
                 and np.random.rand() < LEDGE_PROB):
             self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
                                    else LEDGE_HEIGHT) * self._d_ledge)
+            if CAP_LEDGE_M > 0 and SLOPE_FIXED_RP is None:
+                # the face the robot meets = the block height plus, on a descent, the ground that falls away over the 0.11 m to the edge (found: a 3.2 cm ledge on a 16 deg descent was a 6.1 cm face)
+                _fall = 0.11 * max(0.0, float(np.tan(self._slope_rp[1])))
+                self._ledge_h = float(max(0.0, min(self._ledge_h, CAP_LEDGE_M - _fall)))
             self._ledge_dir = LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1]))
             _lw = 0.30                          # across-path half-width: cannot be side-stepped
             _edge = 0.11                        # x of the edge -- close, so a ~3 s episode actually
@@ -2342,7 +2362,11 @@ class OpenCatGymEnv(gym.Env):
         _pose_tilt = 0.0
         if START_POSE_JITTER > 0 and self._dr > 0:
             _pose_tilt = np.deg2rad(0.3 * START_POSE_JITTER) * self._dr
-        start_pos = [0, 0, 0.08 + (self._ledge_h if self._ledge_dir < 0 else 0.0)]
+        # The ground plane tilts about the ORIGIN and the robot starts parallel to it, but 0.08 m straight up from the origin is only 0.08 * cos(tilt) above the plane along
+        # its normal: on a steep slope the feet started inside the ground (found 2026-10-08: 5% of slope episodes overlapped by more than 1 cm at level 1.0, 10% at 1.25).
+        # Lifting by 1/cos(tilt) keeps the same clearance above the plane at any tilt.
+        _cos_tilt = max(0.5, float(np.cos(self._slope_rp[0]) * np.cos(self._slope_rp[1])))
+        start_pos = [0, 0, 0.08 / _cos_tilt + (self._ledge_h if self._ledge_dir < 0 else 0.0)]
         start_orient = p.getQuaternionFromEuler([
             self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
