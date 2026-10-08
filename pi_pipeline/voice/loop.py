@@ -222,6 +222,11 @@ class VoiceLoop:
             note = "[Picture from G2's camera. Describe what you see out loud now.]"
         return {"image": snap.jpeg, "image_note": f"{note} {snap.hint()}"}
 
+    def _pose_token(self, token: str) -> None:
+        """One step of the picture pose sequence: a raw OpenCat skill token through the actuator's `perform_token` (`perform` only knows skill names and ignores a token)."""
+        fn = getattr(self._act, "perform_token", None)
+        (fn or self._act.perform)(token)
+
     def _pose_for_picture(self) -> None:
         """Any picture, any time the camera is used (user, 2026-10-07): look down (the inspect bow), look up, stand again and settle before the shot, the same sequence as a survey stop
         or a naming. A failed skill must not stop the picture or the voice loop."""
@@ -234,7 +239,7 @@ class VoiceLoop:
                 wait = delay - (time.monotonic() - t0)
                 if wait > 0:
                     time.sleep(wait)
-                self._act.perform(skill)
+                self._pose_token(skill)
             end = picture_pose_steps(SurveyConfig(), settle_only=True)
             wait = end - (time.monotonic() - t0)
             if wait > 0:
@@ -290,7 +295,7 @@ class VoiceLoop:
                 if wait > 0:
                     time.sleep(wait)
                 if kind == "skill":
-                    self._act.perform(payload)
+                    self._pose_token(payload)
                 elif kind == "shot":
                     saved = self._namer(payload)
         except Exception:  # noqa: BLE001 -- a failed picture must not end the voice loop

@@ -55,6 +55,9 @@ class MockActuator:
     def send_token(self, token: str) -> None:
         log.info("[mock] G2 would send %r", token)
 
+    def perform_token(self, token: str) -> None:
+        log.info("[mock] G2 would perform the raw skill token %r", token)
+
     def read_voltage(self) -> float | None:
         return None                      # no robot, no battery
 
@@ -176,6 +179,18 @@ class SerialActuator:
             self.on_command()
         self._send(self._opencat.REST, read_reply=False)
         self._balance(False)
+
+    def perform_token(self, token: str) -> None:
+        """Send one raw OpenCat SKILL token (`kbuttUp`, `ksit`, `kup`: the picture-pose sequence of `behavior/survey`) and let it replace whatever is running: a policy walk is stopped
+        without the rest, the standing cap is cancelled. `perform()` takes skill NAMES from `voice/skills.py` and ignores a raw token (2026-10-07: the first voice 'look' skipped its pose that way)."""
+        log.info("G2 pose token %r", token)
+        self._cancel_cap()
+        if self._policy_walker is not None:
+            self._policy_walker.stop(rest=False)
+        self._gait_active = False
+        if self.on_command:
+            self.on_command()
+        self._send(token, read_reply=False)
 
     def send_token(self, token: str) -> None:
         """Send one raw OpenCat token (used for buzzer cues). Skipped while a looping gait is

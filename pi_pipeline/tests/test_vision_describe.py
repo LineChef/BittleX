@@ -438,6 +438,6 @@ def test_a_voice_look_poses_before_the_picture_bow_look_up_stand(monkeypatch):
     skills = []
     cam = _Cam(Snapshot(JPEG, 240, 240))
     lp, conv = make_loop(cam, ["what do you see"])
-    lp._act = types.SimpleNamespace(perform=lambda s, **k: skills.append(s), stop=lambda: None, close=lambda: None)
+    lp._act = types.SimpleNamespace(perform=lambda s, **k: skills.append(("name", s)), perform_token=lambda t: skills.append(t), stop=lambda: None, close=lambda: None)
     lp._one_turn()
-    assert skills == ["kbuttUp", "ksit", "kup"] and cam.snapshots == 1
+    assert skills == ["kbuttUp", "ksit", "kup"] and cam.snapshots == 1       # raw tokens go through perform_token: perform() takes names and ignored them
