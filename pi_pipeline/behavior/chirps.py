@@ -33,13 +33,14 @@ class ChirpMood(Enum):
 
 # (tone_index, duration_units) sequences. Kept short (<= ~5 notes).
 CHIRP: dict[ChirpMood, list[tuple[int, int]]] = {
-    ChirpMood.HAPPY:    [(20, 6), (24, 6), (28, 8)],       # bright rising
-    ChirpMood.CONFUSED: [(18, 5), (14, 5), (17, 4), (13, 6)],  # wobble down-up-down
-    ChirpMood.ALERT:    [(30, 4), (30, 4)],                 # two sharp equal beeps
-    ChirpMood.SLEEPY:   [(16, 10), (12, 12), (9, 16)],      # slow descending, low
-    ChirpMood.QUESTION: [(19, 5), (26, 8)],                 # rising two-note "?"
-    ChirpMood.GREETING: [(24, 3), (28, 3), (24, 3), (30, 6)],  # quick trill
-    ChirpMood.ACK:      [(26, 3), (30, 3)],                 # quick "got it" blip
+    # LOWER REGISTER (user, 2026-10-08: heard on G2, "easier to hear"): the first-cut tones below, each note 10 semitones lower (the buzzer is loudest at the low end).
+    ChirpMood.HAPPY:    [(10, 6), (14, 6), (18, 8)],       # bright rising
+    ChirpMood.CONFUSED: [(8, 5), (4, 5), (7, 4), (3, 6)],  # wobble down-up-down
+    ChirpMood.ALERT:    [(20, 4), (20, 4)],                 # two sharp equal beeps
+    ChirpMood.SLEEPY:   [(6, 10), (2, 12), (1, 16)],        # slow descending, low
+    ChirpMood.QUESTION: [(9, 5), (16, 8)],                  # rising two-note "?"
+    ChirpMood.GREETING: [(14, 3), (18, 3), (14, 3), (20, 6)],  # quick trill
+    ChirpMood.ACK:      [(16, 3), (20, 3)],                 # quick "got it" blip
 }
 
 # voice-loop cue stage -> a mood (or None to stay silent)

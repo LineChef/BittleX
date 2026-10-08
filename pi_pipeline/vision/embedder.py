@@ -85,9 +85,9 @@ class HistogramEmbedder:
 class OnnxEmbedder:
     """An ONNX image model as an embedder. The output is pooled to one vector (a 4-D feature map is averaged over its spatial axes; a 3-D token output over tokens) and normalised."""
 
-    def __init__(self, path: str, size: int = 224, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), providers=("CPUExecutionProvider",)):
+    def __init__(self, path: str, size: int = 224, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), providers=("CPUExecutionProvider",), pool: str = "auto"):
         import onnxruntime as ort
-        self.path, self.size = str(path), int(size)
+        self.path, self.size, self.pool = str(path), int(size), pool
         self.name = "onnx:" + self.path.rsplit("/", 1)[-1]
         self._mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
         self._std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
@@ -100,15 +100,29 @@ class OnnxEmbedder:
         im = to_image(img).resize((self.size, self.size), Image.BICUBIC)
         x = (np.asarray(im, dtype=np.float32) / 255.0 - self._mean) / self._std
         x = np.transpose(x, (2, 0, 1))[None].astype(np.float32)
-        out = self._sess.run(None, {self._in: x})[0]
-        out = np.asarray(out, dtype=np.float32)
-        if out.ndim == 4:
-            out = out.mean(axis=(2, 3))
-        elif out.ndim == 3:
-            out = out.mean(axis=1)
-        v = _unit(out.reshape(-1))
+        out = np.asarray(self._sess.run(None, {self._in: x})[0], dtype=np.float32)
+        v = pool_output(out, self.pool)
         self.dim = int(v.size)
         return v
+
+
+def pool_output(out: np.ndarray, pool: str = "auto") -> np.ndarray:
+    """One unit vector from a model output: a 2-D (1, D) output is used as is; a 4-D feature map is averaged over its spatial axes; a 3-D token output (1, tokens, D) with a leading class token
+    (a ViT / DINO encoder) is pooled as 'cls' (token 0), 'mean' (the other tokens averaged) or 'cls+mean' (both, each normalised, joined; the default for 3-D)."""
+    out = np.asarray(out, dtype=np.float32)
+    if out.ndim == 4:
+        return _unit(out.mean(axis=(2, 3)).reshape(-1))
+    if out.ndim == 3:
+        mode = "cls+mean" if pool == "auto" else pool
+        cls, mean = out[0, 0], out[0, 1:].mean(axis=0)
+        if mode == "cls":
+            return _unit(cls)
+        if mode == "mean":
+            return _unit(mean)
+        if mode == "cls+mean":
+            return _unit(np.concatenate([_unit(cls), _unit(mean)]))
+        raise ValueError(f"unknown pool {pool!r}")
+    return _unit(out.reshape(-1))
 
 
 def make_embedder(spec: str = "histogram"):
@@ -116,5 +130,6 @@ def make_embedder(spec: str = "histogram"):
     if spec == "histogram":
         return HistogramEmbedder()
     if spec.startswith("onnx:"):
-        return OnnxEmbedder(spec[5:])
+        path, _, pool = spec[5:].partition("#")            # 'onnx:/path/model.onnx#cls' picks the token pooling of a ViT / DINO encoder
+        return OnnxEmbedder(path, pool=pool or "auto")
     raise ValueError(f"unknown embedder {spec!r}: use 'histogram' or 'onnx:/path/model.onnx'")

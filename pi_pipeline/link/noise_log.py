@@ -56,9 +56,16 @@ def _caller() -> str:
 def record(command: str, source: str | None = None, *, sent: bool = True) -> None:
     kind = classify(command)
     if kind is None:
+        # G2_NOISE_LOG_ALL=1: also write the quiet commands (not the joint / head streams `i ...` and `m...`) so a sound the board makes on its own can be matched to what was sent just before it
+        if os.environ.get("G2_NOISE_LOG_ALL") == "1" and command.strip() and not command.lstrip().startswith(("i ", "m")):
+            _append({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "kind": "quiet", "command": command.strip(), "source": source or _caller(), "sent": sent})
         return
     source = source or _caller()
     log.info("BiBoard noise: %s %r from %s%s", kind, command.strip(), source, "" if sent else " (NOT sent)")
+    _append({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "kind": kind, "command": command.strip(), "source": source, "sent": sent})
+
+
+def _append(row: dict) -> None:
     p = _path()
     if p is None:
         return
@@ -66,7 +73,7 @@ def record(command: str, source: str | None = None, *, sent: bool = True) -> Non
         with _lock:
             p.parent.mkdir(parents=True, exist_ok=True)
             with p.open("a") as f:
-                f.write(json.dumps({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "kind": kind, "command": command.strip(), "source": source, "sent": sent}) + "\n")
+                f.write(json.dumps(row) + "\n")
     except OSError:
         log.debug("noise log not written", exc_info=True)
 

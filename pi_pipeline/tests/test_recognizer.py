@@ -69,3 +69,18 @@ def test_make_embedder_names_and_errors():
     assert isinstance(make_embedder("histogram"), HistogramEmbedder) and isinstance(make_embedder(""), HistogramEmbedder)
     with pytest.raises(ValueError):
         make_embedder("clip")
+
+
+def test_pool_output_handles_flat_feature_map_and_class_token_outputs():
+    from pi_pipeline.vision.embedder import pool_output
+    flat = pool_output(np.array([[3.0, 4.0]]))
+    assert np.allclose(flat, [0.6, 0.8])
+    fmap = np.ones((1, 4, 2, 2), dtype=np.float32) * np.array([1, 2, 3, 4], dtype=np.float32).reshape(1, 4, 1, 1)
+    assert pool_output(fmap).shape == (4,)
+    tokens = np.zeros((1, 5, 3), dtype=np.float32)
+    tokens[0, 0] = [1, 0, 0]; tokens[0, 1:] = [0, 2, 0]
+    assert np.allclose(pool_output(tokens, "cls"), [1, 0, 0]) and np.allclose(pool_output(tokens, "mean"), [0, 1, 0])
+    both = pool_output(tokens)
+    assert both.shape == (6,) and abs(float(np.linalg.norm(both)) - 1.0) < 1e-6
+    with pytest.raises(ValueError):
+        pool_output(tokens, "max")
