@@ -11,6 +11,7 @@ capturing data for it.
 | [`detection-layer.md`](detection-layer.md) | Architecture: one model slot, three roles (safety / interaction / objects), a model-manager that swaps by mode. |
 | [`person-recognition.md`](person-recognition.md) | B15 — individual recognition + the "G2, meet X" enrollment flow. |
 | [`exploration-object-learning-plan.md`](exploration-object-learning-plan.md) | **The plan (2026-10-07):** exploration survey pictures, naming objects by voice, processing the pictures, recognition, "what am I looking at?" and "I see the ...". |
+| [`downloaded-models.md`](downloaded-models.md) | **Models downloaded from the internet (outside the repo):** source, size, SHA-256, what each was checked against, who approved it, and what those checks do and do not show |
 | [`detector-bench.md`](detector-bench.md) | Measured on-device detector behaviour (rate, latency, dropout, noise) + confirmed firmware facts. |
 
 The runtime code is `pi_pipeline/vision/` (feed / avoidance / cliff-guard /
