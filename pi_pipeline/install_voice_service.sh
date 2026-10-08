@@ -25,6 +25,7 @@ Wants=network-online.target
 User=$(id -un)
 WorkingDirectory=$ROOT
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONFAULTHANDLER=1
 ExecStart=$PY -m pi_pipeline.voice --mode voice --actuator serial
 Restart=on-failure
 RestartSec=10
