@@ -341,6 +341,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-app
 h1{font-size:1.4rem;margin:0 0 4px}.sub{color:var(--muted);font-size:.85rem;margin-bottom:14px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
 .tab{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+.labelsum{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0;color:var(--ink)}
+.labelsum .sub{color:var(--ink2);font-size:.85em;margin-top:4px}
+.divider{margin:18px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--accent);color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:.8em}
 .tab[aria-selected=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
 .bar{display:flex;gap:8px;align-items:center;margin-bottom:10px}.bar input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
 button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
@@ -406,14 +409,22 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
-  for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
+  const named=Object.keys(groups).filter(g=>g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y)),survey=Object.keys(groups).filter(g=>!g.startsWith("Named: ")).sort().reverse();
+  const nl=named.reduce((n,g)=>n+groups[g].length,0),nu=survey.reduce((n,g)=>n+groups[g].length,0);
+  const sum=el("div","labelsum");sum.append(el("b","","Labels so far: "));
+  sum.append(document.createTextNode(named.length?named.map(g=>g.slice(7)+" ("+groups[g].length+")").join(" \u00b7 "):"none yet"));
+  sum.append(el("div","sub",nl+" labeled, "+nu+" not labeled yet. Name a picture with its Name button; labeled pictures are listed first."));list.append(sum);
+  const order=[...named,...survey];if(named.length&&survey.length){order.splice(named.length,0,"\u0000divider")}
+  for(const g of order){if(g==="\u0000divider"){list.append(el("div","divider","Not labeled yet"));continue}
+   if(g===named[0])list.append(el("div","divider","Labeled"));
+   {list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
-    c.append(picCaption(p));grid.append(c)}list.append(grid)}return}
+    c.append(picCaption(p));grid.append(c)}list.append(grid)}}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
   const b=el("button","btn danger","Empty trash");b.onclick=async()=>{if(Date.now()-confirmAt>4000){confirmAt=Date.now();b.textContent="Click again to delete for good";return}
    try{const r=await api("/api/empty-trash",{});toast("Deleted for good: "+r.memory.removed+" records, "+r.pictures.removed+" pictures");load()}catch(e){toast("Failed: "+e.message)}};$("#extra").append(b);
