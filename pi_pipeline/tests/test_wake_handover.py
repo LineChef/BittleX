@@ -13,6 +13,14 @@ class _Stream:
 
     def start(self):
         self.started = True
+        import threading
+        import time
+
+        def feed():                                     # a live microphone: blocks keep arriving
+            while not self.closed and not getattr(self, "stopped_feeding", False):
+                self.cb(b"\x00" * 8, 4, None, None)
+                time.sleep(0.002)
+        threading.Thread(target=feed, daemon=True).start()
 
     def stop(self):
         pass
@@ -42,12 +50,11 @@ def _wake():
 
     def factory(**k):
         holder["s"] = _Stream(**k)
-        for _ in range(3):
-            k["callback"](b"\x00" * 8, 4, None, None)      # three blocks are already waiting
         return holder["s"]
 
     w._sd = types.SimpleNamespace(RawInputStream=factory)
-    w._rate, w._phrases, w._grammar, w._Recognizer, w._model, w._live = 16000, ["gee two"], "[]", _Rec, None, None
+    w._rate, w._phrases, w._grammar, w._Recognizer, w._model = 16000, ["gee two"], "[]", _Rec, None
+    w._stream, w._q, w._handover = None, queue.Queue(maxsize=200), False
     return w, holder
 
 
@@ -56,18 +63,19 @@ def test_the_stream_stays_open_after_the_wake_word_and_is_handed_over():
     w.wait()
     assert not holder["s"].closed
     q, close = w.hand_over()
-    assert isinstance(q, queue.Queue) and q.qsize() >= 1        # the audio since the hit is waiting
+    assert isinstance(q, queue.Queue)
     close()
-    assert holder["s"].closed
+    assert not holder["s"].closed                  # closing a PortAudio stream segfaulted the service: the stream is never closed
     assert w.hand_over() is None
 
 
-def test_an_untaken_stream_is_closed_before_the_next_wait():
+def test_one_stream_serves_every_wake_word_and_is_never_closed():
     w, holder = _wake()
     w.wait()
     first = holder["s"]
+    w.hand_over()
     w.wait()
-    assert first.closed
+    assert holder["s"] is first and not first.closed
 
 
 def test_stt_uses_the_handed_over_stream_instead_of_opening_the_microphone():

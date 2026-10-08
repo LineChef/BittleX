@@ -42,6 +42,9 @@ def _parse_phrases(phrase: str | list[str]) -> list[str]:
     return list(seen)
 
 
+_QUEUE_BLOCKS = 200                     # about 50 s of audio (4000-sample blocks at 16 kHz)
+
+
 class VoskWakeWord:
     def __init__(self, model_path: str, phrase: str | list[str], sample_rate: int = 16000):
         import sounddevice as sd
@@ -61,68 +64,74 @@ class VoskWakeWord:
         # restrict the recogniser to the wake phrases + [unk] -> very low CPU
         self._grammar = json.dumps([*self._phrases, "[unk]"])
         self._Recognizer = KaldiRecognizer
-        self._live = None
+        # ONE microphone stream for the life of the process, never closed: closing a PortAudio stream segfaulted the whole voice service
+        # (2026-10-08: sounddevice `close()` from the command window's timeout, a native crash with no Python traceback; the crash report in
+        # diag/crashwatch.py pointed at it). The stream feeds a bounded queue; the wake-word detector and the speech recogniser take turns reading it.
+        self._stream = None
+        self._q: "queue.Queue[bytes]" = queue.Queue(maxsize=_QUEUE_BLOCKS)
+        self._handover = False
 
-    def _close_live(self) -> None:
-        live, self._live = self._live, None
-        if live is not None:
-            try:
-                live[0].stop()
-                live[0].close()
-            except Exception:  # noqa: BLE001
-                log.debug("closing the wake-word stream failed", exc_info=True)
-
-    def hand_over(self):
-        """After a wake word the microphone stream is left open, with the audio heard since the wake word waiting in its queue, so the
-        speech recogniser can carry on from the same stream (the card cannot be opened twice, and closing and re-opening it loses the first
-        words of a command said straight after the wake word). Returns ``(queue, close)`` or None."""
-        live = self._live
-        if live is None:
-            return None
-        self._live = None
-        stream, q = live
-
-        def close():
-            try:
-                stream.stop()
-                stream.close()
-            except Exception:  # noqa: BLE001
-                log.debug("closing the handed-over stream failed", exc_info=True)
-
-        return q, close
-
-    def wait(self) -> None:
-        self._close_live()                    # a stream nobody took over last time
-        rec = self._Recognizer(self._model, self._rate, self._grammar)
-        q: "queue.Queue[bytes]" = queue.Queue()
+    def _ensure_stream(self) -> None:
+        if self._stream is not None and getattr(self._stream, "active", True):
+            return
+        if self._stream is not None:
+            log.warning("the microphone stream stopped; opening a new one (the old one is left alone, not closed)")
+        q: "queue.Queue[bytes]" = queue.Queue(maxsize=_QUEUE_BLOCKS)
 
         def cb(indata, _frames, _t, status):
             if status:
                 log.debug("audio status: %s", status)
-            q.put(bytes(indata))
+            data = bytes(indata)
+            try:
+                q.put_nowait(data)
+            except queue.Full:                         # nobody is reading (G2 is talking or thinking): keep the newest audio
+                try:
+                    q.get_nowait()
+                    q.put_nowait(data)
+                except (queue.Empty, queue.Full):
+                    pass
 
-        stream = self._sd.RawInputStream(
-            samplerate=self._rate, blocksize=4000, dtype="int16",
-            channels=1, callback=cb,
-        )
+        stream = self._sd.RawInputStream(samplerate=self._rate, blocksize=4000, dtype="int16", channels=1, callback=cb)
         stream.start()
+        self._stream, self._q = stream, q
+
+    def hand_over(self):
+        """After a wake word the microphone stream keeps running, with the audio heard since the wake word waiting in its queue, so the
+        speech recogniser can carry on from the same stream (the card cannot be opened twice, and re-opening it loses the first words of a
+        command said straight after the wake word). Returns ``(queue, close)`` or None; `close` does nothing: the stream is never closed."""
+        if not self._handover or self._stream is None:
+            return None
+        self._handover = False
+        return self._q, (lambda: None)
+
+    def wait(self) -> None:
+        self._ensure_stream()
+        self._handover = False
+        q = self._q
         try:
-            while True:
-                data = q.get()
-                if rec.AcceptWaveform(data):
-                    heard = json.loads(rec.Result()).get("text", "")
-                else:
-                    heard = json.loads(rec.PartialResult()).get("partial", "")
-                heard = heard.lower()
-                hit = next((p for p in self._phrases if p in heard), None)
-                if hit:
-                    log.info("wake word heard (%r)", hit)
-                    self._live = (stream, q)      # keep listening on this stream; the recogniser picks it up
-                    return
-        finally:
-            if self._live is None:
-                stream.stop()
-                stream.close()
+            while True:                                # whatever was heard while G2 talked or thought is not a wake word
+                q.get_nowait()
+        except queue.Empty:
+            pass
+        rec = self._Recognizer(self._model, self._rate, self._grammar)
+        while True:
+            try:
+                data = q.get(timeout=2.0)
+            except queue.Empty:
+                if not getattr(self._stream, "active", True):
+                    self._ensure_stream()
+                    q = self._q
+                continue
+            if rec.AcceptWaveform(data):
+                heard = json.loads(rec.Result()).get("text", "")
+            else:
+                heard = json.loads(rec.PartialResult()).get("partial", "")
+            heard = heard.lower()
+            hit = next((p for p in self._phrases if p in heard), None)
+            if hit:
+                log.info("wake word heard (%r)", hit)
+                self._handover = True                  # keep listening on this stream; the recogniser picks it up
+                return
 
 
 def make_wake_word(mode: str, *, vosk_model_path: str, phrase: str | list[str]) -> WakeWord:
