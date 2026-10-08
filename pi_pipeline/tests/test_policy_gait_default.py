@@ -141,3 +141,41 @@ def test_policy_walker_passes_the_foot_hold_and_respects_off(monkeypatch):
     assert seen == ["fl", "absent", "legacy"]
     monkeypatch.setenv("G2_FOOT_HOLD", "off")
     assert default_foot_hold() is None
+
+
+def test_a_turn_is_timed_and_the_straight_policy_walk_waits_for_it():
+    link, w = Link(), FakeWalker()
+    now = [100.0]
+    s = WalkerSink(link, policy_walker=w, clock=lambda: now[0])
+    s.walk(0.0)
+    assert w.calls == [("walk", None)]
+    s.turn(0.9)                                                  # about 52 deg to the right: 0.85 * 52 / 18 deg/s = 2.5 s of the firmware turn
+    assert link.sent == ["kwkR"] and s.turning() and w.calls[-1] == ("stop", False)
+    now[0] += 1.0
+    s.walk(0.0)                                                  # the next WANDER tick: the turn is left alone
+    s.turn(0.9)
+    assert link.sent == ["kwkR"] and w.calls[-1] == ("stop", False)
+    now[0] += 1.6                                                # 2.6 s in: the turn is over
+    assert not s.turning()
+    s.walk(0.0)
+    assert w.calls[-1] == ("walk", None)                         # the learned policy walks on, straight, with a fresh hold
+
+
+def test_a_left_turn_takes_longer_than_a_right_turn_and_small_or_nested_turns_are_ignored():
+    for rad, expect_s in ((0.9, 2.5), (-0.9, 4.2)):
+        link, w = Link(), FakeWalker()
+        now = [0.0]
+        s = WalkerSink(link, policy_walker=w, clock=lambda: now[0])
+        s.turn(rad)
+        now[0] = expect_s - 0.3
+        assert s.turning()
+        now[0] = expect_s + 0.3
+        assert not s.turning()
+    link, w = Link(), FakeWalker()
+    s = WalkerSink(link, policy_walker=w, clock=lambda: 0.0)
+    s.turn(0.05)                                                 # under 7 deg: nothing is sent
+    assert link.sent == [] and not s.turning()
+    s.turn(6.0)                                                  # a huge turn is capped at 6 s
+    assert 0.0 < s._turn_until <= 6.0
+    s.stop()                                                     # a stop cancels the turn
+    assert s._turn_until == 0.0

@@ -10,7 +10,9 @@ already reconnects on its own), and `dry_run` power calls don't touch the Pi.
 from __future__ import annotations
 
 import logging
+import math
 import threading
+import time
 
 from ..behavior.bindings import DriverBindings
 from ..link import opencat
@@ -81,13 +83,22 @@ class HeadSink:
 class WalkerSink:
     """WALK / TURN -> firmware walk gaits (the bring-up default; the RL gait
     loop is `gait/run_gait.py`, run separately). `walk(bias)` goes forward;
-    `turn(rad)` uses the curved-walk L/R tokens."""
+    `turn(rad)` is a TIMED firmware curved walk: the L/R token turns G2 only while it runs, so it runs for as long as the angle needs at G2's measured firmware turn
+    rates (left about 11 deg/s, right about 18 deg/s, 2026-10-06) and `walk()` leaves it alone until it ends (2026-10-07: the old turn lasted one tick, the next WANDER tick
+    handed the walk back to the straight policy, so "heading off in a new direction" never changed direction)."""
 
-    def __init__(self, link, *, turn_threshold: float = 0.15, policy_walker=None):
+    TURN_RATE_DPS = {"left": 11.0, "right": 18.0}     # measured yaw rates of the firmware wkL / wkR gaits on G2
+    TURN_GAIN = 0.85                                  # turn a bit less than asked: the heading hold and the next bearing check finish the job
+    TURN_MIN_RAD = 0.12                               # a smaller turn is not worth a gait change
+    TURN_MAX_S = 6.0
+
+    def __init__(self, link, *, turn_threshold: float = 0.15, policy_walker=None, clock=time.monotonic):
         self._link = link
         self._thr = turn_threshold
         self._last = ""
         self._policy = policy_walker         # straight-ahead walking uses the learned policy when given; turns stay firmware tokens
+        self._clock = clock
+        self._turn_until = 0.0               # a timed turn is running until this time
 
     def _send_once(self, token: str) -> None:
         if token != self._last:            # firmware gaits are continuous
@@ -99,7 +110,14 @@ class WalkerSink:
             self._policy.stop(rest=False)       # hand over to a firmware gait without lying down in between
             self._last = ""
 
+    def turning(self) -> bool:
+        return self._clock() < self._turn_until
+
     def walk(self, bias: float = 0.0) -> None:
+        if self.turning():
+            return                              # a timed turn is running: let it finish before walking on
+        if self._turn_until:                    # it just ended: the next command (re)starts cleanly
+            self._turn_until, self._last = 0.0, ""
         if self._policy is not None and -self._thr < bias < self._thr:
             if not self._policy.busy:
                 self._last = ""
@@ -114,10 +132,19 @@ class WalkerSink:
             self._send_once(opencat.skill("wkF"))
 
     def turn(self, rad: float) -> None:
+        r = float(rad)
+        if abs(r) < self.TURN_MIN_RAD or self.turning():
+            return                              # too small to bother, or a turn is already running
+        side = "right" if r >= 0 else "left"
+        dur = min(self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self.TURN_RATE_DPS[side])
         self._firmware()
-        self._send_once(opencat.WALK_RIGHT if float(rad) >= 0 else opencat.WALK_LEFT)
+        self._last = ""
+        self._send_once(opencat.WALK_RIGHT if r >= 0 else opencat.WALK_LEFT)
+        self._turn_until = self._clock() + dur
+        log.info("timed turn %s %.0f deg for %.1f s", side, math.degrees(abs(r)), dur)
 
     def stop(self) -> None:
+        self._turn_until = 0.0
         if self._policy is not None:
             self._policy.stop(rest=True)
         self._link.send(opencat.REST, read_reply=False)
