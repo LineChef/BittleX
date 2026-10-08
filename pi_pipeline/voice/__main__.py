@@ -167,8 +167,8 @@ def main() -> None:
         if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
             stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
         def on_event(**kw):
-            if watcher and kw.get("wake_word"):
-                watcher.check_now()                   # a battery reading when G2 is woken (there is no idle timer: each `P` makes the board tick)
+            # no battery read at the wake word: each `P` makes the BiBoard tick, which sounded like the board answering the wake word and
+            # landed inside the command window (2026-10-08). Readings are taken before each walk and on the slow backstop timer instead.
             if watcher_c and kw.get("told_sleep"):
                 watcher_c.nudge()
             if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":
