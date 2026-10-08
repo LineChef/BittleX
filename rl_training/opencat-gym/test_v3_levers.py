@@ -671,14 +671,15 @@ def test_world2_payload_layout_block_is_the_spine_and_only_camera_and_speaker_ha
         blk = (E.PAYLOAD_POS[0] - E.PAYLOAD_BOX_HALF[0], E.PAYLOAD_POS[0] + E.PAYLOAD_BOX_HALF[0])
         cam = (E.HEAD_MASS_POS[0] - E.HEAD_BOX_HALF[0], E.HEAD_MASS_POS[0] + E.HEAD_BOX_HALF[0])
         spk = (E.REAR_MASS_POS[0] - E.REAR_BOX_HALF[0], E.REAR_MASS_POS[0] + E.REAR_BOX_HALF[0])
-        print(round(blk[0], 4), round(blk[1], 4), round(cam[0], 4), round(spk[1], 4), E.PAYLOAD_POS[1], E.HEAD_MASS_POS[1], E.REAR_MASS_POS[1], E.PAYLOAD_JITTER_XY, E.HEAD_MASS_POS[2], E.PAYLOAD_POS[2], E.REAR_MASS_POS[2])
+        print(round(blk[0], 4), round(blk[1], 4), round(cam[0], 4), round(spk[1], 4), E.PAYLOAD_POS[1], E.HEAD_MASS_POS[1], E.REAR_MASS_POS[1], E.PAYLOAD_JITTER_XY, E.HEAD_MASS_POS[2], E.PAYLOAD_POS[2], E.REAR_MASS_POS[2], E.HEAD_BOX_HALF[2], E.PAYLOAD_BOX_HALF[2], E.REAR_BOX_HALF[2])
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120).stdout.strip().splitlines()[-1].split()
-    b0, b1, c0, s1, py, hy, ry, jit, hz, pz, rz = map(float, out)
+    b0, b1, c0, s1, py, hy, ry, jit, hz, pz, rz, ch, bh, sh = map(float, out)
     assert (b0, b1) == (-0.0525, 0.0525)                  # the block is the spine's length and centred on it
     assert c0 == 0.0525 and s1 == -0.0525                 # the camera starts where the spine ends, the speaker ends where it starts: they alone hang past it
     assert py == hy == ry == 0.0 and jit == 0.0           # centred left to right, no x / y jitter
     assert hz == pz == rz                                 # camera and speaker at the block's mid height
+    assert ch == bh == sh == 0.019                        # and as tall as the block (38 mm)
 
 
 def test_the_world2_check_scores_the_final_policy_in_world_2_and_compares_with_world_1(monkeypatch, tmp_path):

@@ -494,13 +494,15 @@ elif PAYLOAD_PROFILE == "case2":
     PAYLOAD_POS = (-0.005, 0.0, 0.036)
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
 # both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
-# height). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
+# height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
 PAYLOAD_LAYOUT = os.environ.get("G2E_PAYLOAD_LAYOUT", "").strip().lower()
 PAYLOAD_JITTER_XY = 0.003      # m, per-episode x / y position jitter of each welded body (z keeps +-3 mm)
 if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE == "case2":
     SPINE_HALF_X = 0.0525
     PAYLOAD_BOX_HALF = (SPINE_HALF_X, PAYLOAD_BOX_HALF[1], PAYLOAD_BOX_HALF[2])
     PAYLOAD_POS = (0.0, 0.0, PAYLOAD_POS[2])
+    HEAD_BOX_HALF = (HEAD_BOX_HALF[0], HEAD_BOX_HALF[1], PAYLOAD_BOX_HALF[2])      # the camera and the speaker are as tall as the block (38 mm), centred on its mid height
+    REAR_BOX_HALF = (REAR_BOX_HALF[0], REAR_BOX_HALF[1], PAYLOAD_BOX_HALF[2])
     HEAD_MASS_POS = (SPINE_HALF_X + HEAD_BOX_HALF[0], 0.0, PAYLOAD_POS[2])
     REAR_MASS_POS = (-(SPINE_HALF_X + REAR_BOX_HALF[0]), 0.0, PAYLOAD_POS[2])
     PAYLOAD_JITTER_XY = 0.0
