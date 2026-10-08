@@ -91,13 +91,15 @@ LEVERS = {
 }
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
+# The SURFACE STEP / TRANSITION (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the training course COMPLETELY (user, 2026-10-08): no stage,
+# no course and no recipe switches it on. s1_transition and s2_step keep their names (queue jobs refer to stages by name) but are now empty. The generator stays in opencat_gym_env only because
+# benchmark cells T4.1 and T4.2 measure it as a test; nothing trains on it.
 STAGES = [
     ("s0_flat", {}),
-    ("s1_transition", {"G2E_SURFACE_TRANSITION_PROB": "0.25"}),
-    ("s2_step", {"G2E_SURFACE_TRANSITION_PROB": "0.25", "G2E_SURFACE_TRANSITION_STEP_M": "0.012"}),
-    ("s3_snag", {"G2E_SURFACE_TRANSITION_PROB": "0.25", "G2E_SURFACE_TRANSITION_STEP_M": "0.012", "G2E_SNAG_OBSTACLE_PROB": "0.20"}),
-    ("s4_ledge", {"G2E_SURFACE_TRANSITION_PROB": "0.25", "G2E_SURFACE_TRANSITION_STEP_M": "0.012", "G2E_SNAG_OBSTACLE_PROB": "0.20",
-                  "G2E_LEDGE_PROB": "0.20"}),
+    ("s1_transition", {}),
+    ("s2_step", {}),
+    ("s3_snag", {"G2E_SNAG_OBSTACLE_PROB": "0.20"}),
+    ("s4_ledge", {"G2E_SNAG_OBSTACLE_PROB": "0.20", "G2E_LEDGE_PROB": "0.20"}),
 ]
 # The two stages after the course is built. Their extra settings apply only when the lever they harden was kept (see stage_extra()).
 LATE_STAGES = ["s5_turn_wide", "s6_full_strength"]
@@ -178,7 +180,11 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 # The whole course in one place (user, 2026-10-08: every hazard enabled, in every run, unless there is a good reason): surface steps with a 12 mm step, snag obstacles and ledges, on top of the
 # terrain / slope / fault categories. Each hazard still starts from a clean floor and ramps with its own difficulty level, so enabling it from the first step is gentle, and every level is
 # limited to the measured top threshold (the G2E_CAP_* settings; docs/rl/passability-audit.md).
-FULL_COURSE = {k: v for k, v in dict(STAGES)["s4_ledge"].items() if not k.startswith("G2E_SURFACE_")}
+# The share of training episodes each challenge appears in (user, 2026-10-08, measured by sampling the reset: rubble 50%, box obstacles 30%, slopes of 5 deg or more 20%, rough floor 20%,
+# snag obstacles 20%, ledges 20%). The settings are the per-episode chances that give those shares after the episode mix (10% hazard-free anchors, focus and combo episodes), tuned with
+# the sampler in passability_audit.py `mix`; they apply to new fresh finals only (old runs and the benchmark cells keep their own).
+FULL_COURSE = {"G2E_RUBBLE_PROB": "0.575", "G2E_RANDOM_TERRAIN_PROB": "0.34", "G2E_ROUGH_TERRAIN_PROB": "0.25", "G2E_SLOPE_TARGET_PROB": "0.14", "G2E_SLOPE_MAX_DEG": "10",
+               "G2E_SNAG_OBSTACLE_PROB": "0.228", "G2E_LEDGE_PROB": "0.28"}
 # The surface step (a hard floor that turns into a carpet-like slab with a 12 mm step) is deliberately NOT in the course: user, 2026-10-08, "don't re-enable surface step". Carpet-like physics stays out of
 # training (CARPET, CARPET_SOFT and the rug are off too). Its floor bug is fixed and its benchmark cells (T4.1, T4.2) still measure it, so it can be switched on later with one line.
 

@@ -12,30 +12,26 @@ The 20M that finished at 11:50 AM on 2026-10-08 (`v3_20m`) was launched as a fre
 |---|---|---|
 | Recipe | K3 = the `mirror` lever only (the command-drift levers are out, user decision 2026-10-07) | `trained/v3_results.json` -> `v3_k3.levers` |
 | New payload ("world 2") | `G2E_PAYLOAD_LAYOUT=spine`: spine-sized block, camera and speaker as tall as the block (front weight share 46.7%) | `g2_profile.WORLD2_CALIBRATION`; the marker `trained/v3_world2` is already on (created 11:59 AM), so every new run gets it |
-| Course hazards | snag obstacles 20% and ledges 20% on top of terrain and slope; each starts from an empty floor and ramps with its level. **The surface step stays OFF** (user, 2026-10-08: "don't re-enable surface step"; it is the only carpet-like physics: a hard floor that turns into a soft, high-friction slab with a 12 mm step). Carpet, soft-carpet and rug floors are off too. Its floor bug is fixed and its benchmark cells T4.1 and T4.2 still measure it; one line in `FULL_COURSE` turns it on later | `g2_profile.FULL_COURSE`, added to a new fresh final by `env_for_job` |
+| Course hazards | the share of training episodes each appears in, set by the user on 2026-10-08 and tuned by sampling the reset: **rubble 50%, box obstacles 30%, slopes of 5 deg or more 20%, rough floor 20%, snag obstacles 20%, ledges 20%**. Each starts from an empty floor and ramps with its level. **The surface step (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the course completely**: no stage, course or recipe switches it on; its generator stays in the environment only because benchmark cells T4.1 and T4.2 test it. Carpet, soft-carpet and rug floors are off too | `g2_profile.FULL_COURSE` (the per-episode chances) and `STAGES` (surface step removed), added to a new fresh final by `env_for_job` |
 | Level ceiling | 1.25 (RECIPE) | `G2E_LEVEL_MAX` |
 | Hard levels | x1.10 | `FINAL_EXTRA` |
 | Top-threshold caps | NOT SET YET: set them from the capability test (below) before launch | `G2E_CAP_SIDEHILL_DEG`, `G2E_CAP_UPHILL_DEG`, `G2E_CAP_DOWNHILL_DEG`, `G2E_CAP_LEDGE_M` in `g2_profile.RECIPE` |
 | Episode recording | about 1 episode in 50 is saved so it can be watched exactly: `python watch_training.py <tag>` | `G2E_RECORD_EVERY=50` |
 | Real-data calibration | the approved snapshot, if any. Snapshot 0002 (the only candidate) changes nothing: its one value, `G2E_IMU_HOLD_STEPS` 16, equals the profile's, and `G2E_CMD_PATH_EXTRA_MS_MAX` was rejected by the user | `~/g2_data/calibration/` |
 
-### How often each hazard appears (measured 2026-10-08 by sampling the training reset, 2000 episodes for the new run at mature levels of 1.0; 1500 for the finished 20M at its final levels)
+### How often each hazard appears (user targets, 2026-10-08; measured by sampling the training reset, 2000 episodes at mature levels)
 
-| Hazard | Finished 20M (flat stage) | New run (snags + ledges, no surface step) |
+| Challenge | Share of training episodes | Finished 20M for comparison |
 |---|---|---|
-| Ground tilt over 5 / 8 / 12 / 18 deg | 22 / 13 / 4 / 0% | 28 / 18 / 11 / 4% |
-| Strong targeted slope (side-hill 3-15 deg or climb 12-24 deg, scaled by level) | 28% | 28% |
-| Rough heightfield floor | 22% | 22% |
-| Rubble | 71% | 72% |
-| Box obstacles | 32% | 31% |
-| Snag obstacles (two thin lane-spanning boxes, 10 mm) | 0% | 18% |
-| Ledge (full-width block, 8-35 mm x level; up 7%, down 6%) | 0% | 13% (height median 0.8 cm, 95th percentile 3.3 cm, max 3.6 cm) |
-| Surface step | 0% | 0% (off by decision) |
-| Episodes with 0 / 1 / 2 / 3+ kinds of hazard (tilt over 5 deg, obstacles or rough floor, ledge) | 16 / 64 / 19 / 0% | 13 / 55 / 27 / 5% |
-| Obstacles or rough floor together with tilt over 5 deg | 19% | 25% |
-| Ledge together with tilt over 5 deg | 0% | 5.5% |
+| Rubble | 50% | 71% |
+| Box obstacles | 30% | 32% |
+| Slopes (ground tilted 5 deg or more) | 20% | 22% |
+| Rough floor | 20% | 22% |
+| Snag obstacles | 20% | 0% |
+| Ledges (full-width block, up or down) | 20% | 0% |
+| Surface step | 0% (removed) | 0% |
 
-Measured shares are below the nominal 20% for snags and ledges because 10% of episodes are hazard-free anchors and a focus episode puts only its own category at full level. Early in the ramp every hazard is rarer and smaller. The viewer (`watch_v3.sh`) and `watch_training.py` show this same mix.
+The settings that produce them: `G2E_RUBBLE_PROB` 0.575, `G2E_RANDOM_TERRAIN_PROB` 0.34 (boxes), `G2E_SLOPE_TARGET_PROB` 0.14 with `G2E_SLOPE_MAX_DEG` 10 (slopes), `G2E_ROUGH_TERRAIN_PROB` 0.25, `G2E_SNAG_OBSTACLE_PROB` 0.228, `G2E_LEDGE_PROB` 0.28. They are chances per episode; the measured shares are what the list above reports, after the episode mix (10% hazard-free anchors, focus and combo episodes). To re-check them: sample the reset with `g2_profile.env_for_job` for the new tag (see the hazard-mix method in the decisions log).
 
 The faults lever is not part of K3, so the fault category stays inert in this run too. If the user wants faults trained, that is a separate decision (`NOT_IN_K3` in `phase_v3.py`).
 
