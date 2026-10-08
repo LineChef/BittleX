@@ -152,7 +152,8 @@ class FootHold:
     reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited."""
 
     def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
-                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0):
+                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 1.0):
+        self.g_release, self.release_rate_dps = g_release, release_rate_dps   # easing off is faster than building up: once the heading turns back (or is already past the target) the trim drops at g_release per second
         self.ff = ff                         # feed-forward trim added to the feedback: the average trim the hold ends up at anyway (about -0.2..-0.3 on G2), so it does not have to ramp to it
         self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg
         self.g_min, self.g_max, self.g_rate, self.rate_tau_s = g_min, g_max, g_rate, rate_tau_s
@@ -178,10 +179,13 @@ class FootHold:
             self.rate_dps += a * (raw - self.rate_dps)
             self._last_yaw, self._last_t = yaw, self._t
         if not active:
+            self._releasing = True
             return self._slew(0.0, dt)
         e = wrap_deg(yaw - self.target_deg)
         out = max(0.0, abs(e) - self.deadband_deg) * (1.0 if e >= 0 else -1.0)
-        if out == 0.0 or (self.integral != 0.0 and (out > 0) != (self.integral > 0)):
+        releasing = self.g < 0.0 and (e <= 0.0 or self.rate_dps < -self.release_rate_dps)     # the trim is pushing left and the heading is already at / past the target or turning left
+        self._releasing = releasing
+        if releasing or out == 0.0 or (self.integral != 0.0 and (out > 0) != (self.integral > 0)):
             self.integral = 0.0                   # inside the deadband or past the target: drop the wound-up term (it kept steering after the heading was back on the old hold)
         else:
             self.integral = max(-self.i_lim / self.ki, min(self.i_lim / self.ki, self.integral + out * dt))
@@ -189,6 +193,8 @@ class FootHold:
         return self._slew(max(self.g_min, min(self.g_max, want)), dt)
 
     def _slew(self, want: float, dt: float) -> float:
-        step = self.g_rate * dt
+        # a trim moving away from zero is slew-limited (g_rate); one moving back to zero while releasing, or being released because the hold went inactive, uses the faster g_release
+        toward_zero = abs(want) < abs(self.g)
+        step = (self.g_release if (toward_zero and getattr(self, "_releasing", True)) else self.g_rate) * dt
         self.g += max(-step, min(step, want - self.g))
         return self.g

@@ -199,3 +199,27 @@ def test_foot_hold_feed_forward_starts_the_trim_and_default_is_zero(monkeypatch)
         g = h.update(0.0, 1 / 80)              # dead on target: the trim goes to the feed-forward and stays
     assert abs(g + 0.25) < 1e-6
     assert _plant(hh.FootHold("fl", ff=-0.25), drift_dps=6.0)[-1][0] < 25
+
+
+def test_foot_hold_eases_off_fast_when_the_drift_stops():
+    import math
+    from pi_pipeline.gait import heading_hold as hh
+    h = hh.FootHold("fl")
+    yaw, seen, t, dt, next_imu, trace = 0.0, 0.0, 0.0, 1 / 80, 0.0, []
+    while t < 20.0:
+        if t >= next_imu:
+            seen, next_imu = yaw, next_imu + 0.2
+        g = h.update(math.radians(seen), dt)
+        drift = 6.0 if t < 10.0 else 0.0                       # the drift stops half way (a surface change, warm servos)
+        yaw += (drift + 9.0 * g) * dt
+        t += dt
+        trace.append((t, yaw, g))
+    assert min(y for _, y, _ in trace) > -12.0                  # no hard swing to the left after the drift is gone
+    late = [g for tt, _, g in trace if tt > 14.0]
+    assert max(abs(g) for g in late) < 0.25                     # and the trim has eased off
+    # releasing is faster than building up
+    h2 = hh.FootHold("fl")
+    h2.g = -0.6
+    for _ in range(40):
+        h2.update(math.radians(-8.0), 1 / 80)                   # 0.5 s with the heading already left of target
+    assert h2.g > -0.2
