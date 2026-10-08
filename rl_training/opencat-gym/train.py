@@ -63,6 +63,45 @@ class RampSync(BaseCallback):
         return True
 
 
+class CapsSync(BaseCallback):
+    """The top-threshold caps (opencat_gym_env CAP_*; docs/rl/passability-audit.md) live in `trained/<tag>_caps.json` and are pushed to every env at the start of each rollout, so they can be
+    raised or lowered WHILE the run trains (caps_report.py says when). At the start the file is created from the run's launch settings if it does not exist. Each change logs a `[caps]` line."""
+    def __init__(self, tag):
+        super().__init__()
+        self.path = f"trained/{tag}_caps.json"
+        self._mtime = None
+
+    def _on_training_start(self):
+        import json
+        import opencat_gym_env as E
+        if not os.path.exists(self.path):
+            with open(self.path, "w") as f:
+                json.dump(E.current_caps(), f, indent=1)
+        self._push()
+
+    def _on_rollout_start(self):
+        try:
+            if os.path.getmtime(self.path) != self._mtime:
+                self._push()
+        except OSError:
+            pass
+
+    def _push(self):
+        import json
+        import opencat_gym_env as E
+        try:
+            self._mtime = os.path.getmtime(self.path)
+            caps = json.load(open(self.path))
+        except (OSError, ValueError):
+            return
+        self.training_env.env_method("set_caps", caps)
+        E.apply_caps(caps)                       # the probe env lives in this process
+        print(f"[caps] steps {self.num_timesteps}  {caps}", flush=True)
+
+    def _on_step(self):
+        return True
+
+
 class Curriculum(BaseCallback):
     """Difficulty curriculum driven by a DETERMINISTIC probe (opencat_gym_env LEVEL_EXTERNAL). Every `every` training steps the current policy is run, without
     exploration noise, for `episodes` episodes on each hazard category at its current level (the others at 0; random training commands); the category's mean episode
@@ -204,7 +243,7 @@ if __name__ == "__main__":
     else:
         PPOCls = PPO
     ramp_offset = max(_E.RAMP_TOTAL_STEPS, _E.RAMP_PENALTY_STEPS) if (args.from_ckpt and not args.re_ramp) else 0.0
-    cbs = [RampSync(ramp_offset), checkpoint_callback]
+    cbs = [RampSync(ramp_offset), CapsSync(args.tag), checkpoint_callback]
     if _E.LEVEL_EXTERNAL and _E.ADAPTIVE_LEVEL and _E.CATEGORY_LEVELS:
         cbs.append(Curriculum(every=int(os.environ.get("G2E_PROBE_EVERY", "98304")), episodes=int(os.environ.get("G2E_PROBE_EPISODES", "6")),
                               start=_E.LEVEL_FIXED if _E.LEVEL_FIXED >= 0 else _E.LEVEL_START, ramp_offset=ramp_offset))

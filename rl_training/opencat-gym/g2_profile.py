@@ -184,7 +184,10 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 # snag obstacles 20%, ledges 20%). The settings are the per-episode chances that give those shares after the episode mix (10% hazard-free anchors, focus and combo episodes), tuned with
 # the sampler in passability_audit.py `mix`; they apply to new fresh finals only (old runs and the benchmark cells keep their own).
 FULL_COURSE = {"G2E_RUBBLE_PROB": "0.575", "G2E_RANDOM_TERRAIN_PROB": "0.34", "G2E_ROUGH_TERRAIN_PROB": "0.25", "G2E_SLOPE_TARGET_PROB": "0.14", "G2E_SLOPE_MAX_DEG": "10",
-               "G2E_SNAG_OBSTACLE_PROB": "0.228", "G2E_LEDGE_PROB": "0.28"}
+               "G2E_SNAG_OBSTACLE_PROB": "0.228", "G2E_LEDGE_PROB": "0.28",
+               # PROVISIONAL top-threshold caps (start values from the capability test, 2026-10-08; docs/rl/next-20m-plan.md). They are adjustable while the run trains
+               # (trained/<tag>_caps.json) and reviewed every 1M steps with caps_report.py: too low and the policy never improves, too high and it cannot learn to succeed.
+               "G2E_CAP_SIDEHILL_DEG": "8", "G2E_CAP_UPHILL_DEG": "10", "G2E_CAP_DOWNHILL_DEG": "10", "G2E_CAP_LEDGE_M": "0.02"}
 # The surface step (a hard floor that turns into a carpet-like slab with a 12 mm step) is deliberately NOT in the course: user, 2026-10-08, "don't re-enable surface step". Carpet-like physics stays out of
 # training (CARPET, CARPET_SOFT and the rug are off too). Its floor bug is fixed and its benchmark cells (T4.1, T4.2) still measure it, so it can be switched on later with one line.
 

@@ -109,6 +109,11 @@ def _follow_training():
     m = re.search(r"_(\d+)_steps", args.checkpoint)
     env.set_ramp_steps(float(m.group(1)) if m else 20e6)
     try:
+        import json
+        opencat_gym_env.apply_caps(json.load(open(f"trained/{tag}_caps.json")))      # the run\'s current top-threshold caps
+    except (OSError, ValueError):
+        pass
+    try:
         last = [ln for ln in open(f"trained/{tag}_console.log", errors="replace") if ln.startswith("[level]")][-1]
         lv = dict(zip(("terrain", "ledge", "slope", "fault"), map(float, re.findall(r"(?:terrain|ledge|slope|fault) ([0-9.]+)", last))))
         if len(lv) == 4:

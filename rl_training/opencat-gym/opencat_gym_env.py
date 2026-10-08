@@ -615,6 +615,24 @@ CAP_SIDEHILL_DEG = float(os.environ.get("G2E_CAP_SIDEHILL_DEG", "0") or 0)      
 CAP_UPHILL_DEG = float(os.environ.get("G2E_CAP_UPHILL_DEG", "0") or 0)            # climb
 CAP_DOWNHILL_DEG = float(os.environ.get("G2E_CAP_DOWNHILL_DEG", "0") or 0)        # descent
 CAP_LEDGE_M = float(os.environ.get("G2E_CAP_LEDGE_M", "0") or 0)                  # the step face the robot meets, tilt included
+
+
+def apply_caps(caps: dict) -> None:
+    """Change the top-threshold caps of THIS process while a run trains (train.py CapsSync pushes `trained/<tag>_caps.json` to every env). Keys: sidehill_deg, uphill_deg,
+    downhill_deg, ledge_m; a missing key keeps its value, 0 removes that cap. Takes effect from the next episode."""
+    global CAP_SIDEHILL_DEG, CAP_UPHILL_DEG, CAP_DOWNHILL_DEG, CAP_LEDGE_M
+    if "sidehill_deg" in caps:
+        CAP_SIDEHILL_DEG = float(caps["sidehill_deg"])
+    if "uphill_deg" in caps:
+        CAP_UPHILL_DEG = float(caps["uphill_deg"])
+    if "downhill_deg" in caps:
+        CAP_DOWNHILL_DEG = float(caps["downhill_deg"])
+    if "ledge_m" in caps:
+        CAP_LEDGE_M = float(caps["ledge_m"])
+
+
+def current_caps() -> dict:
+    return {"sidehill_deg": CAP_SIDEHILL_DEG, "uphill_deg": CAP_UPHILL_DEG, "downhill_deg": CAP_DOWNHILL_DEG, "ledge_m": CAP_LEDGE_M}
 UPHILL_DEG = (12.0, 24.0)
 # 2026-09-23: FAC_LEG_BALANCE / FAC_STANCE_HOVER / FAC_RESID_BIAS / FAC_CONTACT_IMITATION
 # (hw2/hw5/hw7/hw4) were built to fight the learned gaits' limp. Dropped: the limp turned
@@ -1030,6 +1048,10 @@ class OpenCatGymEnv(gym.Env):
                   + (2 if HEADING_OBS else 0))
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
+
+    def set_caps(self, caps) -> None:
+        """Trainer hook (train.py CapsSync): move the top-threshold caps while the run trains (see apply_caps)."""
+        apply_caps(caps)
 
     def set_category_levels(self, levels) -> None:
         """Called by train.py's Curriculum callback (LEVEL_EXTERNAL): the levels every env trains at from its next episode."""
