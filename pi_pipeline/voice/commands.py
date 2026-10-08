@@ -82,6 +82,7 @@ _RESTART_VOICE = (
 _END_EXPLORE = (
     "end exploration mode", "end explore mode", "end exploring mode", "exit exploration mode", "exit explore mode", "stop exploration mode",
     "leave exploration mode", "leave explore mode", "exploration mode off", "turn off exploration mode", "end exploration", "end exploring", "stop exploration",
+    "cancel exploration", "cancel exploration mode", "cancel explore mode", "cancel exploring", "cancel explore", "cancel the exploration", "cancel exploring mode",
 )
 _UNEXPLORE = (
     "stop exploring", "stop looking around", "stop wandering", "come back",
