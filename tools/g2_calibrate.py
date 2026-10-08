@@ -23,8 +23,9 @@ Needs data we do not have yet, so it is listed as "needs data" and never guessed
 Guards (from the plan): a fixed WHITELIST of parameters, each with physical bounds; there is no yaw, heading, lateral or drift key (a test enforces it) and no fit reads yaw;
 a minimum number of supporting runs and seconds; reproducibility (the median of the odd runs must agree with the median of the even runs); a drift-proxy screen (a per-run
 estimate that tracks that run's heading change is dropped); only the current fit-ok hardware epoch is used; floors and pack-voltage bands are reported, never mixed away.
-Approval: every changed value within its noise, the harm check passed, the same epoch and the cumulative change under its cap -> auto-approved; anything else waits for a person;
-a failed harm check blocks the snapshot.
+Approval is automatic, by statistical gates (user, 2026-10-08): all fit checks pass, the harm check passes, the hardware epoch is unchanged, and every value either stays within its own noise
+or moves for real with strong evidence (20 runs, 120 s) and a modest size (at most 25% of the value it replaces). A failed harm check blocks the snapshot; anything else waits for a person
+(`approve`); every automatic approval is logged in approvals.jsonl and `revert` undoes it.
 """
 from __future__ import annotations
 
@@ -384,8 +385,20 @@ def write_current(i: int | None, how: str, who: str) -> None:
     os.replace(_path("current.json.tmp"), _path("current.json"))
 
 
-def decide(snap: dict, last_human: dict | None) -> tuple[str, list[str]]:
-    """'auto_approved' | 'needs_user' | 'blocked' | 'pending harm check' | 'empty', with the reasons."""
+# The statistical gates that decide approval (user, 2026-10-08: "make the approval automatic based on statistical gates"; before that the first snapshot and every change beyond noise waited for a person).
+CHANGE_MIN_RUNS = 20          # a value that actually moves needs more evidence than one that stays: runs ...
+CHANGE_MIN_SECONDS = 120.0    # ... and seconds of steady walking behind it
+CHANGE_MAX_RELATIVE = CUMULATIVE_CAP     # and a modest size: at most this fraction of the value it replaces (the profile's value, or the last human-approved snapshot's)
+
+
+def decide(snap: dict, last_human: dict | None, current: dict | None = None) -> tuple[str, list[str]]:
+    """'auto_approved' | 'needs_user' | 'blocked' | 'pending harm check' | 'empty', with the reasons. A snapshot is approved by the rules when ALL gates hold:
+      1. every parameter in it passed its own fit checks (enough runs and seconds, reproducible, in bounds, not a drift proxy);
+      2. the harm check passed (flat-ground falls not up, mirror gap not worse, no benchmark cell worse beyond noise); a failed one BLOCKS the snapshot;
+      3. the hardware epoch is the same as the approved snapshot's (a hardware change always goes to a person);
+      4. each value either stays within its own noise of the value it replaces, or moves for real (beyond noise) with strong evidence (CHANGE_MIN_RUNS runs, CHANGE_MIN_SECONDS seconds)
+         and a modest size (at most CHANGE_MAX_RELATIVE of the value it replaces: the profile's value, or the last human-approved snapshot's).
+    Anything else waits for the user (`g2cal approve ID`); every automatic approval is logged and `g2cal revert` undoes it."""
     ok = {k: p for k, p in snap["params"].items() if p.get("status") == "ok"}
     if not ok:
         return "empty", ["no parameter has enough data yet: " + "; ".join(f"{k}: {p.get('reason', p.get('status'))}" for k, p in snap["params"].items())]
@@ -395,18 +408,25 @@ def decide(snap: dict, last_human: dict | None) -> tuple[str, list[str]]:
     if hc != "passed":
         return "pending harm check", ["run `g2cal harm-check` first"]
     why = []
-    if last_human is None:
-        why.append("no human-approved snapshot yet: the first one is always reviewed")
-    elif last_human.get("epoch") != snap.get("epoch"):
-        why.append("the hardware epoch changed")
+    if current is not None and current.get("epoch") != snap.get("epoch"):
+        why.append("the hardware epoch changed since the approved snapshot")
     for k, p in ok.items():
-        if p.get("changed") and not p.get("within_noise"):
-            why.append(f"{k}: {p.get('old')} -> {p['value']} is beyond its noise (+-{p['noise']})")
-        if last_human is not None and k in last_human.get("env", {}):
-            ref = float(last_human["env"][k])
-            if abs(float(p["value"]) - ref) > CUMULATIVE_CAP * max(abs(ref), 1.0):
-                why.append(f"{k}: {ref:g} -> {p['value']} exceeds the {CUMULATIVE_CAP:.0%} cumulative cap since the last human approval")
-    return ("needs_user", why) if why else ("auto_approved", ["every change is within its noise and every check passed"])
+        if not p.get("changed") or p.get("within_noise"):
+            continue                                                       # the same value, or a difference smaller than its own noise: nothing to judge
+        if p["n_runs"] < CHANGE_MIN_RUNS or p["seconds"] < CHANGE_MIN_SECONDS:
+            why.append(f"{k}: {p.get('old')} -> {p['value']} is beyond its noise (+-{p['noise']}) but rests on only {p['n_runs']} runs / {p['seconds']:.0f} s (a change needs {CHANGE_MIN_RUNS} runs and {CHANGE_MIN_SECONDS:.0f} s)")
+        ref = float(last_human["env"][k]) if (last_human is not None and k in last_human.get("env", {})) else (float(p["old"]) if p.get("old") is not None else None)
+        if ref is not None and abs(float(p["value"]) - ref) > CHANGE_MAX_RELATIVE * max(abs(ref), 1.0):
+            why.append(f"{k}: {ref:g} -> {p['value']} moves more than {CHANGE_MAX_RELATIVE:.0%} of the value it replaces")
+    return ("needs_user", why) if why else ("auto_approved", ["every gate passed: fit checks, harm check, same epoch, and every change within its noise or backed by strong evidence and modest in size"])
+
+
+def current_snapshot() -> dict | None:
+    i = read_current()
+    try:
+        return load_snapshot(i) if i else None
+    except (OSError, ValueError):
+        return None
 
 
 def last_human_snapshot() -> dict | None:
@@ -465,6 +485,11 @@ def auto(log=print, min_new_runs: int = MIN_RUNS) -> str:
     last = load_snapshot(ids[-1]) if ids else None
     manifest = json.load(open(mpath))
     refused = last is not None and any(k in read_rejected() for k in last["env"])               # a person has since refused one of its parameters: it is superseded
+    if last is not None and last["env"] and not refused and read_current() != ids[-1] and harm_status(ids[-1])["status"] != "not run":
+        verdict, why = decide(with_harm(last, ids[-1]), last_human_snapshot(), current_snapshot())      # the latest snapshot already has its harm check: apply the gates now
+        if verdict == "auto_approved":
+            write_current(ids[-1], "auto", "rules")
+            return f"snapshot {ids[-1]:04d} auto-approved and live for new training runs ({why[0]})"
     if last is None or refused or not (last["env"] and harm_status(ids[-1])["status"] in ("not run",)):     # a snapshot still waiting for its harm check is processed first
         snap = build(manifest)
         epoch_changed = last is not None and snap["epoch"] != last["epoch"]
@@ -489,7 +514,7 @@ def auto(log=print, min_new_runs: int = MIN_RUNS) -> str:
         json.dump(r, open(harm_path(i), "w"), indent=1)
         snap = with_harm(last, i)
         log(f"harm check for {i:04d}: {r['status']}")
-    verdict, why = decide(snap, last_human_snapshot())
+    verdict, why = decide(snap, last_human_snapshot(), current_snapshot())
     if verdict == "auto_approved" and read_current() != i:
         write_current(i, "auto", "rules")
         return f"snapshot {i:04d} auto-approved and live for new training runs ({why[0]})"
@@ -529,7 +554,7 @@ def main(argv=None) -> int:
         i = save_snapshot(snap)
         snap["id"] = i
         print(diff_text(snap))
-        verdict, why = decide(with_harm(snap, i), last_human_snapshot())
+        verdict, why = decide(with_harm(snap, i), last_human_snapshot(), current_snapshot())
         print(f"\nsnapshot {i:04d} written. verdict: {verdict}")
         for w in why:
             print("  - " + w)
@@ -540,7 +565,7 @@ def main(argv=None) -> int:
         print(f"current (live in new training runs): {cur if cur else own}")
         for i in ids[-3:]:
             s = with_harm(load_snapshot(i), i)
-            verdict, why = decide(s, last_human_snapshot())
+            verdict, why = decide(s, last_human_snapshot(), current_snapshot())
             if any(k in read_rejected() for k in s["env"]):
                 verdict, why = "superseded", ["it carries a parameter you rejected"]
             print(f"  {i:04d} {s['made']}  epoch {s['epoch']}  {s['runs_used']} runs / {s['seconds_used']:.0f} s  harm check: {s['harm_check']['status']}  -> {verdict}")

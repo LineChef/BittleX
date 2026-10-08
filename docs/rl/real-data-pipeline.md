@@ -77,6 +77,8 @@ may drop beyond its noise. A change that fails is blocked.
 
 ## Approval: who and when
 
+**Superseded 2026-10-08 (user: "make the approval automatic based on statistical gates"): the rules decide, not a person.** A snapshot is approved automatically when all gates hold: (1) every parameter passed its fit checks (enough runs and seconds, reproducible across odd and even runs, within physical bounds, not a drift proxy); (2) the harm check passed (a failed one blocks the snapshot); (3) the hardware epoch is unchanged; (4) every value stays within its own noise of the value it replaces, or moves for real with strong evidence (20 runs, 120 s) and a modest size (at most 25% of the value it replaces, measured against the profile's value or the last human-approved snapshot). The first snapshot is no longer always reviewed. Anything that fails a gate other than the harm check waits for the user (`g2cal approve ID`). Every automatic approval is written to `~/g2_data/calibration/approvals.jsonl` and `g2cal revert` undoes it. Snapshot 0002 (IMU frames per tick = 16, unchanged) was the first one approved this way, at 12:37 PM on 2026-10-08. The table below is the earlier rule, kept for history.
+
 | Case | Who approves | When |
 |---|---|---|
 | Every changed value within its noise band, every check and the harm check pass, no epoch change, and the total change since the last **human**-approved snapshot is under the cumulative cap | **Automatic** (the rules); recorded as auto-approved and shown in the next report; one command reverts to the previous snapshot | when the snapshot is built |

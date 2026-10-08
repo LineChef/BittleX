@@ -125,16 +125,33 @@ def snap_with(params, harm="passed", epoch="e1"):
 OK = {"status": "ok", "value": 16, "old": 16.0, "changed": False, "within_noise": True, "noise": 0.5}
 
 
-def test_approval_rules(gc):
-    human = {"epoch": "e1", "env": {"G2E_IMU_HOLD_STEPS": "16"}}
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": OK}), human)[0] == "auto_approved"
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": OK}), None)[0] == "needs_user"                 # the first snapshot is always reviewed
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": OK}, epoch="e2"), human)[0] == "needs_user"
-    moved = dict(OK, value=20, changed=True, within_noise=False)
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": moved}), human)[0] == "needs_user"
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": OK}, harm="failed"), human)[0] == "blocked"
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": OK}, harm="not run"), human)[0] == "pending harm check"
-    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": {"status": "insufficient", "reason": "x"}}), human)[0] == "empty"
+def test_approval_is_automatic_by_statistical_gates(gc):
+    ok = {"G2E_IMU_HOLD_STEPS": OK}
+    # an unchanged value needs no person, even for the very first snapshot
+    assert gc.decide(snap_with(ok), None)[0] == "auto_approved"
+    assert gc.decide(snap_with(ok), {"epoch": "e1", "env": {"G2E_IMU_HOLD_STEPS": "16"}}, {"epoch": "e1"})[0] == "auto_approved"
+    # a hardware change always goes to a person
+    assert gc.decide(snap_with(ok, epoch="e2"), None, {"epoch": "e1"})[0] == "needs_user"
+    # a real change (beyond its noise) with strong evidence and a modest size is approved by the rules
+    strong = dict(OK, value=18, old=16.0, changed=True, within_noise=False, n_runs=30, seconds=200.0, noise=0.5)
+    verdict, why = gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": strong}), None, None)
+    assert verdict == "auto_approved", why
+    # ... but not with thin evidence ...
+    thin = dict(strong, n_runs=12, seconds=90.0)
+    v, why = gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": thin}), None, None)
+    assert v == "needs_user" and "only 12 runs" in why[0]
+    # ... nor when it moves too far from the value it replaces (more than 25%)
+    big = dict(strong, value=24)
+    v, why = gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": big}), None, None)
+    assert v == "needs_user" and "more than 25%" in why[0]
+    # the creep guard: measured against the last human-approved snapshot, not only the previous value
+    drifted = dict(strong, value=18, old=17.0)
+    v, why = gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": drifted}), {"epoch": "e1", "env": {"G2E_IMU_HOLD_STEPS": "10"}}, {"epoch": "e1"})
+    assert v == "needs_user"
+    # the harm check decides first: failed blocks, missing waits
+    assert gc.decide(snap_with(ok, harm="failed"), None)[0] == "blocked"
+    assert gc.decide(snap_with(ok, harm="not run"), None)[0] == "pending harm check"
+    assert gc.decide(snap_with({"G2E_IMU_HOLD_STEPS": {"status": "insufficient", "reason": "x"}}), None)[0] == "empty"
 
 
 def test_auto_waits_for_data_then_builds_checks_and_applies_the_rules(gc, tmp_path, monkeypatch):
@@ -144,7 +161,7 @@ def test_auto_waits_for_data_then_builds_checks_and_applies_the_rules(gc, tmp_pa
     os.makedirs(gc.STORE, exist_ok=True)
     json.dump(manifest(names[:4]), open(os.path.join(gc.STORE, "manifest.json"), "w"))
     monkeypatch.setattr(gc.ingest, "load_epochs", lambda *a: EPOCHS)
-    monkeypatch.setattr(gc, "profile_value", lambda k: 16.0 if k == "G2E_IMU_HOLD_STEPS" else 4.0)
+    monkeypatch.setattr(gc, "profile_value", lambda k: 16.0 if k == "G2E_IMU_HOLD_STEPS" else 0.0)
     assert "waiting for data" in gc.auto(log=lambda *_: None)
     json.dump(manifest(names), open(os.path.join(gc.STORE, "manifest.json"), "w"))
     monkeypatch.setattr(gc, "run_harm_check", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("busy")))
@@ -152,9 +169,10 @@ def test_auto_waits_for_data_then_builds_checks_and_applies_the_rules(gc, tmp_pa
     assert gc.list_ids() == [1] and gc.read_current() is None
     monkeypatch.setattr(gc, "run_harm_check", lambda *a, **k: {"status": "passed", "problems": []})
     out = gc.auto(log=lambda *_: None)
-    assert "needs_user" in out and gc.read_current() is None                # the first snapshot always waits for a person
+    assert "auto-approved" in out and gc.read_current() == 1                # every gate passed: approved by the rules, no person needed
     assert gc.list_ids() == [1]                                             # no second snapshot for the same data
-    assert gc.main(["approve", "1"]) == 0 and gc.read_current() == 1
+    approvals = [json.loads(x) for x in open(os.path.join(gc.CAL, "approvals.jsonl"))]
+    assert approvals[-1]["how"] == "auto" and approvals[-1]["id"] == 1      # logged, and `revert` can undo it
     assert gc.current_env() == {"G2E_IMU_HOLD_STEPS": "16", **{k: v for k, v in gc.load_snapshot(1)["env"].items()}}
 
 
@@ -194,3 +212,19 @@ def test_a_rejected_parameter_is_reported_but_never_applied_and_supersedes_the_s
         gc.reject("G2E_DRIFT_TORQUE")
     gc.unreject("G2E_CMD_PATH_EXTRA_MS_MAX")
     assert gc.read_rejected() == {}
+
+
+def test_a_snapshot_that_already_has_its_harm_check_is_approved_without_new_data(gc, tmp_path, monkeypatch):
+    names = [f"r{i}" for i in range(12)]
+    for n in names:
+        write_run(gc.STORE, n, seconds=8, imu_hz=5.0)
+    os.makedirs(gc.STORE, exist_ok=True)
+    json.dump(manifest(names), open(os.path.join(gc.STORE, "manifest.json"), "w"))
+    monkeypatch.setattr(gc.ingest, "load_epochs", lambda *a: EPOCHS)
+    monkeypatch.setattr(gc, "profile_value", lambda k: 16.0 if k == "G2E_IMU_HOLD_STEPS" else 0.0)
+    monkeypatch.setattr(gc, "run_harm_check", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("busy")))
+    gc.auto(log=lambda *_: None)                                              # snapshot 1 is built and waits for its harm check
+    os.makedirs(os.path.join(gc.CAL, "harm"), exist_ok=True)
+    json.dump({"status": "passed", "problems": []}, open(gc.harm_path(1), "w"))   # the check finished elsewhere (the Mac was idle later)
+    assert gc.read_current() is None
+    assert "auto-approved" in gc.auto(log=lambda *_: None) and gc.read_current() == 1
