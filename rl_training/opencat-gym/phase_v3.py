@@ -365,6 +365,11 @@ def run_final(job, results):
             RP.stop(tag)
             log(f"{tag} STOPPED at {step // 10**6}M on a regression; checkpoint {step} and the last good stage ({job['from']}) are the fallbacks")
             return False
+    ok, reason = RP.wait_for_finish(tag)           # the last gait check comes at 10M of 20M: wait for the run itself to end before the report and the world 2 job use its final policy
+    if not ok:
+        log(f"{tag} HALT before the run finished: {reason}")
+        return False
+    log(f"{tag} FINISHED training")
     return True
 
 
