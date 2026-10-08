@@ -611,10 +611,10 @@ def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
 def test_world2_moves_the_payload_forward_only_when_asked(monkeypatch):
     import g2_profile as G
     monkeypatch.setenv("G2_WORLD", "2")
-    assert G.world2() and G.env_for()["G2E_PAYLOAD_SHIFT_X"] == "0.006" and G.scoring_env()["G2E_PAYLOAD_SHIFT_X"] == "0.006"
+    assert G.world2() and G.env_for()["G2E_PAYLOAD_LAYOUT"] == "spine" and G.scoring_env()["G2E_PAYLOAD_LAYOUT"] == "spine"
     monkeypatch.setenv("G2_WORLD", "1")
     if not G.world2():                                    # world 1 (no trained/v3_world2 marker file): the payload stays where it was
-        assert "G2E_PAYLOAD_SHIFT_X" not in G.env_for()
+        assert "G2E_PAYLOAD_LAYOUT" not in G.env_for()
 
 
 def test_a_failed_k3_is_repaired_by_leave_one_out_newest_lever_first(monkeypatch, tmp_path):
@@ -657,3 +657,25 @@ def test_a_failed_k3_is_repaired_by_leave_one_out_newest_lever_first(monkeypatch
     assert V.repair_k3({"levers": levers}, results, None)
     assert results["v3_k3"]["adopted_from"] == "v3_s1_mirror" and results["v3_k3"]["levers"] == ["mirror"]
     assert len(ran) == V.REPAIR_MAX_RUNS
+
+
+def test_world2_payload_layout_block_is_the_spine_and_only_camera_and_speaker_hang_past_it():
+    import subprocess, sys, textwrap
+    code = textwrap.dedent('''
+        import sys
+        sys.path.insert(0, ".")
+        import os
+        os.environ["G2E_PAYLOAD_PROFILE"] = "case2"; os.environ["G2E_PAYLOAD_LAYOUT"] = "spine"
+        import opencat_gym_env as E
+        sp = 0.0525
+        blk = (E.PAYLOAD_POS[0] - E.PAYLOAD_BOX_HALF[0], E.PAYLOAD_POS[0] + E.PAYLOAD_BOX_HALF[0])
+        cam = (E.HEAD_MASS_POS[0] - E.HEAD_BOX_HALF[0], E.HEAD_MASS_POS[0] + E.HEAD_BOX_HALF[0])
+        spk = (E.REAR_MASS_POS[0] - E.REAR_BOX_HALF[0], E.REAR_MASS_POS[0] + E.REAR_BOX_HALF[0])
+        print(round(blk[0], 4), round(blk[1], 4), round(cam[0], 4), round(spk[1], 4), E.PAYLOAD_POS[1], E.HEAD_MASS_POS[1], E.REAR_MASS_POS[1], E.PAYLOAD_JITTER_XY, E.HEAD_MASS_POS[2], E.PAYLOAD_POS[2], E.REAR_MASS_POS[2])
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120).stdout.strip().splitlines()[-1].split()
+    b0, b1, c0, s1, py, hy, ry, jit, hz, pz, rz = map(float, out)
+    assert (b0, b1) == (-0.0525, 0.0525)                  # the block is the spine's length and centred on it
+    assert c0 == 0.0525 and s1 == -0.0525                 # the camera starts where the spine ends, the speaker ends where it starts: they alone hang past it
+    assert py == hy == ry == 0.0 and jit == 0.0           # centred left to right, no x / y jitter
+    assert hz == pz == rz                                 # camera and speaker at the block's mid height

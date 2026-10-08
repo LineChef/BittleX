@@ -492,6 +492,19 @@ elif PAYLOAD_PROFILE == "case2":
     # body, modeled separately, is at x = 0.045..0.065 in front of it). Tried and rejected 2026-10-07: running the block on to the camera's front face (120 mm).
     PAYLOAD_BOX_HALF = (0.050, 0.020, 0.019)
     PAYLOAD_POS = (-0.005, 0.0, 0.036)
+# World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
+# both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
+# height). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
+PAYLOAD_LAYOUT = os.environ.get("G2E_PAYLOAD_LAYOUT", "").strip().lower()
+PAYLOAD_JITTER_XY = 0.003      # m, per-episode x / y position jitter of each welded body (z keeps +-3 mm)
+if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE == "case2":
+    SPINE_HALF_X = 0.0525
+    PAYLOAD_BOX_HALF = (SPINE_HALF_X, PAYLOAD_BOX_HALF[1], PAYLOAD_BOX_HALF[2])
+    PAYLOAD_POS = (0.0, 0.0, PAYLOAD_POS[2])
+    HEAD_MASS_POS = (SPINE_HALF_X + HEAD_BOX_HALF[0], 0.0, PAYLOAD_POS[2])
+    REAR_MASS_POS = (-(SPINE_HALF_X + REAR_BOX_HALF[0]), 0.0, PAYLOAD_POS[2])
+    PAYLOAD_JITTER_XY = 0.0
+
 # DRIFT_SHOULDER_DEG: per-episode persistent zero offset on a random subset of the four shoulder / hip joints, +/- this many degrees each.
 # The real G2 turns right at ~8-14 deg/s with the policy commanding straight (a leg that sits off its zero, e.g. the front-left shoulder); the
 # policy sees its heading (the quaternion) but, with nothing pushing it off course in training, learned to ignore it. This gives it something to fix.
@@ -2340,7 +2353,7 @@ class OpenCatGymEnv(gym.Env):
         self._rear_id = None
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
-            pj = np.random.uniform(-0.003, 0.003, 3)
+            pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
             off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
             self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF,
                 [start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
@@ -2349,7 +2362,7 @@ class OpenCatGymEnv(gym.Env):
             p.changeConstraint(_c, maxForce=5e3)
             if HEAD_MASS_NOM > 0:
                 hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
-                hj = np.random.uniform(-0.003, 0.003, 3)
+                hj = np.random.uniform(-0.003, 0.003, 3); hj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
                 hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
                 self._head_id = self._payload_body(hm, HEAD_BOX_HALF,
                     [start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
@@ -2359,7 +2372,7 @@ class OpenCatGymEnv(gym.Env):
             self._rear_id = None
             if REAR_MASS_NOM > 0:
                 rm = REAR_MASS_NOM + np.random.uniform(-REAR_MASS_RAND, REAR_MASS_RAND)
-                rj = np.random.uniform(-0.003, 0.003, 3)
+                rj = np.random.uniform(-0.003, 0.003, 3); rj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
                 roff = [REAR_MASS_POS[0] + rj[0], REAR_MASS_POS[1] + rj[1], REAR_MASS_POS[2] + rj[2]]
                 self._rear_id = self._payload_body(rm, REAR_BOX_HALF,
                     [start_pos[0] + roff[0], start_pos[1] + roff[1], start_pos[2] + roff[2]])
