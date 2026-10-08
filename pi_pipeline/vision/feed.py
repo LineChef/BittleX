@@ -139,6 +139,7 @@ class SerialDetectionFeed:
         sensor_opt: int | None = None,   # 0=240 1=480 2=640x480; None = leave as-is
         ae_bump: int = 0,               # 0 = off; ~0x20 helps a dim room, over-exposes a bright one
         detection_filter=None,          # frame -> frame, applied to every frame the feed yields (vision/detection_filter.py)
+        snapshot_settle_frames: int = 2,       # throwaway pictures after the capture-mode switch, so auto-exposure has settled on the one that is kept
         snapshot_sensor_opt: int | None = 0,   # pictures are taken at this capture option (0 = 240 x 240), then detection goes back to `sensor_opt`; None = no switch
     ):
         import serial
@@ -151,6 +152,7 @@ class SerialDetectionFeed:
         self._min_score = min_score
         self._sensor_opt, self._ae_bump, self._snap_opt = sensor_opt, ae_bump, snapshot_sensor_opt
         self._filter = detection_filter
+        self._settle_frames = max(0, int(snapshot_settle_frames))
         self._t = 0.0
         if auto_start:
             time.sleep(2.5)              # let the module boot (port open resets it)
@@ -236,15 +238,21 @@ class SerialDetectionFeed:
                     # the module's picture buffer holds only about 5 KB of JPEG: a 480 x 480 capture comes back cut off (only the top third to half is real, the rest gray),
                     # a 240 x 240 one fits. So pictures are taken at 240 and detection goes back to its own capture option afterwards.
                     self._apply_sensor(self._snap_opt, self._ae_bump)
-                self._ser.reset_input_buffer()
-                self._ser.write(b"AT+INVOKE=1,0,0\r\n")
-                deadline = time.monotonic() + timeout_s
-                while time.monotonic() < deadline:
-                    raw = self._ser.readline()
-                    if not raw:
-                        continue
-                    snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
-                    if snap is not None:
+                # right after a capture-mode switch the sensor's auto-exposure is still ramping (2026-10-08: survey pictures alternated between a mean
+                # brightness of about 65 and about 150): throw away `settle` frames first so the picture that is kept has settled
+                for attempt in range(self._settle_frames + 1 if switched else 1):
+                    self._ser.reset_input_buffer()
+                    self._ser.write(b"AT+INVOKE=1,0,0\r\n")
+                    deadline = time.monotonic() + timeout_s
+                    snap = None
+                    while time.monotonic() < deadline:
+                        raw = self._ser.readline()
+                        if not raw:
+                            continue
+                        snap = parse_invoke_line(raw.decode("utf-8", "replace"), self._labels)
+                        if snap is not None:
+                            break
+                    if snap is None:
                         break
                 if snap is None:
                     log.warning("camera gave no picture within %.0f s", timeout_s)
