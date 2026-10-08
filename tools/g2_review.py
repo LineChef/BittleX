@@ -365,6 +365,7 @@ function addObservationButton(){const b=el("button","btn","Add observation");b.o
   try{const r=await api("/api/observations/add",{caption:t.trim(),labels:l});toast("Observation added",async()=>{await api("/api/delete",{kind:"observations",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
 function addFactButton(){const b=el("button","btn","Add fact");b.onclick=async()=>{const t=prompt("A fact for G2 to remember (a stable thing, for example: The dishwasher is next to the fridge)");if(!t||!t.trim())return;
   try{const r=await api("/api/facts/add",{fact:t.trim()});toast("Fact added",async()=>{await api("/api/delete",{kind:"facts",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
+function picLabel(p){if(p.name)return p.name;if(!p.pose)return "";return p.pose==="after_bow"?"Survey stop":p.pose.replace(/_/g," ")}
 function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Trash; you can undo)";b.setAttribute("aria-label","Delete");b.onclick=fn;return b}
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
@@ -379,13 +380,13 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
  if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
   for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
-   for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.pose||p.name||"picture";
-    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||p.pose||"")+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
+   for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title="Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render()}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
-    c.append(el("div","cap",(p.name||p.pose||"")+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
+    c.append(el("div","cap",picLabel(p)+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
   const b=el("button","btn danger","Empty trash");b.onclick=async()=>{if(Date.now()-confirmAt>4000){confirmAt=Date.now();b.textContent="Click again to delete for good";return}
    try{const r=await api("/api/empty-trash",{});toast("Deleted for good: "+r.memory.removed+" records, "+r.pictures.removed+" pictures");load()}catch(e){toast("Failed: "+e.message)}};$("#extra").append(b);
