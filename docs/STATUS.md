@@ -86,6 +86,8 @@ file instead of restating it. History and data live in the dated logs, not here.
 
 ## Decisions pending
 
+- **The new 20M (parked, 2026-10-08):** the user starts it; the plan, contents and pre-launch checklist are in [`rl/next-20m-plan.md`](rl/next-20m-plan.md). The finished 20M was promoted to the default policy for G2 testing (`Release_CandidateV3`; V2.1 stays on the Pi as the fallback) and deploys when the Pi is next online.
+
 - **How to stop a Claude-started walk, and who owns the voice:** G2's own offline voice module (switch: say "be quiet" / "play sound" to G2) versus the Pi + Claude path; options in [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md).
 - **Petoi AI Head vs the Raspberry Pi** — criteria and test steps in the evaluation doc above; do not remove the Pi before the scorecard is filled.
 
