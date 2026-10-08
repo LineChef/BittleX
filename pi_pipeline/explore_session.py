@@ -232,8 +232,8 @@ def main() -> None:
             try:
                 rt.post(disarm_explore=True)
                 time.sleep(1.0)
+                say("Exploration completed.")                                 # said first (user, 2026-10-07), then G2 lies down
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
-                say("Exploration test finished.")
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
             if policy_walker is not None:

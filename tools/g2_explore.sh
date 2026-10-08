@@ -12,6 +12,7 @@ case "${1:-status}" in
     ssh "$G2_PI" "rm -f ~/.g2_explore_cmd; sudo systemd-run --unit=$UNIT --collect --uid=\$(id -un) \
       -p WorkingDirectory=\$HOME/bittleX -p KillSignal=SIGTERM -p TimeoutStopSec=15 \
       -p ExecStartPre='+/bin/systemctl stop g2-voice' \
+      -p ExecStopPost=\"+/bin/sh -c '\$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send d >/dev/null 2>&1; true'\" \
       -p ExecStopPost='+/bin/systemctl --no-block start g2-voice' \
       -E G2_FEATURES='+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery' -E G2_LOG_HEARD=1 -E PYTHONFAULTHANDLER=1 \
       \$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.explore_session --roam-s ${2:-600}$EXTRA" ;;
