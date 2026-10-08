@@ -44,6 +44,8 @@ class FakePi:
             return json.dumps({"moved": rest[1:]})
         if rest[0] == "name":
             return json.dumps({"named": [{"from": r, "to": "named/" + rest[1].replace(" ", "-") + "/" + r.split("/")[-1]} for r in rest[2:]]})
+        if rest[0] == "label":
+            return json.dumps({"path": rest[1], "detector": [], "dismissed": [rest[2]] if "--restore" not in rest else []})
         if rest[0] == "move":
             return json.dumps({"moved": [{"from": x.split(":")[0], "to": x.split(":")[1]} for x in rest[1:]]})
         return json.dumps({"removed": 0} if rest[0] == "empty-trash" else [])
@@ -79,6 +81,18 @@ def test_adding_and_editing_facts_and_observations_backs_up_once_and_passes_the_
     assert [c[1] for c in mem] == ["backup", "add-fact", "edit-fact", "add-observation", "edit-observation"]       # one backup, before the first change
     assert mem[1][1:] == ["add-fact", "The dishwasher is by the fridge", "--importance", "4", "--core"]
     assert mem[2][1:] == ["edit-fact", "7", "--fact", "New text", "--importance", "2", "--core", "0"]
+
+
+def test_dismissing_a_detector_label_checks_the_path_and_passes_restore():
+    pi = FakePi()
+    app = G.App(G.Remote("pi", runner=pi))
+    with pytest.raises(ValueError):
+        app.dismiss_label("../x.jpg", "dog")
+    with pytest.raises(ValueError):
+        app.dismiss_label("survey/20261007/a.jpg", "  ")
+    assert app.dismiss_label("survey/20261007/a.jpg", "dog")["dismissed"] == ["dog"]
+    assert app.dismiss_label("survey/20261007/a.jpg", "dog", restore=True)["dismissed"] == []
+    assert pi.calls[-1][1:] == ["label", "survey/20261007/a.jpg", "dog", "--restore"]
 
 
 def test_naming_a_picture_checks_paths_and_asks_for_a_name_and_can_be_undone():

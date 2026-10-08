@@ -191,7 +191,8 @@ def list_pictures(root: str = DEFAULT_ROOT) -> list[dict]:
         rel = str(f.relative_to(base))
         out.append({"path": rel, "group": rel.split("/")[0], "folder": f.parent.name, "pose": meta.get("pose"), "name": meta.get("name"),
                     "time": meta.get("time") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(f.stat().st_mtime)),
-                    "brightness": (meta.get("exposure") or {}).get("mean"), "detector": sorted({d["label"] for d in meta.get("detections", [])}),
+                    "brightness": (meta.get("exposure") or {}).get("mean"), "detector": sorted({d["label"] for d in meta.get("detections", [])} - set(meta.get("dismissed_labels", []))),
+                    "dismissed": sorted(set(meta.get("dismissed_labels", []))),
                     "bytes": f.stat().st_size})
     return out
 
@@ -263,6 +264,22 @@ def name_pictures(root: str, name: str, rels: list[str]) -> list[dict]:
     return out
 
 
+def set_label_dismissed(root: str, rel: str, label: str, dismissed: bool = True) -> dict:
+    """Flag one detector label on a picture as wrong (the detector called a bare floor a dog), or put it back. The detection record itself is kept; the picture's sidecar lists the
+    dismissed labels and the page stops showing them. Returns the picture's labels now."""
+    path = _inside(_base(root), rel).with_suffix(".json")
+    meta = {}
+    try:
+        meta = json.loads(path.read_text())
+    except (OSError, ValueError):
+        pass
+    gone = set(meta.get("dismissed_labels", []))
+    (gone.add if dismissed else gone.discard)(label)
+    meta["dismissed_labels"] = sorted(gone)
+    path.write_text(json.dumps(meta, indent=1))
+    return {"path": rel, "dismissed": sorted(gone), "detector": sorted({d["label"] for d in meta.get("detections", [])} - gone)}
+
+
 def move_pictures(root: str, pairs: list[tuple[str, str]]) -> list[dict]:
     """Move pictures (with their sidecars) from one path under the root to another: the Undo of `name_pictures`."""
     base, out = _base(root), []
@@ -309,6 +326,10 @@ def main(argv=None) -> None:
     sp = sub.add_parser("name")
     sp.add_argument("name")
     sp.add_argument("paths", nargs="+")
+    sp = sub.add_parser("label")
+    sp.add_argument("path")
+    sp.add_argument("label")
+    sp.add_argument("--restore", action="store_true")
     sp = sub.add_parser("move")
     sp.add_argument("pairs", nargs="+", help="SRC:DST relative paths")
     sub.add_parser("trash-list")
@@ -324,6 +345,8 @@ def main(argv=None) -> None:
         print(json.dumps({"restored": restore_pictures(a.root, a.paths)}))
     elif a.cmd == "name":
         print(json.dumps({"named": name_pictures(a.root, a.name, a.paths)}))
+    elif a.cmd == "label":
+        print(json.dumps(set_label_dismissed(a.root, a.path, a.label, not a.restore)))
     elif a.cmd == "move":
         print(json.dumps({"moved": move_pictures(a.root, [tuple(x.split(":", 1)) for x in a.pairs])}))
     elif a.cmd == "trash-list":

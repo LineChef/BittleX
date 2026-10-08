@@ -180,6 +180,13 @@ class App:
         self.remote.sync_pictures()
         return out
 
+    def dismiss_label(self, path: str, label: str, restore: bool = False):
+        """Flag a detector label on a picture as wrong (or put it back); the Pi's sidecar keeps the record, the page stops showing it."""
+        label = str(label or "").strip()
+        if not label or len(label) > 60:
+            raise ValueError("no label")
+        return self.remote.pictures("label", self._rel(path), label, *(["--restore"] if restore else []))
+
     def move_pictures(self, pairs: list[list[str]]):
         out = self.remote.pictures("move", *[f"{self._rel(a)}:{self._rel(b)}" for a, b in pairs])
         for a, b in pairs:
@@ -293,6 +300,8 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.edit_observation(int(body["id"]), body.get("caption"), body.get("labels")))
                 if u.path == "/api/pictures/name":
                     return self._json(app.name_pictures(list(body["paths"]), str(body["name"])))
+                if u.path == "/api/pictures/label":
+                    return self._json(app.dismiss_label(str(body["path"]), str(body["label"]), bool(body.get("restore", False))))
                 if u.path == "/api/pictures/move":
                     return self._json(app.move_pictures([list(x) for x in body["pairs"]]))
                 if u.path == "/api/pictures/person":
@@ -365,6 +374,12 @@ function addObservationButton(){const b=el("button","btn","Add observation");b.o
   try{const r=await api("/api/observations/add",{caption:t.trim(),labels:l});toast("Observation added",async()=>{await api("/api/delete",{kind:"observations",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
 function addFactButton(){const b=el("button","btn","Add fact");b.onclick=async()=>{const t=prompt("A fact for G2 to remember (a stable thing, for example: The dishwasher is next to the fridge)");if(!t||!t.trim())return;
   try{const r=await api("/api/facts/add",{fact:t.trim()});toast("Fact added",async()=>{await api("/api/delete",{kind:"facts",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
+function chip(text,onx){const c=el("span","chip",text+" ");c.style.cssText="display:inline-block;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin:2px 4px 2px 0;font-size:.74rem;background:var(--surface)";
+ const x=el("button","","\u00d7");x.title="Wrong: remove this tag (you can undo)";x.style.cssText="border:0;background:none;color:var(--x);cursor:pointer;padding:0 0 0 2px;font:inherit";x.onclick=(ev)=>{ev.stopPropagation();onx()};c.append(x);return c}
+function picCaption(p){const d=el("div","cap",picLabel(p)+" \u00b7 "+p.time+(p.detector.length?" \u00b7 sees: ":""));
+ for(const l of p.detector){d.append(chip(l,async()=>{try{await api("/api/pictures/label",{path:p.path,label:l});p.detector=p.detector.filter(x=>x!==l);render();toast("Removed the tag: "+l,async()=>{await api("/api/pictures/label",{path:p.path,label:l,restore:true});p.detector=[...p.detector,l].sort();render()})}catch(e){toast("Failed: "+e.message)}}))}return d}
+function obsLabels(r){const d=el("div","meta",r.ts+(r.labels?" \u00b7 detector: ":""));const labs=(r.labels||"").split(",").map(x=>x.trim()).filter(Boolean);
+ for(const l of labs){d.append(chip(l,async()=>{const old=r.labels,nw=labs.filter(x=>x!==l).join(", ");try{await api("/api/observations/edit",{id:r.id,labels:nw});r.labels=nw;render();toast("Removed the tag: "+l,async()=>{await api("/api/observations/edit",{id:r.id,labels:old});r.labels=old;render()})}catch(e){toast("Failed: "+e.message)}}))}return d}
 function picLabel(p){if(p.name)return p.name;if(!p.pose)return "";return p.pose==="after_bow"?"Survey stop":p.pose.replace(/_/g," ")}
 function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Trash; you can undo)";b.setAttribute("aria-label","Delete");b.onclick=fn;return b}
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
@@ -382,11 +397,11 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
-    const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title="Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render()}catch(e){toast("Failed: "+e.message)}};c.append(pb);
+    const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
-    c.append(el("div","cap",picLabel(p)+" · "+p.time+(p.detector.length?" · sees: "+p.detector.join(", "):"")));grid.append(c)}list.append(grid)}return}
+    c.append(picCaption(p));grid.append(c)}list.append(grid)}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
   const b=el("button","btn danger","Empty trash");b.onclick=async()=>{if(Date.now()-confirmAt>4000){confirmAt=Date.now();b.textContent="Click again to delete for good";return}
    try{const r=await api("/api/empty-trash",{});toast("Deleted for good: "+r.memory.removed+" records, "+r.pictures.removed+" pictures");load()}catch(e){toast("Failed: "+e.message)}};$("#extra").append(b);
@@ -398,7 +413,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
  const items=data.filter(r=>!f||JSON.stringify(r).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","Nothing here."));return}
  for(const r of items){const row=el("div","row"),main=el("div","main");
   if(tab==="exchanges"){main.append(el("div","",r.user_text),el("div","q",r.assistant_text),el("div","meta",r.ts+(r.actions?" · "+r.actions:"")))}
-  else if(tab==="observations"){main.append(el("div","",r.caption),el("div","meta",r.ts+(r.labels?" · detector: "+r.labels:"")))}
+  else if(tab==="observations"){main.append(el("div","",r.caption),obsLabels(r))}
   else{main.append(el("div","",r.fact),el("div","meta","#"+r.id+" · "+r.ts.slice(0,10)+(r.core?" · core":"")+" · importance "+r.importance))}
   row.append(main);if(tab==="facts")row.append(factTools(r));if(tab==="observations")row.append(obsTools(r));row.append(xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});

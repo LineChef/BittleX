@@ -429,5 +429,6 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `g2pics` | the Pictures tab of the review page; each picture has a **Name** button (type what it is: it moves into that object's folder in the library; Undo in the toast) and a **Person** flag |
 | `g2pics stop` then `g2pics` | restart the page after an update |
 | Facts tab: **Add fact**, **Edit**, importance 1-5, **Core** | write or change what G2 remembers (a database copy is made before the first change of a session; Undo in the toast) |
+| Tag chips (the detector's labels under a picture or on an observation) have an **×** to remove a wrong tag; **Person** can be clicked off again; every removal has an Undo in the toast |
 | Observations tab: **Add observation**, **Edit** | write or change what G2 saw (caption and detector labels) |
 
