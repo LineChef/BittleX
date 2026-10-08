@@ -474,6 +474,8 @@ REAR_MASS_RAND = 0.0
 REAR_MASS_POS = (-0.068, 0.0, 0.030)
 REAR_BOX_HALF = (0.012, 0.012, 0.008)
 PAYLOAD_PROFILE = os.environ.get("G2E_PAYLOAD_PROFILE", "estimate").strip().lower()
+# World 2 (user, 2026-10-07): two weighings put about 46% of G2's weight over the front paws, the sim 44.4%; G2E_PAYLOAD_SHIFT_X (metres, + = forward) slides the payload block along the spine (g2_profile's world 2 sets 0.006).
+PAYLOAD_SHIFT_X = float(os.environ.get("G2E_PAYLOAD_SHIFT_X", "0") or 0.0)
 PAYLOAD_VISUAL = False    # renders only: draw the payload boxes (they are collision-only, so invisible otherwise); set True before reset()
 if PAYLOAD_PROFILE == "case":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
@@ -2339,7 +2341,7 @@ class OpenCatGymEnv(gym.Env):
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3)
-            off = [PAYLOAD_POS[0] + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
+            off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
             self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF,
                 [start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
             _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,

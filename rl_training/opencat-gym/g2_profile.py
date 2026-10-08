@@ -127,10 +127,21 @@ TRAIN_ONLY_PREFIXES = ("G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_A
                        "G2E_SLOPE_TARGET_PROB", "G2E_LEDGE_", "G2E_SURFACE_", "G2E_SNAG_", "G2E_TRAIN_YAW")
 
 
+# World 2 (user, 2026-10-07): the payload block 6 mm further forward, which puts the sim's front share at about 46% to match the two weighings (45% and 47%). It applies to trainings
+# started AFTER the V3 queue (S8, S9, K3 and the 20M are judged against a control in world 1): switch it on with `touch trained/v3_world2` or G2_WORLD=2 (a restarted runner picks it up).
+WORLD2_CALIBRATION = {"G2E_PAYLOAD_SHIFT_X": "0.006"}
+
+
+def world2() -> bool:
+    return os.environ.get("G2_WORLD", "") == "2" or os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "trained", "v3_world2"))
+
+
 def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = None) -> dict:
     """The G2E_* environment for a training run: RECIPE + CALIBRATION + levers + (a stage's course settings) + extra."""
     out = dict(RECIPE)
     out.update(CALIBRATION)
+    if world2():
+        out.update(WORLD2_CALIBRATION)
     for name in lever_names:
         out.update(LEVERS[name])
     if stage is not None:
@@ -143,7 +154,7 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 def scoring_env(*lever_names: str) -> dict:
     """The physical setup for scoring: RECIPE + CALIBRATION, minus training-only settings. Levers that change the observation or the
     reward geometry a policy was trained with (heading_obs) must be passed so the scoring env builds the same inputs."""
-    out = {k: v for k, v in {**RECIPE, **CALIBRATION}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
+    out = {k: v for k, v in {**RECIPE, **CALIBRATION, **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
     for name in lever_names:
         if name == "heading_obs":
             out.update(LEVERS[name])

@@ -304,3 +304,11 @@ open-Q answers in [`pi-bring-up.md`](../guides/pi-bring-up.md)):**
   disable those PiSugar features (it has a switch for the auto-boot one).
 - → Confirms the Pi Zero 2 W side of the power plan; the BiBoard 5-pin Pi socket
   compatibility is still the open item.
+
+### Weight distribution, standing (measured 2026-10-07)
+
+One scale and a spacer, G2 standing with the case and payload on (front feet on the scale, back feet on a spacer, then swapped). First weighing: front legs 171 g, back legs 210 g, whole robot 416 g.
+Second weighing: front legs 185 g, back legs 206 g (the two readings sum to 381 g and 391 g, 25 to 41 g under the total, so the scale and the spacer were not the same height). Front share: 44.9% and 47.3%, about
+46% front and 54% rear (true value roughly 44 to 50%). The sim (`PAYLOAD_PROFILE=case2`: base 254 g, case block 133 g, camera 15 g, speaker 20 g) puts a median of 44.4% over the front paws at 422 g;
+"world 2" in `rl_training/opencat-gym/g2_profile.py` moves the block 6 mm forward (median 46.5%) for trainings started after the V3 queue.
+

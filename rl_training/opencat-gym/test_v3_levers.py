@@ -606,3 +606,12 @@ def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
     mass, share = map(float, out.stdout.strip().splitlines()[-1].split())
     assert 410 <= mass <= 435, mass
     assert 41.0 <= share <= 49.5, share
+
+
+def test_world2_moves_the_payload_forward_only_when_asked(monkeypatch):
+    import g2_profile as G
+    monkeypatch.setenv("G2_WORLD", "2")
+    assert G.world2() and G.env_for()["G2E_PAYLOAD_SHIFT_X"] == "0.006" and G.scoring_env()["G2E_PAYLOAD_SHIFT_X"] == "0.006"
+    monkeypatch.setenv("G2_WORLD", "1")
+    if not G.world2():                                    # world 1 (no trained/v3_world2 marker file): the payload stays where it was
+        assert "G2E_PAYLOAD_SHIFT_X" not in G.env_for()
