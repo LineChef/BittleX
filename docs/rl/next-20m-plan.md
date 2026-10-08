@@ -19,6 +19,24 @@ The 20M that finished at 11:50 AM on 2026-10-08 (`v3_20m`) was launched as a fre
 | Episode recording | about 1 episode in 50 is saved so it can be watched exactly: `python watch_training.py <tag>` | `G2E_RECORD_EVERY=50` |
 | Real-data calibration | the approved snapshot, if any. Snapshot 0002 (the only candidate) changes nothing: its one value, `G2E_IMU_HOLD_STEPS` 16, equals the profile's, and `G2E_CMD_PATH_EXTRA_MS_MAX` was rejected by the user | `~/g2_data/calibration/` |
 
+### How often each hazard appears (measured 2026-10-08 by sampling the training reset, 2000 episodes for the new run at mature levels of 1.0; 1500 for the finished 20M at its final levels)
+
+| Hazard | Finished 20M (flat stage) | New run (snags + ledges, no surface step) |
+|---|---|---|
+| Ground tilt over 5 / 8 / 12 / 18 deg | 22 / 13 / 4 / 0% | 28 / 18 / 11 / 4% |
+| Strong targeted slope (side-hill 3-15 deg or climb 12-24 deg, scaled by level) | 28% | 28% |
+| Rough heightfield floor | 22% | 22% |
+| Rubble | 71% | 72% |
+| Box obstacles | 32% | 31% |
+| Snag obstacles (two thin lane-spanning boxes, 10 mm) | 0% | 18% |
+| Ledge (full-width block, 8-35 mm x level; up 7%, down 6%) | 0% | 13% (height median 0.8 cm, 95th percentile 3.3 cm, max 3.6 cm) |
+| Surface step | 0% | 0% (off by decision) |
+| Episodes with 0 / 1 / 2 / 3+ kinds of hazard (tilt over 5 deg, obstacles or rough floor, ledge) | 16 / 64 / 19 / 0% | 13 / 55 / 27 / 5% |
+| Obstacles or rough floor together with tilt over 5 deg | 19% | 25% |
+| Ledge together with tilt over 5 deg | 0% | 5.5% |
+
+Measured shares are below the nominal 20% for snags and ledges because 10% of episodes are hazard-free anchors and a focus episode puts only its own category at full level. Early in the ramp every hazard is rarer and smaller. The viewer (`watch_v3.sh`) and `watch_training.py` show this same mix.
+
 The faults lever is not part of K3, so the fault category stays inert in this run too. If the user wants faults trained, that is a separate decision (`NOT_IN_K3` in `phase_v3.py`).
 
 ## Before launch (in this order)
