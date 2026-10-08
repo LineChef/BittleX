@@ -47,7 +47,7 @@ def test_curiosity_biases_behavior_params():
     assert curious.idle_secs_before_explore < neutral.idle_secs_before_explore
     assert curious.novelty_pull > neutral.novelty_pull
     assert curious.investigate_secs > neutral.investigate_secs
-    assert curious.approach_novelty is True and neutral.approach_novelty is False
+    assert curious.approach_novelty is True and neutral.approach_novelty is True      # walking up to a find is on by default (2026-10-07)
 
 
 def test_behavior_params_stay_in_range():

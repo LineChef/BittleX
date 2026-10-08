@@ -118,7 +118,7 @@ def _explorer(spec="curiosity=0.9"):
 
 
 def test_explorer_wanders_when_nothing_new():
-    ex, _ = _explorer("")                         # neutral: approach_novelty off
+    ex, _ = _explorer("")                         # neutral
     d0 = ex.decide([], now=0.0)
     assert d0.action is ExploreAction.TURN        # first tick starts a leg
     d1 = ex.decide([], now=0.5)
@@ -126,7 +126,8 @@ def test_explorer_wanders_when_nothing_new():
 
 
 def test_explorer_investigates_novelty_then_marks_it_seen():
-    ex, p = _explorer("curiosity=0.4")            # mid: look, don't approach
+    ex, p = _explorer("curiosity=0.4")            # mid curiosity; walking up to a find is on by default now, so this checks the "just look" path with it off
+    ex.p.approach_novelty = False
     d = ex.decide([det(0.2, bearing=0.5, label="shoe")], now=0.0)
     assert d.action is ExploreAction.INVESTIGATE and d.target == "shoe"
     # still dwelling before investigate_secs elapses

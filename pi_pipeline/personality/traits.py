@@ -33,7 +33,7 @@ class BehaviorParams:
     explore_leg_secs: float = 5.0            # seconds walked in one heading before reassessing
     investigate_secs: float = 3.0            # dwell time when examining one thing
     novelty_pull: float = 0.35              # 0..1 bias toward unvisited headings / novel objects
-    approach_novelty: bool = False          # walk up to a novel detection vs. just orient to it
+    approach_novelty: bool = True           # walk up to a novel detection vs. just orient to it (on by default since 2026-10-07, user)
     revisit_secs: float = 150.0             # how long until a seen thing counts as novel again
     wander_turn_bias: float = 0.30          # 0..1 how much it changes heading between legs
 

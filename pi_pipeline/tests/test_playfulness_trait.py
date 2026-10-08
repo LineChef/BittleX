@@ -22,7 +22,7 @@ def test_low_level_is_a_light_streak():
     p = BehaviorParams()
     Playfulness(0.2).bias(p)
     assert BehaviorParams().vocalize_prob < p.vocalize_prob < 0.30
-    assert p.approach_novelty is False                # only flips at >= 0.5
+    assert p.approach_novelty is True                 # on by default since 2026-10-07 (it used to flip only at >= 0.5)
 
 
 def test_intensity_scales_the_fragment():

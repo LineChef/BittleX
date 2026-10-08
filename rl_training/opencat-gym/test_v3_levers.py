@@ -711,5 +711,5 @@ def test_the_level_ceiling_is_1_0_by_default_and_world2_lets_a_level_be_earned_u
     lv = {c: 1.2 for c in cats}
     curriculum.update_levels(lv, {c: 0 for c in cats}, {c: 0.6 for c in cats}, 0.8, 1.5, up=0.8, down=0.5, step=0.1, windows=1, min_base=0.5, collapse_base=0.35, top=1.25)
     assert [round(lv[c], 3) for c in cats] == [1.2] * 4                                   # a middling score earns nothing
-    assert "G2E_LEVEL_MAX" not in G.env_for() or G.world2()
-    assert G.WORLD2_CALIBRATION["G2E_LEVEL_MAX"] == "1.25" and G.WORLD2_CALIBRATION["G2E_PAYLOAD_LAYOUT"] == "spine"
+    assert G.env_for()["G2E_LEVEL_MAX"] == "1.25" and G.scoring_env().get("G2E_LEVEL_MAX") is None      # every training run gets the 1.25 ceiling, scoring never sees it
+    assert G.WORLD2_CALIBRATION == {"G2E_PAYLOAD_LAYOUT": "spine"}
