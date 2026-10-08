@@ -679,3 +679,21 @@ def test_world2_payload_layout_block_is_the_spine_and_only_camera_and_speaker_ha
     assert c0 == 0.0525 and s1 == -0.0525                 # the camera starts where the spine ends, the speaker ends where it starts: they alone hang past it
     assert py == hy == ry == 0.0 and jit == 0.0           # centred left to right, no x / y jitter
     assert hz == pz == rz                                 # camera and speaker at the block's mid height
+
+
+def test_the_world2_check_scores_the_final_policy_in_world_2_and_compares_with_world_1(monkeypatch, tmp_path):
+    import os
+    import phase_v3 as V
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("trained/v3_report_v3_20m")
+    mk = lambda f: {"cells": [{"id": c, "fell_fraction": f, "speed_mps": 0.08, "heading_mean_deg": 1.0, "heading_abs_mean_deg": 5.0, "roll_std_deg": 4.0, "lr_asym_max_deg": 1.0, "servo_over_frac": 0.1,
+                                "yaw_rate_rms": 0.1} for c in V.DECISION_CELLS]}      # noqa: E731
+    json_dump = __import__("json").dump
+    json_dump(mk(0.10), open("trained/v3_report_v3_20m/final.json", "w"))
+    seen, logs = {}, []
+    monkeypatch.setattr(V, "score", lambda path, levers, **kw: seen.update(path=path, **kw) or mk(0.12))
+    monkeypatch.setattr(V, "log", lambda m: logs.append(m))
+    V.do_world2_check({"of": "v3_20m"}, {V.K3: {"levers": ["mirror"]}})
+    assert seen["extra_env"] == {"G2E_PAYLOAD_LAYOUT": "spine"} and seen["path"] == "trained/v3_20m_ppo"
+    assert os.path.exists("trained/v3_score_v3_20m_world2.json")
+    assert "0.10 (world 1) -> 0.12 (world 2)" in logs[-1] and "none" in logs[-1]

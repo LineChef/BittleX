@@ -368,6 +368,29 @@ def run_final(job, results):
     return True
 
 
+def do_world2_check(job, results):
+    """After the 20M and its report: score the finished policy in world 2 (the spine-sized payload block, `G2E_PAYLOAD_LAYOUT=spine`) on the decision cells and compare with its world 1 scores
+    (the post-20M report), so a drop caused by the layout change is visible. Then the caller switches world 2 on for later trainings."""
+    tag = job.get("of", "v3_20m")
+    levers = results.get(K3, {}).get("levers", ["mirror"])
+    w2 = score(f"trained/{tag}_ppo", levers, spec=",".join(DECISION_CELLS), extra_env={"G2E_PAYLOAD_LAYOUT": "spine"})
+    save(f"trained/v3_score_{tag}_world2.json", w2)
+    w1 = None
+    for cand in (f"trained/v3_report_{tag}/final.json", f"trained/v3_score_{tag}.json"):
+        if os.path.exists(cand):
+            w1 = json.load(open(cand))
+            break
+    a = cellmap(w2)
+    msg = f"{tag} in world 2: {summary(w2)}"
+    if w1 is not None:
+        b = cellmap(w1)
+        both = [c for c in DECISION_CELLS if c in a and c in b]
+        d = sum(a[c]["fell_fraction"] - b[c]["fell_fraction"] for c in both) / max(1, len(both))
+        worse = [f"{c} {b[c]['fell_fraction']:.2f}->{a[c]['fell_fraction']:.2f}" for c in both if a[c]["fell_fraction"] > b[c]["fell_fraction"] + NO_REGRESSION_FELL]
+        msg += f" | mean falls over the decision cells {sum(b[c]['fell_fraction'] for c in both) / max(1, len(both)):.2f} (world 1) -> {sum(a[c]['fell_fraction'] for c in both) / max(1, len(both)):.2f} (world 2), change {d:+.2f}; cells more than {NO_REGRESSION_FELL} worse: {worse or 'none'}"
+    log(f"WORLD2 CHECK {msg}")
+
+
 REPAIR_MAX_RUNS = 3
 SUSPECT_ORDER = ("yaw_damp", "no_heading", "smooth", "balance_pbrs", "servo_feas", "touchdown", "mirror")      # least tested first; mirror passed in three seeds, so it is dropped last
 
@@ -432,6 +455,16 @@ def run_queue():
                 res = score(V21, [])
                 save(REF, res)
                 log(f"REF done | {summary(res)}")
+            continue
+        if kind == "world2":
+            marker = "trained/v3_world2"
+            if not os.path.exists(marker):
+                try:
+                    do_world2_check(job, results)
+                except Exception as e:            # a failed check must not keep later trainings out of the corrected world
+                    log(f"WORLD2 CHECK failed ({type(e).__name__}: {e}); switching world 2 on anyway")
+                open(marker, "w").write("auto after the 20M\n")
+                log("WORLD2 ON: trainings started from now on use the spine-sized payload layout (trained/v3_world2 created)")
             continue
         if kind == "report":
             outdir = f"{REPORT_DIR}_{job['report_of']}" if job.get("report_of") else REPORT_DIR
