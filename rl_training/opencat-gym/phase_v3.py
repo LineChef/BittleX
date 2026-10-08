@@ -33,7 +33,7 @@ V21 = "trained/Release_CandidateV2.1_ppo"
 CONTROL = "v3_w3_c0"          # the control in the current world (case2 payload and the measured IMU, 2026-10-07); earlier controls: "v3_c0" (C0), "v3_w2_c0" (case2 payload, old IMU)
 K3 = "v3_k3"
 SCORE_JOBS = 8
-SCORE_JOBS_BUSY = 2
+SCORE_JOBS_BUSY = 3      # workers while a training run is going (4 torch threads + 3 workers on 8 cores)
 EPISODES = 40
 SCREEN_STEPS = "3e6"
 STEP_MIN = 58            # minutes per 3M steps at ~860 steps/s (train.py now uses 4 torch threads)
@@ -349,8 +349,16 @@ def run_final(job, results):
             log(f"{tag} HALT before {step // 10**6}M: {reason}")
             return False
         t0 = time.time()
-        res = score(f"trained/checkpoints/{tag}_{step}_steps", job.get("levers", []), busy=True)
-        save(f"trained/v3_score_{tag}_{step // 10**6}M.json", res)
+        done_file = f"trained/v3_score_{tag}_{step // 10**6}M.json"
+        if os.path.exists(done_file):                       # a restarted runner does not score a checkpoint it already checked
+            res = json.load(open(done_file))
+            if not (calm_ok(res, base) + regressions(res, base)):
+                log(f"{tag} GAIT CHECK {step // 10**6}M already passed before a restart: skipping")
+                continue
+        else:
+            # the gate reads only T1.1, N1 and the decision cells: score just those (a full benchmark took about 10 min and slowed the training)
+            res = score(f"trained/checkpoints/{tag}_{step}_steps", job.get("levers", []), spec=",".join(DECISION_CELLS), busy=True)
+            save(done_file, res)
         why = calm_ok(res, base) + regressions(res, base)
         log(f"{tag} GAIT CHECK {step // 10**6}M {'PASS' if not why else 'REGRESSION'} {why or ''} | {summary(res)} (scored in {(time.time() - t0) / 60:.0f} min)")
         if why:

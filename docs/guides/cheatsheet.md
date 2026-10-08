@@ -442,3 +442,13 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `bash tools/g2_promote_policy.sh TAG NAME [--dry-run]` | promote a trained policy to the default and deploy it when the Pi is online |
 | `touch rl_training/opencat-gym/trained/v3_world2` | training world 2 (payload 6 mm forward) for trainings started afterwards |
 
+## Watching a V3 training run (Mac)
+
+| Command | What it does |
+|---|---|
+| `tail -f rl_training/opencat-gym/trained/phase_v3.log` | the queue: starts, results, gait checks, stops |
+| `tail -f rl_training/opencat-gym/trained/v3_20m_console.log` | the training run's own log (steps, rewards, curriculum levels); TensorBoard logging is off in this repo |
+| `ls rl_training/opencat-gym/trained/checkpoints \| grep v3_20m_ \| sort -t_ -k3 -n \| tail -1` | the newest checkpoint (saved every 200k steps) |
+| `cd rl_training/opencat-gym && ./watch_v3.sh [TAG] [--dr-push 0.35]` | replay the newest checkpoint of a run in the PyBullet GUI, in the G2 hardware world; run it in your own terminal; it slows the training a little while open |
+| `python rl_training/opencat-gym/phase_v3.py status` | every finished job and its verdict |
+
