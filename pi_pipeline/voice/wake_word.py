@@ -104,8 +104,13 @@ class VoskWakeWord:
         """After a wake word the microphone stream keeps running, with the audio heard since the wake word waiting in its queue, so the
         speech recogniser can carry on from the same stream (the card cannot be opened twice, and re-opening it loses the first words of a
         command said straight after the wake word). Returns ``(queue, close)`` or None; `close` does nothing: the stream is never closed."""
-        if not self._handover or self._stream is None:
-            return None
+        self._ensure_stream()
+        if not self._handover:                          # a follow-up window (no wake word just now): what the stream heard while G2 talked is stale
+            try:
+                while True:
+                    self._q.get_nowait()
+            except queue.Empty:
+                pass
         self._handover = False
         return self._q, (lambda: None)
 

@@ -66,7 +66,8 @@ def test_the_stream_stays_open_after_the_wake_word_and_is_handed_over():
     assert isinstance(q, queue.Queue)
     close()
     assert not holder["s"].closed                  # closing a PortAudio stream segfaulted the service: the stream is never closed
-    assert w.hand_over() is None
+    q2, _ = w.hand_over()                           # a follow-up window with no new wake word: the SAME stream (the card cannot be opened twice)
+    assert q2 is q and holder["s"] is w._stream
 
 
 def test_one_stream_serves_every_wake_word_and_is_never_closed():
