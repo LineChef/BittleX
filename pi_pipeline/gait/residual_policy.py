@@ -57,7 +57,7 @@ RESIDUAL_SCALE_DEG = 22          # LEGACY default: run20m_ppo's scale. Newer pol
                                  # own in a sidecar `<policy>.onnx.json` (export_onnx.py writes it);
                                  # see residual_scale_for(). A mismatch silently applies every
                                  # correction at the wrong size.
-DEFAULT_POLICY = "Release_CandidateV2.1_ppo.onnx"  # the deployed policy (V2.1, set 2026-10-01; was hw1_20m_ppo.onnx); promoting a new one changes this line
+DEFAULT_POLICY = "Release_CandidateV3_ppo.onnx"  # the deployed policy (V2.1, set 2026-10-01; was hw1_20m_ppo.onnx); promoting a new one changes this line
 STAND_FWD_THRESH = 0.025
 ANG_FACTOR = 0.10
 LEN_JOINT_HISTORY = 30

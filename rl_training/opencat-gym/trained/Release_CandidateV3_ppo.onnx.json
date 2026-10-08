@@ -1,0 +1,6 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "v3_20m_ppo",
+ "exported": "2026-10-08"
+}
