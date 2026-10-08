@@ -25,6 +25,8 @@ class FakePi:
         if mod.endswith("memory.review"):
             if rest[0] == "list":
                 return json.dumps([{"id": 7, "ts": "2026-10-01 10:00:00", "fact": "The dog is named Rex.", "core": 0, "importance": 3}])
+            if rest[0] == "count":
+                return json.dumps({"facts": 24, "exchanges": 310, "observations": 12})
             if rest[0] == "delete":
                 return json.dumps({"trash_id": 41})
             if rest[0] == "backup":
@@ -177,3 +179,17 @@ def test_marking_a_picture_as_a_person_is_remembered_beside_the_pictures_and_is_
     assert app.mark_people([rel], False) == {"marked": [], "unmarked": [rel]} and G.read_people_marks() == set()
     with pytest.raises(ValueError):
         app.mark_people(["../../etc/passwd.jpg"], True)                                              # paths are checked like every other picture action
+
+
+def test_counts_give_the_true_totals_for_the_tab_labels(tmp_path):
+    app = G.App(G.Remote("pi", runner=FakePi()))
+    c = app.counts()
+    assert c["facts"] == 24 and c["exchanges"] == 310 and c["observations"] == 12 and c["pictures"] == 0 and c["trash"] == 0
+    from pi_pipeline.memory import review
+    import sqlite3
+    db = tmp_path / "m.db"
+    con = sqlite3.connect(db)
+    con.executescript("CREATE TABLE facts(id INTEGER PRIMARY KEY, fact TEXT); CREATE TABLE exchanges(id INTEGER PRIMARY KEY, user_text TEXT, assistant_text TEXT);"
+                      "CREATE TABLE observations(id INTEGER PRIMARY KEY, caption TEXT, labels TEXT); INSERT INTO facts(fact) VALUES ('a'),('b');")
+    con.commit(); con.close()
+    assert review.count_records(str(db)) == {"facts": 2, "exchanges": 0, "observations": 0}

@@ -100,6 +100,14 @@ class App:
             raise ValueError("unknown kind")
         return self.remote.memory("list", kind, "--limit", str(int(limit)), "--query", q)
 
+    def counts(self) -> dict:
+        """Totals for the tab labels: records of each memory kind, pictures kept, and what is in the Trash."""
+        out = dict(self.remote.memory("count"))
+        out["pictures"] = len(self.remote.pictures("list"))
+        t = self.trash()
+        out["trash"] = len(t["memory"]) + len(t["pictures"])
+        return out
+
     def delete(self, kind: str, row_id: int):
         if kind not in KINDS:
             raise ValueError("unknown kind")
@@ -267,6 +275,8 @@ def make_handler(app: App, token: str, port: int):
                     return self._send(200, f.read_bytes(), "image/jpeg") if f.is_file() else self._send(404, b"missing", "text/plain")
                 if u.path == "/api/list":
                     return self._json(app.list(qs.get("kind", [""])[0], qs.get("q", [""])[0]))
+                if u.path == "/api/counts":
+                    return self._json(app.counts())
                 if u.path == "/api/pictures":
                     return self._json(app.pictures())
                 if u.path == "/api/trash":
@@ -355,9 +365,11 @@ const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
  const r=await fetch(path,o);const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||r.statusText);return j}
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
-function toast(msg,undo){$("#toastmsg").textContent=msg;undoFn=undo||null;$("#undo").style.display=undo?"":"none";$("#toast").style.display="flex";clearTimeout(timer);timer=setTimeout(()=>$("#toast").style.display="none",9000)}
+function toast(msg,undo){clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,1500);$("#toastmsg").textContent=msg;undoFn=undo||null;$("#undo").style.display=undo?"":"none";$("#toast").style.display="flex";clearTimeout(timer);timer=setTimeout(()=>$("#toast").style.display="none",9000)}
 $("#undo").onclick=async()=>{if(undoFn){try{await undoFn();toast("Restored")}catch(e){toast("Could not restore: "+e.message)}load()}};
-function drawTabs(){const t=$("#tabs");t.replaceChildren();for(const [k,n] of TABS){const b=el("button","tab",n);b.setAttribute("role","tab");b.setAttribute("aria-selected",k===tab);b.onclick=()=>{tab=k;localStorage.setItem("g2tab",k);$("#q").value="";drawTabs();load()};t.append(b)}}
+let counts={};
+async function refreshCounts(){try{counts=await api("/api/counts");drawTabs()}catch(e){}}
+function drawTabs(){const t=$("#tabs");t.replaceChildren();for(const [k,n] of TABS){const b=el("button","tab",counts[k]===undefined?n:n+" ("+counts[k]+")");b.setAttribute("role","tab");b.setAttribute("aria-selected",k===tab);b.onclick=()=>{tab=k;localStorage.setItem("g2tab",k);$("#q").value="";drawTabs();load()};t.append(b)}}
 function factTools(r){const d=el("div","");d.style.cssText="display:flex;gap:6px;align-items:center;flex:none";
  const e=el("button","btn","Edit");e.onclick=async()=>{const t=prompt("Edit this fact",r.fact);if(t===null||!t.trim()||t.trim()===r.fact)return;const old=r.fact;
   try{await api("/api/facts/edit",{id:r.id,fact:t.trim()});r.fact=t.trim();render();toast("Fact updated",async()=>{await api("/api/facts/edit",{id:r.id,fact:old});load()})}catch(x){toast("Failed: "+x.message)}};
@@ -390,7 +402,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
   $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
- render()}
+ render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}

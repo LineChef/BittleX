@@ -54,6 +54,15 @@ def list_records(db: str, kind: str, limit: int = 200, query: str = "") -> list[
         c.close()
 
 
+def count_records(db: str) -> dict:
+    """The total number of records of each kind (the page's tab labels; `list` is capped, so its length is not the total)."""
+    c = _conn(db)
+    try:
+        return {k: int(c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]) for k, (t, _cols) in KINDS.items()}
+    finally:
+        c.close()
+
+
 def _fact_columns(c) -> set:
     return {r[1] for r in c.execute("PRAGMA table_info(facts)").fetchall()}
 
@@ -234,7 +243,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("edit-fact"); p.add_argument("id", type=int); p.add_argument("--fact", default=None); p.add_argument("--importance", type=int, default=None); p.add_argument("--core", choices=("0", "1"), default=None)
     p = sub.add_parser("add-observation"); p.add_argument("caption"); p.add_argument("--labels", default="")
     p = sub.add_parser("edit-observation"); p.add_argument("id", type=int); p.add_argument("--caption", default=None); p.add_argument("--labels", default=None)
-    sub.add_parser("trash"); sub.add_parser("empty-trash"); sub.add_parser("backup")
+    sub.add_parser("trash"); sub.add_parser("empty-trash"); sub.add_parser("backup"); sub.add_parser("count")
     ap.add_argument("--db", default=None)
     args = ap.parse_args(argv)
     if args.db is None:
@@ -243,6 +252,8 @@ def main(argv=None) -> int:
     try:
         if args.cmd == "list":
             out = list_records(args.db, args.kind, args.limit, args.query)
+        elif args.cmd == "count":
+            out = count_records(args.db)
         elif args.cmd == "delete":
             out = {"trash_id": delete_record(args.db, args.kind, args.id)}
         elif args.cmd == "add-fact":
