@@ -175,6 +175,31 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
     return out
 
 
+# The whole course in one place (user, 2026-10-08: every hazard enabled, in every run, unless there is a good reason): surface steps with a 12 mm step, snag obstacles and ledges, on top of the
+# terrain / slope / fault categories. Each hazard still starts from a clean floor and ramps with its own difficulty level, so enabling it from the first step is gentle, and every level is
+# limited to the measured top threshold (the G2E_CAP_* settings; docs/rl/passability-audit.md).
+FULL_COURSE = dict(dict(STAGES)["s4_ledge"])
+
+# Finals that already ran WITHOUT the staged hazards, kept honest: the 20M of 2026-10-08 was launched as a fresh run on the flat stage by mistake (dropping the chain also dropped the
+# surface steps, snags and ledges it was meant to introduce), so its viewer environment is the flat one. Nothing new is added to this set.
+HISTORICAL_FLAT_FINALS = {"v3_20m"}
+
+
+def env_for_job(job: dict) -> dict:
+    """THE training environment of a queue job (phase_v3.train launches with exactly this; the viewers use it too, so what you watch is what trains).
+    A fresh final (the 20M) is stage s0_flat plus the hard-levels factor: no surface steps, snags or ledges. A stage job adds its course settings."""
+    levers = job.get("levers", [])
+    kind = job["kind"]
+    if kind == "stage":
+        return env_for(*levers, stage=job["stage"], extra=job.get("extra"))
+    if kind == "final" and job.get("fresh"):
+        course = {} if job.get("tag") in HISTORICAL_FLAT_FINALS else FULL_COURSE
+        return env_for(*levers, stage="s0_flat", extra=dict(course, **FINAL_EXTRA, **(job.get("extra") or {})))
+    if kind == "final":
+        return env_for(*levers, stage=job["stage"], extra=job.get("extra"))
+    return env_for(*levers, extra=job.get("extra"))
+
+
 def scoring_env(*lever_names: str) -> dict:
     """The physical setup for scoring: RECIPE + CALIBRATION, minus training-only settings. Levers that change the observation or the
     reward geometry a policy was trained with (heading_obs) must be passed so the scoring env builds the same inputs."""

@@ -7,7 +7,7 @@ Apply this to every new hazard, every change to a hazard's range, the level ceil
 
 ## Why (2026-10-08)
 
-The surface-transition floor was built from two slabs, each tilted about its own centre, so any ground tilt left a wall at the junction (11 cm at 3 deg, 29 cm at 8 deg). About one training episode in six or seven carried it, from the course stages on, including the 20M run. The user saw it as an impassable ledge. The audit below exists so a bug like that is found by a test, not by eye.
+The surface-transition floor was built from two slabs, each tilted about its own centre, so any ground tilt left a wall at the junction (11 cm at 3 deg, 29 cm at 8 deg). About one episode in six or seven of a staged run carried it. The 20M was not affected (it trained on the flat stage; see the decisions log, 2026-10-08), but the viewer showed the course and the user saw an impassable ledge. The audit below exists so a bug like that is found by a test, not by eye.
 
 ## The audit (`rl_training/opencat-gym/passability_audit.py`)
 

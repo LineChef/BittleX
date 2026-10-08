@@ -1,16 +1,20 @@
-"""Environment exports for watch_v3.sh: `python watch_env.py calm|course` prints `export K=V; ...` for the shell to eval.
+"""Environment exports for the viewers (watch_v3.sh): `python watch_env.py <tag>` prints `export K=V; ...` for the shell to eval.
 
-calm   = the scoring world (a flat, calm floor: what the benchmark cells start from)
-course = the scoring world plus the course the 20M trains on: surface steps, snag obstacles and ledges, hard levels x1.10, hazards pinned at difficulty level 1.0
-         (the 20M's levels at 19M steps: terrain 1.00, ledge 1.00, slope 0.70, fault 1.00)
+It is the run's own training environment, from the same function the training launch uses (g2_profile.env_for_job on the run's queue job), so what you watch is generated exactly
+as it is in training: no calm mode, no omitted hazards, no fixed difficulty. The levels and the ramp position follow the run (watch_trained.py reads them live).
 """
+import json
+import os
 import sys
 
 import g2_profile as G
 
-env = dict(G.scoring_env("mirror"))
-if (sys.argv[1] if len(sys.argv) > 1 else "course") == "course":
-    stage = G.stage_extra("s6_full_strength", ("mirror",))
-    env.update({k: v for k, v in stage.items() if k.startswith(("G2E_SURFACE_", "G2E_SNAG_", "G2E_LEDGE_", "G2E_HARD_SCALE"))})
-    env.update({"G2E_ADAPTIVE_LEVEL": "1", "G2E_CATEGORY_LEVELS": "1", "G2E_SCALE_ALL_HAZARDS": "1", "G2E_LEVEL_FIXED": "1.0"})
-print("; ".join(f"export {k}={v}" for k, v in env.items()))
+tag = sys.argv[1] if len(sys.argv) > 1 else "v3_20m"
+queue = json.load(open("trained/v3_queue.json"))
+jobs = queue if isinstance(queue, list) else queue.get("jobs", queue)
+job = next((j for j in jobs if j.get("tag") == tag), None)
+if job is None:
+    sys.exit(f"{tag} is not a job in trained/v3_queue.json; the viewer needs the run's job to build its exact training environment")
+if job.get("levers") == "K3":
+    job = dict(job, levers=json.load(open("trained/v3_results.json"))["v3_k3"]["levers"])
+print("; ".join(f"export {k}={v}" for k, v in G.env_for_job(job).items()))

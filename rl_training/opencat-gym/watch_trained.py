@@ -28,6 +28,8 @@ ap.add_argument("--dr-mass", type=float, default=None)
 ap.add_argument("--dr-gyro", type=float, default=None)
 ap.add_argument("--dr-push", type=float, default=None)
 ap.add_argument("--dr-terrain", type=float, default=None)
+ap.add_argument("--deterministic", action="store_true",
+                help="act as the policy is DEPLOYED (no exploration noise). Default when watching a training run (watch_v3.sh): sample actions the way training does")
 ap.add_argument("--hide-vision", action="store_true",
                 help="don't draw the _scan_terrain ray fan (it's on by default for a vision checkpoint)")
 args = ap.parse_args()
@@ -96,6 +98,30 @@ from opencat_gym_env import OpenCatGymEnv
 # stable_baselines3/torch -- doing it after causes PyBullet's macOS Metal GUI
 # thread to fail silently ("Not connected to physics server" on first step).
 env = OpenCatGymEnv()
+
+
+def _follow_training():
+    """When watching a training run (watch_v3.sh sets G2_WATCH_TAG): put the env where the run is, so episodes are drawn exactly as training draws them: the ramp position of this checkpoint
+    and the run's CURRENT difficulty levels (the last [level] line of its console log). No-op otherwise."""
+    tag = os.environ.get("G2_WATCH_TAG")
+    if not tag:
+        return
+    m = re.search(r"_(\d+)_steps", args.checkpoint)
+    env.set_ramp_steps(float(m.group(1)) if m else 20e6)
+    try:
+        last = [ln for ln in open(f"trained/{tag}_console.log", errors="replace") if ln.startswith("[level]")][-1]
+        lv = dict(zip(("terrain", "ledge", "slope", "fault"), map(float, re.findall(r"(?:terrain|ledge|slope|fault) ([0-9.]+)", last))))
+        if len(lv) == 4:
+            env.set_category_levels(lv)
+            return lv
+    except (OSError, IndexError, ValueError):
+        pass
+    return None
+
+
+_lv = _follow_training()
+if os.environ.get("G2_WATCH_TAG"):
+    print(f"following {os.environ['G2_WATCH_TAG']}: difficulty levels {_lv or 'not found in its log (using the profile start)'}, sampling actions like training" + (" -- NO: deterministic" if args.deterministic else ""))
 obs, info = env.reset()
 
 from stable_baselines3 import PPO
@@ -154,13 +180,14 @@ def _draw_scan():
 
 try:
     while True:
-        action, _state = model.predict(obs, deterministic=True)
+        action, _state = model.predict(obs, deterministic=(args.deterministic or not os.environ.get("G2_WATCH_TAG")))
         obs, reward, terminated, truncated, info = env.step(action)
         apply_leg_tint(env, action)
         if _show_vis:
             _draw_scan()
         time.sleep(1 / 60)
         if terminated or truncated:
+            _follow_training()                       # pick up the levels training has reached since the last episode
             obs, info = env.reset()
             setup_leg_tint(env)
             _fix_floor()

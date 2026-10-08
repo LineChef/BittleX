@@ -215,17 +215,14 @@ def train(job, results):
     kind = job["kind"]
     for k in [k for k in os.environ if k.startswith("G2E_")]:      # a clean slate: the profile alone decides the training env
         del os.environ[k]
+    env = g2_profile.env_for_job(job)               # the one definition of a job's training environment (the viewers use it too)
     if kind == "stage":
-        env = g2_profile.env_for(*levers, stage=job["stage"], extra=job.get("extra"))
         steps, from_ckpt = job.get("steps", SCREEN_STEPS), f"trained/{job['from']}_ppo"
     elif kind == "final" and job.get("fresh"):      # a fresh 20M of the K3 recipe (no stage chain, no continuation): the ramp difficulty levels start from empty and the hardest levels are +10%
-        env = g2_profile.env_for(*levers, stage="s0_flat", extra=dict(g2_profile.FINAL_EXTRA, **(job.get("extra") or {})))
         steps, from_ckpt = "20e6", None
     elif kind == "final":
-        env = g2_profile.env_for(*levers, stage=job["stage"], extra=job.get("extra"))
         steps, from_ckpt = "20e6", f"trained/{job['from']}_ppo"
     else:
-        env = g2_profile.env_for(*levers, extra=job.get("extra"))
         steps, from_ckpt = SCREEN_STEPS, None
     if RP.training(tag) or os.path.exists(f"trained/{tag}_ppo.zip"):
         log(f"{tag} RESUME: already running or finished, not relaunching")
