@@ -561,3 +561,48 @@ def test_no_drift_levers_and_k3_exclusion_and_fresh_final(tmp_path, monkeypatch)
     assert any("foot_clear_p90_mm" in w for w in V.targets_ok(cell(20.0), ctrl, ["no_heading"]))     # legs stepping lower than 0.85x the control: fails
     d = G.env_for("mirror", stage="s0_flat", extra=dict(G.FINAL_EXTRA))
     assert d["G2E_HARD_SCALE"] == "1.10" and "G2E_LEVEL_START" not in d                              # a fresh 20M ramps from an empty floor
+
+
+def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
+    """Real G2 (2026-10-07, case and payload on): 422 g in all and about 45% of the weight over the front paws (41-49.5% after the weighing's 35 g gap). The sim's payload profile
+    must keep that: median total mass and the median front share over several episode resets (the mass and payload are randomised each episode)."""
+    import subprocess, sys, textwrap
+    code = textwrap.dedent('''
+        import sys, numpy as np
+        sys.path.insert(0, ".")
+        import g2_profile
+        g2_profile.set_environ(g2_profile.env_for())
+        import pybullet as p
+        import opencat_gym_env as E
+        import benchmark_decathlon as B
+        B._apply({})
+        env = E.OpenCatGymEnv()
+        Ms, Ss = [], []
+        for k in range(12):
+            env.reset(seed=k)
+            rid = env.robot_id
+            ms, xs = [], []
+            for i in range(-1, p.getNumJoints(rid)):
+                m = p.getDynamicsInfo(rid, i)[0]
+                if i == -1:
+                    pos, orn = p.getBasePositionAndOrientation(rid)
+                    com = p.multiplyTransforms(pos, orn, p.getDynamicsInfo(rid, -1)[3], [0, 0, 0, 1])[0]
+                else:
+                    com = p.getLinkState(rid, i, computeForwardKinematics=True)[0]
+                ms.append(m); xs.append(np.array(com))
+            for bid in (env._payload_id, env._head_id, env._rear_id):
+                if bid is not None:
+                    pos, orn = p.getBasePositionAndOrientation(bid)
+                    ms.append(p.getDynamicsInfo(bid, -1)[0]); xs.append(np.array(p.multiplyTransforms(pos, orn, p.getDynamicsInfo(bid, -1)[3], [0, 0, 0, 1])[0]))
+            names = {i: p.getJointInfo(rid, i)[12].decode() for i in range(p.getNumJoints(rid))}
+            P = {n: np.array(p.getLinkState(rid, i)[0]) for i, n in names.items() if n.endswith("_paw")}
+            front = np.mean([P[n] for n in P if "front" in n], axis=0); rear = np.mean([P[n] for n in P if "back" in n], axis=0)
+            ax = front - rear; ax[2] = 0; L = np.linalg.norm(ax); ax /= L
+            ms = np.array(ms); com = (ms[:, None] * np.array(xs)).sum(0) / ms.sum()
+            Ms.append(ms.sum() * 1000); Ss.append(100 * float(np.dot(com - rear, ax) / L))
+        print(round(float(np.median(Ms))), round(float(np.median(Ss)), 1))
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    mass, share = map(float, out.stdout.strip().splitlines()[-1].split())
+    assert 410 <= mass <= 435, mass
+    assert 41.0 <= share <= 49.5, share
