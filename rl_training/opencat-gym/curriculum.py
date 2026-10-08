@@ -9,7 +9,7 @@ update_levels() takes the probe's results for one round and changes `levels` / `
 """
 
 
-def update_levels(levels, streak, rel, base, cap, up, down, step, windows, min_base, collapse_base):
+def update_levels(levels, streak, rel, base, cap, up, down, step, windows, min_base, collapse_base, top=1.0):
     for c in levels:
         if base < collapse_base:
             streak[c] = 0
@@ -17,7 +17,7 @@ def update_levels(levels, streak, rel, base, cap, up, down, step, windows, min_b
         elif rel[c] >= up and base >= min_base:
             streak[c] += 1
             if streak[c] >= windows:
-                levels[c] = min(1.0, levels[c] + step)
+                levels[c] = min(top, levels[c] + step)
                 streak[c] = 0
         else:
             streak[c] = 0

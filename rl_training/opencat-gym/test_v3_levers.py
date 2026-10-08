@@ -698,3 +698,18 @@ def test_the_world2_check_scores_the_final_policy_in_world_2_and_compares_with_w
     assert seen["extra_env"] == {"G2E_PAYLOAD_LAYOUT": "spine"} and seen["path"] == "trained/v3_20m_ppo"
     assert os.path.exists("trained/v3_score_v3_20m_world2.json")
     assert "0.10 (world 1) -> 0.12 (world 2)" in logs[-1] and "none" in logs[-1]
+
+
+def test_the_level_ceiling_is_1_0_by_default_and_world2_lets_a_level_be_earned_up_to_1_25():
+    import g2_profile as G
+    assert _ul([0.95] * 4, [0.9] * 4, 0.8, cap=1.5)[0] == [1.0] * 4                      # default top = 1.0: no level goes past it
+    import curriculum
+    cats = ("terrain", "ledge", "slope", "fault")
+    lv = {c: 1.2 for c in cats}
+    curriculum.update_levels(lv, {c: 0 for c in cats}, {c: 0.9 for c in cats}, 0.8, 1.5, up=0.8, down=0.5, step=0.1, windows=1, min_base=0.5, collapse_base=0.35, top=1.25)
+    assert [round(lv[c], 3) for c in cats] == [1.25] * 4                                  # earned, but never past the ceiling
+    lv = {c: 1.2 for c in cats}
+    curriculum.update_levels(lv, {c: 0 for c in cats}, {c: 0.6 for c in cats}, 0.8, 1.5, up=0.8, down=0.5, step=0.1, windows=1, min_base=0.5, collapse_base=0.35, top=1.25)
+    assert [round(lv[c], 3) for c in cats] == [1.2] * 4                                   # a middling score earns nothing
+    assert "G2E_LEVEL_MAX" not in G.env_for() or G.world2()
+    assert G.WORLD2_CALIBRATION["G2E_LEVEL_MAX"] == "1.25" and G.WORLD2_CALIBRATION["G2E_PAYLOAD_LAYOUT"] == "spine"

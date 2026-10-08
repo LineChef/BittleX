@@ -123,7 +123,7 @@ class Curriculum(BaseCallback):
         E = self.E
         base = self._probe(None)                         # what this policy scores on a clean floor under the same randomization: hazards are judged relative to it
         self.base = base
-        cap = min(1.0, (self.ramp_offset + self.num_timesteps) / E.RAMP_TOTAL_STEPS) if E.LEVEL_CAP_BY_TIME else 1.0
+        cap = min(E.LEVEL_MAX, (self.ramp_offset + self.num_timesteps) / E.RAMP_TOTAL_STEPS) if E.LEVEL_CAP_BY_TIME else E.LEVEL_MAX
         rel = {}
         for c in E.CATS:
             raw = self._probe(c)
@@ -131,7 +131,7 @@ class Curriculum(BaseCallback):
             self.last[c], self.raw[c] = rel[c], raw
         from curriculum import update_levels
         update_levels(self.levels, self.streak, rel, base, cap, E.LEVEL_UP_SCORE, E.LEVEL_DOWN_SCORE, E.LEVEL_STEP_C, E.LEVEL_PROMOTE_WINDOWS,
-                      E.LEVEL_MIN_BASELINE, E.LEVEL_COLLAPSE_BASELINE)
+                      E.LEVEL_MIN_BASELINE, E.LEVEL_COLLAPSE_BASELINE, top=E.LEVEL_MAX)
         self.training_env.env_method("set_category_levels", self.levels)
         print(f"[probe] steps {self.num_timesteps:.0f}  clean-floor score {self.base:.2f} (cap {cap:.2f}); relative score by category (raw) -> new level: "
               + "  ".join(f"{c} {self.last[c]:.2f} ({self.raw[c]:.2f}) -> {self.levels[c]:.2f}" for c in E.CATS), flush=True)

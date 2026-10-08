@@ -837,6 +837,7 @@ LEVEL_UP_SCORE = _g2e("LEVEL_UP_SCORE", 0.75)
 LEVEL_DOWN_SCORE = _g2e("LEVEL_DOWN_SCORE", 0.45)
 LEVEL_PROMOTE_WINDOWS = _g2e("LEVEL_PROMOTE_WINDOWS", 2)
 LEVEL_STRETCH = _g2e("LEVEL_STRETCH", 0.10)
+LEVEL_MAX = _g2e("LEVEL_MAX", 1.0)           # the ceiling of every hazard level (1.0 = the hardest world V2.1 and the V3 runs trained in; world 2 sets 1.25). A level is still only earned: a promotion needs 0.80 of the flat-floor score at the current level, and the time cap rises by 1.0 per RAMP_TOTAL_STEPS
 LEVEL_EASY_PROB = _g2e("LEVEL_EASY_PROB", 0.10)
 # LEVEL_EXTERNAL: the levels are set from outside (train.py's Curriculum callback probes the DETERMINISTIC policy periodically and calls set_category_levels on every
 # env), so the envs do not adapt themselves from their noisy training episodes (exploration noise makes a young policy's sampled score far lower than its real skill).
@@ -1041,7 +1042,7 @@ class OpenCatGymEnv(gym.Env):
                 self._focus, d = None, dict(lv)
             else:
                 self._focus = CATS[int(np.random.randint(len(CATS)))]
-                d = {c: (min(1.0, lv[c] + np.random.uniform(0.0, LEVEL_STRETCH)) if c == self._focus else min(lv[c], LEVEL_BASE)) for c in CATS}
+                d = {c: (min(LEVEL_MAX, lv[c] + np.random.uniform(0.0, LEVEL_STRETCH)) if c == self._focus else min(lv[c], LEVEL_BASE)) for c in CATS}
         else:
             d = {c: self._dr for c in CATS}
             self._focus = None

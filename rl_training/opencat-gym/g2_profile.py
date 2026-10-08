@@ -129,7 +129,7 @@ TRAIN_ONLY_PREFIXES = ("G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_A
 
 # World 2 (user, 2026-10-07): the payload block the spine's size and centred on it, with only the camera and the speaker hanging past it (see opencat_gym_env PAYLOAD_LAYOUT); this also puts the sim's front share near 46%, matching the two weighings (45% and 47%). It applies to trainings
 # started AFTER the V3 queue (S8, S9, K3 and the 20M are judged against a control in world 1): switch it on with `touch trained/v3_world2` or G2_WORLD=2 (a restarted runner picks it up).
-WORLD2_CALIBRATION = {"G2E_PAYLOAD_LAYOUT": "spine"}
+WORLD2_CALIBRATION = {"G2E_PAYLOAD_LAYOUT": "spine", "G2E_LEVEL_MAX": "1.25"}      # the layout, and every hazard level may be earned up to 1.25 (user, 2026-10-07)
 
 
 def world2() -> bool:
