@@ -37,6 +37,8 @@ match more than one (e.g. emergency stop beats everything).
 | "narration level 4", "verbosity level 1", "set narration to level 5" | Sets how much G2 narrates its own actions/reasoning, on a **1-5 level** (3 = default/normal). | G2 speaks the level back with what it does, e.g. *"Okay, narration level 4: detailed -- explain actions and reasoning as you go."* Session-only, like the mood hint -- resets on restart. |
 | "turn on your chirps", "enable chirps", "chirps on", "start chirping" | Re-enables chirps, live -- no restart. | |
 | "turn off your chirps", "disable chirps", "chirps off", "stop chirping" | Disables chirps, live -- no restart. | The "heard you" ack chirp still fires either way; it's deliberately exempt so a misheard command is never silent. |
+| "the floor is tile", "we're on hardwood", "this is a tile floor", "set the floor to carpet" (tile, hardwood, carpet, laminate, linoleum, concrete, rug, mat) | Sets the floor label that every run log records (`g2floor`), with no API call. **"This is a ..." only counts as a floor when the word *floor* ends it** (otherwise it is the naming command and takes a picture). Say it at the start of a session and when G2 moves to another floor. | G2 says *"Okay, the floor is tile."* Works in normal voice mode and in exploration sessions. |
+| "what floor are you on", "which floor" | Asks which floor label is set. | G2 reads it back, or says he does not know. |
 
 A few short reproachful phrases ("leave me alone", "stop it", "be quiet", "shut
 up", "go away", "settle down", "calm down", "stop bothering me", ...) aren't

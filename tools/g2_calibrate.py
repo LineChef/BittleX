@@ -5,6 +5,7 @@
     python tools/g2_calibrate.py status           # the current snapshot, the latest snapshot, and what blocks each
     python tools/g2_calibrate.py show [ID]        # one snapshot: every value, its range, its checks, the one-page diff against the profile
     python tools/g2_calibrate.py harm-check ID POLICY [POLICY ...]   # score the policies in the old and the new world (idle Mac only; slow)
+    python tools/g2_calibrate.py reject PARAM [NOTE]    # a person refuses one parameter for good: still measured and reported, never applied (unreject PARAM undoes it)
     python tools/g2_calibrate.py approve ID       # a person approves (the only way a change beyond noise, or a first snapshot, goes live)
     python tools/g2_calibrate.py revert           # point "current" back at the previous snapshot
     (the g2cal alias)
@@ -193,6 +194,9 @@ def build(manifest: dict, store: str | None = None, epochs: dict | None = None, 
             per[k].append(est[k])
         proxy.append(float((r["metrics"].get("monitor") or {}).get("yaw_change_deg", 0.0)))         # an audit input only; never a fit input
     params = {k: fit_param(k, per[k], secs, proxy, old_values(k)) for k in WHITELIST}
+    for k, why in read_rejected().items():          # refused by a person: measured and reported, never applied
+        if k in params:
+            params[k] = dict(params[k], status="rejected", reason=f"rejected by the user on {why.get('at', '?')}" + (f": {why['note']}" if why.get("note") else ""))
     monitor: dict = {}
     for r in runs:
         g = monitor.setdefault(r["surface"], {"runs": 0, "seconds": 0.0, "roll": [], "pitch": []})
@@ -209,6 +213,33 @@ def build(manifest: dict, store: str | None = None, epochs: dict | None = None, 
             "monitor": monitor, "events": {"falls": falls, "walked_s": round(walked, 1), "falls_per_walked_hour": round(falls / walked * 3600, 2) if walked else None},
             "needs_data": NEEDS_DATA, "harm_check": {"status": "not run"}, "drift_canary": {"status": "not run"}}
     return snap
+
+
+def rejected_path() -> str:
+    return os.path.join(CAL, "rejected.json")
+
+
+def read_rejected() -> dict:
+    """Parameters a person has refused: {name: {"value": ..., "at": ..., "note": ...}}. They are never written into a snapshot's env until `g2cal unreject`."""
+    try:
+        return json.load(open(rejected_path()))
+    except (OSError, ValueError):
+        return {}
+
+
+def reject(name: str, note: str = "", value=None) -> None:
+    if name not in WHITELIST:
+        raise ValueError(f"{name} is not a calibration parameter")
+    r = read_rejected()
+    r[name] = {"value": value, "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "note": note}
+    os.makedirs(CAL, exist_ok=True)
+    json.dump(r, open(rejected_path(), "w"), indent=1)
+
+
+def unreject(name: str) -> None:
+    r = read_rejected()
+    r.pop(name, None)
+    json.dump(r, open(rejected_path(), "w"), indent=1)
 
 
 def check_whitelist(env: dict) -> None:
@@ -433,12 +464,15 @@ def auto(log=print, min_new_runs: int = MIN_RUNS) -> str:
     ids = list_ids()
     last = load_snapshot(ids[-1]) if ids else None
     manifest = json.load(open(mpath))
-    if last is None or not (last["env"] and harm_status(ids[-1])["status"] in ("not run",)):     # a snapshot still waiting for its harm check is processed first
+    refused = last is not None and any(k in read_rejected() for k in last["env"])               # a person has since refused one of its parameters: it is superseded
+    if last is None or refused or not (last["env"] and harm_status(ids[-1])["status"] in ("not run",)):     # a snapshot still waiting for its harm check is processed first
         snap = build(manifest)
         epoch_changed = last is not None and snap["epoch"] != last["epoch"]
-        new = snap["runs_used"] - (0 if (last is None or epoch_changed) else last["runs_used"])
+        new = snap["runs_used"] - (0 if (last is None or epoch_changed or refused) else last["runs_used"])
         if new < min_new_runs and not epoch_changed:
             return f"waiting for data: {new} new usable runs since snapshot {ids[-1] if ids else 'none'} (need {min_new_runs})"
+        if not snap["env"]:
+            return "nothing to apply yet: " + "; ".join(f"{k}: {v.get('reason', v.get('status'))}" for k, v in snap["params"].items())[:300]
         i = save_snapshot(snap)
         log(f"snapshot {i:04d} written: {snap['runs_used']} runs, {snap['seconds_used']:.0f} s, parameters fitted: {sorted(snap['env']) or 'none yet'}")
         ids, last = list_ids(), load_snapshot(i)
@@ -472,9 +506,19 @@ def main(argv=None) -> int:
     p = sub.add_parser("approve"); p.add_argument("id", type=int)
     sub.add_parser("revert")
     sub.add_parser("auto")
+    p = sub.add_parser("reject"); p.add_argument("param"); p.add_argument("note", nargs="*")
+    p = sub.add_parser("unreject"); p.add_argument("param")
     a = ap.parse_args(argv)
     if a.cmd == "auto":
         print(auto())
+        return 0
+    if a.cmd == "reject":
+        reject(a.param, " ".join(a.note))
+        print(f"{a.param} rejected: it is still measured and reported, but no snapshot will apply it (g2cal unreject {a.param} to allow it again)")
+        return 0
+    if a.cmd == "unreject":
+        unreject(a.param)
+        print(f"{a.param} is allowed again")
         return 0
     if a.cmd == "build":
         mpath = os.path.join(STORE, "manifest.json")
@@ -497,6 +541,8 @@ def main(argv=None) -> int:
         for i in ids[-3:]:
             s = with_harm(load_snapshot(i), i)
             verdict, why = decide(s, last_human_snapshot())
+            if any(k in read_rejected() for k in s["env"]):
+                verdict, why = "superseded", ["it carries a parameter you rejected"]
             print(f"  {i:04d} {s['made']}  epoch {s['epoch']}  {s['runs_used']} runs / {s['seconds_used']:.0f} s  harm check: {s['harm_check']['status']}  -> {verdict}")
             for w in why[:3]:
                 print("       " + w)

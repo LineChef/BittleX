@@ -55,13 +55,15 @@ def test_each_gate_quarantines_with_its_reason_and_keeps_the_log(gi, tmp_path):
     write_run(raw, "collided", labels=["collision"])
     write_run(raw, "oldhw", epoch="e0")
     write_run(raw, "nofloor", surface="unknown")
-    write_run(raw, "staleflor", age=30.0)
+    write_run(raw, "staleflor", age=100.0)           # the limit is 72 hours (user, 2026-10-08)
+    write_run(raw, "oldish", age=30.0)               # 30 h old: fine now
     write_run(raw, "short", seconds=2.5)
     write_run(raw, "late", late_every=5)
     write_run(raw, "hand", excluded=True)
     m = gi.ingest(raw, store, EPOCHS)
     r = by_run(m)
     assert r["good"]["status"] == "usable" and r["good"]["reasons"] == []
+    assert r["oldish"]["status"] == "usable"
     assert r["hand"]["status"] == "excluded" and "fridge" in r["hand"]["reasons"][0]
     for name, word in (("fell", "end cleanly"), ("collided", "collision"), ("oldhw", "fit_ok"), ("nofloor", "floor not set"), ("staleflor", "old"), ("short", "steady window"), ("late", "late")):
         assert r[name]["status"] == "quarantined" and any(word in w for w in r[name]["reasons"]), name
@@ -105,3 +107,21 @@ def test_groups_are_never_mixed_across_voltage_bands(gi, tmp_path):
         write_run(raw, f"low{i}", roll_amp=0.20 + 0.001 * i, volt=7.4)                         # a sagged pack swings more: a different group, so neither is an outlier
     m = by_run(gi.ingest(raw, store, EPOCHS))
     assert all(x["status"] == "usable" for x in m.values()) and {x["volt_band"] for x in m.values()} == {"full", "low"}
+
+
+def test_a_floor_override_replaces_the_recorded_label_and_unknown_takes_runs_out_of_the_fits(gi, tmp_path):
+    raw = str(tmp_path / "data" / "raw_auto")
+    store = str(tmp_path / "data" / "store")
+    write_run(raw, "a")
+    write_run(raw, "b", surface="hardwood")
+    write_run(raw, "c")
+    side = json.load(open(os.path.join(raw, "20261007", "a.json")))
+    start = side["started"]
+    assert gi.floor_override({"started": start}, [{"from": start[:11] + "00:00", "to": start[:11] + "23:59", "surface": "unknown"}]) == "unknown"
+    json.dump([{"from": start[:11] + "00:00", "to": start[:11] + "23:59", "surface": "unknown"}], open(str(tmp_path / "data" / "floor_overrides.json"), "w"))
+    m = gi.ingest(raw, store, EPOCHS)
+    r = {x["run"]: x for x in m["runs"]}
+    assert all(x["status"] == "quarantined" and any("floor not confirmed" in w for w in x["reasons"]) for x in r.values())
+    json.dump([{"from": start[:11] + "00:00", "to": start[:11] + "23:59", "surface": "tile"}], open(str(tmp_path / "data" / "floor_overrides.json"), "w"))
+    m = gi.ingest(raw, store, EPOCHS)
+    assert {x["run"]: x["surface"] for x in gi.ingest(raw, store, EPOCHS)["runs"]}["b"] == "tile"          # the person's word replaces the recorded label

@@ -28,6 +28,7 @@ from .actuator import Actuator
 from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming, picture_pose_steps
 from .commands import (
     is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
+    parse_floor_command,
     parse_narration_command,
 )
 from .conversation import Conversation, ConversationError
@@ -522,6 +523,19 @@ class VoiceLoop:
             self._events(chirps_off=True)
             self._cue.set("speaking")
             self._speak("Okay, chirps off.")
+            self._set_session()
+            self._cue.set("idle")
+            return
+        if cmd in ("floor", "floor_query"):
+            from ..telemetry import autolog
+            self._cue.set("speaking")
+            if cmd == "floor":
+                label = autolog.set_surface(parse_floor_command(user_text) or "unknown")
+                log.info("floor label set to %r (voice)", label)
+                self._speak(f"Okay, the floor is {label}.")
+            else:
+                label, age = autolog.get_surface_info()
+                self._speak(f"I have the floor down as {label}." if label != "unknown" else "I don't know what floor I'm on. Tell me, like the floor is tile.")
             self._set_session()
             self._cue.set("idle")
             return

@@ -12,7 +12,7 @@ import threading
 import time
 
 from ..vision.describe_local import describe
-from ..voice.commands import match_local_command
+from ..voice.commands import match_local_command, parse_floor_command
 from ..voice.loop import asks_what_g2_sees
 from .survey import parse_naming
 
@@ -93,6 +93,13 @@ class ExploreListener:
         if cmd in ("unexplore", "sleep"):
             self._rt.post(disarm_explore=True)
             return self._reply("Okay, that's enough.")
+        if cmd in ("floor", "floor_query"):
+            from ..telemetry import autolog
+            if cmd == "floor":
+                label = autolog.set_surface(parse_floor_command(text) or "unknown")
+                return self._reply(f"Okay, the floor is {label}.")
+            label, _age = autolog.get_surface_info()
+            return self._reply(f"I have the floor down as {label}." if label != "unknown" else "I don't know what floor I'm on.")
         if cmd == "restart_voice":
             if self._on_stop:
                 self._on_stop()                       # closes the session; the voice service then starts fresh

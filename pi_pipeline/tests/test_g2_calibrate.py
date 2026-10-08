@@ -172,3 +172,25 @@ def test_g2_profile_loads_only_the_approved_snapshot(tmp_path, monkeypatch):
     assert env["G2E_IMU_HOLD_STEPS"] == "12" and env["G2_CAL_ID"] == "0003" and env.get("G2E_DRIFT_TORQUE") != "9"      # a key off the list is ignored
     monkeypatch.setenv("G2_CAL_SNAPSHOT", "off")
     assert g2_profile.env_for()["G2E_IMU_HOLD_STEPS"] == "16"
+
+
+def test_a_rejected_parameter_is_reported_but_never_applied_and_supersedes_the_snapshot_that_had_it(gc, tmp_path, monkeypatch):
+    names = [f"r{i}" for i in range(12)]
+    for n in names:
+        write_run(gc.STORE, n, seconds=8, imu_hz=5.0, jitter=0.02)               # 20 ms late ticks: the jitter parameter is fitted
+    os.makedirs(gc.STORE, exist_ok=True)
+    json.dump(manifest(names), open(os.path.join(gc.STORE, "manifest.json"), "w"))
+    monkeypatch.setattr(gc.ingest, "load_epochs", lambda *a: EPOCHS)
+    monkeypatch.setattr(gc, "profile_value", lambda k: 16.0 if k == "G2E_IMU_HOLD_STEPS" else 4.0)
+    monkeypatch.setattr(gc, "run_harm_check", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("busy")))
+    gc.auto(log=lambda *_: None)
+    assert "G2E_CMD_PATH_EXTRA_MS_MAX" in gc.load_snapshot(1)["env"]
+    gc.reject("G2E_CMD_PATH_EXTRA_MS_MAX", "not convinced it is delay")
+    snap = gc.build(json.load(open(os.path.join(gc.STORE, "manifest.json"))))
+    assert "G2E_CMD_PATH_EXTRA_MS_MAX" not in snap["env"] and snap["params"]["G2E_CMD_PATH_EXTRA_MS_MAX"]["status"] == "rejected"
+    gc.auto(log=lambda *_: None)                                                   # snapshot 1 is superseded by a new one without the refused parameter
+    assert gc.list_ids() == [1, 2] and "G2E_CMD_PATH_EXTRA_MS_MAX" not in gc.load_snapshot(2)["env"]
+    with pytest.raises(ValueError):
+        gc.reject("G2E_DRIFT_TORQUE")
+    gc.unreject("G2E_CMD_PATH_EXTRA_MS_MAX")
+    assert gc.read_rejected() == {}

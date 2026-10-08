@@ -34,7 +34,7 @@ MIN_STEADY_S = 2.0
 LATE_TICK_S = 0.025           # two control ticks at 80 Hz
 MAX_LATE_FRACTION = 0.05
 MAX_IMU_AGE_S = 1.0
-MAX_SURFACE_AGE_H = 12.0
+MAX_SURFACE_AGE_H = 72.0          # user, 2026-10-08: was 12 h; a floor label stays right for days when G2 keeps living in the same room
 GOOD_END = ("stopped", "complete")
 BAD_LABELS = ("fall", "collision", "pickup")
 MAX_HOLD_U = 0.30             # the front-foot heading hold (on in every walk since 2026-10-07) is active much of the time on tile (median mean |u| 0.19); above 0.30 it was doing most of the steering
@@ -112,14 +112,17 @@ def measure(csv_path: str) -> dict:
     return m
 
 
-def floor_confirmed(side: dict, confirmed: list) -> bool:
-    """A person confirmed the floor for this run's time (`~/g2_data/floor_confirmed.json`: [{"from": "2026-10-08T08:00", "to": "2026-10-08T11:00", "surface": "tile"}]):
-    the label that was set earlier was still right, so its age does not matter."""
+def floor_override(side: dict, overrides: list) -> str | None:
+    """A person's statement of the floor for a time range (`~/g2_data/floor_overrides.json`: [{"from": "2026-10-08T08:00", "to": "2026-10-08T11:00", "surface": "tile"}]).
+    It replaces the label G2 recorded (and its age); `"surface": "unknown"` takes the runs out of every fit until someone says what floor they were on. None = no override."""
     t = (side.get("started") or "")[:16]
-    return any(c.get("surface") == side.get("surface") and c["from"][:16] <= t <= c["to"][:16] for c in confirmed)
+    for o in overrides:
+        if o["from"][:16] <= t <= o["to"][:16]:
+            return o["surface"]
+    return None
 
 
-def gate(side: dict, labels: list, m: dict, epochs: dict, confirmed: list | None = None) -> list[str]:
+def gate(side: dict, labels: list, m: dict, epochs: dict, overrides: list | None = None) -> list[str]:
     """Reasons a run may not feed a fit (empty list = usable). 'excluded' means a person said so."""
     why: list[str] = []
     if side.get("excluded"):
@@ -137,10 +140,12 @@ def gate(side: dict, labels: list, m: dict, epochs: dict, confirmed: list | None
     ep = epochs.get(side.get("epoch"))
     if ep is None or not ep.get("fit_ok"):
         why.append(f"hardware epoch {side.get('epoch')} is not marked fit_ok")
-    if side.get("surface") in (None, "", "unknown"):
-        why.append("floor not set")
+    ov = floor_override(side, overrides or [])
+    surface = ov if ov is not None else side.get("surface")
+    if surface in (None, "", "unknown"):
+        why.append("floor not set" if ov is None else "floor not confirmed for this time (floor_overrides.json)")
     age = side.get("surface_age_h")
-    if age is not None and age > MAX_SURFACE_AGE_H and not floor_confirmed(side, confirmed or []):
+    if ov is None and age is not None and age > MAX_SURFACE_AGE_H:
         why.append(f"floor label is {age:.0f} h old")
     if m.get("rows", 0) < 5:
         why.append(f"too few rows ({m.get('rows', 0)})")                 # a run stopped almost at once: nothing to judge, not a damaged log
@@ -181,9 +186,9 @@ def outliers(entries: list[dict]) -> None:
 def ingest(raw: str, store: str, epochs: dict | None = None) -> dict:
     epochs = epochs if epochs is not None else load_epochs()
     try:
-        confirmed = json.load(open(os.path.join(os.path.dirname(os.path.abspath(raw)), "floor_confirmed.json")))
+        overrides = json.load(open(os.path.join(os.path.dirname(os.path.abspath(raw)), "floor_overrides.json")))
     except (OSError, ValueError):
-        confirmed = []
+        overrides = []
     entries = []
     for day in sorted(d for d in os.listdir(raw) if os.path.isdir(os.path.join(raw, d))) if os.path.isdir(raw) else []:
         for fn in sorted(os.listdir(os.path.join(raw, day))):
@@ -198,9 +203,9 @@ def ingest(raw: str, store: str, epochs: dict | None = None) -> dict:
             lab_path = os.path.join(raw, day, stem + ".labels.json")
             labels = json.load(open(lab_path)) if os.path.isfile(lab_path) else []
             m = measure(csv_path) if os.path.isfile(csv_path) else {}
-            why = gate(side, labels, m, epochs, confirmed) if m else ["no log file"]
+            why = gate(side, labels, m, epochs, overrides) if m else ["no log file"]
             status = "excluded" if (why and why[0].startswith("excluded")) else "quarantined" if why else "usable"
-            e = {"run": stem, "day": day, "kind": side.get("kind"), "policy": side.get("policy"), "epoch": side.get("epoch"), "surface": side.get("surface"), "volt_band": volt_band(m.get("volt_mean")),
+            e = {"run": stem, "day": day, "kind": side.get("kind"), "policy": side.get("policy"), "epoch": side.get("epoch"), "surface": floor_override(side, overrides) or side.get("surface"), "volt_band": volt_band(m.get("volt_mean")),
                  "started": side.get("started"), "end_reason": side.get("end_reason"), "status": status, "reasons": why, "labels": sorted({x["tag"] for x in labels}),
                  "roll_std_deg": m.get("roll_std_deg", float("nan")), "pitch_std_deg": m.get("pitch_std_deg", float("nan")), "metrics": m}
             entries.append(e)

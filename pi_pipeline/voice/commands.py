@@ -279,10 +279,35 @@ def looks_like_rebuff(text: str) -> bool:
     return bool(n) and any(p in n for p in _REBUFF)
 
 
+# --- the floor G2 is on: "the floor is tile", "we're on hardwood", "you are on the carpet" -> sets the label every run log records (telemetry/autolog.set_surface).
+# "this is a tile floor" works too, but only WITH the word floor: plain "this is a mug" is the naming command. Local, no API call.
+_SURFACES = {"hardwood": "hardwood", "hard wood": "hardwood", "wood": "hardwood", "tile": "tile", "tiles": "tile", "tiled": "tile", "carpet": "carpet",
+             "carpeted": "carpet", "laminate": "laminate", "linoleum": "linoleum", "concrete": "concrete", "rug": "rug", "mat": "mat"}
+_FLOOR_SET = re.compile(r"^(?:(?:the|this) floor (?:here )?(?:is|now is)|(?:were|we are|you are|youre|you are standing|g2 is|im|i am) on|set the floor to|floor is) (?:the |a )?([a-z]+(?: [a-z]+){0,2})$")
+# "this is a tile floor" / "this is hardwood floor": the word floor at the end says it defines the floor (without it, "this is a ..." is the naming command, which takes a picture)
+_FLOOR_THIS_IS = re.compile(r"^this is (?:the |a )?([a-z]+(?: [a-z]+){0,2}) floor$")
+_FLOOR_QUERY = ("what floor am i on", "what floor are you on", "what floor is this", "which floor", "what is the floor", "whats the floor", "what surface")
+
+
+def parse_floor_command(text: str) -> str | None:
+    """'the floor is tile' / 'we are on the hardwood floor' / 'this is a tile floor' / 'set the floor to carpet' -> 'tile' / 'hardwood' / 'carpet'; None when it is not one."""
+    n = _normalize(text)
+    m = _FLOOR_SET.match(n) or _FLOOR_THIS_IS.match(n)
+    if not m:
+        return None
+    words = [w for w in m.group(1).split() if w != "floor"]
+    return _SURFACES.get(" ".join(words)) if words else None
+
+
+def asks_floor(text: str) -> bool:
+    n = _normalize(text)
+    return any(n == q or n.startswith(q + " ") for q in _FLOOR_QUERY)
+
+
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
-    ``"narration_level"``, ``"character"``, or ``None``. Checked in that order
+    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
@@ -319,4 +344,8 @@ def match_local_command(text: str) -> str | None:
         return "narration_level"
     if parse_character_command(text) is not None:
         return "character"
+    if parse_floor_command(text) is not None:
+        return "floor"
+    if asks_floor(text):
+        return "floor_query"
     return None
