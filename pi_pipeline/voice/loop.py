@@ -367,6 +367,9 @@ class VoiceLoop:
             trace.stamp("speech_end", speech_end)
         if os.environ.get("G2_LOG_HEARD"):   # opt-in: transcripts stay out of the logs otherwise
             log.info("heard: %r", user_text)
+        info = getattr(self._stt, "last_info", None)
+        if info:
+            log.info("command window: %s", info)          # mic peak, blocks read, the last partial transcripts: tells a deaf mic from a missed phrase
 
         if not user_text:
             if self._in_session:

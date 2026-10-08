@@ -84,7 +84,7 @@ class VoskSTT:
 
         self.last_speech_t = None
         self.last_info = {}
-        peak, blocks, partials = 0, 0, []
+        peak, blocks, partials, warned = 0, 0, [], False
         said_anything = False
         quiet_blocks = 0          # blocks since the partial transcript last changed
         last_partial = ""
@@ -126,6 +126,9 @@ class VoskSTT:
                         quiet_blocks += 1
                         if quiet_blocks >= self._silence_blocks:
                             return finish(json.loads(rec.FinalResult()).get("text", "").strip())
+                if not said_anything and not warned and time.monotonic() - t_start > 15.0:
+                    warned = True
+                    log.warning("still listening after 15 s with no speech heard: %s", self.last_info or "no audio blocks received")
                 if (not said_anything and timeout_s is not None
                         and time.monotonic() - t_start > timeout_s):
                     return ""
