@@ -183,8 +183,11 @@ def test_ingest_gate_rejects_steering_test_runs():
     spec = importlib.util.spec_from_file_location("g2_ingest_t", os.path.join(os.path.dirname(__file__), "..", "..", "tools", "g2_ingest.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    why = mod.gate({"foot_hold": "fl", "end_reason": "stopped"}, [], {"rows": 100}, {})
+    why = mod.gate({"foot_trim": "fl:0.5", "end_reason": "stopped"}, [], {"rows": 100}, {})
     assert any("never fed to the sim" in w for w in why)
+    # the front-foot heading hold is on in every walk since 2026-10-07: a light touch is fine, a run where it worked hard is not
+    assert not any("heading hold" in w for w in mod.gate({"foot_hold": "fl", "end_reason": "stopped"}, [], {"rows": 100, "steer_u_mean_abs": 0.2}, {}))
+    assert any("worked hard" in w for w in mod.gate({"foot_hold": "fl", "end_reason": "stopped"}, [], {"rows": 100, "steer_u_mean_abs": 0.5}, {}))
 
 
 def test_foot_hold_feed_forward_starts_the_trim_and_default_is_zero(monkeypatch):
