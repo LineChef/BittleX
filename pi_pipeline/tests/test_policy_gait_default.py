@@ -179,3 +179,38 @@ def test_a_left_turn_takes_longer_than_a_right_turn_and_small_or_nested_turns_ar
     assert 0.0 < s._turn_until <= 6.0
     s.stop()                                                     # a stop cancels the turn
     assert s._turn_until == 0.0
+
+
+def test_a_walker_stopped_from_its_own_thread_does_not_raise_and_a_resting_g2_is_not_told_to_rest_again():
+    from pi_pipeline.gait.policy_walker import PolicyWalker
+    errors = []
+    holder = {}
+
+    def fake_run(lk, cmd, seconds, hz, fmt, dis, stop_event=None, in_service=False, on_battery=None, **kw):
+        try:
+            holder["w"].stop(rest=False)               # the fall callback does this from the walker thread
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+        return "complete"
+
+    w = PolicyWalker(object(), run_fn=fake_run, foot_hold=None)
+    holder["w"] = w
+    w.walk(1)
+    for _ in range(100):
+        if not w.busy:
+            break
+        __import__("time").sleep(0.01)
+    assert errors == []
+    # a link that remembers the last leg command: the second rest is not sent
+    class L(Link):
+        last_motion_command = ""
+        def send(self, cmd, **kw):
+            super().send(cmd, **kw)
+            if cmd[:1] in ("k", "d", "i", "m"):
+                self.last_motion_command = cmd
+    link, walker = L(), FakeWalker()
+    s = WalkerSink(link, policy_walker=walker)
+    s.stop(); s.stop(); s.stop()
+    assert link.sent == ["d"]
+    s.walk(0.9); s.stop()                              # a turn command moved the legs: rest again
+    assert link.sent.count("d") == 2

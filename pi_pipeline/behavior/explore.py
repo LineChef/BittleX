@@ -73,6 +73,10 @@ class Explorer:
         EXPLORE (there's no odometry, so leg count is the distance proxy)."""
         return self._legs >= self.cfg.max_legs
 
+    def hold_for(self, now: float, secs: float) -> None:
+        """Stand still for `secs`: the wake word was heard and G2 should listen without his servos running."""
+        self._hold_until = max(self._hold_until, now + secs)
+
     def reset(self) -> None:
         self._leg_start = None
         self._investigate_until = 0.0

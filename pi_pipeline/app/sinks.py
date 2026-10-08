@@ -147,6 +147,8 @@ class WalkerSink:
         self._turn_until = 0.0
         if self._policy is not None:
             self._policy.stop(rest=True)
+        if getattr(self._link, "last_motion_command", None) == opencat.REST:
+            return                          # already lying down and nothing has moved the legs since: a repeated rest makes a resting G2 twitch (the halted exploration did it every 5 s, 2026-10-08)
         self._link.send(opencat.REST, read_reply=False)
         self._last = ""
 

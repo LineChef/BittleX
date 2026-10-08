@@ -249,7 +249,7 @@ _NOT_A_COMMAND = {"dont", "do", "not", "never", "why", "how", "what", "when", "d
 def grammar_phrases() -> list[str]:
     """The short safety-critical commands (stop, shut down), bare and after the wake word, for a second, tightly
     constrained recognizer that listens alongside the full one."""
-    base = [*_HALT, *_SHUTDOWN, *_SHUTDOWN_EXACT]
+    base = [*_HALT, *_SHUTDOWN, *_SHUTDOWN_EXACT, *_END_EXPLORE]
     return base + [f"gee two {p}" for p in base]
 
 

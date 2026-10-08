@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 from ..vision.describe_local import describe
 from ..voice.commands import match_local_command
@@ -19,9 +20,10 @@ log = logging.getLogger("g2.behavior.explore_listener")
 
 
 class ExploreListener:
-    def __init__(self, wake, stt, say, rt, frame, *, on_arm=None, on_stop=None, listen_s: float = 8.0):
+    def __init__(self, wake, stt, say, rt, frame, *, on_arm=None, on_stop=None, listen_s: float = 8.0, settle_s: float = 1.2):
         self._wake, self._stt, self._say, self._rt, self._frame = wake, stt, say, rt, frame
         self._on_arm, self._on_stop, self._listen_s = on_arm, on_stop, listen_s
+        self._settle_s = settle_s
         self._done = threading.Event()
 
     def start(self) -> "ExploreListener":
@@ -38,6 +40,11 @@ class ExploreListener:
                 if self._done.is_set():
                     break
                 log.info("wake word heard: listening for a command (%.0f s)", self._listen_s)
+                try:
+                    self._rt.post(listen_hold=True)             # stand still: a walking G2's servos drown the microphone (2026-10-08: three wake words, no command heard)
+                except Exception:  # noqa: BLE001
+                    log.debug("could not ask for a listening pause", exc_info=True)
+                time.sleep(self._settle_s)                     # let him stop before the window opens
                 text = (self._stt.listen(timeout_s=self._listen_s) or "").strip()
                 if not text:
                     log.info("nothing recognized after the wake word")

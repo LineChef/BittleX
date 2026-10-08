@@ -69,17 +69,64 @@ def evaluate(spec: str, named, survey, threshold: float) -> dict:
                 retrieval=(correct / total) if total else None, hit_rate=(hits / tried) if tried else None, false_rate=(false / len(survey)) if survey else None)
 
 
+def sweep(spec: str, named, survey, thresholds) -> dict:
+    """Threshold sweep with views embedded once. A picture's score against an object = the best cosine between ANY of its views (the whole picture or a tile) and ANY named sample of that object
+    (the whole-picture vectors of the other pictures of it). Hit rate = held-out named pictures whose best score against their own object reaches the threshold; false rate = survey pictures whose
+    best score against any named object reaches it; also the rate at which a held-out picture scores higher against ANOTHER object than its own (a wrong name)."""
+    emb = make_embedder(spec)
+    loc = GridLocalizer()
+    whole = {f: emb.embed(f.read_bytes()) for fs in named.values() for f in fs}
+
+    def views(f):
+        return [emb.embed(c) for _, c in loc.views(f.read_bytes())]
+    named_views = {f: views(f) for fs in named.values() for f in fs}
+    survey_views = {f: views(f) for f in survey}
+
+    def best(vs, samples):
+        return max((float(v @ x) for v in vs for x in samples), default=-1.0)
+    own, wrong, other_best = [], 0, 0
+    for n, fs in named.items():
+        for f in fs:
+            mine = [whole[g] for g in fs if g != f]
+            if not mine:
+                continue
+            a = best(named_views[f], mine)
+            b = max((best(named_views[f], [whole[g] for g in named[m]]) for m in named if m != n), default=-1.0)
+            own.append(a)
+            other_best += 1
+            wrong += b > a
+    allsamples = list(whole.values())
+    false = [best(vs, allsamples) for vs in survey_views.values()]
+    rows = []
+    for t in thresholds:
+        hit = sum(a >= t for a in own) / len(own) if own else None
+        fr = sum(x >= t for x in false) / len(false) if false else None
+        rows.append((t, hit, fr))
+    return dict(embedder=emb.name, rows=rows, wrong=(wrong / other_best) if other_best else None)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=os.path.expanduser("~/g2_pictures/explore"))
     ap.add_argument("--embedder", action="append", default=None)
     ap.add_argument("--threshold", type=float, default=0.80)
+    ap.add_argument("--sweep", action="store_true", help="instead of one threshold, sweep 0.30-0.95 and show the hit rate and the false-recognition rate at each, and the best cut")
     a = ap.parse_args(argv)
     named, survey = load(Path(a.root))
     if not named:
         print(f"no named pictures under {a.root}/named: name some objects first (voice: 'this is the mug'), then g2pics pull")
         return 1
     f = lambda v, p="{:.3f}": "n/a" if v is None else p.format(v)       # noqa: E731
+    if a.sweep:
+        ths = [round(0.30 + 0.05 * i, 2) for i in range(14)]
+        for spec in (a.embedder or ["histogram"]):
+            r = sweep(spec, named, survey, ths)
+            print(f"{r['embedder']}: wrong-name rate (a held-out picture matches ANOTHER object better than its own) {f(r['wrong'], '{:.0%}')}")
+            print("  threshold  hit rate  false recognitions")
+            best_t = max(r["rows"], key=lambda x: ((x[1] or 0) - (x[2] or 0), x[0]))
+            for t, hit, fr in r["rows"]:
+                print(f"  {t:.2f}      {f(hit, '{:.0%}'):>6}    {f(fr, '{:.0%}'):>6}{'   <- best cut (hit minus false)' if t == best_t[0] else ''}")
+        return 0
     for spec in (a.embedder or ["histogram"]):
         r = evaluate(spec, named, survey, a.threshold)
         gap = None if r["within"] is None or r["between"] is None else r["within"] - r["between"]

@@ -91,6 +91,7 @@ class PolicyWalker:
                 return
             self._stop.rest = rest
             self._stop.set()
-        t.join(timeout)
-        if t.is_alive():
+        if t is not threading.current_thread():     # a fall callback runs ON the walker thread: joining it raised "cannot join current thread" and cut the emergency stop short (2026-10-08)
+            t.join(timeout)
+        if t.is_alive() and t is not threading.current_thread():
             log.warning("the policy walk did not stop within %.0f s", timeout)

@@ -34,6 +34,10 @@ class LockedLink:
             return getattr(self._link, "pop_other", lambda: [])()
 
     @property
+    def last_motion_command(self) -> str:
+        return getattr(self._link, "last_motion_command", "")
+
+    @property
     def is_connected(self) -> bool:
         return getattr(self._link, "is_connected", False)
 

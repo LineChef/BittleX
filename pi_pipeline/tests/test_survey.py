@@ -245,14 +245,14 @@ def test_the_exploration_listener_says_when_the_wake_word_registered_but_no_spee
 
     wake = types.SimpleNamespace(wait=wait)
     stt = types.SimpleNamespace(listen=lambda timeout_s=None: heard.pop(0) if heard else "")
-    lst = ExploreListener(wake, stt, said.append, rt, lambda: [])
+    lst = ExploreListener(wake, stt, said.append, rt, lambda: [], settle_s=0.0)
     holder["lst"] = lst
     with caplog.at_level(logging.INFO, logger="g2.behavior.explore_listener"):
         lst._run()
     text = caplog.text
     assert "nothing recognized after the wake word" in text and "naming request: 'dishwasher'" in text and "not a command I know in exploration" in text
     assert said == ["I didn't catch that.", "Okay, let me look at the dishwasher.", "I didn't understand that."]
-    assert posts == [{"name_request": "dishwasher"}]
+    assert [x for x in posts if "listen_hold" not in x] == [{"name_request": "dishwasher"}]      # (each wake word also asks him to stand still while he listens)
 
 
 def test_the_voice_loop_says_i_am_online_when_it_is_ready_and_only_when_asked_to():
@@ -268,3 +268,35 @@ def test_the_voice_loop_says_i_am_online_when_it_is_ready_and_only_when_asked_to
         lp = VoiceLoop(wake_word=wake, stt=stt, conversation=_t.SimpleNamespace(), tts=tts, actuator=act, cue=cue, announce_online=announce)
         lp.run_forever()
         assert said == expect, announce
+
+
+def test_the_wake_word_in_an_exploration_session_stands_him_still_for_the_command_window():
+    from pi_pipeline.behavior.explore import Explorer
+    posted = []
+    class RT:
+        def post(self, **kw): posted.append(kw)
+    from pi_pipeline.behavior.explore_listener import ExploreListener
+    import types, threading
+    stt = types.SimpleNamespace(listen=lambda timeout_s=None: "cancel exploration")
+    wake = types.SimpleNamespace(wait=lambda: None)
+    ended = []
+    lst = ExploreListener(wake, stt, lambda t: None, RT(), lambda: [], on_stop=lambda: ended.append(1), settle_s=0.0)
+    wake_calls = [0]
+    def wait_once():
+        wake_calls[0] += 1
+        if wake_calls[0] > 1:
+            lst.stop()
+    wake.wait = wait_once
+    lst._run()
+    assert {"listen_hold": True} in posted and ended == [1]
+
+
+def test_listen_hold_makes_the_explorer_hold_and_the_exploration_end_words_are_in_the_tight_grammar():
+    from pi_pipeline.behavior.explore import ExploreAction
+    from pi_pipeline.voice.commands import grammar_phrases
+    from pi_pipeline.tests.test_behavior import _explorer
+    ex, p = _explorer("")
+    ex.hold_for(10.0, 12.0)
+    assert ex.decide([], now=11.0).action is ExploreAction.HOLD and ex.decide([], now=21.9).action is ExploreAction.HOLD
+    g = grammar_phrases()
+    assert "cancel exploration" in g and "gee two end exploration mode" in g

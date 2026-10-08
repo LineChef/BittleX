@@ -104,6 +104,7 @@ class DriverInputs:
     ack: bool = False                       # a voice command was recognised -> "heard you" chirp
     told_stop: bool = False                 # explicit "stop" / "that's enough"
     told_stay: bool = False                 # "stay" / "wait here" -> sit and hold
+    listen_hold: bool = False               # the wake word was heard in an exploration session: stand still for the command window (a walking G2's servos drown the microphone)
     arm_explore: bool = False               # "go ahead and look around" -> allow Tier 1 roam
     disarm_explore: bool = False            # "that's enough" -> end the roam bout
     come_here: bool = False                 # "come here" -> directed walk toward a person
@@ -378,6 +379,8 @@ class BehaviorDriver:
         if i.told_stay:
             self.idle.on_stay_command()
             self.mode.on_activity()
+        if i.listen_hold:
+            self.explorer.hold_for(now, 12.0)
         if i.arm_explore:
             self.mode.arm_explore()
             self.explorer.reset()

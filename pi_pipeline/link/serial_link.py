@@ -116,6 +116,8 @@ class SerialLink:
 
     # --- messaging --------------------------------------------------------
 
+    last_motion_command: str = ""
+
     def send(self, command: str, *, read_reply: bool = True, settle: float = 0.05) -> str:
         """Write `command` (a newline is added). Optionally read one reply line.
         Returns the reply (or '' ). Raises nothing -- logs and returns '' on error."""
@@ -126,6 +128,8 @@ class SerialLink:
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
+            if command[:1] in ("k", "d", "i", "m"):
+                self.last_motion_command = command.strip()      # what the legs were last told to do (a quiet P / gb / gP does not change it)
             if settle:
                 time.sleep(settle)
             if read_reply:
