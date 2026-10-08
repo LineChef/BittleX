@@ -152,7 +152,7 @@ class FootHold:
     reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited."""
 
     def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
-                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 1.0):
+                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 3.0):
         self.g_release, self.release_rate_dps = g_release, release_rate_dps   # easing off is faster than building up: once the heading turns back (or is already past the target) the trim drops at g_release per second
         self.ff = ff                         # feed-forward trim added to the feedback: the average trim the hold ends up at anyway (about -0.2..-0.3 on G2), so it does not have to ramp to it
         self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg
