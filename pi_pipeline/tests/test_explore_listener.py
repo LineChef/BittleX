@@ -46,3 +46,31 @@ def test_tell_me_what_you_see_describes_the_detections():
     li2, said2, rt2, _ = _l()
     li2.handle("look around")                                   # that phrase is the roam command, not a description
     assert rt2.calls == [{"arm_explore": True}]
+
+
+def test_wake_word_chimes_hushes_narration_for_the_window_and_logs_the_mic():
+    events = []
+
+    class Wake:
+        n = 0
+        def wait(self):
+            Wake.n += 1
+            if Wake.n > 1:
+                li.stop()
+                import time; time.sleep(5)
+
+    class STT:
+        last_info = {"mic_peak": 1234, "blocks": 3, "partials": []}
+        def listen(self, timeout_s=None):
+            events.append("listen")
+            return ""
+
+    said, rt = [], RT()
+    li = ExploreListener(Wake(), STT(), said.append, rt, lambda: [], settle_s=0.0, chime=lambda: events.append("chime"),
+                         quiet=lambda on: events.append(("quiet", on)))
+    import threading, time
+    li.start()
+    time.sleep(0.5)
+    li.stop()
+    assert events[:4] == ["chime", ("quiet", True), "listen", ("quiet", False)]
+    assert said == ["I didn't catch that."]

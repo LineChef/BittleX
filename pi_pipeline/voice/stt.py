@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import array
 import contextlib
 import json
 import logging
@@ -82,6 +83,8 @@ class VoskSTT:
             q.put(bytes(indata))
 
         self.last_speech_t = None
+        self.last_info = {}
+        peak, blocks, partials = 0, 0, []
         said_anything = False
         quiet_blocks = 0          # blocks since the partial transcript last changed
         last_partial = ""
@@ -103,6 +106,9 @@ class VoskSTT:
                 except queue.Empty:
                     data = None
                 if data is not None:
+                    blocks += 1
+                    peak = max(peak, max(map(abs, array.array("h", data[: len(data) // 2 * 2])), default=0))
+                    self.last_info = {"mic_peak": peak, "blocks": blocks, "partials": partials[-3:]}
                     if grec is not None:
                         grec.AcceptWaveform(data)
                     if rec.AcceptWaveform(data):          # Vosk's own endpointer fired
@@ -112,6 +118,7 @@ class VoskSTT:
                     partial = json.loads(rec.PartialResult()).get("partial", "").strip()
                     if partial and partial != last_partial:
                         said_anything, quiet_blocks, last_partial = True, 0, partial
+                        partials.append(partial)
                         self.last_speech_t = time.monotonic()
                     elif said_anything:
                         # the partial stopped changing (or emptied): you have stopped talking. Vosk's

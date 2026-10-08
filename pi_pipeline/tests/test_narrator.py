@@ -54,3 +54,12 @@ def test_attach_narrates_after_acting_and_a_failing_narrator_does_not_break_disp
 def test_a_bonded_persons_name_is_never_spoken():
     assert line_for("approach alice", private=["Alice"])[1] == "I'm heading over to someone."
     assert line_for("look at alice", private=["alice"])[1] == "I noticed someone."
+
+
+def test_quiet_mutes_and_forgets_a_waiting_line_and_a_stale_line_is_dropped():
+    spoken, t = [], [0.0]
+    n = Narrator(spoken.append, clock=lambda: t[0], threaded=False)
+    n.quiet(True)
+    assert n.narrate([Effect(EffectKind.HEAD, "pan_sweep", "look-around")]) is None      # muted while a command window is open
+    n.quiet(False)
+    assert n.narrate([Effect(EffectKind.HEAD, "pan_sweep", "look-around")]) == "Looking around."

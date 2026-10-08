@@ -107,6 +107,7 @@ def main() -> None:
         apply_roam_limits(rt.driver, args.roam_s)          # roaming lasts as long as --roam-s says, not the behavior layer's own short caps
 
         tts = None
+        narrator = None
         say = lambda text: None  # noqa: E731
         if not args.no_narrate:
             from .voice.tts import make_tts
@@ -124,14 +125,19 @@ def main() -> None:
             alert["fn"] = make_battery_alert(tts, True)
             from .personality.bonds import Bonds
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
-            attach(rt.bindings, Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ()))
+            narrator = Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
+            attach(rt.bindings, narrator)
             rt.bindings.tts = tts
             say("Exploration test starting. I will stay put and look around first." if args.stationary else "Exploration test starting.")
 
         def _on_fall():
             log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
             rt.halt()
-            say("I fell down. I have stopped.")
+            try:
+                link.send("gb", read_reply=False, settle=0.0)         # balance off: lying (or held) upside down, the gyro balance loop fights the servos and G2 twitches
+            except Exception:  # noqa: BLE001
+                log.debug("could not switch balance off after the fall", exc_info=True)
+            threading.Thread(target=say, args=("I fell down. I have stopped.",), daemon=True).start()   # this runs on the walker thread: never wait for the speaker here
         fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard
@@ -147,6 +153,11 @@ def main() -> None:
                                  record=make_voltage_log(settings.battery_log), record_every_s=settings.battery_log_every_s).start()
         stop_flag = threading.Event()
         listener = None
+
+        def _wake_chime():
+            if features.sound_cues and not args.no_narrate:
+                from .voice import wake_chime
+                wake_chime.play(settings.ack_peak)
         if features.mic and features.wake_word:
             from .behavior.explore_listener import ExploreListener
             from .voice.stt import make_stt
@@ -157,7 +168,8 @@ def main() -> None:
                 stt.audio_source = wake.hand_over
             listener = ExploreListener(wake, stt, say, rt, lambda: rt._frame_source(),
                                        on_arm=lambda: link.send("gB", read_reply=False, settle=0.0),
-                                       on_stop=stop_flag.set).start()
+                                       on_stop=stop_flag.set, chime=_wake_chime,
+                                       quiet=narrator.quiet if narrator is not None else None).start()
             log.info("voice commands on: wake word, then arm/disarm roam, stop, resume, \"tell me what you see\", shut down (ends the session)")
 
         signal.signal(signal.SIGUSR1, lambda *_: rt.halt())

@@ -53,8 +53,9 @@ class Narrator:
         self._speak, self._min_gap, self._repeat, self._clock = speak, min_gap_s, repeat_s, clock
         self._last_any: float | None = None
         self._last_kind: dict[str, float] = {}
-        self._q: "queue.Queue[str]" = queue.Queue(maxsize=1)
+        self._q: "queue.Queue[tuple[float, str]]" = queue.Queue(maxsize=1)
         self.enabled = True
+        self.stale_s = 6.0                       # a line queued longer than this is old news (2026-10-08: lines were spoken 4-120 s late): dropped
         self.said: list[str] = []
         self._threaded = threaded
         if threaded:
@@ -62,11 +63,24 @@ class Narrator:
 
     def _run(self) -> None:
         while True:
-            text = self._q.get()
+            queued_at, text = self._q.get()
+            if not self.enabled or self._clock() - queued_at > self.stale_s:
+                log.info("narration dropped (%s): %s", "muted" if not self.enabled else "stale", text)
+                continue
             try:
                 self._speak(text)
             except Exception:  # noqa: BLE001 -- narration must never take the behavior loop down
                 log.debug("narration speak failed", exc_info=True)
+
+    def quiet(self, on: bool) -> None:
+        """Mute narration (a command window is open: G2 must hear, not talk) and forget a line that is waiting."""
+        self.enabled = not on
+        if on:
+            try:
+                while True:
+                    self._q.get_nowait()
+            except queue.Empty:
+                pass
 
     def narrate(self, effects) -> str | None:
         if not self.enabled:
@@ -85,7 +99,7 @@ class Narrator:
                 continue
             if self._threaded:
                 try:
-                    self._q.put_nowait(text)
+                    self._q.put_nowait((now, text))
                 except queue.Full:
                     return None                               # still talking: drop this one
             else:

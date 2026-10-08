@@ -112,3 +112,13 @@ def test_the_battery_watcher_idle_backstop_timer_fires_after_its_interval():
     time.sleep(1.4)
     assert len(reads) == 2                                  # past 1800 s: the backstop read
     w.stop()
+
+
+def test_joint_streams_without_a_space_are_not_logged_as_quiet_commands(tmp_path, monkeypatch):
+    f = tmp_path / "noise.jsonl"
+    monkeypatch.setattr(noise_log, "LOG_PATH", f, raising=False)
+    monkeypatch.setenv("G2_NOISE_LOG_ALL", "1")
+    for c in ("i8 36 12 9 0", "m0 10", "i 0 20"):
+        assert noise_log._is_stream(c), c
+    for c in ("d", "kbalance", "gb", "P"):
+        assert not noise_log._is_stream(c), c

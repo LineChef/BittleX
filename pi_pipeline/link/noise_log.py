@@ -53,11 +53,17 @@ def _caller() -> str:
     return "?"
 
 
+def _is_stream(command: str) -> bool:
+    """The joint / head streams (`i8 36 12 ...`, `m0 10`): sent many times a second, never a noise."""
+    c = command.lstrip()
+    return c[:1] in ("i", "m") and (len(c) == 1 or c[1].isdigit() or c[1] == " ")
+
+
 def record(command: str, source: str | None = None, *, sent: bool = True) -> None:
     kind = classify(command)
     if kind is None:
         # G2_NOISE_LOG_ALL=1: also write the quiet commands (not the joint / head streams `i ...` and `m...`) so a sound the board makes on its own can be matched to what was sent just before it
-        if os.environ.get("G2_NOISE_LOG_ALL") == "1" and command.strip() and not command.lstrip().startswith(("i ", "m")):
+        if os.environ.get("G2_NOISE_LOG_ALL") == "1" and command.strip() and not _is_stream(command):
             _append({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "kind": "quiet", "command": command.strip(), "source": source or _caller(), "sent": sent})
         return
     source = source or _caller()

@@ -77,6 +77,10 @@ class Explorer:
         """Stand still for `secs`: the wake word was heard and G2 should listen without his servos running."""
         self._hold_until = max(self._hold_until, now + secs)
 
+    def listening(self, now: float) -> bool:
+        """True while a command window holds G2 still (no survey choreography may start: bowing servos drown the microphone too)."""
+        return now < self._hold_until
+
     def reset(self) -> None:
         self._leg_start = None
         self._investigate_until = 0.0

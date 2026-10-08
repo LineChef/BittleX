@@ -510,7 +510,7 @@ class BehaviorDriver:
                 fx.append(Effect(EffectKind.STOP, None, d.reason))
 
         if (self.survey is not None and self._vision and d.action is ExploreAction.HOLD and d.reason == "leg done"
-                and self.survey.ready(now)):
+                and self.survey.ready(now) and not self.explorer.listening(now)):
             self.survey.began(now)
             self._choreo.start("survey", _plan_steps(survey_plan(self.survey.cfg)), now=now)
             return self._choreo.pump(now) + [Effect(EffectKind.DIAG, ("survey.start", "end of a leg"), "survey stop")]
