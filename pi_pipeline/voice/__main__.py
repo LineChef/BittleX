@@ -73,6 +73,12 @@ def main() -> None:
             tts_mode = "print"
         use_wake = voice and features.wake_word
 
+        # crash forensics (diag/crashwatch.py): a heartbeat with the loop stage and resources, faulthandler to a file, and a report of the
+        # previous process at the next start if it did not end cleanly (`python -m pi_pipeline.diag.crashwatch`)
+        from ..diag.crashwatch import CrashWatch, StageTap
+        stt_ref: dict = {}
+        crash = CrashWatch("voice", extras=lambda: getattr(stt_ref.get("stt"), "last_info", None)).start()
+
         memory = None
         if settings.memory_enabled and not args.no_memory and features.memory:
             memory = Memory(settings)
@@ -108,6 +114,7 @@ def main() -> None:
             cue.prime()
         else:
             cue = LogCue()
+        cue = StageTap(cue, crash)
 
         if features.sound_cues and voice and tts_mode == "piper" and settings.api_tone == "on":
             from . import api_log, api_tone
@@ -164,6 +171,7 @@ def main() -> None:
             vosk_model_path=settings.vosk_model_path,
             silence_s=settings.stt_silence_s,
         )
+        stt_ref["stt"] = stt
         if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
             stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
         def on_event(**kw):
@@ -198,6 +206,7 @@ def main() -> None:
         try:
             loop.run_forever()
         finally:
+            crash.stop()                                  # a normal end (Ctrl-C, systemctl stop) is not reported as a crash at the next start
             if watcher:
                 watcher.stop()
             if guard:

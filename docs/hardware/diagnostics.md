@@ -214,3 +214,19 @@ logs a WARNING (journal) and writes a `disk.full` event to the diagnostics log, 
 back below re-arms it. `python -m pi_pipeline.doctor` shows the same figure. The systemd journal is separately capped at 50 MB
 (`/etc/systemd/journald.conf.d/persistent.conf` on the Pi). The unbounded folders are `~/g2_logs` (one small folder per service start, ~20 KB each),
 `~/g2_runs` and `~/g2_cap`; there is no automatic cleanup of them yet.
+
+
+## Crash forensics for the voice service and exploration sessions (2026-10-08)
+
+A native crash (segmentation fault in Vosk, PortAudio or onnxruntime) kills the process with no Python traceback, so `pi_pipeline/diag/crashwatch.py`
+leaves a record while the process runs and reads it at the next start. Files are in `~/.local/share/g2/crash/` (`G2_CRASH_DIR`):
+
+- `<name>_state.json`: a heartbeat every 5 s and at every stage change (idle, awake, listening, thinking, speaking). It holds the pid, the
+  stage and how long G2 had been in it, process memory, system memory available, load, CPU temperature, throttling flags, thread count,
+  the speech recogniser's last mic level, and the last 25 log lines. It is marked clean on a normal exit (Ctrl-C, `systemctl stop`).
+- `<name>_faults.log`: Python `faulthandler` output, so a fatal signal leaves every thread's stack.
+- `crashes.jsonl`: one record per unclean end, written at the next start together with a WARNING in the journal ("the previous voice
+  process ... ended without a clean shutdown: last in stage ...") and the fault trace, if any.
+
+Read the history with `python -m pi_pipeline.diag.crashwatch [N]` on the Pi. A WARNING is also logged (at most every 5 minutes) when the
+system has less than 40 MB of memory available. The systemd unit restarts the service 1 s after a failure (at most 10 times in 60 s).

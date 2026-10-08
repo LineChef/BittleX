@@ -20,6 +20,8 @@ cat <<EOF
 Description=G2 voice loop (wake word, speech-to-text, Claude, serial actuator)
 After=network-online.target sound.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=10
 
 [Service]
 User=$(id -un)
@@ -28,7 +30,7 @@ Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONFAULTHANDLER=1
 ExecStart=$PY -m pi_pipeline.voice --mode voice --actuator serial
 Restart=on-failure
-RestartSec=10
+RestartSec=1
 
 [Install]
 WantedBy=multi-user.target

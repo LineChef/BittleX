@@ -76,6 +76,9 @@ def main() -> None:
         raise SystemExit("exploration is off in G2_FEATURES (+explore, +vision, +vision_safety are needed); nothing to test")
 
     with diag.session("explore", extra={"roam_s": args.roam_s}):
+        from .diag.crashwatch import CrashWatch
+        crash = CrashWatch("explore", extras=lambda: getattr(stt_holder.get("stt"), "last_info", None)).start()
+        stt_holder: dict = {}
         memory = _make_memory()
         link = _make_link(True)
         if link is None:
@@ -164,6 +167,7 @@ def main() -> None:
             from .voice.wake_word import make_wake_word
             wake = make_wake_word("vosk", vosk_model_path=settings.vosk_model_path, phrase=settings.wake_word)
             stt = make_stt("vosk", vosk_model_path=settings.vosk_model_path, silence_s=settings.stt_silence_s)
+            stt_holder["stt"] = stt
             if hasattr(wake, "hand_over"):
                 stt.audio_source = wake.hand_over
             listener = ExploreListener(wake, stt, say, rt, lambda: rt._frame_source(),
@@ -238,6 +242,7 @@ def main() -> None:
         except KeyboardInterrupt:
             pass
         finally:
+            crash.stop()
             if listener is not None:
                 listener.stop()
             log.info("ending the exploration session")
