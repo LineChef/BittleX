@@ -36,8 +36,9 @@ def test_the_launch_uses_the_same_function(monkeypatch):
 def test_every_new_fresh_final_has_the_whole_course_and_only_the_finished_20m_is_flat():
     import g2_profile as G
     new = G.env_for_job({"kind": "final", "tag": "v3_next", "stage": "s6_full_strength", "levers": ["mirror"], "fresh": True})
-    assert (new["G2E_SURFACE_TRANSITION_PROB"], new["G2E_SNAG_OBSTACLE_PROB"], new["G2E_LEDGE_PROB"]) == ("0.25", "0.20", "0.20")
-    assert new["G2E_SURFACE_TRANSITION_STEP_M"] == "0.012" and new["G2E_HARD_SCALE"] == "1.10"
+    assert (new["G2E_SURFACE_TRANSITION_PROB"], new["G2E_SNAG_OBSTACLE_PROB"], new["G2E_LEDGE_PROB"]) == ("0", "0.20", "0.20")      # snags and ledges on; the surface step stays off (user, 2026-10-08)
+    assert new["G2E_HARD_SCALE"] == "1.10"
+    assert not any("CARPET" in k and float(v) > 0 for k, v in new.items() if k.startswith("G2E_CARPET"))
     assert new.get("G2E_LEVEL_START", "0") in ("0", "0.0")                    # a fresh run still starts every hazard from an empty floor
     old = G.env_for_job({"kind": "final", "tag": "v3_20m", "stage": "s6_full_strength", "levers": ["mirror"], "fresh": True})
     assert (old["G2E_SURFACE_TRANSITION_PROB"], old["G2E_SNAG_OBSTACLE_PROB"], old["G2E_LEDGE_PROB"]) == ("0", "0", "0")

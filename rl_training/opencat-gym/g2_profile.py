@@ -178,7 +178,9 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 # The whole course in one place (user, 2026-10-08: every hazard enabled, in every run, unless there is a good reason): surface steps with a 12 mm step, snag obstacles and ledges, on top of the
 # terrain / slope / fault categories. Each hazard still starts from a clean floor and ramps with its own difficulty level, so enabling it from the first step is gentle, and every level is
 # limited to the measured top threshold (the G2E_CAP_* settings; docs/rl/passability-audit.md).
-FULL_COURSE = dict(dict(STAGES)["s4_ledge"])
+FULL_COURSE = {k: v for k, v in dict(STAGES)["s4_ledge"].items() if not k.startswith("G2E_SURFACE_")}
+# The surface step (a hard floor that turns into a carpet-like slab with a 12 mm step) is deliberately NOT in the course: user, 2026-10-08, "don't re-enable surface step". Carpet-like physics stays out of
+# training (CARPET, CARPET_SOFT and the rug are off too). Its floor bug is fixed and its benchmark cells (T4.1, T4.2) still measure it, so it can be switched on later with one line.
 
 # Finals that already ran WITHOUT the staged hazards, kept honest: the 20M of 2026-10-08 was launched as a fresh run on the flat stage by mistake (dropping the chain also dropped the
 # surface steps, snags and ledges it was meant to introduce), so its viewer environment is the flat one. Nothing new is added to this set.

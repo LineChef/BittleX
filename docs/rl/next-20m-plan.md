@@ -12,7 +12,7 @@ The 20M that finished at 11:50 AM on 2026-10-08 (`v3_20m`) was launched as a fre
 |---|---|---|
 | Recipe | K3 = the `mirror` lever only (the command-drift levers are out, user decision 2026-10-07) | `trained/v3_results.json` -> `v3_k3.levers` |
 | New payload ("world 2") | `G2E_PAYLOAD_LAYOUT=spine`: spine-sized block, camera and speaker as tall as the block (front weight share 46.7%) | `g2_profile.WORLD2_CALIBRATION`; the marker `trained/v3_world2` is already on (created 11:59 AM), so every new run gets it |
-| Whole course | surface steps 25% (12 mm step), snag obstacles 20%, ledges 20% on top of terrain, slope and fault; each starts from an empty floor and ramps with its level | `g2_profile.FULL_COURSE`, added to a new fresh final by `env_for_job` |
+| Course hazards | snag obstacles 20% and ledges 20% on top of terrain and slope; each starts from an empty floor and ramps with its level. **The surface step stays OFF** (user, 2026-10-08: "don't re-enable surface step"; it is the only carpet-like physics: a hard floor that turns into a soft, high-friction slab with a 12 mm step). Carpet, soft-carpet and rug floors are off too. Its floor bug is fixed and its benchmark cells T4.1 and T4.2 still measure it; one line in `FULL_COURSE` turns it on later | `g2_profile.FULL_COURSE`, added to a new fresh final by `env_for_job` |
 | Level ceiling | 1.25 (RECIPE) | `G2E_LEVEL_MAX` |
 | Hard levels | x1.10 | `FINAL_EXTRA` |
 | Top-threshold caps | NOT SET YET: set them from the capability test (below) before launch | `G2E_CAP_SIDEHILL_DEG`, `G2E_CAP_UPHILL_DEG`, `G2E_CAP_DOWNHILL_DEG`, `G2E_CAP_LEDGE_M` in `g2_profile.RECIPE` |

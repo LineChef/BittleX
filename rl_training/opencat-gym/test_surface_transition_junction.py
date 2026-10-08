@@ -15,6 +15,8 @@ os.environ["G2E_SURFACE_TRANSITION_PROB"] = "1.0"
 os.environ["G2E_SLOPE_TARGET_PROB"] = "0"
 os.environ["G2E_SLOPE_MAX_DEG"] = "0"
 os.environ["G2E_SURFACE_TRANSITION_STEP_M"] = "0.0"
+for k in ("G2E_ROUGH_TERRAIN_PROB", "G2E_RUBBLE_PROB", "G2E_SNAG_OBSTACLE_PROB", "G2E_LEDGE_PROB", "G2E_RANDOM_TERRAIN"):
+    os.environ[k] = "0"                      # only the two slabs: a random rough floor or an obstacle at the junction is not a seam
 import numpy as np, pybullet as p
 import opencat_gym_env as E
 def top(x, y=0.0):
@@ -23,6 +25,7 @@ def top(x, y=0.0):
 worst = 0.0
 for roll, pitch in ((0, 0), (0, 3), (0, 8), (0, -12), (0, 24), (6, 0), (10, 5)):
     E.SLOPE_FIXED_RP = (np.deg2rad(roll), np.deg2rad(pitch))
+    np.random.seed(3)
     env = E.OpenCatGymEnv(); env.reset()
     tx = E.SURFACE_TRANSITION_X
     for y in (-0.2, 0.0, 0.2):

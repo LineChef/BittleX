@@ -15,6 +15,10 @@ The surface-transition floor was built from two slabs, each tilted about its own
 - **Part B, capability** (`capability`): the best policies (V2.1, K3, the 20M) against each hazard at rising magnitudes (side-hill 4-20 deg, climb 8-30 deg, descent 8-24 deg, ledge 2.5-8 cm), 20 episodes per cell; success = stayed up and covered at least half the commanded distance. The top threshold of a family is the largest magnitude the best policy passes at least half the time. Results: `trained/passability_capability.json` (local). Runs when the Mac is idle.
 - **Scene checks** (`scene`): floating or sunk obstacles, obstacles on the start, overlaps.
 
+## Which hazards a run trains on
+
+The new run trains on snag obstacles (20% of episodes) and ledges (20%) plus the terrain and slope categories; the surface step is off by decision (carpet-like physics). The audit below still covers the surface step (its floor bug is fixed and a test guards it), so it can be switched on later without a new audit.
+
 ## Results so far
 
 - Geometry after the junction fix (300 episodes each): forced rise at most 3.5 cm (level 1.0) and 4.3 cm (1.25) for ledges alone, 6.1 cm worst case in combinations (a ledge plus a tilt); terrain at most 1.6 cm; ground tilt up to 23.9 deg at level 1.0 and 29.9 deg at 1.25.
