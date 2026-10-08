@@ -549,7 +549,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                    + (",ax,ay,az,imu_n,imu_age_s,volt" if log_extra else "") + "\n")
     hold = (_hh.HeadingHold(ff=hold_ff, kp=_hh.KP if hold_kp is None else hold_kp, ki=_hh.KI if hold_ki is None else hold_ki, u_max=_hh.U_MAX if hold_umax is None else hold_umax) if (heading_hold or steer_const is not None) else None)
     if foot_hold:                        # --foot-hold FOOT: the proportional heading hold on one front foot (gait/heading_hold.FootHold)
-        hold = _hh.FootHold(foot=foot_hold)
+        hold = _hh.FootHold(foot=foot_hold, ff=_hh.default_foot_hold_ff())
     if hold is not None and steer_const is not None:
         hold.fixed_u = float(steer_const)
     steer_u = 0.0

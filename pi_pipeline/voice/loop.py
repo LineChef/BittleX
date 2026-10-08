@@ -25,7 +25,7 @@ from ..personality import gir
 from ..personality.mood import MoodModel
 from . import narration
 from .actuator import Actuator
-from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming
+from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming, picture_pose_steps
 from .commands import (
     is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
     parse_narration_command,
@@ -209,6 +209,7 @@ class VoiceLoop:
         if self._camera is None or not (learn or asks_what_g2_sees(user_text)):
             return {}
         self._cue.set("thinking")
+        self._pose_for_picture()
         snap = self._camera.snapshot()
         self._last_look = snap
         if snap is None:
@@ -220,6 +221,26 @@ class VoiceLoop:
         else:
             note = "[Picture from G2's camera. Describe what you see out loud now.]"
         return {"image": snap.jpeg, "image_note": f"{note} {snap.hint()}"}
+
+    def _pose_for_picture(self) -> None:
+        """Any picture, any time the camera is used (user, 2026-10-07): look down (the inspect bow), look up, stand again and settle before the shot, the same sequence as a survey stop
+        or a naming. A failed skill must not stop the picture or the voice loop."""
+        import time
+        if self._act is None:
+            return
+        t0 = time.monotonic()
+        try:
+            for delay, skill in picture_pose_steps(SurveyConfig()):
+                wait = delay - (time.monotonic() - t0)
+                if wait > 0:
+                    time.sleep(wait)
+                self._act.perform(skill)
+            end = picture_pose_steps(SurveyConfig(), settle_only=True)
+            wait = end - (time.monotonic() - t0)
+            if wait > 0:
+                time.sleep(wait)
+        except Exception:  # noqa: BLE001
+            log.exception("the picture pose sequence failed")
 
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""

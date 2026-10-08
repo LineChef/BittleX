@@ -53,6 +53,8 @@ def main() -> None:
     ap.add_argument("--foot-hold", default=None, metavar="FOOT[,FOOT|none..]",
                     help="closed-loop heading hold on one foot (fl = the measured steering foot), cycling per run like --foot-trim; the walk is the scripted wkF through the full loop (--scripted)")
     ap.add_argument("--volt-every", type=float, default=0.0, metavar="S", help="policy walks: ask the BiBoard for the pack voltage (P) this often (0 = the loop's default, 5 s); used to test whether P makes the board click")
+    ap.add_argument("--foot-hold-ff", default=None, metavar="F[,F..]", help="feed-forward trim of the foot hold, cycling per run (sets G2_FOOT_HOLD_FF for that run): the A/B of 0 against -0.25")
+    ap.add_argument("--hold-off", action="store_true", help="run every walk with the heading hold OFF (G2_FOOT_HOLD=off for the child): the system-identification capture needs G2's natural gait")
     ap.add_argument("--hold-on-policy", action="store_true", help="--foot-hold on the learned policy (V2.1) instead of the scripted walk")
     ap.add_argument("--foot-trim", default=None,
                     help="comma list of per-foot step trims, e.g. none,bl=+0.25,bl=-0.25,br=+0.25,br=-0.25,fl=+0.25,fl=-0.25,fr=+0.25,fr=-0.25: run k uses item k (cycling), 'none' = no trim. The per-foot steering test")
@@ -121,6 +123,14 @@ def main() -> None:
                             + ("" if hold is None else f"_hold{'ON' if hold else 'OFF'}")
                             + ("" if cu is None else f"_u{cu:+.2f}") + ("" if fh is None else "_fh" + fh) + ("" if ft is None else "_ft" + ft.replace("/", "_").replace("=", "").replace("+", "p").replace("-", "m")) + ".csv")
         child_env = dict(os.environ, **({} if sgn is None else {"G2_POLICY_YAW_SIGN": f"{sgn:g}"}))
+        if args.hold_off:
+            child_env["G2_FOOT_HOLD"] = "off"
+            path = path.replace(".csv", "_holdoff.csv")
+        if args.foot_hold_ff:
+            ffs = [x.strip() for x in args.foot_hold_ff.split(",") if x.strip()]
+            ffv = ffs[(k - 1) % len(ffs)]
+            child_env["G2_FOOT_HOLD_FF"] = ffv
+            path = path.replace(".csv", f"_ff{ffv.replace('-', 'm').replace('.', 'p')}.csv")
         scripted = (args.scripted_mix == "scripted" or (args.scripted_mix == "abab" and k % 2 == 1)) and not args.foot_hold     # --foot-hold runs go through the full loop (IMU), scripted via --scripted
         if args.scripted_mix:
             path = path.replace(".csv", "_wkF.csv" if scripted else "_V21.csv")

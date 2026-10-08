@@ -58,6 +58,15 @@ def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]
     return plan, t
 
 
+def picture_pose_steps(cfg: SurveyConfig, settle_only: bool = False):
+    """The pose part of the picture sequence for a caller that takes the picture itself (the voice "look"): [(delay_s, skill)] for look down, look up, stand; with settle_only=True the time (s)
+    from the start at which the stance has settled and the picture can be taken."""
+    plan, t = _picture_steps(cfg, "look", "voice look")
+    if settle_only:
+        return t
+    return [(d, payload) for d, kind, payload, _why in plan if kind == "skill"]
+
+
 def survey_plan(cfg: SurveyConfig) -> list:
     """A survey stop: bow, look up, stand, settle, one picture, then walk on."""
     plan, t = _picture_steps(cfg, "after_bow", "survey")

@@ -430,3 +430,14 @@ def test_ordinary_sentences_and_questions_are_not_mistaken_for_naming():
     lp, conv, said, skills, shots = _naming_loop("x", ["what is this"])
     lp._one_turn()
     assert shots == [] and skills == [] and len(conv.calls) == 1                       # a question goes to Claude as before
+
+
+def test_a_voice_look_poses_before_the_picture_bow_look_up_stand(monkeypatch):
+    import time
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    skills = []
+    cam = _Cam(Snapshot(JPEG, 240, 240))
+    lp, conv = make_loop(cam, ["what do you see"])
+    lp._act = types.SimpleNamespace(perform=lambda s, **k: skills.append(s), stop=lambda: None, close=lambda: None)
+    lp._one_turn()
+    assert skills == ["kbuttUp", "ksit", "kup"] and cam.snapshots == 1

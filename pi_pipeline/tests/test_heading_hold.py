@@ -185,3 +185,17 @@ def test_ingest_gate_rejects_steering_test_runs():
     spec.loader.exec_module(mod)
     why = mod.gate({"foot_hold": "fl", "end_reason": "stopped"}, [], {"rows": 100}, {})
     assert any("never fed to the sim" in w for w in why)
+
+
+def test_foot_hold_feed_forward_starts_the_trim_and_default_is_zero(monkeypatch):
+    import math
+    from pi_pipeline.gait import heading_hold as hh
+    monkeypatch.delenv("G2_FOOT_HOLD_FF", raising=False)
+    assert hh.default_foot_hold_ff() == 0.0
+    monkeypatch.setenv("G2_FOOT_HOLD_FF", "-0.25")
+    assert hh.default_foot_hold_ff() == -0.25
+    h = hh.FootHold("fl", ff=-0.25)
+    for _ in range(160):
+        g = h.update(0.0, 1 / 80)              # dead on target: the trim goes to the feed-forward and stays
+    assert abs(g + 0.25) < 1e-6
+    assert _plant(hh.FootHold("fl", ff=-0.25), drift_dps=6.0)[-1][0] < 25

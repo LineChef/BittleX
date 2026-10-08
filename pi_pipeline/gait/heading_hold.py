@@ -133,6 +133,15 @@ def default_foot_hold():
     return None if v in ("", "off", "none", "0", "false") else v
 
 
+def default_foot_hold_ff() -> float:
+    """`G2_FOOT_HOLD_FF`: the feed-forward trim of the everyday hold (default 0.0 until the hardware A/B has run; try -0.25)."""
+    import os
+    try:
+        return float(os.environ.get("G2_FOOT_HOLD_FF", "0") or 0.0)
+    except ValueError:
+        return 0.0
+
+
 class FootHold:
     """Heading hold on ONE front foot (measured on G2, 2026-10-07, scripted walk): front-left alone takes ~9 deg/s of turn per unit of trim (-0.25 -> -35 deg, -0.5 -> -57 deg over
     12.5 s against ~78 deg of drift), the back feet do nothing, and a front pair adds a lean. Trim g scales that foot's swing (apply_foot_trim); a NEGATIVE g shortens the step and
@@ -143,7 +152,8 @@ class FootHold:
     reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited."""
 
     def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
-                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4):
+                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0):
+        self.ff = ff                         # feed-forward trim added to the feedback: the average trim the hold ends up at anyway (about -0.2..-0.3 on G2), so it does not have to ramp to it
         self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg
         self.g_min, self.g_max, self.g_rate, self.rate_tau_s = g_min, g_max, g_rate, rate_tau_s
         self.ki, self.i_lim, self.integral = ki, i_lim, 0.0      # the steady push a P term alone leaves as a standing heading error; cleared when the heading crosses the target
@@ -175,7 +185,7 @@ class FootHold:
             self.integral = 0.0                   # inside the deadband or past the target: drop the wound-up term (it kept steering after the heading was back on the old hold)
         else:
             self.integral = max(-self.i_lim / self.ki, min(self.i_lim / self.ki, self.integral + out * dt))
-        want = -(self.kp * out + self.ki * self.integral + self.kd * self.rate_dps)
+        want = self.ff - (self.kp * out + self.ki * self.integral + self.kd * self.rate_dps)
         return self._slew(max(self.g_min, min(self.g_max, want)), dt)
 
     def _slew(self, want: float, dt: float) -> float:
