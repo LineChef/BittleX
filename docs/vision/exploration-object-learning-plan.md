@@ -79,6 +79,9 @@ Thresholds are the capture tools' defaults and will need tuning on the first rea
 Output location: `training_data/exploration/<session>/` (not tracked by git, like the vision photo library).
 
 ### Phase 3: choose the embedding model, offline
+
+**Status (2026-10-07, user asked to start the build):** the plumbing is built and tested without any model file: `vision/embedder.py` (a `HistogramEmbedder` baseline that needs nothing downloaded, and an `OnnxEmbedder` for any exported image model), `vision/localizer.py` (v0 of Phase 4: the whole picture plus a 3 x 3 overlapping tile grid), `vision/recognizer.py` (learn a named picture, recognise by the best view, never rename a look-alike of a differently named entry), `ObjectGallery.match()` (ask without learning), and `tools/eval_embedder.py` (within-object against between-object similarity, leave-one-out retrieval, hit rate on held-out pictures, false recognitions in survey pictures). First numbers for the baseline on G2's real pictures (4 dishwasher pictures, 11 survey pictures): within-object similarity 0.68, hit rate 25% at threshold 0.80, 18% of survey pictures falsely recognised: weak, as expected. The learned models wait for the user's yes to download one (CLAUDE.md hard rule) and for more named objects (the gap needs two or more).
+
 1. Collect the first data: two or three exploration sessions of about 30 minutes plus the objects you name.
 2. Candidate small models (MobileNet-class, a small CLIP-style, a small DINO-class), run on the Mac over the curated pictures.
 3. Measure: do pictures of the same named object across poses land close together, and different objects apart (retrieval accuracy, the gap between

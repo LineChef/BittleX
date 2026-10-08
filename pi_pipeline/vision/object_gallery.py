@@ -160,6 +160,17 @@ class ObjectGallery:
             first_seen=now, last_seen=now)
         return self._done(GalleryDecision.NEW, eid)
 
+    def match(self, embedding: list[float], *, named_only: bool = True) -> tuple[GalleryEntry | None, float]:
+        """The closest entry to `embedding` and its cosine similarity, without changing the gallery (recognition asks; `consider()` learns). With `named_only`, only entries that have a name."""
+        best, best_sim = None, -1.0
+        for entry in self.entries.values():
+            if named_only and not entry.labeled:
+                continue
+            sim = _cosine(embedding, entry.centroid)
+            if sim > best_sim:
+                best, best_sim = entry, sim
+        return best, best_sim
+
     def _done(self, decision: GalleryDecision, entry_id: str | None) -> GalleryDecision:
         self.last_decision, self.last_entry_id = decision, entry_id
         return decision
