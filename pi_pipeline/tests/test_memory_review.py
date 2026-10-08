@@ -91,3 +91,29 @@ def test_trash_commands_finds_only_short_command_turns_and_moves_them_reversibly
     assert R.main(["--db", p, "trash-commands", "--apply"]) == 0
     assert [r["user_text"] for r in R.list_records(p, "exchanges")] == ["walk forward for ten seconds near the couch please now", "tell me a long story about the garden please"]
     assert len(R.list_trash(p)) == 2
+
+
+def test_add_and_edit_facts_and_observations_by_hand(tmp_path):
+    import sqlite3
+    from pi_pipeline.memory import review as R
+    db = str(tmp_path / "m.db")
+    st = Store(db)
+    st.close()
+    f = R.add_fact(db, "  The dishwasher is next to the fridge  ", importance=4, core=True)
+    assert f["fact"] == "The dishwasher is next to the fridge"
+    with pytest.raises(ValueError):
+        R.add_fact(db, "The dishwasher is next to the fridge")                # identical fact
+    with pytest.raises(ValueError):
+        R.add_fact(db, "   ")
+    R.edit_fact(db, f["id"], fact="The dishwasher is left of the fridge", importance=2, core=False)
+    row = [r for r in R.list_records(db, "facts") if r["id"] == f["id"]][0]
+    assert row["fact"] == "The dishwasher is left of the fridge" and row["importance"] == 2 and row["core"] == 0
+    with pytest.raises(ValueError):
+        R.edit_fact(db, 9999, fact="x")
+    o = R.add_observation(db, "A steel door with a black handle", "dishwasher")
+    R.edit_observation(db, o["id"], caption="A steel door with a black handle and a display", labels="dishwasher, kitchen")
+    ob = [r for r in R.list_records(db, "observations") if r["id"] == o["id"]][0]
+    assert ob["caption"].endswith("a display") and ob["labels"] == "dishwasher, kitchen"
+    c = sqlite3.connect(db)                                                   # the search index follows the edit
+    hits = c.execute("SELECT rowid FROM observations_fts WHERE observations_fts MATCH 'display'").fetchall()
+    assert [h[0] for h in hits] == [o["id"]]

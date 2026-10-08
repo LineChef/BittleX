@@ -33,6 +33,10 @@ class FakePi:
                 return json.dumps({"kind": "facts", "row_id": 7})
             if rest[0] == "trash":
                 return json.dumps([])
+            if rest[0] in ("add-fact", "add-observation"):
+                return json.dumps({"id": 90, "fact": rest[1]})
+            if rest[0] in ("edit-fact", "edit-observation"):
+                return json.dumps({"id": int(rest[1])})
             return json.dumps({"removed": 0})
         if rest[0] == "list":
             return json.dumps([])
@@ -62,6 +66,19 @@ def test_picture_paths_are_checked_before_they_reach_the_pi():
         with pytest.raises(ValueError):
             app.trash_pictures([bad])
     assert app.trash_pictures(["survey/20261007/look_down_1.jpg"]) == {"moved": ["survey/20261007/look_down_1.jpg"]}
+
+
+def test_adding_and_editing_facts_and_observations_backs_up_once_and_passes_the_fields():
+    pi = FakePi()
+    app = G.App(G.Remote("pi", runner=pi))
+    assert app.add_fact("The dishwasher is by the fridge", 4, True)["id"] == 90
+    assert app.edit_fact(7, fact="New text", importance=2, core=False) == {"id": 7}
+    assert app.add_observation("A steel door", "dishwasher")["id"] == 90
+    assert app.edit_observation(5, caption="A steel door with a handle") == {"id": 5}
+    mem = [c for c in pi.calls if c[0].endswith("memory.review")]
+    assert [c[1] for c in mem] == ["backup", "add-fact", "edit-fact", "add-observation", "edit-observation"]       # one backup, before the first change
+    assert mem[1][1:] == ["add-fact", "The dishwasher is by the fridge", "--importance", "4", "--core"]
+    assert mem[2][1:] == ["edit-fact", "7", "--fact", "New text", "--importance", "2", "--core", "0"]
 
 
 def test_naming_a_picture_checks_paths_and_asks_for_a_name_and_can_be_undone():

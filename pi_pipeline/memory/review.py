@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime
 import sqlite3
 import sys
 import time
@@ -49,6 +50,93 @@ def list_records(db: str, kind: str, limit: int = 200, query: str = "") -> list[
             params = [f"%{query}%"] * len(text_cols)
         rows = c.execute(f"SELECT * FROM {table}{where} ORDER BY id DESC LIMIT ?", (*params, int(limit))).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        c.close()
+
+
+def _fact_columns(c) -> set:
+    return {r[1] for r in c.execute("PRAGMA table_info(facts)").fetchall()}
+
+
+def add_fact(db: str, fact: str, importance: int = 3, core: bool = False) -> dict:
+    """Add a fact by hand (the review page). No date / near-duplicate filter: the user wrote it. An identical fact is refused (the table's UNIQUE rule)."""
+    fact = " ".join((fact or "").split())
+    if not fact:
+        raise ValueError("write the fact first")
+    c = _conn(db)
+    try:
+        cols = _fact_columns(c)
+        row = {"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "fact": fact, "importance": max(1, min(5, int(importance))), "core": 1 if core else 0, "source": "hand"}
+        row = {k: v for k, v in row.items() if k in cols}
+        try:
+            cur = c.execute(f"INSERT INTO facts ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", tuple(row.values()))
+        except sqlite3.IntegrityError:
+            raise ValueError("that fact is already saved")
+        c.commit()
+        return {"id": cur.lastrowid, "fact": fact}
+    finally:
+        c.close()
+
+
+def edit_fact(db: str, fact_id: int, fact: str | None = None, importance: int | None = None, core: bool | None = None) -> dict:
+    """Change a fact's text, importance (1-5) or core flag. Only the given fields change. An unknown id or a text that is already another fact is an error."""
+    c = _conn(db)
+    try:
+        cols = _fact_columns(c)
+        sets, params = [], []
+        if fact is not None:
+            fact = " ".join(fact.split())
+            if not fact:
+                raise ValueError("the fact cannot be empty")
+            sets.append("fact = ?"); params.append(fact)
+        if importance is not None and "importance" in cols:
+            sets.append("importance = ?"); params.append(max(1, min(5, int(importance))))
+        if core is not None and "core" in cols:
+            sets.append("core = ?"); params.append(1 if core else 0)
+        if not sets:
+            raise ValueError("nothing to change")
+        try:
+            cur = c.execute(f"UPDATE facts SET {', '.join(sets)} WHERE id = ?", (*params, int(fact_id)))
+        except sqlite3.IntegrityError:
+            raise ValueError("another fact already says exactly that")
+        if cur.rowcount == 0:
+            raise ValueError(f"no fact #{fact_id}")
+        c.commit()
+        return {"id": int(fact_id)}
+    finally:
+        c.close()
+
+
+def add_observation(db: str, caption: str, labels: str = "") -> dict:
+    """Add an observation by hand (what G2 saw: text, date only). The full-text index follows through the table's own insert trigger."""
+    caption = " ".join((caption or "").split())
+    if not caption:
+        raise ValueError("write what G2 saw first")
+    c = _conn(db)
+    try:
+        cur = c.execute("INSERT INTO observations (ts, caption, labels) VALUES (?, ?, ?)", (datetime.now().strftime("%Y-%m-%d"), caption, (labels or "").strip()))
+        c.commit()
+        return {"id": cur.lastrowid, "caption": caption}
+    finally:
+        c.close()
+
+
+def edit_observation(db: str, obs_id: int, caption: str | None = None, labels: str | None = None) -> dict:
+    """Change an observation's caption or labels. The search index has no update trigger, so the row is deleted and put back with the same id and date in one transaction
+    (the delete and insert triggers then keep the index right)."""
+    c = _conn(db)
+    try:
+        row = c.execute("SELECT * FROM observations WHERE id = ?", (int(obs_id),)).fetchone()
+        if row is None:
+            raise ValueError(f"no observation #{obs_id}")
+        cap = row["caption"] if caption is None else " ".join(caption.split())
+        lab = row["labels"] if labels is None else labels.strip()
+        if not cap:
+            raise ValueError("the caption cannot be empty")
+        with c:
+            c.execute("DELETE FROM observations WHERE id = ?", (int(obs_id),))
+            c.execute("INSERT INTO observations (id, ts, caption, labels) VALUES (?, ?, ?, ?)", (int(obs_id), row["ts"], cap, lab))
+        return {"id": int(obs_id)}
     finally:
         c.close()
 
@@ -142,6 +230,10 @@ def main(argv=None) -> int:
     p = sub.add_parser("delete"); p.add_argument("kind"); p.add_argument("id", type=int)
     p = sub.add_parser("restore"); p.add_argument("trash_id", type=int)
     p = sub.add_parser("trash-commands"); p.add_argument("--apply", action="store_true")
+    p = sub.add_parser("add-fact"); p.add_argument("fact"); p.add_argument("--importance", type=int, default=3); p.add_argument("--core", action="store_true")
+    p = sub.add_parser("edit-fact"); p.add_argument("id", type=int); p.add_argument("--fact", default=None); p.add_argument("--importance", type=int, default=None); p.add_argument("--core", choices=("0", "1"), default=None)
+    p = sub.add_parser("add-observation"); p.add_argument("caption"); p.add_argument("--labels", default="")
+    p = sub.add_parser("edit-observation"); p.add_argument("id", type=int); p.add_argument("--caption", default=None); p.add_argument("--labels", default=None)
     sub.add_parser("trash"); sub.add_parser("empty-trash"); sub.add_parser("backup")
     ap.add_argument("--db", default=None)
     args = ap.parse_args(argv)
@@ -153,6 +245,14 @@ def main(argv=None) -> int:
             out = list_records(args.db, args.kind, args.limit, args.query)
         elif args.cmd == "delete":
             out = {"trash_id": delete_record(args.db, args.kind, args.id)}
+        elif args.cmd == "add-fact":
+            out = add_fact(args.db, args.fact, args.importance, args.core)
+        elif args.cmd == "edit-fact":
+            out = edit_fact(args.db, args.id, args.fact, args.importance, None if args.core is None else args.core == "1")
+        elif args.cmd == "add-observation":
+            out = add_observation(args.db, args.caption, args.labels)
+        elif args.cmd == "edit-observation":
+            out = edit_observation(args.db, args.id, args.caption, args.labels)
         elif args.cmd == "restore":
             out = restore_record(args.db, args.trash_id)
         elif args.cmd == "trash":

@@ -108,6 +108,40 @@ class App:
             self._backed_up = True
         return self.remote.memory("delete", kind, str(int(row_id)))
 
+    def _backup_once(self):
+        if not self._backed_up:                              # one safe copy of the database before this session's first change
+            self.remote.memory("backup")
+            self._backed_up = True
+
+    def add_fact(self, fact: str, importance: int = 3, core: bool = False):
+        self._backup_once()
+        args = ["add-fact", str(fact), "--importance", str(int(importance))] + (["--core"] if core else [])
+        return self.remote.memory(*args)
+
+    def edit_fact(self, fact_id: int, fact=None, importance=None, core=None):
+        self._backup_once()
+        args = ["edit-fact", str(int(fact_id))]
+        if fact is not None:
+            args += ["--fact", str(fact)]
+        if importance is not None:
+            args += ["--importance", str(int(importance))]
+        if core is not None:
+            args += ["--core", "1" if core else "0"]
+        return self.remote.memory(*args)
+
+    def add_observation(self, caption: str, labels: str = ""):
+        self._backup_once()
+        return self.remote.memory("add-observation", str(caption), "--labels", str(labels or ""))
+
+    def edit_observation(self, obs_id: int, caption=None, labels=None):
+        self._backup_once()
+        args = ["edit-observation", str(int(obs_id))]
+        if caption is not None:
+            args += ["--caption", str(caption)]
+        if labels is not None:
+            args += ["--labels", str(labels)]
+        return self.remote.memory(*args)
+
     def restore(self, trash_id: int):
         return self.remote.memory("restore", str(int(trash_id)))
 
@@ -249,6 +283,14 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.restore(int(body["trash_id"])))
                 if u.path == "/api/pictures/trash":
                     return self._json(app.trash_pictures(list(body["paths"])))
+                if u.path == "/api/facts/add":
+                    return self._json(app.add_fact(str(body["fact"]), int(body.get("importance", 3)), bool(body.get("core", False))))
+                if u.path == "/api/facts/edit":
+                    return self._json(app.edit_fact(int(body["id"]), body.get("fact"), body.get("importance"), body.get("core")))
+                if u.path == "/api/observations/add":
+                    return self._json(app.add_observation(str(body["caption"]), str(body.get("labels", ""))))
+                if u.path == "/api/observations/edit":
+                    return self._json(app.edit_observation(int(body["id"]), body.get("caption"), body.get("labels")))
                 if u.path == "/api/pictures/name":
                     return self._json(app.name_pictures(list(body["paths"]), str(body["name"])))
                 if u.path == "/api/pictures/move":
@@ -307,6 +349,22 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 function toast(msg,undo){$("#toastmsg").textContent=msg;undoFn=undo||null;$("#undo").style.display=undo?"":"none";$("#toast").style.display="flex";clearTimeout(timer);timer=setTimeout(()=>$("#toast").style.display="none",9000)}
 $("#undo").onclick=async()=>{if(undoFn){try{await undoFn();toast("Restored")}catch(e){toast("Could not restore: "+e.message)}load()}};
 function drawTabs(){const t=$("#tabs");t.replaceChildren();for(const [k,n] of TABS){const b=el("button","tab",n);b.setAttribute("role","tab");b.setAttribute("aria-selected",k===tab);b.onclick=()=>{tab=k;localStorage.setItem("g2tab",k);$("#q").value="";drawTabs();load()};t.append(b)}}
+function factTools(r){const d=el("div","");d.style.cssText="display:flex;gap:6px;align-items:center;flex:none";
+ const e=el("button","btn","Edit");e.onclick=async()=>{const t=prompt("Edit this fact",r.fact);if(t===null||!t.trim()||t.trim()===r.fact)return;const old=r.fact;
+  try{await api("/api/facts/edit",{id:r.id,fact:t.trim()});r.fact=t.trim();render();toast("Fact updated",async()=>{await api("/api/facts/edit",{id:r.id,fact:old});load()})}catch(x){toast("Failed: "+x.message)}};
+ const s=el("select");for(let i=1;i<=5;i++){const o=el("option","",String(i));o.value=i;if(i===r.importance)o.selected=true;s.append(o)}s.title="Importance (1-5)";
+ s.onchange=async()=>{try{await api("/api/facts/edit",{id:r.id,importance:+s.value});r.importance=+s.value}catch(x){toast("Failed: "+x.message)}};
+ const c=el("button","btn",r.core?"Core \u2713":"Core");c.title="Core facts are always told to Claude";
+ c.onclick=async()=>{try{await api("/api/facts/edit",{id:r.id,core:!r.core});r.core=r.core?0:1;render()}catch(x){toast("Failed: "+x.message)}};
+ d.append(e,s,c);return d}
+function obsTools(r){const d=el("div","");d.style.cssText="display:flex;gap:6px;align-items:center;flex:none";const e=el("button","btn","Edit");
+ e.onclick=async()=>{const t=prompt("Edit what G2 saw",r.caption);if(t===null||!t.trim())return;const l=prompt("Detector labels for it (optional, comma separated)",r.labels||"");if(l===null)return;const oc=r.caption,ol=r.labels||"";
+  try{await api("/api/observations/edit",{id:r.id,caption:t.trim(),labels:l});r.caption=t.trim();r.labels=l.trim();render();toast("Observation updated",async()=>{await api("/api/observations/edit",{id:r.id,caption:oc,labels:ol});load()})}catch(x){toast("Failed: "+x.message)}};
+ d.append(e);return d}
+function addObservationButton(){const b=el("button","btn","Add observation");b.onclick=async()=>{const t=prompt("What G2 saw (a sentence, for example: The dishwasher has a steel door with a black handle)");if(!t||!t.trim())return;const l=prompt("Detector labels for it (optional, comma separated)","");if(l===null)return;
+  try{const r=await api("/api/observations/add",{caption:t.trim(),labels:l});toast("Observation added",async()=>{await api("/api/delete",{kind:"observations",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
+function addFactButton(){const b=el("button","btn","Add fact");b.onclick=async()=>{const t=prompt("A fact for G2 to remember (a stable thing, for example: The dishwasher is next to the fridge)");if(!t||!t.trim())return;
+  try{const r=await api("/api/facts/add",{fact:t.trim()});toast("Fact added",async()=>{await api("/api/delete",{kind:"facts",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
 function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Trash; you can undo)";b.setAttribute("aria-label","Delete");b.onclick=fn;return b}
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
@@ -317,7 +375,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
   $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render()}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
   for(const g of Object.keys(groups)){list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
@@ -341,7 +399,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   if(tab==="exchanges"){main.append(el("div","",r.user_text),el("div","q",r.assistant_text),el("div","meta",r.ts+(r.actions?" · "+r.actions:"")))}
   else if(tab==="observations"){main.append(el("div","",r.caption),el("div","meta",r.ts+(r.labels?" · detector: "+r.labels:"")))}
   else{main.append(el("div","",r.fact),el("div","meta","#"+r.id+" · "+r.ts.slice(0,10)+(r.core?" · core":"")+" · importance "+r.importance))}
-  row.append(main,xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
+  row.append(main);if(tab==="facts")row.append(factTools(r));if(tab==="observations")row.append(obsTools(r));row.append(xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;drawTabs();load();
 </script></body></html>"""
