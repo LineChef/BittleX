@@ -18,6 +18,8 @@ import types
 from pathlib import Path
 from typing import Protocol
 
+from .tts import SPEAKING
+
 log = logging.getLogger("g2.stt")
 
 
@@ -85,6 +87,7 @@ class VoskSTT:
         self.last_speech_t = None
         self.last_info = {}
         peak, blocks, partials, warned = 0, 0, [], False
+        last_speaking = -1e9
         said_anything = False
         quiet_blocks = 0          # blocks since the partial transcript last changed
         last_partial = ""
@@ -105,6 +108,10 @@ class VoskSTT:
                     data = q.get(timeout=0.5)
                 except queue.Empty:
                     data = None
+                if SPEAKING.is_set():
+                    last_speaking = time.monotonic()
+                if data is not None and time.monotonic() - last_speaking < 0.8:
+                    continue                      # G2's own voice (a spoken alarm) is not the person's command (2026-10-08: "hi battery is low")
                 if data is not None:
                     blocks += 1
                     peak = max(peak, max(map(abs, array.array("h", data[: len(data) // 2 * 2])), default=0))

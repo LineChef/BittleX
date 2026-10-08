@@ -12,8 +12,11 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import time
 from pathlib import Path
 from typing import Protocol
+
+from .tts import SPEAKING
 
 log = logging.getLogger("g2.wake")
 
@@ -42,6 +45,7 @@ def _parse_phrases(phrase: str | list[str]) -> list[str]:
     return list(seen)
 
 
+_SELF_HEARING_TAIL_S = 0.8                # the speaker's echo lingers a moment after the speech ends
 _QUEUE_BLOCKS = 200                     # about 50 s of audio (4000-sample blocks at 16 kHz)
 
 
@@ -114,13 +118,19 @@ class VoskWakeWord:
         except queue.Empty:
             pass
         rec = self._Recognizer(self._model, self._rate, self._grammar)
+        last_speaking = 0.0
         while True:
+            if SPEAKING.is_set():                      # G2's own voice must not wake him (2026-10-08: the spoken battery alarm triggered "hey buddy")
+                last_speaking = time.monotonic()
             try:
                 data = q.get(timeout=2.0)
             except queue.Empty:
                 if not getattr(self._stream, "active", True):
                     self._ensure_stream()
                     q = self._q
+                continue
+            if time.monotonic() - last_speaking < _SELF_HEARING_TAIL_S:
+                rec = self._Recognizer(self._model, self._rate, self._grammar)       # drop what was heard while (and just after) G2 spoke
                 continue
             if rec.AcceptWaveform(data):
                 heard = json.loads(rec.Result()).get("text", "")
