@@ -24,6 +24,8 @@ Recognition of a bonded person after an absence fires an excited hop in any of
 """
 from __future__ import annotations
 
+import logging
+
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -56,6 +58,9 @@ try:  # CliffGuard is optional -- the driver runs fine with no edge sensing
 except Exception:  # pragma: no cover - vision extras missing
     CliffAction = None  # type: ignore
     EdgeReading = object  # type: ignore
+
+
+_chirp_log = logging.getLogger("g2.chirp")
 
 
 class EffectKind(Enum):
@@ -340,9 +345,14 @@ class BehaviorDriver:
     def _chirp(self, mood: ChirpMood, now: float, reason: str = "") -> list:
         """A rate-limited emotive chirp, as a (possibly empty) effect list.
         One shared Chirper across all trigger points -> at most one buzz/tick."""
-        if self.chirper is None or not self.chirper.ready(now):
+        if self.chirper is None:
+            _chirp_log.info("chirp %s NOT played (%s): chirps are off", mood.value, reason or "-")
+            return []
+        if not self.chirper.ready(now):
+            _chirp_log.info("chirp %s NOT played (%s): inside the %.1f s cooldown", mood.value, reason or "-", self.chirper._gap)
             return []
         self.chirper.fired(now)
+        _chirp_log.info("chirp %s asked for (%s)", mood.value, reason or "-")
         return [Effect(EffectKind.CHIRP, mood, reason or mood.value)]
 
     # --- event fan-out -----------------------------------------------------

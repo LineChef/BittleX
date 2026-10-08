@@ -132,7 +132,9 @@ class DriverBindings:
             fn = self.actuator and _call(self.actuator, "perform")
             if not fn:
                 return self._miss("chirp")
-            fn(opencat.beep(CHIRP[mood]))
+            tone = opencat.beep(CHIRP[mood])
+            logging.getLogger("g2.chirp").info("chirp %s sent to the BiBoard: %s", mood.value, tone)
+            fn(tone)
             return f"chirp:{mood.value}"
         if k is EffectKind.POWER:
             fn = self.power and _call(self.power, "set_profile", "profile", "apply")

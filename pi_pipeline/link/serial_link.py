@@ -11,6 +11,8 @@ import collections
 import logging
 import time
 
+from . import noise_log  # noqa: E402
+
 log = logging.getLogger("g2.link")
 
 # Line prefixes of the firmware's continuous IMU stream (`gP` -> `imu.h`
@@ -123,6 +125,7 @@ class SerialLink:
         try:
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
+            noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             if settle:
                 time.sleep(settle)
             if read_reply:
