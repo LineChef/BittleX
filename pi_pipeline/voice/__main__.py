@@ -94,7 +94,7 @@ def main() -> None:
         if link is not None and (settings.stand_guard or settings.balance_off_idle):
             from ..gait.stand_guard import StandGuard
             guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
-                               balance_off_idle=settings.balance_off_idle,
+                               balance_off_idle=settings.balance_off_idle, reassert_s=settings.stand_reassert_s,
                                reenable_after_s=None if settings.balance_off_idle else 300.0).start()
             actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
@@ -117,6 +117,8 @@ def main() -> None:
         audible = voice and tts_mode != "print"
         battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
+        if watcher is not None:
+            actuator.on_before_gait = watcher.read_before          # a reading right before any walk starts (there is no idle timer)
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
         camera = None
@@ -165,6 +167,8 @@ def main() -> None:
         if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
             stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
         def on_event(**kw):
+            if watcher and kw.get("wake_word"):
+                watcher.check_now()                   # a battery reading when G2 is woken (there is no idle timer: each `P` makes the board tick)
             if watcher_c and kw.get("told_sleep"):
                 watcher_c.nudge()
             if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":

@@ -171,7 +171,7 @@ class Settings:
     # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns
     explore_handover: bool = field(default_factory=lambda: _env("G2_EXPLORE_HANDOVER", "1") not in ("0", "false", "no"))
     explore_roam_s: float = field(default_factory=lambda: _env_float("G2_EXPLORE_ROAM_S", 600.0))
-    battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 60.0))
+    battery_poll_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_POLL_S", 1800.0))   # the idle backstop: a reading every 30 min (was 60 s; every `P` makes the BiBoard tick, measured 2026-10-08). Readings are also taken at start, at the wake word and before a walk, and the walk loop reads the pack every 5 s itself; 0 = no idle timer
     # G2's pack voltage history, one line per `battery_log_every_s` (empty path = off)
     battery_log: str = field(default_factory=lambda: _env("G2_BATTERY_LOG", "~/.local/share/g2/battery_voltage.csv"))
     battery_log_every_s: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOG_EVERY_S", 300.0))
@@ -187,6 +187,7 @@ class Settings:
     # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.
     balance_off_idle: bool = field(default_factory=lambda: _env("G2_BALANCE_OFF_IDLE", "1") not in ("0", "false", "no"))
     stand_guard: bool = field(default_factory=lambda: _env("G2_STAND_GUARD", "1") not in ("0", "false", "no"))
+    stand_reassert_s: float = field(default_factory=lambda: _env_float("G2_STAND_REASSERT_S", 600.0))   # how often the guard re-sends `gb` while idle (was 60: every `gb` makes the BiBoard tick, measured 2026-10-08); the wobble guard still reacts at once
     # Describe what G2 sees: when the user asks, a picture from G2's camera goes to Claude with that message (never saved or kept).
     vision_describe: bool = field(default_factory=lambda: _env("G2_VISION_DESCRIBE", "1") not in ("0", "false", "no"))
     # Sounds that say the camera is in use: a shutter chirp per picture, a rising chirp when continuous capture starts (repeated as a

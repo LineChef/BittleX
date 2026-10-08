@@ -136,7 +136,7 @@ def main() -> None:
 
         from .gait.stand_guard import StandGuard
         guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
-                           balance_off_idle=True, reenable_after_s=None).start()
+                           balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None).start()
 
         # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
         # the walk loop checks the voltage under load)

@@ -94,6 +94,7 @@ class SerialActuator:
         self._gait_active = False     # a looping gait was started and not yet stopped
         # firmware gyro balance is only wanted around a firmware gait: `gB` just before one, `gb` just after (see gait/stand_guard.py)
         self._balance_off_idle = balance_off_idle
+        self.on_before_gait = None    # optional callback: a continuous gait or a policy walk is about to start (the battery watcher takes a reading)
         self.on_command = None        # optional callback: called whenever a command is sent (the stand guard opens a quiet window)
 
         self._opencat = opencat
@@ -134,6 +135,11 @@ class SerialActuator:
         if self.on_command:
             self.on_command()
         continuous = skills.SKILLS[skill_name].continuous
+        if continuous and self.on_before_gait:
+            try:
+                self.on_before_gait()
+            except Exception:  # noqa: BLE001 -- a battery check must never stop a walk
+                log.debug("before-gait callback raised", exc_info=True)
         if skill_name == "walk_forward" and self._policy_walker is not None:
             duration = skills.clamp_seconds(seconds)
             if self._max_continuous_s > 0:

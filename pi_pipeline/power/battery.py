@@ -111,8 +111,11 @@ class BatteryWatcher:
         self._read = read_voltage
         self._on_alert = on_alert
         self.monitor = monitor or BatteryMonitor()
-        self._poll_s = poll_s
+        self._poll_s = poll_s               # the slow backstop timer while idle (G2_BATTERY_POLL_S, default 30 min: every `P` makes the BiBoard tick); <= 0 = no timer at all. Readings are also taken at start and whenever `check_now()` / `read_before()` ask (G2 wakes, a walk is about to start)
+        self._min_gap_s = 20.0              # check_now() twice inside this gap makes one read
+        self._last_read = -1e9
         self._stop = threading.Event()
+        self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self.last_volts: float | None = None
 
@@ -148,12 +151,33 @@ class BatteryWatcher:
         except Exception:  # noqa: BLE001 -- the history must never stop the watch
             log.debug("battery record raised", exc_info=True)
 
+    def check_now(self) -> None:
+        """Ask for a reading soon (at wake-up, before a walk): done on the watcher's thread so the caller is not held up by the serial read."""
+        self._wake.set()
+
+    def read_before(self) -> None:
+        """A reading taken right now on the caller's thread (before a gait starts, while the line is still quiet), unless one was taken in the last `_min_gap_s`."""
+        if self._clock() - self._last_read < self._min_gap_s:
+            return
+        self._last_read = self._clock()
+        self.poll_once()
+
     def start(self) -> "BatteryWatcher":
         def _run() -> None:
-            while True:
-                self.poll_once()
-                if self._stop.wait(self._poll_s):
-                    return
+            first = True
+            next_due = 0.0
+            while not self._stop.is_set():
+                woken = self._wake.wait(0 if first else 1.0)
+                if woken:
+                    self._wake.clear()
+                now = self._clock()
+                due = self._poll_s > 0 and now >= next_due
+                asked = woken and now - self._last_read >= self._min_gap_s
+                if first or due or asked:
+                    first = False
+                    self._last_read = now
+                    self.poll_once()
+                    next_due = now + self._poll_s if self._poll_s > 0 else 0.0
         self._thread = threading.Thread(target=_run, name="battery-watch", daemon=True)
         self._thread.start()
         return self
