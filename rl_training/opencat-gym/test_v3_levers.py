@@ -615,3 +615,45 @@ def test_world2_moves_the_payload_forward_only_when_asked(monkeypatch):
     monkeypatch.setenv("G2_WORLD", "1")
     if not G.world2():                                    # world 1 (no trained/v3_world2 marker file): the payload stays where it was
         assert "G2E_PAYLOAD_SHIFT_X" not in G.env_for()
+
+
+def test_a_failed_k3_is_repaired_by_leave_one_out_newest_lever_first(monkeypatch, tmp_path):
+    import os
+    import phase_v3 as V
+    monkeypatch.chdir(tmp_path)
+    os.makedirs("trained")
+    monkeypatch.setattr(V, "RESULTS", str(tmp_path / "trained" / "results.json"))
+    monkeypatch.setattr(V, "log", lambda *a, **k: None)
+    for t in ("v3_k3", "v3_s1_mirror", "v3_k3_wo_yaw_damp", "v3_k3_wo_smooth"):
+        open(f"trained/{t}_ppo.zip", "wb").write(t.encode())
+    levers = ["mirror", "smooth", "yaw_damp"]
+    results = {"v3_k3": {"kind": "combo", "levers": levers, "passed": False, "why": ["x"], "result_file": "trained/a.json"},
+               "v3_s1_mirror": {"kind": "screen", "levers": ["mirror"], "passed": True, "why": [], "result_file": "trained/m.json"}}
+    ran = []
+    verdict = {"v3_k3_wo_yaw_damp": False, "v3_k3_wo_smooth": True}
+
+    def fake_train(job, res):
+        ran.append(job["tag"])
+        return True
+
+    def fake_finish(job, res, ctrl):
+        res[job["tag"]] = {"kind": "combo", "levers": job["levers"], "passed": verdict[job["tag"]], "why": [] if verdict[job["tag"]] else ["still bad"], "result_file": "trained/b.json"}
+        return True
+
+    monkeypatch.setattr(V, "train", fake_train)
+    monkeypatch.setattr(V, "finish", fake_finish)
+    assert V.repair_k3({"levers": levers}, results, None)
+    assert ran == ["v3_k3_wo_yaw_damp", "v3_k3_wo_smooth"]                       # yaw_damp (newest) first, then smooth; mirror is never tried first
+    assert results["v3_k3"]["adopted_from"] == "v3_k3_wo_smooth" and results["v3_k3"]["levers"] == ["mirror", "yaw_damp"] and results["v3_k3"]["passed"]
+    assert open("trained/v3_k3_ppo.zip", "rb").read() == b"v3_k3_wo_smooth" and os.path.exists("trained/v3_k3_failed_ppo.zip")
+    # nothing passes: the mirror-only fallback is adopted
+    results["v3_k3"] = {"kind": "combo", "levers": levers, "passed": False, "why": ["x"], "result_file": "trained/a.json"}
+    for t in list(results):
+        if t.startswith("v3_k3_wo_"):
+            del results[t]
+    verdict.update({"v3_k3_wo_yaw_damp": False, "v3_k3_wo_smooth": False, "v3_k3_wo_mirror": False})
+    open("trained/v3_s1_mirror_ppo.zip", "wb").write(b"mirror")
+    ran.clear()
+    assert V.repair_k3({"levers": levers}, results, None)
+    assert results["v3_k3"]["adopted_from"] == "v3_s1_mirror" and results["v3_k3"]["levers"] == ["mirror"]
+    assert len(ran) == V.REPAIR_MAX_RUNS

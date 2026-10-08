@@ -360,6 +360,53 @@ def run_final(job, results):
     return True
 
 
+REPAIR_MAX_RUNS = 3
+SUSPECT_ORDER = ("yaw_damp", "no_heading", "smooth", "balance_pbrs", "servo_feas", "touchdown", "mirror")      # least tested first; mirror passed in three seeds, so it is dropped last
+
+
+def _adopt_as_k3(src_tag, results, why):
+    """Make `src_tag` (a passing variant, or the passing S1 screen) the K3 the rest of the queue uses: its checkpoint is copied over trained/v3_k3_ppo.zip (the failed one is kept as
+    v3_k3_failed_ppo.zip) and its levers / result file become K3's, so the pre-20M report, the 20M's lever set and its gait-check baseline all follow it."""
+    r = results[src_tag]
+    failed = dict(results[K3])
+    src, dst = f"trained/{src_tag}_ppo.zip", f"trained/{K3}_ppo.zip"
+    if os.path.exists(dst) and not os.path.exists(f"trained/{K3}_failed_ppo.zip"):
+        shutil.copy(dst, f"trained/{K3}_failed_ppo.zip")
+    shutil.copy(src, dst)
+    results[K3] = dict(r, adopted_from=src_tag, failed_k3_why=failed.get("why"), failed_k3_levers=failed.get("levers"), passed=True, why=[])
+    save(RESULTS, results)
+    log(f"K3 REPAIRED: {why}; using {src_tag} with levers {r['levers']} as K3 (the 20M follows it)")
+
+
+def repair_k3(job, results, ctrl):
+    """K3 (every lever that passed, together) failed its gate. Unattended: train K3 minus one lever at a time, the least tested lever first, and adopt the first variant that passes. If none
+    of the first REPAIR_MAX_RUNS passes, fall back to the best screen that passed alone (S1 mirror). Returns False only if a run halts (the watchdog restarts the runner and this resumes)."""
+    levers = list(job.get("levers") or results[K3]["levers"])
+    order = sorted(levers, key=lambda lv: SUSPECT_ORDER.index(lv) if lv in SUSPECT_ORDER else -1)
+    ran = 0
+    for lv in order:
+        rest = [x for x in levers if x != lv]
+        if not rest or ran >= REPAIR_MAX_RUNS:
+            continue
+        tag = f"{K3}_wo_{lv}"
+        if tag not in results:
+            sub = dict(kind="combo", tag=tag, levers=rest, desc=f"K3 without {lv} (leave-one-out)", repair=True)
+            train(sub, results)
+            if not finish(sub, results, ctrl):
+                return False
+        ran += 1
+        if results[tag].get("passed"):
+            _adopt_as_k3(tag, results, f"removing {lv} fixed it")
+            return True
+        log(f"{tag}: still failing without {lv}: {results[tag].get('why')}")
+    for fb in ("v3_s1_mirror",):
+        if results.get(fb, {}).get("passed") and os.path.exists(f"trained/{fb}_ppo.zip"):
+            _adopt_as_k3(fb, results, "no leave-one-out variant passed; falling back to the best lever that passed alone")
+            return True
+    log("K3 repair found nothing that passes and no fallback exists: DECISION NEEDED")
+    return False
+
+
 def run_queue():
     queue = load(QUEUE, None)
     if queue is None:
@@ -401,6 +448,11 @@ def run_queue():
                     log(f"PAUSE {job['name']}: waiting for the user (touch trained/v3_go_{job['name']} to continue). {job.get('note', '')}")
                     job["announced"] = True
                 time.sleep(60)
+            continue
+        if kind == "combo" and tag == K3 and tag in results and results[tag].get("passed") is False and not results[tag].get("adopted_from"):
+            log("K3 is recorded as failed and not yet repaired: resuming the repair")
+            if not repair_k3(job, results, ctrl):
+                return
             continue
         if tag in results:
             if kind == "stage":
@@ -447,19 +499,10 @@ def run_queue():
                 log(f"{tag} STAGE GATE FAILED {why}: stopping for a decision (retry with a higher LR, or drop the stage)")
                 return
             last_stage = tag
-        if kind == "combo" and not results[tag]["passed"]:
-            log(f"K3 FAILED {results[tag]['why']}: running the two halves to find the group (K1 = passing yaw levers, K2 = passing smoothness levers)")
-            for tg, grp in (("v3_k1", YAW_LEVERS), ("v3_k2", SMOOTH_LEVERS)):
-                sub = [lv for lv in job["levers"] if lv in grp]
-                if not sub or sub == job["levers"] or tg in results:
-                    continue
-                half = dict(kind="combo", tag=tg, levers=sub, desc=f"{tg}: half of K3")
-                train(half, results)
-                if not finish(half, results, ctrl):
-                    return
-            log("DECISION NEEDED: compare v3_k1 / v3_k2 with v3_k3 (python phase_v3.py status), drop the lever whose removal recovers it "
-                "(one 3M run per suspect), then edit trained/v3_queue.json / the lever list and restart the runner")
-            return
+        if kind == "combo" and tag == K3 and not results[tag]["passed"]:
+            log(f"K3 FAILED {results[tag]['why']}: finding the term that spoils the combination (leave-one-out, newest levers first, at most {REPAIR_MAX_RUNS} runs, then the mirror-only fallback)")
+            if not repair_k3(job, results, ctrl):
+                return
     log("QUEUE COMPLETE")
 
 
