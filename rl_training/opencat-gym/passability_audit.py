@@ -23,7 +23,7 @@ CHILD = r'''
 import json, os, sys
 sys.path.insert(0, %(here)r)
 import g2_profile
-env = g2_profile.env_for("mirror", stage="s6_full_strength")
+env = g2_profile.next_final_env()          # the parked fresh final's own training environment (caps included): what is audited is what trains
 env.update({"G2E_SCALE_ALL_HAZARDS": "1", "G2E_ADAPTIVE_LEVEL": "1", "G2E_CATEGORY_LEVELS": "1", "G2E_LEVEL_START": "0", "G2E_RECORD_EVERY": "0"})
 env.update(%(extra)r)
 g2_profile.set_environ(env)
@@ -231,7 +231,7 @@ SCENE_CHILD = r'''
 import json, sys
 sys.path.insert(0, %(here)r)
 import g2_profile
-env = g2_profile.env_for("mirror", stage="s6_full_strength")
+env = g2_profile.next_final_env()          # the parked fresh final's own training environment (caps included): what is audited is what trains
 env.update({"G2E_SCALE_ALL_HAZARDS": "1", "G2E_ADAPTIVE_LEVEL": "1", "G2E_CATEGORY_LEVELS": "1", "G2E_LEVEL_START": "0", "G2E_RECORD_EVERY": "0"})
 env.update(%(force)r)
 g2_profile.set_environ(env)

@@ -36,7 +36,11 @@ _ZERO = ("RANDOM_FRICTION", "RANDOM_MASS", "RANDOM_GYRO", "RANDOM_PUSH", "RANDOM
          "TORQUE_CUTBACK", "LEDGE_HEIGHT", "LEDGE_PROB", "LEDGE_DIR", "RUBBLE", "RUBBLE_PROB",
          "CARPET", "CARPET_SWELL", "CARPET_SOFT",
          # new course mechanics (2026-09-23) -- same leak risk as everything else here
-         "SURFACE_TRANSITION_PROB", "SURFACE_TRANSITION_STEP_M", "RUG_SLIDE_PROB", "SNAG_OBSTACLE_PROB")
+         "SURFACE_TRANSITION_PROB", "SURFACE_TRANSITION_STEP_M", "RUG_SLIDE_PROB", "SNAG_OBSTACLE_PROB",
+         # 2026-10-08 review fix: the rough heightfield was never zeroed (only slope cells did it), so with DR_EVAL_FULL about 30% of the episodes of nearly every cell --
+         # "Flat, calm", the 12.5 s calm walk, every ledge cell (no ledge at all then: a rough floor carries none), rubble, boxes, snags, shoves, carpet, the fault cells --
+         # ran on a +-1.1 cm bumpy floor. A cell that wants it sets ROUGH_TERRAIN itself.
+         "ROUGH_TERRAIN")
 
 # (id, tier, skill, human label, {env knob overrides})
 # 11 categories / 21 cells, one-to-one with the redesigned staged training

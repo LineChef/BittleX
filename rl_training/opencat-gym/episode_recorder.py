@@ -37,12 +37,30 @@ class RecordingWrapper(gym.Wrapper):
         try:
             if self._every > 0 and self._pyrng.random() < 1.0 / self._every:
                 u = self.env.unwrapped
+                if kw.get("seed") is not None:                 # the env seeds numpy itself at reset (SB3 passes the run seed on the first reset): record the state it will start from
+                    np.random.seed(int(kw["seed"]) % (2 ** 32))
+                import opencat_gym_env as _E
+                # 2026-10-08 review fix: the shove multiplier (adaptive per env) and the live caps (trained/<tag>_caps.json) also shape the episode; without them a replay
+                # differed whenever a shove landed or a cap had been moved
                 self._rec = {"rng": np.random.get_state(), "ramp_steps": getattr(u, "_train_total_steps", None),
                              "levels": dict(getattr(u, "_levels", {})), "len_ep": int(getattr(u, "_len_ep", 0)),
-                             "forced_cmd": getattr(u, "_forced_cmd", None), "actions": [], "t0": time.time()}
+                             "forced_cmd": getattr(u, "_forced_cmd", None), "push_curr": float(getattr(u, "_push_curr", 0.55)),
+                             "caps": _E.current_caps(), "actions": [], "ramp_events": [], "t0": time.time(),
+                             "frontier": {"w": {h: [float(x) for x in w] for h, w in getattr(u, "_fr_w", {}).items()},
+                                          "comfort": {h: int(c) for h, c in getattr(u, "_fr_comfort", {}).items()}}}
         except Exception:  # noqa: BLE001 -- recording must never break training
             self._rec = None
         return self.env.reset(**kw)
+
+    def set_ramp_steps(self, total_steps):
+        """The trainer's ramp update (train.py RampSync, every rollout) can land MID-episode and moves the penalty scale from that step on: record when, so a replay
+        applies it at the same step (2026-10-08: 4 of 80 recorded control episodes differed in their final reward without this)."""
+        self.env.unwrapped.set_ramp_steps(total_steps)
+        if self._rec is not None:
+            try:
+                self._rec["ramp_events"].append([len(self._rec["actions"]), float(total_steps)])
+            except Exception:  # noqa: BLE001
+                pass
 
     def step(self, action):
         out = self.env.step(action)
@@ -65,6 +83,7 @@ class RecordingWrapper(gym.Wrapper):
         path = os.path.join(self._dir, f"ep_{time.strftime('%Y%m%d_%H%M%S')}_{os.getpid()}_{self._n}.npz")
         _, key, pos, has_gauss, cached = rec["rng"]            # np.random.get_state() = (name, 624-word key, position, has_gauss, cached_gaussian)
         meta = {"env": _env_vars(), "ramp_steps": rec["ramp_steps"], "levels": rec["levels"], "len_ep": rec["len_ep"], "forced_cmd": rec["forced_cmd"],
+                "push_curr": rec.get("push_curr"), "caps": rec.get("caps"), "frontier": rec.get("frontier"), "ramp_events": rec.get("ramp_events", []),
                 "steps": len(rec["actions"]), "terminated": bool(out[2]), "truncated": bool(out[3]), "final_reward": float(out[1]),
                 "focus": getattr(u, "_focus", None), "d": {c: float(getattr(u, "_d_" + c, 0.0)) for c in ("terrain", "ledge", "slope", "fault")},
                 "slope_rp": [float(x) for x in getattr(u, "_slope_rp", (0.0, 0.0))], "slope_targeted": bool(getattr(u, "_slope_targeted", False)),

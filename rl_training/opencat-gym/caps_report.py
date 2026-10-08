@@ -18,7 +18,29 @@ import re
 import sys
 import time
 
-NOMINAL = {"sidehill_deg": 15.0, "uphill_deg": 24.0, "downhill_deg": 15.4, "ledge_m": 0.035}      # the largest size each hazard reaches at level 1.0 without a cap (opencat_gym_env)
+NOMINAL = {"sidehill_deg": 15.0, "uphill_deg": 24.0, "downhill_deg": 15.4, "ledge_m": 0.035}      # the largest size each hazard reaches at level 1.0 without a cap, for the OLD default course; see nominal_for()
+
+
+def nominal_for(tag=None):
+    """The largest size each capped hazard reaches at level 1.0 without a cap, in THIS run's course (2026-10-08 review fix: the table above assumed the old 14 deg random tilt,
+    so for the next fresh final -- 10 deg x 1.10 hard levels = 11 deg -- the descent cap was reported as binding from level 0.65 when it binds from 0.91).
+    Side-hills and climbs come from the targeted slopes (3-15 deg, 12-24 deg x level); descents from the random tilt (SLOPE_MAX_DEG x HARD_SCALE x level); ledges from LEDGE_HEIGHT."""
+    try:
+        import g2_profile
+        env = None
+        if tag and os.path.exists("trained/v3_queue.json"):
+            for job in json.load(open("trained/v3_queue.json")):
+                if job.get("tag") == tag:
+                    if not isinstance(job.get("levers"), list):           # "K3": the levers the combined recipe kept
+                        res = json.load(open("trained/v3_results.json")) if os.path.exists("trained/v3_results.json") else {}
+                        job = dict(job, levers=res.get("v3_k3", {}).get("levers", ["mirror"]))
+                    env = g2_profile.env_for_job(job)
+        env = env or g2_profile.next_final_env()
+        hard = float(env.get("G2E_HARD_SCALE", "1") or 1)
+        tilt = float(env.get("G2E_SLOPE_MAX_DEG", "14") or 14) * hard
+        return {"sidehill_deg": max(15.0, tilt), "uphill_deg": max(24.0, tilt), "downhill_deg": tilt, "ledge_m": float(env.get("G2E_LEDGE_HEIGHT", "0.035") or 0.035)}
+    except Exception:  # noqa: BLE001 -- fall back to the old table rather than fail the review
+        return dict(NOMINAL)
 CATEGORY_OF = {"sidehill_deg": "slope", "uphill_deg": "slope", "downhill_deg": "slope", "ledge_m": "ledge"}
 STEP = {"sidehill_deg": 2.0, "uphill_deg": 2.0, "downhill_deg": 2.0, "ledge_m": 0.005}
 LIMIT = {"sidehill_deg": 15.0, "uphill_deg": 24.0, "downhill_deg": 15.4, "ledge_m": 0.037}       # a cap never moves above the course's own design size
@@ -38,19 +60,20 @@ def parse(lines):
     return probes
 
 
-def verdicts(probes, caps):
+def verdicts(probes, caps, nominal=None):
+    nominal = nominal or NOMINAL
     out = {}
     for key, cap in caps.items():
-        if key not in NOMINAL or not cap:
+        if key not in nominal or not cap:
             continue
         cat = CATEGORY_OF[key]
         recent = [p["cats"][cat] for p in probes[-WINDOW:] if cat in p["cats"]]
-        binding_level = cap / NOMINAL[key]
+        binding_level = cap / nominal[key]
         if len(recent) < WINDOW:
             out[key] = dict(cap=cap, binding_level=binding_level, verdict="TOO EARLY", why=f"only {len(recent)} probes so far")
             continue
         level = recent[-1]["level"]
-        rels = [r["raw"] for r in recent]             # the probe score relative to the policy's clean-floor score (the raw value the up/down thresholds use)
+        rels = [r["rel"] for r in recent]             # the probe score RELATIVE to the policy's clean-floor score: what the curriculum's up/down thresholds use (2026-10-08 review fix: this read the raw score)
         binds = level >= binding_level - 1e-9
         if binds and all(x >= GOOD for x in rels):
             v, why = "CAP TOO LOW", f"level {level:.2f} is at/over the binding level {binding_level:.2f} and the last {WINDOW} probes were all >= {GOOD}: raise it one step"
@@ -78,7 +101,7 @@ def report(tag):
     caps = json.load(open(caps_path)) if os.path.exists(caps_path) else {}
     steps = probes[-1]["steps"] if probes else 0
     print(f"{tag}: {len(probes)} probes, last at {steps:,} steps; caps {caps or '(none yet)'}")
-    for key, v in verdicts(probes, caps).items():
+    for key, v in verdicts(probes, caps, nominal_for(tag)).items():
         new = suggest(key, v["cap"], v["verdict"])
         move = f"  -> suggest {new:g}" if new != v["cap"] else ""
         print(f"  {key:13s} cap {v['cap']:g}: {v['verdict']:12s} {v['why']}{move}")

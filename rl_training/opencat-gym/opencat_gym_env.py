@@ -890,6 +890,22 @@ LENGTH_HEADING_TOL_DEG = _g2e("LENGTH_HEADING_TOL_DEG", 30.0)
 LONG_RUN_PUSH = _g2e("LONG_RUN_PUSH", 0.0)
 CATS = ("terrain", "ledge", "slope", "fault") + (("length",) if LENGTH_LEVEL else ())
 CATEGORY_OVERRIDE = {}                          # tests / audits: {"slope": 0.8, ...} pins those categories (the others get 0) for every reset
+# CATEGORY_FORCE (2026-10-08 review fix): with CATEGORY_OVERRIDE set, every pinned category's hazard is PRESENT in every episode (its per-episode chance is treated as 1).
+# Without it a probe of a category was mostly a clean floor: with the next-20M course a "ledge" probe had a ledge in 24% of its episodes, a "fault" probe a fault in 42%,
+# a "slope" probe a slope of 5 deg or more in 60%, so a policy that failed EVERY ledge still scored about 0.76 of its clean-floor score (never demoted, promoted after a few
+# lucky passes). train.py's Curriculum and benchmark_v4's ladder set it; training episodes never do. Forced slopes are the targeted kind (side-hill, climb or descent).
+CATEGORY_FORCE = False
+# The forward commands a probe walks at (the training command bands without stand and backward: those never reach a hazard, which is always placed ahead of the robot).
+PROBE_CMD_BANDS = ((0.32, 0.08, 0.12), (0.20, 0.04, 0.055), (0.18, 0.115, CMD_FWD_MAX))      # (weight, low, high): cruise, creep, fast
+
+
+def probe_command(seed: int) -> float:
+    """The forward command of probe episode `seed` (the same for the clean-floor run and every category, so their scores are compared on the same walk)."""
+    rng = np.random.RandomState(int(seed) % (2 ** 31))
+    bands = ((0.58, 0.08, 0.12), (0.25, 0.04, 0.055)) if CMD_BANDS == "forward" else PROBE_CMD_BANDS      # the training run's own forward bands
+    w = np.array([b[0] for b in bands])
+    band = bands[int(rng.choice(len(bands), p=w / w.sum()))]
+    return float(rng.uniform(band[1], band[2]))
 LEVEL_PROGRESS_MIN = _g2e("LEVEL_PROGRESS_MIN", 0.5)   # an episode only counts toward a level-up if it also covered this fraction of the commanded distance (standing still never falls)
 SCALE_ALL_HAZARDS = _g2e("SCALE_ALL_HAZARDS", False)
 # Phase 1 calibration knobs (sim -> G2). Defaults reproduce the current behaviour exactly.
@@ -897,6 +913,44 @@ SCALE_ALL_HAZARDS = _g2e("SCALE_ALL_HAZARDS", False)
 #   lateral friction (0 = the URDF's).   MOTOR_FORCE: joint motor force limit in N*m (0.2 now; 0.5 while recovering is unchanged).
 #   SERVO_KP / SERVO_KD: >0 sets the position / velocity gains of the joint motors (0 = pybullet's defaults).
 GROUND_FRICTION = _g2e("GROUND_FRICTION", 1.0)
+FIX_PAW_VEL = _g2e("FIX_PAW_VEL", False)        # 2026-10-08 review: slip / clearance penalties weighted by the paw's horizontal velocity (as intended), not its x position
+# --- 2026-10-08 training upgrade (docs/plan-detail/handoff-2026-10-08.md section 12). Every flag defaults OFF, so older checkpoints and scripts replay unchanged. ---
+# CMD_BANDS "forward": no backward commands (G2 walks backward with the firmware `bk` skill; the Pi never sends the policy a negative command) and no unreachable fast band
+#   (the gait tops out ~0.095 m/s): stand 17% (unchanged), creep 0.04-0.055 25%, cruise 0.08-0.12 58%. "" = the G4 bands.
+CMD_BANDS = _g2e("CMD_BANDS", "")
+# IMU_NOISE_PER_FRAME: with IMU_HOLD_STEPS, draw the observation noise once per held IMU frame (G2's error is fixed for the whole 0.2 s frame) instead of every control step.
+IMU_NOISE_PER_FRAME = _g2e("IMU_NOISE_PER_FRAME", False)
+# HAZARD_EP_LEN > 0: an episode whose focus is a hazard (frontier focus, or a terrain / ledge / slope focus category) runs this many steps, and the scattered obstacles
+#   spread over a proportionally longer stretch, so the robot spends more of the episode in contact with the hazard.
+HAZARD_EP_LEN = _g2e("HAZARD_EP_LEN", 0)
+# IMITATION_ACTUAL: the imitation reward compares the MEASURED joint angles with wkF (does G2 actually walk the gait?). Off = the commanded joints, which in residual mode
+#   is exp(-0.15 sum(action^2)): a constant alive bonus plus a residual-size penalty (2026-10-08 recipe evaluation).
+IMITATION_ACTUAL = _g2e("IMITATION_ACTUAL", False)
+# PRIV_OBS: PRIV_DIM privileged values appended to the observation for the CRITIC only (train.py zeroes them for the actor; export feeds zeros): the true orientation,
+#   rates, body velocity and height, foot contacts, and the episode's hazards. The policy's own inputs are unchanged, so nothing changes on the Pi.
+PRIV_OBS = _g2e("PRIV_OBS", False)
+PRIV_DIM = 22
+# FRONTIER: the per-hazard frontier curriculum (replaces the category levels, the probe and the static caps for training episodes; see FrontierPlan below).
+FRONTIER = _g2e("FRONTIER", False)
+# The hazards the frontier curriculum ranks, each with its own ladder of FR_BINS size bins from 0 to a PHYSICAL bound nothing ever exceeds (sim geometry, 2026-10-08:
+# static tip-over 24 deg side-hill / 37 deg climb-descent, slip 35 deg at friction 0.7, paw reach 57-61 mm with the +-30 deg residual). Sizes are degrees for the slopes,
+# metres for the ledges, and a severity multiplier of the course's own per-level sizes for the terrain hazards and the overheat cutback.
+FR_HAZARDS = ("sidehill", "climb", "descent", "ledge_up", "ledge_down", "rubble", "boxes", "rough", "snag", "cutback")
+FR_BOUND = {"sidehill": 22.0, "climb": 30.0, "descent": 30.0, "ledge_up": 0.055, "ledge_down": 0.06,
+            "rubble": 2.0, "boxes": 2.0, "rough": 2.0, "snag": 2.0, "cutback": 2.0}
+FR_BINS = 12
+# Share of ALL training episodes each hazard appears in (the user's shares, 2026-10-08; cutback keeps its old ~36%). Converted to per-episode chances after the anchors
+# and the exclusions (a rough floor carries no slope and no ledge) in FrontierPlan.
+FR_SHARE = {"rubble": 0.50, "boxes": 0.30, "slope": 0.20, "rough": 0.20, "snag": 0.20, "ledge": 0.20, "cutback": 0.36}
+FR_ANCHOR = 0.10          # hazard-free episodes: the success baseline every bin is judged against
+FR_COMBO = 0.25           # of the other episodes: every present hazard at frontier sizes, not counted
+FR_BACKGROUND_TILT_DEG = 2.0   # episodes without a slope hazard keep a small random tilt (the old background slope), never on anchors
+
+
+def frontier_default_weights():
+    """The sampling weights before any trainer feedback: the frontier at bin 0 (see train.FrontierCurriculum for the rule)."""
+    w = np.zeros(FR_BINS); w[0], w[1], w[2] = 0.55, 0.30, 0.15
+    return {h: w.copy() for h in FR_HAZARDS}
 FOOT_FRICTION = _g2e("FOOT_FRICTION", 0.0)
 MOTOR_FORCE = _g2e("MOTOR_FORCE", 0.2)
 SERVO_KP = _g2e("SERVO_KP", 0.0)
@@ -1004,6 +1058,11 @@ class OpenCatGymEnv(gym.Env):
         self._cat_score = {c: float("nan") for c in CATS}   # the last full window's mean score per category (for the log)
         self._cat_streak = {c: 0 for c in CATS}
         self._focus = None
+        self._fr_w = frontier_default_weights()        # FRONTIER: per-hazard bin weights (train.py FrontierCurriculum pushes them with set_frontier)
+        self._fr_comfort = {h: 0 for h in FR_HAZARDS}  # highest "comfortable" bin per hazard (non-focus hazards are drawn at or below it)
+        self._fz, self._fr_role, self._fr_focus = None, None, None
+        self._x_scale = 1.0
+        self._last_contact = [False] * 4
         self._d_terrain = self._d_ledge = self._d_slope = self._d_fault = 0.0
         self._d_length, self._long_run, self._len_sign, self._len_drift, self._len_ep, self._lvl_yaw0 = 0.0, False, 0, 0.0, 0, 0.0
         self._reflex_timer = 0   # scripted mid-walk push reflex (surv_r13)
@@ -1045,9 +1104,84 @@ class OpenCatGymEnv(gym.Env):
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
         _n_obs = (SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0) + (3 if CLIFF else 0)
-                  + (2 if HEADING_OBS else 0))
+                  + (2 if HEADING_OBS else 0) + (PRIV_DIM if PRIV_OBS else 0))
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
+
+    def set_frontier(self, payload) -> None:
+        """Trainer hook (train.py FrontierCurriculum): {"w": {hazard: [FR_BINS weights]}, "comfort": {hazard: bin}} for the next episodes."""
+        self._fr_w = {h: np.asarray(payload["w"][h], dtype=float) for h in FR_HAZARDS}
+        self._fr_comfort = {h: int(payload["comfort"][h]) for h in FR_HAZARDS}
+
+    def _use_frontier(self) -> bool:
+        return bool(FRONTIER and not CATEGORY_OVERRIDE and not DR_EVAL_FULL and LEVEL_FIXED < 0 and SLOPE_FIXED_RP is None)
+
+    def _fr_bin(self, h, frontier: bool) -> int:
+        if frontier:
+            w = self._fr_w[h]
+            return int(np.random.choice(FR_BINS, p=w / w.sum()))
+        return int(np.random.randint(self._fr_comfort[h] + 1))
+
+    def _frontier_plan(self) -> None:
+        """FRONTIER: decide this episode's hazards and their sizes (self._fz = {hazard: size}), its role (anchor / combo / focus) and, for a focus episode, the
+        (hazard, bin) whose outcome is reported. Shares follow FR_SHARE; a focus hazard is drawn from the frontier weights, the others from comfortable bins."""
+        self._fz, self._fr_focus = {}, None
+        if np.random.rand() < FR_ANCHOR:
+            self._fr_role = "anchor"
+            return
+        q = 1.0 - FR_ANCHOR
+        p_slope = min(1.0, FR_SHARE["slope"] / q)
+        p_rough = min(1.0, FR_SHARE["rough"] / q / max(1e-6, 1.0 - p_slope))
+        p_ledge = min(1.0, FR_SHARE["ledge"] / q / max(1e-6, 1.0 - FR_SHARE["rough"] / q))
+        present = []
+        if np.random.rand() < p_slope:
+            present.append(("sidehill", "climb", "descent")[int(np.random.randint(3))])
+        elif np.random.rand() < p_rough:
+            present.append("rough")
+        if "rough" not in present and np.random.rand() < p_ledge:
+            present.append("ledge_up" if np.random.rand() < 0.5 else "ledge_down")
+        for h in ("rubble", "boxes", "snag", "cutback"):
+            if np.random.rand() < min(1.0, FR_SHARE[h] / q):
+                present.append(h)
+        combo = np.random.rand() < FR_COMBO
+        focus = None
+        if present and not combo:                  # the focus is drawn inversely to each hazard's share, so rare hazards (a ledge direction: 10%) gather evidence as fast as common ones
+            _share = {"sidehill": FR_SHARE["slope"] / 3, "climb": FR_SHARE["slope"] / 3, "descent": FR_SHARE["slope"] / 3,
+                      "ledge_up": FR_SHARE["ledge"] / 2, "ledge_down": FR_SHARE["ledge"] / 2}
+            _w = np.array([1.0 / max(1e-3, _share.get(h, FR_SHARE.get(h, 0.2))) for h in present])
+            focus = present[int(np.random.choice(len(present), p=_w / _w.sum()))]
+        self._fr_role = "combo" if combo else ("focus" if focus else "plain")
+        for h in present:
+            b = self._fr_bin(h, frontier=(combo or h == focus))
+            self._fz[h] = (b + np.random.rand()) / FR_BINS * FR_BOUND[h]
+            if h == focus:
+                self._fr_focus = (h, b)
+
+    def _fr_report(self, terminated: bool, info: dict) -> None:
+        """FRONTIER: the outcome of a finished anchor / focus episode, for the trainer (survived and covered >= LEVEL_PROGRESS_MIN of the commanded distance)."""
+        if self._lvl_steps <= 0 or abs(self._lvl_cmd_sum / self._lvl_steps) < 0.04:
+            return                                     # a stand episode never reaches a hazard (all sit ahead): it would count as a free success, so it is not reported
+        ok = float((not terminated) and self._episode_score() >= LEVEL_PROGRESS_MIN)
+        if self._fr_role == "anchor":
+            info["fr_anchor"] = ok
+        elif self._fr_role == "focus" and self._fr_focus is not None:
+            info["fr"] = [FR_HAZARDS.index(self._fr_focus[0]), self._fr_focus[1], ok]
+
+    def _priv_obs(self, contacts):
+        """PRIV_OBS: the critic's privileged inputs (PRIV_DIM values, roughly in [-1, 1])."""
+        pos, q = p.getBasePositionAndOrientation(self.robot_id)
+        lin, ang = p.getBaseVelocity(self.robot_id)
+        rpy = p.getEulerFromQuaternion(q)
+        R = np.asarray(p.getMatrixFromQuaternion(q)).reshape(3, 3)
+        vb = R.T @ np.asarray(lin)
+        fz = self._fz or {}
+        ledge = (self._ledge_h if self._ledge_dir > 0 else -self._ledge_h) / 0.06 if self._ledge_h > 0 else 0.0
+        out = [rpy[0] / 1.3, rpy[1] / 1.3, ang[0] * 0.1, ang[1] * 0.1, ang[2] * 0.1, vb[0] / 0.5, vb[1] / 0.5, vb[2] / 0.5, (pos[2] - HEIGHT_TARGET) / 0.05]
+        out += [float(c) for c in contacts]
+        out += [self._slope_rp[0] / 0.5, self._slope_rp[1] / 0.5, ledge,
+                fz.get("rough", 1.0 if getattr(self, "_rough_on", False) else 0.0) / 2.0, fz.get("rubble", 0.0) / 2.0, fz.get("boxes", 0.0) / 2.0,
+                fz.get("snag", 0.0) / 2.0, 1.0 - float(np.min(self._torque_scale)), float(len(self._fz or {})) / 4.0]
+        return np.clip(np.asarray(out, dtype=float), -1.0, 1.0)
 
     def set_caps(self, caps) -> None:
         """Trainer hook (train.py CapsSync): move the top-threshold caps while the run trains (see apply_caps)."""
@@ -1163,7 +1297,8 @@ class OpenCatGymEnv(gym.Env):
         self._ep_outcomes = self._ep_outcomes[ADAPT_WINDOW // 2:]  # slide the window
 
     def step(self, action):
-        p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
+        if GUI_MODE:                                                # 2026-10-08 speed pass: a GUI-only call, skipped headless (no effect on physics)
+            p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING)
         self._phase_step0 = float(getattr(self, "_phase", 0.0))   # stride phase this step started at
         if self._lvl_steps == 0:                                  # ADAPTIVE_LEVEL bookkeeping: where the episode started, and the commanded speed over it
             self._lvl_x0 = p.getBasePositionAndOrientation(self.robot_id)[0][0]
@@ -1257,17 +1392,8 @@ class OpenCatGymEnv(gym.Env):
                     brace + lean, brace, brace - lean, brace])   # back  R / L
                 self._reflex_timer -= 1
 
-        # Apply joint boundaries individually.
-        min_ang = -self.bound_ang
-        max_ang = self.bound_ang
-        joint_angs[0] = np.clip(joint_angs[0], min_ang, max_ang) # shoulder_left
-        joint_angs[1] = np.clip(joint_angs[1], min_ang, max_ang) # elbow_left
-        joint_angs[2] = np.clip(joint_angs[2], min_ang, max_ang) # shoulder_right
-        joint_angs[3] = np.clip(joint_angs[3], min_ang, max_ang) # elbow_right
-        joint_angs[4] = np.clip(joint_angs[4], min_ang, max_ang) # hip_right
-        joint_angs[5] = np.clip(joint_angs[5], min_ang, max_ang) # knee_right
-        joint_angs[6] = np.clip(joint_angs[6], min_ang, max_ang) # hip_left
-        joint_angs[7] = np.clip(joint_angs[7], min_ang, max_ang) # knee_left
+        # Apply joint boundaries (all eight joints share the same bound).
+        joint_angs = np.clip(np.asarray(joint_angs, dtype=float), -self.bound_ang, self.bound_ang)
 
         # Transform angle to degree and perform rounding, because 
         # OpenCat robot have only integer values.
@@ -1297,20 +1423,20 @@ class OpenCatGymEnv(gym.Env):
                                                           linkIndexA=idx) 
                                     else False)
 
+        # One batched read of the four paws (2026-10-08 speed pass; was up to 13 getLinkState calls per step).
+        _pls = p.getLinkStates(self.robot_id, paw_idx, computeLinkVelocity=1)
+        _ppos = [ls[0] for ls in _pls]
+        # Slip / clearance weights: the inherited code read the paw's world POSITION ([0][0:1], its x) where the upstream comment means its velocity, so both
+        # penalties grew with the distance walked from the origin (both are tiny: < 0.1% of the reward). FIX_PAW_VEL uses the paw's horizontal velocity, as intended.
+        _pw = [float(np.hypot(ls[6][0], ls[6][1])) for ls in _pls] if FIX_PAW_VEL else [abs(ls[0][0]) for ls in _pls]
         paw_slipping = 0
         for in_contact in np.nonzero(paw_contact)[0]:
-            paw_slipping += np.linalg.norm((
-                            p.getLinkState(self.robot_id,
-                                           linkIndex=paw_idx[in_contact], 
-                                           computeLinkVelocity=1)[0][0:1]))
+            paw_slipping += _pw[in_contact]
 
         # Read clearance of paw from ground
         paw_clearance = 0
-        for idx in paw_idx:
-            paw_z_pos = p.getLinkState(self.robot_id, linkIndex=idx)[0][2]
-            paw_clearance += (paw_z_pos-PAW_Z_TARGET)**2 * np.linalg.norm(
-                (p.getLinkState(self.robot_id, linkIndex=idx, 
-                                computeLinkVelocity=1)[0][0:1]))**0.5
+        for k in range(4):
+            paw_clearance += (_ppos[k][2] - PAW_Z_TARGET) ** 2 * _pw[k] ** 0.5
 
         # Stride-length reward: on each foot touchdown (contact False->True),
         # reward the forward x-distance that foot covered since its previous
@@ -1318,13 +1444,14 @@ class OpenCatGymEnv(gym.Env):
         stride_reward = 0.0
         touchdown_cost = 0.0
         for i, idx in enumerate(paw_idx):
-            fx = p.getLinkState(self.robot_id, idx)[0][0]
+            fx = _ppos[i][0]
             if paw_contact[i] and not self._foot_prev_contact[i]:
                 stride_reward += max(0.0, fx - self._foot_td_x[i])
                 self._foot_td_x[i] = fx
                 if FAC_TOUCHDOWN > 0:      # R6: downward speed of the paw as it lands
-                    touchdown_cost += max(0.0, -p.getLinkState(self.robot_id, idx, computeLinkVelocity=1)[6][2])
+                    touchdown_cost += max(0.0, -_pls[i][6][2])
             self._foot_prev_contact[i] = paw_contact[i]
+        self._last_contact = list(paw_contact)
 
         # Check if elbows or lower arm are in contact with ground
         arm_idx = [1, 2, 4, 5]
@@ -1403,24 +1530,13 @@ class OpenCatGymEnv(gym.Env):
         power_use = float(sum(abs(j[3]) * abs(j[1]) for j in _js))
 
         # Normalize joint_angs
-        joint_angs[0] /= self.bound_ang
-        joint_angs[1] /= self.bound_ang
-        joint_angs[2] /= self.bound_ang
-        joint_angs[3] /= self.bound_ang
-        joint_angs[4] /= self.bound_ang
-        joint_angs[5] /= self.bound_ang
-        joint_angs[6] /= self.bound_ang
-        joint_angs[7] /= self.bound_ang
+        joint_angs = joint_angs / self.bound_ang
 
-        # Adding every 2nd angle to the joint angle history.
+        # Adding every 2nd angle to the joint angle history (a fixed-size window: drop the oldest frame, append the newest).
         if(self.step_counter % 2 == 0):
-            self.angle_history = np.append(self.angle_history, 
-                                           self.randomize(joint_angs, 
-                                                          RANDOM_JOINT_ANGS))
-            self.angle_history = np.delete(self.angle_history, np.s_[0:8])
+            self.angle_history = np.concatenate((self.angle_history[8:], self.randomize(joint_angs, RANDOM_JOINT_ANGS)))
 
-        self.recent_angles = np.append(self.recent_angles, joint_angs)
-        self.recent_angles = np.delete(self.recent_angles, np.s_[0:8])
+        self.recent_angles = np.concatenate((self.recent_angles[8:], joint_angs))
 
         joint_angs_prev = self.recent_angles[8:16]
         joint_angs_prev_prev = self.recent_angles[0:8]
@@ -1475,8 +1591,10 @@ class OpenCatGymEnv(gym.Env):
         obs_ang, obs_vel_clip, obs_euler = state_ang, state_vel_clip, state_ang_euler
         # IMU_HOLD_STEPS / IMU_RATE_ZERO: what the stock firmware stream delivers
         # (5 Hz, 0.1 deg, no gyro). Obs only -- reward terms keep the clean state.
+        _new_frame = False
         if IMU_HOLD_STEPS > 0:
             if self._imu_held is None or self._imu_hold_k % IMU_HOLD_STEPS == 0:
+                _new_frame = True
                 _e = np.round(np.rad2deg(p.getEulerFromQuaternion(state_ang)), 1)
                 _q = p.getQuaternionFromEuler(np.deg2rad(_e))
                 self._imu_held = (_q, np.asarray(p.getEulerFromQuaternion(_q)[0:2]))
@@ -1511,7 +1629,12 @@ class OpenCatGymEnv(gym.Env):
             obs_ang = p.getQuaternionFromEuler([_e[0], _e[1], 0.0])
             _heading_extra = [float(np.sin(_he)), float(np.cos(_he))]
         gyro_n = RANDOM_GYRO * self._dr if (RANDOM_GYRO > 0 and self._dr > 0) else 0.0
-        if gyro_n:
+        _held_noise = gyro_n and IMU_NOISE_PER_FRAME and IMU_HOLD_STEPS > 0
+        if _held_noise:                 # one noise draw per held IMU frame (see IMU_NOISE_PER_FRAME)
+            if _new_frame or getattr(self, "_imu_noise", None) is None:
+                self._imu_noise = (np.random.normal(0.0, gyro_n, 4), np.random.normal(0.0, gyro_n, 2))
+            obs_ang = np.clip(np.array(obs_ang) + self._imu_noise[0], -1.0, 1.0)
+        elif gyro_n:
             obs_ang = np.clip(np.array(obs_ang) + np.random.normal(0.0, gyro_n, 4), -1.0, 1.0)
             if not IMU_RATE_ZERO:   # no rate signal on the real stream -> the Pi feeds an exact 0
                 obs_vel_clip = np.clip(state_vel_clip + np.random.normal(0.0, gyro_n, 2), -1, 1)
@@ -1520,10 +1643,11 @@ class OpenCatGymEnv(gym.Env):
         # normalised so the fall threshold (1.3 rad) is +/-1. Same IMU noise
         # (and the same persistent bias, if any).
         tnorm = np.clip(_biased_euler / 1.3, -1.0, 1.0)
-        if gyro_n:
+        if _held_noise:
+            tnorm = np.clip(tnorm + self._imu_noise[1], -1.0, 1.0)
+        elif gyro_n:
             tnorm = np.clip(tnorm + np.random.normal(0.0, gyro_n, 2), -1.0, 1.0)
-        self.tilt_history = np.append(self.tilt_history, tnorm)
-        self.tilt_history = np.delete(self.tilt_history, np.s_[0:2])
+        self.tilt_history = np.concatenate((self.tilt_history[2:], tnorm))
         _rot = np.asarray(p.getMatrixFromQuaternion(obs_ang)).reshape(3, 3)
         proj_grav = np.clip(_rot.T @ np.array([0.0, 0.0, -1.0]), -1.0, 1.0)  # gravity in body frame
         self.state_robot = np.concatenate((obs_ang, obs_vel_clip, proj_grav, [time_obs],
@@ -1600,7 +1724,10 @@ class OpenCatGymEnv(gym.Env):
         if FAC_IMITATION > 0 and WKF_REF is not None:
             _iref = STAND_POSE if getattr(self, '_is_stand', False) else self._ref_pose(int(self._phase))
             ref = _iref / self.bound_ang
-            imit_err = np.sum((joint_angs - ref) ** 2)
+            if IMITATION_ACTUAL:        # the joints as measured after the physics step (see IMITATION_ACTUAL)
+                imit_err = np.sum((np.array([j[0] for j in _js]) / self.bound_ang - ref) ** 2)
+            else:
+                imit_err = np.sum((joint_angs - ref) ** 2)
             imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
             # R3: fade the imitation reward while stumbling (prev-step tilt over
             # IMITATION_TILT_FADE) so matching wkF stops fighting a recovery --
@@ -1998,7 +2125,9 @@ class OpenCatGymEnv(gym.Env):
 
         self.observation = np.hstack((self.state_robot, self.angle_history,
                                       self._terrain_obs(), self._goal_obs(),
-                                      self._cliff_obs()))
+                                      self._cliff_obs()) + ((self._priv_obs(paw_contact),) if PRIV_OBS else ()))
+        if (terminated or truncated) and self._fz is not None:
+            self._fr_report(terminated, info)          # FRONTIER: the episode's outcome for the trainer
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -2063,6 +2192,14 @@ class OpenCatGymEnv(gym.Env):
             self._cmd_yaw = float(np.random.uniform(-TRAIN_YAW_RANGE, TRAIN_YAW_RANGE))
         else:
             self._cmd_yaw = 0.0
+        if CMD_BANDS == "forward":      # 2026-10-08: no backward, no unreachable fast band; stand share unchanged (see CMD_BANDS)
+            if r < 0.58:
+                self._cmd_fwd = np.random.uniform(0.08, 0.12)
+            elif r < 0.83:
+                self._cmd_fwd = np.random.uniform(0.04, 0.055)
+            else:
+                self._cmd_fwd = np.random.uniform(-0.01, 0.02)
+            return
         # G4: explicit low / mid / top speed bands with heavy weight on the
         # extremes, so creep and fast stop collapsing toward cruise.
         if r < 0.32:        # cruise (mid)
@@ -2102,6 +2239,10 @@ class OpenCatGymEnv(gym.Env):
         return b
 
     def reset(self, seed=None, options=None):
+        # 2026-10-08 review fix: the seed used to be ignored, so every caller that "seeded" an episode (the curriculum probe, benchmark_v4's ladder, the audits) got an
+        # unrepeatable one and two policies were never scored on the same courses. Training never passes a seed (SB3 resets with None), so it is unaffected.
+        if seed is not None:
+            np.random.seed(int(seed) % (2 ** 32))
         self.step_counter = 0
         self.arm_contact = 0
         self._foot_prev_contact = [False, False, False, False]
@@ -2150,6 +2291,17 @@ class OpenCatGymEnv(gym.Env):
         if not DR_EVAL_FULL and (LEVEL_FIXED >= 0 or (ADAPTIVE_LEVEL and not CATEGORY_LEVELS)):
             self._dr = float(LEVEL_FIXED if LEVEL_FIXED >= 0 else self._level)     # global-level mode; in CATEGORY mode _dr stays the time ramp (IMU, mass, friction ... are not difficulty)
         self._assign_category_levels()
+        self._fz, self._fr_role, self._fr_focus = None, None, None
+        if self._use_frontier():                  # FRONTIER: hazards and sizes come from the per-hazard frontier (the category levels are not used)
+            self._frontier_plan()
+            self._d_terrain = self._d_ledge = self._d_slope = 0.0
+            self._d_fault = float(self._fz.get("cutback", 0.0))
+        self._x_scale = 1.0
+        if HAZARD_EP_LEN > 0:                     # a hazard-focus episode runs longer, over a proportionally longer stretch of obstacles
+            _hz = (self._fr_focus is not None and self._fr_focus[0] != "cutback") if self._fz is not None else (self._focus in ("terrain", "ledge", "slope"))
+            if _hz:
+                self._step_budget = max(self._step_budget, int(HAZARD_EP_LEN))
+                self._x_scale = HAZARD_EP_LEN / EPISODE_LENGTH
         self._begin_long_run()
         p.resetSimulation()
         # Disable rendering during loading.
@@ -2164,15 +2316,31 @@ class OpenCatGymEnv(gym.Env):
         # Slope: tilt the ground plane a few degrees, random roll & pitch (coverage loop).
         self._slope_rp = (0.0, 0.0)
         self._slope_targeted = False
+        _forced = set(CATEGORY_OVERRIDE) if (CATEGORY_FORCE and CATEGORY_OVERRIDE) else set()     # CATEGORY_FORCE: these categories' hazards are present in every episode
         if SLOPE_FIXED_RP is not None:
             self._slope_rp = (float(SLOPE_FIXED_RP[0]), float(SLOPE_FIXED_RP[1]))
-        elif SLOPE_TARGET_PROB > 0 and self._d_slope > 0 and np.random.rand() < SLOPE_TARGET_PROB:
+        elif self._fz is not None:                # FRONTIER: one of side-hill / climb / descent at its frontier size, else a small background tilt
+            _fz = self._fz
+            if "sidehill" in _fz:
+                self._slope_rp = (float(np.deg2rad(_fz["sidehill"]) * np.random.choice([-1.0, 1.0])), 0.0)
+            elif "climb" in _fz:
+                self._slope_rp = (0.0, -float(np.deg2rad(_fz["climb"])))
+            elif "descent" in _fz:
+                self._slope_rp = (0.0, float(np.deg2rad(_fz["descent"])))
+            elif self._fr_role != "anchor" and "rough" not in _fz:
+                _bt = np.deg2rad(FR_BACKGROUND_TILT_DEG)
+                self._slope_rp = (float(np.random.uniform(-_bt, _bt)), float(np.random.uniform(-_bt, _bt)))
+            self._slope_targeted = any(h in _fz for h in ("sidehill", "climb", "descent"))
+        elif SLOPE_TARGET_PROB > 0 and self._d_slope > 0 and ("slope" in _forced or np.random.rand() < SLOPE_TARGET_PROB):
             self._slope_targeted = True
-            if np.random.rand() < 0.5:     # side-hill, either side down
+            _kind = int(np.random.randint(3)) if "slope" in _forced else (0 if np.random.rand() < 0.5 else 1)   # a probe also tests descents (training meets them in the random tilt below)
+            if _kind == 0:                 # side-hill, either side down
                 r = np.deg2rad(np.random.uniform(*SIDEHILL_DEG)) * self._d_slope * np.random.choice([-1.0, 1.0])
                 self._slope_rp = (float(r), 0.0)
-            else:                          # climb (negative pitch = uphill)
+            elif _kind == 1:               # climb (negative pitch = uphill)
                 self._slope_rp = (0.0, -float(np.deg2rad(np.random.uniform(*UPHILL_DEG)) * self._d_slope))
+            else:                          # descent, over the range the random tilt below reaches (probes only)
+                self._slope_rp = (0.0, float(np.deg2rad(np.random.uniform(min(3.0, SLOPE_MAX_DEG), SLOPE_MAX_DEG)) * self._d_slope))
         elif SLOPE_MAX_DEG > 0 and self._d_slope > 0:
             m = np.deg2rad(SLOPE_MAX_DEG) * self._d_slope
             # 2026-09-04: triangular, not uniform -- most episodes near-flat, with a
@@ -2204,8 +2372,21 @@ class OpenCatGymEnv(gym.Env):
         # instead of discarding it, so this restriction is gone.
         _carpet = (CARPET > 0 and self._dr > 0 and not self._slope_targeted
                    and np.random.rand() < CARPET_PROB)
-        _rough = (not _carpet and not self._slope_targeted and ROUGH_TERRAIN > 0 and self._d_terrain > 0
-                  and np.random.rand() < ROUGH_TERRAIN_PROB)
+        _tf = None                     # CATEGORY_FORCE on "terrain": which terrain generators run (at least one), drawn up front; None = each draws its own chance below
+        if self._fz is not None:                  # FRONTIER: the plan decided
+            _rough = bool("rough" in self._fz and not _carpet and ROUGH_TERRAIN > 0)
+            if _rough:
+                self._d_terrain = float(self._fz["rough"])
+        else:
+            if "terrain" in _forced and self._d_terrain > 0:
+                _gens = [("rough", ROUGH_TERRAIN_PROB if (ROUGH_TERRAIN > 0 and not _carpet and not self._slope_targeted) else 0.0),
+                         ("boxes", RANDOM_TERRAIN_PROB if RANDOM_TERRAIN > 0 else 0.0), ("rubble", RUBBLE_PROB if RUBBLE > 0 else 0.0), ("snag", SNAG_OBSTACLE_PROB)]
+                _tf = {g: bool(pr > 0 and np.random.rand() < pr) for g, pr in _gens}
+                _w = np.array([pr for _, pr in _gens], dtype=float)
+                if not any(_tf.values()) and _w.sum() > 0:
+                    _tf[_gens[int(np.random.choice(len(_gens), p=_w / _w.sum()))][0]] = True
+            _rough = (not _carpet and not self._slope_targeted and ROUGH_TERRAIN > 0 and self._d_terrain > 0
+                      and (_tf["rough"] if _tf is not None else np.random.rand() < ROUGH_TERRAIN_PROB))
         # 2026-09-05 slope-collapse fix: a heightfield body is placed at x=1.4/1.6,
         # so rotating it by the slope quaternion pivots ~1.5 m from the robot and
         # (a) lifts the surface under the spawn point by ~1.4*sin(pitch) -- >=9 cm
@@ -2214,6 +2395,7 @@ class OpenCatGymEnv(gym.Env):
         # Root cause of the ~1.1M-step ep_rew_mean collapse on every new-sim run.
         # Heightfields carry bumps only, no grade (pre-2026-09-04 behavior); the
         # flat-plane branch below still tilts for slope episodes.
+        self._rough_on = bool(_rough)
         if _carpet or _rough:
             self._slope_rp = (0.0, 0.0)
         # A flat episode's floor is "carpeted" (compliant + carpet-typical
@@ -2348,38 +2530,58 @@ class OpenCatGymEnv(gym.Env):
                 0, p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.06, 0.09, 0.005]),
                 basePosition=[sx, sy, 0.005])
             p.changeDynamics(patch, -1, lateralFriction=float(np.random.uniform(0.03, 0.18)))
-        if RANDOM_TERRAIN > 0 and self._d_terrain > 0 and np.random.rand() < RANDOM_TERRAIN_PROB:
-            self._scatter_obstacles((min(RANDOM_TERRAIN, RANDOM_TERRAIN_MAX_H) if SCALE_ALL_HAZARDS else RANDOM_TERRAIN) * self._d_terrain)   # box height reaches its cap only at level 1
-        if RUBBLE > 0 and self._d_terrain > 0 and np.random.rand() < RUBBLE_PROB:
-            self._scatter_rubble(RUBBLE * self._d_terrain, RUBBLE_N)
-        if SNAG_OBSTACLE_PROB > 0 and self._d_terrain > 0 and np.random.rand() < SNAG_OBSTACLE_PROB:
-            self._scatter_snags(SNAG_OBSTACLE_N)
+        if self._fz is not None:                  # FRONTIER: sizes are severities of the level-1 sizes, up to FR_BOUND (boxes may pass their old level-1 height cap)
+            _fz = self._fz
+            if "boxes" in _fz and RANDOM_TERRAIN > 0:
+                _bh = min(RANDOM_TERRAIN, RANDOM_TERRAIN_MAX_H) * _fz["boxes"]
+                self._scatter_obstacles(_bh, cap=_bh)
+            if "rubble" in _fz and RUBBLE > 0:
+                self._d_terrain = float(_fz["rubble"])
+                self._scatter_rubble(RUBBLE * _fz["rubble"], RUBBLE_N)
+            if "snag" in _fz:
+                self._d_terrain = float(_fz["snag"])
+                self._scatter_snags(SNAG_OBSTACLE_N)
+            self._d_terrain = 0.0
+        else:
+            if RANDOM_TERRAIN > 0 and self._d_terrain > 0 and (_tf["boxes"] if _tf is not None else np.random.rand() < RANDOM_TERRAIN_PROB):
+                self._scatter_obstacles((min(RANDOM_TERRAIN, RANDOM_TERRAIN_MAX_H) if SCALE_ALL_HAZARDS else RANDOM_TERRAIN) * self._d_terrain)   # box height reaches its cap only at level 1
+            if RUBBLE > 0 and self._d_terrain > 0 and (_tf["rubble"] if _tf is not None else np.random.rand() < RUBBLE_PROB):
+                self._scatter_rubble(RUBBLE * self._d_terrain, RUBBLE_N)
+            if SNAG_OBSTACLE_PROB > 0 and self._d_terrain > 0 and (_tf["snag"] if _tf is not None else np.random.rand() < SNAG_OBSTACLE_PROB):
+                self._scatter_snags(SNAG_OBSTACLE_N)
 
         # Phase 4: sharp step across the whole lane. Flat ground only, not with the
         # rough heightfield (which replaces the plane). Step-up = raised plateau
         # ahead; step-down = robot starts on a raised block with a drop ahead.
         self._ledge_h = 0.0
         self._ledge_dir = 0
-        if (LEDGE_HEIGHT > 0 and self._d_ledge > 0 and SLOPE_FIXED_RP is None and not _rough
-                and np.random.rand() < LEDGE_PROB):
-            self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
-                                   else LEDGE_HEIGHT) * self._d_ledge)
+        _lfz = None
+        if self._fz is not None:
+            _lfz = "ledge_up" if "ledge_up" in self._fz else ("ledge_down" if "ledge_down" in self._fz else None)
+        if ((self._fz is not None and _lfz is not None and not _rough) or
+                (self._fz is None and LEDGE_HEIGHT > 0 and self._d_ledge > 0 and SLOPE_FIXED_RP is None and not _rough
+                 and ("ledge" in _forced or np.random.rand() < LEDGE_PROB))):
+            if _lfz is not None:                  # FRONTIER: the ledge's size is its frontier draw
+                self._ledge_h = float(max(0.001, self._fz[_lfz]))
+            else:
+                self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
+                                       else LEDGE_HEIGHT) * self._d_ledge)
             if CAP_LEDGE_M > 0 and SLOPE_FIXED_RP is None:
-                # the face the robot meets = the block height plus, on a descent, the ground that falls away over the 0.11 m to the edge (found: a 3.2 cm ledge on a 16 deg descent was a 6.1 cm face)
-                _fall = 0.11 * max(0.0, float(np.tan(self._slope_rp[1])))
-                self._ledge_h = float(max(0.0, min(self._ledge_h, CAP_LEDGE_M - _fall)))
-            self._ledge_dir = LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1]))
+                # the block lies on the (possibly tilted) ground, so the face the robot meets is the block height itself (2026-10-08 review: a LEVEL block on tilted ground made
+                # descent faces taller, buried climbs, and started step-downs tilted on a level block; the cap used to subtract the extra fall instead)
+                self._ledge_h = float(max(0.0, min(self._ledge_h, CAP_LEDGE_M)))
+            self._ledge_dir = (1 if _lfz == "ledge_up" else -1) if _lfz is not None else (LEDGE_DIR if LEDGE_DIR != 0 else int(np.random.choice([-1, 1])))
             _lw = 0.30                          # across-path half-width: cannot be side-stepped
             _edge = 0.11                        # x of the edge -- close, so a ~3 s episode actually
                                                #  reaches it and has time to attempt the step
-            if self._ledge_dir > 0:            # step UP: plateau from x~_edge forward
-                _hl = 0.70
-                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
-                _lid = p.createMultiBody(0, _cs, basePosition=[_edge + _hl, 0.0, self._ledge_h / 2])
-            else:                              # step DOWN: block under the robot, drop past x~_edge
-                _hl = 0.60
-                _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
-                _lid = p.createMultiBody(0, _cs, basePosition=[_edge - _hl, 0.0, self._ledge_h / 2])
+            # 2026-10-08 review fix: the block is placed in the ground's frame (rotated about the origin, like the tilted plane), parallel to the floor -- a door sill on a ramp.
+            # It used to be level whatever the ground tilt, so a step-down started G2 tilted on a level block (the body dropped and rotated ~5 deg, up to 10, before the first step).
+            _gq = p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0])
+            _hl = 0.70 if self._ledge_dir > 0 else 0.60                # step UP: plateau from x~_edge forward; step DOWN: block under the robot, drop past x~_edge
+            _cx = _edge + _hl if self._ledge_dir > 0 else _edge - _hl
+            _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
+            _lpos, _ = p.multiplyTransforms([0, 0, 0], _gq, [_cx, 0.0, self._ledge_h / 2], [0, 0, 0, 1])
+            _lid = p.createMultiBody(0, _cs, basePosition=list(_lpos), baseOrientation=_gq)
             p.changeVisualShape(_lid, -1, rgbaColor=[0.62, 0.62, 0.66, 1])   # a touch lighter than the ground so the step edge still reads
 
         _pose_tilt = 0.0
@@ -2389,7 +2591,7 @@ class OpenCatGymEnv(gym.Env):
         # its normal: on a steep slope the feet started inside the ground (found 2026-10-08: 5% of slope episodes overlapped by more than 1 cm at level 1.0, 10% at 1.25).
         # Lifting by 1/cos(tilt) keeps the same clearance above the plane at any tilt.
         _cos_tilt = max(0.5, float(np.cos(self._slope_rp[0]) * np.cos(self._slope_rp[1])))
-        start_pos = [0, 0, 0.08 / _cos_tilt + (self._ledge_h if self._ledge_dir < 0 else 0.0)]
+        start_pos = [0, 0, (0.08 + (self._ledge_h if self._ledge_dir < 0 else 0.0)) / _cos_tilt]      # a step-down starts on the block, which lies on the tilted ground
         start_orient = p.getQuaternionFromEuler([
             self._slope_rp[0] + np.random.uniform(-_pose_tilt, _pose_tilt),
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
@@ -2443,6 +2645,8 @@ class OpenCatGymEnv(gym.Env):
         _torque_trigger = 0.4
         if TORQUE_SLOPE_CORRELATE and (self._slope_rp[0] != 0.0 or self._slope_rp[1] != 0.0):
             _torque_trigger = 0.85
+        if "fault" in _forced or (self._fz is not None and "cutback" in self._fz):
+            _torque_trigger = 1.0                                          # CATEGORY_FORCE: a probe of the fault category always has the overheat cutback
         if TORQUE_CUTBACK > 0 and self._d_fault > 0 and np.random.rand() < _torque_trigger:
             k = np.random.choice(8, np.random.randint(1, 4), replace=False)
             self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._d_fault, 1.0, len(k))
@@ -2486,6 +2690,7 @@ class OpenCatGymEnv(gym.Env):
             self._torque_scale = self._torque_scale * _sag
         # real control path (IMU_HOLD_STEPS / CMD_PATH); inert by default
         self._imu_held = None
+        self._imu_noise = None
         self._imu_hold_k = int(np.random.randint(IMU_HOLD_STEPS)) if IMU_HOLD_STEPS > 0 else 0
         self._fw = None
         self._fw_k = 0
@@ -2590,7 +2795,7 @@ class OpenCatGymEnv(gym.Env):
                                            self.angle_history,
                                            self._terrain_obs(),
                                            self._goal_obs(),
-                                           self._cliff_obs()))
+                                           self._cliff_obs()) + ((self._priv_obs([False] * 4),) if PRIV_OBS else ()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -2851,7 +3056,7 @@ class OpenCatGymEnv(gym.Env):
                         np.clip(dist / GOAL_DIST_MAX, 0.0, 1.0), 1.0,
                         self._goal_polarity])
 
-    def _scatter_obstacles(self, max_h):
+    def _scatter_obstacles(self, max_h, cap=None):
         """Small static boxes/steps scattered in the robot's forward path --
         'obstacles to trip it up a bit', not walls. Amplitude (max_h) is scaled
         by the caller (dr ramp); the recovery loop raises it slowly per round.
@@ -2870,14 +3075,14 @@ class OpenCatGymEnv(gym.Env):
         n = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                       np.cos(pitch) * np.cos(roll)])
         box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
-        _cap = min(max_h, RANDOM_TERRAIN_MAX_H)
+        _cap = min(max_h, RANDOM_TERRAIN_MAX_H if cap is None else cap)      # cap: the frontier's own size bound (boxes may pass the old level-1 cap)
         _n_boxes = OBSTACLE_COUNT if OBSTACLE_COUNT > 0 else np.random.randint(4, 10)
         for _ in range(_n_boxes):
             if np.random.rand() < OBSTACLE_TALL_FRAC:
                 h = np.random.uniform(0.058, 0.085)   # "go around" height -- clears TERRAIN_TALL_Z (0.055) so vision tall_flag fires
             else:
                 h = np.random.uniform(0.002, max(0.003, _cap))
-            _x_hi = OBSTACLE_X_HI if OBSTACLE_X_HI > 0 else RANDOM_TERRAIN_X_RANGE[1]
+            _x_hi = OBSTACLE_X_HI if OBSTACLE_X_HI > 0 else RANDOM_TERRAIN_X_RANGE[1] * getattr(self, "_x_scale", 1.0)
             x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], _x_hi)
             _y_hw = OBSTACLE_Y_SPREAD if OBSTACLE_Y_SPREAD > 0 else 0.03
             if np.random.rand() < OBSTACLE_SPAN_FRAC:
@@ -2909,7 +3114,7 @@ class OpenCatGymEnv(gym.Env):
                         np.cos(pitch) * np.cos(roll)])
         box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
         for _ in range(n):
-            x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], RANDOM_TERRAIN_X_RANGE[1])
+            x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], RANDOM_TERRAIN_X_RANGE[1] * getattr(self, "_x_scale", 1.0))
             y = np.random.uniform(-0.02, 0.02)
             z_ground = -(nrm[0] * x + nrm[1] * y) / nrm[2]
             _snag_h = SNAG_HEIGHT_M * ((0.4 + 0.6 * self._d_terrain) if SCALE_ALL_HAZARDS else 1.0)
@@ -2931,7 +3136,7 @@ class OpenCatGymEnv(gym.Env):
                        np.cos(pitch) * np.cos(roll)])
         for _ in range(int(n)):
             r = np.random.uniform(0.45, 1.15) * chunk
-            x = np.random.uniform(*RUBBLE_X_RANGE)
+            x = np.random.uniform(RUBBLE_X_RANGE[0], RUBBLE_X_RANGE[1] * getattr(self, "_x_scale", 1.0))
             y = np.random.uniform(-0.08, 0.08)   # 2026-09-04: narrowed from +/-0.14, same
                                                    # straight-walking reasoning as the box scatter
             z_ground = -(nv[0] * x + nv[1] * y) / nv[2]

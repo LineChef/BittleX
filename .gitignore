@@ -12,6 +12,7 @@ __pycache__/
 venv/
 env/
 .venv/
+.venv-*/
 *.egg-info/
 
 # Trained model checkpoints (large binary files — consider Git LFS if you want to version these)

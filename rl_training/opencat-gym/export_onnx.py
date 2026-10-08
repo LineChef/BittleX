@@ -28,8 +28,9 @@ class DeterministicPolicy(nn.Module):
     """The mean-action forward path of an SB3 continuous PPO policy, plus the
     action-space clip. Weights are copied in from the loaded model."""
 
-    def __init__(self, policy, act_low, act_high):
+    def __init__(self, policy, act_low, act_high, priv_dim=0):
         super().__init__()
+        self.priv_dim = int(priv_dim)        # privileged-critic policies: the actor was trained with zeros there, so the export takes the plain observation and pads zeros
         # SB3 MlpPolicy: features_extractor is FlattenExtractor (identity for a
         # vector obs), so the net is mlp_extractor.policy_net -> action_net.
         self.policy_net = policy.mlp_extractor.policy_net
@@ -38,6 +39,8 @@ class DeterministicPolicy(nn.Module):
         self.register_buffer("act_high", torch.as_tensor(act_high, dtype=torch.float32))
 
     def forward(self, obs):
+        if self.priv_dim:
+            obs = torch.cat([obs, torch.zeros(obs.shape[0], self.priv_dim, dtype=obs.dtype)], dim=1)
         x = self.policy_net(obs)
         mean = self.action_net(x)
         return torch.clamp(mean, self.act_low, self.act_high)
@@ -70,20 +73,23 @@ def main():
     print(f"loaded {args.model}: obs {obs_dim}, act {act_dim}, "
           f"action_space {model.action_space}, squash_output={model.policy.squash_output}")
 
-    net = DeterministicPolicy(model.policy, model.action_space.low, model.action_space.high).eval()
+    priv = int(getattr(model.policy, "priv_dim", 0) or 0)
+    net = DeterministicPolicy(model.policy, model.action_space.low, model.action_space.high, priv).eval()
+    if priv:
+        print(f"privileged critic: the actor's last {priv} inputs are critic-only; the export takes {obs_dim - priv} inputs")
 
-    # sanity: our forward path must match model.predict(deterministic=True)
+    # sanity: our forward path must match model.predict(deterministic=True) (with random privileged values, which the actor must ignore)
     rng = np.random.default_rng(0)
     probe = rng.standard_normal((16, obs_dim)).astype(np.float32)
     with torch.no_grad():
-        ours = net(torch.from_numpy(probe)).numpy()
+        ours = net(torch.from_numpy(probe[:, :obs_dim - priv])).numpy()
     theirs = np.stack([model.predict(o, deterministic=True)[0] for o in probe])
     d = np.abs(ours - theirs).max()
     print(f"pre-export self-check vs model.predict: max|diff| = {d:.2e}", "OK" if d < 1e-5 else "!! MISMATCH")
     if d >= 1e-5:
         raise SystemExit("forward path does not match SB3 predict -- do not ship this export")
 
-    dummy = torch.zeros(1, obs_dim, dtype=torch.float32)
+    dummy = torch.zeros(1, obs_dim - priv, dtype=torch.float32)
     torch.onnx.export(
         net, dummy, out,
         input_names=["obs"], output_names=["action"],

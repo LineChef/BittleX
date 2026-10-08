@@ -20,7 +20,7 @@ roll = up = down = ledge = 0.0
 for k in range(80):
     np.random.seed(k); e.reset(seed=k)
     r, pt = e._slope_rp
-    roll = max(roll, abs(np.degrees(r))); up = max(up, -np.degrees(pt)); down = max(down, np.degrees(pt)); ledge = max(ledge, e._ledge_h + 0.11 * max(0.0, np.tan(pt)))
+    roll = max(roll, abs(np.degrees(r))); up = max(up, -np.degrees(pt)); down = max(down, np.degrees(pt)); ledge = max(ledge, e._ledge_h)          # the block lies on the tilted ground (2026-10-08), so its height is the face the robot meets
 print("MAX", round(roll, 2), round(up, 2), round(down, 2), round(ledge, 4))
 """
 

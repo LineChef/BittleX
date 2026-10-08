@@ -45,7 +45,7 @@ def _log(scores, level, start=98304):
     lines = []
     for i, s in enumerate(scores):
         lines.append(f"[probe] steps {start + i * 98304}  clean-floor score 0.88 (cap 1.00); relative score by category (raw) -> new level: terrain 1.00 (0.90) -> 1.00  "
-                     f"ledge 1.00 ({s:.2f}) -> {level:.2f}  slope 1.00 ({s:.2f}) -> {level:.2f}  fault 1.00 (0.90) -> 1.00")
+                     f"ledge {s:.2f} ({0.9 * s:.2f}) -> {level:.2f}  slope {s:.2f} ({0.9 * s:.2f}) -> {level:.2f}  fault 1.00 (0.90) -> 1.00")      # relative (raw): the verdicts read the relative score
     return lines
 
 
@@ -64,3 +64,15 @@ def test_report_verdicts():
     assert C.verdicts(C.parse(_log([0.9] * 3, 1.0)), caps)["ledge_m"]["verdict"] == "TOO EARLY"
     # a cap never moves above the course's own design size
     assert C.suggest("uphill_deg", 24.0, "CAP TOO LOW") == 24.0 and C.suggest("ledge_m", 0.037, "CAP TOO LOW") == 0.037
+
+
+def test_verdicts_read_the_relative_score_and_the_runs_own_course():
+    caps = {"uphill_deg": 12.0}
+    # relative 0.85 (raw 0.77): the curriculum counts these as good probes, so the report must too
+    v = C.verdicts(C.parse(_log([0.85] * 8, 1.0)), caps)
+    assert v["uphill_deg"]["verdict"] == "CAP TOO LOW"
+    # the next fresh final tilts the ground up to 10 deg x 1.10: a 10 deg descent cap binds from level ~0.91, not 0.65 (the old 14 deg course)
+    nom = C.nominal_for("no_such_tag")
+    assert abs(nom["downhill_deg"] - 11.0) < 1e-6 and nom["uphill_deg"] == 24.0 and nom["ledge_m"] == 0.035
+    v = C.verdicts(C.parse(_log([0.9] * 8, 0.8)), {"downhill_deg": 10.0}, nom)
+    assert v["downhill_deg"]["verdict"] == "ON TRACK" and abs(v["downhill_deg"]["binding_level"] - 10 / 11) < 1e-6

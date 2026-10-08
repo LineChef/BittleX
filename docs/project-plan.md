@@ -122,6 +122,16 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
 
 - [ ] Real sim-to-real gap work: re-score on the real path, the scripted-vs-learned comparison ([`rl/h1-rubric.md`](rl/h1-rubric.md)),
       sysid against real logs, and retrain if warranted. Blocked first on the FL shoulder servo.
+- [ ] **Training upgrade and the next 20M (2026-10-08, in progress):** a training-process review fixed 11 bugs (curriculum probes without their hazard, ignored seeds,
+      level ledge blocks on slopes, a world-mismatched gate baseline, a stray rough floor in ~30% of benchmark episodes, ...); approved upgrades: native arm64 Python (about 3x
+      training speed), 6 envs, larger PPO batches, a per-hazard frontier curriculum that finds each hazard's ceiling itself, forward-only commands, an optimizer bundle, longer
+      hazard episodes, imitation on measured joints, a privileged critic (training-only; the policy keeps G2's inputs), health checks, best checkpoint and a plateau stop.
+      Behaviour changes are screened two seeds at a time (`phase_v4.py`); the 20M follows on the user's go, then the V3 vs V4 benchmark report. State and decisions:
+      [`plan-detail/handoff-2026-10-08.md`](plan-detail/handoff-2026-10-08.md) section 12.
+- [ ] **Real-to-sim calibration from G2's own walks (approved 2026-10-08):** `rl_training/opencat-gym/real2sim.py` replays logged joint commands open-loop through the training
+      env and compares roll / pitch spread and sway frequency with G2's IMU (heading excluded: real data is never a drift source); `--fit` ranks servo speed limit x motor
+      force x ground friction (run with the Mac idle). First check (2026-10-06 tile walks): sway frequency matches (0.79 vs 0.78 Hz), sim roll about 10-13% low. Next: the
+      controlled capture sessions at the next hardware visit (STATUS next steps 0b), then a fit; a fitted value enters training only through the real-data pipeline's gates.
 - [ ] **V3 gait retrain: plan approved 2026-10-06 — [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) (start at §0).** It replaces the item
       below and the closed v2.2 campaign: calibrate the sim to G2, single-lever 3M screens (incl. mirror symmetry and a turning gate), a staged
       chain, a hardware check-in, then one 20M run with gait checks at 3M/5M/10M and no planned tuning runs after it. Why V2.1 drifts:

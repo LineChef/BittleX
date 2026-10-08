@@ -10,7 +10,7 @@ PY = sys.executable
 RECORD = r'''
 import os, sys
 import g2_profile as G
-G.set_environ(G.env_for("mirror", stage="s6_full_strength"))
+G.set_environ(G.next_final_env())                        # the parked fresh final's course (caps included)
 os.environ["G2E_LEVEL_EXTERNAL"] = "1"
 import numpy as np
 import opencat_gym_env as E
@@ -18,10 +18,14 @@ from episode_recorder import RecordingWrapper
 env = RecordingWrapper(E.OpenCatGymEnv(), directory=sys.argv[1], every=1, keep=10)
 env.unwrapped.set_ramp_steps(3_000_000)
 env.unwrapped.set_category_levels({"terrain": 0.8, "ledge": 0.8, "slope": 0.8, "fault": 0.8})
+env.unwrapped._push_curr = 1.4                     # an adapted shove size (a fresh env starts at 0.55): the replay must use the recorded one
+env.unwrapped.set_caps({"uphill_deg": 6.0, "ledge_m": 0.012})     # caps moved while training: the replay must use the caps in force
 rng = np.random.RandomState(5)
-for _ in range(3):
-    env.reset()
-    for _ in range(2000):
+for i in range(3):
+    env.reset(seed=42 if i == 0 else None)         # SB3 passes the run seed on the first reset
+    for t in range(2000):
+        if t == 120:
+            env.set_ramp_steps(3_200_000)          # the trainer's ramp update lands mid-episode (every rollout): the replay must apply it at the same step
         out = env.step(rng.uniform(-0.3, 0.3, 8))
         if out[2] or out[3]:
             break

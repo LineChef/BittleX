@@ -26,11 +26,12 @@ def test_the_launch_uses_the_same_function(monkeypatch):
     seen = {}
     monkeypatch.setattr(phase_v3, "log", lambda *a, **k: None)         # never write to the real queue log
     monkeypatch.setattr(phase_v3.RP, "training", lambda tag: False)
-    monkeypatch.setattr(phase_v3.RP, "launch", lambda tag, env, steps, from_ckpt: seen.update(env=dict(env), steps=steps))
+    monkeypatch.setattr(phase_v3.RP, "launch", lambda tag, env, steps, from_ckpt, base=True: seen.update(env=dict(env), steps=steps, base=base))
     monkeypatch.setattr(os.path, "exists", lambda p: False if str(p).endswith("_ppo.zip") else os.path.lexists(p))
     job = {"kind": "final", "tag": "v3_zz_sync_test", "stage": "s6_full_strength", "levers": ["mirror"], "fresh": True}
     phase_v3.train(job, {})
     assert {k: str(v) for k, v in seen["env"].items()} == {k: str(v) for k, v in G.env_for_job(job).items()}
+    assert seen["base"] is False                                          # the profile is the whole environment: run_pipeline's old BASE is not merged under it
 
 
 def test_every_new_fresh_final_has_the_whole_course_and_only_the_finished_20m_is_flat():
@@ -41,6 +42,7 @@ def test_every_new_fresh_final_has_the_whole_course_and_only_the_finished_20m_is
     assert new["G2E_HARD_SCALE"] == "1.10"
     assert not any("CARPET" in k and float(v) > 0 for k, v in new.items() if k.startswith("G2E_CARPET"))
     assert new.get("G2E_LEVEL_START", "0") in ("0", "0.0")                    # a fresh run still starts every hazard from an empty floor
+    assert (new["G2E_LEVEL_STEP_C"], new["G2E_LEVEL_PROMOTE_WINDOWS"]) == ("0.05", "2")   # the careful climb, not the 3M screening pace
     old = G.env_for_job({"kind": "final", "tag": "v3_20m", "stage": "s6_full_strength", "levers": ["mirror"], "fresh": True})
     assert (old["G2E_SURFACE_TRANSITION_PROB"], old["G2E_SNAG_OBSTACLE_PROB"], old["G2E_LEDGE_PROB"]) == ("0", "0", "0")
     assert old["G2E_RUBBLE_PROB"] if "G2E_RUBBLE_PROB" in old else True                         # the finished 20M keeps the defaults it trained with (no tuned mix)

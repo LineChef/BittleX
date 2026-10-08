@@ -56,6 +56,10 @@ RECIPE = {
     # record about one training episode in 50 so it can be watched exactly as it happened (episode_recorder.py, watch_training.py); the newest 80 are kept per run
     "G2E_RECORD_EVERY": "50",
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "12", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
+    # 2026-10-08 training upgrade, applied directly (no change to what the policy learns, or a correction too small to screen; docs/plan-detail/handoff-2026-10-08.md 12):
+    # 6 env processes (the M1 Pro's performance cores), only the needed info between processes, the eval / best-checkpoint / health monitor every 1M steps,
+    # IMU noise held for each 5 Hz frame (as on G2), and the paw slip / clearance penalties weighted by paw velocity (they read the paw's x position).
+    "G2E_N_ENVS": "6", "G2E_LEAN_INFO": "1", "G2E_RUN_MONITOR": "1", "G2E_IMU_NOISE_PER_FRAME": "1", "G2E_FIX_PAW_VEL": "1",
 }
 
 # the IMU settings every run before 2026-10-07 (about 9:30 AM) used; queue jobs that must stay in that world set them through their "extra"
@@ -88,7 +92,21 @@ LEVERS = {
     # 2026-10-07 (user): no command-drift training. no_heading drops the accumulated-heading penalty; yaw_damp doubles the yaw-rate damping (FAC_YAW_TRACK is a pure yaw-rate penalty while cmd_yaw is 0: 9 -> 18).
     "no_heading": {"G2E_FAC_HEADING": "0"},
     "yaw_damp": {"G2E_FAC_YAW_TRACK": "18.0"},                                                  # R6
+    # 2026-10-08 training upgrade, screened one at a time (two seeds each) by phase_v4.py:
+    "big_batch": {"G2E_PPO_BATCH": "4096", "G2E_PPO_EPOCHS": "5"},                               # 20 gradient steps per rollout instead of 2,560
+    "frontier": {"G2E_FRONTIER": "1", "G2E_CAP_SIDEHILL_DEG": "0", "G2E_CAP_UPHILL_DEG": "0",      # per-hazard frontier curriculum (physical bounds; caps file = manual override)
+                 "G2E_CAP_DOWNHILL_DEG": "0", "G2E_CAP_LEDGE_M": "0"},
+    "cmd_forward": {"G2E_CMD_BANDS": "forward"},                                                 # no backward, no unreachable fast band (user: drop backward)
+    "opt_bundle": {"G2E_NORM_REWARD": "1", "G2E_LOG_STD_INIT": "-1", "G2E_LR_FLOOR": "0.1"},     # reward normalization, std 0.37 start, LR floor 3e-5
+    "hazard_contact": {"G2E_HAZARD_EP_LEN": "375"},                                              # hazard-focus episodes 4.7 s, obstacles spread to match
+    "imitation_actual": {"G2E_IMITATION_ACTUAL": "1"},                                           # imitation on measured joints (recipe evaluation finding 1)
+    "privileged_critic": {"G2E_PRIV_OBS": "1"},                                                  # critic-only true state + hazards (recipe evaluation finding 3)
 }
+# Levers that change what the POLICY observes: a policy trained with one must be scored with it (scoring_env, benchmark_v4.ladder_env, phase_v3.policy_levers).
+OBS_LEVERS = ("heading_obs", "privileged_critic")
+# Settings only train.py reads (how training runs, not the world): never part of a scoring or ladder environment.
+TRAINER_ONLY_PREFIXES = ("G2E_N_ENVS", "G2E_LEAN_INFO", "G2E_RUN_MONITOR", "G2E_MONITOR_EVERY", "G2E_PLATEAU", "G2E_PPO_", "G2E_NORM_REWARD", "G2E_LOG_STD_INIT",
+                         "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS")
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
 # The SURFACE STEP / TRANSITION (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the training course COMPLETELY (user, 2026-10-08): no stage,
@@ -127,7 +145,7 @@ def stage_extra(stage: str, levers) -> dict:
 
 
 # settings that only make sense while training; scoring never uses them
-TRAIN_ONLY_PREFIXES = ("G2E_RECORD", "G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_ALL", "G2E_LEVEL_", "G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
+TRAIN_ONLY_PREFIXES = TRAINER_ONLY_PREFIXES + ("G2E_RECORD", "G2E_ADAPTIVE_LEVEL", "G2E_CATEGORY_LEVELS", "G2E_SCALE_ALL", "G2E_LEVEL_", "G2E_MIRROR", "G2E_HARD_SCALE", "G2E_RAMP", "G2E_FAULT_", "G2E_LONG_EP", "G2E_DRIFT_", "G2E_MOTOR_SCALE_RAND",
                        "G2E_SLOPE_TARGET_PROB", "G2E_LEDGE_", "G2E_SURFACE_", "G2E_SNAG_", "G2E_TRAIN_YAW")
 
 
@@ -194,21 +212,31 @@ FULL_COURSE = {"G2E_RUBBLE_PROB": "0.575", "G2E_RANDOM_TERRAIN_PROB": "0.34", "G
 # Finals that already ran WITHOUT the staged hazards, kept honest: the 20M of 2026-10-08 was launched as a fresh run on the flat stage by mistake (dropping the chain also dropped the
 # surface steps, snags and ledges it was meant to introduce), so its viewer environment is the flat one. Nothing new is added to this set.
 HISTORICAL_FLAT_FINALS = {"v3_20m"}
+# The careful climb (RECIPE: "Continuation stages and the 20M climb carefully"): +0.05 after two good probes in a row, not the screening pace (+0.10 after one). 2026-10-08 review:
+# since the 20M became a FRESH s0_flat run it silently got the 3M screening pace, so each single noisy probe moved a level by 0.10 (the finished 20M's slope level fell
+# 0.90 -> 0.80 -> 0.70 in two probes at 19.9M). New fresh finals get the careful pace; v3_20m keeps what it ran with.
+FINAL_PACE = {"G2E_LEVEL_WINDOW_C": "8", "G2E_LEVEL_STEP_C": "0.05", "G2E_LEVEL_PROMOTE_WINDOWS": "2"}
 
 
 def env_for_job(job: dict) -> dict:
     """THE training environment of a queue job (phase_v3.train launches with exactly this; the viewers use it too, so what you watch is what trains).
-    A fresh final (the 20M) is stage s0_flat plus the hard-levels factor: no surface steps, snags or ledges. A stage job adds its course settings."""
+    A fresh final (the 20M) is stage s0_flat plus FULL_COURSE (every hazard, with the caps), the careful climb (FINAL_PACE) and the hard-levels factor; the historical
+    flat finals keep the flat stage. A stage job adds its course settings."""
     levers = job.get("levers", [])
     kind = job["kind"]
     if kind == "stage":
         return env_for(*levers, stage=job["stage"], extra=job.get("extra"))
     if kind == "final" and job.get("fresh"):
-        course = {} if job.get("tag") in HISTORICAL_FLAT_FINALS else FULL_COURSE
+        course = {} if job.get("tag") in HISTORICAL_FLAT_FINALS else dict(FULL_COURSE, **FINAL_PACE, G2E_PLATEAU_STOP="1")      # plateau stop on long runs (user, 2026-10-08)
         return env_for(*levers, stage="s0_flat", extra=dict(course, **FINAL_EXTRA, **(job.get("extra") or {})))
     if kind == "final":
         return env_for(*levers, stage=job["stage"], extra=job.get("extra"))
     return env_for(*levers, extra=job.get("extra"))
+
+
+def next_final_env(levers=("mirror",)) -> dict:
+    """The training environment of the next fresh final (what the audits and the cap tests check, so what is audited is what trains)."""
+    return env_for_job({"kind": "final", "tag": "next_fresh_final", "fresh": True, "levers": list(levers)})
 
 
 def scoring_env(*lever_names: str) -> dict:
@@ -216,7 +244,7 @@ def scoring_env(*lever_names: str) -> dict:
     reward geometry a policy was trained with (heading_obs) must be passed so the scoring env builds the same inputs."""
     out = {k: v for k, v in {**RECIPE, **CALIBRATION, **calibration_snapshot()[0], **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
     for name in lever_names:
-        if name == "heading_obs":
+        if name in OBS_LEVERS:
             out.update(LEVERS[name])
     return out
 

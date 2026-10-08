@@ -16,6 +16,8 @@ import json
 import os
 import time
 
+import numpy as np
+
 SERIES = [("v21", "V2.1 (deployed)", "var(--s1)"), ("control", "V3 control (no levers)", "var(--s3)"), ("k3", "V3 base (K3)", "var(--s4)"),
           ("final", "V3 final stage", "var(--s2)")]
 DECISION_CELLS = ["T1.1", "N1", "N3", "N5", "T2.2", "T3.2", "T5.2", "T7.2", "T8.1", "T9.1", "T10.2", "T11.1"]
@@ -66,6 +68,10 @@ ul.plain{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:6px
 details summary{cursor:pointer;color:var(--accent);font-size:.88rem}
 .note{font-size:.85rem;color:var(--ink2);max-width:80ch}
 footer{color:var(--muted);font-size:.8rem}
+.tag.good{color:var(--good);background:var(--good-bg)}.tag.bad{color:var(--bad);background:var(--bad-bg)}
+.gifs{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.gif{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}
+.gif img{width:100%;height:auto;display:block;border-radius:4px}.gif figcaption{font-size:.82rem;color:var(--ink2);margin-top:6px}
 """
 
 
@@ -288,6 +294,225 @@ def sec_history(training):
             f'<div class="panel scroll"><table><thead><tr><th class="l">Run</th><th>Verdict</th><th class="l">Detail</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
 
 
+def sec_reached(reached):
+    """Difficulty reached IN TRAINING per challenge type (user, 2026-10-08): reached = {series key: {"note": str, "rows": {challenge: text}}} (phase_v4.difficulty_reached)."""
+    if not reached:
+        return ""
+    keys = [(k, n, c) for k, n, c in SERIES if k in reached]
+    challenges = []
+    for k, _, _ in keys:
+        for ch in reached[k]["rows"]:
+            if ch not in challenges:
+                challenges.append(ch)
+    head = "".join(f'<th><i class="sw" style="background:{c}"></i> {e(n)}</th>' for k, n, c in keys)
+    body = "".join(f'<tr><td class="l">{e(ch)}</td>' + "".join(f'<td class="l">{e(reached[k]["rows"].get(ch, "not in its course"))}</td>' for k, _, _ in keys) + "</tr>" for ch in challenges)
+    notes = "".join(f'<li><b>{e(n)}</b>: {e(reached[k]["note"])}</li>' for k, n, _ in keys)
+    return (f'<section><h2>Difficulty reached in training</h2><p class="lede">The hardest size of each challenge each policy was training at when its run ended. '
+            f'This is what the training curriculum had earned, not a benchmark score; the ladder above measures the finished policies on fixed levels.</p>'
+            f'<ul class="plain">{notes}</ul><div class="panel scroll"><table><thead><tr><th class="l">Challenge</th>{head}</tr></thead><tbody>{body}</tbody></table></div></section>')
+
+
+def _binom_two_sided(k, n):
+    """Exact two-sided sign-test p-value for k of n discordant pairs going one way (McNemar)."""
+    from math import comb
+    if n == 0:
+        return 1.0
+    tail = sum(comb(n, i) for i in range(0, min(k, n - k) + 1)) / 2 ** n
+    return min(1.0, 2 * tail)
+
+
+def sec_paired(results):
+    """Per cell, the reference (V3) and the candidate (V4) met the SAME courses (seeded episodes), so falls are compared pair by pair (McNemar's exact test) and
+    speed by the paired difference; a verdict only when it is unlikely to be noise (p < 0.05; speed: the 95% interval excludes 0 and the change is >= 3 mm/s)."""
+    a, b = results.get("v21"), results.get("final")
+    if not (a and b):
+        return ""
+    ca, cb = {c["id"]: c for c in a["cells"]}, {c["id"]: c for c in b["cells"]}
+    rows, better, worse = [], 0, 0
+    for cid, x in ca.items():
+        y = cb.get(cid)
+        if not y or "ep_fell" not in x or "ep_fell" not in y or len(x["ep_fell"]) != len(y["ep_fell"]):
+            continue
+        fa, fb = x["ep_fell"], y["ep_fell"]
+        only_a = sum(1 for u, v in zip(fa, fb) if u and not v)
+        only_b = sum(1 for u, v in zip(fa, fb) if v and not u)
+        pf = _binom_two_sided(min(only_a, only_b), only_a + only_b)
+        d = np.array(y["ep_speed"]) - np.array(x["ep_speed"])
+        md, half = float(d.mean()), float(1.96 * d.std(ddof=1) / np.sqrt(len(d))) if len(d) > 1 else 0.0
+        verdicts = []
+        if pf < 0.05:
+            verdicts.append(("fewer falls" if only_a > only_b else "more falls", only_a > only_b))
+        if abs(md) >= 0.003 and abs(md) > half:
+            verdicts.append(("faster" if md > 0 else "slower", md > 0))
+        good = [v for v, ok in verdicts if ok]
+        bad = [v for v, ok in verdicts if not ok]
+        if bad and not good:
+            worse += 1
+            tag = '<span class="tag bad">V4 worse: ' + e(", ".join(bad)) + "</span>"
+        elif good and not bad:
+            better += 1
+            tag = '<span class="tag good">V4 better: ' + e(", ".join(good)) + "</span>"
+        elif good and bad:
+            tag = '<span class="tag">mixed: ' + e(", ".join(good + bad)) + "</span>"
+        else:
+            tag = '<span class="tag">no clear difference</span>'
+        rows.append(f'<tr><td class="l">{e(cid)} {e(x.get("label", ""))}</td><td class="n">{x["fell_fraction"]:.2f} &rarr; {y["fell_fraction"]:.2f}</td>'
+                    f'<td class="n">{only_a} / {only_b}</td><td class="n">{pf:.3f}</td><td class="n">{md * 1000:+.1f} &plusmn; {half * 1000:.1f}</td><td class="l">{tag}</td></tr>')
+    if not rows:
+        return ""
+    return (f'<section><h2>Cell by cell: real differences or noise?</h2><p class="lede">Both policies met the same courses (seeded episodes), so each cell is compared pair by pair. '
+            f'Falls: the episodes only V3 fell vs only V4 fell, with an exact test; a verdict only below p = 0.05. Speed: the paired difference with its 95% interval. '
+            f'<b>{better}</b> cells clearly better for V4, <b>{worse}</b> clearly worse, the rest within noise.</p><div class="panel scroll"><table><thead><tr><th class="l">Cell</th>'
+            f'<th>Falls V3 &rarr; V4</th><th>Only V3 fell / only V4 fell</th><th>p (falls)</th><th>Speed change, mm/s</th><th class="l">Verdict</th></tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody></table></div></section>')
+
+
+def sec_g2(results):
+    """What to expect on G2: the calm 12.5 s walk (N1, as G2 is tested) side by side, with the known sim-to-real gaps."""
+    keys = [(k, n) for k, n, _ in SERIES if results.get(k)]
+    m = {k: next((c for c in results[k]["cells"] if c["id"] == "N1"), None) for k, _ in keys}
+    if not any(m.values()):
+        return ""
+    def val(k, f, fmt):
+        c = m.get(k)
+        return fmt.format(c[f]) if c and f in c else "-"
+    rows = [("Falls (calm 12.5 s walk)", "fell_fraction", "{:.2f}", "G2 falls more than the sim on tile: count them on the floor you test on"),
+            ("Speed, m/s", "speed_mps", "{:.3f}", "the sim walks slower than G2 (about 0.09 vs 0.12 m/s at the same command): compare the two policies, not the sim value with G2"),
+            ("Heading change over 12.5 s, deg (mean)", "heading_mean_deg", "{:+.1f}", "G2 turns right ~36 deg per 12.5 s without the front-foot hold; the sim drifts in a random direction"),
+            ("Heading change, deg (mean of |value|)", "heading_abs_mean_deg", "{:.1f}", "with the hold on, G2's heading is set by the hold, not the policy"),
+            ("Roll wobble, deg (std)", "roll_std_deg", "{:.1f}", "G2's measured roll std on tile: 5.4 deg"),
+            ("Pitch wobble, deg (std)", "pitch_std_deg", "{:.1f}", "G2's measured pitch std on tile: 2.6 deg"),
+            ("Joint speed over the servo limit (share of joints)", "servo_over_frac", "{:.2f}", "commands the servos cannot follow: lower is gentler on G2"),
+            ("Swing clearance, mm (90th percentile)", "foot_clear_p90_mm", "{:.1f}", "how high the paws lift: higher clears carpet edges and cords"),
+            ("Left-right joint asymmetry, deg (max)", "lr_asym_max_deg", "{:.1f}", "a one-sided stance turns G2 on the floor")]
+    head = "".join(f"<th>{e(n)}</th>" for _, n in keys)
+    body = "".join(f'<tr><td class="l">{e(lbl)}</td>' + "".join(f'<td class="n">{val(k, f, fmt)}</td>' for k, _ in keys) + f'<td class="l note">{e(note)}</td></tr>'
+                   for lbl, f, fmt, note in rows)
+    return (f'<section><h2>What to expect on G2</h2><p class="lede">The calm 12.5 s walk (N1), the cell closest to how G2 is tested, with what is known about the sim-to-real gap '
+            f'for each number. Use it to plan the hardware runs and to read them against the sim.</p><div class="panel scroll"><table><thead><tr><th class="l">Measure</th>{head}'
+            f'<th class="l">On the real G2</th></tr></thead><tbody>{body}</tbody></table></div></section>')
+
+
+def sec_falls(results):
+    """How each policy falls: which way, how long into the episode, and in which cells."""
+    keys = [(k, n) for k, n, _ in SERIES if results.get(k)]
+    blocks = []
+    for k, n in keys:
+        falls = [(c["id"], f) for c in results[k]["cells"] for f in c.get("ep_falls", [])]
+        if not falls:
+            blocks.append(f"<h3>{e(n)}</h3><p>No falls recorded (or the result predates per-episode records).</p>")
+            continue
+        ways = {}
+        for _, f in falls:
+            ways[f["way"]] = ways.get(f["way"], 0) + 1
+        cells = {}
+        for cid, _ in falls:
+            cells[cid] = cells.get(cid, 0) + 1
+        ts = sorted(f["t_s"] for _, f in falls)
+        early = sum(1 for t in ts if t < 1.0)
+        blocks.append(f"<h3>{e(n)}: {len(falls)} falls</h3><ul class='plain'>"
+                      + f"<li>Which way: " + ", ".join(f"{e(w)} {v}" for w, v in sorted(ways.items(), key=lambda kv: -kv[1])) + "</li>"
+                      + f"<li>When: median {ts[len(ts) // 2]:.1f} s into the episode; {early} within the first second</li>"
+                      + f"<li>Where most: " + ", ".join(f"{e(c)} ({v})" for c, v in sorted(cells.items(), key=lambda kv: -kv[1])[:5]) + "</li></ul>")
+    return (f'<section><h2>How they fall</h2><p class="lede">Every fall in every cell, by the direction the body tipped, how long into the episode, and where. '
+            f'Sideways falls point at balance across the body; forward or backward falls at stepping and pitch; very early falls at the start pose or a hazard right at the start.</p>'
+            f'<div class="panel">{"".join(blocks)}</div></section>')
+
+
+def _svg_lines(series, xlabel, ylabel, w=640, h=220):
+    """series: [(name, color, [(x, y), ...])] -> a small SVG line chart drawn to one scale."""
+    pts = [p for _, _, s in series for p in s]
+    if not pts:
+        return ""
+    x0, x1 = min(p[0] for p in pts), max(p[0] for p in pts)
+    y0, y1 = min(p[1] for p in pts), max(p[1] for p in pts)
+    if x1 == x0:
+        x1 = x0 + 1
+    if y1 == y0:
+        y1 = y0 + 1
+    L, R, T, B = 52, 12, 10, 34
+    sx = lambda x: L + (x - x0) / (x1 - x0) * (w - L - R)
+    sy = lambda y: T + (1 - (y - y0) / (y1 - y0)) * (h - T - B)
+    out = [f'<svg viewBox="0 0 {w} {h}" class="chart-svg" role="img" aria-label="{e(ylabel)} vs {e(xlabel)}">']
+    for i in range(5):
+        yv = y0 + (y1 - y0) * i / 4
+        out.append(f'<line x1="{L}" x2="{w - R}" y1="{sy(yv):.1f}" y2="{sy(yv):.1f}" stroke="var(--line)" stroke-width="1"/>'
+                   f'<text x="{L - 6}" y="{sy(yv) + 4:.1f}" text-anchor="end" font-size="10" fill="var(--muted)">{yv:.3g}</text>')
+    for i in range(5):
+        xv = x0 + (x1 - x0) * i / 4
+        out.append(f'<text x="{sx(xv):.1f}" y="{h - 14}" text-anchor="middle" font-size="10" fill="var(--muted)">{xv:.3g}</text>')
+    out.append(f'<text x="{(L + w - R) / 2:.0f}" y="{h - 2}" text-anchor="middle" font-size="10" fill="var(--muted)">{e(xlabel)}</text>')
+    for name, color, s in series:
+        if s:
+            out.append(f'<polyline fill="none" stroke="{color}" stroke-width="2" points="' + " ".join(f"{sx(x):.1f},{sy(y):.1f}" for x, y in s) + '"/>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def sec_training(train):
+    """How each run trained (user, 2026-10-08): reward over the run, the fixed-difficulty eval and the curriculum's progress, why it stopped, and each hazard's success vs size."""
+    if not train:
+        return ""
+    colors = {k: c for k, _, c in SERIES}
+    names = {k: n for k, n, _ in SERIES}
+    parts = []
+    rew = [(names[k], colors[k], t.get("reward", [])) for k, t in train.items()]
+    parts.append(f'<div class="chart"><h3>Mean episode reward over the run (millions of steps)</h3>{_svg_lines(rew, "steps (M)", "reward")}</div>')
+    ev = [(names[k], colors[k], t.get("eval", [])) for k, t in train.items() if t.get("eval")]
+    if ev:
+        parts.append(f'<div class="chart"><h3>Fixed-difficulty eval every 1M steps (0-1)</h3>{_svg_lines(ev, "steps (M)", "eval")}</div>')
+    notes = "".join(f"<li><b>{e(names[k])}</b>: {e(t.get('note', ''))}</li>" for k, t in train.items())
+    curves = ""
+    for k, t in train.items():
+        fr = t.get("frontier_bins")
+        if not fr:
+            continue
+        rows = []
+        for h, (bins, bound, unit) in fr.items():
+            cells = "".join((f'<td class="n">{v:.2f}<br><span class="note">n {nn}</span></td>' if nn else '<td class="n note">-</td>') for v, nn in bins)
+            rows.append(f'<tr><td class="l">{e(h)}<br><span class="note">0-{bound:g} {e(unit)}</span></td>{cells}</tr>')
+        nb = len(next(iter(fr.values()))[0])
+        curves += (f'<div class="panel scroll"><h3>{e(names[k])}: success by size, each hazard (relative to a hazard-free walk; columns = size bins from small to the physical bound)</h3>'
+                   f'<table><thead><tr><th class="l">Hazard</th>' + "".join(f"<th>{i + 1}</th>" for i in range(nb)) + f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    return (f'<section><h2>How they trained</h2><ul class="plain">{notes}</ul>{legend({k: True for k in train})}<div class="panel"><div class="charts">{"".join(parts)}</div></div>'
+            f'{curves}</section>')
+
+
+def sec_gifs(gifs):
+    """Side-by-side replays: the same course (same seed) for both policies, one GIF per cell (left V3, right V4)."""
+    if not gifs:
+        return ""
+    items = "".join(f'<figure class="gif"><img src="{uri}" alt="{e(label)}: V3 left, V4 right" loading="lazy"><figcaption>{e(label)} &middot; '
+                    f'{e(outcome)}</figcaption></figure>' for label, uri, outcome in gifs)
+    return (f'<section><h2>Side by side</h2><p class="lede">The same course and the same random events for both policies (left V3, right V4), so differences are the policies'
+            f' own. Deterministic actions, as on G2.</p><div class="gifs">{items}</div></section>')
+
+
+def sec_delay(results, delay):
+    """Reality-gap check: each policy's falls and speed with the 12.5 ms command delay G2's walks show, against the same cells as trained (4 ms)."""
+    if not delay:
+        return ""
+    keys = [(k, n) for k, n, _ in SERIES if k in delay and results.get(k)]
+    cells = [c["id"] for c in delay[keys[0][0]]["cells"]]
+    rows = []
+    for cid in cells:
+        tds = []
+        for k, _ in keys:
+            base = next((c for c in results[k]["cells"] if c["id"] == cid), None)
+            d = next((c for c in delay[k]["cells"] if c["id"] == cid), None)
+            if base and d:
+                tds.append(f'<td class="n">{base["fell_fraction"]:.2f} &rarr; {d["fell_fraction"]:.2f}</td><td class="n">{base["speed_mps"]:.3f} &rarr; {d["speed_mps"]:.3f}</td>')
+            else:
+                tds.append('<td class="n">-</td><td class="n">-</td>')
+        label = next((c.get("label", "") for c in delay[keys[0][0]]["cells"] if c["id"] == cid), "")
+        rows.append(f'<tr><td class="l">{e(cid)} {e(label)}</td>{"".join(tds)}</tr>')
+    head = "".join(f'<th>{e(n)}: falls</th><th>{e(n)}: speed</th>' for _, n in keys)
+    return (f'<section><h2>Reality-gap check: the measured command delay</h2><p class="lede">G2\'s walk logs show about 12.5 ms of command-path delay (the loop\'s 99th-percentile tick '
+            f'minus its median); the sim trains with up to 4 ms. Each policy is scored again with 12.5 ms (evaluation only, nothing trains on it). Little change means the parameter does not '
+            f'matter; a large drop means it is worth a training screen. Each cell: as scored above &rarr; with the delay.</p><div class="panel scroll"><table><thead><tr><th class="l">Cell</th>'
+            f'{head}</tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>')
+
+
 def sec_caveats():
     items = [
         "The sim is calibrated to G2's roll and pitch while walking (servo speed 200 deg/s, motor force 0.15 N*m). It does not reproduce G2's real right drift, so a better heading number here is evidence, not proof.",
@@ -300,7 +525,11 @@ def sec_caveats():
     return '<section><h2>What these numbers cannot tell us</h2><ul class="plain">' + "".join(f"<li>{e(i)}</li>" for i in items) + "</ul></section>"
 
 
-def build(results, training, title="V3 Pre-20M Benchmark"):
+def build(results, training, title="V3 Pre-20M Benchmark", labels=None, reached=None, train=None, gifs=None, delay=None):
+    """labels: {"v21": "...", "final": "..."} renames the series (the V3 vs V4 report passes the deployed V3 as the reference "v21" slot and V4 as "final")."""
+    global SERIES
+    if labels:
+        SERIES = [(k, labels.get(k, n), c) for k, n, c in SERIES]
     ref = results.get("v21") or next(iter(results.values()))
     fin = results.get("final")
     meta = (f'benchmark version {ref.get("bench_version", "?")}, {ref.get("episodes", "?")} episodes per cell, seed {ref.get("seed", "?")}'
@@ -309,7 +538,8 @@ def build(results, training, title="V3 Pre-20M Benchmark"):
              '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">',
              '<div class="page"><header><div class="eyebrow">G2 gait retrain / benchmark before the 20M decision</div>', f"<h1>{e(title)}</h1>",
              f'<p class="lede">Final-stage policy against the deployed V2.1, scored on the training-matched benchmark. {e(meta)}. Generated {time.strftime("%B %d, %Y, %I:%M %p")} Eastern.</p></header>',
-             sec_verdict(results), sec_ladder(results), sec_straight(results), sec_cells(results), sec_replicates(training), sec_history(training), sec_caveats(),
+             sec_verdict(results), sec_paired(results), sec_g2(results), sec_gifs(gifs), sec_ladder(results), sec_reached(reached), sec_training(train),
+             sec_falls(results), sec_delay(results, delay), sec_straight(results), sec_cells(results), sec_replicates(training), sec_history(training), sec_caveats(),
              '<footer>Scores come from benchmark_v4.py (bench version 5) on the shared G2 profile in g2_profile.py. The 20M run starts only on your go.</footer></div>']
     return "\n".join(parts)
 

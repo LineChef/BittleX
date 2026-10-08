@@ -140,6 +140,7 @@ def cost(row, default_eps):
 def v4_metrics(eps_list):
     """eps_list: [(rec, per_term, steps, fell, recovered)] from benchmark_gaits._bench."""
     heads, speeds, early, late, roll_s, pitch_s, jm, over, yrms, falls, clear = [], [], [], [], [], [], [], [], [], [], []
+    ep_falls = []                                # per fallen episode: when and which way (2026-10-08 report: how each policy falls)
     for rec, pt, steps, fell, _ in eps_list:
         x = np.array(rec["x"])
         yaw = np.unwrap(np.array(rec["yaw"]))
@@ -157,6 +158,11 @@ def v4_metrics(eps_list):
             clear.append(float(np.mean([np.percentile(np.array(fz), 90) for fz in rec["foot_z"] if len(fz)])) * 1000.0)
         tilt = np.maximum(np.abs(rec["roll"]), np.abs(rec["pitch"]))
         falls.append(bool(tilt.max() > 1.3))
+        if falls[-1]:
+            i = int(np.argmax(tilt > 1.3))
+            r_, p_ = float(rec["roll"][i]), float(rec["pitch"][i])
+            way = ("sideways, left side down" if r_ < 0 else "sideways, right side down") if abs(r_) >= abs(p_) else ("forward, nose down" if p_ > 0 else "backward, nose up")
+            ep_falls.append({"ep": len(falls) - 1, "t_s": round(i / STEPS_HZ, 2), "way": way})
     jm = np.mean(np.array(jm), axis=0)
     asym = [float(jm[a] - jm[b]) for a, b in JOINT_PAIRS]
     h = np.array(heads)
@@ -173,6 +179,7 @@ def v4_metrics(eps_list):
         servo_over_frac=float(np.mean(over)),
         foot_clear_p90_mm=float(np.mean(clear)) if clear else 0.0,
         joint_mean_deg=[float(v) for v in jm],
+        ep_fell=[bool(f) for f in falls], ep_speed=[round(float(v), 4) for v in speeds], ep_falls=ep_falls,      # per episode, for paired comparisons (same seeds for every policy)
     )
 
 
@@ -191,18 +198,21 @@ LADDER_HARD_SCALE = 1.10                                    # g2_profile.FINAL_E
 LADDER_UP = 0.80                                            # = LEVEL_UP_SCORE in g2_profile.RECIPE: a level counts as reached at a relative score >= this
 LADDER_BASE_FLOOR = 0.30                                    # train.py Curriculum: rel = raw / max(base, 0.30)
 LADDER_EPISODES = 20
-LADDER_STAGE = "s6_full_strength"                           # the world the 20M trains in
+LADDER_VERSION = 2          # 2: hazard forced present, forward commands, seeds honoured, fixed shove size (2026-10-08 review); 1 = everything scored before
+LADDER_STAGE = "fresh final: s0_flat + FULL_COURSE"          # the world the next 20M trains in (2026-10-08 review: it was the old staged plan's s6_full_strength course, without the caps)
 
 
 def ladder_env(world_levers=(), obs_levers=(), hard=False):
     """The G2E_* settings of the ladder's world: the base recipe + calibration + the kept levers' settings + the final stage's course (everything the training probe
     sees), with only the observation-changing levers a policy needs (heading_obs) set per policy. hard=True adds the final run's +10% hardest levels."""
-    levers = [l for l in world_levers if l != "heading_obs"]
-    env = dict(g2_profile.env_for(*levers, stage=LADDER_STAGE))
-    for k in [k for k in env if k.startswith(("G2E_MIRROR", "G2E_RAMP"))]:      # training-only, never read at inference
+    levers = [l for l in world_levers if l not in g2_profile.OBS_LEVERS]
+    env = dict(g2_profile.env_for(*levers, stage="s0_flat", extra=dict(g2_profile.FULL_COURSE)))
+    # training-only settings, and the caps (a lever such as `frontier` removes them, so leaving them would score policies on different courses): one fixed ladder for every policy
+    for k in [k for k in env if k.startswith(("G2E_MIRROR", "G2E_RAMP", "G2E_CAP_") + g2_profile.TRAINER_ONLY_PREFIXES)]:
         del env[k]
-    if "heading_obs" in obs_levers:
-        env.update(g2_profile.LEVERS["heading_obs"])
+    for name in obs_levers:
+        if name in g2_profile.OBS_LEVERS:
+            env.update(g2_profile.LEVERS[name])
     if hard:
         env.update(g2_profile.FINAL_EXTRA)
     return env
@@ -235,11 +245,14 @@ def _ladder_worker(job):
     out = []
     for cat, level in job["cells"]:
         E.CATEGORY_OVERRIDE = {cat: float(level)} if cat else {"terrain": 0.0}
-        t0 = time.time()
+        E.CATEGORY_FORCE = bool(cat)          # LADDER_VERSION 2 (2026-10-08 review): like the curriculum probe, the hazard is in every episode, the walk is forward,
+        t0 = time.time()                      # episode k has the same seed and command for every level and policy, and the shove size is fixed (it used to adapt to the policy's falls)
         scores, falls, speeds = [], [], []
         for k in range(job["episodes"]):
             if hasattr(model, "reset"):
                 model.reset()
+            env.set_command(fwd=E.probe_command(job["seed"] + k), yaw=0.0)
+            env._push_curr, env._ep_outcomes = 1.0, []
             obs, _ = env.reset(seed=job["seed"] + k)
             x0 = pb.getBasePositionAndOrientation(env.robot_id)[0][0]
             peak, steps = 0.0, 0
@@ -256,7 +269,9 @@ def _ladder_worker(job):
             falls.append(fell)
             speeds.append((pb.getBasePositionAndOrientation(env.robot_id)[0][0] - x0) / (steps / STEPS_HZ))
         E.CATEGORY_OVERRIDE = {}
-        out.append(dict(category=cat, level=level, hard=bool(job["hard"]), episodes=job["episodes"], score=float(np.mean(scores)),
+        E.CATEGORY_FORCE = False
+        env._forced_cmd = None
+        out.append(dict(category=cat, level=level, ladder_version=LADDER_VERSION, hard=bool(job["hard"]), episodes=job["episodes"], score=float(np.mean(scores)),
                         fell_fraction=float(np.mean(falls)), speed_mps=float(np.mean(speeds)), seconds=round(time.time() - t0, 1)))
         print(f"  [{os.getpid()}] ladder {cat or 'clean'} {level:.2f}{' hard' if job['hard'] else ''}: score {np.mean(scores):.2f}  fell {np.mean(falls):.0%}", flush=True)
     return out

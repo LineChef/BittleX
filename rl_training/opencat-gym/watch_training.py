@@ -50,13 +50,23 @@ def replay(path: str) -> bool:
         u.set_category_levels(m["levels"])
     u._len_ep = int(m.get("len_ep", 0))
     u._forced_cmd = m.get("forced_cmd")
+    if m.get("push_curr") is not None:                   # recordings made after 2026-10-08: the env's shove multiplier and the caps in force at the time
+        u._push_curr = float(m["push_curr"])
+    if m.get("caps"):
+        E.apply_caps(m["caps"])
+    fr = m.get("frontier")
+    if fr and fr.get("w"):                               # FRONTIER runs: the bin weights in force when the episode started
+        u.set_frontier(fr)
     np.random.set_state(ep["rng"])
     env.reset()
     focus = m.get("focus")
     print(f"\n{os.path.basename(path)}  recorded {m['recorded_at']}  focus: {focus or 'combo/easy'}  levels {m['levels']}  difficulty this episode {m['d']}"
           f"  slope {[round(float(np.degrees(x)), 1) for x in m['slope_rp']]} deg{' (targeted)' if m['slope_targeted'] else ''}", flush=True)
     total, steps, out = 0.0, 0, None
-    for a in ep["actions"]:
+    ramp_events = {int(i): v for i, v in m.get("ramp_events", [])}      # mid-episode ramp updates (recordings made after 2026-10-08)
+    for i, a in enumerate(ep["actions"]):
+        if i in ramp_events:
+            u.set_ramp_steps(ramp_events[i])
         out = env.step(a)
         total += float(out[1])
         steps += 1

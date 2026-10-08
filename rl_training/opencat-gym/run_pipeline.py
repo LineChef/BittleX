@@ -196,7 +196,9 @@ def _clean_stale(tag):
             os.remove(f)
 
 
-def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetune_target_kl="0.05"):
+def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetune_target_kl="0.05", base=True):
+    """base=False: `extra` is the WHOLE environment (phase_v3 passes g2_profile.env_for_job). 2026-10-08 review fix: the old BASE dict (hw1-era IMU bias 2 deg, body mass 1.12,
+    servo 137 deg/s ...) was merged under every launch; the V3 profile overrides each of its keys today, but any key a profile ever drops would silently come back from it."""
     if any_training():
         raise SystemExit(f"another training is running -- refusing to launch {tag} on top of it")
     _clean_stale(tag)
@@ -205,7 +207,7 @@ def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetun
     # with the same unpacking silently lets later keys win, which is what we actually
     # want here: extra overriding a BASE default (2026-09-26, found when a yaw-tuning
     # candidate tried to override BASE's own G2E_FAC_YAW_TRACK).
-    env = {**os.environ, **BASE, **extra}
+    env = {**os.environ, **(BASE if base else {}), **extra}
     # start_run.sh can raise up to two y/N prompts (lingering viewer, then
     # uncommitted changes) -- `yes y` answers as many as show up, not just
     # the first (2026-09-24: a single `echo y` silently lost b4_carpet in

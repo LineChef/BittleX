@@ -32,11 +32,17 @@ N_FRAMES = 30
 PHASE_IDX = 9
 
 
+PRIV_DIM = 22          # opencat_gym_env.PRIV_DIM: the critic-only values appended last (PRIV_OBS)
+PRIV_NEG = (0, 2, 4, 6, 13)                     # roll, roll rate, yaw rate, sideways velocity, ground roll flip sign
+PRIV_SWAP = {9: 10, 10: 9, 11: 12, 12: 11}      # paw contacts FL<->FR, BR<->BL
+
+
 def _maps(obs_dim):
     """(perm, sign) so that mirrored = obs[..., perm] * sign, except the phase column, which is shifted separately."""
-    heading = {278: False, 280: True}.get(obs_dim)
+    priv = obs_dim in (278 + PRIV_DIM, 280 + PRIV_DIM)
+    heading = {278: False, 280: True}.get(obs_dim - (PRIV_DIM if priv else 0))
     if heading is None:
-        raise ValueError(f"mirror.py supports the 278-value base observation and the 280-value HEADING_OBS one, not {obs_dim}")
+        raise ValueError(f"mirror.py supports the 278-value base observation and the 280-value HEADING_OBS one (+{PRIV_DIM} PRIV_OBS), not {obs_dim}")
     perm = list(range(obs_dim))
     sign = np.ones(obs_dim)
     sign[0:4] = [-1, 1, -1, 1]          # quaternion
@@ -53,6 +59,12 @@ def _maps(obs_dim):
     for f in range(N_FRAMES):
         for j in range(8):
             perm[state + 8 * f + j] = state + 8 * f + int(JOINT_SWAP[j])
+    if priv:
+        base = obs_dim - PRIV_DIM
+        for k in PRIV_NEG:
+            sign[base + k] = -1
+        for a, b in PRIV_SWAP.items():
+            perm[base + a] = base + b
     return np.array(perm), sign
 
 
@@ -111,13 +123,17 @@ class MirrorPPO(PPO):
                     actions = rollout_data.actions.long().flatten()
 
                 mirror_pair = None
-                if self.mirror_w > 0 and self.policy.share_features_extractor:
+                if self.mirror_w > 0:
                     # one forward pass over [observations, mirrored observations] gives SB3's evaluate_actions() outputs for the real half
                     # and the mirrored policy mean / value for the other half (about 2x the batch, not 3 passes)
                     obs = rollout_data.observations
                     n = obs.shape[0]
                     feats = self.policy.extract_features(th.cat([obs, mirror_obs(obs)], dim=0))
-                    latent_pi, latent_vf = self.policy.mlp_extractor(feats)
+                    if self.policy.share_features_extractor:
+                        latent_pi, latent_vf = self.policy.mlp_extractor(feats)
+                    else:                       # separate actor / critic extractors (priv_policy.PrivCriticPolicy: the actor's masks the privileged values)
+                        latent_pi = self.policy.mlp_extractor.forward_actor(feats[0])
+                        latent_vf = self.policy.mlp_extractor.forward_critic(feats[1])
                     mean_all = self.policy.action_net(latent_pi)
                     dist = self.policy.action_dist.proba_distribution(mean_all[:n], self.policy.log_std)
                     log_prob, entropy = dist.log_prob(actions), dist.entropy()

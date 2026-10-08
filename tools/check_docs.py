@@ -41,7 +41,7 @@ def md_files(root, staged=False):
         return sorted(f for f in out if f.endswith(".md") and os.path.exists(os.path.join(root, f)))
     found = []
     for d, dirs, files in os.walk(root):
-        dirs[:] = [x for x in dirs if x not in SKIP_DIRS]
+        dirs[:] = [x for x in dirs if x not in SKIP_DIRS and not x.startswith(".venv")]      # .venv-x86_64 etc. (2026-10-08)
         for f in files:
             if f.endswith(".md"):
                 found.append(os.path.relpath(os.path.join(d, f), root))

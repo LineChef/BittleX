@@ -104,7 +104,7 @@ def save(path, obj):
 # ----------------------------------------------------------------------------------------------- scoring
 def policy_levers(levers):
     """Only the observation-changing levers matter to how a policy is scored."""
-    return tuple(l for l in levers if l == "heading_obs")
+    return tuple(l for l in levers if l in g2_profile.OBS_LEVERS)
 
 
 def score(policy_path, levers, spec=None, busy=False, ladder=False, ladder_levers=(), extra_env=None):
@@ -229,7 +229,7 @@ def train(job, results):
         return True
     minutes = STEP_MIN * float(steps) / 3e6
     log(f"{tag} START ({kind}): {job.get('desc', '')} levers={levers} steps={steps} -> done about {clock_in(minutes)}, scored about {clock_in(minutes + SCORE_MIN)}")
-    RP.launch(tag, env, steps=steps, from_ckpt=from_ckpt)
+    RP.launch(tag, env, steps=steps, from_ckpt=from_ckpt, base=False)
     return True
 
 
@@ -245,7 +245,7 @@ def finish(job, results, ctrl_res):
     try:                                              # the difficulty levels the curriculum had reached when the run ended (last probe line)
         probes = [l for l in open(f"trained/{tag}_console.log") if l.startswith("[probe]")]
         if probes:
-            reached = probes[-1].strip().split("(new level):", 1)[-1].strip()
+            reached = probes[-1].strip().split("new level:", 1)[-1].strip()      # 2026-10-08 review fix: it split on "(new level):", which the line never contains
     except OSError:
         pass
     rec = dict(kind=kind, levers=levers, summary=summary(res) + (f" | levels reached: {reached}" if reached else ""), result_file=f"trained/v3_score_{tag}.json")
@@ -297,12 +297,15 @@ def do_report(job, results, last_stage, outdir=None, episodes=None, spec=None, l
     kept = results[K3]["levers"] if K3 in results else []
     post = job.get("report_of")                  # a report of a finished run (the 20M): reuses the pre-20M report's scores of V2.1, the control and K3
     final_path = f"trained/{post}_ppo" if post else f"trained/{last_stage}_ppo"
-    policies = [("v21", V21, []), ("control", "trained/v3_c0b_ppo", []), ("k3", f"trained/{K3}_ppo", kept), ("final", final_path, kept)]
+    policies = [("v21", V21, []), ("control", f"trained/{CONTROL}_ppo", []), ("k3", f"trained/{K3}_ppo", kept), ("final", final_path, kept)]
     if post:
-        for key in ("v21", "control", "k3"):
+        import benchmark_v4
+        for key in ("v21", "control", "k3"):     # (2026-10-08 review: "control" is CONTROL, the current world's control; it was v3_c0b, an old-IMU control that failed against C0)
             src, dst = f"{REPORT_DIR}/{key}.json", f"{outdir}/{key}.json"
             if os.path.exists(src) and not os.path.exists(dst):
-                shutil.copy(src, dst)
+                lad = (json.load(open(src)).get("ladder") or {}).get("cells") or [{}]
+                if lad[0].get("ladder_version", 1) == benchmark_v4.LADDER_VERSION:       # an older ladder (diluted probe, unseeded) is scored again, not mixed in
+                    shutil.copy(src, dst)
     elif last_stage == K3:                       # no stage chain: "final" would be K3 scored a second time
         policies = policies[:3]
     log(f"REPORT scoring {len(policies)} policies on benchmark v5 with the difficulty ladder (world levers {kept}); about 10 min each -> done about {clock_in(10 * len(policies))}")
@@ -336,10 +339,63 @@ def do_report(job, results, last_stage, outdir=None, episodes=None, spec=None, l
     return html_path
 
 
+def _world_key(profile):
+    """The physical / observation settings of a scoring profile (reward weights and probe settings do not change how a policy is scored)."""
+    return {k: v for k, v in (profile or {}).items() if not k.startswith(("G2E_FAC_", "G2E_PROBE_"))}
+
+
+def gate_baseline(results, frm, levers):
+    """(result, path) of `frm`'s scores in the world the gait checks score in NOW, or (None, None). 2026-10-08 review fix: the K3 envelope was scored in world 1 and the
+    next 20M's checkpoints are scored in world 2 (the spine payload layout alone moved the finished 20M's T3.2 falls 0.10 -> 0.35), so a 3M check could stop the run on a
+    regression the world change made. `python phase_v3.py rebase-baseline` scores the baseline again in the current world (results[frm]["rebased_files"])."""
+    want = _world_key(g2_profile.scoring_env(*policy_levers(levers)))
+    rec = results.get(frm, {})
+    for f in [rec.get("result_file")] + list(rec.get("rebased_files", [])):
+        if f and os.path.exists(f):
+            d = json.load(open(f))
+            if _world_key(d.get("profile")) == want:
+                return d, f
+    return None, None
+
+
+ENVELOPE_POLICIES = ("v3_s1_mirror", "v3_r_s1_s43", "v3_r_s1_s44", "v3_k3")     # the four 3M mirror runs the K3 envelope is the worst case of (its baseline_note)
+
+
+def rebase_baseline(frm=K3):
+    """Score the gait-check baseline again in the CURRENT world: for the K3 envelope, the four 3M mirror policies on the gate cells, worst case per cell (max falls, min speed)."""
+    results = load(RESULTS, {})
+    levers = results.get(frm, {}).get("levers", ["mirror"])
+    spec = ",".join(["N1"] + [c for c in DECISION_CELLS if c != "N1"])
+    pols = [t for t in (ENVELOPE_POLICIES if frm == K3 else (frm,)) if os.path.exists(f"trained/{t}_ppo.zip")]
+    log(f"REBASE scoring {pols} on the gate cells in the current world (about {4 * len(pols)} min) -> done about {clock_in(4 * len(pols))}")
+    scored = [score(f"trained/{t}_ppo", levers, spec=spec) for t in pols]
+    env = scored[0]
+    cells = []
+    for c in env["cells"]:
+        same = [cellmap(s)[c["id"]] for s in scored if c["id"] in cellmap(s)]
+        worst = dict(c)
+        worst["fell_fraction"] = max(x["fell_fraction"] for x in same)
+        worst["speed_mps"] = min(x["speed_mps"] for x in same)
+        cells.append(worst)
+    env = dict(env, cells=cells, policy=f"worst case of {pols}", baseline_note=f"rebased in the current world, {time.strftime('%Y-%m-%d %I:%M %p')}")
+    import hashlib
+    path = f"trained/v3_score_{frm}_envelope_{hashlib.sha1(json.dumps(_world_key(env['profile']), sort_keys=True).encode()).hexdigest()[:8]}.json"
+    save(path, env)
+    rec = results.setdefault(frm, {})
+    rec["rebased_files"] = sorted(set(rec.get("rebased_files", [])) | {path})
+    save(RESULTS, results)
+    log(f"REBASE done: {path} | {summary(env)}")
+    return path
+
+
 def run_final(job, results):
     """20M with gait checks: each checkpoint is scored against the stage it continues from; a regression stops the run."""
     tag = job["tag"]
-    base = json.load(open(results[job["from"]]["result_file"]))
+    base, base_file = gate_baseline(results, job["from"], job.get("levers", []))
+    if base is None:
+        log(f"{tag} HALT: no {job['from']} baseline scored in the current world (profile mismatch); run `python phase_v3.py rebase-baseline`, then restart the runner")
+        return False
+    log(f"{tag} gait checks compare against {base_file}")
     for step in FINAL_CHECK_STEPS:
         ok, reason = RP.wait_for_ckpt(tag, step)
         if not ok:
@@ -522,6 +578,9 @@ def run_queue():
         if job.get("needs") and job["needs"] not in job.get("levers", []):
             log(f"{tag} SKIPPED: the {job['needs']} lever was not kept")
             continue
+        if kind == "final" and not RP.training(tag) and not os.path.exists(f"trained/{tag}_ppo.zip") and gate_baseline(results, job["from"], job.get("levers", []))[0] is None:
+            log(f"{tag} NOT STARTED: its gait checks need {job['from']}'s scores in the current world (profile mismatch); run `python phase_v3.py rebase-baseline`, then restart the runner")
+            return
         train(job, results)
         if kind == "final":
             if not run_final(job, results):
@@ -601,5 +660,7 @@ if __name__ == "__main__":
         print(f"wrote {QUEUE} ({len(default_queue())} jobs)")
     elif cmd == "status":
         status()
+    elif cmd == "rebase-baseline":
+        rebase_baseline(sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("-") else K3)
     else:
         run_queue()
