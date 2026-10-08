@@ -24,6 +24,7 @@ def test_the_launch_uses_the_same_function(monkeypatch):
     import phase_v3
     import g2_profile as G
     seen = {}
+    monkeypatch.setattr(phase_v3, "log", lambda *a, **k: None)         # never write to the real queue log
     monkeypatch.setattr(phase_v3.RP, "training", lambda tag: False)
     monkeypatch.setattr(phase_v3.RP, "launch", lambda tag, env, steps, from_ckpt: seen.update(env=dict(env), steps=steps))
     monkeypatch.setattr(os.path, "exists", lambda p: False if str(p).endswith("_ppo.zip") else os.path.lexists(p))
