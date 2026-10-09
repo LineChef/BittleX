@@ -46,3 +46,11 @@ Started on tile 4 in before the ramp, 4 ft of floor beyond. All six cleared it. 
 - The path stays near straight on tape while the body turns; unexplained.
 - A 6.4 mm ramped threshold costs neither walk any speed or stability.
 - Not done: the taller threshold, the low-pack repeat, bench servo tests. `real2sim.py --fit` waits for an idle Mac.
+
+## Sim-versus-real replay and fit (run 2026-10-09 evening, Mac idle)
+
+`real2sim.py` replays the joint commands G2 actually sent through the training environment (no randomization) and compares the body motion with G2's IMU. Nine V4 hold-off hardwood logs (capture A runs 2, 4, 6, 8, 10, 12 and the three facing-check runs; the scripted-walk logs have a different format and were not replayed):
+
+- **Per log:** real roll sway 3.5-4.3 deg against 2.7-2.9 in the sim (the sim sways about 30% less), pitch 1.9-2.9 against 1.7-1.9, dominant sway frequency 0.77-0.79 Hz real against 0.79 sim (matches). Gap score 0.02-0.10 (mean about 0.04).
+- **Fit** (`real2sim_fit.json`, 60 grid points over servo speed limit, motor force and ground friction): best gap 0.028 at servo speed 320 deg/s (the sim uses 200), motor force 0.18-0.22, friction 1.0-1.3. The five best points differ by under 0.002 in gap, so the data does not separate these three settings: **not confident, nothing applied.** It must reproduce on a second session (another day or battery) and pass `tools/g2_calibrate.py`'s gates before any value goes into training. Heading is not part of the fit (real data never sets drift).
+- **Ingest** (`tools/g2_ingest.py` on the Pi's automatic logs, 196 runs): 35 usable (119 s of steady walking), all from hardware epoch 2026-10-07 on tile; 153 quarantined (65 with a steady window under 2 s, 60 steering-test runs, 55 whose floor was not confirmed for that time, 50 with too few rows); 8 excluded. Today's explicit-log capture runs are not in the store (they have no automatic sidecar); they feed `real2sim.py` directly.

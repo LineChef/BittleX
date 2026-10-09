@@ -1,0 +1,542 @@
+{
+ "logs": [
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run02_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run04_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run06_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run08_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run10_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/sysidA2_20261009_run12_holdoff_V21.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/facing2_20261009_run01_holdoff.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/facing2_20261009_run02_holdoff.csv",
+  "/Users/markjohnson/Desktop/OneFolder/G2/walk-logs/facing2_20261009_run03_holdoff.csv"
+ ],
+ "real": [
+  {
+   "roll_std": 3.9985366669363405,
+   "pitch_std": 1.8869171370336062,
+   "roll_hz": 0.7834657390432296
+  },
+  {
+   "roll_std": 3.7827199452765092,
+   "pitch_std": 1.9723664780255687,
+   "roll_hz": 0.7817294199958582
+  },
+  {
+   "roll_std": 3.491078924455047,
+   "pitch_std": 2.109733398107241,
+   "roll_hz": 0.7723677706376629
+  },
+  {
+   "roll_std": 3.791753615575831,
+   "pitch_std": 2.228533964229618,
+   "roll_hz": 0.7727497527200777
+  },
+  {
+   "roll_std": 4.294337930530214,
+   "pitch_std": 2.9331926931560184,
+   "roll_hz": 0.7854040511140941
+  },
+  {
+   "roll_std": 3.9274787168921583,
+   "pitch_std": 1.9429977342092706,
+   "roll_hz": 0.7727497527200786
+  },
+  {
+   "roll_std": 3.8313603455243905,
+   "pitch_std": 2.1811621951246005,
+   "roll_hz": 0.7697044334975391
+  },
+  {
+   "roll_std": 4.106538413334893,
+   "pitch_std": 1.9926401110297132,
+   "roll_hz": 0.7731321128154373
+  },
+  {
+   "roll_std": 3.671492694822316,
+   "pitch_std": 2.267130020369817,
+   "roll_hz": 0.7850156218108734
+  }
+ ],
+ "ranked": [
+  [
+   0.027998800561475443,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.028167005770216604,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.028255204208438515,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.028406410809094174,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.029167452471398514,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.029800895572203785,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.03131256040542933,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.03150119504993101,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.031764599249940365,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.0319097483509481,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.03300120276512275,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.0330344142189606,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.03313201778679207,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.033711526676932176,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.034365137033203895,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.034626797311714995,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.036185164930672906,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.03622966834218481,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.03628207231293365,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.03642063220636777,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.03647280064019358,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.03680084908894173,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.03691493153757338,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.03717149258122149,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.0373967699781006,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.037585763268529755,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.037708587258855696,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 250.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.0383512178807534,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.038926257292368996,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.03912425291555904,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.039577929585547296,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.04082941968462215,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 320.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.041640604712667985,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.042083644909408635,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.04520548939105587,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.04559113487220115,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 200.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.06520526434103405,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.06890793732000484,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.06921039638475884,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.07390624560114124,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.07796446904351306,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.07847597979437086,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.07884415781417256,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.08398500971668568,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.08412514517970082,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.08482729402346827,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.08632016434732709,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.08973388291504432,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.08996697752972663,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.08999366789405544,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 160.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.10002653899438833,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.10113106360869392,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.3
+   }
+  ],
+  [
+   0.10399609232561338,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.1072092108695372,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.10887049538315764,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 1.0
+   }
+  ],
+  [
+   0.11472140908829909,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.11779769805348098,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.15,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.11841728190352975,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.22,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   0.11845462569023019,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.18,
+    "GROUND_FRICTION": 0.7
+   }
+  ],
+  [
+   21.452985344746875,
+   {
+    "SERVO_RATE_LIMIT_DEG_S": 120.0,
+    "MOTOR_FORCE": 0.12,
+    "GROUND_FRICTION": 1.3
+   }
+  ]
+ ]
+}
