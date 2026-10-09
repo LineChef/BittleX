@@ -2,7 +2,7 @@
 
     python phase_v4.py run       # work through SCREENS (resumable: a finished run is not redone, a run still training is waited for)
     python phase_v4.py status    # one line per screen
-    python phase_v4.py final     # the 20M with the adopted recipe (ONLY on the user's go): gait checks at 3M / 5M / 10M against the adopted 3M pair, plateau stop
+    python phase_v4.py final     # the 20M with the adopted recipe (ONLY on the user's go): gait checks at 3M (stops on a regression) and 5M / 10M (logged warnings) against the adopted 3M pair, plateau stop
 
 Each screen trains TWO seeds (42, 43) of a fresh 3M run in the next 20M's own world (g2_profile.env_for_job of a fresh final: the full course, world 2, hard x1.10),
 with the base recipe plus one lever, scores both on benchmark v5 (every cell, 40 episodes, plus the difficulty ladder; episodes are seeded, so the base and the lever
@@ -327,6 +327,12 @@ def final(tag="v4_20m"):
         res = V3.score(f"trained/checkpoints/{tag}_{step}_steps", obs_levers(levers), spec=",".join(V3.DECISION_CELLS), busy=True)
         save(f"trained/v4_score_{tag}_{step // 10**6}M.json", res)
         bad = V3.calm_ok(res, base) + V3.regressions(res, base)
+        if bad and step > FINAL_CHECKS[0]:
+            # 2026-10-09 (user): a mid-run checkpoint (learning rate still high, difficulty still moving) is compared with a 3M screen policy that finished its schedule at the
+            # 3e-5 floor, so only the first check (3M, a gross-failure sanity check) stops the run; the later ones are logged warnings. The health stops, the plateau rule
+            # and the final V3 vs V4 comparison are unchanged.
+            log(f"{tag} GAIT CHECK {step // 10**6}M WARNING (the run continues) {bad} | {V3.summary(res)}")
+            continue
         log(f"{tag} GAIT CHECK {step // 10**6}M {'PASS' if not bad else 'REGRESSION ' + str(bad)} | {V3.summary(res)}")
         if bad:
             RP.stop(tag)
