@@ -187,6 +187,7 @@ Full walkthroughs: [`train-vision-model.md`](train-vision-model.md), [`../vision
 | `g2chat` | text conversation with Claude (needs `ANTHROPIC_API_KEY`) |
 | `g2voice` | full voice loop — wake word + mic + Piper TTS (needs audio deps + models) |
 | `g2audio [devices\|wake\|stt\|tts]` | audio diagnostics |
+| `python -m pi_pipeline.voice.api_log --hours 2` | Claude API calls, tokens and approximate cost in the last 2 h, by source (run on the Pi for G2's own calls; `--last 40` prints raw lines) |
 | `python -m pi_pipeline.voice.livecheck` | real-API end-to-end check: reply + `perform_skill`/`remember` parsing + memory seam (needs a key; ~4 billed calls) |
 | _say_ "shut off" / "turn off" (bare phrases only) | same as "shut down" above; "turn off the music" does not trigger it |
 | _say_ "you're unplugged" / "you're plugged in" | start / pause the Pi-battery runtime count (the PiSugar S has no telemetry, so G2 only warns while counting) |

@@ -79,3 +79,22 @@ def test_rotates_at_the_size_cap(tmp_path, monkeypatch):
     for _ in range(8):
         api_log.log_event("start", "voice", api="messages.create", model="x" * 40)
     assert (tmp_path / "calls.jsonl.1").exists() and p.exists()
+
+
+def test_summarize_counts_and_costs():
+    import json
+    import time
+    from pi_pipeline.voice import api_log
+    now = time.time()
+    ts = lambda ago: time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - ago))  # noqa: E731
+    lines = [json.dumps(r) for r in [
+        {"ts": ts(60), "event": "start", "source": "voice", "api": "messages.stream"},
+        {"ts": ts(59), "event": "done", "source": "voice", "api": "messages.stream", "input_tokens": 1_000_000, "output_tokens": 100_000},
+        {"ts": ts(50), "event": "start", "source": "voice", "api": "models.list"},
+        {"ts": ts(49), "event": "done", "source": "voice", "api": "models.list"},
+        {"ts": ts(99999), "event": "start", "source": "old", "api": "messages.create"},
+    ]]
+    out = api_log.summarize(lines, 1, now)
+    assert "voice" in out and "1 billed + 1 free" in out and "old" not in out
+    assert "~$4.500" in out          # 1M in at $3 + 0.1M out at $15
+    assert "none logged" in api_log.summarize([], 1, now)
