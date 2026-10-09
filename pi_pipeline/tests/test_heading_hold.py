@@ -162,7 +162,7 @@ def test_foot_hold_contains_drift_without_hunting():
     tr = _plant(hh.FootHold("fl"), drift_dps=6.0)
     yaws = [y for y, _ in tr]
     assert max(abs(y) for y in yaws) < 30 and abs(yaws[-1]) < 25           # open loop is +75 deg after 12.5 s
-    assert all(-0.9 <= g <= 0.2 for _, g in tr)
+    assert all(-0.6 <= g <= 0.2 for _, g in tr)
     late = [g for _, g in tr[len(tr) // 2:]]
     assert max(late) - min(late) < 0.35                                       # settles, no big swings
 
@@ -226,3 +226,14 @@ def test_foot_hold_eases_off_fast_when_the_drift_stops():
     for _ in range(40):
         h2.update(math.radians(-8.0), 1 / 80)                   # 0.5 s with the heading already left of target
     assert h2.g > -0.2
+
+
+def test_default_foot_trim_is_the_measured_v4_value_and_can_be_overridden(monkeypatch):
+    from pi_pipeline.gait import heading_hold as hh
+    monkeypatch.delenv("G2_FOOT_TRIM", raising=False)
+    assert hh.default_foot_trim("trained/Release_CandidateV4_ppo.onnx") == [("fl", -0.2)]
+    assert hh.default_foot_trim("trained/other_ppo.onnx") is None and hh.default_foot_trim(None) is None
+    monkeypatch.setenv("G2_FOOT_TRIM", "fl=-0.25")
+    assert hh.default_foot_trim("trained/other_ppo.onnx") == [("fl", -0.25)]
+    monkeypatch.setenv("G2_FOOT_TRIM", "off")
+    assert hh.default_foot_trim("trained/Release_CandidateV4_ppo.onnx") is None

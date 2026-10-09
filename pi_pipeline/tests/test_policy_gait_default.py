@@ -130,6 +130,8 @@ def test_policy_walker_passes_the_foot_hold_and_respects_off(monkeypatch):
         return "complete"
 
     monkeypatch.delenv("G2_FOOT_HOLD", raising=False)
+    assert default_foot_hold() is None                 # off by default since 2026-10-09 (a constant trim steers V4 instead)
+    monkeypatch.setenv("G2_FOOT_HOLD", "fl")
     assert default_foot_hold() == "fl"
     for fn, hold in ((fake_run, "env"), (fake_run, None), (legacy_run, "env")):
         w = PolicyWalker(object(), run_fn=fn, foot_hold=hold)

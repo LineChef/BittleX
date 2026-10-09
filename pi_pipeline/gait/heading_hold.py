@@ -126,11 +126,25 @@ def apply_stride_difference(joint_deg, u: float):
 
 
 def default_foot_hold():
-    """Which foot every real-hardware policy walk steers with: `G2_FOOT_HOLD` (default `fl`, the front-left foot, which turned G2 on the real robot 2026-10-07: a closed-loop hold kept V2.1
-    within 13-21 deg of its starting heading over 10 ft against +148 deg without). `off` / `none` / empty turns it off. Returns the foot name or None."""
+    """Which foot a real-hardware policy walk steers with in closed loop: `G2_FOOT_HOLD` (`fl`, the front-left foot, turned G2 on the real robot 2026-10-07: a closed-loop hold kept V2.1
+    within 13-21 deg of its starting heading over 10 ft against +148 deg without). OFF by default since 2026-10-09 (V4 on G2: the hold overshot to 60 deg left against 60 deg right with it
+    off; a constant trim, `default_foot_trim`, ended within about 30 deg either way and averaged straight). `fl` turns it back on. Returns the foot name or None."""
     import os
-    v = os.environ.get("G2_FOOT_HOLD", "fl").strip().lower()
+    v = os.environ.get("G2_FOOT_HOLD", "off").strip().lower()
     return None if v in ("", "off", "none", "0", "false") else v
+
+
+# Constant front-left trims measured on G2 (hardwood, hold off, 12.5 s, 3 runs each, heading by eye): V4 untrimmed ends about 60 deg right; -0.2 ended 7 deg right / 2 deg left / 30 deg left.
+DEFAULT_TRIMS = {"Release_CandidateV4_ppo.onnx": "fl=-0.2"}
+
+
+def default_foot_trim(policy_name: str | None):
+    """The fixed foot trim of the everyday policy walk (a list for `apply_foot_trims`, or None). `G2_FOOT_TRIM` overrides (`fl=-0.25`, or `off`); otherwise `DEFAULT_TRIMS` by policy file name."""
+    import os
+    v = os.environ.get("G2_FOOT_TRIM")
+    if v is None:
+        v = DEFAULT_TRIMS.get(os.path.basename(str(policy_name or "")), "")
+    return None if v.strip().lower() in ("", "off", "none", "0", "false") else parse_foot_trims(v)
 
 
 def default_foot_hold_ff() -> float:
@@ -149,11 +163,12 @@ class FootHold:
 
     g = -(KP * deadband(e) + KD * rate): the proportional term acts only outside +-DEADBAND_DEG; the rate term is the ease-off in both directions: it adds trim while the heading
     is running away and takes it off as soon as the heading is already turning back (rate toward the target), so the correction does not overshoot while the 5 Hz IMU is still
-    reporting the old heading. g is clamped to [G_MIN, G_MAX] and slew-limited. G_MIN was -0.6 (the trim the first walks tolerated); 2026-10-09 V4 on hardware turned right ~8 deg/s with the hold off and the hold sat at -0.6 the whole walk
-    (one unit of trim is ~9 deg/s), so it is -0.9 (user: more authority); -1.0 would stop the foot's swing altogether and below that it would reverse."""
+    reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited. 2026-10-09: with V4 on G2 the hold pinned at G_MIN and
+    still ended 60 deg off on the left (hold off: 60 deg off on the right; the logged yaw it steers on did not match the real heading), so V4's everyday walk uses a constant trim instead
+    (`default_foot_trim`) and this hold is off unless `G2_FOOT_HOLD=fl`."""
 
     def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
-                 g_min: float = -0.9, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 3.0):
+                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 3.0):
         self.g_release, self.release_rate_dps = g_release, release_rate_dps   # easing off is faster than building up: once the heading turns back (or is already past the target) the trim drops at g_release per second
         self.ff = ff                         # feed-forward trim added to the feedback: the average trim the hold ends up at anyway (about -0.2..-0.3 on G2), so it does not have to ramp to it
         self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg

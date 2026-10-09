@@ -530,6 +530,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
               + ("" if vision is not None else " (no feed -- terrain always clear)"),
               flush=True)
 
+    if foot_trim is None and not scripted and not foot_hold and not heading_hold and steer_const is None:     # the everyday policy walk: the measured constant trim (heading_hold.DEFAULT_TRIMS)
+        foot_trim = _hh.default_foot_trim(getattr(pol, "onnx_path", None))
+        if foot_trim:
+            print(f"[steer] constant foot trim {foot_trim} (G2_FOOT_TRIM=off disables)", flush=True)
     autolog_run, end_reason = None, ["other"]
     if not log_path:                     # no explicit --log: every policy walk (voice, exploration, command line) is captured automatically
         try:
