@@ -455,4 +455,4 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `g2watchrun [TAG] [--dr-push 0.35]` | replay the run in progress (or TAG) from its newest checkpoint in the PyBullet GUI, in the G2 hardware world; `g2watchrun list` shows every run's newest checkpoint; works from any directory. Underneath: |
 | `cd rl_training/opencat-gym && ./watch_v3.sh [TAG] [--dr-push 0.35]` | replay the newest checkpoint of a run in the PyBullet GUI, in the G2 hardware world; run it in your own terminal; it slows the training a little while open |
 | `python rl_training/opencat-gym/phase_v3.py status` | every finished job and its verdict |
-
+| `g2clean` | list scratch files on the Mac and the Pi that are safe to delete and untracked files that need a commit-or-delete decision (dry run); `g2clean --apply` deletes the scratch list and the Pi's stray files |

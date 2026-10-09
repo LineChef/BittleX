@@ -27,6 +27,7 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 | A backlog item changes status | its own heading in `rl/hardware-gated-backlog.md`, `rl/robustness-backlog.md` or `behavior-ideas.md`, then `python tools/gen_backlog.py` ([`backlog.md`](backlog.md) is generated) |
 | The deployed policy changes | `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py` and [`STATUS.md`](STATUS.md); nowhere else names it |
 | Wiring, pinouts, assembly | [`../blueprints/`](../blueprints/README.md); vendor specs in [`hardware/specs.md`](hardware/specs.md); firmware tokens in [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
+| Scratch / temp files pile up (Mac or Pi) | `python tools/g2_cleanup.py` (`g2clean`): dry run lists them, `--apply` deletes by exact path and cleans the Pi's `trained/` folder; a hook reminds on every prompt and the pre-commit hook warns about leftovers and blocks adds of >150 files or >5 MB |
 | A command worth remembering | [`guides/cheatsheet.md`](guides/cheatsheet.md) (grouped by task) |
 | A research question or vendor evaluation | [`research/`](research/) |
 

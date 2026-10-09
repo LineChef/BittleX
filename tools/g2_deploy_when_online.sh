@@ -52,6 +52,13 @@ say "rsync policy $POLICY"
 rsync -az "$ROOT/rl_training/opencat-gym/trained/$POLICY" "$ROOT/rl_training/opencat-gym/trained/$POLICY.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
 [ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of the policy failed"; exit 1; }
 
+# keep the Pi's trained/ folder to the exported release candidates only (stray files there are leftovers of earlier syncs)
+STRAY=$(ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained 2>/dev/null && ls -1 | grep -vE "^Release_Candidate[^ /]*_ppo\.onnx(\.json)?$"' 2>/dev/null || true)
+if [ -n "$STRAY" ]; then
+  say "removing $(echo "$STRAY" | wc -l | tr -d ' ') stray file(s) from the Pi's trained/ folder: $(echo "$STRAY" | head -5 | tr '\n' ' ')"
+  echo "$STRAY" | ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained && xargs -d "\n" rm -rf --' 2>&1 | tee -a "$LOG"
+fi
+
 say "checking the new code imports on the Pi"
 ssh "$G2_PI" 'cd ~/bittleX && pi_pipeline/.venv/bin/python -c "import pi_pipeline.voice.api_log, pi_pipeline.voice.usage, pi_pipeline.voice.conversation; print(\"imports ok\")"' 2>&1 | tee -a "$LOG"
 [ "${PIPESTATUS[0]}" = 0 ] || { say "the new code does not import on the Pi; NOT restarting g2-voice"; exit 1; }

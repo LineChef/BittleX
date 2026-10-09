@@ -125,6 +125,7 @@ g2pcam-pull() {
     || { _g2log "rsync from $host failed or timed out (is the Pi on, and does ~/g2_cap/$name/session_$sess exist?)"; return 1; }
 }
 # g2membackup  -- snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups); needs G2_PI
+g2clean() { ( cd "$G2_ROOT" && "$_G2_PY" tools/g2_cleanup.py "$@" ); }          # dry-run list of scratch files (Mac + Pi); `g2clean --apply` deletes them
 g2membackup() { bash "$G2_ROOT/tools/g2_memory_backup.sh"; }
 # g2wifi list|status|scan|add <ssid>|remove <ssid>  -- manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI
 g2wifi() { bash "$G2_ROOT/tools/g2_wifi.sh" "$@"; }

@@ -3,7 +3,8 @@ full V3 vs V4 comparison on it (29 cells x 40 paired episodes, ladder, replays, 
 
     ../../.venv/bin/python paired_compare.py TAG LEVER,LEVER,... [EVERY_STEPS]      # runs until the trainer is gone
 
-Per checkpoint: trained/<TAG>_at<N>M_ppo.zip, report in trained/v4_report_<TAG>_at<N>M/ , one line in trained/<TAG>_paired.jsonl. Resumable."""
+Per checkpoint: trained/<TAG>_at<N>M_ppo.zip, report in trained/v4_report_<TAG>_at<N>M/ , one line in trained/<TAG>_paired.jsonl. Resumable.
+The copy and the report folder are deleted after scoring (the jsonl line is the record); pass --keep-report to keep them."""
 import json
 import os
 import re
@@ -14,6 +15,8 @@ import time
 from math import comb
 
 import phase_v4 as P
+
+KEEP_REPORT = "--keep-report" in sys.argv      # keep trained/<name>_ppo.zip and trained/v4_report_<name>/ after scoring (default: delete them)
 
 
 def mcnemar(x, y):
@@ -55,6 +58,9 @@ def main(tag, levers, every=5_000_000):
             v = verdicts(name)
             open(out, "a").write(json.dumps(dict(step=s, **v)) + "\n")
             done.add(s)
+            if not KEEP_REPORT:      # the verdict line above is the record; the scratch copy and the report folder are regenerable
+                os.remove(f"trained/{name}_ppo.zip")
+                shutil.rmtree(f"trained/v4_report_{name}", ignore_errors=True)
             print(f"[paired {s / 1e6:.0f}M] vs V3: {len(v['better'])} better {v['better']}, {len(v['worse'])} worse {v['worse']}, {v['same']} same | mirror gap {v['mirror_gap']} (V3 {v['v3_mirror_gap']}) | report trained/v4_report_{name}/v3_vs_v4_report.html", flush=True)
         if not training and not todo:
             break
@@ -63,4 +69,5 @@ def main(tag, levers, every=5_000_000):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2].split(","), int(float(sys.argv[3])) if len(sys.argv) > 3 else 5_000_000)
+    args = [a for a in sys.argv[1:] if a != "--keep-report"]
+    main(args[0], args[1].split(","), int(float(args[2])) if len(args) > 2 else 5_000_000)

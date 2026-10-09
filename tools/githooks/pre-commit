@@ -14,6 +14,8 @@
 #      place real images (hardware photos, diagrams we make) belong.
 #   4. Doc checks (tools/check_docs.py): broken relative links, hard-coded test counts or the deployed
 #      policy name in the wrong page, a stale generated docs/backlog.md.
+#   5. Commit hygiene: BLOCK a commit that adds more than 150 files or any file over 5 MB (override: G2_ALLOW_BIG_COMMIT=1), and WARN
+#      about leftover untracked files / scratch (tools/g2_cleanup.py) so they get committed by exact path or deleted.
 # Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
@@ -70,6 +72,29 @@ if printf '%s\n' "$staged_all" | grep -qE '\.md$|^tools/(check_docs|gen_backlog)
     exit 1
   fi
 fi
+
+# --- 5. commit hygiene: no mass adds, no big files; remind about leftovers -----------------------------
+# (the 2026-10-09 accident: `git add` on a folder pushed 2,074 training outputs.) Override a deliberate big commit with G2_ALLOW_BIG_COMMIT=1.
+if [ "${G2_ALLOW_BIG_COMMIT:-0}" != 1 ]; then
+  added="$(git diff --cached --name-only --diff-filter=A)"
+  n_added=0; [ -n "$added" ] && n_added=$(printf '%s\n' "$added" | wc -l | tr -d ' ')
+  if [ "$n_added" -gt 150 ]; then
+    echo "pre-commit: this commit ADDS $n_added files (limit 150): was a whole folder added by mistake? Add by exact path, or G2_ALLOW_BIG_COMMIT=1 git commit ..."
+    exit 1
+  fi
+  big=""
+  while IFS= read -r f; do
+    [ -n "$f" ] && [ -f "$f" ] || continue
+    sz=$(wc -c < "$f" | tr -d ' ')
+    [ "$sz" -gt 5242880 ] && big="$big\n  $f ($((sz / 1048576)) MB)"
+  done <<< "$added"
+  if [ -n "$big" ]; then
+    printf "pre-commit: file(s) over 5 MB would be added:$big\nTraining outputs do not belong in the repo. Override: G2_ALLOW_BIG_COMMIT=1 git commit ...\n"
+    exit 1
+  fi
+fi
+left="$(python3 "$(git rev-parse --show-toplevel)/tools/g2_cleanup.py" --check 2>/dev/null || true)"
+[ -n "$left" ] && echo "pre-commit: $left"
 
 repo_root="$(git rev-parse --show-toplevel)"
 terms_file="$repo_root/.gitprivacy-terms"

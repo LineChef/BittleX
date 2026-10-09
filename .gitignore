@@ -99,3 +99,9 @@ rl_training/opencat-gym/trained/failed_c0_run*/
 
 # Training-episode recordings: written automatically by every run (G2E_RECORD_EVERY) for local replay with watch_training.py, never committed
 rl_training/opencat-gym/trained/*_episodes/
+
+# generated scratch from comparison / probe scripts (tools/g2_cleanup.py deletes these); force-add a result file only when it backs a decision
+rl_training/opencat-gym/trained/*.out
+rl_training/opencat-gym/trained/v4_report_*/
+rl_training/opencat-gym/trained/zz_*
+rl_training/opencat-gym/trained/*_at*M_ppo.zip
