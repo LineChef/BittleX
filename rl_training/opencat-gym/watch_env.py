@@ -21,7 +21,7 @@ def v4_env(tag):
         return None
     t = re.escape(tag)
     for ln in reversed(lines):
-        m = re.search(rf"\] {t} START: levers (\[.*?\]) seed (\d+)(?: extra (\{{.*\}}))?\s*$", ln)
+        m = re.search(rf"\] {t} START: levers (\[.*?\]) seed (\d+)(?: extra (\{{.*?\}}))?(?: \(.*\))?\s*$", ln)
         if m:                                                                   # a 3M screen
             levers, seed, extra = ast.literal_eval(m.group(1)), m.group(2), (ast.literal_eval(m.group(3)) if m.group(3) else {})
             env = G.env_for_job({"kind": "final", "tag": tag, "fresh": True, "levers": list(levers)})
