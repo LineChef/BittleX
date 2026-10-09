@@ -4,7 +4,7 @@ from pi_pipeline.explore_launch import command, launch
 def test_the_command_stops_voice_first_and_always_restarts_it():
     c = command(600, python="/py", workdir="/w", user="u")
     s = " ".join(c)
-    assert c[:4] == ["sudo", "-n", "systemd-run", "--unit=g2-explore"]
+    assert c[:5] == ["sudo", "-n", "systemd-run", "--no-block", "--unit=g2-explore"]      # --no-block: the launch must not wait for the unit it is about to be stopped by
     assert "ExecStartPre=+/bin/systemctl stop g2-voice" in s and "ExecStopPost=+/bin/systemctl --no-block start g2-voice" in s
     assert s.endswith("-m pi_pipeline.explore_session --arm-on-start --exit-when-roam-ends --roam-s 600")
     assert "G2_FEATURES=" in s and "+explore" in s

@@ -514,9 +514,9 @@ class VoiceLoop:
             return
         if cmd == "explore":
             log.info("explore armed (voice)")
-            self._events(arm_explore=True)
             self._cue.set("speaking")
-            self._speak("Okay, looking around. Make sure I'm on the floor.")
+            self._speak("Okay, going exploring. I need about half a minute to get ready. Make sure I'm on the floor.")     # said BEFORE the hand-over: the launch stops this service
+            self._events(arm_explore=True)
             self._set_session()
             self._cue.set("idle")
             return

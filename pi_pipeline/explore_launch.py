@@ -20,7 +20,7 @@ FEATURES = "+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-o
 def command(roam_s: float = 600.0, *, python: str | None = None, workdir: str | None = None, user: str | None = None) -> list[str]:
     python = python or sys.executable
     workdir = workdir or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return ["sudo", "-n", "systemd-run", f"--unit={UNIT}", "--collect", f"--uid={user or getpass.getuser()}",
+    return ["sudo", "-n", "systemd-run", "--no-block", f"--unit={UNIT}", "--collect", f"--uid={user or getpass.getuser()}",
             "-p", f"WorkingDirectory={workdir}", "-p", "KillSignal=SIGTERM", "-p", "TimeoutStopSec=15",
             "-p", "ExecStartPre=+/bin/systemctl stop g2-voice",
             "-p", "ExecStopPost=+/bin/systemctl --no-block start g2-voice",
