@@ -30,7 +30,7 @@ class BehaviorParams:
 
     # --- explore mode ---
     idle_secs_before_explore: float = 45.0   # quiet time before G2 wanders on its own
-    explore_leg_secs: float = 5.0            # seconds walked in one heading before reassessing
+    explore_leg_secs: float = 7.0            # seconds walked in one heading before reassessing (5.0 until 2026-10-09: user, slightly longer legs)
     investigate_secs: float = 3.0            # dwell time when examining one thing
     novelty_pull: float = 0.35              # 0..1 bias toward unvisited headings / novel objects
     approach_novelty: bool = True           # walk up to a novel detection vs. just orient to it (on by default since 2026-10-07, user)
