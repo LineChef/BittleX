@@ -48,6 +48,15 @@ _SLEEP = (
     "go to sleep",
 )
 
+# Conversation mode: "let's talk" keeps G2 listening for a back-and-forth without the wake word until a quiet gap or "that's all".
+# Only a short phrase counts ("lets talk", "lets talk now"): "lets talk about my day" is a normal request and goes to Claude.
+_CONVERSE = ("lets talk", "let us talk", "lets chat", "let us chat", "lets have a chat", "lets have a conversation", "conversation mode")
+_END_CONVERSE = ("thats all", "thats it", "were done", "we are done", "all done", "end conversation", "end the conversation",
+                 "stop the conversation", "conversation over", "conversation done", "end conversation mode", "conversation mode off")
+# Said to someone else while G2 was listening: he stays quiet instead of answering.
+_NOT_YOU = ("not talking to you", "wasnt talking to you", "was not talking to you", "talking to someone else", "talking to somebody else",
+            "not you g2", "not you buddy", "im talking to")
+
 # Emergency stop -- a hard, latching freeze. Matched loosely (these phrases are
 # never a normal request) and handled before anything else, no Claude call.
 _HALT = (
@@ -188,6 +197,17 @@ def _parse_level(raw: str) -> float | None:
     return _LEVEL_WORDS.get(m.group(3))
 
 
+def _hit_short(norm: str, phrases: tuple[str, ...], extra_words: int = 2) -> bool:
+    """`phrase` plus at most `extra_words` more words ("lets talk now"); a longer sentence is a different request."""
+    return any(norm == p or (norm.startswith(p + " ") and len(norm.split()) - len(p.split()) <= extra_words) for p in phrases)
+
+
+def addressed_elsewhere(text: str) -> bool:
+    """True for "I'm not talking to you" style remarks: the person is speaking to someone else."""
+    n = _normalize(text)
+    return bool(n) and any(p in n for p in _NOT_YOU)
+
+
 def _has_verb(norm: str, verbs: tuple[str, ...]) -> bool:
     words = set(norm.split())
     return any((" " in v and v in norm) or (" " not in v and v in words) for v in verbs)
@@ -307,7 +327,7 @@ def asks_floor(text: str) -> bool:
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
-    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, or ``None``. Checked in that order
+    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
@@ -332,6 +352,10 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
+    if _hit_short(n, _CONVERSE):
+        return "converse"
+    if _hit_short(n, _END_CONVERSE, extra_words=3):
+        return "end_converse"
     if _hit(n, _UNPLUGGED):
         return "unplugged"
     if _hit(n, _PLUGGED):

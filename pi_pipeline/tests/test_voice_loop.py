@@ -373,3 +373,117 @@ def test_no_question_means_the_wake_word_is_needed_again():
         speech="Standing.", actions=[], facts=[], action_seconds=[], expects_reply=False)
     lp._one_turn()
     assert not lp._in_session
+
+
+# --- conversation mode ("let's talk") and side-chatter rules ---
+
+def _talk_loop(script, **kw):
+    lp, w, stt, conv, tts = _loop(script, follow_up_s=0.0)
+    lp._question_window_s = 8.0
+    lp._conv_window_s = kw.get("window", 20.0)
+    lp._conv_max_s = kw.get("max_s", 600.0)
+    lp._side_max_words = kw.get("side", 14)
+    lp._conv_max_words = kw.get("conv_words", 30)
+    conv.send = lambda text, memory_context=None: (conv.sent.append(text), types.SimpleNamespace(
+        speech="Sure.", actions=[], facts=[], action_seconds=[], expects_reply=False))[1]
+    waits = []
+    lp._wake.wait = lambda: waits.append(1)
+    return lp, waits, stt, conv, tts
+
+
+def test_lets_talk_starts_conversation_mode_without_calling_claude():
+    lp, waits, stt, conv, tts = _talk_loop(["gee two let's talk"])
+    lp._one_turn()
+    assert lp._conversing and lp._in_session and lp._session_window == 20.0
+    assert conv.sent == [] and any("let's talk" in s.lower() for s in tts.said)
+
+
+def test_conversation_mode_needs_no_wake_word_between_turns_and_ends_on_silence():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", "how was your day", "tell me more", ""])
+    for _ in range(4):
+        lp._one_turn()
+    assert conv.sent == ["how was your day", "tell me more"]
+    assert len(waits) == 1                      # one wake word for the whole conversation
+    assert stt.timeouts == [None, 20.0, 20.0, 20.0]
+    assert not lp._conversing and not lp._in_session
+
+
+def test_thats_all_ends_conversation_mode():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", "hello there", "that's all thanks", "next"])
+    for _ in range(4):
+        lp._one_turn()
+    assert conv.sent == ["hello there", "next"] and len(waits) == 2
+    assert any("wake word" in s.lower() for s in tts.said)
+
+
+def test_thats_all_outside_conversation_mode_is_just_a_sentence():
+    lp, waits, stt, conv, tts = _talk_loop(["that's all I wanted to say"])
+    lp._one_turn()
+    assert conv.sent == ["that's all I wanted to say"]
+
+
+def test_conversation_mode_time_limit():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", "hello", "again"])
+    lp._one_turn()
+    assert lp._conversing
+    lp._conv_started -= 700.0                   # 700 s into a 600 s limit
+    lp._one_turn()                              # answered, then the limit ends the mode
+    assert conv.sent == ["hello"] and not lp._conversing
+    lp._one_turn()
+    assert len(waits) == 2                      # "again" needed a new wake word
+
+
+def test_lets_talk_about_something_is_a_normal_request():
+    from pi_pipeline.voice.commands import match_local_command
+    assert match_local_command("lets talk about my day") is None
+    assert match_local_command("let's talk") == "converse"
+    assert match_local_command("lets talk now") == "converse"
+
+
+def test_conversation_mode_off_when_window_is_zero():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk"], window=0.0)
+    lp._one_turn()
+    assert not lp._conversing and any("isn't turned on" in s for s in tts.said)
+
+
+def test_long_speech_without_the_wake_word_is_dropped_before_claude():
+    chatter = "so then she said we should probably just go to the store later and get some of those things"
+    lp, waits, stt, conv, tts = _talk_loop(["are you ok", chatter, "yes"])
+    answers = iter([types.SimpleNamespace(speech="Want me to stand?", actions=[], facts=[], action_seconds=[], expects_reply=True)])
+    conv.send = lambda text, memory_context=None: (conv.sent.append(text), next(answers))[1]
+    lp._one_turn()                              # a question opens the window
+    lp._one_turn()                              # long side chatter: dropped, window closes
+    assert conv.sent == ["are you ok"] and not lp._in_session
+
+
+def test_long_speech_after_the_wake_word_is_never_dropped():
+    chatter = "so then she said we should probably just go to the store later and get some of those things"
+    lp, waits, stt, conv, tts = _talk_loop([chatter])
+    lp._one_turn()
+    assert conv.sent == [chatter]
+
+
+def test_conversation_mode_has_its_own_longer_word_limit_and_stays_open_after_chatter():
+    medium = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen"
+    huge = " ".join(["word"] * 40)
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", medium, huge, "hello again"])
+    for _ in range(4):
+        lp._one_turn()
+    assert conv.sent == [medium, "hello again"]  # 16 words pass in conversation mode, 40 are dropped, the mode stays on
+    assert lp._conversing
+
+
+def test_not_talking_to_you_is_ignored_and_ends_the_window_even_in_conversation_mode():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", "I'm not talking to you", "hi"])
+    for _ in range(3):
+        lp._one_turn()
+    assert conv.sent == ["hi"] and len(waits) == 2    # the remark never reached Claude; "hi" needed a new wake word
+    assert not lp._conversing
+
+
+def test_stop_commands_work_in_a_window_whatever_their_length():
+    lp, waits, stt, conv, tts = _talk_loop(["lets talk", "emergency stop"])
+    seen = []
+    lp._events = lambda **kw: seen.append(kw)
+    lp._one_turn(); lp._one_turn()
+    assert any(k.get("halt") for k in seen) and not lp._conversing

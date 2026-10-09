@@ -241,6 +241,13 @@ class Settings:
     buzzer_length: float = field(default_factory=lambda: _env_float("G2_BUZZER_LEN", 1.0))
     # After G2 asks a question, keep listening this many seconds for the answer without the wake word (0 = never).
     question_window_s: float = field(default_factory=lambda: _env_float("G2_QUESTION_WINDOW_S", 8.0))
+    # Conversation mode ("let's talk"): no wake word between turns until a quiet gap, "that's all", "go to sleep" or the time limit.
+    # conversation_window_s = how long G2 waits for you to START speaking each turn (0 turns the mode off).
+    conversation_window_s: float = field(default_factory=lambda: _env_float("G2_CONVERSATION_WINDOW_S", 20.0))
+    conversation_max_s: float = field(default_factory=lambda: _env_float("G2_CONVERSATION_MAX_S", 600.0))
+    # Side chatter: a turn heard WITHOUT the wake word that runs longer than this many words is dropped before Claude (0 = no limit).
+    side_max_words: int = field(default_factory=lambda: _env_int("G2_SIDE_MAX_WORDS", 14))
+    conversation_max_words: int = field(default_factory=lambda: _env_int("G2_CONVERSATION_MAX_WORDS", 30))
     # Auto-stop a looping gait (walk/trot/crawl) started by voice after this many seconds. 0 = off.
     max_gait_s: float = field(default_factory=lambda: _env_float("G2_MAX_GAIT_S", 0.0))
 

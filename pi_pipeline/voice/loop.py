@@ -9,6 +9,11 @@ Session / privacy behaviour:
   conversation can continue without re-saying the wake word. On silence it drops
   back to wake-word-only. `follow_up_s=0` -> every turn needs the wake word.
 - "go to sleep" ends the follow-up window immediately.
+- "let's talk" starts conversation mode: G2 keeps listening without the wake word (each turn waits `conversation_window_s`
+  for you to start speaking) until a quiet gap, "that's all", "go to sleep" or `conversation_max_s`.
+- Side chatter: a turn taken WITHOUT the wake word (a question window or conversation mode) is dropped before Claude when it is
+  too long to be a request to a robot (`side_max_words`, `conversation_max_words`) or says it is aimed at someone else
+  ("I'm not talking to you"). Safety commands (stop, shut down, ...) always work.
 - "forget that" drops everything recorded since the wake word and does not reach
   Claude.
 """
@@ -19,6 +24,7 @@ import os
 import queue
 import re
 import threading
+import time
 
 from ..personality import character_state
 from ..personality import gir
@@ -27,7 +33,7 @@ from . import narration
 from .actuator import Actuator
 from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming, picture_pose_steps
 from .commands import (
-    is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
+    addressed_elsewhere, is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
     parse_floor_command,
     parse_narration_command,
 )
@@ -175,6 +181,10 @@ class VoiceLoop:
         on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
         shutdown_confirm_s: float = 6.0,
         announce_online: bool = False,  # say "I am online." once the loop is ready (the voice service turns this on; G2_ANNOUNCE_ONLINE=off silences it)
+        conversation_window_s: float = 0.0,  # conversation mode ("let's talk"): seconds to wait for you to start speaking each turn (0 = mode off)
+        conversation_max_s: float = 600.0,  # conversation mode ends by itself after this long
+        side_max_words: int = 0,  # a question-window turn (no wake word) longer than this many words is treated as side chatter (0 = no limit)
+        conversation_max_words: int = 0,  # the same limit inside conversation mode (0 = no limit)
         namer=None,  # object called with a picture kind ("name:mug") that takes and saves one picture and returns its path or None (vision.exploration_pictures.ExplorationPictureSaver)
     ):
         self._namer = namer
@@ -195,6 +205,12 @@ class VoiceLoop:
         self._question_window_s = max(0.0, question_window_s)
         self._session_window = self._follow_up_s
         self._in_session = False
+        self._conv_window_s = max(0.0, conversation_window_s)
+        self._conv_max_s = max(0.0, conversation_max_s)
+        self._side_max_words = max(0, int(side_max_words))
+        self._conv_max_words = max(0, int(conversation_max_words))
+        self._conversing = False
+        self._conv_started = 0.0
         # bridge to the behaviour runtime (if running alongside); no-op otherwise
         self._events = on_event or (lambda **_kw: None)
         # slow-moving mood from interaction recency -> a one-line system-prompt
@@ -273,7 +289,15 @@ class VoiceLoop:
 
     def _set_session(self, expects_reply: bool = False) -> None:
         """Decide whether the next turn needs the wake word. G2 listens on without it only for the short question window
-        (when its reply asked something) or the general follow-up window (off on the robot)."""
+        (when its reply asked something) or the general follow-up window (off on the robot). In conversation mode the
+        conversation window applies after every turn, until the mode's time limit."""
+        if self._conversing:
+            if self._conv_max_s and time.monotonic() - self._conv_started > self._conv_max_s:
+                log.info("conversation mode ended: time limit (%.0f s)", self._conv_max_s)
+                self._end_session()
+                return
+            self._in_session, self._session_window = True, self._conv_window_s
+            return
         if expects_reply and self._question_window_s > 0:
             self._in_session, self._session_window = True, self._question_window_s
         elif self._follow_up_s > 0:
@@ -321,6 +345,9 @@ class VoiceLoop:
         sys.exit(1)
 
     def _end_session(self) -> None:
+        if self._conversing:
+            log.info("conversation mode off")
+        self._conversing = False
         self._in_session = False
         self._cue.set("idle")
         self._events(conversation_ended=True)
@@ -346,8 +373,25 @@ class VoiceLoop:
             log.info("character mode %s OFF", cc.name)
             self._speak(f"Okay, {cc.name} mode off.")
 
+    def _is_side_chatter(self, text: str, woke: bool) -> bool:
+        """True when a turn that is not a local command should not reach Claude: told it was for someone else, or (taken without the
+        wake word) too long to be a request to a robot. A turn that followed the wake word is never dropped for length."""
+        if addressed_elsewhere(text):
+            log.info("ignored: the person said they were not talking to G2")
+            return True
+        if woke:
+            return False
+        limit = self._conv_max_words if self._conversing else self._side_max_words
+        n = len(text.split())
+        if limit and n > limit:
+            log.info("ignored side chatter: %d words heard without the wake word (limit %d%s)", n, limit,
+                     ", conversation mode" if self._conversing else "")
+            return True
+        return False
+
     def _one_turn(self) -> None:
         trace = TurnTrace()
+        woke = not self._in_session            # False: this turn is taken without the wake word (a question window or conversation mode)
         if not self._in_session:
             self._wake.wait()
             self._cue.set("awake")       # right after the wake word: the chime that says G2 is listening
@@ -374,7 +418,7 @@ class VoiceLoop:
 
         if not user_text:
             if self._in_session:
-                log.info("follow-up window elapsed -- wake word needed again")
+                log.info("%s elapsed -- wake word needed again", "conversation window" if self._conversing else "follow-up window")
             self._end_session()
             return
 
@@ -396,6 +440,35 @@ class VoiceLoop:
             self._events(ack=True)
             self._cue.set("heard")
 
+        if cmd == "end_converse" and not self._conversing:
+            cmd = None                                      # "that's all" outside conversation mode is just a sentence for Claude
+        if cmd is None and self._is_side_chatter(user_text, woke):
+            self._cue.set("idle")
+            if not self._conversing or addressed_elsewhere(user_text):
+                self._end_session()                         # not answering a question, or told it was not for G2: back to the wake word
+            else:
+                self._set_session()
+            return
+
+        if cmd == "converse":
+            if self._conv_window_s <= 0:
+                self._cue.set("speaking")
+                self._speak("Conversation mode isn't turned on.")
+                self._set_session()
+                self._cue.set("idle")
+                return
+            self._conversing, self._conv_started = True, time.monotonic()
+            log.info("conversation mode on (window %.0f s, limit %.0f s)", self._conv_window_s, self._conv_max_s)
+            self._cue.set("speaking")
+            self._speak("Okay, let's talk. Say that's all when you're done.")
+            self._set_session()
+            self._cue.set("idle")
+            return
+        if cmd == "end_converse":
+            self._cue.set("speaking")
+            self._speak("Okay, back to the wake word.")
+            self._end_session()
+            return
         if cmd == "halt":
             log.warning("EMERGENCY STOP (voice command %r)", user_text)
             self._events(halt=True)
