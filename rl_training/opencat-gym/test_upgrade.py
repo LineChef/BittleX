@@ -227,3 +227,20 @@ def test_capped_bands_remove_only_the_unreachable_fast_band():
     assert out["forward"]["back"] == 0.0                       # forward: no backward at all
     assert 0.07 < out["capped"]["back"] < 0.20                  # capped keeps backward (about 13%)
     assert 0.40 < out["capped"]["cruise"] < 0.60 and 0.12 < out["capped"]["creep"] < 0.28
+
+
+def test_path_speed_does_not_lose_a_curving_walk():
+    """N2 / L1 'speed decay' is progress along the start direction: a walk that keeps its pace but curves away shows decay. The path metrics must not."""
+    import numpy as np
+    import benchmark_v4 as B
+    steps, hz = 600, B.STEPS_HZ
+    t = np.arange(steps) / hz
+    ang = np.linspace(0.0, 1.4, steps)                    # the heading turns 80 deg over the episode at a constant pace of 0.08 m/s
+    x = np.cumsum(0.08 * np.cos(ang) / hz)
+    y = np.cumsum(0.08 * np.sin(ang) / hz)
+    rec = {"x": x.tolist(), "y": y.tolist(), "yaw": ang.tolist(), "roll": np.zeros(steps).tolist(), "pitch": np.zeros(steps).tolist(),
+           "joint": np.zeros((steps, 8)).tolist(), "yaw_rate": np.zeros(steps).tolist()}
+    m = B.v4_metrics([(rec, {}, steps, False, False)] * 2)
+    assert abs(m["path_speed_mps"] - 0.08) < 0.004 and abs(m["path_decay"]) < 0.05
+    assert m["speed_decay"] > 0.2 and m["speed_mps"] < m["path_speed_mps"]
+    assert "pdecay" in B.table({"cells": [dict(m, id="N2")]})

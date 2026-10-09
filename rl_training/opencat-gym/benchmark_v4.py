@@ -141,14 +141,19 @@ def v4_metrics(eps_list):
     """eps_list: [(rec, per_term, steps, fell, recovered)] from benchmark_gaits._bench."""
     heads, speeds, early, late, roll_s, pitch_s, jm, over, yrms, falls, clear = [], [], [], [], [], [], [], [], [], [], []
     ep_falls = []                                # per fallen episode: when and which way (2026-10-08 report: how each policy falls)
+    path_s, path_e, path_l = [], [], []          # speed ALONG THE PATH (distance walked / time), which a drifting walk does not lose, unlike progress along the start direction
     for rec, pt, steps, fell, _ in eps_list:
         x = np.array(rec["x"])
+        xy = np.hypot(np.diff(x), np.diff(np.array(rec["y"], dtype=float))) if rec.get("y") is not None and len(rec["y"]) == len(x) else np.abs(np.diff(x))
         yaw = np.unwrap(np.array(rec["yaw"]))
         heads.append(math.degrees(yaw[-1] - yaw[0]))
         speeds.append(float(x[-1]) / (steps / STEPS_HZ))
         n = max(8, min(250, steps // 3))
         early.append(float(x[n - 1] - x[0]) / ((n - 1) / STEPS_HZ))
         late.append(float(x[-1] - x[-n]) / ((n - 1) / STEPS_HZ))
+        path_s.append(float(xy.sum()) / (steps / STEPS_HZ))
+        path_e.append(float(xy[:n - 1].sum()) / ((n - 1) / STEPS_HZ))
+        path_l.append(float(xy[-(n - 1):].sum()) / ((n - 1) / STEPS_HZ))
         roll_s.append(float(np.degrees(np.std(rec["roll"]))))
         pitch_s.append(float(np.degrees(np.std(rec["pitch"]))))
         jm.append(np.degrees(np.mean(np.array(rec["joint"]), axis=0)))
@@ -168,9 +173,11 @@ def v4_metrics(eps_list):
     h = np.array(heads)
     ev, od = (np.abs(h[0::2]), np.abs(h[1::2]))                       # alternating-sign cells (L1): even episodes = push right, odd = push left
     e, l = float(np.mean(early)), float(np.mean(late))
+    pe, pl = float(np.mean(path_e)), float(np.mean(path_l))
     return dict(
         n=len(eps_list), fell_fraction=float(np.mean(falls)), speed_mps=float(np.mean(speeds)),
-        speed_early_mps=e, speed_late_mps=l, speed_decay=(1.0 - l / e) if e > 1e-6 else 0.0,
+        speed_early_mps=e, speed_late_mps=l, speed_decay=(1.0 - l / e) if e > 1e-6 else 0.0,      # progress along the START direction: a walk that drifts sideways "decays" without slowing down
+        path_speed_mps=float(np.mean(path_s)), path_speed_early_mps=pe, path_speed_late_mps=pl, path_decay=(1.0 - pl / pe) if pe > 1e-6 else 0.0,      # distance walked along the path / time
         heading_mean_deg=float(h.mean()), heading_abs_mean_deg=float(np.abs(h).mean()), heading_std_deg=float(h.std()),
         heading_even_abs_mean_deg=float(ev.mean()) if len(ev) else 0.0, heading_odd_abs_mean_deg=float(od.mean()) if len(od) else 0.0,
         heading_sign_gap_deg=abs(float(ev.mean()) - float(od.mean())) if len(ev) and len(od) else 0.0,
@@ -451,12 +458,13 @@ def by_id(res):
 
 
 def table(res, ref=None):
-    """A printable comparison of one result (and an optional reference result)."""
+    """A printable comparison of one result (and an optional reference result). speed / decay are progress along the START direction (a walk that curves away loses them);
+    path / pdecay are distance walked along the path (scored results from before 2026-10-09 have no path columns: nan)."""
     rc = by_id(ref) if ref else {}
-    lines = [f"{'cell':8s} {'fell':>6s} {'speed':>7s} {'decay':>6s} {'head':>7s} {'roll':>5s} {'asym':>5s} {'over':>5s}   " + ("| reference fell / head" if ref else "")]
+    lines = [f"{'cell':8s} {'fell':>6s} {'speed':>7s} {'path':>6s} {'decay':>6s} {'pdecay':>6s} {'head':>7s} {'roll':>5s} {'asym':>5s} {'over':>5s}   " + ("| reference fell / head" if ref else "")]
     for c in res["cells"]:
         r = rc.get(c["id"])
-        lines.append(f"{c['id']:8s} {c['fell_fraction']:6.0%} {c['speed_mps']:7.3f} {c['speed_decay']:6.2f} {c['heading_mean_deg']:+7.1f} "
+        lines.append(f"{c['id']:8s} {c['fell_fraction']:6.0%} {c['speed_mps']:7.3f} {c.get('path_speed_mps', float('nan')):6.3f} {c['speed_decay']:6.2f} {c.get('path_decay', float('nan')):6.2f} {c['heading_mean_deg']:+7.1f} "
                      f"{c['roll_std_deg']:5.1f} {c['lr_asym_max_deg']:5.1f} {c['servo_over_frac']:5.2f}"
                      + (f"   | {r['fell_fraction']:.0%} / {r['heading_mean_deg']:+.1f}" if r else ""))
     return "\n".join(lines)
