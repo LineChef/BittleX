@@ -28,9 +28,22 @@ from pi_pipeline.vision.recognizer import Recognizer  # noqa: E402
 
 def load(root: Path):
     named, survey = {}, []
+
+    def readable(f) -> bool:                 # pictures cut off by the camera's small buffer (6 of 89 so far) do not decode: left out, and counted
+        from PIL import Image
+        try:
+            Image.open(f).load()
+            return True
+        except OSError:
+            skipped.append(f.name)
+            return False
+    skipped: list = []
     for f in sorted((root / "named").glob("*/*.jpg")):
-        named.setdefault(f.parent.name, []).append(f)
-    survey = sorted((root / "survey").glob("*/*.jpg"))
+        if readable(f):
+            named.setdefault(f.parent.name, []).append(f)
+    survey = [f for f in sorted((root / "survey").glob("*/*.jpg")) if readable(f)]
+    if skipped:
+        print(f"left out {len(skipped)} cut-off picture(s): {', '.join(skipped)}")
     return named, survey
 
 

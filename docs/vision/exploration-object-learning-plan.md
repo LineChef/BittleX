@@ -89,6 +89,16 @@ Output location: `training_data/exploration/<session>/` (not tracked by git, lik
 4. Pick one, export it to ONNX, and time it on the Pi Zero 2 W (milliseconds per picture, memory, CPU heat); the budget is one embedding per crop, a few per
    survey stop. A model change later means starting the gallery over (noted in `object_gallery.py`).
 
+**Model provenance and first comparison (2026-10-09, user's yes to the download):** MobileNetV2 (opset 12, exported from PyTorch 1.8) from the official ONNX Model Zoo, `https://github.com/onnx/models/raw/main/validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx` (one redirect to GitHub's own file host `media.githubusercontent.com`), 13,964,571 bytes, SHA-256 `c0c3f76d93fa3fd6580652a45618618a220fced18babf65774ed169de0432ad5` (the zoo publishes no checksum, so this is a record, not a comparison); license Apache-2.0 (the zoo's). Kept in `~/g2_data/models/mobilenetv2-12/`, outside the repo. Checked read-only: it parses, `onnx.checker` passes, only standard operators (Conv, Clip, Add, GlobalAveragePool, Gemm and the like), no custom-domain operators, and it loads in onnxruntime. The embedder uses a derived copy, `mobilenetv2-12-features.onnx`, whose output is the 1280 x 7 x 7 feature map before the pooling and classifier (the embedder then averages it to 1280 numbers).
+On the 25 readable named pictures of 8 objects (6 cut-off survey pictures were left out), whole-picture vectors, threshold 0.80:
+
+| | within-object | between-object | gap | leave-one-out retrieval | hit rate | survey pictures that "match" |
+|---|---|---|---|---|---|---|
+| histogram baseline | 0.781 | 0.588 | 0.193 | 82% | 82% | 68% |
+| MobileNetV2 features | 0.788 | 0.687 | 0.101 | 77% | 73% | 46% |
+
+Too little data to choose: most objects have 4-5 pictures, the survey pictures contain the named kitchen fixtures themselves (so some "false" matches are real), and 0.80 is not the right threshold for both scales. Rerun `tools/eval_embedder.py` once more objects have 5 or more labelled pictures. Time on the Pi Zero 2 W is still to measure when the Pi is online.
+
 ### Phase 4: the localizer
 1. v0: no localizer. Embed the whole picture and an overlapping tile grid (for example 3 by 3); the gallery's duplicate handling collapses repeats.
 2. v1, only if v0 is too coarse: a foreground cut-out from the floor-level view (colour and edge difference against the floor, or motion while he is
