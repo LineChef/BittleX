@@ -26,14 +26,15 @@ class Gait:
     name: str
     phrases: tuple          # spoken forms, normalised (lower case, no punctuation); a command may carry up to two extra words
     echo_on: str            # what G2 says when it is switched on
-    base_ref: str           # reference_gait/<base_ref>_ref.npy: the scripted base the learned correction sits on
+    base_ref: str           # <base_ref>_ref.npy: the scripted base the learned correction sits on (pi_pipeline/gait/, reference_gait/ in the training tree)
+    scripted: bool = False  # can be played as a plain scripted walk (no learned correction) by a policy that does not know the gait: slow and experimental
 
 
 GAITS = {
     "normal": Gait("normal", ("walk normally", "walk normal", "normal walk", "normal gait", "walk like normal", "walk mode", "walk mode on", "normal mode", "step mode off", "hi step off", "high step off"),
                    "Walking normally.", "wkf"),
     "hi_step": Gait("hi_step", ("hi step", "high step", "hi steps", "high steps", "hi step mode", "high step mode", "step mode", "step mode on", "hi step on", "high step on"),
-                    "Hi step on.", "highstep"),
+                    "Hi step on.", "hsF", scripted=True),
 }
 DEFAULT = "normal"
 _PUNCT = re.compile(r"[^\w\s]")
@@ -114,8 +115,11 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     gait = parse_gait_command(text)
     if gait is None:
         return None, ""
+    label = "hi step" if gait == "hi_step" else gait.replace("_", " ")
     if not supports(policy_onnx, gait):
-        label = "hi step" if gait == "hi_step" else gait.replace("_", " ")
+        if GAITS[gait].scripted:                          # a scripted walk without the learned correction: allowed, said out loud, experimental
+            set_mode(gait, path)
+            return gait, f"{GAITS[gait].echo_on} It is a scripted walk without my learned correction, so it is slow and experimental."
         return None, f"My walking policy doesn't have {label} yet, so I'm staying as I am."
     set_mode(gait, path)
     return gait, GAITS[gait].echo_on

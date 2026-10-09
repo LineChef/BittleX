@@ -198,7 +198,7 @@ def probe_imu_under_load(lk, seconds, hz=CONTROL_HZ):
 
 def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
              balance_off=False, lift_joints="all", shoulder_scale=1.0, ramp_cycles=0.0, volt_every_s=0.0, send_every=1, foot_trim=None, *,
-             sleep=time.sleep, clock=time.monotonic):
+             ref_name="wkf", stop_event=None, sleep=time.sleep, clock=time.monotonic):
     """Replays the scripted wkF walk with no policy/IMU -- a firmware/servo
     sanity check before running the real control loop.
 
@@ -219,12 +219,12 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
     Pacing (2026-10-07): frames are scheduled against a deadline, the way the policy loop does, so the playback holds `hz` however long a send takes. It used to sleep `dt` AFTER
     each frame's work (a serial send blocks about 5 ms at 115200 baud), which ran the walk at about 44 Hz instead of 80 (23 s for a 12.5 s walk). `send_every` sends only every Nth
     frame (the policy loop sends every 3rd tick, `i@27`, the cadence the BiBoard is known to take without chattering); the frames in between are skipped, not queued."""
-    ref = np.load(os.path.join(_HERE, "wkf_ref.npy"))          # (100,8) rad, URDF order
+    ref = np.load(os.path.join(_HERE, f"{ref_name}_ref.npy"))   # (100,8) rad, URDF order; `ref_name` picks another scripted base gait (hsF = the stable high-step, 2026-10-09)
     m = ref.mean(axis=0)
     scale = np.ones(8)
     scale[[1, 3, 5, 7] if lift_joints == "knees" else slice(None)] = lift_scale
     scale[[0, 2, 4, 6]] *= shoulder_scale if lift_joints == "knees" else 1.0
-    base = ref
+    base = np.load(os.path.join(_HERE, "wkf_ref.npy")) if ref_name != "wkf" else ref        # the ramp blends the plain wkF into the chosen gait
     ref = m + (ref - m) * scale
     ramp_n = int(ramp_cycles * len(ref))
     dt = 1.0 / hz
@@ -233,6 +233,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
           f"{', balance off' if balance_off else ''}. Ctrl-C to stop.")
     log = open(log_path, "w") if log_path else None
     t_start, tilt_since, fell = clock(), None, False
+    reason = "complete"
     try:
         if balance_off:
             _send(lk, "gb")
@@ -282,7 +283,11 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
                             tilt_since = None
                 if fell:
                     print("!! fallen -- resting", flush=True)
-                    return
+                    reason = "fall"
+                    return reason
+                if stop_event is not None and stop_event.is_set():
+                    reason = "stopped"
+                    return reason
                 t_next += dt
                 slack = t_next - clock()
                 if slack > 0:
@@ -296,9 +301,15 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         if balance_off:
             _send(lk, "gB")       # restore the firmware balance BEFORE the rest, as the policy loop does: `d` sent right after left G2 standing
             sleep(0.3)
-        _send(lk, "d")
-        sleep(0.5)                # a pause so the board has the rest command before the port closes (2026-10-07: without it G2 stayed standing after a scripted walk)
-    print("done (sent rest).")
+        if stop_event is not None and not getattr(stop_event, "rest", True):
+            if getattr(stop_event, "end_pose", None) == "balance":
+                _send(lk, "kbalance")        # an exploration leg ending with another about to start: the standing pose, not lying down
+            sleep(0.8)
+        else:
+            _send(lk, "d")
+            sleep(0.5)                # a pause so the board has the rest command before the port closes (2026-10-07: without it G2 stayed standing after a scripted walk)
+    print("done (sent rest)." if stop_event is None or getattr(stop_event, "rest", True) else "done (standing).")
+    return "complete"
 
 
 def dry_run(cmd_fwd, seconds, hz, skill_layer=None, vision=None):

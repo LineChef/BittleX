@@ -28,7 +28,8 @@ class _Stop(threading.Event):
 
 
 class PolicyWalker:
-    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False):
+    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False, scripted_fn=None):
+        self._scripted_fn = scripted_fn          # the open-loop player for a gait the policy does not know (tests inject one)
         self._hold = hold_between_legs          # exploration: a leg that ends by itself leaves G2 in a balanced stand, not lying down (the session rests at its end)
         self._foot_hold = default_foot_hold() if foot_hold == "env" else foot_hold
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
@@ -37,6 +38,11 @@ class PolicyWalker:
         self._thread: threading.Thread | None = None
         self._stop = _Stop()
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _policy_path():
+        from .residual_policy import default_policy_path
+        return default_policy_path()
 
     @property
     def busy(self) -> bool:
@@ -56,8 +62,19 @@ class PolicyWalker:
                 params = inspect.signature(run).parameters
                 if "foot_hold" in params or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
                     extra["foot_hold"] = self._foot_hold
-            reason = run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
-                         on_battery=self._on_battery, **extra)
+            from . import gait_mode
+            mode = gait_mode.current()
+            if mode != gait_mode.DEFAULT and not gait_mode.supports(self._policy_path(), mode):
+                # the user switched gait ("hi step") and this policy never learned it: play the scripted base of that gait (slow, experimental), same stop and end-pose rules
+                sc = self._scripted_fn
+                if sc is None:
+                    from .run_gait import openloop as sc
+                cycles = max(1, int(round(float(seconds) / 1.25)))                       # one 100-frame cycle is 1.25 s at 80 Hz
+                log.info("scripted %s walk, %d cycles (the policy has no %s mode)", mode, cycles, mode)
+                reason = sc(self._link, cycles, CONTROL_HZ, ramp_cycles=1.0, send_every=3, ref_name=gait_mode.GAITS[mode].base_ref, stop_event=self._stop)
+            else:
+                reason = run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
+                             on_battery=self._on_battery, **extra)
             if reason == "fall" and self._on_fall is not None:
                 try:
                     self._on_fall()

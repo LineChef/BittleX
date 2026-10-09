@@ -33,17 +33,75 @@ def test_state_is_shared_through_the_file_and_the_blend_runs_over_a_cycle(tmp_pa
     assert gm.current(f) == "normal"                                     # a damaged file means the normal gait, never a crash
 
 
-def test_a_policy_without_the_mode_refuses_and_changes_nothing(tmp_path):
+def test_a_policy_without_the_mode_plays_the_scripted_gait_and_says_so(tmp_path):
     f = str(tmp_path / "mode.json")
     onnx = tmp_path / "p.onnx"
     (tmp_path / "p.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0}))
     gait, said = gm.request("hi step", str(onnx), f)
-    assert gait is None and "doesn't have hi step" in said and gm.current(f) == "normal"
-    assert gm.request("walk normally", str(onnx), f)[0] == "normal"      # the normal gait is always supported
+    assert gait == "hi_step" and "scripted walk" in said and "experimental" in said and gm.current(f) == "hi_step"
+    assert gm.request("walk normally", str(onnx), f) == ("normal", "Walking normally.")      # the normal gait is always supported
     (tmp_path / "p.onnx.json").write_text(json.dumps({"modes": ["normal", "hi_step"]}))
     gait, said = gm.request("high step", str(onnx), f)
-    assert gait == "hi_step" and said == "Hi step on." and gm.current(f) == "hi_step"
+    assert gait == "hi_step" and said == "Hi step on." and gm.current(f) == "hi_step"      # a policy that knows it: no caveat
     assert gm.request("walk normally", str(onnx), f) == ("normal", "Walking normally.")
+
+
+def test_the_walker_plays_the_scripted_base_in_hi_step_and_the_policy_otherwise(tmp_path, monkeypatch):
+    import time
+    from pi_pipeline.gait.policy_walker import PolicyWalker
+    f = str(tmp_path / "mode.json")
+    monkeypatch.setattr(gm, "STATE_PATH", f)
+    calls = []
+
+    def policy_run(lk, cmd, seconds, hz, fmt, dis, **kw):
+        calls.append("policy")
+        return "complete"
+
+    def scripted(lk, cycles, hz, **kw):
+        calls.append(("scripted", cycles, kw["ref_name"], kw["ramp_cycles"]))
+        return "complete"
+
+    def go():
+        w = PolicyWalker(object(), run_fn=policy_run, foot_hold=None, scripted_fn=scripted)
+        w.walk(5)
+        for _ in range(100):
+            if not w.busy:
+                break
+            time.sleep(0.01)
+    go()
+    gm.set_mode("hi_step", f)
+    go()
+    gm.set_mode("normal", f)
+    go()
+    assert calls == ["policy", ("scripted", 4, "hsF", 1.0), "policy"]
+
+
+def test_openloop_plays_another_reference_stops_on_request_and_ends_standing_when_asked(tmp_path):
+    import threading
+    from pi_pipeline.gait import run_gait
+
+    class Lk:
+        def __init__(self):
+            self.sent = []
+
+        def send(self, cmd, read_reply=False, settle=0.0):
+            self.sent.append(cmd)
+
+        def poll_imu(self):
+            return []
+
+    class Stop(threading.Event):
+        rest = False
+        end_pose = "balance"
+    ev, lk = Stop(), Lk()
+    n = [0]
+
+    def sleep(s):
+        n[0] += 1
+        if n[0] > 30:
+            ev.set()
+    reason = run_gait.openloop(lk, 3, 80, ramp_cycles=1.0, send_every=3, ref_name="hsF", stop_event=ev, sleep=sleep, fall_abort_deg=0)
+    assert reason == "stopped" and "kbalance" in lk.sent and "d" not in lk.sent[-3:]
 
 
 def test_the_double_beep_is_two_short_notes_and_speaker_sounds_are_off_in_tests(monkeypatch):
