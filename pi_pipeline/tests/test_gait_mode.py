@@ -8,7 +8,7 @@ from pi_pipeline.voice.commands import match_local_command
 def test_the_spoken_phrases_pick_the_right_gait_and_off_phrases_win():
     for t in ("hi step", "Hi step!", "high step", "G2, hi step", "hi step mode", "step mode"):
         assert gm.parse_gait_command(t) == "hi_step", t
-    for t in ("walk normally", "Walk normally.", "normal walk", "hi step off", "high step off", "step mode off"):
+    for t in ("walk normally", "Walk normally.", "normal walk", "hi step off", "high step off", "step mode off", "walk mode", "Walk mode!", "normal mode"):
         assert gm.parse_gait_command(t) == "normal", t
     for t in ("walk forward", "walk for ten seconds", "what is a high step", "I want you to take a long walk normally around the house tonight", "hello"):
         assert gm.parse_gait_command(t) is None, t

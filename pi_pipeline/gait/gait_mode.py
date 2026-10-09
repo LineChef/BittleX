@@ -30,7 +30,7 @@ class Gait:
 
 
 GAITS = {
-    "normal": Gait("normal", ("walk normally", "walk normal", "normal walk", "normal gait", "walk like normal", "step mode off", "hi step off", "high step off"),
+    "normal": Gait("normal", ("walk normally", "walk normal", "normal walk", "normal gait", "walk like normal", "walk mode", "walk mode on", "normal mode", "step mode off", "hi step off", "high step off"),
                    "Walking normally.", "wkf"),
     "hi_step": Gait("hi_step", ("hi step", "high step", "hi steps", "high steps", "hi step mode", "high step mode", "step mode", "step mode on", "hi step on", "high step on"),
                     "Hi step on.", "highstep"),
