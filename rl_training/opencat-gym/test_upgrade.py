@@ -274,3 +274,26 @@ def test_hazard_long_lengthens_hazard_episodes_without_moving_the_obstacles():
     out = json.loads(_child(HAZARD_LONG_PROBE).strip().splitlines()[-1])
     assert out["long"] >= 10 and out["short"] >= 3          # hazard-focus episodes run 600 steps, the rest keep the usual length
     assert out["scales"] == [1.0]                             # the obstacle stretch is not stretched with the episode
+
+
+def test_frontier_floor_holds_a_hazard_at_its_minimum_bin():
+    sys.path.insert(0, HERE)
+    os.environ["G2E_FRONTIER"] = "1"
+    os.environ["G2E_FRONTIER_FLOOR"] = "sidehill:5,climb:4"
+    try:
+        import train
+        c = train.FrontierCurriculum("zz_test_floor")
+        c.num_timesteps = 50_000_000
+        c.ramp_offset = 0.0
+        for _ in range(400):
+            c.anchor.append(1.0)
+        c._update()                                         # no evidence at all: the floor still holds
+        assert c.F["sidehill"] == 5 and c.F["climb"] == 4 and c.F["rubble"] == 0
+        w = np.array(c.weights("sidehill"))
+        assert w[5] > 0.3 and w[:3].sum() < 0.2             # sampled around bin 5, not at the tiniest sizes
+        c.num_timesteps = 1_000_000                          # a short pace caps the floor (12 bins x 1M / ramp)
+        c.ramp_offset = 0.0
+        c._update()
+        assert c.F["sidehill"] <= max(5, 0)
+    finally:
+        os.environ.pop("G2E_FRONTIER_FLOOR", None)

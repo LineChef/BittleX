@@ -245,6 +245,13 @@ class FrontierCurriculum(BaseCallback):
         self.anchor = deque(maxlen=400)
         self.F = {h: 0 for h in E.FR_HAZARDS}
         self.blocked = {h: None for h in E.FR_HAZARDS}
+        # G2E_FRONTIER_FLOOR="sidehill:5,climb:4,descent:4": a minimum frontier bin per hazard (2026-10-09). V3 passed 10 deg side-hills, 12 deg climbs and 10.8 deg descents, so those
+        # sizes are known to be passable; the frontier had stalled at 2-3 deg side-hills because success on them fell under half of a hazard-free walk. Capped by the pace.
+        self.floor = {}
+        for part in filter(None, os.environ.get("G2E_FRONTIER_FLOOR", "").split(",")):
+            k, _, v = part.partition(":")
+            if k in self.F and v.strip().isdigit():
+                self.floor[k] = min(int(v), self.K - 1)
         self._next_log = 0                 # the first update logs at once, then every log_every steps
 
     def frontier_sum(self):
@@ -289,6 +296,7 @@ class FrontierCurriculum(BaseCallback):
                 new = min(new, old)
             if a is not None and a < self.E.LEVEL_COLLAPSE_BASELINE:
                 new = max(0, old - 1)
+            new = max(new, min(self.floor.get(h, 0), max(0, tcap)))           # never below the hazard's floor (when the pace allows it)
             self.F[h] = new
             self.blocked[h] = None
             for b in range(new + 1, self.K):
