@@ -52,6 +52,14 @@ def run_for(d, c, seconds, step=0.25):
     return out
 
 
+def _real_jpeg():
+    import io
+    from PIL import Image
+    b = io.BytesIO()
+    Image.new("RGB", (16, 16), (120, 90, 60)).save(b, "JPEG")
+    return b.getvalue()
+
+
 def test_survey_cooldown_and_plan_order():
     s = Survey(SurveyConfig(cooldown_s=15.0), clock=lambda: 100.0)
     assert s.ready(100.0)
@@ -141,7 +149,7 @@ class FakeSource:
 
 
 def test_saver_writes_the_picture_and_its_sidecar_in_the_right_folder(tmp_path):
-    snap = Snapshot(b"\xff\xd8\xff\xe0fake\xff\xd9", 240, 240, [("face", 0.91, 0.5, 0.5, 0.2, 0.2)])
+    snap = Snapshot(_real_jpeg(), 240, 240, [("face", 0.91, 0.5, 0.5, 0.2, 0.2)])
     clock = types.SimpleNamespace(t=1791387600.123)
     saver = ExplorationPictureSaver(FakeSource(snap), str(tmp_path), clock=lambda: clock.t)
     p1 = saver("look_down")
@@ -164,7 +172,7 @@ def test_listener_posts_a_naming_request_and_answers():
 
 def test_pictures_can_be_trashed_restored_and_only_emptying_the_trash_deletes(tmp_path):
     from pi_pipeline.vision import exploration_pictures as EP
-    snap = Snapshot(b"\xff\xd8\xff\xe0fake\xff\xd9", 240, 240, [])
+    snap = Snapshot(_real_jpeg(), 240, 240, [])
     saver = ExplorationPictureSaver(FakeSource(snap), str(tmp_path / "pics"), clock=lambda: 1791387600.5)
     p = saver("name:Mug")
     rel = EP.list_pictures(str(tmp_path / "pics"))[0]["path"]

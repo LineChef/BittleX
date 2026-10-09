@@ -40,3 +40,25 @@ def test_without_prep_every_s_every_picture_is_prepped(tmp_path):
     saver("after_bow")
     saver("after_bow")
     assert src.calls == [None, None]
+
+
+def test_a_cut_off_jpeg_is_not_kept(tmp_path):
+    pytest = __import__("pytest")
+    pytest.importorskip("PIL")
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (120, 90, 60)).save(buf, "JPEG")
+    good = buf.getvalue()
+
+    class One:
+        def __init__(self, jpeg):
+            self.jpeg = jpeg
+
+        def snapshot(self, timeout_s=6.0, settle=None):
+            s = Snap()
+            s.jpeg = self.jpeg
+            return s
+    assert EP.ExplorationPictureSaver(One(good), str(tmp_path), survey_distance=-1)("after_bow") is not None
+    cut = EP.ExplorationPictureSaver(One(good[: len(good) // 2]), str(tmp_path / "cut"), survey_distance=-1)
+    assert cut("after_bow") is None and cut.truncated == 1

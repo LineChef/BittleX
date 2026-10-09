@@ -27,6 +27,20 @@ def slug(text: str) -> str:
     return _SLUG.sub("_", (text or "").lower().replace(" ", "-")).strip("_") or "x"
 
 
+def _decodes(jpeg: bytes) -> bool:
+    """True if the JPEG decodes completely (a picture cut off by the camera's small buffer fails here). Without Pillow nothing is checked."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return True
+    try:
+        import io
+        Image.open(io.BytesIO(jpeg)).load()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
                  survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0):
@@ -60,6 +74,10 @@ class ExplorationPictureSaver:
             self._last_prep = self._clock()
         if snap is None:
             log.warning("no picture for %s (the camera did not answer)", kind)
+            return None
+        if not _decodes(snap.jpeg):
+            self.truncated = getattr(self, "truncated", 0) + 1
+            log.warning("picture not kept: the JPEG is cut off or damaged (%s)", kind)         # 6 of 89 pictures from 10-07..10-09 were cut off
             return None
         now = self._clock()
         folder = self.folder_for(kind, now)
