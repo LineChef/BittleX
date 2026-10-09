@@ -104,9 +104,16 @@ def main():
                         waited = now
                     time.sleep(1)
                     continue
-                ep, jids = scene["ep"], scene["joint_ids"]
-                rid, ids = build(p, scene)
-                f = open(os.path.join(LIVE, scene["frames"]))
+                try:
+                    nf = open(os.path.join(LIVE, scene["frames"]))     # the run deletes an episode's frames when the next one starts: it can be gone already
+                    nrid, nids = build(p, scene)
+                except (OSError, KeyError, ValueError, p.error) as e:
+                    print(f"skipping an episode that is already over ({type(e).__name__}); waiting for the next one", flush=True)
+                    scene_m = None                                 # re-read the scene file
+                    scene = None
+                    time.sleep(0.3)
+                    continue
+                ep, jids, rid, ids, f = scene["ep"], scene["joint_ids"], nrid, nids, nf
                 if not a.realtime:                                 # live: join near the end of the stream instead of replaying a backlog
                     f.seek(max(0, os.fstat(f.fileno()).st_size - 60000))
                     f.readline()
@@ -155,6 +162,8 @@ def main():
                 time.sleep(2 / 80.0)                        # 2 control steps per frame, 80 Hz
     except KeyboardInterrupt:
         pass
+    except p.error:                                         # the window was closed while a frame was being drawn
+        print("window closed", flush=True)
     finally:
         try:
             os.remove(REQ)                                  # stop the stream
