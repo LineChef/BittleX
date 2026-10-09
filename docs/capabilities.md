@@ -122,6 +122,12 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
     bout cap, a leg-budget leash, or "that's enough" — and disarms, so each bout
     needs re-arming. Gated by `features.vision`; the desk-edge classifier (B16)
     upgrades it for near-edge use.
+  - **Exploration, as of 2026-10-09** (user decisions): the start is a rising "ba nun na NAAA" fanfare (buzzer arpeggio, brass-like on the speaker); each leg is 7 s and ends
+    in the standing pose, never lying down (rest only at the end of the session or on a fall); picture stops are at most one a minute and only when something is worth a picture
+    (`behavior/interest_watch.py`: an unknown object-like thing or an unfinished named object, never a person; a slow fallback every 5 min), and the camera prep (the settle frames)
+    is done for the first picture and once half way; no head gestures and no recognition hop (`G2_HEAD=1`, `G2_EXCITED_HOP=1` bring them back), a short play bow at a find instead;
+    the wall estimator (`vision/wall_distance.py`) only LOGS what it would do (`~/.local/share/g2/wall_dryrun.jsonl`) until it is calibrated and the user says to wire it in.
+    Stop a running session with `tools/g2_safe_stop.sh` (stop, balance, rest), never a plain service stop.
   - **"Come here"** (`behavior/approach.py`) — a directed one-shot walk toward
     the nearest person; stops close, or gives up (with a confused chirp) if it
     loses sight. Voice command, `Mode.APPROACH`.

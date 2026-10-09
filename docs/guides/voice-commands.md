@@ -114,3 +114,14 @@ Tier 0 "attentive" layer (turning toward a sound, following a face with its
 head, reacting to something new in view) and idle fidgets/mood-driven chirps
 run on their own, no wake word needed. See
 [`../capabilities.md`](../capabilities.md) for the full behaviour inventory.
+
+
+## The three sounds of an exchange (2026-10-09)
+
+| Sound | Means |
+|---|---|
+| **beep** (one short bright note) | he heard the wake word and is listening |
+| **boop** (one lower, rounder note) | he thinks you have finished speaking and has your words |
+| **two falling notes** | the follow-up window ended: he has stopped listening (say the wake word again) |
+
+On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`).
