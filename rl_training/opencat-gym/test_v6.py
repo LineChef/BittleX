@@ -51,7 +51,7 @@ print("ok")
 
 def test_edge_rewards_stall_penalty_and_lift_bonus():
     out = _child(PRELUDE.replace("LEVERS", repr(BASE + ["v6_s2_ledges"])) + r"""
-assert E.FAC_EDGE_STALL == 1.0 and E.FAC_EDGE_LIFT == 1.0
+assert E.FAC_EDGE_STALL == 2.0 and E.FAC_EDGE_LIFT == 1.0
 e.reset()
 e._ledge_edge, e._ledge_h, e._ledge_dir, e._ledge_passed = 0.30, 0.020, 1, False
 e._edge_stall_n = 0
@@ -61,12 +61,14 @@ assert e._edge_reward(0.0, paws) == 0.0 and e._edge_stall_n == 0
 # at the edge, standing still: nothing for the first 40 steps, then -1 per step
 p.resetBaseVelocity(e.robot_id, [0, 0, 0], [0, 0, 0])
 rs = [e._edge_reward(0.25, paws) for _ in range(60)]
-assert rs[:40] == [0.0] * 40 and all(r == -1.0 for r in rs[41:]), rs[35:45]
-# a front paw above the ledge top: +1
+assert rs[:40] == [0.0] * 40 and all(r == -2.0 for r in rs[41:]), rs[35:45]
+# a front paw above the ledge top: +20 ONCE per episode (a per-step bonus could be hovered for)
 paws_up = [(0.29, 0.0, 0.025), (0.29, 0.0, 0.0), (0.2, 0.0, 0.0), (0.2, 0.0, 0.0)]
-assert e._edge_reward(0.25, paws_up) == 0.0          # still stalled: the -1 and the +1 cancel
 e._edge_stall_n = 0
-assert e._edge_reward(0.25, paws_up) == 1.0
+assert e._edge_reward(0.25, paws_up) == 20.0
+assert e._edge_reward(0.25, paws_up) == 0.0 and e._edge_lift_paid
+e.reset()
+assert not e._edge_lift_paid
 # once past the ledge nothing is paid
 e._ledge_passed = True
 assert e._edge_reward(0.25, paws_up) == 0.0

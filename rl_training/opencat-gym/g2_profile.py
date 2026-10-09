@@ -128,11 +128,11 @@ LEVERS = {
     "v6_s0_flat": {"G2E_FR_ANCHOR": "0.85", "G2E_FR_SHARE_SET": "rubble:0.05,boxes:0.03,snag:0.02,rough:0.03,ledge:0.0,slope:0.0,cutback:0.10"},                  # flat foundation
     "v6_s1_terrain": {"G2E_FR_ANCHOR": "0.25", "G2E_FR_SHARE_SET": "rubble:0.50,boxes:0.35,snag:0.25,rough:0.20,ledge:0.0,slope:0.0,cutback:0.36", "G2E_LR_SCALE": "0.3"},
     "v6_s2_ledges": {"G2E_FR_ANCHOR": "0.20", "G2E_FR_SHARE_SET": "ledge:0.60,rubble:0.10,boxes:0.05,snag:0.05,rough:0.0,slope:0.0,cutback:0.10", "G2E_LR_SCALE": "0.3",
-                     "G2E_FRONTIER_FLOOR": "ledge_up:4,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5",                   # sizes start at 10 / 15 mm, not 0; the gate is 0.5
-                     "G2E_FAC_EDGE_STALL": "1.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_HAZ_POSTURE_RELAX": "0.25"},                          # tackle the edge: a stall costs, lifting a paw over the ledge pays, imitation relaxed
+                     "G2E_FRONTIER_FLOOR": "ledge_up:1,ledge_down:4", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5",                   # sizes start at 2.5 / 10 mm; the gate is 0.5
+                     "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_HAZ_POSTURE_RELAX": "0.25"},                          # tackle the edge: a stall costs, lifting a paw over the ledge pays, imitation relaxed
     "v6_s3_slopes": {"G2E_FR_ANCHOR": "0.30", "G2E_FR_SHARE_SET": "slope:0.25,rubble:0.20,boxes:0.10,snag:0.10,rough:0.10,ledge:0.10,cutback:0.20", "G2E_LR_SCALE": "0.25"},
     "v6_s4_all": {"G2E_FR_ANCHOR": "0.10", "G2E_FR_SHARE_SET": "ledge:0.25", "G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.0",           # the consolidation: the V5 course with more ledges, decaying to zero
-                  "G2E_FRONTIER_FLOOR": "ledge_up:4,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5", "G2E_FAC_EDGE_STALL": "1.0", "G2E_FAC_EDGE_LIFT": "1.0",
+                  "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5", "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0",
                   "G2E_HAZ_POSTURE_RELAX": "0.4"},
     "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
 }

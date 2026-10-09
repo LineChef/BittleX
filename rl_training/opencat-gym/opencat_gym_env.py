@@ -991,7 +991,7 @@ FAC_CROSS = _g2e("FAC_CROSS", 0.0)
 CROSS_CLEAR_M = 0.10       # the base must be this far past an object's far edge (about half the body: the hind feet are over it)
 # V6 ledge stage (user, 2026-10-09: tackle ledges, do not avoid them; falls first, success second): FAC_EDGE_STALL is paid (negative) on every step after half a second of
 #   hovering at a ledge edge (forward speed under 2 cm/s, from 12 cm before the edge to 6 cm past it) so stalling there is not the safe choice; FAC_EDGE_LIFT is paid on every step a
-#   front paw near the edge is above the ledge top (step-ups); and the paw-height target near a step-up edge is the ledge top plus 6 mm instead of PAW_Z_TARGET (the plain clearance
+#   front paw near the edge is above the ledge top (step-ups), ONCE per episode, 20 x FAC_EDGE_LIFT; and the paw-height target near a step-up edge is the ledge top plus 6 mm instead of PAW_Z_TARGET (the plain clearance
 #   term otherwise pulls the feet back down to 20 mm). Positions are the simulator's, reward only. 0 = off. Falls are not penalised any harder than before.
 FAC_EDGE_STALL = _g2e("FAC_EDGE_STALL", 0.0)
 FAC_EDGE_LIFT = _g2e("FAC_EDGE_LIFT", 0.0)
@@ -2993,6 +2993,7 @@ class OpenCatGymEnv(gym.Env):
         self._obj_passed = 0
         self._ledge_passed = False
         self._edge_stall_n = 0
+        self._edge_lift_paid = False
         self._haz_timer = 0
 
     def _on_hazard(self, base_x) -> bool:
@@ -3021,10 +3022,11 @@ class OpenCatGymEnv(gym.Env):
             self._edge_stall_n = 0
         if FAC_EDGE_STALL > 0 and self._edge_stall_n > 40:
             r -= FAC_EDGE_STALL
-        if FAC_EDGE_LIFT > 0 and self._ledge_dir > 0:
+        if FAC_EDGE_LIFT > 0 and self._ledge_dir > 0 and not self._edge_lift_paid:      # ONCE per episode: a per-step bonus was hoverable (a paw held over the ledge cancelled the stall cost)
             front = [pp for pp in ppos if e - 0.08 <= pp[0] <= e + 0.02]
             if front and max(pp[2] for pp in front) >= self._ledge_h + 0.002:
-                r += FAC_EDGE_LIFT
+                r += FAC_EDGE_LIFT * 20.0
+                self._edge_lift_paid = True
         return r
 
     def _cross_reward(self, base_x) -> float:

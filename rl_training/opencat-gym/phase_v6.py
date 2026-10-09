@@ -111,6 +111,8 @@ def go_no_go(st):
         reasons.append(f"calm-walk heading {head:.0f} deg > 30")
     if asym > 4:
         reasons.append(f"left/right difference {asym:.1f} > 4")
+    if lu < 0.4:
+        reasons.append(f"7.5 mm step-up success {lu:.2f} < 0.4: it avoids the edge instead of crossing it")
     if m3 > m5 + 0.03:
         reasons.append(f"mean falls {m3:.3f} above V5's {m5:.3f} + 0.03")
     log(f"S3 BENCHMARK | mean falls over {len(ids)} cells: S3 {m3:.3f}, V5 final {m5:.3f}, V4 {m4:.3f} | flat falls none = {flat} | calm walk heading {head:.0f} asym {asym:.1f} | "
