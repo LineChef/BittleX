@@ -300,3 +300,20 @@ def test_listen_hold_makes_the_explorer_hold_and_the_exploration_end_words_are_i
     assert ex.decide([], now=11.0).action is ExploreAction.HOLD and ex.decide([], now=21.9).action is ExploreAction.HOLD
     g = grammar_phrases()
     assert "cancel exploration" in g and "gee two end exploration mode" in g
+
+
+def test_first_picture_waits_and_the_pacing_comes_from_the_environment(monkeypatch):
+    from pi_pipeline.behavior.survey import survey_config_from_env
+    s = Survey(SurveyConfig(cooldown_s=40.0, first_delay_s=25.0), clock=lambda: 100.0)
+    assert not s.ready(110.0) and s.ready(125.0)                  # nothing before 25 s of exploring
+    s.began(125.0)
+    assert not s.ready(150.0) and s.ready(165.0)                  # then at most one every 40 s
+    assert Survey(SurveyConfig(), clock=lambda: 100.0).ready(100.0)   # the defaults still allow one at the end of the first leg
+    monkeypatch.delenv("G2_SURVEY_COOLDOWN_S", raising=False)
+    monkeypatch.delenv("G2_SURVEY_FIRST_S", raising=False)
+    c = survey_config_from_env()
+    assert (c.cooldown_s, c.first_delay_s) == (60.0, 30.0)
+    monkeypatch.setenv("G2_SURVEY_COOLDOWN_S", "90")
+    monkeypatch.setenv("G2_SURVEY_FIRST_S", "bad")
+    c = survey_config_from_env()
+    assert (c.cooldown_s, c.first_delay_s) == (90.0, 30.0)

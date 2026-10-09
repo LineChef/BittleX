@@ -22,6 +22,7 @@ from dataclasses import dataclass
 @dataclass
 class SurveyConfig:
     cooldown_s: float = 15.0        # at most one survey this often (the end of every leg is a chance, not a promise)
+    first_delay_s: float = 0.0      # no survey before G2 has been exploring this long (0 = the first leg's end can already be one)
     pose_settle_s: float = 2.2      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
     stand_settle_s: float = 2.5     # after standing again from the bow, before the picture (the stance has to settle)
     final_settle_s: float = 1.5     # after standing again, before the walk resumes
@@ -30,11 +31,24 @@ class SurveyConfig:
     stand_skill: str = "kup"
 
 
+def survey_config_from_env() -> SurveyConfig:
+    """The exploration session's pacing (user, 2026-10-09: walk around more before taking a picture): a picture at most every `G2_SURVEY_COOLDOWN_S` seconds (default 60: a quarter of the old 15 s pace) and not before
+    `G2_SURVEY_FIRST_S` seconds of exploring (default 30). The dataclass defaults stay as they were (15 s, no first delay) for callers that build their own config."""
+    import os
+
+    def _f(name: str, default: float) -> float:
+        try:
+            return max(0.0, float(os.environ.get(name, default)))
+        except ValueError:
+            return default
+    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0))
+
+
 class Survey:
     def __init__(self, cfg: SurveyConfig | None = None, *, clock=time.monotonic):
         self.cfg = cfg or SurveyConfig()
         self._clock = clock
-        self._last = float("-inf")
+        self._last = clock() - self.cfg.cooldown_s + self.cfg.first_delay_s if self.cfg.first_delay_s > 0 else float("-inf")      # the first picture waits first_delay_s
 
     def ready(self, now: float | None = None) -> bool:
         t = self._clock() if now is None else now

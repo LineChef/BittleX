@@ -99,12 +99,13 @@ def main() -> None:
                                          on_fall=lambda: fall["fn"] and fall["fn"]())
         saver = None
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
+            from .behavior.survey import survey_config_from_env
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
             saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver)
         if saver is not None:
-            rt.driver.enable_survey()                  # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
+            rt.driver.enable_survey(survey_config_from_env())                  # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
             log.info("survey stops ON: pictures go to %s", saver._root)
 
         apply_roam_limits(rt.driver, args.roam_s)          # roaming lasts as long as --roam-s says, not the behavior layer's own short caps
