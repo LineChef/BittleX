@@ -196,7 +196,7 @@ def _clean_stale(tag):
             os.remove(f)
 
 
-def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetune_target_kl="0.05", base=True):
+def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetune_target_kl="0.05", base=True, chain_from=None):
     """base=False: `extra` is the WHOLE environment (phase_v3 passes g2_profile.env_for_job). 2026-10-08 review fix: the old BASE dict (hw1-era IMU bias 2 deg, body mass 1.12,
     servo 137 deg/s ...) was merged under every launch; the V3 profile overrides each of its keys today, but any key a profile ever drops would silently come back from it."""
     if any_training():
@@ -214,6 +214,8 @@ def launch(tag, extra, steps="20e6", from_ckpt=None, finetune_lr="3e-5", finetun
     # phase_b_orchestrator.py the same way).
     from_flag = (f" --from {from_ckpt} --finetune-lr {finetune_lr} "
                  f"--finetune-target-kl {finetune_target_kl}") if from_ckpt else ""
+    if chain_from:                                              # V6 chain: weights from the previous stage, a fresh-run learning-rate schedule (train.py --chain-from)
+        from_flag += f" --chain-from {chain_from}"
     r = subprocess.run(f"yes y | ./start_run.sh {tag} --steps {steps}{from_flag}", shell=True, env=env,
                        capture_output=True, text=True)
     log(f"launched {tag}: {r.stdout.strip().splitlines()[0] if r.stdout.strip() else r.stderr.strip()[-200:]}")

@@ -236,6 +236,8 @@ class FrontierCurriculum(BaseCallback):
     WINDOW, MIN_N, PASS, BLOCK, FLOOR = 300, 30, 0.5, 0.05, 0.02
     # V5 (2026-10-09): a bin passes at G2E_FR_PASS of the hazard-free success (0.7: the frontier sits where G2 succeeds most of the time, not half of it)
     PASS = float(os.environ.get("G2E_FR_PASS", "") or PASS)
+    # V6: a pass bar per hazard, "ledge_up:0.5,ledge_down:0.5" (the step-up band sat at 0.59 against the 0.62 bar for the whole V5 run and the frontier never moved)
+    PASS_H = {k.strip(): float(v) for k, _, v in (part.partition(":") for part in filter(None, os.environ.get("G2E_FR_PASS_H", "").split(","))) if v.strip()}
 
     def __init__(self, tag, ramp_offset=0.0, log_every=196608):
         super().__init__()
@@ -286,7 +288,7 @@ class FrontierCurriculum(BaseCallback):
             f = 0
             for b in range(self.K):
                 rel, n = self._rel(h, b, ref)
-                if n >= self.MIN_N and rel >= self.PASS:
+                if n >= self.MIN_N and rel >= self.PASS_H.get(h, self.PASS):
                     f = b
                 elif n >= self.MIN_N and rel < 0.35:
                     break                                    # a clearly failing bin stops the climb
@@ -503,6 +505,9 @@ if __name__ == "__main__":
     parser.add_argument("--mirror-loss", type=float, default=float(os.environ.get("G2E_MIRROR_LOSS", "0") or 0),
                         help="V3 lever R1: weight of the left/right mirror-symmetry loss (mirror.py MirrorPPO); 0 = plain PPO. "
                              "Env default G2E_MIRROR_LOSS. Value-loss weight: G2E_MIRROR_VALUE_LOSS (default 0.1)")
+    parser.add_argument("--chain-from", dest="chain_from", default=None,
+                        help="V6 chain: start from this checkpoint's weights but train like a fresh run (the learning-rate schedule G2E_LR_SCALE / G2E_LR_FLOOR decays "
+                             "over THIS stage, G2E_TARGET_KL applies, the curriculum starts at full pace); unlike --from, which nudges with a low constant rate")
     parser.add_argument("--re-ramp", action="store_true",
                         help="with --from: ramp penalties / domain randomization up from zero again "
                              "(default: a continuation starts at full strength)")
@@ -565,7 +570,7 @@ if __name__ == "__main__":
               f"{float(os.environ.get('G2E_MIRROR_VALUE_LOSS', '0.1'))}", flush=True)
     else:
         PPOCls = PPO
-    ramp_offset = max(_E.RAMP_TOTAL_STEPS, _E.RAMP_PENALTY_STEPS) if (args.from_ckpt and not args.re_ramp) else 0.0
+    ramp_offset = max(_E.RAMP_TOTAL_STEPS, _E.RAMP_PENALTY_STEPS) if ((args.from_ckpt or args.chain_from) and not args.re_ramp) else 0.0
     cbs = [RampSync(ramp_offset), CapsSync(args.tag), checkpoint_callback]
     curriculum = None
     if _E.FRONTIER:                                                     # the per-hazard frontier replaces the probe-driven category levels
@@ -582,7 +587,14 @@ if __name__ == "__main__":
         cbs.append(monitor)
     checkpoint_callback = CallbackList(cbs)
 
-    if args.from_ckpt:
+    if args.chain_from:
+        _tkl = os.environ.get("G2E_TARGET_KL", "")
+        print(f"chaining from {args.chain_from}: fresh-run schedule (lr start {3e-4 * lr_scale:.1e}, floor {lr_floor}), target_kl {_tkl or 'off'}", flush=True)
+        model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None)
+        if args.mirror_loss > 0:
+            model.mirror_w, model.mirror_wv = args.mirror_loss, float(os.environ.get("G2E_MIRROR_VALUE_LOSS", "0.1"))
+        model.learn(args.steps, callback=checkpoint_callback, reset_num_timesteps=True)
+    elif args.from_ckpt:
         # Finetune: load the policy and nudge it with a low CONSTANT LR plus a
         # target_kl early-stop. The previous linear_schedule(3e-4) restart on a
         # converged policy diverged every time (approx_kl 70-400, clip_fraction

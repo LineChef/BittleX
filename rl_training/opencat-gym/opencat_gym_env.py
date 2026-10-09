@@ -967,7 +967,11 @@ FR_BINS = 12
 # Share of ALL training episodes each hazard appears in (the user's shares, 2026-10-08; cutback keeps its old ~36%). Converted to per-episode chances after the anchors
 # and the exclusions (a rough floor carries no slope and no ledge) in FrontierPlan. V5 (user, 2026-10-09): slopes and tilts in no more than 10% of episodes (G2E_FR_SLOPE_SHARE).
 FR_SHARE = {"rubble": 0.50, "boxes": 0.30, "slope": _g2e("FR_SLOPE_SHARE", 0.20), "rough": 0.20, "snag": 0.20, "ledge": 0.20, "cutback": 0.36}
-FR_ANCHOR = 0.10          # hazard-free episodes: the success baseline every bin is judged against
+for _part in filter(None, os.environ.get("G2E_FR_SHARE_SET", "").split(",")):       # V6 stage mixes: "ledge:0.6,rubble:0.1" sets those shares (a stage trains mostly its own skill)
+    _k, _, _v = _part.partition(":")
+    if _k.strip() in FR_SHARE and _v.strip():
+        FR_SHARE[_k.strip()] = float(_v)
+FR_ANCHOR = _g2e("FR_ANCHOR", 0.10)          # hazard-free episodes: the success baseline every bin is judged against (V6 stages: 0.2-0.9, the flat share of the stage)
 FR_COMBO = _g2e("FR_COMBO", 0.25)          # of the other episodes: every present hazard at frontier sizes, not counted (V5: 0.15)
 FR_BACKGROUND_TILT_DEG = _g2e("FR_BACKGROUND_TILT_DEG", 2.0)   # episodes without a slope hazard keep a small random tilt (the old background slope), never on anchors (V5: 0, user)
 # FR_SLOPE_DECK: the slope kind (each side-hill side, climb, descent) is dealt from a shuffled deck per environment instead of a coin, so every kind gets exactly its share.
@@ -985,6 +989,12 @@ FR_ANCHOR_LONG = _g2e("FR_ANCHOR_LONG", False)
 #   edge, each worth FAC_CROSS. Positions come from the sim (reward only, nothing the policy sees). 0 = off.
 FAC_CROSS = _g2e("FAC_CROSS", 0.0)
 CROSS_CLEAR_M = 0.10       # the base must be this far past an object's far edge (about half the body: the hind feet are over it)
+# V6 ledge stage (user, 2026-10-09: tackle ledges, do not avoid them; falls first, success second): FAC_EDGE_STALL is paid (negative) on every step after half a second of
+#   hovering at a ledge edge (forward speed under 2 cm/s, from 12 cm before the edge to 6 cm past it) so stalling there is not the safe choice; FAC_EDGE_LIFT is paid on every step a
+#   front paw near the edge is above the ledge top (step-ups); and the paw-height target near a step-up edge is the ledge top plus 6 mm instead of PAW_Z_TARGET (the plain clearance
+#   term otherwise pulls the feet back down to 20 mm). Positions are the simulator's, reward only. 0 = off. Falls are not penalised any harder than before.
+FAC_EDGE_STALL = _g2e("FAC_EDGE_STALL", 0.0)
+FAC_EDGE_LIFT = _g2e("FAC_EDGE_LIFT", 0.0)
 # Hazard-aware relaxation (V5 screens): while G2 is on a hazard (touched an obstacle or ledge in the last HAZ_HOLD_STEPS steps, stands on a slope of HAZ_SLOPE_DEG or more,
 #   or is at a ledge edge), HAZ_SPEED_RELAX scales the speed-tracking penalty (0 = off on a hazard) and HAZ_POSTURE_RELAX scales the imitation sharpness and the residual cost
 #   (0.5 = holding a non-scripted posture costs half). 1.0 = unchanged.
@@ -1536,8 +1546,13 @@ class OpenCatGymEnv(gym.Env):
 
         # Read clearance of paw from ground
         paw_clearance = 0
+        _paw_tgt = PAW_Z_TARGET
+        if FAC_EDGE_LIFT > 0 and self._ledge_edge is not None and self._ledge_dir > 0 and not self._ledge_passed:
+            _bx = p.getBasePositionAndOrientation(self.robot_id)[0][0]
+            if self._ledge_edge - 0.12 <= _bx <= self._ledge_edge + 0.03:
+                _paw_tgt = max(PAW_Z_TARGET, self._ledge_h + 0.006)             # V6: near a step-up edge the feet are asked to clear the ledge, not to stay at 20 mm
         for k in range(4):
-            paw_clearance += (_ppos[k][2] - PAW_Z_TARGET) ** 2 * _pw[k] ** 0.5
+            paw_clearance += (_ppos[k][2] - _paw_tgt) ** 2 * _pw[k] ** 0.5
 
         # Stride-length reward: on each foot touchdown (contact False->True),
         # reward the forward x-distance that foot covered since its previous
@@ -1760,6 +1775,7 @@ class OpenCatGymEnv(gym.Env):
         _haz = self._on_hazard(current_position) if (HAZ_SPEED_RELAX != 1.0 or HAZ_POSTURE_RELAX != 1.0) else False      # V5 hazard-aware relaxation
         _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
         r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
+        r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0) else 0.0
 
         # Penalty and reward
         smooth_movement = np.sum(
@@ -2044,6 +2060,7 @@ class OpenCatGymEnv(gym.Env):
 
         reward = (FAC_MOVEMENT * capped_forward
                  + r_cross
+                 + r_edge
                  + r_goal_progress
                  + r_goal_reached
                  + obs_swerve_rew
@@ -2089,6 +2106,7 @@ class OpenCatGymEnv(gym.Env):
         info = {
             "r_movement": FAC_MOVEMENT * capped_forward,
             "r_cross": r_cross,
+            "r_edge": r_edge,
             "on_hazard": float(_haz),
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
@@ -2974,6 +2992,7 @@ class OpenCatGymEnv(gym.Env):
                 self._obj_far.append(float(hi[0]))
         self._obj_passed = 0
         self._ledge_passed = False
+        self._edge_stall_n = 0
         self._haz_timer = 0
 
     def _on_hazard(self, base_x) -> bool:
@@ -2988,6 +3007,25 @@ class OpenCatGymEnv(gym.Env):
         if max(abs(self._slope_rp[0]), abs(self._slope_rp[1])) >= np.deg2rad(HAZ_SLOPE_DEG):
             return True
         return self._ledge_edge is not None and (self._ledge_edge - 0.12) <= base_x <= (self._ledge_edge + 0.20)
+
+    def _edge_reward(self, base_x, ppos) -> float:
+        """V6 ledge stage: a stall penalty after half a second of hovering at a ledge edge, and a bonus while a front paw near a step-up edge is above the ledge top."""
+        e = self._ledge_edge
+        if e is None or self._ledge_passed or not (e - 0.12 <= base_x <= e + 0.06):
+            self._edge_stall_n = 0
+            return 0.0
+        r = 0.0
+        if p.getBaseVelocity(self.robot_id)[0][0] < 0.02:
+            self._edge_stall_n += 1
+        else:
+            self._edge_stall_n = 0
+        if FAC_EDGE_STALL > 0 and self._edge_stall_n > 40:
+            r -= FAC_EDGE_STALL
+        if FAC_EDGE_LIFT > 0 and self._ledge_dir > 0:
+            front = [pp for pp in ppos if e - 0.08 <= pp[0] <= e + 0.02]
+            if front and max(pp[2] for pp in front) >= self._ledge_h + 0.002:
+                r += FAC_EDGE_LIFT
+        return r
 
     def _cross_reward(self, base_x) -> float:
         """V5 crossing bonus: FAC_CROSS for the whole obstacle field (split evenly over its pieces, paid as each one is cleared) and FAC_CROSS for the ledge edge."""
