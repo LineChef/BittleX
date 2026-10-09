@@ -101,6 +101,7 @@ LEVERS = {
     "cmd_capped": {"G2E_CMD_BANDS": "capped"},                                                   # ablation of cmd_forward: only the unreachable fast band is removed, backward stays
     "opt_bundle": {"G2E_NORM_REWARD": "1", "G2E_LOG_STD_INIT": "-1", "G2E_LR_FLOOR": "0.1"},     # reward normalization, std 0.37 start, LR floor 3e-5
     "hazard_contact": {"G2E_HAZARD_EP_LEN": "375"},                                              # hazard-focus episodes 4.7 s, obstacles spread to match
+    "lr_half": {"G2E_LR_SCALE": "0.5"},                                                         # 2026-10-09: the clip fraction was above 0.3 in every long run (0.33-0.49): half the learning rate
     "hazard_long": {"G2E_HAZARD_EP_LEN": "600", "G2E_HAZARD_X_SCALE": "1.0"},                    # hazard-focus episodes 7.5 s with the obstacles where they were: G2 gets time to walk through them
     "imitation_actual": {"G2E_IMITATION_ACTUAL": "1"},                                           # imitation on measured joints (recipe evaluation finding 1)
     "privileged_critic": {"G2E_PRIV_OBS": "1"},                                                  # critic-only true state + hazards (recipe evaluation finding 3)
@@ -109,7 +110,7 @@ LEVERS = {
 OBS_LEVERS = ("heading_obs", "privileged_critic")
 # Settings only train.py reads (how training runs, not the world): never part of a scoring or ladder environment.
 TRAINER_ONLY_PREFIXES = ("G2E_N_ENVS", "G2E_LEAN_INFO", "G2E_RUN_MONITOR", "G2E_MONITOR_EVERY", "G2E_PLATEAU", "G2E_PPO_", "G2E_NORM_REWARD", "G2E_LOG_STD_INIT",
-                         "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS")
+                         "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_LR_SCALE", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS")
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
 # The SURFACE STEP / TRANSITION (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the training course COMPLETELY (user, 2026-10-08): no stage,

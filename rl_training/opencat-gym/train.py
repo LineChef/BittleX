@@ -540,8 +540,10 @@ if __name__ == "__main__":
     ppo_batch, ppo_epochs = int(os.environ.get("G2E_PPO_BATCH", "64")), int(os.environ.get("G2E_PPO_EPOCHS", "10"))   # lever big_batch: 4096 x 5
     lr_floor = float(os.environ.get("G2E_LR_FLOOR", "0") or 0)        # opt_bundle: the linear decay ends at this fraction of 3e-4 instead of 0
 
+    lr_scale = float(os.environ.get("G2E_LR_SCALE", "1") or 1)          # lever lr_half: the whole schedule (start and floor) scaled, 0.5 = start at 1.5e-4
+
     def lr_schedule(progress_remaining, _f=lr_floor):
-        return 3e-4 * (_f + (1.0 - _f) * progress_remaining)
+        return 3e-4 * lr_scale * (_f + (1.0 - _f) * progress_remaining)
 
     # Save a checkpoint every 200K total env steps, so an interruption only costs progress back to the last checkpoint. Named by the 200k boundary crossed.
     checkpoint_callback = BoundaryCheckpoint(200_000, args.tag)

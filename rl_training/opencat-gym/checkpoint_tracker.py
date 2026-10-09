@@ -2,7 +2,7 @@
 calm walk (T1.1, N1: speed, falls, roll / pitch spread, asymmetry, heading drift, servo overload, mirror gap) and run the exposure probe on a fixed moderate course
 (every hazard's frontier at bin 4, hazard episodes 7.5 s), the same for every checkpoint and run. One JSON line per checkpoint in trained/<tag>_curve.jsonl, one printed line each.
 
-    ../../.venv/bin/python checkpoint_tracker.py [TAG]         # runs until the trainer is gone, then scores what is left
+    ../../.venv/bin/python checkpoint_tracker.py [TAG [LEVER,LEVER,...]]    # runs until the trainer is gone, then scores what is left (levers default to the adopted recipe)
 
 Resumable: a checkpoint already in the curve file is skipped. Nothing here stops or changes the run."""
 import json
@@ -36,10 +36,10 @@ def probe(tag, step):
     return {}
 
 
-def main(tag="v4_20m"):
+def main(tag="v4_20m", levers=None):
     curve = f"trained/{tag}_curve.jsonl"
     done = {json.loads(l)["step"] for l in open(curve)} if os.path.exists(curve) else set()
-    levers = json.load(open(P.RESULTS))["base"]
+    levers = levers or json.load(open(P.RESULTS))["base"]
     while True:
         training = subprocess.run(["pgrep", "-f", f"[t]rain.py --tag {tag}"], capture_output=True).returncode == 0
         steps = sorted(int(m.group(1)) for f in os.listdir("trained/checkpoints") for m in [re.fullmatch(rf"{tag}_(\d+)_steps\.zip", f)] if m and int(m.group(1)) % STEP_EVERY == 0)
@@ -62,4 +62,4 @@ def main(tag="v4_20m"):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "v4_20m")
+    main(sys.argv[1] if len(sys.argv) > 1 else "v4_20m", sys.argv[2].split(",") if len(sys.argv) > 2 else None)

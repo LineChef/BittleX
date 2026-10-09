@@ -345,6 +345,36 @@ def final(tag="v4_20m"):
         compare_v3_v4(tag, levers)
 
 
+STAGE_GATES = {"G2E_LEVEL_MIN_BASELINE": "0.25", "G2E_LEVEL_COLLAPSE_BASELINE": "0.12"}      # the working curriculum gates (2026-10-09)
+STAGE1_LEVERS = ["mirror_strong", "frontier", "cmd_forward", "opt_bundle", "privileged_critic", "lr_half"]
+STAGE2_LEVERS = STAGE1_LEVERS + ["hazard_long"]
+
+
+def stage(tag, levers, steps, from_ckpt=None, finetune_lr="1e-4", finetune_kl="0.03", plateau=False, seed=42):
+    """One run of the overnight plan's step 2 (2026-10-09): stage 1 = a fresh 5M run with short hazard episodes; stage 2 = a 20M continuation of it (train.py --from: constant
+    low learning rate with a KL limit, difficulty at full strength from the start) with long hazard episodes. Logged in the screens' START format so the viewers and the
+    checkpoint tracker can rebuild the run's settings. Returns True when the run finished."""
+    extra = dict(STAGE_GATES)
+    env = job_env(tag, levers, seed, extra)
+    if plateau:
+        env["G2E_PLATEAU_STOP"] = "1"
+    for k in [k for k in os.environ if k.startswith("G2E_")]:
+        del os.environ[k]
+    if not RP.training(tag) and not os.path.exists(f"trained/{tag}_ppo.zip"):
+        log(f"{tag} START: levers {levers} seed {seed} extra {extra}" + (f" (continuing {from_ckpt}, lr {finetune_lr}, kl {finetune_kl})" if from_ckpt else ""))
+        RP.launch(tag, env, steps=steps, base=False, from_ckpt=from_ckpt, finetune_lr=finetune_lr, finetune_target_kl=finetune_kl)
+    ok, why = RP.wait_for_finish(tag)
+    log(f"{tag} {'FINISHED' if ok else 'HALT: ' + str(why)}")
+    return ok
+
+
+def stages():
+    """Step 2: stage 1 then stage 2, unattended (a person can stop between them)."""
+    if not stage("v4_s1", STAGE1_LEVERS, "5e6"):
+        raise SystemExit(1)
+    stage("v4_s2", STAGE2_LEVERS, "20e6", from_ckpt="trained/v4_s1_ppo", plateau=True)
+
+
 V3_POLICY = "trained/v3_20m_ppo"            # Release_CandidateV3, the deployed policy
 DELAY_CELLS = "T1.1,N1,T3.2,T5.2,T6.1,T8.1,N5"     # the reality-gap check: calm walks, a side-hill, a ledge, rubble, shoves, the yaw push
 
@@ -559,4 +589,4 @@ def compare_v3_v4(tag="v4_20m", levers=None):
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "run"
-    {"run": run, "status": status, "final": final, "compare": compare_v3_v4}[cmd]()
+    {"run": run, "status": status, "final": final, "compare": compare_v3_v4, "stages": stages}[cmd]()
