@@ -78,6 +78,7 @@ CALIBRATION: dict[str, str] = {
 # --- screening levers: one per 3M round (docs/rl/v3-retrain-plan.md sections 2.3-2.5) ---
 LEVERS = {
     "mirror": {"G2E_MIRROR_LOSS": "1.0", "G2E_MIRROR_VALUE_LOSS": "0.1"},                      # R1 (train.py reads these)
+    "mirror_strong": {"G2E_MIRROR_LOSS": "2.0", "G2E_MIRROR_VALUE_LOSS": "0.2"},                 # 2026-10-09 (user): twice the mirror weight in every run after the first long-hazard run; the 20M mirror gap rose to 0.09 (V3: 0.039)
     "heading_obs": {"G2E_HEADING_OBS": "1"},                                                   # Y2 (the Pi needs the same inputs)
     "heading_shape": {"G2E_FAC_HEADING_B": "3.0", "G2E_HEADING_SIGMA_DEG": "10"},              # R2
     "long_episodes": {"G2E_LONG_EP_PROB": "0.25", "G2E_LONG_EP_LEN": "1000"},                  # Y3
