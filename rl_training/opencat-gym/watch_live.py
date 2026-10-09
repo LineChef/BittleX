@@ -14,6 +14,7 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+HOLD_S = 1.2                                                # how long an episode's last frame stays up before the next episode is shown
 LIVE = os.path.join(HERE, "trained", "live")
 REQ = os.path.join(LIVE, "request")
 
@@ -79,7 +80,7 @@ def main():
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     touch()
     last_touch, ep, f, rid, ids, text, jids = time.time(), None, None, None, {}, None, []
-    waited, scene, scene_t, scene_m, done_playing, last_draw = time.time(), None, 0.0, None, False, 0.0
+    waited, scene, scene_t, scene_m, done_playing, last_draw, end_t, last_frame_t = time.time(), None, 0.0, None, False, 0.0, 0.0, time.time()
     print("watching trained/live (close the window or Ctrl-C to stop)", flush=True)
     try:
         while p.isConnected():
@@ -96,8 +97,8 @@ def main():
                         scene, scene_m = json.load(open(scene_path)), m
                 except (OSError, ValueError):
                     pass
-            # a new episode: switch to it now (live) or once the current one has played out (--realtime)
-            if scene is not None and scene["ep"] != ep and (not a.realtime or f is None or done_playing):
+            # a new episode: switch once the current one has played out and its last frame has been held a moment (no flashing between short episodes)
+            if scene is not None and scene["ep"] != ep and (f is None or (done_playing and now - end_t >= HOLD_S)):      # finish the episode on screen, hold its last frame, then jump to the newest
                 if now - scene["t"] > 60:
                     if now - waited > 10:
                         print("no live episode in the last minute: is a run training (started after the live-view change)?", flush=True)
@@ -119,7 +120,7 @@ def main():
                     f.readline()
                 text = p.addUserDebugText(describe(scene), [0, 0, 0.25], textSize=1.1, textColorRGB=[0.1, 0.1, 0.1])
                 print(describe(scene), flush=True)
-                done_playing = False
+                done_playing, last_frame_t = False, time.time()
             if f is None:
                 time.sleep(0.2)
                 continue
@@ -138,10 +139,11 @@ def main():
                     continue
                 end = fr.get("end") or end
             if fr is None:
-                if a.realtime and ep is not None and scene is not None and scene["ep"] != ep:
-                    done_playing = True                            # the episode ended and a newer one exists
+                if ep is not None and scene is not None and scene["ep"] != ep and not done_playing and now - last_frame_t > 0.5:
+                    done_playing, end_t = True, now                # a newer episode exists and this one has stopped streaming
                 time.sleep(0.02)
                 continue
+            last_frame_t = time.time()
             if not a.realtime and time.time() - last_draw < 0.05:      # at most 20 drawings a second
                 time.sleep(0.02)
                 continue
@@ -157,7 +159,7 @@ def main():
             if end:
                 p.addUserDebugText("FELL" if end == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
                                    textColorRGB=[0.8, 0.1, 0.1] if end == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
-                done_playing = True
+                done_playing, end_t = True, time.time()
             if a.realtime:
                 time.sleep(2 / 80.0)                        # 2 control steps per frame, 80 Hz
     except KeyboardInterrupt:
