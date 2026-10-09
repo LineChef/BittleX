@@ -29,6 +29,7 @@ class ChirpMood(Enum):
     QUESTION = "question"    # asking something / enrollment prompt
     GREETING = "greeting"    # "G2 meet X" / say-hi trill
     ACK = "ack"             # "heard you" -- fires on every recognised voice command
+    FANFARE = "fanfare"      # starting to explore: "ba nun na NAAA!" (user, 2026-10-09)
 
 
 # (tone_index, duration_units) sequences. Kept short (<= ~5 notes).
@@ -41,6 +42,7 @@ CHIRP: dict[ChirpMood, list[tuple[int, int]]] = {
     ChirpMood.QUESTION: [(9, 5), (16, 8)],                  # rising two-note "?"
     ChirpMood.GREETING: [(14, 3), (18, 3), (14, 3), (20, 6)],  # quick trill
     ChirpMood.ACK:      [(16, 3), (20, 3)],                 # quick "got it" blip
+    ChirpMood.FANFARE:  [(9, 10), (13, 8), (16, 10), (21, 2)],   # root, major third, fifth, then the octave held: short, short, short, LONG (a rising arpeggio, all notes under 23 like the other chirps)
 }
 
 # voice-loop cue stage -> a mood (or None to stay silent)

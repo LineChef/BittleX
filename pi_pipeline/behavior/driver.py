@@ -760,7 +760,7 @@ class BehaviorDriver:
             # so autonomous movement is never a surprise
             if self._roam_chirp_at is None:
                 self._roam_chirp_at = now
-                effects += self._chirp(ChirpMood.GREETING, now, "starting to roam")
+                effects += self._chirp(ChirpMood.FANFARE, now, "starting to roam")
             elif now - self._roam_chirp_at >= self.explorer.cfg.roam_chirp_s:
                 self._roam_chirp_at = now
                 effects += self._chirp(ChirpMood.QUESTION, now, "still roaming")

@@ -49,6 +49,27 @@ def render_close(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([_note(523.3, 0.18, rate, decay=9.0), gap, _note(349.2, 0.22, rate, decay=8.0)], peak)
 
 
+def _brass(f0: float, dur: float, rate: int, attack: float = 0.03, release: float = 0.06, scoop: float = 0.0, vibrato: float = 0.0) -> np.ndarray:
+    """A trumpet-like note: a harmonic series falling off as 1/n (the bright, buzzy brass spectrum), a quick attack that starts a hair flat, a sustained body and a short release;
+    `vibrato` (Hz-fraction depth) wobbles the long notes."""
+    t = np.arange(0, dur, 1.0 / rate)
+    f = f0 * (1.0 - scoop * np.exp(-t / 0.03))                     # the note slides up into pitch over the first ~30 ms
+    if vibrato:
+        f = f * (1.0 + vibrato * np.sin(2 * np.pi * 5.5 * t) * np.minimum(1.0, t / 0.25))
+    phase = 2 * np.pi * np.cumsum(f) / rate
+    y = sum(np.sin(k * phase) / k ** 0.9 for k in range(1, 9))
+    env = np.minimum(1.0, t / attack) * np.minimum(1.0, (dur - t) / release)
+    return y * env
+
+
+def render_fanfare(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """"ba nun na NAAA!": C5 E5 G5 short, then a long held C6 with a little vibrato (a rising brass arpeggio, about 1.4 s)."""
+    gap = np.zeros(int(rate * 0.025))
+    parts = [_brass(523.3, 0.11, rate, scoop=0.02), gap, _brass(659.3, 0.15, rate, scoop=0.02), gap,
+             _brass(784.0, 0.11, rate, scoop=0.02), gap, _brass(1046.5, 0.75, rate, attack=0.04, release=0.18, scoop=0.03, vibrato=0.006)]
+    return _finish(parts, peak)
+
+
 def _play(pcm_fn, peak: float, rate: int, wait: bool) -> None:
     def _run() -> None:
         try:
@@ -74,3 +95,7 @@ def play_boop(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False)
 
 def play_close(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_close, peak, rate, wait)
+
+
+def play_fanfare(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_fanfare, peak, rate, wait)

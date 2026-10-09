@@ -135,6 +135,12 @@ class DriverBindings:
             tone = opencat.beep(CHIRP[mood])
             logging.getLogger("g2.chirp").info("chirp %s sent to the BiBoard: %s", mood.value, tone)
             fn(tone)
+            if mood is ChirpMood.FANFARE:                # the same fanfare as a brass-like sound on the speaker, when there is one (never raises)
+                try:
+                    from ..voice import prompt_tones
+                    prompt_tones.play_fanfare()
+                except Exception:  # noqa: BLE001
+                    pass
             return f"chirp:{mood.value}"
         if k is EffectKind.POWER:
             fn = self.power and _call(self.power, "set_profile", "profile", "apply")

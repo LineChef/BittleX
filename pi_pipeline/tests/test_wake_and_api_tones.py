@@ -72,3 +72,14 @@ def test_prompt_tones_are_three_distinct_sounds_and_the_cue_plays_each_on_its_st
     for st in ("awake", "listening", "captured", "heard", "closed"):
         cue.set(st)
     assert played == ["p", "p", "p"]                           # only the three stages sound
+
+
+def test_the_exploration_fanfare_is_four_notes_and_rides_the_roam_chirp():
+    from pi_pipeline.behavior.chirps import CHIRP, ChirpMood, chirp_for
+    from pi_pipeline.voice import prompt_tones as pt
+    pcm = pt.render_fanfare()
+    assert 1.0 < pcm.size / 48000 < 1.7 and abs(int(pcm.max())) > 100
+    notes = CHIRP[ChirpMood.FANFARE]
+    assert len(notes) == 4 and notes[-1][1] < min(d for _, d in notes[:-1])          # three short notes, then a long one
+    assert [n for n, _ in notes] == sorted(n for n, _ in notes)                       # rising
+    assert chirp_for(ChirpMood.FANFARE).startswith("b9 ")
