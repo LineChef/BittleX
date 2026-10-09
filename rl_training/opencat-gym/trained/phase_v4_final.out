@@ -1,0 +1,36 @@
+[v4 03:12 AM] v4_20m START: the 20M with ['mirror', 'frontier', 'cmd_forward', 'opt_bundle', 'privileged_critic', 'hazard_long'] {'G2E_LEVEL_MIN_BASELINE': '0.25', 'G2E_LEVEL_COLLAPSE_BASELINE': '0.12'} (plateau stop on)
+[pipeline 03:12 AM] v4_20m: cleaning 42 stale file(s) from an incomplete previous attempt
+[pipeline 03:12 AM] launched v4_20m: Training started (PID 5392)
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [7641] N3: fell 0%  speed 0.073  heading -2 deg  (29 s)
+  [7639] N1: fell 0%  speed 0.097  heading -7 deg  (29 s)
+  [7640] N5: fell 0%  speed 0.098  heading -9 deg  (29 s)
+  [7640] T3.2: fell 65%  speed 0.046  heading -1 deg  (6 s)
+  [7641] T2.2: fell 8%  speed 0.048  heading -11 deg  (8 s)
+  [7639] T1.1: fell 0%  speed 0.097  heading -3 deg  (8 s)
+  [7640] T8.1: fell 65%  speed 0.067  heading -1 deg  (5 s)
+  [7639] T5.2: fell 38%  speed 0.054  heading +2 deg  (7 s)
+  [7641] T7.2: fell 0%  speed 0.067  heading -1 deg  (8 s)
+  [7639] T9.1: fell 30%  speed 0.039  heading -7 deg  (7 s)
+  [7641] T10.2: fell 0%  speed 0.097  heading -1 deg  (8 s)
+  [7640] T11.1: fell 12%  speed 0.062  heading +1 deg  (16 s)
+[v4 03:39 AM] v4_20m GAIT CHECK 3M WARNING (the run continues) ['T9.1 falls 0.30 vs 0.08'] | T1.1 falls 0.00 | N1 speed 0.097 heading -6.7 roll 3.3 asym 2.1 over 0.17 | N5 heading 17.7 | mirror gap 0.06578303873538971
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [8700] N5: fell 10%  speed 0.074  heading +43 deg  (30 s)
+  [8701] N3: fell 0%  speed 0.053  heading +20 deg  (31 s)
+  [8699] N1: fell 0%  speed 0.073  heading +45 deg  (31 s)
+  [8700] T3.2: fell 95%  speed 0.040  heading -2 deg  (4 s)
+  [8700] T8.1: fell 68%  speed 0.064  heading +2 deg  (5 s)
+  [8701] T2.2: fell 0%  speed 0.053  heading -0 deg  (8 s)
+  [8699] T1.1: fell 0%  speed 0.086  heading +4 deg  (8 s)
+  [8699] T5.2: fell 42%  speed 0.058  heading +12 deg  (7 s)
+  [8701] T7.2: fell 0%  speed 0.072  heading +4 deg  (8 s)
+  [8699] T9.1: fell 5%  speed 0.043  heading -1 deg  (8 s)
+  [8700] T11.1: fell 18%  speed 0.060  heading +6 deg  (16 s)
+  [8701] T10.2: fell 0%  speed 0.091  heading +4 deg  (8 s)
+[v4 03:56 AM] v4_20m GAIT CHECK 5M WARNING (the run continues) ["N1 speed 0.073 < 90% of control's 0.094"] | T1.1 falls 0.00 | N1 speed 0.073 heading +45.1 roll 5.9 asym 11.4 over 0.17 | N5 heading 43.4 | mirror gap 0.06533712893724442

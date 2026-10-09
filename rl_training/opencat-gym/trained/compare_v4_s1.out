@@ -1,0 +1,166 @@
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [15337] ladder clean 0.00 hard: score 0.87  fell 0%
+  [15336] ladder clean 0.00: score 0.88  fell 0%
+  [15333] ladder terrain 1.00 hard: score 0.73  fell 5%
+  [15338] ladder terrain 0.25: score 0.90  fell 0%
+  [15333] ladder slope 1.00 hard: score 0.47  fell 30%
+  [15337] ladder ledge 1.00 hard: score 0.53  fell 20%
+  [15336] ladder terrain 0.50: score 0.85  fell 0%
+  [15338] ladder terrain 0.75: score 0.84  fell 0%
+  [15337] ladder fault 1.00 hard: score 0.82  fell 5%
+  [15336] ladder terrain 1.00: score 0.78  fell 0%
+  [15338] ladder ledge 0.25: score 0.86  fell 0%
+  [15336] ladder ledge 0.50: score 0.73  fell 5%
+  [15338] ladder ledge 0.75: score 0.66  fell 10%
+  [15336] ladder ledge 1.00: score 0.51  fell 25%
+  [15338] ladder slope 0.25: score 0.86  fell 0%
+  [15336] ladder slope 0.50: score 0.79  fell 5%
+  [15338] ladder slope 0.75: score 0.59  fell 25%
+  [15336] ladder slope 1.00: score 0.52  fell 25%
+  [15338] ladder fault 0.25: score 0.84  fell 5%
+  [15335] N2: fell 0%  speed 0.068  heading -24 deg  (41 s)
+  [15336] ladder fault 0.50: score 0.84  fell 5%
+  [15338] ladder fault 0.75: score 0.82  fell 5%
+  [15332] N3: fell 0%  speed 0.063  heading -6 deg  (43 s)
+  [15334] N5: fell 0%  speed 0.084  heading -8 deg  (44 s)
+  [15329] N4: fell 0%  speed 0.086  heading -9 deg  (44 s)
+  [15331] N1: fell 0%  speed 0.086  heading -10 deg  (43 s)
+  [15336] ladder fault 1.00: score 0.79  fell 10%
+  [15335] T1.1: fell 0%  speed 0.088  heading -4 deg  (10 s)
+  [15332] T2.1: fell 0%  speed 0.089  heading -2 deg  (9 s)
+  [15334] T3.1: fell 0%  speed 0.082  heading -4 deg  (9 s)
+  [15329] T2.2: fell 0%  speed 0.058  heading -1 deg  (9 s)
+  [15331] T1.2: fell 0%  speed 0.088  heading -4 deg  (9 s)
+  [15330] L1: fell 0%  speed 0.072  heading -29 deg  (53 s)
+  [15335] T3.2: fell 32%  speed 0.058  heading -3 deg  (7 s)
+  [15334] T5.2: fell 55%  speed 0.070  heading +9 deg  (6 s)
+  [15330] T5.3: fell 57%  speed 0.087  heading -20 deg  (6 s)
+  [15332] T4.2: fell 0%  speed 0.056  heading -4 deg  (8 s)
+  [15329] T5.1: fell 12%  speed 0.056  heading -4 deg  (8 s)
+  [15331] T4.1: fell 0%  speed 0.090  heading -4 deg  (8 s)
+  [15334] T8.1: fell 65%  speed 0.061  heading -5 deg  (6 s)
+  [15330] T9.1: fell 8%  speed 0.052  heading -1 deg  (8 s)
+  [15332] T7.1: fell 2%  speed 0.035  heading -1 deg  (9 s)
+  [15329] T7.2: fell 0%  speed 0.067  heading -3 deg  (9 s)
+  [15334] N6a: fell 0%  speed 0.087  heading -7 deg  (8 s)
+  [15330] N6b: fell 0%  speed 0.086  heading -7 deg  (8 s)
+  [15335] T6.1: fell 0%  speed 0.040  heading +0 deg  (17 s)
+  [15329] T11.2: fell 95%  speed 0.119  heading +31 deg  (10 s)
+  [15331] T6.2: fell 5%  speed 0.004  heading -1 deg  (22 s)
+  [15335] T10.1: fell 0%  speed 0.089  heading -2 deg  (8 s)
+  [15332] T11.1: fell 22%  speed 0.059  heading +3 deg  (16 s)
+  [15331] T10.2: fell 0%  speed 0.087  heading -2 deg  (7 s)
+[v4 05:24 AM] V3 vs V4: scored v21 (trained/v3_20m_ppo) | T1.1 falls 0.00 | N1 speed 0.086 heading -9.6 roll 2.6 asym 1.3 over 0.16 | N2 falls 0.00 decay 0.61 | N5 heading 17.0 | mirror gap 0.03964172303676605
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [15467] ladder clean 0.00 hard: score 0.90  fell 0%
+  [15465] ladder clean 0.00: score 0.91  fell 0%
+  [15466] ladder terrain 1.00 hard: score 0.82  fell 0%
+  [15468] ladder terrain 0.25: score 0.91  fell 0%
+  [15466] ladder slope 1.00 hard: score 0.47  fell 30%
+  [15467] ladder ledge 1.00 hard: score 0.45  fell 30%
+  [15468] ladder terrain 0.75: score 0.84  fell 0%
+  [15465] ladder terrain 0.50: score 0.87  fell 0%
+  [15467] ladder fault 1.00 hard: score 0.82  fell 5%
+  [15468] ladder ledge 0.25: score 0.84  fell 0%
+  [15465] ladder terrain 1.00: score 0.82  fell 0%
+  [15468] ladder ledge 0.75: score 0.67  fell 5%
+  [15465] ladder ledge 0.50: score 0.71  fell 10%
+  [15468] ladder slope 0.25: score 0.89  fell 0%
+  [15465] ladder ledge 1.00: score 0.51  fell 25%
+  [15468] ladder slope 0.75: score 0.67  fell 15%
+  [15465] ladder slope 0.50: score 0.82  fell 5%
+  [15465] ladder slope 1.00: score 0.48  fell 30%
+  [15468] ladder fault 0.25: score 0.88  fell 0%
+  [15465] ladder fault 0.50: score 0.84  fell 5%
+  [15468] ladder fault 0.75: score 0.84  fell 5%
+  [15464] N2: fell 0%  speed 0.088  heading +11 deg  (40 s)
+  [15459] N4: fell 0%  speed 0.094  heading +2 deg  (41 s)
+  [15463] N5: fell 0%  speed 0.093  heading +2 deg  (41 s)
+  [15461] N1: fell 0%  speed 0.093  heading +2 deg  (41 s)
+  [15462] N3: fell 0%  speed 0.072  heading +5 deg  (41 s)
+  [15465] ladder fault 1.00: score 0.84  fell 5%
+  [15464] T1.1: fell 0%  speed 0.093  heading +1 deg  (8 s)
+  [15459] T2.2: fell 0%  speed 0.062  heading +1 deg  (8 s)
+  [15463] T3.1: fell 0%  speed 0.089  heading -8 deg  (8 s)
+  [15461] T1.2: fell 0%  speed 0.094  heading +1 deg  (8 s)
+  [15462] T2.1: fell 0%  speed 0.096  heading +2 deg  (8 s)
+  [15460] L1: fell 0%  speed 0.091  heading -0 deg  (49 s)
+  [15464] T3.2: fell 62%  speed 0.043  heading -3 deg  (6 s)
+  [15460] T5.3: fell 60%  speed 0.093  heading -17 deg  (5 s)
+  [15463] T5.2: fell 38%  speed 0.059  heading +10 deg  (6 s)
+  [15459] T5.1: fell 12%  speed 0.066  heading -1 deg  (7 s)
+  [15461] T4.1: fell 0%  speed 0.095  heading +0 deg  (7 s)
+  [15462] T4.2: fell 0%  speed 0.062  heading -3 deg  (7 s)
+  [15463] T8.1: fell 65%  speed 0.071  heading -5 deg  (5 s)
+  [15460] T9.1: fell 5%  speed 0.052  heading +3 deg  (8 s)
+  [15459] T7.2: fell 8%  speed 0.064  heading +2 deg  (8 s)
+  [15462] T7.1: fell 5%  speed 0.033  heading +0 deg  (8 s)
+  [15463] N6a: fell 0%  speed 0.093  heading +1 deg  (8 s)
+  [15460] N6b: fell 0%  speed 0.093  heading -1 deg  (8 s)
+  [15464] T6.1: fell 2%  speed 0.046  heading +2 deg  (17 s)
+  [15459] T11.2: fell 88%  speed 0.121  heading +31 deg  (11 s)
+  [15461] T6.2: fell 12%  speed 0.003  heading +1 deg  (21 s)
+  [15464] T10.1: fell 0%  speed 0.095  heading +1 deg  (8 s)
+  [15462] T11.1: fell 15%  speed 0.061  heading +1 deg  (16 s)
+  [15461] T10.2: fell 0%  speed 0.095  heading +2 deg  (7 s)
+[v4 05:26 AM] V3 vs V4: scored final (trained/v4_s1_ppo) | T1.1 falls 0.00 | N1 speed 0.093 heading +1.7 roll 3.2 asym 1.1 over 0.17 | N2 falls 0.00 decay 0.07 | N5 heading 11.6 | mirror gap 0.026949293911457062
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [15546] T8.1: fell 55%  speed 0.061  heading -4 deg  (6 s)
+  [15548] T5.2: fell 57%  speed 0.066  heading +16 deg  (6 s)
+  [15542] T3.2: fell 32%  speed 0.059  heading -3 deg  (8 s)
+  [15547] T1.1: fell 0%  speed 0.087  heading -4 deg  (8 s)
+  [15544] T6.1: fell 0%  speed 0.038  heading -1 deg  (16 s)
+  [15543] N1: fell 0%  speed 0.085  heading -9 deg  (28 s)
+  [15545] N5: fell 0%  speed 0.083  heading -9 deg  (29 s)
+[v4 05:26 AM] V3 vs V4: scored v21 with the 12.5 ms command delay | T1.1 falls 0.00 | N1 speed 0.085 heading -9.5 roll 2.6 asym 1.3 over 0.16 | N5 heading 17.2 | mirror gap None
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+  [15576] T8.1: fell 62%  speed 0.067  heading -2 deg  (6 s)
+  [15574] T3.2: fell 57%  speed 0.046  heading -5 deg  (7 s)
+  [15575] T5.2: fell 30%  speed 0.059  heading +6 deg  (7 s)
+  [15572] T1.1: fell 0%  speed 0.092  heading +1 deg  (8 s)
+  [15577] T6.1: fell 0%  speed 0.045  heading +1 deg  (17 s)
+  [15573] N1: fell 0%  speed 0.092  heading +1 deg  (30 s)
+  [15571] N5: fell 0%  speed 0.092  heading +1 deg  (30 s)
+[v4 05:27 AM] V3 vs V4: scored final with the 12.5 ms command delay | T1.1 falls 0.00 | N1 speed 0.092 heading +1.3 roll 3.1 asym 1.1 over 0.17 | N5 heading 11.3 | mirror gap None
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+pybullet build time: Oct  8 2026 14:28:44
+[v4 05:27 AM] V3 vs V4 REPORT ready: trained/v4_report_v4_s1/v3_vs_v4_report.html (publish it as an Artifact page)

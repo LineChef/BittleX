@@ -1,0 +1,13 @@
+[preflight] recipe: levers ['mirror', 'frontier', 'cmd_forward', 'opt_bundle'] 
+[preflight] PASS  RL test suite  -- ...............................................................          [100%]
+[preflight] PASS  every setting is read  -- 61 settings
+[preflight] PASS  passability audit (geometry)  -- saved trained/passability_geometry.json
+[preflight] PASS  passability audit (scene)  -- saved trained/passability_scene.json
+[preflight] PASS  smoke run finished  -- 1.2 min
+[preflight] PASS  no Python error in the smoke log
+[preflight] PASS  curriculum lines ([frontier]) present
+[preflight] PASS  health lines present
+[preflight] PASS  checkpoints on 200k boundaries  -- none (run shorter than 200k)
+[preflight] PASS  the benchmark scores this recipe's policy (cells, mirror gap, ladder)
+[preflight] PASS  recorded episodes replay exactly  -- 72 match, 0 differ
+[preflight] ALL PASS

@@ -1,0 +1,5 @@
+V3 K=4: {"all": {"episodes": 80, "seconds_median": 3.1375, "dist_median_m": 0.22978923330074358, "with_objects": 8, "never_reached": 1, "past_first": 6, "past_whole_field": 4, "fell": 2}, "focus": {}}
+c1-2M K=4: {"all": {"episodes": 80, "seconds_median": 7.5125, "dist_median_m": 0.27093655278388284, "with_objects": 55, "never_reached": 9, "past_first": 41, "past_whole_field": 21, "fell": 2}, "focus": {"episodes": 52, "seconds_median": 7.5125, "dist_median_m": 0.4127713938161942, "with_objects": 40, "never_reached": 4, "past_first": 32, "past_whole_field": 21, "fell": 2}}
+V3 K=7: {"all": {"episodes": 80, "seconds_median": 3.1375, "dist_median_m": 0.22978923330074358, "with_objects": 8, "never_reached": 1, "past_first": 6, "past_whole_field": 4, "fell": 2}, "focus": {}}
+c1-2M K=7: {"all": {"episodes": 80, "seconds_median": 5.675, "dist_median_m": 0.19421719360751025, "with_objects": 62, "never_reached": 16, "past_first": 35, "past_whole_field": 6, "fell": 9}, "focus": {"episodes": 51, "seconds_median": 7.5125, "dist_median_m": 0.21736795652310265, "with_objects": 44, "never_reached": 7, "past_first": 28, "past_whole_field": 6, "fell": 9}}
+done
