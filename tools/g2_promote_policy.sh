@@ -25,5 +25,5 @@ run "pi_pipeline/.venv/bin/pytest >/dev/null 2>&1" || { echo "the test suite fai
 run "git add -f rl_training/opencat-gym/$ONNX rl_training/opencat-gym/$ONNX.json pi_pipeline/gait/residual_policy.py"
 run "git commit -qm 'Promote $NAME to the default walking policy (V2.1 stays on the Pi as the fallback)'"
 run "git push -q"
-run "(nohup bash tools/g2_deploy_when_online.sh --max-hours 24 > ~/g2_logs/promote_deploy.out 2>&1 &)"
+run "(nohup bash tools/g2_deploy_when_online.sh --replace --max-hours 24 > ~/g2_logs/promote_deploy.out 2>&1 &)"
 echo "promoted $TAG as $NAME; the deploy waits for the Pi (log ~/g2_logs/promote_deploy.out)"

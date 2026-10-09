@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Wait for G2's Pi to come online, then deploy pi_pipeline/ and the deployed policy to it (rsync, as docs/guides/pi-bring-up.md section 7) and restart g2-voice. Needs G2_PI.
-#   g2_deploy_when_online.sh [--once] [--max-hours N]     --once: check one time, deploy if the Pi answers, else exit 1.  default wait: 24 h
+#   g2_deploy_when_online.sh [--once] [--max-hours N] [--replace]     --once: check one time, deploy if the Pi answers, else exit 1.  default wait: 24 h
+#   g2_deploy_when_online.sh --cancel                      disarm the waiting watcher (it deploys ONCE, then exits; it never repeats on later power-ons)
+# Only one waiting watcher may exist (pid in ~/g2_logs/deploy_waiter.pid): a second start refuses unless --replace. A watcher deploys whatever the working tree holds when the Pi answers, so a stale one
+# can ship code hours after it was armed; check with `cat ~/g2_logs/deploy_waiter.pid` and cancel what you no longer want.
 # Log: ~/g2_logs/deploy_<time>.log. Writes ~/g2_logs/deploy_done when the deploy succeeded. The Pi's own .env, .venv and memory data are never touched.
 # g2-voice is NOT restarted while a baseline run (g2-baseline) is active: that unit stops g2-voice itself and starts it again when it ends.
 set -uo pipefail
@@ -8,8 +11,21 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOGDIR="$HOME/g2_logs"; mkdir -p "$LOGDIR"
 LOG="$LOGDIR/deploy_$(date +%Y%m%d_%H%M%S).log"
-ONCE=0; MAX_H=24
-while [ $# -gt 0 ]; do case "$1" in --once) ONCE=1 ;; --max-hours) MAX_H="$2"; shift ;; *) echo "usage: $0 [--once] [--max-hours N]"; exit 2 ;; esac; shift; done
+ONCE=0; MAX_H=24; REPLACE=0; CANCEL=0
+while [ $# -gt 0 ]; do case "$1" in --once) ONCE=1 ;; --max-hours) MAX_H="$2"; shift ;; --replace) REPLACE=1 ;; --cancel) CANCEL=1 ;; *) echo "usage: $0 [--once] [--max-hours N] [--replace] | --cancel"; exit 2 ;; esac; shift; done
+PIDFILE="$LOGDIR/deploy_waiter.pid"
+OLD=$(cat "$PIDFILE" 2>/dev/null || true)
+if [ -n "$OLD" ] && kill -0 "$OLD" 2>/dev/null; then ARMED=1; else ARMED=0; fi
+if [ "$CANCEL" = 1 ]; then
+  if [ "$ARMED" = 1 ]; then kill "$OLD"; rm -f "$PIDFILE"; echo "cancelled the waiting deploy watcher (pid $OLD)"; else echo "no deploy watcher is armed"; fi
+  exit 0
+fi
+if [ "$ONCE" = 0 ]; then
+  if [ "$ARMED" = 1 ]; then
+    if [ "$REPLACE" = 1 ]; then kill "$OLD"; echo "replaced the armed watcher (pid $OLD)"; else echo "a deploy watcher is already armed (pid $OLD): use --replace or --cancel"; exit 3; fi
+  fi
+  echo $$ > "$PIDFILE"; trap 'rm -f "$PIDFILE"' EXIT
+fi
 say() { echo "$(date '+%I:%M:%S %p')  $*" | tee -a "$LOG"; }
 reachable() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$G2_PI" true 2>/dev/null; }
 
