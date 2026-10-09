@@ -25,3 +25,20 @@ S0 flat foundation 2M (flat only, light nudges, strong mirror loss) | S1 terrain
 - **Gait switching from any mode** is built (`pi_pipeline/gait/gait_mode.py`): one shared state file read by the voice service, the exploration session and the walk loop; "hi step" / "high step" and "walk normally" work in the voice loop and in an exploration session; a short double beep (speaker and buzzer) plays when a gait really switches; a policy whose sidecar has no `"modes"` key (V4, V5) refuses the switch out loud and changes nothing. The 80 Hz loop will read the mode and blend the base only when the mode-trained policy exists.
 - **Training go/no-go delegated (user, 2026-10-09):** the call to run the consolidation 20M is Claude's, after the checkpoint benchmark at the end of S3; promotion and deployment of a result are NOT delegated.
 - **Ladder probes, corrected** (the first run did not apply the probe gait to the ladder; fixed): the unlearned high-step base makes step-ups fall less (0.05 at 22.5 and 30 mm) only because it never gets over them (success 0.00 at every size, against scripted's 0.47 at 7.5 mm), and step-downs fall 1.00 from 15 mm. It lifts only 3 mm more at the 90th percentile (13.5 -> 16.4 mm). A symmetrized scripted base gives the same ladders as scripted. So any gain on ledges has to come from a learned correction on top, with the imitation penalty relaxed, and a taller high-step reference (`build_highstep_reference.py --shoulder 14 --knee 24`) is the next thing to probe for clearance.
+
+## Foot-clearance probe, both rounds (open-loop base gaits in the sim, no policy; `rl_training/opencat-gym/gait_probe.py`)
+
+| Base gait | Clearance p90 | Calm-walk roll | Calm-walk speed | Calm-walk falls | Boxes falls | Rubble falls | 15 mm ledge falls |
+|---|---|---|---|---|---|---|---|
+| wkF (scripted) | 13.5 mm | 2.5 deg | 0.091 | 0.00 | 0.08 | 0.06 | 0.04 |
+| A (+20 sh, +32 kn, rear x1.35) | 20.2 | 15.6 | 0.034 | 0.65 | 0.13 | 0.15 | 0.58 |
+| B (+26, +42) | 25.5 | 19.2 | 0.021 | 0.91 | 0.42 | 0.29 | 0.57 |
+| C (+32, +52) | 27.5 | 20.8 | 0.011 | 0.89 | 0.31 | 0.17 | 0.32 |
+| D (+14, +40, rear x1.0) | 16.9 | 6.3 | 0.050 | 0.01 | 0.00 | 0.00 | 0.15 |
+| E (+20, +32, rear x1.0) | 17.1 | 9.9 | 0.040 | 0.17 | 0.05 | 0.08 | 0.50 |
+| F (+8, +46, rear x1.0) | 17.8 | 6.8 | 0.040 | 0.04 | 0.01 | 0.01 | 0.00 |
+
+- The back-hip boost (x1.35) was the main source of the sway: without it and with the lift moved from the shoulders to the knees, D and F are stable (roll 6-7 deg, flat falls under 5%) and clear boxes and rubble better than scripted.
+- No base gait crosses a ledge on its own (success 0.00 at every size for A-F; the stable ones also walk at under half the commanded speed). The tall ones that reach 25 mm of clearance (B, C) are not walkable open loop.
+- So the **hi-step mode base is F** (`hsF_ref.npy`: stable, 17.8 mm, best on obstacles) with the learned correction supplying the rest of the lift and the speed; chain 1 stays on the scripted wkF base.
+- The unlearned symmetrized wkF gives the same results as wkF (`wkfsym_ref.npy`), so the back-leg mismatch is not the command-drift source.
