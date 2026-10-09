@@ -162,7 +162,7 @@ def test_foot_hold_contains_drift_without_hunting():
     tr = _plant(hh.FootHold("fl"), drift_dps=6.0)
     yaws = [y for y, _ in tr]
     assert max(abs(y) for y in yaws) < 30 and abs(yaws[-1]) < 25           # open loop is +75 deg after 12.5 s
-    assert all(-0.6 <= g <= 0.2 for _, g in tr)
+    assert all(-0.9 <= g <= 0.2 for _, g in tr)
     late = [g for _, g in tr[len(tr) // 2:]]
     assert max(late) - min(late) < 0.35                                       # settles, no big swings
 

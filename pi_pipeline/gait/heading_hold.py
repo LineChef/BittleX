@@ -149,10 +149,11 @@ class FootHold:
 
     g = -(KP * deadband(e) + KD * rate): the proportional term acts only outside +-DEADBAND_DEG; the rate term is the ease-off in both directions: it adds trim while the heading
     is running away and takes it off as soon as the heading is already turning back (rate toward the target), so the correction does not overshoot while the 5 Hz IMU is still
-    reporting the old heading. g is clamped to [G_MIN, G_MAX] (the trim the walk tolerated without a fall) and slew-limited."""
+    reporting the old heading. g is clamped to [G_MIN, G_MAX] and slew-limited. G_MIN was -0.6 (the trim the first walks tolerated); 2026-10-09 V4 on hardware turned right ~8 deg/s with the hold off and the hold sat at -0.6 the whole walk
+    (one unit of trim is ~9 deg/s), so it is -0.9 (user: more authority); -1.0 would stop the foot's swing altogether and below that it would reverse."""
 
     def __init__(self, foot: str = "fl", target_deg: float = 0.0, kp: float = 0.02, kd: float = 0.08, deadband_deg: float = 6.0,
-                 g_min: float = -0.6, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 3.0):
+                 g_min: float = -0.9, g_max: float = 0.2, g_rate: float = 0.30, rate_tau_s: float = 0.8, ki: float = 0.01, i_lim: float = 0.4, ff: float = 0.0, g_release: float = 1.2, release_rate_dps: float = 3.0):
         self.g_release, self.release_rate_dps = g_release, release_rate_dps   # easing off is faster than building up: once the heading turns back (or is already past the target) the trim drops at g_release per second
         self.ff = ff                         # feed-forward trim added to the feedback: the average trim the hold ends up at anyway (about -0.2..-0.3 on G2), so it does not have to ramp to it
         self.foot, self.target_deg, self.kp, self.kd, self.deadband_deg = foot, target_deg, kp, kd, deadband_deg
