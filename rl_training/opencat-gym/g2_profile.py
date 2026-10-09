@@ -122,6 +122,7 @@ LEVERS = {
     "haz_speed": {"G2E_HAZ_SPEED_RELAX": "0.0"},                                                 # no speed-tracking penalty while on a hazard
     "haz_posture": {"G2E_HAZ_POSTURE_RELAX": "0.5"},                                             # holding a non-scripted posture costs half while on a hazard
     "heading_blind": {"G2E_HEADING_BLIND": "1", "G2E_PRIV_YAW": "1", "G2E_FAC_HEADING": "10"},   # the policy never sees yaw (no steering); the critic does; heading penalty x2
+    "ledge30": {"G2E_FR_BOUNDS": "sidehill_l:8,sidehill_r:8,climb:10,descent:10,ledge_up:0.03,ledge_down:0.03", "G2E_LEDGE_HEIGHT": "0.03"},   # 2026-10-09 (user): step-up and step-down tops 30 mm so they stay passable if the policy learns; applied to the preflight and the 20M, not to the screens
     "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
 }
 # Levers that change what the POLICY observes: a policy trained with one must be scored with it (scoring_env, benchmark_v4.ladder_env, phase_v3.policy_levers).

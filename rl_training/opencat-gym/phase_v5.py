@@ -286,10 +286,36 @@ def screens(st):
     return ctrl
 
 
+LEDGE_TOP = "0.03"      # user, 2026-10-09: step-up and step-down tops 30 mm (the screens ran with 35 / 40 mm)
+
+
+def use_ledge30():
+    """From the preflight on, everything (20M recipe, tracker, scoring, report) uses the 30 mm ledge tops; the scripted walk's ledge ladders are re-scored once at the same sizes."""
+    os.environ["G2E_V5_LEDGE_TOP"] = LEDGE_TOP
+
+
+def rescore_scripted_ledges(st):
+    if st.get("scripted_ledge30"):
+        return
+    log("BASELINE (ledges): re-scoring the scripted walk's step-up and step-down ladders at the 30 mm tops (about 3 min)")
+    code = ("import json, sys; sys.path.insert(0, '.'); import benchmark_v5 as B; P = 'trained/v5_scripted.json'; d = json.load(open(P)); "
+            "json.dump(d, open('trained/v5_scripted_ledge40.json', 'w')); "
+            f"r = B.run_ladder('scripted', (), {FINAL_LADDER_EPISODES}, jobs=4, hazards=['ledge_up', 'ledge_down'], quiet=True); "
+            "cells = [c for c in d['size_ladder']['cells'] if c['hazard'] not in ('ledge_up', 'ledge_down')] + r['cells']; "
+            "d['size_ladder']['cells'] = cells; d['size_ladder']['summary'] = B.ladder_summary(cells); json.dump(d, open(P, 'w'), indent=1); print('MERGED')")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env={**os.environ, "G2E_V5_LEDGE_TOP": LEDGE_TOP})
+    if "MERGED" not in r.stdout:
+        halt(f"HALT: re-scoring the scripted ledge ladders failed: {(r.stdout + r.stderr)[-500:]}")
+    st["scripted_ledge30"] = True
+    save_state(st)
+
+
 def preflight(st):
+    use_ledge30()
+    rescore_scripted_ledges(st)
     if st.get("preflight") == "pass":
         return
-    levers = BASE + st["adopted"]
+    levers = BASE + st["adopted"] + ["ledge30"]
     log(f"PREFLIGHT on {levers} (about 15 min, done about {clock_in(15)})")
     r = subprocess.run([sys.executable, "preflight.py", "--levers", ",".join(levers)], capture_output=True, text=True)
     open("trained/v5_preflight.log", "w").write(r.stdout + r.stderr)
@@ -328,9 +354,10 @@ def track(step, levers):
 
 
 def final(st):
+    use_ledge30()
     if st.get("final") == "done":
         return
-    levers = BASE + st["adopted"]
+    levers = BASE + st["adopted"] + ["ledge30"]
     for k in [k for k in os.environ if k.startswith("G2E_")]:
         del os.environ[k]
     env = g2_profile.env_for_job({"kind": "final", "tag": FINAL_TAG, "fresh": True, "levers": list(levers)})
@@ -382,11 +409,12 @@ def average_checkpoints(paths, out):
 
 
 def pick(st):
+    use_ledge30()
     if st.get("picked"):
         return st["picked"]
     import glob
     import re
-    levers = BASE + st["adopted"]
+    levers = BASE + st["adopted"] + ["ledge30"]
     cks = sorted(glob.glob(f"trained/checkpoints/{FINAL_TAG}_*_steps.zip"), key=lambda p: int(re.search(r"_(\d+)_steps", p).group(1)))
     cands = [("final", f"trained/{FINAL_TAG}_ppo")]
     if len(cks) >= 3:
@@ -425,6 +453,7 @@ def pick(st):
 
 
 def report(st):
+    use_ledge30()
     if st.get("report") == "done":
         return
     import report_v5

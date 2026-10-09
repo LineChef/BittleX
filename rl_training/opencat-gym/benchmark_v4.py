@@ -69,7 +69,7 @@ N_CELLS = [
     ("LU25", "Step UP 25 mm", {"LEDGE_HEIGHT": 0.025, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}, 40, None, None),
     ("LD25", "Step DOWN 25 mm", {"LEDGE_HEIGHT": 0.025, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}, 40, None, None),
     ("LU35", "Step UP 35 mm (V5 training top)", {"LEDGE_HEIGHT": 0.035, "LEDGE_PROB": 1.0, "LEDGE_DIR": 1}, 40, None, None),
-    ("LD40", "Step DOWN 40 mm (V5 training top)", {"LEDGE_HEIGHT": 0.040, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}, 40, None, None),
+    ("LD40", "Step DOWN 40 mm (stress: above the 30 mm training top)", {"LEDGE_HEIGHT": 0.040, "LEDGE_PROB": 1.0, "LEDGE_DIR": -1}, 40, None, None),
 ]
 NEW_KNOBS = ("EPISODE_LENGTH", "LEDGE_DIR", "FAULT_STUCK_PROB", "FAULT_STUCK_JOINT", "FAULT_STUCK_DEG", "FAULT_WEAK_PROB", "FAULT_OFFSET_PROB",
              "MOTOR_SCALE_ALL", "MOTOR_SCALE_RAND", "DRIFT_TORQUE", "DRIFT_PROB", "LONG_EP_PROB", "LONG_RUN_PUSH")

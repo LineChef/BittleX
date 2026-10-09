@@ -79,44 +79,66 @@ def main():
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     touch()
     last_touch, ep, f, rid, ids, text, jids = time.time(), None, None, None, {}, None, []
-    waited = time.time()
+    waited, scene, scene_t, scene_m, done_playing, last_draw = time.time(), None, 0.0, None, False, 0.0
     print("watching trained/live (close the window or Ctrl-C to stop)", flush=True)
     try:
         while p.isConnected():
-            if time.time() - last_touch > 5:
+            now = time.time()
+            if now - last_touch > 5:
                 touch()
-                last_touch = time.time()
-            scene_path = os.path.join(LIVE, "scene.json")
-            try:
-                scene = json.load(open(scene_path))
-            except (OSError, ValueError):
-                scene = None
+                last_touch = now
+            if now - scene_t > 0.5:                                # the scene file is read twice a second, only when it changed (it used to be parsed on every loop)
+                scene_t = now
+                scene_path = os.path.join(LIVE, "scene.json")
+                try:
+                    m = os.stat(scene_path).st_mtime
+                    if m != scene_m:
+                        scene, scene_m = json.load(open(scene_path)), m
+                except (OSError, ValueError):
+                    pass
             # a new episode: switch to it now (live) or once the current one has played out (--realtime)
             if scene is not None and scene["ep"] != ep and (not a.realtime or f is None or done_playing):
-                if time.time() - scene["t"] > 60:
-                    if time.time() - waited > 10:
+                if now - scene["t"] > 60:
+                    if now - waited > 10:
                         print("no live episode in the last minute: is a run training (started after the live-view change)?", flush=True)
-                        waited = time.time()
+                        waited = now
                     time.sleep(1)
                     continue
                 ep, jids = scene["ep"], scene["joint_ids"]
                 rid, ids = build(p, scene)
                 f = open(os.path.join(LIVE, scene["frames"]))
+                if not a.realtime:                                 # live: join near the end of the stream instead of replaying a backlog
+                    f.seek(max(0, os.fstat(f.fileno()).st_size - 60000))
+                    f.readline()
                 text = p.addUserDebugText(describe(scene), [0, 0, 0.25], textSize=1.1, textColorRGB=[0.1, 0.1, 0.1])
                 print(describe(scene), flush=True)
-                done_playing, t_prev = False, None
+                done_playing = False
             if f is None:
                 time.sleep(0.2)
                 continue
-            line = f.readline()
-            if not line or not line.endswith("\n"):
-                if line:
-                    f.seek(f.tell() - len(line))
+            # read what is there: live mode takes everything new and draws only the newest frame (a viewer that falls behind skips ahead, it never queues up work);
+            # --realtime draws every frame at 80 Hz pace
+            fr, end = None, None
+            for _ in range(1 if a.realtime else 5000):
+                line = f.readline()
+                if not line or not line.endswith("\n"):
+                    if line:
+                        f.seek(f.tell() - len(line))
+                    break
+                try:
+                    fr = json.loads(line)
+                except ValueError:
+                    continue
+                end = fr.get("end") or end
+            if fr is None:
                 if a.realtime and ep is not None and scene is not None and scene["ep"] != ep:
-                    done_playing = True                     # the episode ended and a newer one exists
-                time.sleep(0.01)
+                    done_playing = True                            # the episode ended and a newer one exists
+                time.sleep(0.02)
                 continue
-            fr = json.loads(line)
+            if not a.realtime and time.time() - last_draw < 0.05:      # at most 20 drawings a second
+                time.sleep(0.02)
+                continue
+            last_draw = time.time()
             b = fr["b"]
             p.resetBasePositionAndOrientation(rid, b[:3], b[3:7])
             for j, v in zip(jids, fr["j"]):
@@ -125,9 +147,9 @@ def main():
                 if int(k) in ids:
                     p.resetBasePositionAndOrientation(ids[int(k)], v[:3], v[3:7])
             p.resetDebugVisualizerCamera(cameraDistance=0.45, cameraYaw=50, cameraPitch=-25, cameraTargetPosition=[b[0], b[1], 0.04])
-            if fr.get("end"):
-                p.addUserDebugText("FELL" if fr["end"] == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
-                                   textColorRGB=[0.8, 0.1, 0.1] if fr["end"] == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
+            if end:
+                p.addUserDebugText("FELL" if end == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
+                                   textColorRGB=[0.8, 0.1, 0.1] if end == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
                 done_playing = True
             if a.realtime:
                 time.sleep(2 / 80.0)                        # 2 control steps per frame, 80 Hz

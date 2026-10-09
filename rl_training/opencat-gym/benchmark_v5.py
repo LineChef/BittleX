@@ -42,6 +42,12 @@ OBJECT_HAZARDS = ("rubble", "boxes", "snag")          # hazards with solid objec
 LEDGE_HAZARDS = ("ledge_up", "ledge_down")
 
 
+_LEDGE_TOP = float(os.environ.get("G2E_V5_LEDGE_TOP", "0") or 0)       # set by phase_v5 for the preflight / 20M / report: step-up and step-down ladders in quarters of this top (user: 30 mm)
+if _LEDGE_TOP > 0:
+    for _h, _lab in (("ledge_up", "Step up"), ("ledge_down", "Step down")):
+        LADDER[_h] = (_lab, "mm", 1000, tuple(round(_LEDGE_TOP * f, 5) for f in (0.25, 0.5, 0.75, 1.0)))
+
+
 def ladder_cells(hazards=None):
     """[(cell id, hazard or None, size)]: a 7.5 s hazard-free walk first (the ladder's own baseline), then every hazard x size."""
     out = [("Z0", None, 0.0)]
