@@ -198,3 +198,32 @@ print("CELLS", bad)
 def test_benchmark_cells_have_no_stray_training_hazards():
     out = _child(CELLS_PROBE)
     assert "CELLS []" in out, out[-600:]          # 2026-10-08: ~30% of episodes of nearly every cell ran on the training rough floor (and ledge cells then had no ledge)
+
+
+CMD_BANDS_PROBE = r"""
+import os, sys, json
+sys.path.insert(0, ".")
+for k in [k for k in os.environ if k.startswith("G2E_")]:
+    del os.environ[k]
+os.environ["G2E_CMD_BANDS"] = "MODE"
+import numpy as np
+import opencat_gym_env as E
+E.GUI_MODE = False
+e = E.OpenCatGymEnv()
+vals = []
+for i in range(600):
+    np.random.seed(i); e._sample_command()
+    vals.append(float(e._cmd_fwd))
+vals = np.array(vals)
+print(json.dumps({"fast": float((vals > 0.121).mean()), "back": float((vals < -0.02).mean()), "stand": float(((vals > -0.011) & (vals < 0.021)).mean()),
+                  "cruise": float(((vals >= 0.08) & (vals <= 0.12)).mean()), "creep": float(((vals >= 0.04) & (vals <= 0.055)).mean())}))
+"""
+
+
+def test_capped_bands_remove_only_the_unreachable_fast_band():
+    import json
+    out = {m: json.loads(_child(CMD_BANDS_PROBE.replace("MODE", m)).strip().splitlines()[-1]) for m in ("capped", "forward")}
+    assert out["capped"]["fast"] == 0.0 and out["forward"]["fast"] == 0.0
+    assert out["forward"]["back"] == 0.0                       # forward: no backward at all
+    assert 0.07 < out["capped"]["back"] < 0.20                  # capped keeps backward (about 13%)
+    assert 0.40 < out["capped"]["cruise"] < 0.60 and 0.12 < out["capped"]["creep"] < 0.28

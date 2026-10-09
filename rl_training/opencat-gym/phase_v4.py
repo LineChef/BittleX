@@ -73,6 +73,10 @@ def obs_levers(levers):
     return [l for l in levers if l in g2_profile.OBS_LEVERS]
 
 
+class HealthStop(Exception):
+    """The run's own health check stopped it (it was not learning): a verdict on the lever, not a crash."""
+
+
 def run_one(tag, levers, seed, extra=None):
     """Train (or resume / skip) one 3M run and score it; returns the score dict (cached in trained/v4_score_<tag>.json)."""
     out = f"trained/v4_score_{tag}.json"
@@ -82,6 +86,8 @@ def run_one(tag, levers, seed, extra=None):
         if os.path.exists(f"trained/{tag}_ppo.zip"):
             break
         if not RP.training(tag):
+            if os.path.exists(f"trained/{tag}_health_stop_ppo.zip"):
+                raise HealthStop(tag)
             if os.path.exists(f"trained/{tag}_console.log"):          # a run that died: keep its files aside and try once more (no person in the loop)
                 if attempt == 2 or os.path.exists(f"trained/{tag}_crash1_console.log"):
                     open(HALT, "w").write(f"{tag} crashed twice\n")
@@ -99,6 +105,8 @@ def run_one(tag, levers, seed, extra=None):
         if ok:
             break
         log(f"{tag} did not finish: {why}")
+        if os.path.exists(f"trained/{tag}_health_stop_ppo.zip"):
+            raise HealthStop(tag)
     t0 = time.time()
     res = V3.score(f"trained/{tag}_ppo", obs_levers(levers), ladder=True, ladder_levers=tuple(levers))
     res["explained_variance_last"] = _last_ev(tag)
@@ -185,7 +193,16 @@ def run():
                 base_res = json.load(open(rec["combined_file"]))
             continue
         log(f"SCREEN {name}: {desc} (levers {levers}{', ' + str(results.get('base_extra')) if results.get('base_extra') else ''}, seeds {list(SEEDS)})")
-        combined = screen_pair(name, levers, extra=results.get("base_extra") or None)
+        try:
+            combined = screen_pair(name, levers, extra=results.get("base_extra") or None)
+        except HealthStop as e:
+            if name == "control":
+                raise
+            why = [f"{e} did not learn: stopped by its own health check (explained variance below 0.2 twice); see trained/{e}_console.log"]
+            results["screens"][name] = dict(levers=levers, combined_file=None, decided=True, adopted=False, why=why, extra={})
+            log(f"{name} REJECTED {why}")
+            save(RESULTS, results)
+            continue
         cf = f"trained/v4_combined_{name}.json"
         save(cf, combined)
         if name == "control":
@@ -207,14 +224,63 @@ def run():
         log(f"{name} {'ADOPTED' if adopted else 'REJECTED'}{' (user decision; gate said ' + str(why) + ')' if (why and name in USER_DECIDED) else (' ' + str(why) if why else '')} | "
             f"{V3.summary(json.load(open(cf)))} | ladder {json.load(open(cf)).get('ladder_score', 0):.2f}")
         save(RESULTS, results)
+    ablate_cmd_capped(results, base_res)
     log(f"SCREENS COMPLETE: adopted recipe {results['base']} {results.get('base_extra') or ''}. Next: preflight, the final bug sweep, then the 20M on the user's go")
+
+
+def cmd_capped_verdict(a, b):
+    """The cap-only variant (backward kept) replaces the full `cmd_forward` only if it clearly wins: calm-walk speed up at least 5% on T1.1 and N1, falls on T3.2 and
+    T11.1 no higher, hazard falls overall no higher (+0.02), and the usual calm-walk gate. Otherwise `cmd_forward` stays. Returns the reasons it does not win."""
+    ma, mb = V3.cellmap(a), V3.cellmap(b)
+    why = list(V3.calm_ok(a, b))
+    for c in ("T1.1", "N1"):
+        if c in ma and c in mb and ma[c]["speed_mps"] < 1.05 * mb[c]["speed_mps"]:
+            why.append(f"{c} speed {ma[c]['speed_mps']:.3f} is not 5% above {mb[c]['speed_mps']:.3f}")
+    for c in ("T3.2", "T11.1"):
+        if c in ma and c in mb and ma[c]["fell_fraction"] > mb[c]["fell_fraction"]:
+            why.append(f"{c} falls {ma[c]['fell_fraction']:.2f} vs {mb[c]['fell_fraction']:.2f}")
+    if hazard_falls(a) > hazard_falls(b) + 0.02:
+        why.append(f"hazard falls {hazard_falls(a):.2f} vs {hazard_falls(b):.2f}")
+    return why
+
+
+def ablate_cmd_capped(results, base_res):
+    """After the screens (user approved 2026-10-08): the adopted recipe with `cmd_forward` swapped for `cmd_capped` (only the unreachable fast band removed, backward kept),
+    two seeds, compared with the adopted recipe's own combined score. Tells whether dropping backward walking is what `cmd_forward` cost. Resumable; recorded under
+    results["ablations"] (not "screens", so the screen count that `final` checks is unchanged)."""
+    rec = results.get("ablations", {}).get("cmd_capped")
+    if (rec and rec.get("decided")) or "cmd_forward" not in results["base"]:
+        return
+    levers = ["cmd_capped" if l == "cmd_forward" else l for l in results["base"]]
+    log(f"ABLATION cmd_capped: the adopted recipe with only the fast band removed and backward kept (levers {levers}, seeds {list(SEEDS)})")
+    try:
+        combined = screen_pair("cmd_capped", levers, extra=results.get("base_extra") or None)
+    except HealthStop as e:
+        why = [f"{e} did not learn: stopped by its own health check"]
+        results.setdefault("ablations", {})["cmd_capped"] = dict(decided=True, swapped=False, why=why)
+        log(f"cmd_capped KEPT cmd_forward {why}")
+        save(RESULTS, results)
+        return
+    cf = "trained/v4_combined_cmd_capped.json"
+    save(cf, combined)
+    why = cmd_capped_verdict(combined, base_res)
+    swapped = not why
+    results.setdefault("ablations", {})["cmd_capped"] = dict(decided=True, swapped=swapped, combined_file=cf, why=why)
+    if swapped:
+        results["base"] = levers
+    log(f"cmd_capped {'SWAPPED IN for cmd_forward' if swapped else 'KEPT cmd_forward'}{'' if swapped else ' ' + str(why)} | {V3.summary(combined)} | ladder {combined.get('ladder_score', 0):.2f}")
+    save(RESULTS, results)
 
 
 def repair_opt(levers, base_res, why0, base_extra):
     """opt_bundle failed: leave one part out at a time; adopt the first variant that passes (returned as the setting that removes the part), else drop the bundle."""
     log(f"opt_bundle FAILED {why0}: trying it without one part at a time")
     for part, unset in OPT_PARTS.items():
-        combined = screen_pair("opt_bundle", levers, extra=dict(base_extra, **unset), label=f"opt_bundle_wo_{part}")
+        try:
+            combined = screen_pair("opt_bundle", levers, extra=dict(base_extra, **unset), label=f"opt_bundle_wo_{part}")
+        except HealthStop as e:
+            log(f"opt_bundle without {part}: FAIL {e} did not learn (health stop)")
+            continue
         cf = f"trained/v4_combined_opt_bundle_wo_{part}.json"
         save(cf, combined)
         why = gate("opt_bundle", combined, base_res)
@@ -229,6 +295,8 @@ def status():
     print("base:", r.get("base"), r.get("base_extra", ""))
     for name, rec in r.get("screens", {}).items():
         print(f"{name:18s} {'ADOPTED' if rec.get('adopted') else 'rejected'} {rec.get('why') or ''}")
+    for name, rec in r.get("ablations", {}).items():
+        print(f"ablation {name:10s} {'SWAPPED IN' if rec.get('swapped') else 'kept cmd_forward'} {rec.get('why') or ''}")
 
 
 FINAL_CHECKS = (3_000_000, 5_000_000, 10_000_000)

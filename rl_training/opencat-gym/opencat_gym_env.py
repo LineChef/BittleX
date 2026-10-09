@@ -902,7 +902,8 @@ PROBE_CMD_BANDS = ((0.32, 0.08, 0.12), (0.20, 0.04, 0.055), (0.18, 0.115, CMD_FW
 def probe_command(seed: int) -> float:
     """The forward command of probe episode `seed` (the same for the clean-floor run and every category, so their scores are compared on the same walk)."""
     rng = np.random.RandomState(int(seed) % (2 ** 31))
-    bands = ((0.58, 0.08, 0.12), (0.25, 0.04, 0.055)) if CMD_BANDS == "forward" else PROBE_CMD_BANDS      # the training run's own forward bands
+    bands = (((0.58, 0.08, 0.12), (0.25, 0.04, 0.055)) if CMD_BANDS == "forward"
+             else ((0.50, 0.08, 0.12), (0.20, 0.04, 0.055)) if CMD_BANDS == "capped" else PROBE_CMD_BANDS)      # the training run's own forward bands
     w = np.array([b[0] for b in bands])
     band = bands[int(rng.choice(len(bands), p=w / w.sum()))]
     return float(rng.uniform(band[1], band[2]))
@@ -917,6 +918,8 @@ FIX_PAW_VEL = _g2e("FIX_PAW_VEL", False)        # 2026-10-08 review: slip / clea
 # --- 2026-10-08 training upgrade (docs/plan-detail/handoff-2026-10-08.md section 12). Every flag defaults OFF, so older checkpoints and scripts replay unchanged. ---
 # CMD_BANDS "forward": no backward commands (G2 walks backward with the firmware `bk` skill; the Pi never sends the policy a negative command) and no unreachable fast band
 #   (the gait tops out ~0.095 m/s): stand 17% (unchanged), creep 0.04-0.055 25%, cruise 0.08-0.12 58%. "" = the G4 bands.
+#   "capped" (2026-10-08 ablation of "forward"): ONLY the unreachable fast band is removed (its share goes to cruise 0.08-0.12); backward stays:
+#   cruise 50%, creep 0.04-0.055 20%, stand 17%, backward 13%. Tells whether dropping backward is what "forward" cost in speed and hazard falls.
 CMD_BANDS = _g2e("CMD_BANDS", "")
 # IMU_NOISE_PER_FRAME: with IMU_HOLD_STEPS, draw the observation noise once per held IMU frame (G2's error is fixed for the whole 0.2 s frame) instead of every control step.
 IMU_NOISE_PER_FRAME = _g2e("IMU_NOISE_PER_FRAME", False)
@@ -2192,6 +2195,16 @@ class OpenCatGymEnv(gym.Env):
             self._cmd_yaw = float(np.random.uniform(-TRAIN_YAW_RANGE, TRAIN_YAW_RANGE))
         else:
             self._cmd_yaw = 0.0
+        if CMD_BANDS == "capped":       # 2026-10-08 ablation: no unreachable fast band, backward kept (see CMD_BANDS)
+            if r < 0.50:
+                self._cmd_fwd = np.random.uniform(0.08, 0.12)
+            elif r < 0.70:
+                self._cmd_fwd = np.random.uniform(0.04, 0.055)
+            elif r < 0.87:
+                self._cmd_fwd = np.random.uniform(-0.01, 0.02)
+            else:
+                self._cmd_fwd = np.random.uniform(-0.09, -0.03)
+            return
         if CMD_BANDS == "forward":      # 2026-10-08: no backward, no unreachable fast band; stand share unchanged (see CMD_BANDS)
             if r < 0.58:
                 self._cmd_fwd = np.random.uniform(0.08, 0.12)

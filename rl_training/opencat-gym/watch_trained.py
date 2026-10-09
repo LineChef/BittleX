@@ -68,7 +68,10 @@ opencat_gym_env.GUI_MODE = True
 # feature-flag the env to match the checkpoint's observation width
 _od = _ckpt_obs_dim(args.checkpoint)
 if _od:
-    _extra = _od - opencat_gym_env.SIZE_OBSERVATION
+    # the run's own settings (watch_env.py) already add some inputs: the yaw-free heading pair and the critic's privileged values
+    _base = (opencat_gym_env.SIZE_OBSERVATION + (2 if opencat_gym_env.HEADING_OBS else 0)
+             + (opencat_gym_env.PRIV_DIM if opencat_gym_env.PRIV_OBS else 0))
+    _extra = _od - _base
     _map = {0: (0, 0, 0), 4: (1, 0, 0), 7: (1, 0, 1), 8: (1, 1, 0), 11: (1, 1, 1)}
     _t, _g, _c = _map.get(_extra, (1 if _extra >= 4 else 0, 0, 0))
     opencat_gym_env.TERRAIN_FEATURE = bool(_t)
@@ -100,6 +103,9 @@ from opencat_gym_env import OpenCatGymEnv
 env = OpenCatGymEnv()
 
 
+_fr_found = None        # the step count of the frontier file in use (FRONTIER runs), else None
+
+
 def _follow_training():
     """When watching a training run (watch_v3.sh sets G2_WATCH_TAG): put the env where the run is, so episodes are drawn exactly as training draws them: the ramp position of this checkpoint
     and the run's CURRENT difficulty levels (the last [level] line of its console log). No-op otherwise."""
@@ -112,6 +118,15 @@ def _follow_training():
         import json
         opencat_gym_env.apply_caps(json.load(open(f"trained/{tag}_caps.json")))      # the run\'s current top-threshold caps
     except (OSError, ValueError):
+        pass
+    global _fr_found
+    try:
+        import json
+        st = json.load(open(f"trained/{tag}_frontier.json"))          # FRONTIER runs: the bin weights and comfort bins the trainer last pushed (train.py FrontierCurriculum._push)
+        env.set_frontier({"w": st["weights"], "comfort": {h: max(0, int(f) - 1) for h, f in st["F"].items()}})
+        _fr_found = st.get("steps")
+        return None
+    except (OSError, ValueError, KeyError):
         pass
     try:
         last = [ln for ln in open(f"trained/{tag}_console.log", errors="replace") if ln.startswith("[level]")][-1]
@@ -126,7 +141,8 @@ def _follow_training():
 
 _lv = _follow_training()
 if os.environ.get("G2_WATCH_TAG"):
-    print(f"following {os.environ['G2_WATCH_TAG']}: difficulty levels {_lv or 'not found in its log (using the profile start)'}, sampling actions like training" + (" -- NO: deterministic" if args.deterministic else ""))
+    _where = (f"frontier weights as of step {_fr_found:,}" if _fr_found else f"difficulty levels {_lv or 'not found in its log (using the profile start)'}")
+    print(f"following {os.environ['G2_WATCH_TAG']}: {_where}, sampling actions like training" + (" -- NO: deterministic" if args.deterministic else ""))
 obs, info = env.reset()
 
 from stable_baselines3 import PPO

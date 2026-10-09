@@ -11,6 +11,7 @@ set -u
 cd "$(dirname "$0")"
 PY=../../.venv/bin/python
 TAG="${1:-v3_20m}"
-eval "$($PY watch_env.py "$TAG")" || exit 1
+ENVSET="$($PY watch_env.py "$TAG")" || exit 1      # (eval "$(...)" would hide a failure: the status of eval of an empty string is 0)
+eval "$ENVSET"
 export G2_WATCH_TAG="$TAG"
 exec "$PY" watch_trained.py "$TAG" "${@:2}"

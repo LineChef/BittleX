@@ -97,6 +97,7 @@ LEVERS = {
     "frontier": {"G2E_FRONTIER": "1", "G2E_CAP_SIDEHILL_DEG": "0", "G2E_CAP_UPHILL_DEG": "0",      # per-hazard frontier curriculum (physical bounds; caps file = manual override)
                  "G2E_CAP_DOWNHILL_DEG": "0", "G2E_CAP_LEDGE_M": "0"},
     "cmd_forward": {"G2E_CMD_BANDS": "forward"},                                                 # no backward, no unreachable fast band (user: drop backward)
+    "cmd_capped": {"G2E_CMD_BANDS": "capped"},                                                   # ablation of cmd_forward: only the unreachable fast band is removed, backward stays
     "opt_bundle": {"G2E_NORM_REWARD": "1", "G2E_LOG_STD_INIT": "-1", "G2E_LR_FLOOR": "0.1"},     # reward normalization, std 0.37 start, LR floor 3e-5
     "hazard_contact": {"G2E_HAZARD_EP_LEN": "375"},                                              # hazard-focus episodes 4.7 s, obstacles spread to match
     "imitation_actual": {"G2E_IMITATION_ACTUAL": "1"},                                           # imitation on measured joints (recipe evaluation finding 1)
