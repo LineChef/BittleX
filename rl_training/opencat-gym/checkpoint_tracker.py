@@ -15,7 +15,7 @@ import time
 import phase_v4 as P
 import phase_v3 as V3
 
-STEP_EVERY = 1_000_000
+STEP_EVERY = int(float(os.environ.get("CURVE_EVERY", "1000000")))      # CURVE_EVERY=500000 scores every 500k steps
 HERE = os.path.dirname(os.path.abspath(__file__))
 PY = sys.executable
 
