@@ -46,6 +46,28 @@ def apply_roam_limits(driver, roam_s: float) -> None:
     driver.mode.cfg = replace(driver.mode.cfg, explore_max_secs=(roam_s + 5.0) if roam_s > 0 else 1e9)
 
 
+def _start_interest(survey, saver, vision, rt, settings, args):
+    """Picture stops only for something worth it: unknown objects and unfinished named ones, never a person (behavior/interest_watch.py). Returns the running watch."""
+    from .behavior.mode_controller import Mode
+    from .behavior.interest_watch import GalleryFeeder, InterestWatch
+    from .vision.embedder import make_embedder
+    from .vision.interest import InterestScorer
+    from .vision.localizer import ForegroundLocalizer
+    from .vision.object_gallery import ObjectGallery, ObjectGalleryConfig
+    gpath = os.path.join(os.path.expanduser(settings.object_gallery_dir), "gallery.json")
+    gallery = ObjectGallery.load(gpath, ObjectGalleryConfig(lock_by_holdout=True))
+    base = frozenset({"face", "person", "human"})
+    scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,
+                            veto_labels=lambda: base | frozenset(str(x).lower() for x in ((getattr(rt, "_roster", None) or (lambda: ()))() or ()) if x))
+    saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
+    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "10")), fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
+                          active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
+    survey.gate = watch.gate
+    log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",
+             watch.every_s, watch.fallback_s, gpath)
+    return watch
+
+
 def parse_args(argv=None):
     """Roaming (Tier 1) starts at once by default; `--stationary` is the opt-in stay-put mode (Tier 0 only, until `arm`)."""
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
@@ -105,9 +127,15 @@ def main() -> None:
                                            prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", args.roam_s / 2 if args.roam_s > 0 else 300.0)))   # prep the camera for the first picture and once half way (user)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver)
+        watch = None
         if saver is not None:
-            rt.driver.enable_survey(survey_config_from_env())                  # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
+            survey = rt.driver.enable_survey(survey_config_from_env())          # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)
             log.info("survey stops ON: pictures go to %s", saver._root)
+            if os.environ.get("G2_INTEREST", "1") != "0":
+                try:
+                    watch = _start_interest(survey, saver, vision, rt, settings, args)
+                except Exception:  # noqa: BLE001 -- without it the survey just keeps its timer
+                    log.exception("the interest watch could not start; picture stops stay on the timer")
 
         apply_roam_limits(rt.driver, args.roam_s)          # roaming lasts as long as --roam-s says, not the behavior layer's own short caps
 
@@ -265,6 +293,8 @@ def main() -> None:
             t.join(timeout=2.0)
             guard.stop()
             watcher.stop()
+            if watch is not None:
+                watch.stop()
             if vision is not None:
                 vision.close()
             if memory is not None:

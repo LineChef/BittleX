@@ -81,6 +81,7 @@ class GalleryEntry:
     crop_files: list[str] = field(default_factory=list)   # opaque refs the caller manages
     first_seen: float = 0.0             # wall-clock epoch seconds
     last_seen: float = 0.0
+    samples: list = field(default_factory=list)    # every sample's own embedding (small), so a named entry can be tested on pictures it was not built from
 
     @property
     def labeled(self) -> bool:
@@ -97,6 +98,14 @@ class ObjectGalleryConfig:
     same_instance_threshold: float = 0.80   # cosine sim >= this -> "the same thing I've seen"
     near_duplicate_threshold: float = 0.93  # cosine sim >= this -> not worth another sample
     min_quality: float = 0.35            # quality score (0..1) below this is refused outright
+    # The lock rule for NAMED entries (user, 2026-10-09: reinforce an object until it is recognised reliably, not until a count): with `lock_by_holdout` on, a named entry never
+    # locks by `max_samples_per_entry`; it locks when, with every `holdout_every`-th sample held back, at least `lock_min_samples` samples exist, at least `lock_min_holdout` were held back
+    # and `lock_accuracy` of the held-back samples are recognised as THIS entry (closest named entry, similarity >= same_instance_threshold).
+    lock_by_holdout: bool = False
+    lock_min_samples: int = 15
+    holdout_every: int = 5
+    lock_min_holdout: int = 3
+    lock_accuracy: float = 0.90
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -140,7 +149,10 @@ class ObjectGallery:
             if best_sim >= self.cfg.near_duplicate_threshold:
                 return self._done(GalleryDecision.DUPLICATE, best_id)
             self._add_sample(entry, embedding, crop_ref)
-            if entry.sample_count >= self.cfg.max_samples_per_entry:
+            if self.cfg.lock_by_holdout and entry.labeled:
+                if self.holdout_accuracy(best_id)[0] >= self.cfg.lock_accuracy:
+                    entry.locked = True
+            elif entry.sample_count >= self.cfg.max_samples_per_entry:
                 entry.locked = True
             return self._done(GalleryDecision.ADD_SAMPLE, best_id)
 
@@ -155,7 +167,7 @@ class ObjectGallery:
 
         eid = uuid.uuid4().hex[:12]
         self.entries[eid] = GalleryEntry(
-            id=eid, centroid=list(embedding), sample_count=1,
+            id=eid, centroid=list(embedding), sample_count=1, samples=[list(embedding)],
             crop_files=[crop_ref] if crop_ref else [],
             first_seen=now, last_seen=now)
         return self._done(GalleryDecision.NEW, eid)
@@ -170,6 +182,30 @@ class ObjectGallery:
             if sim > best_sim:
                 best, best_sim = entry, sim
         return best, best_sim
+
+    def holdout_accuracy(self, entry_id: str) -> tuple[float, int]:
+        """(accuracy, held-back count) for a named entry: hold back every `holdout_every`-th sample, rebuild the entry's centroid from the rest, and ask how many held-back samples are
+        recognised as this entry (the closest of all named entries, rebuilt the same way, with similarity >= the same-instance threshold). (0.0, n) when there is too little data."""
+        e = self.entries[entry_id]
+        n = len(e.samples)
+        every = max(2, self.cfg.holdout_every)
+
+        def centroid(samples):
+            return [sum(v) / len(samples) for v in zip(*samples)]
+        held = [x for i, x in enumerate(e.samples) if i % every == every - 1]
+        train = [x for i, x in enumerate(e.samples) if i % every != every - 1]
+        if n < self.cfg.lock_min_samples or len(held) < self.cfg.lock_min_holdout or not train:
+            return 0.0, len(held)
+        cents = {entry_id: centroid(train)}
+        for oid, o in self.entries.items():
+            if oid != entry_id and o.labeled and o.samples:
+                cents[oid] = centroid([x for i, x in enumerate(o.samples) if i % every != every - 1] or o.samples)
+        ok = 0
+        for x in held:
+            best = max(cents, key=lambda k: _cosine(x, cents[k]))
+            if best == entry_id and _cosine(x, cents[best]) >= self.cfg.same_instance_threshold:
+                ok += 1
+        return ok / len(held), len(held)
 
     def _done(self, decision: GalleryDecision, entry_id: str | None) -> GalleryDecision:
         self.last_decision, self.last_entry_id = decision, entry_id
@@ -188,6 +224,7 @@ class ObjectGallery:
         n = entry.sample_count
         entry.centroid = [(c * n + e) / (n + 1) for c, e in zip(entry.centroid, embedding)]
         entry.sample_count = n + 1
+        entry.samples.append(list(embedding))
         if crop_ref:
             entry.crop_files.append(crop_ref)
 
@@ -231,6 +268,8 @@ class ObjectGallery:
                  clock=time.time) -> "ObjectGallery":
         g = cls(cfg, clock=clock)
         for eid, ev in data.get("entries", {}).items():
+            ev = dict(ev)
+            ev.setdefault("samples", [ev["centroid"]] * 0)          # galleries saved before samples were kept have none: they lock by count only
             g.entries[eid] = GalleryEntry(**ev)
         return g
 

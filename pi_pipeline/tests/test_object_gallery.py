@@ -112,3 +112,52 @@ def test_the_total_ceiling_stops_new_entries_but_never_removes_one():
     assert len(g.entries) == 2
 
 
+
+
+def _vec(rng, base, noise):
+    v = [b + noise * rng.gauss(0, 1) for b in base]
+    n = sum(x * x for x in v) ** 0.5
+    return [x / n for x in v]
+
+
+def test_a_named_entry_locks_when_held_back_pictures_are_recognised_not_when_a_count_is_reached():
+    import random
+    from pi_pipeline.vision.object_gallery import GalleryDecision, ObjectGallery, ObjectGalleryConfig
+    rng = random.Random(7)
+    dim = 24
+    a = [rng.gauss(0, 1) for _ in range(dim)]
+    b = [rng.gauss(0, 1) for _ in range(dim)]
+    cfg = ObjectGalleryConfig(lock_by_holdout=True, max_samples_per_entry=8, near_duplicate_threshold=1.01)
+    g = ObjectGallery(cfg)
+    g.consider(_vec(rng, a, 0.15), quality=1.0)
+    ida = g.last_entry_id
+    g.set_name(ida, "mug")
+    g.consider(_vec(rng, b, 0.15), quality=1.0)
+    g.set_name(g.last_entry_id, "lamp")
+    for _ in range(10):                                         # past the old count of 8: a named entry does NOT lock by count any more
+        g.consider(_vec(rng, a, 0.15), quality=1.0)
+    assert not g.entries[ida].locked and g.entries[ida].sample_count == 11
+    acc, held = g.holdout_accuracy(ida)
+    assert acc == 0.0 and held >= 2                             # fewer than the 15 samples the rule needs
+    for _ in range(6):
+        g.consider(_vec(rng, a, 0.15), quality=1.0)
+    assert g.entries[ida].locked                                # enough samples, and the held-back ones are recognised as the mug
+    assert g.consider(_vec(rng, a, 0.15), quality=1.0) is GalleryDecision.LOCKED
+
+
+def test_an_entry_that_looks_like_another_named_entry_does_not_lock():
+    import random
+    from pi_pipeline.vision.object_gallery import ObjectGallery, ObjectGalleryConfig
+    rng = random.Random(3)
+    a = [rng.gauss(0, 1) for _ in range(24)]
+    cfg = ObjectGalleryConfig(lock_by_holdout=True, near_duplicate_threshold=1.01)
+    g = ObjectGallery(cfg)
+    g.consider(_vec(rng, a, 0.12), quality=1.0)
+    first = g.last_entry_id
+    g.set_name(first, "cup")
+    g.entries["twin"] = type(g.entries[first])(id="twin", centroid=list(g.entries[first].centroid), sample_count=1, name="mug",
+                                               samples=[list(g.entries[first].centroid)])          # a differently named entry sitting on top of it
+    for _ in range(20):
+        g.consider(_vec(rng, a, 0.12), quality=1.0)
+    assert not g.entries[first].locked or g.holdout_accuracy(first)[0] >= 0.9                       # never locks on a false 'recognised'
+    assert g.to_dict()["entries"][first]["samples"]                                                  # and the samples are saved

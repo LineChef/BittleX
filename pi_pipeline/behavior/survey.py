@@ -50,9 +50,13 @@ class Survey:
         self._clock = clock
         self._last = clock() - self.cfg.cooldown_s + self.cfg.first_delay_s if self.cfg.first_delay_s > 0 else float("-inf")      # the first picture waits first_delay_s
 
+    gate = None            # optional callable(now) -> bool: also needed to be True (the interest watch: only stop for a picture when something is worth it)
+
     def ready(self, now: float | None = None) -> bool:
         t = self._clock() if now is None else now
-        return t - self._last >= self.cfg.cooldown_s
+        if t - self._last < self.cfg.cooldown_s:
+            return False
+        return True if self.gate is None else bool(self.gate(t))
 
     def began(self, now: float | None = None) -> None:
         self._last = self._clock() if now is None else now
