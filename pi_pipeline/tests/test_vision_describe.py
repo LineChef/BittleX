@@ -166,7 +166,7 @@ def test_asking_what_g2_sees_attaches_a_picture_and_the_detector_hint():
 
 def test_other_requests_take_no_picture():
     cam = _Cam(Snapshot(JPEG, 240, 240))
-    lp, conv = make_loop(cam, ["walk forward"])
+    lp, conv = make_loop(cam, ["tell me a joke about walking"])     # (a bare "walk forward" is a local command since 2026-10-09)
     lp._one_turn()
     assert conv.calls[0][1] == {} and cam.snapshots == 0
 

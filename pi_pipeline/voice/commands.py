@@ -324,8 +324,55 @@ def asks_floor(text: str) -> bool:
     return any(n == q or n.startswith(q + " ") for q in _FLOOR_QUERY)
 
 
+# "walk for ten seconds" (2026-10-09, user: the Claude round trip for this never seemed to work; it needs no conversation): a local command, no API call.
+# Matched strictly: an optional "go / start / keep", "walk"/"walking" (optionally "forward / ahead / straight"), then optionally "for [about] N seconds / minutes".
+# Number words are read before the usual filler stripping ("two" is a filler token there because of the wake word).
+WALK_DEFAULT_S = 10.0
+_NUM_WORDS = {"a": 1, "an": 1, "one": 1, "two": 2, "to": 2, "too": 2, "three": 3, "four": 4, "for": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+              "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+              "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60}
+_WALK_RE = re.compile(r"^(?:(?:go|start|keep|begin) )?(?:walk|walking)(?: (?:forward|forwards|ahead|straight|straight ahead))?"
+                      r"(?: (?:for )?(?:(?:about|around|like) )?(?P<num>(?:[a-z]+|\d+(?:\.\d+)?)(?: [a-z]+)?|half a) (?P<unit>seconds?|secs?|minutes?|mins?))?$")
+
+
+def _walk_norm(text: str) -> str:
+    t = _PUNCT.sub(" ", _APOS.sub("", text.lower()))
+    t = re.sub(r"^\s*(?:(?:hey|ok|okay)\s+)?(?:g2|gee two|gee to|g two|g to|she to|gee too)\b", " ", t)
+    t = _LEADING_WAKE.sub(" ", t)
+    return " ".join(w for w in t.split() if w not in ("please", "now", "um", "uh", "ok", "okay", "so", "hey", "robot", "g2"))
+
+
+def _words_to_number(words: str) -> float | None:
+    if words == "half a":
+        return 0.5
+    try:
+        return float(words)
+    except ValueError:
+        pass
+    total = 0.0
+    for w in words.split():
+        if w not in _NUM_WORDS:
+            return None
+        total += _NUM_WORDS[w]
+    return total or None
+
+
+def parse_walk_command(text: str) -> float | None:
+    """Seconds for a plain "walk (forward) [for N seconds|minutes]" request, else None. A bare "walk forward" walks WALK_DEFAULT_S. Not a walk toward someone
+    ("walk to me" is come-here, matched earlier) and never backward."""
+    m = _WALK_RE.match(_walk_norm(text))
+    if not m:
+        return None
+    if not m.group("num"):
+        return WALK_DEFAULT_S
+    n = _words_to_number(m.group("num"))
+    if n is None:
+        return None
+    return n * (60.0 if m.group("unit").startswith("min") else 1.0)
+
+
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"explore"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"walk"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -340,6 +387,8 @@ def match_local_command(text: str) -> str | None:
         return "shutdown"
     if _hit(n, _COME):
         return "come"
+    if parse_walk_command(text) is not None:
+        return "walk"
     if _hit(n, _RESTART_VOICE):
         return "restart_voice"
     if _hit(n, _END_EXPLORE):

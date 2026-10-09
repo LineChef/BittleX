@@ -112,6 +112,7 @@ LEVERS = {
                   "G2E_FR_IGNORE_CAPS": "1",                                                     # the old static caps no longer clip frontier sizes (V4's silent 8 deg / 20 mm cap)
                   "G2E_FR_SLOPE_SHARE": "0.095", "G2E_FR_SLOPE_DECK": "1",                       # slopes and tilts in under 10% of episodes (user: no more than 10%), dealt evenly: up, down, left, right
                   "G2E_FR_BACKGROUND_TILT_DEG": "0",                                             # no background tilt anywhere (user)
+                  "G2E_BALANCED": "1",                                                           # every left/right and up/down variation dealt in equal parts (user)
                   "G2E_FR_MAX_HAZARDS": "2", "G2E_FR_COMBO": "0.15",                            # no stacking past two hazards; fewer all-at-once episodes
                   "G2E_FR_ANCHOR_LONG": "1", "G2E_FR_PASS": "0.7",                               # hazard-free baseline as long as the hazard episodes; pass at 0.7 of it
                   "G2E_RANDOM_PUSH": "0.12", "G2E_RANDOM_PUSH_PROB": "0.003",                    # small nudges: up to 0.12 m/s about every 4 s (V4: 0.22 m/s, 1.6 a second)

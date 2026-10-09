@@ -60,6 +60,8 @@ Measured on Candidate A (`v4_c2` at 1.0M, deployed as V4) with short read-only s
 | Crossing bonus | yes |
 | Baseline for this training | the scripted walk, not V3; V3 and V4 are left out of the report |
 | The 20M | not held for V4's hardware walks; the user reports V4 results separately |
+| Every variation in equal parts (user, 2026-10-09, before the start) | lever setting `G2E_BALANCED`: shove and nudge directions dealt evenly over 8 compass sectors (nudge magnitudes isotropic), step-up vs step-down, and the mirror image of the overheated-servo set, the servo zero offsets, the IMU roll bias and the payload's sideways offset, each from a shuffled per-env deck, so no side gets more of anything (obstacle fields' sideways placement stays random: many objects per episode average out) |
+| Watch the real run | `g2watchrun` shows the training run itself: env 0 streams the episode it is simulating while a viewer is open (`watch_live.py`); the old fresh-simulation viewer is `g2watchsim` |
 | Report | plain-language summary sections (verdict, per-hazard result with training level reached and size of change, better / worse / unchanged lists, symmetry) above the full statistics |
 
 Claude's additions inside the approved plan: at most two hazards per episode, size passed at 0.7 of hazard-free success, fewer all-at-once episodes (25% to 15%),
@@ -70,6 +72,7 @@ a KL limit through the whole fresh run, and picking the final policy between the
 | Lever (`g2_profile.LEVERS`) | Settings | What it does |
 |---|---|---|
 | `v5_course` | `G2E_FR_SPLIT_SIDE`, `G2E_FR_BOUNDS`, `G2E_FR_IGNORE_CAPS`, `G2E_FR_SLOPE_SHARE`, `G2E_FR_SLOPE_DECK`, `G2E_FR_BACKGROUND_TILT_DEG`, `G2E_FR_MAX_HAZARDS`, `G2E_FR_COMBO`, `G2E_FR_ANCHOR_LONG`, `G2E_FR_PASS`, `G2E_RANDOM_PUSH`, `G2E_RANDOM_PUSH_PROB`, `G2E_IMPULSE_PUSH_PROB`, `G2E_PUSH_NO_HARD_SCALE`, the 0.25 / 0.12 curriculum gates | the course decisions in section 2 |
+| (in `v5_course`) `G2E_BALANCED` | | the equal-parts dealing above (`OpenCatGymEnv._deal`); the episode recorder saves the decks so replays stay exact |
 | `kl_limit` | `G2E_TARGET_KL` 0.03 | PPO stops an update early when it moves the policy too far, through the whole fresh run |
 | `cross_bonus` | `G2E_FAC_CROSS` 200 | one-time reward for getting the body 10 cm past the last object of the field (split over its pieces) and past a ledge edge; positions from the sim, reward only |
 | `haz_speed` | `G2E_HAZ_SPEED_RELAX` 0 | no speed-tracking penalty while on a hazard (touched an object or ledge in the last 0.5 s, on a slope of 4 deg or more, or at a ledge edge) |
@@ -120,3 +123,4 @@ size, plus crossing rates). `report_v5.py` builds the report against the scripte
 |---|---|---|
 | 2026-10-09 9:30 AM | V4 evaluation presented (section 1) | the user's decisions in section 2 |
 | 2026-10-09 9:45 AM | plan revised for the user's feedback | approved ("the plan is approved, proceed"), with the automation and documentation requirements |
+| 2026-10-09 10:20 AM | before the start: user asked for equal parts for every variation, a live view of the actual run, and a bug sweep | built (`G2E_BALANCED`, `watch_live.py`); sweep fixes: two voice tests rephrased for the new local walk command; preflight re-run |

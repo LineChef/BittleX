@@ -48,7 +48,7 @@ class RecordingWrapper(gym.Wrapper):
                              "caps": _E.current_caps(), "actions": [], "ramp_events": [], "t0": time.time(),
                              "frontier": {"w": {h: [float(x) for x in w] for h, w in getattr(u, "_fr_w", {}).items()},
                                           "comfort": {h: int(c) for h, c in getattr(u, "_fr_comfort", {}).items()}},
-                             "slope_deck": list(getattr(u, "_slope_deck", None) or [])}       # V5 FR_SLOPE_DECK: the env's remaining slope cards (state carried between episodes)
+                             "decks": {k: list(v) for k, v in (getattr(u, "_decks", None) or {}).items()}}       # V5 FR_SLOPE_DECK / BALANCED: the env's dealt-card decks (state carried between episodes)
         except Exception:  # noqa: BLE001 -- recording must never break training
             self._rec = None
         return self.env.reset(**kw)
@@ -84,7 +84,7 @@ class RecordingWrapper(gym.Wrapper):
         path = os.path.join(self._dir, f"ep_{time.strftime('%Y%m%d_%H%M%S')}_{os.getpid()}_{self._n}.npz")
         _, key, pos, has_gauss, cached = rec["rng"]            # np.random.get_state() = (name, 624-word key, position, has_gauss, cached_gaussian)
         meta = {"env": _env_vars(), "ramp_steps": rec["ramp_steps"], "levels": rec["levels"], "len_ep": rec["len_ep"], "forced_cmd": rec["forced_cmd"],
-                "push_curr": rec.get("push_curr"), "caps": rec.get("caps"), "frontier": rec.get("frontier"), "slope_deck": rec.get("slope_deck"), "ramp_events": rec.get("ramp_events", []),
+                "push_curr": rec.get("push_curr"), "caps": rec.get("caps"), "frontier": rec.get("frontier"), "decks": rec.get("decks"), "ramp_events": rec.get("ramp_events", []),
                 "steps": len(rec["actions"]), "terminated": bool(out[2]), "truncated": bool(out[3]), "final_reward": float(out[1]),
                 "focus": getattr(u, "_focus", None), "d": {c: float(getattr(u, "_d_" + c, 0.0)) for c in ("terrain", "ledge", "slope", "fault")},
                 "slope_rp": [float(x) for x in getattr(u, "_slope_rp", (0.0, 0.0))], "slope_targeted": bool(getattr(u, "_slope_targeted", False)),

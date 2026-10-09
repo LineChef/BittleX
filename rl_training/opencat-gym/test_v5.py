@@ -132,3 +132,66 @@ def test_report_holm_and_build():
     for part in ("Verdict", "Per hazard", "What got better", "What got worse", "What did not change", "Symmetry", "All statistics"):
         assert part in html, part
     assert "significant" in html
+
+
+def test_balanced_decks_deal_every_variation_evenly():
+    out = _child(PRELUDE.replace("LEVERS", repr(V5_LEVERS)) + r"""
+assert E.BALANCED
+np.random.seed(2)
+for name, cards in (("impulse", tuple(range(8))), ("ledge", ("ledge_up", "ledge_down")), ("cutback_mirror", (False, True))):
+    c = collections.Counter(e._deal(name, cards) for _ in range(len(cards) * 50))
+    assert set(c.values()) == {50}, (name, c)
+# shoves through the real step: 8 sectors, each hit equally often (whole decks)
+E.IMPULSE_PUSH_PROB, E.RANDOM_PUSH_PROB = 1.0, 0.0
+e.set_forced_hazards({}); e.reset(); e._decks.pop("impulse", None)
+seen = collections.Counter()
+_orig = e._deal
+def spy(name, cards):
+    c = _orig(name, cards)
+    if name == "impulse": seen[c] += 1
+    return c
+e._deal = spy
+for t in range(80):
+    e.step(np.zeros(8))
+    if e._in_recovery or e.step_counter == 0: break
+n = sum(seen.values())
+assert n >= 16 and max(seen.values()) - min(seen.get(k, 0) for k in range(8)) <= 1, seen       # every direction within one shove of every other
+print("OK")
+""")
+    assert "OK" in out
+
+
+def test_live_stream_writes_the_real_episode_only_while_watched():
+    out = _child(PRELUDE.replace("LEVERS", repr(V5_LEVERS)) + r"""
+import json, time, tempfile
+e.set_live_slot("unit_live")
+e._live_dir = tempfile.mkdtemp()
+e.reset()
+assert e._live_f is None and not os.path.exists(os.path.join(e._live_dir, "scene.json"))      # nobody watching: nothing written
+open(os.path.join(e._live_dir, "request"), "w").close()
+e.set_forced_hazards({"rubble": 0.5}); e.reset()
+for t in range(10):
+    e.step(np.zeros(8))
+sc = json.load(open(os.path.join(e._live_dir, "scene.json")))
+lines = open(os.path.join(e._live_dir, sc["frames"])).read().splitlines()
+assert sc["tag"] == "unit_live" and sc["hazards"] == {"rubble": 0.5} and len(lines) == 5, (sc["hazards"], len(lines))
+fr = json.loads(lines[-1])
+pos = p.getBasePositionAndOrientation(e.robot_id)[0]
+assert abs(fr["b"][0] - pos[0]) < 1e-4 and len(fr["j"]) == 8
+print("OK", os.path.join(e._live_dir, "scene.json"))
+""")
+    assert "OK" in out
+    scene = out.split("OK", 1)[1].strip().split()[-1]
+    out2 = _child(r"""
+import json, sys
+sys.path.insert(0, ".")
+import pybullet as p
+import watch_live
+p.connect(p.DIRECT)
+sc = json.load(open(%r))
+rid, ids = watch_live.build(p, sc)
+solid = [b for b in sc["bodies"] if b["shapes"]]
+assert rid is not None and len(ids) == len(solid), (len(ids), len(solid))
+print("BUILT", len(ids))
+""" % scene)
+    assert "BUILT" in out2

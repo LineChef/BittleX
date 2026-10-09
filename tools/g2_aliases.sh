@@ -254,12 +254,19 @@ g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" )
 g2climbwatch() { ( "$G2_ROOT/rl_training/opencat-gym/climbwatch" "$@" ); }
 
 
-# g2watchrun [TAG] [watch_trained args]  -- watch a training run's newest checkpoint live in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges.  --calm = the flat scoring world instead.
-#   g2watchrun            the run that wrote the newest checkpoint (the one in progress)
-#   g2watchrun v3_20m     a given run;   g2watchrun v3_20m --dr-push 0.35   adds random shoves
-#   g2watchrun list       the runs with their newest checkpoint and how long ago it was written;   g2watchrun which   prints the tag it would watch
-# Runs in a subshell (leaves you where you are); needs your own terminal for the GUI window; it slows the training a little while open. (`g2watch` / `g2watch-checkpoint` in ~/.bash_profile replay in the default world.)
+# g2watchrun [--realtime]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of
+#   its own, not an approximation; it joins wherever the run is). Default = follow live at training speed (about 4-5x real time); --realtime = each episode at real
+#   speed, then the newest. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal for the window. Costs the run nothing when closed.
 g2watchrun() {
+  ( cd "$G2_ROOT/rl_training/opencat-gym" && "$G2_ROOT/.venv/bin/python" watch_live.py "$@" )
+}
+
+# g2watchsim [TAG] [watch_trained args]  -- (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges.  --calm = the flat scoring world instead.
+#   g2watchsim            the run that wrote the newest checkpoint (the one in progress)
+#   g2watchsim v3_20m     a given run;   g2watchsim v3_20m --dr-push 0.35   adds random shoves
+#   g2watchsim list       the runs with their newest checkpoint and how long ago it was written;   g2watchsim which   prints the tag it would watch
+# Runs in a subshell (leaves you where you are); needs your own terminal for the GUI window; it slows the training a little while open. (`g2watch` / `g2watch-checkpoint` in ~/.bash_profile replay in the default world.)
+g2watchsim() {
   local d="$G2_ROOT/rl_training/opencat-gym" ck="$G2_ROOT/rl_training/opencat-gym/trained/checkpoints"
   _g2run_tag() { ls -t "$ck"/*_steps.zip 2>/dev/null | head -1 | sed -E 's#.*/##; s/_[0-9]+_steps\.zip$//'; }
   case "${1:-}" in

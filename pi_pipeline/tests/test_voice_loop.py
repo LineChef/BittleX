@@ -224,7 +224,7 @@ def test_narration_level_sets_hint_not_claude():
 
 
 def test_loop_passes_seconds_to_the_actuator():
-    lp, w, stt, conv, tts = _loop(["walk for eight seconds", ""])
+    lp, w, stt, conv, tts = _loop(["walk for eight seconds and then wave at me", ""])     # (a bare "walk for N seconds" is a local command since 2026-10-09)
     conv.send = lambda text, memory_context=None: types.SimpleNamespace(
         speech="", actions=["walk_forward", "wave"], facts=[], action_seconds=[8.0, None])
     calls = []
@@ -256,7 +256,7 @@ def test_non_streamed_turn_moves_before_it_talks():
 
 def test_streamed_turn_speaks_each_sentence_and_acts_immediately():
     order = []
-    lp, w, stt, conv, tts = _loop(["walk", ""])
+    lp, w, stt, conv, tts = _loop(["go for a little walk around the room", ""])     # Claude decides (a bare "walk" is a local command)
     conv.supports_streaming = True
 
     def send(text, memory_context=None, on_action=None, on_speech=None):

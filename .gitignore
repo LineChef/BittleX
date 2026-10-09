@@ -60,6 +60,10 @@ datasets/
 # benchmark_*.py / resilience_*.py tools, same category as the checkpoints above
 rl_training/opencat-gym/trained/*.json
 rl_training/opencat-gym/robustness_sweep.json
+# V5 (2026-10-09): the live-view stream (watch_live.py) and the runner's report folder (force-add the result JSONs that back a decision)
+rl_training/opencat-gym/trained/live/
+rl_training/opencat-gym/trained/v5_report/
+rl_training/opencat-gym/trained/*.jsonl
 
 # Automated-iteration scratch
 rl_training/opencat-gym/eval_frames/

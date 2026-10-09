@@ -452,7 +452,8 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `tail -f rl_training/opencat-gym/trained/phase_v3.log` | the queue: starts, results, gait checks, stops |
 | `tail -f rl_training/opencat-gym/trained/v3_20m_console.log` | the training run's own log (steps, rewards, curriculum levels); TensorBoard logging is off in this repo |
 | `ls rl_training/opencat-gym/trained/checkpoints \| grep v3_20m_ \| sort -t_ -k3 -n \| tail -1` | the newest checkpoint (saved every 200k steps) |
-| `g2watchrun [TAG] [--dr-push 0.35]` | replay the run in progress (or TAG) from its newest checkpoint in the PyBullet GUI, in the G2 hardware world; `g2watchrun list` shows every run's newest checkpoint; works from any directory. Underneath: |
+| `g2watchrun [--realtime]` | watch the training run going on right now: the actual episodes it is simulating, streamed from the run (no simulation of its own; runs started after 2026-10-09); default follows live at training speed, `--realtime` plays each episode at real speed; works from any directory |
+| `g2watchsim [TAG] [--dr-push 0.35]` | (the old `g2watchrun`) a fresh simulation of a run's newest checkpoint in the PyBullet GUI, in the G2 hardware world; `g2watchsim list` shows every run's newest checkpoint. Underneath: |
 | `cd rl_training/opencat-gym && ./watch_v3.sh [TAG] [--dr-push 0.35]` | replay the newest checkpoint of a run in the PyBullet GUI, in the G2 hardware world; run it in your own terminal; it slows the training a little while open |
 | `python rl_training/opencat-gym/phase_v3.py status` | every finished job and its verdict |
 | `g2clean` | list scratch files on the Mac and the Pi that are safe to delete and untracked files that need a commit-or-delete decision (dry run); `g2clean --apply` deletes the scratch list and the Pi's stray files |

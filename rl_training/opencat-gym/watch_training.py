@@ -54,8 +54,8 @@ def replay(path: str) -> bool:
         u._push_curr = float(m["push_curr"])
     if m.get("caps"):
         E.apply_caps(m["caps"])
-    if m.get("slope_deck") is not None:                 # V5 runs: the slope cards left in this env's deck when the episode started
-        u._slope_deck = list(m["slope_deck"])
+    if m.get("decks") is not None:                      # V5 runs: the dealt-card decks (slope kinds, shove directions, ...) as they stood when the episode started
+        u._decks = {k: list(v) for k, v in m["decks"].items()}
     fr = m.get("frontier")
     if fr and fr.get("w"):                               # FRONTIER runs: the bin weights in force when the episode started
         u.set_frontier(fr)

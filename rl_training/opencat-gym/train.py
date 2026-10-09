@@ -532,6 +532,7 @@ if __name__ == "__main__":
     env = make_vec_env(OpenCatGymEnv,
                        n_envs=parallel_env,
                        vec_env_cls=SubprocVecEnv, wrapper_class=_wrap if _wrappers else None)
+    env.env_method("set_live_slot", args.tag, indices=[0])             # 2026-10-09: env 0 streams its real episodes while a live viewer is open (watch_live.py, g2watchrun)
     # Optimizer bundle (lever opt_bundle, 2026-10-08): reward normalization for the critic (the policy never sees rewards, nothing changes on the Pi; obs untouched)
     if os.environ.get("G2E_NORM_REWARD", "0") not in ("0", ""):
         from stable_baselines3.common.vec_env import VecNormalize

@@ -30,11 +30,12 @@ from ..personality import character_state
 from ..personality import gir
 from ..personality.mood import MoodModel
 from . import narration
+from . import skills
 from .actuator import Actuator
 from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming, picture_pose_steps
 from .commands import (
     addressed_elsewhere, is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
-    parse_floor_command,
+    parse_floor_command, parse_walk_command,
     parse_narration_command,
 )
 from .conversation import Conversation, ConversationError
@@ -45,6 +46,16 @@ from .stt import STT
 from .timing import TurnTrace
 from .tts import TTS
 from .wake_word import WakeWord
+
+
+def _say_seconds(secs) -> str:
+    """'ten seconds', '1 minute' ... for the local walk's spoken acknowledgement."""
+    if not secs:
+        return "a bit"
+    s = int(round(secs))
+    if s % 60 == 0 and s >= 60:
+        return "a minute" if s == 60 else f"{s // 60} minutes"
+    return "1 second" if s == 1 else f"{s} seconds"
 
 log = logging.getLogger("g2.loop")
 
@@ -528,6 +539,15 @@ class VoiceLoop:
             self._events(come_here=True)
             self._cue.set("speaking")
             self._speak("Coming.")
+            self._set_session()
+            self._cue.set("idle")
+            return
+        if cmd == "walk":                                   # "walk for ten seconds": straight to the walk, no Claude call (the same path a Claude walk takes)
+            secs = skills.clamp_seconds(parse_walk_command(user_text))
+            log.info("walk %.1f s (voice, local)", secs or 0.0)
+            self._cue.set("speaking")
+            self._act.perform("walk_forward", seconds=secs)
+            self._speak(f"Walking for {_say_seconds(secs)}.")
             self._set_session()
             self._cue.set("idle")
             return

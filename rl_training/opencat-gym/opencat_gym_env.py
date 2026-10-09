@@ -972,6 +972,11 @@ FR_COMBO = _g2e("FR_COMBO", 0.25)          # of the other episodes: every presen
 FR_BACKGROUND_TILT_DEG = _g2e("FR_BACKGROUND_TILT_DEG", 2.0)   # episodes without a slope hazard keep a small random tilt (the old background slope), never on anchors (V5: 0, user)
 # FR_SLOPE_DECK: the slope kind (each side-hill side, climb, descent) is dealt from a shuffled deck per environment instead of a coin, so every kind gets exactly its share.
 FR_SLOPE_DECK = _g2e("FR_SLOPE_DECK", False)
+# BALANCED (V5, user 2026-10-09: "any hazard that has variations is always presented in equal parts so we don't produce bias in the gait"): every left/right or up/down
+#   variation is dealt from a shuffled per-env deck (OpenCatGymEnv._deal) instead of a coin, so each side gets exactly its share: shove and nudge directions (8 compass
+#   sectors, isotropic magnitudes), step-up vs step-down, and the mirror image of the overheated-servo set, the servo zero offsets, the IMU roll bias and the payload's
+#   sideways jitter. The obstacle fields' lateral placement stays random (many objects per episode average out).
+BALANCED = _g2e("BALANCED", False)
 # FR_MAX_HAZARDS > 0: at most this many hazards in one episode (the overheat cutback counts). V5: 2 (V4 averaged 2.2 and a third of its hazard episodes ended in a fall).
 FR_MAX_HAZARDS = _g2e("FR_MAX_HAZARDS", 0)
 # FR_ANCHOR_LONG: hazard-free comparison episodes run HAZARD_EP_LEN steps too, so a hazard and the hazard-free baseline are judged over the same time.
@@ -1199,7 +1204,7 @@ class OpenCatGymEnv(gym.Env):
         elif np.random.rand() < p_rough:
             present.append("rough")
         if "rough" not in present and np.random.rand() < p_ledge:
-            present.append("ledge_up" if np.random.rand() < 0.5 else "ledge_down")
+            present.append(self._deal("ledge", ("ledge_up", "ledge_down")) if BALANCED else ("ledge_up" if np.random.rand() < 0.5 else "ledge_down"))
         for h in ("rubble", "boxes", "snag", "cutback"):
             if np.random.rand() < min(1.0, FR_SHARE[h] / q):
                 present.append(h)
@@ -1227,12 +1232,24 @@ class OpenCatGymEnv(gym.Env):
         """Which slope this slope episode gets: a coin over SLOPE_HAZARDS, or (FR_SLOPE_DECK) the next card of a shuffled per-env deck, so each kind gets exactly its share."""
         if not FR_SLOPE_DECK:
             return SLOPE_HAZARDS[int(np.random.randint(len(SLOPE_HAZARDS)))]
-        deck = getattr(self, "_slope_deck", None)
-        if not deck:
-            deck = list(SLOPE_HAZARDS)
-            np.random.shuffle(deck)
-        self._slope_deck = deck
-        return deck.pop()
+        return self._deal("slope", SLOPE_HAZARDS)
+
+    def _deal(self, name, cards):
+        """The next card of this env's shuffled deck `name` (refilled and reshuffled when empty): over every len(cards) draws each card comes up exactly once.
+        The decks are env state carried between episodes, so the episode recorder saves them (self._decks) for exact replays."""
+        decks = self.__dict__.setdefault("_decks", {})
+        d = decks.get(name)
+        if not d:
+            d = list(cards)
+            np.random.shuffle(d)
+        card = d.pop()
+        decks[name] = d
+        return card
+
+    def _mirror_joints(self, values):
+        """Left/right mirror of a per-joint array in URDF order (FL, FR, BR, BL pairs): the same swap as mirror.JOINT_SWAP."""
+        v = np.asarray(values)
+        return v[[2, 3, 0, 1, 6, 7, 4, 5]]
 
     def _fr_report(self, terminated: bool, info: dict) -> None:
         """FRONTIER: the outcome of a finished anchor / focus episode, for the trainer (survived and covered >= LEVEL_PROGRESS_MIN of the commanded distance)."""
@@ -1394,7 +1411,11 @@ class OpenCatGymEnv(gym.Env):
         if (RANDOM_PUSH > 0 and self._dr > 0 and not self._in_recovery
                 and np.random.rand() < RANDOM_PUSH_PROB):
             lin, ang = p.getBaseVelocity(self.robot_id)
-            dv = np.random.uniform(-RANDOM_PUSH, RANDOM_PUSH, 2) * self._dr
+            if BALANCED:                       # an even share of each of 8 directions, magnitude up to RANDOM_PUSH whatever the direction
+                _th = self._deal("nudge", tuple(range(8))) * np.pi / 4 + np.random.uniform(-np.pi / 8, np.pi / 8)
+                dv = np.random.uniform(0.0, RANDOM_PUSH) * np.array([np.cos(_th), np.sin(_th)]) * self._dr
+            else:
+                dv = np.random.uniform(-RANDOM_PUSH, RANDOM_PUSH, 2) * self._dr
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + dv[0], lin[1] + dv[1], lin[2]], ang)
         # Impulse "recovery drill" (Run 7): occasional large kick, random
@@ -1403,7 +1424,7 @@ class OpenCatGymEnv(gym.Env):
         if (IMPULSE_PUSH > 0 and self._dr > 0 and not self._in_recovery
                 and np.random.rand() < IMPULSE_PUSH_PROB):
             lin, ang = p.getBaseVelocity(self.robot_id)
-            theta = np.random.uniform(0, 2 * np.pi)
+            theta = (self._deal("impulse", tuple(range(8))) * np.pi / 4 + np.random.uniform(-np.pi / 8, np.pi / 8)) if BALANCED else np.random.uniform(0, 2 * np.pi)
             mag = IMPULSE_PUSH * self._dr * (self._push_curr if ADAPTIVE_PUSH else 1.0)
             p.resetBaseVelocity(self.robot_id,
                                 [lin[0] + mag * np.cos(theta),
@@ -2216,6 +2237,8 @@ class OpenCatGymEnv(gym.Env):
                                       self._cliff_obs()) + ((self._priv_obs(paw_contact),) if PRIV_OBS else ()))
         if (terminated or truncated) and self._fz is not None:
             self._fr_report(terminated, info)          # FRONTIER: the episode's outcome for the trainer
+        if getattr(self, "_live_f", None) is not None:
+            self._live_frame(reward, terminated, truncated)
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {
@@ -2404,6 +2427,7 @@ class OpenCatGymEnv(gym.Env):
                 self._x_scale = HAZARD_X_SCALE if HAZARD_X_SCALE > 0 else HAZARD_EP_LEN / EPISODE_LENGTH
         self._begin_long_run()
         p.resetSimulation()
+        self._hf_info = None
         # Disable rendering during loading.
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
         p.setGravity(0,0,-9.81)
@@ -2549,6 +2573,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
+            self._hf_info = {"scale": [0.021, 0.021, 1.0], "n": _n, "data": _h}        # the live viewer rebuilds the field from these
             p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])
             p.resetBasePositionAndOrientation(plane_id, [1.6, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _rough:
@@ -2564,6 +2589,7 @@ class OpenCatGymEnv(gym.Env):
                 heightfieldData=_h.flatten().astype(np.float64).tolist(),
                 numHeightfieldRows=_n, numHeightfieldColumns=_n)
             plane_id = p.createMultiBody(0, _hf)
+            self._hf_info = {"scale": [0.06, 0.06, 1.0], "n": _n, "data": _h}
             p.changeVisualShape(plane_id, -1, rgbaColor=[0.55, 0.55, 0.58, 1])
             p.resetBasePositionAndOrientation(plane_id, [1.4, 0, 0], [0, 0, 0, 1])  # identity: no grade on heightfields (see slope-collapse fix above)
         elif _surface_transition:
@@ -2717,6 +2743,8 @@ class OpenCatGymEnv(gym.Env):
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
+            if BALANCED:                       # the payload sits off-centre to the left as often as to the right
+                pj[1] = abs(pj[1]) * self._deal("payload_y", (-1.0, 1.0))
             off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
             self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF,
                 [start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
@@ -2756,6 +2784,8 @@ class OpenCatGymEnv(gym.Env):
             _torque_trigger = 1.0                                          # CATEGORY_FORCE: a probe of the fault category always has the overheat cutback
         if TORQUE_CUTBACK > 0 and self._d_fault > 0 and np.random.rand() < _torque_trigger:
             k = np.random.choice(8, np.random.randint(1, 4), replace=False)
+            if BALANCED and self._deal("cutback_mirror", (False, True)):     # every overheated-servo set comes up as often as its mirror image
+                k = np.array([[2, 3, 0, 1, 6, 7, 4, 5][j] for j in k])
             self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._d_fault, 1.0, len(k))
 
         # sim-to-real transfer knobs (default 0 -> inert)
@@ -2764,6 +2794,8 @@ class OpenCatGymEnv(gym.Env):
         if JOINT_OFFSET_DEG > 0 and self._dr > 0:
             self._joint_offset = (np.random.uniform(-JOINT_OFFSET_DEG, JOINT_OFFSET_DEG, 8)
                                   * np.deg2rad(1.0) * self._dr)
+            if BALANCED and self._deal("offset_mirror", (False, True)):
+                self._joint_offset = self._mirror_joints(self._joint_offset)
         self._motor_max = None
         self._drift_torque = 0.0
         if DRIFT_TORQUE > 0 and self._d_fault > 0 and np.random.rand() < DRIFT_PROB:
@@ -2808,6 +2840,8 @@ class OpenCatGymEnv(gym.Env):
         if IMU_BIAS_DEG > 0 and self._dr > 0:
             self._imu_bias_euler = (np.random.uniform(-IMU_BIAS_DEG, IMU_BIAS_DEG, 2)
                                     * np.deg2rad(1.0) * self._dr)
+            if BALANCED:                       # roll bias: each side as often as the other
+                self._imu_bias_euler[0] = abs(self._imu_bias_euler[0]) * self._deal("imu_roll", (-1.0, 1.0))
         
         # Initialize urdf links and joints.
         self.joint_id = []
@@ -2916,6 +2950,8 @@ class OpenCatGymEnv(gym.Env):
             }
         self._index_hazards()
         self._recolor_scene()
+        if getattr(self, "_live_tag", None):
+            self._live_begin()
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
         info = {}
         return np.array(self.observation).astype(np.float32), info
@@ -2965,6 +3001,89 @@ class OpenCatGymEnv(gym.Env):
             self._ledge_passed = True
             r += FAC_CROSS
         return r
+
+    # ---------------------------------------------------------------------------------------------------- live view (watch_live.py, `g2watchrun`)
+    # One training env (train.py marks env 0 with set_live_slot) streams what it is ACTUALLY simulating while a viewer is open: the scene of each episode at its reset
+    # (every body's shape and pose, heightfield data, the hazards) and every LIVE_EVERY steps the robot's base pose, its joint angles and any moving body. The viewer
+    # draws exactly that, no physics of its own. Nothing is written unless trained/live/request was touched in the last LIVE_STALE_S seconds, so a run nobody watches
+    # pays nothing.
+    LIVE_EVERY = 2
+    LIVE_STALE_S = 30.0
+
+    def set_live_slot(self, tag) -> None:
+        self._live_tag = str(tag) if tag else None
+        self._live_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "trained", "live")
+        self._live_ep = 0
+        self._live_f = None
+
+    def _live_begin(self) -> None:
+        import json
+        import time
+        if getattr(self, "_live_f", None) is not None:
+            try:
+                self._live_f.close()
+            except OSError:
+                pass
+            self._live_f = None
+        req = os.path.join(self._live_dir, "request")
+        try:
+            if time.time() - os.path.getmtime(req) > self.LIVE_STALE_S:
+                return
+        except OSError:
+            return
+        try:
+            self._live_ep += 1
+            bodies = []
+            for _i in range(p.getNumBodies()):
+                bid = p.getBodyUniqueId(_i)
+                if bid == self.robot_id:
+                    continue
+                pos, orn = p.getBasePositionAndOrientation(bid)
+                mass = p.getDynamicsInfo(bid, -1)[0]
+                shapes = []
+                if bid == getattr(self, "_plane_id", None) and self._hf_info is not None:
+                    hf = self._hf_info
+                    shapes.append({"type": "heightfield", "scale": hf["scale"], "n": hf["n"], "data": np.round(hf["data"], 5).flatten().tolist()})
+                else:
+                    for sd in p.getCollisionShapeData(bid, -1):
+                        shapes.append({"type": int(sd[2]), "dims": [float(x) for x in sd[3]], "file": (sd[4].decode() if isinstance(sd[4], bytes) else str(sd[4])),
+                                       "lpos": [float(x) for x in sd[5]], "lorn": [float(x) for x in sd[6]]})
+                bodies.append({"id": int(bid), "mass": float(mass), "pos": list(pos), "orn": list(orn), "shapes": shapes,
+                               "ground": bid == getattr(self, "_plane_id", None)})
+            frames = f"frames_{os.getpid()}_{self._live_ep}.jsonl"
+            scene = {"tag": self._live_tag, "ep": f"{os.getpid()}_{self._live_ep}", "frames": frames, "t": time.time(), "role": getattr(self, "_fr_role", None),
+                     "hazards": {k: round(float(v), 4) for k, v in (self._fz or {}).items()}, "slope_deg": [round(float(np.degrees(x)), 2) for x in self._slope_rp],
+                     "ledge_mm": round(self._ledge_h * 1000 * (self._ledge_dir or 1), 1), "steps": int(self._step_budget), "cmd_fwd": round(float(self._cmd_fwd), 3),
+                     "joint_ids": [int(j) for j in self.joint_id], "bodies": bodies}
+            os.makedirs(self._live_dir, exist_ok=True)
+            for old in os.listdir(self._live_dir):              # the previous episode's frames
+                if old.startswith(f"frames_{os.getpid()}_") and old != frames:
+                    os.remove(os.path.join(self._live_dir, old))
+            self._live_f = open(os.path.join(self._live_dir, frames), "w")
+            tmp = os.path.join(self._live_dir, f".scene_{os.getpid()}.json")
+            json.dump(scene, open(tmp, "w"))
+            os.replace(tmp, os.path.join(self._live_dir, "scene.json"))
+        except Exception:  # noqa: BLE001 -- the live view must never break training
+            self._live_f = None
+
+    def _live_frame(self, reward, terminated, truncated) -> None:
+        import json
+        if self.step_counter % self.LIVE_EVERY != 0 and not (terminated or truncated):
+            return
+        try:
+            pos, orn = p.getBasePositionAndOrientation(self.robot_id)
+            js = [float(s[0]) for s in p.getJointStates(self.robot_id, self.joint_id)]
+            mv = {}
+            for _a in ("_payload_id", "_head_id", "_rear_id"):
+                bid = getattr(self, _a, None)
+                if bid is not None:
+                    bp, bo = p.getBasePositionAndOrientation(bid)
+                    mv[int(bid)] = [round(v, 5) for v in list(bp) + list(bo)]
+            self._live_f.write(json.dumps({"k": int(self.step_counter), "b": [round(v, 5) for v in list(pos) + list(orn)], "j": [round(v, 4) for v in js], "m": mv,
+                                           "r": round(float(reward), 3), "end": ("fell" if terminated else "time") if (terminated or truncated) else None}) + "\n")
+            self._live_f.flush()
+        except Exception:  # noqa: BLE001
+            self._live_f = None
 
     def _recolor_scene(self):
         """PERMANENT black-floor fix: after reset() builds every body, give each
