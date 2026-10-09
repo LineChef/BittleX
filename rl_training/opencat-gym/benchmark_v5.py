@@ -128,6 +128,9 @@ def run_ladder(policy, levers=(), episodes=40, seed=5000, jobs=8, hazards=None, 
     """The size ladder for one policy; returns {"cells": [...], "summary": ladder_summary(...)}."""
     env = {k: str(v) for k, v in g2_profile.scoring_env(*levers).items()}
     env["G2E_FR_SPLIT_SIDE"] = "1"                     # the forced side-hill names (no effect on anything else)
+    for k in ("G2E_SKILL_REF", "G2E_V5_LEDGE_TOP"):                   # a base gait other than wkF (the gait probes) must reach the ladder workers too
+        if os.environ.get(k):
+            env[k] = os.environ[k]
     cells = ladder_cells(hazards)
     buckets = [cells[i::max(1, jobs)] for i in range(max(1, min(jobs, len(cells))))]
     jl = [dict(policy=policy, env=env, cells=b, episodes=episodes, seed=seed) for b in buckets]
