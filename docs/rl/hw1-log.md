@@ -623,3 +623,14 @@ clean apples-to-apples benchmark.
 `residual scale: 30 deg` and `ALL OK`; set `DEFAULT_POLICY` in
 `pi_pipeline/gait/residual_policy.py`; rsync the `.onnx` and `.onnx.json`
 together (bring-up step 12a, `guides/pi-bring-up.md` §7).
+
+
+## V4 (2026-10-09): Candidate A promoted for hardware testing
+
+The overnight training (decisions and numbers: [`../plan-detail/decisions-log-2026-10-08.md`](../plan-detail/decisions-log-2026-10-08.md), summary in [`../plan-detail/handoff-2026-10-08.md`](../plan-detail/handoff-2026-10-08.md) section 13) produced two exported candidates comparable to V3. On the user's instruction (2026-10-09) **Candidate A became V4 and the default walking policy** and was deployed to the Pi for hardware testing.
+
+- Source: a chain of continuations. Stage 1 (`v4_s1`, fresh 5M, short hazard episodes) -> stage 2 (`v4_s2`, long hazard episodes, stopped at 5.4M; its 3M checkpoint) -> cool-down (`v4_c1`, 3M at learning rate 3e-5; its 2.0M checkpoint) -> `v4_c2` (slope floor, learning rate 5e-5; **its 1.0M checkpoint, `trained/checkpoints/v4_c2_1000000_steps`**). All with mirror loss 2.0 and the working curriculum gates (0.25 / 0.12).
+- Export: `export_onnx.py --model trained/checkpoints/v4_c2_1000000_steps --out trained/Release_CandidateV4_ppo.onnx --residual-scale-deg 30 --cmd-send-every-n 3` (568 KB, 278 inputs; the privileged critic inputs are masked for the actor and the export takes only the 278). The exported file matched the trained policy to 2e-7 over 600 simulated steps. Byte-identical to the earlier candidate export.
+- Final exam against V3 (29 cells, 100 paired episodes): 1 cell better (T8.1, brutal shoves), 2 worse (T2.2 uphill 12 deg 0.10 vs 0.00, T7.2 snags 0.07 vs 0.00), 26 the same; mean falls 0.112 vs 0.111; cross-slope 10 deg 0.26 vs 0.29; calm walk speed 0.096 vs 0.086 m/s, asymmetry 0.5 deg, drift 2 deg, mirror gap 0.029 vs 0.040.
+- Fallbacks on the Pi: V3 and V2.1 files stay in `rl_training/opencat-gym/trained/`. Rollback: set `DEFAULT_POLICY` back and run `tools/g2_deploy_when_online.sh --once`.
+- Candidate B (cool-down 2.2M, `trained/V4cand_B_c1_2p2M_ppo.onnx`) is not deployed.
