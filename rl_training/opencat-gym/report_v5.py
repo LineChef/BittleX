@@ -129,14 +129,20 @@ def build(P, S, frontier=None, title="G2 Gait V5 vs Scripted", console=None, pol
         side_txt = (f"Left side down: falls {gl['mean_falls']:.0%} over the ladder, passes up to {fmt_size(gl['largest_passed'], 'deg', 1)}; right side down: "
                     f"{gr['mean_falls']:.0%}, up to {fmt_size(gr['largest_passed'], 'deg', 1)}. At 8 deg (3.1 s): left {s8[0] if s8[0] is None else f'{s8[0]:.0%}'}, "
                     f"right {s8[1] if s8[1] is None else f'{s8[1]:.0%}'}. " + ("Even." if side_ok else "Not even."))
-    crit.append(("Side-hills even in both directions (for information, not scored)", side_ok, side_txt))
+    crit.append(("Secondary: side-hills even in both directions", side_ok, side_txt))
     n1p, n1s = Pc.get("N1"), Sc.get("N1")
     if n1p and n1s:
         ok = (n1p["roll_std_deg"] <= 1.1 * n1s["roll_std_deg"] and n1p["heading_abs_mean_deg"] <= n1s["heading_abs_mean_deg"] + 3.0)
         crit.append(("Calm walk at least as smooth and straight as scripted", ok,
                      f"12.5 s calm walk: roll sway {n1p['roll_std_deg']:.1f} deg vs scripted {n1s['roll_std_deg']:.1f}; heading change {n1p['heading_abs_mean_deg']:.0f} deg vs "
                      f"{n1s['heading_abs_mean_deg']:.0f}; speed {n1p['path_speed_mps']:.3f} vs {n1s['path_speed_mps']:.3f} m/s."))
-    scored = [c for c in crit if "not scored" not in c[0]]
+    sl = [(k, Pc[k]["fell_fraction"], Sc[k]["fell_fraction"]) for k in SLOPE_IDS if k in Pc and k in Sc]
+    if sl:
+        mp_s, ms_s = sum(x[1] for x in sl) / len(sl), sum(x[2] for x in sl) / len(sl)
+        crit.append(("Secondary: slopes and tilts not far worse than scripted", mp_s - ms_s < SLOPE_LARGE,
+                     f"Across {len(sl)} slope and tilt tests it falls {mp_s:.0%} of the time against scripted's {ms_s:.0%} ({pts(mp_s - ms_s)}); counts against the policy only if "
+                     f"{SLOPE_LARGE * 100:.0f} points or more worse."))
+    scored = [c for c in crit if not c[0].startswith("Secondary")]
     passed = sum(1 for c in scored if c[1])
     headline = (f"{policy_name} meets {passed} of {len(scored)} win criteria against the scripted walk. "
                 f"{sum(r['verdict'] == 'Better' for r in allcmp)} tests significantly better, {sum(r['verdict'] == 'Worse' for r in allcmp)} significantly worse, "
