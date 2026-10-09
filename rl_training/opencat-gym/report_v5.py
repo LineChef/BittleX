@@ -20,6 +20,7 @@ FLAT = ("T1.1", "N1", "N2", "L1")
 NOTICE = 0.05          # a fall-rate change this big is named even when it is not significant
 SLOPE_IDS = ("T2.2", "T3.2", "SL10", "SL8", "SR8")     # slope / tilt tests: not a primary trait (user, 2026-10-09)
 SLOPE_LARGE = 0.30       # a slope / tilt result only counts against the policy when it falls this much more often than scripted
+HEADING_TARGET_DEG = 3.0   # user, 2026-10-09: the calm walk's heading change is judged against 0 deg (straight), not against the scripted walk's biased 17 deg
 SIDE_GAP = 0.10        # side-hill left vs right: at most this fall-rate gap counts as even
 
 
@@ -132,10 +133,10 @@ def build(P, S, frontier=None, title="G2 Gait V5 vs Scripted", console=None, pol
     crit.append(("Secondary: side-hills even in both directions", side_ok, side_txt))
     n1p, n1s = Pc.get("N1"), Sc.get("N1")
     if n1p and n1s:
-        ok = (n1p["roll_std_deg"] <= 1.1 * n1s["roll_std_deg"] and n1p["heading_abs_mean_deg"] <= n1s["heading_abs_mean_deg"] + 3.0)
-        crit.append(("Calm walk at least as smooth and straight as scripted", ok,
-                     f"12.5 s calm walk: roll sway {n1p['roll_std_deg']:.1f} deg vs scripted {n1s['roll_std_deg']:.1f}; heading change {n1p['heading_abs_mean_deg']:.0f} deg vs "
-                     f"{n1s['heading_abs_mean_deg']:.0f}; speed {n1p['path_speed_mps']:.3f} vs {n1s['path_speed_mps']:.3f} m/s."))
+        ok = (n1p["roll_std_deg"] <= 1.1 * n1s["roll_std_deg"] and n1p["heading_abs_mean_deg"] <= HEADING_TARGET_DEG)
+        crit.append((f"Calm walk as smooth as scripted and within {HEADING_TARGET_DEG:.0f} deg of straight", ok,
+                     f"12.5 s calm walk: roll sway {n1p['roll_std_deg']:.1f} deg vs scripted {n1s['roll_std_deg']:.1f}; heading change {n1p['heading_abs_mean_deg']:.1f} deg from straight "
+                     f"(target {HEADING_TARGET_DEG:.0f}; scripted {n1s['heading_abs_mean_deg']:.0f}, which is biased, so it is not the bar); speed {n1p['path_speed_mps']:.3f} vs {n1s['path_speed_mps']:.3f} m/s."))
     sl = [(k, Pc[k]["fell_fraction"], Sc[k]["fell_fraction"]) for k in SLOPE_IDS if k in Pc and k in Sc]
     if sl:
         mp_s, ms_s = sum(x[1] for x in sl) / len(sl), sum(x[2] for x in sl) / len(sl)
