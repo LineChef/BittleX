@@ -96,7 +96,7 @@ def main() -> None:
         if features.gait != "off" and settings.default_gait == "policy":
             from .gait.policy_walker import PolicyWalker
             policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
-                                         on_fall=lambda: fall["fn"] and fall["fn"]())
+                                         on_fall=lambda: fall["fn"] and fall["fn"](), hold_between_legs=True)    # no rest between legs: hold a balanced stand, rest at the end of the session
         saver = None
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env

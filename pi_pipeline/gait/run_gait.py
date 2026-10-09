@@ -815,6 +815,9 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         if getattr(stop_event, "rest", True):
             _send(lk, "d")     # rest, last, then a pause so the board has it before the port closes
             time.sleep(0.5)
+        elif getattr(stop_event, "end_pose", None) == "balance":
+            _send(lk, "kbalance")     # an exploration leg ended with another about to start (2026-10-09, user): hold a balanced stand, not the last stride; the session rests at its end
+            time.sleep(0.8)
         if vision is not None:
             vision.close()
         if logf:

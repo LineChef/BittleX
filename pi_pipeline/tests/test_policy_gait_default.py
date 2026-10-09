@@ -216,3 +216,26 @@ def test_a_walker_stopped_from_its_own_thread_does_not_raise_and_a_resting_g2_is
     assert link.sent == ["d"]
     s.walk(0.9); s.stop()                              # a turn command moved the legs: rest again
     assert link.sent.count("d") == 2
+
+
+def test_exploration_legs_end_in_a_balanced_stand_and_a_stop_with_rest_still_rests():
+    import time
+    from pi_pipeline.gait.policy_walker import PolicyWalker
+    seen = []
+
+    def run(lk, cmd, seconds, hz, fmt, dis, stop_event=None, **kw):
+        seen.append((stop_event.rest, stop_event.end_pose))
+        return "complete"
+
+    def wait(w):
+        for _ in range(100):
+            if not w.busy:
+                break
+            time.sleep(0.01)
+    w = PolicyWalker(object(), run_fn=run, foot_hold=None, hold_between_legs=True)
+    w.walk(1)
+    wait(w)
+    PolicyWalker(object(), run_fn=run, foot_hold=None).walk(1)
+    time.sleep(0.05)
+    assert seen[0] == (False, "balance")                 # an exploration leg: no rest, a balanced stand
+    assert seen[1] == (True, None)                       # every other walk (a voice command, a test) still rests at the end

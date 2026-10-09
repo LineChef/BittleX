@@ -24,10 +24,12 @@ MAX_SECONDS = 120.0           # a walk with no stated length still ends
 
 class _Stop(threading.Event):
     rest = True
+    end_pose = None            # "balance": when the walk ends without a rest, settle into a balanced stand instead of leaving the last stride
 
 
 class PolicyWalker:
-    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env"):
+    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False):
+        self._hold = hold_between_legs          # exploration: a leg that ends by itself leaves G2 in a balanced stand, not lying down (the session rests at its end)
         self._foot_hold = default_foot_hold() if foot_hold == "env" else foot_hold
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
         self._on_battery = on_battery            # called with (level, volts) on a low reading while walking
@@ -78,6 +80,8 @@ class PolicyWalker:
             if self.busy:
                 return True
             self._stop = _Stop()
+            if self._hold:
+                self._stop.rest, self._stop.end_pose = False, "balance"
             secs = min(float(seconds), MAX_SECONDS) if seconds else MAX_SECONDS
             self._thread = threading.Thread(target=self._run, args=(secs,), name="policy-walk", daemon=True)
             self._thread.start()
@@ -90,6 +94,8 @@ class PolicyWalker:
             if t is None or not t.is_alive():
                 return
             self._stop.rest = rest
+            if rest:
+                self._stop.end_pose = None
             self._stop.set()
         if t is not threading.current_thread():     # a fall callback runs ON the walker thread: joining it raised "cannot join current thread" and cut the emergency stop short (2026-10-08)
             t.join(timeout)
