@@ -214,9 +214,14 @@ def main() -> None:
             stt_holder["stt"] = stt
             if hasattr(wake, "hand_over"):
                 stt.audio_source = wake.hand_over
+            def _gait_beep():                                              # a short double beep on the speaker and the buzzer when a gait command switches the gait
+                from .voice import prompt_tones
+                from .link import opencat
+                prompt_tones.play_double()
+                link.send(opencat.beep([(10, 8), (10, 8)]), read_reply=False, settle=0.0)
             listener = ExploreListener(wake, stt, say, rt, lambda: rt._frame_source(),
                                        on_arm=lambda: link.send("gB", read_reply=False, settle=0.0),
-                                       on_stop=stop_flag.set, chime=_wake_chime,
+                                       on_stop=stop_flag.set, chime=_wake_chime, on_gait=_gait_beep,
                                        quiet=narrator.quiet if narrator is not None else None).start()
             log.info("voice commands on: wake word, then arm/disarm roam, stop, resume, \"tell me what you see\", shut down (ends the session)")
 

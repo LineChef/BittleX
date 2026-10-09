@@ -8,6 +8,7 @@ Plain numpy tones in the same family as `wake_chime`; `render_*()` return int16 
 from __future__ import annotations
 
 import logging
+import os
 import threading
 
 import numpy as np
@@ -15,6 +16,13 @@ import numpy as np
 from .star_trek_whistle import DEFAULT_PEAK
 
 log = logging.getLogger("g2.prompt_tones")
+
+def speaker_enabled() -> bool:
+    """Speaker sounds play on the Pi (Linux) by default and never on a dev machine unless `G2_SPEAKER_SOUNDS=1`; `0` silences them everywhere (the tests set it)."""
+    import sys
+    v = os.environ.get("G2_SPEAKER_SOUNDS")
+    return (v == "1") if v is not None else sys.platform.startswith("linux")
+
 
 BELL = (1.0, 0.25, 0.08)            # fundamental and two overtones: a soft bell-like timbre
 
@@ -41,6 +49,12 @@ def render_beep(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
 def render_boop(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """One lower, rounder note that sags (G4 to E4, about 0.2 s): "got it, you've finished"."""
     return _finish([_note(392.0, 0.2, rate, f1=329.6, decay=7.0, overtones=(1.0, 0.12))], peak)
+
+
+def render_double(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A short double beep (two identical C6 notes, about 0.3 s): "I'm switching gait"."""
+    gap = np.zeros(int(rate * 0.07))
+    return _finish([_note(1046.5, 0.08, rate, decay=16.0), gap, _note(1046.5, 0.08, rate, decay=16.0)], peak)
 
 
 def render_close(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
@@ -71,6 +85,8 @@ def render_fanfare(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
 
 
 def _play(pcm_fn, peak: float, rate: int, wait: bool) -> None:
+    if not speaker_enabled():
+        return
     def _run() -> None:
         try:
             import sounddevice as sd
@@ -99,3 +115,7 @@ def play_close(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False
 
 def play_fanfare(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_fanfare, peak, rate, wait)
+
+
+def play_double(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_double, peak, rate, wait)

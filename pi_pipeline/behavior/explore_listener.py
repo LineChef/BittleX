@@ -21,10 +21,11 @@ log = logging.getLogger("g2.behavior.explore_listener")
 
 class ExploreListener:
     def __init__(self, wake, stt, say, rt, frame, *, on_arm=None, on_stop=None, listen_s: float = 8.0, settle_s: float = 1.2,
-                 chime=None, quiet=None):
+                 chime=None, quiet=None, on_gait=None):
         self._wake, self._stt, self._say, self._rt, self._frame = wake, stt, say, rt, frame
         self._on_arm, self._on_stop, self._listen_s = on_arm, on_stop, listen_s
         self._settle_s = settle_s
+        self._on_gait = on_gait                          # callable(): the short double beep when the gait really switched
         self._chime, self._quiet = chime, quiet           # chime(): the wake word was heard; quiet(bool): hush narration while the window is open
         self._done = threading.Event()
 
@@ -85,6 +86,17 @@ class ExploreListener:
         if cmd == "resume":
             self._rt.release()
             return self._reply("Okay.")
+        if cmd == "gait":                                   # the same shared gait state as the voice service, so a switch works during an exploration session too
+            from ..gait import gait_mode
+            from ..gait.residual_policy import default_policy_path
+            gait, said = gait_mode.request(text, default_policy_path())
+            log.info("gait command (exploration): %s", gait or "refused")
+            if gait and self._on_gait:
+                try:
+                    self._on_gait()
+                except Exception:  # noqa: BLE001
+                    log.debug("gait beep failed", exc_info=True)
+            return self._reply(said)
         if cmd == "explore":
             if self._on_arm:
                 self._on_arm()

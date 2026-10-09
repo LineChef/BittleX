@@ -544,6 +544,18 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd == "gait":                                   # "hi step" / "walk normally": works from any mode; the state is shared with an exploration session
+            from ..gait import gait_mode
+            from ..gait.residual_policy import default_policy_path
+            gait, said = gait_mode.request(user_text, default_policy_path())
+            log.info("gait command (voice): %s", gait or "refused")
+            if gait:
+                self._cue.set("gait_switch")             # the short double beep
+            self._cue.set("speaking")
+            self._speak(said)
+            self._set_session()
+            self._cue.set("idle")
+            return
         if cmd == "walk":                                   # "walk for ten seconds": straight to the walk, no Claude call (the same path a Claude walk takes)
             secs = skills.clamp_seconds(parse_walk_command(user_text))
             log.info("walk %.1f s (voice, local)", secs or 0.0)

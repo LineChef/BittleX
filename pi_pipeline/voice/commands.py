@@ -372,7 +372,7 @@ def parse_walk_command(text: str) -> float | None:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"walk"``, ``"explore"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -387,6 +387,9 @@ def match_local_command(text: str) -> str | None:
         return "shutdown"
     if _hit(n, _COME):
         return "come"
+    from ..gait.gait_mode import parse_gait_command
+    if parse_gait_command(text) is not None:
+        return "gait"                                  # "hi step" / "walk normally": before "walk" so "walk normally" is never read as a walk command
     if parse_walk_command(text) is not None:
         return "walk"
     if _hit(n, _RESTART_VOICE):

@@ -203,6 +203,11 @@ class CameraSink:
                 log.exception("camera on_toggle hook failed")
 
 
+def _speaker_fanfare() -> None:
+    from ..voice import prompt_tones
+    prompt_tones.play_fanfare()          # silent unless the speaker sounds are enabled (the Pi by default, never a dev machine or a test)
+
+
 def build_bindings(link, *, dry_run_power: bool | None = None,
                    camera_toggle=None, policy_walker=None, camera_snapshot=None) -> DriverBindings:
     """Wire a `DriverBindings` to the real sinks. `link` is a `SerialLink` /
@@ -218,6 +223,7 @@ def build_bindings(link, *, dry_run_power: bool | None = None,
         head=HeadSink(link),
         power=PowerSink(dry_run=dry_run_power),
         on_diag=_diag_event,
+        fanfare=_speaker_fanfare,
     )
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Literal, Protocol
 
-Stage = Literal["idle", "awake", "listening", "captured", "heard", "thinking", "speaking", "closed"]
+Stage = Literal["idle", "awake", "listening", "captured", "heard", "thinking", "speaking", "closed", "gait_switch"]
 
 log = logging.getLogger("g2.cue")
 
@@ -30,13 +30,14 @@ class LogCue:
 LOW_CUES: dict[str, list[tuple[int, int]]] = {
     "awake": [(10, 4)],                # the wake word was heard: ONE short beep (user, 2026-10-09; used when there is no speaker)
     "captured": [(4, 3)],              # he thinks you have finished speaking and has your words: ONE lower "boop"
-    "closed": [(8, 4), (4, 3)],        # the follow-up window ended, he has stopped listening: two falling notes
+    "closed": [(8, 4), (4, 3)],
+    "gait_switch": [(10, 8), (10, 8)],  # a short double beep: he is switching gait ("hi step" / "walk normally")        # the follow-up window ended, he has stopped listening: two falling notes
     "listening": [(8, 3), (8, 3)],     # two equal beeps: ready, say your command
     "thinking": [(4, 4), (9, 2)],      # a low rising pair: got your words, asking Claude
     "heard": [(4, 3), (8, 3)],         # quick "got it" for a recognised local command
 }
 
-DEFAULT_STAGES = ("awake", "captured", "closed")          # the sound is the wake chime, right after the wake word (2026-10-07); API calls have their own tone (voice/api_tone.py)
+DEFAULT_STAGES = ("awake", "captured", "closed", "gait_switch")          # the sound is the wake chime, right after the wake word (2026-10-07); API calls have their own tone (voice/api_tone.py)
 
 
 class SpeakerCue:
@@ -59,6 +60,7 @@ class SpeakerCue:
             "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.DEFAULT_PEAK)),
             "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.DEFAULT_PEAK)),
             "closed": lambda: prompt_tones.play_close(pk(prompt_tones.DEFAULT_PEAK)),
+            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.DEFAULT_PEAK)),
         }
 
     def set(self, stage: Stage) -> None:

@@ -15,6 +15,12 @@ def _isolate_api_log(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_speaker_sounds(monkeypatch):
+    """Tests never play a sound on the developer's speakers (the exploration fanfare came out of the Mac during a test run, 2026-10-09)."""
+    monkeypatch.setenv("G2_SPEAKER_SOUNDS", "0")
+
+
+@pytest.fixture(autouse=True)
 def _isolate_diag_logs(tmp_path, monkeypatch):
     """Any test that exercises a CLI `main()` (doctor, check_serial, voice, ...)
     may start a real `diag` session -- redirect it to a per-test tmp dir so the
