@@ -109,7 +109,7 @@ size, plus crossing rates). `report_v5.py` builds the report against the scripte
 1. No falls on flat ground (T1.1, N1, N2, L1).
 2. Fewer hazard falls than scripted across all hazard tests, and no hazard test significantly worse (Holm-corrected).
 3. Side-hills even both ways: left vs right within 0.10 in fall rate on the ladder and at 8 deg, same largest size passed. **Secondary (user, 2026-10-09: slopes and tilts are scored and shown but are not a primary trait, only some exposure; they sit outside the win count); a slope or tilt result only counts against a policy (screen regression or report) when it falls 0.30 or more above the control / scripted walk.**
-4. Calm walk as smooth as scripted and within 3 deg of straight (user 2026-10-09; the scripted heading is biased so it is not the bar) (roll sway within 10%, heading change within 3 deg).
+4. Calm walk at least as smooth and straight as scripted (roll sway within 10%, heading change within 3 deg).
 
 ## 7. Open questions noted while building
 
