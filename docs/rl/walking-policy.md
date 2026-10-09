@@ -128,3 +128,8 @@ or jump (a jump is planned as a separate on-command skill,
 though unlike the others, climbing a single ledge is now a **confirmed,
 scheduled** goal (B13) once the body arrives, not a maybe: Phase F's sim
 attempt hit a contact-physics wall, not proof the real robot can't do it.
+
+
+## V4 (2026-10-09)
+
+The newest policy, trained with a hazard curriculum that advances, long hazard episodes, a doubled mirror-symmetry loss, a lower learning rate and a low-rate cool-down. It is a learned residual on the scripted walk like the others, with the same 278 inputs; a training-only critic saw extra true-state values. Against V3 it is about even overall, smoother and faster on flat ground and better on ledges and shoves, and a little weaker on the 10 deg cross-slope and small rubble. Details, numbers and the first-walk plan: [`hw1-log.md`](hw1-log.md) (V4 entry) and [`../plan-detail/handoff-2026-10-08.md`](../plan-detail/handoff-2026-10-08.md) section 13.
