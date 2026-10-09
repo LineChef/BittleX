@@ -46,7 +46,8 @@ say "rsync pi_pipeline/"
 rsync -az --itemize-changes --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache --exclude .env \
       "$ROOT/pi_pipeline/" "$G2_PI:bittleX/pi_pipeline/" 2>&1 | tee -a "$LOG" | tail -n 25
 [ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of pi_pipeline failed"; exit 1; }
-POLICY=$(python3 -c "import sys; sys.path.insert(0, '$ROOT/pi_pipeline/gait'); import residual_policy as r; print(r.DEFAULT_POLICY)")
+POLICY=$(sed -n 's/^DEFAULT_POLICY = "\([^"]*\)".*/\1/p' "$ROOT/pi_pipeline/gait/residual_policy.py" | head -1)     # (not python: the system python3 has no numpy, the import failed, the name came back empty and rsync copied the whole trained/ folder)
+[ -n "$POLICY" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$POLICY" ] || { say "could not read DEFAULT_POLICY, or its file is missing: NOT syncing the policy"; exit 1; }
 say "rsync policy $POLICY"
 rsync -az "$ROOT/rl_training/opencat-gym/trained/$POLICY" "$ROOT/rl_training/opencat-gym/trained/$POLICY.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
 [ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of the policy failed"; exit 1; }
