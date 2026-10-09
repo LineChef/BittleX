@@ -1,0 +1,6 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "v4_c1_2200000_steps",
+ "exported": "2026-10-09"
+}

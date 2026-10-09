@@ -96,3 +96,6 @@ rl_training/opencat-gym/trained/v3_go_*
 rl_training/opencat-gym/trained/v3_roll_matched
 rl_training/opencat-gym/trained/v3_turning_gate_pass
 rl_training/opencat-gym/trained/failed_c0_run*/
+
+# Training-episode recordings: written automatically by every run (G2E_RECORD_EVERY) for local replay with watch_training.py, never committed
+rl_training/opencat-gym/trained/*_episodes/
