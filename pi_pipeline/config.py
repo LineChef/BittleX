@@ -155,7 +155,7 @@ class Settings:
     # waiting for the whole reply. 0 = off (the old whole-reply behaviour, for A/B timing).
     stream_replies: bool = field(default_factory=lambda: _env("G2_STREAM", "1").lower() not in ("0", "false", "off", "no"))
     # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
-    cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "awake"))
+    cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "awake,captured,closed"))
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
     # What acknowledges a command that goes to Claude: short_tone (one short blip through the speaker; default), star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.

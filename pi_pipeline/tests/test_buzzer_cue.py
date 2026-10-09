@@ -23,7 +23,10 @@ def test_by_default_only_the_claude_stage_beeps():
         cue.set(stage)
     assert sent == []                                   # no sound for a local command or while thinking (the API has its own tone)
     cue.set("awake")
-    assert sent == ["b8 3 8 3"]                         # the wake word: the chime
+    assert sent == ["b10 4"]                            # the wake word: one beep
+    cue.set("captured")
+    cue.set("closed")
+    assert sent == ["b10 4", "b4 3", "b8 4 4 3"]        # then the boop (your words are captured) and the falling pair (the follow-up window closed)
 
 
 def test_stages_are_configurable():

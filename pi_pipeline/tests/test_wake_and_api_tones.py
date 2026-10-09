@@ -57,3 +57,18 @@ def test_every_picture_path_clicks(monkeypatch):
     shutter.click()
     assert clicks == [1]
 
+
+
+def test_prompt_tones_are_three_distinct_sounds_and_the_cue_plays_each_on_its_stage():
+    from pi_pipeline.voice import prompt_tones as pt
+    from pi_pipeline.voice.cues import LOW_CUES, SpeakerCue
+    b, o, c = pt.render_beep(), pt.render_boop(), pt.render_close()
+    assert b.dtype == o.dtype == c.dtype and 0.08 < b.size / 48000 < 0.2 and 0.15 < o.size / 48000 < 0.3 and 0.3 < c.size / 48000 < 0.6
+    assert len({b.size, o.size, c.size}) == 3
+    assert set(("awake", "captured", "closed")) <= set(LOW_CUES)
+    assert len({tuple(LOW_CUES[k]) for k in ("awake", "captured", "closed")}) == 3
+    played = []
+    cue = SpeakerCue(player=lambda: played.append("p"), stages=("awake", "captured", "closed"))
+    for st in ("awake", "listening", "captured", "heard", "closed"):
+        cue.set(st)
+    assert played == ["p", "p", "p"]                           # only the three stages sound

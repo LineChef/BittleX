@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Literal, Protocol
 
-Stage = Literal["idle", "awake", "listening", "heard", "thinking", "speaking"]
+Stage = Literal["idle", "awake", "listening", "captured", "heard", "thinking", "speaking", "closed"]
 
 log = logging.getLogger("g2.cue")
 
@@ -28,13 +28,15 @@ class LogCue:
 # "thinking" is the acknowledgement for a command that goes to Claude: a low rising two-note blip. (A bosun's-call style whistle was
 # drafted and dropped for now; see docs/research/buzzer-sounds.md.)
 LOW_CUES: dict[str, list[tuple[int, int]]] = {
-    "awake": [(8, 3), (8, 3)],         # the wake word was heard: the same two beeps as "listening" (used when there is no speaker)
+    "awake": [(10, 4)],                # the wake word was heard: ONE short beep (user, 2026-10-09; used when there is no speaker)
+    "captured": [(4, 3)],              # he thinks you have finished speaking and has your words: ONE lower "boop"
+    "closed": [(8, 4), (4, 3)],        # the follow-up window ended, he has stopped listening: two falling notes
     "listening": [(8, 3), (8, 3)],     # two equal beeps: ready, say your command
     "thinking": [(4, 4), (9, 2)],      # a low rising pair: got your words, asking Claude
     "heard": [(4, 3), (8, 3)],         # quick "got it" for a recognised local command
 }
 
-DEFAULT_STAGES = ("awake",)          # the sound is the wake chime, right after the wake word (2026-10-07); API calls have their own tone (voice/api_tone.py)
+DEFAULT_STAGES = ("awake", "captured", "closed")          # the sound is the wake chime, right after the wake word (2026-10-07); API calls have their own tone (voice/api_tone.py)
 
 
 class SpeakerCue:
@@ -50,13 +52,19 @@ class SpeakerCue:
         self._inner = inner or LogCue()
         self._stages = set(stages)
         self._play = player or (lambda: module.play(peak if peak is not None else module.DEFAULT_PEAK))
-        # the "awake" stage (right after the wake word) always has its own chime, whatever `tone` the other stages use
-        self._play_awake = player or (lambda: wake_chime.play(peak if peak is not None else wake_chime.DEFAULT_PEAK))
+        # the three exchange stages each have their own sound whatever `tone` the others use (user, 2026-10-09): beep = listening, boop = your words are captured, close = he stopped listening
+        from . import prompt_tones
+        pk = lambda default: peak if peak is not None else default                     # noqa: E731
+        self._stage_play = {} if player else {
+            "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.DEFAULT_PEAK)),
+            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.DEFAULT_PEAK)),
+            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.DEFAULT_PEAK)),
+        }
 
     def set(self, stage: Stage) -> None:
         self._inner.set(stage)
         if stage in self._stages:
-            (self._play_awake if stage == "awake" else self._play)()
+            self._stage_play.get(stage, self._play)()
 
 
 def chunk_notes(notes: list[tuple[int, int]], max_chars: int = 60) -> list[list[tuple[int, int]]]:

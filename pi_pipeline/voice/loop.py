@@ -430,8 +430,10 @@ class VoiceLoop:
         if not user_text:
             if self._in_session:
                 log.info("%s elapsed -- wake word needed again", "conversation window" if self._conversing else "follow-up window")
+                self._cue.set("closed")          # the window ended: he has stopped listening
             self._end_session()
             return
+        self._cue.set("captured")                # he thinks you have finished speaking and has your words
 
         if user_text.lower() in _QUIT:
             raise KeyboardInterrupt
