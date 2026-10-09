@@ -148,8 +148,13 @@ def combine(results):
 
 
 # ------------------------------------------------------------------------------------------------ the decision rules (docs/plan-detail/v5-training-plan.md section 5)
+SLOPE_CELLS = ("T2.2", "T3.2", "SL10", "SL8", "SR8")          # slope / tilt tests
+SLOPE_HAZARDS = ("sidehill_l", "sidehill_r", "climb", "descent")
+SLOPE_LARGE = 0.30       # user, 2026-10-09: slopes and tilts are not a primary trait (only some exposure); stop for them only on a LARGE regression
+
+
 def regressions(a, ctrl):
-    """What a lever may not do, whatever its target: fall on flat ground, slow the calm walk, or make a hazard clearly worse."""
+    """What a lever may not do, whatever its target: fall on flat ground, slow the calm walk, or make a hazard clearly worse (slopes and tilts only if LARGELY worse)."""
     ca, cc = cm(a), cm(ctrl)
     why = []
     for c in ("T1.1", "N1"):
@@ -160,10 +165,10 @@ def regressions(a, ctrl):
         why.append(f"N1 speed {ca['N1']['path_speed_mps']:.3f} < 95% of the control's {cc['N1']['path_speed_mps']:.3f}")
     sa, sc = a["size_ladder"]["summary"], ctrl["size_ladder"]["summary"]
     for h in sa:
-        if h in sc and sa[h]["mean_falls"] > sc[h]["mean_falls"] + 0.10:
+        if h in sc and sa[h]["mean_falls"] > sc[h]["mean_falls"] + (SLOPE_LARGE if h in SLOPE_HAZARDS else 0.10):
             why.append(f"{h} ladder falls {sa[h]['mean_falls']:.2f} vs {sc[h]['mean_falls']:.2f}")
-    for c in ("T2.2", "T3.2", "SL10", "SL8", "SR8", "T6.1", "T7.1", "T7.2", "T8.1", "T9.1", "T11.1", "LU15", "LD15", "LU25", "LD25"):
-        if c in ca and c in cc and ca[c]["fell_fraction"] > cc[c]["fell_fraction"] + 0.15:
+    for c in SLOPE_CELLS + ("T6.1", "T7.1", "T7.2", "T8.1", "T9.1", "T11.1", "LU15", "LD15", "LU25", "LD25"):
+        if c in ca and c in cc and ca[c]["fell_fraction"] > cc[c]["fell_fraction"] + (SLOPE_LARGE if c in SLOPE_CELLS else 0.15):
             why.append(f"{c} falls {ca[c]['fell_fraction']:.2f} vs {cc[c]['fell_fraction']:.2f}")
     return why
 

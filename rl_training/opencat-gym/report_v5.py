@@ -18,6 +18,8 @@ from paired_compare import mcnemar  # noqa: E402
 
 FLAT = ("T1.1", "N1", "N2", "L1")
 NOTICE = 0.05          # a fall-rate change this big is named even when it is not significant
+SLOPE_IDS = ("T2.2", "T3.2", "SL10", "SL8", "SR8")     # slope / tilt tests: not a primary trait (user, 2026-10-09)
+SLOPE_LARGE = 0.30       # a slope / tilt result only counts against the policy when it falls this much more often than scripted
 SIDE_GAP = 0.10        # side-hill left vs right: at most this fall-rate gap counts as even
 
 
@@ -112,7 +114,7 @@ def build(P, S, frontier=None, title="G2 Gait V5 vs Scripted", console=None, pol
                  "It fell on flat ground: " + ", ".join(f"{c} {v:.0%}" for c, v in flat_falls.items() if v > 0) + "."))
     haz = [r for r in allcmp if r["id"] not in FLAT and not r["id"].startswith("N") and r["id"] != "Z0"]
     mp, ms = (sum(r["p"]["fell_fraction"] for r in haz) / max(1, len(haz)), sum(r["s"]["fell_fraction"] for r in haz) / max(1, len(haz)))
-    worse_sig = [r for r in haz if r["verdict"] == "Worse"]
+    worse_sig = [r for r in haz if r["verdict"] == "Worse" and not (r["id"] in SLOPE_IDS and r["p"]["fell_fraction"] - r["s"]["fell_fraction"] < SLOPE_LARGE)]
     ok = mp < ms and not worse_sig
     crit.append(("Fewer hazard falls than scripted, no hazard significantly worse", ok,
                  f"Across {len(haz)} hazard tests it falls {mp:.0%} of the time against scripted's {ms:.0%} ({pts(mp - ms)})" +
@@ -127,15 +129,16 @@ def build(P, S, frontier=None, title="G2 Gait V5 vs Scripted", console=None, pol
         side_txt = (f"Left side down: falls {gl['mean_falls']:.0%} over the ladder, passes up to {fmt_size(gl['largest_passed'], 'deg', 1)}; right side down: "
                     f"{gr['mean_falls']:.0%}, up to {fmt_size(gr['largest_passed'], 'deg', 1)}. At 8 deg (3.1 s): left {s8[0] if s8[0] is None else f'{s8[0]:.0%}'}, "
                     f"right {s8[1] if s8[1] is None else f'{s8[1]:.0%}'}. " + ("Even." if side_ok else "Not even."))
-    crit.append(("Side-hills even in both directions", side_ok, side_txt))
+    crit.append(("Side-hills even in both directions (for information, not scored)", side_ok, side_txt))
     n1p, n1s = Pc.get("N1"), Sc.get("N1")
     if n1p and n1s:
         ok = (n1p["roll_std_deg"] <= 1.1 * n1s["roll_std_deg"] and n1p["heading_abs_mean_deg"] <= n1s["heading_abs_mean_deg"] + 3.0)
         crit.append(("Calm walk at least as smooth and straight as scripted", ok,
                      f"12.5 s calm walk: roll sway {n1p['roll_std_deg']:.1f} deg vs scripted {n1s['roll_std_deg']:.1f}; heading change {n1p['heading_abs_mean_deg']:.0f} deg vs "
                      f"{n1s['heading_abs_mean_deg']:.0f}; speed {n1p['path_speed_mps']:.3f} vs {n1s['path_speed_mps']:.3f} m/s."))
-    passed = sum(1 for c in crit if c[1])
-    headline = (f"{policy_name} meets {passed} of {len(crit)} win criteria against the scripted walk. "
+    scored = [c for c in crit if "not scored" not in c[0]]
+    passed = sum(1 for c in scored if c[1])
+    headline = (f"{policy_name} meets {passed} of {len(scored)} win criteria against the scripted walk. "
                 f"{sum(r['verdict'] == 'Better' for r in allcmp)} tests significantly better, {sum(r['verdict'] == 'Worse' for r in allcmp)} significantly worse, "
                 f"{sum(r['verdict'] in ('Slightly better', 'Slightly worse') for r in allcmp)} changed a little, {sum(r['verdict'] == 'Same' for r in allcmp)} the same.")
 
