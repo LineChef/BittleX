@@ -234,6 +234,8 @@ class FrontierCurriculum(BaseCallback):
       weights: 15% retention over 0..F-2, 20% on F-1, 35% on F, 20% on F+1, 10% on F+2; a bin past F with a full window and relative success < BLOCK is blocked:
       2% floor and nothing past it (the automatic ceiling)."""
     WINDOW, MIN_N, PASS, BLOCK, FLOOR = 300, 30, 0.5, 0.05, 0.02
+    # V5 (2026-10-09): a bin passes at G2E_FR_PASS of the hazard-free success (0.7: the frontier sits where G2 succeeds most of the time, not half of it)
+    PASS = float(os.environ.get("G2E_FR_PASS", "") or PASS)
 
     def __init__(self, tag, ramp_offset=0.0, log_every=196608):
         super().__init__()
@@ -596,10 +598,11 @@ if __name__ == "__main__":
         model.learn(args.steps, callback=checkpoint_callback,
                     reset_num_timesteps=True)
     else:
+        _tkl = os.environ.get("G2E_TARGET_KL", "")                     # V5 lever kl_limit: PPO's early stop on the update size, through the whole fresh run
         model = PPOCls(policy_cls, env, seed=int(os.environ.get("G2E_SEED", "42")),
                     policy_kwargs=custom_arch,
                     n_steps=n_steps, batch_size=ppo_batch, n_epochs=ppo_epochs,
-                    learning_rate=lr_schedule,
+                    learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None),
                     verbose=1,
                     tensorboard_log=None)
         if args.mirror_loss > 0:

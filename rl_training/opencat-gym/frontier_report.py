@@ -15,7 +15,7 @@ def report(tag):
     print(f"{tag}: {s['steps']:,} steps; anchor (hazard-free) success {s['anchor']:.2f}")
     for h, F in s["F"].items():
         bound = s["bound"][h]
-        unit = "deg" if h in ("sidehill", "climb", "descent") else ("cm" if h.startswith("ledge") else "x level-1 size")
+        unit = "deg" if h in ("sidehill", "sidehill_l", "sidehill_r", "climb", "descent") else ("cm" if h.startswith("ledge") else "x level-1 size")
         k = 100.0 if unit == "cm" else 1.0
         cells = []
         for b, (succ, n) in enumerate(s["bins"][h]):

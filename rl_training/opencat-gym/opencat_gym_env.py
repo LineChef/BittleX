@@ -936,22 +936,57 @@ IMITATION_ACTUAL = _g2e("IMITATION_ACTUAL", False)
 # PRIV_OBS: PRIV_DIM privileged values appended to the observation for the CRITIC only (train.py zeroes them for the actor; export feeds zeros): the true orientation,
 #   rates, body velocity and height, foot contacts, and the episode's hazards. The policy's own inputs are unchanged, so nothing changes on the Pi.
 PRIV_OBS = _g2e("PRIV_OBS", False)
-PRIV_DIM = 22
+# PRIV_YAW (2026-10-09, lever heading_blind): two more critic-only values, sin / cos of the heading error, so the critic can predict the heading penalty the blind actor is scored on.
+PRIV_YAW = _g2e("PRIV_YAW", False)
+PRIV_DIM = 24 if PRIV_YAW else 22
+# HEADING_BLIND (2026-10-09, user: "leave steering out of the policy"): the policy sees no yaw at all (the quaternion it gets is yaw-free, the Pi sends yaw 0 for a policy whose
+#   sidecar says heading_blind). It cannot steer, so the heading penalty can only shape a base walk with no built-in turn; steering is the Pi's front-foot hold.
+HEADING_BLIND = _g2e("HEADING_BLIND", False)
 # FRONTIER: the per-hazard frontier curriculum (replaces the category levels, the probe and the static caps for training episodes; see FrontierPlan below).
 FRONTIER = _g2e("FRONTIER", False)
 # The hazards the frontier curriculum ranks, each with its own ladder of FR_BINS size bins from 0 to a PHYSICAL bound nothing ever exceeds (sim geometry, 2026-10-08:
 # static tip-over 24 deg side-hill / 37 deg climb-descent, slip 35 deg at friction 0.7, paw reach 57-61 mm with the +-30 deg residual). Sizes are degrees for the slopes,
 # metres for the ledges, and a severity multiplier of the course's own per-level sizes for the terrain hazards and the overheat cutback.
-FR_HAZARDS = ("sidehill", "climb", "descent", "ledge_up", "ledge_down", "rubble", "boxes", "rough", "snag", "cutback")
-FR_BOUND = {"sidehill": 22.0, "climb": 30.0, "descent": 30.0, "ledge_up": 0.055, "ledge_down": 0.06,
+# FR_SPLIT_SIDE (2026-10-09, V5 course): the side-hill is two hazards, left side down and right side down, each with its own frontier, so the curriculum cannot advance on one
+#   side's success while the other fails (V4: 10 deg side-hill falls 0.26 right side down, 0.49 left side down).
+FR_SPLIT_SIDE = _g2e("FR_SPLIT_SIDE", False)
+_SIDES = ("sidehill_l", "sidehill_r") if FR_SPLIT_SIDE else ("sidehill",)
+SLOPE_HAZARDS = _SIDES + ("climb", "descent")
+FR_HAZARDS = SLOPE_HAZARDS + ("ledge_up", "ledge_down", "rubble", "boxes", "rough", "snag", "cutback")
+FR_BOUND = {"sidehill": 22.0, "sidehill_l": 22.0, "sidehill_r": 22.0, "climb": 30.0, "descent": 30.0, "ledge_up": 0.055, "ledge_down": 0.06,
             "rubble": 2.0, "boxes": 2.0, "rough": 2.0, "snag": 2.0, "cutback": 2.0}
+# FR_BOUNDS "h:v,...": the top of a hazard's ladder (V5 course, user 2026-10-09: climbs and descents 10 deg, side-hills 8 deg, step-ups 35 mm, step-downs 40 mm). The 12 bins
+#   span 0..bound, so a bin's size is what the episode really gets (V4's static caps clipped the frontier's draws silently: its "10 deg" side-hills were 8 deg).
+for _part in filter(None, os.environ.get("G2E_FR_BOUNDS", "").split(",")):
+    _k, _, _v = _part.partition(":")
+    if _k.strip() in FR_BOUND and _v.strip():
+        FR_BOUND[_k.strip()] = float(_v)
+# FR_IGNORE_CAPS: the static G2E_CAP_* caps (pre-frontier course) do not touch frontier episodes; FR_BOUNDS is the cap.
+FR_IGNORE_CAPS = _g2e("FR_IGNORE_CAPS", False)
 FR_BINS = 12
 # Share of ALL training episodes each hazard appears in (the user's shares, 2026-10-08; cutback keeps its old ~36%). Converted to per-episode chances after the anchors
-# and the exclusions (a rough floor carries no slope and no ledge) in FrontierPlan.
-FR_SHARE = {"rubble": 0.50, "boxes": 0.30, "slope": 0.20, "rough": 0.20, "snag": 0.20, "ledge": 0.20, "cutback": 0.36}
+# and the exclusions (a rough floor carries no slope and no ledge) in FrontierPlan. V5 (user, 2026-10-09): slopes and tilts in no more than 10% of episodes (G2E_FR_SLOPE_SHARE).
+FR_SHARE = {"rubble": 0.50, "boxes": 0.30, "slope": _g2e("FR_SLOPE_SHARE", 0.20), "rough": 0.20, "snag": 0.20, "ledge": 0.20, "cutback": 0.36}
 FR_ANCHOR = 0.10          # hazard-free episodes: the success baseline every bin is judged against
-FR_COMBO = 0.25           # of the other episodes: every present hazard at frontier sizes, not counted
-FR_BACKGROUND_TILT_DEG = 2.0   # episodes without a slope hazard keep a small random tilt (the old background slope), never on anchors
+FR_COMBO = _g2e("FR_COMBO", 0.25)          # of the other episodes: every present hazard at frontier sizes, not counted (V5: 0.15)
+FR_BACKGROUND_TILT_DEG = _g2e("FR_BACKGROUND_TILT_DEG", 2.0)   # episodes without a slope hazard keep a small random tilt (the old background slope), never on anchors (V5: 0, user)
+# FR_SLOPE_DECK: the slope kind (each side-hill side, climb, descent) is dealt from a shuffled deck per environment instead of a coin, so every kind gets exactly its share.
+FR_SLOPE_DECK = _g2e("FR_SLOPE_DECK", False)
+# FR_MAX_HAZARDS > 0: at most this many hazards in one episode (the overheat cutback counts). V5: 2 (V4 averaged 2.2 and a third of its hazard episodes ended in a fall).
+FR_MAX_HAZARDS = _g2e("FR_MAX_HAZARDS", 0)
+# FR_ANCHOR_LONG: hazard-free comparison episodes run HAZARD_EP_LEN steps too, so a hazard and the hazard-free baseline are judged over the same time.
+FR_ANCHOR_LONG = _g2e("FR_ANCHOR_LONG", False)
+# FAC_CROSS (V5 crossing bonus, user 2026-10-09): a one-time reward for getting the whole body past the obstacle field (split evenly over its pieces) and past a ledge's
+#   edge, each worth FAC_CROSS. Positions come from the sim (reward only, nothing the policy sees). 0 = off.
+FAC_CROSS = _g2e("FAC_CROSS", 0.0)
+CROSS_CLEAR_M = 0.10       # the base must be this far past an object's far edge (about half the body: the hind feet are over it)
+# Hazard-aware relaxation (V5 screens): while G2 is on a hazard (touched an obstacle or ledge in the last HAZ_HOLD_STEPS steps, stands on a slope of HAZ_SLOPE_DEG or more,
+#   or is at a ledge edge), HAZ_SPEED_RELAX scales the speed-tracking penalty (0 = off on a hazard) and HAZ_POSTURE_RELAX scales the imitation sharpness and the residual cost
+#   (0.5 = holding a non-scripted posture costs half). 1.0 = unchanged.
+HAZ_SPEED_RELAX = _g2e("HAZ_SPEED_RELAX", 1.0)
+HAZ_POSTURE_RELAX = _g2e("HAZ_POSTURE_RELAX", 1.0)
+HAZ_HOLD_STEPS = 40
+HAZ_SLOPE_DEG = 4.0
 
 
 def frontier_default_weights():
@@ -1034,9 +1069,16 @@ OBS_SWING_NOMINAL = _g2e("OBS_SWING_NOMINAL", 0.018) # m; swing-foot height trea
 # shove sizes, slope range, overheat cutback, obstacle / rubble height caps. Nominal-walk knobs are deliberately NOT scaled (earlier rounds showed that
 # a harder nominal makes the policy over-cautious). The benchmark scores both the original ladder and a +10% ladder (benchmark_decathlon.py --hard-scale).
 HARD_SCALE = float(os.environ.get("G2E_HARD_SCALE", "1.0") or 1.0)
-if HARD_SCALE != 1.0:
+# Shoves (V5, user 2026-10-09: "the body is constantly fighting an unseen force"): the small nudge (V4: up to 0.22 m/s about 1.6 times a second) and the big impulse
+# (0.6 m/s about every 2 s) are settable, and PUSH_NO_HARD_SCALE keeps the x1.10 hard scaling off them.
+RANDOM_PUSH = _g2e("RANDOM_PUSH", RANDOM_PUSH)
+RANDOM_PUSH_PROB = _g2e("RANDOM_PUSH_PROB", RANDOM_PUSH_PROB)
+IMPULSE_PUSH_PROB = _g2e("IMPULSE_PUSH_PROB", IMPULSE_PUSH_PROB)
+PUSH_NO_HARD_SCALE = _g2e("PUSH_NO_HARD_SCALE", False)
+if HARD_SCALE != 1.0 and not PUSH_NO_HARD_SCALE:
     RANDOM_PUSH *= HARD_SCALE
     IMPULSE_PUSH *= HARD_SCALE
+if HARD_SCALE != 1.0:
     SLOPE_MAX_DEG *= HARD_SCALE
     TORQUE_CUTBACK = min(0.9, TORQUE_CUTBACK * HARD_SCALE)
     RANDOM_TERRAIN_MAX_H *= HARD_SCALE
@@ -1121,7 +1163,14 @@ class OpenCatGymEnv(gym.Env):
         self._fr_comfort = {h: int(payload["comfort"][h]) for h in FR_HAZARDS}
 
     def _use_frontier(self) -> bool:
+        if getattr(self, "_forced_fz", None) is not None:
+            return True
         return bool(FRONTIER and not CATEGORY_OVERRIDE and not DR_EVAL_FULL and LEVEL_FIXED < 0 and SLOPE_FIXED_RP is None)
+
+    def set_forced_hazards(self, fz) -> None:
+        """Benchmark (V5 size ladder): every following episode has exactly these frontier hazards at these sizes ({hazard: size}, sizes in FR_BOUND units; {} = a
+        hazard-free walk), whatever FRONTIER says. None goes back to normal episodes."""
+        self._forced_fz = None if fz is None else {str(k): float(v) for k, v in fz.items()}
 
     def _fr_bin(self, h, frontier: bool) -> int:
         if frontier:
@@ -1133,6 +1182,10 @@ class OpenCatGymEnv(gym.Env):
         """FRONTIER: decide this episode's hazards and their sizes (self._fz = {hazard: size}), its role (anchor / combo / focus) and, for a focus episode, the
         (hazard, bin) whose outcome is reported. Shares follow FR_SHARE; a focus hazard is drawn from the frontier weights, the others from comfortable bins."""
         self._fz, self._fr_focus = {}, None
+        if getattr(self, "_forced_fz", None) is not None:          # benchmark size ladder: exactly these hazards at exactly these sizes (set_forced_hazards)
+            self._fz = dict(self._forced_fz)
+            self._fr_role = "focus" if self._fz else "anchor"
+            return
         if np.random.rand() < FR_ANCHOR:
             self._fr_role = "anchor"
             return
@@ -1142,7 +1195,7 @@ class OpenCatGymEnv(gym.Env):
         p_ledge = min(1.0, FR_SHARE["ledge"] / q / max(1e-6, 1.0 - FR_SHARE["rough"] / q))
         present = []
         if np.random.rand() < p_slope:
-            present.append(("sidehill", "climb", "descent")[int(np.random.randint(3))])
+            present.append(self._slope_kind())
         elif np.random.rand() < p_rough:
             present.append("rough")
         if "rough" not in present and np.random.rand() < p_ledge:
@@ -1153,16 +1206,33 @@ class OpenCatGymEnv(gym.Env):
         combo = np.random.rand() < FR_COMBO
         focus = None
         if present and not combo:                  # the focus is drawn inversely to each hazard's share, so rare hazards (a ledge direction: 10%) gather evidence as fast as common ones
-            _share = {"sidehill": FR_SHARE["slope"] / 3, "climb": FR_SHARE["slope"] / 3, "descent": FR_SHARE["slope"] / 3,
-                      "ledge_up": FR_SHARE["ledge"] / 2, "ledge_down": FR_SHARE["ledge"] / 2}
+            _share = {h: FR_SHARE["slope"] / len(SLOPE_HAZARDS) for h in SLOPE_HAZARDS}
+            _share.update({"ledge_up": FR_SHARE["ledge"] / 2, "ledge_down": FR_SHARE["ledge"] / 2})
             _w = np.array([1.0 / max(1e-3, _share.get(h, FR_SHARE.get(h, 0.2))) for h in present])
             focus = present[int(np.random.choice(len(present), p=_w / _w.sum()))]
+        if FR_MAX_HAZARDS > 0 and len(present) > FR_MAX_HAZARDS:      # V5: no stacking past the limit; the focus always stays, then a slope (so the dealt slope kinds stay even), the rest at random
+            first = ([focus] if focus else []) + [h for h in present if h in SLOPE_HAZARDS and h != focus]
+            first = first[:FR_MAX_HAZARDS]
+            others = [h for h in present if h not in first]
+            keep = list(np.random.choice(len(others), FR_MAX_HAZARDS - len(first), replace=False)) if FR_MAX_HAZARDS > len(first) else []
+            present = first + [others[i] for i in sorted(keep)]
         self._fr_role = "combo" if combo else ("focus" if focus else "plain")
         for h in present:
             b = self._fr_bin(h, frontier=(combo or h == focus))
             self._fz[h] = (b + np.random.rand()) / FR_BINS * FR_BOUND[h]
             if h == focus:
                 self._fr_focus = (h, b)
+
+    def _slope_kind(self) -> str:
+        """Which slope this slope episode gets: a coin over SLOPE_HAZARDS, or (FR_SLOPE_DECK) the next card of a shuffled per-env deck, so each kind gets exactly its share."""
+        if not FR_SLOPE_DECK:
+            return SLOPE_HAZARDS[int(np.random.randint(len(SLOPE_HAZARDS)))]
+        deck = getattr(self, "_slope_deck", None)
+        if not deck:
+            deck = list(SLOPE_HAZARDS)
+            np.random.shuffle(deck)
+        self._slope_deck = deck
+        return deck.pop()
 
     def _fr_report(self, terminated: bool, info: dict) -> None:
         """FRONTIER: the outcome of a finished anchor / focus episode, for the trainer (survived and covered >= LEVEL_PROGRESS_MIN of the commanded distance)."""
@@ -1188,6 +1258,9 @@ class OpenCatGymEnv(gym.Env):
         out += [self._slope_rp[0] / 0.5, self._slope_rp[1] / 0.5, ledge,
                 fz.get("rough", 1.0 if getattr(self, "_rough_on", False) else 0.0) / 2.0, fz.get("rubble", 0.0) / 2.0, fz.get("boxes", 0.0) / 2.0,
                 fz.get("snag", 0.0) / 2.0, 1.0 - float(np.min(self._torque_scale)), float(len(self._fz or {})) / 4.0]
+        if PRIV_YAW:                               # the heading error the (blind) actor is scored on
+            _he = (rpy[2] - self._cmd_heading + np.pi) % (2 * np.pi) - np.pi
+            out += [float(np.sin(_he)), float(np.cos(_he))]
         return np.clip(np.asarray(out, dtype=float), -1.0, 1.0)
 
     def set_caps(self, caps) -> None:
@@ -1612,7 +1685,7 @@ class OpenCatGymEnv(gym.Env):
             ang_acc = np.zeros(2)
         # Probe-only yaw-convention check (drift_probe.py yawflip / yawzero): the policy sees its
         # yaw times this sign (0 = always straight ahead). Obs only; default 1.0 = unchanged.
-        _yaw_sign = getattr(self, '_obs_yaw_sign', 1.0)
+        _yaw_sign = 0.0 if HEADING_BLIND else getattr(self, '_obs_yaw_sign', 1.0)      # HEADING_BLIND: the policy never sees yaw
         if _yaw_sign != 1.0:
             _e = p.getEulerFromQuaternion(obs_ang)
             obs_ang = p.getQuaternionFromEuler([_e[0], _e[1], _yaw_sign * _e[2]])
@@ -1663,6 +1736,9 @@ class OpenCatGymEnv(gym.Env):
                                             np.clip(self._cmd_yaw / CMD_YAW_MAX, -1, 1)],
                                            _heading_extra))
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
+        _haz = self._on_hazard(current_position) if (HAZ_SPEED_RELAX != 1.0 or HAZ_POSTURE_RELAX != 1.0) else False      # V5 hazard-aware relaxation
+        _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
+        r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
 
         # Penalty and reward
         smooth_movement = np.sum(
@@ -1735,7 +1811,7 @@ class OpenCatGymEnv(gym.Env):
                 imit_err = np.sum((np.array([j[0] for j in _js]) / self.bound_ang - ref) ** 2)
             else:
                 imit_err = np.sum((joint_angs - ref) ** 2)
-            imitation_reward = np.exp(-IMITATION_SHARPNESS * imit_err)
+            imitation_reward = np.exp(-IMITATION_SHARPNESS * _posture_k * imit_err)
             # R3: fade the imitation reward while stumbling (prev-step tilt over
             # IMITATION_TILT_FADE) so matching wkF stops fighting a recovery --
             # FAC_BALANCE takes over. The R1 phase-pause tried to do this by
@@ -1836,6 +1912,8 @@ class OpenCatGymEnv(gym.Env):
         _spd_band = max(0.012, 0.15 * abs(self._cmd_fwd))
         speed_track_penalty = (FAC_SPEED_TRACK * max(0.0, abs(_spd_err) - _spd_band)
                                if tilt < BALANCE_TILT_ON else 0.0)
+        if _haz:
+            speed_track_penalty *= HAZ_SPEED_RELAX
         min_speed_penalty = 0.0        # superseded by speed_track_penalty
         overspeed_penalty = 0.0
 
@@ -1855,7 +1933,7 @@ class OpenCatGymEnv(gym.Env):
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
         upright_penalty = FAC_UPRIGHT * tilt ** 2
-        residual_cost = FAC_RESIDUAL_COST * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
+        residual_cost = FAC_RESIDUAL_COST * _posture_k * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE and FAC_RESID_CALM_BONUS > 0:
             calm_factor = max(0.0, 1.0 - tilt / IMITATION_TILT_FADE)
             residual_cost += (FAC_RESID_CALM_BONUS * calm_factor
@@ -1944,6 +2022,7 @@ class OpenCatGymEnv(gym.Env):
                 obs_swerve_rew = FAC_OBS_SWERVE * max(0.0, -np.sign(_pb) * _vlat)
 
         reward = (FAC_MOVEMENT * capped_forward
+                 + r_cross
                  + r_goal_progress
                  + r_goal_reached
                  + obs_swerve_rew
@@ -1988,6 +2067,8 @@ class OpenCatGymEnv(gym.Env):
         # instead of only seeing the total reward.
         info = {
             "r_movement": FAC_MOVEMENT * capped_forward,
+            "r_cross": r_cross,
+            "on_hazard": float(_haz),
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
             "r_imitation": FAC_IMITATION * imitation_reward,
@@ -2316,6 +2397,8 @@ class OpenCatGymEnv(gym.Env):
         self._x_scale = 1.0
         if HAZARD_EP_LEN > 0:                     # a hazard-focus episode runs longer, over a proportionally longer stretch of obstacles
             _hz = (self._fr_focus is not None and self._fr_focus[0] != "cutback") if self._fz is not None else (self._focus in ("terrain", "ledge", "slope"))
+            if FR_ANCHOR_LONG and self._fz is not None and self._fr_role == "anchor" and getattr(self, "_forced_fz", None) is None:
+                _hz = True                        # V5: the hazard-free baseline runs as long as the hazard episodes it is compared with
             if _hz:
                 self._step_budget = max(self._step_budget, int(HAZARD_EP_LEN))
                 self._x_scale = HAZARD_X_SCALE if HAZARD_X_SCALE > 0 else HAZARD_EP_LEN / EPISODE_LENGTH
@@ -2340,14 +2423,18 @@ class OpenCatGymEnv(gym.Env):
             _fz = self._fz
             if "sidehill" in _fz:
                 self._slope_rp = (float(np.deg2rad(_fz["sidehill"]) * np.random.choice([-1.0, 1.0])), 0.0)
+            elif "sidehill_r" in _fz:             # positive roll = the right side down (benchmark T3.2's convention)
+                self._slope_rp = (float(np.deg2rad(_fz["sidehill_r"])), 0.0)
+            elif "sidehill_l" in _fz:
+                self._slope_rp = (-float(np.deg2rad(_fz["sidehill_l"])), 0.0)
             elif "climb" in _fz:
                 self._slope_rp = (0.0, -float(np.deg2rad(_fz["climb"])))
             elif "descent" in _fz:
                 self._slope_rp = (0.0, float(np.deg2rad(_fz["descent"])))
-            elif self._fr_role != "anchor" and "rough" not in _fz:
+            elif self._fr_role != "anchor" and "rough" not in _fz and FR_BACKGROUND_TILT_DEG > 0:
                 _bt = np.deg2rad(FR_BACKGROUND_TILT_DEG)
                 self._slope_rp = (float(np.random.uniform(-_bt, _bt)), float(np.random.uniform(-_bt, _bt)))
-            self._slope_targeted = any(h in _fz for h in ("sidehill", "climb", "descent"))
+            self._slope_targeted = any(h in _fz for h in ("sidehill", "sidehill_l", "sidehill_r", "climb", "descent"))
         elif SLOPE_TARGET_PROB > 0 and self._d_slope > 0 and ("slope" in _forced or np.random.rand() < SLOPE_TARGET_PROB):
             self._slope_targeted = True
             _kind = int(np.random.randint(3)) if "slope" in _forced else (0 if np.random.rand() < 0.5 else 1)   # a probe also tests descents (training meets them in the random tilt below)
@@ -2366,7 +2453,8 @@ class OpenCatGymEnv(gym.Env):
             # this (see SLOPE_MAX_DEG) so that tail actually reaches "steep", not
             # just "gentle".
             self._slope_rp = (np.random.triangular(-m, 0.0, m), np.random.triangular(-m, 0.0, m))
-        if SLOPE_FIXED_RP is None and (CAP_SIDEHILL_DEG > 0 or CAP_UPHILL_DEG > 0 or CAP_DOWNHILL_DEG > 0):
+        _caps_apply = not (FR_IGNORE_CAPS and self._fz is not None)          # V5: a frontier episode's sizes are already bounded by FR_BOUND
+        if _caps_apply and SLOPE_FIXED_RP is None and (CAP_SIDEHILL_DEG > 0 or CAP_UPHILL_DEG > 0 or CAP_DOWNHILL_DEG > 0):
             _r, _pt = self._slope_rp                  # pitch < 0 is a climb, pitch > 0 a descent (see SLOPE_TARGET_PROB)
             if CAP_SIDEHILL_DEG > 0:
                 _r = float(np.clip(_r, -np.deg2rad(CAP_SIDEHILL_DEG), np.deg2rad(CAP_SIDEHILL_DEG)))
@@ -2572,6 +2660,7 @@ class OpenCatGymEnv(gym.Env):
         # ahead; step-down = robot starts on a raised block with a drop ahead.
         self._ledge_h = 0.0
         self._ledge_dir = 0
+        self._ledge_id, self._ledge_edge = None, None
         _lfz = None
         if self._fz is not None:
             _lfz = "ledge_up" if "ledge_up" in self._fz else ("ledge_down" if "ledge_down" in self._fz else None)
@@ -2583,7 +2672,7 @@ class OpenCatGymEnv(gym.Env):
             else:
                 self._ledge_h = float((np.random.uniform(0.008, LEDGE_HEIGHT) if LEDGE_RANDOMIZE
                                        else LEDGE_HEIGHT) * self._d_ledge)
-            if CAP_LEDGE_M > 0 and SLOPE_FIXED_RP is None:
+            if CAP_LEDGE_M > 0 and SLOPE_FIXED_RP is None and _caps_apply:
                 # the block lies on the (possibly tilted) ground, so the face the robot meets is the block height itself (2026-10-08 review: a LEVEL block on tilted ground made
                 # descent faces taller, buried climbs, and started step-downs tilted on a level block; the cap used to subtract the extra fall instead)
                 self._ledge_h = float(max(0.0, min(self._ledge_h, CAP_LEDGE_M)))
@@ -2599,6 +2688,7 @@ class OpenCatGymEnv(gym.Env):
             _cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[_hl, _lw, self._ledge_h / 2])
             _lpos, _ = p.multiplyTransforms([0, 0, 0], _gq, [_cx, 0.0, self._ledge_h / 2], [0, 0, 0, 1])
             _lid = p.createMultiBody(0, _cs, basePosition=list(_lpos), baseOrientation=_gq)
+            self._ledge_id, self._ledge_edge = _lid, _edge
             p.changeVisualShape(_lid, -1, rgbaColor=[0.62, 0.62, 0.66, 1])   # a touch lighter than the ground so the step edge still reads
 
         _pose_tilt = 0.0
@@ -2824,10 +2914,57 @@ class OpenCatGymEnv(gym.Env):
                 "phase": float(self._phase),
                 "cmd": (float(self._cmd_fwd), float(self._cmd_yaw)),
             }
+        self._index_hazards()
         self._recolor_scene()
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
         info = {}
         return np.array(self.observation).astype(np.float32), info
+
+    def _index_hazards(self):
+        """V5 (crossing bonus, hazard-aware relaxation): the solid objects in G2's way this episode, from the physics bodies (the same rule as exposure_probe.py: at least
+        2 mm tall, not behind the start), their far edges for the crossing bonus, and the ledge. Bookkeeping only: nothing here changes the physics."""
+        skip = {self.robot_id, getattr(self, "_plane_id", -999), self._ledge_id}
+        for _a in ("_payload_id", "_head_id", "_rear_id"):
+            if getattr(self, _a, None) is not None:
+                skip.add(getattr(self, _a))
+        self._obj_ids, self._obj_far = set(), []
+        for _i in range(p.getNumBodies()):
+            bid = p.getBodyUniqueId(_i)
+            if bid in skip:
+                continue
+            lo, hi = p.getAABB(bid)
+            if hi[2] - lo[2] >= 0.002 and lo[0] >= -0.05 and hi[0] - lo[0] < 0.5:      # long bodies are floor (ground segments), not objects
+                self._obj_ids.add(bid)
+                self._obj_far.append(float(hi[0]))
+        self._obj_passed = 0
+        self._ledge_passed = False
+        self._haz_timer = 0
+
+    def _on_hazard(self, base_x) -> bool:
+        """V5: is G2 on a hazard now? touched an object or the ledge in the last HAZ_HOLD_STEPS steps, on a slope of HAZ_SLOPE_DEG or more, or at a ledge edge."""
+        ids = self._obj_ids | ({self._ledge_id} if self._ledge_id is not None else set())
+        if ids and any(c[2] in ids for c in p.getContactPoints(bodyA=self.robot_id)):
+            self._haz_timer = HAZ_HOLD_STEPS
+        elif self._haz_timer > 0:
+            self._haz_timer -= 1
+        if self._haz_timer > 0:
+            return True
+        if max(abs(self._slope_rp[0]), abs(self._slope_rp[1])) >= np.deg2rad(HAZ_SLOPE_DEG):
+            return True
+        return self._ledge_edge is not None and (self._ledge_edge - 0.12) <= base_x <= (self._ledge_edge + 0.20)
+
+    def _cross_reward(self, base_x) -> float:
+        """V5 crossing bonus: FAC_CROSS for the whole obstacle field (split evenly over its pieces, paid as each one is cleared) and FAC_CROSS for the ledge edge."""
+        r = 0.0
+        if self._obj_far:
+            n = sum(1 for fx in self._obj_far if base_x - CROSS_CLEAR_M > fx)
+            if n > self._obj_passed:
+                r += FAC_CROSS * (n - self._obj_passed) / len(self._obj_far)
+                self._obj_passed = n
+        if self._ledge_edge is not None and not self._ledge_passed and base_x - CROSS_CLEAR_M > self._ledge_edge + 0.05:
+            self._ledge_passed = True
+            r += FAC_CROSS
+        return r
 
     def _recolor_scene(self):
         """PERMANENT black-floor fix: after reset() builds every body, give each

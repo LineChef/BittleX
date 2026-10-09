@@ -44,7 +44,7 @@ sys.path.insert(0, _HERE)                              # sibling modules, also u
 sys.path.insert(0, os.path.join(_HERE, ".."))          # for `link`
 sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for `pi_pipeline.diag`
 
-from residual_policy import ResidualGaitPolicy, CONTROL_HZ   # noqa: E402
+from residual_policy import ResidualGaitPolicy, CONTROL_HZ, heading_blind_for   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
 import heading_hold as _hh                                    # noqa: E402  -- optional steering on the policy's joint targets (--heading-hold)
@@ -492,6 +492,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     if scripted:                       # --scripted: no learned correction at all, the scripted wkF walk through the same loop (IMU, logging, holds)
         pol.residual_scale_deg = 0.0
     send_every = max(1, send_every if send_every else pol.send_every)   # explicit flag wins; else what the policy was trained with
+    yaw_k = 0.0 if heading_blind_for(pol.onnx_path) else 1.0           # a heading-blind policy (sidecar) is fed yaw 0, as in training; the hold still reads the real yaw
     print(f"policy: {os.path.basename(pol.onnx_path)}"
           f"  (joint command every {send_every} tick{'s' if send_every != 1 else ''})", flush=True)
     pol.set_command(fwd=cmd_fwd, yaw=0.0)
@@ -587,7 +588,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     # 2026-09-22), but rebasing keeps any policy on the distribution it saw.
     yaw0 = y
     y = 0.0
-    q = policy_quat(r, p_, y)
+    q = policy_quat(r, p_, yaw_k * y)
     pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
 
     dt = 1.0 / hz
@@ -657,7 +658,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 else:
                     tilt_since = None
                 y = math.remainder(y - yaw0, 2.0 * math.pi)     # firmware convention, + = right (logged as is)
-                q = policy_quat(r, p_, y)
+                q = policy_quat(r, p_, yaw_k * y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
                 if foot_trim is not None:            # --foot-trim: ONE foot's steps scaled, a fixed amount, no feedback (the per-foot steering test)

@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | [`STATUS.md`](STATUS.md) | **What is true right now** — what is deployed, what has run on the robot, open problems, next steps. The only place for current state. |
-| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the latest session handoff is [`plan-detail/handoff-2026-10-08.md`](plan-detail/handoff-2026-10-08.md). |
+| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the latest session handoff is [`plan-detail/handoff-2026-10-08.md`](plan-detail/handoff-2026-10-08.md); the gait training running now is [`plan-detail/v5-training-plan.md`](plan-detail/v5-training-plan.md). |
 | [`backlog.md`](backlog.md) | Open work by ID (H#, R#, B#) — generated from the item headings. |
 | [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |

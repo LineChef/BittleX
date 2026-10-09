@@ -59,6 +59,8 @@ def main():
                     help="joint-command cadence the policy was TRAINED with (G2E_CMD_SEND_EVERY_N; "
                          "Release_CandidateV2/V2.1 = 3), written to the sidecar so run_gait.py "
                          "sends at the same cadence by default")
+    ap.add_argument("--heading-blind", action="store_true",
+                    help="the policy was trained with the heading_blind lever (it never saw yaw): written to the sidecar, so the Pi feeds it yaw 0")
     args = ap.parse_args()
     out = args.out or (args.model + ".onnx")
 
@@ -113,9 +115,13 @@ def main():
         import opencat_gym_env
         scale = float(opencat_gym_env.RESIDUAL_SCALE_DEG)
     with open(out + ".json", "w") as f:
-        json.dump({"residual_scale_deg": scale, "cmd_send_every_n": args.cmd_send_every_n,
-                   "checkpoint": os.path.basename(args.model),
-                   "exported": datetime.date.today().isoformat()}, f, indent=1)
+        side = {"residual_scale_deg": scale, "cmd_send_every_n": args.cmd_send_every_n,
+                "checkpoint": os.path.basename(args.model),
+                "exported": datetime.date.today().isoformat()}
+        if args.heading_blind:
+            side["heading_blind"] = True
+            side["levers"] = ["heading_blind"]                  # g2_profile.policy_levers_from_sidecar: score it with the same (yaw-free) inputs
+        json.dump(side, f, indent=1)
     print(f"wrote {out}.json  (residual_scale_deg={scale:g})")
 
 

@@ -26,3 +26,16 @@ def test_deployed_policy_declares_its_scale():
     path = rp.default_policy_path()
     scale = rp.residual_scale_for(path)
     assert scale in (22.0, 30.0)
+
+
+def test_heading_blind_flag_travels_in_the_sidecar(tmp_path):
+    """A policy trained heading-blind (V5 lever, 2026-10-09) never saw yaw: its sidecar says so and run_gait feeds it yaw 0. Older policies keep the real yaw."""
+    blind = tmp_path / "V5cand_ppo.onnx"
+    blind.write_bytes(b"")
+    (tmp_path / "V5cand_ppo.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0, "heading_blind": True}))
+    old = tmp_path / "V4_ppo.onnx"
+    old.write_bytes(b"")
+    (tmp_path / "V4_ppo.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0}))
+    assert rp.heading_blind_for(blind) is True
+    assert rp.heading_blind_for(old) is False
+    assert rp.heading_blind_for(tmp_path / "none.onnx") is False

@@ -117,6 +117,17 @@ def send_every_for(onnx_path):
     return 1
 
 
+def heading_blind_for(onnx_path):
+    """True when the policy was trained heading-blind (sidecar "heading_blind", lever heading_blind, 2026-10-09): it must be fed yaw 0, since it never saw yaw in
+    training. Steering comes from the Pi's front-foot hold either way."""
+    import json
+    side = str(onnx_path) + ".json"
+    if os.path.exists(side):
+        with open(side) as f:
+            return bool(json.load(f).get("heading_blind", False))
+    return False
+
+
 class ResidualGaitPolicy:
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort

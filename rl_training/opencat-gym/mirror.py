@@ -32,8 +32,11 @@ N_FRAMES = 30
 PHASE_IDX = 9
 
 
-PRIV_DIM = 22          # opencat_gym_env.PRIV_DIM: the critic-only values appended last (PRIV_OBS)
-PRIV_NEG = (0, 2, 4, 6, 13)                     # roll, roll rate, yaw rate, sideways velocity, ground roll flip sign
+import os
+# opencat_gym_env.PRIV_DIM: the critic-only values appended last (PRIV_OBS); 24 with G2E_PRIV_YAW (lever heading_blind: + sin / cos of the heading error)
+PRIV_YAW = os.environ.get("G2E_PRIV_YAW", "0") not in ("0", "", "false", "False", "no")
+PRIV_DIM = 24 if PRIV_YAW else 22
+PRIV_NEG = (0, 2, 4, 6, 13) + ((22,) if PRIV_YAW else ())    # roll, roll rate, yaw rate, sideways velocity, ground roll [, sin heading error] flip sign
 PRIV_SWAP = {9: 10, 10: 9, 11: 12, 12: 11}      # paw contacts FL<->FR, BR<->BL
 
 

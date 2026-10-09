@@ -106,12 +106,29 @@ LEVERS = {
     "hazard_long": {"G2E_HAZARD_EP_LEN": "600", "G2E_HAZARD_X_SCALE": "1.0"},                    # hazard-focus episodes 7.5 s with the obstacles where they were: G2 gets time to walk through them
     "imitation_actual": {"G2E_IMITATION_ACTUAL": "1"},                                           # imitation on measured joints (recipe evaluation finding 1)
     "privileged_critic": {"G2E_PRIV_OBS": "1"},                                                  # critic-only true state + hazards (recipe evaluation finding 3)
+    # 2026-10-09 V5 plan (docs/plan-detail/v5-training-plan.md), user-approved. v5_course is the fixed training setup every V5 run uses; the rest are its screens.
+    "v5_course": {"G2E_FR_SPLIT_SIDE": "1",                                                      # side-hill left-down and right-down tracked as separate hazards
+                  "G2E_FR_BOUNDS": "sidehill_l:8,sidehill_r:8,climb:10,descent:10,ledge_up:0.035,ledge_down:0.04",   # ladder tops = the real caps (user)
+                  "G2E_FR_IGNORE_CAPS": "1",                                                     # the old static caps no longer clip frontier sizes (V4's silent 8 deg / 20 mm cap)
+                  "G2E_FR_SLOPE_SHARE": "0.095", "G2E_FR_SLOPE_DECK": "1",                       # slopes and tilts in under 10% of episodes (user: no more than 10%), dealt evenly: up, down, left, right
+                  "G2E_FR_BACKGROUND_TILT_DEG": "0",                                             # no background tilt anywhere (user)
+                  "G2E_FR_MAX_HAZARDS": "2", "G2E_FR_COMBO": "0.15",                            # no stacking past two hazards; fewer all-at-once episodes
+                  "G2E_FR_ANCHOR_LONG": "1", "G2E_FR_PASS": "0.7",                               # hazard-free baseline as long as the hazard episodes; pass at 0.7 of it
+                  "G2E_RANDOM_PUSH": "0.12", "G2E_RANDOM_PUSH_PROB": "0.003",                    # small nudges: up to 0.12 m/s about every 4 s (V4: 0.22 m/s, 1.6 a second)
+                  "G2E_IMPULSE_PUSH_PROB": "0.0015", "G2E_PUSH_NO_HARD_SCALE": "1",              # big shoves about every 8 s (V4: every 2 s), no x1.10
+                  "G2E_LEVEL_MIN_BASELINE": "0.25", "G2E_LEVEL_COLLAPSE_BASELINE": "0.12"},      # the working curriculum gates (2026-10-09)
+    "cross_bonus": {"G2E_FAC_CROSS": "200"},                                                     # one-time bonus for clearing the obstacle field / a ledge edge (user: yes)
+    "haz_speed": {"G2E_HAZ_SPEED_RELAX": "0.0"},                                                 # no speed-tracking penalty while on a hazard
+    "haz_posture": {"G2E_HAZ_POSTURE_RELAX": "0.5"},                                             # holding a non-scripted posture costs half while on a hazard
+    "heading_blind": {"G2E_HEADING_BLIND": "1", "G2E_PRIV_YAW": "1", "G2E_FAC_HEADING": "10"},   # the policy never sees yaw (no steering); the critic does; heading penalty x2
+    "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
 }
 # Levers that change what the POLICY observes: a policy trained with one must be scored with it (scoring_env, benchmark_v4.ladder_env, phase_v3.policy_levers).
-OBS_LEVERS = ("heading_obs", "privileged_critic")
+OBS_LEVERS = ("heading_obs", "privileged_critic", "heading_blind")
 # Settings only train.py reads (how training runs, not the world): never part of a scoring or ladder environment.
 TRAINER_ONLY_PREFIXES = ("G2E_N_ENVS", "G2E_LEAN_INFO", "G2E_RUN_MONITOR", "G2E_MONITOR_EVERY", "G2E_PLATEAU", "G2E_PPO_", "G2E_NORM_REWARD", "G2E_LOG_STD_INIT",
-                         "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_LR_SCALE", "G2E_FRONTIER_FLOOR", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS")
+                         "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_LR_SCALE", "G2E_FRONTIER_FLOOR", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS",
+                         "G2E_FR_", "G2E_TARGET_KL")
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
 # The SURFACE STEP / TRANSITION (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the training course COMPLETELY (user, 2026-10-08): no stage,
