@@ -1,3 +1,0 @@
-V3-in-c1-course K=4: {"all": {"episodes": 80, "seconds_median": 3.76875, "dist_median_m": 0.22223948822153372, "with_objects": 55, "never_reached": 8, "past_first": 35, "past_whole_field": 9, "fell": 7}, "focus": {"episodes": 48, "seconds_median": 7.5125, "dist_median_m": 0.3013842066898561, "with_objects": 40, "never_reached": 4, "past_first": 29, "past_whole_field": 9, "fell": 5}}
-V3-in-c1-course K=7: {"all": {"episodes": 80, "seconds_median": 3.1375, "dist_median_m": 0.1893092063903013, "with_objects": 56, "never_reached": 15, "past_first": 29, "past_whole_field": 4, "fell": 11}, "focus": {"episodes": 47, "seconds_median": 7.5125, "dist_median_m": 0.2009536791307309, "with_objects": 40, "never_reached": 7, "past_first": 25, "past_whole_field": 4, "fell": 7}}
-done

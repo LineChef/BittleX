@@ -1,4 +1,0 @@
-[v4 04:32 AM] v4_s1 START: levers ['mirror_strong', 'frontier', 'cmd_forward', 'opt_bundle', 'privileged_critic', 'lr_half'] seed 42 extra {'G2E_LEVEL_MIN_BASELINE': '0.25', 'G2E_LEVEL_COLLAPSE_BASELINE': '0.12'}
-[pipeline 04:32 AM] launched v4_s1: Training started (PID 11517)
-[v4 05:15 AM] v4_s1 FINISHED
-[v4 05:17 AM] v4_s2 HALT: v4_s2 process exited with no trained/v4_s2_ppo.zip -- likely a crash, check trained/v4_s2_console.log

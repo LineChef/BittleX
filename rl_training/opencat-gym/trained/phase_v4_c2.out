@@ -1,2 +1,0 @@
-[v4 06:40 AM] v4_c2 START: levers ['mirror_strong', 'frontier', 'cmd_forward', 'opt_bundle', 'privileged_critic', 'lr_half', 'hazard_long', 'slope_floor'] seed 42 extra {'G2E_LEVEL_MIN_BASELINE': '0.25', 'G2E_LEVEL_COLLAPSE_BASELINE': '0.12'} (continuing trained/checkpoints/v4_c1_2000000_steps, lr 5e-5, kl 0.02)
-[pipeline 06:40 AM] launched v4_c2: Training started (PID 21175)

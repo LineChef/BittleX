@@ -1,3 +1,0 @@
-[v4 05:18 AM] v4_s1 FINISHED
-[v4 05:18 AM] v4_s2 START: levers ['mirror_strong', 'frontier', 'cmd_forward', 'opt_bundle', 'privileged_critic', 'lr_half', 'hazard_long'] seed 42 extra {'G2E_LEVEL_MIN_BASELINE': '0.25', 'G2E_LEVEL_COLLAPSE_BASELINE': '0.12'} (continuing trained/v4_s1_ppo, lr 1e-4, kl 0.03)
-[pipeline 05:18 AM] launched v4_s2: Training started (PID 14788)
