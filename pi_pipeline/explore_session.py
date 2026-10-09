@@ -63,6 +63,20 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "10")), fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
     survey.gate = watch.gate
+    if os.environ.get("G2_WALL_DRYRUN", "1") != "0":                    # the wall estimator reads the same peeks and only LOGS what it would do (vision/wall_distance.py); it never moves G2
+        from .vision.embedder import to_image
+        from .vision import wall_distance as wd
+        cal = wd.Calibration.load()
+
+        def wall_look(snap):
+            im = to_image(snap.jpeg)
+            if cal is None:                                              # not calibrated yet: keep the raw base rows so the first calibration can be checked against them
+                rows, visible = wd.base_rows(im)
+                wd.log_dry_run(wd.WallEstimate(None, [None if r is None else round(r, 3) for r in rows], not visible, None, "uncalibrated: base rows only"))
+            else:
+                wd.log_dry_run(wd.estimate(im, cal))
+        watch.on_snap = wall_look
+        log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)
     log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",
              watch.every_s, watch.fallback_s, gpath)
     return watch

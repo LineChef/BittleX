@@ -28,6 +28,7 @@ class InterestWatch:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.peeks = self.vetoes = 0
+        self.on_snap = None                          # optional callable(snapshot): other readers of the same cheap look (the wall dry run)
 
     def peek_once(self, now: float | None = None):
         now = self._clock() if now is None else now
@@ -42,6 +43,11 @@ class InterestWatch:
         if snap is None:
             return None
         self.peeks += 1
+        if self.on_snap is not None:
+            try:
+                self.on_snap(snap)
+            except Exception:  # noqa: BLE001
+                log.debug("on_snap failed", exc_info=True)
         try:
             got = self.scorer.assess(snap)
         except Exception:  # noqa: BLE001 -- a bad frame must never take the loop down

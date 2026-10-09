@@ -75,3 +75,11 @@ def test_the_feeder_gives_each_saved_picture_to_the_gallery_and_skips_people(tmp
     f.with_suffix(".json").write_text(json.dumps({"detections": [{"label": "face", "score": 0.9}]}))
     feeder(f)
     assert feeder.skipped == 1 and len(g.entries) == 1         # a picture with a person is not used
+
+
+def test_other_readers_get_the_same_peek():
+    seen = []
+    w = InterestWatch(Scorer(["none"]), Src())
+    w.on_snap = seen.append
+    w.peek_once(1.0)
+    assert len(seen) == 1
