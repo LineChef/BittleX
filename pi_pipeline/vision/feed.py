@@ -220,7 +220,7 @@ class SerialDetectionFeed:
                 frame = self._filter(frame)
             yield frame
 
-    def snapshot(self, timeout_s: float = 6.0):
+    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None):
         """Take ONE picture on this feed's own port and go back to detecting: stops the detection loop, asks for a single inference that
         comes back with its JPEG (`AT+INVOKE=1,0,0`), then restarts the loop. Returns a `vision.snapshot.Snapshot`, or None if the module
         did not answer in time. The detection stream is dark for about a second. The pause is in the reader (`frames()`), so this is safe
@@ -240,7 +240,7 @@ class SerialDetectionFeed:
                     self._apply_sensor(self._snap_opt, self._ae_bump)
                 # right after a capture-mode switch the sensor's auto-exposure is still ramping (2026-10-08: survey pictures alternated between a mean
                 # brightness of about 65 and about 150): throw away `settle` frames first so the picture that is kept has settled
-                for attempt in range(self._settle_frames + 1 if switched else 1):
+                for attempt in range((self._settle_frames if settle is None else max(0, int(settle))) + 1 if switched else 1):
                     self._ser.reset_input_buffer()
                     self._ser.write(b"AT+INVOKE=1,0,0\r\n")
                     deadline = time.monotonic() + timeout_s
@@ -327,13 +327,13 @@ class BackgroundFrameSource:
                 return []
             return list(self._frame)
 
-    def snapshot(self, timeout_s: float = 6.0):
+    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None):
         """One picture from the underlying feed (see `SerialDetectionFeed.snapshot`), or None if the feed cannot take pictures. The newest
-        detection frame is cleared so a stale one is not read as current right after the pause."""
+        detection frame is cleared so a stale one is not read as current right after the pause. `settle`: throwaway frames after the mode switch (None = the feed's own)."""
         fn = getattr(self._feed, "snapshot", None)
         if fn is None:
             return None
-        snap = fn(timeout_s)
+        snap = fn(timeout_s) if settle is None else fn(timeout_s, settle=settle)
         with self._lock:
             self._at = None
         return snap

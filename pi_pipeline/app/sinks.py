@@ -10,6 +10,7 @@ already reconnects on its own), and `dry_run` power calls don't touch the Pi.
 from __future__ import annotations
 
 import logging
+import os
 import math
 import threading
 import time
@@ -57,9 +58,10 @@ class HeadSink:
     """HEAD effect -> head-pan serial. Payload is "center" | "up" | "pan_sweep"
     | a float bearing in radians (+ = right)."""
 
-    def __init__(self, link, *, pan_deg: float = _HEAD_PAN_DEG):
+    def __init__(self, link, *, pan_deg: float = _HEAD_PAN_DEG, enabled: bool | None = None):
         self._link = link
         self._pan = pan_deg
+        self.enabled = os.environ.get("G2_HEAD", "0") == "1" if enabled is None else enabled      # OFF since 2026-10-09 (user): no head is connected; G2_HEAD=1 when the AI head arrives
 
     def _m(self, deg: float) -> None:
         deg = max(-self._pan, min(self._pan, float(deg)))
@@ -67,6 +69,8 @@ class HeadSink:
                         read_reply=False)
 
     def move(self, arg) -> None:
+        if not self.enabled:
+            return
         if arg in ("center", "up", "down", None):
             self._m(0.0)
         elif arg == "pan_sweep":

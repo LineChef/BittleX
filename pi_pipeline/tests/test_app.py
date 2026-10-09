@@ -46,7 +46,7 @@ def test_actuator_sink_sends_safe_refuses_calibration():
 
 def test_head_sink_center_sweep_and_bearing():
     lk = FakeLink()
-    h = HeadSink(lk, pan_deg=45.0)
+    h = HeadSink(lk, pan_deg=45.0, enabled=True)
     h.move("center")
     h.move("pan_sweep")
     h.move(math.radians(90))            # clamped to +45
@@ -322,3 +322,16 @@ def test_no_edge_source_means_the_cliff_reflex_stays_inert(monkeypatch):
     monkeypatch.setattr(features, "vision_safety", True)
     rt = _build_runtime(None, hz=0)
     assert EffectKind.STOP not in [e.kind for e in rt.tick().effects]
+
+
+def test_head_sink_does_nothing_while_no_head_is_connected(monkeypatch):
+    monkeypatch.delenv("G2_HEAD", raising=False)
+    lk = FakeLink()
+    h = HeadSink(lk)
+    h.move("center")
+    h.move("pan_sweep")
+    h.move(0.3)
+    assert lk.sent == []                         # off by default since 2026-10-09
+    monkeypatch.setenv("G2_HEAD", "1")
+    HeadSink(lk).move("center")
+    assert lk.sent == ["m0 0"]

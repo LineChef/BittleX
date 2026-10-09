@@ -96,7 +96,8 @@ def test_picked_up_preempts_a_settle_choreo():
 
 # --- explore ----------------------------------------------------------
 
-def test_explore_investigates_novel_object_with_a_sniff():
+def test_explore_investigates_novel_object_with_a_sniff(monkeypatch):
+    monkeypatch.setenv("G2_HEAD", "1")                # the sniff is a head gesture: only with a head connected
     p = BehaviorParams(investigate_secs=3.0, approach_novelty=False)
     d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
     c.adv(11)                                       # past the settle grace
@@ -203,7 +204,8 @@ def test_enrollment_owns_the_robot_over_idle_and_explore(tmp_path):
 
 # --- recognition hop ---------------------------------------------
 
-def test_known_person_after_absence_triggers_one_excited_hop():
+def test_known_person_after_absence_triggers_one_excited_hop(monkeypatch):
+    monkeypatch.setenv("G2_EXCITED_HOP", "1")                     # the hop is off by default since 2026-10-09
     p = BehaviorParams(idle_secs_before_explore=1e9)
     d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
     roster = frozenset({"sam"})
@@ -346,3 +348,22 @@ def test_roam_emits_an_audible_state():
                for e in t.effects):
             got_periodic = True
     assert got_periodic
+
+
+def test_known_person_after_absence_does_not_hop_by_default(monkeypatch):
+    monkeypatch.delenv("G2_EXCITED_HOP", raising=False)
+    d = BehaviorDriver(BehaviorParams(idle_secs_before_explore=1e9), clock=(c := Clk()), rng=random.Random(0))
+    t = d.tick(DriverInputs(frame=[det("sam")], known_person_labels=frozenset({"sam"})))
+    assert "kjpF" not in payloads(t, EffectKind.SKILL)
+
+
+def test_without_a_head_a_find_gets_a_short_play_bow_then_a_stand(monkeypatch):
+    monkeypatch.delenv("G2_HEAD", raising=False)
+    p = BehaviorParams(investigate_secs=3.0, approach_novelty=False)
+    d = BehaviorDriver(p, clock=(c := Clk()), rng=random.Random(0))
+    c.adv(11)
+    t = d.tick(DriverInputs(arm_explore=True, frame=[det("mug", area_side=0.45, bearing=0.5)]))
+    assert "kbuttUp" in payloads(t, EffectKind.SKILL) and "ksnf" not in payloads(t, EffectKind.SKILL)
+    c.adv(1.5)
+    t2 = d.tick(DriverInputs(frame=[det("mug", area_side=0.45, bearing=0.5)]))
+    assert "kbalance" in payloads(t2, EffectKind.SKILL)         # and he stands again

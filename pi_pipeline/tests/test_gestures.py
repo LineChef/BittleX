@@ -65,7 +65,7 @@ def test_greeting_picks_from_greeting_set_and_cools_down():
 
 
 def test_sniff_find_cooldown():
-    p, t = _picker(explore_sniff_cooldown_s=20.0)
+    p, t = _picker(explore_sniff_cooldown_s=20.0, head_enabled=True)
     assert p.sniff_find() is Gesture.SNIFF
     assert p.sniff_find() is Gesture.NONE
     t[0] += 21.0
@@ -73,9 +73,30 @@ def test_sniff_find_cooldown():
 
 
 def test_excited_hop_is_hard_rate_limited():
-    p, t = _picker(hop_cooldown_s=300.0)
+    p, t = _picker(hop_cooldown_s=300.0, hop_enabled=True)
     assert p.excited_hop() is Gesture.HOP
     t[0] += 120.0
     assert p.excited_hop() is Gesture.NONE
     t[0] += 200.0
     assert p.excited_hop() is Gesture.HOP
+
+
+def test_the_excited_hop_is_off_by_default(monkeypatch):
+    monkeypatch.delenv("G2_EXCITED_HOP", raising=False)
+    p, _ = _picker()
+    assert p.excited_hop() is Gesture.NONE
+    monkeypatch.setenv("G2_EXCITED_HOP", "1")
+    p2, _ = _picker()
+    assert p2.excited_hop() is Gesture.HOP
+
+
+def test_no_head_gestures_while_no_head_is_connected(monkeypatch):
+    monkeypatch.delenv("G2_HEAD", raising=False)
+    p, t = _picker(idle_interval_s=1.0, idle_min_quiet_s=0.0, idle_cooldown_s=0.0)
+    seen = set()
+    for _ in range(400):
+        t[0] += 5.0
+        seen.add(p.idle(can_gesture=True, idle_quiet_s=60.0) if hasattr(p, "idle") else Gesture.NONE)
+    assert Gesture.NOD not in seen and Gesture.SNIFF not in seen
+    assert p.sniff_find() is Gesture.NONE
+    assert p.found_something() is Gesture.PLAY_BOW and p.found_something() is Gesture.NONE     # a play bow instead, rate-limited

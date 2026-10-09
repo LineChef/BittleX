@@ -11,7 +11,7 @@ case "${1:-status}" in
       -p ExecStartPre='+/bin/systemctl stop g2-voice' \
       -p ExecStopPost='+/bin/systemctl --no-block start g2-voice' \
       \$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.gait.baseline_runs --runs ${2:-6} --label ${3:-case_v21} ${*:4}" ;;
-  stop)   ssh "$G2_PI" "sudo systemctl stop $UNIT" ;;
+  stop)   ssh "$G2_PI" "sudo systemctl kill -s SIGINT $UNIT" ;;      # SIGINT: the walk loop sends rest (never a plain stop mid-stride)
   status) ssh "$G2_PI" "systemctl is-active $UNIT || true; systemctl is-active g2-voice || true" ;;
   logs)   ssh "$G2_PI" "journalctl -u $UNIT -n 40 --no-pager | cut -c1-180" ;;
   fetch)  mkdir -p "${2:-$HOME/Desktop/OneFolder/G2/walk-logs}" && scp "$G2_PI:~/g2_runs/${3:-case_v21}_*.csv" "${2:-$HOME/Desktop/OneFolder/G2/walk-logs}/" ;;

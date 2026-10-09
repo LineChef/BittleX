@@ -101,7 +101,8 @@ def main() -> None:
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
-            saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
+            saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT),
+                                           prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", args.roam_s / 2 if args.roam_s > 0 else 300.0)))   # prep the camera for the first picture and once half way (user)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver)
         if saver is not None:
@@ -250,6 +251,10 @@ def main() -> None:
             try:
                 rt.post(disarm_explore=True)
                 time.sleep(1.0)
+                if policy_walker is not None:
+                    policy_walker.stop(rest=False)                            # stop walking first, then settle into a balanced stand, and only then lie down:
+                link.send("kbalance", read_reply=False, settle=0.0)           # resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
+                time.sleep(1.5)
                 say("Exploration completed.")                                 # said first (user, 2026-10-07), then G2 lies down
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
             except Exception:  # noqa: BLE001

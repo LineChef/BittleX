@@ -505,6 +505,12 @@ class BehaviorDriver:
             g = self.gestures.sniff_find(now)
             if g is not Gesture.NONE:
                 fx.append(Effect(EffectKind.SKILL, GESTURE_TOKEN[g], "sniff a find"))
+            elif not self.gestures.cfg.head_enabled:                  # no head connected: a short play bow instead of the head-down sniff (stopped, four feet down), then stand again
+                b = self.gestures.found_something(now)
+                if b is not Gesture.NONE:
+                    self._choreo.start("found", [(0.0, Effect(EffectKind.SKILL, GESTURE_TOKEN[b], "interesting find: play bow")),
+                                                 (1.3, Effect(EffectKind.SKILL, "kbalance", "stand again after the bow"))], now=now)
+                    fx += self._choreo.pump(now)
         elif d.action is ExploreAction.HOLD:
             if not (self.survey is not None and d.reason == "leg done"):      # surveying: a finished leg never rests; the next leg just starts (rest is for the end)
                 fx.append(Effect(EffectKind.STOP, None, d.reason))
@@ -556,7 +562,7 @@ class BehaviorDriver:
                 if g is not Gesture.NONE:
                     return [Effect(EffectKind.SKILL, GESTURE_TOKEN[g],
                                    f"recognised {lab} after an absence")] + happy
-                self._last_reason = f"recognised {lab}, hop on cooldown"
+                self._last_reason = f"recognised {lab}, chirp only (no hop)"
                 return happy
         return []
 

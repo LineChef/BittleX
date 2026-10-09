@@ -29,8 +29,10 @@ def slug(text: str) -> str:
 
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
-                 survey_distance: int = 12, named_distance: int = 3):
+                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0):
         self._source = source
+        self._prep_every_s = prep_every_s           # the camera prep (the throwaway frames that let auto-exposure settle) is done for the first picture and again after this long (0 = every picture)
+        self._last_prep: float | None = None
         self._root = Path(os.path.expanduser(root))
         self._clock = clock
         self._warn_mb = warn_mb
@@ -49,7 +51,13 @@ class ExplorationPictureSaver:
 
     def __call__(self, kind) -> str | None:
         kind = str(kind or "picture")
-        snap = self._source.snapshot()
+        prep = self._prep_every_s <= 0 or kind.startswith("name:") or self._last_prep is None or self._clock() - self._last_prep >= self._prep_every_s
+        try:
+            snap = self._source.snapshot() if prep else self._source.snapshot(settle=0)       # no prep: the picture right after the mode switch
+        except TypeError:                                                                       # a source whose snapshot() takes no settle argument
+            snap = self._source.snapshot()
+        if prep and snap is not None:
+            self._last_prep = self._clock()
         if snap is None:
             log.warning("no picture for %s (the camera did not answer)", kind)
             return None

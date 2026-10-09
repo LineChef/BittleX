@@ -51,6 +51,7 @@ GESTURE_TOKEN = {
     Gesture.HOP: opencat.JUMP,
 }
 
+_HEAD_GESTURES = (Gesture.NOD, Gesture.SNIFF)      # gestures that are head moves: off while no head is connected (G2_HEAD=1 turns them back on)
 _IDLE_SET = (Gesture.STRETCH, Gesture.SCRATCH, Gesture.SNIFF, Gesture.NOD, Gesture.SIT_SHIFT)
 _GREETING_SET = (Gesture.WAVE, Gesture.SHAKE_PAW, Gesture.PLAY_BOW)
 
@@ -62,6 +63,8 @@ class GestureConfig:
     idle_cooldown_s: float = 90.0        # a given idle gesture can't repeat within this
     explore_sniff_cooldown_s: float = 20.0  # SNIFF at a novel find, min gap
     hop_cooldown_s: float = 300.0        # excited hop is loud -- keep it rare
+    head_enabled: bool = field(default_factory=lambda: __import__("os").environ.get("G2_HEAD", "0") == "1")   # OFF since 2026-10-09 (user): no head is connected until the AI head arrives
+    hop_enabled: bool = field(default_factory=lambda: __import__("os").environ.get("G2_EXCITED_HOP", "0") == "1")   # OFF since 2026-10-09 (user): no hopping when he recognises a person; G2_EXCITED_HOP=1 brings it back
     greet_cooldown_s: float = 45.0       # one greeting gesture per meeting, then quiet
     # weights for the idle pick (higher = more often). SIT_SHIFT is the safe default.
     idle_weights: dict = field(default_factory=lambda: {
@@ -111,7 +114,7 @@ class GesturePicker:
             self._reason = f"not due yet ({due:.1f})"
             return Gesture.NONE
         pool = [(g, self.cfg.idle_weights.get(g, 1.0)) for g in _IDLE_SET
-                if self._cool(g, now, self.cfg.idle_cooldown_s)]
+                if (self.cfg.head_enabled or g not in _HEAD_GESTURES) and self._cool(g, now, self.cfg.idle_cooldown_s)]
         if not pool:
             self._reason = "all idle gestures cooling down"
             return Gesture.NONE
@@ -137,6 +140,9 @@ class GesturePicker:
     def sniff_find(self, now: float | None = None) -> Gesture:
         """SNIFF when the explore layer lands on a novel object."""
         now = self._clock() if now is None else now
+        if not self.cfg.head_enabled:
+            self._reason = "no head connected: no sniff"
+            return Gesture.NONE
         if not self._cool(Gesture.SNIFF, now, self.cfg.explore_sniff_cooldown_s):
             self._reason = "sniff cooling down"
             return Gesture.NONE
@@ -144,10 +150,24 @@ class GesturePicker:
         self._reason = "sniff a find"
         return Gesture.SNIFF
 
+    def found_something(self, now: float | None = None) -> Gesture:
+        """What G2 does on noticing something interesting while no head is connected: a short play bow (front low, rear high, then he stands again), stopped and on all four feet.
+        Rate-limited like the sniff it stands in for."""
+        now = self._clock() if now is None else now
+        if not self._cool(Gesture.PLAY_BOW, now, self.cfg.explore_sniff_cooldown_s):
+            self._reason = "bow cooling down"
+            return Gesture.NONE
+        self._fired(Gesture.PLAY_BOW, now)
+        self._reason = "play bow at a find"
+        return Gesture.PLAY_BOW
+
     def excited_hop(self, now: float | None = None) -> Gesture:
         """A hop for recognising a bonded person after a while / a big find.
         Loud -- hard rate limit."""
         now = self._clock() if now is None else now
+        if not self.cfg.hop_enabled:
+            self._reason = "hop disabled"
+            return Gesture.NONE
         if now - self._last_hop < self.cfg.hop_cooldown_s:
             self._reason = "hop on cooldown"
             return Gesture.NONE
