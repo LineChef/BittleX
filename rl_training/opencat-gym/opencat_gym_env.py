@@ -926,6 +926,10 @@ IMU_NOISE_PER_FRAME = _g2e("IMU_NOISE_PER_FRAME", False)
 # HAZARD_EP_LEN > 0: an episode whose focus is a hazard (frontier focus, or a terrain / ledge / slope focus category) runs this many steps, and the scattered obstacles
 #   spread over a proportionally longer stretch, so the robot spends more of the episode in contact with the hazard.
 HAZARD_EP_LEN = _g2e("HAZARD_EP_LEN", 0)
+# HAZARD_X_SCALE > 0: the stretch the scattered obstacles are spread over is this multiple of the usual one, whatever the episode length (0 = proportional to HAZARD_EP_LEN, the original
+#   behaviour). 1.0 with a longer HAZARD_EP_LEN keeps the obstacles where they were and gives G2 the extra time to walk THROUGH them (2026-10-09: in 3.1 s episodes G2 reached the
+#   first obstacles but never got past them).
+HAZARD_X_SCALE = _g2e("HAZARD_X_SCALE", 0.0)
 # IMITATION_ACTUAL: the imitation reward compares the MEASURED joint angles with wkF (does G2 actually walk the gait?). Off = the commanded joints, which in residual mode
 #   is exp(-0.15 sum(action^2)): a constant alive bonus plus a residual-size penalty (2026-10-08 recipe evaluation).
 IMITATION_ACTUAL = _g2e("IMITATION_ACTUAL", False)
@@ -2314,7 +2318,7 @@ class OpenCatGymEnv(gym.Env):
             _hz = (self._fr_focus is not None and self._fr_focus[0] != "cutback") if self._fz is not None else (self._focus in ("terrain", "ledge", "slope"))
             if _hz:
                 self._step_budget = max(self._step_budget, int(HAZARD_EP_LEN))
-                self._x_scale = HAZARD_EP_LEN / EPISODE_LENGTH
+                self._x_scale = HAZARD_X_SCALE if HAZARD_X_SCALE > 0 else HAZARD_EP_LEN / EPISODE_LENGTH
         self._begin_long_run()
         p.resetSimulation()
         # Disable rendering during loading.

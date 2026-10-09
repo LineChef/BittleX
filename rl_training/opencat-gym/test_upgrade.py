@@ -244,3 +244,33 @@ def test_path_speed_does_not_lose_a_curving_walk():
     assert abs(m["path_speed_mps"] - 0.08) < 0.004 and abs(m["path_decay"]) < 0.05
     assert m["speed_decay"] > 0.2 and m["speed_mps"] < m["path_speed_mps"]
     assert "pdecay" in B.table({"cells": [dict(m, id="N2")]})
+
+
+HAZARD_LONG_PROBE = r"""
+import os, sys, json
+sys.path.insert(0, ".")
+for k in [k for k in os.environ if k.startswith("G2E_")]:
+    del os.environ[k]
+import g2_profile
+env = g2_profile.next_final_env(); env.update(g2_profile.LEVERS["frontier"]); env.update(g2_profile.LEVERS["hazard_long"]); env["G2E_RECORD_EVERY"] = "0"
+g2_profile.set_environ(env)
+import numpy as np
+import opencat_gym_env as E
+E.GUI_MODE = False
+e = E.OpenCatGymEnv(); e.set_ramp_steps(10e6)
+long_, short_, scales = 0, 0, set()
+for i in range(40):
+    np.random.seed(i); e.reset()
+    if e._step_budget >= 600:
+        long_ += 1; scales.add(round(float(e._x_scale), 3))
+    else:
+        short_ += 1
+print(json.dumps({"long": long_, "short": short_, "scales": sorted(scales)}))
+"""
+
+
+def test_hazard_long_lengthens_hazard_episodes_without_moving_the_obstacles():
+    import json
+    out = json.loads(_child(HAZARD_LONG_PROBE).strip().splitlines()[-1])
+    assert out["long"] >= 10 and out["short"] >= 3          # hazard-focus episodes run 600 steps, the rest keep the usual length
+    assert out["scales"] == [1.0]                             # the obstacle stretch is not stretched with the episode
