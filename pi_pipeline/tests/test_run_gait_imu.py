@@ -582,3 +582,27 @@ def test_standup_test_ramp_ends_on_the_stand_pose_in_even_steps():
     assert len(poses) == 40 and poses[-1] == [50, 0] * 4
     assert abs(poses[0][0] - 80) < 0.1 and abs(poses[19][0] - 65) < 1.0     # S-curve: barely moved after the first step, about halfway at the middle
     assert st.summarize([(0, 1, 2, 10), (1, -5, 3, 4)]) == (5, 3, -6)
+
+
+def test_watchdog_starts_after_the_stand_up_setup_not_before(rg, monkeypatch):
+    """2026-10-10: the stand-up ramp pushed the setup past the watchdog's 2 s start-up grace, it saw a stall, sent `d` and G2 lay down and stood up again un-eased."""
+    pytest.importorskip("onnxruntime")
+    from unittest import mock
+    lk = _FiveHzImuLink()
+
+    class _FakeWd:
+        def __init__(self, *a, **k): pass
+        def start(self): lk.sent.append("WD_START")
+        def beat(self): pass
+        def stop(self): pass
+
+    monkeypatch.setattr(rg, "diag", mock.MagicMock())
+    monkeypatch.setattr("pi_pipeline.diag.watchdog.Watchdog", _FakeWd)
+    monkeypatch.setattr("pi_pipeline.diag.sysmon.Sysmon", mock.MagicMock())
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.8")
+    monkeypatch.setattr(rg.time, "sleep", lambda s: None)
+    rg.run(lk, 0.10, 0.5, 80.0, "auto", disable_firmware_balance=True, thermal_guard=False, send_every=1)
+    assert "WD_START" in lk.sent
+    ramp_steps = [c for c in lk.sent[:lk.sent.index("WD_START")] if c.startswith("i")]
+    assert len(ramp_steps) >= 17                    # the 16 ramp steps and the exact stand pose all went out before the watchdog started
+    assert lk.sent.index("gP") < lk.sent.index("WD_START")

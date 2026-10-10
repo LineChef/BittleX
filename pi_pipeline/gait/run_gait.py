@@ -531,8 +531,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             from pi_pipeline.diag.watchdog import Watchdog, WatchdogConfig
             from pi_pipeline.diag.sysmon import Sysmon
             wd = Watchdog(WatchdogConfig(stall_after_s=max(0.25, 4.0 / hz)),
-                          on_stall=lambda: _send(lk, "d"), sysmon=Sysmon())
-            wd.start()
+                          on_stall=lambda: _send(lk, "d"), sysmon=Sysmon())      # started just before the loop (below): the stand-up ramp + settle take longer than its 2 s start-up grace
         except Exception:
             wd = None
     _guard_prev = "ok"
@@ -609,6 +608,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     q = policy_quat(r, p_, yaw_k * y)
     pol.reset(np.deg2rad(np.array(STAND_URDF_DEG, dtype=float)), q, [gx, gy, gz])
 
+    if wd is not None:
+        wd.start()          # the setup above (stand-up ramp, settle, IMU priming) is not a stall: a start here, not earlier, kept a 2.1 s setup from sending `d` and laying G2 down (2026-10-10)
     dt = 1.0 / hz
     n = int(seconds * hz) if seconds else None
     t_next = time.perf_counter()

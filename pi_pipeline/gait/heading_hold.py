@@ -135,7 +135,7 @@ def default_foot_hold():
 
 
 # Constant front-left trims measured on G2 (hardwood, hold off, 12.5 s, 3 runs each, heading by eye): V4 untrimmed ends about 60 deg right; -0.2 ended 7 deg right / 2 deg left / 30 deg left.
-DEFAULT_TRIMS = {"Release_CandidateV4_ppo.onnx": "fl=-0.2", "Release_CandidateV6_ppo.onnx": "fl=-0.5"}
+DEFAULT_TRIMS = {"Release_CandidateV4_ppo.onnx": "fl=-0.2", "Release_CandidateV6_ppo.onnx": "fl=-0.3"}
 
 
 def default_foot_trim(policy_name: str | None):
