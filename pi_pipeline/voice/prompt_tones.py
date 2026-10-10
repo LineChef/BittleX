@@ -159,6 +159,17 @@ def render_refuse(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([out], peak)
 
 
+def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A "da naaaa" (about 1.9 s) for a finished exploration: a short brass note, then a fourth above it, held with a slight vibrato and a slow fade."""
+    da = _brass(261.6, 0.20, rate, attack=0.015, release=0.05)
+    nah = _brass(349.2, 1.55, rate, attack=0.04, release=0.55, vibrato=0.012)
+    return _finish([da, np.zeros(int(rate * 0.06)), nah], peak)
+
+
+def play_complete(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_complete, peak, rate, wait)
+
+
 def render_oof(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A winded "ooof" (about 0.5 s): a low thump of impact, then a breathy vowel that falls in pitch and fades."""
     n = int(rate * 0.06)
@@ -255,5 +266,5 @@ if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline
     name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
     fn = globals().get(f"play_{name}")
     if fn is None:
-        raise SystemExit("sounds: grunt refuse oof sigh yawn beep boop close double fanfare")
+        raise SystemExit("sounds: grunt refuse complete oof sigh yawn beep boop close double fanfare")
     fn(wait=True)

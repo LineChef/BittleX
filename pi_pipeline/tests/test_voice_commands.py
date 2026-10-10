@@ -146,6 +146,18 @@ def test_refuse_horn_renders_the_measured_five_pieces_and_ends_on_a_falling_long
     assert pt.HORN_LAST_BREAKS[0][1] > pt.HORN_LAST_BREAKS[-1][1]      # the long note sags in pitch
 
 
+def test_complete_sting_is_two_notes_the_second_longer_and_higher():
+    import numpy as np
+    from pi_pipeline.voice import prompt_tones as pt
+    pcm = pt.render_complete(48000, pt.DEFAULT_PEAK)
+    assert 1.7 < len(pcm) / 48000 < 2.1 and 300 < np.abs(pcm).max() < 1500
+    r = 48000
+    def f0(seg):
+        seg = seg.astype(float) * np.hanning(len(seg)); sp = np.abs(np.fft.rfft(seg, 1 << 15)); fr = np.fft.rfftfreq(1 << 15, 1 / r)
+        return fr[np.argmax(np.where((fr > 150) & (fr < 700), sp, 0))]
+    assert abs(f0(pcm[int(0.03 * r):int(0.18 * r)]) - 261.6) < 20 and abs(f0(pcm[int(0.6 * r):int(1.2 * r)]) - 349.2) < 20
+
+
 def test_horn_switches_are_per_situation(monkeypatch):
     from pi_pipeline.voice import prompt_tones as pt
     played = []

@@ -175,7 +175,7 @@ def main() -> None:
             narrator = Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
             attach(rt.bindings, narrator)
             rt.bindings.tts = tts
-            say("Exploration mode started. I will stay put and look around first." if args.stationary else "Exploration mode started.")
+            say("Exploration mode. I will stay put and look around first." if args.stationary else "Exploration mode.")
 
         def _on_fall():
             log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
@@ -306,7 +306,10 @@ def main() -> None:
                     policy_walker.stop(rest=False)                            # stop walking first, then settle into a balanced stand, and only then lie down:
                 link.send("kbalance", read_reply=False, settle=0.0)           # resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
                 time.sleep(1.5)
-                say("Exploration mode complete.")                              # said first (user, 2026-10-07; wording 2026-10-10), then G2 lies down
+                say("Exploration complete.")                                   # said first (user, 2026-10-07; wording 2026-10-10), then the "da naaaa", then G2 lies down
+                if os.environ.get("G2_COMPLETE_SOUND", "1") != "0":
+                    from .voice import prompt_tones
+                    prompt_tones.play_complete(wait=True)
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")

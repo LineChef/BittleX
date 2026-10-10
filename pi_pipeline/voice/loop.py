@@ -536,7 +536,7 @@ class VoiceLoop:
             self._cue.set("speaking")
             from . import prompt_tones
             prompt_tones.play_fanfare(wait=True)                    # the brass fanfare, then the words (user, 2026-10-10)
-            self._speak("Commencing exploration mode.")             # said BEFORE the hand-over: the launch stops this service
+            self._speak("Exploration mode.")             # said BEFORE the hand-over: the launch stops this service
             self._events(arm_explore=True)
             self._set_session()
             self._cue.set("idle")
