@@ -74,12 +74,24 @@ def test_prompt_tones_are_three_distinct_sounds_and_the_cue_plays_each_on_its_st
     assert played == ["p", "p", "p"]                           # only the three stages sound
 
 
-def test_the_exploration_fanfare_is_four_notes_and_rides_the_roam_chirp():
-    from pi_pipeline.behavior.chirps import CHIRP, ChirpMood, chirp_for
+def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
+    import types
+    from pi_pipeline.behavior.bindings import DriverBindings
+    from pi_pipeline.behavior.chirps import ChirpMood
+    from pi_pipeline.behavior.driver import Effect, EffectKind
     from pi_pipeline.voice import prompt_tones as pt
-    pcm = pt.render_fanfare()
-    assert 1.0 < pcm.size / 48000 < 1.7 and abs(int(pcm.max())) > 100
-    notes = CHIRP[ChirpMood.FANFARE]
-    assert len(notes) == 4 and notes[-1][1] < min(d for _, d in notes[:-1])          # three short notes, then a long one
-    assert [n for n, _ in notes] == sorted(n for n, _ in notes)                       # rising
-    assert chirp_for(ChirpMood.FANFARE).startswith("b9 ")
+    pcm = pt.render_start_horn()
+    assert 2.2 < pcm.size / 48000 < 2.4 and abs(int(pcm.max())) > 100
+    import numpy as np
+    tail, mid = np.abs(pcm[-240:]).max(), np.abs(pcm[48000:72000]).max()
+    assert tail < 0.02 * mid                                                         # it fades out to nothing at the end
+    sp = np.abs(np.fft.rfft(pcm[24000:72000].astype(float) * np.hanning(48000), 1 << 17)); fr = np.fft.rfftfreq(1 << 17, 48000 ** -1)
+    assert abs(fr[np.argmax(np.where((fr > 200) & (fr < 400), sp, 0))] - 302.5) < 3 # the measured steady pitch
+    sent = []
+    b = DriverBindings(actuator=types.SimpleNamespace(perform=lambda tone: sent.append(tone)))
+    b.dispatch([Effect(EffectKind.CHIRP, ChirpMood.FANFARE)])
+    b.dispatch([Effect(EffectKind.CHIRP, ChirpMood.QUESTION)])
+    assert len(sent) == 1                                                            # the other chirps still sound
+    sent.clear()
+    b.dispatch([Effect(EffectKind.CHIRP, ChirpMood.FANFARE)])
+    assert sent == []                                                               # no buzzer notes for the roam start; the horn plays with the announcement

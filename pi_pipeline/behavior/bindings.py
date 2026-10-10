@@ -41,7 +41,7 @@ def _call(obj, *names):
 
 class DriverBindings:
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
-                 walker=None, head=None, power=None, on_diag=None, fanfare=None):
+                 walker=None, head=None, power=None, on_diag=None):
         self.actuator = actuator
         self.tts = tts
         self.camera = camera
@@ -49,7 +49,6 @@ class DriverBindings:
         self.walker = walker
         self.head = head
         self.power = power
-        self.fanfare = fanfare                 # callable(): the brass-like fanfare on the speaker when the roam-start chirp is dispatched (None = buzzer only)
         self._on_diag = on_diag or _default_diag
         self._warned: set[str] = set()
 
@@ -133,14 +132,12 @@ class DriverBindings:
             fn = self.actuator and _call(self.actuator, "perform")
             if not fn:
                 return self._miss("chirp")
+            if mood is ChirpMood.FANFARE:                                    # silent: the start horn plays right after "Exploration mode." instead (user, 2026-10-10)
+                logging.getLogger("g2.chirp").info("chirp %s skipped (the start horn plays with the announcement)", mood.value)
+                return f"chirp:{mood.value}"
             tone = opencat.beep(CHIRP[mood])
             logging.getLogger("g2.chirp").info("chirp %s sent to the BiBoard: %s", mood.value, tone)
             fn(tone)
-            if mood is ChirpMood.FANFARE and self.fanfare is not None:
-                try:
-                    self.fanfare()
-                except Exception:  # noqa: BLE001
-                    pass
             return f"chirp:{mood.value}"
         if k is EffectKind.POWER:
             fn = self.power and _call(self.power, "set_profile", "profile", "apply")

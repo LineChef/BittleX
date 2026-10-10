@@ -176,6 +176,9 @@ def main() -> None:
             attach(rt.bindings, narrator)
             rt.bindings.tts = tts
             say("Exploration mode. I will stay put and look around first." if args.stationary else "Exploration mode.")
+            if not args.arm_on_start:                                              # a script start; the voice hand-over already said it and played the horn
+                from .voice import prompt_tones
+                prompt_tones.play_start_horn(wait=True)
 
         def _on_fall():
             log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
