@@ -398,9 +398,9 @@ def test_a_look_picture_is_quick_no_warm_up_no_retake_and_a_short_stillness_wait
 def test_a_survey_stop_runs_the_firmware_check_skill_between_the_bow_and_the_stand_when_asked(monkeypatch):
     from pi_pipeline.behavior.survey import SurveyConfig, survey_config_from_env, survey_plan
     plan = survey_plan(SurveyConfig(check=True))
-    assert [p for _, k, p, _ in plan if k == "skill"] == ["ksit", "kbuttUp", "kck", "kup"]
+    assert [p for _, k, p, _ in plan if k == "skill"] == ["ksit", "kbuttUp", "kup", "kck", "kup"]       # up, down, stand, check, stand again
     t_ck = next(d for d, k, p, _ in plan if p == "kck")
-    t_up = next(d for d, k, p, _ in plan if p == "kup")
+    t_up = [d for d, k, p, _ in plan if p == "kup"][-1]
     assert abs((t_up - t_ck) - 3.0) < 1e-6                                          # the check skill gets 3 s to finish
     assert [p for _, k, p, _ in plan if k == "shot"] == ["after_bow"]               # one picture, standing, after the settle
     assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "skill"] == ["ksit", "kbuttUp", "kup"]
