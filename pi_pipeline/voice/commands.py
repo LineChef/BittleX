@@ -312,6 +312,9 @@ _SURFACES = {"hardwood": "hardwood", "hard wood": "hardwood", "wood": "hardwood"
 _FLOOR_SET = re.compile(r"^(?:(?:the|this) floor (?:here )?(?:is|now is)|(?:were|we are|you are|youre|you are standing|g2 is|im|i am) on|set the floor to|floor is) (?:the |a )?([a-z]+(?: [a-z]+){0,2})$")
 # "this is a tile floor" / "this is hardwood floor": the word floor at the end says it defines the floor (without it, "this is a ..." is the naming command, which takes a picture)
 _FLOOR_THIS_IS = re.compile(r"^this is (?:the |a )?([a-z]+(?: [a-z]+){0,2}) floor$")
+_BATTERY_QUERY = ("what is your power level", "whats your power level", "what is your battery level", "whats your battery level", "what is your battery", "whats your battery", "power level",
+                  "battery level", "how much battery do you have left", "how much battery do you have", "how much battery is left", "how much battery left", "how much power do you have left",
+                  "how is your battery", "hows your battery", "check your battery")
 _FLOOR_QUERY = ("what floor am i on", "what floor are you on", "what floor is this", "which floor", "what is the floor", "whats the floor", "what surface")
 
 
@@ -377,10 +380,19 @@ def parse_walk_command(text: str) -> float | None:
     return n * (60.0 if m.group("unit").startswith("min") else 1.0)
 
 
+def asks_battery(text: str) -> bool:
+    """"what is your power level", "how much battery do you have left" and the like: G2 answers with his pack percent and the Pi's estimate."""
+    n = _normalize(text)
+    for pre in ("gee two ", "g two ", "hey buddy "):
+        if n.startswith(pre):
+            n = n[len(pre):]
+    return any(n == q or n.startswith(q + " ") for q in _BATTERY_QUERY)
+
+
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
-    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
+    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
@@ -430,6 +442,8 @@ def match_local_command(text: str) -> str | None:
         return "character"
     if parse_floor_command(text) is not None:
         return "floor"
+    if asks_battery(text):
+        return "battery_query"
     if asks_floor(text):
         return "floor_query"
     return None

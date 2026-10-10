@@ -47,6 +47,9 @@ Every exploration or voice picture now: waits until the IMU shows G2 has stopped
 ## Where this is going (user, 2026-10-10)
 Once wall avoidance is reliable, which will take more sessions with varied wall types and the planned training photos, most of the random turns can be switched off so he bounces around like a robot vacuum. Not yet: keep the explorer's turns (8 s legs) until the avoider has been shown reliable on several wall types.
 
+## A new leg after a wall look turns toward the open side (2026-10-10)
+When the explorer starts a new leg and the freshest wall look (under 8 s old, a wall within 60 in) names a side with more room, the new heading goes that way (at least 0.6 rad) instead of the explorer's random heading. It uses only the looks he already takes; no extra camera use. `G2_LEG_TURN_OPEN=0` turns it off. The backup behaviour the user described (a hit he did not turn away from in time: oof, back up, turn away again) is the hit sequence above; a separate bounce mode was not needed.
+
 ## Steps
 1. Calibrate on hardware (hardware plan block 5): `wd.calibrate()`, box at 20/30/40/60/100 cm; check the logged distances against tape within about 5 cm.
 2. One dry-run exploration session with the per-leg look wired to the log only; review the log for false positives (table legs, rugs, shadows, floor seams, tile lines, a person standing).

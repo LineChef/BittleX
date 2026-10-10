@@ -141,6 +141,34 @@ class PowerLog:
         return msg
 
 
+def sleep_stats(rows: list) -> dict:
+    """Boots, sleeps and wakes from the power log lines: how many times he slept, for how long (from the `sleep` line to the next `wake`, or to the last heartbeat / stop of that boot),
+    what woke him, and the share of each boot spent asleep."""
+    boots: dict = {}
+    for r in rows:
+        if r.get("boot"):
+            boots.setdefault(r["boot"], []).append(r)
+    sleeps, reasons = [], {}
+    asleep_s = up_s = 0.0
+    for lines in boots.values():
+        start = None
+        last_t = lines[-1].get("t", 0.0)
+        for r in lines:
+            if r.get("event") == "sleep":
+                start = r["t"]
+            elif r.get("event") == "wake" and start is not None:
+                sleeps.append(round(r["t"] - start, 1))
+                reasons[r.get("why", "?")] = reasons.get(r.get("why", "?"), 0) + 1
+                asleep_s += r["t"] - start
+                start = None
+        if start is not None:                                     # still asleep when the boot's log ends (power lost or stopped)
+            sleeps.append(round(last_t - start, 1))
+            asleep_s += last_t - start
+        up_s += max(0.0, last_t - lines[0].get("t", last_t))
+    return {"boots": len(boots), "sleeps": len(sleeps), "sleep_s": sleeps, "longest_s": max(sleeps, default=0.0), "wake_reasons": reasons,
+            "asleep_share": round(asleep_s / up_s, 3) if up_s > 0 else 0.0}
+
+
 def format_line(r: dict) -> str:
     t = time.strftime("%Y-%m-%d %I:%M:%S %p", time.localtime(r.get("t", 0)))
     extra = " ".join(f"{k}={v}" for k, v in r.items() if k not in ("t", "boot", "up", "event"))

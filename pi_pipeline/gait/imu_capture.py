@@ -52,6 +52,10 @@ def main(argv=None) -> int:
     ap.add_argument("--pose", choices=("rest", "stand"), default="rest")
     ap.add_argument("--out", default=None)
     a = ap.parse_args(argv)
+    import subprocess
+    if subprocess.run(["systemctl", "is-active", "--quiet", "g2-voice"]).returncode == 0:
+        print("the voice service is running and holds the serial port: bash tools/g2_safe_stop.sh voice first")
+        return 2
     from ..link.serial_link import SerialLink
     lk = SerialLink("/dev/serial0", baud=115200)
     if not lk.connect():

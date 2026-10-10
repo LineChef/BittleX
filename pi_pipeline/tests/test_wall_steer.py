@@ -171,3 +171,19 @@ def test_a_wall_ahead_cuts_the_current_leg_to_what_is_left_before_it(monkeypatch
     assert d.explorer._leg_cap is not None and abs(d.explorer._leg_cap - (33.0 - 12.0) / 3.5) < 0.01       # 21 in left at 3.5 in/s = 6 s
     d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=14.0, confirmed=False, groups=0, votes=0, turn=None, age=0.1)))
     assert d.explorer._leg_cap >= 1.5 and d.explorer._leg_cap <= 6.0                                        # never shorter than 1.5 s, never longer than before
+
+
+def test_a_new_leg_after_a_wall_look_turns_toward_the_open_side_and_without_one_the_explorer_is_unchanged(monkeypatch):
+    from pi_pipeline.behavior.explore import ExploreAction, ExploreDecision
+    d, c = _explorer(monkeypatch)
+    c.adv(12.0)
+    d.explorer.decide = lambda frame, now: ExploreDecision(ExploreAction.TURN, turn=-0.2, reason="new leg")            # a random heading to the left
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=40.0, confirmed=False, groups=0, votes=0, turn="right")))
+    assert [p for p in payloads(t, EffectKind.TURN) if p > 0.5]                                                          # sent right, at least 0.6 rad
+    c.adv(3.0)
+    t = d.tick(DriverInputs(frame=[]))                                                                                    # no wall look: his own heading stands
+    assert [p for p in payloads(t, EffectKind.TURN) if abs(p + 0.2) < 1e-9]
+    monkeypatch.setenv("G2_LEG_TURN_OPEN", "0")
+    c.adv(3.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=40.0, confirmed=False, groups=0, votes=0, turn="right")))
+    assert [p for p in payloads(t, EffectKind.TURN) if abs(p + 0.2) < 1e-9]                                               # switched off

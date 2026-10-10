@@ -323,6 +323,23 @@ g2pics() {
   esac
 }
 
+# g2walls  -- the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page.
+g2walls() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  python3 "$G2_ROOT/tools/g2_review.py" --tab walls
+}
+# g2wallstats [DAYS]  -- statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns, the times he stayed near a wall.
+g2wallstats() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_stats ${1:+--days $1}"; }
+# g2wallreplay [DIR]  -- what an exploring G2 would do with each saved wall picture (runs on the Pi; default ~/g2_wall_pics); nothing moves.
+g2wallreplay() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_replay ${1:-~/g2_wall_pics}"; }
+# g2wallpic LABEL INCHES [ANGLE]  -- take one labelled wall picture on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice); distance in inches from the lens to the base of the wall.
+g2wallpic() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ $# -ge 2 ] || { echo "usage: g2wallpic LABEL INCHES [ANGLE_DEG]   e.g. g2wallpic wall_straight 16"; return 2; }
+  ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '$1' --inches '$2' ${3:+--angle $3}"
+}
+# g2imu [rest|stand] [SECONDS]  -- record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
+g2imu() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.gait.imu_capture --pose ${1:-rest} --seconds ${2:-60}"; }
 # g2picscurate [IN_DIR] [OUT_DIR]  -- curate the pulled exploration pictures (default ~/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }

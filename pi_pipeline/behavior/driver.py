@@ -42,7 +42,7 @@ from .enrollment import (
     Enrollment, EnrollmentConfig, EnrollAction, EnrollState, EnrollTick,
     count_completed_sessions, new_session_dir, mark_session_done,
 )
-from .explore import Explorer, ExploreAction, ExploreConfig
+from .explore import Explorer, ExploreAction, ExploreConfig, ExploreDecision
 from .gestures import GesturePicker, GestureConfig, GESTURE_TOKEN, Gesture
 from .idle_posture import (
     IdlePosture, IdlePostureConfig, Posture, PostureAction,
@@ -588,6 +588,10 @@ class BehaviorDriver:
         if w is not None and w.nearest_in is not None and now - w.t <= self.WALL_STALE_S and w.nearest_in <= 60.0:
             self.explorer.cap_leg(max(1.5, (w.nearest_in - self.LEG_MARGIN_IN) / self.LEG_SPEED_IN_S))      # a wall ahead: cut this leg to what is left before it (look once per leg, shorten the walk)
         d = self.explorer.decide(list(i.frame), now)
+        if (d.action is ExploreAction.TURN and w is not None and w.turn in ("left", "right") and w.nearest_in is not None and w.nearest_in <= 60.0
+                and now - w.t <= self.WALL_STALE_S and os.environ.get("G2_LEG_TURN_OPEN", "1") != "0"):
+            side = 1.0 if w.turn == "right" else -1.0                          # a wall was just seen ahead: the new heading goes toward the open side, not a random one (existing looks only, no extra camera use)
+            d = ExploreDecision(ExploreAction.TURN, turn=side * max(abs(d.turn), 0.6), reason=d.reason + f" (toward the open side, {w.turn})")
         if d.action is ExploreAction.TURN and now - self._roam_began_at < self.EXPLORE_STRAIGHT_S:
             return [Effect(EffectKind.WALK, 0.0, "straight first")]               # walk straight at the start; a wall turn above still wins
         self._explore_target = d.target

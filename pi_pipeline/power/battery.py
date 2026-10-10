@@ -42,6 +42,23 @@ def read_voltage(link, *, attempts: int = 3, drain_s: float = 0.2) -> float | No
     return None
 
 
+# Per-cell resting voltage -> percent left for a Li-ion cell (approximate; the user wants every battery figure as percent, 2026-10-10). Readings taken while walking sag 0.1 to 0.3 V.
+_CELL_PERCENT = ((4.20, 100), (4.15, 95), (4.11, 90), (4.08, 85), (4.02, 80), (3.98, 75), (3.95, 70), (3.91, 65), (3.87, 60), (3.85, 55), (3.84, 50), (3.82, 45), (3.80, 40),
+                 (3.79, 35), (3.77, 30), (3.75, 25), (3.73, 20), (3.71, 15), (3.69, 10), (3.61, 5), (3.27, 0))
+
+
+def pack_percent(volts: float, cells: int = 2) -> int:
+    """About how much charge is left in the pack, 0 to 100, from its resting voltage (G2's pack is 2S: 8.4 V full)."""
+    v = volts / cells
+    pts = _CELL_PERCENT
+    if v >= pts[0][0]:
+        return 100
+    for (v0, p0), (v1, p1) in zip(pts, pts[1:]):
+        if v1 <= v <= v0:
+            return int(round(p1 + (p0 - p1) * (v - v1) / (v0 - v1)))
+    return 0
+
+
 class BatteryLevel(IntEnum):
     OK = 0
     LOW = 1

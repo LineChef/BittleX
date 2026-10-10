@@ -459,3 +459,13 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `cd rl_training/opencat-gym && ./watch_v3.sh [TAG] [--dr-push 0.35]` | replay the newest checkpoint of a run in the PyBullet GUI, in the G2 hardware world; run it in your own terminal; it slows the training a little while open |
 | `python rl_training/opencat-gym/phase_v3.py status` | every finished job and its verdict |
 | `g2clean` | list scratch files on the Mac and the Pi that are safe to delete and untracked files that need a commit-or-delete decision (dry run); `g2clean --apply` deletes the scratch list and the Pi's stray files |
+
+## Wall and IMU tools (2026-10-10)
+
+| Command | What it does |
+|---|---|
+| `g2walls` | opens the review page on the **Walls** tab: the labelled wall recognition shots and the near-wall pictures kept during roams (kept apart from the object pictures) |
+| `g2wallstats [DAYS]` | statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns it made, the times he stayed near a wall, detections per label |
+| `g2wallreplay [DIR]` | what an exploring G2 would do with each saved wall picture (default `~/g2_wall_pics` on the Pi); nothing moves |
+| `g2wallpic LABEL INCHES [ANGLE]` | one labelled wall picture on the Pi (stop the voice service first): stands him, waits for stillness, warms the camera, retakes a bad exposure |
+| `g2imu [rest\|stand] [SECONDS]` | records the raw IMU stream on the Pi and prints the frame rate, accel bias and noise (stop the voice service first) |

@@ -1,5 +1,5 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
-                               | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
+                               | stats   (sleeps and wakes from the power log) | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
                                | runtime [list] | runtime add <seconds> [full] | runtime forget <index> | runtime count <index> | runtime path
                                | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
 from __future__ import annotations
@@ -30,6 +30,10 @@ def main(argv=None):
         n = int(a[1]) if len(a) > 1 else 30
         rows = PowerLog().lines()
         print("\n".join(format_line(r) for r in rows[-n:]) if rows else "no power log yet")
+    elif cmd == "stats":
+        from .power_log import PowerLog, sleep_stats
+        s = sleep_stats(PowerLog().lines())
+        print(f"{s['boots']} boots in the log; {s['sleeps']} sleeps, the longest {s['longest_s'] / 60:.1f} min, {100 * s['asleep_share']:.0f}% of the logged time asleep; woken by: {s['wake_reasons'] or 'nothing yet'}")
     elif cmd == "leds-off":
         print("\n".join(P.disable_onboard_leds()))
     else:
