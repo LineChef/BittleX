@@ -21,9 +21,11 @@ CAL_PATH = os.path.expanduser(os.environ.get("G2_WALL_CAL", "~/.local/share/g2/w
 LOG_PATH = os.path.expanduser(os.environ.get("G2_WALL_LOG", "~/.local/share/g2/wall_dryrun.jsonl"))
 
 
-def base_rows(img, localizer: ForegroundLocalizer | None = None, *, groups: int = GROUPS, need_rows: int = 2, group_frac: float = 0.6):
+def base_rows(img, localizer: ForegroundLocalizer | None = None, *, groups: int = GROUPS, need_rows: int = 2, group_frac: float = 0.6, min_rise: int = 6):
     """Per column group, the picture row (a fraction 0..1, the lower edge of the obstacle's base) where the floor ends, or None when the floor runs to the top of the picture.
-    Returns (rows, floor_visible): `floor_visible` False when almost the whole picture differs from the floor strip (the obstacle is right in front of him)."""
+    A wall RISES: the obstacle must be at least `min_rise` consecutive grid rows tall (a quarter of the picture), so a bright sheen, a reflection or a floor-grain patch (2 to 4 rows, with floor above it)
+    is skipped and the search goes on upward to the wall behind it (user, 2026-10-10: a wall 10 ft away read as 9 in because of a floor sheen). Returns (rows, floor_visible):
+    `floor_visible` False when almost the whole picture differs from the floor strip (the obstacle is right in front of him)."""
     import numpy as np
     loc = localizer or ForegroundLocalizer()
     mask = loc.foreground_mask(img)
@@ -33,12 +35,21 @@ def base_rows(img, localizer: ForegroundLocalizer | None = None, *, groups: int 
         c0, c1 = int(i * g / groups), max(int((i + 1) * g / groups), int(i * g / groups) + 1)
         fg = mask[:, c0:c1].mean(axis=1) >= group_frac                      # per row: is most of this column group not floor
         found = None
-        run = 0
-        for r in range(g - 1, -1, -1):                                       # from the bottom of the picture upward
-            run = run + 1 if fg[r] else 0
-            if run >= need_rows:
-                found = r + need_rows                                        # the lower edge of the lowest obstacle row of that run
+        r = g - 1
+        while r >= 0:                                                        # from the bottom of the picture upward, one run of obstacle rows at a time
+            if not fg[r]:
+                r -= 1
+                continue
+            t = r
+            while t - 1 >= 0 and fg[t - 1]:
+                t -= 1                                                       # [t..r] is a run of consecutive obstacle rows; its lower edge is the candidate base
+            if r - t + 1 < need_rows:                                        # a single stray row is not an obstacle
+                r = t - 1
+                continue
+            if r - t + 1 >= min_rise:                                        # tall enough to be a wall: it rises at least a quarter of the picture without a gap
+                found = r + 1                                                # the lower edge of the lowest wall-height obstacle
                 break
+            r = t - 1                                                        # too short (a sheen, a floor-grain patch): keep looking above it
         rows.append(None if found is None else min(1.0, found / g))
     covered = float(mask.mean())
     return rows, covered < 0.9
@@ -138,6 +149,7 @@ class WallLog:
         self.cal, self.path, self.pics_dir, self.ring, self.clear_every_s = calibration, path, pics_dir, ring, clear_every_s
         self.context, self._clock = context, clock
         self._last_clear = float("-inf")
+        self._prev_state = None
 
     def look(self, jpeg: bytes, img) -> WallEstimate:
         if self.cal is None:                                              # not calibrated: keep the raw base rows so a calibration can be checked against them
@@ -157,6 +169,9 @@ class WallLog:
             pic = self._keep(jpeg, st, now)
             if pic:
                 extra["pic"] = pic
+        near_now = st in ("near", "blocked")
+        extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
+        self._prev_state = st
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 

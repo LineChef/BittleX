@@ -98,3 +98,28 @@ def test_the_wall_log_keeps_pictures_for_near_walls_only_in_a_ring_and_the_stats
     assert len(list((tmp_path / "pics").glob("wall_*.jpg"))) == 3                                      # a ring of 3
     w = wall_summary(rows)
     assert w["looks"] == 7 and w["states"] == {"clear": 3, "near": 4} and w["near_streaks"][0][1] == 4 and sum(v for k, v in w["distance_hist"].items() if k in ("8 in or less", "8 to 12 in")) == 4
+
+
+def test_a_floor_sheen_is_not_a_wall_but_the_wall_behind_it_still_is():
+    img = _scene(0.5, 0.5)                                               # a wall whose base is at half height, 40 in or more away
+    img[150:190, 70:170] = (235, 230, 225)                               # a bright sheen on the floor in front of it, only 40 px (about 4 grid rows) tall, floor above it
+    rows, visible = base_rows(img)
+    assert visible and abs(rows[2] - 0.5) < 0.1                          # the centre group still reads the wall base, not the sheen (0.79)
+    est = estimate(img, CAL)
+    assert est.nearest_cm is not None and est.nearest_cm > 60.0 and est.turn is None
+
+
+def test_a_near_wall_is_confirmed_only_when_two_looks_in_a_row_agree(tmp_path):
+    import io
+    import json
+    from PIL import Image
+    from pi_pipeline.vision.wall_distance import WallLog
+    log = WallLog(CAL, path=str(tmp_path / "w.jsonl"), pics_dir=str(tmp_path / "p"), clock=lambda: 1.0)
+    near, clear = _scene(0.86, 0.86), _scene(None, None)
+
+    def jpeg(img):
+        b = io.BytesIO(); Image.fromarray(img).save(b, "JPEG"); return b.getvalue()
+    for img in (clear, near, near, clear, near):
+        log.look(jpeg(img), img)
+    rows = [json.loads(line) for line in (tmp_path / "w.jsonl").read_text().splitlines()]
+    assert [r["near_confirmed"] for r in rows] == [False, False, True, False, False]

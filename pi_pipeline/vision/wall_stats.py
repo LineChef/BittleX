@@ -64,7 +64,7 @@ def wall_summary(rows: list) -> dict:
             streaks.append(cur); cur = []
     if cur:
         streaks.append(cur)
-    return {"looks": len(rows), "states": dict(states), "distance_hist": dict(hist), "turns": dict(Counter(r.get("turn") for r in rows if r.get("turn"))),
+    return {"looks": len(rows), "states": dict(states), "near_confirmed": sum(1 for r in rows if r.get("near_confirmed")), "distance_hist": dict(hist), "turns": dict(Counter(r.get("turn") for r in rows if r.get("turn"))),
             "uncalibrated": sum(1 for r in rows if r.get("calibrated") is False or "uncalibrated" in str(r.get("reason", ""))),
             "near_streaks": [(s[0].get("t"), len(s), min((x.get("nearest_in") or 0) for x in s)) for s in streaks],
             "by_hour": {h: dict(c) for h, c in sorted(by_hour.items())},
@@ -90,6 +90,8 @@ def main(argv=None) -> int:
     print(f"WALL LOOKS: {w['looks']} ({w['uncalibrated']} before calibration)")
     for k, v in sorted(w["states"].items()):
         print(f"  {k:8s} {v}")
+    if w["states"].get("near") or w["states"].get("blocked"):
+        print(f"  near looks confirmed by two in a row: {w['near_confirmed']}")
     if w["distance_hist"]:
         print("nearest wall (inches):")
         for _, name in BUCKETS:
