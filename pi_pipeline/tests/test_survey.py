@@ -94,7 +94,7 @@ def test_driver_surveys_at_the_end_of_a_leg_then_walks_on():
     assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["kbuttUp"]       # the first thing is the bow itself
     assert EffectKind.STOP not in [e.kind for e in t.effects]                               # never a rest in the middle of exploring
     walking(d)                                           # from now on the explorer would keep walking, if the choreography let it
-    during = run_for(d, c, 7.1)                         # the plan runs to 7.3 s: ksit, kup and the picture fall inside this window
+    during = run_for(d, c, 8.2)                         # the plan runs to 8.1 s (2.2 + 2.2 + the 3.3 s stand settle + 0.4): ksit, kup and the picture fall inside this window
     skills = [e.payload for e in during if e.kind is EffectKind.SKILL]
     shots = [e.payload for e in during if e.kind is EffectKind.CAPTURE]
     assert skills == ["ksit", "kup"] and shots == [("shot", "after_bow")]
@@ -123,7 +123,7 @@ def test_survey_does_not_repeat_inside_the_cooldown_and_is_off_by_default():
 def test_a_spoken_name_takes_its_picture_like_a_survey_stop_and_confirms_aloud():
     d, c = mk()
     t = d.tick(DriverInputs(name_request="Mug", frame=[]))
-    effects = t.effects + run_for(d, c, 7.3)             # bow, look up, stand, settle, picture, confirm: the plan is over at about 7.7 s
+    effects = t.effects + run_for(d, c, 8.6)             # bow, look up, stand, settle, picture, confirm: the plan is over at about 8.4 s (3.3 s stand settle)
     assert EffectKind.STOP not in [e.kind for e in effects]
     assert [e.payload for e in effects if e.kind is EffectKind.SKILL] == ["kbuttUp", "ksit", "kup"]          # the same sequence as the survey (user, 2026-10-07)
     assert [e.payload for e in effects if e.kind is EffectKind.CAPTURE] == [("shot", "name:mug")]
@@ -188,7 +188,8 @@ def test_pictures_can_be_trashed_restored_and_only_emptying_the_trash_deletes(tm
         EP.trash_pictures(str(tmp_path / "pics"), ["../../etc/passwd.jpg"])               # never outside the picture folder
 
 
-def test_a_near_duplicate_is_not_saved_a_different_picture_is(tmp_path):
+def test_a_near_duplicate_is_not_saved_a_different_picture_is(tmp_path, monkeypatch):
+    monkeypatch.setattr("pi_pipeline.vision.exploration_pictures._badly_exposed", lambda jpeg: False)      # these test pictures are black and white patterns: no exposure retake here
     pytest = __import__("pytest")
     pytest.importorskip("PIL")
     import io
