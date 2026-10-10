@@ -3,7 +3,7 @@
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   look up (`ksit`) -> look down (`kbuttUp`, the INSPECT bow) -> stand (`kup`) -> settle -> [look left, throwaway picture, look right, throwaway picture, back to the middle, settle] -> picture (the bracketed part only when `looks`, `G2_SURVEY_LOOKS=1`; off by default)
+  survey_plan   look up (`ksit`) -> look down (`kbuttUp`, the INSPECT bow) -> [check (`kck`), when `check`: the default for survey stops] -> stand (`kup`) -> settle -> [look left, throwaway picture, look right, throwaway picture, back to the middle, settle] -> picture (the bracketed part only when `looks`, `G2_SURVEY_LOOKS=1`; off by default)
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -29,6 +29,9 @@ class SurveyConfig:
     look_down_skill: str = "kbuttUp"
     look_up_skill: str = "ksit"
     stand_skill: str = "kup"
+    check: bool = False             # survey stops run the firmware `check` skill (`kck`: a head pan with a body lean; with no head connected only the lean shows) between the bow and the stand (user, 2026-10-10)
+    check_skill: str = "kck"
+    check_s: float = 3.0            # how long the check skill is given to finish
     looks: bool = False             # survey stops also look left and right, a throwaway picture each, then settle and take the normal picture (user, 2026-10-10); False = the one standing picture
     look_deg: float = 45.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
     turn_rate_dps: tuple = (11.0, 18.0)      # measured yaw rates of the firmware left / right turn gaits (app/sinks.py WalkerSink.TURN_RATE_DPS)
@@ -46,7 +49,7 @@ def survey_config_from_env() -> SurveyConfig:
             return max(0.0, float(os.environ.get(name, default)))
         except ValueError:
             return default
-    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), looks=os.environ.get("G2_SURVEY_LOOKS", "0") == "1")     # `G2_SURVEY_LOOKS=1` = also look left and right (OFF by default: open-loop timed turns were off by 30 to 70 deg and G2 has no head to pan, 2026-10-10)
+    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), looks=os.environ.get("G2_SURVEY_LOOKS", "0") == "1", check=os.environ.get("G2_SURVEY_CHECK", "1") != "0")     # `G2_SURVEY_LOOKS=1` = also look left and right (OFF by default: open-loop timed turns were off by 30 to 70 deg and G2 has no head to pan, 2026-10-10)
 
 
 class Survey:
@@ -81,6 +84,9 @@ def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]
     t += cfg.pose_settle_s
     plan.append((t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)"))
     t += cfg.pose_settle_s
+    if cfg.check and kind == "after_bow":
+        plan.append((t, "skill", cfg.check_skill, f"{why}: check, the firmware look left and right"))
+        t += cfg.check_s
     plan.append((t, "skill", cfg.stand_skill, f"{why}: stand again"))
     t += cfg.stand_settle_s
     if cfg.looks and kind == "after_bow":

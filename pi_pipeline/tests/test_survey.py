@@ -393,3 +393,18 @@ def test_a_look_picture_is_quick_no_warm_up_no_retake_and_a_short_stillness_wait
     saver("after_bow")
     assert waits == [2.0, 6.0] or waits == [2.0, waits[1]] and waits[0] == 2.0       # a look waits at most 2 s for stillness; the real picture keeps its wait
     assert takes[0] == 0                                                              # no camera warm-up for a throwaway look
+
+
+def test_a_survey_stop_runs_the_firmware_check_skill_between_the_bow_and_the_stand_when_asked(monkeypatch):
+    from pi_pipeline.behavior.survey import SurveyConfig, survey_config_from_env, survey_plan
+    plan = survey_plan(SurveyConfig(check=True))
+    assert [p for _, k, p, _ in plan if k == "skill"] == ["ksit", "kbuttUp", "kck", "kup"]
+    t_ck = next(d for d, k, p, _ in plan if p == "kck")
+    t_up = next(d for d, k, p, _ in plan if p == "kup")
+    assert abs((t_up - t_ck) - 3.0) < 1e-6                                          # the check skill gets 3 s to finish
+    assert [p for _, k, p, _ in plan if k == "shot"] == ["after_bow"]               # one picture, standing, after the settle
+    assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "skill"] == ["ksit", "kbuttUp", "kup"]
+    monkeypatch.delenv("G2_SURVEY_CHECK", raising=False)
+    assert survey_config_from_env().check is True
+    monkeypatch.setenv("G2_SURVEY_CHECK", "0")
+    assert survey_config_from_env().check is False
