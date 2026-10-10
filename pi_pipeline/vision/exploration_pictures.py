@@ -51,14 +51,14 @@ def _exposure_cost(jpeg: bytes) -> float:
 
 
 def _badly_exposed(jpeg: bytes) -> bool:
-    """Brightness outside 60 to 170 (0..255, target about 100) or more than 5% blown out: the picture is worth one more try. Wider than the wall pictures (85 to 140): a retake is a second warm-up, and the
+    """Brightness over 170 (0..255, target about 100) or more than 5% blown out: the picture is worth one more try (a dark one is kept, its brightness is in the sidecar). Wider than the wall pictures (85 to 140): a retake is a second warm-up, and the
     stop was 15 s long on 2026-10-10 with a picture at brightness 64 retaken for nothing."""
     try:
         from .snapshot import exposure_stats
         st = exposure_stats(jpeg)
     except Exception:  # noqa: BLE001
         return False
-    return st is not None and (st.mean < 60.0 or st.mean > 170.0 or st.clip_high > 0.05)
+    return st is not None and (st.mean > 170.0 or st.clip_high > 0.05)           # too bright only: a retake of a dark picture is dark again (a dim room, 2026-10-10: brightness 30, retaken, still 30) and costs another warm-up
 
 
 class ExplorationPictureSaver:
