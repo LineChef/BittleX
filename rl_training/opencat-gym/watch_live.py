@@ -19,6 +19,23 @@ LIVE = os.path.join(HERE, "trained", "live")
 REQ = os.path.join(LIVE, "request")
 
 
+def training_now():
+    """Is a training run going (the same test the pipeline uses)?"""
+    import subprocess
+    try:
+        return subprocess.run(["pgrep", "-f", "train.py --tag"], capture_output=True).returncode == 0
+    except OSError:
+        return True                                         # cannot tell: do not block the viewer
+
+
+def last_run_note():
+    try:
+        sc = json.load(open(os.path.join(LIVE, "scene.json")))
+        return f"The last run that streamed was {sc['tag']} ({time.strftime('%I:%M %p on %b %d', time.localtime(sc['t'])).lstrip('0')})."
+    except (OSError, ValueError, KeyError):
+        return "No run has streamed yet."
+
+
 def touch():
     os.makedirs(LIVE, exist_ok=True)
     with open(REQ, "a"):
@@ -109,14 +126,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fast", action="store_true", help="draw the newest frame as fast as the run produces it (about 4-5x real time) instead of playing each episode at real speed")
     ap.add_argument("--realtime", action="store_true", help="(default, kept for old habits)")
+    ap.add_argument("--replay", action="store_true", help="open even when no run is training and replay the last recorded episode")
     a = ap.parse_args()
+    if not a.replay and not training_now():
+        print("No training run is in progress, so there is nothing to watch live.\n" + last_run_note() + "\nStart a run, or use --replay to see the last recorded episode.", flush=True)
+        return
     import collections
     import pybullet as p
     p.connect(p.GUI)
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)         # shadow maps flicker and cost frames on a laptop GPU
     touch()
-    labels, shown_stale, banner = [], None, None
+    labels, shown_stale, banner, check_t, gone_t = [], None, None, time.time(), 0.0
     last_touch, ep, f, rid, ids, jids = time.time(), None, None, None, {}, []
     waited, scene, scene_t, scene_m = time.time(), None, 0.0, None
     q, t0, k0, last_k, end_t, cam, new_cam = collections.deque(), 0.0, 0, 0, 0.0, None, True
@@ -127,6 +148,12 @@ def main():
             if now - last_touch > 5:
                 touch()
                 last_touch = now
+            if not a.replay and now - check_t > 5:                 # the run finished or was stopped while the window is open: finish the episode on screen, then close
+                check_t = now
+                gone_t = 0.0 if training_now() else (gone_t or now)
+            if gone_t and now - gone_t > 10 and (f is None or end_t or now - last_k > 3):
+                print("The training run has ended, closing the viewer. " + last_run_note(), flush=True)
+                break
             if now - scene_t > 0.5:                                # the scene file is read twice a second, only when it changed
                 scene_t = now
                 scene_path = os.path.join(LIVE, "scene.json")
