@@ -74,3 +74,27 @@ def test_the_calibration_is_built_from_labelled_pictures_and_reads_them_back(tmp
         assert abs(true_in - est_in) < 1.5, (name, true_in, est_in)                              # the pictures it was built from read back within an inch
     c2, t2 = calibrate_from_pictures(str(tmp_path), shots=["shot_000"], save=False)             # one distance is not enough to save
     assert len(c2.points) == 1
+
+
+def test_the_wall_log_keeps_pictures_for_near_walls_only_in_a_ring_and_the_stats_read_it(tmp_path):
+    import io
+    import json
+    from PIL import Image
+    from pi_pipeline.vision.wall_distance import WallLog
+    from pi_pipeline.vision.wall_stats import wall_summary
+    t = [1_000_000.0]
+    log = WallLog(CAL, path=str(tmp_path / "w.jsonl"), pics_dir=str(tmp_path / "pics"), ring=3, clear_every_s=300, context=lambda: {"mode": "EXPLORE"}, clock=lambda: t[0])
+
+    def jpeg(img):
+        b = io.BytesIO(); Image.fromarray(img).save(b, "JPEG"); return b.getvalue()
+    clear, near = _scene(None, None), _scene(0.86, 0.86)
+    for img in (clear, clear, near, near, near, near, clear):
+        t[0] += 10
+        log.look(jpeg(img), img)
+    rows = [json.loads(line) for line in (tmp_path / "w.jsonl").read_text().splitlines()]
+    assert [r["state"] for r in rows] == ["clear", "clear", "near", "near", "near", "near", "clear"]
+    assert all(r["mode"] == "EXPLORE" and r["calibrated"] for r in rows) and rows[2]["nearest_in"] < 12 and rows[2]["group_in"][0] is not None
+    assert "pic" in rows[0] and "pic" not in rows[1] and all("pic" in r for r in rows[2:6])           # the first clear look is kept once, then every 300 s
+    assert len(list((tmp_path / "pics").glob("wall_*.jpg"))) == 3                                      # a ring of 3
+    w = wall_summary(rows)
+    assert w["looks"] == 7 and w["states"] == {"clear": 3, "near": 4} and w["near_streaks"][0][1] == 4 and sum(v for k, v in w["distance_hist"].items() if k in ("8 in or less", "8 to 12 in")) == 4

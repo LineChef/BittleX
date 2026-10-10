@@ -68,13 +68,10 @@ def _start_interest(survey, saver, vision, rt, settings, args):
         from .vision import wall_distance as wd
         cal = wd.Calibration.load()
 
+        wall_log = wd.WallLog(cal, context=lambda: {"mode": rt.driver.mode.mode.name})
+
         def wall_look(snap):
-            im = to_image(snap.jpeg)
-            if cal is None:                                              # not calibrated yet: keep the raw base rows so the first calibration can be checked against them
-                rows, visible = wd.base_rows(im)
-                wd.log_dry_run(wd.WallEstimate(None, [None if r is None else round(r, 3) for r in rows], not visible, None, "uncalibrated: base rows only"))
-            else:
-                wd.log_dry_run(wd.estimate(im, cal))
+            wall_log.look(snap.jpeg, to_image(snap.jpeg))
         watch.on_snap = wall_look
         log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)
     log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",

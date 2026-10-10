@@ -102,14 +102,75 @@ def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer:
     return WallEstimate(nearest, cm, False, side, f"nearest {nearest:.0f} cm: would turn {side}")
 
 
+NEAR_IN = 12.0                    # "near" for the log: the nearest wall base at or inside 12 in (30 cm is the turn threshold of `estimate`)
+PICS_DIR = os.path.expanduser(os.environ.get("G2_WALL_PICS", "~/.local/share/g2/wall_pics"))
+
+
+def state_of(est: "WallEstimate") -> str:
+    """One word for the log and the statistics: blocked / near / far / clear (open floor to the top of the picture)."""
+    if est.blocked:
+        return "blocked"
+    if est.nearest_cm is None:
+        return "clear"
+    return "near" if est.nearest_cm / IN_TO_CM <= NEAR_IN else "far"
+
+
 def log_dry_run(est: WallEstimate, path: str = LOG_PATH, *, extra: dict | None = None) -> None:
+    """One JSON line per look: centimetres (as measured) and the same in inches, the state, the turn it would make and whatever `extra` adds (mode, picture name, ...)."""
     try:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
+        inch = lambda c: None if c is None else round(c / IN_TO_CM, 1)  # noqa: E731
+        row = {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "state": state_of(est), "nearest_in": inch(est.nearest_cm), "group_in": [inch(c) for c in est.group_cm],
+               "nearest_cm": est.nearest_cm, "group_cm": est.group_cm, "blocked": est.blocked, "turn": est.turn, "reason": est.reason, **(extra or {})}
         with open(path, "a") as f:
-            f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "nearest_cm": est.nearest_cm, "group_cm": est.group_cm, "blocked": est.blocked, "turn": est.turn,
-                                "reason": est.reason, **(extra or {})}) + "\n")
+            f.write(json.dumps(row) + "\n")
     except OSError:
         pass
+
+
+class WallLog:
+    """What the wall estimator logs while G2 explores (user, 2026-10-10: log when walls are seen and at what distance, for debugging). Every look is one line in `wall_dryrun.jsonl`;
+    a picture is kept for every near / blocked look, and one clear look every `clear_every_s` for comparison, in a ring of `ring` files (`wall_pics`); each line that has a picture
+    names it. `context()` returns extra fields (the exploration mode, whether he is walking). Never raises, never moves G2."""
+
+    def __init__(self, calibration: "Calibration | None", *, path: str = LOG_PATH, pics_dir: str = PICS_DIR, ring: int = 20, clear_every_s: float = 300.0,
+                 context=lambda: {}, clock=time.time):
+        self.cal, self.path, self.pics_dir, self.ring, self.clear_every_s = calibration, path, pics_dir, ring, clear_every_s
+        self.context, self._clock = context, clock
+        self._last_clear = float("-inf")
+
+    def look(self, jpeg: bytes, img) -> WallEstimate:
+        if self.cal is None:                                              # not calibrated: keep the raw base rows so a calibration can be checked against them
+            rows, visible = base_rows(img)
+            est = WallEstimate(None, [None if r is None else round(r, 3) for r in rows], not visible, None, "uncalibrated: base rows only")
+        else:
+            est = estimate(img, self.cal)
+        try:
+            extra = dict(self.context() or {})
+        except Exception:  # noqa: BLE001
+            extra = {}
+        st = state_of(est)
+        now = self._clock()
+        if st in ("near", "blocked") or (st in ("clear", "far") and now - self._last_clear >= self.clear_every_s):
+            if st in ("clear", "far"):
+                self._last_clear = now
+            pic = self._keep(jpeg, st, now)
+            if pic:
+                extra["pic"] = pic
+        log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
+        return est
+
+    def _keep(self, jpeg: bytes, state: str, now: float) -> str | None:
+        try:
+            d = Path(self.pics_dir)
+            d.mkdir(parents=True, exist_ok=True)
+            name = time.strftime("wall_%Y%m%d_%H%M%S", time.localtime(now)) + f"_{state}.jpg"
+            (d / name).write_bytes(jpeg)
+            for old in sorted(d.glob("wall_*.jpg"))[:-self.ring]:           # a ring: only the newest `ring` pictures stay
+                old.unlink(missing_ok=True)
+            return name
+        except OSError:
+            return None
 
 
 def calibrate(distances_cm=(20, 30, 40, 60, 100), source=None) -> Calibration:
