@@ -63,7 +63,7 @@ def _badly_exposed(jpeg: bytes) -> bool:
 
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
-                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None):
+                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None, on_survey_stop=None):
         self._source = source
         self._prep_every_s = prep_every_s           # the camera prep (the throwaway frames that let auto-exposure settle) is done for the first picture and again after this long (0 = every picture)
         self._last_prep: float | None = None
@@ -73,6 +73,7 @@ class ExplorationPictureSaver:
         self._clock = clock
         self._warn_mb = warn_mb
         self._on_saved = on_saved                  # called with the saved path (a shutter tick, a counter)
+        self._on_survey_stop = on_survey_stop      # called as (path or None, sidecar dict, jpeg bytes) for every survey-stop picture (kind 'after_bow'), also a near-duplicate that was not kept: the place log (behavior/place_log.py)
         self._survey_distance, self._named_distance = survey_distance, named_distance
         self._hashes: dict = {}                    # (folder, prefix) -> hashes of the pictures already kept there
         self.duplicates = 0
@@ -132,6 +133,7 @@ class ExplorationPictureSaver:
         if self._is_duplicate(folder, prefix, snap.jpeg, self._named_distance if kind.startswith("name:") else self._survey_distance):
             self.duplicates += 1
             log.info("picture not kept: a near-duplicate of one already saved (%s)", kind)
+            self._survey_stop(kind, None, {}, snap.jpeg)
             return None
         base = prefix + time.strftime("_%H%M%S", time.localtime(now)) + f"_{int((now % 1) * 1000):03d}"
         path = folder / (base + ".jpg")
@@ -151,6 +153,7 @@ class ExplorationPictureSaver:
         self.last_path, self.last_kind = str(path), kind
         log.info("picture saved: %s (%s)", path, kind)
         self._check_size()
+        self._survey_stop(kind, str(path), meta, snap.jpeg)
         if kind.startswith("look_"):
             self._trim_looks(folder.parent)
             return str(path)                                             # look-only pictures are never offered to the object gallery
@@ -160,6 +163,13 @@ class ExplorationPictureSaver:
             except Exception:  # noqa: BLE001
                 log.debug("on_saved hook failed", exc_info=True)
         return str(path)
+
+    def _survey_stop(self, kind: str, path, meta: dict, jpeg: bytes) -> None:
+        if self._on_survey_stop is not None and kind == "after_bow":
+            try:
+                self._on_survey_stop(path, meta, jpeg)
+            except Exception:  # noqa: BLE001 -- a place record never stops a picture
+                log.debug("on_survey_stop hook failed", exc_info=True)
 
     def _trim_looks(self, looks_root: Path, keep: int = 30) -> None:
         """Only the newest `keep` look pictures stay (user, 2026-10-10: throwaway pictures just for looking)."""

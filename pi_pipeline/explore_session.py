@@ -168,7 +168,12 @@ def main() -> None:
             from .gait.stillness import StillnessWaiter
             from .voice import fail_sound
             still = StillnessWaiter(fan.consumer().poll_imu)               # waits, before every picture, until the IMU shows G2 has stopped swaying (camera shake)
-            saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT),
+            places = None
+            if os.environ.get("G2_PLACE_LOG", "1") != "0":                 # place memory P1: one record per survey stop, no behavior change (behavior/place_log.py)
+                from .behavior.place_log import PlaceLog
+                places = PlaceLog(os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT), yaw_fn=lambda: getattr(getattr(getattr(rt, "_sensors", None), "__self__", None), "yaw_deg", lambda: None)(),
+                                  wall_fn=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
+            saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT), on_survey_stop=places.record_stop if places else None,
                                            prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", "0")),      # the camera is warmed up for EVERY picture (user, 2026-10-10: pictures are rare now)
                                            wait_still=still.wait, on_failure=fail_sound.command_failed)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),

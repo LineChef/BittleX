@@ -10,14 +10,14 @@ Agreed with the user 2026-10-10: **rooms** (not finer spots), tag the existing p
 - **Rooms are named by the user** ("this is the kitchen" by voice, and the Room button in `g2pics`); G2 never invents a room name.
 - **The map links rooms, not coordinates.** A change of the voted room across one leg becomes a link (hallway to kitchen, about N legs). Yaw restarts every session, so a direction is only kept relative to a landmark.
 - **All local on the Pi, no API calls.** The work happens at a survey stop (G2 standing still, at most once per 15 s), so it does not add to the late ticks while walking. Place facts reach Claude through the normal memory facts.
-- **Storage:** new tables in the memory database (`stops`, `legs`, `places`), same file and backup path as the facts.
+- **Storage:** P1 writes `place_stops.jsonl` beside the exploration pictures (so `g2pics pull` brings it to the Mac, and it stays apart from the memory database); P2 decides whether places move into the database.
 
 ## Phases and gates
 
 | Phase | What | Gate |
 |---|---|---|
 | **P0** | Test on the saved pictures: rooms set by hand in `g2pics`, `python tools/eval_rooms.py` | 3-stop vote picks the right room >= 75% on a returning visit (other days only), with the histogram embedder. If it fails: a learned image model (a download: ask first, CLAUDE.md security protocol) |
-| **P1** | Record only: exploration writes stops and legs; behavior unchanged | A real session gives a complete chain; no extra late ticks; tests pass |
+| **P1** (built 2026-10-10, not yet deployed; `behavior/place_log.py`) | Record only: exploration writes stops and legs; behavior unchanged | A real session gives a complete chain; no extra late ticks; tests pass |
 | **P2** | "Where are you?": naming rooms by voice, the vote over recent stops, a local spoken answer ("I think the kitchen" / "not sure yet"); Places view in `g2pics` | Right room >= 80% over 2 sessions in at least 2 rooms |
 | **P3** | The map: room links from transitions, "the hallway leads to the kitchen" facts, rooms attached to the existing "the dog is often to the left" notes | Links match the house as the user would draw it |
 | **P4** | "Go to the kitchen" (later) | Needs a closed-loop turn and wall avoidance trusted on several wall types (both open) |

@@ -26,6 +26,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_WALL_STEER` | on | `0` turns off wall steering (and the 3 s looks) |
 | `G2_HIT_WALL` | on | `0` turns off the hit-a-wall sequence |
 | `G2_WALL_DRYRUN` | on | `0` turns off the wall estimator and its log entirely |
+| `G2_PLACE_LOG` | on | `0` stops the place-memory record of survey stops (`place_stops.jsonl` beside the exploration pictures) |
 | `G2_WALL_LOOK_SLOW_S` | 6 | the look interval when no wall was seen within 40 in in the last 20 s (3 s otherwise) |
 | `G2_INTEREST_EVERY_S` | 3 with steering, else 10 | the look interval (overrides the above) |
 | `G2_PICTURE_PREP_EVERY_S` | 0 | camera warm-up for every picture (0) or only every N seconds |
