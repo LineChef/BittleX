@@ -185,6 +185,26 @@ def main() -> None:
                 from ..explore_launch import launch
                 threading.Timer(5.0, lambda: launch(settings.explore_roam_s)).start()
 
+        if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
+            from ..power import power as _power
+            from ..power.sleep_watch import SleepWatch, WakeHook
+            from . import prompt_tones
+            _sleep_steps = [lambda: prompt_tones.play_sigh(wait=True), lambda: _power.set_wifi_power_save(True)]
+            _wake_steps = [lambda: prompt_tones.play_yawn(wait=True), lambda: _power.set_wifi_power_save(False)]
+            if guard is not None:
+                _sleep_steps.append(guard.pause)
+                _wake_steps.append(guard.resume)
+            sleep_watch = SleepWatch(is_resting=lambda: getattr(link, "last_motion_command", "") in ("", "d"),
+                                     is_busy=lambda: getattr(actuator, "busy", False), after_s=settings.sleep_after_s,
+                                     on_sleep=_sleep_steps, on_wake=_wake_steps).start()
+            _prev_on_command = getattr(actuator, "on_command", None)
+
+            def _on_command(_prev=_prev_on_command):
+                sleep_watch.note_activity("command")
+                if _prev is not None:
+                    _prev()
+            actuator.on_command = _on_command
+            wake = WakeHook(wake, sleep_watch)
         loop = VoiceLoop(
             wake_word=wake,
             stt=stt,

@@ -15,6 +15,7 @@ Everything degrades to a dry-run print when the sysfs / tools aren't present
 from __future__ import annotations
 
 import glob
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -70,6 +71,8 @@ def set_wifi_power_save(on: bool, dry_run: bool | None = None) -> tuple[bool, st
     cmd = ["iw", "dev", _WIFI_IF, "set", "power_save", "on" if on else "off"]
     if dry:
         return True, "DRY-RUN: " + " ".join(cmd)
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        cmd = ["sudo", "-n", *cmd]          # the voice service runs as a normal user; the Pi's sudo needs no password (setup_pi.sh)
     return _run(cmd)
 
 

@@ -133,6 +133,33 @@ def render_oof(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([thump * 1.2 + vowel[:n] * 0.0, vowel], peak)
 
 
+def render_sigh(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A long breathy sigh going to sleep (about 1.3 s): soft noise that swells and fades, with a faint falling hum under it."""
+    dur = 1.3
+    t = np.arange(0, dur, 1.0 / rate)
+    breath = _lowpass(np.random.default_rng(5).standard_normal(t.size), 28)
+    breath = breath / (np.abs(breath).max() or 1.0)
+    env = np.sin(np.pi * np.clip(t / dur, 0, 1)) ** 1.5 * np.exp(-t * 0.8)
+    hum = _voiced(170.0, 105.0, dur, rate, attack=0.25, decay=1.6, harmonics=4)
+    hum = hum / (np.abs(hum).max() or 1.0)
+    return _finish([breath * env + 0.35 * hum * env], peak)
+
+
+def render_yawn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A yawn waking up (about 1.4 s): a voiced "aaah" that rises, holds, then falls and trails off into breath."""
+    dur = 1.4
+    t = np.arange(0, dur, 1.0 / rate)
+    u = t / dur
+    f = 140.0 + 130.0 * np.sin(np.pi * np.clip(u / 0.7, 0, 1)) ** 1.2 * (u < 0.7) + (u >= 0.7) * (140.0 - 30.0 * (u - 0.7) / 0.3)
+    ph = 2 * np.pi * np.cumsum(f) / rate
+    bright = 0.3 + 0.7 * np.sin(np.pi * np.clip(u, 0, 1))          # the mouth opens then closes: more upper harmonics in the middle
+    y = sum(np.sin(k * ph) / k * (bright if k > 2 else 1.0) for k in range(1, 9))
+    breath = _lowpass(np.random.default_rng(6).standard_normal(t.size), 30)
+    y = y / (np.abs(y).max() or 1.0) + 0.3 * breath / (np.abs(breath).max() or 1.0)
+    env = np.minimum(1.0, t / 0.12) * np.minimum(1.0, (dur - t) / 0.45)
+    return _finish([y * env], peak)
+
+
 def play_beep(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_beep, peak, rate, wait)
 
@@ -161,10 +188,18 @@ def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) 
     _play(render_oof, peak, rate, wait)
 
 
+def play_sigh(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_sigh, peak, rate, wait)
+
+
+def play_yawn(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_yawn, peak, rate, wait)
+
+
 if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline.voice.prompt_tones grunt|oof|beep|boop|close|double|fanfare
     import sys
     name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
     fn = globals().get(f"play_{name}")
     if fn is None:
-        raise SystemExit("sounds: grunt oof beep boop close double fanfare")
+        raise SystemExit("sounds: grunt oof sigh yawn beep boop close double fanfare")
     fn(wait=True)

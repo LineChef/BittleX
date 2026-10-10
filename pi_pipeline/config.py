@@ -182,6 +182,8 @@ class Settings:
     # so a reboot resets it). 0 turns it off.
     # the fraction of the measured runtime used at which the Pi warns "battery low" (0.80 = about 20% left; 0.50 = about half left)
     pi_warn_fraction: float = field(default_factory=lambda: _env_float("G2_PI_WARN_FRACTION", 0.70))   # 0.70 = about 30% left (user, 2026-10-10)
+    # power-saving sleep in the voice service (power/sleep_watch.py): after this long at rest with no activity G2 sighs and the Pi saves power; 0 = off
+    sleep_after_s: float = field(default_factory=lambda: _env_float("G2_SLEEP_AFTER_S", 300.0))
     pi_battery_watch: bool = field(default_factory=lambda: _env("G2_PI_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     # G2's standing wobble (firmware gyro balance going unstable on a 5 Hz IMU, see gait/stand_guard.py): keep balance off while idle
     # (on only around a firmware gait) and run a guard that turns it off if a wobble starts anyway.

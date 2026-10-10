@@ -130,6 +130,24 @@ class StandGuard:
         self._thread.start()
         return self
 
+    def pause(self) -> None:
+        """Sleep: stop the IMU print and the wobble checks (G2 is lying down); balance stays off."""
+        self._paused = True
+        try:
+            self._link.send("gp", read_reply=False, settle=0.0)
+        except Exception:  # noqa: BLE001
+            log.debug("stopping the IMU print failed", exc_info=True)
+
+    def resume(self) -> None:
+        self._paused = False
+        self._started_at = self._clock()
+        self._det.reset()
+        if self._guard:
+            try:
+                self._link.send("gP", read_reply=False, settle=0.0)
+            except Exception:  # noqa: BLE001
+                log.debug("restarting the IMU print failed", exc_info=True)
+
     def stop(self) -> None:
         self._stop.set()
         if self._guard:
@@ -146,6 +164,8 @@ class StandGuard:
     def tick(self) -> bool:
         """One pass: drain the IMU lines, re-assert balance off, run the detector. True if the detector tripped."""
         now = self._clock()
+        if getattr(self, "_paused", False):
+            return False
         try:
             lines = self._link.poll_imu() if self._guard else []
         except Exception:  # noqa: BLE001
