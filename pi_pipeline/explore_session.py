@@ -46,6 +46,9 @@ def apply_roam_limits(driver, roam_s: float) -> None:
     driver.mode.cfg = replace(driver.mode.cfg, explore_max_secs=(roam_s + 5.0) if roam_s > 0 else 1e9)
 
 
+NEAR_LOOK_IN = float(os.environ.get("G2_NEAR_LOOK_IN", "30"))          # a wall this close (inches) starts the fast 3 s looks and blocks surveys and object checks for 20 s (user, 2026-10-10: 30; it was 40)
+
+
 def _start_interest(survey, saver, vision, rt, settings, args):
     """Picture stops only for something worth it: unknown objects and unfinished named ones, never a person (behavior/interest_watch.py). Returns the running watch."""
     from .behavior.mode_controller import Mode
@@ -63,7 +66,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "3" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 3 s while the wall steers him
                           fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
-    seen_near = {"t": -1e9}                                               # when a wall was last seen 40 in or closer (set by the wall look below)
+    seen_near = {"t": -1e9}                                               # when a wall was last seen NEAR_LOOK_IN (30 in) or closer (set by the wall look below)
 
     def _gate(now=None):
         if time.monotonic() - seen_near["t"] <= 20.0:                     # surveys only when he is FAR from a wall (user, 2026-10-10): the same 20 s window as the fast wall looks; a survey also holds off the wall guard
@@ -85,12 +88,12 @@ def _start_interest(survey, saver, vision, rt, settings, args):
             wall_log.look(snap.jpeg, to_image(snap.jpeg))
             last = wall_log.last
             now = time.monotonic()
-            if last is not None and last.nearest_in is not None and last.nearest_in <= 40.0:
+            if last is not None and last.nearest_in is not None and last.nearest_in <= NEAR_LOOK_IN:
                 seen_near["t"] = now
             if os.environ.get("G2_WALL_STEER", "1") != "0":
                 watch.every_s = fast_s if now - seen_near["t"] <= 20.0 else max(fast_s, slow_s)      # look more often only while a wall was seen close in the last 20 s
         watch.on_snap = wall_look
-        watch.skip_scoring = lambda: time.monotonic() - seen_near["t"] <= 20.0      # a wall (40 in or closer) was seen in the last 20 s: its base is not an unknown object
+        watch.skip_scoring = lambda: time.monotonic() - seen_near["t"] <= 20.0      # a wall (NEAR_LOOK_IN or closer) was seen in the last 20 s: its base is not an unknown object
         log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)
     log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",
              watch.every_s, watch.fallback_s, gpath)
