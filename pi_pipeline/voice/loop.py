@@ -589,7 +589,7 @@ class VoiceLoop:
         if cmd == "restart_voice":
             log.info("voice service restart requested (voice)")
             self._cue.set("speaking")
-            self._speak("Restarting voice loop. I will say I am online when I am back.")
+            self._speak("Restarting voice loop. I will say G2 online when I am back.")
             self._restart_service()
             return
         if cmd == "shutdown":
