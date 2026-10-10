@@ -909,9 +909,22 @@ order:
 Requested 2026-10-07: try teaching skills by moving G2's legs by hand and recording the joint angles, then replaying them as a skill. This is the
 "raw joint puppeteering" tier of [B10], promoted to its own item so it can be tried on the bench. Servos relaxed (`d`), joints polled with `j`
 (`READ_JOINTS`), keyframes saved under a name and replayed through the same path as any scripted skill. Fits sit, wave, shake, reach; playback has no
-balance feedback, so new poses are tried held in the air first (hardware safety rule). Reference video to study for technique:
-<https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Not started; waits for the user's go. Decision the same day: skills are **not**
+balance feedback, so every new movement is checked in the sim first and then tried on G2 on his feet on the floor, hands near (no held-in-the-air
+tests since 2026-10-09). Reference video to study for technique:
+<https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Decision the same day: skills are **not**
 authored by an LLM writing keyframes.
+
+**First use: a real high-step gait (user, 2026-10-10; planned for the next session that has a charged Pi).** The scripted options do not lift the
+feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the normal walk), `carpetF` was rejected by eye on G2, and the taller
+`hsB`/`hsC` (25-27 mm) fell about 90% of the time open loop in the sim. Steps:
+1. **Make the joint read work.** On 2026-10-10 `j` and `f` at rest returned no joint data, so this comes first. Fallback if it cannot be made to
+   work: the user poses the leg, Claude nudges single joints by command (`i`) until the user approves the pose, and that pose is the keyframe.
+2. **Record one leg's step.** Servos relaxed, the user moves one front leg through the step (lift, reach, plant) and the Pi saves the joint
+   angles as keyframes; then a back leg the same way.
+3. **Build the 4-leg cycle** from those shapes with the normal walk's phase timing (as the `hs*` variants were built from `wkF`).
+4. **Sim check** (`gait_probe.py`): clearance, sway, falls and the ledge ladder; tune the timing until it stands up open loop.
+5. **On G2:** short floor walks, judged by eye; then it replaces `hsF` behind the "hi step" voice mode (`gait/gait_mode.py`).
+6. **Later:** a base for a trained high-step mode (fresh candidate, never on top of a finished 20M).
 
 ---
 
