@@ -23,6 +23,8 @@ def command(roam_s: float = 600.0, *, python: str | None = None, workdir: str | 
     return ["sudo", "-n", "systemd-run", "--no-block", f"--unit={UNIT}", "--collect", f"--uid={user or getpass.getuser()}",
             "-p", f"WorkingDirectory={workdir}", "-p", "KillSignal=SIGTERM", "-p", "TimeoutStopSec=15",
             "-p", "ExecStartPre=+/bin/systemctl stop g2-voice",
+            # however the session ends (a stop, a crash, a kill) lay G2 down before the voice service starts again: a crash left his last firmware turn running and he walked in circles (2026-10-10)
+            "-p", f"ExecStopPost=+/bin/sh -c '{python} -m pi_pipeline.link.check_serial send d >/dev/null 2>&1; true'",
             "-p", "ExecStopPost=+/bin/systemctl --no-block start g2-voice",
             "-E", f"G2_FEATURES={FEATURES}", "-E", "G2_LOG_HEARD=1",
             python, "-m", "pi_pipeline.explore_session", "--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(int(roam_s))]

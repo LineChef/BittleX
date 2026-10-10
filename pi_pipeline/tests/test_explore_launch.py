@@ -6,6 +6,7 @@ def test_the_command_stops_voice_first_and_always_restarts_it():
     s = " ".join(c)
     assert c[:5] == ["sudo", "-n", "systemd-run", "--no-block", "--unit=g2-explore"]      # --no-block: the launch must not wait for the unit it is about to be stopped by
     assert "ExecStartPre=+/bin/systemctl stop g2-voice" in s and "ExecStopPost=+/bin/systemctl --no-block start g2-voice" in s
+    assert "check_serial send d" in s and s.index("check_serial send d") < s.index("start g2-voice")          # rest first, then the voice service (a crash must not leave a turn running)
     assert s.endswith("-m pi_pipeline.explore_session --arm-on-start --exit-when-roam-ends --roam-s 600")
     assert "G2_FEATURES=" in s and "+explore" in s
 
