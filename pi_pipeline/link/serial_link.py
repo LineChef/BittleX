@@ -125,6 +125,7 @@ class SerialLink:
             log.debug("send(%r) dropped -- not connected", command)
             return ""
         try:
+            self._ease_stand_up(command)
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
@@ -140,6 +141,29 @@ class SerialLink:
             self.close()
             self._mark_down(f"send failed: {e}")
             return ""
+
+    _ramping = False
+
+    def _ease_stand_up(self, command: str) -> None:
+        """Standing rule (user, 2026-10-10): every stand-up is eased. `kup` / `kbalance` sent while G2 lies at rest (last motion `d`, or nothing yet) are preceded by a ~0.8 s ramp of `i` steps
+        from the rest pose to that skill's pose (gait/standup.py). From any other state the command goes out as it is (a stop / freeze `kbalance` out of a stride must stay immediate)."""
+        c = command.strip()
+        if c not in ("kup", "kbalance") or self._ramping or self.last_motion_command not in ("", "d"):
+            return
+        try:
+            from pi_pipeline.gait import standup
+            secs = standup.ramp_seconds()
+            if secs <= 0:
+                return
+            self._ramping = True
+            for pose in standup.ramp_poses(standup.REST_URDF_DEG, standup.BALANCE_URDF_DEG, secs):
+                self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
+                self._ser.flush()
+                time.sleep(1.0 / standup.STEPS_PER_S)
+        except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
+            log.warning("stand-up ramp skipped (%s)", e)
+        finally:
+            self._ramping = False
 
     def read_line(self) -> str:
         """Read one non-IMU line the board sent (a reply, a banner). Waits up to

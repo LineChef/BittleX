@@ -557,12 +557,28 @@ def test_log_extra_adds_the_columns_to_a_real_loop_log_and_default_logs_are_unch
     assert all(len(r.split(",")) == len(head_p) for r in plain.read_text().splitlines() if r[:1].isdigit())
 
 
-def test_ease_to_stand_sends_kbalance_then_waits_and_can_be_turned_off(monkeypatch):
+def test_ramp_to_stand_runs_from_any_known_pose_and_can_be_turned_off(monkeypatch):
     from pi_pipeline.gait import standup
+    stand = [50, 0] * 4
     sent, slept = [], []
-    monkeypatch.setenv("G2_STAND_EASE", "on")
-    assert standup.ease_to_stand(sent.append, slept.append) is True
-    assert sent == ["kbalance"] and slept == [standup.EASE_SETTLE_S]
-    monkeypatch.setenv("G2_STAND_EASE", "off")
+    mk = lambda deg: "i" + ",".join(map(str, deg))
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.8")
+    assert standup.ramp_to_stand(sent.append, mk, stand, slept.append, None) is True
+    assert len(sent) == 16 and sent[-1] == mk(stand) and slept == [0.05] * 16
     sent.clear(); slept.clear()
-    assert standup.ease_to_stand(sent.append, slept.append) is False and not sent and not slept
+    assert standup.ramp_to_stand(sent.append, mk, stand, slept.append, "kwkF") is False and not sent          # unknown pose (firmware gait mid-stride): left to the firmware
+    assert standup.ramp_to_stand(sent.append, mk, stand, slept.append, "kbalance") is True                   # a stand-up from a stand is eased too (no exceptions)
+    assert standup.ramp_to_stand(sent.append, mk, stand, slept.append, "d") is True
+    sent.clear()
+    monkeypatch.setenv("G2_STAND_RAMP_S", "off")
+    assert standup.ramp_to_stand(sent.append, mk, stand, slept.append, "d") is False and not sent
+    monkeypatch.delenv("G2_STAND_RAMP_S")
+    assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S
+
+
+def test_standup_test_ramp_ends_on_the_stand_pose_in_even_steps():
+    from pi_pipeline.gait import standup_test as st
+    poses = st.ramp_poses([80, 60] * 4, [50, 0] * 4, 2.0)
+    assert len(poses) == 40 and poses[-1] == [50, 0] * 4
+    assert abs(poses[0][0] - 80) < 0.1 and abs(poses[19][0] - 65) < 1.0     # S-curve: barely moved after the first step, about halfway at the middle
+    assert st.summarize([(0, 1, 2, 10), (1, -5, 3, 4)]) == (5, 3, -6)

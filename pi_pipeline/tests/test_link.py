@@ -127,3 +127,27 @@ def test_tab_inside_a_non_imu_reply_is_not_split():
     lk = _link_with(b"S,\tA,\tT,\t\r\n1,\t1,\t0,\t\r\n")
     assert lk.read_line() == "S,\tA,\tT,"
     assert lk.read_line() == "1,\t1,\t0,"
+
+
+# ------------------------------------------------------------------ eased stand-up (standing rule 2026-10-10)
+def test_kup_from_rest_is_preceded_by_a_ramp_but_a_stop_kbalance_from_a_stride_is_not(monkeypatch):
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.2")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    lk = _link_with(b"")
+    lk.send("kup", read_reply=False, settle=0.0)
+    sent = [w.decode().strip() for w in lk._ser.written]
+    assert sent[-1] == "kup" and len(sent) == 5 and all(c.startswith("i") for c in sent[:-1])     # 0.2 s x 20 steps/s = 4 ramp steps, then the skill
+    assert lk.last_motion_command == "kup"
+    lk._ser.written.clear()
+    lk.last_motion_command = "i8 50 12 0 9 50 13 0 10 50 14 0 11 50 15 0"                          # mid-policy-walk: a freeze must be immediate
+    lk.send("kbalance", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written] == ["kbalance"]
+
+
+def test_standup_helpers_agree_with_deploy_map_and_read_the_last_pose():
+    from pi_pipeline.gait import standup, deploy_map
+    deg = [50, 0, 50, 0, 50, 0, 50, 0]
+    assert standup.move_cmd(deg) == deploy_map.policy_deg_to_move_cmd(deg)
+    assert standup.start_pose("") == standup.REST_URDF_DEG and standup.start_pose("kbalance") == standup.BALANCE_URDF_DEG
+    assert standup.start_pose(standup.move_cmd([40, 5, 41, 6, 42, 7, 43, 8])) == [40, 5, 41, 6, 42, 7, 43, 8]
+    assert standup.start_pose("kwkF") is None and standup.start_pose("i1 2") is None

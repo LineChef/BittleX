@@ -239,7 +239,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         if balance_off:
             _send(lk, "gb")
             sleep(0.2)
-        _standup.ease_to_stand(lambda c: _send(lk, c), sleep)
+        _standup.ramp_to_stand(lambda c: _send(lk, c), deploy_map.policy_deg_to_move_cmd, STAND_URDF_DEG, sleep, getattr(lk, "last_motion_command", None))
         _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))   # stand first: no jump from rest into mid-stride
         sleep(2.0)
         if log:
@@ -581,8 +581,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         _send(lk, "gb")
         time.sleep(0.2)
 
-    # go to the sim's reset stance, let it settle (eased through the firmware's own stand-up first: one `i` jump from rest jerks the heading)
-    _standup.ease_to_stand(lambda c: _send(lk, c))
+    # go to the sim's reset stance, let it settle (from rest the legs are first ramped up over ~0.8 s: one `i` jump from rest jerks the heading, see gait/standup.py)
+    _standup.ramp_to_stand(lambda c: _send(lk, c), deploy_map.policy_deg_to_move_cmd, STAND_URDF_DEG, last_motion_command=getattr(lk, "last_motion_command", None))
     _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
     time.sleep(1.0)
 
