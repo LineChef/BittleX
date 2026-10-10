@@ -22,9 +22,9 @@ _G2_WORD = re.compile(r"\bG-?2\b")
 
 
 def pronounce(text: str) -> str:
-    """What the voice is given to say: the robot's name "G2" is read by Piper as "J2" (user, 2026-10-10): its phonemes for "G2" and for "gee two" are the same soft j-sound (d-zh-ee), so it is spelled "ghee two", which Piper gives a hard g (g-ee).
-    The words printed and logged stay "G2"."""
-    return _G2_WORD.sub("ghee two", text)
+    """What the voice is given to say: the robot's name "G2" is spelled "gee two", the soft g that the wake word uses (user, 2026-10-10). A hard-g spelling ("ghee two", forced /g/) was tried first and the Pi's own recognizer heard it as "the to online" (it sounded like "V2");
+    "gee two" is heard as "gee to online". The words printed and logged stay "G2"."""
+    return _G2_WORD.sub("gee two", text)
 
 
 # set while a spoken sentence is playing, so the short signal sounds (api_tone) wait instead of cutting the speech off
