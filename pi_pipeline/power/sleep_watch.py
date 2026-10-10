@@ -3,7 +3,7 @@ saves power; the wake word (or any command) wakes him with a yawn.
 
 What sleeping changes: Wi-Fi power-save on (the Pi's battery; +0.1-0.3 s per API call), the 5 Hz IMU print off (the stand guard does not need it while
 he lies down; a little of the pack). The posture stays in rest (no curl-up), so waking needs no extra stand-up. The CPU governor stays `ondemand`:
-`powersave` would starve the wake-word listener. `G2_SLEEP_AFTER_S` sets the delay in seconds; the default is 0 = OFF until the user has tested it formally (2026-10-10), then try 300.
+`powersave` would starve the wake-word listener. `G2_SLEEP_AFTER_S` sets the delay in seconds; the default is 300 (0 = off); it was briefly off on 2026-10-10 and turned back on after a quick test (3 sleep / wake cycles at 60 s, wake felt quick), to live with it before the formal test.
 """
 from __future__ import annotations
 
