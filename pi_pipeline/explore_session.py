@@ -66,7 +66,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     seen_near = {"t": -1e9}                                               # when a wall was last seen 40 in or closer (set by the wall look below)
 
     def _gate(now=None):
-        if time.monotonic() - seen_near["t"] <= 10.0:                     # never start a survey (a choreography that holds off the wall guard) right next to a wall
+        if time.monotonic() - seen_near["t"] <= 20.0:                     # surveys only when he is FAR from a wall (user, 2026-10-10): the same 20 s window as the fast wall looks; a survey also holds off the wall guard
             return False
         return watch.gate(now)
     survey.gate = _gate
