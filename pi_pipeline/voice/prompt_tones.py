@@ -222,6 +222,12 @@ def play_refuse(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = Fals
     _play(render_refuse, peak, rate, wait)
 
 
+def play_horn_if_enabled(env_var: str, wait: bool = False) -> None:
+    """The losing horn for one situation, unless that situation's switch (`G2_REFUSE_SOUND`, `G2_FALL_HORN`) is set to 0."""
+    if os.environ.get(env_var, "1") != "0":
+        play_refuse(wait=wait)
+
+
 def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_oof, peak, rate, wait)
 

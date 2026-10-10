@@ -151,7 +151,8 @@ On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps
 | Sound | Plays when | Turn off |
 |---|---|---|
 | **grunt** (low "hmph") | you rebuff him ("shut up", "go away" and the like) | `G2_GRUNT=0` |
-| **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request; today that is a gait he cannot switch to | `G2_REFUSE_SOUND=0` |
+| **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request (today: a gait he cannot switch to), and when he falls over in a walk or an exploration session (`G2_FALL_HORN=0` for the fall) | `G2_REFUSE_SOUND=0` |
+| *(not built)* a recognition miss, "what is this?" with no match | the instance recognizer is not connected to the spoken "what is this?" yet (that goes to Claude's vision); add the horn when it is |
 | **sigh / yawn** | going to sleep after 5 min at rest / waking | `G2_SLEEP_AFTER_S=0` |
 | **oof** | built, no trigger yet (a wall bump cannot be told from walking in the 5 Hz IMU) | n/a |
 

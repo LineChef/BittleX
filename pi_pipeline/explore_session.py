@@ -184,7 +184,11 @@ def main() -> None:
                 link.send("gb", read_reply=False, settle=0.0)         # balance off: lying (or held) upside down, the gyro balance loop fights the servos and G2 twitches
             except Exception:  # noqa: BLE001
                 log.debug("could not switch balance off after the fall", exc_info=True)
-            threading.Thread(target=say, args=("I fell down. I have stopped.",), daemon=True).start()   # this runs on the walker thread: never wait for the speaker here
+            def _announce():
+                from .voice import prompt_tones
+                prompt_tones.play_horn_if_enabled("G2_FALL_HORN", wait=True)              # the losing horn (user, 2026-10-10), then the words
+                say("I fell down. I have stopped.")
+            threading.Thread(target=_announce, daemon=True).start()   # this runs on the walker thread: never wait for the speaker here
         fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard

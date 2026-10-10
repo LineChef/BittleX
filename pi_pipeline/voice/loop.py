@@ -277,9 +277,8 @@ class VoiceLoop:
 
     def _refuse_sound(self) -> None:
         """The losing horn when G2 refuses a request (user, 2026-10-10, a measured approximation of the game-show clip); `G2_REFUSE_SOUND=0` turns it off."""
-        if os.environ.get("G2_REFUSE_SOUND", "1") != "0":
-            from . import prompt_tones
-            prompt_tones.play_refuse(wait=True)
+        from . import prompt_tones
+        prompt_tones.play_horn_if_enabled("G2_REFUSE_SOUND", wait=True)
 
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""

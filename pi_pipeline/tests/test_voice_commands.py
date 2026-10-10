@@ -144,3 +144,14 @@ def test_refuse_horn_renders_the_measured_five_pieces_and_ends_on_a_falling_long
     assert 3.6 < len(pcm) / 48000 < 3.9 and 300 < np.abs(pcm).max() < 1500
     assert len(pt.HORN) == 5 and pt.HORN[-1][1] - pt.HORN[-1][0] > 2.0
     assert pt.HORN_LAST_BREAKS[0][1] > pt.HORN_LAST_BREAKS[-1][1]      # the long note sags in pitch
+
+
+def test_horn_switches_are_per_situation(monkeypatch):
+    from pi_pipeline.voice import prompt_tones as pt
+    played = []
+    monkeypatch.setattr(pt, "play_refuse", lambda wait=False: played.append(wait))
+    pt.play_horn_if_enabled("G2_FALL_HORN")
+    monkeypatch.setenv("G2_FALL_HORN", "0")
+    pt.play_horn_if_enabled("G2_FALL_HORN")
+    pt.play_horn_if_enabled("G2_REFUSE_SOUND", wait=True)
+    assert played == [False, True]                       # the fall horn off leaves the refusal horn on

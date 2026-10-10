@@ -91,7 +91,9 @@ def main() -> None:
             fan = ImuFanout(link)                          # the stand guard and the learned walk each get their own copy of the IMU stream
             if features.gait != "off" and settings.default_gait == "policy":
                 from ..gait.policy_walker import PolicyWalker
-                policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v))
+                from . import prompt_tones
+                policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v),
+                                             on_fall=lambda: prompt_tones.play_horn_if_enabled("G2_FALL_HORN"))     # the losing horn when he falls (user, 2026-10-10); it does not wait, the walker thread must rest him at once
         actuator = make_actuator(
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
             max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,

@@ -44,6 +44,7 @@ Cleared area, no edges. Watch: the 40 s start announcement, fanfare, 7 s legs en
 A box or book wide enough, placed at 20, 30, 40, 60 and 100 cm in front of G2 (floor tape). Plan and the cadence of the periodic wall look: [`../vision/wall-check-plan.md`](../vision/wall-check-plan.md). The vision avoider stays unwired until the user says.
 
 ## Block 6 -- recognition training
+Also (user, 2026-10-10): when the spoken "what is this?" is connected to the instance recognizer, play the losing horn on a no-match (`prompt_tones.play_horn_if_enabled`, switch to add: `G2_MISS_HORN`).
 Label the first 5 pictures per object (plan [`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md)); DINOv2-small thresholds need retuning, Pi int8 timing still to measure.
 
 ## If time or battery allows
