@@ -41,6 +41,12 @@ say "the Pi answers; letting its services settle for 25 s"
 [ "$ONCE" = 1 ] || sleep 25
 reachable || { say "the Pi stopped answering; not deploying"; exit 1; }
 
+# never deploy while G2 is exploring or walking (user rule 2026-10-10; a deploy mid-run restarted the voice service on top of a running exploration)
+if ssh "$G2_PI" 'systemctl is-active --quiet g2-explore || systemctl is-active --quiet g2-baseline || pgrep -f "run_gait" >/dev/null'; then
+  say "an exploration, a baseline run or a walk is running on the Pi: NOT deploying (stop it first: bash tools/g2_safe_stop.sh all)"
+  exit 1
+fi
+
 git -C "$ROOT" rev-parse --short HEAD > "$ROOT/pi_pipeline/.deployed_commit" 2>/dev/null || true     # recorded in every run log
 say "rsync pi_pipeline/"
 rsync -az --itemize-changes --exclude .venv --exclude __pycache__ --exclude memory/data --exclude .pytest_cache --exclude .env \

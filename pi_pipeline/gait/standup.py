@@ -81,3 +81,12 @@ def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_comma
         send(make_cmd([int(round(x)) for x in pose]))
         sleep(1.0 / STEPS_PER_S)
     return True
+
+
+BLEND_S = 0.6
+
+
+def blend_to_balance(send, make_cmd=move_cmd, sleep=time.sleep, last_motion_command=None, seconds=BLEND_S) -> bool:
+    """Ease the legs from where the last command left them (often mid-stride, a foot in the air) to the balance pose before the `kbalance` token, instead of snapping there (user, 2026-10-10: exploration walks
+    ended with one foot in the air and were unstable). Returns True if a blend ran; an unknown last pose (a firmware gait, a skill) is left to the firmware, as for the stand-up."""
+    return ramp_to_stand(send, make_cmd, BALANCE_URDF_DEG, sleep=sleep, last_motion_command=last_motion_command, seconds=seconds)

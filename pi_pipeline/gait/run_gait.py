@@ -858,6 +858,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             _send(lk, "d")     # rest, last, then a pause so the board has it before the port closes
             time.sleep(0.5)
         elif getattr(stop_event, "end_pose", None) == "balance":
+            try:
+                _standup.blend_to_balance(lambda c: _send(lk, c), last_motion_command=getattr(lk, "last_motion_command", None))      # ease out of the stride first: a foot in the air is not a stable stop
+            except Exception:  # noqa: BLE001
+                pass
             _send(lk, "kbalance")     # an exploration leg ended with another about to start (2026-10-09, user): hold a balanced stand, not the last stride; the session rests at its end
             time.sleep(0.8)
         if vision is not None:
