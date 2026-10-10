@@ -160,7 +160,7 @@ Audition any of them on a dev machine: `G2_SPEAKER_SOUNDS=1 python -m pi_pipelin
 
 ## Exploration mode wording (2026-10-10)
 
-Saying "explore" / "go ahead and look around": the brass fanfare, then "Exploration mode." (he still needs about 30 s to hand over). When the roam time runs out (`G2_EXPLORE_ROAM_S`, or `ROAM_S` of `g2_explore.sh start`) the session ends: "Exploration complete.", then a "ta-da" sting (a bright chord stab, then the C major chord held and fading, about 1.3 s, rebuilt from a measured recording of a stock sound effect; `G2_COMPLETE_SOUND=0` turns it off), he settles, lies down, and the voice service comes back ("G2 online."). The robot's name is spoken as "gee two" (Piper read "G2" as "J2").
+Saying "explore" / "go ahead and look around": the "ta-da" (the same sound as at the end), then "Exploration mode." (he still needs about 30 s to hand over). When the roam time runs out (`G2_EXPLORE_ROAM_S`, or `ROAM_S` of `g2_explore.sh start`) the session ends: "Exploration complete.", then a "ta-da" sting (a bright chord stab, then the C major chord held and fading, about 1.3 s, rebuilt from a measured recording of a stock sound effect; `G2_COMPLETE_SOUND=0` turns it off), he settles, lies down, and the voice service comes back ("G2 online."). The robot's name is spoken as "gee two" (Piper read "G2" as "J2").
 
 ## Switching gait (2026-10-09)
 
