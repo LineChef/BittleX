@@ -50,4 +50,20 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_FOOT_TRIM` | policy default | `off` disables the foot trim (V6 default `fl=-0.3`) |
 | `G2_ANNOUNCE_ONLINE` | on | `off` silences "G2 online." |
 
+## Exploration pictures, contact and one-sound-at-a-time (2026-10-10)
+
+| Switch | Default | What it does |
+|---|---|---|
+| `G2_SURVEY_CHECK` | on | a survey stop is look up, look down, stand, firmware `check` (`kck`, the body lean; G2 has no head to pan), stand, settle, one picture; `0` skips the check |
+| `G2_SURVEY_LOOKS` | off | `1` adds left and right turns with a throwaway picture each (open-loop turns were off by 30 to 70 deg) |
+| `G2_NEAR_LOOK_IN` | 30 | a wall this close (inches) starts the fast 3 s wall looks and blocks surveys and object checks for 20 s |
+| `G2_SURVEY_FIRST_S`, `G2_SURVEY_COOLDOWN_S`, `G2_INTEREST_FALLBACK_S` | 30, 60, 300 | survey pacing; the fallback is a random 0.6 to 1.4 times this |
+| `G2_WALL_KEEP_ALL` | off | `1` keeps a picture of every wall look (a hit test); `tools/g2_explore.sh` passes it through |
+| `G2_IMU_CONTACT` | on | the walk loop's heading-jitter signal (6 deg per IMU update over 3 s, 8 samples) starts the hit sequence (oof, back up, turn) even when vision says clear |
+| `G2_CONTACT_PICS`, `G2_CONTACT_PICS_DIR` | on, `~/.local/share/g2/contact_pictures` | two instant frames at a stall or hit, for diagnosis only |
+| `G2_STALL_LOG` | on | log-only 8 s stall detector (`imu.stall_suspect`) |
+| `G2_AUDIO_GATE` | on | speech, sound effects and BiBoard beeps wait for each other (up to 4 s, then a safety sound cuts in) |
+| `G2_NARRATE_START_QUIET_S` | 8 | no narration for the first seconds of an exploration |
+| `G2_WALL_STEER` | on | `0` turns the wall turn-away off (used to let him walk into a wall and test the hit sequence) |
+
 See also [`feature-flags.md`](feature-flags.md) for the `G2_FEATURES` subsystem flags.
