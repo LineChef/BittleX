@@ -71,8 +71,18 @@ def _start_interest(survey, saver, vision, rt, settings, args):
         wall_log = wd.WallLog(cal, context=lambda: {"mode": rt.driver.mode.mode.name})
         rt.wall_log = wall_log                                           # the sensor hub reads wall_log.last for the behaviour driver's wall steering
 
+        slow_s = float(os.environ.get("G2_WALL_LOOK_SLOW_S", "6"))
+        fast_s = watch.every_s                                          # 3 s while a wall may be near
+        seen_near = {"t": -1e9}
+
         def wall_look(snap):
             wall_log.look(snap.jpeg, to_image(snap.jpeg))
+            last = wall_log.last
+            now = time.monotonic()
+            if last is not None and last.nearest_in is not None and last.nearest_in <= 40.0:
+                seen_near["t"] = now
+            if os.environ.get("G2_WALL_STEER", "1") != "0":
+                watch.every_s = fast_s if now - seen_near["t"] <= 20.0 else max(fast_s, slow_s)      # look more often only while a wall was seen close in the last 20 s
         watch.on_snap = wall_look
         log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)
     log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",

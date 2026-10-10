@@ -333,6 +333,7 @@ class BehaviorDriver:
         self._wall_steer = os.environ.get("G2_WALL_STEER", "1") != "0"   # a near wall steers an exploring G2 away (user, 2026-10-10: it does not have to be perfect at first)
         self._wall_seen_t = -1e9                  # the look already acted on: one reaction per look
         self._wall_turn_until = 0.0               # no new wall reaction while a turn away is running
+        self._last_wall_reaction = -1e9           # when a wall turn or hit sequence last started
         self._hit_until = 0.0                     # no new hit-a-wall reaction until the last one should be done
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
@@ -500,6 +501,9 @@ class BehaviorDriver:
     EXPLORE_STRAIGHT_S = 8.0     # at the start of a roam he walks straight ahead this long before any exploring turn
     HIT_STALE_S = 4.0            # a look older than this is not taken as "he is at the wall now"
     HIT_NEAREST_IN = 6.0         # a wall this close on three or more groups (or a blocked picture) while walking = he has hit it
+    STUCK_NEAREST_IN = 16.0      # two looks in a row this close and not moving closer or farther (within 2 in): stuck against it
+    LEG_MARGIN_IN = 12.0         # the next leg is cut so that he stops this far from the nearest wall
+    LEG_SPEED_IN_S = 3.5         # his walking speed for that sum (about 0.09 m/s)
     HIT_BACK_S = 2.4             # how long he backs up
     HIT_TURN_RAD = 2.6           # about 150 degrees: turn around toward the open side
     WALL_STALE_S = 8.0           # a wall look older than this is not acted on
@@ -518,11 +522,12 @@ class BehaviorDriver:
         if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
             return None
         blocked = w.state == "blocked"
-        ahead = w.near_groups >= 3                                           # three of the five column groups of ONE picture read 24 in or closer: a wall is ahead, turn now
+        ahead = w.near_groups >= 3 and w.ahead_votes >= 2                    # three of the five column groups of one picture read 24 in or closer on two of the newest three looks: a wall is ahead (a one-off glare reading is not)
         very_near = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN
         if not (blocked or ahead or very_near or (w.state == "near" and w.confirmed)):
             return None
         self._wall_seen_t = w.t
+        self._last_wall_reaction = now
         side = w.turn or "right"
         rad = (self.WALL_BLOCKED_RAD if blocked else self.WALL_TURN_RAD) * (1.0 if side == "right" else -1.0)
         self._wall_turn_until = now + self.WALL_TURN_HOLD_S
@@ -546,12 +551,16 @@ class BehaviorDriver:
             return None
         if w.t <= self._wall_seen_t or now - w.t > self.HIT_STALE_S:
             return None
-        if not (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3)):
+        stuck = (w.nearest_in is not None and w.prev_nearest_in is not None and w.prev_age_s is not None and 1.5 <= w.prev_age_s <= 7.0
+                 and w.nearest_in <= self.STUCK_NEAREST_IN and w.prev_nearest_in <= self.STUCK_NEAREST_IN and abs(w.nearest_in - w.prev_nearest_in) <= 2.0 and w.near_groups >= 3
+                 and self._last_wall_reaction < w.t - w.prev_age_s)            # two looks in a row at the same close wall and no turn in between: he is not getting anywhere
+        if not (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3) or stuck):
             return None
         self._wall_seen_t = w.t
+        self._last_wall_reaction = now
         side = w.turn or "right"
         rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
-        why = f"hit a wall ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.state}): oof, back up, turn {side}"
+        why = f"{'stuck at a wall' if stuck and w.state != 'blocked' else 'hit a wall'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.state}): oof, back up, turn {side}"
         logging.getLogger("g2.wall.hit").info("%s", why)
         steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why))]
         if self.chirper is not None:
@@ -575,6 +584,9 @@ class BehaviorDriver:
             return steer
         if self._roam_began_at is None:
             self._roam_began_at = now
+        w = i.wall
+        if w is not None and w.nearest_in is not None and now - w.t <= self.WALL_STALE_S and w.nearest_in <= 60.0:
+            self.explorer.cap_leg(max(1.5, (w.nearest_in - self.LEG_MARGIN_IN) / self.LEG_SPEED_IN_S))      # a wall ahead: cut this leg to what is left before it (look once per leg, shorten the walk)
         d = self.explorer.decide(list(i.frame), now)
         if d.action is ExploreAction.TURN and now - self._roam_began_at < self.EXPLORE_STRAIGHT_S:
             return [Effect(EffectKind.WALK, 0.0, "straight first")]               # walk straight at the start; a wall turn above still wins

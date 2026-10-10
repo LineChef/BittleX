@@ -63,6 +63,23 @@ The current state — what is deployed, what has been tested on the robot, open 
 - Dated history and data: [`docs/history.md`](docs/history.md), [`docs/rl/real-walk-log.md`](docs/rl/real-walk-log.md)
 - Index of all docs: [`docs/README.md`](docs/README.md)
 
+## Voice commands
+
+Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep means he is listening, a lower boop means he has your words. The full list, with what each one does, is in
+**[`docs/guides/voice-commands.md`](docs/guides/voice-commands.md)**; the ones you will use most:
+
+| Say | What happens |
+|---|---|
+| "G2, explore" / "go ahead and look around" | exploration mode ([how it works](docs/guides/exploration-mode.md)) |
+| "that's enough" / "end exploration mode" | ends the exploration |
+| "walk forward for ten seconds", "come here" | a walk, or a walk to you |
+| "hi step" / "walk normally" | switches the walking gait |
+| "emergency stop" / "resume" | freezes him now / lets him move again |
+| "go to sleep" / "shut down" | curls up and sleeps / lies down and goes dormant |
+| "switch to English" | resets the voice module's language (when it falls back to Korean) |
+
+Switches for sounds and behaviours: [`docs/guides/settings-switches.md`](docs/guides/settings-switches.md).
+
 ## Walking policy
 
 The gait is a learned control layer over Bittle's built-in `wkF` walk: every control step (80 Hz) it reads the IMU, the

@@ -193,3 +193,18 @@ def test_counts_give_the_true_totals_for_the_tab_labels(tmp_path):
                       "CREATE TABLE observations(id INTEGER PRIMARY KEY, caption TEXT, labels TEXT); INSERT INTO facts(fact) VALUES ('a'),('b');")
     con.commit(); con.close()
     assert review.count_records(str(db)) == {"facts": 2, "exchanges": 0, "observations": 0}
+
+
+def test_the_walls_tab_lists_recognition_shots_with_their_labels_and_the_roam_ring_apart_from_the_object_pictures(tmp_path, monkeypatch):
+    monkeypatch.setattr(G, "WALL_CACHE", tmp_path)
+    (tmp_path / "ring").mkdir()
+    for n in ("shot_003.jpg", "shot_009.jpg"):
+        (tmp_path / n).write_bytes(b"\xff\xd8\xff")
+    (tmp_path / "ring" / "wall_20261010_120537_near.jpg").write_bytes(b"\xff\xd8\xff")
+    (tmp_path / "labels.json").write_text(json.dumps({"shot_003": {"label": "wall_straight", "distance_in": 16, "set": "prototype1", "flags": ["camera roll 4 deg"], "base_rows": [0.6]},
+                                                      "shot_009": {"label": "wall_straight", "distance_in": 16, "expected_turn": None}}))
+    app = G.App(G.Remote("pi", runner=lambda a: "[]"))
+    walls = app.walls()
+    assert [w["file"] for w in walls] == ["shot_003.jpg", "shot_009.jpg", "wall_20261010_120537_near.jpg"]
+    assert walls[0]["distance_in"] == 16 and walls[0]["set"] == "prototype1" and walls[2]["src"] == "roam" and walls[2]["label"] == "roam: near"
+    assert app.pictures.__func__ is not None                                             # the object pictures tab is a separate method and cache

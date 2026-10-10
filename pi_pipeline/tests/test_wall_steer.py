@@ -17,8 +17,8 @@ def _explorer(monkeypatch, steer="1"):
     return d, c
 
 
-def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, groups=0):
-    return WallReading(c() - age, state, inches, turn, confirmed, groups)
+def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, groups=0, votes=None, prev=None, prev_age=None):
+    return WallReading(c() - age, state, inches, turn, confirmed, groups, (2 if groups >= 3 else 0) if votes is None else votes, prev, prev_age)
 
 
 def test_a_confirmed_near_wall_turns_him_toward_the_open_side_with_a_soft_sound_once_per_look(monkeypatch):
@@ -140,3 +140,34 @@ def test_a_wall_ahead_is_acted_on_at_24_inches_when_three_groups_agree_and_at_12
     c.adv(6.0)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=2)))
     assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)                                                       # two groups at 24 in is not yet a wall ahead
+
+
+def test_a_one_off_glare_look_at_24_inches_is_not_a_wall_ahead_but_two_of_three_looks_are(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=4, votes=1, turn="right")))
+    assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)                       # one vote only
+    c.adv(4.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=4, votes=2, turn="right")))
+    assert ChirpMood.AVOID in payloads(t, EffectKind.CHIRP)
+
+
+def test_stuck_at_the_same_close_wall_for_two_looks_without_turning_counts_as_a_hit_and_a_turn_in_between_does_not(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    # first reaction: a turn away at 14 in (a wall ahead), so a following look at the same wall is NOT "stuck" (he has turned since)
+    d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=14.0, confirmed=False, groups=4, votes=2, turn="left", prev=14.0, prev_age=3.0)))
+    c.adv(12.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=14.5, confirmed=False, groups=4, votes=1, prev=14.0, prev_age=3.0)))
+    assert ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)                          # the previous look came after his turn only if no reaction lay between
+    c.adv(30.0)
+    # two looks 3 s apart at 14 in with no reaction in between: pinned against it
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=14.2, confirmed=False, groups=4, votes=1, prev=14.0, prev_age=3.0)))
+    assert ChirpMood.HIT in payloads(t, EffectKind.CHIRP) and any("stuck" in p[1] for p in payloads(t, EffectKind.DIAG))
+
+
+def test_a_wall_ahead_cuts_the_current_leg_to_what_is_left_before_it(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    d.tick(DriverInputs(frame=[]))
+    d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=33.0, confirmed=False, groups=0, votes=0, turn=None)))
+    assert d.explorer._leg_cap is not None and abs(d.explorer._leg_cap - (33.0 - 12.0) / 3.5) < 0.01       # 21 in left at 3.5 in/s = 6 s
+    d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=14.0, confirmed=False, groups=0, votes=0, turn=None, age=0.1)))
+    assert d.explorer._leg_cap >= 1.5 and d.explorer._leg_cap <= 6.0                                        # never shorter than 1.5 s, never longer than before

@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | [`STATUS.md`](STATUS.md) | **What is true right now** — what is deployed, what has run on the robot, open problems, next steps. The only place for current state. |
-| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the latest session handoff is [`plan-detail/handoff-2026-10-09-night.md`](plan-detail/handoff-2026-10-09-night.md); the next hardware session is [`plan-detail/hardware-session-plan-2026-10-09.md`](plan-detail/hardware-session-plan-2026-10-09.md). |
+| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the latest session handoff is [`plan-detail/handoff-2026-10-10.md`](plan-detail/handoff-2026-10-10.md); the next hardware session is [`plan-detail/hardware-session-plan-2026-10-09.md`](plan-detail/hardware-session-plan-2026-10-09.md). |
 | [`backlog.md`](backlog.md) | Open work by ID (H#, R#, B#) — generated from the item headings. |
 | [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
@@ -36,7 +36,9 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 | | |
 |---|---|
 | [`cheatsheet.md`](guides/cheatsheet.md) | Curated quick-reference, grouped by task (setup, robot, BiBoard tokens, walking, deploying, camera, voice, sim/RL) — command tables + full step sequences. |
-| [`voice-commands.md`](guides/voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills. |
+| [`voice-commands.md`](guides/voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills, plus G2's character sounds. |
+| [`exploration-mode.md`](guides/exploration-mode.md) | How exploration mode works: starting it, legs, picture stops, wall steering and hit detection, sounds, ending it, where the logs are. |
+| [`settings-switches.md`](guides/settings-switches.md) | Every environment switch (sounds, exploration, walls, power, standing) with its default. |
 | [`pi-bring-up.md`](guides/pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
 | [`gait-deployment.md`](guides/gait-deployment.md) | The sim→real path (ONNX export, on-robot loop, bring-up steps). |
 | [`train-vision-model.md`](guides/train-vision-model.md) | The SenseCraft capture→train→deploy flow. |

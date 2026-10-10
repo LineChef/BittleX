@@ -33,6 +33,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 CACHE = Path(os.path.expanduser("~/g2_pictures/explore"))
+WALL_CACHE = Path(os.path.expanduser("~/g2_pictures/wall"))       # the wall recognition pictures (~/g2_wall_pics on the Pi) and the ring of near-wall pictures: kept apart from the object pictures so that
+                                                                  # near-duplicates are never auto-pruned and nothing here is offered for naming or the object library
 KINDS = ("facts", "exchanges", "observations")
 
 
@@ -88,12 +90,41 @@ class Remote:
         return "ok" if r.returncode == 0 else (r.stderr.strip().splitlines() or ["no pictures yet"])[-1]
 
 
+    def sync_walls(self) -> str:
+        WALL_CACHE.mkdir(parents=True, exist_ok=True)
+        (WALL_CACHE / "ring").mkdir(exist_ok=True)
+        msgs = []
+        for src, dst in (("g2_wall_pics/", str(WALL_CACHE) + "/"), (".local/share/g2/wall_pics/", str(WALL_CACHE / "ring") + "/")):
+            r = subprocess.run(["rsync", "-a", f"{self.pi}:{src}", dst], capture_output=True, text=True, timeout=300)
+            if r.returncode != 0:
+                msgs.append((r.stderr.strip().splitlines() or ["none yet"])[-1])
+        return "ok" if not msgs else "; ".join(msgs)
+
+
 class App:
     """The actions behind the page. Pure of HTTP, so it can be tested with a fake Remote."""
 
     def __init__(self, remote: Remote):
         self.remote = remote
         self._backed_up = False
+
+    def walls(self) -> list:
+        """The wall pictures in the local cache: the recognition shots (with their labels, distance in inches, flags and what the estimator read) and the ring of pictures G2 kept
+        in a roam when a wall was near or blocked (named after the look: wall_<date>_<time>_<state>.jpg)."""
+        out = []
+        try:
+            labels = json.loads((WALL_CACHE / "labels.json").read_text())
+        except (OSError, ValueError):
+            labels = {}
+        for f in sorted(WALL_CACHE.glob("shot_*.jpg")):
+            info = labels.get(f.stem, {})
+            out.append({"file": f.name, "path": f.name, "src": "recognition", "label": info.get("label", "unlabelled"), "distance_in": info.get("distance_in"),
+                        "angle_deg": info.get("angle_deg"), "set": info.get("set"), "flags": info.get("flags", []), "note": info.get("note", ""), "base_rows": info.get("base_rows"),
+                        "expected_turn": info.get("expected_turn")})
+        for f in sorted((WALL_CACHE / "ring").glob("wall_*.jpg"), reverse=True):
+            state = f.stem.rsplit("_", 1)[-1]
+            out.append({"file": f.name, "path": "ring/" + f.name, "src": "roam", "label": "roam: " + state, "distance_in": None, "note": f.stem[5:], "flags": []})
+        return out
 
     def list(self, kind: str, q: str = "", limit: int = 300):
         if kind not in KINDS:
@@ -279,6 +310,13 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.counts())
                 if u.path == "/api/pictures":
                     return self._json(app.pictures())
+                if u.path.startswith("/wimg/"):
+                    rel = urllib.parse.unquote(u.path[6:])
+                    f = (WALL_CACHE / rel).resolve()
+                    ok = str(f).startswith(str(WALL_CACHE.resolve())) and f.is_file() and f.suffix == ".jpg"
+                    return self._send(200, f.read_bytes(), "image/jpeg") if ok else self._send(404, b"missing", "text/plain")
+                if u.path == "/api/walls":
+                    return self._json(app.walls())
                 if u.path == "/api/trash":
                     return self._json(app.trash())
                 return self._send(404, b"not found", "text/plain")
@@ -294,6 +332,8 @@ def make_handler(app: App, token: str, port: int):
             n = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
+                if u.path == "/api/walls/sync":
+                    return self._json({"status": app.remote.sync_walls()})
                 if u.path == "/api/delete":
                     return self._json(app.delete(body["kind"], int(body["id"])))
                 if u.path == "/api/restore":
@@ -362,7 +402,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
-const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["trash","Trash"]];
+const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["walls","Walls"],["trash","Trash"]];
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts",data=[],undoFn=null,timer=null,confirmAt=0;
 const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
@@ -401,12 +441,19 @@ function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
   if(tab==="pictures"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
+  else if(tab==="walls"){await api("/api/walls/sync",{});data=await api("/api/walls")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
   $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function renderWalls(list,f){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No wall pictures yet."));return}
+ const sum=el("div","labelsum");sum.append(el("b","","Wall pictures: "),document.createTextNode(items.filter(p=>p.src==="recognition").length+" recognition shots, "+items.filter(p=>p.src==="roam").length+" kept in roams. Distances are in inches from the camera lens to the base of the wall. These are kept apart from the object pictures."));list.append(sum);
+ const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/wimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
+  im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.note?" \u00b7 "+p.note:"");lb.style.display="flex"};
+  const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:""));c.append(im,cap);
+  if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
   const named=Object.keys(groups).filter(g=>g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y)),survey=Object.keys(groups).filter(g=>!g.startsWith("Named: ")).sort().reverse();

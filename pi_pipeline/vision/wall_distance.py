@@ -151,6 +151,9 @@ class WallReading:
     turn: str | None
     confirmed: bool
     near_groups: int = 0              # how many of the five column groups of this one look read TURN_IN (24 in) or closer
+    ahead_votes: int = 0              # how many of the newest three looks (this one included) had three or more groups at TURN_IN or closer: a one-off glare reading is one vote
+    prev_nearest_in: float | None = None     # the nearest wall of the look before this one, and how long ago it was (for "he is not getting anywhere")
+    prev_age_s: float | None = None
 
 
 class WallLog:
@@ -164,6 +167,7 @@ class WallLog:
         self.context, self._clock = context, clock
         self._last_clear = float("-inf")
         self._prev_state = None
+        self._votes: list = []                                        # per look: True when three or more groups read TURN_IN or closer (the newest three are kept)
         self.last: WallReading | None = None                          # the newest look, read by the behaviour driver
 
     def look(self, jpeg: bytes, img) -> WallEstimate:
@@ -188,7 +192,12 @@ class WallLog:
         extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
         self._prev_state = st
         if self.cal is not None:                                      # an uncalibrated look is never acted on
-            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= TURN_IN))
+            near_groups = sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= TURN_IN)
+            self._votes = (self._votes + [near_groups >= 3])[-3:]
+            prev = self.last
+            mono = time.monotonic()
+            self.last = WallReading(mono, st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], near_groups,
+                                    sum(self._votes), None if prev is None else prev.nearest_in, None if prev is None else round(mono - prev.t, 2))
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 

@@ -123,3 +123,19 @@ def test_a_near_wall_is_confirmed_only_when_two_looks_in_a_row_agree(tmp_path):
         log.look(jpeg(img), img)
     rows = [json.loads(line) for line in (tmp_path / "w.jsonl").read_text().splitlines()]
     assert [r["near_confirmed"] for r in rows] == [False, False, True, False, False]
+
+
+def test_the_replay_tool_says_what_an_exploring_g2_would_do_with_each_saved_picture(tmp_path):
+    import json
+    from PIL import Image
+    from pi_pipeline.vision.wall_replay import replay, decide
+    from pi_pipeline.vision.wall_distance import WallReading
+    for name, base in (("shot_001", 0.9), ("shot_002", 0.5)):
+        Image.fromarray(_scene(base, base)).save(tmp_path / f"{name}.jpg", quality=95)
+    labels = {"shot_001": {"label": "wall_straight", "distance_in": 6}, "shot_002": {"label": "wall_far", "distance_in": 70}}
+    rows = {r["shot"]: r for r in replay(str(tmp_path), CAL, labels)}
+    assert rows["shot_001"]["action"].startswith("turn") or rows["shot_001"]["action"].startswith("oof")         # a wall right in front: he reacts
+    assert rows["shot_002"]["action"] == "none"                                                                  # a far wall: he walks on
+    assert decide(WallReading(0.0, "blocked", 0.0, "left", True, 5, 3)) == "oof, back up, turn left"
+    assert decide(WallReading(0.0, "far", 20.0, "right", True, 4, 3)) == "turn right (wall ahead)"
+    assert decide(WallReading(0.0, "far", 30.0, None, True, 1, 0)) == "none"

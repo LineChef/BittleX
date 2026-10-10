@@ -37,6 +37,9 @@ Speaker works at all? (The Pi logged a sound-device error earlier.) Then: wake-w
 ## Block 3 -- hi step, scripted hsF (about 25 min)
 On the floor: 4 walks, note speed (expected about 0.04 m/s, slower than normal on purpose) and sway; a snag (cable or pencil) and a small rubble patch, where it should help most; then "walk normally" back. No comparison with the basic walk on G2 (sim only).
 
+## IMU capture for the speed estimate (optional, low priority; user 2026-10-10)
+On the floor, not the stand: `python -m pi_pipeline.gait.imu_capture --seconds 60 --pose rest` and `--pose stand` (bias, noise and the real frame rate), then walk him into a book or a wall 3 times for 8 s each with the IMU logged (a real stall, on his feet) to see whether a stall shows at 5 Hz. Tuning the ZUPT constants needs floor walks against a measured distance. Nothing built today depends on it: the stuck and hit signals use the wall looks.
+
 ## Block 4 -- exploration session (about 15 min, at the end of the walking blocks)
 Cleared area, no edges. Watch: the 40 s start announcement, fanfare, 7 s legs ending in the standing pose, no head moves, picture stops about once a minute, clean stop (`tools/g2_safe_stop.sh`). Afterwards read `~/.local/share/g2/wall_dryrun.jsonl` (the wall estimator only logs).
 

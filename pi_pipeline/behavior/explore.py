@@ -58,6 +58,7 @@ class Explorer:
         self._leg_start: float | None = None
         self._investigate_until: float = 0.0
         self._hold_until: float = 0.0
+        self._leg_cap: float | None = None      # seconds: the driver cuts the current leg short when a wall is ahead (cleared when a new leg starts)
         self._target = ""
         self._legs = 0
         self._reason = "init"
@@ -73,6 +74,10 @@ class Explorer:
         EXPLORE (there's no odometry, so leg count is the distance proxy)."""
         return self._legs >= self.cfg.max_legs
 
+    def cap_leg(self, secs: float) -> None:
+        """End the current leg after at most `secs` seconds from its start (never longer than it already was)."""
+        self._leg_cap = secs if self._leg_cap is None else min(self._leg_cap, secs)
+
     def hold_for(self, now: float, secs: float) -> None:
         """Stand still for `secs`: the wake word was heard and G2 should listen without his servos running."""
         self._hold_until = max(self._hold_until, now + secs)
@@ -85,6 +90,7 @@ class Explorer:
         self._leg_start = None
         self._investigate_until = 0.0
         self._hold_until = 0.0
+        self._leg_cap = None
         self._target = ""
         self._legs = 0
         self._reason = "reset"
@@ -142,13 +148,14 @@ class Explorer:
         # 4. nothing new -- wander. New leg when the current one is spent.
         if self._leg_start is None:
             self._leg_start = now
+            self._leg_cap = None
             self._legs += 1
             heading = self.nov.stalest_heading(now)
             self.nov.see_heading(heading, now)
             turn = heading * self.p.wander_turn_bias
             return self._d(ExploreAction.TURN, turn=turn,
                            reason=f"new leg ({self._legs}/{self.cfg.max_legs})")
-        if now - self._leg_start >= self.p.explore_leg_secs:
+        if now - self._leg_start >= min(self.p.explore_leg_secs, self._leg_cap if self._leg_cap is not None else 1e9):
             self._leg_start = None
             return self._d(ExploreAction.HOLD, reason="leg done")
         return self._d(ExploreAction.WANDER, reason="on leg")
