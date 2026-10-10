@@ -74,7 +74,7 @@ def test_watcher_is_silent_until_a_runtime_is_known_then_warns_at_80_and_95_perc
     t = m.tracker(tmp_path / "rt.json")
     alerts = []
     now = [0.0]
-    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300, require_arm=False)
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300, warn_fraction=0.8, critical_fraction=0.95, require_arm=False)
     m.up = 99999.0
     assert w.poll_once() is None                        # nothing measured yet: stays quiet
     t.add_run(10000, source="test")
@@ -91,7 +91,7 @@ def test_a_configured_full_runtime_overrides_the_recorded_mean(tmp_path):
     m = Boot(up=1800.0)
     t = m.tracker(tmp_path / "rt.json"); t.add_run(100000, source="test")
     alerts = []
-    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=2000, require_arm=False).poll_once()
+    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=2000, warn_fraction=0.8, critical_fraction=0.95, require_arm=False).poll_once()
     assert alerts == [BatteryLevel.LOW]
 
 
@@ -101,7 +101,7 @@ def test_the_watcher_is_on_by_default_but_ignores_rough_manual_readings(tmp_path
     m = Boot(up=99999.0)
     t = m.tracker(tmp_path / "rt.json"); t.add_run(6414)           # a manual reading: counted in the mean, not used to warn
     alerts = []
-    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), require_arm=False).poll_once()
+    RuntimeWatcher(t, lambda lv, u: alerts.append(lv), warn_fraction=0.8, critical_fraction=0.95, require_arm=False).poll_once()
     assert alerts == [] and t.mean_runtime_s() == 6414
 
 
@@ -121,7 +121,7 @@ def test_by_default_the_warning_counts_from_boot_and_plugged_in_pauses_it_and_un
     t = m.tracker(tmp_path / "rt.json")
     t.add_run(10000, source="test")
     alerts, now = [], [0.0]
-    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300)    # counts from boot
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append((lv, round(u, 2))), clock=lambda: now[0], repeat_s=300, warn_fraction=0.8, critical_fraction=0.95)    # counts from boot
     m.up = 7900.0; now[0] += 60
     assert w.poll_once() is None
     m.up = 8100.0; now[0] += 60
@@ -140,7 +140,7 @@ def test_manual_mode_stays_silent_until_the_person_says_unplugged(tmp_path):
     m = Boot("b1", up=9000.0)
     t = m.tracker(tmp_path / "rt.json"); t.add_run(10000, source="test")
     alerts, now = [], [0.0]
-    w = RuntimeWatcher(t, lambda lv, u: alerts.append(lv), clock=lambda: now[0], require_arm=True)
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append(lv), clock=lambda: now[0], warn_fraction=0.8, critical_fraction=0.95, require_arm=True)
     assert w.poll_once() is None and alerts == []                     # 9000 s up, but not told he is on battery
     t.arm_now(); m.up += 8100
     assert w.poll_once() is BatteryLevel.LOW
@@ -206,3 +206,15 @@ def test_a_run_the_user_vouches_for_counts_for_the_warning_but_a_manual_one_does
     t.add_run(11376, source="confirmed")
     t.add_run(11776, source="confirmed")
     assert RuntimeWatcher(t, lambda *a: None).full_runtime_s() == 11576
+
+
+def test_default_thresholds_are_30_percent_left_for_low_and_20_percent_left_for_critical(tmp_path):
+    alerts = []
+    now = [0.0]
+    m = Boot(up=0.0)
+    t = m.tracker(tmp_path / "rt2.json")
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append(lv), full_runtime_s=1000, clock=lambda: now[0], require_arm=False)
+    for up, expect in ((690, None), (710, BatteryLevel.LOW), (790, BatteryLevel.LOW), (810, BatteryLevel.CRITICAL)):         # low repeats every 5 min while it stays low
+        m.up = float(up); now[0] += 600
+        assert w.poll_once() is expect
+    assert alerts == [BatteryLevel.LOW, BatteryLevel.LOW, BatteryLevel.CRITICAL]

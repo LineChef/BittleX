@@ -11,7 +11,7 @@ the test is how long that charge lasted. If the Pi is instead shut down or reboo
 battery state afterwards is unknown), so reboots can't be mistaken for an empty battery. `cancel` ends a test by hand.
 
 `RuntimeWatcher` is on by default (G2_PI_BATTERY_WATCH=0 turns it off) but stays silent until a timed test has measured a full runtime.
-Then it warns at 80% of that runtime (about 20% left) and again at 95%, counting from boot (a Pi is normally booted on a full battery and then
+Then it warns at 70% of that runtime (about 30% left) and again at 80% (about 20% left, critical), counting from boot (a Pi is normally booted on a full battery and then
 unplugged). The Pi cannot sense a charger, so you can tell it: "you're plugged in" (or `runtime plugged`) pauses the warning for this boot,
 and "you're unplugged" (or `runtime unplugged`) restarts the count from that moment. G2_PI_BATTERY_ARM=manual counts only after "unplugged".
 A reboot forgets both."""
@@ -30,8 +30,8 @@ from .battery import BatteryLevel
 
 log = logging.getLogger("g2.runtime")
 
-WARN_FRACTION = 0.80       # uptime / full runtime at which "about 20% left" fires
-CRITICAL_FRACTION = 0.95
+WARN_FRACTION = 0.70       # uptime / full runtime at which "about 30% left" fires
+CRITICAL_FRACTION = 0.80   # about 20% left (user, 2026-10-10)
 MEASURED = ("test", "log", "confirmed")   # run sources the warning trusts: a timed test, a power loss from power_log.py the user confirmed, or a run the user vouched for as full-to-empty
 
 
@@ -237,13 +237,13 @@ class RuntimeTracker:
 
 class RuntimeWatcher:
     """Checks every `poll_s` how much of the full runtime this boot has used, and calls `on_alert(level, fraction_used)`.
-    LOW at 80% used (about 20% battery left), CRITICAL at 95%; repeats every `repeat_s` while it stays that high. Silent until
+    LOW at 70% used (about 30% battery left), CRITICAL at 80% (about 20% left); repeats every `repeat_s` while it stays that high. Silent until
     a full runtime is known (`full_runtime_s` from settings, else the mean of the recorded runs)."""
 
     def __init__(self, tracker: RuntimeTracker, on_alert, *, full_runtime_s=None, poll_s: float = 60.0, repeat_s: float = 300.0,
-                 clock=time.monotonic, require_arm: bool = False, warn_fraction: float = WARN_FRACTION):
+                 clock=time.monotonic, require_arm: bool = False, warn_fraction: float = WARN_FRACTION, critical_fraction: float = CRITICAL_FRACTION):
         self._tracker, self._on_alert = tracker, on_alert
-        self._warn_fraction = warn_fraction
+        self._warn_fraction, self._critical_fraction = warn_fraction, critical_fraction
         self._require_arm = require_arm
         self._override = full_runtime_s or None
         self._poll_s, self._repeat_s, self._clock = poll_s, repeat_s, clock
@@ -264,7 +264,7 @@ class RuntimeWatcher:
             self.level, self._last_alert = BatteryLevel.OK, None
             return None                                     # not told he is on battery (this boot): stay silent
         used = elapsed / full
-        seen = BatteryLevel.CRITICAL if used >= CRITICAL_FRACTION else BatteryLevel.LOW if used >= self._warn_fraction else BatteryLevel.OK
+        seen = BatteryLevel.CRITICAL if used >= self._critical_fraction else BatteryLevel.LOW if used >= self._warn_fraction else BatteryLevel.OK
         now = self._clock()
         if seen == BatteryLevel.OK:
             self.level, self._last_alert = BatteryLevel.OK, None

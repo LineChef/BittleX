@@ -162,10 +162,10 @@ class Settings:
     # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the star_trek_red_alert siren.
     battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.54))   # about 30% left of a 2S Li-ion pack at rest (3.77 V/cell; user, 2026-10-10: warn at 30%)
-    battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 7.4))
+    battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 7.46))   # about 20% left at rest (3.73 V/cell; user, 2026-10-10: critical at 20%)
     # thresholds for readings taken WHILE walking (the voltage sags under load); first guesses, refine from the logged readings (events.jsonl, name gait/battery.load)
-    battery_load_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_LOW_V", 7.2))
-    battery_load_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_CRITICAL_V", 6.8))
+    battery_load_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_LOW_V", 7.3))     # the same 30% as read under load (sags ~0.2 V)
+    battery_load_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOAD_CRITICAL_V", 7.2))   # 20% under load
     # G2's forward gait: "policy" = the deployed learned walk (default), "firmware" = the stock scripted wkF. Turning and the other gaits stay firmware.
     default_gait: str = field(default_factory=lambda: _env("G2_DEFAULT_GAIT", "policy").strip().lower())
     # "go ahead and look around" by voice hands over to an exploration session (explore_launch.py); it ends and the voice service returns
@@ -181,6 +181,7 @@ class Settings:
     # the 80%-of-runtime warning: on, but silent until a timed battery test has measured a runtime (it counts uptime since boot,
     # so a reboot resets it). 0 turns it off.
     # the fraction of the measured runtime used at which the Pi warns "battery low" (0.80 = about 20% left; 0.50 = about half left)
+    pi_critical_fraction: float = field(default_factory=lambda: _env_float("G2_PI_CRITICAL_FRACTION", 0.80))   # 0.80 = about 20% left (user, 2026-10-10)
     pi_warn_fraction: float = field(default_factory=lambda: _env_float("G2_PI_WARN_FRACTION", 0.70))   # 0.70 = about 30% left (user, 2026-10-10)
     # power-saving sleep in the voice service (power/sleep_watch.py): after this long at rest with no activity G2 sighs and the Pi saves power; 0 = off
     sleep_after_s: float = field(default_factory=lambda: _env_float("G2_SLEEP_AFTER_S", 0.0))
