@@ -1,4 +1,6 @@
-# Session handoff, 2026-10-09 evening (read this first in a new session)
+# Session handoff, 2026-10-09 evening
+
+> **Superseded by [`handoff-2026-10-09-night.md`](handoff-2026-10-09-night.md)** (the V6 run finished, V6 promoted and deployed, the hardware plan). Kept for the run's history.
 
 Times Eastern. Earlier handoffs: [`handoff-2026-10-09.md`](handoff-2026-10-09.md) (V4 evaluation and the V5 run, complete), [`handoff-2026-10-08.md`](handoff-2026-10-08.md). Plan: [`v6-staged-training-plan.md`](v6-staged-training-plan.md)
 (stage results, the S2 loophole, Layer 2 and Plan B, the alternate-gait design). Current truth about the robot: [`../STATUS.md`](../STATUS.md).
