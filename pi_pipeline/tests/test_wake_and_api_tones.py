@@ -81,12 +81,16 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     from pi_pipeline.behavior.driver import Effect, EffectKind
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_start_horn()
-    assert 2.2 < pcm.size / 48000 < 2.4 and abs(int(pcm.max())) > 100
+    assert 2.55 < pcm.size / 48000 < 2.75 and abs(int(pcm.max())) > 100
     import numpy as np
-    tail, mid = np.abs(pcm[-240:]).max(), np.abs(pcm[48000:72000]).max()
-    assert tail < 0.02 * mid                                                         # it fades out to nothing at the end
-    sp = np.abs(np.fft.rfft(pcm[24000:72000].astype(float) * np.hanning(48000), 1 << 17)); fr = np.fft.rfftfreq(1 << 17, 48000 ** -1)
-    assert abs(fr[np.argmax(np.where((fr > 200) & (fr < 400), sp, 0))] - 302.5) < 3 # the measured steady pitch
+    r = 48000
+    assert np.abs(pcm[-240:]).max() < 0.02 * np.abs(pcm[r:int(1.5 * r)]).max()          # it fades out to nothing at the end
+
+    def peak_hz(a, b):
+        seg = pcm[int(a * r):int(b * r)].astype(float) * np.hanning(int((b - a) * r))
+        sp = np.abs(np.fft.rfft(seg, 1 << 17)); fr = np.fft.rfftfreq(1 << 17, 1 / r)
+        return fr[np.argmax(np.where((fr > 150) & (fr < 360), sp, 0))]
+    assert abs(peak_hz(0.12, 0.30) - 208) < 8 and abs(peak_hz(0.6, 1.4) - 302.5) < 3   # two notes, the second a fifth up
     sent = []
     b = DriverBindings(actuator=types.SimpleNamespace(perform=lambda tone: sent.append(tone)))
     b.dispatch([Effect(EffectKind.CHIRP, ChirpMood.FANFARE)])

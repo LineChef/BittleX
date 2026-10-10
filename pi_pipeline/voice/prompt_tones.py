@@ -171,18 +171,25 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
 
 
 def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """The "Viking horn" that starts an exploration, played right after "Exploration mode." (user, 2026-10-10). Rebuilt from a laptop-microphone recording of the
-    clip (2.4 s): one steady note at 302.5 Hz (it stayed within 1 Hz), rising into pitch over the first 0.1 s, a second harmonic as strong as the note at the start
-    (the horn is overblown, about 610 Hz) that settles to 0.55 of it, nearly nothing above; full loudness from 0.13 s to about 1.4 s, then a long fade out to
-    silence at 2.3 s."""
-    dur = 2.3
+    """The "Viking horn" that starts an exploration, played right after "Exploration mode." (user, 2026-10-10). Two notes, rebuilt from two laptop-microphone
+    recordings of the clip (the same timing and pitches both times): a short lower note at 206 Hz (0.06 to 0.33 s, rising a little, a rich nasal spectrum with the
+    2nd to 4th harmonics stronger than the note), then at once a long higher note at 302.5 Hz (a fifth up; the 2nd harmonic about 0.6 of it, little above) that holds at
+    full level to 1.4 s, drifts down, and fades out to silence at 2.65 s."""
+    dur = 2.65
     t = np.arange(0, dur, 1.0 / rate)
-    f = 302.5 * (1.0 - 0.28 * np.exp(-t / 0.045))                     # starts near 220 Hz and slides up into pitch
-    ph = 2 * np.pi * np.cumsum(f) / rate
-    h2 = 0.55 + 0.45 * np.exp(-t / 0.3)
-    y = np.sin(ph) + h2 * np.sin(2 * ph) + 0.06 * np.sin(3 * ph) + 0.05 * np.sin(5 * ph) + 0.04 * np.sin(6 * ph)
-    env = np.interp(t, [0.0, 0.04, 0.13, 0.40, 1.40, 1.70, 2.00, 2.30], [0.0, 0.40, 0.95, 1.0, 1.0, 0.80, 0.38, 0.0])
-    return _finish([y * env], peak)
+    # note 1: 0.06 to 0.33 s
+    f1 = 205.8 + 9.0 * np.clip((t - 0.06) / 0.27, 0, 1)
+    p1 = 2 * np.pi * np.cumsum(f1) / rate
+    n1 = sum(w * np.sin(k * p1) for k, w in zip(range(1, 7), (1.0, 1.73, 2.11, 1.07, 0.37, 0.09)))
+    e1 = np.interp(t, [0.06, 0.12, 0.20, 0.30, 0.33, 0.35], [0.0, 0.55, 0.92, 0.80, 0.55, 0.0])
+    n1 = n1 / 3.2 * e1
+    # note 2: from 0.33 s
+    f2 = np.where(t < 0.33, 293.0, 302.5 - 9.5 * np.exp(-(t - 0.33) / 0.04))
+    p2 = 2 * np.pi * np.cumsum(f2) / rate
+    n2 = np.sin(p2) + 0.58 * np.sin(2 * p2) + 0.11 * np.sin(3 * p2) + 0.04 * np.sin(4 * p2) + 0.05 * np.sin(5 * p2)
+    e2 = np.interp(t, [0.0, 0.33, 0.37, 0.50, 1.40, 1.80, 2.10, 2.65], [0.0, 0.0, 0.85, 1.0, 1.0, 0.82, 0.55, 0.0])
+    n2 = n2 / 1.6 * e2
+    return _finish([n1 + n2], peak)
 
 
 def play_start_horn(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
