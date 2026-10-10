@@ -440,7 +440,7 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 
 | Command | What it does |
 |---|---|
-| `bash tools/g2_explore.sh start [ROAM_S]` | exploration session (roams by default, 600 s); say "cancel exploration" / "end exploration mode" to end it; it says "Exploration complete.", plays the "da naaaa" sting and lies down |
+| `bash tools/g2_explore.sh start [ROAM_S]` | exploration session (roams by default, 600 s); say "cancel exploration" / "end exploration mode" to end it; it says "Exploration complete.", plays the "ta-da" sting and lies down |
 | `bash tools/g2_baseline.sh start N NAME --foot-hold fl --hold-on-policy --seconds 18 --lead-s 5 --reset-s 35` | N logged V2.1 walks with the front-left hold (35 s between walks to tape the offset); `--hold-off` for a no-hold control, `--foot-hold-ff 0,-0.25` for the feed-forward A/B |
 | `touch rl_training/opencat-gym/trained/v3_hold_20m` | veto the 20M auto-go (the runner then waits for `trained/v3_go_hardware_checkin`) |
 | `bash tools/g2_promote_policy.sh TAG NAME [--dry-run]` | promote a trained policy to the default and deploy it when the Pi is online |

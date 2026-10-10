@@ -159,11 +159,23 @@ def render_refuse(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([out], peak)
 
 
+# The exploration-complete sting (user, 2026-10-10): a "ta-da" rebuilt from the notes, timing and loudness measured off a laptop-microphone recording of a stock
+# "Ta-Da" sound effect (about 1.25 s per play): a bright stab, then the same chord held and fading. The chord, measured: E4, C5, E5, G5, C6 (a C major chord).
+CHORD_HZ = (329.6, 523.3, 659.3, 784.0, 1046.5)
+CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
+
+
 def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """A "da naaaa" (about 1.9 s) for a finished exploration: a short brass note, then a fourth above it, held with a slight vibrato and a slow fade."""
-    da = _brass(261.6, 0.20, rate, attack=0.015, release=0.05)
-    nah = _brass(349.2, 1.55, rate, attack=0.04, release=0.55, vibrato=0.012)
-    return _finish([da, np.zeros(int(rate * 0.06)), nah], peak)
+    """A "ta-da" (about 1.3 s) for a finished exploration: a short bright chord stab, then the chord held and fading."""
+    def chord(dur, attack, release, bright):
+        y = sum(w * _brass(f, dur, rate, attack=attack, release=release) for f, w in zip(CHORD_HZ, CHORD_WEIGHT))
+        t = np.arange(y.size) / rate
+        sparkle = sum(np.sin(2 * np.pi * f * t) for f in (2100.0, 3150.0)) * np.exp(-t / 0.06) * bright      # the bright attack seen at 2.1 and 3.1 kHz
+        return y + sparkle
+    stab = chord(0.22, 0.008, 0.03, 0.9)
+    held = chord(1.05, 0.012, 0.45, 0.35)
+    held = held * np.exp(-np.arange(held.size) / rate / 1.4)
+    return _finish([stab, held], peak)
 
 
 def play_complete(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
