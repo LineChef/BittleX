@@ -108,6 +108,11 @@ def test_add_and_edit_facts_and_observations_by_hand(tmp_path):
     R.edit_fact(db, f["id"], fact="The dishwasher is left of the fridge", importance=2, core=False)
     row = [r for r in R.list_records(db, "facts") if r["id"] == f["id"]][0]
     assert row["fact"] == "The dishwasher is left of the fridge" and row["importance"] == 2 and row["core"] == 0
+    R.edit_fact(db, f["id"], ts="2026-09-01")                                  # the date can be changed on its own
+    row = [r for r in R.list_records(db, "facts") if r["id"] == f["id"]][0]
+    assert row["ts"].startswith("2026-09-01") and row["fact"] == "The dishwasher is left of the fridge" and row["importance"] == 2
+    with pytest.raises(ValueError):
+        R.edit_fact(db, f["id"], ts="not a date")
     with pytest.raises(ValueError):
         R.edit_fact(db, 9999, fact="x")
     o = R.add_observation(db, "A steel door with a black handle", "dishwasher")
@@ -117,3 +122,13 @@ def test_add_and_edit_facts_and_observations_by_hand(tmp_path):
     c = sqlite3.connect(db)                                                   # the search index follows the edit
     hits = c.execute("SELECT rowid FROM observations_fts WHERE observations_fts MATCH 'display'").fetchall()
     assert [h[0] for h in hits] == [o["id"]]
+
+
+def test_a_fact_date_can_be_edited_keeping_the_time_of_day_and_a_bad_date_is_refused(tmp_path):
+    from pi_pipeline.memory import review as R
+    assert R.parse_date("2026-10-01", "2026-10-07T19:08:46.340756+00:00") == "2026-10-01 19:08:46"        # the date changes, the time of day stays
+    assert R.parse_date("2026-10-01 07:30") == "2026-10-01 07:30:00" and R.parse_date("2026-10-01", None) == "2026-10-01 00:00:00"
+    import pytest
+    for bad in ("", "yesterday", "10/01/2026", "2026-13-40"):
+        with pytest.raises(ValueError):
+            R.parse_date(bad)

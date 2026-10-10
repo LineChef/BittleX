@@ -197,7 +197,7 @@ class App:
         args = ["add-fact", str(fact), "--importance", str(int(importance))] + (["--core"] if core else [])
         return self.remote.memory(*args)
 
-    def edit_fact(self, fact_id: int, fact=None, importance=None, core=None):
+    def edit_fact(self, fact_id: int, fact=None, importance=None, core=None, ts=None):
         self._backup_once()
         args = ["edit-fact", str(int(fact_id))]
         if fact is not None:
@@ -206,6 +206,8 @@ class App:
             args += ["--importance", str(int(importance))]
         if core is not None:
             args += ["--core", "1" if core else "0"]
+        if ts is not None:
+            args += ["--ts", str(ts)]
         return self.remote.memory(*args)
 
     def add_observation(self, caption: str, labels: str = ""):
@@ -431,7 +433,7 @@ def make_handler(app: App, token: str, port: int):
                 if u.path == "/api/facts/add":
                     return self._json(app.add_fact(str(body["fact"]), int(body.get("importance", 3)), bool(body.get("core", False))))
                 if u.path == "/api/facts/edit":
-                    return self._json(app.edit_fact(int(body["id"]), body.get("fact"), body.get("importance"), body.get("core")))
+                    return self._json(app.edit_fact(int(body["id"]), body.get("fact"), body.get("importance"), body.get("core"), body.get("ts")))
                 if u.path == "/api/observations/add":
                     return self._json(app.add_observation(str(body["caption"]), str(body.get("labels", ""))))
                 if u.path == "/api/observations/edit":
@@ -575,7 +577,9 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
  for(const r of items){const row=el("div","row"),main=el("div","main");
   if(tab==="exchanges"){main.append(el("div","",r.user_text),el("div","q",r.assistant_text),el("div","meta",r.ts+(r.actions?" · "+r.actions:"")))}
   else if(tab==="observations"){main.append(el("div","",r.caption),obsLabels(r))}
-  else{main.append(el("div","",r.fact),el("div","meta","#"+r.id+" · "+r.ts.slice(0,10)+(r.core?" · core":"")+" · importance "+r.importance))}
+  else{const meta=el("div","meta","#"+r.id+" · ");const db=el("button","","");db.textContent=r.ts.slice(0,10);db.title="Click to change this fact's date";db.style.cssText="border:0;background:none;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline dotted";
+   db.onclick=async()=>{const t=prompt("Date for this fact (2026-10-10, or 2026-10-10 18:30)",r.ts.slice(0,10));if(t===null||!t.trim()||t.trim()===r.ts.slice(0,10))return;const old=r.ts.slice(0,19);try{await api("/api/facts/edit",{id:r.id,ts:t.trim()});load();toast("Date changed",async()=>{await api("/api/facts/edit",{id:r.id,ts:old});load()})}catch(x){toast("Failed: "+x.message)}};
+   meta.append(db,document.createTextNode((r.core?" \u00b7 core":"")+" \u00b7 importance "+r.importance+" (change it with the number box)"));main.append(el("div","",r.fact),meta)}
   row.append(main);if(tab==="facts")row.append(factTools(r));if(tab==="observations")row.append(obsTools(r));row.append(xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;drawTabs();load();

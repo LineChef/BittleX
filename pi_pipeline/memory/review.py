@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime
+import re
 import sqlite3
 import sys
 import time
@@ -87,8 +88,26 @@ def add_fact(db: str, fact: str, importance: int = 3, core: bool = False) -> dic
         c.close()
 
 
-def edit_fact(db: str, fact_id: int, fact: str | None = None, importance: int | None = None, core: bool | None = None) -> dict:
-    """Change a fact's text, importance (1-5) or core flag. Only the given fields change. An unknown id or a text that is already another fact is an error."""
+def parse_date(text: str, old: str | None = None) -> str:
+    """A date typed by hand -> the stored text. `YYYY-MM-DD` keeps the time of day the fact already had (00:00:00 if it had none), `YYYY-MM-DD HH:MM[:SS]` is taken as typed. ValueError otherwise."""
+    t = " ".join(str(text or "").replace("T", " ").split())
+    for fmt, has_time in (("%Y-%m-%d", False), ("%Y-%m-%d %H:%M", True), ("%Y-%m-%d %H:%M:%S", True)):
+        try:
+            d = datetime.strptime(t, fmt)
+        except ValueError:
+            continue
+        if has_time:
+            return d.strftime("%Y-%m-%d %H:%M:%S")
+        tod = "00:00:00"
+        m = re.search(r"[T ](\d{2}:\d{2}:\d{2})", old or "")
+        if m:
+            tod = m.group(1)
+        return f"{d.strftime('%Y-%m-%d')} {tod}"
+    raise ValueError("give a date like 2026-10-10 (or 2026-10-10 18:30)")
+
+
+def edit_fact(db: str, fact_id: int, fact: str | None = None, importance: int | None = None, core: bool | None = None, ts: str | None = None) -> dict:
+    """Change a fact's text, importance (1-5), core flag or date. Only the given fields change. An unknown id or a text that is already another fact is an error."""
     c = _conn(db)
     try:
         cols = _fact_columns(c)
@@ -102,6 +121,9 @@ def edit_fact(db: str, fact_id: int, fact: str | None = None, importance: int | 
             sets.append("importance = ?"); params.append(max(1, min(5, int(importance))))
         if core is not None and "core" in cols:
             sets.append("core = ?"); params.append(1 if core else 0)
+        if ts is not None:
+            old = c.execute("SELECT ts FROM facts WHERE id = ?", (int(fact_id),)).fetchone()
+            sets.append("ts = ?"); params.append(parse_date(ts, old[0] if old else None))
         if not sets:
             raise ValueError("nothing to change")
         try:
@@ -240,7 +262,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("restore"); p.add_argument("trash_id", type=int)
     p = sub.add_parser("trash-commands"); p.add_argument("--apply", action="store_true")
     p = sub.add_parser("add-fact"); p.add_argument("fact"); p.add_argument("--importance", type=int, default=3); p.add_argument("--core", action="store_true")
-    p = sub.add_parser("edit-fact"); p.add_argument("id", type=int); p.add_argument("--fact", default=None); p.add_argument("--importance", type=int, default=None); p.add_argument("--core", choices=("0", "1"), default=None)
+    p = sub.add_parser("edit-fact"); p.add_argument("id", type=int); p.add_argument("--fact", default=None); p.add_argument("--importance", type=int, default=None); p.add_argument("--core", choices=("0", "1"), default=None); p.add_argument("--ts", default=None)
     p = sub.add_parser("add-observation"); p.add_argument("caption"); p.add_argument("--labels", default="")
     p = sub.add_parser("edit-observation"); p.add_argument("id", type=int); p.add_argument("--caption", default=None); p.add_argument("--labels", default=None)
     sub.add_parser("trash"); sub.add_parser("empty-trash"); sub.add_parser("backup"); sub.add_parser("count")
@@ -259,7 +281,7 @@ def main(argv=None) -> int:
         elif args.cmd == "add-fact":
             out = add_fact(args.db, args.fact, args.importance, args.core)
         elif args.cmd == "edit-fact":
-            out = edit_fact(args.db, args.id, args.fact, args.importance, None if args.core is None else args.core == "1")
+            out = edit_fact(args.db, args.id, args.fact, args.importance, None if args.core is None else args.core == "1", args.ts)
         elif args.cmd == "add-observation":
             out = add_observation(args.db, args.caption, args.labels)
         elif args.cmd == "edit-observation":
