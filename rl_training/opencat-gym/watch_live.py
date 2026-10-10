@@ -2,8 +2,8 @@
 the run's training environments (env 0) streams the episode it is actually simulating (its scene at each reset, then G2's pose and joints every 2 steps), and this
 window draws exactly that, joining wherever the run is.
 
-    python watch_live.py              # follow the live episode as it is simulated (training runs about 4-5x faster than real time)
-    python watch_live.py --realtime   # play each episode at real speed, then jump to the newest one
+    python watch_live.py              # play each episode at real speed (80 Hz), then jump to the newest one
+    python watch_live.py --fast       # draw the newest frame as the run produces it (about 4-5x real time)
 
 `g2watchrun` runs this. The stream is on only while a viewer is open (this script touches trained/live/request every few seconds; the env checks it at each episode
 start), so a run nobody watches pays nothing. A run started before 2026-10-09's change has no stream: the window says so and keeps waiting."""
@@ -65,22 +65,61 @@ def build(p, scene):
     return rid, ids
 
 
+NAMES = {"ledge_up": "step up", "ledge_down": "step down", "rubble": "rubble", "boxes": "boxes", "snags": "snags", "slope": "slope", "sidehill": "side-hill",
+         "threshold": "threshold", "shove": "shoves", "snag": "snag", "cutback": "switchback turn", "sidehill_r": "side-hill (right side down)",
+         "sidehill_l": "side-hill (left side down)"}
+ROLES = {"anchor": "flat-ground check", "combo": "mixed hazards", "focus": "hazard practice"}
+
+
+def _amount(k, v):
+    """A hazard's size in words: ledges in millimetres, the rest as a plain 0-100% strength."""
+    return f"{abs(v) * 1000:.0f} mm" if k.startswith("ledge") and abs(v) < 0.2 else f"{min(abs(v), 1.0) * 100:.0f}%"
+
+
 def describe(scene):
-    hz = ", ".join(f"{k} {v:g}" for k, v in scene["hazards"].items()) or "no hazard"
-    return (f"{scene['tag']}  |  episode {scene['ep']}  ({scene['role'] or '-'}: {hz})  |  slope roll/pitch {scene['slope_deg'][0]:+.1f}/{scene['slope_deg'][1]:+.1f} deg"
-            + (f"  |  ledge {scene['ledge_mm']:+.0f} mm" if scene.get("ledge_mm") else "") + f"  |  command {scene['cmd_fwd']:.2f} m/s")
+    """The overlay as short lines: what this episode is, what is in the way, how steep the ground is, how fast G2 was told to go."""
+    hz = scene["hazards"]
+    lines = [f"Episode {str(scene['ep']).split('_')[-1]}   ({ROLES.get(scene['role'], scene['role'] or 'episode')})"]
+    lines.append("In the way: " + (", ".join(f"{NAMES.get(k, k.replace('_', ' '))} {_amount(k, v)}" for k, v in hz.items()) if hz else "nothing, flat ground"))
+    roll, pitch = scene["slope_deg"]
+    if abs(roll) >= 0.5 or abs(pitch) >= 0.5:
+        lines.append(f"Ground tilt: {abs(pitch):.0f} deg {'uphill' if pitch > 0 else 'downhill'}, {abs(roll):.0f} deg sideways")
+    if scene.get("ledge_mm"):
+        lines.append(f"Ledge: {abs(scene['ledge_mm']):.0f} mm {'up' if scene['ledge_mm'] > 0 else 'down'}")
+    lines.append(f"Speed asked for: {scene['cmd_fwd'] * 100:.0f} cm/s")
+    return lines
+
+
+def read_frames(f, out):
+    """Append every complete new line of the frames file to `out` (a partial last line is left for the next read)."""
+    while True:
+        line = f.readline()
+        if not line:
+            return
+        if not line.endswith("\n"):
+            f.seek(f.tell() - len(line))
+            return
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            pass
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--realtime", action="store_true", help="play each episode at real speed, then jump to the newest one")
+    ap.add_argument("--fast", action="store_true", help="draw the newest frame as fast as the run produces it (about 4-5x real time) instead of playing each episode at real speed")
+    ap.add_argument("--realtime", action="store_true", help="(default, kept for old habits)")
     a = ap.parse_args()
+    import collections
     import pybullet as p
     p.connect(p.GUI)
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
+    p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)         # shadow maps flicker and cost frames on a laptop GPU
     touch()
-    last_touch, ep, f, rid, ids, text, jids = time.time(), None, None, None, {}, None, []
-    waited, scene, scene_t, scene_m, done_playing, last_draw, end_t, last_frame_t = time.time(), None, 0.0, None, False, 0.0, 0.0, time.time()
+    labels = []
+    last_touch, ep, f, rid, ids, jids = time.time(), None, None, None, {}, []
+    waited, scene, scene_t, scene_m = time.time(), None, 0.0, None
+    q, t0, k0, last_k, end_t, cam, new_cam = collections.deque(), 0.0, 0, 0, 0.0, None, True
     print("watching trained/live (close the window or Ctrl-C to stop)", flush=True)
     try:
         while p.isConnected():
@@ -88,7 +127,7 @@ def main():
             if now - last_touch > 5:
                 touch()
                 last_touch = now
-            if now - scene_t > 0.5:                                # the scene file is read twice a second, only when it changed (it used to be parsed on every loop)
+            if now - scene_t > 0.5:                                # the scene file is read twice a second, only when it changed
                 scene_t = now
                 scene_path = os.path.join(LIVE, "scene.json")
                 try:
@@ -97,8 +136,10 @@ def main():
                         scene, scene_m = json.load(open(scene_path)), m
                 except (OSError, ValueError):
                     pass
-            # a new episode: switch once the current one has played out and its last frame has been held a moment (no flashing between short episodes)
-            if scene is not None and scene["ep"] != ep and (f is None or (done_playing and now - end_t >= HOLD_S)):      # finish the episode on screen, hold its last frame, then jump to the newest
+            # an episode is played to its end at real speed, its last frame is held a moment, then the newest episode is shown (no mid-episode jumps, no flashing)
+            playing = f is not None and not (end_t and now - end_t >= HOLD_S)
+            idle = f is not None and not q and now - last_k > 1.5 and scene is not None and scene["ep"] != ep      # the stream stopped and a newer episode exists
+            if scene is not None and scene["ep"] != ep and (f is None or idle or not playing):
                 if now - scene["t"] > 60:
                     if now - waited > 10:
                         print("no live episode in the last minute: is a run training (started after the live-view change)?", flush=True)
@@ -110,44 +151,42 @@ def main():
                     nrid, nids = build(p, scene)
                 except (OSError, KeyError, ValueError, p.error) as e:
                     print(f"skipping an episode that is already over ({type(e).__name__}); waiting for the next one", flush=True)
-                    scene_m = None                                 # re-read the scene file
+                    scene_m = None
                     scene = None
                     time.sleep(0.3)
                     continue
+                if f is not None:
+                    f.close()
                 ep, jids, rid, ids, f = scene["ep"], scene["joint_ids"], nrid, nids, nf
-                if not a.realtime:                                 # live: join near the end of the stream instead of replaying a backlog
-                    f.seek(max(0, os.fstat(f.fileno()).st_size - 60000))
-                    f.readline()
-                text = p.addUserDebugText(describe(scene), [0, 0, 0.25], textSize=1.1, textColorRGB=[0.1, 0.1, 0.1])
-                print(describe(scene), flush=True)
-                done_playing, last_frame_t = False, time.time()
+                q.clear()
+                t0, end_t, last_k = 0.0, 0.0, time.time()
+                labels = []
+                print(" | ".join(describe(scene)), flush=True)
+                continue
             if f is None:
                 time.sleep(0.2)
                 continue
-            # read what is there: live mode takes everything new and draws only the newest frame (a viewer that falls behind skips ahead, it never queues up work);
-            # --realtime draws every frame at 80 Hz pace
-            fr, end = None, None
-            for _ in range(1 if a.realtime else 5000):
-                line = f.readline()
-                if not line or not line.endswith("\n"):
-                    if line:
-                        f.seek(f.tell() - len(line))
-                    break
-                try:
-                    fr = json.loads(line)
-                except ValueError:
+            read_frames(f, q)
+            if not q:
+                time.sleep(0.01)
+                continue
+            if a.fast:
+                while len(q) > 1:
+                    q.popleft()
+                fr = q.popleft()
+            else:
+                # pace by the run's own step counter: frame k is due at k / 80 s after the first frame was shown
+                if not t0:
+                    t0, k0 = now, q[0]["k"]
+                fr = None
+                while q and now >= t0 + (q[0]["k"] - k0) / 80.0:
+                    fr = q.popleft()                              # several can be due after a slow draw: show the latest, skip the rest
+                    if fr.get("end"):
+                        break
+                if fr is None:
+                    time.sleep(0.004)
                     continue
-                end = fr.get("end") or end
-            if fr is None:
-                if ep is not None and scene is not None and scene["ep"] != ep and not done_playing and now - last_frame_t > 0.5:
-                    done_playing, end_t = True, now                # a newer episode exists and this one has stopped streaming
-                time.sleep(0.02)
-                continue
-            last_frame_t = time.time()
-            if not a.realtime and time.time() - last_draw < 0.05:      # at most 20 drawings a second
-                time.sleep(0.02)
-                continue
-            last_draw = time.time()
+            last_k = time.time()
             b = fr["b"]
             p.resetBasePositionAndOrientation(rid, b[:3], b[3:7])
             for j, v in zip(jids, fr["j"]):
@@ -155,13 +194,25 @@ def main():
             for k, v in fr.get("m", {}).items():
                 if int(k) in ids:
                     p.resetBasePositionAndOrientation(ids[int(k)], v[:3], v[3:7])
-            p.resetDebugVisualizerCamera(cameraDistance=0.45, cameraYaw=50, cameraPitch=-25, cameraTargetPosition=[b[0], b[1], 0.04])
-            if end:
-                p.addUserDebugText("FELL" if end == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
-                                   textColorRGB=[0.8, 0.1, 0.1] if end == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
-                done_playing, end_t = True, time.time()
-            if a.realtime:
-                time.sleep(2 / 80.0)                        # 2 control steps per frame, 80 Hz
+            # follow G2 smoothly but keep whatever angle and distance the user has dragged the camera to
+            if new_cam:
+                dist, yaw, pitch, tgt, new_cam = 0.45, 50.0, -25.0, [b[0], b[1], 0.04], False
+            else:
+                c = p.getDebugVisualizerCamera()
+                yaw, pitch, dist = c[8], c[9], c[10]
+                tgt = [cam[0] + 0.25 * (b[0] - cam[0]), cam[1] + 0.25 * (b[1] - cam[1]), 0.04]
+            cam = tgt
+            lines = describe(scene)                         # the overlay rides above G2 so it is never left behind
+            for n, line in enumerate(lines):
+                pos = [b[0], b[1], 0.20 - 0.02 * n]
+                kw = dict(textSize=1.0 if n else 1.3, textColorRGB=[0.05, 0.05, 0.05])
+                labels.append(p.addUserDebugText(line, pos, **kw)) if len(labels) <= n else p.addUserDebugText(line, pos, replaceItemUniqueId=labels[n], **kw)
+            p.resetDebugVisualizerCamera(cameraDistance=dist, cameraYaw=yaw, cameraPitch=pitch, cameraTargetPosition=tgt)
+            if fr.get("end"):
+                p.addUserDebugText("FELL" if fr["end"] == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
+                                   textColorRGB=[0.8, 0.1, 0.1] if fr["end"] == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
+                end_t = time.time()
+                q.clear()
     except KeyboardInterrupt:
         pass
     except p.error:                                         # the window was closed while a frame was being drawn
