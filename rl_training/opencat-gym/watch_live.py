@@ -116,7 +116,7 @@ def main():
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)         # shadow maps flicker and cost frames on a laptop GPU
     touch()
-    labels = []
+    labels, shown_stale, banner = [], None, None
     last_touch, ep, f, rid, ids, jids = time.time(), None, None, None, {}, []
     waited, scene, scene_t, scene_m = time.time(), None, 0.0, None
     q, t0, k0, last_k, end_t, cam, new_cam = collections.deque(), 0.0, 0, 0, 0.0, None, True
@@ -140,12 +140,17 @@ def main():
             playing = f is not None and not (end_t and now - end_t >= HOLD_S)
             idle = f is not None and not q and now - last_k > 1.5 and scene is not None and scene["ep"] != ep      # the stream stopped and a newer episode exists
             if scene is not None and scene["ep"] != ep and (f is None or idle or not playing):
-                if now - scene["t"] > 60:
-                    if now - waited > 10:
-                        print("no live episode in the last minute: is a run training (started after the live-view change)?", flush=True)
+                stale = now - scene["t"] > 60                      # no run is streaming: show the last recorded episode once, with a banner, instead of an empty window
+                if stale and scene["ep"] == shown_stale:
+                    if now - waited > 5:
+                        banner = p.addUserDebugText("No run is training right now. Waiting for the next one...", [0, 0, 0.12], textSize=1.2, textColorRGB=[0.6, 0.1, 0.1],
+                                                    replaceItemUniqueId=banner) if banner is not None else p.addUserDebugText(
+                            "No run is training right now. Waiting for the next one...", [0, 0, 0.12], textSize=1.2, textColorRGB=[0.6, 0.1, 0.1])
                         waited = now
                     time.sleep(1)
                     continue
+                if stale:
+                    shown_stale = scene["ep"]
                 try:
                     nf = open(os.path.join(LIVE, scene["frames"]))     # the run deletes an episode's frames when the next one starts: it can be gone already
                     nrid, nids = build(p, scene)
@@ -160,13 +165,16 @@ def main():
                 ep, jids, rid, ids, f = scene["ep"], scene["joint_ids"], nrid, nids, nf
                 q.clear()
                 t0, end_t, last_k = 0.0, 0.0, time.time()
-                labels = []
-                print(" | ".join(describe(scene)), flush=True)
+                labels, banner = [], None
+                print(("(replay of the last recorded episode) " if scene["ep"] == shown_stale else "") + " | ".join(describe(scene)), flush=True)
                 continue
             if f is None:
                 time.sleep(0.2)
                 continue
             read_frames(f, q)
+            if not q and end_t and ep == shown_stale and banner is None:
+                banner = p.addUserDebugText("No run is training right now. This was the last recorded episode; waiting for the next run...", [0, 0, 0.12], textSize=1.2,
+                                            textColorRGB=[0.6, 0.1, 0.1])
             if not q:
                 time.sleep(0.01)
                 continue
