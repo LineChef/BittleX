@@ -151,7 +151,7 @@ def test_complete_sting_is_a_ta_da_chord_stab_then_the_held_chord():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_complete(48000, pt.DEFAULT_PEAK)
     r = 48000
-    assert 1.2 < len(pcm) / r < 1.5 and 300 < np.abs(pcm).max() < 1500
+    assert 1.2 < len(pcm) / r < 1.5 and abs(np.abs(pcm).max() / (pt.DEFAULT_PEAK * 32767) - 1.5) < 0.15      # 50% louder than a normal-level sound
     seg = pcm[int(0.6 * r):int(1.0 * r)].astype(float) * np.hanning(int(0.4 * r))
     sp = np.abs(np.fft.rfft(seg, 1 << 16)); fr = np.fft.rfftfreq(1 << 16, 1 / r)
     for hz in (523.3, 659.3, 784.0):                       # the held chord's notes stand clear of their neighbours

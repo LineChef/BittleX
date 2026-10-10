@@ -167,7 +167,11 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
     stab = chord(0.22, 0.008, 0.03, 0.9)
     held = chord(1.05, 0.012, 0.45, 0.35)
     held = held * np.exp(-np.arange(held.size) / rate / 1.4)
-    return _finish([stab, held], peak)
+    return _finish([stab, held], peak * COMPLETE_GAIN)
+
+
+START_HORN_GAIN = 1.5           # 50% louder than the other speaker sounds (user, 2026-10-10: first 25%, then 50%)
+COMPLETE_GAIN = 1.5             # the same for the ta-da
 
 
 def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
@@ -189,7 +193,7 @@ def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarr
     n2 = np.sin(p2) + 0.58 * np.sin(2 * p2) + 0.11 * np.sin(3 * p2) + 0.04 * np.sin(4 * p2) + 0.05 * np.sin(5 * p2)
     e2 = np.interp(t, [0.0, 0.33, 0.37, 0.50, 1.40, 1.80, 2.10, 2.65], [0.0, 0.0, 0.85, 1.0, 1.0, 0.82, 0.55, 0.0])
     n2 = n2 / 1.6 * e2
-    return _finish([n1 + n2], peak)
+    return _finish([n1 + n2], peak * START_HORN_GAIN)
 
 
 def play_start_horn(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:

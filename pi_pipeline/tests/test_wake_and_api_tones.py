@@ -82,6 +82,7 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_start_horn()
     assert 2.55 < pcm.size / 48000 < 2.75 and abs(int(pcm.max())) > 100
+    assert abs(int(abs(pcm).max()) / (pt.DEFAULT_PEAK * 32767) - 1.5) < 0.1           # 50% louder than a normal-level sound
     import numpy as np
     r = 48000
     assert np.abs(pcm[-240:]).max() < 0.02 * np.abs(pcm[r:int(1.5 * r)]).max()          # it fades out to nothing at the end
