@@ -158,6 +158,9 @@ def main() -> None:
                                            wait_still=still.wait, on_failure=fail_sound.command_failed)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
+        hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
+        if hub is not None and hasattr(hub, "yaw_deg") and getattr(rt.bindings, "walker", None) is not None:
+            rt.bindings.walker.yaw_fn = hub.yaw_deg               # every timed turn logs how far the IMU saw him turn
         if vision is not None:                                               # instant diagnosis frames when the IMU shows a stall or the hit sequence starts (vision/contact_pictures.py); never used for training
             from .vision.contact_pictures import ContactPictures
             contact = ContactPictures(vision, context=lambda: {"mode": rt.driver.mode.mode.name, "wall": (lambda w: dict(vars(w)) if w is not None else None)(getattr(getattr(rt, "wall_log", None), "last", None))})

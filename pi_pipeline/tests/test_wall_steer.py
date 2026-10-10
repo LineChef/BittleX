@@ -214,3 +214,19 @@ def test_the_imu_contact_signal_is_ignored_when_switched_off_or_old_or_outside_e
     monkeypatch.delenv("G2_IMU_CONTACT")
     d._contact_t -= 10.0                                                        # the walk has long ended: too old
     assert ChirpMood.HIT not in payloads(d.tick(DriverInputs(frame=[], wall=None)), EffectKind.CHIRP)
+
+
+def test_a_timed_turn_logs_how_far_the_imu_saw_him_turn(caplog, monkeypatch):
+    import logging
+    import threading
+    from pi_pipeline.app.sinks import WalkerSink
+    sent = []
+    link = type("L", (), {"send": lambda self, c, **k: sent.append(c) or "", "last_motion_command": ""})()
+    w = WalkerSink(link, clock=lambda: 0.0)
+    yaws = iter([10.0, 52.0])
+    w.yaw_fn = lambda: next(yaws)
+    done = threading.Event()
+    monkeypatch.setattr(threading, "Timer", lambda dur, fn: type("T", (), {"daemon": False, "start": lambda self: (fn(), done.set())})())
+    with caplog.at_level(logging.INFO, logger="g2.app.sinks"):
+        w.turn(0.8)                                                           # about 46 degrees right
+    assert done.is_set() and any("turn result: asked right 46 deg, the IMU saw +42 deg" in r.getMessage() for r in caplog.records)

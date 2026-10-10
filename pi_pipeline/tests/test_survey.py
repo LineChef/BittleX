@@ -334,14 +334,14 @@ def test_a_survey_stop_looks_up_down_then_left_and_right_with_a_throwaway_pictur
     plan = survey_plan(SurveyConfig(looks=True))
     seq = [(k, p if k != "turn" else round(math.degrees(p))) for _, k, p, _ in plan if k in ("skill", "turn", "shot")]
     assert seq == [("skill", "ksit"), ("skill", "kbuttUp"), ("skill", "kup"),
-                   ("turn", -30), ("skill", "kbalance"), ("shot", "look_left"),
-                   ("turn", 60), ("skill", "kbalance"), ("shot", "look_right"),
-                   ("turn", -30), ("skill", "kbalance"), ("shot", "after_bow")]
+                   ("turn", -45), ("skill", "kbalance"), ("shot", "look_left"),
+                   ("turn", 90), ("skill", "kbalance"), ("shot", "look_right"),
+                   ("turn", -45), ("skill", "kbalance"), ("shot", "after_bow")]
     times = [d for d, _, _, _ in plan]
     assert times == sorted(times)
     t_turn_left = next(d for d, k, p, _ in plan if k == "turn")
     t_stop_left = next(d for d, k, p, _ in plan if k == "skill" and p == "kbalance")
-    assert abs((t_stop_left - t_turn_left) - (30 * 0.85 / 11.0 + 0.3)) < 1e-6          # the stop comes after the timed turn the walker will run
+    assert abs((t_stop_left - t_turn_left) - (45 * 0.85 / 11.0 + 0.3)) < 1e-6          # the stop comes after the timed turn the walker will run
     assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "shot"] == ["after_bow"]          # the dataclass default stays one picture
     assert [p for _, k, p, _ in naming_plan("mug", SurveyConfig(looks=True)) if k == "shot"] == ["name:mug"]      # a named picture is not a look sequence
 
@@ -378,3 +378,18 @@ def test_a_slow_picture_does_not_make_the_steps_behind_it_fire_in_a_burst():
     assert [e.kind for e in ch.pump()] == [EffectKind.TURN]
     t[0] = 11.0
     assert [e.kind for e in ch.pump()] == [EffectKind.SKILL]
+
+
+def test_a_look_picture_is_quick_no_warm_up_no_retake_and_a_short_stillness_wait(tmp_path):
+    snap = Snapshot(_real_jpeg(), 240, 240, [])
+    waits, takes = [], []
+
+    class Src(FakeSource):
+        def snapshot(self, settle=None):
+            takes.append(settle)
+            return self.snap
+    saver = ExplorationPictureSaver(Src(snap), str(tmp_path), wait_still=lambda t=6.0: waits.append(t))
+    saver("look_left")
+    saver("after_bow")
+    assert waits == [2.0, 6.0] or waits == [2.0, waits[1]] and waits[0] == 2.0       # a look waits at most 2 s for stillness; the real picture keeps its wait
+    assert takes[0] == 0                                                              # no camera warm-up for a throwaway look

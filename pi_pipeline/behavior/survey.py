@@ -30,10 +30,10 @@ class SurveyConfig:
     look_up_skill: str = "ksit"
     stand_skill: str = "kup"
     looks: bool = False             # survey stops also look left and right, a throwaway picture each, then settle and take the normal picture (user, 2026-10-10); False = the one standing picture
-    look_deg: float = 30.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
+    look_deg: float = 45.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
     turn_rate_dps: tuple = (11.0, 18.0)      # measured yaw rates of the firmware left / right turn gaits (app/sinks.py WalkerSink.TURN_RATE_DPS)
     turn_gain: float = 0.85         # the walker turns a bit less than asked (WalkerSink.TURN_GAIN)
-    look_pause_s: float = 0.6       # after a turn is stopped, before the picture (the picture then waits for the IMU to show he has stopped swaying)
+    look_pause_s: float = 1.2       # after a turn is stopped, before the picture (the picture then waits for the IMU to show he has stopped swaying)
 
 
 def survey_config_from_env() -> SurveyConfig:

@@ -98,6 +98,7 @@ class WalkerSink:
 
     TURN_RATE_DPS = {"left": 11.0, "right": 18.0}     # measured yaw rates of the firmware wkL / wkR gaits on G2
     TURN_GAIN = 0.85                                  # turn a bit less than asked: the heading hold and the next bearing check finish the job
+    yaw_fn = None                                     # optional: callable() -> current yaw in degrees (+ = right); lets every timed turn log how far he really turned
     TURN_MIN_RAD = 0.12                               # a smaller turn is not worth a gait change
     TURN_MAX_S = 6.0
 
@@ -153,6 +154,31 @@ class WalkerSink:
         self._send_once(opencat.WALK_RIGHT if r >= 0 else opencat.WALK_LEFT)
         self._turn_until = self._clock() + dur
         log.info("timed turn %s %.0f deg for %.1f s", side, math.degrees(abs(r)), dur)
+        self._watch_turn(side, math.degrees(abs(r)), dur)
+
+    def _watch_turn(self, side: str, asked_deg: float, dur: float) -> None:
+        """Log how far the IMU says the timed turn really went (asked vs got), a second or so after it ends. Never raises."""
+        fn = self.yaw_fn
+        if fn is None:
+            return
+        try:
+            y0 = fn()
+            if y0 is None:
+                return
+
+            def report():
+                try:
+                    y1 = fn()
+                    if y1 is not None:
+                        got = (y1 - y0 + 180.0) % 360.0 - 180.0
+                        log.info("turn result: asked %s %.0f deg, the IMU saw %+.0f deg (+ = right)", side, asked_deg, got)
+                except Exception:  # noqa: BLE001
+                    pass
+            t = threading.Timer(dur + 1.5, report)
+            t.daemon = True
+            t.start()
+        except Exception:  # noqa: BLE001
+            pass
 
     def stop(self) -> None:
         self._turn_until = 0.0

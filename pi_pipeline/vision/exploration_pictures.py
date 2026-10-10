@@ -95,18 +95,19 @@ class ExplorationPictureSaver:
 
     def __call__(self, kind) -> str | None:
         kind = str(kind or "picture")
-        prep = self._prep_every_s <= 0 or kind.startswith("name:") or self._last_prep is None or self._clock() - self._last_prep >= self._prep_every_s
+        quick = kind.startswith("look_")                                                         # throwaway look pictures: no camera warm-up, no retake, a short wait for stillness (a full picture took 15 s)
+        prep = False if quick else (self._prep_every_s <= 0 or kind.startswith("name:") or self._last_prep is None or self._clock() - self._last_prep >= self._prep_every_s)
         still = None
         if self._wait_still is not None:
             try:
-                still = self._wait_still()                                                       # the body must have stopped swaying before the shutter (camera shake)
+                still = self._wait_still(2.0) if quick else self._wait_still()                                                       # the body must have stopped swaying before the shutter (camera shake)
             except Exception:  # noqa: BLE001
                 log.debug("wait for stillness failed", exc_info=True)
         snap = self._take(prep)
         if prep and snap is not None:
             self._last_prep = self._clock()
         retaken = False
-        if snap is not None and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
+        if snap is not None and not quick and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
             again = self._take(True)
             retaken = True
             if again is not None and _exposure_cost(again.jpeg) < _exposure_cost(snap.jpeg):

@@ -65,6 +65,13 @@ class SensorHub:
         self._unlevel_since: float | None = None
         self._person_seen_at: float | None = None
 
+    def yaw_deg(self):
+        """The newest firmware yaw in degrees (+ = right; relative, it wanders), or None before the first IMU frame."""
+        try:
+            return math.degrees(self._feed.frame[2]) if self._feed.frame is not None else None
+        except Exception:  # noqa: BLE001
+            return None
+
     # --- IMU --------------------------------------------------------------
     def start_stream(self) -> None:
         """Turn on the firmware's continuous IMU print (`gP`)."""
