@@ -35,7 +35,8 @@ GAITS = {
                                 "switch to normal", "switch to normal walk", "switch to normal walking", "switch to walk mode", "switch to normal mode"),
                    "Walking normally.", "wkf"),
     "hi_step": Gait("hi_step", ("hi step", "high step", "hi steps", "high steps", "hi step mode", "high step mode", "step mode", "step mode on", "hi step on", "high step on",
-                                "highstep", "highstep mode", "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
+                                "highstep", "highstep mode", "i step", "eye step", "die step", "hi stepp",      # the last four: what the recognizer actually heard on G2 (2026-10-10: "i step", "switch die step")
+                                 "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
                     "Hi step on.", "hsF", scripted=True),
 }
 DEFAULT = "normal"
