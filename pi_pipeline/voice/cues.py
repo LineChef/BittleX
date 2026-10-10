@@ -42,14 +42,15 @@ DEFAULT_STAGES = ("awake", "captured", "closed", "gait_switch")          # the s
 
 class SpeakerCue:
     """Plays an acknowledgement tone through the Pi's speaker on the chosen stages, and logs every stage. `tone` names the sound:
-    `short_tone` (default, one short blip) or `star_trek_whistle`. Replaces the buzzer blip for those stages, since the buzzer can
+    `short_tone` (default, one short blip) or `ack_whistle`. Replaces the buzzer blip for those stages, since the buzzer can
     only beep in separate notes."""
 
     def __init__(self, inner: Cue | None = None, *, stages=DEFAULT_STAGES, peak: float | None = None, player=None,
                  tone: str = "short_tone"):
-        from . import short_tone, star_trek_whistle, wake_chime
+        from . import short_tone, ack_whistle, wake_chime
 
-        module = {"short_tone": short_tone, "star_trek_whistle": star_trek_whistle}[tone]
+        tone = {"star_trek_whistle": "ack_whistle"}.get(tone, tone)          # the old setting value still works (renamed 2026-10-10)
+        module = {"short_tone": short_tone, "ack_whistle": ack_whistle}[tone]
         self._inner = inner or LogCue()
         self._stages = set(stages)
         self._play = player or (lambda: module.play(peak if peak is not None else module.DEFAULT_PEAK))

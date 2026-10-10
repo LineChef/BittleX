@@ -42,7 +42,7 @@ PiSugar S  --5 pogo pins (header solder joints), 4 screws, no wiring-->  Pi Zero
 Before wiring anything, know the board. Top-down, GPIO header along the top
 edge, three ports along the bottom:
 
-![Top-down port map of the Raspberry Pi Zero 2W: 40-pin GPIO header along the top edge with pins 2 (5V, not used), 6 (GND), 8 (GPIO14/TXD), 10 (GPIO15/RXD) called out; microSD slot on the left edge; mini-HDMI, a micro-USB "USB" data-only port, and a micro-USB "PWR IN" port along the bottom edge; unused CSI camera port on the right edge](images/biboard-pi-connector/pizero-port-map.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).)* Top-down port map of the Raspberry Pi Zero 2W: 40-pin GPIO header along the top edge with pins 2 (5V, not used), 6 (GND), 8 (GPIO14/TXD), 10 (GPIO15/RXD) called out; microSD slot on the left edge; mini-HDMI, a micro-USB "USB" data-only port, and a micro-USB "PWR IN" port along the bottom edge; unused CSI camera port on the right edge
 
 - **PWR IN** is the micro-USB port at the far end of the bottom edge,
   farthest from the mini-HDMI — silkscreen reads `PWR IN`. This is where a
@@ -71,7 +71,7 @@ reach both top corners, microSD engulfs the left edge, the CSI connector
 sits at the top-right, mini-HDMI and a micro-USB port sit at the two bottom
 corners). This wasn't visible from reasoning about the header/port edges
 alone — a full top-down photo of the board (already in this repo,
-`images/biboard-pi-connector/pizero-overview.png`) shows every corner
+the vendor's picture (pizero-overview, not included)) shows every corner
 crowded. The height math below (N=19.15mm) is still a confirmed, real
 measurement and stays useful for whatever mount design replaces the clip,
 but the clip's underlying grip mechanism is invalidated. **Mount redesign is
@@ -142,7 +142,7 @@ boss pocket once the part is printed, before assuming pan-head is correct.
 
 Bench work — no BiBoard needed, can happen any time.
 
-![PiSugar S board, top view](images/biboard-pi-connector/pisugar-s.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series).)* PiSugar S board, top view
 
 Align PiSugar's 4 screw holes underneath the Pi and secure it with the
 included screws.
@@ -195,7 +195,7 @@ This edge is also, per Petoi's official BiBoard V1 wiring diagram
 That matters for where the Pi mounts; see
 [Step 5](#step-5--mount-the-assembled-stack-to-the-frame) below.
 
-![BiBoard V1 front, with the 5-pin Raspberry Pi header outlined near the top edge](images/biboard-pi-connector/board-overview.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1).)* BiBoard V1 front, with the 5-pin Raspberry Pi header outlined near the top edge
 
 If it isn't already populated, solder a 5-pin header there. Left to right:
 
@@ -237,15 +237,15 @@ Ground doesn't cross — it just connects the two boards' references together.
 BiBoard side, zoomed &mdash; the three pins to wire are checked, the two +5V
 pins are marked to skip:
 
-![Close-up of BiBoard's 5-pin header: TX2, RX2, GND checked; both +5V pins marked with an X](images/biboard-pi-connector/header-detail.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1).)* Close-up of BiBoard's 5-pin header: TX2, RX2, GND checked; both +5V pins marked with an X
 
 Pi side, the other end of the same 3 wires &mdash; the relevant pins are the
 first 5 columns of the header, nearest the microSD slot. Pin 1 (square,
 top-left) orients you:
 
-![Raspberry Pi Zero 2 W, with the GPIO header outlined near the top edge](images/biboard-pi-connector/pizero-overview.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).)* Raspberry Pi Zero 2 W, with the GPIO header outlined near the top edge
 
-![Close-up of the Pi's header: pin 1 marked with a white square, pin 2 (5V) marked to skip, pins 6/8/10 checked for GND/TXD/RXD](images/biboard-pi-connector/pizero-detail.png)
+*(Image not included: third-party artwork. See [the vendor's page](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).)* Close-up of the Pi's header: pin 1 marked with a white square, pin 2 (5V) marked to skip, pins 6/8/10 checked for GND/TXD/RXD
 
 (The photo above shows a bare Pi Zero 2 W with unpopulated pads — your WH kit
 ships with the header already soldered, so there's nothing to solder on the
@@ -277,7 +277,7 @@ decided" (kept below, collapsed, for the record):
    back-edge-vs-header-edge debate below assumed the two short edges
    (microSD side, camera-connector side) were clear for a clip's edge-grip
    notch. A full top-down photo of the real board
-   (`images/biboard-pi-connector/pizero-overview.png`, already in this
+   (the vendor's picture (pizero-overview, not included), already in this
    repo) shows every corner crowded — header pins reach both top corners,
    microSD takes most of the left edge, the CSI connector sits at
    top-right, mini-HDMI and a micro-USB port occupy the two bottom
@@ -423,7 +423,7 @@ undecided.)
 
 Researched against the real board photos already in this doc, not just
 reasoned abstractly:
-- **Pi Zero 2 W** (`pizero-overview.png`/`pizero-detail.png` above): the
+- **Pi Zero 2 W** (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
   40-pin GPIO header runs along one **long edge**, spanning nearly the full
   65mm width — pins 6/8/10 (the ones we wire) sit at that header's left
   end, next to the microSD slot. The **opposite long edge** is fully
@@ -433,7 +433,7 @@ reasoned abstractly:
   a clip's edge-grip slot. Both long edges have connectors in the way; the
   short-side pair is the one that's actually viable, not an open 50/50
   between short and long.
-- **BiBoard** (`board-overview.png`/`header-detail.png` above): the 5-pin
+- **BiBoard** (the vendor's picture (board-overview, not included)/the vendor's picture (header-detail, not included) above): the 5-pin
   Pi header sits at BiBoard's top edge, and — from the zoomed photo —
   directly next to BiBoard's top-right corner mounting hole.
 - Combining both: the natural, shortest-wire layout (if mounting near the
@@ -1097,7 +1097,7 @@ Wiring" and "Pi Zero 2 W Port Map." Both are now fully folded in and
 deleted, so there's one place to look, not three.
 
 Source diagram (both sides of BiBoard, all 17 numbered components):
-[`petoi-official-diagram.png`](images/biboard-pi-connector/petoi-official-diagram.png).
+[Petoi's official wiring diagram](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1).
 
 **Note:** BiBoard V1's spec sheet lists Pi compatibility as "Pi 3A+, 4, 5" —
 the Pi Zero 2 WH isn't named. The pins used here (5V/GND/GPIO14/GPIO15) are
@@ -1113,6 +1113,6 @@ both boards are in hand.
 - [PiSugarS Series | PiSugar Docs](https://docs.pisugar.com/docs/product-wiki/battery/pisugar-s-series)
 - [PiSugar S | Tindie](https://www.tindie.com/products/pisugar/pisugar-s-battery-for-raspberry-pi-zero/) — "bottom connection... without affecting GPIO expansion," confirming PiSugar mounts under the Pi and never touches the GPIO header
 - [Raspberry PI Zero 2W TOP 02.jpg | Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Raspberry_PI_Zero_2W_TOP_02.jpg) — CC BY-SA 4.0, source of the Pi Zero 2 W photos above
-- BiBoard's ~68 × 59 mm size is not published anywhere found — measured from `petoi-official-diagram.png` using the on-board USB-C receptacle's standardized shell width (~8.7 mm) as a pixel-to-mm scale reference
+- BiBoard's ~68 × 59 mm size is not published anywhere found — measured from the vendor's picture (petoi-official-diagram, not included) using the on-board USB-C receptacle's standardized shell width (~8.7 mm) as a pixel-to-mm scale reference
 - [Frequently Asked Questions | Petoi](https://www.petoi.com/pages/faq) — confirms direct Pi mounting on Bittle/Bittle X and links the official Pi standoff accessory
 - [`RaspberryPiStandOff/` | PetoiCamp/NonCodeFiles on GitHub](https://github.com/PetoiCamp/NonCodeFiles/tree/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff) — the official 3D-printable Pi standoff: [`Pi_StandOffRegular.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi_StandOffRegular.stl) (Pi Zero 2 W / this build), [`Pi3A_standOff.stl`](https://github.com/PetoiCamp/NonCodeFiles/raw/master/stl/Bittle%20%26%20BittleX/RaspberryPiStandOff/Pi3A_standOff.stl) (Pi 3A+)

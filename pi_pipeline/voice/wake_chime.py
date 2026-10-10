@@ -7,7 +7,7 @@ import threading
 
 import numpy as np
 
-from .star_trek_whistle import DEFAULT_PEAK
+from .ack_whistle import DEFAULT_PEAK
 
 log = logging.getLogger("g2.wake_chime")
 

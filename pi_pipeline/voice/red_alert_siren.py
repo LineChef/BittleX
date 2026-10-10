@@ -1,10 +1,10 @@
-"""star_trek_red_alert -- a siren whose pitch climbs as it plays, repeated. Measured from a reference clip (2026-10-04), averaged over
+"""red_alert_siren -- a siren whose pitch climbs as it plays, repeated. Measured from a reference clip (2026-10-04), averaged over
 13 bursts: each burst lasts ~0.85 s; its fundamental rises from ~390 Hz to ~875 Hz (about 14 semitones, quickly at first, then
 flattening) and carries strong harmonics (the 1st to 3rd about equal, the 4th less, the 5th faint); then silence until the next
 burst, 1.83 s after the last began. Earlier versions (a ~1450-2100 Hz single sweep, then lower copies of it) were too high and too
 narrow in range; this one is fitted to the clip's measured fundamental, harmonic weights and loudness.
 
-G2 plays two bursts by default, at the same level as `star_trek_whistle`. `render()` returns int16 mono PCM; `play()` plays it
+G2 plays two bursts by default, at the same level as `ack_whistle`. `render()` returns int16 mono PCM; `play()` plays it
 without blocking."""
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import threading
 
 import numpy as np
 
-from .star_trek_whistle import DEFAULT_PEAK
+from .ack_whistle import DEFAULT_PEAK
 
 log = logging.getLogger("g2.red_alert")
 

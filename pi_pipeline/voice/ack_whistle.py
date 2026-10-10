@@ -1,4 +1,4 @@
-"""star_trek_whistle -- G2's acknowledgement tone: one continuous whistle (about 1.2 s) that glides up from ~1950 Hz to ~2450 Hz, holds with a slight
+"""ack_whistle -- G2's acknowledgement tone: one continuous whistle (about 1.2 s) that glides up from ~1950 Hz to ~2450 Hz, holds with a slight
 wobble, and glides back down. Chosen by ear on 2026-10-04 (rebuilt from the measured pitch and loudness contour of a reference clip).
 
 The buzzer can't make this sound (its notes are separate semitone steps, so it beeps), so it is synthesised and played through the

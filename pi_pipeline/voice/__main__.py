@@ -109,7 +109,7 @@ def main() -> None:
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
         stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
-        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone in ("short_tone", "star_trek_whistle"):
+        if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone in ("short_tone", "ack_whistle", "star_trek_whistle"):
             cue = SpeakerCue(stages=stages, peak=settings.ack_peak, tone=settings.ack_tone)
         elif settings.ack_tone != "off" and args.actuator == "serial" and features.sound_cues:
             cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length,
@@ -255,13 +255,13 @@ def main() -> None:
 
 
 def _play_whistle() -> None:
-    from . import star_trek_whistle
-    star_trek_whistle.play(peak=settings.alert_peak, wait=True)
+    from . import ack_whistle
+    ack_whistle.play(peak=settings.alert_peak, wait=True)
 
 
 def _play_siren() -> None:
-    from . import star_trek_red_alert
-    star_trek_red_alert.play(peak=settings.alert_peak, count=2, wait=True)
+    from . import red_alert_siren
+    red_alert_siren.play(peak=settings.alert_peak, count=2, wait=True)
 
 
 def _sound_then_say(tts, text: str, sound) -> None:
@@ -271,7 +271,7 @@ def _sound_then_say(tts, text: str, sound) -> None:
 
 
 def make_battery_alert(tts, audible: bool, sound=None):
-    """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the star_trek_whistle and a spoken line.
+    """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the ack_whistle and a spoken line.
     `sound` replaces the whistle in tests."""
     from ..power.battery import ALERT_MESSAGES
 
@@ -283,7 +283,7 @@ def make_battery_alert(tts, audible: bool, sound=None):
 
 
 def make_pi_battery_alert(tts, audible: bool, sound=None):
-    """The Pi's battery is probably about 80% used (estimated from uptime): the star_trek_red_alert siren twice, then a line saying
+    """The Pi's battery is probably about 80% used (estimated from uptime): the red_alert_siren siren twice, then a line saying
     which battery. `sound` replaces the siren in tests."""
     from ..power.battery import PI_ALERT_MESSAGES
 
@@ -372,7 +372,7 @@ def _open_shared_link(actuator_mode: str):
 
 
 def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, link=None):
-    """Watch the robot's battery and play the star_trek_red_alert siren when it is low. Reads the voltage through the serial
+    """Watch the robot's battery and play the red_alert_siren siren when it is low. Reads the voltage through the serial
     actuator, or, when the actuator is a mock (G2 is not allowed to move), through a read-only link of its own, since asking
     for the voltage moves nothing. No serial port (e.g. a laptop) means no watch."""
     import os

@@ -216,8 +216,8 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
   overrides a short misheard transcript (never a long sentence); a mis-transcribed wake word run into a command ("gee to shut
   down", "she to power down") is stripped before matching. `G2_LOG_HEARD=1` logs every transcript; `G2_STT_COMMAND_GRAMMAR=0`
   turns the grammar recognizer off.
-- **Sounds** — a single short tone acknowledges a command; a double tick marks a real camera picture; `star_trek_whistle` is
-  the BiBoard low-battery alarm and `star_trek_red_alert` the Pi's (each followed by a spoken line, at ~10 % volume).
+- **Sounds** — a single short tone acknowledges a command; a double tick marks a real camera picture; `ack_whistle` is
+  the BiBoard low-battery alarm and `red_alert_siren` the Pi's (each followed by a spoken line, at ~10 % volume).
 - **API usage counter** — calls and tokens are counted per day in `~/.local/share/g2/api_usage.json`
   (`voice/usage.py`).
 - **Graceful degradation** — auth / rate-limit / billing failures each map to a

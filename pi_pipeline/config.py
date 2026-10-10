@@ -157,9 +157,9 @@ class Settings:
     # Which voice stages beep, comma separated from: listening, thinking, heard. `thinking` = a command going to Claude.
     cue_stages: str = field(default_factory=lambda: _env("G2_CUE_STAGES", "awake,captured,closed,gait_switch"))
     # Buzzer volume sent to the board at start (1-10; 0 = leave it as it is).
-    # What acknowledges a command that goes to Claude: short_tone (one short blip through the speaker; default), star_trek_whistle (continuous tone through the Pi speaker; default), buzzer (the old
+    # What acknowledges a command that goes to Claude: short_tone (one short blip through the speaker; default), ack_whistle (continuous tone through the Pi speaker; default), buzzer (the old
     # low blip on G2's buzzer) or off. The whistle needs the speaker, i.e. voice mode with spoken replies.
-    # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the star_trek_red_alert siren.
+    # Low-battery watch (robot's 2S pack, read with the firmware's `P` command): alert with the red_alert_siren siren.
     battery_watch: bool = field(default_factory=lambda: _env("G2_BATTERY_WATCH", "1") not in ("0", "false", "no"))
     battery_low_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_LOW_V", 7.54))   # about 30% left of a 2S Li-ion pack at rest (3.77 V/cell; user, 2026-10-10: warn at 30%)
     battery_critical_v: float = field(default_factory=lambda: _env_float("G2_BATTERY_CRITICAL_V", 7.46))   # about 20% left at rest (3.73 V/cell; user, 2026-10-10: critical at 20%)

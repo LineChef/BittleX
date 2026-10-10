@@ -1,7 +1,7 @@
 import numpy as np
 
-from pi_pipeline.voice import star_trek_red_alert as ra
-from pi_pipeline.voice import star_trek_whistle
+from pi_pipeline.voice import red_alert_siren as ra
+from pi_pipeline.voice import ack_whistle
 
 
 def _peak_hz(y, t0, t1, rate=48000):
@@ -14,7 +14,7 @@ def _peak_hz(y, t0, t1, rate=48000):
 def test_one_burst_is_under_a_second_at_the_default_level():
     y = ra.render(48000)
     assert 0.8 < len(y) / 48000 < 0.9
-    assert abs(np.abs(y).max() / 32767 - star_trek_whistle.DEFAULT_PEAK) < 0.002
+    assert abs(np.abs(y).max() / 32767 - ack_whistle.DEFAULT_PEAK) < 0.002
 
 
 def test_pitch_climbs_from_about_390_to_about_875_hz_as_it_plays():

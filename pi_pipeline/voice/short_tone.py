@@ -1,5 +1,5 @@
 """short_tone -- G2's acknowledgement signal: one short, soft tone (~0.12 s, 880 Hz) meaning "got it". Chosen 2026-10-04 to replace the
-longer `star_trek_whistle` as the acknowledgement (the whistle became the battery alert instead). `render()` returns int16 mono PCM;
+longer `ack_whistle` as the acknowledgement (the whistle became the battery alert instead). `render()` returns int16 mono PCM;
 `play()` plays it without blocking, at the same quiet level as the other sounds."""
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import threading
 
 import numpy as np
 
-from .star_trek_whistle import DEFAULT_PEAK
+from .ack_whistle import DEFAULT_PEAK
 
 log = logging.getLogger("g2.short_tone")
 
