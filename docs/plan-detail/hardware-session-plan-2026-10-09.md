@@ -45,3 +45,7 @@ Tile trims for V6, taller threshold strip, a low-pack repeat (about 7.9 V), a se
 
 ## What to bring back
 Tape/facing numbers per run, resting pack voltage at start and end, any falls, the floor, how the sounds and exploration felt. Claude: logs fetched, README written, STATUS and the trim default updated, commit with explicit paths.
+
+## Session log (update as blocks complete)
+- **2026-10-09 ~11:50 PM, block 1 step 1 DONE; session paused by the user, the next session continues from step 2.** Hardwood labelled (`telemetry surface hardwood`), fresh pack 8.43 V resting (8.36 V at the end of the walk). First V6 walk, 6 s, `G2_FOOT_TRIM=off`, hold off: no fault, guard ok, policy step 1.95 ms mean; roll sway 3.7 deg (range -6.1..+5.9), pitch sway 2.7 deg, **logged yaw +55 deg in 6 s (a right turn of about 9 deg/s, like V4's about 8 deg/s with no trim)**. Log on the Pi: `~/g2_runs/v6_first_20261009.csv`. The user's by-eye report of the walk was not collected. `g2-voice` was stopped for the walk and started again afterwards (active); to run more single walks stop it first (`sudo systemctl stop g2-voice`), and start it again at the end.
+- Next: step 2 (3 natural-turn runs of 12.5 s, trim off), then the trim sweep starting from `fl=-0.2` (V4's value; V6 turns right about as much), then steps 3-5. Expect V6 to need the same sign of trim.
