@@ -150,7 +150,7 @@ On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps
 
 | Say | Does |
 |---|---|
-| "hi step" / "high step" / "step mode" | switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. |
-| "walk normally" / "walk mode" / "normal mode" / "normal walk" | back to the normal walk (the V4 policy). |
+| "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode" | switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. |
+| "walk normally" / "switch to normal" / "switch to walk mode" / "walk mode" / "normal mode" / "normal walk" | back to the normal walk (the V4 policy). |
 
 Works in the voice loop and during an exploration session (one shared state, `gait/gait_mode.py`); a short double beep plays when the gait really switches. The switch takes effect at the next walk or exploration leg.

@@ -53,14 +53,15 @@ class SpeakerCue:
         self._inner = inner or LogCue()
         self._stages = set(stages)
         self._play = player or (lambda: module.play(peak if peak is not None else module.DEFAULT_PEAK))
+        # `wait=True`: the tone plays to its end before the loop goes on, because the next sound (the thinking tone, the spoken reply) starts at once and a second sounddevice play cuts the first one off -- the boop was never heard (user, 2026-10-10).
         # the three exchange stages each have their own sound whatever `tone` the others use (user, 2026-10-09): beep = listening, boop = your words are captured, close = he stopped listening
         from . import prompt_tones
         pk = lambda default: peak if peak is not None else default                     # noqa: E731
         self._stage_play = {} if player else {
             "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.DEFAULT_PEAK)),
-            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.DEFAULT_PEAK)),
-            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.DEFAULT_PEAK)),
-            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.DEFAULT_PEAK)),
+            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.DEFAULT_PEAK), wait=True),
+            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.DEFAULT_PEAK), wait=True),
+            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.DEFAULT_PEAK), wait=True),
         }
 
     def set(self, stage: Stage) -> None:

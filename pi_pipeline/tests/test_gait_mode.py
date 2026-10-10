@@ -117,3 +117,13 @@ def test_the_double_beep_is_two_short_notes_and_speaker_sounds_are_off_in_tests(
     assert pt.speaker_enabled() is False                      # conftest sets this for every test: no horn from the Mac
     monkeypatch.setenv("G2_SPEAKER_SOUNDS", "1")
     assert pt.speaker_enabled() is True
+
+
+def test_switch_to_phrases_for_both_gaits():
+    from pi_pipeline.gait.gait_mode import parse_gait_command
+    for t in ("switch to high step", "switch to hi step", "switch to highstep", "highstep", "switch to high step mode", "please switch to high step"):
+        assert parse_gait_command(t) == "hi_step", t
+    for t in ("switch to normal", "switch to walk mode", "switch to normal walking"):
+        assert parse_gait_command(t) == "normal", t
+    from pi_pipeline.voice.commands import match_local_command
+    assert match_local_command("gee two switch to highstep") == "gait"
