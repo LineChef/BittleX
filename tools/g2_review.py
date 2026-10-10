@@ -50,6 +50,14 @@ def read_people_marks() -> set:
 PROMOTED = Path(__file__).resolve().parents[1] / "training_data" / "exploration" / "promoted"      # labelled pictures you promoted: the training data (gitignored; never in the repo)
 
 
+def read_roam_labels() -> dict:
+    """Your labels on the roam wall pictures: {"ring/<file>.jpg": {"label", "distance_in", "note"}}."""
+    try:
+        return dict(json.loads((WALL_CACHE / "roam_labels.json").read_text()))
+    except (OSError, ValueError):
+        return {}
+
+
 def read_unpromoted() -> set:
     """Pictures you took back out of the training data by hand: they are not promoted again automatically."""
     try:
@@ -144,7 +152,24 @@ class Remote:
             r = subprocess.run(["rsync", "-a", f"{self.pi}:{src}", dst], capture_output=True, text=True, timeout=300)
             if r.returncode != 0:
                 msgs.append((r.stderr.strip().splitlines() or ["none yet"])[-1])
+        r = subprocess.run(["rsync", "-a", f"{self.pi}:.local/share/g2/wall_dryrun.jsonl", str(WALL_CACHE / "wall_dryrun.jsonl")], capture_output=True, text=True, timeout=120)     # what the estimator said at each look, to judge the roam pictures against
         return "ok" if not msgs else "; ".join(msgs)
+
+
+def read_estimates() -> dict:
+    """{roam picture file name: what the wall estimator read at that look} from `wall_dryrun.jsonl` (the lines that name a kept picture)."""
+    out = {}
+    try:
+        for line in (WALL_CACHE / "wall_dryrun.jsonl").read_text().splitlines():
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if d.get("pic"):
+                out[d["pic"]] = {"state": d.get("state"), "nearest_in": d.get("nearest_in"), "group_in": d.get("group_in"), "turn": d.get("turn")}
+    except OSError:
+        pass
+    return out
 
 
 class App:
@@ -167,9 +192,57 @@ class App:
             out.append({"file": f.name, "path": f.name, "src": "recognition", "label": info.get("label", "unlabelled"), "distance_in": info.get("distance_in"),
                         "angle_deg": info.get("angle_deg"), "set": info.get("set"), "flags": info.get("flags", []), "note": info.get("note", ""), "base_rows": info.get("base_rows"),
                         "expected_turn": info.get("expected_turn")})
+        mine, est = read_roam_labels(), read_estimates()
         for f in sorted((WALL_CACHE / "ring").glob("wall_*.jpg"), reverse=True):
             state = f.stem.rsplit("_", 1)[-1]
-            out.append({"file": f.name, "path": "ring/" + f.name, "src": "roam", "label": "roam: " + state, "distance_in": None, "note": f.stem[5:], "flags": []})
+            m = mine.get("ring/" + f.name, {})
+            out.append({"file": f.name, "path": "ring/" + f.name, "src": "roam", "label": m.get("label") or "roam: " + state, "labelled": bool(m.get("label")), "state": state,
+                        "distance_in": m.get("distance_in"), "note": m.get("note") or f.stem[5:], "flags": [],
+                        "estimate": est.get(f.name)})
+        return out
+
+    def label_wall(self, path: str, label: str, distance_in=None, note: str = ""):
+        """Label a roam picture by hand: what it shows (wall, door, corner, chair, ...), optionally the real distance in inches and a note. Kept on this Mac next to the pictures (`roam_labels.json`); an empty label clears it."""
+        name = self._wall_name(path)
+        if not name.startswith("ring/"):
+            raise ValueError("only roam pictures are labelled here (recognition shots carry their labels from the Pi)")
+        label = " ".join(str(label or "").split())[:40]
+        marks = read_roam_labels()
+        if not label:
+            marks.pop(name, None)
+        else:
+            d = None
+            if distance_in not in (None, ""):
+                d = float(distance_in)
+                if not 0 < d < 600:
+                    raise ValueError("distance in inches, for example 16")
+            marks[name] = {"label": label, "distance_in": d, "note": " ".join(str(note or "").split())[:120]}
+        WALL_CACHE.mkdir(parents=True, exist_ok=True)
+        (WALL_CACHE / "roam_labels.json").write_text(json.dumps(marks, indent=1))
+        return {"labelled": name, "label": label}
+
+    @staticmethod
+    def _wall_name(p: str) -> str:
+        if not re.fullmatch(r"(ring/wall_[A-Za-z0-9_\-]+|shot_\d+)\.jpg", p or ""):
+            raise ValueError(f"not a wall picture path: {p!r}")
+        return p[:-4] if p.startswith("shot_") else p
+
+    def trash_walls(self, paths: list[str]):
+        """Move wall pictures to a trash folder on the Pi (nothing is erased; the page's Undo restores them) and drop the local copies; the next sync brings back anything restored."""
+        names = [self._wall_name(p) for p in paths]
+        out = self.remote.call(["pi_pipeline.vision.wall_pictures", "trash", *names])
+        for p in paths:
+            for f in (WALL_CACHE / p, (WALL_CACHE / p).with_suffix(".json")):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+        return out
+
+    def restore_walls(self, paths: list[str]):
+        names = [self._wall_name(p) for p in paths]
+        out = self.remote.call(["pi_pipeline.vision.wall_pictures", "restore", *names])
+        self.remote.sync_walls()
         return out
 
     def list(self, kind: str, q: str = "", limit: int = 300):
@@ -450,6 +523,12 @@ def make_handler(app: App, token: str, port: int):
             n = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
+                if u.path == "/api/walls/label":
+                    return self._json(app.label_wall(str(body["path"]), str(body.get("label", "")), body.get("distance_in"), str(body.get("note", ""))))
+                if u.path == "/api/walls/trash":
+                    return self._json(app.trash_walls(list(body["paths"])))
+                if u.path == "/api/walls/restore":
+                    return self._json(app.restore_walls(list(body["paths"])))
                 if u.path == "/api/walls/sync":
                     return self._json({"status": app.remote.sync_walls()})
                 if u.path == "/api/delete":
@@ -568,11 +647,12 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
   $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
-function renderWalls(list,f){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No wall pictures yet."));return}
+function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=data.filter(p=>(!onlyNew||(p.src==="roam"&&!p.labelled))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));const nun=data.filter(p=>p.src==="roam"&&!p.labelled).length;if(nun){const fb=el("button","btn",onlyNew?"Show all wall pictures":"Show only the "+nun+" roam pictures without a label");fb.onclick=()=>{window.wallsUnlabeled=!onlyNew;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",onlyNew?"Every roam picture has a label.":"No wall pictures yet."));return}
  const sum=el("div","labelsum");sum.append(el("b","","Wall pictures: "),document.createTextNode(items.filter(p=>p.src==="recognition").length+" recognition shots, "+items.filter(p=>p.src==="roam").length+" kept in roams. Distances are in inches from the camera lens to the base of the wall. These are kept apart from the object pictures."));list.append(sum);
  const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/wimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
   im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.note?" \u00b7 "+p.note:"");lb.style.display="flex"};
-  const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:""));c.append(im,cap);
+  const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
+  c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||p.group==="named"||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":"No pictures yet."));return}

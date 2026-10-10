@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 import subprocess
 import sys
@@ -54,6 +55,81 @@ def delete(folder, numbers) -> list:
         labels.pop(name, None)
     (Path(folder) / "labels.json").write_text(json.dumps(labels, indent=1))
     return gone
+
+
+def _ring_dir() -> Path:
+    from .wall_distance import PICS_DIR
+    return Path(PICS_DIR)
+
+
+def trash(folder, names) -> list:
+    """Move wall pictures to a trash folder (nothing is erased): `shot_021` (a recognition shot: the picture, its sidecar and its labels entry) or `ring/wall_....jpg` (a roam picture). Returns the names moved."""
+    folder, ring = Path(folder), _ring_dir()
+    labels, moved = load_labels(folder), []
+    tdir = folder / "_trash"
+    tl = {}
+    try:
+        tl = json.loads((tdir / "labels.json").read_text())
+    except (OSError, ValueError):
+        pass
+    for name in names:
+        if name.startswith("ring/"):
+            f = ring / Path(name).name
+            dst = ring.with_name(ring.name + "_trash") / f.name
+            if f.exists() and f.suffix == ".jpg":
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                f.replace(dst)
+                moved.append(name)
+            continue
+        stem = Path(name).stem
+        if not re.fullmatch(r"shot_\d+", stem):
+            continue
+        tdir.mkdir(parents=True, exist_ok=True)
+        hit = False
+        for ext in (".jpg", ".json"):
+            f = folder / (stem + ext)
+            if f.exists():
+                f.replace(tdir / f.name)
+                hit = True
+        if stem in labels:
+            tl[stem] = labels.pop(stem)
+            hit = True
+        if hit:
+            moved.append(stem)
+    if tdir.exists():
+        (tdir / "labels.json").write_text(json.dumps(tl, indent=1))
+    (folder / "labels.json").write_text(json.dumps(labels, indent=1))
+    return moved
+
+
+def restore(folder, names) -> list:
+    folder, ring = Path(folder), _ring_dir()
+    labels, back = load_labels(folder), []
+    tdir = folder / "_trash"
+    try:
+        tl = json.loads((tdir / "labels.json").read_text())
+    except (OSError, ValueError):
+        tl = {}
+    for name in names:
+        if name.startswith("ring/"):
+            src = ring.with_name(ring.name + "_trash") / Path(name).name
+            if src.exists():
+                ring.mkdir(parents=True, exist_ok=True)
+                src.replace(ring / src.name)
+                back.append(name)
+            continue
+        stem = Path(name).stem
+        for ext in (".jpg", ".json"):
+            f = tdir / (stem + ext)
+            if f.exists():
+                f.replace(folder / f.name)
+                back.append(stem) if stem not in back else None
+        if stem in tl:
+            labels[stem] = tl.pop(stem)
+    if tdir.exists():
+        (tdir / "labels.json").write_text(json.dumps(tl, indent=1))
+    (folder / "labels.json").write_text(json.dumps(labels, indent=1))
+    return back
 
 
 def best_picture(take, still=None):
@@ -138,6 +214,9 @@ def main(argv=None) -> int:
     sub.add_parser("list")
     d = sub.add_parser("delete")
     d.add_argument("numbers", nargs="+", type=int)
+    for nm in ("trash", "restore"):
+        t = sub.add_parser(nm)
+        t.add_argument("names", nargs="+")
     a = ap.parse_args(argv)
     if a.cmd == "shot":
         return shot(a)
@@ -145,6 +224,9 @@ def main(argv=None) -> int:
         for k, v in sorted(load_labels(a.dir).items()):
             e = v.get("exposure") or {}
             print(f"{k}  {v.get('label'):18s} {str(v.get('distance_in')):>6s} in  angle {v.get('angle_deg')}  set {v.get('set')}  still={v.get('still')} mean={e.get('mean')}")
+        return 0
+    if a.cmd in ("trash", "restore"):
+        print(json.dumps({"moved" if a.cmd == "trash" else "restored": (trash if a.cmd == "trash" else restore)(a.dir, a.names)}))
         return 0
     print("deleted:", ", ".join(delete(a.dir, a.numbers)) or "nothing")
     return 0

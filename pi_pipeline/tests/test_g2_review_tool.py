@@ -326,3 +326,37 @@ def test_a_labelled_picture_that_the_filter_kept_is_promoted_automatically_unles
     assert [p for p in out if p["group"] == "named"][0]["promoted"] is False and len(calls) == 1   # ... and it is not promoted again
     app.promote_pictures(["named/mug/mug_a.jpg"])                                                  # promoting by hand puts it back
     assert gr.read_promoted() and len(calls) == 2
+
+
+def test_wall_pictures_can_be_trashed_restored_and_roam_pictures_labelled_with_the_estimator_reading(tmp_path, monkeypatch):
+    import json
+    from pi_pipeline.vision import wall_pictures as wp
+    from tools import g2_review as gr
+    folder, ring = tmp_path / "pics", tmp_path / "ring"
+    (folder).mkdir()
+    ring.mkdir()
+    (folder / "shot_021.jpg").write_bytes(b"x")
+    (folder / "labels.json").write_text(json.dumps({"shot_021": {"label": "wall_straight", "distance_in": 16}}))
+    (ring / "wall_20261010_170000_near.jpg").write_bytes(b"y")
+    monkeypatch.setattr(wp, "_ring_dir", lambda: ring)
+    assert wp.trash(folder, ["shot_021", "ring/wall_20261010_170000_near.jpg"]) == ["shot_021", "ring/wall_20261010_170000_near.jpg"]
+    assert not (folder / "shot_021.jpg").exists() and not (ring / "wall_20261010_170000_near.jpg").exists() and wp.load_labels(folder) == {}
+    assert (tmp_path / "ring_trash" / "wall_20261010_170000_near.jpg").exists()                  # nothing was erased
+    assert wp.restore(folder, ["shot_021", "ring/wall_20261010_170000_near.jpg"]) == ["shot_021", "ring/wall_20261010_170000_near.jpg"]
+    assert (folder / "shot_021.jpg").exists() and wp.load_labels(folder)["shot_021"]["distance_in"] == 16 and (ring / "wall_20261010_170000_near.jpg").exists()
+    wc = tmp_path / "wallcache"
+    (wc / "ring").mkdir(parents=True)
+    (wc / "ring" / "wall_20261010_170000_near.jpg").write_bytes(b"y")
+    (wc / "wall_dryrun.jsonl").write_text(json.dumps({"pic": "wall_20261010_170000_near.jpg", "state": "near", "nearest_in": 9.7, "group_in": [9.7], "turn": "right"}) + "\n")
+    monkeypatch.setattr(gr, "WALL_CACHE", wc)
+    app = gr.App.__new__(gr.App)
+    row = [r for r in app.walls() if r["src"] == "roam"][0]
+    assert row["label"] == "roam: near" and not row["labelled"] and row["estimate"]["nearest_in"] == 9.7
+    app.label_wall("ring/wall_20261010_170000_near.jpg", "wall", "10")
+    row = [r for r in app.walls() if r["src"] == "roam"][0]
+    assert row["label"] == "wall" and row["labelled"] and row["distance_in"] == 10.0
+    import pytest
+    with pytest.raises(ValueError):
+        app.label_wall("shot_021.jpg", "wall")
+    with pytest.raises(ValueError):
+        gr.App._wall_name("../../x.jpg")
