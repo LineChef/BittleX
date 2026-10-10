@@ -140,7 +140,7 @@ class Settings:
     # the wake word again. Resets on every exchange, so a normal back-and-forth
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".
     # 0 = every turn needs the wake word (most private).
-    follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 60.0))
+    follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 5.0))   # seconds the mic stays open after a reply (user, 2026-10-10: 5 s to start; a reply ending in "?" gets G2_QUESTION_WINDOW_S = 8 s)
     # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
     # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
     tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))

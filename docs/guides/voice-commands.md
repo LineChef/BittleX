@@ -143,7 +143,7 @@ run on their own, no wake word needed. See
 | **boop** (one lower, rounder note) | he thinks you have finished speaking and has your words |
 | **two falling notes** | the follow-up window ended: he has stopped listening (say the wake word again) |
 
-On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`).
+On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`). The two falling notes play when the follow-up window closes: the mic stays open `G2_FOLLOW_UP_S` seconds after a reply (default 5; 0 = no window, so no closing notes), and 8 s (`G2_QUESTION_WINDOW_S`) after a reply that ends in a question (user, 2026-10-10).
 
 
 ## G2's character sounds (2026-10-10)
