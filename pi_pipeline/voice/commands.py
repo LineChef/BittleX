@@ -122,6 +122,12 @@ _CHIRPS_ON = (
     "turn on your chirps", "turn on chirps", "enable chirps", "chirps on",
     "start chirping", "enable your chirping",
 )
+# The BiBoard's own voice module sometimes falls back to another language (Chinese, Korean) and then ignores English commands. Saying one of these makes the Pi send the English reset
+# (`XAc`, `XAb`, `XAa`, the documented recovery in hardware/petoi-firmware-reference.md). The module's own spoken switch is "bing bing". Never `Xa` / `XAd`.
+_VOICE_LANGUAGE = (
+    "switch to english", "switch to english please", "change to english", "set language to english", "set your language to english", "set the voice module to english",
+    "reset your language", "fix your language", "reset the voice module language", "english mode",
+)
 _CHIRPS_OFF = (
     "turn off your chirps", "turn off chirps", "disable chirps", "chirps off",
     "stop chirping", "no more chirping", "quiet the chirps",
@@ -373,7 +379,7 @@ def parse_walk_command(text: str) -> float | None:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
-    ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``,
+    ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -412,6 +418,8 @@ def match_local_command(text: str) -> str | None:
         return "unplugged"
     if _hit(n, _PLUGGED):
         return "plugged"
+    if _hit_short(n, _VOICE_LANGUAGE, extra_words=2):
+        return "voice_language"
     if _hit(n, _CHIRPS_ON):
         return "chirps_on"
     if _hit(n, _CHIRPS_OFF):

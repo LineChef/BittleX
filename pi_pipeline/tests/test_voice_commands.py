@@ -119,3 +119,11 @@ def test_chirps_and_narration_dont_collide_with_rebuff():
     assert looks_like_rebuff("be quiet")
     assert not looks_like_rebuff("turn off your chirps")
     assert not looks_like_rebuff("narrate less")
+
+
+def test_voice_language_reset_phrases():
+    from pi_pipeline.voice.commands import match_local_command
+    for t in ("switch to english", "gee two switch to english", "please switch to english", "fix your language", "reset your language", "set your language to english"):
+        assert match_local_command(t) == "voice_language", t
+    assert match_local_command("I like english muffins") is None
+    assert match_local_command("the floor is tile") == "floor"

@@ -119,6 +119,10 @@ does not go through the Pi's voice loop, so a phrase meant for the Pi can also t
 | "be quiet" | Mutes the module: it ignores basic commands such as "rest" until "play sound" | -- (do NOT use `Xa` / `XAd`, they silently break the module) |
 | "rest" | One of the module's fixed commands (G2 lies down). "stop" is not one | -- |
 
+**Pi-side command (2026-10-10), for when the module has fallen back to Korean or Chinese:** say "gee two, switch to English" (also "fix your language", "reset your language", "set your language to English"). The Pi answers
+"Okay, setting my voice module to English." and sends `XAc`, `XAb`, `XAa` about 1.2 s apart (the documented recovery, never `Xa` / `XAd`). It works while the module is in the wrong language because the Pi hears you, not the module. It needs the voice
+service running (`g2-voice`) and G2 not mid-gait (raw tokens are skipped while a gait runs). Local command, no API call (`voice_language` in `voice/commands.py`).
+
 Other serial settings for the same module (sent by the Pi or `check_serial`, never spoken): `XAb` Chinese, `XAc` enable, `XAe` learning mode. If it answers "ok" but the body does not move, send `XA`
 and check the dial on the hat is on "Voice Command". Recovery when it is stuck defaulting to Chinese: `XAc`, `XAb`, `XAa` about 1.2 s apart (or say "bing bing").
 

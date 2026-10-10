@@ -633,6 +633,18 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd == "voice_language":
+            log.info("resetting the BiBoard voice module to English (voice)")
+            self._cue.set("speaking")
+            self._speak("Okay, setting my voice module to English.")
+            send = getattr(self._act, "send_token", None)
+            if send is not None:
+                for tok in ("XAc", "XAb", "XAa"):          # enable, Chinese, English: the documented recovery; never Xa / XAd
+                    send(tok)
+                    time.sleep(1.2)
+            self._set_session()
+            self._cue.set("idle")
+            return
         if cmd in ("floor", "floor_query"):
             from ..telemetry import autolog
             self._cue.set("speaking")
