@@ -41,7 +41,7 @@ def _call(obj, *names):
 
 class DriverBindings:
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
-                 walker=None, head=None, power=None, on_diag=None, avoid_sound=None, hit_sound=None):
+                 walker=None, head=None, power=None, on_diag=None, avoid_sound=None, hit_sound=None, contact=None):
         self.actuator = actuator
         self.tts = tts
         self.camera = camera
@@ -49,6 +49,7 @@ class DriverBindings:
         self.walker = walker
         self.head = head
         self.power = power
+        self.contact = contact                   # callable(reason): instant diagnosis pictures when he hits a wall (vision/contact_pictures.py)
         self.hit_sound = hit_sound               # callable() -> bool: the "ooooof" on the speaker when he hits a wall (True = it played)
         self.avoid_sound = avoid_sound         # callable() -> bool: the turn-away sound on the speaker (True = it played, so no buzzer notes)
         self._on_diag = on_diag or _default_diag
@@ -115,6 +116,12 @@ class DriverBindings:
             return f"speak:{e.payload}"
         if k is EffectKind.CAPTURE:
             on, kind = (e.payload if isinstance(e.payload, (tuple, list)) else (e.payload, None))
+            if on == "contact":                   # instant diagnosis frames at a contact: never the full picture routine
+                fn = self.contact
+                if not fn:
+                    return self._miss("contact")
+                fn(kind)
+                return f"contact:{kind}"
             if on == "shot":                      # take ONE picture now (survey / naming): a camera call, no network
                 fn = self.camera and _call(self.camera, "snapshot")
                 if not fn:

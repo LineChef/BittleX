@@ -156,6 +156,12 @@ def main() -> None:
                                            wait_still=still.wait, on_failure=fail_sound.command_failed)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
+        if vision is not None:                                               # instant diagnosis frames when the IMU shows a stall or the hit sequence starts (vision/contact_pictures.py); never used for training
+            from .vision.contact_pictures import ContactPictures
+            contact = ContactPictures(vision, context=lambda: {"mode": rt.driver.mode.mode.name, "wall": (lambda w: dict(vars(w)) if w is not None else None)(getattr(getattr(rt, "wall_log", None), "last", None))})
+            rt.bindings.contact = contact.capture
+            if policy_walker is not None:
+                policy_walker._on_stall = lambda ev: contact.capture("stall_suspect", ev)
         watch = None
         if saver is not None:
             survey = rt.driver.enable_survey(survey_config_from_env())          # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)

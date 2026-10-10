@@ -563,7 +563,8 @@ class BehaviorDriver:
         rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
         why = f"{'stuck at a wall' if stuck and w.state != 'blocked' else 'hit a wall'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.state}): oof, back up, turn {side}"
         logging.getLogger("g2.wall.hit").info("%s", why)
-        steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why))]
+        steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why)),
+                 (0.0, Effect(EffectKind.CAPTURE, ("contact", "hit"), why))]          # instant diagnosis frames of what he sees (vision/contact_pictures.py)
         if self.chirper is not None:
             self.chirper.fired(now)
             steps.append((0.0, Effect(EffectKind.CHIRP, ChirpMood.HIT, why)))

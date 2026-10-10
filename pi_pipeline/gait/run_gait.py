@@ -494,7 +494,7 @@ def _extra_cols(feed, now, volt, on):
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
-        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False, foot_trim=None, foot_hold=None, scripted=False):
+        stop_event=None, in_service=False, volt_every_s=5.0, on_battery=None, on_stall=None, heading_hold=False, steer_const=None, hold_ff=0.0, hold_kp=None, hold_umax=None, hold_ki=None, log_extra=False, foot_trim=None, foot_hold=None, scripted=False):
     """`log_extra=True` adds accel (m/s^2, about 10 on az at rest), the IMU frame counter and age, and the pack voltage to the log (see tools/g2_log_extra notes in docs/rl/hardware-logging.md).
     `heading_hold=True` steers back toward the starting heading by lengthening the strides on one side (gait/heading_hold.py); off by default.
     `stop_event` (a threading.Event) ends the loop from another thread; with `stop_event.rest = False` the legs are left standing, not rested.
@@ -513,6 +513,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
     carpet_det = speed_est = None
+    contact_det = ImuStallDetector(window_s=3.0, min_samples=10, trigger_deg=5.0, clear_deg=3.0, settle_s=1.0) if on_stall is not None else None     # a short, touchy window ONLY to start contact pictures (a false alarm costs two frames)
     stall_det = ImuStallDetector() if os.environ.get("G2_STALL_LOG", "1") != "0" else None     # log-only stall suspect (G2_STALL_LOG=0 turns it off)
     _carpet_prev = "normal"
     if carpet and CarpetDetector is not None:
@@ -679,6 +680,13 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 else:
                     tilt_since = None
                 y = math.remainder(y - yaw0, 2.0 * math.pi)     # firmware convention, + = right (logged as is)
+                if contact_det is not None:
+                    cev = contact_det.update(now, y, abs(cmd_fwd) >= 0.025)
+                    if cev is not None:
+                        try:
+                            on_stall(cev)
+                        except Exception:  # noqa: BLE001
+                            pass
                 if stall_det is not None:                                  # LOG ONLY (gait/imu_stall.py): never changes what G2 does
                     ev = stall_det.update(now, y, abs(cmd_fwd) >= 0.025)
                     if ev is not None:
