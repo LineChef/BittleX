@@ -333,6 +333,7 @@ class BehaviorDriver:
         self._wall_steer = os.environ.get("G2_WALL_STEER", "1") != "0"   # a near wall steers an exploring G2 away (user, 2026-10-10: it does not have to be perfect at first)
         self._wall_seen_t = -1e9                  # the look already acted on: one reaction per look
         self._wall_turn_until = 0.0               # no new wall reaction while a turn away is running
+        self._hit_until = 0.0                     # no new hit-a-wall reaction until the last one should be done
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
         self._prev_mode = self.mode.mode
@@ -497,6 +498,10 @@ class BehaviorDriver:
 
     # --- explore --------------------------------------------------------
     EXPLORE_STRAIGHT_S = 8.0     # at the start of a roam he walks straight ahead this long before any exploring turn
+    HIT_STALE_S = 4.0            # a look older than this is not taken as "he is at the wall now"
+    HIT_NEAREST_IN = 6.0         # a wall this close on three or more groups (or a blocked picture) while walking = he has hit it
+    HIT_BACK_S = 2.4             # how long he backs up
+    HIT_TURN_RAD = 2.6           # about 150 degrees: turn around toward the open side
     WALL_STALE_S = 8.0           # a wall look older than this is not acted on
     WALL_TURN_RAD = 0.9          # about 50 degrees away from a near wall
     WALL_BLOCKED_RAD = 1.4       # about 80 degrees when the wall fills the floor strip itself
@@ -532,7 +537,39 @@ class BehaviorDriver:
         self._last_reason = why
         return fx
 
+    def _hit_wall(self, i: DriverInputs, now: float) -> list | None:
+        """He has walked into a wall (the last wall look is fresh and says blocked, or a wall 6 in or closer on three or more groups): say "ooooof", back up, then turn around toward the
+        open side (user, 2026-10-10). A prototype from vision alone; a stall / jam signal is still to come. Runs as a choreography so nothing else acts until it is done.
+        `G2_HIT_WALL=0` turns it off."""
+        w = i.wall
+        if os.environ.get("G2_HIT_WALL", "1") == "0" or w is None or now < self._hit_until:
+            return None
+        if w.t <= self._wall_seen_t or now - w.t > self.HIT_STALE_S:
+            return None
+        if not (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3)):
+            return None
+        self._wall_seen_t = w.t
+        side = w.turn or "right"
+        rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
+        why = f"hit a wall ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.state}): oof, back up, turn {side}"
+        logging.getLogger("g2.wall.hit").info("%s", why)
+        steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why))]
+        if self.chirper is not None:
+            self.chirper.fired(now)
+            steps.append((0.0, Effect(EffectKind.CHIRP, ChirpMood.HIT, why)))
+        steps += [(0.3, Effect(EffectKind.SKILL, "kbkF", "hit: back up")),
+                  (0.3 + self.HIT_BACK_S, Effect(EffectKind.SKILL, "kbalance", "hit: stop backing up")),
+                  (0.3 + self.HIT_BACK_S + 0.5, Effect(EffectKind.TURN, UrgentTurn(rad), "hit: turn around"))]
+        self._choreo.start("hit", steps, now=now)
+        self._hit_until = now + 0.3 + self.HIT_BACK_S + 0.5 + 9.0             # no new reaction until the turn-around should be done
+        self._wall_turn_until = self._hit_until
+        self._last_reason = why
+        return self._choreo.pump(now)
+
     def _from_explore(self, i: DriverInputs, now: float) -> list:
+        hit = self._hit_wall(i, now)
+        if hit is not None:
+            return hit
         steer = self._wall_reflex(i, now)
         if steer is not None:
             return steer

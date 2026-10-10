@@ -30,6 +30,7 @@ class ChirpMood(Enum):
     GREETING = "greeting"    # "G2 meet X" / say-hi trill
     ACK = "ack"             # "heard you" -- fires on every recognised voice command
     FANFARE = "fanfare"      # starting to explore: "ba nun na NAAA!" (user, 2026-10-09)
+    HIT = "hit"              # he walked into a wall: a long falling "ooooof" (the speaker has its own sound) before he backs up and turns around (user, 2026-10-10)
     AVOID = "avoid"          # turning away from a wall: a soft falling "uh-oh" so the reason for the turn is audible (user, 2026-10-10)
 
 
@@ -43,6 +44,7 @@ CHIRP: dict[ChirpMood, list[tuple[int, int]]] = {
     ChirpMood.QUESTION: [(9, 5), (16, 8)],                  # rising two-note "?"
     ChirpMood.GREETING: [(14, 3), (18, 3), (14, 3), (20, 6)],  # quick trill
     ChirpMood.ACK:      [(16, 3), (20, 3)],                 # quick "got it" blip
+    ChirpMood.HIT:      [(8, 6), (4, 8), (1, 14)],          # slow low fall (the buzzer fallback)
     ChirpMood.AVOID:    [(14, 4), (9, 5)],                  # soft two-note fall (the buzzer fallback; the speaker has its own sound)
     ChirpMood.FANFARE:  [(9, 10), (13, 8), (16, 10), (21, 2)],   # root, major third, fifth, then the octave held: short, short, short, LONG (a rising arpeggio, all notes under 23 like the other chirps)
 }

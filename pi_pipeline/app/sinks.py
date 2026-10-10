@@ -142,7 +142,7 @@ class WalkerSink:
         if abs(r) < self.TURN_MIN_RAD or self.turning():
             return                              # too small to bother, or a turn is already running
         side = "right" if r >= 0 else "left"
-        dur = min(self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self.TURN_RATE_DPS[side])
+        dur = min(9.0 if urgent else self.TURN_MAX_S, math.degrees(abs(r)) * self.TURN_GAIN / self.TURN_RATE_DPS[side])      # an urgent turn-around may take up to 9 s
         self._firmware()
         self._last = ""
         self._send_once(opencat.WALK_RIGHT if r >= 0 else opencat.WALK_LEFT)
@@ -214,6 +214,17 @@ def _speaker_avoid_sound() -> bool:
     return True
 
 
+def _speaker_hit_sound() -> bool:
+    """The long "ooooof" on the speaker when he walks into a wall; True when it played or is switched off (`G2_HIT_SOUND=0`), so the buzzer notes are skipped either way on the Pi."""
+    from ..voice import prompt_tones
+    if os.environ.get("G2_HIT_SOUND", "1") == "0":
+        return True
+    if not prompt_tones.speaker_enabled():
+        return False
+    prompt_tones.play_hit()
+    return True
+
+
 def build_bindings(link, *, dry_run_power: bool | None = None,
                    camera_toggle=None, policy_walker=None, camera_snapshot=None) -> DriverBindings:
     """Wire a `DriverBindings` to the real sinks. `link` is a `SerialLink` /
@@ -230,6 +241,7 @@ def build_bindings(link, *, dry_run_power: bool | None = None,
         power=PowerSink(dry_run=dry_run_power),
         on_diag=_diag_event,
         avoid_sound=_speaker_avoid_sound,
+        hit_sound=_speaker_hit_sound,
     )
 
 

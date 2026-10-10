@@ -48,15 +48,43 @@ def test_one_unconfirmed_look_a_stale_look_a_far_wall_or_the_switch_off_never_st
     assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP) and not any(p[0] == "wall.steer" for p in payloads(t, EffectKind.DIAG))
 
 
-def test_a_blocked_wall_needs_no_second_look_and_turns_harder_and_only_while_exploring(monkeypatch):
+def test_a_blocked_wall_means_he_hit_it_so_he_says_oof_backs_up_and_turns_around_and_only_while_exploring(monkeypatch):
     d, c = _explorer(monkeypatch)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", confirmed=False, turn="right", inches=0.0)))
+    assert ChirpMood.HIT in payloads(t, EffectKind.CHIRP) and any(p[0] == "wall.hit" for p in payloads(t, EffectKind.DIAG))
+    c.adv(0.5)
+    t = d.tick(DriverInputs(frame=[]))
+    assert "kbkF" in payloads(t, EffectKind.SKILL)                              # back up
+    c.adv(2.4)
+    t = d.tick(DriverInputs(frame=[]))
+    assert "kbalance" in payloads(t, EffectKind.SKILL)                           # stop backing up
+    c.adv(0.6)
+    t = d.tick(DriverInputs(frame=[]))
     big = payloads(t, EffectKind.TURN)
-    assert big and big[0] > 1.0                                               # about 80 degrees
+    assert big and big[0] > 2.0 and big[0].__class__.__name__ == "UrgentTurn"    # about 150 degrees toward the open side, replacing any running turn
     idle = BehaviorDriver(BehaviorParams(), clock=(c2 := Clk()), rng=random.Random(0))
     c2.adv(11)
     t = idle.tick(DriverInputs(frame=[], wall=_wall(c2, state="blocked", confirmed=True)))
-    assert t.mode is not Mode.EXPLORE and EffectKind.TURN not in kinds(t)      # a wall look does nothing outside a roam
+    assert t.mode is not Mode.EXPLORE and EffectKind.TURN not in kinds(t) and ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)      # a wall look does nothing outside a roam
+
+
+def test_a_wall_at_six_inches_on_three_groups_is_a_hit_but_a_wall_at_ten_inches_is_only_a_turn_and_the_switch_turns_it_off(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=10.0, groups=4, turn="left")))
+    assert ChirpMood.AVOID in payloads(t, EffectKind.CHIRP) and ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)
+    c.adv(15.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=5.0, groups=3, turn="left")))
+    assert ChirpMood.HIT in payloads(t, EffectKind.CHIRP)
+    c.adv(30.0)
+    monkeypatch.setenv("G2_HIT_WALL", "0")
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", inches=0.0, groups=5)))
+    assert ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)
+
+
+def test_the_hit_sound_is_a_long_falling_oof():
+    from pi_pipeline.voice import prompt_tones as pt
+    pcm = pt.render_hit()
+    assert 0.9 < pcm.size / 48000 < 1.2 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 2.0) < 0.3
 
 
 def test_the_turn_away_sound_is_two_soft_falling_notes_and_the_sink_obeys_its_switch(monkeypatch):
@@ -79,7 +107,7 @@ def test_at_the_start_of_a_roam_he_walks_straight_before_any_exploring_turn(monk
     t = d.tick(DriverInputs(frame=[]))
     assert EffectKind.TURN in kinds(t)                                            # then the explorer may turn
     c.adv(1.0)
-    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", confirmed=False, turn="left", inches=0.0)))
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", confirmed=False, turn="left", inches=10.0, groups=4)))
     assert any(isinstance(p, float) and p < 0 for p in payloads(t, EffectKind.TURN))      # a wall turn is never held back
 
 

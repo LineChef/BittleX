@@ -157,6 +157,21 @@ CHORD_HZ = (329.6, 523.3, 659.3, 784.0, 1046.5)
 CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
+def render_hit(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 200% of the usual level."""
+    n = int(rate * 0.07)
+    thump = _lowpass(np.random.default_rng(11).standard_normal(n), 60)
+    thump = thump / (np.abs(thump).max() or 1.0) * np.exp(-np.arange(n) / (rate * 0.018))
+    vowel = _voiced(230.0, 90.0, 0.95, rate, attack=0.04, decay=3.2, harmonics=6, breath=0.5, seed=12)
+    vowel = vowel / (np.abs(vowel).max() or 1.0)
+    out = np.concatenate([thump * 1.1 + vowel[:n] * 0.0, vowel])
+    return _finish([out], peak * 2.0)
+
+
+def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_hit, peak, rate, wait)
+
+
 def render_turn_away(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A two-note fall (about 0.35 s, at 200% of the usual level: 70%, then 150%, were not heard over the walking noise, 2026-10-10) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
     gap = np.zeros(int(rate * 0.03))
@@ -315,5 +330,5 @@ if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline
     name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
     fn = globals().get(f"play_{name}")
     if fn is None:
-        raise SystemExit("sounds: grunt refuse complete turn_away oof sigh yawn beep boop close double")
+        raise SystemExit("sounds: grunt refuse complete turn_away hit oof sigh yawn beep boop close double")
     fn(wait=True)
