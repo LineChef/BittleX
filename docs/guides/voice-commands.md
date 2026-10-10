@@ -107,6 +107,21 @@ from whatever *else* is in the log around that time, not the fall itself,
 until that integration lands (real fall-recovery testing needs real hardware
 anyway).
 
+## The BiBoard's own voice module (heard by the board, not the Pi)
+
+G2's BiBoard has a separate offline voice module with **no wake word**: it listens all the time and acts on its fixed phrases (40 in two languages, plus up to 10 you record in learning mode). It
+does not go through the Pi's voice loop, so a phrase meant for the Pi can also trigger it. Details and the incident history: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md).
+
+| Say | What it does | Serial equivalent |
+|---|---|---|
+| **"bing bing"** | Switches the module to **English** (use it when the module has fallen back to Chinese and G2 ignores English commands) | `XAa` |
+| "play sound" | Liveness test (replies with a Do-Re-Mi tone, works in either language) and turns the module's basic commands back on after "be quiet" | -- |
+| "be quiet" | Mutes the module: it ignores basic commands such as "rest" until "play sound" | -- (do NOT use `Xa` / `XAd`, they silently break the module) |
+| "rest" | One of the module's fixed commands (G2 lies down). "stop" is not one | -- |
+
+Other serial settings for the same module (sent by the Pi or `check_serial`, never spoken): `XAb` Chinese, `XAc` enable, `XAe` learning mode. If it answers "ok" but the body does not move, send `XA`
+and check the dial on the hat is on "Voice Command". Recovery when it is stuck defaulting to Chinese: `XAc`, `XAb`, `XAa` about 1.2 s apart (or say "bing bing").
+
 ## Not a voice command, but related
 
 G2 also acts on some things with no phrase to say at all -- the always-on
