@@ -144,13 +144,30 @@ def track6(step, levers):
     row = dict(step=step, heading=c["N1"]["heading_abs_mean_deg"], asym=c["N1"]["lr_asym_max_deg"], roll=c["N1"]["roll_std_deg"], speed=c["N1"]["path_speed_mps"],
                t11=c["T1.1"]["fell_fraction"], n1=c["N1"]["fell_fraction"], mirror=res.get("mirror_gap"),
                **{f"{h}_falls": s[h]["mean_falls"] for h in s}, **{f"{h}_success": s[h]["success"] for h in s})
+    row["t"] = time.time()
     with open(f"trained/{tag}_curve.jsonl", "a") as f:
         f.write(json.dumps(row) + "\n")
     su, sd = s["ledge_up"], s["ledge_down"]
     log(f"{tag} TRACK {step // 10**6}M | N1 heading {row['heading']:.0f} asym {row['asym']:.1f} roll {row['roll']:.1f} speed {row['speed']:.3f} | step-up falls {su['mean_falls']:.2f} "
         f"success {[round(x, 2) for x in su['success']]} | step-down falls {sd['mean_falls']:.2f} success {[round(x, 2) for x in sd['success']]} | rubble {s['rubble']['mean_falls']:.2f} | "
-        f"side-hill L/R {s['sidehill_l']['mean_falls']:.2f}/{s['sidehill_r']['mean_falls']:.2f} | mirror {res.get('mirror_gap') or float('nan'):.3f}")
+        f"side-hill L/R {s['sidehill_l']['mean_falls']:.2f}/{s['sidehill_r']['mean_falls']:.2f} | mirror {res.get('mirror_gap') or float('nan'):.3f}{projected_finish(tag, row)}")
     return row
+
+
+def projected_finish(tag, row):
+    """' | training done about HH:MM PM' from the pace of the last three checkpoints (the pace drifts: the trackers share the CPU and the courses get heavier, so a start-of-run estimate is too short).
+    Training only: the scoring steps after it (final, averaged candidate, report, export) take about 25 min more and are announced when they start."""
+    try:
+        target = {f"v6_{n}": float(st) for n, _l, st, _m in STAGES}
+        target[TAG(FINAL[0])] = float(FINAL[2])
+        rows = [json.loads(l) for l in open(f"trained/{tag}_curve.jsonl")][-4:]
+        rows = [r for r in rows if "t" in r]
+        if len(rows) < 3 or tag not in target or row["step"] >= target[tag]:
+            return ""
+        pace = (rows[-1]["t"] - rows[0]["t"]) / max(rows[-1]["step"] - rows[0]["step"], 1)     # seconds per step over the last checkpoints
+        return f" | training done about {time.strftime('%I:%M %p', time.localtime(time.time() + pace * (target[tag] - row['step'])))}"
+    except (OSError, ValueError, KeyError):
+        return ""
 
 
 def final6(st):
