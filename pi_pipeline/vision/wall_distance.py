@@ -114,8 +114,14 @@ def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer:
 
 
 TURN_IN = 24.0                    # the steering distance: at about 3 in/s with a look every 3 to 5 s he covers 10 to 15 in between looks and the turn takes about 1.5 s, so a wall must be acted on at 24 in
+AHEAD_GROUPS = 2                 # how many of the five column groups must read TURN_IN or closer for "a wall is ahead" (was 3; on 2026-10-10 a plain wall at 12 to 24 in showed its base in only the two left groups, so 3 never fired; two looks of three must agree, so a one-off glare still does not steer)
 NEAR_IN = 12.0                    # "near" for the log: the nearest wall base at or inside 12 in (30 cm is the turn threshold of `estimate`)
 PICS_DIR = os.path.expanduser(os.environ.get("G2_WALL_PICS", "~/.local/share/g2/wall_pics"))
+
+
+def groups_within(est: "WallEstimate", inches: float) -> int:
+    """How many column groups read `inches` or closer (to a tenth of an inch, so a base calibrated at exactly 24 in counts at 24 in)."""
+    return sum(1 for c in est.group_cm if c is not None and round(c / IN_TO_CM, 1) <= inches)
 
 
 def state_of(est: "WallEstimate") -> str:
@@ -151,7 +157,7 @@ class WallReading:
     turn: str | None
     confirmed: bool
     near_groups: int = 0              # how many of the five column groups of this one look read TURN_IN (24 in) or closer
-    ahead_votes: int = 0              # how many of the newest three looks (this one included) had three or more groups at TURN_IN or closer: a one-off glare reading is one vote
+    ahead_votes: int = 0              # how many of the newest three looks (this one included) had AHEAD_GROUPS or more groups at TURN_IN or closer: a one-off glare reading is one vote
     prev_nearest_in: float | None = None     # the nearest wall of the look before this one, and how long ago it was (for "he is not getting anywhere")
     prev_age_s: float | None = None
 
@@ -192,8 +198,8 @@ class WallLog:
         extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
         self._prev_state = st
         if self.cal is not None:                                      # an uncalibrated look is never acted on
-            near_groups = sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= TURN_IN)
-            self._votes = (self._votes + [near_groups >= 3])[-3:]
+            near_groups = groups_within(est, TURN_IN)
+            self._votes = (self._votes + [near_groups >= AHEAD_GROUPS])[-3:]
             prev = self.last
             mono = time.monotonic()
             self.last = WallReading(mono, st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], near_groups,
@@ -231,9 +237,9 @@ def calibrate(distances_cm=(20, 30, 40, 60, 100), source=None) -> Calibration:
             if snap is None:
                 continue
             rows, visible = base_rows(to_image(snap.jpeg))
-            centre = [r for r in rows[1:4] if r is not None]
-            if centre:
-                got.append(statistics.median(centre))
+            r = calibration_row(rows)
+            if r is not None:
+                got.append(r)
         if got:
             pts.append((round(statistics.median(got), 4), float(d)))
             print(f"  {d} cm -> base row {pts[-1][0]:.3f} of the picture height ({len(got)} readings)")
@@ -249,10 +255,17 @@ def calibrate(distances_cm=(20, 30, 40, 60, 100), source=None) -> Calibration:
 IN_TO_CM = 2.54
 
 
+def calibration_row(rows):
+    """The one base row a calibration picture gives: the LOWEST base of any column group, the same obstacle `estimate` reports as the nearest (user, 2026-10-10; the old rule, the median of the
+    three middle groups, read 12 in as 40 in on a wall whose base only showed in the left groups)."""
+    seen = [r for r in rows if r is not None]
+    return max(seen) if seen else None
+
+
 def calibrate_from_pictures(pictures_dir: str, labels: dict | None = None, *, shots: list | None = None, save: bool = True, path: str = CAL_PATH) -> tuple[Calibration, list]:
     """Build the calibration from labelled wall pictures instead of moving a box (user, 2026-10-10: wall recognition pictures first). `pictures_dir` holds `shot_NNN.jpg` and a
     `labels.json` mapping each shot name to {"label": "wall_straight", "distance_in": 16, ...}; only `wall_straight` shots with a distance are used (and only `shots`, if given). Each
-    shot gives the median of the three middle column groups' base rows (as `calibrate` does); shots at the same distance are averaged; the distance is converted to centimetres here
+    shot gives the lowest base row of any column group (`calibration_row`, as `calibrate` does); shots at the same distance are averaged; the distance is converted to centimetres here
     and nowhere in what the user sees. Returns (calibration, the list of (distance_in, row, shots used) rows)."""
     import statistics
     from .embedder import to_image
@@ -268,11 +281,11 @@ def calibrate_from_pictures(pictures_dir: str, labels: dict | None = None, *, sh
         if not jpg.exists():
             continue
         rows, _ = base_rows(to_image(jpg.read_bytes()))
-        centre = [r for r in rows[1:4] if r is not None]
-        if not centre:
+        r = calibration_row(rows)
+        if r is None:
             continue
         d = float(info["distance_in"])
-        per_distance.setdefault(d, []).append(statistics.median(centre))
+        per_distance.setdefault(d, []).append(r)
         used.setdefault(d, []).append(name)
     pts = [(round(sum(v) / len(v), 4), round(d * IN_TO_CM, 1)) for d, v in sorted(per_distance.items())]
     cal = Calibration(sorted(pts))
@@ -295,9 +308,9 @@ def check_against_pictures(cal: Calibration, pictures_dir: str, labels: dict | N
         if not jpg.exists():
             continue
         rows, _ = base_rows(to_image(jpg.read_bytes()))
-        centre = [r for r in rows[1:4] if r is not None]
-        if centre:
-            out.append((name, float(info["distance_in"]), round(cal.distance_cm(statistics.median(centre)) / IN_TO_CM, 1)))
+        r = calibration_row(rows)
+        if r is not None:
+            out.append((name, float(info["distance_in"]), round(cal.distance_cm(r) / IN_TO_CM, 1)))
     return out
 
 

@@ -34,6 +34,7 @@ from enum import Enum
 from ..personality.mood import IdleBias, Mood, MoodConfig, MoodModel
 from ..personality.traits import BehaviorParams
 from ..vision.feed import Frame
+from ..vision.wall_distance import AHEAD_GROUPS
 from .approach import ApproachConfig, ApproachTarget
 from .attentive import AttentiveConfig, AttentiveLook
 from .chirps import ChirpMood, Chirper
@@ -522,7 +523,7 @@ class BehaviorDriver:
         if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
             return None
         blocked = w.state == "blocked"
-        ahead = w.near_groups >= 3 and w.ahead_votes >= 2                    # three of the five column groups of one picture read 24 in or closer on two of the newest three looks: a wall is ahead (a one-off glare reading is not)
+        ahead = w.near_groups >= AHEAD_GROUPS and w.ahead_votes >= 2         # two of the five column groups of one picture read 24 in or closer on two of the newest three looks: a wall is ahead (a one-off glare reading is not)
         very_near = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN
         if not (blocked or ahead or very_near or (w.state == "near" and w.confirmed)):
             return None

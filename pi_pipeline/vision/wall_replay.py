@@ -14,7 +14,7 @@ import random
 import time
 from pathlib import Path
 
-from .wall_distance import CAL_PATH, IN_TO_CM, NEAR_IN, TURN_IN, Calibration, WallReading, estimate, state_of
+from .wall_distance import AHEAD_GROUPS, CAL_PATH, groups_within, IN_TO_CM, NEAR_IN, TURN_IN, Calibration, WallReading, estimate, state_of
 
 
 def decide(reading: WallReading) -> str:
@@ -63,9 +63,9 @@ def replay(pictures_dir: str, cal: Calibration | None = None, labels: dict | Non
         if not jpg.exists():
             continue
         est = estimate(to_image(jpg.read_bytes()), cal)
-        near_groups = sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= TURN_IN)
+        near_groups = groups_within(est, TURN_IN)
         nearest = None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1)
-        reading = WallReading(0.0, state_of(est), nearest, est.turn, True, near_groups, 3 if near_groups >= 3 else 0)
+        reading = WallReading(0.0, state_of(est), nearest, est.turn, True, near_groups, 3 if near_groups >= AHEAD_GROUPS else 0)
         action = decide(reading)
         exp = info.get("expected_turn")
         side_ok = None if not exp or "turn" not in action else (exp in action)

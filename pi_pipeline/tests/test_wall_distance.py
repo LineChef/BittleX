@@ -139,3 +139,12 @@ def test_the_replay_tool_says_what_an_exploring_g2_would_do_with_each_saved_pict
     assert decide(WallReading(0.0, "blocked", 0.0, "left", True, 5, 3)) == "oof, back up, turn left"
     assert decide(WallReading(0.0, "far", 20.0, "right", True, 4, 3)) == "turn right (wall ahead)"
     assert decide(WallReading(0.0, "far", 30.0, None, True, 1, 0)) == "none"
+
+
+def test_calibration_uses_the_lowest_base_of_any_group_and_a_wall_ahead_needs_two_groups():
+    """2026-10-10: a plain wall at 12 to 24 in showed its base in only the two left groups; the old median of the three middle groups read it as 40 in, and 'three groups' never fired."""
+    from pi_pipeline.vision import wall_distance as wd
+    assert wd.calibration_row([0.71, 0.71, 0.38, None, None]) == 0.71 and wd.calibration_row([None] * 5) is None
+    assert wd.AHEAD_GROUPS == 2
+    est = wd.WallEstimate(60.96, [60.96, 60.96, None, None, None], False, "right", "x")
+    assert wd.groups_within(est, wd.TURN_IN) == 2                  # exactly 24 in counts at 24 in

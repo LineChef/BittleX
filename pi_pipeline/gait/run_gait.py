@@ -51,6 +51,7 @@ import standup as _standup                                 # noqa: E402  -- ease
 import heading_hold as _hh                                    # noqa: E402  -- optional steering on the policy's joint targets (--heading-hold)
 from imu_parse import ImuFeed, parse_imu_line                 # noqa: E402  -- shared with app/sensors.py
 
+from pi_pipeline.gait.imu_stall import ImuStallDetector     # noqa: E402  -- log-only stall suspect
 try:                                                          # carpet mode (optional)
     from pi_pipeline.gait.carpet import CarpetAction, CarpetDetector  # noqa: E402
     from pi_pipeline.gait.speed_estimate import ZuptSpeedEstimator    # noqa: E402
@@ -512,6 +513,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     guard = ThermalGuard(enabled=thermal_guard, on_announce=_speak_best_effort)
 
     carpet_det = speed_est = None
+    stall_det = ImuStallDetector() if os.environ.get("G2_STALL_LOG", "1") != "0" else None     # log-only stall suspect (G2_STALL_LOG=0 turns it off)
     _carpet_prev = "normal"
     if carpet and CarpetDetector is not None:
         carpet_det = CarpetDetector()
@@ -677,6 +679,12 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 else:
                     tilt_since = None
                 y = math.remainder(y - yaw0, 2.0 * math.pi)     # firmware convention, + = right (logged as is)
+                if stall_det is not None:                                  # LOG ONLY (gait/imu_stall.py): never changes what G2 does
+                    ev = stall_det.update(now, y, abs(cmd_fwd) >= 0.025)
+                    if ev is not None:
+                        print(f"[stall?] heading jitter {ev['mean_jitter_deg']:.1f} deg per IMU update over {ev['window_s']:g} s (log only)", flush=True)
+                        if diag is not None:
+                            diag.event("gait", "WARN", "imu.stall_suspect", **ev)
                 q = policy_quat(r, p_, yaw_k * y)
                 t0 = time.perf_counter()
                 joint_deg = pol.step(q, [gx, gy, gz])
