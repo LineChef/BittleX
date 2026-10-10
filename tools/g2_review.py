@@ -50,6 +50,14 @@ def read_people_marks() -> set:
 PROMOTED = Path(__file__).resolve().parents[1] / "training_data" / "exploration" / "promoted"      # labelled pictures you promoted: the training data (gitignored; never in the repo)
 
 
+def read_unpromoted() -> set:
+    """Pictures you took back out of the training data by hand: they are not promoted again automatically."""
+    try:
+        return set(json.loads((CACHE / "unpromoted.json").read_text()))
+    except (OSError, ValueError):
+        return set()
+
+
 def read_promoted() -> dict:
     """{picture path under the pictures folder: where its training copy is}: what you promoted by hand."""
     try:
@@ -230,6 +238,8 @@ class App:
         items = self.remote.pictures("list")
         marks = read_people_marks()
         verdicts, promoted = curation_verdicts(), read_promoted()
+        self._auto_promote(items, verdicts, promoted, marks)
+        promoted = read_promoted()
         for p in items:
             p["cut_off"] = picture_is_cut_off(CACHE / p["path"])
             p["person"] = p["path"] in marks
@@ -239,11 +249,26 @@ class App:
             p["promoted"] = p["path"] in promoted
         return items
 
+    def _auto_promote(self, items, verdicts, promoted, marks) -> None:
+        """A labelled picture is assumed ready for training (user, 2026-10-10): every picture in a name's folder that the filter kept (not rejected, not a duplicate, no person in it) and that you have not
+        taken out by hand is promoted automatically, which also queues it for the robot's gallery. Never raises."""
+        skip = read_unpromoted()
+        for p in items:
+            rel = p["path"]
+            v = verdicts.get(rel) or {}
+            if p.get("group") != "named" or rel in promoted or rel in skip or rel in marks or v.get("status") not in ("kept", "weak"):
+                continue
+            try:
+                self.promote_pictures([rel])
+            except Exception:  # noqa: BLE001 -- a picture that cannot be promoted now is tried again on the next load
+                continue
+
     def promote_pictures(self, paths: list[str], value: bool = True):
         """Promote labelled pictures into the training data (`training_data/exploration/promoted/<name>/`), or take them back out. Only a picture you labelled (it is in a name's folder), that the filter
         kept (not rejected, not a duplicate, no person in it) can be promoted. The original stays where it is."""
         rels = [self._rel(p) for p in paths]
         promoted = read_promoted()
+        skip = read_unpromoted()
         verdicts, marks = curation_verdicts(), read_people_marks()
         done = []
         for rel in rels:
@@ -255,7 +280,9 @@ class App:
                     except OSError:
                         pass
                 done.append(rel)
+                skip.add(rel)                                   # taken out by hand: not promoted again automatically
                 continue
+            skip.discard(rel)
             if not rel.startswith("named/"):
                 raise ValueError("label it first (Name), then promote")
             v = verdicts.get(rel) or {}
@@ -274,6 +301,7 @@ class App:
             done.append(rel)
         CACHE.mkdir(parents=True, exist_ok=True)
         (CACHE / "promoted.json").write_text(json.dumps(promoted, indent=1))
+        (CACHE / "unpromoted.json").write_text(json.dumps(sorted(skip)))
         out = {"promoted" if value else "unpromoted": done}
         if value and done:                                     # loading into the robot's gallery is automatic: the Pi learns the picture under its label (now, or at the next exploration start)
             try:
@@ -558,9 +586,9 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   const order=[...named,...survey];if(named.length&&survey.length){order.splice(named.length,0,"\u0000divider")}
   for(const g of order){if(g==="\u0000divider"){list.append(el("div","divider","Not labeled yet"));continue}
    if(g===named[0])list.append(el("div","divider","Labeled"));
-   {list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
+   {list.append(el("div","group",g+" ("+groups[g].length+(g.startsWith("Named: ")?" \u00b7 "+groups[g].filter(q=>q.promoted).length+" in the training data":"")+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
-    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.promoted)c.append(el("div","badge","promoted \u2713"));if(p.person)c.classList.add("isperson");
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.group==="named"&&!p.promoted){const nb2=el("div","badge","not in the training data");nb2.title=["rejected","duplicate","people"].includes(p.status)?"the filter set it aside: "+(p.reason||p.status):(p.person?"flagged as a person":"you took it out (click Promote to put it back)");c.append(nb2)}if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     if(tab==="pictures"&&p.group==="named"){const pr=el("button","pbtn",p.promoted?"Unpromote":"Promote");pr.title=p.promoted?"Take this picture back out of the training data":"Add this labelled picture to the training data";pr.onclick=async(ev)=>{ev.stopPropagation();try{const r=await api("/api/pictures/promote",{paths:[p.path],value:!p.promoted});p.promoted=!p.promoted;render();const g=r.gallery||{};toast(!p.promoted?"Taken out of the training data (it stays in the robot's gallery)":g.error?"Promoted to the training data; the robot's gallery could not be reached: "+g.error:g.deferred?"Promoted; the robot's gallery learns it at the next exploration start":(g.conflicts&&g.conflicts.length)?"Promoted, but the gallery has a look-alike with a different name: not loaded":"Promoted: in the training data and the robot's gallery")}catch(e){toast("Failed: "+e.message)}};c.append(pr)}
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;

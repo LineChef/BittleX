@@ -287,3 +287,42 @@ def test_a_wrong_detector_tag_you_removed_no_longer_sets_the_picture_aside_as_a_
     import time
     os.utime(side, (time.time() + 5, time.time() + 5))
     assert gr.curation_verdicts()["survey/20261010/after_bow_x.jpg"]["status"] in ("kept", "weak")      # the removed tag no longer counts; the record stays in the sidecar
+
+
+def test_a_labelled_picture_that_the_filter_kept_is_promoted_automatically_unless_you_took_it_out(tmp_path, monkeypatch):
+    import io
+    import json
+    import random
+    from PIL import Image
+    from tools import g2_review as gr
+    cache = tmp_path / "explore"
+    monkeypatch.setattr(gr, "CACHE", cache)
+    monkeypatch.setattr(gr, "PROMOTED", tmp_path / "training_data" / "exploration" / "promoted")
+    gr._curation_cache.update(key=None, rows={})
+
+    def jpg(path, base, seed):
+        r = random.Random(seed)
+        im = Image.new("RGB", (96, 96))
+        im.putdata([(min(255, max(0, base + r.randint(-60, 60))),) * 3 for _ in range(96 * 96)])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        path.write_bytes(buf.getvalue())
+        path.with_suffix(".json").write_text(json.dumps({"pose": "named", "time": "2026-10-10 18:00:00", "detections": []}))
+    jpg(cache / "named/mug/mug_a.jpg", 120, 1)
+    jpg(cache / "survey/20261010/after_bow_a.jpg", 110, 2)
+    items = [{"path": "named/mug/mug_a.jpg", "group": "named", "folder": "mug"}, {"path": "survey/20261010/after_bow_a.jpg", "group": "survey", "folder": "20261010"}]
+    calls = []
+    app = gr.App.__new__(gr.App)
+    app.remote = type("R", (), {"pictures": lambda self, *a: [dict(i) for i in items], "call": lambda self, args: calls.append(args) or {"loaded": [], "deferred": False}})()
+    out = app.pictures()
+    named = [p for p in out if p["group"] == "named"][0]
+    assert named["promoted"] is True and calls == [["pi_pipeline.vision.promoted_loader", "add", "named/mug/mug_a.jpg"]]
+    assert [p for p in out if p["group"] == "survey"][0]["promoted"] is False                  # an unlabelled picture waits for a label
+    app.pictures()
+    assert len(calls) == 1                                                                         # already promoted: nothing more is queued
+    app.promote_pictures(["named/mug/mug_a.jpg"], False)                                           # you take it out by hand ...
+    out = app.pictures()
+    assert [p for p in out if p["group"] == "named"][0]["promoted"] is False and len(calls) == 1   # ... and it is not promoted again
+    app.promote_pictures(["named/mug/mug_a.jpg"])                                                  # promoting by hand puts it back
+    assert gr.read_promoted() and len(calls) == 2
