@@ -12,6 +12,7 @@ one everywhere instead of copy-pasting it again.
 from __future__ import annotations
 
 import math
+import re
 
 # The firmware stream's line prefixes (MPU6050 / ICM42670). link/serial_link.py
 # keeps an identical IMU_PREFIXES for its reply/IMU demux -- a test asserts
@@ -20,6 +21,9 @@ IMU_PREFIXES = ("MCU:", "ICM:")
 
 
 _FIELD_WIDTHS = (6, 6, 6, 7, 7, 7)       # %6.2f x3 (accel), %7.1f x3 (yaw, pitch, roll)
+
+
+_FIELDS_RE = re.compile(r"\s*([-+]?\d+\.\d{2})\s*([-+]?\d+\.\d{2})\s*([-+]?\d+\.\d{2})\s*([-+]?\d+\.\d)\s*([-+]?\d+\.\d)\s*([-+]?\d+\.\d)\s*")
 
 
 def _fixed_width_fields(body):
@@ -34,9 +38,12 @@ def _fixed_width_fields(body):
         for w in _FIELD_WIDTHS:
             out.append(float(body[i:i + w]))
             i += w
-        return out if not body[i:].strip() else None
+        if not body[i:].strip():
+            return out
     except ValueError:
-        return None
+        pass
+    m = _FIELDS_RE.fullmatch(body.strip())                  # accel has 2 decimals and the angles 1, so the fields split even when the yaw is wider than its column
+    return [float(g) for g in m.groups()] if m else None     # (2026-10-10: yaw -12746.5 is 8 characters, one past the column, and the fixed-width slicing failed: the walk loop saw no IMU frames and G2 stopped walking)
 
 
 def parse_imu_line(line, fmt="auto", deg_in=True):

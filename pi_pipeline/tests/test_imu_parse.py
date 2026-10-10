@@ -102,3 +102,17 @@ def test_glued_fixed_width_fields_parse_when_yaw_fills_its_column():
     # a negative yaw that fills the column (-1000.0 or beyond) glues the same way
     assert parse_imu_line("MCU:  0.02 -0.01  1.00-1234.5   45.6  -78.9") is not None
     assert parse_imu_line("ICM: garbage") is None
+
+
+def test_a_yaw_wider_than_its_column_still_parses_the_two_decimal_accel_and_one_decimal_angles_split_it():
+    """2026-10-10: the firmware yaw integrated down to -12746.5 (8 characters, one more than the column), the line ran together as `10.02-12746.5`, the parser returned None, the walk loop saw
+    no IMU frames and G2 stopped walking."""
+    from pi_pipeline.gait.imu_parse import parse_imu_accel, parse_imu_line
+    glued = "ICM:  0.05 -0.05 10.02-12746.5    0.4   -0.3"
+    p = parse_imu_line(glued)
+    assert p is not None and abs(p[2] - 12746.5 * 3.141592653589793 / 180) < 1e-6          # yaw is re-negated: +12746.5 deg
+    assert parse_imu_accel(glued) == (0.05, -0.05, 10.02)
+    pos = parse_imu_line("ICM:  0.05 -0.05 10.4017640.5    0.4   -0.3")                     # the older positive case (yaw 17640.5) still works
+    assert pos is not None and abs(pos[2] - (-17640.5 * 3.141592653589793 / 180)) < 1e-6
+    assert parse_imu_line("ICM:  0.05 -0.05 10.02  -12.5   -0.4    0.3") is not None
+    assert parse_imu_line("ICM: nonsense") is None
