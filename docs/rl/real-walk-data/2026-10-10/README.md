@@ -55,3 +55,15 @@ Invalid runs (user handling G2 or a cord): `policy_walk_004734` (stood up twice,
 ## Bug found: watchdog laid G2 down during setup
 
 The first lane runs with the eased stand-up stood G2 up, laid him down, and stood him up again un-eased. The control-loop watchdog was started before the stand-up and has a 2 s start-up grace; the 0.8 s ramp pushed the setup (gb, ramp, settle, gP, IMU priming) past it, the watchdog saw a stall and sent `d` (visible in `~/.local/share/g2/noise.jsonl` at 12:47:36 AM). The same thing explains the earlier `kbalance` try. Fixed: `wd.start()` now runs just before the control loop (test `test_watchdog_starts_after_the_stand_up_setup_not_before`).
+
+## Threshold crossings, 1/4 in (6.4 mm) ramped strip, tile to hardwood (floor label `transition`)
+
+Same strip and layout as the V4 session (2026-10-09): start on tile 4.5 in before the threshold, 4 ft of runway beyond it; V6 at the default trim fl=-0.3, 11 s, hold off, pack 7.82-7.85 V. Logs are the auto-captured `policy_walk_*` runs of 1:22, 1:24 and 1:26 AM on the Pi.
+
+| Crossing | Cleared | Forward | Sideways | Facing | Roll / pitch sway (deg) |
+|---|---|---|---|---|---|
+| 1 | clean | 3 ft 3 in | 0 | 11:45 | 3.5 / 2.5 |
+| 2 | clean | 3 ft 3 in | 1 in left | 12:00 | 3.5 / 2.5 |
+| 3 | clean | 3 ft 3 in | 0 | 12:00 | 3.6 / 2.6 |
+
+All three clear the 6.4 mm threshold with no snag and no speed cost (V4: about 3 ft 6 in, sway 3.5-4.0 / flat-lane sway), and heading stayed within 15 deg of straight. No taller strip available yet.
