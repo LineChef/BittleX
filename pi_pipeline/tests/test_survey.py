@@ -67,7 +67,7 @@ def test_survey_cooldown_and_plan_order():
     assert not s.ready(110.0) and s.ready(115.0)
     plan = survey_plan(SurveyConfig())
     assert [k for _, k, _, _ in plan] == ["skill", "skill", "skill", "shot", "diag"]                # no stop / rest step: the bow replaces the walk
-    assert [p for _, k, p, _ in plan if k == "skill"] == ["kbuttUp", "ksit", "kup"]            # look down, look up, stand again
+    assert [p for _, k, p, _ in plan if k == "skill"] == ["ksit", "kbuttUp", "kup"]            # look up, look down, stand again (user, 2026-10-10)
     assert [p for _, k, p, _ in plan if k == "shot"] == ["after_bow"]
     delays = [d for d, *_ in plan]
     assert delays == sorted(delays)
@@ -91,13 +91,13 @@ def test_driver_surveys_at_the_end_of_a_leg_then_walks_on():
     assert d.tick(DriverInputs(arm_explore=True, frame=[])).mode is Mode.EXPLORE
     leg_done(d)
     t = d.tick(DriverInputs(frame=[]))
-    assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["kbuttUp"]       # the first thing is the bow itself
+    assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["ksit"]       # the first thing is the look up
     assert EffectKind.STOP not in [e.kind for e in t.effects]                               # never a rest in the middle of exploring
     walking(d)                                           # from now on the explorer would keep walking, if the choreography let it
-    during = run_for(d, c, 8.2)                         # the plan runs to 8.1 s (2.2 + 2.2 + the 3.3 s stand settle + 0.4): ksit, kup and the picture fall inside this window
+    during = run_for(d, c, 5.9)                         # the plan runs to 5.6 s (1.8 + 1.8 + the 2.0 s stand settle): kbuttUp, kup and the picture fall inside this window
     skills = [e.payload for e in during if e.kind is EffectKind.SKILL]
     shots = [e.payload for e in during if e.kind is EffectKind.CAPTURE]
-    assert skills == ["ksit", "kup"] and shots == [("shot", "after_bow")]
+    assert skills == ["kbuttUp", "kup"] and shots == [("shot", "after_bow")]
     assert not any(e.kind in (EffectKind.WALK, EffectKind.STOP) for e in during)          # no walking while looking, and no rest
     after = run_for(d, c, 3.0)
     assert any(e.kind is EffectKind.WALK for e in after)                                  # and it walks on afterwards
@@ -125,7 +125,7 @@ def test_a_spoken_name_takes_its_picture_like_a_survey_stop_and_confirms_aloud()
     t = d.tick(DriverInputs(name_request="Mug", frame=[]))
     effects = t.effects + run_for(d, c, 8.6)             # bow, look up, stand, settle, picture, confirm: the plan is over at about 8.4 s (3.3 s stand settle)
     assert EffectKind.STOP not in [e.kind for e in effects]
-    assert [e.payload for e in effects if e.kind is EffectKind.SKILL] == ["kbuttUp", "ksit", "kup"]          # the same sequence as the survey (user, 2026-10-07)
+    assert [e.payload for e in effects if e.kind is EffectKind.SKILL] == ["ksit", "kbuttUp", "kup"]          # the same sequence as the survey
     assert [e.payload for e in effects if e.kind is EffectKind.CAPTURE] == [("shot", "name:mug")]
     assert [e.payload for e in effects if e.kind is EffectKind.SPEAK] == ["Okay, I will remember the mug."]
     off, c2 = mk(survey=False)
@@ -152,11 +152,11 @@ def test_saver_writes_the_picture_and_its_sidecar_in_the_right_folder(tmp_path):
     snap = Snapshot(_real_jpeg(), 240, 240, [("face", 0.91, 0.5, 0.5, 0.2, 0.2)])
     clock = types.SimpleNamespace(t=1791387600.123)
     saver = ExplorationPictureSaver(FakeSource(snap), str(tmp_path), clock=lambda: clock.t)
-    p1 = saver("look_down")
+    p1 = saver("after_bow")
     p2 = saver("name:Red Mug")
     assert "/survey/" in p1 and p1.endswith(".jpg") and "/named/red-mug/" in p2
     meta = json.loads(open(p1[:-4] + ".json").read())
-    assert meta["pose"] == "look_down" and meta["name"] is None and meta["detections"][0]["label"] == "face" and meta["width"] == 240
+    assert meta["pose"] == "after_bow" and meta["name"] is None and meta["detections"][0]["label"] == "face" and meta["width"] == 240
     assert json.loads(open(p2[:-4] + ".json").read())["name"] == "Red Mug" and saver.count == 2
     assert ExplorationPictureSaver(FakeSource(None), str(tmp_path))("look_up") is None                                 # no picture: nothing written
 
@@ -328,20 +328,53 @@ def test_first_picture_waits_and_the_pacing_comes_from_the_environment(monkeypat
     assert (c.cooldown_s, c.first_delay_s) == (90.0, 30.0)
 
 
-def test_a_survey_stop_can_take_three_pictures_bottom_of_the_bow_top_of_the_look_up_and_standing():
+def test_a_survey_stop_looks_up_down_then_left_and_right_with_a_throwaway_picture_each_then_settles_and_takes_the_real_one():
     from pi_pipeline.behavior.survey import SurveyConfig, survey_plan
-    plan = survey_plan(SurveyConfig(all_shots=True))
-    kinds = [(k, p) for _, k, p, _ in plan if k in ("skill", "shot")]
-    assert kinds == [("skill", "kbuttUp"), ("shot", "look_down"), ("skill", "ksit"), ("shot", "look_up"), ("skill", "kup"), ("shot", "after_bow")]
+    import math
+    plan = survey_plan(SurveyConfig(looks=True))
+    seq = [(k, p if k != "turn" else round(math.degrees(p))) for _, k, p, _ in plan if k in ("skill", "turn", "shot")]
+    assert seq == [("skill", "ksit"), ("skill", "kbuttUp"), ("skill", "kup"),
+                   ("turn", -30), ("skill", "kbalance"), ("shot", "look_left"),
+                   ("turn", 60), ("skill", "kbalance"), ("shot", "look_right"),
+                   ("turn", -30), ("skill", "kbalance"), ("shot", "after_bow")]
     times = [d for d, _, _, _ in plan]
     assert times == sorted(times)
+    t_turn_left = next(d for d, k, p, _ in plan if k == "turn")
+    t_stop_left = next(d for d, k, p, _ in plan if k == "skill" and p == "kbalance")
+    assert abs((t_stop_left - t_turn_left) - (30 * 0.85 / 11.0 + 0.3)) < 1e-6          # the stop comes after the timed turn the walker will run
     assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "shot"] == ["after_bow"]          # the dataclass default stays one picture
-    assert [p for _, k, p, _ in naming_plan("mug", SurveyConfig(all_shots=True)) if k == "shot"] == ["name:mug"]      # a named picture stays one picture
+    assert [p for _, k, p, _ in naming_plan("mug", SurveyConfig(looks=True)) if k == "shot"] == ["name:mug"]      # a named picture is not a look sequence
 
 
-def test_the_three_pictures_are_off_unless_the_environment_asks(monkeypatch):
+def test_the_looks_are_on_unless_the_environment_turns_them_off(monkeypatch):
     from pi_pipeline.behavior.survey import survey_config_from_env
-    monkeypatch.delenv("G2_SURVEY_SHOTS", raising=False)
-    assert survey_config_from_env().all_shots is False
-    monkeypatch.setenv("G2_SURVEY_SHOTS", "3")
-    assert survey_config_from_env().all_shots is True
+    monkeypatch.delenv("G2_SURVEY_LOOKS", raising=False)
+    assert survey_config_from_env().looks is True
+    monkeypatch.setenv("G2_SURVEY_LOOKS", "0")
+    assert survey_config_from_env().looks is False
+
+
+def test_look_pictures_are_throwaway_own_folder_not_fed_to_the_gallery_and_the_newest_30_stay(tmp_path):
+    snap = Snapshot(_real_jpeg(), 240, 240, [])
+    fed = []
+    clock = types.SimpleNamespace(t=1791387600.0)
+    saver = ExplorationPictureSaver(FakeSource(snap), str(tmp_path), clock=lambda: clock.t, on_saved=fed.append)
+    p = saver("look_left")
+    assert "/looks/" in p and fed == []                                  # never offered to the object gallery
+    saver("after_bow")
+    assert len(fed) == 1                                                  # the picture that counts still is
+
+
+def test_a_slow_picture_does_not_make_the_steps_behind_it_fire_in_a_burst():
+    from pi_pipeline.behavior.driver import Effect, _Choreo
+    t = [0.0]
+    ch = _Choreo(clock=lambda: t[0])
+    ch.start("x", [(0.0, Effect(EffectKind.TURN, 0.5)), (1.0, Effect(EffectKind.CAPTURE, ("shot", "look_left"))), (2.0, Effect(EffectKind.TURN, 0.9)), (3.0, Effect(EffectKind.SKILL, "kbalance"))])
+    t[0] = 1.0
+    assert [e.kind for e in ch.pump()] == [EffectKind.TURN, EffectKind.CAPTURE]     # the picture is released alone
+    t[0] = 9.0                                                            # the camera call blocked for 8 s
+    assert ch.pump() == []                                               # what is left is re-timed from now, not fired at once
+    t[0] = 10.0
+    assert [e.kind for e in ch.pump()] == [EffectKind.TURN]
+    t[0] = 11.0
+    assert [e.kind for e in ch.pump()] == [EffectKind.SKILL]

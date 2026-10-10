@@ -93,6 +93,6 @@ def test_a_motion_command_that_cannot_be_sent_plays_the_wrong_answer_signal_but_
     assert played == [False]
 
 
-def test_the_survey_stand_settle_is_3_3_seconds():
+def test_the_survey_stand_settle_is_2_seconds():
     from pi_pipeline.behavior.survey import SurveyConfig
-    assert SurveyConfig().stand_settle_s == 3.3
+    assert SurveyConfig().stand_settle_s == 2.0          # shortened from 3.3 on 2026-10-10: the picture also waits for the IMU to show he has stopped swaying (a 15 s stop was too long)

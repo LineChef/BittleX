@@ -195,6 +195,7 @@ class _Choreo:
     def __init__(self, *, clock=time.monotonic):
         self._clock = clock
         self._queue: list = []          # (due_time, Effect), sorted by due_time
+        self._after_shot = None         # the due time of a picture step just released: the camera call BLOCKS (stillness wait, warm-up), so the steps behind it keep their gaps from it
         self._on_done = None
         self._label = ""
 
@@ -220,8 +221,16 @@ class _Choreo:
     def pump(self, now: float | None = None) -> list:
         t = self._clock() if now is None else now
         out = []
+        if self._after_shot is not None and self._queue:            # the last pump released a picture; the dispatch blocked: re-time what is left from now, keeping the planned gaps
+            shift = t + (self._queue[0][0] - self._after_shot) - self._queue[0][0]
+            self._queue = [(d + shift, e) for d, e in self._queue]
+        self._after_shot = None
         while self._queue and self._queue[0][0] <= t:
-            out.append(self._queue.pop(0)[1])
+            due, eff = self._queue.pop(0)
+            out.append(eff)
+            if eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, (tuple, list)) and eff.payload[:1] == ("shot",) or (eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, tuple) and eff.payload and eff.payload[0] == "shot"):
+                self._after_shot = due
+                break                                               # nothing behind the picture is released in the same pump
         if not self._queue and self._on_done is not None:
             self._on_done()
             self._on_done = None
@@ -229,7 +238,7 @@ class _Choreo:
         return out
 
 
-_PLAN_KINDS = {"stop": EffectKind.STOP, "skill": EffectKind.SKILL, "speak": EffectKind.SPEAK, "diag": EffectKind.DIAG}
+_PLAN_KINDS = {"stop": EffectKind.STOP, "skill": EffectKind.SKILL, "speak": EffectKind.SPEAK, "diag": EffectKind.DIAG, "turn": EffectKind.TURN}
 
 
 def _plan_steps(plan: list) -> list:

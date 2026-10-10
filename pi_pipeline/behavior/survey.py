@@ -3,7 +3,7 @@
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   look down (`kbuttUp`, the INSPECT bow) -> [picture] -> look up (`ksit`) -> [picture] -> stand (`kup`) -> settle -> picture (the bracketed ones only when `all_shots`, `G2_SURVEY_SHOTS=3`; off by default)
+  survey_plan   look up (`ksit`) -> look down (`kbuttUp`, the INSPECT bow) -> stand (`kup`) -> settle -> [look left, throwaway picture, look right, throwaway picture, back to the middle, settle] -> picture (the bracketed part when `looks`, the default for survey stops; `G2_SURVEY_LOOKS=0` turns it off)
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -23,14 +23,17 @@ from dataclasses import dataclass
 class SurveyConfig:
     cooldown_s: float = 15.0        # at most one survey this often (the end of every leg is a chance, not a promise)
     first_delay_s: float = 0.0      # no survey before G2 has been exploring this long (0 = the first leg's end can already be one)
-    pose_settle_s: float = 2.2      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
-    stand_settle_s: float = 3.3     # after standing again from the bow, before the picture (the stance has to settle; 2.5 s plus the 0.8 s eased stand-up ramp, 2026-10-10)
+    pose_settle_s: float = 1.8      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
+    stand_settle_s: float = 2.0     # after standing again from the bow, before the picture (the stance has to settle; 2.5 s plus the 0.8 s eased stand-up ramp, 2026-10-10)
     final_settle_s: float = 1.5     # after standing again, before the walk resumes
     look_down_skill: str = "kbuttUp"
     look_up_skill: str = "ksit"
     stand_skill: str = "kup"
-    all_shots: bool = False         # survey stops take three pictures: at the bottom of the bow, at the top of the look up, and standing after the settle (user, 2026-10-10); False = the one standing picture
-    shot_gap_s: float = 1.0         # after a picture in a pose, before the next pose is commanded (the picture takes a moment)
+    looks: bool = False             # survey stops also look left and right, a throwaway picture each, then settle and take the normal picture (user, 2026-10-10); False = the one standing picture
+    look_deg: float = 30.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
+    turn_rate_dps: tuple = (11.0, 18.0)      # measured yaw rates of the firmware left / right turn gaits (app/sinks.py WalkerSink.TURN_RATE_DPS)
+    turn_gain: float = 0.85         # the walker turns a bit less than asked (WalkerSink.TURN_GAIN)
+    look_pause_s: float = 0.6       # after a turn is stopped, before the picture (the picture then waits for the IMU to show he has stopped swaying)
 
 
 def survey_config_from_env() -> SurveyConfig:
@@ -43,7 +46,7 @@ def survey_config_from_env() -> SurveyConfig:
             return max(0.0, float(os.environ.get(name, default)))
         except ValueError:
             return default
-    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), all_shots=os.environ.get("G2_SURVEY_SHOTS", "1") == "3")     # `G2_SURVEY_SHOTS=3` = also a picture at the bottom of the bow and at the top of the look up (off by default until we know off-angle pictures help)
+    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), looks=os.environ.get("G2_SURVEY_LOOKS", "1") != "0")     # `G2_SURVEY_LOOKS=0` = only the one standing picture
 
 
 class Survey:
@@ -64,23 +67,34 @@ class Survey:
         self._last = self._clock() if now is None else now
 
 
+def _turn_s(cfg: SurveyConfig, deg: float, right: bool) -> float:
+    """How long the walker's timed firmware turn runs for `deg` degrees (the same formula as `WalkerSink.turn`)."""
+    return abs(deg) * cfg.turn_gain / cfg.turn_rate_dps[1 if right else 0]
+
+
 def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]:
-    """The one way G2 takes a picture while exploring (user, 2026-10-07: the same sequence every time): look down (the inspect bow), look up (`ksit`), stand again, and take the picture once
-    the stance has settled. Pictures taken in the look-down and look-up poses themselves were not good, so the picture is taken standing, after both looks. Returns the steps and the time of the shot."""
+    """The one way G2 takes a picture while exploring (user, 2026-10-10): look UP (`ksit`), look DOWN (the inspect bow), stand and settle; then, when `cfg.looks`, look LEFT and pause for a throwaway
+    picture, look RIGHT and pause for a throwaway picture, come back to the middle, settle, and take the picture that counts. Pictures taken in the bow and sit poses themselves were not good, so no
+    picture is taken in them. A look is a small timed turn (`("turn", radians)`, + = right) followed by a stop (`kbalance`). Returns the steps and the time of the last shot."""
     t = 0.0
-    plan = [(t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)")]
+    plan = [(t, "skill", cfg.look_up_skill, f"{why}: look up")]
     t += cfg.pose_settle_s
-    if cfg.all_shots and kind == "after_bow":                 # survey stops only: the bottom of the bow and the top of the look up get a picture each
-        plan.append((t, "shot", "look_down", f"{why}: picture at the bottom of the bow"))
-        t += cfg.shot_gap_s
-    plan.append((t, "skill", cfg.look_up_skill, f"{why}: look up"))
+    plan.append((t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)"))
     t += cfg.pose_settle_s
-    if cfg.all_shots and kind == "after_bow":
-        plan.append((t, "shot", "look_up", f"{why}: picture at the top of the look up"))
-        t += cfg.shot_gap_s
     plan.append((t, "skill", cfg.stand_skill, f"{why}: stand again"))
     t += cfg.stand_settle_s
-    plan.append((t, "shot", kind, f"{why}: picture, standing after looking down and up"))
+    if cfg.looks and kind == "after_bow":
+        import math
+        rad = math.radians(cfg.look_deg)
+        for label, sign, deg in (("left", -1, cfg.look_deg), ("right", 1, 2 * cfg.look_deg), ("middle", -1, cfg.look_deg)):
+            plan.append((t, "turn", sign * math.radians(deg), f"{why}: look {label}"))
+            t += _turn_s(cfg, deg, sign > 0) + 0.3
+            plan.append((t, "skill", "kbalance", f"{why}: stop turning, look {label}"))
+            t += cfg.look_pause_s
+            if label != "middle":
+                plan.append((t, "shot", f"look_{label}", f"{why}: throwaway picture, looking {label}"))
+        t += cfg.stand_settle_s - cfg.look_pause_s if cfg.stand_settle_s > cfg.look_pause_s else 0.0      # settle in the middle before the picture that counts
+    plan.append((t, "shot", kind, f"{why}: picture, standing after looking"))
     return plan, t
 
 

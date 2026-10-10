@@ -51,13 +51,14 @@ def _exposure_cost(jpeg: bytes) -> float:
 
 
 def _badly_exposed(jpeg: bytes) -> bool:
-    """Brightness outside 85 to 140 (0..255, target about 100) or more than 2% blown out: the picture is worth one more try."""
+    """Brightness outside 60 to 170 (0..255, target about 100) or more than 5% blown out: the picture is worth one more try. Wider than the wall pictures (85 to 140): a retake is a second warm-up, and the
+    stop was 15 s long on 2026-10-10 with a picture at brightness 64 retaken for nothing."""
     try:
         from .snapshot import exposure_stats
         st = exposure_stats(jpeg)
     except Exception:  # noqa: BLE001
         return False
-    return st is not None and (st.mean < 85.0 or st.mean > 140.0 or st.clip_high > 0.02)
+    return st is not None and (st.mean < 60.0 or st.mean > 170.0 or st.clip_high > 0.05)
 
 
 class ExplorationPictureSaver:
@@ -88,6 +89,8 @@ class ExplorationPictureSaver:
     def folder_for(self, kind: str, now: float) -> Path:
         if kind.startswith("name:"):
             return self._root / "named" / slug(kind[5:])
+        if kind.startswith("look_"):                                     # throwaway look pictures (left / right): their own folder, never the recognition set
+            return self._root / "looks" / time.strftime("%Y%m%d", time.localtime(now))
         return self._root / "survey" / time.strftime("%Y%m%d", time.localtime(now))
 
     def __call__(self, kind) -> str | None:
@@ -147,12 +150,25 @@ class ExplorationPictureSaver:
         self.last_path, self.last_kind = str(path), kind
         log.info("picture saved: %s (%s)", path, kind)
         self._check_size()
+        if kind.startswith("look_"):
+            self._trim_looks(folder.parent)
+            return str(path)                                             # look-only pictures are never offered to the object gallery
         if self._on_saved:
             try:
                 self._on_saved(str(path))
             except Exception:  # noqa: BLE001
                 log.debug("on_saved hook failed", exc_info=True)
         return str(path)
+
+    def _trim_looks(self, looks_root: Path, keep: int = 30) -> None:
+        """Only the newest `keep` look pictures stay (user, 2026-10-10: throwaway pictures just for looking)."""
+        try:
+            jpgs = sorted(looks_root.glob("*/*.jpg"), key=lambda f: f.stat().st_mtime)
+            for old in jpgs[:-keep]:
+                old.unlink(missing_ok=True)
+                old.with_suffix(".json").unlink(missing_ok=True)
+        except OSError:
+            pass
 
     def _is_duplicate(self, folder: Path, prefix: str, jpeg: bytes, max_distance: int) -> bool:
         """The ONLY reason a picture is not kept (retention policy 2026-10-07: nothing is deleted except duplicates): its 256-bit average hash is within

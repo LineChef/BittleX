@@ -414,7 +414,7 @@ def test_this_is_the_dishwasher_takes_the_picture_sequence_and_confirms_without_
     lp, conv, said, skills, shots = _naming_loop("/pics/named/dishwasher/x.jpg", ["this is the dishwasher"])
     lp._one_turn()
     assert conv.calls == []                                                           # no API call
-    assert skills == ["kbuttUp", "ksit", "kup"] and shots == ["name:dishwasher"]      # bow, look up, stand, then one picture saved under the name
+    assert skills == ["ksit", "kbuttUp", "kup"] and shots == ["name:dishwasher"]      # bow, look up, stand, then one picture saved under the name
     assert said == ["Okay, let me look at the dishwasher.", "Okay, I will remember the dishwasher."]
 
 
@@ -440,4 +440,4 @@ def test_a_voice_look_poses_before_the_picture_bow_look_up_stand(monkeypatch):
     lp, conv = make_loop(cam, ["what do you see"])
     lp._act = types.SimpleNamespace(perform=lambda s, **k: skills.append(("name", s)), perform_token=lambda t: skills.append(t), stop=lambda: None, close=lambda: None)
     lp._one_turn()
-    assert skills == ["kbuttUp", "ksit", "kup"] and cam.snapshots == 1       # raw tokens go through perform_token: perform() takes names and ignored them
+    assert skills == ["ksit", "kbuttUp", "kup"] and cam.snapshots == 1       # raw tokens go through perform_token: perform() takes names and ignored them
