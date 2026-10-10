@@ -17,8 +17,8 @@ def _explorer(monkeypatch, steer="1"):
     return d, c
 
 
-def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5):
-    return WallReading(c() - age, state, inches, turn, confirmed)
+def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, groups=0):
+    return WallReading(c() - age, state, inches, turn, confirmed, groups)
 
 
 def test_a_confirmed_near_wall_turns_him_toward_the_open_side_with_a_soft_sound_once_per_look(monkeypatch):
@@ -39,7 +39,7 @@ def test_a_confirmed_near_wall_turns_him_toward_the_open_side_with_a_soft_sound_
 
 def test_one_unconfirmed_look_a_stale_look_a_far_wall_or_the_switch_off_never_steer(monkeypatch):
     d, c = _explorer(monkeypatch)
-    for w in (_wall(c, confirmed=False), _wall(c, age=30.0), _wall(c, state="far", inches=20.0), _wall(c, state="clear", inches=None), None):
+    for w in (_wall(c, state="far", inches=20.0, confirmed=False, groups=2), _wall(c, age=30.0), _wall(c, state="far", inches=20.0), _wall(c, state="clear", inches=None), None):
         t = d.tick(DriverInputs(frame=[], wall=w))
         assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)
         c.adv(5.0)
@@ -64,7 +64,7 @@ def test_the_turn_away_sound_is_two_soft_falling_notes_and_the_sink_obeys_its_sw
     from pi_pipeline.app import sinks
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_turn_away()
-    assert 0.3 < pcm.size / 48000 < 0.45 and 0 < abs(int(pcm.max())) < 0.8 * pt.DEFAULT_PEAK * 32767 + 1
+    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 1.5) < 0.15      # 150% of the usual level
     monkeypatch.setenv("G2_WALL_SOUND", "0")
     assert sinks._speaker_avoid_sound() is True                                # off: silent, and True so no buzzer notes either
 
@@ -100,3 +100,15 @@ def test_a_wall_turn_cancels_a_turn_that_is_already_running():
     assert len(link.sent) == n
     w.turn(UrgentTurn(-0.9), urgent=True)                                       # a wall turn replaces it at once
     assert len(link.sent) == n + 1
+
+
+def test_a_wall_ahead_is_acted_on_at_24_inches_when_three_groups_agree_and_at_12_inches_from_a_single_look(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=3, turn="right")))
+    assert [p for p in payloads(t, EffectKind.TURN) if p > 0] and ChirpMood.AVOID in payloads(t, EffectKind.CHIRP)        # three groups at 24 in or closer
+    c.adv(6.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=10.0, confirmed=False, groups=1, turn="left")))
+    assert [p for p in payloads(t, EffectKind.TURN) if p < 0]                                                         # one look at 12 in or closer is enough
+    c.adv(6.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=20.0, confirmed=False, groups=2)))
+    assert ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)                                                       # two groups at 24 in is not yet a wall ahead

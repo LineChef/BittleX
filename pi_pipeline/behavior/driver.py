@@ -501,7 +501,7 @@ class BehaviorDriver:
     WALL_TURN_RAD = 0.9          # about 50 degrees away from a near wall
     WALL_BLOCKED_RAD = 1.4       # about 80 degrees when the wall fills the floor strip itself
     WALL_TURN_HOLD_S = 4.0       # a turn takes a few seconds: no new reaction until it should be done
-    WALL_STOP_IN = 8.0           # a wall this close (or closer) is acted on from a single look
+    WALL_STOP_IN = 12.0          # any wall this close (or closer) is acted on from a single look
 
     def _wall_reflex(self, i: DriverInputs, now: float) -> list | None:
         """A near wall steers an exploring G2 away from it (the wall estimate is a prototype: it can be wrong in either direction, and the user is watching). Acts on a wall look
@@ -513,14 +513,15 @@ class BehaviorDriver:
         if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
             return None
         blocked = w.state == "blocked"
-        near_now = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN or w.near_groups >= 2           # a wall at 8 in or less, or two column groups of ONE picture agree it is near: act at once
-        if not (blocked or (w.state == "near" and (w.confirmed or near_now))):
+        ahead = w.near_groups >= 3                                           # three of the five column groups of ONE picture read 24 in or closer: a wall is ahead, turn now
+        very_near = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN
+        if not (blocked or ahead or very_near or (w.state == "near" and w.confirmed)):
             return None
         self._wall_seen_t = w.t
         side = w.turn or "right"
         rad = (self.WALL_BLOCKED_RAD if blocked else self.WALL_TURN_RAD) * (1.0 if side == "right" else -1.0)
         self._wall_turn_until = now + self.WALL_TURN_HOLD_S
-        why = f"wall {'blocked' if blocked else 'near'} ({w.nearest_in if w.nearest_in is not None else 0:g} in): turn {side}"
+        why = f"wall {'blocked' if blocked else 'ahead'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.near_groups} groups): turn {side}"
         logging.getLogger("g2.wall.steer").info("%s", why)
         fx = [Effect(EffectKind.DIAG, ("wall.steer", why), why)]
         if self.chirper is not None:                          # the reason for the turn is always audible: it is not held back by the chirp cooldown (it still restarts it)

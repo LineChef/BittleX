@@ -113,6 +113,7 @@ def estimate(img, calibration: Calibration, *, near_cm: float = 30.0, localizer:
     return WallEstimate(nearest, cm, False, side, f"nearest {nearest:.0f} cm: would turn {side}")
 
 
+TURN_IN = 24.0                    # the steering distance: at about 3 in/s with a look every 3 to 5 s he covers 10 to 15 in between looks and the turn takes about 1.5 s, so a wall must be acted on at 24 in
 NEAR_IN = 12.0                    # "near" for the log: the nearest wall base at or inside 12 in (30 cm is the turn threshold of `estimate`)
 PICS_DIR = os.path.expanduser(os.environ.get("G2_WALL_PICS", "~/.local/share/g2/wall_pics"))
 
@@ -149,7 +150,7 @@ class WallReading:
     nearest_in: float | None
     turn: str | None
     confirmed: bool
-    near_groups: int = 0              # how many of the five column groups of this one look read NEAR_IN or closer
+    near_groups: int = 0              # how many of the five column groups of this one look read TURN_IN (24 in) or closer
 
 
 class WallLog:
@@ -187,7 +188,7 @@ class WallLog:
         extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
         self._prev_state = st
         if self.cal is not None:                                      # an uncalibrated look is never acted on
-            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= NEAR_IN))
+            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= TURN_IN))
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 

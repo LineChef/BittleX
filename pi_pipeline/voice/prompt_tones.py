@@ -158,9 +158,9 @@ CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
 def render_turn_away(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """A subtle two-note fall (about 0.35 s, at 70% of the usual level) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
+    """A two-note fall (about 0.35 s, at 150% of the usual level: 70% was not heard over the walking noise, 2026-10-10) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
     gap = np.zeros(int(rate * 0.03))
-    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], peak * 0.7)
+    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], peak * 1.5)
 
 
 def play_turn_away(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
