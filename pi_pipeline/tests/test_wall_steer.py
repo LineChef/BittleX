@@ -64,7 +64,7 @@ def test_the_turn_away_sound_is_two_soft_falling_notes_and_the_sink_obeys_its_sw
     from pi_pipeline.app import sinks
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_turn_away()
-    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 1.5) < 0.15      # 150% of the usual level
+    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 2.0) < 0.15      # 200% of the usual level
     monkeypatch.setenv("G2_WALL_SOUND", "0")
     assert sinks._speaker_avoid_sound() is True                                # off: silent, and True so no buzzer notes either
 
