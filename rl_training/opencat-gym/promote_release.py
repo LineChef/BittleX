@@ -60,7 +60,7 @@ def main() -> int:
         return 2
     rel = lambda p: os.path.relpath(p, ROOT)                                    # noqa: E731
     paths = [rel(POLICY_PY), rel(dst), rel(dst + ".json")]
-    subprocess.run(["git", "add", *paths], cwd=ROOT, check=True)
+    subprocess.run(["git", "add", "-f", *paths], cwd=ROOT, check=True)
     c = subprocess.run(["git", "commit", "-qm", f"Promote {a.name} to the default policy ({a.note}); the previous release stays as the fallback"], cwd=ROOT, capture_output=True, text=True)
     if c.returncode != 0:
         print("commit failed:\n" + (c.stdout + c.stderr)[-400:], flush=True)

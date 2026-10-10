@@ -91,11 +91,35 @@ def test_loop_feeds_the_policy_sim_signed_yaw_and_logs_firmware_yaw(rg, monkeypa
 
     monkeypatch.setattr(rg.ResidualGaitPolicy, "step", spy)
     log = tmp_path / "walk.csv"
+    v4 = os.path.join(os.path.dirname(residual_policy.default_policy_path()), "Release_CandidateV4_ppo.onnx")      # a policy that sees the heading (the default may be heading-blind)
     rg.run(_TurningRightLink(), 0.10, 0.2, 80.0, "auto", disable_firmware_balance=True,
-           thermal_guard=False, send_every=1, log_path=str(log))
+           thermal_guard=False, send_every=1, log_path=str(log), policy_path=v4)
     assert seen and seen[-1] == pytest.approx(-math.radians(20.0), abs=1e-6)
     rows = [r for r in log.read_text().splitlines() if r[:1].isdigit()]
     assert float(rows[-1].split(",")[3]) == pytest.approx(math.radians(20.0), abs=1e-4)   # log: + = right
+
+
+def test_a_heading_blind_policy_is_fed_yaw_zero_but_the_log_keeps_the_real_yaw(rg, monkeypatch, tmp_path):
+    pytest.importorskip("onnxruntime")
+    import residual_policy
+    monkeypatch.setattr(rg, "diag", None)
+    seen = []
+    real_step = rg.ResidualGaitPolicy.step
+
+    def spy(self, q, g):
+        seen.append(residual_policy.quat_to_euler(q)[2])
+        return real_step(self, q, g)
+
+    monkeypatch.setattr(rg.ResidualGaitPolicy, "step", spy)
+    log = tmp_path / "walk.csv"
+    v6 = os.path.join(os.path.dirname(residual_policy.default_policy_path()), "Release_CandidateV6_ppo.onnx")
+    if not os.path.exists(v6):
+        pytest.skip("the V6 release is not in trained/")
+    rg.run(_TurningRightLink(), 0.10, 0.2, 80.0, "auto", disable_firmware_balance=True,
+           thermal_guard=False, send_every=1, log_path=str(log), policy_path=v6)
+    assert seen and all(abs(v) < 1e-9 for v in seen)
+    rows = [r for r in log.read_text().splitlines() if r[:1].isdigit()]
+    assert float(rows[-1].split(",")[3]) == pytest.approx(math.radians(20.0), abs=1e-4)
 
 
 # -------------------------------------------------------- probe_imu_under_load
