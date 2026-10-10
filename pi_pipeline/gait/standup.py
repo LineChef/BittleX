@@ -42,6 +42,7 @@ def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
 
 
 BALANCE_URDF_DEG = [30, 30] * 4      # the firmware `balance` / `up` skill pose (shoulders 30, knees 30)
+SIT_URDF_DEG = [45.0, 45.0, 45.0, 45.0, 105.0, -45.0, 105.0, -45.0]      # the firmware `sit` pose, decoded from InstinctBittleESP.h (reference_gait/sit_ref.npy), URDF order
 _URDF_TO_SERVO = [8, 12, 9, 13, 10, 14, 11, 15]       # same table as gait/deploy_map.py (a test checks they agree); kept here so the serial link needs no numpy
 
 
@@ -57,6 +58,8 @@ def start_pose(last_motion_command):
         return list(REST_URDF_DEG)
     if c in ("kbalance", "kup"):
         return list(BALANCE_URDF_DEG)
+    if c == "ksit":
+        return list(SIT_URDF_DEG)
     if c.startswith("i"):
         try:
             nums = [int(x) for x in c[1:].split()]

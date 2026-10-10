@@ -78,6 +78,10 @@ class EffectKind(Enum):
     DIAG = "diag"        # payload: (event, reason) -- structured-log hook
 
 
+class UrgentTurn(float):
+    """A turn (radians, + = right) that must cancel any turn already running: a wall is in front of him (the walker ignores a new turn while a timed one runs, which swallowed the first wall turn, 2026-10-10)."""
+
+
 @dataclass
 class Effect:
     """One abstract action a tick produced -- a binding layer maps this onto
@@ -325,6 +329,7 @@ class BehaviorDriver:
         self._session_name = ""
         self._explore_target = ""
         self._roam_chirp_at: float | None = None   # last "I'm roaming" chirp; None = not roaming
+        self._roam_began_at: float | None = None  # when this roam started: he walks straight for EXPLORE_STRAIGHT_S before the explorer may start a turn (user, 2026-10-10)
         self._wall_steer = os.environ.get("G2_WALL_STEER", "1") != "0"   # a near wall steers an exploring G2 away (user, 2026-10-10: it does not have to be perfect at first)
         self._wall_seen_t = -1e9                  # the look already acted on: one reaction per look
         self._wall_turn_until = 0.0               # no new wall reaction while a turn away is running
@@ -491,10 +496,12 @@ class BehaviorDriver:
         return self.survey
 
     # --- explore --------------------------------------------------------
+    EXPLORE_STRAIGHT_S = 8.0     # at the start of a roam he walks straight ahead this long before any exploring turn
     WALL_STALE_S = 8.0           # a wall look older than this is not acted on
     WALL_TURN_RAD = 0.9          # about 50 degrees away from a near wall
     WALL_BLOCKED_RAD = 1.4       # about 80 degrees when the wall fills the floor strip itself
     WALL_TURN_HOLD_S = 4.0       # a turn takes a few seconds: no new reaction until it should be done
+    WALL_STOP_IN = 8.0           # a wall this close (or closer) is acted on from a single look
 
     def _wall_reflex(self, i: DriverInputs, now: float) -> list | None:
         """A near wall steers an exploring G2 away from it (the wall estimate is a prototype: it can be wrong in either direction, and the user is watching). Acts on a wall look
@@ -506,7 +513,8 @@ class BehaviorDriver:
         if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
             return None
         blocked = w.state == "blocked"
-        if not (blocked or (w.state == "near" and w.confirmed)):
+        near_now = w.nearest_in is not None and w.nearest_in <= self.WALL_STOP_IN or w.near_groups >= 2           # a wall at 8 in or less, or two column groups of ONE picture agree it is near: act at once
+        if not (blocked or (w.state == "near" and (w.confirmed or near_now))):
             return None
         self._wall_seen_t = w.t
         side = w.turn or "right"
@@ -519,7 +527,7 @@ class BehaviorDriver:
             self.chirper.fired(now)
             _chirp_log.info("chirp %s asked for (%s)", ChirpMood.AVOID.value, why)
             fx.append(Effect(EffectKind.CHIRP, ChirpMood.AVOID, why))
-        fx.append(Effect(EffectKind.TURN, rad, why))
+        fx.append(Effect(EffectKind.TURN, UrgentTurn(rad), why))
         self._last_reason = why
         return fx
 
@@ -527,7 +535,11 @@ class BehaviorDriver:
         steer = self._wall_reflex(i, now)
         if steer is not None:
             return steer
+        if self._roam_began_at is None:
+            self._roam_began_at = now
         d = self.explorer.decide(list(i.frame), now)
+        if d.action is ExploreAction.TURN and now - self._roam_began_at < self.EXPLORE_STRAIGHT_S:
+            return [Effect(EffectKind.WALK, 0.0, "straight first")]               # walk straight at the start; a wall turn above still wins
         self._explore_target = d.target
         fx: list = []
         if d.action is ExploreAction.WANDER:
@@ -811,6 +823,7 @@ class BehaviorDriver:
                                 reason=f"explore: {self._explore_target or 'roaming'}")
         else:
             self._roam_chirp_at = None       # not roaming -> reset the entry chirp
+            self._roam_began_at = None
 
         # 5. IDLE -- staged descent + idle fidgets + the Tier 0 attentive layer
         safe_to_rest = (i.imu_level and i.imu_stable and not i.held

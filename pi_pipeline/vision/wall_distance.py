@@ -149,6 +149,7 @@ class WallReading:
     nearest_in: float | None
     turn: str | None
     confirmed: bool
+    near_groups: int = 0              # how many of the five column groups of this one look read NEAR_IN or closer
 
 
 class WallLog:
@@ -186,7 +187,7 @@ class WallLog:
         extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
         self._prev_state = st
         if self.cal is not None:                                      # an uncalibrated look is never acted on
-            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"])
+            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"], sum(1 for c in est.group_cm if c is not None and c / IN_TO_CM <= NEAR_IN))
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 

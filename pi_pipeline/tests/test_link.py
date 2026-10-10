@@ -151,3 +151,23 @@ def test_standup_helpers_agree_with_deploy_map_and_read_the_last_pose():
     assert standup.start_pose("") == standup.REST_URDF_DEG and standup.start_pose("kbalance") == standup.BALANCE_URDF_DEG
     assert standup.start_pose(standup.move_cmd([40, 5, 41, 6, 42, 7, 43, 8])) == [40, 5, 41, 6, 42, 7, 43, 8]
     assert standup.start_pose("kwkF") is None and standup.start_pose("i1 2") is None
+
+
+def test_a_firmware_walk_or_turn_started_from_sit_or_rest_is_eased_but_one_from_a_stride_is_not(monkeypatch):
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.2")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    from pi_pipeline.gait import standup
+    lk = _link_with(b"")
+    lk.last_motion_command = "ksit"                                       # he was sitting (the idle posture): the old start jerked into the gait un-eased (2026-10-10)
+    lk.send("kwkL", read_reply=False, settle=0.0)
+    sent = [w.decode().strip() for w in lk._ser.written]
+    assert sent[-1] == "kwkL" and len(sent) == 5 and all(c.startswith("i") for c in sent[:-1])
+    assert standup.start_pose("ksit") == standup.SIT_URDF_DEG
+    lk._ser.written.clear()
+    lk.last_motion_command = "d"
+    lk.send("kwkR", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written][-1] == "kwkR" and len(lk._ser.written) == 5
+    lk._ser.written.clear()
+    lk.last_motion_command = "kwkL"                                        # already walking: a turn token goes out as it is
+    lk.send("kwkR", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written] == ["kwkR"]

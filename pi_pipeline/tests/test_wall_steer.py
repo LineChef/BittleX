@@ -67,3 +67,36 @@ def test_the_turn_away_sound_is_two_soft_falling_notes_and_the_sink_obeys_its_sw
     assert 0.3 < pcm.size / 48000 < 0.45 and 0 < abs(int(pcm.max())) < 0.8 * pt.DEFAULT_PEAK * 32767 + 1
     monkeypatch.setenv("G2_WALL_SOUND", "0")
     assert sinks._speaker_avoid_sound() is True                                # off: silent, and True so no buzzer notes either
+
+
+def test_at_the_start_of_a_roam_he_walks_straight_before_any_exploring_turn(monkeypatch):
+    from pi_pipeline.behavior.explore import ExploreAction, ExploreDecision
+    d, c = _explorer(monkeypatch)
+    d.explorer.decide = lambda frame, now: ExploreDecision(ExploreAction.TURN, turn=0.8, reason="new heading")
+    t = d.tick(DriverInputs(frame=[]))
+    assert EffectKind.TURN not in kinds(t) and EffectKind.WALK in kinds(t)       # inside the first 8 s: straight ahead
+    c.adv(9.0)
+    t = d.tick(DriverInputs(frame=[]))
+    assert EffectKind.TURN in kinds(t)                                            # then the explorer may turn
+    c.adv(1.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", confirmed=False, turn="left", inches=0.0)))
+    assert any(isinstance(p, float) and p < 0 for p in payloads(t, EffectKind.TURN))      # a wall turn is never held back
+
+
+def test_a_wall_turn_cancels_a_turn_that_is_already_running():
+    from pi_pipeline.app.sinks import WalkerSink
+    from pi_pipeline.behavior.driver import UrgentTurn
+
+    class Link:
+        last_motion_command = ""
+        def __init__(self): self.sent = []
+        def send(self, c, **k): self.sent.append(c)
+    t = [100.0]
+    link = Link()
+    w = WalkerSink(link, clock=lambda: t[0])
+    w.turn(0.9)                                                                 # the explorer's own turn: runs a few seconds
+    n = len(link.sent)
+    w.turn(-0.9)                                                                # a normal turn is ignored while it runs
+    assert len(link.sent) == n
+    w.turn(UrgentTurn(-0.9), urgent=True)                                       # a wall turn replaces it at once
+    assert len(link.sent) == n + 1

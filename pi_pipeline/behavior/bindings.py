@@ -25,7 +25,7 @@ import logging
 
 from ..link import opencat
 from .chirps import CHIRP, ChirpMood
-from .driver import DriverTick, Effect, EffectKind
+from .driver import DriverTick, Effect, EffectKind, UrgentTurn
 
 log = logging.getLogger("g2.behavior.bindings")
 
@@ -90,6 +90,9 @@ class DriverBindings:
             rad = float(e.payload or 0.0)
             fn = (self.walker and _call(self.walker, "turn"))
             if fn:
+                if isinstance(e.payload, UrgentTurn):
+                    fn(rad, urgent=True)                 # cancels a timed turn that is already running
+                    return f"turn!:{rad:+.2f}"
                 fn(rad)
                 return f"turn:{rad:+.2f}"
             fn = self.actuator and _call(self.actuator, "perform")

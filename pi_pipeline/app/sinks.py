@@ -135,8 +135,10 @@ class WalkerSink:
         else:
             self._send_once(opencat.skill("wkF"))
 
-    def turn(self, rad: float) -> None:
+    def turn(self, rad: float, urgent: bool = False) -> None:
         r = float(rad)
+        if urgent:
+            self._turn_until = 0.0              # a wall ahead: cancel the turn that is running and turn away now
         if abs(r) < self.TURN_MIN_RAD or self.turning():
             return                              # too small to bother, or a turn is already running
         side = "right" if r >= 0 else "left"

@@ -148,7 +148,8 @@ class SerialLink:
         """Standing rule (user, 2026-10-10): every stand-up is eased. `kup` / `kbalance` sent while G2 lies at rest (last motion `d`, or nothing yet) are preceded by a ~0.8 s ramp of `i` steps
         from the rest pose to that skill's pose (gait/standup.py). From any other state the command goes out as it is (a stop / freeze `kbalance` out of a stride must stay immediate)."""
         c = command.strip()
-        if c not in ("kup", "kbalance") or self._ramping or self.last_motion_command not in ("", "d"):
+        walks = c.startswith(("kwk", "kcr", "ktr", "kbk", "kvt", "kgp"))     # a firmware gait or turn started from lying or sitting stands him up by itself, un-eased (user, 2026-10-10: glitchy start of an exploration)
+        if not (c in ("kup", "kbalance") or walks) or self._ramping or self.last_motion_command not in ("", "d", "ksit"):
             return
         try:
             try:
@@ -164,7 +165,8 @@ class SerialLink:
             if secs <= 0:
                 return
             self._ramping = True
-            for pose in standup.ramp_poses(standup.REST_URDF_DEG, standup.BALANCE_URDF_DEG, secs):
+            start = standup.start_pose(self.last_motion_command) or standup.REST_URDF_DEG
+            for pose in standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs):
                 self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
                 self._ser.flush()
                 time.sleep(1.0 / standup.STEPS_PER_S)
