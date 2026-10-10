@@ -28,13 +28,14 @@ class _Stop(threading.Event):
 
 
 class PolicyWalker:
-    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False, scripted_fn=None, on_stall=None):
+    def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False, scripted_fn=None, on_stall=None, on_contact=None):
         self._scripted_fn = scripted_fn          # the open-loop player for a gait the policy does not know (tests inject one)
         self._hold = hold_between_legs          # exploration: a leg that ends by itself leaves G2 in a balanced stand, not lying down (the session rests at its end)
         self._foot_hold = default_foot_hold() if foot_hold == "env" else foot_hold
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
         self._on_battery = on_battery            # called with (level, volts) on a low reading while walking
         self._on_stall = on_stall                # called with the event dict when the short-window IMU stall suspect fires while walking (contact pictures)
+        self._on_contact = on_contact            # called with the event dict when the hit-level IMU contact fires (the behaviour driver starts the hit sequence)
         self._on_fall = on_fall                  # called when a walk ended because G2 fell (the exploration halts instead of walking on, 2026-10-07)
         self._thread: threading.Thread | None = None
         self._stop = _Stop()
@@ -67,6 +68,10 @@ class PolicyWalker:
                 params = inspect.signature(run).parameters
                 if "on_stall" in params or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
                     extra["on_stall"] = self._on_stall
+            if self._on_contact is not None:
+                params = inspect.signature(run).parameters
+                if "on_contact" in params or any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+                    extra["on_contact"] = self._on_contact
             from . import gait_mode
             mode = gait_mode.current()
             if mode != gait_mode.DEFAULT and not gait_mode.supports(self._policy_path(), mode):

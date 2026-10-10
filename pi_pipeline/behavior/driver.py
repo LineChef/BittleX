@@ -335,6 +335,8 @@ class BehaviorDriver:
         self._wall_seen_t = -1e9                  # the look already acted on: one reaction per look
         self._wall_turn_until = 0.0               # no new wall reaction while a turn away is running
         self._last_wall_reaction = -1e9           # when a wall turn or hit sequence last started
+        self._contact_t = -1e9                    # when the IMU last said he is pushing into something (`note_contact`), and the one already acted on
+        self._contact_seen = -1e9
         self._hit_until = 0.0                     # no new hit-a-wall reaction until the last one should be done
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
@@ -500,6 +502,7 @@ class BehaviorDriver:
 
     # --- explore --------------------------------------------------------
     EXPLORE_STRAIGHT_S = 8.0     # at the start of a roam he walks straight ahead this long before any exploring turn
+    CONTACT_FRESH_S = 2.0        # an IMU contact signal older than this is not acted on (the walk may have ended)
     HIT_STALE_S = 4.0            # a look older than this is not taken as "he is at the wall now"
     HIT_NEAREST_IN = 6.0         # a wall this close on three or more groups (or a blocked picture) while walking = he has hit it
     STUCK_NEAREST_IN = 16.0      # two looks in a row this close and not moving closer or farther (within 2 in): stuck against it
@@ -543,25 +546,36 @@ class BehaviorDriver:
         self._last_reason = why
         return fx
 
+    def note_contact(self, ev: dict | None = None) -> None:
+        """The IMU says he is pushing into something while walking forward (`gait/imu_stall.py`, the hit detector in the walk loop; called from the walk thread): the next tick starts the hit
+        sequence. `G2_IMU_CONTACT=0` ignores it."""
+        self._contact_t = time.monotonic()
+        logging.getLogger("g2.wall.hit").info("IMU contact signal: %s", ev)
+
     def _hit_wall(self, i: DriverInputs, now: float) -> list | None:
         """He has walked into a wall (the last wall look is fresh and says blocked, or a wall 6 in or closer on three or more groups): say "ooooof", back up, then turn around toward the
         open side (user, 2026-10-10). A prototype from vision alone; a stall / jam signal is still to come. Runs as a choreography so nothing else acts until it is done.
         `G2_HIT_WALL=0` turns it off."""
         w = i.wall
-        if os.environ.get("G2_HIT_WALL", "1") == "0" or w is None or now < self._hit_until:
+        if os.environ.get("G2_HIT_WALL", "1") == "0" or now < self._hit_until:
             return None
-        if w.t <= self._wall_seen_t or now - w.t > self.HIT_STALE_S:
-            return None
-        stuck = (w.nearest_in is not None and w.prev_nearest_in is not None and w.prev_age_s is not None and 1.5 <= w.prev_age_s <= 7.0
+        contact = os.environ.get("G2_IMU_CONTACT", "1") != "0" and self._contact_t > self._contact_seen and time.monotonic() - self._contact_t <= self.CONTACT_FRESH_S
+        fresh = w is not None and w.t > self._wall_seen_t and now - w.t <= self.HIT_STALE_S
+        stuck = (fresh and w.nearest_in is not None and w.prev_nearest_in is not None and w.prev_age_s is not None and 1.5 <= w.prev_age_s <= 7.0
                  and w.nearest_in <= self.STUCK_NEAREST_IN and w.prev_nearest_in <= self.STUCK_NEAREST_IN and abs(w.nearest_in - w.prev_nearest_in) <= 2.0 and w.near_groups >= 3
                  and self._last_wall_reaction < w.t - w.prev_age_s)            # two looks in a row at the same close wall and no turn in between: he is not getting anywhere
-        if not (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3) or stuck):
+        seen = fresh and (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3) or stuck)
+        if not (seen or contact):
             return None
-        self._wall_seen_t = w.t
+        if contact:
+            self._contact_seen = self._contact_t
+        wall_t, turn, state, near = (w.t, w.turn, w.state, w.nearest_in) if w is not None else (self._wall_seen_t, None, "none", None)
+        self._wall_seen_t = max(self._wall_seen_t, wall_t)
         self._last_wall_reaction = now
-        side = w.turn or "right"
+        side = turn or "right"
         rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
-        why = f"{'stuck at a wall' if stuck and w.state != 'blocked' else 'hit a wall'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.state}): oof, back up, turn {side}"
+        why = (f"hit something (IMU: pushing without moving, {state}): oof, back up, turn {side}" if contact and not seen else
+               f"{'stuck at a wall' if stuck and state != 'blocked' else 'hit a wall'} ({near if near is not None else 0:g} in, {state}): oof, back up, turn {side}")
         logging.getLogger("g2.wall.hit").info("%s", why)
         steps = [(0.0, Effect(EffectKind.DIAG, ("wall.hit", why), why)),
                  (0.0, Effect(EffectKind.CAPTURE, ("contact", "hit"), why))]          # instant diagnosis frames of what he sees (vision/contact_pictures.py)

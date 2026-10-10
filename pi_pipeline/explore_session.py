@@ -163,6 +163,8 @@ def main() -> None:
             rt.bindings.contact = contact.capture
             if policy_walker is not None:
                 policy_walker._on_stall = lambda ev: contact.capture("stall_suspect", ev)
+        if policy_walker is not None and os.environ.get("G2_IMU_CONTACT", "1") != "0":          # the IMU contact signal starts the hit sequence even when vision says clear
+            policy_walker._on_contact = lambda ev: rt.driver.note_contact(ev)
         watch = None
         if saver is not None:
             survey = rt.driver.enable_survey(survey_config_from_env())          # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)

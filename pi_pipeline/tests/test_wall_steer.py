@@ -187,3 +187,30 @@ def test_a_new_leg_after_a_wall_look_turns_toward_the_open_side_and_without_one_
     c.adv(3.0)
     t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="far", inches=40.0, confirmed=False, groups=0, votes=0, turn="right")))
     assert [p for p in payloads(t, EffectKind.TURN) if abs(p + 0.2) < 1e-9]                                               # switched off
+
+
+def test_an_imu_contact_signal_starts_the_hit_sequence_even_when_vision_sees_no_wall_and_is_used_once(monkeypatch):
+    """2026-10-10: two walk legs showed the stall signature while the wall estimator said clear; the IMU contact signal is a second way to know he hit something."""
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="clear", inches=None, confirmed=False)))
+    assert ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)
+    d.note_contact({"mean_jitter_deg": 7.0})
+    c.adv(0.2)
+    t = d.tick(DriverInputs(frame=[], wall=None))                               # no wall look at all
+    assert ChirpMood.HIT in payloads(t, EffectKind.CHIRP) and any(p[0] == "wall.hit" for p in payloads(t, EffectKind.DIAG))
+    assert ("contact", "hit") in payloads(t, EffectKind.CAPTURE)                # and the instant diagnosis frames
+    c.adv(0.5)
+    assert "kbkF" in payloads(d.tick(DriverInputs(frame=[], wall=None)), EffectKind.SKILL)
+    c.adv(15.0)
+    t = d.tick(DriverInputs(frame=[], wall=None))                               # the same signal is not acted on twice
+    assert ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)
+
+
+def test_the_imu_contact_signal_is_ignored_when_switched_off_or_old_or_outside_exploring(monkeypatch):
+    d, c = _explorer(monkeypatch)
+    monkeypatch.setenv("G2_IMU_CONTACT", "0")
+    d.note_contact({})
+    assert ChirpMood.HIT not in payloads(d.tick(DriverInputs(frame=[], wall=None)), EffectKind.CHIRP)
+    monkeypatch.delenv("G2_IMU_CONTACT")
+    d._contact_t -= 10.0                                                        # the walk has long ended: too old
+    assert ChirpMood.HIT not in payloads(d.tick(DriverInputs(frame=[], wall=None)), EffectKind.CHIRP)
