@@ -60,7 +60,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,
                             veto_labels=lambda: base | frozenset(str(x).lower() for x in ((getattr(rt, "_roster", None) or (lambda: ()))() or ()) if x))
     saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
-    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "10")), fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
+    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "4" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 4 s while the wall steers him fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
     survey.gate = watch.gate
     if os.environ.get("G2_WALL_DRYRUN", "1") != "0":                    # the wall estimator reads the same peeks and only LOGS what it would do (vision/wall_distance.py); it never moves G2
@@ -69,6 +69,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
         cal = wd.Calibration.load()
 
         wall_log = wd.WallLog(cal, context=lambda: {"mode": rt.driver.mode.mode.name})
+        rt.wall_log = wall_log                                           # the sensor hub reads wall_log.last for the behaviour driver's wall steering
 
         def wall_look(snap):
             wall_log.look(snap.jpeg, to_image(snap.jpeg))
@@ -137,7 +138,7 @@ def main() -> None:
             saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT),
                                            prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", args.roam_s / 2 if args.roam_s > 0 else 300.0)))   # prep the camera for the first picture and once half way (user)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
-                            camera_snapshot=saver)
+                            camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
         watch = None
         if saver is not None:
             survey = rt.driver.enable_survey(survey_config_from_env())          # stop at the end of each leg, look down and up, one picture each (behavior/survey.py)

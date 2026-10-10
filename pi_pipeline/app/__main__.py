@@ -106,7 +106,7 @@ def _make_vision_source():
     return src
 
 
-def _build_runtime(link, *, hz: float, memory=None, frame_source=None, edge_source=None, policy_walker=None, imu_link=None, camera_snapshot=None):
+def _build_runtime(link, *, hz: float, memory=None, frame_source=None, edge_source=None, policy_walker=None, imu_link=None, camera_snapshot=None, wall_source=None):
     personality = Personality.from_settings(settings)
     bonds = Bonds.from_settings(settings)
     # a bonded *person* is a person even though the model's class for them is a
@@ -123,7 +123,7 @@ def _build_runtime(link, *, hz: float, memory=None, frame_source=None, edge_sour
                             cliff=CliffGuard() if features.vision_safety else None)
     bindings = build_bindings(link, dry_run_power=link is None, policy_walker=policy_walker, camera_snapshot=camera_snapshot)
     hub = SensorHub(imu_link or link, feed_source=frame_source,
-                    cfg=SensorConfig(person_labels=person_labels), edge_source=edge_source)
+                    cfg=SensorConfig(person_labels=person_labels), edge_source=edge_source, wall_source=wall_source)
     if link is not None:
         hub.start_stream()   # nothing else turns the IMU print on in app mode
     # B11 place memory: "the dog is often to the left" -> a durable fact

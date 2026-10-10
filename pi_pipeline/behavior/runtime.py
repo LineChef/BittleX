@@ -45,7 +45,7 @@ _EVENT_BOOLS = (
 # continuous sensor keys a `sensors()` callable may return
 _SENSOR_KEYS = (
     "imu_level", "imu_stable", "held", "recovering", "person_present",
-    "face_quality", "good_frames_this_step", "edge",
+    "face_quality", "good_frames_this_step", "edge", "wall",
 )
 
 

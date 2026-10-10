@@ -157,6 +157,16 @@ CHORD_HZ = (329.6, 523.3, 659.3, 784.0, 1046.5)
 CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
+def render_turn_away(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A subtle two-note fall (about 0.35 s, at 70% of the usual level) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
+    gap = np.zeros(int(rate * 0.03))
+    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], peak * 0.7)
+
+
+def play_turn_away(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_turn_away, peak, rate, wait)
+
+
 def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A "ta-da" (about 1.3 s) for a finished exploration: a short bright chord stab, then the chord held and fading."""
     def chord(dur, attack, release, bright):
@@ -305,5 +315,5 @@ if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline
     name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
     fn = globals().get(f"play_{name}")
     if fn is None:
-        raise SystemExit("sounds: grunt refuse complete oof sigh yawn beep boop close double")
+        raise SystemExit("sounds: grunt refuse complete turn_away oof sigh yawn beep boop close double")
     fn(wait=True)

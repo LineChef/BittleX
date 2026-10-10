@@ -41,7 +41,7 @@ def _call(obj, *names):
 
 class DriverBindings:
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
-                 walker=None, head=None, power=None, on_diag=None):
+                 walker=None, head=None, power=None, on_diag=None, avoid_sound=None):
         self.actuator = actuator
         self.tts = tts
         self.camera = camera
@@ -49,6 +49,7 @@ class DriverBindings:
         self.walker = walker
         self.head = head
         self.power = power
+        self.avoid_sound = avoid_sound         # callable() -> bool: the turn-away sound on the speaker (True = it played, so no buzzer notes)
         self._on_diag = on_diag or _default_diag
         self._warned: set[str] = set()
 
@@ -135,6 +136,13 @@ class DriverBindings:
             if mood is ChirpMood.FANFARE:                                    # silent: the start horn plays right after "Exploration mode." instead (user, 2026-10-10)
                 logging.getLogger("g2.chirp").info("chirp %s skipped (the start horn plays with the announcement)", mood.value)
                 return f"chirp:{mood.value}"
+            if mood is ChirpMood.AVOID and self.avoid_sound is not None:
+                try:
+                    if self.avoid_sound():
+                        logging.getLogger("g2.chirp").info("chirp %s played on the speaker (buzzer notes skipped)", mood.value)
+                        return f"chirp:{mood.value}"
+                except Exception:  # noqa: BLE001
+                    pass
             tone = opencat.beep(CHIRP[mood])
             logging.getLogger("g2.chirp").info("chirp %s sent to the BiBoard: %s", mood.value, tone)
             fn(tone)

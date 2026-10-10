@@ -139,6 +139,18 @@ def log_dry_run(est: WallEstimate, path: str = LOG_PATH, *, extra: dict | None =
         pass
 
 
+@dataclass
+class WallReading:
+    """The latest wall look as the behaviour driver sees it (user, 2026-10-10: let the wall estimate steer him): `t` is `time.monotonic()` of the look, `nearest_in` the closest wall
+    base in inches (None = clear), `state` clear / far / near / blocked, `turn` the side with more room ("left" / "right"), `confirmed` true when this and the previous look were both
+    near or blocked."""
+    t: float
+    state: str
+    nearest_in: float | None
+    turn: str | None
+    confirmed: bool
+
+
 class WallLog:
     """What the wall estimator logs while G2 explores (user, 2026-10-10: log when walls are seen and at what distance, for debugging). Every look is one line in `wall_dryrun.jsonl`;
     a picture is kept for every near / blocked look, and one clear look every `clear_every_s` for comparison, in a ring of `ring` files (`wall_pics`); each line that has a picture
@@ -150,6 +162,7 @@ class WallLog:
         self.context, self._clock = context, clock
         self._last_clear = float("-inf")
         self._prev_state = None
+        self.last: WallReading | None = None                          # the newest look, read by the behaviour driver
 
     def look(self, jpeg: bytes, img) -> WallEstimate:
         if self.cal is None:                                              # not calibrated: keep the raw base rows so a calibration can be checked against them
@@ -172,6 +185,8 @@ class WallLog:
         near_now = st in ("near", "blocked")
         extra["near_confirmed"] = bool(near_now and self._prev_state in ("near", "blocked"))     # two looks in a row agree: a one-off reading is not yet a wall
         self._prev_state = st
+        if self.cal is not None:                                      # an uncalibrated look is never acted on
+            self.last = WallReading(time.monotonic(), st, None if est.nearest_cm is None else round(est.nearest_cm / IN_TO_CM, 1), est.turn, extra["near_confirmed"])
         log_dry_run(est, self.path, extra=extra | {"calibrated": self.cal is not None})
         return est
 

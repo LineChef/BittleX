@@ -25,6 +25,7 @@ Recognition of a bonded person after an absence fires an excited hop in any of
 from __future__ import annotations
 
 import logging
+import os
 
 import time
 from dataclasses import dataclass, field
@@ -132,6 +133,7 @@ class DriverInputs:
     face_quality: float = 1.0              # 0..1, for enrollment quality nudges
     good_frames_this_step: int = 0         # accepted frames since the last CAPTURE_ON
     edge: object = None                    # EdgeReading | None, for CliffGuard
+    wall: object = None                    # vision.wall_distance.WallReading | None: the latest wall look (steers an exploring G2 away from a near wall)
     known_person_labels: frozenset = frozenset()  # bonded roster -> recognition hop
 
     # --- mood inputs (from the memory store's recency, fed by the runtime) ---
@@ -323,6 +325,9 @@ class BehaviorDriver:
         self._session_name = ""
         self._explore_target = ""
         self._roam_chirp_at: float | None = None   # last "I'm roaming" chirp; None = not roaming
+        self._wall_steer = os.environ.get("G2_WALL_STEER", "1") != "0"   # a near wall steers an exploring G2 away (user, 2026-10-10: it does not have to be perfect at first)
+        self._wall_seen_t = -1e9                  # the look already acted on: one reaction per look
+        self._wall_turn_until = 0.0               # no new wall reaction while a turn away is running
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
         self._prev_mode = self.mode.mode
@@ -486,7 +491,42 @@ class BehaviorDriver:
         return self.survey
 
     # --- explore --------------------------------------------------------
+    WALL_STALE_S = 8.0           # a wall look older than this is not acted on
+    WALL_TURN_RAD = 0.9          # about 50 degrees away from a near wall
+    WALL_BLOCKED_RAD = 1.4       # about 80 degrees when the wall fills the floor strip itself
+    WALL_TURN_HOLD_S = 4.0       # a turn takes a few seconds: no new reaction until it should be done
+
+    def _wall_reflex(self, i: DriverInputs, now: float) -> list | None:
+        """A near wall steers an exploring G2 away from it (the wall estimate is a prototype: it can be wrong in either direction, and the user is watching). Acts on a wall look
+        that is fresh and either blocked or near on two looks in a row, once per look, toward the side with more room; a soft falling sound says why he turns. Never walks into a wall:
+        it only turns. `G2_WALL_STEER=0` turns it off."""
+        w = i.wall
+        if not self._wall_steer or w is None or now < self._wall_turn_until:
+            return None
+        if w.t <= self._wall_seen_t or now - w.t > self.WALL_STALE_S:
+            return None
+        blocked = w.state == "blocked"
+        if not (blocked or (w.state == "near" and w.confirmed)):
+            return None
+        self._wall_seen_t = w.t
+        side = w.turn or "right"
+        rad = (self.WALL_BLOCKED_RAD if blocked else self.WALL_TURN_RAD) * (1.0 if side == "right" else -1.0)
+        self._wall_turn_until = now + self.WALL_TURN_HOLD_S
+        why = f"wall {'blocked' if blocked else 'near'} ({w.nearest_in if w.nearest_in is not None else 0:g} in): turn {side}"
+        logging.getLogger("g2.wall.steer").info("%s", why)
+        fx = [Effect(EffectKind.DIAG, ("wall.steer", why), why)]
+        if self.chirper is not None:                          # the reason for the turn is always audible: it is not held back by the chirp cooldown (it still restarts it)
+            self.chirper.fired(now)
+            _chirp_log.info("chirp %s asked for (%s)", ChirpMood.AVOID.value, why)
+            fx.append(Effect(EffectKind.CHIRP, ChirpMood.AVOID, why))
+        fx.append(Effect(EffectKind.TURN, rad, why))
+        self._last_reason = why
+        return fx
+
     def _from_explore(self, i: DriverInputs, now: float) -> list:
+        steer = self._wall_reflex(i, now)
+        if steer is not None:
+            return steer
         d = self.explorer.decide(list(i.frame), now)
         self._explore_target = d.target
         fx: list = []

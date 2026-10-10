@@ -203,6 +203,15 @@ class CameraSink:
                 log.exception("camera on_toggle hook failed")
 
 
+def _speaker_avoid_sound() -> bool:
+    """The soft "turning away from a wall" sound on the speaker; True when it played (the Pi by default; `G2_WALL_SOUND=0` turns it off)."""
+    from ..voice import prompt_tones
+    if os.environ.get("G2_WALL_SOUND", "1") == "0" or not prompt_tones.speaker_enabled():
+        return os.environ.get("G2_WALL_SOUND", "1") == "0"            # off = silent, no buzzer either; a dev machine falls back to the buzzer notes
+    prompt_tones.play_turn_away()
+    return True
+
+
 def build_bindings(link, *, dry_run_power: bool | None = None,
                    camera_toggle=None, policy_walker=None, camera_snapshot=None) -> DriverBindings:
     """Wire a `DriverBindings` to the real sinks. `link` is a `SerialLink` /
@@ -218,6 +227,7 @@ def build_bindings(link, *, dry_run_power: bool | None = None,
         head=HeadSink(link),
         power=PowerSink(dry_run=dry_run_power),
         on_diag=_diag_event,
+        avoid_sound=_speaker_avoid_sound,
     )
 
 

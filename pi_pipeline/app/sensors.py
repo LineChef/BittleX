@@ -50,11 +50,12 @@ class SensorConfig:
 
 class SensorHub:
     def __init__(self, link=None, feed_source=None, cfg: SensorConfig | None = None,
-                 *, clock=time.monotonic, edge_source=None):
+                 *, clock=time.monotonic, edge_source=None, wall_source=None):
         self._link = link
         # edge_source() -> EdgeReading | None, the floor-vs-edge classifier's latest read for CliffGuard. No real
         # detector exists yet (it needs training on the mounted camera view), so None means "no edge sensing".
         self._edge_source = edge_source
+        self._wall_source = wall_source       # wall_source() -> vision.wall_distance.WallReading | None, the latest wall look (steers an exploring G2 away from a near wall)
         self._feed_source = feed_source or (lambda: [])
         self.cfg = cfg or SensorConfig()
         self._clock = clock
@@ -126,6 +127,8 @@ class SensorHub:
         }
         if self._edge_source is not None:
             out["edge"] = self._edge_source()
+        if self._wall_source is not None:
+            out["wall"] = self._wall_source()
         return out
 
     __call__ = sample
