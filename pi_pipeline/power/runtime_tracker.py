@@ -249,6 +249,7 @@ class RuntimeWatcher:
         self._poll_s, self._repeat_s, self._clock = poll_s, repeat_s, clock
         self.level = BatteryLevel.OK
         self._last_alert: float | None = None
+        self._repeats = 0                                   # alerts sent at the current level: the siren backs off after a few (user, 2026-10-10: it kept playing over and over)
         self._stop = threading.Event()
 
     def full_runtime_s(self) -> float | None:
@@ -261,17 +262,19 @@ class RuntimeWatcher:
             return None
         elapsed = self._tracker.armed_elapsed_s(from_boot=not self._require_arm)
         if elapsed is None:
-            self.level, self._last_alert = BatteryLevel.OK, None
+            self.level, self._last_alert, self._repeats = BatteryLevel.OK, None, 0
             return None                                     # not told he is on battery (this boot): stay silent
         used = elapsed / full
         seen = BatteryLevel.CRITICAL if used >= self._critical_fraction else BatteryLevel.LOW if used >= self._warn_fraction else BatteryLevel.OK
         now = self._clock()
         if seen == BatteryLevel.OK:
-            self.level, self._last_alert = BatteryLevel.OK, None
+            self.level, self._last_alert, self._repeats = BatteryLevel.OK, None, 0
             return None
         worse = seen > self.level
         self.level = seen
-        if worse or self._last_alert is None or now - self._last_alert >= self._repeat_s:
+        gap = self._repeat_s * (1 if self._repeats < 3 else 3)           # three alerts at 5 min, then one every 15 min
+        if worse or self._last_alert is None or now - self._last_alert >= gap:
+            self._repeats = 1 if worse or self._last_alert is None else self._repeats + 1
             self._last_alert = now
             log.warning("Pi battery %s: %.0f%% of the expected runtime used", seen.name.lower(), used * 100)
             try:

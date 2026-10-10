@@ -218,3 +218,16 @@ def test_default_thresholds_are_30_percent_left_for_low_and_20_percent_left_for_
         m.up = float(up); now[0] += 600
         assert w.poll_once() is expect
     assert alerts == [BatteryLevel.LOW, BatteryLevel.LOW, BatteryLevel.CRITICAL]
+
+
+def test_the_critical_alert_backs_off_to_every_15_minutes_after_three_repeats(tmp_path):
+    m = Boot(up=0.0)
+    t = m.tracker(tmp_path / "rt.json")
+    alerts, now = [], [0.0]
+    w = RuntimeWatcher(t, lambda lv, u: alerts.append(now[0]), full_runtime_s=1000, clock=lambda: now[0], repeat_s=300, require_arm=False)
+    m.up = 900.0                                          # past the critical level and staying there
+    for k in range(0, 3600, 60):
+        now[0] = float(k)
+        w.poll_once()
+    gaps = [round(b - a) for a, b in zip(alerts, alerts[1:])]
+    assert gaps[:2] == [300, 300] and all(g == 900 for g in gaps[2:])            # three at 5 min, then 15 min apart
