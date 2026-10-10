@@ -28,6 +28,9 @@ Hardwood, the 9 ft lane, no timed spacing between rounds (see the run procedure 
 4. **Confirm at the chosen trim:** 3 more lane runs, then 3 crossings of the 1/4 in (6.4 mm) threshold strip (11 s, tile side), then, if the user has it, the taller strip.
 5. **Record:** set the V6 default trim in `gait/heading_hold.py` `DEFAULT_TRIMS` keyed to `Release_CandidateV6_ppo.onnx`; README for the day; update STATUS. A trim for tile if the user switches floors.
 
+## Start of the next hardware round -- sleep mode test (queued by the user, 2026-10-10)
+Power-saving sleep is OFF by default (`G2_SLEEP_AFTER_S` default 0). At the very start of the next round: add `G2_SLEEP_AFTER_S=300` to the Pi's `.env` (append with `echo`, never cat the file), restart `g2-voice`, and the user watches it for the whole session (sigh at sleep, yawn on waking, whether it sleeps at the wrong moments such as between walk rounds, whether the wake word is still heard on Wi-Fi power-save) to settle the rest time before sleep. The power log (`python -m pi_pipeline.power log`) records every sleep and wake with times. Afterwards set the chosen value as the default.
+
 ## Block 2 -- sounds (about 15 min)
 Speaker works at all? (The Pi logged a sound-device error earlier.) Then: wake-word beep, "boop" when the words are captured, the two falling notes when the follow-up window closes, the double beep on a gait switch, the exploration fanfare (the user liked it from the Mac, still to hear on G2). About 10 tries each of "hi step" and "walk mode" (and "walk normally") to see how well the recognizer hears them.
 
