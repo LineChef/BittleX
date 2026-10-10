@@ -3,11 +3,11 @@
 
     g2pimem            # opens this page on the Facts tab (g2pimem <subcommand> still prints text: log 20, search ..., usage)
     g2pics             # opens this page on the Pictures tab (g2pics status / pull still print or copy)
-    python3 tools/g2_review.py [--tab facts|exchanges|observations|pictures|trash] [--no-open] [--stop]
+    python3 tools/g2_review.py [--tab facts|exchanges|observations|pictures|looks|walls|trash] [--no-open] [--stop]
 
 The page runs as a background server (so your terminal is free): the first call starts it, later calls just open the browser. `--stop` ends it. Log: ~/g2_logs/review_server.log.
 
-Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Trash. The X moves a record to the Trash
+Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Looks (throwaway left / right look pictures), Walls, Trash. The X moves a record to the Trash
 (you get an Undo for a few seconds, and the Trash tab restores anything later); only "Empty trash" deletes for good, and it asks twice. A safe copy of the
 memory database is made before the first delete of each session. Everything runs on the Pi through ssh (needs G2_PI, e.g. user@g2pi.local); the pictures
 are copied to ~/g2_pictures/explore on this Mac so the page can show them. The page listens on 127.0.0.1 only and every action needs a token that only the
@@ -134,7 +134,9 @@ class App:
     def counts(self) -> dict:
         """Totals for the tab labels: records of each memory kind, pictures kept, and what is in the Trash."""
         out = dict(self.remote.memory("count"))
-        out["pictures"] = len(self.remote.pictures("list"))
+        pics = self.remote.pictures("list")
+        out["pictures"] = sum(1 for p in pics if p.get("group") != "looks")             # the throwaway look pictures have their own tab
+        out["looks"] = sum(1 for p in pics if p.get("group") == "looks")
         t = self.trash()
         out["trash"] = len(t["memory"]) + len(t["pictures"])
         return out
@@ -261,7 +263,7 @@ class App:
 
     @staticmethod
     def _rel(p: str) -> str:
-        if not re.fullmatch(r"(survey|named)/[A-Za-z0-9_\-]+/[A-Za-z0-9_\-.]+\.jpg", p or ""):
+        if not re.fullmatch(r"(survey|named|looks)/[A-Za-z0-9_\-]+/[A-Za-z0-9_\-.]+\.jpg", p or ""):
             raise ValueError(f"not a picture path: {p!r}")
         return p
 
@@ -402,7 +404,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
-const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["walls","Walls"],["trash","Trash"]];
+const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["trash","Trash"]];
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts",data=[],undoFn=null,timer=null,confirmAt=0;
 const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
@@ -440,7 +442,7 @@ function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Tra
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
-  if(tab==="pictures"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
+  if(tab==="pictures"||tab==="looks"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
   else if(tab==="walls"){await api("/api/walls/sync",{});data=await api("/api/walls")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
@@ -454,8 +456,8 @@ function renderWalls(list,f){const items=data.filter(p=>!f||JSON.stringify(p).to
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:""));c.append(im,cap);
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
- if(tab==="pictures"){const items=data.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!items.length){list.append(el("div","empty","No pictures yet."));return}
-  const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:"Survey "+p.folder;(groups[g]=groups[g]||[]).push(p)}
+ if(tab==="pictures"||tab==="looks"){const items=data.filter(p=>((p.group==="looks")===(tab==="looks"))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":"No pictures yet."));return}
+  const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:(p.group==="looks"?"Looks ":"Survey ")+p.folder;(groups[g]=groups[g]||[]).push(p)}
   const named=Object.keys(groups).filter(g=>g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y)),survey=Object.keys(groups).filter(g=>!g.startsWith("Named: ")).sort().reverse();
   const nl=named.reduce((n,g)=>n+groups[g].length,0),nu=survey.reduce((n,g)=>n+groups[g].length,0);
   const sum=el("div","labelsum");sum.append(el("b","","Labels so far: "));

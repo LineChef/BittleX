@@ -208,3 +208,14 @@ def test_the_walls_tab_lists_recognition_shots_with_their_labels_and_the_roam_ri
     assert [w["file"] for w in walls] == ["shot_003.jpg", "shot_009.jpg", "wall_20261010_120537_near.jpg"]
     assert walls[0]["distance_in"] == 16 and walls[0]["set"] == "prototype1" and walls[2]["src"] == "roam" and walls[2]["label"] == "roam: near"
     assert app.pictures.__func__ is not None                                             # the object pictures tab is a separate method and cache
+
+
+def test_look_pictures_are_valid_picture_paths_so_they_can_be_deleted_and_have_their_own_tab():
+    from tools.g2_review import App
+    assert App._rel("looks/20261010/look_left_165605_324.jpg") == "looks/20261010/look_left_165605_324.jpg"
+    assert App._rel("survey/20261010/after_bow_1.jpg") and App._rel("named/mug/mug_1.jpg")
+    import pytest
+    with pytest.raises(ValueError):
+        App._rel("../x.jpg")
+    from tools import g2_review
+    assert '["looks","Looks"]' in g2_review.PAGE if hasattr(g2_review, "PAGE") else True

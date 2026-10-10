@@ -151,7 +151,7 @@ def test_complete_sting_is_a_ta_da_chord_stab_then_the_held_chord():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_complete(48000, pt.DEFAULT_PEAK)
     r = 48000
-    assert 1.2 < len(pcm) / r < 1.5 and abs(np.abs(pcm).max() / (pt.DEFAULT_PEAK * 32767) - 1.5) < 0.15      # 50% louder than a normal-level sound
+    assert 1.2 < len(pcm) / r < 1.5 and abs(np.abs(pcm).max() / (pt.MAX_PEAK * 32767) - 1.0) < 0.01      # the maximum clean level (user, 2026-10-10)
     seg = pcm[int(0.6 * r):int(1.0 * r)].astype(float) * np.hanning(int(0.4 * r))
     sp = np.abs(np.fft.rfft(seg, 1 << 16)); fr = np.fft.rfftfreq(1 << 16, 1 / r)
     for hz in (523.3, 659.3, 784.0):                       # the held chord's notes stand clear of their neighbours
@@ -163,12 +163,12 @@ def test_complete_sting_is_a_ta_da_chord_stab_then_the_held_chord():
 def test_horn_switches_are_per_situation(monkeypatch):
     from pi_pipeline.voice import prompt_tones as pt
     played = []
-    monkeypatch.setattr(pt, "play_refuse", lambda wait=False: played.append(wait))
+    monkeypatch.setattr(pt, "play_refuse", lambda peak=None, wait=False: played.append((wait, peak)))
     pt.play_horn_if_enabled("G2_FALL_HORN")
     monkeypatch.setenv("G2_FALL_HORN", "0")
     pt.play_horn_if_enabled("G2_FALL_HORN")
     pt.play_horn_if_enabled("G2_REFUSE_SOUND", wait=True)
-    assert played == [False, True]                       # the fall horn off leaves the refusal horn on
+    assert played == [(False, pt.MAX_PEAK), (True, None)]          # the fall horn off leaves the refusal horn on; the fall alarm is at the maximum, the refusal horn is not
 
 
 def test_the_robots_name_is_spelled_out_for_the_voice_but_other_words_are_left_alone():

@@ -87,12 +87,12 @@ def test_the_hit_sound_is_a_long_falling_oof():
     assert 0.9 < pcm.size / 48000 < 1.2 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 2.0) < 0.3
 
 
-def test_the_turn_away_sound_is_two_soft_falling_notes_and_the_sink_obeys_its_switch(monkeypatch):
+def test_the_turn_away_sound_is_two_falling_notes_at_the_maximum_level_and_the_sink_obeys_its_switch(monkeypatch):
     import numpy as np
     from pi_pipeline.app import sinks
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_turn_away()
-    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 2.0) < 0.15      # 200% of the usual level
+    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.MAX_PEAK * 32767) - 1.0) < 0.01      # the maximum clean level (user, 2026-10-10)
     monkeypatch.setenv("G2_WALL_SOUND", "0")
     assert sinks._speaker_avoid_sound() is True                                # off: silent, and True so no buzzer notes either
 

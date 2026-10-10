@@ -36,6 +36,9 @@ def _note(f0: float, dur: float, rate: int, f1: float | None = None, decay: floa
     return y * np.minimum(1.0, t / 0.006) * np.exp(-t * decay)             # 6 ms attack, then a decay
 
 
+MAX_PEAK = 0.95                  # full scale without clipping: "all the way to max" (user, 2026-10-10) for the ta-da, the turn-away sound and the fall alarm. DEFAULT_PEAK is a FRACTION of full scale, never a big number (a clipped one was loud and fed back, 2026-10-10)
+
+
 def _finish(parts, peak: float) -> np.ndarray:
     y = np.concatenate(parts)
     y = y / np.abs(y).max() * peak
@@ -175,7 +178,7 @@ def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) 
 def render_turn_away(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A two-note fall (about 0.35 s, at 200% of the usual level: 70%, then 150%, were not heard over the walking noise, 2026-10-10) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
     gap = np.zeros(int(rate * 0.03))
-    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], peak * 2.0)
+    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], MAX_PEAK)
 
 
 def play_turn_away(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
@@ -192,7 +195,7 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
     stab = chord(0.22, 0.008, 0.03, 0.9)
     held = chord(1.05, 0.012, 0.45, 0.35)
     held = held * np.exp(-np.arange(held.size) / rate / 1.4)
-    return _finish([stab, held], peak * COMPLETE_GAIN)
+    return _finish([stab, held], MAX_PEAK)
 
 
 START_HORN_GAIN = 1.5           # 50% louder than the other speaker sounds (user, 2026-10-10: first 25%, then 50%)
@@ -313,7 +316,7 @@ def play_horn_if_enabled(env_var: str, wait: bool = False, cooldown_s: float = 2
     if now - _HORN_LAST.get(env_var, -1e9) < cooldown_s:
         return
     _HORN_LAST[env_var] = now
-    play_refuse(wait=wait)
+    play_refuse(peak=MAX_PEAK, wait=wait) if env_var == "G2_FALL_HORN" else play_refuse(wait=wait)      # the fall alarm is at the maximum (user, 2026-10-10); the refusal and failure horns stay at the base level times REFUSE_HORN_GAIN
 
 
 def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
