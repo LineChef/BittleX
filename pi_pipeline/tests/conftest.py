@@ -97,6 +97,7 @@ def _no_shutter_sound(monkeypatch):
 def _no_autolog(monkeypatch, tmp_path_factory):
     """Tests never write automatic run logs into the real ~/g2_runs/auto (the autolog tests turn it on and point it at a temp folder)."""
     monkeypatch.setenv("G2_AUTOLOG", "off")
+    monkeypatch.setenv("G2_STAND_EASE", "off")      # the eased stand-up adds a 1.5 s setup pause that timing tests count; its own test turns it back on
 
 
 @pytest.fixture(autouse=True)

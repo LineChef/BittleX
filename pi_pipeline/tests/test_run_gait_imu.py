@@ -555,3 +555,14 @@ def test_log_extra_adds_the_columns_to_a_real_loop_log_and_default_logs_are_unch
     assert all(len(r) == len(head_e) for r in rows)
     assert rows[-1][len(head_p) + 2] == "1.00"                                    # az as printed
     assert all(len(r.split(",")) == len(head_p) for r in plain.read_text().splitlines() if r[:1].isdigit())
+
+
+def test_ease_to_stand_sends_kbalance_then_waits_and_can_be_turned_off(monkeypatch):
+    from pi_pipeline.gait import standup
+    sent, slept = [], []
+    monkeypatch.setenv("G2_STAND_EASE", "on")
+    assert standup.ease_to_stand(sent.append, slept.append) is True
+    assert sent == ["kbalance"] and slept == [standup.EASE_SETTLE_S]
+    monkeypatch.setenv("G2_STAND_EASE", "off")
+    sent.clear(); slept.clear()
+    assert standup.ease_to_stand(sent.append, slept.append) is False and not sent and not slept

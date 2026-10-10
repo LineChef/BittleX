@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.join(_HERE, "..", ".."))    # repo root, for `pi_pipe
 from residual_policy import ResidualGaitPolicy, CONTROL_HZ, heading_blind_for   # noqa: E402
 import deploy_map                                             # noqa: E402
 from thermal_guard import ThermalGuard                        # noqa: E402
+import standup as _standup                                 # noqa: E402  -- eased stand-up before a walk
 import heading_hold as _hh                                    # noqa: E402  -- optional steering on the policy's joint targets (--heading-hold)
 from imu_parse import ImuFeed, parse_imu_line                 # noqa: E402  -- shared with app/sensors.py
 
@@ -238,6 +239,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         if balance_off:
             _send(lk, "gb")
             sleep(0.2)
+        _standup.ease_to_stand(lambda c: _send(lk, c), sleep)
         _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))   # stand first: no jump from rest into mid-stride
         sleep(2.0)
         if log:
@@ -579,7 +581,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         _send(lk, "gb")
         time.sleep(0.2)
 
-    # go to the sim's reset stance, let it settle
+    # go to the sim's reset stance, let it settle (eased through the firmware's own stand-up first: one `i` jump from rest jerks the heading)
+    _standup.ease_to_stand(lambda c: _send(lk, c))
     _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
     time.sleep(1.0)
 

@@ -232,6 +232,7 @@ def test_default_foot_trim_is_the_measured_v4_value_and_can_be_overridden(monkey
     from pi_pipeline.gait import heading_hold as hh
     monkeypatch.delenv("G2_FOOT_TRIM", raising=False)
     assert hh.default_foot_trim("trained/Release_CandidateV4_ppo.onnx") == [("fl", -0.2)]
+    assert hh.default_foot_trim("trained/Release_CandidateV6_ppo.onnx") == [("fl", -0.5)]
     assert hh.default_foot_trim("trained/other_ppo.onnx") is None and hh.default_foot_trim(None) is None
     monkeypatch.setenv("G2_FOOT_TRIM", "fl=-0.25")
     assert hh.default_foot_trim("trained/other_ppo.onnx") == [("fl", -0.25)]

@@ -7,6 +7,7 @@ Read first: [`handoff-2026-10-09-night.md`](handoff-2026-10-09-night.md) (state)
 - **Everything starts on his feet** (the user has no stand): hands near, never on his back, no "in the air first" step. Anything new still gets a short first walk (6 s).
 - **No gait comparisons on the real robot.** Comparing gaits (policy against policy, scripted against hi step) is sim only. On G2 we measure one thing's own behavior: drift, trim, ramp, stability, sounds.
 - Stop anything that controls G2 with `tools/g2_safe_stop.sh` (rest first, never a plain `systemctl stop`). Tell Claude about any fall, odd noise or heat.
+- **Why `g2-voice` is stopped before a walk:** the service runs the real serial actuator and holds the BiBoard's serial port (and the mic stream), and only one process can use the port at a time (see the `stand_log.py` note in `hardware/petoi-firmware-reference.md`). A walk script started beside it would collide on the port, and the voice loop's own commands (wake word, behavior, battery watcher) could move G2 mid-test. Stop it with `tools/g2_safe_stop.sh voice` (not a plain `systemctl stop`) and start it again at the end (`sudo systemctl start g2-voice`).
 - Ask for the floor, the pack voltage (resting) and the lane before the first walk. Give timing estimates with clock times (12-hour AM/PM Eastern); `python tools/eta.py` is for training, hardware time is quoted from this plan.
 
 ## Confirmed by the user (2026-10-09 night)
