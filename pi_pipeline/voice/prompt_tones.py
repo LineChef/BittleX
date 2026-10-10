@@ -294,7 +294,7 @@ def play_grunt(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False
     _play(render_grunt, peak, rate, wait)
 
 
-REFUSE_HORN_GAIN = 2.0           # the losing horn (refusal, failed command, fall) was too quiet at the base level (user, 2026-10-10); a multiple of DEFAULT_PEAK, 0.0225 x 2 stays far from clipping
+REFUSE_HORN_GAIN = 3.5           # the losing horn (refusal, failed command, fall) was too quiet at the base level (user, 2026-10-10); a multiple of DEFAULT_PEAK, 0.0225 x 2 stays far from clipping
 
 
 def play_refuse(peak: float = DEFAULT_PEAK * REFUSE_HORN_GAIN, rate: int = 48000, wait: bool = False) -> None:
