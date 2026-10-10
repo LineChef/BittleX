@@ -151,7 +151,15 @@ class SerialLink:
         if c not in ("kup", "kbalance") or self._ramping or self.last_motion_command not in ("", "d"):
             return
         try:
-            from pi_pipeline.gait import standup
+            try:
+                from pi_pipeline.gait import standup
+            except ImportError:                       # scripts run by path (fw_skill_log.py, run_gait.py) have pi_pipeline/ itself on sys.path, not the repo root
+                import importlib.util as _ilu
+                import os as _os
+                _p = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "gait", "standup.py")
+                _spec = _ilu.spec_from_file_location("g2_standup", _p)
+                standup = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(standup)
             secs = standup.ramp_seconds()
             if secs <= 0:
                 return
