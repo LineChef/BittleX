@@ -32,7 +32,7 @@ def test_sleep_and_wake_are_logged_and_heartbeats_carry_the_state(tmp_path):
     assert "sleep" in format_line(rows[0])
 
 
-def test_a_power_loss_becomes_a_counted_runtime_once(tmp_path):
+def test_a_power_loss_is_a_candidate_until_the_user_confirms_a_full_charge_run(tmp_path):
     m = Machine("boot-1", up=10.0)
     pl = m.log(tmp_path / "p.jsonl").start(every_s=3600)
     m.up = 3600.0
@@ -44,8 +44,10 @@ def test_a_power_loss_becomes_a_counted_runtime_once(tmp_path):
     pl2 = m.log(tmp_path / "p.jsonl")
     msg = pl2.collect_into(tr)
     assert "power lost" in msg and "asleep" in msg
-    assert tr.runs() == [{"runtime_s": 11776, "ended": 1_000_000.0 + 11776.0, "source": "log", "counted": True}]
-    assert RuntimeWatcher(tr, lambda *a: None).full_runtime_s() == 11776
+    assert tr.runs() == [{"runtime_s": 11776, "ended": 1_000_000.0 + 11776.0, "source": "log", "counted": False}]
+    assert RuntimeWatcher(tr, lambda *a: None).full_runtime_s() is None        # a cut-short run must not pull the estimate down
+    assert tr.count_run(0) and RuntimeWatcher(tr, lambda *a: None).full_runtime_s() == 11776
+    assert not tr.count_run(5)
     assert pl2.collect_into(tr) is None and len(tr.runs()) == 1     # settled once only
 
 

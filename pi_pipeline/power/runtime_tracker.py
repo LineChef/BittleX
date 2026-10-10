@@ -217,6 +217,15 @@ class RuntimeTracker:
         data["runs"].append({"runtime_s": round(runtime_s), "ended": ended, "source": source, "counted": counted})
         self._save(data)
 
+    def count_run(self, index: int) -> bool:
+        """Confirm a run (e.g. a power loss seen in the power log) as a full charge run to empty, so it enters the estimate."""
+        data = self._load()
+        if not 0 <= index < len(data["runs"]):
+            return False
+        data["runs"][index]["counted"] = True
+        self._save(data)
+        return True
+
     def forget_run(self, index: int) -> bool:
         data = self._load()
         if not 0 <= index < len(data["runs"]):

@@ -1,6 +1,6 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
                                | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
-                               | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime path
+                               | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime count <index> | runtime path
                                | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
 from __future__ import annotations
 
@@ -59,6 +59,8 @@ def _runtime(a):
     elif sub == "add" and len(a) > 1:
         t.add_run(float(a[1]), source="manual")
         print(f"added a run of {float(a[1]) / 3600:.2f} h")
+    elif sub == "count" and len(a) > 1:
+        print("counted in the estimate" if t.count_run(int(a[1])) else "no such run")
     elif sub == "forget" and len(a) > 1:
         print("ignored" if t.forget_run(int(a[1])) else "no such run")
     else:

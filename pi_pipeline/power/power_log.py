@@ -8,10 +8,11 @@ One JSON line per event, each flushed to the SD card at once (the journal on the
     alive           a heartbeat every minute, awake or asleep (`asleep: true|false`)
     runtime         written at the next start, when the previous boot ended without a stop: the Pi lost power
 
-So after the Pi goes quiet, the last line says whether G2 was asleep or awake and when he was last alive. A power loss becomes a measured
-runtime in the Pi-battery estimate (`runtime_tracker.py`, source "log"), counted from boot like the warning itself, so it assumes the Pi was
-booted on a full charge. If the service had been stopped before the end (a walk run by hand) the time is only a lower bound and is kept
-but not counted.
+So after the Pi goes quiet, the last line says whether G2 was asleep or awake and when he was last alive. A power loss is
+written to the runtime records (`runtime_tracker.py`, source "log") as an UNCOUNTED candidate: the Pi cannot know it was booted on a full
+charge or that nobody plugged it in on the way, and a run cut short would pull the estimate down (user, 2026-10-10: the Pi is not always run
+until the battery is dead). It enters the estimate only when the user confirms it was a full charge run to empty:
+`python -m pi_pipeline.power runtime count <index>`.
 
     ~/.local/share/g2/power_log.jsonl      (G2_POWER_LOG)
     python -m pi_pipeline.power log [N]     # the last N lines in local time
@@ -111,7 +112,7 @@ class PowerLog:
         return out
 
     def collect_into(self, tracker, *, record: bool = True) -> str | None:
-        """Settle the previous boot once: a power loss is added to `tracker` as a run (source "log"); `record=False` only marks it settled
+        """Settle the previous boot once: a power loss is added to `tracker` as an uncounted run (source "log"); `record=False` only marks it settled
         (an intentional battery test already recorded that boot). Returns a one-line summary or None."""
         rows = self.lines()
         me = self._boot_id()
@@ -128,13 +129,13 @@ class PowerLog:
         elif last.get("event") == "stop":
             outcome, counted = "service stopped before the end (lower bound)", False
         else:
-            outcome, counted = "power lost", True
+            outcome, counted = "power lost, not counted until you confirm a full charge (runtime count <index>)", False
         runtime = float(last.get("up", 0.0))
         if not record:
             outcome, counted = "recorded by the battery test", None
         if counted is not None:
             tracker.add_run(runtime, source="log", ended=last.get("t"), counted=counted)
-        self.event("runtime", of_boot=last_boot, runtime_s=round(runtime), outcome=outcome, last_state=state, counted=bool(counted))
+        self.event("runtime", of_boot=last_boot, runtime_s=round(runtime), outcome=outcome, last_state=state, counted=False)
         msg = f"previous boot: {outcome} after {runtime / 3600:.2f} h, last seen {state}"
         log.warning(msg)
         return msg

@@ -1,0 +1,10 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "v5_20m_avg3_ppo",
+ "exported": "2026-10-09",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ]
+}
