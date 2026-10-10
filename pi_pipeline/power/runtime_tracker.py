@@ -32,7 +32,7 @@ log = logging.getLogger("g2.runtime")
 
 WARN_FRACTION = 0.80       # uptime / full runtime at which "about 20% left" fires
 CRITICAL_FRACTION = 0.95
-MEASURED = ("test", "log")   # run sources the warning trusts: a timed test, or a power loss seen in power_log.py
+MEASURED = ("test", "log", "confirmed")   # run sources the warning trusts: a timed test, a power loss from power_log.py the user confirmed, or a run the user vouched for as full-to-empty
 
 
 def _read_boot_id() -> str:

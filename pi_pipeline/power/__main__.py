@@ -1,6 +1,6 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
                                | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
-                               | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime count <index> | runtime path
+                               | runtime [list] | runtime add <seconds> [full] | runtime forget <index> | runtime count <index> | runtime path
                                | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
 from __future__ import annotations
 
@@ -57,8 +57,9 @@ def _runtime(a):
     if sub == "path":
         print(t.path)
     elif sub == "add" and len(a) > 1:
-        t.add_run(float(a[1]), source="manual")
-        print(f"added a run of {float(a[1]) / 3600:.2f} h")
+        full = len(a) > 2 and a[2] == "full"               # "full": the user vouches it was a full charge run to empty, so the warning may use it
+        t.add_run(float(a[1]), source="confirmed" if full else "manual")
+        print(f"added a run of {float(a[1]) / 3600:.2f} h" + (" (full charge to empty: used by the warning)" if full else ""))
     elif sub == "count" and len(a) > 1:
         print("counted in the estimate" if t.count_run(int(a[1])) else "no such run")
     elif sub == "forget" and len(a) > 1:

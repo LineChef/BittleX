@@ -197,3 +197,12 @@ def test_warn_fraction_is_configurable(tmp_path):
     t.armed_elapsed_s = lambda from_boot=True: 600.0            # 60% of the runtime used: past a 0.5 warning, short of the default 0.8
     w.poll_once()
     assert alerts
+
+
+def test_a_run_the_user_vouches_for_counts_for_the_warning_but_a_manual_one_does_not(tmp_path):
+    t = Boot().tracker(tmp_path / "rt.json")
+    t.add_run(6414)                                      # manual: in the plain mean only
+    assert RuntimeWatcher(t, lambda *a: None).full_runtime_s() is None
+    t.add_run(11376, source="confirmed")
+    t.add_run(11776, source="confirmed")
+    assert RuntimeWatcher(t, lambda *a: None).full_runtime_s() == 11576
