@@ -125,3 +125,13 @@ run on their own, no wake word needed. See
 | **two falling notes** | the follow-up window ended: he has stopped listening (say the wake word again) |
 
 On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`).
+
+
+## Switching gait (2026-10-09)
+
+| Say | Does |
+|---|---|
+| "hi step" / "high step" / "step mode" | switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. |
+| "walk normally" / "walk mode" / "normal mode" / "normal walk" | back to the normal walk (the V4 policy). |
+
+Works in the voice loop and during an exploration session (one shared state, `gait/gait_mode.py`); a short double beep plays when the gait really switches. The switch takes effect at the next walk or exploration leg.

@@ -127,6 +127,7 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
     (`behavior/interest_watch.py`: an unknown object-like thing or an unfinished named object, never a person; a slow fallback every 5 min), and the camera prep (the settle frames)
     is done for the first picture and once half way; no head gestures and no recognition hop (`G2_HEAD=1`, `G2_EXCITED_HOP=1` bring them back), a short play bow at a find instead;
     the wall estimator (`vision/wall_distance.py`) only LOGS what it would do (`~/.local/share/g2/wall_dryrun.jsonl`) until it is calibrated and the user says to wire it in.
+    Gait switching: "hi step" / "walk normally" from any mode (voice loop or exploration), a double beep on a switch; today hi step is the scripted hsF gait (experimental), because the deployed policy has no hi-step mode.
     Stop a running session with `tools/g2_safe_stop.sh` (stop, balance, rest), never a plain service stop.
   - **"Come here"** (`behavior/approach.py`) — a directed one-shot walk toward
     the nearest person; stops close, or gives up (with a confused chirp) if it
