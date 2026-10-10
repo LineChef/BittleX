@@ -124,6 +124,40 @@ def render_grunt(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([a, np.zeros(int(rate * 0.04)), b], peak)
 
 
+# The "losing horn" (user, 2026-10-10), rebuilt from the pitch and loudness measured off a laptop-microphone recording of "The Price is Right Losing
+# Horn" (6 s clip). Five pieces: (start s, end s, Hz at start, Hz at end, loudness at start, loudness at end). The laptop's small speaker (like G2's)
+# does not reproduce low fundamentals, so these are the frequencies that were actually audible, probably a few overtones above the horn's true low notes.
+HORN = [
+    (0.00, 0.26, 128, 128, 1.00, 0.12),
+    (0.30, 0.52, 143, 141, 0.70, 0.11),
+    (0.62, 0.78, 125, 122, 0.85, 0.28),
+    (0.80, 1.50, 96, 96, 1.00, 0.30),
+    (1.50, 3.74, 283, 208, 0.95, 0.10),        # the long last note: holds near 283 Hz for 1.3 s, then sags in steps to 208
+]
+HORN_LAST_BREAKS = [(1.50, 283), (2.00, 283), (2.50, 268), (2.80, 258), (3.10, 240), (3.30, 221), (3.60, 214), (3.74, 208)]
+
+
+def render_refuse(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """The "losing horn" (about 3.7 s): G2 refuses. Four short falling-loudness muted-brass notes, then a long last note that holds and sags in pitch.
+    Built from the measured contour in `HORN`."""
+    out = np.zeros(int(rate * HORN[-1][1]) + 1)
+    for i, (t0, t1, f0, f1, a0, a1) in enumerate(HORN):
+        t = np.arange(0, t1 - t0, 1.0 / rate)
+        u = t / (t1 - t0)
+        if i == len(HORN) - 1:
+            f = np.interp(t + t0, [b[0] for b in HORN_LAST_BREAKS], [b[1] for b in HORN_LAST_BREAKS])
+            f = f * (1.0 + 0.006 * np.sin(2 * np.pi * 5.5 * t) * np.minimum(1.0, t / 0.4))      # a slight wobble
+        else:
+            f = f0 + (f1 - f0) * u
+        ph = 2 * np.pi * np.cumsum(f) / rate
+        y = sum(np.sin(k * ph) / k ** 0.9 for k in range(1, 9))
+        env = (a0 + (a1 - a0) * u) * np.minimum(1.0, t / 0.015) * np.minimum(1.0, (t1 - t0 - t) / 0.03)
+        y = _lowpass(y, 4) * env                                     # a mute takes the top off the brass
+        n0 = int(t0 * rate)
+        out[n0:n0 + y.size] += y[: out.size - n0]
+    return _finish([out], peak)
+
+
 def render_oof(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A winded "ooof" (about 0.5 s): a low thump of impact, then a breathy vowel that falls in pitch and fades."""
     n = int(rate * 0.06)
@@ -184,6 +218,10 @@ def play_grunt(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False
     _play(render_grunt, peak, rate, wait)
 
 
+def play_refuse(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_refuse, peak, rate, wait)
+
+
 def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_oof, peak, rate, wait)
 
@@ -201,5 +239,5 @@ if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline
     name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
     fn = globals().get(f"play_{name}")
     if fn is None:
-        raise SystemExit("sounds: grunt oof sigh yawn beep boop close double fanfare")
+        raise SystemExit("sounds: grunt refuse oof sigh yawn beep boop close double fanfare")
     fn(wait=True)

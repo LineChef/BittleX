@@ -146,6 +146,17 @@ run on their own, no wake word needed. See
 On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps (`voice/cues.py`, `LOW_CUES`). `G2_CUE_STAGES` picks which are on (default `awake,captured,closed`).
 
 
+## G2's character sounds (2026-10-10)
+
+| Sound | Plays when | Turn off |
+|---|---|---|
+| **grunt** (low "hmph") | you rebuff him ("shut up", "go away" and the like) | `G2_GRUNT=0` |
+| **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request; today that is a gait he cannot switch to | `G2_REFUSE_SOUND=0` |
+| **sigh / yawn** | going to sleep after 5 min at rest / waking | `G2_SLEEP_AFTER_S=0` |
+| **oof** | built, no trigger yet (a wall bump cannot be told from walking in the 5 Hz IMU) | n/a |
+
+Audition any of them on a dev machine: `G2_SPEAKER_SOUNDS=1 python -m pi_pipeline.voice.prompt_tones grunt|refuse|oof|sigh|yawn` (G2's level is a very small fraction of full scale; never pass a large `peak`).
+
 ## Switching gait (2026-10-09)
 
 | Say | Does |

@@ -275,6 +275,12 @@ class VoiceLoop:
         except Exception:  # noqa: BLE001
             log.exception("the picture pose sequence failed")
 
+    def _refuse_sound(self) -> None:
+        """The losing horn when G2 refuses a request (user, 2026-10-10, a measured approximation of the game-show clip); `G2_REFUSE_SOUND=0` turns it off."""
+        if os.environ.get("G2_REFUSE_SOUND", "1") != "0":
+            from . import prompt_tones
+            prompt_tones.play_refuse(wait=True)
+
     def _speak(self, text: str) -> None:
         """Speak `text`; a speaker/TTS failure is logged, never raised (it must not take the voice loop down)."""
         try:
@@ -449,6 +455,8 @@ class VoiceLoop:
                 if gait:
                     self._cue.set("gait_switch")
                     self._speak("Hi step on." if gait == "hi_step" else "Walking normally.")
+                else:
+                    self._refuse_sound()
                 user_text = both[1]
                 cmd = match_local_command(user_text)
         if cmd is None and self._namer is not None:
@@ -563,6 +571,8 @@ class VoiceLoop:
             log.info("gait command (voice): %s", gait or "refused")
             if gait:
                 self._cue.set("gait_switch")             # the short double beep
+            else:
+                self._refuse_sound()                     # the losing horn: G2 will not do that
             self._cue.set("speaking")
             self._speak(said)
             self._set_session()

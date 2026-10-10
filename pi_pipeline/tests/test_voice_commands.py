@@ -135,3 +135,12 @@ def test_grunt_and_oof_render_short_audible_pcm():
     for fn, lo, hi in ((pt.render_grunt, 0.3, 0.5), (pt.render_oof, 0.4, 0.6)):
         y = fn()
         assert y.dtype == np.int16 and lo < y.size / 48000 < hi and np.abs(y).max() > 300
+
+
+def test_refuse_horn_renders_the_measured_five_pieces_and_ends_on_a_falling_long_note():
+    import numpy as np
+    from pi_pipeline.voice import prompt_tones as pt
+    pcm = pt.render_refuse(48000, pt.DEFAULT_PEAK)
+    assert 3.6 < len(pcm) / 48000 < 3.9 and 300 < np.abs(pcm).max() < 1500
+    assert len(pt.HORN) == 5 and pt.HORN[-1][1] - pt.HORN[-1][0] > 2.0
+    assert pt.HORN_LAST_BREAKS[0][1] > pt.HORN_LAST_BREAKS[-1][1]      # the long note sags in pitch
