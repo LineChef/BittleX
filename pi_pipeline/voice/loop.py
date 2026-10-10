@@ -439,6 +439,18 @@ class VoiceLoop:
             raise KeyboardInterrupt
 
         cmd = match_local_command(user_text)
+        if cmd is None:                                    # "hi step and walk forward": switch the gait here, then handle the rest as its own request
+            from ..gait import gait_mode
+            both = gait_mode.split_compound(user_text)
+            if both:
+                from ..gait.residual_policy import default_policy_path
+                gait, said = gait_mode.request(user_text.split(" and ")[0], default_policy_path())
+                log.info("gait command (voice, compound): %s, then %r", gait or "refused", both[1])
+                if gait:
+                    self._cue.set("gait_switch")
+                    self._speak("Hi step on." if gait == "hi_step" else "Walking normally.")
+                user_text = both[1]
+                cmd = match_local_command(user_text)
         if cmd is None and self._namer is not None:
             name = clean_name(parse_naming(user_text))
             if name:                                       # "this is the dishwasher": the same picture sequence as in an exploration session, no Claude call
@@ -682,6 +694,13 @@ class VoiceLoop:
         age, n_recent = recency() if callable(recency) else (None, 0)
         self._mood.update(last_interaction_s=age, exchanges_recent=n_recent)
         self._conv.set_mood_hint(self._mood.phrasing_hint())
+        try:
+            from ..gait import gait_mode
+            setter = getattr(self._conv, "set_gait_hint", None)
+            if setter is not None:
+                setter(gait_mode.claude_hint())
+        except Exception:  # noqa: BLE001 -- a missing gait file must never stop a turn
+            log.debug("gait hint skipped", exc_info=True)
 
         # a conversational turn: still signal "heard you" -- the Claude round
         # trip has real latency on this hardware, so an instant chirp + the

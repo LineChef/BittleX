@@ -127,3 +127,23 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
         return None, f"My walking policy doesn't have {label} yet, so I'm staying as I am."
     set_mode(gait, path)
     return gait, GAITS[gait].echo_on
+
+
+def split_compound(text: str):
+    """'hi step and walk forward' -> ('hi_step', 'walk forward'): a gait command followed by "and (then) ..." asks for the gait first, then the rest; None otherwise."""
+    m = re.match(r"^(.*?)\s+and\s+(?:then\s+)?(.+)$", (text or "").strip(), re.I)
+    if not m:
+        return None
+    gait = parse_gait_command(m.group(1))
+    return (gait, m.group(2)) if gait else None
+
+
+def claude_hint() -> str:
+    """One system-prompt line for Claude: G2's current walking gait, so a conversational walk uses it and never swaps in another skill."""
+    mode = current()
+    if mode == "hi_step":
+        return ("Your walking gait is set to HI STEP (a slow scripted high-stepping walk, lifted feet for snags and rubble). It is real: when asked to walk "
+                "or go forward, use perform_skill walk_forward and it walks in hi step. Never substitute trot or another skill for it, and never say you do not have it. "
+                "The person switches back with 'walk normally'.")
+    return ("Your walking gait is NORMAL. You also have a HI STEP gait (a slow scripted high-stepping walk); the person switches to it by saying 'hi step' or "
+            "'switch to high step'. Never substitute trot for a gait you are asked for.")

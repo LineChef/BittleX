@@ -127,3 +127,12 @@ def test_switch_to_phrases_for_both_gaits():
         assert parse_gait_command(t) == "normal", t
     from pi_pipeline.voice.commands import match_local_command
     assert match_local_command("gee two switch to highstep") == "gait"
+
+
+def test_compound_gait_then_request_and_the_claude_hint(tmp_path, monkeypatch):
+    from pi_pipeline.gait import gait_mode as g
+    assert g.split_compound("switch to high step and walk forward") == ("hi_step", "walk forward")
+    assert g.split_compound("hi step and then walk forward") == ("hi_step", "walk forward")
+    assert g.split_compound("walk forward and sit") is None and g.split_compound("tell me a joke") is None
+    monkeypatch.setattr(g, "current", lambda: "hi_step")
+    assert "HI STEP" in g.claude_hint() and "trot" in g.claude_hint()

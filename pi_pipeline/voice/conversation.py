@@ -305,7 +305,15 @@ class Conversation:
             s = s.rstrip() + "\n\n" + self._mood_hint
         if self._narration_hint:
             s = s.rstrip() + "\n\n" + self._narration_hint
+        if getattr(self, "_gait_hint", ""):
+            s = s.rstrip() + "\n\n" + self._gait_hint
         self._system_prompt = s
+
+    def set_gait_hint(self, hint: str) -> None:
+        """The current walking gait (gait_mode.claude_hint), so a walk Claude starts uses it."""
+        if hint != getattr(self, "_gait_hint", ""):
+            self._gait_hint = hint
+            self._rebuild_system()
 
     def set_personality(self, p: Personality) -> None:
         """Swap the personality mid-session (e.g. the user asks to enable a
