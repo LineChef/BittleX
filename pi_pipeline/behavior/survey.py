@@ -3,7 +3,7 @@
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   look down (`kbuttUp`, the INSPECT bow) -> look up (`ksit`) -> stand (`kup`) -> settle -> one picture
+  survey_plan   look down (`kbuttUp`, the INSPECT bow) -> [picture] -> look up (`ksit`) -> [picture] -> stand (`kup`) -> settle -> picture (the bracketed ones only when `all_shots`, `G2_SURVEY_SHOTS=3`; off by default)
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -29,6 +29,8 @@ class SurveyConfig:
     look_down_skill: str = "kbuttUp"
     look_up_skill: str = "ksit"
     stand_skill: str = "kup"
+    all_shots: bool = False         # survey stops take three pictures: at the bottom of the bow, at the top of the look up, and standing after the settle (user, 2026-10-10); False = the one standing picture
+    shot_gap_s: float = 1.0         # after a picture in a pose, before the next pose is commanded (the picture takes a moment)
 
 
 def survey_config_from_env() -> SurveyConfig:
@@ -41,7 +43,7 @@ def survey_config_from_env() -> SurveyConfig:
             return max(0.0, float(os.environ.get(name, default)))
         except ValueError:
             return default
-    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0))
+    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), all_shots=os.environ.get("G2_SURVEY_SHOTS", "1") == "3")     # `G2_SURVEY_SHOTS=3` = also a picture at the bottom of the bow and at the top of the look up (off by default until we know off-angle pictures help)
 
 
 class Survey:
@@ -68,8 +70,14 @@ def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]
     t = 0.0
     plan = [(t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)")]
     t += cfg.pose_settle_s
+    if cfg.all_shots and kind == "after_bow":                 # survey stops only: the bottom of the bow and the top of the look up get a picture each
+        plan.append((t, "shot", "look_down", f"{why}: picture at the bottom of the bow"))
+        t += cfg.shot_gap_s
     plan.append((t, "skill", cfg.look_up_skill, f"{why}: look up"))
     t += cfg.pose_settle_s
+    if cfg.all_shots and kind == "after_bow":
+        plan.append((t, "shot", "look_up", f"{why}: picture at the top of the look up"))
+        t += cfg.shot_gap_s
     plan.append((t, "skill", cfg.stand_skill, f"{why}: stand again"))
     t += cfg.stand_settle_s
     plan.append((t, "shot", kind, f"{why}: picture, standing after looking down and up"))

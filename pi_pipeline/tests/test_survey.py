@@ -326,3 +326,22 @@ def test_first_picture_waits_and_the_pacing_comes_from_the_environment(monkeypat
     monkeypatch.setenv("G2_SURVEY_FIRST_S", "bad")
     c = survey_config_from_env()
     assert (c.cooldown_s, c.first_delay_s) == (90.0, 30.0)
+
+
+def test_a_survey_stop_can_take_three_pictures_bottom_of_the_bow_top_of_the_look_up_and_standing():
+    from pi_pipeline.behavior.survey import SurveyConfig, survey_plan
+    plan = survey_plan(SurveyConfig(all_shots=True))
+    kinds = [(k, p) for _, k, p, _ in plan if k in ("skill", "shot")]
+    assert kinds == [("skill", "kbuttUp"), ("shot", "look_down"), ("skill", "ksit"), ("shot", "look_up"), ("skill", "kup"), ("shot", "after_bow")]
+    times = [d for d, _, _, _ in plan]
+    assert times == sorted(times)
+    assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "shot"] == ["after_bow"]          # the dataclass default stays one picture
+    assert [p for _, k, p, _ in naming_plan("mug", SurveyConfig(all_shots=True)) if k == "shot"] == ["name:mug"]      # a named picture stays one picture
+
+
+def test_the_three_pictures_are_off_unless_the_environment_asks(monkeypatch):
+    from pi_pipeline.behavior.survey import survey_config_from_env
+    monkeypatch.delenv("G2_SURVEY_SHOTS", raising=False)
+    assert survey_config_from_env().all_shots is False
+    monkeypatch.setenv("G2_SURVEY_SHOTS", "3")
+    assert survey_config_from_env().all_shots is True

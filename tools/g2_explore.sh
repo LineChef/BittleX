@@ -14,7 +14,7 @@ case "${1:-status}" in
       -p ExecStartPre='+/bin/systemctl stop g2-voice' \
       -p ExecStopPost=\"+/bin/sh -c '\$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send d >/dev/null 2>&1; true'\" \
       -p ExecStopPost='+/bin/systemctl --no-block start g2-voice' \
-      -E G2_FEATURES='+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery' -E G2_LOG_HEARD=1 -E PYTHONFAULTHANDLER=1 \
+      -E G2_FEATURES='+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery' -E G2_LOG_HEARD=1 -E PYTHONFAULTHANDLER=1 -E G2_WALL_KEEP_ALL=${G2_WALL_KEEP_ALL:-0} -E G2_SURVEY_SHOTS=${G2_SURVEY_SHOTS:-1} \
       \$HOME/bittleX/pi_pipeline/.venv/bin/python -m pi_pipeline.explore_session --roam-s ${2:-600}$EXTRA" ;;
   arm|disarm|halt|release|stop)
     # only while a session is running: a command written to the file with no session would be read by the NEXT session as soon as it starts (a stale halt stopped a fresh run, 2026-10-07)

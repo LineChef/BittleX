@@ -172,6 +172,9 @@ class WallLog:
         self.cal, self.path, self.pics_dir, self.ring, self.clear_every_s = calibration, path, pics_dir, ring, clear_every_s
         self.context, self._clock = context, clock
         self._last_clear = float("-inf")
+        self.keep_all = os.environ.get("G2_WALL_KEEP_ALL", "0") == "1"       # a hit test: keep a picture of EVERY look (the ring still caps them), to see what he saw while a wall was not recognised
+        if self.keep_all:
+            self.ring = max(self.ring, 60)
         self._prev_state = None
         self._votes: list = []                                        # per look: True when three or more groups read TURN_IN or closer (the newest three are kept)
         self.last: WallReading | None = None                          # the newest look, read by the behaviour driver
@@ -188,7 +191,7 @@ class WallLog:
             extra = {}
         st = state_of(est)
         now = self._clock()
-        if st in ("near", "blocked") or (st in ("clear", "far") and now - self._last_clear >= self.clear_every_s):
+        if st in ("near", "blocked") or self.keep_all or (st in ("clear", "far") and now - self._last_clear >= self.clear_every_s):
             if st in ("clear", "far"):
                 self._last_clear = now
             pic = self._keep(jpeg, st, now)
