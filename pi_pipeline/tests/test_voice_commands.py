@@ -173,5 +173,5 @@ def test_horn_switches_are_per_situation(monkeypatch):
 
 def test_the_robots_name_is_spelled_out_for_the_voice_but_other_words_are_left_alone():
     from pi_pipeline.voice.tts import pronounce
-    assert pronounce("G2 online.") == "gee two online."
-    assert pronounce("This is G2's floor, not a G20 summit or BG2.") == "This is gee two's floor, not a G20 summit or BG2."
+    assert pronounce("G2 online.") == "ghee two online."
+    assert pronounce("This is G2's floor, not a G20 summit or BG2.") == "This is ghee two's floor, not a G20 summit or BG2."
