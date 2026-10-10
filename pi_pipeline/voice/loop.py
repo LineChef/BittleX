@@ -679,14 +679,14 @@ class VoiceLoop:
             return
         if cmd == "battery_query":
             from ..config import settings as _s
-            from ..power import status as _power_status
+            from ..power.status import battery_report as _battery_report
             from ..power.runtime_tracker import RuntimeTracker
             try:
                 volts = self._act.read_voltage()
             except Exception:  # noqa: BLE001
                 volts = None
             self._cue.set("speaking")
-            self._speak(_power_status.battery_report(volts, RuntimeTracker(_s.pi_runtime_log)))
+            self._speak(_battery_report(volts, RuntimeTracker(_s.pi_runtime_log)))
             self._set_session()
             self._cue.set("idle")
             return

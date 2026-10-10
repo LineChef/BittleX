@@ -42,3 +42,11 @@ def test_sleep_stats_count_sleeps_their_length_and_what_woke_him():
     s = sleep_stats(rows)
     assert s["boots"] == 1 and s["sleeps"] == 2 and s["sleep_s"] == [180.0, 100.0] and s["longest_s"] == 180.0 and s["wake_reasons"] == {"wake word": 1}
     assert abs(s["asleep_share"] - 0.28) < 0.001
+
+
+def test_the_voice_loop_battery_handler_imports_the_report_function():
+    """`pi_pipeline.power.status` is also a function exported by the package, so `from ..power import status` gave the function (crashed the loop on 2026-10-10)."""
+    import inspect
+    from pi_pipeline.voice import loop
+    src = inspect.getsource(loop)
+    assert "from ..power.status import battery_report" in src and "from ..power import status" not in src
