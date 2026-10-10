@@ -360,3 +360,26 @@ def test_wall_pictures_can_be_trashed_restored_and_roam_pictures_labelled_with_t
         app.label_wall("shot_021.jpg", "wall")
     with pytest.raises(ValueError):
         gr.App._wall_name("../../x.jpg")
+
+
+def test_the_empty_trash_button_has_its_state_declared_and_wall_trash_is_emptied_too(tmp_path, monkeypatch):
+    """2026-10-10: `confirmAt` was read by the Empty trash button but only ever assigned inside an `if`, so the click threw a ReferenceError and did nothing."""
+    from pi_pipeline.vision import wall_pictures as wp
+    from tools import g2_review as gr
+    html = [v for v in vars(gr).values() if isinstance(v, str) and "const TOKEN" in v][0]
+    assert "let data=[],undoFn=null,timer=null,confirmAt=0;" in html
+    folder, ring = tmp_path / "pics", tmp_path / "ring"
+    folder.mkdir()
+    ring.mkdir()
+    (folder / "shot_001.jpg").write_bytes(b"x")
+    (ring / "wall_20261010_170000_near.jpg").write_bytes(b"y")
+    monkeypatch.setattr(wp, "_ring_dir", lambda: ring)
+    wp.trash(folder, ["shot_001", "ring/wall_20261010_170000_near.jpg"])
+    assert wp.empty_trash(folder) == 2 and not (folder / "_trash").exists() and not (tmp_path / "ring_trash").exists()
+    assert wp.empty_trash(folder) == 0
+    app = gr.App.__new__(gr.App)
+    calls = []
+    app.remote = type("R", (), {"memory": lambda self, *a: {"removed": 1}, "pictures": lambda self, *a: {"removed": 2},
+                                "call": lambda self, args: calls.append(args) or {"removed": 3}})()
+    assert app.empty_trash() == {"memory": {"removed": 1}, "pictures": {"removed": 2}, "walls": {"removed": 3}}
+    assert calls == [["pi_pipeline.vision.wall_pictures", "empty-trash"]]

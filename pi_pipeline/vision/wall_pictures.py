@@ -132,6 +132,17 @@ def restore(folder, names) -> list:
     return back
 
 
+def empty_trash(folder) -> int:
+    """The only permanent delete of a wall picture (the page's Empty trash): the recognition trash and the roam trash. Returns how many pictures were removed."""
+    import shutil
+    n = 0
+    for tdir in (Path(folder) / "_trash", _ring_dir().with_name(_ring_dir().name + "_trash")):
+        if tdir.exists():
+            n += len(list(tdir.glob("*.jpg")))
+            shutil.rmtree(tdir)
+    return n
+
+
 def best_picture(take, still=None):
     """`take(prep)` -> a snapshot or None. Warm-up on, one retake when badly exposed, keep the better. Returns (snapshot, retaken)."""
     from .exploration_pictures import _badly_exposed, _exposure_cost
@@ -214,6 +225,7 @@ def main(argv=None) -> int:
     sub.add_parser("list")
     d = sub.add_parser("delete")
     d.add_argument("numbers", nargs="+", type=int)
+    sub.add_parser("empty-trash")
     for nm in ("trash", "restore"):
         t = sub.add_parser(nm)
         t.add_argument("names", nargs="+")
@@ -224,6 +236,9 @@ def main(argv=None) -> int:
         for k, v in sorted(load_labels(a.dir).items()):
             e = v.get("exposure") or {}
             print(f"{k}  {v.get('label'):18s} {str(v.get('distance_in')):>6s} in  angle {v.get('angle_deg')}  set {v.get('set')}  still={v.get('still')} mean={e.get('mean')}")
+        return 0
+    if a.cmd == "empty-trash":
+        print(json.dumps({"removed": empty_trash(a.dir)}))
         return 0
     if a.cmd in ("trash", "restore"):
         print(json.dumps({"moved" if a.cmd == "trash" else "restored": (trash if a.cmd == "trash" else restore)(a.dir, a.names)}))

@@ -448,7 +448,12 @@ class App:
         return {"memory": self.remote.memory("trash"), "pictures": self.remote.pictures("trash-list")}
 
     def empty_trash(self):
-        return {"memory": self.remote.memory("empty-trash"), "pictures": self.remote.pictures("empty-trash")}
+        out = {"memory": self.remote.memory("empty-trash"), "pictures": self.remote.pictures("empty-trash")}
+        try:
+            out["walls"] = self.remote.call(["pi_pipeline.vision.wall_pictures", "empty-trash"])
+        except Exception:  # noqa: BLE001 -- an older Pi without the command: the rest was emptied
+            out["walls"] = {"removed": 0}
+        return out
 
     @staticmethod
     def _rel(p: str) -> str:
@@ -602,7 +607,8 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
 const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["trash","Trash"]];
-let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts",data=[],undoFn=null,timer=null,confirmAt=0;
+let data=[],undoFn=null,timer=null,confirmAt=0;      // declared: confirmAt was read before it was ever set, so the Empty trash button threw and did nothing
+let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts";
 const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
  const r=await fetch(path,o);const raw=await r.text();let j;try{j=JSON.parse(raw)}catch(e){if(r.status===403||/bad token/i.test(raw)){setTimeout(()=>location.reload(),1500);throw new Error("this page is out of date (the review server was restarted): reloading")}throw new Error(raw.slice(0,120)||r.statusText)}
@@ -677,7 +683,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
     c.append(picCaption(p));grid.append(c)}list.append(grid)}}return}
  if(tab==="trash"){const m=data.memory.map(t=>({t,txt:t.kind+": "+(t.row.fact||t.row.caption||t.row.user_text||"")})),pics=data.pictures;
   const b=el("button","btn danger","Empty trash");b.onclick=async()=>{if(Date.now()-confirmAt>4000){confirmAt=Date.now();b.textContent="Click again to delete for good";return}
-   try{const r=await api("/api/empty-trash",{});toast("Deleted for good: "+r.memory.removed+" records, "+r.pictures.removed+" pictures");load()}catch(e){toast("Failed: "+e.message)}};$("#extra").append(b);
+   try{const r=await api("/api/empty-trash",{});toast("Deleted for good: "+r.memory.removed+" records, "+(r.pictures.removed+((r.walls||{}).removed||0))+" pictures");load()}catch(e){toast("Failed: "+e.message)}};$("#extra").append(b);
   if(!m.length&&!pics.length)list.append(el("div","empty","The trash is empty."));
   for(const {t,txt} of m){const row=el("div","row"),main=el("div","main");main.append(el("div","",txt),el("div","meta","deleted "+t.deleted_at));const r=el("button","btn","Restore");
    r.onclick=async()=>{try{await api("/api/restore",{trash_id:t.trash_id});toast("Restored");load()}catch(e){toast("Could not restore: "+e.message)}};row.append(main,r);list.append(row)}
