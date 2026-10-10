@@ -95,3 +95,12 @@ def test_a_wall_in_view_is_not_judged_an_object_and_the_fallback_interval_is_ran
     lo = InterestWatch(Scorer([]), Src(), fallback_s=300.0, rng=lambda: 0.0)._fallback_due
     hi = InterestWatch(Scorer([]), Src(), fallback_s=300.0, rng=lambda: 1.0)._fallback_due
     assert round(lo) == 180 and round(hi) == 420                # 0.6 to 1.4 times the base, not a clock
+
+
+def test_the_exploration_session_really_passes_the_fallback_setting_to_the_watch():
+    """2026-10-10: the `fallback_s=` argument sat inside a trailing comment, so G2_INTEREST_FALLBACK_S never reached the watch."""
+    import inspect
+    from pi_pipeline import explore_session
+    src = inspect.getsource(explore_session)
+    code_lines = [l.split("#")[0] for l in src.splitlines()]
+    assert any('fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S"' in l for l in code_lines)

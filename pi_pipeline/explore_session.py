@@ -60,7 +60,8 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,
                             veto_labels=lambda: base | frozenset(str(x).lower() for x in ((getattr(rt, "_roster", None) or (lambda: ()))() or ()) if x))
     saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
-    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "3" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 3 s while the wall steers him fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
+    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "3" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 3 s while the wall steers him
+                          fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
     survey.gate = watch.gate
     if os.environ.get("G2_WALL_DRYRUN", "1") != "0":                    # the wall estimator reads the same peeks and only LOGS what it would do (vision/wall_distance.py); it never moves G2
