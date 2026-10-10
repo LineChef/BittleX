@@ -1,5 +1,7 @@
 # Third-party notices
 
+The code of this repository is released under the MIT License (see `LICENSE`). The notices below are for the third-party work it contains or builds on.
+
 This repository contains or builds on the following third-party work. Each is used under its own license; this file keeps the notices those licenses require.
 
 ## Petoi OpenCat and OpenCatEsp32 (MIT)
