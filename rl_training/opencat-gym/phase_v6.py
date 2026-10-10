@@ -252,8 +252,12 @@ def report6(st):
     import report_v5
     P, S = json.load(open(f"{REPORT_DIR}/v6.json")), json.load(open(SCRIPTED_JSON))
     fr = json.load(open(f"trained/{TAG(FINAL[0])}_frontier.json")) if os.path.exists(f"trained/{TAG(FINAL[0])}_frontier.json") else None
-    open(f"{REPORT_DIR}/report.html", "w").write(report_v5.build(P, S, fr, title="V6 Gait Report", console=f"trained/{TAG(FINAL[0])}_console.log", policy_name="V6"))
+    open(f"{REPORT_DIR}/report_full.html", "w").write(report_v5.build(P, S, fr, title="V6 Gait Report, full statistics", console=f"trained/{TAG(FINAL[0])}_console.log", policy_name="V6"))
     v5, v4 = json.load(open(V5_JSON)), json.load(open(V4_JSON))
+    import report_summary
+    ok_, why_, _m, _m4 = beats_v4(P)
+    verdict = ("Beats V4 by the rule set beforehand: promoted." if ok_ else "Does not beat V4 by the rule set beforehand, so V4 stays the default. Reasons: " + "; ".join(why_) + ".")
+    open(f"{REPORT_DIR}/report.html", "w").write(report_summary.build(P, {"V4": v4, "Scripted": S, "V5": v5}, name="V6", primary="V4", verdict_text=verdict))
     ids = [i for i in cm(P) if i in cm(v5) and i in cm(v4) and not i.startswith(("Z.", "N")) and i != "Z0"]
     rows = [f"mean falls over {len(ids)} cells: V6 {mean_cell_falls(P, ids)[0]:.3f} | V5 {mean_cell_falls(v5, ids)[0]:.3f} | V4 {mean_cell_falls(v4, ids)[0]:.3f} | scripted {mean_cell_falls(json.load(open(SCRIPTED_JSON)), ids)[0]:.3f}"]
     for h in ("ledge_up", "ledge_down"):
@@ -419,7 +423,7 @@ CORE_CELLS = ("T5.1", "T5.2", "T6.1", "T6.2", "T7.1", "T7.2", "T8.1", "LU15", "L
 
 def beats_v4(res):
     """The user's condition (2026-10-09): promote if this beats V4. Defined here, before the result is seen: no flat-ground falls; mean falls over the shared cells below V4's; calm-walk heading
-    and left/right difference no worse than V4's by more than 3 deg and 0.7; and no core hazard cell (ledges, rubble, boxes, snags, shoves) falling 0.15 or more above V4's."""
+    no worse than V4's by more than 3 deg (the left/right difference is reported, not gated); and no core hazard cell (ledges, rubble, boxes, snags, shoves) falling 0.15 or more above V4's."""
     v4 = json.load(open(V4_JSON))
     ids = shared_ids(res, v4)
     m, m4 = l2_metrics(res, ids), l2_metrics(v4, ids)
@@ -431,8 +435,7 @@ def beats_v4(res):
         why.append(f"mean falls {m['mean']:.3f} not below V4's {m4['mean']:.3f}")
     if m["heading"] > m4["heading"] + 3:
         why.append(f"calm-walk heading {m['heading']:.0f} deg against V4's {m4['heading']:.0f}")
-    if m["asym"] > m4["asym"] + 0.7:
-        why.append(f"left/right difference {m['asym']:.1f} against V4's {m4['asym']:.1f}")
+    # the calm-walk left/right difference is reported but does not gate the promotion (user, 2026-10-09: the calm walk is good enough)
     worst = sorted(((c[i]["fell_fraction"] - c4[i]["fell_fraction"], i) for i in CORE_CELLS if i in c and i in c4), reverse=True)[:3]
     bad = [(i, round(d, 2)) for d, i in worst if d >= 0.15]
     if bad:
