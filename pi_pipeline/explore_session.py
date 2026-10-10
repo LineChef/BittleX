@@ -84,6 +84,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
             if os.environ.get("G2_WALL_STEER", "1") != "0":
                 watch.every_s = fast_s if now - seen_near["t"] <= 20.0 else max(fast_s, slow_s)      # look more often only while a wall was seen close in the last 20 s
         watch.on_snap = wall_look
+        watch.skip_scoring = lambda: (lambda w: w is not None and w.state in ("near", "blocked") and time.monotonic() - w.t < 6.0)(getattr(wall_log, "last", None))      # a wall in view is not an unknown object
         log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)
     log.info("interest watch ON: picture stops for unknown or unfinished objects (a peek every %.0f s, a slow fallback every %.0f s); gallery %s",
              watch.every_s, watch.fallback_s, gpath)

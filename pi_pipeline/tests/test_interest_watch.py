@@ -25,7 +25,7 @@ class Src:
 
 def test_the_gate_opens_for_something_interesting_once_then_only_for_the_slow_fallback():
     t = [100.0]
-    w = InterestWatch(Scorer(["none", "unknown", "vetoed"]), Src(), fresh_s=20.0, fallback_s=300.0, clock=lambda: t[0])
+    w = InterestWatch(Scorer(["none", "unknown", "vetoed"]), Src(), fresh_s=20.0, fallback_s=300.0, clock=lambda: t[0], rng=lambda: 0.5)
     w.peek_once(100.0)
     assert not w.gate(105.0)                                   # nothing interesting
     w.peek_once(110.0)
@@ -83,3 +83,15 @@ def test_other_readers_get_the_same_peek():
     w.on_snap = seen.append
     w.peek_once(1.0)
     assert len(seen) == 1
+
+
+def test_a_wall_in_view_is_not_judged_an_object_and_the_fallback_interval_is_random():
+    scorer = Scorer(["unknown", "unknown"])
+    w = InterestWatch(scorer, Src(), clock=lambda: 0.0)
+    w.skip_scoring = lambda: True
+    assert w.peek_once() is None and w.latest is None and scorer.__dict__.get("calls", 0) == 0          # a wall's base never becomes a picture stop
+    w.skip_scoring = lambda: False
+    assert w.peek_once() is not None
+    lo = InterestWatch(Scorer([]), Src(), fallback_s=300.0, rng=lambda: 0.0)._fallback_due
+    hi = InterestWatch(Scorer([]), Src(), fallback_s=300.0, rng=lambda: 1.0)._fallback_due
+    assert round(lo) == 180 and round(hi) == 420                # 0.6 to 1.4 times the base, not a clock

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import threading
 import time
 from pathlib import Path
@@ -17,10 +18,11 @@ log = logging.getLogger("g2.interest")
 
 
 class InterestWatch:
-    def __init__(self, scorer, source, *, every_s: float = 10.0, fresh_s: float = 20.0, fallback_s: float = 300.0, active=lambda: True, clock=time.monotonic):
+    def __init__(self, scorer, source, *, every_s: float = 10.0, fresh_s: float = 20.0, fallback_s: float = 300.0, active=lambda: True, clock=time.monotonic, rng=random.random):
         self.scorer, self._source = scorer, source
         self.every_s, self.fresh_s, self.fallback_s = every_s, fresh_s, fallback_s
-        self._active, self._clock = active, clock
+        self._active, self._clock, self._rng = active, clock, rng
+        self._fallback_due = fallback_s * (0.6 + 0.8 * rng())           # the slow fallback is a RANDOM interval (0.6 to 1.4 times fallback_s), not a clock (user, 2026-10-10)
         self._lock = threading.Lock()
         self.latest = None                           # (time, Interest) of the newest worthwhile sighting, until a picture stop uses it
         self._last_peek = float("-inf")
@@ -28,6 +30,7 @@ class InterestWatch:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.peeks = self.vetoes = 0
+        self.skip_scoring = None                     # optional callable() -> bool: True while a wall is in view, so a wall's base is not judged an unknown object (it caused picture stops of walls, 2026-10-10)
         self.on_snap = None                          # optional callable(snapshot): other readers of the same cheap look (the wall dry run)
 
     def peek_once(self, now: float | None = None):
@@ -48,6 +51,13 @@ class InterestWatch:
                 self.on_snap(snap)
             except Exception:  # noqa: BLE001
                 log.debug("on_snap failed", exc_info=True)
+        if self.skip_scoring is not None:
+            try:
+                if self.skip_scoring():
+                    log.info("peek: skipped (a wall is in view)")
+                    return None
+            except Exception:  # noqa: BLE001
+                log.debug("skip_scoring failed", exc_info=True)
         try:
             got = self.scorer.assess(snap)
         except Exception:  # noqa: BLE001 -- a bad frame must never take the loop down
@@ -69,9 +79,10 @@ class InterestWatch:
                 log.info("picture stop: %s", self.latest[1].reason)
                 self.latest, self._last_stop = None, now
                 return True
-            if now - self._last_stop >= self.fallback_s:
-                log.info("picture stop: the slow fallback (%.0f s without one)", self.fallback_s)
+            if now - self._last_stop >= self._fallback_due:
+                log.info("picture stop: the random fallback (%.0f s without one)", self._fallback_due)
                 self._last_stop = now
+                self._fallback_due = self.fallback_s * (0.6 + 0.8 * self._rng())
                 return True
         return False
 
