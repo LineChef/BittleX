@@ -116,6 +116,7 @@ commanded vs. actual *joint angle*. Unit-testable now against synthetic
 cmd/feedback traces; the constants wait for the bench.
 
 ### B13 — Climb as a separate skill policy  🟢 CONFIRMED NEED (2026-09-15)
+**Update 2026-10-10:** the user wants a climbing movement taught by hand with the B25 method (after the hand-taught hi-step gait works), instead of keyframes written by Claude; plan in [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md).
 **Decided need, not a deferred idea.** Reference motion: Petoi's own `cmh`
 demo, [`step.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif)
 — front paws reach up onto a raised box, body hauls up and over, ends standing
@@ -913,6 +914,8 @@ balance feedback, so every new movement is checked in the sim first and then tri
 tests since 2026-10-09). Reference video to study for technique:
 <https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Decision the same day: skills are **not**
 authored by an LLM writing keyframes.
+
+**Second use (user, 2026-10-10): a climbing movement,** taught the same way after the hi-step works; see B13 and [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md).
 
 **First use: a real high-step gait (user, 2026-10-10; planned for the next session that has a charged Pi).** Plan: [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md). Petoi's Skill Composer (B3) is the other way to record the step and is to be compared with this first. The scripted options do not lift the
 feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the normal walk), `carpetF` was rejected by eye on G2, and the taller
