@@ -1,0 +1,31 @@
+# High-step gait plan (opened 2026-10-10)
+
+Goal: real extra ground clearance for G2 (cables, thresholds, rubble) behind the "hi step" voice mode, now that gait switching works (`pi_pipeline/gait/gait_mode.py`).
+
+## Why a new gait is needed
+
+Every scripted option so far is a knee-folded crouch or fell in the sim:
+
+| Gait | Foot clearance (sim) | Result |
+|---|---|---|
+| normal walk (`wkF`) | 13.5 mm | the reference |
+| `hsF` (what "hi step" plays today) | 17.8 mm | stays up open loop, but does not lift the feet; G2 does a crouching walk (user, 2026-10-10) |
+| `hsB`, `hsC` | 25-27 mm | fell about 90% of episodes open loop |
+| `carpetF` (firmware gait) | -- | tried on G2 2026-10-10, rejected by eye |
+
+A tall step needs active balance, which is what a learned correction on top of a scripted base gives. The gait mode input, the voice switch and the mid-walk blend are already built; they wait for a policy trained for the mode (V6 sidecar has no `"modes"` key). Background: [`v6-staged-training-plan.md`](v6-staged-training-plan.md) "Track A / Track C".
+
+## Path (user, 2026-10-10: "this is gonna be the path forward on getting some extra ground clearance")
+
+1. **A better high-step base.** Two sources, both allowed by the no-LLM-authored-keyframes rule:
+   - **Parameter sweep in the sim** of the generator (`rl_training/opencat-gym/reference_gait/build_highstep_reference.py`): shoulder lift, knee fold, rear boost, cycle time, stance width. Score with `gait_probe.py` (clearance, sway, falls, ledge ladders). Mac only.
+   - **A hand-taught step** (puppeteering): the user moves a leg through the step and the angles are recorded. Two tools, to be compared first: Petoi's Skill Composer (desktop app: B3 in [`../behavior-ideas.md`](../behavior-ideas.md)) and our own Pi-side recording (B25). Either way the result is a keyframe array that `reference_gait/build_skill_reference.py` turns into a reference `.npy`. Open: the joint read (`j`) returned nothing at rest on 2026-10-10 and must be made to work for the Pi-side route; whether Skill Composer can read the joints by hand is not verified.
+2. **Check the chosen base in the sim** (`gait_probe.py`) before G2 sees it.
+3. **Track C, a fresh screening run** (3M cap; gate: the high step stays up, and the normal walk does not get worse) on that base: one network for both modes, about 20% of episodes in the opposite mode, some switching mid-episode, high step triggered by step-ups, rubble, boxes, snags and small thresholds. A 20M run only on the user's go. Never a continuation of a finished 20M.
+4. **On G2** (on his feet on the floor, hands near; sim-only comparisons): short walks over a cable and the threshold strip, judged by eye; then deploy with `"modes": ["normal", "hi_step"]` in the sidecar.
+
+## Needs from the user
+
+- What G2 should step over and how tall it is (sets the clearance target; 25 mm is about 1 inch).
+- Go for the sweep and for the Track C screening run.
+- The first-session puppeteering choice (Skill Composer or the Pi-side recording).

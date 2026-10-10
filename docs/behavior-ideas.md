@@ -914,7 +914,7 @@ tests since 2026-10-09). Reference video to study for technique:
 <https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Decision the same day: skills are **not**
 authored by an LLM writing keyframes.
 
-**First use: a real high-step gait (user, 2026-10-10; planned for the next session that has a charged Pi).** The scripted options do not lift the
+**First use: a real high-step gait (user, 2026-10-10; planned for the next session that has a charged Pi).** Plan: [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md). Petoi's Skill Composer (B3) is the other way to record the step and is to be compared with this first. The scripted options do not lift the
 feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the normal walk), `carpetF` was rejected by eye on G2, and the taller
 `hsB`/`hsC` (25-27 mm) fell about 90% of the time open loop in the sim. Steps:
 1. **Make the joint read work.** On 2026-10-10 `j` and `f` at rest returned no joint data, so this comes first. Fallback if it cannot be made to
