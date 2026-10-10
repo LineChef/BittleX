@@ -196,9 +196,17 @@ def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarr
     return _finish([n1 + n2], peak * START_HORN_GAIN)
 
 
+START_HORN_DELAY_S = 1.0        # a pause after "Exploration mode." before the horn (user, 2026-10-10: it was too close to the end of the words)
+
+
+def render_start_sequence(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """One second of silence, then the Viking horn."""
+    return np.concatenate([np.zeros(int(rate * START_HORN_DELAY_S), dtype=np.int16), render_start_horn(rate, peak)])
+
+
 def play_start_horn(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
-    """The sound that starts an exploration (the Viking horn replaces the fanfare)."""
-    _play(render_start_horn, peak, rate, wait)
+    """The sound that starts an exploration: a 1 s pause, then the Viking horn (it replaces the fanfare)."""
+    _play(render_start_sequence, peak, rate, wait)
 
 
 def play_complete(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:

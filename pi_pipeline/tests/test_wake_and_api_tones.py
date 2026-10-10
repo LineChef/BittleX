@@ -74,6 +74,13 @@ def test_prompt_tones_are_three_distinct_sounds_and_the_cue_plays_each_on_its_st
     assert played == ["p", "p", "p"]                           # only the three stages sound
 
 
+def test_the_start_sequence_waits_one_second_before_the_horn():
+    import numpy as np
+    from pi_pipeline.voice import prompt_tones as pt
+    seq, horn = pt.render_start_sequence(), pt.render_start_horn()
+    assert seq.size == horn.size + 48000 and not np.any(seq[:48000]) and np.array_equal(seq[48000:], horn)
+
+
 def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     import types
     from pi_pipeline.behavior.bindings import DriverBindings
