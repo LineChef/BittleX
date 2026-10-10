@@ -50,7 +50,7 @@ def _norm(text: str) -> str:
 def parse_gait_command(text: str) -> str | None:
     """The gait a short spoken command asks for, or None. Off-phrases are checked first ("hi step off" must not turn it on)."""
     n = _norm(text)
-    n = " ".join({"switched": "switch", "switching": "switch", "changed": "change"}.get(w, w) for w in n.split() if w not in ("a", "the"))      # the recognizer's "switched to a high step" (2026-10-10)
+    n = " ".join({"switched": "switch", "switching": "switch", "changed": "change"}.get(w, w) for w in n.split()).replace(" to a ", " to ").replace(" to the ", " to ")      # the recognizer's "switched to a high step" (2026-10-10); an article elsewhere ("what is a high step") stays so it is not a command
     if not n or len(n.split()) > 6:
         return None
     for name in ("normal", "hi_step"):
