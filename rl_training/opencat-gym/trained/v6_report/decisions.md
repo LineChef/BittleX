@@ -1,0 +1,4 @@
+- 2026-10-09 11:02 PM: Layer 2 is OFF by the user's rule: no training on top of a consolidated 20M run. Layer 1 is the V6 candidate; ledge work, if wanted, goes into a fresh chain.
+- 2026-10-09 11:02 PM: candidate layer 1: mean falls 0.215, 15 mm step-up success 0.00 / falls 0.33, 7.5 mm success 0.85, flat falls none = True, heading 14, asym 0.7, score 0.215
+- 2026-10-09 11:02 PM: CHOSEN as the V6 candidate: layer 1 (trained/v6_s4_avg5_ppo). Rule: lowest mean falls over the shared cells, minus 0.15 x the 15 mm step-up success, with flat-ground falls ruled out. Promotion and deployment are left to the user.
+- 2026-10-09 11:02 PM: NOT promoted (mean falls 0.215 not below V4's 0.189; core hazards much worse than V4: [('LU25', 0.18)]). V6 layer 1: mean falls 0.215 against V4 0.189; heading 14 against 14; asymmetry 0.7 against 0.5; 7.5 mm step-up success 0.85 against 0.62; 15 mm 0.00 against 0.00. V4 stays the default.
