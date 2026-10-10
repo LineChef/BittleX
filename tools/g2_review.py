@@ -498,7 +498,8 @@ const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversation
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts",data=[],undoFn=null,timer=null,confirmAt=0;
 const $=s=>document.querySelector(s);
 async function api(path,body){const o=body===undefined?{headers:{"X-G2-Token":TOKEN}}:{method:"POST",headers:{"X-G2-Token":TOKEN,"Content-Type":"application/json"},body:JSON.stringify(body)};
- const r=await fetch(path,o);const j=await r.json();if(!r.ok||j.error)throw new Error(j.error||r.statusText);return j}
+ const r=await fetch(path,o);const raw=await r.text();let j;try{j=JSON.parse(raw)}catch(e){if(r.status===403||/bad token/i.test(raw)){setTimeout(()=>location.reload(),1500);throw new Error("this page is out of date (the review server was restarted): reloading")}throw new Error(raw.slice(0,120)||r.statusText)}
+ if(!r.ok||j.error)throw new Error(j.error||r.statusText);return j}
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 function toast(msg,undo){clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,1500);$("#toastmsg").textContent=msg;undoFn=undo||null;$("#undo").style.display=undo?"":"none";$("#toast").style.display="flex";clearTimeout(timer);timer=setTimeout(()=>$("#toast").style.display="none",9000)}
 $("#undo").onclick=async()=>{if(undoFn){try{await undoFn();toast("Restored")}catch(e){toast("Could not restore: "+e.message)}load()}};
