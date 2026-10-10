@@ -125,6 +125,9 @@ Power, lowest → highest: **REST (`d`) < sit (`ksit`) < stand (`kup`)**.
 Resume cost: REST → walking is ~1–2 s + a rebalance; stand → walking is instant.
 So **fold to REST only when idle > a few seconds**, not for a 1 s gap.
 
+## Power log and measured runtime (2026-10-10)
+The voice service keeps a power diary at `~/.local/share/g2/power_log.jsonl` (`G2_POWER_LOG`), one fsynced line per event: `start` / `stop` (with whether the OS was shutting down), `sleep` / `wake` (with the reason), a heartbeat `alive` every minute (awake or asleep), and `runtime` at the next start. After the Pi goes quiet, the last line says whether G2 was asleep or awake and when he was last alive. Read it with `python -m pi_pipeline.power log [N]`. A boot that ends with no `stop` line (power lost) becomes a measured Pi runtime (source `log`, counted from boot, so it assumes a full charge at boot); a clean OS shutdown is discarded, a hand-stopped service is kept as an uncounted lower bound. The Pi-battery warning uses timed tests and these power-loss runs, and ignores manual entries. First point from this: 11,776 s (3 h 16 min) on 2026-10-10. Code: `pi_pipeline/power/power_log.py`, `runtime_tracker.py`.
+
 ## Measures
 
 | Measure | Buildable now? | Autonomy impact | Rule |

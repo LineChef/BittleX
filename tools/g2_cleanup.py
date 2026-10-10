@@ -10,7 +10,8 @@ Classes of finding:
   DELETE   scratch by pattern (comparison copies, intermediate report folders, probe output, *.bak, __pycache__ strays) -- removed by --apply
   DECIDE   untracked files that are not scratch: commit them (git add by exact path) or delete them; never deleted automatically
   PI       files on the Pi's trained/ folder other than Release_Candidate*_ppo.onnx(.json) -- removed by --apply over ssh ($G2_PI)
-Never touched (protected): anything tracked by git, checkpoints, run console logs, candidate exports (*_ppo.onnx*), trained/v3_world2, V3 report caches.
+Never touched (protected): anything tracked by git, checkpoints, run console logs, candidate exports (*_ppo.onnx*, except an untracked copy byte-identical to a tracked
+Release_Candidate*_ppo.onnx, which is a leftover of the promote step and is listed under DELETE), trained/v3_world2, V3 report caches.
 """
 import argparse
 import fnmatch
@@ -28,6 +29,9 @@ SCRATCH = [
     f"{TRAINED}/v4_report_*",             # intermediate-checkpoint report folders
     f"{TRAINED}/zz_*",                    # one-off probe output
     f"{TRAINED}/*.out",
+    "rl_training/opencat-gym/eval_frames", "rl_training/opencat-gym/frames_wkf",     # frame dumps of evaluate_policy.py --frames-dir / verify_wkf_reference.py --render
+    "rl_training/opencat-gym/robustness_sweep.json",                             # robustness_sweep.py's default output file
+    "rl_training/opencat-gym/.carpet_tex_cache.png",                             # watch.py rebuilds this texture cache when it is missing
     "*.bak", "*.orig", "*.rej", "*.tmp",
     "*/.DS_Store", ".DS_Store",
 ]
@@ -56,10 +60,36 @@ def ignored_scratch():
     return [p.rstrip("/") for p in out if matches(p.rstrip("/"), SCRATCH) and not matches(p.rstrip("/"), PROTECT)]
 
 
+def _sha(path):
+    import hashlib
+    with open(path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def duplicate_candidates():
+    """Exported candidates (`<name>cand_ppo.onnx` + its sidecar) that are byte-identical to a tracked Release_Candidate*_ppo.onnx: the promote step
+    copied them, so the extra copy is scratch. A candidate that was never promoted is NOT here (it is a DECIDE: the user keeps or deletes it)."""
+    tracked = [t for t in git("ls-files", TRAINED).splitlines() if re.search(r"/Release_Candidate[^/]*_ppo\.onnx$", t)]
+    if not tracked:
+        return []
+    hashes = {_sha(os.path.join(ROOT, t)) for t in tracked}
+    out = []
+    for line in git("status", "--porcelain", "--ignored", "-uall", "--", TRAINED).splitlines():
+        path = line[3:]
+        if re.search(r"/[^/]*cand_ppo\.onnx$", path) and os.path.exists(os.path.join(ROOT, path)) and _sha(os.path.join(ROOT, path)) in hashes:
+            out += [q for q in (path, path + ".json") if os.path.lexists(os.path.join(ROOT, q))]
+    return out
+
+
 def classify():
-    delete, decide = [], []
+    dups = duplicate_candidates()
+    delete, decide = list(dups), []
     for p in untracked():
+        if p in dups:
+            continue
         if matches(p, PROTECT):
+            if p.startswith(TRAINED + "/") and re.search(r"_ppo\.onnx(\.json)?$", p):
+                decide.append(p)                      # an exported candidate nobody committed or promoted: protected from deletion, but the user decides
             continue
         (delete if matches(p, SCRATCH) else decide).append(p)
     delete += [p for p in ignored_scratch() if p not in delete]

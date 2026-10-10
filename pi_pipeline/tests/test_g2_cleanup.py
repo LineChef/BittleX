@@ -10,7 +10,8 @@ T = C.TRAINED
 
 
 def test_scratch_patterns_match_generated_output():
-    for p in (f"{T}/x_at5M_ppo.zip", f"{T}/v4_report_x_at5M", f"{T}/zz_probe.out", "docs/a.md.bak"):
+    for p in (f"{T}/x_at5M_ppo.zip", f"{T}/v4_report_x_at5M", f"{T}/zz_probe.out", "docs/a.md.bak", "rl_training/opencat-gym/eval_frames",
+              "rl_training/opencat-gym/frames_wkf", "rl_training/opencat-gym/robustness_sweep.json", "rl_training/opencat-gym/.carpet_tex_cache.png"):
         assert C.matches(p, C.SCRATCH), p
 
 
@@ -34,6 +35,28 @@ def test_pi_keep_pattern_only_keeps_release_candidates():
 def test_classify_splits_delete_and_decide(monkeypatch):
     monkeypatch.setattr(C, "untracked", lambda: ["tools/new_tool.py", f"{T}/a_at5M_ppo.zip", f"{T}/v3_world2"])
     monkeypatch.setattr(C, "ignored_scratch", lambda: [])
+    monkeypatch.setattr(C, "duplicate_candidates", lambda: [])
     delete, decide = C.classify()
     assert delete == [f"{T}/a_at5M_ppo.zip"]
     assert decide == ["tools/new_tool.py"]
+
+
+def test_a_candidate_copy_identical_to_a_tracked_release_is_scratch_but_a_unique_one_is_not(tmp_path, monkeypatch):
+    t = tmp_path / T
+    t.mkdir(parents=True)
+    (t / "Release_CandidateV6_ppo.onnx").write_bytes(b"same")
+    (t / "V6cand_ppo.onnx").write_bytes(b"same")
+    (t / "V6cand_ppo.onnx.json").write_text("{}")
+    (t / "V5cand_ppo.onnx").write_bytes(b"other")
+    monkeypatch.setattr(C, "ROOT", str(tmp_path))
+
+    def fake_git(*a):
+        if a[0] == "ls-files":
+            return f"{T}/Release_CandidateV6_ppo.onnx\n"
+        return f"?? {T}/V6cand_ppo.onnx\n!! {T}/V6cand_ppo.onnx.json\n?? {T}/V5cand_ppo.onnx\n"
+    monkeypatch.setattr(C, "git", fake_git)
+    assert C.duplicate_candidates() == [f"{T}/V6cand_ppo.onnx", f"{T}/V6cand_ppo.onnx.json"]
+    monkeypatch.setattr(C, "untracked", lambda: [f"{T}/V6cand_ppo.onnx", f"{T}/V5cand_ppo.onnx"])
+    monkeypatch.setattr(C, "ignored_scratch", lambda: [])
+    delete, decide = C.classify()
+    assert delete == [f"{T}/V6cand_ppo.onnx", f"{T}/V6cand_ppo.onnx.json"] and decide == [f"{T}/V5cand_ppo.onnx"]      # V5cand is never deleted by the tool; it is listed for the user to decide

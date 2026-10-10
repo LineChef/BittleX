@@ -16,11 +16,12 @@ log = logging.getLogger("g2.sleep")
 
 class SleepWatch:
     def __init__(self, *, is_resting, is_busy=lambda: False, after_s: float = 300.0, on_sleep=(), on_wake=(),
-                 clock=time.monotonic, sleep=time.sleep, poll_s: float = 5.0):
+                 clock=time.monotonic, sleep=time.sleep, poll_s: float = 5.0, on_event=None):
         self._is_resting, self._is_busy = is_resting, is_busy
         self._after_s = after_s
         self._on_sleep, self._on_wake = list(on_sleep), list(on_wake)
         self._clock, self._sleep, self._poll_s = clock, sleep, poll_s
+        self._on_event = on_event or (lambda kind, **fields: None)     # power_log.PowerLog.event: sleep / wake lines for diagnostics
         self._last = clock()
         self.asleep = False
         self._lock = threading.Lock()
@@ -47,6 +48,7 @@ class SleepWatch:
             self.asleep = False
             self._last = self._clock()
         log.info("waking (%s)", why)
+        self._run_all([lambda: self._on_event("wake", why=why)], "wake log")
         self._run_all(self._on_wake, "wake")
         return True
 
@@ -65,6 +67,7 @@ class SleepWatch:
                 return False
             self.asleep = True
         log.info("going to sleep after %.0f s at rest", now - self._last)
+        self._run_all([lambda: self._on_event("sleep", rested_s=round(now - self._last))], "sleep log")
         self._run_all(self._on_sleep, "sleep")
         return True
 

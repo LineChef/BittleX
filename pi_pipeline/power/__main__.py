@@ -1,4 +1,5 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
+                               | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
                                | runtime [list] | runtime add <seconds> | runtime forget <index> | runtime path
                                | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
 from __future__ import annotations
@@ -24,6 +25,11 @@ def main(argv=None):
         print(P.set_wifi_power_save(a[1] == "on"))
     elif cmd == "runtime":
         _runtime(a[1:])
+    elif cmd == "log":
+        from .power_log import PowerLog, format_line
+        n = int(a[1]) if len(a) > 1 else 30
+        rows = PowerLog().lines()
+        print("\n".join(format_line(r) for r in rows[-n:]) if rows else "no power log yet")
     elif cmd == "leds-off":
         print("\n".join(P.disable_onboard_leds()))
     else:
@@ -33,7 +39,7 @@ def main(argv=None):
 def _runtime(a):
     """The Pi's measured runtimes on one charge (see runtime_tracker.py)."""
     from ..config import settings
-    from .runtime_tracker import RuntimeTracker
+    from .runtime_tracker import MEASURED, RuntimeTracker
     t = RuntimeTracker(settings.pi_runtime_log)
     sub = a[0] if a else "list"
     if sub == "test":
@@ -41,9 +47,9 @@ def _runtime(a):
     if sub in ("unplugged", "plugged"):
         if sub == "unplugged":
             t.arm_now()
-            full = t.mean_runtime_s(sources=("test",))
-            print("counting from now (this boot only)" + (f"; the warning fires after {0.8 * full / 3600:.2f} h on battery" if full else
-                                                        "; no timed-test runtime yet, so no warning"))
+            full = t.mean_runtime_s(sources=MEASURED)
+            print("counting from now (this boot only)" + (f"; the warning fires after {settings.pi_warn_fraction * full / 3600:.2f} h on battery"
+                                                        if full else "; no measured runtime yet, so no warning"))
         else:
             t.disarm()
             print("charging: the battery warning is paused for this boot")
@@ -61,13 +67,14 @@ def _runtime(a):
             print(f"{i}: {r['runtime_s'] / 3600:5.2f} h  {r.get('source', '?'):9s} {'counted' if r.get('counted', True) else 'IGNORED'}")
         mean = t.mean_runtime_s()
         print(f"mean of counted runs: {mean / 3600:.2f} h" if mean else "no runs recorded yet")
-        timed = t.mean_runtime_s(sources=("test",))
+        timed = t.mean_runtime_s(sources=MEASURED)
+        wf = settings.pi_warn_fraction
         state, secs = t.battery_state()
         now = {"paused": "PAUSED for this boot (you said plugged in; say \"you're unplugged\" to restart the count)",
                "since_unplugged": f"counting since you said unplugged: {(secs or 0) / 3600:.2f} h so far",
                "since_boot": f"counting from boot: {(secs or 0) / 3600:.2f} h so far"}[state]
-        print((f"the warning uses timed-test runs only: {timed / 3600:.2f} h, so it fires after {0.8 * timed / 3600:.2f} h on battery; "
-               if timed else "the warning uses timed-test runs only: none yet, so it is silent; ") + now)
+        print((f"the warning uses measured runs only (timed tests and power losses in the power log): {timed / 3600:.2f} h, so it fires after "
+               f"{wf * timed / 3600:.2f} h on battery; " if timed else "the warning uses measured runs only: none yet, so it is silent; ") + now)
 
 
 def _runtime_test(t, a):

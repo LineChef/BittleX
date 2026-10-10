@@ -126,6 +126,7 @@ def main() -> None:
         watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
         if watcher is not None:
             actuator.on_before_gait = watcher.read_before          # a reading right before any walk starts (there is no idle timer)
+        power_log = _start_power_log()
         stop_pi_watch = _start_pi_battery_watch(tts=tts, audible=audible)
 
         camera = None
@@ -196,7 +197,8 @@ def main() -> None:
                 _wake_steps.append(guard.resume)
             sleep_watch = SleepWatch(is_resting=lambda: getattr(link, "last_motion_command", "") in ("", "d"),
                                      is_busy=lambda: getattr(actuator, "busy", False), after_s=settings.sleep_after_s,
-                                     on_sleep=_sleep_steps, on_wake=_wake_steps).start()
+                                     on_sleep=_sleep_steps, on_wake=_wake_steps,
+                                     on_event=(power_log.event if power_log else None)).start()
             _prev_on_command = getattr(actuator, "on_command", None)
 
             def _on_command(_prev=_prev_on_command):
@@ -243,6 +245,8 @@ def main() -> None:
                 link.close()
             if stop_pi_watch:
                 stop_pi_watch.stop()
+            if power_log:
+                power_log.stop()
             if memory:
                 memory.close()
 
@@ -285,6 +289,27 @@ def make_pi_battery_alert(tts, audible: bool, sound=None):
         if audible:
             _sound_then_say(tts, PI_ALERT_MESSAGES[level], sound or _play_siren)
     return on_alert
+
+
+def _start_power_log():
+    """The always-on power diary (power/power_log.py; Linux/Pi only): settles the previous boot (a power loss becomes a measured Pi runtime),
+    then logs start, sleep / wake and a heartbeat every minute. Returns the PowerLog or None."""
+    import sys
+
+    if sys.platform != "linux":
+        return None
+    from ..power.power_log import PowerLog
+    from ..power.runtime_tracker import RuntimeTracker
+
+    try:
+        plog = PowerLog()
+        tracker = RuntimeTracker(settings.pi_runtime_log)
+        plog.collect_into(tracker, record=tracker.collect() is None)   # an intentional battery test records its own run; don't count it twice
+        return plog.start()
+    except Exception:  # noqa: BLE001 -- diagnostics must never stop the voice service
+        import logging
+        logging.getLogger("g2.powerlog").warning("power log not started", exc_info=True)
+        return None
 
 
 def _start_pi_battery_watch(*, tts, audible: bool):

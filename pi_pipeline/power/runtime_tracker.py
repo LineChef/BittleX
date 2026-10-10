@@ -32,6 +32,7 @@ log = logging.getLogger("g2.runtime")
 
 WARN_FRACTION = 0.80       # uptime / full runtime at which "about 20% left" fires
 CRITICAL_FRACTION = 0.95
+MEASURED = ("test", "log")   # run sources the warning trusts: a timed test, or a power loss seen in power_log.py
 
 
 def _read_boot_id() -> str:
@@ -211,9 +212,9 @@ class RuntimeTracker:
                 if r.get("counted", True) and (sources is None or r.get("source") in sources)]
         return sum(vals) / len(vals) if vals else None
 
-    def add_run(self, runtime_s: float, source: str = "manual") -> None:
+    def add_run(self, runtime_s: float, source: str = "manual", *, ended=None, counted: bool = True) -> None:
         data = self._load()
-        data["runs"].append({"runtime_s": round(runtime_s), "ended": None, "source": source, "counted": True})
+        data["runs"].append({"runtime_s": round(runtime_s), "ended": ended, "source": source, "counted": counted})
         self._save(data)
 
     def forget_run(self, index: int) -> bool:
@@ -242,8 +243,8 @@ class RuntimeWatcher:
         self._stop = threading.Event()
 
     def full_runtime_s(self) -> float | None:
-        # only runs from an intentional timed test count: a rough manual reading must not trigger siren warnings
-        return self._override or self._tracker.mean_runtime_s(sources=("test",))
+        # only measured runs count (a timed test, or a power loss seen in the power log): a rough manual reading must not trigger siren warnings
+        return self._override or self._tracker.mean_runtime_s(sources=MEASURED)
 
     def poll_once(self) -> BatteryLevel | None:
         full = self.full_runtime_s()
