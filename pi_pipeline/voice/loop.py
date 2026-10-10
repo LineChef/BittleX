@@ -191,7 +191,7 @@ class VoiceLoop:
         on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
         on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
         shutdown_confirm_s: float = 6.0,
-        announce_online: bool = False,  # say "I am online." once the loop is ready (the voice service turns this on; G2_ANNOUNCE_ONLINE=off silences it)
+        announce_online: bool = False,  # say "G2 online." once the loop is ready (the voice service turns this on; G2_ANNOUNCE_ONLINE=off silences it)
         conversation_window_s: float = 0.0,  # conversation mode ("let's talk"): seconds to wait for you to start speaking each turn (0 = mode off)
         conversation_max_s: float = 600.0,  # conversation mode ends by itself after this long
         side_max_words: int = 0,  # a question-window turn (no wake word) longer than this many words is treated as side chatter (0 = no limit)
@@ -292,7 +292,7 @@ class VoiceLoop:
         log.info("G2 voice loop ready")
         if self._announce_online:
             from . import restart_notice
-            restart_notice.announce_online(self._speak)        # "I am online.": the loop has finished starting and is listening
+            restart_notice.announce_online(self._speak)        # "G2 online.": the loop has finished starting and is listening
         try:
             while True:
                 self._one_turn()

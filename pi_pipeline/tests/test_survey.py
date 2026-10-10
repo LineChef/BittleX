@@ -266,7 +266,7 @@ def test_the_exploration_listener_says_when_the_wake_word_registered_but_no_spee
 def test_the_voice_loop_says_i_am_online_when_it_is_ready_and_only_when_asked_to():
     import types as _t
     from pi_pipeline.voice.loop import VoiceLoop
-    for announce, expect in ((True, ["I am online."]), (False, [])):
+    for announce, expect in ((True, ["G2 online."]), (False, [])):
         said = []
         stt = _t.SimpleNamespace(listen=lambda timeout_s=None: "")
         wake = _t.SimpleNamespace(wait=lambda: (_ for _ in ()).throw(KeyboardInterrupt()))

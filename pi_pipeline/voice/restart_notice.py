@@ -1,4 +1,4 @@
-"""Say "I am online." when the voice loop has finished starting, so you can tell he is ready (after a restart, a deploy, power-up, or an exploration session handing the voice service back).
+"""Say "G2 online." when the voice loop has finished starting, so you can tell he is ready (after a restart, a deploy, power-up, or an exploration session handing the voice service back).
 
 `G2_ANNOUNCE_ONLINE=off` silences it. Nothing here may ever stop the voice loop from starting."""
 from __future__ import annotations
@@ -7,7 +7,7 @@ import logging
 
 log = logging.getLogger("g2.restart_notice")
 
-ONLINE_LINE = "I am online."
+ONLINE_LINE = "G2 online."
 
 
 def announce_online(speak) -> bool:
