@@ -535,7 +535,7 @@ class VoiceLoop:
             log.info("explore armed (voice)")
             self._cue.set("speaking")
             from . import prompt_tones
-            prompt_tones.play_complete(wait=True)                   # the "ta-da" (the same measured sound effect as the end), then the words (user, 2026-10-10)
+            prompt_tones.play_fanfare(wait=True)                    # the brass fanfare until the Viking horn is built (user, 2026-10-10), then the words
             self._speak("Exploration mode.")             # said BEFORE the hand-over: the launch stops this service
             self._events(arm_explore=True)
             self._set_session()
