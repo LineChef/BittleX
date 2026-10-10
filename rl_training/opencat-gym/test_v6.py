@@ -149,3 +149,31 @@ assert P6.candidate_score(P6.l2_metrics(crashy, ids)) > 5                       
 print("ok")
 """)
     assert "ok" in out
+
+
+def test_the_beats_v4_rule_and_the_promotion_script_dry_run():
+    out = _child(r"""
+import copy, json, os, sys
+sys.path.insert(0, ".")
+if not os.path.exists("trained/v5_cmp_v4.json"):
+    print("ok (no local V4 benchmark file)"); raise SystemExit
+import phase_v6 as P6
+v4 = json.load(open("trained/v5_cmp_v4.json"))
+better = copy.deepcopy(v4)
+for c in better["cells"]:
+    c["fell_fraction"] = max(0.0, c["fell_fraction"] - 0.05)
+ok, why, m, m4 = P6.beats_v4(better)
+assert ok and not why, why
+worse = copy.deepcopy(v4)
+for c in worse["cells"]:
+    c["fell_fraction"] = min(1.0, c["fell_fraction"] + 0.05)
+assert not P6.beats_v4(worse)[0]
+flat = copy.deepcopy(better)
+next(c for c in flat["cells"] if c["id"] == "T1.1")["fell_fraction"] = 0.1
+assert "falls on flat ground" in " ".join(P6.beats_v4(flat)[1])
+core = copy.deepcopy(better)
+next(c for c in core["cells"] if c["id"] == "T7.1")["fell_fraction"] = min(1.0, next(c for c in v4["cells"] if c["id"] == "T7.1")["fell_fraction"] + 0.3)
+assert "core hazards" in " ".join(P6.beats_v4(core)[1])
+print("ok")
+""")
+    assert "ok" in out

@@ -396,6 +396,57 @@ def choose_and_export(st):
     st["chosen"] = dict(name=win, path=path)
     save_state(st)
 
+RELEASE_NAME = "V5"        # the next numbered release (the earlier V5 training run was not promoted); this one is layer 1 of the V6 chain
+CORE_CELLS = ("T5.1", "T5.2", "T6.1", "T6.2", "T7.1", "T7.2", "T8.1", "LU15", "LU25", "LU35", "LD15", "LD25")
+
+
+def beats_v4(res):
+    """The user's condition (2026-10-09): promote if this beats V4. Defined here, before the result is seen: no flat-ground falls; mean falls over the shared cells below V4's; calm-walk heading
+    and left/right difference no worse than V4's by more than 3 deg and 0.7; and no core hazard cell (ledges, rubble, boxes, snags, shoves) falling 0.15 or more above V4's."""
+    v4 = json.load(open(V4_JSON))
+    ids = shared_ids(res, v4)
+    m, m4 = l2_metrics(res, ids), l2_metrics(v4, ids)
+    c, c4 = cm(res), cm(v4)
+    why = []
+    if not m["flat"]:
+        why.append("it falls on flat ground")
+    if m["mean"] >= m4["mean"]:
+        why.append(f"mean falls {m['mean']:.3f} not below V4's {m4['mean']:.3f}")
+    if m["heading"] > m4["heading"] + 3:
+        why.append(f"calm-walk heading {m['heading']:.0f} deg against V4's {m4['heading']:.0f}")
+    if m["asym"] > m4["asym"] + 0.7:
+        why.append(f"left/right difference {m['asym']:.1f} against V4's {m4['asym']:.1f}")
+    worst = sorted(((c[i]["fell_fraction"] - c4[i]["fell_fraction"], i) for i in CORE_CELLS if i in c and i in c4), reverse=True)[:3]
+    bad = [(i, round(d, 2)) for d, i in worst if d >= 0.15]
+    if bad:
+        why.append(f"core hazards much worse than V4: {bad}")
+    return (not why), why, m, m4
+
+
+def promote_if_better(st):
+    if st.get("promotion"):
+        return
+    if st.get("chosen", {}).get("name") != "layer 1":
+        decision("Promotion check skipped: the chosen candidate is not layer 1.")
+        st["promotion"] = "skipped"
+        save_state(st)
+        return
+    res = json.load(open(f"{REPORT_DIR}/v6.json"))
+    ok, why, m, m4 = beats_v4(res)
+    detail = (f"V6 layer 1: mean falls {m['mean']:.3f} against V4 {m4['mean']:.3f}; heading {m['heading']:.0f} against {m4['heading']:.0f}; asymmetry {m['asym']:.1f} against {m4['asym']:.1f}; "
+              f"7.5 mm step-up success {m['lu75_success']:.2f} against {m4['lu75_success']:.2f}; 15 mm {m['lu15_success']:.2f} against {m4['lu15_success']:.2f}")
+    if not ok:
+        decision(f"NOT promoted ({'; '.join(why)}). {detail}. V4 stays the default.")
+        st["promotion"] = "no"
+        save_state(st)
+        return
+    decision(f"V6 layer 1 BEATS V4 by the rule set before the result (no flat falls, lower mean falls, heading and symmetry not worse, no core hazard 0.15 worse). {detail}. Promoting it as {RELEASE_NAME} (the user's instruction).")
+    r = subprocess.run([sys.executable, "promote_release.py", "--candidate", "trained/V6cand_ppo.onnx", "--name", RELEASE_NAME, "--note", "V6 chain layer 1, heading-blind, 20M"], capture_output=True, text=True)
+    decision(f"promotion script: {(r.stdout + r.stderr).strip()[-300:]}")
+    st["promotion"] = "yes" if r.returncode == 0 else "failed"
+    save_state(st)
+
+
 
 def summary6(st):
     if st.get("summary") == "done":
@@ -451,6 +502,7 @@ def run():
     report6(st)
     layer2(st)
     choose_and_export(st)
+    promote_if_better(st)
     summary6(st)
     log("V6 COMPLETE")
 
