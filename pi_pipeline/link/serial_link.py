@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import collections
 import logging
+import threading
 import time
 
 from . import noise_log  # noqa: E402
@@ -126,7 +127,7 @@ class SerialLink:
             except Exception:  # noqa: BLE001
                 pass
 
-    def send(self, command: str, *, read_reply: bool = True, settle: float = 0.05) -> str:
+    def send(self, command: str, *, read_reply: bool = True, settle: float = 0.05, _deferred: bool = False) -> str:
         """Write `command` (a newline is added). Optionally read one reply line.
         Returns the reply (or '' ). Raises nothing -- logs and returns '' on error."""
         if not self.is_connected and not (self._auto_reconnect and self.connect()):
@@ -135,9 +136,11 @@ class SerialLink:
             return ""
         try:
             self._ease_stand_up(command)
-            if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep: wait (at most 2 s) for speech to finish, then tell the gate speech must wait for the beep
+            if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep
                 from ..voice import audio_gate
-                audio_gate.wait_idle(2.0)
+                if not _deferred and audio_gate.is_busy():          # speech or another beep is sounding: send this beep a moment later from its own thread. NEVER wait here: the link is shared and a wait starved the walk loop of IMU frames (2026-10-10)
+                    threading.Thread(target=lambda: (audio_gate.wait_idle(2.0), self.send(command, read_reply=False, settle=settle, _deferred=True)), name="beep-wait", daemon=True).start()
+                    return ""
                 audio_gate.note_beep(audio_gate.beep_seconds(command))
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()

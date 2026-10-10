@@ -47,6 +47,18 @@ def beep_seconds(command: str) -> float:
     return sum(1.0 / d for d in nums[1::2] if d > 0)
 
 
+def is_busy(sd=None) -> bool:
+    """True while speech or a sound is playing or a beep is sounding (non-blocking). False when the gate is off."""
+    if os.environ.get("G2_AUDIO_GATE", "1") == "0":
+        return False
+    if sd is None:
+        try:
+            import sounddevice as sd  # type: ignore
+        except Exception:  # noqa: BLE001
+            sd = None
+    return (sd is not None and _is_playing(sd)) or time.monotonic() < _beep_until
+
+
 def wait_idle(max_wait_s: float = 2.0, sd=None) -> bool:
     """Block (at most `max_wait_s`) until no speech or sound is playing and no beep is sounding. Returns True if idle at the end. Never raises."""
     if os.environ.get("G2_AUDIO_GATE", "1") == "0":

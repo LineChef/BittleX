@@ -63,7 +63,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,
                             veto_labels=lambda: base | frozenset(str(x).lower() for x in ((getattr(rt, "_roster", None) or (lambda: ()))() or ()) if x))
     saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
-    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "3" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 3 s while the wall steers him
+    watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "8")),     # the wall look rides the peek: every 3 s while the wall steers him
                           fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
     seen_near = {"t": -1e9}                                               # when a wall was last seen NEAR_LOOK_IN (30 in) or closer (set by the wall look below)
@@ -81,8 +81,8 @@ def _start_interest(survey, saver, vision, rt, settings, args):
         wall_log = wd.WallLog(cal, context=lambda: {"mode": rt.driver.mode.mode.name})
         rt.wall_log = wall_log                                           # the sensor hub reads wall_log.last for the behaviour driver's wall steering
 
-        slow_s = float(os.environ.get("G2_WALL_LOOK_SLOW_S", "6"))
-        fast_s = watch.every_s                                          # 3 s while a wall may be near
+        slow_s = float(os.environ.get("G2_WALL_LOOK_SLOW_S", "8"))       # the far cadence: a look every 8 s (user, 2026-10-10: not every 3 s when he is far from a wall)
+        fast_s = float(os.environ.get("G2_WALL_LOOK_FAST_S", "3"))      # 3 s while a wall is within NEAR_LOOK_IN
 
         def wall_look(snap):
             wall_log.look(snap.jpeg, to_image(snap.jpeg))
@@ -91,7 +91,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
             if last is not None and last.nearest_in is not None and last.nearest_in <= NEAR_LOOK_IN:
                 seen_near["t"] = now
             if os.environ.get("G2_WALL_STEER", "1") != "0":
-                watch.every_s = fast_s if now - seen_near["t"] <= 20.0 else max(fast_s, slow_s)      # look more often only while a wall was seen close in the last 20 s
+                watch.every_s = fast_s if now - seen_near["t"] <= 20.0 else slow_s      # look more often only while a wall was seen close in the last 20 s
         watch.on_snap = wall_look
         watch.skip_scoring = lambda: time.monotonic() - seen_near["t"] <= 20.0      # a wall (NEAR_LOOK_IN or closer) was seen in the last 20 s: its base is not an unknown object
         log.info("wall dry run ON (%s): logging to %s, nothing moves", "calibrated" if cal else "not calibrated yet", wd.LOG_PATH)

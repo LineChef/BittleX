@@ -63,20 +63,27 @@ def test_beeps_and_speech_wait_for_each_other(monkeypatch):
     assert time.monotonic() - t0 >= 0.15
 
 
-def test_the_serial_link_waits_for_speech_before_a_beep_and_tells_the_gate(monkeypatch):
+def test_the_serial_link_never_blocks_for_a_beep_it_defers_it_from_a_thread_when_speech_is_playing(monkeypatch):
+    """2026-10-10: a wait inside link.send held the shared serial lock, starved the walk loop of IMU frames and G2 stopped walking."""
+    import threading as th
     import pi_pipeline.voice.audio_gate as g
     from pi_pipeline.link.serial_link import SerialLink
-    calls = []
-    monkeypatch.setattr(g, "wait_idle", lambda t=2.0, sd=None: calls.append(("wait", t)) or True)
-    monkeypatch.setattr(g, "note_beep", lambda s: calls.append(("beep", round(s, 3))))
+    written, ran = [], th.Event()
+    monkeypatch.setattr(g, "is_busy", lambda sd=None: True)
+    monkeypatch.setattr(g, "wait_idle", lambda t=2.0, sd=None: True)
+    monkeypatch.setattr(g, "note_beep", lambda s: None)
     link = SerialLink.__new__(SerialLink)
-    link._ser = type("S", (), {"write": lambda self, b: None, "flush": lambda self: None, "is_open": True})()
+    link._ser = type("S", (), {"write": lambda self, b: (written.append(b), ran.set()), "flush": lambda self: None, "is_open": True})()
     link._auto_reconnect = False
     link._failed = lambda *a, **k: None
     monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
     monkeypatch.setattr(SerialLink, "_ease_stand_up", lambda self, c: None)
     monkeypatch.setattr(SerialLink, "_read_reply", lambda self, d: "")
     link.last_motion_command = ""
-    link.send("b9 5 16 8", read_reply=False, settle=0)
-    link.send("kup", read_reply=False, settle=0)
-    assert calls == [("wait", 2.0), ("beep", 0.325)]
+    t0 = time.monotonic()
+    assert link.send("b9 5 16 8", read_reply=False, settle=0) == ""
+    assert time.monotonic() - t0 < 0.1                                  # returned at once
+    assert ran.wait(1.0) and written == [b"b9 5 16 8\n"]               # and the beep went out from the thread
+    written.clear()
+    link.send("kup", read_reply=False, settle=0)                        # anything else is sent straight away
+    assert written == [b"kup\n"]
