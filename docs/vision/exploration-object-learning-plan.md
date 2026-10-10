@@ -99,6 +99,16 @@ On the 25 readable named pictures of 8 objects (6 cut-off survey pictures were l
 
 Too little data to choose: most objects have 4-5 pictures, the survey pictures contain the named kitchen fixtures themselves (so some "false" matches are real), and 0.80 is not the right threshold for both scales. Rerun `tools/eval_embedder.py` once more objects have 5 or more labelled pictures. Time on the Pi Zero 2 W is still to measure when the Pi is online.
 
+**Second model, DINOv2-small (2026-10-09, the user's yes):** a self-supervised image model trained to match the same thing across views, which is the property instance recognition needs (MobileNetV2 is a 1,000-category classifier: it groups kinds, not individuals). ONNX conversion by the `onnx-community` organization (a third-party export; Meta publishes only PyTorch weights) of `facebook/dinov2-small` (license Apache-2.0), pinned to commit `8b1f705a3a7f6f062f6bdd21986c1583d3ef105d`, file `onnx/model.onnx`, 88,532,934 bytes, SHA-256 `f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a` (matches the publisher's own checksum from the Hub API). Kept in `~/g2_data/models/dinov2-small/`, outside the repo. Checked read-only: parses, `onnx.checker` passes, only standard operators (MatMul, Softmax, Erf, LayerNorm pieces and the like), no custom-domain operators, loads in onnxruntime; one 224 px picture takes 0.06 s on the Mac. Output (1, 257, 384): class token plus 256 patch tokens, pooled by the embedder as class + mean (768 numbers). The 24 MB int8 file (`model_int8.onnx`, SHA-256 `dfce54a8...`) is the Pi candidate, not fetched.
+
+| | within-object | between-object | gap | leave-one-out retrieval | hit rate at 0.80 | survey pictures that "match" at 0.80 |
+|---|---|---|---|---|---|---|
+| histogram baseline | 0.781 | 0.588 | 0.193 | 82% | 82% | 68% |
+| MobileNetV2 | 0.788 | 0.687 | 0.101 | 77% | 73% | 46% |
+| **DINOv2-small** | 0.756 | 0.534 | **0.222** | **91%** | 45% | 19% |
+
+DINOv2 separates best (largest gap, best retrieval, fewest false matches) but its similarities sit lower, so the 0.80 threshold (set for the histogram scale) is too high for it: the hit rate at 0.80 is low only because of that. Next: tune the same-instance and duplicate thresholds for it on the labelled pictures (about 0.65-0.70 to start), time the int8 file on the Pi, then switch `G2_EMBEDDER` to it. Still only 25 named pictures of 8 objects; recheck after the first 5 labelled pictures per object.
+
 ### Phase 4: the localizer
 1. v0: no localizer. Embed the whole picture and an overlapping tile grid (for example 3 by 3); the gallery's duplicate handling collapses repeats.
 2. v1, only if v0 is too coarse: a foreground cut-out from the floor-level view (colour and edge difference against the floor, or motion while he is
