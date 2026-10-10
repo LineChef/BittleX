@@ -338,8 +338,16 @@ def l2_attempt(st, key, start):
     return best
 
 
+HOLD = "trained/v6_layer2_hold"       # kept for the record; layer 2 is now off for good (below)
+
+
 def layer2(st):
+    """OFF (user, 2026-10-09 evening: "no layer 2, no training on top of what we consider a consolidated run (20M)"). The code below stays for reference, and its rewards (progress past
+    the edge, graduated stall cost, ledge-height crossing bonus, action-noise reset) are available as levers for a FRESH chain; it only runs with G2_V6_LAYER2=1."""
     if st.get("l2_done"):
+        return
+    if os.environ.get("G2_V6_LAYER2") != "1":
+        decision("Layer 2 is OFF by the user's rule: no training on top of a consolidated 20M run. Layer 1 is the V6 candidate; ledge work, if wanted, goes into a fresh chain.")
         return
     base = json.load(open(f"{REPORT_DIR}/v6.json"))
     start = l1_path(st)

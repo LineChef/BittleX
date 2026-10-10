@@ -34,9 +34,10 @@ Times Eastern. Earlier handoffs: [`handoff-2026-10-09.md`](handoff-2026-10-09.md
 - Always rest or stand G2 before stopping anything that controls him (`tools/g2_safe_stop.sh`, never a plain service stop mid-stride); never put G2 on his back.
 - API calls sparingly, prefer local on the Pi; every download follows the security protocol and needs the user's yes first (official source, pinned, ONNX/safetensors only, own folder, hash, Mac first).
 - Do not read replies aloud (the read-aloud idea was dropped).
+- **Nothing trains on top of a consolidated 20M run** (user, 2026-10-09). A chain that starts fresh at S0 is fine; a fine-tune of a finished 20M is not.
 
 ## 4. What is left
-1. **When the 20M finishes:** read the report and `compare.txt`; judge Layer 2 against the success criteria in the plan doc; build the `--chain-from` action-noise reset option and the stronger ledge stage; run Layer 2 (3-6M ledge stage, then 8-10M mixed); Plan B = an earlier layer-1 checkpoint. Promotion/deploy only on the user's word.
+1. **When the 20M finishes:** read the report and `compare.txt`; layer 1 is the V6 candidate (**layer 2 and Plan B were withdrawn by the user: nothing trains on top of a consolidated 20M**; ledge work, if wanted, goes into a fresh chain using the layer-2 rewards as levers). Compare layer 1 with V4 on the benchmark; promotion/deploy only on the user's word, after the hardware trial.
 2. **Hardware (the user wants to discuss next):** deploy (watcher armed); hi step first held in the air, then on the floor; measure V6/V5's own turn with the hold off and set a trim; tile trim for V4; the taller threshold; low-pack repeat; bench servo tests; wall calibration (a box at 20/30/40/60/100 cm: `python -m pi_pipeline.vision.wall_distance calibrate`) then dry-run logs; first 5 labelled pictures per object; BiBoard low-battery alarm reading (the user will say when it sounds; the Pi's own "low battery" is only a runtime estimate).
 3. **Open questions:** the object-recognition model choice (DINO-class needs another download and a yes); why V4's path stays near straight on tape while its body turns about 60 deg; the API cost jump (the Pi made almost no billed calls, so the cause is probably outside G2).
 
