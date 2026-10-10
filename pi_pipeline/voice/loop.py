@@ -274,6 +274,12 @@ class VoiceLoop:
                 time.sleep(wait)
         except Exception:  # noqa: BLE001
             log.exception("the picture pose sequence failed")
+            self._fail("the picture pose sequence failed")
+
+    def _fail(self, why: str) -> None:
+        """A command failed: the wrong-answer horn so the user knows (`G2_FAIL_SOUND=0` turns it off)."""
+        from . import fail_sound
+        fail_sound.command_failed(why)
 
     def _refuse_sound(self) -> None:
         """The losing horn when G2 refuses a request (user, 2026-10-10, a measured approximation of the game-show clip); `G2_REFUSE_SOUND=0` turns it off."""
@@ -341,6 +347,7 @@ class VoiceLoop:
                     saved = self._namer(payload)
         except Exception:  # noqa: BLE001 -- a failed picture must not end the voice loop
             log.exception("naming picture failed")
+            self._fail("naming picture failed")
         self._cue.set("speaking")
         if saved:
             self._speak(f"Okay, I will remember the {name}.")
@@ -358,6 +365,7 @@ class VoiceLoop:
             return
         except Exception:  # noqa: BLE001
             log.warning("could not ask systemd to restart the voice service; exiting so it restarts", exc_info=True)
+            self._fail("could not restart the voice service")
         sys.exit(1)
 
     def _end_session(self) -> None:
@@ -612,6 +620,7 @@ class VoiceLoop:
                     self._on_poweroff()
                 except Exception:  # noqa: BLE001 -- say so rather than fail silently
                     log.exception("power-off failed")
+                    self._fail("power-off failed")
                     self._speak("I lay down, but I couldn't switch the computer off.")
                 return
             self._speak("Okay, lying down and shutting down. Wake me when you need me.")
@@ -749,6 +758,7 @@ class VoiceLoop:
                 turn = self._conv.send(user_text, memory_context=context, **pic)
         except ConversationError as e:      # known reason -> say it plainly
             log.warning("Claude call failed (%s): %s", e.kind, e.spoken)
+            self._fail(f"Claude call failed ({e.kind})")
             if speaker:
                 speaker.finish()
             self._cue.set("speaking")
@@ -758,6 +768,7 @@ class VoiceLoop:
             return
         except Exception:  # noqa: BLE001 -- one bad turn must not kill the loop
             log.exception("turn failed")
+            self._fail("the turn failed")
             if speaker:
                 speaker.finish()
             self._cue.set("speaking")

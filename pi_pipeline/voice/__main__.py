@@ -85,6 +85,9 @@ def main() -> None:
 
         link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
         fan = policy_walker = None
+        if link is not None:
+            from . import fail_sound
+            link.on_failure = fail_sound.command_failed         # a motion command that cannot be sent plays the wrong-answer horn
         battery_alert = {"fn": None}                      # filled in once the speaker exists (below)
         if link is not None and args.actuator == "serial":
             from ..link.fanout import ImuFanout
@@ -142,11 +145,16 @@ def main() -> None:
                 if settings.camera_sounds and tts_mode != "print":
                     from . import camera_sounds
                     on_capture = lambda: camera_sounds.play("shutter", settings.camera_peak)  # noqa: E731
+                wait_still = None
+                if fan is not None:
+                    from ..gait.stillness import StillnessWaiter
+                    wait_still = StillnessWaiter(fan.consumer().poll_imu).wait      # no picture until the IMU shows G2 has stopped swaying (camera shake)
                 camera = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0,
                                            ae_bump=settings.vision_ae_bump, on_capture=on_capture,
                                            save_dir=settings.vision_save_dir or None,
                                            keep_days=settings.picture_keep_days,
-                                           exposure_check=settings.vision_exposure_check)
+                                           exposure_check=settings.vision_exposure_check,
+                                           meter_every_s=0.0, wait_still=wait_still)      # meter the light before EVERY picture (user, 2026-10-10: pictures are rare now)
 
         namer = None
         if camera is not None:                             # "this is the dishwasher" works in plain voice mode too, not only inside an exploration session

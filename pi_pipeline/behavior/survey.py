@@ -24,7 +24,7 @@ class SurveyConfig:
     cooldown_s: float = 15.0        # at most one survey this often (the end of every leg is a chance, not a promise)
     first_delay_s: float = 0.0      # no survey before G2 has been exploring this long (0 = the first leg's end can already be one)
     pose_settle_s: float = 2.2      # after a pose is commanded, before the picture (the skill has to finish and the body stop swaying)
-    stand_settle_s: float = 2.5     # after standing again from the bow, before the picture (the stance has to settle)
+    stand_settle_s: float = 3.3     # after standing again from the bow, before the picture (the stance has to settle; 2.5 s plus the 0.8 s eased stand-up ramp, 2026-10-10)
     final_settle_s: float = 1.5     # after standing again, before the walk resumes
     look_down_skill: str = "kbuttUp"
     look_up_skill: str = "ksit"

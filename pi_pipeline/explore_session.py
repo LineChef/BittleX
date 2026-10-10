@@ -115,6 +115,9 @@ def main() -> None:
         stt_holder: dict = {}
         memory = _make_memory()
         link = _make_link(True)
+        if link is not None:
+            from .voice import fail_sound
+            link.on_failure = fail_sound.command_failed         # a motion command that cannot be sent plays the wrong-answer horn
         if link is None:
             raise SystemExit("no serial link to the BiBoard")
         vision = _make_vision_source() if features.vision else None
@@ -135,8 +138,12 @@ def main() -> None:
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
+            from .gait.stillness import StillnessWaiter
+            from .voice import fail_sound
+            still = StillnessWaiter(fan.consumer().poll_imu)               # waits, before every picture, until the IMU shows G2 has stopped swaying (camera shake)
             saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT),
-                                           prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", args.roam_s / 2 if args.roam_s > 0 else 300.0)))   # prep the camera for the first picture and once half way (user)
+                                           prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", "0")),      # the camera is warmed up for EVERY picture (user, 2026-10-10: pictures are rare now)
+                                           wait_still=still.wait, on_failure=fail_sound.command_failed)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
         watch = None

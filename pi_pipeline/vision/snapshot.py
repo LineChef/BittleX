@@ -155,11 +155,12 @@ def next_bump(bump: int, s: ExposureStats) -> int | None:
 class CameraSnapshotter:
     def __init__(self, port: str, baud: int = 921600, *, labels: list[str] | None = None, sensor_opt: int | None = None,
                  ae_bump: int = 0, timeout_s: float = 8.0, idle_close_s: float = 120.0, on_capture=None, save_dir: str | None = None, keep_days: float = 0.0, exposure_check: bool = True,
-                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, serial_factory=None,
+                 max_exposure_retries: int = 2, meter_every_s: float = 30.0, wait_still=None, serial_factory=None,
                  sleep=time.sleep, clock=time.monotonic):
         self._port, self._baud, self._labels = port, baud, labels or []
         self._sensor_opt, self._ae_bump, self._timeout_s = sensor_opt, ae_bump, timeout_s
         self._factory, self._sleep, self._clock = serial_factory, sleep, clock
+        self._wait_still = wait_still                       # optional callable() -> bool | None: wait until G2's body has stopped swaying (the IMU), right before the shot
         self._ser = None
         self._lock = threading.Lock()
         self._idle_close_s = idle_close_s
@@ -343,6 +344,11 @@ class CameraSnapshotter:
                 # warm up right before the shot (not on the wake word): settle the exposure if the light was not measured recently
                 if self._exposure_check and self._clock() - self._metered_at > self._meter_every_s:
                     self._meter()
+                if self._wait_still is not None:
+                    try:
+                        self._wait_still()
+                    except Exception:  # noqa: BLE001 -- never stop a picture
+                        log.debug("wait for stillness failed", exc_info=True)
                 snap = self._grab_one()
                 if snap is None:
                     return None

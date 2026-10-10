@@ -43,6 +43,11 @@ class SerialActuatorSink:
             return
         if not opencat.is_safe(cmd):
             log.warning("refusing unsafe serial command %r", cmd)
+            try:
+                from ..voice import fail_sound
+                fail_sound.command_failed(f"refused unsafe command {cmd[:20]}")
+            except Exception:  # noqa: BLE001
+                pass
             return
         if self._policy is not None and self._policy.busy and cmd[0] in ("k", "d"):
             self._policy.stop(rest=False)            # a skill replaces a running learned walk (chirps and head moves do not)

@@ -117,12 +117,21 @@ class SerialLink:
     # --- messaging --------------------------------------------------------
 
     last_motion_command: str = ""
+    on_failure = None            # callable(why): the "wrong answer" signal when a MOTION command (k / d / i / m) could not be sent (user, 2026-10-10); set by the services, never raises
+
+    def _failed(self, command: str, why: str) -> None:
+        if self.on_failure is not None and command[:1] in ("k", "d", "i", "m"):          # background reads and balance toggles must not honk
+            try:
+                self.on_failure(f"{command.strip()[:20]}: {why}")
+            except Exception:  # noqa: BLE001
+                pass
 
     def send(self, command: str, *, read_reply: bool = True, settle: float = 0.05) -> str:
         """Write `command` (a newline is added). Optionally read one reply line.
         Returns the reply (or '' ). Raises nothing -- logs and returns '' on error."""
         if not self.is_connected and not (self._auto_reconnect and self.connect()):
             log.debug("send(%r) dropped -- not connected", command)
+            self._failed(command, "not connected")
             return ""
         try:
             self._ease_stand_up(command)
@@ -140,6 +149,7 @@ class SerialLink:
             log.warning("serial send failed (%s); marking disconnected", e)
             self.close()
             self._mark_down(f"send failed: {e}")
+            self._failed(command, f"send failed: {e}")
             return ""
 
     _ramping = False

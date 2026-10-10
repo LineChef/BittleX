@@ -41,12 +41,33 @@ def _decodes(jpeg: bytes) -> bool:
         return False
 
 
+def _exposure_cost(jpeg: bytes) -> float:
+    try:
+        from .snapshot import exposure_score, exposure_stats
+        st = exposure_stats(jpeg)
+        return 9.0 if st is None else exposure_score(st)
+    except Exception:  # noqa: BLE001
+        return 9.0
+
+
+def _badly_exposed(jpeg: bytes) -> bool:
+    """Brightness outside 85 to 140 (0..255, target about 100) or more than 2% blown out: the picture is worth one more try."""
+    try:
+        from .snapshot import exposure_stats
+        st = exposure_stats(jpeg)
+    except Exception:  # noqa: BLE001
+        return False
+    return st is not None and (st.mean < 85.0 or st.mean > 140.0 or st.clip_high > 0.02)
+
+
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
-                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0):
+                 survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None):
         self._source = source
         self._prep_every_s = prep_every_s           # the camera prep (the throwaway frames that let auto-exposure settle) is done for the first picture and again after this long (0 = every picture)
         self._last_prep: float | None = None
+        self._wait_still = wait_still              # callable() -> True (still) | False (still swaying at the timeout) | None (no IMU): waited for right before each picture, to limit camera shake
+        self._on_failure = on_failure              # callable(why): the wrong-answer signal when no picture could be taken
         self._root = Path(os.path.expanduser(root))
         self._clock = clock
         self._warn_mb = warn_mb
@@ -58,6 +79,12 @@ class ExplorationPictureSaver:
         self.last_path: str | None = None
         self.last_kind: str | None = None
 
+    def _take(self, prep: bool):
+        try:
+            return self._source.snapshot() if prep else self._source.snapshot(settle=0)       # no prep: the picture right after the mode switch
+        except TypeError:                                                                       # a source whose snapshot() takes no settle argument
+            return self._source.snapshot()
+
     def folder_for(self, kind: str, now: float) -> Path:
         if kind.startswith("name:"):
             return self._root / "named" / slug(kind[5:])
@@ -66,14 +93,28 @@ class ExplorationPictureSaver:
     def __call__(self, kind) -> str | None:
         kind = str(kind or "picture")
         prep = self._prep_every_s <= 0 or kind.startswith("name:") or self._last_prep is None or self._clock() - self._last_prep >= self._prep_every_s
-        try:
-            snap = self._source.snapshot() if prep else self._source.snapshot(settle=0)       # no prep: the picture right after the mode switch
-        except TypeError:                                                                       # a source whose snapshot() takes no settle argument
-            snap = self._source.snapshot()
+        still = None
+        if self._wait_still is not None:
+            try:
+                still = self._wait_still()                                                       # the body must have stopped swaying before the shutter (camera shake)
+            except Exception:  # noqa: BLE001
+                log.debug("wait for stillness failed", exc_info=True)
+        snap = self._take(prep)
         if prep and snap is not None:
             self._last_prep = self._clock()
+        retaken = False
+        if snap is not None and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
+            again = self._take(True)
+            retaken = True
+            if again is not None and _exposure_cost(again.jpeg) < _exposure_cost(snap.jpeg):
+                snap = again
         if snap is None:
             log.warning("no picture for %s (the camera did not answer)", kind)
+            if self._on_failure:
+                try:
+                    self._on_failure(f"no picture for {kind}")
+                except Exception:  # noqa: BLE001
+                    pass
             return None
         if not _decodes(snap.jpeg):
             self.truncated = getattr(self, "truncated", 0) + 1
@@ -91,7 +132,7 @@ class ExplorationPictureSaver:
         base = prefix + time.strftime("_%H%M%S", time.localtime(now)) + f"_{int((now % 1) * 1000):03d}"
         path = folder / (base + ".jpg")
         path.write_bytes(snap.jpeg)
-        meta = {"file": path.name, "kind": kind, "pose": pose, "name": kind[5:] if kind.startswith("name:") else None,
+        meta = {"still": still, "retaken": retaken, "file": path.name, "kind": kind, "pose": pose, "name": kind[5:] if kind.startswith("name:") else None,
                 "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)), "width": snap.width, "height": snap.height,
                 "detections": [{"label": d[0], "score": round(float(d[1]), 3), "cx": round(float(d[2]), 3), "cy": round(float(d[3]), 3),
                                 "w": round(float(d[4]), 3), "h": round(float(d[5]), 3)} for d in (snap.detections or [])]}
