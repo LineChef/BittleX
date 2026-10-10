@@ -9,12 +9,22 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Protocol
 
 log = logging.getLogger("g2.tts")
+
+
+_G2_WORD = re.compile(r"\bG-?2\b")
+
+
+def pronounce(text: str) -> str:
+    """What the voice is given to say: the robot's name "G2" is read by Piper as "J2" (user, 2026-10-10), so it is spelled out as "gee two" (the wake word's spelling).
+    The words printed and logged stay "G2"."""
+    return _G2_WORD.sub("gee two", text)
 
 
 # set while a spoken sentence is playing, so the short signal sounds (api_tone) wait instead of cutting the speech off
@@ -68,7 +78,7 @@ class PiperTTS:
 
     def _synth(self, text: str):
         import numpy as np
-        chunks = list(self._voice.synthesize(text))
+        chunks = list(self._voice.synthesize(pronounce(text)))
         if not chunks:
             return None, self._rate
         audio = np.concatenate([c.audio_int16_array for c in chunks])

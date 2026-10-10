@@ -103,7 +103,8 @@ def main() -> None:
             from ..gait.stand_guard import StandGuard
             guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
                                balance_off_idle=settings.balance_off_idle, reassert_s=settings.stand_reassert_s,
-                               reenable_after_s=None if settings.balance_off_idle else 300.0).start()
+                               reenable_after_s=None if settings.balance_off_idle else 300.0,
+                               on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time: the losing horn
             actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot

@@ -151,12 +151,16 @@ On the speaker (`voice/prompt_tones.py`) and, without a speaker, as buzzer beeps
 | Sound | Plays when | Turn off |
 |---|---|---|
 | **grunt** (low "hmph") | you rebuff him ("shut up", "go away" and the like) | `G2_GRUNT=0` |
-| **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request (today: a gait he cannot switch to), and when he falls over in a walk or an exploration session (`G2_FALL_HORN=0` for the fall) | `G2_REFUSE_SOUND=0` |
+| **losing horn** (about 3.7 s, four short brass notes then a long sagging one; a measured approximation of the game-show clip) | he refuses a request (today: a gait he cannot switch to), and when he tips over at any time, walking or standing (the stand guard watches the IMU for a tilt past 60 deg for 0.3 s; `G2_FALL_HORN=0` for the fall) | `G2_REFUSE_SOUND=0` |
 | *(not built)* a recognition miss, "what is this?" with no match | the instance recognizer is not connected to the spoken "what is this?" yet (that goes to Claude's vision); add the horn when it is |
 | **sigh / yawn** | going to sleep after 5 min at rest / waking | `G2_SLEEP_AFTER_S=0` |
 | **oof** | built; will play when G2 hits a wall, once wall recognition and wall-distance calibration are trained (user, 2026-10-10; a bump cannot be told from walking in the 5 Hz IMU) | n/a |
 
 Audition any of them on a dev machine: `G2_SPEAKER_SOUNDS=1 python -m pi_pipeline.voice.prompt_tones grunt|refuse|oof|sigh|yawn` (G2's level is a very small fraction of full scale; never pass a large `peak`).
+
+## Exploration mode wording (2026-10-10)
+
+Saying "explore" / "go ahead and look around": the brass fanfare, then "Commencing exploration mode." (the old "I need half a minute, make sure I'm on the floor" is gone; he still needs about 30 s to hand over). When the roam time runs out (`G2_EXPLORE_ROAM_S`, or `ROAM_S` of `g2_explore.sh start`) the session ends: "Exploration mode complete.", he settles, lies down, and the voice service comes back ("G2 online."). The robot's name is spoken as "gee two" (Piper read "G2" as "J2").
 
 ## Switching gait (2026-10-09)
 

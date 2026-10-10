@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import threading
 
 import numpy as np
@@ -222,10 +223,19 @@ def play_refuse(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = Fals
     _play(render_refuse, peak, rate, wait)
 
 
-def play_horn_if_enabled(env_var: str, wait: bool = False) -> None:
-    """The losing horn for one situation, unless that situation's switch (`G2_REFUSE_SOUND`, `G2_FALL_HORN`) is set to 0."""
-    if os.environ.get(env_var, "1") != "0":
-        play_refuse(wait=wait)
+_HORN_LAST: dict[str, float] = {}
+
+
+def play_horn_if_enabled(env_var: str, wait: bool = False, cooldown_s: float = 20.0) -> None:
+    """The losing horn for one situation, unless that situation's switch (`G2_REFUSE_SOUND`, `G2_FALL_HORN`) is set to 0. The same situation does not
+    play it twice within `cooldown_s` (a fall seen by both the walk loop and the stand guard sounds once)."""
+    if os.environ.get(env_var, "1") == "0":
+        return
+    now = time.monotonic()
+    if now - _HORN_LAST.get(env_var, -1e9) < cooldown_s:
+        return
+    _HORN_LAST[env_var] = now
+    play_refuse(wait=wait)
 
 
 def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:

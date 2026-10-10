@@ -534,7 +534,9 @@ class VoiceLoop:
         if cmd == "explore":
             log.info("explore armed (voice)")
             self._cue.set("speaking")
-            self._speak("Okay, going exploring. I need about half a minute to get ready. Make sure I'm on the floor.")     # said BEFORE the hand-over: the launch stops this service
+            from . import prompt_tones
+            prompt_tones.play_fanfare(wait=True)                    # the brass fanfare, then the words (user, 2026-10-10)
+            self._speak("Commencing exploration mode.")             # said BEFORE the hand-over: the launch stops this service
             self._events(arm_explore=True)
             self._set_session()
             self._cue.set("idle")

@@ -87,7 +87,7 @@ class StandGuard:
 
     def __init__(self, link, *, is_busy=lambda: False, detector: WobbleDetector | None = None, balance_off_idle: bool = True,
                  guard: bool = True, reassert_s: float = 60.0, quiet_after_activity_s: float = 8.0, on_trip=None,
-                 reenable_after_s: float | None = None, max_reenable_s: float = 3600.0,
+                 reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
                  clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
@@ -105,6 +105,9 @@ class StandGuard:
         self.frames = 0                      # IMU frames seen so far
         self._started_at = clock()
         self._warned_no_frames = False
+        self._on_fall, self._fall_deg = on_fall, fall_deg
+        self._tilt_since: float | None = None
+        self._fell = False
 
     def note_activity(self) -> None:
         self._quiet_until = self._clock() + self._quiet_s
@@ -161,6 +164,21 @@ class StandGuard:
             self.tick()
             self._sleep(self._poll_s)
 
+    def _check_fall(self, now: float, roll_deg: float, pitch_deg: float) -> None:
+        """Tilted past `fall_deg` for 0.3 s: call `on_fall` once; re-arm after he is back under 40 degrees."""
+        tilt = max(abs(roll_deg), abs(pitch_deg))
+        if tilt > self._fall_deg:
+            self._tilt_since = self._tilt_since if self._tilt_since is not None else now
+            if not self._fell and now - self._tilt_since >= 0.3:
+                self._fell = True
+                log.warning("G2 is tipped over (tilt %.0f deg)", tilt)
+                try:
+                    self._on_fall()
+                except Exception:  # noqa: BLE001
+                    log.debug("on_fall handler raised", exc_info=True)
+        elif tilt < 40.0:
+            self._tilt_since, self._fell = None, False
+
     def tick(self) -> bool:
         """One pass: drain the IMU lines, re-assert balance off, run the detector. True if the detector tripped."""
         now = self._clock()
@@ -181,6 +199,11 @@ class StandGuard:
                 self._link.send("gP", read_reply=False, settle=0.0)
             except Exception:  # noqa: BLE001
                 pass
+        if self._on_fall is not None:
+            for line in lines:                        # a fall at any time, walking or not (the walk loops have their own detector); before the busy / quiet checks
+                r = parse_imu_line(line)
+                if r is not None:
+                    self._check_fall(now, math.degrees(r[0]), math.degrees(r[1]))
         if self._is_busy():
             self._quiet_until = now + self._quiet_s
             self._det.reset()

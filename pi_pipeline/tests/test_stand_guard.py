@@ -170,3 +170,25 @@ def test_guard_counts_frames():
     link.queue = [imu_line(0, 0)] * 3
     clock.t = 1.0; g.tick()
     assert g.frames == 3
+
+
+def test_a_fall_at_any_time_calls_on_fall_once_and_rearms_when_he_is_back_up():
+    link, clock, falls = FakeLink(), Clock(), []
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, on_fall=lambda: falls.append(clock.t), is_busy=lambda: True)   # busy (walking): the fall still counts
+    for roll in (5.0, 70.0, 75.0, 80.0, 80.0, 80.0):
+        clock.t += 0.2
+        link.queue = [imu_line(roll, 3.0)]
+        g.tick()
+    assert len(falls) == 1                          # tilted past 60 degrees for 0.3 s -> once, not on every frame
+    for roll in (10.0, 5.0, 70.0, 75.0, 78.0):
+        clock.t += 0.2
+        link.queue = [imu_line(roll, 3.0)]
+        g.tick()
+    assert len(falls) == 2                          # back under 40 degrees re-armed it
+    quiet = []
+    g2 = StandGuard(link, clock=clock, sleep=lambda s: None, on_fall=lambda: quiet.append(1))
+    for _ in range(10):
+        clock.t += 0.2
+        link.queue = [imu_line(30.0, 20.0)]
+        g2.tick()
+    assert quiet == []                              # a big lean is not a fall

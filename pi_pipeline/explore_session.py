@@ -175,7 +175,7 @@ def main() -> None:
             narrator = Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
             attach(rt.bindings, narrator)
             rt.bindings.tts = tts
-            say("Exploration test starting. I will stay put and look around first." if args.stationary else "Exploration test starting.")
+            say("Exploration mode started. I will stay put and look around first." if args.stationary else "Exploration mode started.")
 
         def _on_fall():
             log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
@@ -193,7 +193,8 @@ def main() -> None:
 
         from .gait.stand_guard import StandGuard
         guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
-                           balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None).start()
+                           balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
+                           on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time (the walker's own fall also plays it once)
 
         # this session has stopped the voice service, so it must watch G2's battery itself (reads pause while a walk is running;
         # the walk loop checks the voltage under load)
@@ -275,9 +276,8 @@ def main() -> None:
                 if args.roam_s > 0 and armed_at is not None and time.monotonic() - armed_at > args.roam_s:
                     rt.post(disarm_explore=True)
                     armed_at = None
-                    log.warning("roam bout over (%.0f s): disarmed", args.roam_s)
-                    if args.exit_when_roam_ends:
-                        break
+                    log.warning("roam bout over (%.0f s): disarmed, ending the session", args.roam_s)
+                    break                                         # the cap is the end of the exploration: he says it is complete and lies down (user, 2026-10-10)
                 if args.exit_when_roam_ends:                       # roaming ended some other way ("that's enough", picked up, ...)
                     mode = rt.driver.mode.mode
                     if mode in (Mode.EXPLORE, Mode.APPROACH):
@@ -306,7 +306,7 @@ def main() -> None:
                     policy_walker.stop(rest=False)                            # stop walking first, then settle into a balanced stand, and only then lie down:
                 link.send("kbalance", read_reply=False, settle=0.0)           # resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
                 time.sleep(1.5)
-                say("Exploration completed.")                                 # said first (user, 2026-10-07), then G2 lies down
+                say("Exploration mode complete.")                              # said first (user, 2026-10-07; wording 2026-10-10), then G2 lies down
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
