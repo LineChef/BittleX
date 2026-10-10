@@ -144,9 +144,69 @@ def calibrate(distances_cm=(20, 30, 40, 60, 100), source=None) -> Calibration:
     return cal
 
 
+IN_TO_CM = 2.54
+
+
+def calibrate_from_pictures(pictures_dir: str, labels: dict | None = None, *, shots: list | None = None, save: bool = True, path: str = CAL_PATH) -> tuple[Calibration, list]:
+    """Build the calibration from labelled wall pictures instead of moving a box (user, 2026-10-10: wall recognition pictures first). `pictures_dir` holds `shot_NNN.jpg` and a
+    `labels.json` mapping each shot name to {"label": "wall_straight", "distance_in": 16, ...}; only `wall_straight` shots with a distance are used (and only `shots`, if given). Each
+    shot gives the median of the three middle column groups' base rows (as `calibrate` does); shots at the same distance are averaged; the distance is converted to centimetres here
+    and nowhere in what the user sees. Returns (calibration, the list of (distance_in, row, shots used) rows)."""
+    import statistics
+    from .embedder import to_image
+    labels = labels if labels is not None else json.loads((Path(pictures_dir) / "labels.json").read_text())
+    per_distance: dict[float, list] = {}
+    used: dict[float, list] = {}
+    for name, info in sorted(labels.items()):
+        if shots is not None and name not in shots:
+            continue
+        if info.get("label") != "wall_straight" or not info.get("distance_in"):
+            continue
+        jpg = Path(pictures_dir) / f"{name}.jpg"
+        if not jpg.exists():
+            continue
+        rows, _ = base_rows(to_image(jpg.read_bytes()))
+        centre = [r for r in rows[1:4] if r is not None]
+        if not centre:
+            continue
+        d = float(info["distance_in"])
+        per_distance.setdefault(d, []).append(statistics.median(centre))
+        used.setdefault(d, []).append(name)
+    pts = [(round(sum(v) / len(v), 4), round(d * IN_TO_CM, 1)) for d, v in sorted(per_distance.items())]
+    cal = Calibration(sorted(pts))
+    table = [(d, round(sum(v) / len(v), 4), used[d]) for d, v in sorted(per_distance.items())]
+    if save and len(cal.points) >= 2:
+        cal.save(path)
+    return cal, table
+
+
+def check_against_pictures(cal: Calibration, pictures_dir: str, labels: dict | None = None, *, skip: list | None = None) -> list:
+    """For every wall_straight picture with a distance (except `skip`): (shot, distance_in, estimated_in) using the same centre-group rule as the calibration."""
+    import statistics
+    from .embedder import to_image
+    labels = labels if labels is not None else json.loads((Path(pictures_dir) / "labels.json").read_text())
+    out = []
+    for name, info in sorted(labels.items()):
+        if name in (skip or []) or info.get("label") != "wall_straight" or not info.get("distance_in"):
+            continue
+        jpg = Path(pictures_dir) / f"{name}.jpg"
+        if not jpg.exists():
+            continue
+        rows, _ = base_rows(to_image(jpg.read_bytes()))
+        centre = [r for r in rows[1:4] if r is not None]
+        if centre:
+            out.append((name, float(info["distance_in"]), round(cal.distance_cm(statistics.median(centre)) / IN_TO_CM, 1)))
+    return out
+
+
 if __name__ == "__main__":
     import sys
     if sys.argv[1:2] == ["calibrate"]:
         calibrate()
+    elif sys.argv[1:2] == ["pictures"] and len(sys.argv) > 2:
+        c, table = calibrate_from_pictures(sys.argv[2], shots=sys.argv[3:] or None)
+        for d, row, names in table:
+            print(f"{d:g} in -> row {row:.3f}  ({', '.join(names)})")
+        print(f"saved {len(c.points)} points to {CAL_PATH}" if len(c.points) >= 2 else "need at least 2 distances: nothing saved")
     else:
-        print("usage: python -m pi_pipeline.vision.wall_distance calibrate")
+        print("usage: python -m pi_pipeline.vision.wall_distance calibrate | pictures DIR [shot_007 shot_008 ...]")

@@ -52,3 +52,25 @@ def test_a_picture_that_is_all_wall_is_blocked_and_the_dry_run_log_is_written(tm
     f = tmp_path / "wall.jsonl"
     log_dry_run(e, str(f), extra={"note": "test"})
     assert f.exists() and '"note": "test"' in f.read_text()
+
+
+def test_the_calibration_is_built_from_labelled_pictures_and_reads_them_back(tmp_path):
+    from PIL import Image
+    from pi_pipeline.vision.wall_distance import calibrate_from_pictures, check_against_pictures
+    import json
+    labels = {}
+    for i, (inches, base) in enumerate(((8, 0.85), (16, 0.66), (24, 0.58), (40, 0.50))):        # a lower base row = closer
+        Image.fromarray(_scene(base, base, seed=i)).save(tmp_path / f"shot_{i:03d}.jpg", quality=95)
+        labels[f"shot_{i:03d}"] = {"label": "wall_straight", "distance_in": inches}
+    Image.fromarray(_scene(0.7, 0.7)).save(tmp_path / "shot_900.jpg")
+    labels["shot_900"] = {"label": "door", "distance_in": 16}                                   # not a plain wall: never used
+    labels["shot_901"] = {"label": "wall_straight", "distance_in": None}                        # distance unknown: never used
+    (tmp_path / "labels.json").write_text(json.dumps(labels))
+    cal_path = tmp_path / "cal.json"
+    cal, table = calibrate_from_pictures(str(tmp_path), path=str(cal_path))
+    assert [t[0] for t in table] == [8.0, 16.0, 24.0, 40.0] and cal_path.exists()
+    assert [round(d, 1) for _, d in sorted(cal.points)] == [101.6, 61.0, 40.6, 20.3]
+    for name, true_in, est_in in check_against_pictures(cal, str(tmp_path)):
+        assert abs(true_in - est_in) < 1.5, (name, true_in, est_in)                              # the pictures it was built from read back within an inch
+    c2, t2 = calibrate_from_pictures(str(tmp_path), shots=["shot_000"], save=False)             # one distance is not enough to save
+    assert len(c2.points) == 1

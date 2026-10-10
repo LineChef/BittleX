@@ -14,6 +14,9 @@ Goal (user): G2 looks often enough to notice a wall coming, not so often that co
 4. **Cost control:** no look while sleeping, resting or during a picture stop (the survey picture counts as a look); never faster than once per 3 s; the last 20 estimates are kept in memory and only the log line per look is written (a flagged "turn" case also saves its jpeg to a small ring of 10 for review).
 5. **Failure handling:** two bad grabs in a row (camera error) keeps the current behavior (short legs of 3 s) and logs it; the wall logic must never block the safe stop.
 
+## Calibration from pictures (2026-10-10)
+The first calibration was built from labelled recognition pictures, not by moving a box: `python -m pi_pipeline.vision.wall_distance pictures ~/g2_wall_pics shot_007 shot_008 shot_009 shot_010 shot_011` (the same median-of-the-middle-three-groups rule as `calibrate`; `calibrate_from_pictures` / `check_against_pictures` in `wall_distance.py`). Pictures were taken with G2 standing, wall straight on, at 8, 12, 16, 24 and 40 in; the second pass (picked up and re-placed each time) repeated within 3 px, and a simple lens model (floor line = 115 + 608 / distance in inches, in a 240 px picture) fits to 2 px. Limits: rows come in steps of 1/24 of the picture (10 px), so between 8 and 24 in the reading is good to about 2 to 4 in, and beyond 24 in it only tells far from near (24 to 40 in differ by 14 px). Pictures stay on the Pi (`~/g2_wall_pics`), never in the repo.
+
 ## Steps
 1. Calibrate on hardware (hardware plan block 5): `wd.calibrate()`, box at 20/30/40/60/100 cm; check the logged distances against tape within about 5 cm.
 2. One dry-run exploration session with the per-leg look wired to the log only; review the log for false positives (table legs, rugs, shadows, floor seams, tile lines, a person standing).
