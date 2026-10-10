@@ -63,7 +63,13 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "3" if os.environ.get("G2_WALL_STEER", "1") != "0" else "10")),     # the wall look rides the peek: every 3 s while the wall steers him
                           fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
-    survey.gate = watch.gate
+    seen_near = {"t": -1e9}                                               # when a wall was last seen 40 in or closer (set by the wall look below)
+
+    def _gate(now=None):
+        if time.monotonic() - seen_near["t"] <= 10.0:                     # never start a survey (a choreography that holds off the wall guard) right next to a wall
+            return False
+        return watch.gate(now)
+    survey.gate = _gate
     if os.environ.get("G2_WALL_DRYRUN", "1") != "0":                    # the wall estimator reads the same peeks and only LOGS what it would do (vision/wall_distance.py); it never moves G2
         from .vision.embedder import to_image
         from .vision import wall_distance as wd
@@ -74,7 +80,6 @@ def _start_interest(survey, saver, vision, rt, settings, args):
 
         slow_s = float(os.environ.get("G2_WALL_LOOK_SLOW_S", "6"))
         fast_s = watch.every_s                                          # 3 s while a wall may be near
-        seen_near = {"t": -1e9}
 
         def wall_look(snap):
             wall_log.look(snap.jpeg, to_image(snap.jpeg))

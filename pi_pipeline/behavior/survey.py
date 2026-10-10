@@ -3,7 +3,7 @@
 Pure logic, no I/O. `Survey` only decides *when* (the end of an exploration leg, at most once per `cooldown_s`); the two plans below are plain
 timed steps `(delay_s, kind, payload, reason)` that the driver turns into Effects and plays with its choreography player:
 
-  survey_plan   look up (`ksit`) -> look down (`kbuttUp`, the INSPECT bow) -> stand (`kup`) -> settle -> [look left, throwaway picture, look right, throwaway picture, back to the middle, settle] -> picture (the bracketed part when `looks`, the default for survey stops; `G2_SURVEY_LOOKS=0` turns it off)
+  survey_plan   look up (`ksit`) -> look down (`kbuttUp`, the INSPECT bow) -> stand (`kup`) -> settle -> [look left, throwaway picture, look right, throwaway picture, back to the middle, settle] -> picture (the bracketed part only when `looks`, `G2_SURVEY_LOOKS=1`; off by default)
   naming_plan   the same, but a single look-down picture saved under a name the user gave by voice ("this is a mug"), and G2 says he will remember it
 
 G2 does NOT lie down first (2026-10-07): a skill replaces a running learned walk without resting (`app/sinks.py`, `stop(rest=False)`), so the first step is the bow itself.
@@ -46,7 +46,7 @@ def survey_config_from_env() -> SurveyConfig:
             return max(0.0, float(os.environ.get(name, default)))
         except ValueError:
             return default
-    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), looks=os.environ.get("G2_SURVEY_LOOKS", "1") != "0")     # `G2_SURVEY_LOOKS=0` = only the one standing picture
+    return SurveyConfig(cooldown_s=_f("G2_SURVEY_COOLDOWN_S", 60.0), first_delay_s=_f("G2_SURVEY_FIRST_S", 30.0), looks=os.environ.get("G2_SURVEY_LOOKS", "0") == "1")     # `G2_SURVEY_LOOKS=1` = also look left and right (OFF by default: open-loop timed turns were off by 30 to 70 deg and G2 has no head to pan, 2026-10-10)
 
 
 class Survey:

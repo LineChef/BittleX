@@ -346,12 +346,12 @@ def test_a_survey_stop_looks_up_down_then_left_and_right_with_a_throwaway_pictur
     assert [p for _, k, p, _ in naming_plan("mug", SurveyConfig(looks=True)) if k == "shot"] == ["name:mug"]      # a named picture is not a look sequence
 
 
-def test_the_looks_are_on_unless_the_environment_turns_them_off(monkeypatch):
+def test_the_looks_are_off_unless_the_environment_turns_them_on(monkeypatch):
     from pi_pipeline.behavior.survey import survey_config_from_env
     monkeypatch.delenv("G2_SURVEY_LOOKS", raising=False)
+    assert survey_config_from_env().looks is False                       # off by default (2026-10-10)
+    monkeypatch.setenv("G2_SURVEY_LOOKS", "1")
     assert survey_config_from_env().looks is True
-    monkeypatch.setenv("G2_SURVEY_LOOKS", "0")
-    assert survey_config_from_env().looks is False
 
 
 def test_look_pictures_are_throwaway_own_folder_not_fed_to_the_gallery_and_the_newest_30_stay(tmp_path):
