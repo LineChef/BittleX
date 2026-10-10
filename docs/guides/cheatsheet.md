@@ -102,6 +102,15 @@ Analyze runs (dev machine):
 | `python sysid_replay.py --log <real_log.csv>` | Replay a real robot log's joint commands open-loop in a sim mirror; report the sim-to-real tilt/rate gap |
 | `python sysid_replay.py --log <real_log.csv> --fit` | + sweep motor force / PD gains / `CMD_LATENCY_STEPS` to close the gap; prints the env edits |
 
+## Teaching a movement by hand (voice service stopped, G2 on his feet)
+
+```bash
+bash tools/g2_safe_stop.sh voice
+python -m pi_pipeline.gait.teach --out ~/g2_taught/hi_step.json --leg fl     # on the Pi; type help
+#   stand | fl knee +5 | fr shoulder 40 | hand, grab, hold | check | raw | save [name] | undo | list | goto N | play | rest | quit
+cd rl_training/opencat-gym/reference_gait && ../../../.venv/bin/python build_taught_step.py ~/g2_taught/hi_step.json --name hiT   # Mac: makes hiT_ref.npy
+```
+
 ## 5. Deploying to the Pi
 
 Deploying is `rsync`, never `git clone` ([`pi-bring-up.md`](pi-bring-up.md) §7, [`gait-deployment.md`](gait-deployment.md)).

@@ -19,7 +19,7 @@ A tall step needs active balance, which is what a learned correction on top of a
 
 1. **A better high-step base.** Two sources, both allowed by the no-LLM-authored-keyframes rule:
    - **Parameter sweep in the sim** of the generator (`rl_training/opencat-gym/reference_gait/build_highstep_reference.py`): shoulder lift, knee fold, rear boost, cycle time, stance width. Score with `gait_probe.py` (clearance, sway, falls, ledge ladders). Mac only.
-   - **A hand-taught step** (puppeteering): the user moves a leg through the step and the angles are recorded. Two tools, to be compared first: Petoi's Skill Composer (desktop app: B3 in [`../behavior-ideas.md`](../behavior-ideas.md)) and our own Pi-side recording (B25). Either way the result is a keyframe array that `reference_gait/build_skill_reference.py` turns into a reference `.npy`. Open: the joint read (`j`) returned nothing at rest on 2026-10-10 and must be made to work for the Pi-side route; whether Skill Composer can read the joints by hand is not verified.
+   - **A hand-taught step** (puppeteering; decided 2026-10-10 after reading Petoi's Skill Composer, which only has sliders and never reads the joints back, so it is not used): our own tool, `pi_pipeline/gait/teach.py`. Two ways that work together: `hand` relaxes the servos, the user moves a leg, `grab` reads the eight angles from the servo feedback (`f`, else `j`); or `stand` then jog commands like `fl knee +5` / `fr shoulder 40`, each eased. `save` keeps a step. `check` proves the readback against the balance pose before it is trusted. Steps go to a JSON file, then `rl_training/opencat-gym/reference_gait/build_taught_step.py FILE --name N` makes `N_ref.npy`: a smooth closed path through the steps for the taught leg, copied to the other three legs with wkF's phase offsets (rear legs: wkF plus the taught change, or the taught angles with `--rear replace`). Open: the reply format of `f` / `j` is undocumented, so the first session starts with `raw` and `check`.
 2. **Check the chosen base in the sim** (`gait_probe.py`) before G2 sees it.
 3. **Track C, a fresh screening run** (3M cap; gate: the high step stays up, and the normal walk does not get worse) on that base: one network for both modes, about 20% of episodes in the opposite mode, some switching mid-episode, high step triggered by step-ups, rubble, boxes, snags and small thresholds. A 20M run only on the user's go. Never a continuation of a finished 20M.
 4. **On G2** (on his feet on the floor, hands near; sim-only comparisons): short walks over a cable and the threshold strip, judged by eye; then deploy with `"modes": ["normal", "hi_step"]` in the sidecar.
@@ -28,7 +28,7 @@ A tall step needs active balance, which is what a learned correction on top of a
 
 - What G2 should step over and how tall it is (sets the clearance target; 25 mm is about 1 inch).
 - Go for the sweep and for the Track C screening run.
-- The first-session puppeteering choice (Skill Composer or the Pi-side recording).
+- A teaching session (Block G of the hardware plan): the voice service stopped, G2 on his feet, hands near.
 
 ## After the hi-step: a climbing movement with the same method (user, 2026-10-10)
 
