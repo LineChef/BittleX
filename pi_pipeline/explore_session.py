@@ -58,6 +58,11 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     from .vision.localizer import ForegroundLocalizer
     from .vision.object_gallery import ObjectGallery, ObjectGalleryConfig
     gpath = os.path.join(os.path.expanduser(settings.object_gallery_dir), "gallery.json")
+    try:
+        from .vision import promoted_loader
+        promoted_loader.process(gpath)                                    # pictures you promoted since the last session are learned first (vision/promoted_loader.py)
+    except Exception:  # noqa: BLE001 -- the gallery loads as it was
+        log.exception("loading the promoted pictures failed")
     gallery = ObjectGallery.load(gpath, ObjectGalleryConfig(lock_by_holdout=True))
     base = frozenset({"face", "person", "human"})
     scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,

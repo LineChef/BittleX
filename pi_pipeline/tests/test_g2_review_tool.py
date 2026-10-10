@@ -252,10 +252,13 @@ def test_the_filter_marks_bad_and_duplicate_pictures_automatically_and_only_labe
     app = gr.App.__new__(gr.App)
     with pytest.raises(ValueError):
         app.promote_pictures(["survey/20261010/after_bow_a.jpg"])           # not labelled yet: label first
+    calls = []
+    app.remote = type("R", (), {"call": lambda self, args: calls.append(args) or {"loaded": [{"path": "named/mug/mug_a.jpg"}], "deferred": False}})()
     out = app.promote_pictures(["named/mug/mug_a.jpg"])
-    assert out == {"promoted": ["named/mug/mug_a.jpg"]} and (tmp_path / "training_data/exploration/promoted/mug/mug_a.jpg").exists()
+    assert calls == [["pi_pipeline.vision.promoted_loader", "add", "named/mug/mug_a.jpg"]]          # promotion queues the picture for the robot's gallery
+    assert out["promoted"] == ["named/mug/mug_a.jpg"] and out["gallery"]["deferred"] is False and (tmp_path / "training_data/exploration/promoted/mug/mug_a.jpg").exists()
     assert gr.read_promoted() == {"named/mug/mug_a.jpg": "exploration/promoted/mug/mug_a.jpg"}
-    app.promote_pictures(["named/mug/mug_a.jpg"], False)
+    assert app.promote_pictures(["named/mug/mug_a.jpg"], False) == {"unpromoted": ["named/mug/mug_a.jpg"]} and len(calls) == 1      # taking it out does not touch the gallery
     assert gr.read_promoted() == {} and not (tmp_path / "training_data/exploration/promoted/mug/mug_a.jpg").exists()
 
 

@@ -272,7 +272,13 @@ class App:
             done.append(rel)
         CACHE.mkdir(parents=True, exist_ok=True)
         (CACHE / "promoted.json").write_text(json.dumps(promoted, indent=1))
-        return {"promoted" if value else "unpromoted": done}
+        out = {"promoted" if value else "unpromoted": done}
+        if value and done:                                     # loading into the robot's gallery is automatic: the Pi learns the picture under its label (now, or at the next exploration start)
+            try:
+                out["gallery"] = self.remote.call(["pi_pipeline.vision.promoted_loader", "add", *done])
+            except Exception as e:  # noqa: BLE001 -- the training copy is made either way
+                out["gallery"] = {"error": str(e)[:120]}
+        return out
 
     def mark_people(self, paths: list[str], value: bool):
         """Flag (or unflag) pictures as containing a person. Kept on this Mac only, next to the pictures; nothing is deleted."""
@@ -552,7 +558,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.promoted)c.append(el("div","badge","promoted \u2713"));if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
-    if(tab==="pictures"&&p.group==="named"){const pr=el("button","pbtn",p.promoted?"Unpromote":"Promote");pr.title=p.promoted?"Take this picture back out of the training data":"Add this labelled picture to the training data";pr.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/promote",{paths:[p.path],value:!p.promoted});p.promoted=!p.promoted;render();toast(p.promoted?"Promoted to the training data":"Taken out of the training data")}catch(e){toast("Failed: "+e.message)}};c.append(pr)}
+    if(tab==="pictures"&&p.group==="named"){const pr=el("button","pbtn",p.promoted?"Unpromote":"Promote");pr.title=p.promoted?"Take this picture back out of the training data":"Add this labelled picture to the training data";pr.onclick=async(ev)=>{ev.stopPropagation();try{const r=await api("/api/pictures/promote",{paths:[p.path],value:!p.promoted});p.promoted=!p.promoted;render();const g=r.gallery||{};toast(!p.promoted?"Taken out of the training data (it stays in the robot's gallery)":g.error?"Promoted to the training data; the robot's gallery could not be reached: "+g.error:g.deferred?"Promoted; the robot's gallery learns it at the next exploration start":(g.conflicts&&g.conflicts.length)?"Promoted, but the gallery has a look-alike with a different name: not loaded":"Promoted: in the training data and the robot's gallery")}catch(e){toast("Failed: "+e.message)}};c.append(pr)}
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));
