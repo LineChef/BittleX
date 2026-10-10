@@ -135,6 +135,10 @@ class SerialLink:
             return ""
         try:
             self._ease_stand_up(command)
+            if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep: wait (at most 2 s) for speech to finish, then tell the gate speech must wait for the beep
+                from ..voice import audio_gate
+                audio_gate.wait_idle(2.0)
+                audio_gate.note_beep(audio_gate.beep_seconds(command))
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)

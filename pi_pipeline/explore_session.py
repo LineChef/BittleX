@@ -117,6 +117,8 @@ def parse_args(argv=None):
 
 def main() -> None:
     args = parse_args()
+    from .voice import audio_gate as _gate
+    _gate.install()                                   # one sound at a time: speech and sound effects wait for each other (voice/audio_gate.py)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s", datefmt="%H:%M:%S")
     from .app.__main__ import _build_runtime, _make_link, _make_memory, _make_vision_source
@@ -210,6 +212,10 @@ def main() -> None:
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
             narrator = Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
             attach(rt.bindings, narrator)
+            narrator.quiet(True)                                              # no narration during the hand-over greeting, the eased stand-up and the first leg (the glitchy first 3 to 5 s, 2026-10-10)
+            _t = threading.Timer(float(os.environ.get("G2_NARRATE_START_QUIET_S", "8")), lambda: narrator.quiet(False))
+            _t.daemon = True
+            _t.start()
             rt.bindings.tts = tts
             say("Exploration mode. I will stay put and look around first." if args.stationary else "Exploration mode.")
             if not args.arm_on_start:                                              # a script start; the voice hand-over already said it and played the horn

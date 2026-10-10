@@ -191,6 +191,8 @@ def main() -> None:
                          "file; replay with `python -m pi_pipeline.link.trace replay PATH`")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+    from .voice import audio_gate as _gate
+    _gate.install()                                   # one sound at a time: speech and sound effects wait for each other (voice/audio_gate.py)
 
     if args.halt:
         return _signal_running_instance(signal.SIGUSR1, "EMERGENCY STOP")

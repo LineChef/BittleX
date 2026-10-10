@@ -36,6 +36,8 @@ def main() -> None:
     ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
+    from . import audio_gate as _gate
+    _gate.install()                                   # one sound at a time: speech and sound effects wait for each other (voice/audio_gate.py)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
