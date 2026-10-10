@@ -219,3 +219,68 @@ def test_look_pictures_are_valid_picture_paths_so_they_can_be_deleted_and_have_t
         App._rel("../x.jpg")
     from tools import g2_review
     assert '["looks","Looks"]' in g2_review.PAGE if hasattr(g2_review, "PAGE") else True
+
+
+def test_the_filter_marks_bad_and_duplicate_pictures_automatically_and_only_labelled_kept_ones_can_be_promoted(tmp_path, monkeypatch):
+    import io
+    import json
+    import pytest
+    from PIL import Image
+    from tools import g2_review as gr
+    cache = tmp_path / "explore"
+    monkeypatch.setattr(gr, "CACHE", cache)
+    monkeypatch.setattr(gr, "PROMOTED", tmp_path / "training_data" / "exploration" / "promoted")
+    gr._curation_cache.update(key=None, rows={})
+
+    def jpg(path, base, noise=0):
+        import random
+        r = random.Random(noise)
+        im = Image.new("RGB", (96, 96))
+        px = [(min(255, max(0, base + r.randint(-60, 60))),) * 3 for _ in range(96 * 96)]
+        im.putdata(px)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=90)
+        path.write_bytes(buf.getvalue())
+        path.with_suffix(".json").write_text(json.dumps({"pose": "after_bow", "time": "2026-10-10 18:00:00", "detections": []}))
+    jpg(cache / "survey/20261010/after_bow_a.jpg", 110, 1)
+    jpg(cache / "survey/20261010/after_bow_dark.jpg", 4, 2)               # far too dark: filtered
+    jpg(cache / "named/mug/mug_a.jpg", 120, 3)
+    v = gr.curation_verdicts()
+    assert v["survey/20261010/after_bow_dark.jpg"]["status"] == "rejected"
+    assert v["survey/20261010/after_bow_a.jpg"]["status"] in ("kept", "weak") and v["named/mug/mug_a.jpg"]["status"] in ("kept", "weak")
+    app = gr.App.__new__(gr.App)
+    with pytest.raises(ValueError):
+        app.promote_pictures(["survey/20261010/after_bow_a.jpg"])           # not labelled yet: label first
+    out = app.promote_pictures(["named/mug/mug_a.jpg"])
+    assert out == {"promoted": ["named/mug/mug_a.jpg"]} and (tmp_path / "training_data/exploration/promoted/mug/mug_a.jpg").exists()
+    assert gr.read_promoted() == {"named/mug/mug_a.jpg": "exploration/promoted/mug/mug_a.jpg"}
+    app.promote_pictures(["named/mug/mug_a.jpg"], False)
+    assert gr.read_promoted() == {} and not (tmp_path / "training_data/exploration/promoted/mug/mug_a.jpg").exists()
+
+
+def test_a_wrong_detector_tag_you_removed_no_longer_sets_the_picture_aside_as_a_person(tmp_path, monkeypatch):
+    import io
+    import json
+    from PIL import Image
+    from tools import g2_review as gr
+    cache = tmp_path / "explore"
+    monkeypatch.setattr(gr, "CACHE", cache)
+    gr._curation_cache.update(key=None, rows={})
+    path = cache / "survey/20261010/after_bow_x.jpg"
+    path.parent.mkdir(parents=True)
+    im = Image.new("RGB", (96, 96))
+    import random
+    r = random.Random(5)
+    im.putdata([(110 + r.randint(-50, 50),) * 3 for _ in range(96 * 96)])
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=90)
+    path.write_bytes(buf.getvalue())
+    side = path.with_suffix(".json")
+    side.write_text(json.dumps({"pose": "after_bow", "time": "2026-10-10 18:00:00", "detections": [{"label": "person", "score": 0.9}]}))
+    assert gr.curation_verdicts()["survey/20261010/after_bow_x.jpg"]["status"] == "people"
+    side.write_text(json.dumps({"pose": "after_bow", "time": "2026-10-10 18:00:00", "detections": [{"label": "person", "score": 0.9}], "dismissed_labels": ["person"]}))
+    import os
+    import time
+    os.utime(side, (time.time() + 5, time.time() + 5))
+    assert gr.curation_verdicts()["survey/20261010/after_bow_x.jpg"]["status"] in ("kept", "weak")      # the removed tag no longer counts; the record stays in the sidecar

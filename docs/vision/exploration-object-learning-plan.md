@@ -187,3 +187,12 @@ Camera lessons: the module's picture buffer cuts 480 x 480 pictures short (use 2
 
 Recognizing objects and scenes is meant to be the first step toward G2 having a **sense of where he is**: the pictures he takes while exploring, and the names he is taught, are the raw material for place memory (behavior idea B11, [`../behavior-ideas.md`](../behavior-ideas.md)). That is why clean pictures of the place are kept even when nothing in them is named,
 and why the curation tool does not discard pictures just because they were taken near one that had a person in it. People are kept out of the object library when the models find them (the on-camera detector and, until the on-camera model is trained, an outside model) or when flagged by hand: legs and people seen from behind, which no model finds yet, are caught by hand (the user wants them excluded).
+
+
+## Picture workflow, decided 2026-10-10 (user)
+
+Survey pictures no longer feed the object gallery on their own (only a picture named by voice does). The path from a picture to training data:
+1. **Automatic filter** (every time the g2pics page loads the pictures, no step to run): too dark, blown out, blurry, flat, cut off, a person in it, and near-duplicates are marked and hidden by default ("Show the N filtered" brings them back). Nothing is deleted; look pictures and contact pictures are never curated.
+2. **You label by hand** (Name) and can remove a wrong detector tag (the x on a tag, undoable; the record stays in the sidecar and curation ignores a removed tag, so a false "person" no longer sets a picture aside).
+3. **You promote** (Promote on a labelled, kept picture): a copy goes to `training_data/exploration/promoted/<name>/` (gitignored). Only promoted pictures are training data. Unpromote takes the copy back out.
+Loading the promoted set into the on-robot gallery is a separate step, not built yet.

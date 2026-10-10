@@ -21,6 +21,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -44,6 +45,43 @@ def read_people_marks() -> set:
         return set(json.loads((CACHE / "people.json").read_text()))
     except (OSError, ValueError):
         return set()
+
+
+PROMOTED = Path(__file__).resolve().parents[1] / "training_data" / "exploration" / "promoted"      # labelled pictures you promoted: the training data (gitignored; never in the repo)
+
+
+def read_promoted() -> dict:
+    """{picture path under the pictures folder: where its training copy is}: what you promoted by hand."""
+    try:
+        return dict(json.loads((CACHE / "promoted.json").read_text()))
+    except (OSError, ValueError):
+        return {}
+
+
+_curation_cache: dict = {"key": None, "rows": {}}
+
+
+def curation_verdicts() -> dict:
+    """{picture path: {"status": kept|weak|rejected|duplicate|people, "reason": ...}} for the survey and named pictures: the AUTOMATIC filter (too dark, blown out, blurry, flat, cut off, a person in it) and
+    the near-duplicate removal, from tools/curate_exploration.py, recomputed whenever the pictures change. Nothing is deleted or moved: a filtered picture is only marked, and hidden on the page by default.
+    Look pictures are never curated. {} if the curation tool's libraries (Pillow, numpy) are not installed."""
+    try:
+        files = sorted((f, f.stat().st_mtime) for top in ("survey", "named") for f in (CACHE / top).rglob("*") if f.suffix in (".jpg", ".json"))      # a tag removed in the page changes a sidecar
+    except OSError:
+        return {}
+    marks = read_people_marks()
+    key = (len(files), max((m for _, m in files), default=0), len(marks))
+    if _curation_cache["key"] == key:
+        return _curation_cache["rows"]
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import curate_exploration
+        manifest = curate_exploration.curate(str(CACHE), "", None, write=False)
+    except Exception:  # noqa: BLE001 -- the page works without the verdicts
+        return {}
+    rows = {r["file"]: {"status": r["status"], "reason": r["reason"], "duplicate_of": r.get("duplicate_of")} for r in manifest["pictures"]}
+    _curation_cache.update(key=key, rows=rows)
+    return rows
 
 
 def picture_is_cut_off(path) -> bool | None:
@@ -189,10 +227,52 @@ class App:
     def pictures(self):
         items = self.remote.pictures("list")
         marks = read_people_marks()
+        verdicts, promoted = curation_verdicts(), read_promoted()
         for p in items:
             p["cut_off"] = picture_is_cut_off(CACHE / p["path"])
             p["person"] = p["path"] in marks
+            v = verdicts.get(p["path"])
+            p["status"] = v["status"] if v else ("look" if p.get("group") == "looks" else "unknown")
+            p["reason"] = v["reason"] if v else ""
+            p["promoted"] = p["path"] in promoted
         return items
+
+    def promote_pictures(self, paths: list[str], value: bool = True):
+        """Promote labelled pictures into the training data (`training_data/exploration/promoted/<name>/`), or take them back out. Only a picture you labelled (it is in a name's folder), that the filter
+        kept (not rejected, not a duplicate, no person in it) can be promoted. The original stays where it is."""
+        rels = [self._rel(p) for p in paths]
+        promoted = read_promoted()
+        verdicts, marks = curation_verdicts(), read_people_marks()
+        done = []
+        for rel in rels:
+            if not value:
+                dest = promoted.pop(rel, None)
+                for f in ([PROMOTED.parent.parent / dest, (PROMOTED.parent.parent / dest).with_suffix(".json")] if dest else []):
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
+                done.append(rel)
+                continue
+            if not rel.startswith("named/"):
+                raise ValueError("label it first (Name), then promote")
+            v = verdicts.get(rel) or {}
+            if rel in marks or v.get("status") in ("people", "rejected", "duplicate"):
+                raise ValueError(f"not promoted: {v.get('status') or 'a person is in it'} ({v.get('reason') or 'flagged'})")
+            src = CACHE / rel
+            if not src.exists():
+                raise ValueError("that picture is not here yet (refresh)")
+            name = rel.split("/")[1]
+            dst = PROMOTED / name / src.name
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            if src.with_suffix(".json").exists():
+                shutil.copy2(src.with_suffix(".json"), dst.with_suffix(".json"))
+            promoted[rel] = str(dst.relative_to(PROMOTED.parent.parent))
+            done.append(rel)
+        CACHE.mkdir(parents=True, exist_ok=True)
+        (CACHE / "promoted.json").write_text(json.dumps(promoted, indent=1))
+        return {"promoted" if value else "unpromoted": done}
 
     def mark_people(self, paths: list[str], value: bool):
         """Flag (or unflag) pictures as containing a person. Kept on this Mac only, next to the pictures; nothing is deleted."""
@@ -358,6 +438,8 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.move_pictures([list(x) for x in body["pairs"]]))
                 if u.path == "/api/pictures/person":
                     return self._json(app.mark_people(list(body["paths"]), bool(body["value"])))
+                if u.path == "/api/pictures/promote":
+                    return self._json(app.promote_pictures(list(body["paths"]), bool(body.get("value", True))))
                 if u.path == "/api/pictures/restore":
                     return self._json(app.restore_pictures(list(body["paths"])))
                 if u.path == "/api/pictures/sync":
@@ -456,7 +538,7 @@ function renderWalls(list,f){const items=data.filter(p=>!f||JSON.stringify(p).to
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:""));c.append(im,cap);
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
- if(tab==="pictures"||tab==="looks"){const items=data.filter(p=>((p.group==="looks")===(tab==="looks"))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":"No pictures yet."));return}
+ if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||p.group==="named"||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":"No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:(p.group==="looks"?"Looks ":"Survey ")+p.folder;(groups[g]=groups[g]||[]).push(p)}
   const named=Object.keys(groups).filter(g=>g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y)),survey=Object.keys(groups).filter(g=>!g.startsWith("Named: ")).sort().reverse();
   const nl=named.reduce((n,g)=>n+groups[g].length,0),nu=survey.reduce((n,g)=>n+groups[g].length,0);
@@ -468,8 +550,9 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
    if(g===named[0])list.append(el("div","divider","Labeled"));
    {list.append(el("div","group",g+" ("+groups[g].length+")"));const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
-    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(p.person)c.classList.add("isperson");
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.promoted)c.append(el("div","badge","promoted \u2713"));if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
+    if(tab==="pictures"&&p.group==="named"){const pr=el("button","pbtn",p.promoted?"Unpromote":"Promote");pr.title=p.promoted?"Take this picture back out of the training data":"Add this labelled picture to the training data";pr.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/promote",{paths:[p.path],value:!p.promoted});p.promoted=!p.promoted;render();toast(p.promoted?"Promoted to the training data":"Taken out of the training data")}catch(e){toast("Failed: "+e.message)}};c.append(pr)}
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));

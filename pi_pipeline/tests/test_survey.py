@@ -354,7 +354,7 @@ def test_the_looks_are_off_unless_the_environment_turns_them_on(monkeypatch):
     assert survey_config_from_env().looks is True
 
 
-def test_look_pictures_are_throwaway_own_folder_not_fed_to_the_gallery_and_the_newest_30_stay(tmp_path):
+def test_look_and_survey_pictures_do_not_feed_the_gallery_only_a_named_one_does(tmp_path):
     snap = Snapshot(_real_jpeg(), 240, 240, [])
     fed = []
     clock = types.SimpleNamespace(t=1791387600.0)
@@ -362,7 +362,9 @@ def test_look_pictures_are_throwaway_own_folder_not_fed_to_the_gallery_and_the_n
     p = saver("look_left")
     assert "/looks/" in p and fed == []                                  # never offered to the object gallery
     saver("after_bow")
-    assert len(fed) == 1                                                  # the picture that counts still is
+    assert fed == []                                                      # a survey picture waits for the filter, your label and a promotion (user, 2026-10-10)
+    p3 = saver("name:red mug")
+    assert fed == [p3]                                                    # only a picture named by voice feeds the gallery
 
 
 def test_a_slow_picture_does_not_make_the_steps_behind_it_fire_in_a_burst():

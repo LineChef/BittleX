@@ -107,7 +107,8 @@ def _load(in_dir: str) -> list[Pic]:
                 try:
                     d = json.load(open(side))
                     p.pose, p.name, p.taken = str(d.get("pose") or ""), d.get("name"), str(d.get("time") or "")
-                    p.dets = list(d.get("detections") or [])
+                    dismissed = {str(x).lower() for x in (d.get("dismissed_labels") or [])}          # tags you removed on the g2pics page as wrong ("person" with no person in it): the record stays in the sidecar, curation ignores them
+                    p.dets = [x for x in (d.get("detections") or []) if str(x.get("label", "")).lower() not in dismissed]
                 except (OSError, ValueError):
                     pass
                 if not p.pose:                                    # no sidecar: the file name starts with the pose (survey) or name

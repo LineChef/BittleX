@@ -154,7 +154,7 @@ class ExplorationPictureSaver:
         if kind.startswith("look_"):
             self._trim_looks(folder.parent)
             return str(path)                                             # look-only pictures are never offered to the object gallery
-        if self._on_saved:
+        if self._on_saved and kind.startswith("name:"):                 # only a picture named by voice feeds the object gallery; survey pictures wait for the filter, your label and a promotion (user, 2026-10-10)
             try:
                 self._on_saved(str(path))
             except Exception:  # noqa: BLE001
