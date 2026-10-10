@@ -134,6 +134,14 @@ LEVERS = {
     "v6_s4_all": {"G2E_FR_ANCHOR": "0.10", "G2E_FR_SHARE_SET": "ledge:0.25", "G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.0",           # the consolidation: the V5 course with more ledges, decaying to zero
                   "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.5,ledge_down:0.5", "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0",
                   "G2E_HAZ_POSTURE_RELAX": "0.4"},
+    # V6 layer 2 (docs/plan-detail/v6-staged-training-plan.md "Layer 2 and Plan B"): the structural changes, a ledge stage then a mixed consolidation, both chained from layer 1.
+    "v6_l2_ledges": {"G2E_FR_ANCHOR": "0.20", "G2E_FR_SHARE_SET": "ledge:0.60,rubble:0.10,boxes:0.05,snag:0.05,rough:0.0,slope:0.0,cutback:0.10", "G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.1",
+                     "G2E_FRONTIER_FLOOR": "ledge_up:1,ledge_down:4", "G2E_FR_PASS_H": "ledge_up:0.45,ledge_down:0.45",
+                     "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5",
+                     "G2E_HAZ_POSTURE_RELAX": "0.1", "G2E_RESET_LOG_STD": "-1.0"},
+    "v6_l2_mixed": {"G2E_FR_ANCHOR": "0.15", "G2E_FR_SHARE_SET": "ledge:0.30", "G2E_LR_SCALE": "0.3", "G2E_LR_FLOOR": "0.0",
+                    "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.45,ledge_down:0.45",
+                    "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5", "G2E_HAZ_POSTURE_RELAX": "0.3"},
     "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
 }
 # Levers that change what the POLICY observes: a policy trained with one must be scored with it (scoring_env, benchmark_v4.ladder_env, phase_v3.policy_levers).

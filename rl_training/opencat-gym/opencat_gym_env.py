@@ -995,6 +995,8 @@ CROSS_CLEAR_M = 0.10       # the base must be this far past an object's far edge
 #   term otherwise pulls the feet back down to 20 mm). Positions are the simulator's, reward only. 0 = off. Falls are not penalised any harder than before.
 FAC_EDGE_STALL = _g2e("FAC_EDGE_STALL", 0.0)
 FAC_EDGE_LIFT = _g2e("FAC_EDGE_LIFT", 0.0)
+FAC_EDGE_PROGRESS = _g2e("FAC_EDGE_PROGRESS", 0.0)       # V6 layer 2: reward for forward distance moved (metres) while within 12 cm before to 12 cm past a ledge edge
+CROSS_LEDGE_GAIN = _g2e("CROSS_LEDGE_GAIN", 0.0)         # V6 layer 2: the ledge crossing bonus is FAC_CROSS x (1 + gain x ledge height / 7.5 mm): a taller ledge pays more
 # Hazard-aware relaxation (V5 screens): while G2 is on a hazard (touched an obstacle or ledge in the last HAZ_HOLD_STEPS steps, stands on a slope of HAZ_SLOPE_DEG or more,
 #   or is at a ledge edge), HAZ_SPEED_RELAX scales the speed-tracking penalty (0 = off on a hazard) and HAZ_POSTURE_RELAX scales the imitation sharpness and the residual cost
 #   (0.5 = holding a non-scripted posture costs half). 1.0 = unchanged.
@@ -1775,7 +1777,7 @@ class OpenCatGymEnv(gym.Env):
         _haz = self._on_hazard(current_position) if (HAZ_SPEED_RELAX != 1.0 or HAZ_POSTURE_RELAX != 1.0) else False      # V5 hazard-aware relaxation
         _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
         r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
-        r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0) else 0.0
+        r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0 or FAC_EDGE_PROGRESS > 0) else 0.0
 
         # Penalty and reward
         smooth_movement = np.sum(
@@ -3010,18 +3012,25 @@ class OpenCatGymEnv(gym.Env):
         return self._ledge_edge is not None and (self._ledge_edge - 0.12) <= base_x <= (self._ledge_edge + 0.20)
 
     def _edge_reward(self, base_x, ppos) -> float:
-        """V6 ledge stage: a stall penalty after half a second of hovering at a ledge edge, and a bonus while a front paw near a step-up edge is above the ledge top."""
+        """V6 ledge stage: a stall cost after half a second of hovering at a ledge edge (growing the longer it lasts, up to 3x), a once-per-episode bonus when a front paw near a
+        step-up edge is above the ledge top, and (layer 2) a reward for forward distance moved around the edge."""
         e = self._ledge_edge
-        if e is None or self._ledge_passed or not (e - 0.12 <= base_x <= e + 0.06):
+        if e is None or self._ledge_passed or not (e - 0.12 <= base_x <= e + 0.12):
             self._edge_stall_n = 0
             return 0.0
         r = 0.0
-        if p.getBaseVelocity(self.robot_id)[0][0] < 0.02:
+        vx = p.getBaseVelocity(self.robot_id)[0][0]
+        if FAC_EDGE_PROGRESS > 0 and vx > 0:
+            r += FAC_EDGE_PROGRESS * vx * (1.0 / 80.0)                          # metres moved this control step
+        if base_x > e + 0.06:
+            self._edge_stall_n = 0
+            return r
+        if vx < 0.02:
             self._edge_stall_n += 1
         else:
             self._edge_stall_n = 0
         if FAC_EDGE_STALL > 0 and self._edge_stall_n > 40:
-            r -= FAC_EDGE_STALL
+            r -= FAC_EDGE_STALL * min(3.0, 1.0 + (self._edge_stall_n - 40) / 80.0)
         if FAC_EDGE_LIFT > 0 and self._ledge_dir > 0 and not self._edge_lift_paid:      # ONCE per episode: a per-step bonus was hoverable (a paw held over the ledge cancelled the stall cost)
             front = [pp for pp in ppos if e - 0.08 <= pp[0] <= e + 0.02]
             if front and max(pp[2] for pp in front) >= self._ledge_h + 0.002:
@@ -3039,7 +3048,7 @@ class OpenCatGymEnv(gym.Env):
                 self._obj_passed = n
         if self._ledge_edge is not None and not self._ledge_passed and base_x - CROSS_CLEAR_M > self._ledge_edge + 0.05:
             self._ledge_passed = True
-            r += FAC_CROSS
+            r += FAC_CROSS * (1.0 + CROSS_LEDGE_GAIN * self._ledge_h / 0.0075)
         return r
 
     # ---------------------------------------------------------------------------------------------------- live view (watch_live.py, `g2watchrun`)
