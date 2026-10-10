@@ -121,7 +121,7 @@ def test_the_double_beep_is_two_short_notes_and_speaker_sounds_are_off_in_tests(
 
 def test_switch_to_phrases_for_both_gaits():
     from pi_pipeline.gait.gait_mode import parse_gait_command
-    for t in ("i step", "switch die step", "eye step", "switch to high step", "switch to hi step", "switch to highstep", "highstep", "switch to high step mode", "please switch to high step"):
+    for t in ("switched to a high step", "switch to a high step", "i step", "switch die step", "eye step", "switch to high step", "switch to hi step", "switch to highstep", "highstep", "switch to high step mode", "please switch to high step"):
         assert parse_gait_command(t) == "hi_step", t
     for t in ("switch to normal", "switch to walk mode", "switch to normal walking"):
         assert parse_gait_command(t) == "normal", t
