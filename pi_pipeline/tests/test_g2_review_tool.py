@@ -383,3 +383,23 @@ def test_the_empty_trash_button_has_its_state_declared_and_wall_trash_is_emptied
                                 "call": lambda self, args: calls.append(args) or {"removed": 3}})()
     assert app.empty_trash() == {"memory": {"removed": 1}, "pictures": {"removed": 2}, "walls": {"removed": 3}}
     assert calls == [["pi_pipeline.vision.wall_pictures", "empty-trash"]]
+
+
+def test_rooms_are_set_by_file_name_survive_naming_can_be_cleared_and_undone(tmp_path, monkeypatch):
+    """B11 place memory: the room of a picture is kept on the Mac by file name, so moving the picture into an object's folder keeps it."""
+    from tools import g2_review as gr
+    monkeypatch.setattr(gr, "CACHE", tmp_path)
+    app = gr.App.__new__(gr.App)
+    out = app.set_rooms({"survey/20261010/after_bow_1.jpg": " Kitchen ", "named/oven/after_bow_2.jpg": "kitchen"})
+    assert out == {"set": 2, "previous": {"survey/20261010/after_bow_1.jpg": "", "named/oven/after_bow_2.jpg": ""}}
+    assert gr.read_rooms() == {"after_bow_1.jpg": "kitchen", "after_bow_2.jpg": "kitchen"}
+    back = app.set_rooms({"survey/20261010/after_bow_1.jpg": ""})                  # clear
+    assert back["previous"] == {"survey/20261010/after_bow_1.jpg": "kitchen"} and "after_bow_1.jpg" not in gr.read_rooms()
+    app.set_rooms(back["previous"])                                                # undo
+    assert gr.read_rooms()["after_bow_1.jpg"] == "kitchen"
+    with pytest.raises(ValueError):
+        app.set_rooms({"looks/20261010/look_1.jpg": "kitchen"})
+    with pytest.raises(ValueError):
+        app.set_rooms({"../x.jpg": "kitchen"})
+    with pytest.raises(ValueError):
+        app.set_rooms({})

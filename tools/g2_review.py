@@ -58,6 +58,15 @@ def read_roam_labels() -> dict:
         return {}
 
 
+def read_rooms() -> dict:
+    """Your room labels for the pictures (B11 place memory): {picture file name: room}. Kept on this Mac next to the pictures (`rooms.json`); keyed by the file name, which stays the same when a
+    picture is named and moves into an object's folder."""
+    try:
+        return {str(k): str(v) for k, v in json.loads((CACHE / "rooms.json").read_text()).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def read_unpromoted() -> set:
     """Pictures you took back out of the training data by hand: they are not promoted again automatically."""
     try:
@@ -312,8 +321,9 @@ class App:
         marks = read_people_marks()
         verdicts, promoted = curation_verdicts(), read_promoted()
         self._auto_promote(items, verdicts, promoted, marks)
-        promoted = read_promoted()
+        promoted, rooms = read_promoted(), read_rooms()
         for p in items:
+            p["room"] = rooms.get(p["path"].rsplit("/", 1)[-1], "") if p.get("group") != "looks" else ""
             p["cut_off"] = picture_is_cut_off(CACHE / p["path"])
             p["person"] = p["path"] in marks
             v = verdicts.get(p["path"])
@@ -391,6 +401,29 @@ class App:
         CACHE.mkdir(parents=True, exist_ok=True)
         (CACHE / "people.json").write_text(json.dumps(sorted(marks), indent=1))
         return {"marked": rels if value else [], "unmarked": [] if value else rels}
+
+    def set_rooms(self, rooms: dict):
+        """Set the room of pictures by hand ({picture path: room}; an empty room clears it). Survey and named pictures only: the look pictures are throwaways. Returns the rooms they had, for the Undo."""
+        new = {}
+        for p, room in dict(rooms).items():
+            rel = self._rel(p)
+            if rel.startswith("looks/"):
+                raise ValueError("look pictures do not get a room")
+            new[rel.rsplit("/", 1)[-1]] = " ".join(str(room or "").lower().split())[:40]
+        if not new:
+            raise ValueError("no pictures")
+        marks = read_rooms()
+        previous = {}
+        for p in rooms:
+            previous[p] = marks.get(p.rsplit("/", 1)[-1], "")
+        for f, room in new.items():
+            if room:
+                marks[f] = room
+            else:
+                marks.pop(f, None)
+        CACHE.mkdir(parents=True, exist_ok=True)
+        (CACHE / "rooms.json").write_text(json.dumps(dict(sorted(marks.items())), indent=1))
+        return {"set": len(new), "previous": previous}
 
     def name_pictures(self, paths: list[str], name: str):
         """Name pictures by hand: they move to named/<name>/ on the Pi (and here), where a voice naming would have put them. Returns the moves, for the Undo."""
@@ -556,6 +589,8 @@ def make_handler(app: App, token: str, port: int):
                     return self._json(app.dismiss_label(str(body["path"]), str(body["label"]), bool(body.get("restore", False))))
                 if u.path == "/api/pictures/move":
                     return self._json(app.move_pictures([list(x) for x in body["pairs"]]))
+                if u.path == "/api/pictures/room":
+                    return self._json(app.set_rooms(dict(body["rooms"])))
                 if u.path == "/api/pictures/person":
                     return self._json(app.mark_people(list(body["paths"]), bool(body["value"])))
                 if u.path == "/api/pictures/promote":
@@ -595,7 +630,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 .x{flex:none;width:32px;height:32px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--x);font-size:1.25rem;line-height:1}.x:hover{background:var(--xbg);border-color:var(--x)}
 .btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 12px}.btn.danger{color:var(--x);border-color:var(--x)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.pbtn{position:absolute;left:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.nbtn{position:absolute;right:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.isperson img{opacity:.35}.isperson .pbtn{background:#b83227;color:#fff}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
+.card img{width:100%;aspect-ratio:1;object-fit:contain;display:block;background:#000;cursor:zoom-in}.pbtn{position:absolute;left:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.nbtn{position:absolute;right:6px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.rbtn{position:absolute;right:56px;bottom:34px;background:rgba(255,255,255,.88);color:#13201f;border:1px solid var(--line);border-radius:4px;padding:1px 7px;font-size:.72rem}.rbtn.set{background:var(--accent);color:#fff}.isperson img{opacity:.35}.isperson .pbtn{background:#b83227;color:#fff}.badge{position:absolute;left:6px;top:6px;background:#b8860b;color:#fff;border-radius:4px;padding:1px 6px;font-size:.7rem}.lb{position:fixed;inset:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}.lb img{max-width:95vw;max-height:92vh;object-fit:contain;background:#000}.lb div{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#ddd;font-size:.85rem}.card .cap{padding:6px 8px;font-size:.78rem;color:var(--ink2)}
 .card .x{position:absolute;top:6px;right:6px;background:rgba(255,255,255,.85)}.group{margin:16px 0 6px;font-weight:600;color:var(--ink2)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;gap:12px;align-items:center;max-width:90vw}
 .toast button{background:none;border:0;color:var(--bg);text-decoration:underline}.empty{color:var(--muted);padding:24px 0}
@@ -637,11 +672,12 @@ function addFactButton(){const b=el("button","btn","Add fact");b.onclick=async()
   try{const r=await api("/api/facts/add",{fact:t.trim()});toast("Fact added",async()=>{await api("/api/delete",{kind:"facts",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
 function chip(text,onx){const c=el("span","chip",text+" ");c.style.cssText="display:inline-block;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin:2px 4px 2px 0;font-size:.74rem;background:var(--surface)";
  const x=el("button","","\u00d7");x.title="Wrong: remove this tag (you can undo)";x.style.cssText="border:0;background:none;color:var(--x);cursor:pointer;padding:0 0 0 2px;font:inherit";x.onclick=(ev)=>{ev.stopPropagation();onx()};c.append(x);return c}
-function picCaption(p){const d=el("div","cap",picLabel(p)+" \u00b7 "+p.time+(p.detector.length?" \u00b7 sees: ":""));
+function picCaption(p){const d=el("div","cap",picLabel(p)+(p.room?" \u00b7 room: "+p.room:"")+" \u00b7 "+p.time+(p.detector.length?" \u00b7 sees: ":""));
  for(const l of p.detector){d.append(chip(l,async()=>{try{await api("/api/pictures/label",{path:p.path,label:l});p.detector=p.detector.filter(x=>x!==l);render();toast("Removed the tag: "+l,async()=>{await api("/api/pictures/label",{path:p.path,label:l,restore:true});p.detector=[...p.detector,l].sort();render()})}catch(e){toast("Failed: "+e.message)}}))}return d}
 function obsLabels(r){const d=el("div","meta",r.ts+(r.labels?" \u00b7 detector: ":""));const labs=(r.labels||"").split(",").map(x=>x.trim()).filter(Boolean);
  for(const l of labs){d.append(chip(l,async()=>{const old=r.labels,nw=labs.filter(x=>x!==l).join(", ");try{await api("/api/observations/edit",{id:r.id,labels:nw});r.labels=nw;render();toast("Removed the tag: "+l,async()=>{await api("/api/observations/edit",{id:r.id,labels:old});r.labels=old;render()})}catch(e){toast("Failed: "+e.message)}}))}return d}
 function picLabel(p){if(p.name)return p.name;if(!p.pose)return "";return p.pose==="after_bow"?"Survey stop":p.pose.replace(/_/g," ")}
+async function setRooms(ps,room){room=(room||"").trim().toLowerCase();const m={};for(const p of ps)m[p.path]=room;try{const r=await api("/api/pictures/room",{rooms:m});if(room)window.lastRoom=room;for(const p of ps)p.room=room;render();toast(room?"Room set to "+room+" for "+ps.length+" picture(s)":"Room cleared",async()=>{await api("/api/pictures/room",{rooms:r.previous});for(const p of ps)p.room=r.previous[p.path]||"";render()})}catch(e){toast("Failed: "+e.message)}}
 function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Trash; you can undo)";b.setAttribute("aria-label","Delete");b.onclick=fn;return b}
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
@@ -661,7 +697,8 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
- if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||p.group==="named"||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":"No pictures yet."));return}
+ if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||p.group==="named"||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb)}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
+  if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":window.noRoomOnly?"Every picture has a room.":"No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:(p.group==="looks"?"Looks "+p.folder:"Not labeled");(groups[g]=groups[g]||[]).push(p)}
   const fname=p=>p.path.split("/").pop().toLowerCase();for(const g of Object.keys(groups))groups[g].sort((a,b)=>fname(a).localeCompare(fname(b)));       // A to Z by file name inside every group (classes first, then the unlabeled images, both alphabetical)
   const named=Object.keys(groups).filter(g=>g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y,undefined,{sensitivity:"base"})),survey=Object.keys(groups).filter(g=>!g.startsWith("Named: ")).sort((x,y)=>x.localeCompare(y)).reverse();
@@ -672,11 +709,12 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   const order=[...named,...survey];if(named.length&&survey.length){order.splice(named.length,0,"\u0000divider")}
   for(const g of order){if(g==="\u0000divider"){list.append(el("div","divider","Not labeled yet"));continue}
    if(g===named[0])list.append(el("div","divider","Labeled"));
-   {list.append(el("div","group",g+" ("+groups[g].length+(g.startsWith("Named: ")?" \u00b7 "+groups[g].filter(q=>q.promoted).length+" in the training data":"")+")"));const grid=el("div","grid");
+   {const gh=el("div","group",g+" ("+groups[g].length+(g.startsWith("Named: ")?" \u00b7 "+groups[g].filter(q=>q.promoted).length+" in the training data":"")+(groups[g].some(q=>q.room)?" \u00b7 "+groups[g].filter(q=>q.room).length+" with a room":"")+") ");const gb=el("button","btn","Set the room of all "+groups[g].length);gb.style.cssText="margin-left:8px;padding:1px 8px;font-size:.78rem";gb.onclick=async()=>{const r=prompt("Which room are all "+groups[g].length+" pictures in this group from? (you can change single ones afterwards)",window.lastRoom||"");if(r===null||!r.trim())return;await setRooms(groups[g],r)};gh.append(gb);list.append(gh);const grid=el("div","grid");
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
     if(tab==="pictures"&&p.group==="named"&&!p.promoted){const pr=el("button","pbtn","Promote");pr.title="Add this labelled picture to the training data (it was set aside or taken out)";pr.onclick=async(ev)=>{ev.stopPropagation();try{const r=await api("/api/pictures/promote",{paths:[p.path],value:!p.promoted});p.promoted=!p.promoted;render();const g=r.gallery||{};toast(!p.promoted?"Taken out of the training data (it stays in the robot's gallery)":g.error?"Promoted to the training data; the robot's gallery could not be reached: "+g.error:g.deferred?"Promoted; the robot's gallery learns it at the next exploration start":(g.conflicts&&g.conflicts.length)?"Promoted, but the gallery has a look-alike with a different name: not loaded":"Promoted: in the training data and the robot's gallery")}catch(e){toast("Failed: "+e.message)}};c.append(pr)}
+    if(p.group!=="looks"){const rb=el("button","rbtn"+(p.room?" set":""),p.room?"Room: "+p.room:"Room");rb.title="Which room is this picture from? (kitchen, hallway, ...). Used for G2's place memory; leave empty to clear";rb.onclick=async(ev)=>{ev.stopPropagation();const r=prompt("Which room is this picture from? (empty clears it)",p.room||window.lastRoom||"");if(r===null)return;await setRooms([p],r)};c.append(rb)}
     const nb=el("button","nbtn","Name");nb.title="Name what is in this picture (it moves into that object's folder in the library)";nb.onclick=async(ev)=>{ev.stopPropagation();const nm=prompt("What is this? (for example: dishwasher)",p.name||window.lastName||"");if(!nm||!nm.trim())return;
      try{const r=await api("/api/pictures/name",{paths:[p.path],name:nm.trim()});window.lastName=nm.trim();toast("Named: "+nm.trim(),async()=>{await api("/api/pictures/move",{pairs:r.named.map(m=>[m.to,m.from])})});load()}catch(e){toast("Failed: "+e.message)}};c.append(nb);
     c.append(im,xbtn(async()=>{try{await api("/api/pictures/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Picture moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:[p.path]})})}catch(e){toast("Failed: "+e.message)}}));

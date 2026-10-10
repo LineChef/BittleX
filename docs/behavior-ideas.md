@@ -802,6 +802,8 @@ applies):**
   more than it currently does — a later design question, not blocking this.
 
 ### B11 — Learn its way around the house (topological place memory)
+**Plan agreed 2026-10-10 (rooms, phases P0 to P4): [`plan-detail/place-memory-plan.md`](plan-detail/place-memory-plan.md).** P0 = room labels on the saved pictures (`g2pics`, Room button) + `tools/eval_rooms.py`.
+
 G2 builds up a sense of *where it is* over time — as **place recognition + a
 graph of places**, never a metric floor plan (no depth/lidar, and monocular
 VSLAM is out of reach on a 512 MB Pi with a 192×192 low-FPS camera).
