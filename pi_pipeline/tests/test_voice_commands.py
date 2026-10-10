@@ -127,3 +127,11 @@ def test_voice_language_reset_phrases():
         assert match_local_command(t) == "voice_language", t
     assert match_local_command("I like english muffins") is None
     assert match_local_command("the floor is tile") == "floor"
+
+
+def test_grunt_and_oof_render_short_audible_pcm():
+    import numpy as np
+    from pi_pipeline.voice import prompt_tones as pt
+    for fn, lo, hi in ((pt.render_grunt, 0.3, 0.5), (pt.render_oof, 0.4, 0.6)):
+        y = fn()
+        assert y.dtype == np.int16 and lo < y.size / 48000 < hi and np.abs(y).max() > 300

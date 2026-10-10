@@ -675,6 +675,9 @@ class VoiceLoop:
         # system prompt for this turn (a rebuff drops it to SUBDUED for a while)
         if looks_like_rebuff(user_text):
             self._mood.note_rebuff()
+            if os.environ.get("G2_GRUNT", "1") != "0":
+                from . import prompt_tones
+                prompt_tones.play_grunt(wait=True)           # G2 does not like that (user, 2026-10-10); the speaker is the only voice here, so waiting 0.4 s is harmless
         recency = getattr(self._memory, "recency", None)
         age, n_recent = recency() if callable(recency) else (None, 0)
         self._mood.update(last_interaction_s=age, exchanges_recent=n_recent)

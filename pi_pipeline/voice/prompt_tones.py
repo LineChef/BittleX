@@ -101,6 +101,38 @@ def _play(pcm_fn, peak: float, rate: int, wait: bool) -> None:
         threading.Thread(target=_run, daemon=True).start()
 
 
+def _lowpass(x: np.ndarray, n: int) -> np.ndarray:
+    return np.convolve(x, np.ones(n) / n, mode="same")
+
+
+def _voiced(f0: float, f1: float, dur: float, rate: int, attack: float, decay: float, harmonics: int = 9, breath: float = 0.0, seed: int = 1) -> np.ndarray:
+    """A sagging buzzy voice: a pitch glide f0 -> f1 with 1/n harmonics, a little low-passed noise ("breath") and a fast attack."""
+    t = np.arange(0, dur, 1.0 / rate)
+    f = np.linspace(f0, f1, t.size)
+    ph = 2 * np.pi * np.cumsum(f) / rate
+    y = sum(np.sin(k * ph) / k for k in range(1, harmonics + 1))
+    if breath:
+        noise = _lowpass(np.random.default_rng(seed).standard_normal(t.size), 40)
+        y = y + breath * noise / (np.abs(noise).max() or 1.0) * np.abs(y).max()
+    return y * np.minimum(1.0, t / attack) * np.exp(-t * decay)
+
+
+def render_grunt(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A low, gravelly "hmph" (about 0.35 s): G2 does not like something. Two quick falling pulses, the second shorter and lower."""
+    a = _voiced(120.0, 78.0, 0.20, rate, attack=0.01, decay=7.0, breath=0.35, seed=1)
+    b = _voiced(100.0, 62.0, 0.14, rate, attack=0.01, decay=9.0, breath=0.35, seed=2)
+    return _finish([a, np.zeros(int(rate * 0.04)), b], peak)
+
+
+def render_oof(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+    """A winded "ooof" (about 0.5 s): a low thump of impact, then a breathy vowel that falls in pitch and fades."""
+    n = int(rate * 0.06)
+    thump = _lowpass(np.random.default_rng(3).standard_normal(n), 60)
+    thump = thump / (np.abs(thump).max() or 1.0) * np.exp(-np.arange(n) / (rate * 0.015))
+    vowel = _voiced(210.0, 105.0, 0.44, rate, attack=0.03, decay=5.5, harmonics=6, breath=0.45, seed=4)
+    return _finish([thump * 1.2 + vowel[:n] * 0.0, vowel], peak)
+
+
 def play_beep(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_beep, peak, rate, wait)
 
@@ -119,3 +151,20 @@ def play_fanfare(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = Fal
 
 def play_double(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_double, peak, rate, wait)
+
+
+def play_grunt(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_grunt, peak, rate, wait)
+
+
+def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    _play(render_oof, peak, rate, wait)
+
+
+if __name__ == "__main__":          # audition on the Pi:  python -m pi_pipeline.voice.prompt_tones grunt|oof|beep|boop|close|double|fanfare
+    import sys
+    name = sys.argv[1] if len(sys.argv) > 1 else "grunt"
+    fn = globals().get(f"play_{name}")
+    if fn is None:
+        raise SystemExit("sounds: grunt oof beep boop close double fanfare")
+    fn(wait=True)
