@@ -38,7 +38,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 
 **Conversation quality:** greetings, small talk, simple arithmetic and questions about itself were answered by its own model, about one second to the start of a reply, with no Claude call. The tone comes from the role text and the model (it said "la" and "eh" until prompted otherwise); it also knows the date from the server.
 
-**The device's own robot tool does not work with the free model:** every "sit down", "shake your head" and "say goodbye" made the model write `% self.robot.send_command...` into its speech; the firmware stripped it and no command reached the BiBoard (checked on the BiBoard's USB log and the Pi's serial line). Petoi's recommended role template made no difference.
+**The device's own robot tool did not move anything in our tests, cause not established:** every "sit down", "shake your head" and "say goodbye" produced the log line `Detected code leak in TTS text, removing: % self.robot.send_command...`, the head said it had done the action, and no command was seen reaching the BiBoard (checked on the BiBoard's USB log and the Pi's serial line, with the BiBoard in low-power mode and later with the battery on). Petoi's own Role template tells the model to filter `% self.robot.` and `% get_xxx` out of what it speaks, which suggests that text is the cloud's normal notation for a tool call, so the strip alone does not prove the call was never made; whether the call reached the head, and whether the head's serial line was connected the way we assumed, were not separated. Petoi's recommended Role template made no difference.
 
 **MCP works, with the same free model.** A tool server of ours on the Pi (`pi_pipeline/head/mcp_tools.py`, using the `websockets` package already on the Pi) connects out to the access point. The cloud immediately sent `initialize`, `notifications/initialized`, `tools/list` and later `ping`. A made-up answer (`g2_test_word` = "marmalade") was spoken by the head and the Pi's log showed the `tools/call`. So **the head's model can reach G2's abilities through code we control**, with our rules and safety layers.
 
@@ -98,7 +98,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **Small saving in money** (see section 3).
 - **Weight:** 42 g at the front of a robot that is already about 46 percent front-heavy, and the walking policy was trained with an assumed head mass. Not yet checked in simulation.
 - **Small chip** (one core, little memory), so the heavy work stays on the Pi.
-- **The device's own robot tool is unusable** with the free model, and the head's serial lines stay connected to the BiBoard's input, so it could send motion on its own if its model ever calls the tool.
+- **The device's own robot tool produced no movement in our tests** (cause not established), and the head's serial lines stay connected to the BiBoard's input, so it could send motion on its own if its model does call the tool.
 - **Two sources of truth to maintain:** an agent configured in a web console, plus our tool server.
 - **Firmware is not published**, so any change starts from upstream plus a rebuild of Petoi's additions.
 
