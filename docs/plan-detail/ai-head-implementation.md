@@ -106,20 +106,7 @@ Read 2026-10-11; the English summary with every source is [`../research/xiaozhi-
 
 **Net effect on the staged plan:** stages 1 to 3 are unchanged in order, with a stronger-model retest added after the certification decision; stage 4 gains two possible ways to keep self-initiated speech or a G2-like voice (a developer push, voice cloning), both unverified or payment-blocked; stage 6 and stage 8 get concrete mechanisms (emotion messages, the OTA URL); stage 7 gets a no-toolchain trial path; the wake word on the head's chip is presets only, which makes stage 7b the route to "G2".
 
-**What needs a fork (changing the firmware source) and what does not** (the build settings above are not a fork: they are options of the unmodified upstream source, but they replace Petoi's build and need a toolchain, or the console's cloud build for the few options it offers).
-
-| Goal | Fork needed? | Notes |
-|---|---|---|
-| Chat, tools, persona, escalation (stages 1 and 2) | No | the cloud agent and MCP |
-| Mounting (stage 3), one voice with a stock or cloned voice (stage 4) | No | hardware and console settings |
-| Motion through the head (stage 5) | No | a tool on the Pi's server |
-| The face (stage 6) | No | the model's emotions; our own server could send them |
-| A preset wake word ("Hi, Jason" or "Hi, ESP") | No | a settings build; replaces Petoi's build |
-| A custom wake word "G2" on the head's chip | Not possible with the vendor's tools; a fork would still need a trained model | S3 hardware, the Pi route (7b), an add-on module, or the button trick |
-| Self-initiated speech in G2's voice | No, if our own backend and an upstream build with `notify` work (item 16); otherwise a firmware change (host-driven speaker) | unverified |
-| Our own backend (stage 8) | Probably no: the address is a build setting | needs the settings build and our server |
-| The head as the Pi's mic and speaker (7b) | Yes (the realtime-mode shortcut is ruled out on the C3) | custom firmware, or an S3 head |
-| Custom boot and Wi-Fi sounds | A rebuild with new sound files | source build |
+**What each update needs** (nothing, our own backend, a fork, or other hardware) is listed update by update in section 5a, which is the one home for that answer.
 
 **Dependency view: what works with neither a backend of our own nor a fork, what needs a backend, what needs a fork** (written 2026-10-11).
 
@@ -160,6 +147,41 @@ Read 2026-10-11; the English summary with every source is [`../research/xiaozhi-
 ## 5. The target
 
 The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait, safety, vision, exploration, memory, reflection). The head's free model does the everyday talking; our tools give it facts about G2; Claude answers only the turns that need G2's memory and personality, through an "ask the brain" tool. G2 speaks in one voice, and anything he must say on his own (alarms, announcements) has a route.
+
+## 5a. What each update needs: nothing, our own backend, a fork, or other hardware
+
+**Legend.** **None** = stock firmware, XiaoZhi's cloud agent and our tool server on the Pi (nothing to build). **Settings build** = the unmodified upstream firmware built with different options (for example the server address or the wake-word preset); not a fork and not a backend, but it needs the toolchain (or the console's cloud build for the few options it offers) and it replaces Petoi's build, dropping their BiBoard link, robot tool and face tools. **Backend** = our own server instead of XiaoZhi's cloud (it also needs a settings build so the head points at it). **Fork** = changing the firmware source. **Other hardware** = an S3 head, an add-on module, or wiring.
+
+| # | Update | Stage | Needs | Why |
+|---|---|---|---|---|
+| 1 | Chat through the head, woken by the button | 1 | **None** | the cloud agent |
+| 2 | Tools: about G2, last exploration, what he learned, battery | 1 | **None** | tool server on the Pi |
+| 3 | Persona and mood tool | 2 | **None** | tool server |
+| 4 | "Ask the brain": hard questions go to Claude with G2's memory | 2 | **None** | a tool that calls Claude through the Pi |
+| 5 | A G2 handbook in the knowledge base | 1 | **None** | console feature, static and non-personal only |
+| 6 | Stronger free models (developer certification) | 1 | **None** | an account step (a GitHub account) |
+| 7 | Mounting the head on G2 | 3 | **None** | hardware and a weight check |
+| 8 | One voice: the head's stock voice, Pi speech off | 4 | **None** | loses G2's voice, narration and alarms, hands-free wake word, offline speech |
+| 9 | A G2-like voice by voice cloning | 4 | **None** (paid) | the console, WeChat Pay |
+| 10 | Motion by voice through the Pi's allowlisted skills | 5 | **None** | a tool on the Pi |
+| 11 | The face follows the model's own emotions | 6 | **None** | the model chooses; the role text can steer |
+| 12 | A preset wake word ("Hi, Jason" or "Hi, ESP") | 7 | **Settings build** | not a fork or a backend; replaces Petoi's build |
+| 13 | The face and mood driven by G2's own mood | 6 | **Backend** | the server sends the emotion messages |
+| 14 | G2's Piper voice in conversation | 8 | **Backend** | our server makes the speech |
+| 15 | G2 speaking on his own initiative (narration, alarms, announcements) in G2's voice | 4 and 8 | **Backend** (the newer push message, unverified on the C3); a developer push (unverified); or a **Fork** (a host-driven speaker) | the head only speaks inside a conversation unless the server pushes audio |
+| 16 | Claude with G2's memory as the live brain, not through a tool | 8 | **Backend** | our server calls Claude |
+| 17 | Audio stays in the house; independence from XiaoZhi's free service | 8 | **Backend** | our server replaces the cloud |
+| 18 | Pointing the head at our own server | 8 | **Settings build + Backend** | the address is a build setting (`Default OTA URL`) |
+| 19 | Hands-free "G2" by the Pi pressing the head's button | none yet | **Other hardware** | two wires and a transistor on a Pi pin; needs the Pi's microphone to stay |
+| 20 | A custom wake word "G2" on the head itself | none yet | **Other hardware** (an S3 head, or an add-on module) | not possible on the C3 by a fork or a backend |
+| 21 | Interrupting the head while it speaks | none yet | **Other hardware** (an S3 head) | echo cancellation is an S3 feature |
+| 22 | The head as the Pi's microphone and speaker; removing the Pi's own mic and speaker | 7b | **Fork** (or an S3 head); **a backend cannot do it** | custom firmware streams the mic to the Pi and plays what it sends |
+| 23 | A host-driven speaker without a backend | 7 | **Fork** | custom firmware |
+| 24 | Keeping Petoi's BiBoard link and tools while changing the server | 7 and 8 | **Fork** (or Petoi's published source) | a settings build drops them |
+| 25 | Custom boot and Wi-Fi sounds | 7 | **Settings build with new sound files** (a source build) | the sounds are compiled in |
+| 26 | Removing the head's direct robot command | 3 and 7 | **None** for a role-text discouragement; a real removal needs a **settings build** (which drops Petoi's tool) or a **Fork** | |
+
+**Reading it:** rows 1 to 11 need nothing and make stages 0 to 6. Rows 13 to 18 are the **backend** group. Rows 22 to 24 are the **fork** group. Rows 19 to 21 need other hardware, not a fork or a backend. The long-term goals split like this: G2's voice and speech on his own initiative need the backend (rows 14, 15); a hands-free "G2" needs other hardware (row 19 or 20); removing the Pi's mic and speaker needs the fork or an S3 head (row 22).
 
 ## 6. What it takes: the full list
 
@@ -208,18 +230,18 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 **Stages at a glance: what each one gains and what it costs**
 
-| Stage | What we gain | What we lose or risk |
-|---|---|---|
-| **0. Bench bring-up** (done) | The head talks in English on its own account; our tool server answers its model; the firmware is backed up. | Nothing from G2's existing setup. The test audio goes to XiaoZhi's cloud, and the account holds a phone number. |
-| **1. Talker + read-only tools** | Free chat about G2; "what did you do" and "what have you learned" answered from the Pi with no Claude call; real measurements of the savings. | Nothing existing is removed. There are briefly two voices (the head on the button, the Pi as usual), a small service to keep running, and tool answers pass through the cloud. |
-| **2. Personality + escalation** | The head carries G2's mood and traits through a tool; hard questions go to Claude with G2's memory, spoken by the head; Claude is called only then. | Casual chat is flatter than Claude's. A hard question takes two hops, so it is slower. A new rate limit and call log to maintain. |
-| **3. Mount on G2** | The head on his body with the face in front; microphone and speaker in the head. | About 27 g more at the nose than the 15 g head the walking policy assumes, which may change the gait; unmeasured current on the Grove supply; a risk that the head's serial line sends commands (default: leave it disconnected). |
-| **4. One voice, no firmware change** | A single voice for all conversation, and answers to commands as tools. | **G2's robot voice; spoken narration and alarms** (they become sounds); the Pi's hands-free "G2" wake word (the head is button-only); local, offline speech (all speech now goes to the cloud). The silent stop-word listener stays on the Pi. |
-| **5. Motion through the head** | "G2, sit" and similar through the head, with the Pi's eased stand-up and fall guard around it. | A new way for G2 to move: it needs an allowlist, refusal rules and trust in a cloud model that may mishear. |
-| **6. The face** | An expressive screen tied to his mood and events. | It depends on whether the cloud model can call the head's own face tools; if not, it waits for stage 7. |
-| **7. Firmware fork** (not decided) | A hands-free wake word; the Pi can send text or audio to the head's speaker (self-initiated speech and the robot voice for those lines return); the head's direct robot command removed. | We maintain a fork and no longer get Petoi's updates; a multi-GB toolchain download; a flash (the backup is the way back); Petoi's additions rebuilt unless their source appears. Conversation is still the cloud voice. |
-| **7b. Head as the Pi's mic and speaker** (firmware) | Everything the Pi voice does today (G2's voice, wake word, voice stop, exploration commands, narration, sounds) from hardware in the head, local; the Pi's own mic and speaker can be removed. | The free cloud brain (the Pi's Claude pipeline keeps talking); a Wi-Fi link between head and Pi that the voice stop must not depend on alone; unproven chip capacity. |
-| **8. Our own backend** (optional) | G2's own voice everywhere; no audio to XiaoZhi's cloud; independence from the free plan. | The free brain: Claude calls return (or a weaker local model); a machine that must be on; more moving parts. |
+| Stage | What we gain | What we lose or risk | Needs (section 5a) |
+|---|---|---|---|
+| **0. Bench bring-up** (done) | The head talks in English on its own account; our tool server answers its model; the firmware is backed up. | Nothing from G2's existing setup. The test audio goes to XiaoZhi's cloud, and the account holds a phone number. | None |
+| **1. Talker + read-only tools** | Free chat about G2; "what did you do" and "what have you learned" answered from the Pi with no Claude call; real measurements of the savings. | Nothing existing is removed. There are briefly two voices (the head on the button, the Pi as usual), a small service to keep running, and tool answers pass through the cloud. | None |
+| **2. Personality + escalation** | The head carries G2's mood and traits through a tool; hard questions go to Claude with G2's memory, spoken by the head; Claude is called only then. | Casual chat is flatter than Claude's. A hard question takes two hops, so it is slower. A new rate limit and call log to maintain. | None |
+| **3. Mount on G2** | The head on his body with the face in front; microphone and speaker in the head. | About 27 g more at the nose than the 15 g head the walking policy assumes, which may change the gait; unmeasured current on the Grove supply; a risk that the head's serial line sends commands (default: leave it disconnected). | None (hardware) |
+| **4. One voice, no firmware change** | A single voice for all conversation, and answers to commands as tools. | **G2's robot voice; spoken narration and alarms** (they become sounds); the Pi's hands-free "G2" wake word (the head is button-only); local, offline speech (all speech now goes to the cloud). The silent stop-word listener stays on the Pi. | None; G2's voice and speech on his own initiative need the backend |
+| **5. Motion through the head** | "G2, sit" and similar through the head, with the Pi's eased stand-up and fall guard around it. | A new way for G2 to move: it needs an allowlist, refusal rules and trust in a cloud model that may mishear. | None |
+| **6. The face** | An expressive screen tied to his mood and events. | It depends on whether the cloud model can call the head's own face tools; if not, it waits for stage 7. | None for the model's emotions; the backend for G2's mood |
+| **7. Firmware fork** (not decided) | A hands-free wake word; the Pi can send text or audio to the head's speaker (self-initiated speech and the robot voice for those lines return); the head's direct robot command removed. | We maintain a fork and no longer get Petoi's updates; a multi-GB toolchain download; a flash (the backup is the way back); Petoi's additions rebuilt unless their source appears. Conversation is still the cloud voice. | Settings build for a preset wake word; Fork for a host-driven speaker |
+| **7b. Head as the Pi's mic and speaker** (firmware) | Everything the Pi voice does today (G2's voice, wake word, voice stop, exploration commands, narration, sounds) from hardware in the head, local; the Pi's own mic and speaker can be removed. | The free cloud brain (the Pi's Claude pipeline keeps talking); a Wi-Fi link between head and Pi that the voice stop must not depend on alone; unproven chip capacity. | Fork (or an S3 head) |
+| **8. Our own backend** (optional) | G2's own voice everywhere; no audio to XiaoZhi's cloud; independence from the free plan. | The free brain: Claude calls return (or a weaker local model); a machine that must be on; more moving parts. | Backend + a settings build |
 
 **Stage 0: bench bring-up and the tool proof. Done 2026-10-11.** Gets working: the head talks in English on its own account; our tool server answers its model; the firmware is backed up.
 
