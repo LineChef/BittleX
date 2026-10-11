@@ -1,6 +1,6 @@
 # The Petoi AI Head: everything we know and the plan to use it
 
-The one home for facts about the head, the pros and cons of adopting it, what it would take, and a staged path. First hands-on session: 2026-10-11. **Status: exploration. Nothing here is committed yet: adopting the head, forking its firmware and running a backend are all open decisions** (section 8). What is deployed or running right now is in [`../STATUS.md`](../STATUS.md); the original keep-the-Pi-or-not criteria and the behavior inventory stay in [`../research/petoi-ai-head-evaluation.md`](../research/petoi-ai-head-evaluation.md); the vendor's own page is [Petoi AI conversation](https://guide.petoi.com/extensible-modules/ai-conversation).
+The one home for facts about the head, the pros and cons of adopting it, what it would take, and a staged path. First hands-on session: 2026-10-11. **Status: exploration. Nothing here is committed yet: adopting the head and running a backend are open decisions, and a small firmware fork is the owner's preferred direction (2026-10-11, section 5d) but has not started and needs the toolchain download approved first** (section 8). What is deployed or running right now is in [`../STATUS.md`](../STATUS.md); the original keep-the-Pi-or-not criteria and the behavior inventory stay in [`../research/petoi-ai-head-evaluation.md`](../research/petoi-ai-head-evaluation.md); the vendor's own page is [Petoi AI conversation](https://guide.petoi.com/extensible-modules/ai-conversation).
 
 **The owner's goal for the head (2026-10-10):** offload as much work as possible from Claude to the head, so there are as few API calls as possible. A second, related wish: one voice for G2, not two.
 
@@ -197,6 +197,8 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 
 ## 5b. Build order: where the backend and the fork become necessary
 
+**Revised 2026-10-11:** the owner's preferred direction is a small firmware fork *early*, with the Pi pressing the head's "button" by a command instead of by hardware; see section 5d. Steps 9 and 15 below keep their numbers but are superseded in that order: the first fork (the Pi trigger) comes right after step 8, the button wire or pusher is only the fallback, and the backend (steps 11 to 14) is no longer needed for hands-free talk.
+
 One ordered list, in the order we would build it. **Steps 1 to 9 need neither a backend nor a fork.** The first server code is a tiny test server at step 11; the **backend gate** is step 12; the **fork gate** is step 15. Each step says what it unlocks. The "Needs" words are defined in section 5a.
 
 | Step | What we build | Needs | What it unlocks |
@@ -209,7 +211,7 @@ One ordered list, in the order we would build it. **Steps 1 to 9 need neither a 
 | 6 | One-voice policy: Pi speech off for conversation, sounds stay, commands become tools, the silent stop-word listener stays on the Pi | None | one voice; it **loses** G2's voice, narration and alarms, hands-free wake word and offline speech (stage 4) |
 | 7 | A skills tool with an allowlist, run through the Pi's safety | None | "G2, sit" through the head (stage 5) |
 | 8 | Steer the model's emotions with the role text | None | a face that follows the conversation (stage 6, partly) |
-| 9 | Optional: the Pi presses the head's button when it hears "G2" (one wire from a free Pi pin through a resistor to the button's pad; ground is already shared; details in section 5c) | Other hardware | a hands-free "G2" while the Pi's microphone stays |
+| 9 | **Fallback only (superseded by fork step F0 in section 5d):** the Pi presses the head's button when it hears "G2", by one wire to the button's pad or an outside pusher (sheet: `blueprints/wiring/head-button-pusher.html`) | Other hardware | a hands-free "G2" while the Pi's microphone stays |
 | | **Decision point:** if one stock voice and the button trick are enough, stop here. Everything below is what steps 1 to 9 cannot give. | | |
 | 10 | Try stock upstream on the head with a preset wake word ("Hi, Jason"): the console's cloud build or the prebuilt image flashed in a browser, backup ready | Settings build | the preset wake word; shows what of Petoi's build is lost; no server needed |
 | 11 | Install the toolchain (a multi-GB download, your yes first) and make a settings build whose `Default OTA URL` points at a tiny test server of ours; check the push message and the normal speech flow on the C3 | Settings build + a tiny test server | **tells us whether the backend path works on this chip** |
@@ -222,14 +224,42 @@ One ordered list, in the order we would build it. **Steps 1 to 9 need neither a 
 
 **What each gate holds back.** *Before the backend (steps 12 to 14):* G2's own voice in conversation, Claude with G2's memory as the live brain, speech on his own initiative, a face driven by G2's mood, audio staying in the house. *Before the fork (steps 15 and 16):* the head as the Pi's microphone and speaker, removing the Pi's microphone and speaker, keeping Petoi's BiBoard link while changing the server, custom boot sounds. *Not held by either:* a hands-free "G2" (step 9 now, step 17 later) and interrupting the head (step 17).
 
+## 5d. Preferred path (owner, 2026-10-11): a small firmware fork, early, with the Pi pressing the "button" by command
+
+**Direction, not yet a started project.** Fork the head's open-source firmware (`78/xiaozhi-esp32`, MIT; private copy at `~/g2_head_firmware/xiaozhi-esp32`, tag v2.5.0) in a **separate repository or local working copy, not in bittleX**. bittleX keeps the Pi side (the listener, `pi_pipeline/head/`) and the docs. The flash backup, Wi-Fi settings and keys stay outside every repo. The head's pin map is known (section 3b); Petoi's own UART pins and tools are the only missing parts, and we do not need them because the Pi runs the body.
+
+**Why a fork instead of hardware for the button:** a command from the Pi replaces the wire, the servo or the solenoid. No opening the head, no soldering, no alignment, no weight at the nose, and the firmware can refuse the command while the head is booting (a click during start-up enters Wi-Fi setup mode) and can tell start from stop.
+
+**Staged, smallest first** (each stage is usable by itself):
+
+| Stage | The fork adds | We get | Needs |
+|---|---|---|---|
+| **F0** | A tiny local listener on the head: a command from the Pi (over Wi-Fi) that does what a click does, ignored while the head is starting | **Hands-free "G2" with the Pi's own microphone and wake word; no button hardware.** The free cloud model keeps talking. | the fork plus a small Pi sender; **no backend** |
+| **F1** | The head plays audio the Pi sends | G2's own voice (Piper) through the head's speaker, including speech on his own initiative; no button involved | F0's listener extended; a small Pi sender |
+| **F2** | The head streams its idle microphone to the Pi | The Pi's wake word hears through the head; **the Pi's own microphone and speaker can be removed** once the eight-item gate in section 6 passes | F1 plus the stream; unproven chip capacity |
+
+**The hybrid:** while idle the head streams its microphone to the Pi; the Pi hears "G2" and sends the F0 command; the head runs the stock cloud conversation (the free model, reaching G2's body through the tools already built); the Pi speaks its own lines through the head (F1). The Pi keeps movement, vision, the emergency stop, memory and reflection. Claude is used only where G2's memory and personality are needed.
+
+**What this does not need:** the backend (a server that emulates XiaoZhi's cloud). It does need a small listener and sender on the Pi, a few hundred lines.
+
+**Costs and risks:**
+- A self-built firmware replaces Petoi's build: their second serial port to the BiBoard and the `self.robot.send_command` tool go. The flash backup is the way back.
+- **Activation is the first test:** the head is bound to the owner's XiaoZhi account; a self-built firmware must reach the same cloud and activate the same way, or the free model is lost until fixed (untested; check Petoi's server address and device identity setting in the backup first).
+- The ESP-IDF toolchain is a multi-GB download (needs the owner's explicit yes and the download protocol in CLAUDE.md); flashing is reversible with the backup.
+- Unproven on the C3: running the Pi trigger, the audio paths, Wi-Fi and the cloud chat together (F2 is the heaviest). The voice emergency stop must not depend only on the head's Wi-Fi link once the Pi's microphone is gone.
+- Not covered: a custom wake word on the head and echo cancellation (S3 features); the Pi's "G2" wake word replaces the first, and the head stays half-duplex.
+
+**First actions (none starts the fork):** (1) read what Petoi's build does for the server address and activation (read-only, from the backup); (2) ask the owner to approve the toolchain download; (3) F0 on the bench with the head off G2.
+
 ## 5c. The two goals that matter most, and what is still impossible with both a backend and a fork
 
 **The owner's two priorities (2026-10-11): hands-free talk and responses, and removing the Pi's own microphone and speaker.**
 
-- **Hands-free talk now (step 9, neither a fork nor a backend):** no servo is needed. The head's side button is the board's BOOT button (GPIO 9 in the board profile). Pressing it electrically means connecting that button's signal line to ground for about 100 ms, and the Pi can do that from one GPIO pin through a resistor (about 330 ohms to 1 kilohm), leaving the pin high-impedance otherwise. **Ground is already shared** (the head's ground goes to the BiBoard over the Grove cable, and the BiBoard's ground goes to the Pi over the 5-pin header), so it is **one extra thin wire** from a free Pi pin to the button's signal pad, run along the Grove cable. It needs the head opened and one wire soldered to the button's pad (which pad is the signal side needs a photo of the opened head's board; the plan does not assume it). Pick a Pi pin not used by the amplifier and microphone (GPIO 16, 18, 19, 20, 21) or the BiBoard serial link; `blueprints/biboard-pi-connector.md` has the pin table. GPIO 9 is a boot-mode pin on this chip: the Pi must never hold it low at the head's power-up. The Pi's software would pulse the pin after it hears "G2" and only while the head is idle (pressing the button during a conversation stops it). **A servo is not recommended:** it needs a bracket on the head, adds noise and current, and a spare BiBoard servo port, for what one wire does.
+- **Hands-free talk (preferred: fork step F0 in section 5d; the hardware below is the fallback):** no servo is needed. The head's side button is the board's BOOT button (GPIO 9 in the board profile). Pressing it electrically means connecting that button's signal line to ground for about 100 ms, and the Pi can do that from one GPIO pin through a resistor (about 330 ohms to 1 kilohm), leaving the pin high-impedance otherwise. **Ground is already shared** (the head's ground goes to the BiBoard over the Grove cable, and the BiBoard's ground goes to the Pi over the 5-pin header), so it is **one extra thin wire** from a free Pi pin to the button's signal pad, run along the Grove cable. It needs the head opened and one wire soldered to the button's pad (which pad is the signal side needs a photo of the opened head's board; the plan does not assume it). Pick a Pi pin not used by the amplifier and microphone (GPIO 16, 18, 19, 20, 21) or the BiBoard serial link; `blueprints/biboard-pi-connector.md` has the pin table. GPIO 9 is a boot-mode pin on this chip: the Pi must never hold it low at the head's power-up. The Pi's software would pulse the pin after it hears "G2" and only while the head is idle (pressing the button during a conversation stops it). **A servo is not recommended:** it needs a bracket on the head, adds noise and current, and a spare BiBoard servo port, for what one wire does.
 - **This trick needs the Pi's microphone,** so it conflicts with the second priority. With the Pi's microphone gone, a hands-free "G2" needs the head's own audio to reach the Pi (stage 7b, a fork) or an S3 head with our backend (step 17).
 - **Removing the Pi's microphone and speaker** needs the fork (7b) on this C3 head, or an S3 head plus the backend. **The backend alone cannot do it on the C3.**
-- **The tension with the first goal (offload to the head's free model):** under 7b the head becomes the Pi's microphone and speaker and the conversation runs through the Pi's own pipeline, so XiaoZhi's free cloud model is no longer used and Claude calls come back; under our own backend the brain is ours (Claude, or a cheaper local model) for the same reason. So hands-free plus removing the Pi's mic and the head's free model do not all fit on the C3 head; the free model fits with the button trick and the Pi's mic kept.
+- **Superseded by the hybrid in section 5d:** the head can stream its idle microphone to the Pi, the Pi's "G2" wake word can start the stock cloud chat, and the free model keeps doing the talking. What follows describes the case where the conversation moves to the Pi or a backend.
+- **The tension with the first goal (offload to the head's free model), if the conversation moves to the Pi or a backend:** under 7b the head becomes the Pi's microphone and speaker and the conversation runs through the Pi's own pipeline, so XiaoZhi's free cloud model is no longer used and Claude calls come back; under our own backend the brain is ours (Claude, or a cheaper local model) for the same reason. So hands-free plus removing the Pi's mic and the head's free model do not all fit on the C3 head; the free model fits with the button trick and the Pi's mic kept.
 
 **Even with both a backend and a fork, what is still not possible or not guaranteed:**
 1. **Interrupting the head while it speaks** is not available on the C3: echo cancellation is an S3-class feature. With the fork, the Pi could do the echo cancellation itself (it plays the audio, so it knows the reference) but that is unproven and delicate; otherwise the head stays half-duplex (it cannot be talked over).
@@ -361,7 +391,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 1. Whether to adopt the head as G2's voice at all, or keep the Pi voice and use the head as a trial.
 2. Whether a stock cloud voice is acceptable for G2.
-3. Whether to fork the firmware (stage 7) or wait for Petoi's source. Not decided; no fork work has started.
+3. Whether to fork the firmware (stage 7) or wait for Petoi's source. **Preferred direction 2026-10-11: a small fork early (section 5d, F0 first); not started, waiting on the toolchain download approval.**
 4. Whether a backend is worth running (stage 8), and on what machine.
 5. What the head's model may do beyond talking (stage 5), and what may leave the house through tools.
 6. Decided 2026-10-11: the long-term goal is to remove the Pi's own microphone and speaker, but only once the head's microphone and speaker can do their job. The route is stage 7b (a firmware change), with the gate in section 6 first.
