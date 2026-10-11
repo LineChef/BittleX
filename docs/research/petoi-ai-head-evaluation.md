@@ -202,6 +202,14 @@ The agent's **MCP access point** (console, role page, bottom right; a secret `ws
 
 Also learned the same day: the head's board profile is the open-source firmware's `lichuang-c3-dev` (an LCKFB ESP32-C3 board with a 320x240 screen, ES8311 speaker and ES7210 microphone chips, no camera); `SecondUart` is Petoi's own addition; a read-only backup of its 16 MB flash is on the Mac (not in the repo; it holds the saved Wi-Fi settings). Forking its firmware is NOT decided; this is exploration only.
 
+### What is inside the head's firmware (read from the backup, 2026-10-11; read-only, nothing flashed)
+
+- **Layout:** the standard XiaoZhi 16 MB map: `nvs` (settings; holds the saved Wi-Fi, never read or shared), `otadata`, `phy_init`, a 960 KB wake-word `model`, a 7 MB `storage` (assets), and two 4 MB program slots, of which only `ota_0` holds a program.
+- **Base:** XiaoZhi firmware **v2.0.4**, built 2026-05-26 with **ESP-IDF 5.4.2** (project name `xiaozhi`). A fork would start from v2.0.4, not the newer upstream releases (v2.5.0 needs a different toolchain).
+- **Petoi's additions, not in upstream v2.5.0:** a `SecondUart` class on UART1 (the serial link to the BiBoard; the pin numbers are constants in the code, not visible as text), a device tool `self.robot.send_command` with Petoi token examples (`ksit`, `kwkF 3`, nod `knd`, shake `kwh`, check `kck`, scratch `kscrh`), a built-in "Bittle" role text, and an on-screen **face**: tools `self.expression.look` (center/up/down/left/right), `blink`, `set_mouth_width`, `set_mouth_style`, `set_quiet_after_speech`. The firmware also strips tool-call text from speech (`Detected code leak in TTS text`).
+- **Transport:** MQTT with UDP audio, as upstream.
+- **What it means:** Petoi's changes are larger than a serial link: a screen-face system and the robot tool as well. Rebuilding them on top of upstream would be real work; if Petoi publishes their source, a fork would start much closer. Forking remains undecided.
+
 ## How the decision will be judged
 
 1. **Is the scripted gait about as good as the learned gait?** If it is, an RL policy may not be needed for walking —
