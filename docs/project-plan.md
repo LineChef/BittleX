@@ -210,7 +210,7 @@ is **ordered, arriving ~2026-10-10**. It might replace the mic and speaker parts
 UART shared with the Pi by default). **Undecided; keeping the Pi is a fully valid outcome.** Criteria, behavior inventory, test steps and scorecard:
 [`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md).
 
-Judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
+**The owner's goal for the head (2026-10-10): offload as much work as possible from Claude to the head, so there are as few API calls as possible.** Also judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
 behaviors that make it feel alive; (3) the trade-off — a streamlined ~42 g module vs the Pi build's wiring, weight and exposed hardware, against what
 would be lost (custom control and safety layers, our Claude/memory path, local voice, the SSH/Python dev loop, privacy, vendor dependence).
 Outcomes: A keep the Pi · B Pi + head · C head only with scripted gaits · D head only with our logic elsewhere. **Do not remove the Pi before the

@@ -201,6 +201,14 @@ behavior runtime and our memory design.
    This was always a learning project and the wiring work has been worthwhile, but robustness and simplicity count.
    Against that, the head may cost capability (below), adds a cloud dependency, and sends audio/camera data off-device.
 
+4. **The owner's goal for the head (2026-10-10): offload as much work as possible from Claude to the head, to cut API calls as far as possible.** This is the main thing the head is for, and
+   it is judged alongside the three above. What to measure: which of today's Claude turns the head's own (XiaoZhi) model can take (chit-chat, greetings, simple questions, narration), which
+   must stay with Claude (anything needing G2's tools, memory, vision results or reflection), and the resulting drop in billed calls (`python -m pi_pipeline.voice.api_log --hours N`,
+   `python -m pi_pipeline.memory calls`, before and after). What already exists on our side: the local commands that never call Claude (stop, walk, battery, floor, "what did you do",
+   "what have you learned", "tell me what you see"), and the swappable-LLM `routed` mode ([`../guides/swappable-llm.md`](../guides/swappable-llm.md)), which sends easy turns to a cheaper
+   model and hard ones to Claude. The cost to weigh against it: audio and what is said leave the house for the head's cloud (privacy gate, step 0), and the head's model does not know G2's
+   memory or tools unless we bridge them.
+
 Other considerations to record, not to lose sight of: privacy (audio and images leaving the house), cost after the free
 tier, what happens if the service changes or shuts down, loss of the SSH/Python dev loop that produced all of the
 2026-10-01/02 hardware data, and that the BiBoard already has Petoi's own balance, fall and self-right reflexes.
@@ -226,6 +234,8 @@ From `docs/capabilities.md`. "Needs today" is what makes it work now; the last c
 
 Do these in order; each step ends with notes in this file or the walk log. Stop and re-plan if a step reveals a safety or
 privacy problem.
+
+**Standing aim for every step below: how much can the head do so Claude does not have to?** Note, per step, what the head handled on its own and what would still need Claude.
 
 0. **Privacy gate first.** The head sends audio (and probably camera data) to a third-party cloud. Before powering it:
    use a throwaway account, do not enroll household faces or names, keep personal details out of prompts, read the terms and
