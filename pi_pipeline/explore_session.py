@@ -269,7 +269,7 @@ def main() -> None:
         def _wake_chime():
             if features.sound_cues and not args.no_narrate:
                 from .voice import wake_chime
-                wake_chime.play(settings.ack_peak)
+                wake_chime.play()
         if features.mic and features.wake_word:
             from .behavior.explore_listener import ExploreListener
             from .voice.stt import make_stt

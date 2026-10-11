@@ -43,7 +43,7 @@ def test_call_hook_fires_for_create_not_for_models_list():
 
 def test_shutter_is_louder_than_the_other_signals():
     from pi_pipeline.voice import shutter
-    assert np.abs(shutter.render()).max() > 3 * np.abs(api_tone.render()).max()
+    assert np.abs(shutter.render().astype(float)).max() > 1.2 * np.abs(api_tone.render().astype(float)).max()
 
 
 def test_every_picture_path_clicks(monkeypatch):
@@ -107,3 +107,25 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     sent.clear()
     b.dispatch([Effect(EffectKind.CHIRP, ChirpMood.FANFARE)])
     assert sent == []                                                               # no buzzer notes for the roam start; the horn plays with the announcement
+
+
+def test_every_sound_level_is_the_requested_percent_of_max_volume():
+    import numpy as np
+    from pi_pipeline import sound_levels as lv
+    from pi_pipeline.config import settings
+    from pi_pipeline.voice import camera_sounds, prompt_tones as pt, red_alert_siren, shutter, wake_chime
+
+    def pct(pcm):
+        return np.abs(pcm.astype(float)).max() / (lv.MAX_PEAK * 32767) * 100
+
+    expected = {
+        "losing horn": (pt.render_refuse(), 80), "picture click": (shutter.render(), 70), "camera shutter": (camera_sounds.render("shutter"), 70),
+        "camera recording": (camera_sounds.render("recording"), 70), "camera recording stop": (camera_sounds.render("recording_stop"), 70),
+        "siren": (red_alert_siren.render(), 80), "wake chime": (wake_chime.render(), 70), "beep": (pt.render_beep(), 70), "boop": (pt.render_boop(), 70),
+        "close": (pt.render_close(), 70), "double": (pt.render_double(), 70), "api tick": (api_tone.render(), 50), "grunt": (pt.render_grunt(), 70),
+        "sigh": (pt.render_sigh(), 70), "yawn": (pt.render_yawn(), 70), "oof": (pt.render_hit(), 50), "turn-away": (pt.render_turn_away(), 50),
+        "ta-da": (pt.render_complete(), 70), "viking horn": (pt.render_start_horn(), 100),
+    }
+    for name, (pcm, want) in expected.items():
+        assert abs(pct(pcm) - want) < 1.0, (name, pct(pcm))
+    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(80)) < 1e-9

@@ -14,9 +14,11 @@ import threading
 
 import numpy as np
 
+from .. import sound_levels
+
 log = logging.getLogger("g2.camera_sounds")
 
-DEFAULT_PEAK = 0.045
+DEFAULT_PEAK = sound_levels.CAMERA          # 70% of max (user, 2026-10-11)
 
 
 def _note(freq: float, dur: float, rate: int, attack: float = 0.005, release: float = 0.03, harmonics=(1.0, 0.2)) -> np.ndarray:

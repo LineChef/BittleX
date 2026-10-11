@@ -15,6 +15,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import sound_levels
+
 try:  # optional at import time so `--help` etc. work without the dep installed
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover
@@ -196,7 +198,7 @@ class Settings:
     # Sounds that say the camera is in use: a shutter chirp per picture, a rising chirp when continuous capture starts (repeated as a
     # reminder), a falling one when it stops. See voice/camera_sounds.py.
     camera_sounds: bool = field(default_factory=lambda: _env("G2_CAMERA_SOUNDS", "1") not in ("0", "false", "no"))
-    camera_peak: float = field(default_factory=lambda: _env_float("G2_CAMERA_PEAK", 0.045))
+    camera_peak: float = field(default_factory=lambda: _env_float("G2_CAMERA_PEAK", sound_levels.CAMERA))
     camera_reminder_s: float = field(default_factory=lambda: _env_float("G2_CAMERA_REMINDER_S", 60.0))
     # Opt-in: keep every camera picture in this folder (empty = never save, the default). For collecting a test set; delete afterwards.
     vision_save_dir: str = field(default_factory=lambda: os.path.expanduser(_env("G2_VISION_SAVE_DIR", "")))
@@ -235,9 +237,10 @@ class Settings:
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
     # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
     alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))
+    siren_peak: float = field(default_factory=lambda: _env_float("G2_SIREN_PEAK", sound_levels.SIREN))     # 80% of max
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     api_tone: str = field(default_factory=lambda: _env("G2_API_TONE", "on").lower())   # "on": a unique tone each time G2 calls the Claude API (not the free wake-word ping); "off" silences it
-    api_peak: float = field(default_factory=lambda: _env_float("G2_API_PEAK", 0.0225))
+    api_peak: float = field(default_factory=lambda: _env_float("G2_API_PEAK", sound_levels.API_TICK))
     buzzer_volume: int = field(default_factory=lambda: _env_int("G2_BUZZER_VOLUME", 10))
     # Voice-loop buzzer cues: raise every note by this many semitones and make each note this many times longer.
     # Small piezo buzzers are loudest around 2-4 kHz, so higher and longer sounds louder. 0 / 1.0 = the raw chirp melodies.

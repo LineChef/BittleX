@@ -7,7 +7,9 @@ import threading
 
 import numpy as np
 
-from .ack_whistle import DEFAULT_PEAK
+from .. import sound_levels
+
+DEFAULT_PEAK = sound_levels.PROMPT_TONES          # 70% of max (user, 2026-10-11)
 
 log = logging.getLogger("g2.wake_chime")
 

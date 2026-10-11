@@ -13,7 +13,9 @@ import threading
 
 import numpy as np
 
-from .ack_whistle import DEFAULT_PEAK
+from .. import sound_levels
+
+DEFAULT_PEAK = sound_levels.SIREN          # 80% of max (user, 2026-10-11)
 
 log = logging.getLogger("g2.red_alert")
 

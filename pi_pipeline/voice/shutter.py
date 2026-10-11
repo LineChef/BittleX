@@ -8,9 +8,11 @@ import threading
 
 import numpy as np
 
+from .. import sound_levels
+
 log = logging.getLogger("g2.shutter")
 
-DEFAULT_PEAK = 0.5
+DEFAULT_PEAK = sound_levels.CAMERA          # 70% of max (user, 2026-10-11)
 
 
 def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:

@@ -84,7 +84,7 @@ def test_a_wall_at_six_inches_on_three_groups_is_a_hit_but_a_wall_at_ten_inches_
 def test_the_hit_sound_is_a_long_falling_oof():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_hit()
-    assert 0.9 < pcm.size / 48000 < 1.2 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 0.35) < 0.1
+    assert 0.9 < pcm.size / 48000 < 1.2 and abs(int(abs(pcm.astype(int)).max()) / (pt.MAX_PEAK * 0.5 * 32767) - 1.0) < 0.02      # 50% of max volume (user, 2026-10-11)
 
 
 def test_the_turn_away_sound_is_two_falling_notes_at_the_maximum_level_and_the_sink_obeys_its_switch(monkeypatch):

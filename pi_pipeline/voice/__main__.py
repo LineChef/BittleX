@@ -286,7 +286,7 @@ def _play_whistle() -> None:
 
 def _play_siren() -> None:
     from . import red_alert_siren
-    red_alert_siren.play(peak=settings.alert_peak, count=2, wait=True)
+    red_alert_siren.play(peak=settings.siren_peak, count=2, wait=True)
 
 
 def _sound_then_say(tts, text: str, sound) -> None:

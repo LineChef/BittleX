@@ -9,7 +9,9 @@ import time
 
 import numpy as np
 
-from .ack_whistle import DEFAULT_PEAK
+from .. import sound_levels
+
+DEFAULT_PEAK = sound_levels.API_TICK          # 50% of max (user, 2026-10-11)
 
 log = logging.getLogger("g2.api_tone")
 

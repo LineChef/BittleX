@@ -14,6 +14,7 @@ import threading
 
 import numpy as np
 
+from .. import sound_levels as lv
 from .ack_whistle import DEFAULT_PEAK
 
 log = logging.getLogger("g2.prompt_tones")
@@ -36,7 +37,7 @@ def _note(f0: float, dur: float, rate: int, f1: float | None = None, decay: floa
     return y * np.minimum(1.0, t / 0.006) * np.exp(-t * decay)             # 6 ms attack, then a decay
 
 
-MAX_PEAK = 0.95                  # full scale without clipping: "all the way to max" (user, 2026-10-10) for the ta-da, the turn-away sound and the fall alarm. DEFAULT_PEAK is a FRACTION of full scale, never a big number (a clipped one was loud and fed back, 2026-10-10)
+MAX_PEAK = lv.MAX_PEAK                  # full scale without clipping: "all the way to max" (user, 2026-10-10) for the ta-da, the turn-away sound and the fall alarm. DEFAULT_PEAK is a FRACTION of full scale, never a big number (a clipped one was loud and fed back, 2026-10-10)
 
 
 def _finish(parts, peak: float) -> np.ndarray:
@@ -45,23 +46,23 @@ def _finish(parts, peak: float) -> np.ndarray:
     return (y * 32767).astype(np.int16)
 
 
-def render_beep(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_beep(rate: int = 48000, peak: float = lv.PROMPT_TONES) -> np.ndarray:
     """One short bright note (C6, about 0.12 s): "I'm listening"."""
     return _finish([_note(1046.5, 0.12, rate, decay=14.0)], peak)
 
 
-def render_boop(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_boop(rate: int = 48000, peak: float = lv.PROMPT_TONES) -> np.ndarray:
     """One lower, rounder note that sags (G4 to E4, about 0.2 s): "got it, you've finished"."""
     return _finish([_note(392.0, 0.2, rate, f1=329.6, decay=7.0, overtones=(1.0, 0.12))], peak)
 
 
-def render_double(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_double(rate: int = 48000, peak: float = lv.PROMPT_TONES) -> np.ndarray:
     """A short double beep (two identical C6 notes, about 0.3 s): "I'm switching gait"."""
     gap = np.zeros(int(rate * 0.07))
     return _finish([_note(1046.5, 0.08, rate, decay=16.0), gap, _note(1046.5, 0.08, rate, decay=16.0)], peak)
 
 
-def render_close(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_close(rate: int = 48000, peak: float = lv.PROMPT_TONES) -> np.ndarray:
     """Two soft falling notes (C5 then F4, about 0.4 s): "I've stopped listening"."""
     gap = np.zeros(int(rate * 0.04))
     return _finish([_note(523.3, 0.18, rate, decay=9.0), gap, _note(349.2, 0.22, rate, decay=8.0)], peak)
@@ -113,7 +114,7 @@ def _voiced(f0: float, f1: float, dur: float, rate: int, attack: float, decay: f
     return y * np.minimum(1.0, t / attack) * np.exp(-t * decay)
 
 
-def render_grunt(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_grunt(rate: int = 48000, peak: float = lv.VOICE_SOUNDS) -> np.ndarray:
     """A low, gravelly "hmph" (about 0.35 s): G2 does not like something. Two quick falling pulses, the second shorter and lower."""
     a = _voiced(120.0, 78.0, 0.20, rate, attack=0.01, decay=7.0, breath=0.35, seed=1)
     b = _voiced(100.0, 62.0, 0.14, rate, attack=0.01, decay=9.0, breath=0.35, seed=2)
@@ -133,7 +134,7 @@ HORN = [
 HORN_LAST_BREAKS = [(1.50, 283), (2.00, 283), (2.50, 268), (2.80, 258), (3.10, 240), (3.30, 221), (3.60, 214), (3.74, 208)]
 
 
-def render_refuse(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_refuse(rate: int = 48000, peak: float = lv.LOSING_HORN) -> np.ndarray:
     """The "losing horn" (about 3.7 s): G2 refuses. Four short falling-loudness muted-brass notes, then a long last note that holds and sags in pitch.
     Built from the measured contour in `HORN`."""
     out = np.zeros(int(rate * HORN[-1][1]) + 1)
@@ -160,18 +161,18 @@ CHORD_HZ = (329.6, 523.3, 659.3, 784.0, 1046.5)
 CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
-def render_hit(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 35% of the usual level (user, 2026-10-11: 70% of the earlier 200%, then halved twice)."""
+def render_hit(rate: int = 48000, peak: float = lv.OOF) -> np.ndarray:
+    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 50% of max volume (`sound_levels.OOF`)."""
     n = int(rate * 0.07)
     thump = _lowpass(np.random.default_rng(11).standard_normal(n), 60)
     thump = thump / (np.abs(thump).max() or 1.0) * np.exp(-np.arange(n) / (rate * 0.018))
     vowel = _voiced(230.0, 90.0, 0.95, rate, attack=0.04, decay=3.2, harmonics=6, breath=0.5, seed=12)
     vowel = vowel / (np.abs(vowel).max() or 1.0)
     out = np.concatenate([thump * 1.1 + vowel[:n] * 0.0, vowel])
-    return _finish([out], peak * 0.35)
+    return _finish([out], peak)
 
 
-def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_hit(peak: float = lv.OOF, rate: int = 48000, wait: bool = False) -> None:
     _play(render_hit, peak, rate, wait)
 
 
@@ -251,7 +252,7 @@ def render_oof(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([thump * 1.2 + vowel[:n] * 0.0, vowel], peak)
 
 
-def render_sigh(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_sigh(rate: int = 48000, peak: float = lv.VOICE_SOUNDS) -> np.ndarray:
     """A long breathy sigh going to sleep (about 1.3 s): soft noise that swells and fades, with a faint falling hum under it."""
     dur = 1.3
     t = np.arange(0, dur, 1.0 / rate)
@@ -263,7 +264,7 @@ def render_sigh(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([breath * env + 0.35 * hum * env], peak)
 
 
-def render_yawn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render_yawn(rate: int = 48000, peak: float = lv.VOICE_SOUNDS) -> np.ndarray:
     """A yawn waking up (about 1.4 s): a voiced "aaah" that rises, holds, then falls and trails off into breath."""
     dur = 1.4
     t = np.arange(0, dur, 1.0 / rate)
@@ -278,30 +279,27 @@ def render_yawn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return _finish([y * env], peak)
 
 
-def play_beep(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_beep(peak: float = lv.PROMPT_TONES, rate: int = 48000, wait: bool = False) -> None:
     _play(render_beep, peak, rate, wait)
 
 
-def play_boop(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_boop(peak: float = lv.PROMPT_TONES, rate: int = 48000, wait: bool = False) -> None:
     _play(render_boop, peak, rate, wait)
 
 
-def play_close(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_close(peak: float = lv.PROMPT_TONES, rate: int = 48000, wait: bool = False) -> None:
     _play(render_close, peak, rate, wait)
 
 
-def play_double(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_double(peak: float = lv.PROMPT_TONES, rate: int = 48000, wait: bool = False) -> None:
     _play(render_double, peak, rate, wait)
 
 
-def play_grunt(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_grunt(peak: float = lv.VOICE_SOUNDS, rate: int = 48000, wait: bool = False) -> None:
     _play(render_grunt, peak, rate, wait)
 
 
-REFUSE_HORN_GAIN = 3.5           # the losing horn (refusal, failed command, fall) was too quiet at the base level (user, 2026-10-10); a multiple of DEFAULT_PEAK, 0.0225 x 2 stays far from clipping
-
-
-def play_refuse(peak: float = DEFAULT_PEAK * REFUSE_HORN_GAIN, rate: int = 48000, wait: bool = False) -> None:
+def play_refuse(peak: float = lv.LOSING_HORN, rate: int = 48000, wait: bool = False) -> None:
     _play(render_refuse, peak, rate, wait)
 
 
@@ -317,18 +315,18 @@ def play_horn_if_enabled(env_var: str, wait: bool = False, cooldown_s: float = 2
     if now - _HORN_LAST.get(env_var, -1e9) < cooldown_s:
         return
     _HORN_LAST[env_var] = now
-    play_refuse(peak=MAX_PEAK, wait=wait) if env_var == "G2_FALL_HORN" else play_refuse(wait=wait)      # the fall alarm is at the maximum (user, 2026-10-10); the refusal and failure horns stay at the base level times REFUSE_HORN_GAIN
+    play_refuse(wait=wait)      # the refusal, the failed command and the fall alarm are one horn at one level (user, 2026-10-11: 80% of max)
 
 
 def play_oof(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
     _play(render_oof, peak, rate, wait)
 
 
-def play_sigh(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_sigh(peak: float = lv.VOICE_SOUNDS, rate: int = 48000, wait: bool = False) -> None:
     _play(render_sigh, peak, rate, wait)
 
 
-def play_yawn(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play_yawn(peak: float = lv.VOICE_SOUNDS, rate: int = 48000, wait: bool = False) -> None:
     _play(render_yawn, peak, rate, wait)
 
 

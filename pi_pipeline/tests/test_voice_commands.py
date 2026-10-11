@@ -163,12 +163,12 @@ def test_complete_sting_is_a_ta_da_chord_stab_then_the_held_chord():
 def test_horn_switches_are_per_situation(monkeypatch):
     from pi_pipeline.voice import prompt_tones as pt
     played = []
-    monkeypatch.setattr(pt, "play_refuse", lambda peak=None, wait=False: played.append((wait, peak)))
+    monkeypatch.setattr(pt, "play_refuse", lambda wait=False: played.append(wait))
     pt.play_horn_if_enabled("G2_FALL_HORN")
     monkeypatch.setenv("G2_FALL_HORN", "0")
     pt.play_horn_if_enabled("G2_FALL_HORN")
     pt.play_horn_if_enabled("G2_REFUSE_SOUND", wait=True)
-    assert played == [(False, pt.MAX_PEAK), (True, None)]          # the fall horn off leaves the refusal horn on; the fall alarm is at the maximum, the refusal horn is not
+    assert played == [False, True]          # the fall horn off leaves the refusal horn on; both are the same horn at the same level (80% of max)
 
 
 def test_the_robots_name_is_spelled_out_for_the_voice_but_other_words_are_left_alone():

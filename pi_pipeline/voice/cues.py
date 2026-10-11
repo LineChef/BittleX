@@ -57,12 +57,12 @@ class SpeakerCue:
         # `wait=True`: the tone plays to its end before the loop goes on, because the next sound (the thinking tone, the spoken reply) starts at once and a second sounddevice play cuts the first one off -- the boop was never heard (user, 2026-10-10).
         # the three exchange stages each have their own sound whatever `tone` the others use (user, 2026-10-09): beep = listening, boop = your words are captured, close = he stopped listening
         from . import prompt_tones
-        pk = lambda default: peak if peak is not None else default                     # noqa: E731
+        pk = lambda default: default                                                    # noqa: E731  (own levels in sound_levels.py, not the shared ack peak; user, 2026-10-11)
         self._stage_play = {} if player else {
-            "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.DEFAULT_PEAK)),
-            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.DEFAULT_PEAK), wait=True),
-            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.DEFAULT_PEAK), wait=True),
-            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.DEFAULT_PEAK), wait=True),
+            "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.lv.PROMPT_TONES)),
+            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
+            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
+            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
         }
 
     def set(self, stage: Stage) -> None:
