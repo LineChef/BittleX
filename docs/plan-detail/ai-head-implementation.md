@@ -119,7 +119,19 @@ The first draft of the staged plan assumed they stay. What depends on them today
 | Sounds (horn, "oof", chirps, ta-da) | Pi speaker | **Lost**, except the BiBoard's own buzzer beeps | Works (audio sent to the head) |
 | Sleep and wake by wake word | Pi mic | Button only | Works |
 
-So with the stock firmware, removing the external mic and speaker costs hands-free control, the voice emergency stop, exploration voice commands, narration and sounds. **Even stage 7 as first described (wake word plus a host-driven speaker) does not cover the microphone side.** What does is **stage 7b** below, which is also what Petoi said the head's firmware could do (stream the microphone out, accept audio to play).
+**Order, decided by the owner (2026-10-11): the Pi's microphone and speaker stay installed until the head's own microphone and speaker can do their job.** Nothing in the table above is lost along the way, because they are removed only after stage 7b is proven. Until then every stage, including stage 4, runs with them in place.
+
+**Gate before anything is unplugged (all of these, on the real G2):**
+1. The wake word "G2" wakes him from across a room using the head's microphone, and false wake-ups are no worse than today.
+2. The voice emergency stop works from the head's audio, and an independent stop path (not the head's Wi-Fi link alone) exists and was tested.
+3. Exploration commands work by voice while he is walking away from the button.
+4. Speech, narration, alarms and every sound play on the head's speaker at a usable level, with no clipping and no echo into the microphone.
+5. The head's audio link survives the things that go wrong: Wi-Fi dropping and returning, the Pi restarting, the head rebooting, an hour of use.
+6. The Pi's load and the delay from speech to reply are no worse than today (the Pi already runs some control ticks late during exploration).
+7. Power: the head's added current on the Grove supply fits the battery budget, and the Pi's saved current is measured.
+8. A way back: the removed mic and speaker (and their wiring notes in `blueprints/`) are kept so they can be reinstalled.
+
+So with the stock firmware, if they were removed early, this would cost hands-free control, the voice emergency stop, exploration voice commands, narration and sounds. **Even stage 7 as first described (wake word plus a host-driven speaker) does not cover the microphone side.** What does is **stage 7b** below, which is also what Petoi said the head's firmware could do (stream the microphone out, accept audio to play).
 
 ## 7. Staged integration
 
@@ -161,7 +173,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 **Stage 4: one voice, no firmware change.**
 - Work: turn off the Pi's spoken output; keep its non-voice sounds (horns, "oof", chirps); answers to local commands become tools; narration and alarms become sounds or nothing; the Pi keeps a silent local stop-word listener.
 - No route found for the Pi to push speech to the head without firmware or a backend (section 3).
-- **Not compatible with removing the Pi's microphone and speaker:** the silent stop-word listener needs the Pi's microphone. Removing them means stage 7b.
+- The Pi's microphone and speaker stay installed through this stage (they come out only after stage 7b passes its gate), so the silent stop-word listener keeps working.
 - Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, his current robot voice, the hands-free "G2" wake word (the head is button-only), and offline speech.
 - Decision gate: if losing the robot voice and the spoken narration is too much, stop at stage 3, or go to stage 7.
 
@@ -178,7 +190,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Gets working: a hands-free wake word and G2's own voice for his announcements. Conversation is still the cloud voice unless stage 8.
 - Prerequisites: Petoi's source (or a rebuild from upstream v2.0.4); the ESP-IDF 5.4.2 toolchain (a multi-GB download, needs approval); the backup in hand.
 
-**Stage 7b: the head as the Pi's microphone and speaker (firmware change; this is the route to removing the external mic and speaker).**
+**Stage 7b: the head as the Pi's microphone and speaker (firmware change; this is the route to removing the external mic and speaker, and only after the gate above is met).**
 - Work: firmware that streams the head's microphone audio to the Pi over the local network (not the cloud) and plays audio the Pi sends; the Pi's existing voice pipeline (wake word, speech recognition, stop words, exploration commands, Piper, sounds, the audio gate) runs on that audio unchanged; check echo between the head's speaker and microphone; keep an independent stop path (the head link is Wi-Fi, so it must never be the only way to stop G2); then remove the Pi's microphone and speaker.
 - Gets working: everything the Pi voice does today, from hardware in the head: G2's own voice, the hands-free wake word, the voice emergency stop, exploration commands, narration, alarms and all the sounds. Local and private. One set of audio hardware, the screen face on the same unit.
 - Loses: the free cloud brain for chat (the Pi's own pipeline keeps using Claude as it does now; the head's cloud model would be off), and a dependence on a reliable Wi-Fi link between the head and the Pi.
@@ -199,7 +211,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 3. Whether to fork the firmware (stage 7) or wait for Petoi's source. Not decided; no fork work has started.
 4. Whether a backend is worth running (stage 8), and on what machine.
 5. What the head's model may do beyond talking (stage 5), and what may leave the house through tools.
-6. Whether the long-term goal is to remove the Pi's own microphone and speaker. If yes, the route is stage 7b (a firmware change); stage 4 alone cannot do it without losing hands-free control and the voice stop.
+6. Decided 2026-10-11: the long-term goal is to remove the Pi's own microphone and speaker, but only once the head's microphone and speaker can do their job. The route is stage 7b (a firmware change), with the gate in section 6 first.
 
 ## 9. Still to verify (none of it blocks writing this or stage 1)
 
