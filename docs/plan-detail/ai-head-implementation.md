@@ -95,6 +95,20 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 
 Each stage ends in something that works on its own, so the project can stop after any of them.
 
+**Stages at a glance: what each one gains and what it costs**
+
+| Stage | What we gain | What we lose or risk |
+|---|---|---|
+| **0. Bench bring-up** (done) | The head talks in English on its own account; our tool server answers its model; the firmware is backed up. | Nothing from G2's existing setup. The test audio goes to XiaoZhi's cloud, and the account holds a phone number. |
+| **1. Talker + read-only tools** | Free chat about G2; "what did you do" and "what have you learned" answered from the Pi with no Claude call; real measurements of the savings. | Nothing existing is removed. There are briefly two voices (the head on the button, the Pi as usual), a small service to keep running, and tool answers pass through the cloud. |
+| **2. Personality + escalation** | The head carries G2's mood and traits through a tool; hard questions go to Claude with G2's memory, spoken by the head; Claude is called only then. | Casual chat is flatter than Claude's. A hard question takes two hops, so it is slower. A new rate limit and call log to maintain. |
+| **3. Mount on G2** | The head on his body with the face in front; microphone and speaker in the head. | About 27 g more at the nose than the 15 g head the walking policy assumes, which may change the gait; unmeasured current on the Grove supply; a risk that the head's serial line sends commands (default: leave it disconnected). |
+| **4. One voice, no firmware change** | A single voice for all conversation, and answers to commands as tools. | **G2's robot voice; spoken narration and alarms** (they become sounds); the Pi's hands-free "G2" wake word (the head is button-only); local, offline speech (all speech now goes to the cloud). The silent stop-word listener stays on the Pi. |
+| **5. Motion through the head** | "G2, sit" and similar through the head, with the Pi's eased stand-up and fall guard around it. | A new way for G2 to move: it needs an allowlist, refusal rules and trust in a cloud model that may mishear. |
+| **6. The face** | An expressive screen tied to his mood and events. | It depends on whether the cloud model can call the head's own face tools; if not, it waits for stage 7. |
+| **7. Firmware fork** (not decided) | A hands-free wake word; the Pi can send text or audio to the head's speaker (self-initiated speech and the robot voice for those lines return); the head's direct robot command removed. | We maintain a fork and no longer get Petoi's updates; a multi-GB toolchain download; a flash (the backup is the way back); Petoi's additions rebuilt unless their source appears. Conversation is still the cloud voice. |
+| **8. Our own backend** (optional) | G2's own voice everywhere; no audio to XiaoZhi's cloud; independence from the free plan. | The free brain: Claude calls return (or a weaker local model); a machine that must be on; more moving parts. |
+
 **Stage 0: bench bring-up and the tool proof. Done 2026-10-11.** Gets working: the head talks in English on its own account; our tool server answers its model; the firmware is backed up.
 
 **Stage 1: a talker with read-only tools, beside the Pi voice (no mounting).**
@@ -115,7 +129,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 **Stage 4: one voice, no firmware change.**
 - Work: turn off the Pi's spoken output; keep its non-voice sounds (horns, "oof", chirps); answers to local commands become tools; narration and alarms become sounds or nothing; the Pi keeps a silent local stop-word listener.
-- Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, and his current robot voice.
+- Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, his current robot voice, the hands-free "G2" wake word (the head is button-only), and offline speech.
 - Decision gate: if losing the robot voice and the spoken narration is too much, stop at stage 3, or go to stage 7.
 
 **Stage 5: motion through the head, via the Pi.**
