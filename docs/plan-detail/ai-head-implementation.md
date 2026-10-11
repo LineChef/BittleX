@@ -61,6 +61,9 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 **Flashing without a toolchain (from the vendor's firmware flashing guide, a Feishu page, updated 2026-01-27)**
 - A prebuilt upstream image exists for the head's board: board type `BOARD_TYPE_LICHUANG_C3`, firmware file `vx.x.x_lichuang-c3-dev.zip` (the S3 board is a different row), from the official firmware list.
 - It is flashed as a single `merged-binary.bin` written at address 0x0 (the whole flash), either with Espressif's Flash Download Tool 3.9.7 in UART mode (Windows-oriented; the path must not contain Chinese characters) or with esptool; the guide also mentions a browser-based method (not seen).
+- The guide gives three ways: Espressif's Flash Download Tool 3.9.7 (Windows, UART mode, address 0x0, no Chinese characters in any path); a third-party web flasher (needs Edge and a login; skipped); and **ESP-Launchpad**, Espressif's own browser flasher (`espressif.github.io/esp-launchpad`, Chrome or Edge: DIY page, Connect, pick `merged-binary.bin`, address 0x0, Program, then Reset Device). esptool, which we already have, does the same write.
+- **Forcing download mode** if a board will not respond: hold BOOT, tap RST, release BOOT. The head's C3 has native USB, so none of the guide's serial-chip drivers (CH340/CH343) are needed.
+- **Restoring the backup is the same operation:** the backup is a full 16 MB image from address 0x0, the same shape as `merged-binary.bin`, so writing it back at 0x0 restores Petoi's firmware and its saved settings. (A generic prebuilt image overwrites the settings partition too.)
 - So stock upstream firmware could be tried on the head **without building anything**. It would replace Petoi's additions (face tools, the BiBoard serial link, the robot tool), and the read-only backup is the way back. Nothing has been flashed; this is not a decision to fork.
 
 **Pushing a message to the head so it speaks (researched 2026-10-11)**
