@@ -11,6 +11,8 @@ wakes on "Hi, Jason" or the Boot button, needs internet and a free account, send
 mentioned in Petoi's description** — recognition questions were answered by pointing to the separate Petoi AI Vision Module (the
 Grove Vision AI V2 we already own). Treat "the head has a camera" as unconfirmed, probably false, until the unit arrives.
 
+**Re-checked 2026-10-10 against Petoi's guide page ([AI conversation](https://guide.petoi.com/extensible-modules/ai-conversation)):** it names no camera, microphone, speaker or chip. It shows only an "LCD display" figure, voice prompts (the activation code is read out), a Boot button, a hotspot named "Xiaozhi-..." (set Wi-Fi at 192.168.4.1, 2.4 GHz only), a 6-digit activation code, a phone-number account, and separate Grove wiring diagrams for BiBoard V1 with and without the voice module and for NyBoard V1. Speaker Recognition is not on the free plan. No product listing for the head turned up in a web search. So: no camera is documented; the vision stays on the Grove Vision AI V2, and the head's use is voice, a display and a head servo. Confirm by looking at the unit.
+
 ## What has to be found out (open questions)
 
 Access: does the head give a host its microphone audio, a way to play audio or text through its speaker, camera detections or
