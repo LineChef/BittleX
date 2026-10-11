@@ -80,6 +80,7 @@ The physical assembly record (wiring, soldering, mounting, calibration, real mea
 |---|---|
 | [`buzzer-sounds.md`](research/buzzer-sounds.md) | The BiBoard buzzer: melody format (notes, durations, volume), what we measured, whether a ready-made chirp library exists (no; RTTTL is the source to convert), and the plan for more sounds. |
 | [`petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) | The Petoi AI Head: whether it replaces the Pi — criteria, behavior inventory, test steps, scorecard. |
+| [`ai-head-implementation.md`](plan-detail/ai-head-implementation.md) | The AI Head in one place: what we learned hands-on, pros and cons, what adopting it takes, and a staged integration path. |
 | [`xiaozhi-esp32-review.md`](research/xiaozhi-esp32-review.md) | Review of the upstream XiaoZhi project the AI Head is built on: protocol, MCP tools, self-hosted servers, and what it means for a backend we control. |
 | [`firmware-fork-case.md`](research/firmware-fork-case.md) | What forking the BiBoard (or AI Head) firmware would unblock, with pros, cons and decision triggers. |
 | [`robot-memory-patterns.md`](research/robot-memory-patterns.md) | Memory designs that have worked for robots and companion agents (scored retrieval, reflection, core/recall/archival tiers, sleep-time consolidation, observation logs) mapped onto G2's memory, with a ranked list of what to adopt. |

@@ -186,29 +186,9 @@ wander with the IR pair, not our exploration.
 tool-based custom behavior, and a camera that tracks with the head but disables the IMU; it loses the learned gait, our reflexes, the
 behavior runtime and our memory design.
 
-## First hands-on results (2026-10-11)
+## Hands-on results (2026-10-11)
 
-Head on the Mac's USB-C (its log is `/dev/cu.usbmodem*` at 115200; opening the port reboots it), Grove cable in G1, BiBoard battery OFF so nothing could move.
-- **Identity:** ESP32-C3, board profile `lichuang-c3-dev` (the open-source XiaoZhi firmware's board list), boots with a failed SHA-256 check and carries on, a `SecondUart` for the BiBoard link, an I2S audio path, and a wake-word model named for the Mandarin phrase (the English "Hi, Jason" also works).
-- **Setup mode** shows the `Xiaozhi-xxxx` hotspot until Wi-Fi is saved; after that it reconnects by itself (no hotspot) and repeats an activation code every ~170 s. It looks up its country from the public IP (GeoIP) at the first join. Audio goes to the cloud over MQTT.
-- **Account:** xiaozhi.me, phone-number sign-up, **create an agent first, then Add Device** with the 6-digit code. The default agent listened and replied in Mandarin; set the language to English in the agent's settings.
-- **The log prints transcripts:** `>>` what it heard, `<<` what it said, so a conversation can be read in full without extra tools.
-- **Quality for offload (the goal):** greetings, small talk, simple arithmetic and questions about itself were answered by its own model in about 1 s, with no Claude call. Motion requests ("sit down", "shake your head") make the model write `self.robot.send_command` into its spoken text; the firmware logs `Detected code leak in TTS text, removing: % self.robot.send_command...` and strips it, and the log truncates the arguments, so the command text is NOT yet visible. "Say goodbye" did not send rest.
-- **Not yet known:** the bytes it puts on the BiBoard line and whether a command really goes out. The Pi cannot hear the head's transmit line; options: the BiBoard powered from USB only (servos unpowered) with the Pi listening to its echo, or a USB-serial adapter on the head's transmit line.
-
-### MCP access point works with the free model (2026-10-11)
-
-The agent's **MCP access point** (console, role page, bottom right; a secret `wss://` address, kept only in the Pi's `.env` as `XIAOZHI_MCP_ENDPOINT`) accepts a tool server of ours that connects OUT from the Pi (`python -m pi_pipeline.head`, `pi_pipeline/head/mcp_tools.py`, the `websockets` package already on the Pi). The cloud connected at once and sent `initialize`, `notifications/initialized` and `tools/list`, later `ping`. A made-up tool answer (`g2_test_word` = "marmalade") was spoken by the head, and the Pi's log shows `tools/call g2_test_word`: **the free "XiaoZhi Lite" model does call tools through this route**, although its device-side robot tool only produced stripped text (`code leak`). So the head's model can reach G2's abilities through code we control on the Pi, with our rules and safety layers. What a tool returns passes through XiaoZhi's cloud, so tools may only return things fine to leave the house; no tool may evaluate text as code (the vendor's calculator example does, and is not used).
-
-Also learned the same day: the head's board profile is the open-source firmware's `lichuang-c3-dev` (an LCKFB ESP32-C3 board with a 320x240 screen, ES8311 speaker and ES7210 microphone chips, no camera); `SecondUart` is Petoi's own addition; a read-only backup of its 16 MB flash is on the Mac (not in the repo; it holds the saved Wi-Fi settings). Forking its firmware is NOT decided; this is exploration only.
-
-### What is inside the head's firmware (read from the backup, 2026-10-11; read-only, nothing flashed)
-
-- **Layout:** the standard XiaoZhi 16 MB map: `nvs` (settings; holds the saved Wi-Fi, never read or shared), `otadata`, `phy_init`, a 960 KB wake-word `model`, a 7 MB `storage` (assets), and two 4 MB program slots, of which only `ota_0` holds a program.
-- **Base:** XiaoZhi firmware **v2.0.4**, built 2026-05-26 with **ESP-IDF 5.4.2** (project name `xiaozhi`). A fork would start from v2.0.4, not the newer upstream releases (v2.5.0 needs a different toolchain).
-- **Petoi's additions, not in upstream v2.5.0:** a `SecondUart` class on UART1 (the serial link to the BiBoard; the pin numbers are constants in the code, not visible as text), a device tool `self.robot.send_command` with Petoi token examples (`ksit`, `kwkF 3`, nod `knd`, shake `kwh`, check `kck`, scratch `kscrh`), a built-in "Bittle" role text, and an on-screen **face**: tools `self.expression.look` (center/up/down/left/right), `blink`, `set_mouth_width`, `set_mouth_style`, `set_quiet_after_speech`. The firmware also strips tool-call text from speech (`Detected code leak in TTS text`).
-- **Transport:** MQTT with UDP audio, as upstream.
-- **What it means:** Petoi's changes are larger than a serial link: a screen-face system and the robot tool as well. Rebuilding them on top of upstream would be real work; if Petoi publishes their source, a fork would start much closer. Forking remains undecided.
+Moved to one place: [`../plan-detail/ai-head-implementation.md`](../plan-detail/ai-head-implementation.md) holds everything learned from the first bench session (setup, the account, the free model, the MCP tool route, the firmware backup and what is inside it), the pros and cons, the staged plan and the open decisions.
 
 ## How the decision will be judged
 
