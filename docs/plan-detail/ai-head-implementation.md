@@ -183,6 +183,33 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 
 **Reading it:** rows 1 to 11 need nothing and make stages 0 to 6. Rows 13 to 18 are the **backend** group. Rows 22 to 24 are the **fork** group. Rows 19 to 21 need other hardware, not a fork or a backend. The long-term goals split like this: G2's voice and speech on his own initiative need the backend (rows 14, 15); a hands-free "G2" needs other hardware (row 19 or 20); removing the Pi's mic and speaker needs the fork or an S3 head (row 22).
 
+## 5b. Build order: where the backend and the fork become necessary
+
+One ordered list, in the order we would build it. **Steps 1 to 9 need neither a backend nor a fork.** The first server code is a tiny test server at step 11; the **backend gate** is step 12; the **fork gate** is step 15. Each step says what it unlocks. The "Needs" words are defined in section 5a.
+
+| Step | What we build | Needs | What it unlocks |
+|---|---|---|---|
+| 1 | Decide on developer certification (a GitHub account); if yes, compare the stronger models on chat quality and tool-call reliability | None | the head's free brain |
+| 2 | Run the tool server as a service; real read-only tools: about G2, last exploration, what he learned, battery | None | the head answers questions about G2 with no Claude call (stage 1) |
+| 3 | Role text (2000 characters at most), a voice, a call log; optionally a G2 handbook in the knowledge base | None | a usable talker; the measurements of the savings |
+| 4 | A persona and mood tool, and "ask the brain" (hard questions go through the Pi to Claude, rate-limited and logged) | None | personality, and Claude only for the hard turns (stage 2) |
+| 5 | Measure the head's current, simulate its mass, mount it (Grove cable to the UART socket, the head's transmit line left disconnected) | None (hardware) | the head on G2's body (stage 3) |
+| 6 | One-voice policy: Pi speech off for conversation, sounds stay, commands become tools, the silent stop-word listener stays on the Pi | None | one voice; it **loses** G2's voice, narration and alarms, hands-free wake word and offline speech (stage 4) |
+| 7 | A skills tool with an allowlist, run through the Pi's safety | None | "G2, sit" through the head (stage 5) |
+| 8 | Steer the model's emotions with the role text | None | a face that follows the conversation (stage 6, partly) |
+| 9 | Optional: the Pi presses the head's button when it hears "G2" (two wires and a transistor) | Other hardware | a hands-free "G2" while the Pi's microphone stays |
+| | **Decision point:** if one stock voice and the button trick are enough, stop here. Everything below is what steps 1 to 9 cannot give. | | |
+| 10 | Try stock upstream on the head with a preset wake word ("Hi, Jason"): the console's cloud build or the prebuilt image flashed in a browser, backup ready | Settings build | the preset wake word; shows what of Petoi's build is lost; no server needed |
+| 11 | Install the toolchain (a multi-GB download, your yes first) and make a settings build whose `Default OTA URL` points at a tiny test server of ours; check the push message and the normal speech flow on the C3 | Settings build + a tiny test server | **tells us whether the backend path works on this chip** |
+| **12** | **BACKEND GATE.** Build the real server: OTA endpoint, protocol server, speech-to-text (Vosk), the brain (Claude through our conversation code, with G2's memory), speech (Piper with the robot effect); pick an always-on machine | **Backend** | **G2's voice in conversation; Claude as the live brain; audio stays in the house; independence from XiaoZhi's cloud** |
+| 13 | The server pushes to the head: emotion messages from G2's mood, `alert`, and audio files for the push message | Backend | **the face driven by G2's mood; speech on his own initiative (narration, alarms, announcements) in G2's voice**; this repairs the losses of step 6 |
+| 14 | Move narration, alarms and announcements to the server and retire the stock-voice policy | Backend | G2 sounds like G2 everywhere on the head, except for hands-free wake and interruption |
+| **15** | **FORK GATE.** Fork the firmware (or use Petoi's source if it is published): stream the head's microphone to the Pi, play audio the Pi sends, keep Petoi's BiBoard link and tools, custom boot sounds | **Fork** | **the head as the Pi's microphone and speaker; keeping Petoi's parts while changing the server; custom sounds** |
+| 16 | Pass the eight-item gate (section 6), then remove the Pi's own microphone and speaker | Fork (step 15) | **removing the Pi's microphone and speaker** (stage 7b) |
+| 17 | Alternative to steps 15 and 16: an S3 head (Petoi's, if offered, or the S3 version of the same board if it fits) | Other hardware, plus the backend | **a custom wake word "G2" on the head, interrupting the head while it speaks**; with these, the backend may reach the Pi-mic removal without a fork (the voice emergency stop would then travel through the server and needs its own independent path) |
+
+**What each gate holds back.** *Before the backend (steps 12 to 14):* G2's own voice in conversation, Claude with G2's memory as the live brain, speech on his own initiative, a face driven by G2's mood, audio staying in the house. *Before the fork (steps 15 and 16):* the head as the Pi's microphone and speaker, removing the Pi's microphone and speaker, keeping Petoi's BiBoard link while changing the server, custom boot sounds. *Not held by either:* a hands-free "G2" (step 9 now, step 17 later) and interrupting the head (step 17).
+
 ## 6. What it takes: the full list
 
 | Area | Work |
