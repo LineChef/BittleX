@@ -84,7 +84,7 @@ def test_a_wall_at_six_inches_on_three_groups_is_a_hit_but_a_wall_at_ten_inches_
 def test_the_hit_sound_is_a_long_falling_oof():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_hit()
-    assert 0.9 < pcm.size / 48000 < 1.2 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 0.7) < 0.15
+    assert 0.9 < pcm.size / 48000 < 1.2 and abs(abs(int(pcm.max())) / (pt.DEFAULT_PEAK * 32767) - 0.35) < 0.1
 
 
 def test_the_turn_away_sound_is_two_falling_notes_at_the_maximum_level_and_the_sink_obeys_its_switch(monkeypatch):
@@ -92,7 +92,7 @@ def test_the_turn_away_sound_is_two_falling_notes_at_the_maximum_level_and_the_s
     from pi_pipeline.app import sinks
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_turn_away()
-    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.MAX_PEAK * 32767) - 1.0) < 0.01      # the maximum clean level (user, 2026-10-10)
+    assert 0.3 < pcm.size / 48000 < 0.45 and abs(abs(int(pcm.max())) / (pt.MAX_PEAK * pt.TURN_AWAY_LEVEL * 32767) - 1.0) < 0.01      # 50% of the maximum clean level (user, 2026-10-11)
     monkeypatch.setenv("G2_WALL_SOUND", "0")
     assert sinks._speaker_avoid_sound() is True                                # off: silent, and True so no buzzer notes either
 

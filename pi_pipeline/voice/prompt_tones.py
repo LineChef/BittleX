@@ -161,14 +161,14 @@ CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
 def render_hit(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 70% of the usual level (user, 2026-10-11: 70% of the earlier 200%, then halved)."""
+    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 35% of the usual level (user, 2026-10-11: 70% of the earlier 200%, then halved twice)."""
     n = int(rate * 0.07)
     thump = _lowpass(np.random.default_rng(11).standard_normal(n), 60)
     thump = thump / (np.abs(thump).max() or 1.0) * np.exp(-np.arange(n) / (rate * 0.018))
     vowel = _voiced(230.0, 90.0, 0.95, rate, attack=0.04, decay=3.2, harmonics=6, breath=0.5, seed=12)
     vowel = vowel / (np.abs(vowel).max() or 1.0)
     out = np.concatenate([thump * 1.1 + vowel[:n] * 0.0, vowel])
-    return _finish([out], peak * 0.7)
+    return _finish([out], peak * 0.35)
 
 
 def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
@@ -178,7 +178,7 @@ def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) 
 def render_turn_away(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     """A two-note fall (about 0.35 s, at 200% of the usual level: 70%, then 150%, were not heard over the walking noise, 2026-10-10) when G2 turns away from a wall: so you can tell why he is turning (user, 2026-10-10)."""
     gap = np.zeros(int(rate * 0.03))
-    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], MAX_PEAK)
+    return _finish([_note(659.3, 0.14, rate, f1=587.3, decay=10.0), gap, _note(493.9, 0.18, rate, f1=415.3, decay=9.0)], MAX_PEAK * TURN_AWAY_LEVEL)
 
 
 def play_turn_away(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
@@ -198,6 +198,7 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
     return _finish([stab, held], MAX_PEAK * COMPLETE_LEVEL)
 
 
+TURN_AWAY_LEVEL = 0.5          # the turn-away sound at 50% of the maximum clean level (user, 2026-10-11; it was at the maximum)
 COMPLETE_LEVEL = 0.7            # the ta-da at 70% of the maximum clean level (user, 2026-10-11; it was at the maximum)
 START_HORN_LEVEL = 1.0          # the Viking horn at 100% = the maximum clean level (user, 2026-10-11; it was 1.5 x the default level)
 
