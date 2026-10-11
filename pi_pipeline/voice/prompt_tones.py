@@ -161,14 +161,14 @@ CHORD_WEIGHT = (0.8, 1.0, 1.0, 0.7, 0.6)
 
 
 def render_hit(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
-    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 200% of the usual level."""
+    """A long winded "ooooof" (about 1.0 s) when G2 walks into a wall: a low thump of impact, then a breathy vowel that falls in pitch and fades slowly. At 140% of the usual level (user, 2026-10-11: 70% of the earlier 200%)."""
     n = int(rate * 0.07)
     thump = _lowpass(np.random.default_rng(11).standard_normal(n), 60)
     thump = thump / (np.abs(thump).max() or 1.0) * np.exp(-np.arange(n) / (rate * 0.018))
     vowel = _voiced(230.0, 90.0, 0.95, rate, attack=0.04, decay=3.2, harmonics=6, breath=0.5, seed=12)
     vowel = vowel / (np.abs(vowel).max() or 1.0)
     out = np.concatenate([thump * 1.1 + vowel[:n] * 0.0, vowel])
-    return _finish([out], peak * 2.0)
+    return _finish([out], peak * 1.4)
 
 
 def play_hit(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
@@ -195,11 +195,11 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
     stab = chord(0.22, 0.008, 0.03, 0.9)
     held = chord(1.05, 0.012, 0.45, 0.35)
     held = held * np.exp(-np.arange(held.size) / rate / 1.4)
-    return _finish([stab, held], MAX_PEAK)
+    return _finish([stab, held], MAX_PEAK * COMPLETE_LEVEL)
 
 
-START_HORN_GAIN = 1.5           # 50% louder than the other speaker sounds (user, 2026-10-10: first 25%, then 50%)
-COMPLETE_GAIN = 1.5             # the same for the ta-da
+COMPLETE_LEVEL = 0.7            # the ta-da at 70% of the maximum clean level (user, 2026-10-11; it was at the maximum)
+START_HORN_LEVEL = 1.0          # the Viking horn at 100% = the maximum clean level (user, 2026-10-11; it was 1.5 x the default level)
 
 
 def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
@@ -221,7 +221,7 @@ def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarr
     n2 = np.sin(p2) + 0.58 * np.sin(2 * p2) + 0.11 * np.sin(3 * p2) + 0.04 * np.sin(4 * p2) + 0.05 * np.sin(5 * p2)
     e2 = np.interp(t, [0.0, 0.33, 0.37, 0.50, 1.40, 1.80, 2.10, 2.65], [0.0, 0.0, 0.85, 1.0, 1.0, 0.82, 0.55, 0.0])
     n2 = n2 / 1.6 * e2
-    return _finish([n1 + n2], peak * START_HORN_GAIN)
+    return _finish([n1 + n2], MAX_PEAK * START_HORN_LEVEL)
 
 
 START_HORN_DELAY_S = 1.0        # a pause after "Exploration mode." before the horn (user, 2026-10-10: it was too close to the end of the words)
