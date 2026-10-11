@@ -8,7 +8,8 @@ one message per websocket text frame): `initialize`, `tools/list`, `tools/call`.
 Rules this module keeps:
   * The address contains a token. It is read only from the environment, and never logged, printed or put in an error (see `redact`).
   * Tools take fixed, validated arguments and return plain text. Nothing here evaluates text as code, runs a command, or moves G2; nothing opens the serial link.
-  * What a tool returns travels through XiaoZhi's cloud to the model, so a tool may only return things that are fine to leave the house.
+  * What a tool returns travels through XiaoZhi's cloud to the model, so a tool may only return things that are fine to leave the house, and the vendor limits a result to about 1024 bytes (cut here at 1000).
+  * One connection per access point (the vendor limits the number): run a single connector.
   * `ToolServer.handle()` is pure (a message in, a reply or None out), so the protocol is tested without a network.
 """
 from __future__ import annotations
@@ -25,7 +26,7 @@ log = logging.getLogger("g2.head.mcp")
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "g2-pi"
 MAX_FRAME_BYTES = 256 * 1024
-MAX_RESULT_CHARS = 1500
+MAX_RESULT_BYTES = 1000                              # the vendor's guide: a tool's return value is limited, usually to 1024 bytes
 
 
 @dataclass(frozen=True)
@@ -95,7 +96,7 @@ class ToolServer:
                 return self._error(mid, -32602, "this tool takes no arguments")
             self.calls.append(tool.name)
             try:
-                text = str(tool.handler(args))[:MAX_RESULT_CHARS]
+                text = str(tool.handler(args)).encode("utf-8")[:MAX_RESULT_BYTES].decode("utf-8", "ignore")
                 is_error = False
             except Exception as e:  # noqa: BLE001 -- a failing tool must not end the session
                 log.warning("tool %s failed: %s", tool.name, type(e).__name__)

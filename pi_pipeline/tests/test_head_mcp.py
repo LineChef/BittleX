@@ -33,6 +33,12 @@ def test_a_tool_call_returns_text_and_is_recorded_and_bad_calls_are_clean_errors
     assert "marmalade" in s.handle(_req("tools/call", 9, name="g2_test_word", arguments={}))["result"]["content"][0]["text"]
 
 
+def test_a_long_result_is_cut_to_the_vendors_size_limit_without_breaking_a_character():
+    s = ToolServer([Tool("long", "x", lambda _a: "é" * 900)])                                  # 1800 bytes
+    text = s.handle(_req("tools/call", 1, name="long", arguments={}))["result"]["content"][0]["text"]
+    assert len(text.encode("utf-8")) <= 1000 and text == "é" * 500
+
+
 def test_a_failing_tool_is_an_error_result_not_a_crash():
     def boom(_a):
         raise RuntimeError("secret detail")

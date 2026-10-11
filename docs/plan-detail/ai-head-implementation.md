@@ -50,6 +50,14 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 
 **What G2 spends on Claude today:** 57 billed calls, about $0.33, in 72 hours (2026-10-07 to 10-10). The saving the head can offer in dollars is small; the reason to use it is the principle of fewer calls, the face, and the placement of the mic and speaker.
 
+**The vendor's rules for tools (their MCP access-point guide, the precautions section)**
+- Name tools and parameters so the model knows what they do (no abbreviations; for a search tool the parameter is `keywords`), and put the guidance for when to use a tool in its description.
+- A tool's return value is usually a string or JSON and is **limited, typically to 1024 bytes**; our server cuts results at 1000 bytes.
+- The tool list text is limited too (counted in tokens), so keep the list short.
+- Each access point has an upper limit on connections: run one connector only.
+- The console's "MCP access point" dialog shows the connection status (online) and the **names of the registered tools**, a quick way to check that our server is connected.
+- The vendor's own example tool evaluates a Python expression from the model (`eval`); we do not do that.
+
 **Pushing a message to the head so it speaks (researched 2026-10-11)**
 - **The protocol has push messages,** but only the *server* side of the head's connection can send them: the cloud broker that the head's MQTT link goes to. Upstream documents these (`docs/notify.md` and `main/application.cc` in the xiaozhi-esp32 source): `notify` (an https/http URL to a mono Ogg Opus file, plus optional subtitles, played while the head is idle), `alert` (status, message and emotion: shows text and a face emotion and plays a sound), `tts` (the cloud's own speech: start, stop, sentence text; the audio comes over the audio channel) and `custom` (only if the firmware is built with that option).
 - **In the head's firmware (v2.0.4):** `alert`, `tts`, `stt`, `llm`, `mcp`, `system` and `iot` message types are present; **`notify` is not** (no `audio_url` or `subtitles` handling; it arrived in a newer release).
