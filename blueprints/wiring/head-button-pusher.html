@@ -1,0 +1,167 @@
+<title>Head Button Pusher</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a parts-and-wiring sheet. Two install options, each a short list plus one drawing. Blueprint ink on paper, Petoi-yellow only for the head shell. */
+:root{
+  --bg:#f3f3ef; --panel:#fbfbf8; --fg:#1d2430; --muted:#5d6676; --line:#c9ccd2;
+  --ink:#1f4e8c; --warn:#a4400f; --shell:#f2c230; --part:#e6e9ee; --good:#1d6b4a;
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --shell:#c9a021; --part:#2a3342; --good:#6fd0a3; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --shell:#c9a021; --part:#2a3342; --good:#6fd0a3; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;padding-inline:16px;padding-block:28px}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-size:28px;line-height:1.15;margin:0;text-wrap:balance;font-weight:600}
+h2{font-size:18px;margin:0 0 10px;font-weight:600;text-wrap:balance}
+p{margin:0}
+.sub{color:var(--muted);max-width:62ch;margin-top:8px}
+.tag{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.opt{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:20px}
+@media(max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
+ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.fig{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.fig svg{display:block;min-width:520px;width:100%;height:auto}
+svg text{font-family:var(--mono);font-size:11px;fill:var(--fg)}
+svg .m{fill:var(--muted)}
+svg .ln{stroke:var(--ink);stroke-width:2;fill:none;stroke-linecap:round}
+svg .gr{stroke:var(--muted);stroke-width:2;fill:none;stroke-dasharray:5 4}
+svg .pt{fill:var(--part);stroke:var(--line);stroke-width:1.5}
+svg .sh{fill:var(--shell);stroke:var(--fg);stroke-width:1.5}
+svg .wn{stroke:var(--warn);stroke-width:2;fill:none}
+.warn{color:var(--warn)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.scroll{overflow-x:auto}
+.good{color:var(--good)}
+</style>
+
+<main>
+  <header>
+    <div class="tag">G2 head · hands-free trigger</div>
+    <h1>Head Button Pusher</h1>
+    <p class="sub">What you would install so the Pi can press the head's side button. Two ways: push it from outside (nothing soldered), or wire across the switch (one fine solder joint). Nothing here is bought or tested yet.</p>
+  </header>
+
+  <section class="opt">
+    <div class="tag">Option A · push from outside · no soldering, board untouched</div>
+    <div class="cols">
+      <div>
+        <h2>What you install</h2>
+        <ul>
+          <li><b>A mini push solenoid</b>, 5 V, spring return, body under about 15 mm, stroke 4 to 6 mm, with a <b>flat wide tip</b> (a clear rubber dot, about 1/4 inch, on the tip softens the hit and widens it). A rigid bracket holds it to the shell with the tip 0.5 to 1 mm off the button at rest.</li>
+          <li><b>A MOSFET driver board</b> (3.3 V logic). A Pi pin cannot drive a solenoid directly.</li>
+          <li><b>3 wires to the Pi:</b> a signal pin, 5 V and ground, run along the neck cable.</li>
+          <li>Optional: a 470 µF capacitor across the 5 V feed to absorb the pulse.</li>
+        </ul>
+        <p style="margin-top:12px" class="warn">The button is a raised cap about 1/40 inch (0.025 in) proud of the shell, in a 1/8 inch oval opening. The shell around it is the stop: a tip wider than the opening pushes the cap in and no further. Unknown until you measure: the cap's height edge-on, the force and travel that trigger the switch, and the solenoid's pull on G2's 5 V supply.</p>
+      </div>
+      <div class="fig">
+        <svg viewBox="0 0 640 330" role="img" aria-label="Wiring from the Pi to a MOSFET driver board to the solenoid">
+          <rect class="pt" x="20" y="40" width="150" height="250" rx="6"/>
+          <text x="95" y="62" text-anchor="middle">Pi header</text>
+          <circle cx="170" cy="100" r="5" fill="var(--ink)"/><text x="30" y="104">5 V (pin 2)</text>
+          <circle cx="170" cy="170" r="5" fill="var(--ink)"/><text x="30" y="174">GPIO 17 (pin 11)</text>
+          <circle cx="170" cy="240" r="5" fill="var(--ink)"/><text x="30" y="244">GND (pin 9)</text>
+          <text class="m" x="30" y="274" style="font-size:10px">pin choice: confirm it is free</text>
+
+          <rect class="pt" x="300" y="60" width="150" height="210" rx="6"/>
+          <text x="375" y="82" text-anchor="middle">MOSFET board</text>
+          <text class="m" x="375" y="98" text-anchor="middle" style="font-size:10px">(with flyback diode)</text>
+          <circle cx="300" cy="120" r="5" fill="var(--ink)"/><text x="312" y="124">VIN</text>
+          <circle cx="300" cy="170" r="5" fill="var(--ink)"/><text x="312" y="174">SIG</text>
+          <circle cx="300" cy="240" r="5" fill="var(--ink)"/><text x="312" y="244">GND</text>
+          <circle cx="450" cy="120" r="5" fill="var(--ink)"/><text x="400" y="124">OUT+</text>
+          <circle cx="450" cy="240" r="5" fill="var(--ink)"/><text x="400" y="244">OUT−</text>
+
+          <rect class="pt" x="540" y="130" width="80" height="90" rx="6"/>
+          <text x="580" y="152" text-anchor="middle">solenoid</text>
+          <circle cx="540" cy="150" r="5" fill="var(--ink)"/><circle cx="540" cy="200" r="5" fill="var(--ink)"/>
+          <rect x="620" y="165" width="14" height="20" fill="var(--ink)"/>
+
+          <path class="ln" d="M170 100 H235 V120 H300"/>
+          <path class="ln" d="M170 170 H300"/>
+          <path class="ln" d="M170 240 H300"/>
+          <path class="ln" d="M450 120 H500 V150 H540"/>
+          <path class="ln" d="M450 240 H500 V200 H540"/>
+          <text class="m" x="20" y="316" style="font-size:10px">Pi pulls GPIO 17 high for about 150 ms; the board powers the solenoid; the tip presses the button.</text>
+        </svg>
+      </div>
+    </div>
+    <div class="fig">
+      <svg viewBox="0 0 640 240" role="img" aria-label="Side view: solenoid mounted outside the head shell pushing the raised button">
+        <path class="sh" d="M250 20 H600 V220 H250 Z"/>
+        <text x="425" y="45" text-anchor="middle">head shell (inside: circuit board)</text>
+        <rect class="pt" x="470" y="90" width="110" height="80" rx="4"/>
+        <text x="525" y="125" text-anchor="middle">board</text>
+        <rect class="pt" x="440" y="115" width="30" height="30" rx="2"/>
+        <text x="455" y="107" text-anchor="middle" style="font-size:10px">switch</text>
+        <rect x="420" y="124" width="22" height="12" fill="var(--fg)"/>
+        <text x="431" y="160" text-anchor="middle" style="font-size:10px">raised button</text>
+        <rect x="250" y="106" width="8" height="48" fill="var(--bg)"/>
+        <text class="m" x="262" y="195" style="font-size:10px">opening in shell</text>
+        <rect class="pt" x="110" y="108" width="110" height="44" rx="4"/>
+        <text x="165" y="134" text-anchor="middle">solenoid</text>
+        <rect x="220" y="124" width="170" height="12" fill="var(--ink)" opacity=".85"/>
+        <text x="305" y="118" text-anchor="middle" style="font-size:10px">tip + rubber dot, stops on the shell</text>
+        <path class="gr" d="M165 152 V210 H20"/>
+        <text class="m" x="20" y="226" style="font-size:10px">to the MOSFET board and the Pi</text>
+        <path class="wn" d="M120 92 H200"/><text class="warn" x="120" y="82" style="fill:var(--warn)" style="font-size:10px">needs a rigid mount to the shell</text>
+      </svg>
+    </div>
+  </section>
+
+  <section class="opt">
+    <div class="tag">Option B · wire across the switch · one fine solder joint</div>
+    <div class="cols">
+      <div>
+        <h2>What you install</h2>
+        <ul>
+          <li><b>One thin wire</b> (about 30 AWG) from the switch's signal terminal to a Pi pin.</li>
+          <li><b>One resistor</b>, 330 Ω to 1 kΩ, in line.</li>
+          <li><b>Kapton tape</b> to hold the antenna cable aside while soldering.</li>
+          <li>Ground is already shared through the body's cable.</li>
+        </ul>
+        <p style="margin-top:12px" class="warn">The joint is the risk: the antenna cable, the connector and tiny neighbors are all next to it. A repair shop could do it in minutes.</p>
+      </div>
+      <div class="fig">
+        <svg viewBox="0 0 640 230" role="img" aria-label="Wire from a Pi pin through a resistor to the switch's signal terminal">
+          <rect class="pt" x="20" y="60" width="130" height="100" rx="6"/>
+          <text x="85" y="84" text-anchor="middle">Pi header</text>
+          <circle cx="150" cy="120" r="5" fill="var(--ink)"/><text x="30" y="124">free GPIO</text>
+          <path class="ln" d="M150 120 H230"/>
+          <rect class="pt" x="230" y="108" width="70" height="24" rx="3"/>
+          <text x="265" y="124" text-anchor="middle">330 Ω</text>
+          <path class="ln" d="M300 120 H400"/>
+          <rect class="pt" x="400" y="80" width="110" height="80" rx="6"/>
+          <text x="455" y="104" text-anchor="middle">head switch</text>
+          <circle cx="400" cy="120" r="5" fill="var(--ink)"/><text x="410" y="124">signal (3.3 V)</text>
+          <circle cx="510" cy="120" r="5" fill="var(--ink)"/><text x="468" y="150" style="font-size:10px">ground side</text>
+          <path class="gr" d="M510 120 H580 V200 H85 V160"/>
+          <text class="m" x="200" y="216" style="font-size:10px">ground, already common through the body's cable</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="opt">
+    <h2>Side by side</h2>
+    <div class="scroll">
+      <table>
+        <tr><th></th><th>A: pusher</th><th>B: wire</th></tr>
+        <tr><td>Opening the head</td><td>Not needed</td><td>Needed</td></tr>
+        <tr><td>Soldering</td><td class="good">None</td><td class="warn">One fine joint</td></tr>
+        <tr><td>Reversible</td><td class="good">Fully</td><td>Mostly</td></tr>
+        <tr><td>Weight at the nose</td><td class="warn">Adds some</td><td class="good">Almost none</td></tr>
+        <tr><td>Holds up while walking</td><td class="warn">Mount must be rigid</td><td>Wire needs strain relief</td></tr>
+        <tr><td>Needs the Pi microphone</td><td colspan="2">Yes, both. They only replace the physical press.</td></tr>
+      </table>
+    </div>
+    <p class="sub">Not covered by either: the Pi cannot tell whether the head is already listening, so a stray extra press can end a conversation.</p>
+  </section>
+</main>
