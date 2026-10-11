@@ -40,6 +40,10 @@ def _call(obj, *names):
 
 
 class DriverBindings:
+    def wrap_diag(self, wrapper) -> None:
+        """Put `wrapper(previous_on_diag) -> new_on_diag` around the DIAG sink (the exploration session counts events for its recap this way)."""
+        self._on_diag = wrapper(self._on_diag)
+
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
                  walker=None, head=None, power=None, on_diag=None, avoid_sound=None, hit_sound=None, contact=None):
         self.actuator = actuator

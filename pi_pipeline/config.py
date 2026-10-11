@@ -219,6 +219,7 @@ class Settings:
     consolidate_idle_s: float = field(default_factory=lambda: _env_float("G2_CONSOLIDATE_IDLE_S", 1200.0))
     consolidate_min_exchanges: int = field(default_factory=lambda: _env_int("G2_CONSOLIDATE_MIN_EXCHANGES", 6))
     consolidate_min_interval_s: float = field(default_factory=lambda: _env_float("G2_CONSOLIDATE_MIN_INTERVAL_S", 21600.0))
+    reflect: str = field(default_factory=lambda: (_env("G2_REFLECT", "dry") or "dry").strip().lower())      # off | dry (default: the notes it would save are only logged) | on (saved as facts); see reflection/reflect.py
     # Which memory shaped a reply (python -m pi_pipeline.memory usage): "match" = the code compares each reply with the notes it was given
     # (free, always on); "declare" = also give G2 a memory_used tool to name the notes that mattered (richer, but in a measured test the
     # model skipped speaking more often, so the words-only retry fired on ~3 of 8 question turns: extra API calls); "off" = neither.

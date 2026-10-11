@@ -71,14 +71,14 @@ def parse_plan(text: str) -> dict | None:
     return plan if isinstance(plan, dict) else None
 
 
-def make_llm(cfg):
+def make_llm(cfg, label: str = "consolidate"):
     """The default model call: (system, user) -> (text, usage). One short Claude request, no tools."""
     import anthropic
 
     from ..voice.conversation import _http_client_kwargs
     client = anthropic.Anthropic(api_key=cfg.require_api_key(), timeout=cfg.request_timeout_s, **_http_client_kwargs(cfg.api_keepalive_s))
     from ..voice import api_log
-    api_log.instrument(client, "consolidate")
+    api_log.instrument(client, label)
 
     def llm(system: str, user: str):
         resp = client.messages.create(
@@ -209,13 +209,18 @@ class Consolidator:
         return {"ok": True, "applied": True, "result": self.apply(actions)}
 
 
+def _mode_of(consolidator) -> str | None:
+    return getattr(consolidator, "mode", None)
+
+
 class ConsolidationWatcher:
     """Runs a pass when G2 has been idle long enough, enough has happened since the last pass, and enough time has gone by in this
     process since the last one (so a day costs about one call). `nudge()` (the person told G2 to sleep) skips the idle wait."""
 
     def __init__(self, consolidator: Consolidator, idle_age, *, idle_s: float = 1200.0, min_interval_s: float = 21600.0,
-                 poll_s: float = 60.0, clock=time.monotonic):
+                 poll_s: float = 60.0, clock=time.monotonic, gate=None, kind: str = "consolidation"):
         self._c, self._idle_age = consolidator, idle_age
+        self._gate, self._kind = gate, kind               # the gate allows one memory-processing call per session across both watchers (memory/call_log.py)
         self._idle_s, self._min_interval_s, self._poll_s, self._clock = idle_s, min_interval_s, poll_s, clock
         self._last_run: float | None = None
         self._nudged = False
@@ -235,13 +240,21 @@ class ConsolidationWatcher:
             return None
         if not self._c.has_enough_new():
             return None
+        if self._gate is not None and not self._gate.acquire(self._kind):
+            return None                                      # the other pass already used this session's call; try again later (nothing consumed)
         self._nudged = False
         self._last_run = now
+        from .call_log import log_call
         try:
-            return self._c.run(apply=True)
-        except Exception:  # noqa: BLE001 -- a failed pass must never disturb G2
-            log.warning("consolidation failed", exc_info=True)
+            out = self._c.run(apply=True)
+        except Exception as e:  # noqa: BLE001 -- a failed pass must never disturb G2
+            log.warning("%s failed", self._kind, exc_info=True)
+            log_call(self._kind, "failed", why=f"{type(e).__name__}: {e}"[:160])
             return None
+        res = (out or {}).get("result") or (out or {}).get("plan") or out or {}
+        log_call(self._kind, "called" if (out or {}).get("ok", True) else "failed", mode=_mode_of(self._c), applied=(out or {}).get("applied"),
+                 counts={k: len(v) for k, v in res.items() if isinstance(v, list)}, why=None if (out or {}).get("ok", True) else (out or {}).get("note"))
+        return out
 
     def start(self) -> "ConsolidationWatcher":
         def _run() -> None:

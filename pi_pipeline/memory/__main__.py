@@ -49,6 +49,9 @@ def main() -> None:
     p_unpin = sub.add_parser("unpin"); p_unpin.add_argument("id", type=int)
     p_si = sub.add_parser("sightings"); p_si.add_argument("n", type=int, nargs="?", default=10)
     p_co = sub.add_parser("consolidate"); p_co.add_argument("--apply", action="store_true")
+    p_rf = sub.add_parser("reflect"); p_rf.add_argument("--apply", action="store_true")
+    sub.add_parser("recaps")
+    p_ca = sub.add_parser("calls"); p_ca.add_argument("--days", type=float, default=7)
     sub.add_parser("usage")
     p_log = sub.add_parser("log"); p_log.add_argument("n", type=int, nargs="?", default=20)
     p_se = sub.add_parser("search"); p_se.add_argument("query")
@@ -92,9 +95,38 @@ def main() -> None:
         con = Consolidator(st, make_llm(settings), usage=UsageTracker(settings.usage_path) if settings.usage_path else None,
                            audit_path="~/.local/share/g2/memory_consolidation.jsonl", min_new_exchanges=settings.consolidate_min_exchanges)
         out = con.run(apply=args.apply)
+        from .call_log import log_call
+        log_call("consolidation", "called" if out.get("ok") else "failed", mode="cli", applied=out.get("applied"))
         print(_json.dumps(out, indent=2, default=str))
         if out.get("ok") and not out.get("applied"):
             print("  (dry run: nothing changed; add --apply to do it)")
+
+    elif args.cmd == "reflect":
+        import json as _json
+
+        from ..reflection.reflect import ExperienceReflector
+        from ..voice.usage import UsageTracker
+        from .consolidate import make_llm
+        rf = ExperienceReflector(Store(db), make_llm(settings, "reflect"), mode=settings.reflect if settings.reflect in ("dry", "on") else "dry",
+                                 usage=UsageTracker(settings.usage_path) if settings.usage_path else None)
+        out = rf.run(apply=args.apply, force=args.apply)
+        from .call_log import log_call
+        log_call("reflection", "called" if out.get("ok") else "failed", mode="cli", applied=out.get("applied"))
+        print(_json.dumps(out, indent=2, default=str))
+        if out.get("ok") and not out.get("applied"):
+            print("  (dry run: nothing saved; add --apply to save the notes)")
+
+    elif args.cmd == "calls":
+        from .call_log import summary
+        print(summary(args.days))
+
+    elif args.cmd == "recaps":
+        from ..reflection.recap import ExperienceLog, recap_text
+        rows = ExperienceLog().read()
+        for r in rows[-10:]:
+            print(f"  #{r.get('id')}  {r.get('started')}  ({r.get('ended_by') or 'ended'})\n    {recap_text(r)}")
+        if not rows:
+            print("  no exploration recaps yet")
 
     elif args.cmd == "log":
         for r in reversed(Store(db).recent_exchanges(args.n)):

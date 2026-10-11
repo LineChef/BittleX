@@ -690,6 +690,22 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd in ("recap_query", "learned_query"):
+            from ..reflection.recap import ExperienceLog, recap_text
+            if cmd == "recap_query":
+                reply = recap_text(ExperienceLog().latest() or {})
+            else:
+                from ..reflection.reflect import experience_notes
+                try:
+                    notes = experience_notes(self._memory.store)[:3] if self._memory else []
+                except Exception:  # noqa: BLE001
+                    notes = []
+                reply = (" ".join(n if n.endswith((".", "!", "?")) else n + "." for n in notes)) if notes else "I haven't learned anything new from my explorations yet."
+            self._cue.set("speaking")
+            self._speak(reply)
+            self._set_session()
+            self._cue.set("idle")
+            return
         if cmd in ("floor", "floor_query"):
             from ..telemetry import autolog
             self._cue.set("speaking")

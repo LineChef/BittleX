@@ -162,13 +162,16 @@ def main() -> None:
             policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
                                          on_fall=lambda: fall["fn"] and fall["fn"](), hold_between_legs=True)    # no rest between legs: hold a balanced stand, rest at the end of the session
         saver = None
+        places = None
+        from .reflection.recap import SessionTally
+        tally = SessionTally()                              # counts the session for its recap (reflection level 1): turns away from walls, hits, survey stops, falls
+        session_started = time.time()
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
             from .gait.stillness import StillnessWaiter
             from .voice import fail_sound
             still = StillnessWaiter(fan.consumer().poll_imu)               # waits, before every picture, until the IMU shows G2 has stopped swaying (camera shake)
-            places = None
             if os.environ.get("G2_PLACE_LOG", "1") != "0":                 # place memory P1: one record per survey stop, no behavior change (behavior/place_log.py)
                 from .behavior.place_log import PlaceLog
                 places = PlaceLog(os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT), yaw_fn=lambda: getattr(getattr(getattr(rt, "_sensors", None), "__self__", None), "yaw_deg", lambda: None)(),
@@ -178,6 +181,7 @@ def main() -> None:
                                            wait_still=still.wait, on_failure=fail_sound.command_failed)
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
+        rt.bindings.wrap_diag(tally.wrap)
         hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
         if hub is not None and hasattr(hub, "yaw_deg") and getattr(rt.bindings, "walker", None) is not None:
             rt.bindings.walker.yaw_fn = hub.yaw_deg               # every timed turn logs how far the IMU saw him turn
@@ -233,6 +237,7 @@ def main() -> None:
                 prompt_tones.play_start_horn(wait=True)
 
         def _on_fall():
+            tally.note("fall")
             log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
             rt.halt()
             try:
@@ -299,6 +304,7 @@ def main() -> None:
         started = time.monotonic()
         armed_at: float | None = None
         was_exploring, left_at = False, None
+        ended_by = ""
         if args.arm_on_start:
             link.send("gB", read_reply=False, settle=0.0)
             rt.post(arm_explore=True)
@@ -314,6 +320,7 @@ def main() -> None:
                         log.exception("saving a place note failed")
                 cmd = _read_command()
                 if cmd == "stop":
+                    ended_by = "stop command"
                     break
                 if cmd == "arm":
                     link.send("gB", read_reply=False, settle=0.0)              # balance on for walking
@@ -332,6 +339,7 @@ def main() -> None:
                     rt.post(disarm_explore=True)
                     armed_at = None
                     log.warning("roam bout over (%.0f s): disarmed, ending the session", args.roam_s)
+                    ended_by = "roam time limit"
                     break                                         # the cap is the end of the exploration: he says it is complete and lies down (user, 2026-10-10)
                 if args.exit_when_roam_ends:                       # roaming ended some other way ("that's enough", picked up, ...)
                     mode = rt.driver.mode.mode
@@ -341,6 +349,7 @@ def main() -> None:
                         left_at = left_at or time.monotonic()
                         if time.monotonic() - left_at > 4.0:
                             log.info("roaming ended: leaving the exploration session")
+                            ended_by = "roaming ended"
                             break
                     elif armed_at is not None and time.monotonic() - armed_at > 90.0:
                         log.warning("roaming never started: leaving the exploration session")
@@ -348,7 +357,7 @@ def main() -> None:
                     elif armed_at is None and not was_exploring:
                         break
         except KeyboardInterrupt:
-            pass
+            ended_by = "interrupted"
         finally:
             crash.stop()
             if listener is not None:
@@ -374,6 +383,15 @@ def main() -> None:
             t.join(timeout=2.0)
             guard.stop()
             watcher.stop()
+            try:                                                              # reflection level 1: keep a recap of this session (never disturbs the shutdown)
+                from .behavior.place_log import read_stops
+                from .reflection.recap import ExperienceLog, build_recap
+                from .vision.wall_distance import LOG_PATH as _WALL_LOG
+                stops = [s for s in read_stops(places.path) if s.get("session") == places.session] if places is not None else []
+                ended_by = ended_by or ("voice command" if stop_flag.is_set() else "time limit" if time.monotonic() - started >= args.max_s else "runtime stopped")
+                ExperienceLog().append(build_recap(tally, started=session_started, ended=time.time(), ended_by=ended_by, stops=stops, wall_path=_WALL_LOG))
+            except Exception:  # noqa: BLE001
+                log.exception("could not keep the session recap")
             if watch is not None:
                 watch.stop()
             if vision is not None:

@@ -315,6 +315,12 @@ _FLOOR_THIS_IS = re.compile(r"^this is (?:the |a )?([a-z]+(?: [a-z]+){0,2}) floo
 _BATTERY_QUERY = ("what is your power level", "whats your power level", "what is your battery level", "whats your battery level", "what is your battery", "whats your battery", "power level",
                   "battery level", "how much battery do you have left", "how much battery do you have", "how much battery is left", "how much battery left", "how much power do you have left",
                   "how is your battery", "hows your battery", "check your battery")
+# Reflection, level 3 (docs/plan-detail/reflection-plan.md): "what did you do", "how was your exploration" -> the recap of his last exploration; "what have you learned" -> the notes he holds
+# about his own experience. Local, no API call.
+_RECAP_QUERY = ("what did you do", "what have you been up to", "what have you been doing", "how was your exploration", "how was your exploring", "how did your exploration go",
+                "how did exploring go", "how did your exploring go", "tell me about your exploration", "tell me about your exploring", "recap your exploration", "recap your day")
+_LEARNED_QUERY = ("what have you learned", "what did you learn", "what have you noticed", "what did you notice", "what have you figured out", "what do you remember about exploring",
+                  "what do you remember about your exploration")
 _FLOOR_QUERY = ("what floor am i on", "what floor are you on", "what floor is this", "which floor", "what is the floor", "whats the floor", "what surface")
 
 
@@ -326,6 +332,16 @@ def parse_floor_command(text: str) -> str | None:
         return None
     words = [w for w in m.group(1).split() if w != "floor"]
     return _SURFACES.get(" ".join(words)) if words else None
+
+
+def asks_recap(text: str) -> bool:
+    n = _normalize(text)
+    return _hit_short(n, _RECAP_QUERY, extra_words=2)
+
+
+def asks_learned(text: str) -> bool:
+    n = _normalize(text)
+    return _hit_short(n, _LEARNED_QUERY, extra_words=3)
 
 
 def asks_floor(text: str) -> bool:
@@ -392,7 +408,7 @@ def asks_battery(text: str) -> bool:
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
     ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
-    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
+    ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
     if not n:
@@ -446,4 +462,8 @@ def match_local_command(text: str) -> str | None:
         return "battery_query"
     if asks_floor(text):
         return "floor_query"
+    if asks_recap(text):
+        return "recap_query"
+    if asks_learned(text):
+        return "learned_query"
     return None

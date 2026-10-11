@@ -487,3 +487,23 @@ def test_stop_commands_work_in_a_window_whatever_their_length():
     lp._events = lambda **kw: seen.append(kw)
     lp._one_turn(); lp._one_turn()
     assert any(k.get("halt") for k in seen) and not lp._conversing
+
+
+def test_what_did_you_do_and_what_have_you_learned_are_answered_locally_from_the_recap_and_the_notes(tmp_path, monkeypatch):
+    from pi_pipeline.memory.store import Store
+    from pi_pipeline.reflection.recap import ExperienceLog
+    monkeypatch.setenv("G2_EXPERIENCES", str(tmp_path / "e.jsonl"))
+    mem = _Mem()
+    mem.store = Store(str(tmp_path / "m.db"))
+    lp, w, stt, conv, tts = _loop(["what did you do", "what have you learned", "what have you learned", ""], memory=mem)
+    _run(lp, 1)
+    assert "nothing to tell" in tts.said[-1]
+    ExperienceLog().append({"duration_s": 600, "events": {"wall.steer": 2}, "stops": 3})
+    lp, w, stt, conv, tts = _loop(["what did you do", "what have you learned", ""], memory=mem)
+    _run(lp, 2)
+    assert tts.said[0].startswith("I explored for about 10 minutes.") and "turned away from a wall twice" in tts.said[0]
+    assert tts.said[1] == "I haven't learned anything new from my explorations yet."
+    mem.store.add_fact("I keep turning away from walls", importance=2, source="experience")
+    lp, w, stt, conv, tts = _loop(["what have you learned", ""], memory=mem)
+    _run(lp, 1)
+    assert tts.said == ["I keep turning away from walls."] and conv.sent == []

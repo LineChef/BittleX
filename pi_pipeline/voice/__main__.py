@@ -165,6 +165,8 @@ def main() -> None:
             namer = ExplorationPictureSaver(camera, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
 
         watcher_c = None
+        from ..memory.call_log import MemoryCallGate
+        call_gate = MemoryCallGate(lambda: memory.recency()[0]) if memory else None      # at most ONE memory-processing Claude call per session, across the tidy-up and the reflection
         if memory and settings.consolidate and settings.anthropic_api_key:
             from ..memory.consolidate import Consolidator, ConsolidationWatcher, make_llm
             from .usage import UsageTracker
@@ -173,7 +175,16 @@ def main() -> None:
                              audit_path="~/.local/share/g2/memory_consolidation.jsonl",
                              min_new_exchanges=settings.consolidate_min_exchanges),
                 lambda: memory.recency()[0], idle_s=settings.consolidate_idle_s,
-                min_interval_s=settings.consolidate_min_interval_s).start()
+                min_interval_s=settings.consolidate_min_interval_s, gate=call_gate).start()
+
+        watcher_r = None
+        if memory and settings.consolidate and settings.anthropic_api_key and settings.reflect in ("dry", "on"):
+            from ..memory.consolidate import ConsolidationWatcher, make_llm
+            from ..reflection.reflect import ExperienceReflector
+            from .usage import UsageTracker
+            watcher_r = ConsolidationWatcher(
+                ExperienceReflector(memory.store, make_llm(settings, "reflect"), mode=settings.reflect, usage=UsageTracker(settings.usage_path) if settings.usage_path else None),
+                lambda: memory.recency()[0], idle_s=settings.consolidate_idle_s, min_interval_s=settings.consolidate_min_interval_s, gate=call_gate, kind="reflection").start()      # level 2: his own experience, one call per new session
 
         wake = make_wake_word(
             "vosk" if use_wake else "none",
@@ -193,6 +204,8 @@ def main() -> None:
             # landed inside the command window (2026-10-08). Readings are taken before each walk and on the slow backstop timer instead.
             if watcher_c and kw.get("told_sleep"):
                 watcher_c.nudge()
+            if watcher_r and kw.get("told_sleep"):
+                watcher_r.nudge()
             if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":
                 # the voice service has no behavior runtime: hand over to an exploration session once the spoken reply is finished
                 import threading
@@ -254,6 +267,8 @@ def main() -> None:
                 camera.close()
             if watcher_c:
                 watcher_c.stop()
+            if watcher_r:
+                watcher_r.stop()
             if link is not None:
                 link.close()
             if stop_pi_watch:
