@@ -91,7 +91,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 **Cons**
 - **Voice:** through the head G2 speaks with a stock cloud voice, not his Piper robot voice. G2's own lines (narration, alarms, announcements) cannot be spoken through it without a firmware change.
 - **Two voices** while the Pi voice stays; one voice means giving up Pi speech or changing firmware.
-- **Wake word:** the side button only, in practice. A different wake word needs firmware.
+- **Wake word:** the side button only, in practice. A different wake word needs firmware, and on this chip (an ESP32-C3) the vendor's wake-word tool offers **only a fixed list of preset words** (custom words such as "G2" are supported only on the S3); the Pi-side route (stage 7b, the Pi's own wake word running on the head's audio) is the way to get "G2".
 - **Privacy:** every sentence goes to XiaoZhi's cloud; the account needs a phone number; retention terms are unread; tool answers also pass through their cloud.
 - **Dependence on a free service** that can change or stop; G2 is silent without Wi-Fi or the service.
 - **Personality is thinner:** a small model with a fixed role text, and no mood, traits or memory unless a tool supplies them.
@@ -200,7 +200,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Gets working: an expressive screen. If those tools are unreachable, this needs firmware (stage 7).
 
 **Stage 7: firmware fork (decision gate; not decided).**
-- Work: wake word; host-driven speaker so the Pi plays G2's Piper robot voice through the head; the head's direct robot command removed; Petoi's face tools kept.
+- Work: wake word (**a preset one only**: on the C3 the vendor's tool has no custom words; "G2" arrives with stage 7b); host-driven speaker so the Pi plays G2's Piper robot voice through the head; the head's direct robot command removed; Petoi's face tools kept.
 - Gets working: a hands-free wake word and G2's own voice for his announcements. Conversation is still the cloud voice unless stage 8.
 - Prerequisites: Petoi's source (or a rebuild from upstream v2.0.4); the ESP-IDF 5.4.2 toolchain (a multi-GB download, needs approval); the backup in hand.
 
