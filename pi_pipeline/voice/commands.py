@@ -79,7 +79,7 @@ _SHUTDOWN = (
 _EXPLORE = (
     "go ahead and look around", "look around", "have a look around",
     "exploration mode", "explore", "go explore", "go and explore",
-    "check things out", "go for a wander", "wander around",
+    "check things out", "go for a wander", "wander around", "go for walkies",
 )
 # Restart the voice service itself ("restart your voice service"): it says so, then the service restarts and is back in about 30 s.
 _RESTART_VOICE = (

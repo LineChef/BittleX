@@ -70,7 +70,7 @@ from pi_pipeline.voice.commands import match_local_command as _mlc
 
 def test_explore_and_unexplore_phrases():
     for p in ("go ahead and look around", "exploration mode", "look around",
-              "go explore", "wander around"):
+              "go explore", "wander around", "go for walkies"):
         assert _mlc(p) == "explore", p
     for p in ("that's enough", "stop exploring", "come back", "stop looking around"):
         assert _mlc(p) == "unexplore", p
