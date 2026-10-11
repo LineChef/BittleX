@@ -1,0 +1,65 @@
+# XiaoZhi and Petoi head documentation: what the documents say
+
+Read on 2026-10-11. Our own summary and translation of the vendors' documents about the XiaoZhi firmware and cloud service and the Petoi AI head, kept here so the facts are not lost; the originals belong to their authors, so follow the links for the full text. What we concluded and what we will do is in [`../plan-detail/ai-head-implementation.md`](../plan-detail/ai-head-implementation.md); the head's own measurements are there too. A private copy of the page screenshots is kept on the Mac outside the repository (`~/g2_head_firmware/vendor-docs/`, with a README of sources); they are third-party material and are never committed.
+
+## The most important facts (read these first)
+
+1. **The MCP access point lets our own tool server serve the cloud model.** Console: the agent's role page, bottom right, has a dialog showing status (online), the **registered tool names** and the secret address (with a copy button). The vendor's own example runs a Python `eval` tool: never copy that.
+2. **Tool rules from the vendor:** clear tool and parameter names (no abbreviations), guidance for when to use a tool in its description, results usually limited to about **1024 bytes**, the tool list text is limited (counted in tokens), and **each access point allows a limited number of connections**.
+3. **The device protocol** has `stt`, `llm` (an emotion, which drives the **screen face**), `tts` (start, stop, sentence text), `mcp`, `system` (reboot), `alert` (status, message, emotion, sound), `custom` (optional) and binary Opus audio frames. The audio channel opens when a conversation starts, so a server cannot simply speak to an idle head; the newer `notify` message (an audio file at a web address) fills that gap and **is not in the head's firmware (v2.0.4)**.
+4. **Audio:** Opus, 16 kHz mono 60 ms frames from the device, 24 kHz from the server; the device can run echo cancellation, noise reduction and gain control.
+5. **A prebuilt upstream firmware exists for the head's board** (`BOARD_TYPE_LICHUANG_C3`, file `vx.x.x_lichuang-c3-dev.zip`) and is flashed as one `merged-binary.bin` at address 0x0. Three ways to flash: Espressif's Flash Download Tool, ESP-Launchpad in the browser (official), or a third-party web tool (skipped).
+6. **The vendor's hub lists documents we have not read** that matter to us: **voice cloning (public beta)**, **changing the wake word**, **a custom wake-word scheme**, **online firmware compile**, **enabling echo cancellation**, **the OTA interface**, **the emoji mood display**, **knowledge base usage**, **the FAQ**, and **developer certification** (section 3).
+7. **Community servers exist** (MIT, Python, Java, Go) that speak the same protocol; the biggest needs 2 cores and 2 to 4 GB of memory, **does not list Piper**, documents **no push-to-device interface**, and says itself that it is **not production-ready or security-tested**.
+8. **Forcing download mode:** hold BOOT, tap RST, release BOOT.
+
+## 1. MCP access-point guide (official, Feishu; modified Sept 2025)
+
+Title: 小智AI配置MCP接入点使用说明（官方）. Sections: Overview, Get the MCP access point, Sample code (MCP example, Precautions, Running results, Conversation content).
+- **Overview:** MCP is a protocol that lets a server expose callable tools (database queries, API calls, calculations) to a language model, each with a unique name and a schema. The access point connects a *local* MCP service to the XiaoZhi model for voice devices. It is pitched for remote control, calculation, email operations and knowledge search.
+- **Get it:** log in at xiaozhi.me, open the agent's role configuration page; the agent's own access point is at the bottom right. The dialog shows the status, the available tools and the address.
+- **Example:** [78/mcp-calculator](https://github.com/78/mcp-calculator) (MIT): a `FastMCP` server over stdio with a `calculator` tool that **evaluates a Python expression from the model**; run with `MCP_ENDPOINT=<address>` and `mcp_pipe.py`. The log shows `Connecting to WebSocket server`, a `ListToolsRequest` and `CallToolRequest`. The repository bridges many tool servers from a config file and reconnects with exponential backoff; it has no mention of pushing messages.
+- **Precautions (the six items):** (1) clear names and a description for each tool and parameter; (2) the docstring tells the model when to use it, including what is available inside it; (3) with stdio transport, do not `print`, use logging; (4) results are a string or JSON and length-limited, about 1024 bytes; (5) the tool list text is limited and counted in tokens; (6) each access point has a connection limit.
+- Not read: "Running results" in full and "Conversation content" (probably a sample dialogue).
+
+## 2. Firmware flashing guide (Feishu; modified Jan 2026)
+
+Title: Flash工具/Web端烧录固件（无IDF开发环境）: flashing without a development environment.
+- **Method 1, Espressif Flash Download Tool 3.9.7** (a 20.63 MB zip; Windows recommended; the tool's folder and the bin's folder must not contain Chinese characters). Connect the board by USB, ChipType ESP32-S3 (choose ESP32-C3 for C3 boards), WorkMode Develop, LoadMode UART; tick the file's box, set the address to 0x0, choose the right COM port, leave SPI speed and mode at their defaults (a higher baud rate is faster); press START; FINISH means done (a few minutes); then press the board's RST to restart into Wi-Fi setup mode. On the S3 dev boards the UART port is the one that shows up as a CH340 or CH343 serial device (drivers linked at the end of the page); some boards differ.
+- **Firmware:** from the official firmware list (their examples say v1.5.5; the hub lists v2.2.4 as newest), one zip per board; the zip holds `merged-binary.bin`. A table of 33 boards maps board type to file name; **row 10, 立创·实战派ESP32-C3开发板, `BOARD_TYPE_LICHUANG_C3`, `vx.x.x_lichuang-c3-dev.zip` is the head's board**; row 9 (S3) is a different board.
+- **Method 2, third-party web flasher** by 鹿戴马物联 (`16302.com`): detects the chip and picks the firmware; needs Edge and a WeChat or account login. Skipped.
+- **Method 3, ESP-Launchpad** (`espressif.github.io/esp-launchpad`, Chrome or Edge): DIY page, Connect and pick the port (it shows "Connected to device: ESP32-xx"), load `merged-binary.bin`, flash address 0x0, Program; progress appears in the Console; press Reset Device and Confirm; the board then logs the Wi-Fi setup prompt. Troubleshooting: if the port is not listed, check the cable, the port and other programs using it; if Program stays grey, reconnect, reload the page (F5 or Ctrl-R) and reselect the file; if the board will not run after flashing, the firmware is not for that board.
+- **Boot mode:** hold BOOT, tap RST (about half a second), release BOOT.
+
+## 3. The vendor hub: XiaoZhi AI Chatbot Encyclopedia (Feishu; modified Aug 2025)
+
+小智 AI 聊天机器人百科全书; its own address is `xiaozhi.me/docs`, which redirects to the Feishu wiki. Contents, translated; **bold = worth reading for us and not yet read** (priority order in the plan):
+- **Account verification:** **XiaoZhi AI developer certification**.
+- **Firmware downloads:** v2.2.4 (latest, with source), v2.0.5 (with source), v1.9.4.
+- **DIY tutorials, ESP32-S3 breadboard:** hardware list and wiring; an LCD wiring tutorial; a camera-interaction wiring tutorial; the flashing guide (read); configuring Wi-Fi and adding a device and signal problems; module buying notes; an AI product design reference. ESP32-C3 and plain ESP32 breadboard guides.
+- **Help:** **voice cloning (public beta) console guide**; **FAQ ("read first")**; not receiving the phone verification code, forgotten password, unbinding a device; **knowledge base usage**.
+- **Build tutorials:** **online firmware compile**; Windows ESP-IDF setup; custom project configuration (1); **enabling AEC (echo cancellation) in the SDK configuration**; **changing the wake word and its configuration**; a standalone serial tool; changing the prompt sounds (P3 files such as the boot and Wi-Fi announcements).
+- **MCP tutorials:** the access-point guide (read); connecting web search or lookup MCP tools; simple computer control; a "mcphub" management platform; third-party tool examples.
+- **Other boards and products:** several (Xmini, SF32LB52, a plug-in board design, supported-board list).
+- **Hardware extensions:** **a simple custom wake-word (ASR) scheme**; controlling GPIO; battery power; connecting a speaker or earphones.
+- **Open hardware projects**, **communication protocols:** WebSocket connection (read), **emoji mood display**, **OTA interface document**; trivia pages.
+
+## 4. WebSocket protocol page (Feishu; modified July 2025)
+
+Matches upstream `docs/websocket.md` in the firmware source (more current; read there). Protocol version 1; headers `Authorization: Bearer <token>`, `Protocol-Version`, `Device-Id` (the MAC address), `Client-Id` (a UUID); `hello` both ways; audio Opus 16 kHz mono 60 ms up, 24 kHz down. Listening modes: auto and manual stop, and realtime (continuous, needs echo cancellation). Message types and the state diagrams are summarized in the plan; a TTS or tool-call result arrives as JSON, and audio travels as binary frames. Network errors close the connection and the device must reconnect.
+
+## 5. Upstream firmware source documents (`xiaozhi-esp32` v2.5.0, MIT; copy kept on the Mac)
+
+`docs/notify.md` (the `notify` message), `docs/websocket.md`, `docs/mqtt-udp.md` (the transport the head uses), `docs/mcp-protocol.md` and `docs/mcp-usage.md` (device-side tools), `docs/custom-board.md` (how a board profile is defined; the head's is `main/boards/lckfb/szpi-esp32c3`). Key facts: `notify` carries an `audio_url` to a mono Ogg Opus file plus optional subtitles, plays only while the device is idle, and is best effort with no acknowledgement; `alert` shows text and an emotion with a sound; `custom` needs a build option; the board profile `lichuang-c3-dev` enables the wake-word code and the USB serial console; the build needs a newer toolchain (ESP-IDF 6.x) than the head's base (v2.0.4, ESP-IDF 5.4.2).
+
+## 6. Community server project (`xinnan-tech/xiaozhi-esp32-server`, MIT)
+
+A Python, Java and Vue backend speaking the XiaoZhi protocol (MQTT with UDP and WebSocket) with MCP access points. Local speech recognition (FunASR, SherpaASR), local speech output (FishSpeech, GPT-SoVITS, Index-TTS, PaddleSpeech; **not Piper**), any model with an OpenAI-style interface; Docker or source install in a minimal and a full mode (2 to 4 GB of memory at least; more with local recognition). Its warnings: it is open source with no commercial tie to the third-party services it calls (read their terms; it holds no accounts or funds), its features are not complete and it **has not passed security testing, so it is not for production or the public internet without your own protection**. It documents no interface for sending text to a device; the device must be pointed at its OTA and WebSocket addresses, which is a firmware matter. Other servers, clients and tools it lists: Java and Go servers, a Python and an Android client, a Linux client, and **`xiaozhi-assets-generator`** (custom wake words, fonts, emojis and backgrounds with web-based editing).
+
+## 7. Petoi AI conversation guide ([guide.petoi.com](https://guide.petoi.com/extensible-modules/ai-conversation))
+
+Replace the head unit on the head servo and connect through the Grove ports (**three wiring diagrams as images only**: BiBoard V1 without the voice module, BiBoard V1 with it, and NyBoard V1); power on, join the `Xiaozhi-xxxx` hotspot, `http://192.168.4.1`, a 2.4 GHz network; account at xiaozhi.me with a phone number; a six-digit activation code; wake word "Hi, Jason" or the Boot button; the Role tab holds the introduction (Petoi's template: Bittle, two short plain-text sentences, tool parameters only command codes, send rest before goodbye, default nod, shake, check or scratch, run several actions one at a time); Model & Memory; Speaker Recognition not on the free plan; Extensions. The tool the model calls is `self.robot.send_command`.
+
+## 8. Still to collect (the owner's screenshots, same way as before)
+
+In priority order: the **communication protocol: emoji mood display** and **OTA interface** pages; **voice cloning**; the **wake word** pages; **online firmware compile**; **AEC**; the **knowledge base** page; the **FAQ**; **developer certification**; account recovery and unbinding; the prompt-sound (P3) page. Also Petoi's wiring diagrams and the full Role template, the console's Model & Memory and voice list and the MCP dialog, and xiaozhi.me's plans, terms and privacy policy.
