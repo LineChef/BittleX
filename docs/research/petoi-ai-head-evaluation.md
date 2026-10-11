@@ -196,6 +196,12 @@ Head on the Mac's USB-C (its log is `/dev/cu.usbmodem*` at 115200; opening the p
 - **Quality for offload (the goal):** greetings, small talk, simple arithmetic and questions about itself were answered by its own model in about 1 s, with no Claude call. Motion requests ("sit down", "shake your head") make the model write `self.robot.send_command` into its spoken text; the firmware logs `Detected code leak in TTS text, removing: % self.robot.send_command...` and strips it, and the log truncates the arguments, so the command text is NOT yet visible. "Say goodbye" did not send rest.
 - **Not yet known:** the bytes it puts on the BiBoard line and whether a command really goes out. The Pi cannot hear the head's transmit line; options: the BiBoard powered from USB only (servos unpowered) with the Pi listening to its echo, or a USB-serial adapter on the head's transmit line.
 
+### MCP access point works with the free model (2026-10-11)
+
+The agent's **MCP access point** (console, role page, bottom right; a secret `wss://` address, kept only in the Pi's `.env` as `XIAOZHI_MCP_ENDPOINT`) accepts a tool server of ours that connects OUT from the Pi (`python -m pi_pipeline.head`, `pi_pipeline/head/mcp_tools.py`, the `websockets` package already on the Pi). The cloud connected at once and sent `initialize`, `notifications/initialized` and `tools/list`, later `ping`. A made-up tool answer (`g2_test_word` = "marmalade") was spoken by the head, and the Pi's log shows `tools/call g2_test_word`: **the free "XiaoZhi Lite" model does call tools through this route**, although its device-side robot tool only produced stripped text (`code leak`). So the head's model can reach G2's abilities through code we control on the Pi, with our rules and safety layers. What a tool returns passes through XiaoZhi's cloud, so tools may only return things fine to leave the house; no tool may evaluate text as code (the vendor's calculator example does, and is not used).
+
+Also learned the same day: the head's board profile is the open-source firmware's `lichuang-c3-dev` (an LCKFB ESP32-C3 board with a 320x240 screen, ES8311 speaker and ES7210 microphone chips, no camera); `SecondUart` is Petoi's own addition; a read-only backup of its 16 MB flash is on the Mac (not in the repo; it holds the saved Wi-Fi settings). Forking its firmware is NOT decided; this is exploration only.
+
 ## How the decision will be judged
 
 1. **Is the scripted gait about as good as the learned gait?** If it is, an RL policy may not be needed for walking —

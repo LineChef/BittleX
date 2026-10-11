@@ -50,8 +50,13 @@ def g2_about(_args: dict) -> str:
             "and his body and walking are run by a small computer inside him.")
 
 
+def g2_test_word(_args: dict) -> str:
+    return "G2's test word is marmalade."            # a made-up answer the model cannot know without calling the tool: the test that a tool call really happened
+
+
 DEFAULT_TOOLS = (
     Tool("g2_about", "Tell the person who or what G2 is. Call this whenever someone asks about G2, the robot, or what it is.", g2_about),
+    Tool("g2_test_word", "Get G2's test word. Call this whenever someone asks what G2's test word is.", g2_test_word),
 )
 
 
@@ -69,6 +74,7 @@ class ToolServer:
         if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0":
             return self._error(msg.get("id") if isinstance(msg, dict) else None, -32600, "invalid request")
         method, mid, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+        log.info("request: %s%s", method if isinstance(method, str) else "?", f" {params.get('name')}" if method == "tools/call" and isinstance(params, dict) and isinstance(params.get("name"), str) else "")
         if "id" not in msg:                                         # a notification (initialized, cancelled, ...): nothing to answer
             return None
         if method == "initialize":

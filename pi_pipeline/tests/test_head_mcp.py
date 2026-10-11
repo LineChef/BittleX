@@ -17,7 +17,7 @@ def test_initialize_lists_the_tools_and_answers_ping():
     assert init["result"]["protocolVersion"] == "2025-03-26" and init["result"]["capabilities"] == {"tools": {}} and init["id"] == 1
     assert s.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None            # a notification gets no answer
     tools = s.handle(_req("tools/list", 2))["result"]["tools"]
-    assert [t["name"] for t in tools] == ["g2_about"] and tools[0]["inputSchema"]["type"] == "object" and "description" in tools[0]
+    assert [t["name"] for t in tools] == ["g2_about", "g2_test_word"] and tools[0]["inputSchema"]["type"] == "object" and "description" in tools[0]
     assert s.handle(_req("ping", 3))["result"] == {}
 
 
@@ -30,6 +30,7 @@ def test_a_tool_call_returns_text_and_is_recorded_and_bad_calls_are_clean_errors
     assert s.handle(_req("nonsense", 7))["error"]["code"] == -32601
     assert s.handle({"id": 8, "method": "ping"})["error"]["code"] == -32600 and s.handle("text")["error"]["code"] == -32600
     assert s.calls == ["g2_about"]
+    assert "marmalade" in s.handle(_req("tools/call", 9, name="g2_test_word", arguments={}))["result"]["content"][0]["text"]
 
 
 def test_a_failing_tool_is_an_error_result_not_a_crash():
