@@ -50,6 +50,12 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 
 **What G2 spends on Claude today:** 57 billed calls, about $0.33, in 72 hours (2026-10-07 to 10-10). The saving the head can offer in dollars is small; the reason to use it is the principle of fewer calls, the face, and the placement of the mic and speaker.
 
+**Pushing a message to the head so it speaks (researched 2026-10-11)**
+- **The protocol has push messages,** but only the *server* side of the head's connection can send them: the cloud broker that the head's MQTT link goes to. Upstream documents these (`docs/notify.md` and `main/application.cc` in the xiaozhi-esp32 source): `notify` (an https/http URL to a mono Ogg Opus file, plus optional subtitles, played while the head is idle), `alert` (status, message and emotion: shows text and a face emotion and plays a sound), `tts` (the cloud's own speech: start, stop, sentence text; the audio comes over the audio channel) and `custom` (only if the firmware is built with that option).
+- **In the head's firmware (v2.0.4):** `alert`, `tts`, `stt`, `llm`, `mcp`, `system` and `iot` message types are present; **`notify` is not** (no `audio_url` or `subtitles` handling; it arrived in a newer release).
+- **For us:** no documented public interface on xiaozhi.me for sending these to our own head. Searches in English and Chinese turned up none; the one lead is a community pattern of a platform-run scheduled task that calls an MCP tool and speaks the result (polling, not a push, and unverified on the free plan). Upstream's `xz-mqtt` forwarding is the vendor's internal server tooling.
+- **So** without firmware or a backend of our own, the Pi cannot make the head say something on its own. With **our own backend** (stage 8) we would be the server and could send `alert` now and `tts` audio; `notify` would also need a firmware newer than v2.0.4. With a **firmware change** (stage 7) a host-driven speaker is the other route.
+
 ## 4. Pros and cons of adopting the head
 
 **Pros**
@@ -129,6 +135,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 **Stage 4: one voice, no firmware change.**
 - Work: turn off the Pi's spoken output; keep its non-voice sounds (horns, "oof", chirps); answers to local commands become tools; narration and alarms become sounds or nothing; the Pi keeps a silent local stop-word listener.
+- No route found for the Pi to push speech to the head without firmware or a backend (section 3).
 - Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, his current robot voice, the hands-free "G2" wake word (the head is button-only), and offline speech.
 - Decision gate: if losing the robot voice and the spoken narration is too much, stop at stage 3, or go to stage 7.
 
@@ -169,6 +176,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 - The head's power draw; the exact serial pins; how the head's serial output looks on the wire (needs its transmit line, see section 3).
 - The effect of the head's mass on the walking policy (simulation first).
 - The custom wake-word process for the chip's speech library.
+- Whether the xiaozhi.me console or its documentation has any interface for sending a message to the head (none found in searches or in the one official document read, the MCP access-point guide); ask or look in the console before relying on the answer.
 
 ## 10. How-to reference
 
