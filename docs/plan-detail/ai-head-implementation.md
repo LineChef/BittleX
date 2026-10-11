@@ -105,6 +105,22 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 | Safety and privacy | Hardware rules (G2 on his feet, hands near; no moving while he is in pieces); no household names, faces or routines in the role text, tools or knowledge base; endpoint and account details never in chat, logs or the repo. |
 | Measurement | Before and after: Claude calls per day (`python -m pi_pipeline.voice.api_log`, `python -m pi_pipeline.memory calls`), share of turns the head handled, tool-call success rate, delay, and quality. |
 
+### Removing the Pi's own microphone and speaker (a long-term goal of the owner)
+
+The first draft of the staged plan assumed they stay. What depends on them today (microphone: Vosk wake word, speech recognition and the local stop words; speaker: Piper speech and every sound):
+
+| Behavior | Needs today | Mic and speaker removed, stock firmware (stage 4) | Mic and speaker removed, with the head as the Pi's audio peripheral (stage 7b) |
+|---|---|---|---|
+| Conversation | Pi mic and speaker | Works through the head (button, stock cloud voice) | Works, in G2's voice, local |
+| Hands-free wake word "G2" | Pi mic (Vosk) | **Lost** (button only) | Works (Vosk on the audio the head sends) |
+| Emergency stop by voice ("emergency stop", "freeze", "halt") | Pi mic, local, never the cloud | **Lost** unless another path exists | Works, plus an independent path (the head link is Wi-Fi) |
+| Exploration voice control ("go ahead and look around", "that's enough", "tell me what you see", naming an object) | Pi mic | **Lost** while G2 is away from the button (some could become tools, but only after a button press) | Works |
+| Spoken narration and alarms | Pi speaker | **Lost** (silent) | Works |
+| Sounds (horn, "oof", chirps, ta-da) | Pi speaker | **Lost**, except the BiBoard's own buzzer beeps | Works (audio sent to the head) |
+| Sleep and wake by wake word | Pi mic | Button only | Works |
+
+So with the stock firmware, removing the external mic and speaker costs hands-free control, the voice emergency stop, exploration voice commands, narration and sounds. **Even stage 7 as first described (wake word plus a host-driven speaker) does not cover the microphone side.** What does is **stage 7b** below, which is also what Petoi said the head's firmware could do (stream the microphone out, accept audio to play).
+
 ## 7. Staged integration
 
 Each stage ends in something that works on its own, so the project can stop after any of them.
@@ -121,6 +137,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 | **5. Motion through the head** | "G2, sit" and similar through the head, with the Pi's eased stand-up and fall guard around it. | A new way for G2 to move: it needs an allowlist, refusal rules and trust in a cloud model that may mishear. |
 | **6. The face** | An expressive screen tied to his mood and events. | It depends on whether the cloud model can call the head's own face tools; if not, it waits for stage 7. |
 | **7. Firmware fork** (not decided) | A hands-free wake word; the Pi can send text or audio to the head's speaker (self-initiated speech and the robot voice for those lines return); the head's direct robot command removed. | We maintain a fork and no longer get Petoi's updates; a multi-GB toolchain download; a flash (the backup is the way back); Petoi's additions rebuilt unless their source appears. Conversation is still the cloud voice. |
+| **7b. Head as the Pi's mic and speaker** (firmware) | Everything the Pi voice does today (G2's voice, wake word, voice stop, exploration commands, narration, sounds) from hardware in the head, local; the Pi's own mic and speaker can be removed. | The free cloud brain (the Pi's Claude pipeline keeps talking); a Wi-Fi link between head and Pi that the voice stop must not depend on alone; unproven chip capacity. |
 | **8. Our own backend** (optional) | G2's own voice everywhere; no audio to XiaoZhi's cloud; independence from the free plan. | The free brain: Claude calls return (or a weaker local model); a machine that must be on; more moving parts. |
 
 **Stage 0: bench bring-up and the tool proof. Done 2026-10-11.** Gets working: the head talks in English on its own account; our tool server answers its model; the firmware is backed up.
@@ -144,6 +161,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 **Stage 4: one voice, no firmware change.**
 - Work: turn off the Pi's spoken output; keep its non-voice sounds (horns, "oof", chirps); answers to local commands become tools; narration and alarms become sounds or nothing; the Pi keeps a silent local stop-word listener.
 - No route found for the Pi to push speech to the head without firmware or a backend (section 3).
+- **Not compatible with removing the Pi's microphone and speaker:** the silent stop-word listener needs the Pi's microphone. Removing them means stage 7b.
 - Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, his current robot voice, the hands-free "G2" wake word (the head is button-only), and offline speech.
 - Decision gate: if losing the robot voice and the spoken narration is too much, stop at stage 3, or go to stage 7.
 
@@ -160,6 +178,12 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Gets working: a hands-free wake word and G2's own voice for his announcements. Conversation is still the cloud voice unless stage 8.
 - Prerequisites: Petoi's source (or a rebuild from upstream v2.0.4); the ESP-IDF 5.4.2 toolchain (a multi-GB download, needs approval); the backup in hand.
 
+**Stage 7b: the head as the Pi's microphone and speaker (firmware change; this is the route to removing the external mic and speaker).**
+- Work: firmware that streams the head's microphone audio to the Pi over the local network (not the cloud) and plays audio the Pi sends; the Pi's existing voice pipeline (wake word, speech recognition, stop words, exploration commands, Piper, sounds, the audio gate) runs on that audio unchanged; check echo between the head's speaker and microphone; keep an independent stop path (the head link is Wi-Fi, so it must never be the only way to stop G2); then remove the Pi's microphone and speaker.
+- Gets working: everything the Pi voice does today, from hardware in the head: G2's own voice, the hands-free wake word, the voice emergency stop, exploration commands, narration, alarms and all the sounds. Local and private. One set of audio hardware, the screen face on the same unit.
+- Loses: the free cloud brain for chat (the Pi's own pipeline keeps using Claude as it does now; the head's cloud model would be off), and a dependence on a reliable Wi-Fi link between the head and the Pi.
+- Prerequisites: stage 7's firmware work plus microphone streaming; whether the C3 can stream audio, play audio, run the screen and keep Wi-Fi stable at once is **not yet known**.
+
 **Stage 8: our own backend (optional).**
 - Work: a server for the head's audio protocol: speech-to-text, the brain (Claude, or a local model), Piper with the robot effect; the firmware pointed at it; an always-on machine (a Mac works only while it is on and awake; a small always-on computer is roughly $100 to $200, or a rented server a few dollars to about $20 a month; the Pi is already busy).
 - Gets working: G2's own voice everywhere and no audio to XiaoZhi's cloud. Costs: the Claude calls come back (the brain is Claude again), so the call savings from the free model are gone.
@@ -175,6 +199,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 3. Whether to fork the firmware (stage 7) or wait for Petoi's source. Not decided; no fork work has started.
 4. Whether a backend is worth running (stage 8), and on what machine.
 5. What the head's model may do beyond talking (stage 5), and what may leave the house through tools.
+6. Whether the long-term goal is to remove the Pi's own microphone and speaker. If yes, the route is stage 7b (a firmware change); stage 4 alone cannot do it without losing hands-free control and the voice stop.
 
 ## 9. Still to verify (none of it blocks writing this or stage 1)
 
@@ -187,6 +212,10 @@ Each stage ends in something that works on its own, so the project can stop afte
 - The effect of the head's mass on the walking policy (simulation first).
 - The custom wake-word process for the chip's speech library.
 - Whether the xiaozhi.me console or its documentation has any interface for sending a message to the head (none found in searches or in the one official document read, the MCP access-point guide); ask or look in the console before relying on the answer.
+
+**Documents worth collecting now** (so there is no need to come back for them)
+- Public, and I can read them myself: Petoi's BiBoard V1 guide and serial-protocol page; Espressif's speech-recognition (wake word) documentation; the upstream firmware's `xiaozhi-assets-generator` README (custom wake words); the head board's open-source schematic.
+- Needs the owner (a login, images or the live page; save as HTML, or screenshots with the file names): the Feishu page "小智通信协议" (XiaoZhi communication protocol, linked from the community server's README; it matters for stages 7b and 8 and for pushing messages); the Feishu "Beginner's Firmware Flashing Guide" (restoring or flashing); Petoi's three wiring diagrams on the AI conversation page (BiBoard V1 with the voice module is ours) and the full Role template text; console screenshots of Model & Memory, the voice list, the knowledge-base page (limits, cost) and the MCP access-point dialog; xiaozhi.me's plans page and its terms and privacy policy (data retention, which models are paid).
 
 ## 10. How-to reference
 
