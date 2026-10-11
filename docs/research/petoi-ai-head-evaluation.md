@@ -247,7 +247,7 @@ privacy problem.
 3. **Standalone bring-up on the bench.** Hotspot, Wi-Fi (2.4 GHz), account, activation, a conversation. Time the latency,
    try the wake word, interrupt it while it speaks. Then **cut Wi-Fi** and note exactly what still works (wake word,
    recognition, vision, canned skills), and what it does with the robot connected (idle, continue, reboot).
-4. **Listen to its serial output to the BiBoard** with the Pi's UART or a USB-serial adapter as a passive listener, never
+4. **Listen to its serial output to the BiBoard.** CORRECTION 2026-10-11: the Pi's UART cannot hear it (the Pi's receive pin is on the BiBoard's transmit line, the head's transmit is on the BiBoard's receive line, so the Pi hears only the BiBoard's IMU stream; a 2-minute Pi listener with the head plugged in and in setup mode saw only `ICM:` lines and proves nothing about the head). Use the head's own USB-C log on the Mac, the BiBoard's replies on the Pi's line, or a USB-serial adapter with its receive pin on the head's transmit line, as a passive listener, never
    connected as a second driver: baud, framing, message list. Speak commands and record exactly what it emits; look for
    anything beyond named skills (joint-level `i`/`m` moves, rates).
 5. **Connect it to G2 with the Pi still installed.** Petoi says it uses UART2 on the first Grove socket, the same UART as the Pi header by default — so first
