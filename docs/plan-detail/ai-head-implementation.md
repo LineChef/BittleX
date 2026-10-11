@@ -12,6 +12,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 | Brain it uses | XiaoZhi's free cloud model ("XiaoZhi Lite", the only choice on the free plan). |
 | Tools | Proven: our tool server on the Pi (`python -m pi_pipeline.head`) is called by the head's model through the agent's MCP access point. Two test tools only (`g2_about`, `g2_test_word`). It is started by hand and stops when the Pi reboots. |
 | Pi voice service | Stopped by hand on 2026-10-11 (G2 is in pieces); G2's own voice does not work until it is restarted. |
+| Documentation | The vendor documents were read on 2026-10-11 (as a guest, no logins) and summarized in English in [`../research/xiaozhi-vendor-docs.md`](../research/xiaozhi-vendor-docs.md); what they change for this project is in section 3a. |
 | Firmware | Backed up (read-only copy of the head's whole flash, kept on the Mac outside the repo; it contains the saved Wi-Fi settings, so it is never shared). Not forked, not flashed. |
 
 ## 2. What the head is
@@ -21,7 +22,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **Flash layout:** `nvs` (settings, including the saved Wi-Fi: never read), `otadata`, `phy_init`, a 960 KB wake-word `model`, a 7 MB `storage` (assets), and two 4 MB program slots of which only `ota_0` is used. OTA is off by default.
 - **Petoi's additions** (not in the upstream project): a `SecondUart` on UART1 (the link to the BiBoard; the pin numbers are constants in the code, not visible as text), a device tool `self.robot.send_command` taking Petoi tokens (`ksit`, `kwkF 3`, `knd` nod, `kwh` shake, `kck` check, `kscrh` scratch), a built-in "Bittle" role text, and an on-screen **face**: tools `self.expression.look` (center, up, down, left, right), `blink`, `set_mouth_width`, `set_mouth_style`, `set_quiet_after_speech`. The firmware also removes tool-call text from speech (`Detected code leak in TTS text`).
 - **Transport:** MQTT with UDP audio to XiaoZhi's cloud (as upstream).
-- **Wake word:** the on-device model is `wakenet9s` for the Mandarin phrase "你好小智". Petoi's guide says "Hi, Jason". In our tests the **side button** is what reliably wakes it; "Hi, Jason" was not reliable.
+- **Wake word:** the on-device model is `wakenet9s` for the Mandarin phrase "你好小智". Petoi's guide says "Hi, Jason". In our tests the **side button** is what reliably wakes it; "Hi, Jason" was not reliable. On this chip the vendor's tools only offer preset wake words (section 3a).
 - **Source for a fork:** upstream is [xiaozhi-esp32](https://github.com/78/xiaozhi-esp32) (MIT). Its tree has the head's board (`main/boards/lckfb/szpi-esp32c3`). A copy of v2.5.0 (commit `ac6deed3…`) and esptool 5.4.0 (hash-verified) sit in `~/g2_head_firmware` on the Mac, outside the repo. v2.5.0 needs a newer toolchain than the head's v2.0.4 base.
 
 ## 3. What we learned hands-on (2026-10-11)
@@ -78,6 +79,28 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **For us:** no documented public interface on xiaozhi.me for sending these to our own head. Searches in English and Chinese turned up none; the one lead is a community pattern of a platform-run scheduled task that calls an MCP tool and speaks the result (polling, not a push, and unverified on the free plan). Upstream's `xz-mqtt` forwarding is the vendor's internal server tooling.
 - **So** without firmware or a backend of our own, the Pi cannot make the head say something on its own. With **our own backend** (stage 8) we would be the server and could send `alert` now and `tts` audio; `notify` would also need a firmware newer than v2.0.4. With a **firmware change** (stage 7) a host-driven speaker is the other route.
 
+## 3a. What the vendor documents change for this project
+
+Read 2026-10-11; the English summary with every source is [`../research/xiaozhi-vendor-docs.md`](../research/xiaozhi-vendor-docs.md). The findings that matter here, each with its effect on the plan:
+
+1. **Stronger free models are one account step away.** "Developer certification" (console, avatar menu, bind a GitHub account) unlocks Qwen 3, the full DeepSeek and Doubao (and two preview models), where the ordinary free tier has only "XiaoZhi Lite" and a quantized DeepSeek; it also raises limits (knowledge bases 1 to 10, documents each 1 to 10, bound devices 10 to 100). *Plan effect:* the tool-reliability and chat-quality tests of stages 1 and 2 should be repeated on a stronger model; a stronger model may also change the robot-tool result. It links a GitHub account to a third party, so it is the owner's decision (section 8).
+2. **A push feature exists for developers but is not public.** The activation design lists, for developers: device activation status and deregistering, device status and usage statistics, **real-time notification push (needs an active MQTT connection)**, and agent configuration read and write ("to be evaluated"). *Plan effect:* the stage 4 loss (no self-initiated speech) might be avoidable without firmware or a backend; find that interface (ask XiaoZhi or Petoi; it may only be visible after certification) before relying on it. Until seen, the earlier conclusion stands.
+3. **A G2-like voice may be possible with no firmware change: voice cloning.** In the console: 99 yuan a year for 8 clones (as of March 2025), an 8 to 30 second clean clip (one speaker, no echo), selectable about 5 minutes after the clone succeeds. It is **paid with WeChat Pay**, which is likely a blocker for a US account and is something the assistant cannot do for the owner; the clone lapses when the year ends; whether a synthetic robot voice clones well is unknown; some users reported a device going silent after choosing a clone. *Plan effect:* an option for stage 4 beside a stock voice, behind a payment decision.
+4. **Wake words on this chip are presets only.** C3 and C6 chips take a fixed list (a handful; examples "Hi, 乐鑫" and "你好小智"); custom words are for the S3 and P4; a truly custom trained word is an Espressif commercial service (2 to 3 weeks, a corpus of over 20,000 samples or Espressif collects, a minimum fee). Petoi's guide says "Hi, Jason" and our tests did not make it reliable. *Plan effect:* hands-free "G2" needs stage 7b (the Pi's own wake word on the head's audio) or an add-on recognition module (a community scheme), not the head's chip; the button stays the wake action until then.
+5. **The firmware route is cheaper to try.** The console has a **cloud firmware build** (10 builds per account per day, official boards only; options: wake-word preset, echo cancellation on or off, display style, Wi-Fi setup method) and a prebuilt image exists for the head's board, flashable in a browser with ESP-Launchpad or with esptool (`merged-binary.bin` at 0x0). *Plan effect:* "see what stock upstream does on the head" needs no toolchain, but it **drops Petoi's additions** (the BiBoard serial link, the robot tool, the face tools); the backup is the way back. A local build needs ESP-IDF 5.4.2 for the head's v2.0.4 base (5.5.2 for v2.2.4; the newest source needs 6). The device's Client-Id is regenerated when its flash is erased, so a full flash may need the device re-added to the account; restoring the backup restores the old identity.
+6. **Pointing the head at our own server is a menu setting.** The firmware's configuration menu has **Default OTA URL**; the server's OTA reply carries the MQTT and WebSocket settings and the activation code. Older versions (1.6.0 and earlier) set the WebSocket address directly. *Plan effect:* stage 8 is our OTA endpoint plus a protocol server plus one setting and a rebuild; no firmware code change for the address. The community server is heavy (2 to 4 GB, no Piper in its speech list, not security-tested), so our own small server stays the plan.
+7. **The face is driven by emotion messages with 19 fixed names** (neutral, happy, laughing, funny, sad, angry, crying, loving, embarrassed, surprised, shocked, thinking, winking, cool, relaxed, delicious, kissy, confident, sleepy). With the cloud agent the model picks its own emotion; the role text can steer it; G2 cannot send one without our own server. *Plan effect:* stage 6 can map G2's moods (neutral, content, playful, lonely, subdued) onto these names, but only through our server or the role text.
+8. **The knowledge base is not worth it on the free tier** (1 knowledge base, 1 document; the model must be told in the description to call it first). *Plan effect:* stay with tools.
+9. **The vendor's tool rules are applied in the code:** results cut at 1000 bytes, one connection, clear names and "when to use" descriptions (to keep).
+10. **Persona limits:** the role text is at most 2000 characters; XiaoZhi has its own memory box (about 1000 characters, regenerated each conversation) that is separate from G2's memory and should stay off or ignored. *Plan effect:* the persona tool of stage 2 carries what does not fit.
+11. **Wiring and power:** Petoi's photo for the voice-module BiBoard shows the head's Grove cable on the socket at the board's left edge; on BiBoard V1 G1 is the only UART socket (G2 I²C, G3 and G4 analog), so before mounting confirm which physical socket on G2's board is G1 and that it matches the photo. The board's input is 7 to 9 V; no per-socket current is given, so the head's draw still has to be measured.
+12. **Wi-Fi:** Petoi's firmware stores several networks (home and a phone hotspot) and falls back to setup mode after failures; the generic firmware remembers only the last. *Plan effect:* roaming to a hotspot is possible; the saved networks are listed and deletable on the setup page.
+13. **The robot-tool silence is still open.** Petoi's role template tells the model to filter `% self.robot.` out of speech, so that text is probably the cloud's tool-call notation. *Plan effect:* the next test must separate "the cloud made the call" from "the head's serial line was connected as assumed" (a USB-serial adapter on the head's transmit line, or the head's own log at a higher level).
+14. **Petoi's next product uses the same firmware on an S3 board.** Their "Quaddle" pages describe an AI core board with an ESP32-S3 flashed with a `merged` bin. An S3 supports custom wake words and is where the vendor documents echo cancellation. *Plan effect:* watch for a published source; an S3-based head would make stage 7b more realistic than the C3.
+15. **Account facts:** first sign-up needs a mobile phone number; a device already bound to an account will not announce its code (unbinding is by email to support); the ordinary tier binds 10 devices. Terms, privacy and pricing sit behind the login and were not read, so the privacy gate stands.
+
+**Net effect on the staged plan:** stages 1 to 3 are unchanged in order, with a stronger-model retest added after the certification decision; stage 4 gains two possible ways to keep self-initiated speech or a G2-like voice (a developer push, voice cloning), both unverified or payment-blocked; stage 6 and stage 8 get concrete mechanisms (emotion messages, the OTA URL); stage 7 gets a no-toolchain trial path; the wake word on the head's chip is presets only, which makes stage 7b the route to "G2".
+
 ## 4. Pros and cons of adopting the head
 
 **Pros**
@@ -85,6 +108,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - It can reach G2's abilities and facts through our own tools (proven), so it can answer "what did you do" and "what have you learned" from the Pi without Claude.
 - It adds a **screen with an animated face** (look, blink, mouth) that G2 does not have.
 - Microphone and speaker sit in the head, a natural place for them, and it is a vendor-supported accessory ($39) with a documented Grove connection.
+- Developer certification (a GitHub account) may unlock stronger free models than "XiaoZhi Lite" (section 3a).
 - The firmware base is open source (MIT) and Petoi has said theirs will be, so a custom wake word, a host-driven speaker or our own backend stay possible later.
 - Everything on the Pi (gait, safety, vision, exploration, memory, reflection) is unaffected: the head complements the Pi, as Petoi says.
 
@@ -92,6 +116,7 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **Voice:** through the head G2 speaks with a stock cloud voice, not his Piper robot voice. G2's own lines (narration, alarms, announcements) cannot be spoken through it without a firmware change.
 - **Two voices** while the Pi voice stays; one voice means giving up Pi speech or changing firmware.
 - **Wake word:** the side button only, in practice. A different wake word needs firmware, and on this chip (an ESP32-C3) the vendor's wake-word tool offers **only a fixed list of preset words** (custom words such as "G2" are supported only on the S3); the Pi-side route (stage 7b, the Pi's own wake word running on the head's audio) is the way to get "G2".
+- **A G2-like voice costs money and needs WeChat Pay** (voice cloning), or needs our own backend (section 3a).
 - **Privacy:** every sentence goes to XiaoZhi's cloud; the account needs a phone number; retention terms are unread; tool answers also pass through their cloud.
 - **Dependence on a free service** that can change or stop; G2 is silent without Wi-Fi or the service.
 - **Personality is thinner:** a small model with a fixed role text, and no mood, traits or memory unless a tool supplies them.
@@ -110,12 +135,12 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 
 | Area | Work |
 |---|---|
-| Account and agent | Role text (persona, brevity, English, "call tools for facts about G2"); a chosen voice; keep the MCP access point secret in the Pi's `.env` (`XIAOZHI_MCP_ENDPOINT`); read XiaoZhi's terms for data retention; decide on the knowledge base (probably not needed). |
+| Account and agent | Role text (persona, brevity, English, "call tools for facts about G2"); a chosen voice; keep the MCP access point secret in the Pi's `.env` (`XIAOZHI_MCP_ENDPOINT`); read XiaoZhi's terms for data retention; decide on developer certification (a GitHub account; stronger free models) and on voice cloning (WeChat Pay); the knowledge base is not worth it on the free tier. |
 | Pi software | Tool server as a service (start at boot, restart on failure, log each call with a count); real tools: about G2, last-exploration recap, experience notes, persona and mood hint; an **"ask the brain"** tool to Claude with a call log and rate limit; later a skills tool with an allowlist; keep tool answers safe to leave the house. |
 | Voice policy | One-voice rules (section 7, stage 4); answers to local commands (battery, floor, recap) become tools; alarms and narration need a non-speech route or a firmware change. **The emergency stop must stay on the Pi** (local stop-word listening, silent): never depend on the cloud to stop G2. |
 | Hardware | Measure the head's current on the Grove 5 V; check the center of mass and the walking policy in simulation with the head's mass; mount on the head servo; Grove cable to G1; decide whether the head's transmit line stays connected to the BiBoard; check the camera mount and the head do not collide (Petoi: they do not). |
-| Firmware (optional) | Custom wake word; host-driven speaker (text or audio from the Pi, so G2's Piper voice); remove the head's direct robot command; keep Petoi's face tools; toolchain ESP-IDF 5.4.2 and the v2.0.4 source; flash with the backup in hand. |
-| Backend (optional) | A server the head connects to: speech-to-text, the brain, Piper with the robot effect, tool handling; point the firmware at it; a machine that is always on. |
+| Firmware (optional) | Trial first with the console's cloud build or the prebuilt image for the head's board (no toolchain; drops Petoi's additions); custom wake word (presets only on this chip); host-driven speaker (text or audio from the Pi, so G2's Piper voice); remove the head's direct robot command; keep Petoi's face tools; toolchain ESP-IDF 5.4.2 and the v2.0.4 source; flash with the backup in hand. |
+| Backend (optional) | An OTA endpoint that returns the MQTT and WebSocket settings, set as the firmware's Default OTA URL; a server the head connects to: speech-to-text, the brain, Piper with the robot effect, tool handling; point the firmware at it; a machine that is always on. |
 | Safety and privacy | Hardware rules (G2 on his feet, hands near; no moving while he is in pieces); no household names, faces or routines in the role text, tools or knowledge base; endpoint and account details never in chat, logs or the repo. |
 | Measurement | Before and after: Claude calls per day (`python -m pi_pipeline.voice.api_log`, `python -m pi_pipeline.memory calls`), share of turns the head handled, tool-call success rate, delay, and quality. |
 
@@ -169,7 +194,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 **Stage 0: bench bring-up and the tool proof. Done 2026-10-11.** Gets working: the head talks in English on its own account; our tool server answers its model; the firmware is backed up.
 
 **Stage 1: a talker with read-only tools, beside the Pi voice (no mounting).**
-- Work: run the tool server as a service; replace the test tools with `g2_about`, a last-exploration recap and the experience notes; write the role text; choose a voice; log every tool call.
+- Work: run the tool server as a service (after the certification decision, repeat the tool-reliability test on a stronger model); replace the test tools with `g2_about`, a last-exploration recap and the experience notes; write the role text; choose a voice; log every tool call.
 - Gets working: press the head's button and ask what G2 is, what he did, what he has learned; answers come from the Pi with no Claude call. The Pi's own voice is unchanged.
 - Measure: tool-call reliability over a set of questions; the delay; how many of G2's usual Claude turns the head can take.
 - Stop point: if the model calls tools unreliably, the head stays a toy and nothing else is affected.
@@ -186,7 +211,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 **Stage 4: one voice, no firmware change.**
 - Work: turn off the Pi's spoken output; keep its non-voice sounds (horns, "oof", chirps); answers to local commands become tools; narration and alarms become sounds or nothing; the Pi keeps a silent local stop-word listener.
-- No route found for the Pi to push speech to the head without firmware or a backend (section 3).
+- No route found for the Pi to push speech to the head without firmware or a backend (section 3); a developer-only real-time push exists on paper and should be found before relying on it (section 3a), and voice cloning could give the head a G2-like voice behind a payment decision.
 - The Pi's microphone and speaker stay installed through this stage (they come out only after stage 7b passes its gate), so the silent stop-word listener keeps working.
 - Gets working: G2 has one voice (the head's, a stock voice) for all conversation. Loses: self-initiated spoken lines, his current robot voice, the hands-free "G2" wake word (the head is button-only), and offline speech.
 - Decision gate: if losing the robot voice and the spoken narration is too much, stop at stage 3, or go to stage 7.
@@ -196,12 +221,13 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Gets working: "G2, sit" works through the head with the Pi's safety around it.
 
 **Stage 6: the face.**
-- Work: find out whether the cloud model can call the head's own face tools; if so, tie expressions to mood and events.
+- Work: find out whether the cloud model can call the head's own face tools; if so, tie expressions to mood and events. The face follows the model's own emotion messages (19 names, section 3a); G2 can only steer them through the role text unless we run our own server.
 - Gets working: an expressive screen. If those tools are unreachable, this needs firmware (stage 7).
 
 **Stage 7: firmware fork (decision gate; not decided).**
 - Work: wake word (**a preset one only**: on the C3 the vendor's tool has no custom words; "G2" arrives with stage 7b); host-driven speaker so the Pi plays G2's Piper robot voice through the head; the head's direct robot command removed; Petoi's face tools kept.
 - Gets working: a hands-free wake word and G2's own voice for his announcements. Conversation is still the cloud voice unless stage 8.
+- Trial path with no toolchain: build stock upstream for the head's board in the console (10 a day) or flash the prebuilt image with ESP-Launchpad; it drops Petoi's additions and the backup restores them; a full flash may need the device re-added to the account.
 - Prerequisites: Petoi's source (or a rebuild from upstream v2.0.4); the ESP-IDF 5.4.2 toolchain (a multi-GB download, needs approval); the backup in hand.
 
 **Stage 7b: the head as the Pi's microphone and speaker (firmware change; this is the route to removing the external mic and speaker, and only after the gate above is met).**
@@ -212,6 +238,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 
 **Stage 8: our own backend (optional).**
 - Work: a server for the head's audio protocol: speech-to-text, the brain (Claude, or a local model), Piper with the robot effect; the firmware pointed at it; an always-on machine (a Mac works only while it is on and awake; a small always-on computer is roughly $100 to $200, or a rented server a few dollars to about $20 a month; the Pi is already busy).
+- Needs: an OTA endpoint (its reply carries the MQTT and WebSocket settings), the firmware's Default OTA URL pointed at it, a protocol server, and Piper as a custom speech source (the community servers do not list it).
 - Gets working: G2's own voice everywhere and no audio to XiaoZhi's cloud. Costs: the Claude calls come back (the brain is Claude again), so the call savings from the free model are gone.
 
 **Existing community servers (read about, not downloaded; for stage 8).** The firmware README lists several open-source backends that speak the same protocol; the main one is [xinnan-tech/xiaozhi-esp32-server](https://github.com/xinnan-tech/xiaozhi-esp32-server) (Python, Java and Vue, MIT). From its README: MQTT+UDP, WebSocket and MCP access-point support; local speech-to-text (FunASR, SherpaASR) and local text-to-speech (FishSpeech, GPT-SoVITS, Index-TTS, PaddleSpeech; **Piper is not listed**); any LLM with an OpenAI-style interface; Docker or source install. Its minimum is 2 cores and 2 to 4 GB of memory, **more than the Pi Zero 2 W has** (512 MB); it calls itself not production-ready and not security-tested. It documents **no** "send text to a device" interface (only MCP commands sent from its console). The head would need to be pointed at its OTA and WebSocket addresses, which is a firmware matter. Our own small server speaking the documented protocol (`docs/websocket.md` and `docs/mqtt-udp.md` in the firmware source) remains the alternative to adopting one of these.
@@ -226,6 +253,9 @@ Each stage ends in something that works on its own, so the project can stop afte
 4. Whether a backend is worth running (stage 8), and on what machine.
 5. What the head's model may do beyond talking (stage 5), and what may leave the house through tools.
 6. Decided 2026-10-11: the long-term goal is to remove the Pi's own microphone and speaker, but only once the head's microphone and speaker can do their job. The route is stage 7b (a firmware change), with the gate in section 6 first.
+7. Whether to certify as a developer (bind a GitHub account) for stronger free models and higher limits.
+8. Whether to buy voice cloning (WeChat Pay, 99 yuan a year as of March 2025), or stay with a stock voice, or wait for stage 8.
+9. Whether to ask XiaoZhi or Petoi about the developer push interface and about publishing the head's firmware.
 
 ## 9. Still to verify (none of it blocks writing this or stage 1)
 
@@ -233,15 +263,14 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Whether the cloud model can call the head's own face and volume tools.
 - Behavior over long sessions and Wi-Fi drops; whether the tool server reconnects cleanly overnight (it reconnects with a growing pause; not yet exercised for hours).
 - Whether the console has an interface to update the role text from code (for a live persona).
-- The knowledge base's file types, size limit and cost; XiaoZhi's data-retention terms.
+- XiaoZhi's data-retention terms (they sit behind the login). The knowledge base's limits are now known (1 and 1 on the free tier).
 - The head's power draw; the exact serial pins; how the head's serial output looks on the wire (needs its transmit line, see section 3).
 - The effect of the head's mass on the walking policy (simulation first).
-- The custom wake-word process for the chip's speech library.
-- Whether the xiaozhi.me console or its documentation has any interface for sending a message to the head (none found in searches or in the one official document read, the MCP access-point guide); ask or look in the console before relying on the answer.
+- Whether the developer real-time push has an interface we can use, and where it is documented.
+- Whether the cloud made the robot-tool call in our tests (section 3a, item 13).
+- Whether a cloned voice of the robot voice sounds good (needs the paid feature).
 
-**Documents worth collecting now** (so there is no need to come back for them)
-- Public, and I can read them myself: Petoi's BiBoard V1 guide and serial-protocol page; Espressif's speech-recognition (wake word) documentation; the upstream firmware's `xiaozhi-assets-generator` README (custom wake words); the head board's open-source schematic.
-- Needs the owner (Feishu pages my tool cannot open; screenshots saved to the Desktop, scrolled to the bottom so everything loads). The vendor's hub is the "XiaoZhi AI Chatbot Encyclopedia" (`xiaozhi.me/docs` redirects to it: `https://ccnphfhqs21z.feishu.cn/wiki/F5krwD16viZoF0kKkvDcrZNYnhb`). Pages in priority order: (1) **通信协议：Websocket 连接** (message types, audio, pushing; the server README links a "小智通信协议" page at `…/wiki/M0XiwldO9iJwHikpXD5cEx71nKh`); (2) **小智AI声音复刻（公测）控制台操作指引** (voice cloning, public beta: a cloned voice could give the head a G2-like voice without firmware); (3) **关于唤醒词更改及配置操作步骤** and **小智AI终端ASR自定义唤醒词简单方案** (wake word); (4) **小智AI固件在线编译功能操作教程文档** (online firmware build, possibly no local toolchain); (5) **小智AI终端开源项目SDK配置AEC支持操作步骤** (echo cancellation, stage 7b); (6) **OTA 接口文档** (how the device finds its server); (7) **通信协议：Emoji 心情显示** (the screen face); (8) **小智知识库使用说明** (knowledge base limits); (9) **小智AI聊天机器人常见问题Q&A【先看】**. Lower: account recovery and unbinding a device, 小智AI 开发者认证 (developer certification), the firmware download pages (v2.0.5, v2.2.4; the head is v2.0.4), changing the built-in prompt sounds (P3 files). Already read: the MCP access-point guide and the flashing guide. Also from the owner: Petoi's three wiring diagrams and the full Role template; console screenshots (Model & Memory, voice list, knowledge base, MCP dialog); xiaozhi.me's plans, terms and privacy policy.
+**Documents:** everything read is summarized, with every address, in [`../research/xiaozhi-vendor-docs.md`](../research/xiaozhi-vendor-docs.md) (its section 13 is the page index and section 14 lists what was not read). Not read: the breadboard wiring and parts pages, the third-party MCP pages, the serial tool page, the supported-boards list, the rest of the echo-cancellation page, the knowledge base's images; and, behind the login, the console, plans, terms and privacy. Petoi's three wiring photos and the full Role template were read in the browser.
 
 ## 10. How-to reference
 
