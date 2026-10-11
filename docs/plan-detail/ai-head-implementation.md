@@ -58,6 +58,11 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - The console's "MCP access point" dialog shows the connection status (online) and the **names of the registered tools**, a quick way to check that our server is connected.
 - The vendor's own example tool evaluates a Python expression from the model (`eval`); we do not do that.
 
+**Flashing without a toolchain (from the vendor's firmware flashing guide, a Feishu page, updated 2026-01-27)**
+- A prebuilt upstream image exists for the head's board: board type `BOARD_TYPE_LICHUANG_C3`, firmware file `vx.x.x_lichuang-c3-dev.zip` (the S3 board is a different row), from the official firmware list.
+- It is flashed as a single `merged-binary.bin` written at address 0x0 (the whole flash), either with Espressif's Flash Download Tool 3.9.7 in UART mode (Windows-oriented; the path must not contain Chinese characters) or with esptool; the guide also mentions a browser-based method (not seen).
+- So stock upstream firmware could be tried on the head **without building anything**. It would replace Petoi's additions (face tools, the BiBoard serial link, the robot tool), and the read-only backup is the way back. Nothing has been flashed; this is not a decision to fork.
+
 **Pushing a message to the head so it speaks (researched 2026-10-11)**
 - **The protocol has push messages,** but only the *server* side of the head's connection can send them: the cloud broker that the head's MQTT link goes to. Upstream documents these (`docs/notify.md` and `main/application.cc` in the xiaozhi-esp32 source): `notify` (an https/http URL to a mono Ogg Opus file, plus optional subtitles, played while the head is idle), `alert` (status, message and emotion: shows text and a face emotion and plays a sound), `tts` (the cloud's own speech: start, stop, sentence text; the audio comes over the audio channel) and `custom` (only if the firmware is built with that option).
 - **In the head's firmware (v2.0.4):** `alert`, `tts`, `stt`, `llm`, `mcp`, `system` and `iot` message types are present; **`notify` is not** (no `audio_url` or `subtitles` handling; it arrived in a newer release).
@@ -194,7 +199,7 @@ Each stage ends in something that works on its own, so the project can stop afte
 - Work: firmware that streams the head's microphone audio to the Pi over the local network (not the cloud) and plays audio the Pi sends; the Pi's existing voice pipeline (wake word, speech recognition, stop words, exploration commands, Piper, sounds, the audio gate) runs on that audio unchanged; check echo between the head's speaker and microphone; keep an independent stop path (the head link is Wi-Fi, so it must never be the only way to stop G2); then remove the Pi's microphone and speaker.
 - Gets working: everything the Pi voice does today, from hardware in the head: G2's own voice, the hands-free wake word, the voice emergency stop, exploration commands, narration, alarms and all the sounds. Local and private. One set of audio hardware, the screen face on the same unit.
 - Loses: the free cloud brain for chat (the Pi's own pipeline keeps using Claude as it does now; the head's cloud model would be off), and a dependence on a reliable Wi-Fi link between the head and the Pi.
-- Prerequisites: stage 7's firmware work plus microphone streaming; whether the C3 can stream audio, play audio, run the screen and keep Wi-Fi stable at once is **not yet known**.
+- Prerequisites: stage 7's firmware work plus microphone streaming (a prebuilt upstream image for the head's board exists, see section 3, for trying stock upstream first); whether the C3 can stream audio, play audio, run the screen and keep Wi-Fi stable at once is **not yet known**.
 
 **Stage 8: our own backend (optional).**
 - Work: a server for the head's audio protocol: speech-to-text, the brain (Claude, or a local model), Piper with the robot effect; the firmware pointed at it; an always-on machine (a Mac works only while it is on and awake; a small always-on computer is roughly $100 to $200, or a rented server a few dollars to about $20 a month; the Pi is already busy).
