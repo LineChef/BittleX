@@ -79,6 +79,16 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **For us:** no documented public interface on xiaozhi.me for sending these to our own head. Searches in English and Chinese turned up none; the one lead is a community pattern of a platform-run scheduled task that calls an MCP tool and speaks the result (polling, not a push, and unverified on the free plan). Upstream's `xz-mqtt` forwarding is the vendor's internal server tooling.
 - **So** without firmware or a backend of our own, the Pi cannot make the head say something on its own. With **our own backend** (stage 8) we would be the server and could send `alert` now and `tts` audio; `notify` would also need a firmware newer than v2.0.4. With a **firmware change** (stage 7) a host-driven speaker is the other route.
 
+## 3b. The opened head: what the photos show (2026-10-11)
+
+Photos are kept locally and are gitignored (`*.jpeg`): `blueprints/images/ai-head/head-board-top.jpeg` (whole board, top side), `head-board-button-closeup.jpeg` (left edge, soft focus) and `head-shell-button-opening-ruler.jpeg` (outside of the shell, ruler in inches, low resolution).
+
+- **The board is a custom Petoi design, not the stock LCKFB dev board.** A bare **ESP32-C3** chip (not a module), a **Winbond 25Q128JVSQ** flash (128 Mbit = 16 MB), a 40 MHz crystal, a USB-C port (top right), a **speaker** connector labeled SPKER (bottom right, twisted red and black pair), a small microphone (top right), and a 4-pin connector at the top left labeled **R, T, V, G** (UART plus power) for the cable to the body. The antenna is **external**: a thin coax from a u.FL socket at the bottom left runs up the left side. It is not a ground lead and must not be pulled or melted.
+- **So the button pin (GPIO 9) from the firmware's board profile is unconfirmed for this board.** It has to be measured.
+- **Two small switches on the left edge.** The lower one, with a **B** printed below it, is the likely BOOT/user button, a side-actuated surface-mount switch whose plunger points at the shell wall. The upper one has a cut-off letter (D or R) and is not to be used. Which terminal is the signal side is not known; measure with the head on USB power (signal side should read about 3.3 V against the USB-C shell), then do the jumper touch test before any soldering.
+- **The opening in the shell is very small**, roughly 1/8 inch (3 to 4 mm) by the ruler in the photo (rough: tilted, low resolution). A mechanical pusher needs a thin pin tip, about 2 to 3 mm, with tight alignment. How far the plunger sits back is unmeasured.
+- Soldering to the switch is hard (small terminals, the antenna coax and the 8-pin flash chip next to it); the alternatives are a pusher through the opening or having someone experienced do the joint. The decision is open.
+
 ## 3a. What the vendor documents change for this project
 
 Read 2026-10-11; the English summary with every source is [`../research/xiaozhi-vendor-docs.md`](../research/xiaozhi-vendor-docs.md). The findings that matter here, each with its effect on the plan:
