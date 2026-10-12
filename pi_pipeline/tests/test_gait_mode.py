@@ -136,3 +136,13 @@ def test_compound_gait_then_request_and_the_claude_hint(tmp_path, monkeypatch):
     assert g.split_compound("walk forward and sit") is None and g.split_compound("tell me a joke") is None
     monkeypatch.setattr(g, "current", lambda: "hi_step")
     assert "HI STEP" in g.claude_hint() and "trot" in g.claude_hint()
+
+
+def test_no_gait_is_ever_refused_for_a_policy_that_lacks_it(tmp_path, monkeypatch):
+    f = str(tmp_path / "mode.json")
+    onnx = tmp_path / "p.onnx"
+    (tmp_path / "p.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0}))
+    monkeypatch.setitem(gm.GAITS, "crawl", gm.Gait("crawl", ("crawl mode",), "Crawling.", "wkF"))      # a new gait with no special flags
+    monkeypatch.setattr(gm, "parse_gait_command", lambda text: "crawl")
+    gait, said = gm.request("crawl mode", str(onnx), f)
+    assert gait == "crawl" and gm.current(f) == "crawl" and "Crawling." in said and "experimental" in said

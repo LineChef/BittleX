@@ -4,9 +4,12 @@ One small state file (`~/.local/share/g2/gait_mode.json`) is the single source o
 separate processes, always agree. A voice command ("hi step", "walk normally") from ANY of them sets it; the walk loop reads `current()` every tick and, for a policy that supports the
 mode, blends its base gait over `BLEND_S` seconds so a switch in the middle of a walk is smooth.
 
-Gaits are a table, so more can be added later (a crawl, a trot) with a name, spoken phrases and a base reference. A policy declares what it was trained for in its `.onnx.json` sidecar
-(`"modes": ["normal", "hi_step"]`); a policy without that key (V4, V5) supports only `normal`, and asking for another gait is refused out loud and changes nothing: switching the base
-under a policy that never learned it was measured to be unstable (the unlearned high-step base falls 0.37 against 0.22 and sways three times as much).
+Gaits are a table, so more can be added later (a crawl, a trot) with a name, spoken phrases and a base reference. Any gait in the table can be switched to under any policy; nothing is refused.
+A policy declares what it was trained for in its `.onnx.json` sidecar (`"modes": ["normal", "hi_step"]`): that picks HOW the gait is played, not whether. A policy that lists the gait plays it
+with its learned correction on the gait's base; a policy that does not (V4, V5, V6: no `modes` key means `normal` only) plays the gait's scripted base through the open-loop player, with no
+learned correction, and says so out loud ("slow and experimental"). The goal of a gait such as the high step is foot clearance, not stability, so a higher fall rate than the normal walk is expected.
+(An earlier version refused the switch for a policy without the mode, citing a measurement of the crouching `hsF` under a normal-only policy; that measured the combination, not the
+switch, and the switch itself always worked, so the refusal was removed 2026-10-12.)
 """
 from __future__ import annotations
 
@@ -27,7 +30,6 @@ class Gait:
     phrases: tuple          # spoken forms, normalised (lower case, no punctuation); a command may carry up to two extra words
     echo_on: str            # what G2 says when it is switched on
     base_ref: str           # <base_ref>_ref.npy: the scripted base the learned correction sits on (pi_pipeline/gait/, reference_gait/ in the training tree)
-    scripted: bool = False  # can be played as a plain scripted walk (no learned correction) by a policy that does not know the gait: slow and experimental
 
 
 GAITS = {
@@ -37,7 +39,7 @@ GAITS = {
     "hi_step": Gait("hi_step", ("hi step", "high step", "hi steps", "high steps", "hi step mode", "high step mode", "step mode", "step mode on", "hi step on", "high step on",
                                 "highstep", "highstep mode", "i step", "eye step", "die step", "hi stepp",      # the last four: what the recognizer actually heard on G2 (2026-10-10: "i step", "switch die step")
                                  "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
-                    "Hi step on.", "hsF", scripted=True),
+                    "Hi step on.", "hsF"),
 }
 DEFAULT = "normal"
 _PUNCT = re.compile(r"[^\w\s]")
@@ -115,17 +117,13 @@ def set_mode(gait: str, path: str | None = None, now: float | None = None) -> st
 
 
 def request(text: str, policy_onnx: str | None = None, path: str | None = None) -> tuple[str | None, str]:
-    """For the voice loop and the exploration listener: (gait or None, the sentence to say). Switches only when the policy supports the gait."""
+    """For the voice loop and the exploration listener: (gait or None, the sentence to say). Always switches; a policy that does not list the gait plays its scripted base and says so."""
     gait = parse_gait_command(text)
     if gait is None:
         return None, ""
-    label = "hi step" if gait == "hi_step" else gait.replace("_", " ")
-    if not supports(policy_onnx, gait):
-        if GAITS[gait].scripted:                          # a scripted walk without the learned correction: allowed, said out loud, experimental
-            set_mode(gait, path)
-            return gait, f"{GAITS[gait].echo_on} It is a scripted walk without my learned correction, so it is slow and experimental."
-        return None, f"My walking policy doesn't have {label} yet, so I'm staying as I am."
     set_mode(gait, path)
+    if not supports(policy_onnx, gait):                   # played as the gait's scripted base, no learned correction: said out loud
+        return gait, f"{GAITS[gait].echo_on} It is a scripted walk without my learned correction, so it is slow and experimental."
     return gait, GAITS[gait].echo_on
 
 
