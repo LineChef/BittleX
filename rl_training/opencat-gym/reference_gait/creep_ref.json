@@ -1,15 +1,15 @@
 {
  "generator": "build_creep_reference.py",
  "params": {
-  "A": 10.0,
-  "Lf": 29.0,
-  "Lr": 42.0,
+  "A": 16.0,
+  "Lf": 32.0,
+  "Lr": 35.0,
   "cf": 39.0,
   "cr": 52.0,
   "ksf": 7.0,
   "ksr": 17.0,
   "duty": 0.8,
-  "lean": 8.0,
+  "lean": 0.0,
   "sway": 12.0,
   "sway_f": 0.0
  },

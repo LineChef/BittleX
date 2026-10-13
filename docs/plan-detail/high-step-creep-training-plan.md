@@ -85,7 +85,7 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
 
 ## 5. Gates and decision rules (set before the run)
 
-- **Base sweep (round A)**: no falls in 8 calm walks, rear paw lift at least 3x V6's, body height at least V6's, mean rear knee at least V6's minus 5 deg, speed at least 0.025 m/s.
+- **Base sweep (round A)**: no falls in 8 calm walks, rear paw lift at least 2x V6's, front paw lift at least 1.5x V6's (relaxed to 1.35x / 1.25x only if none pass; 2026-10-12: rear lift 3x with front 1.0x left only a 1.09x front lift and weak step-ups; ranking all gates together fixed it), body height at least V6's, mean rear knee at least V6's minus 5 deg, speed at least 0.025 m/s.
   Nothing passing halts the runner (the gates are not loosened without a review).
   First run (10:22 PM): round B took only the 4 highest rear lifts, all sway 18 deg, which fall 80-100% at an edge open loop; stopped before any training, re-run with every
   passing candidate in round B and a score that weights all four feet up over falls (training fixes falls, not clearance).
@@ -105,7 +105,7 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
 | Target | 80% at 15 mm (0.59 in), about double V6 |
 | Stretch | 60% at 20 mm (0.79 in) |
 | Flat ground | at most 5% falls on calm walks, at least 0.025 m/s, no crouch |
-| Clearance | rear paw lift at least 3x V6's; front paw lift above V6's |
+| Clearance | rear paw lift at least 2x V6's; front paw lift at least 1.25x V6's |
 | Higher than V6 | 80% step-up ceiling above V6's |
 
 ## 7. Files

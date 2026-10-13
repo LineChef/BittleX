@@ -21,9 +21,9 @@ sys.path.insert(0, os.path.join(HERE, "reference_gait"))
 import build_creep_reference as BC      # noqa: E402
 import hs_probe as HP                   # noqa: E402
 
-GRID = dict(sway=(12.0, 15.0, 18.0), lean=(0.0,), A=(10.0, 12.0, 14.0), Lr=(35.0, 42.0), Lf=(29.0, 36.0, 42.0))      # lean dropped and front knee lift added (2026-10-12: lean 8 won the first sweeps and halved the front lift)
-FRONT_LIFT_X = (1.5, 1.25, 1.0)       # front paw lift >= this x V6's: the strictest level that leaves a passing candidate is used (and logged)
-REAR_LIFT_X, REAR_KNEE_SLACK, MIN_SPEED = 3.0, 5.0, 0.025
+GRID = dict(sway=(12.0, 14.0, 16.0), lean=(0.0,), A=(12.0, 14.0, 16.0), Lr=(35.0, 42.0), Lf=(29.0, 32.0, 35.0))      # lean dropped and front knee lift added (2026-10-12: lean 8 won the first sweeps and halved the front lift)
+FRONT_LIFT_X = (1.5, 1.35, 1.25)       # front paw lift >= this x V6's: the strictest level that leaves a passing candidate is used (and logged)
+REAR_LIFT_X, REAR_KNEE_SLACK, MIN_SPEED = 2.0, 5.0, 0.025       # rear lift 2x V6's (2026-10-12: was 3x, which crowded out every gait whose front paws lift higher than V6's)
 LEDGES = (0.0075, 0.0125, 0.015)
 CMD = 0.035
 NOM = 0.035

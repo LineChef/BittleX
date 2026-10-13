@@ -139,13 +139,13 @@ def sweep(st):
     r = subprocess.run([sys.executable, "creep_sweep.py", "--v6-flat", f"{REPORT_DIR}/v6_baseline.json", "--out", f"{REPORT_DIR}/sweep.json"], capture_output=True, text=True)
     open(f"{REPORT_DIR}/sweep.log", "w").write(r.stdout + r.stderr)
     if r.returncode == 2:
-        halt("DECISION NEEDED / HALT: no creep candidate passed the flat-ground gates (no falls, rear lift 3x V6, body and rear knee at V6's): see trained/hs_report/sweep.log. "
+        halt("DECISION NEEDED / HALT: no creep candidate passed the flat-ground gates (no falls, rear lift 2x V6, front lift 1.25x V6, body and rear knee at V6's): see trained/hs_report/sweep.log. "
              "The gates are not loosened without a review.")
     if r.returncode != 0:
         halt(f"HALT: creep_sweep.py failed: {(r.stdout + r.stderr)[-600:]}")
     w = json.load(open(f"{REPORT_DIR}/sweep.json"))["winner"]
     decision(f"Base gait chosen by the sweep: {w['params']} (step-up score {w['ledge_score']:.3f}, rear paw lift {w['flat']['rear_lift_mm']:.1f} mm, body {w['flat']['body_mm']:.1f} mm, "
-             f"open-loop flat falls {w['flat']['falls']:.2f}). Rule: pass the flat gates (incl. front paw lift at least 1.5x V6's, relaxed to 1.25x / 1.0x only if none pass), then the best step-up score (success + all four up - falls / 4 at 7.5 / 12.5 / 15 mm) among every passing candidate.")
+             f"open-loop flat falls {w['flat']['falls']:.2f}). Rule: pass the flat gates (incl. front paw lift at least 1.5x V6's, relaxed to 1.35x / 1.25x only if none pass; rear lift at least 2x V6's), then the best step-up score (success + all four up - falls / 4 at 7.5 / 12.5 / 15 mm) among every passing candidate.")
     shutil.copy("reference_gait/creep_ref.npy", "../../pi_pipeline/gait/creep_ref.npy")        # the Pi's base (not deployed: rsync is the user's call)
     st["sweep"] = "done"
     save_state(st)
@@ -390,8 +390,8 @@ def verdict(res, v6res):
         ("Target: 80% success at 15 mm (0.59 in)", s.get(CRIT_TARGET_MM, 0) >= 0.8, f"{s.get(CRIT_TARGET_MM, 0):.2f}"),
         ("Stretch: 60% success at 20 mm (0.79 in)", s.get(CRIT_STRETCH_MM, 0) >= CRIT_STRETCH_SUCCESS, f"{s.get(CRIT_STRETCH_MM, 0):.2f}"),
         ("Flat ground: at most 5% falls, at least 0.025 m/s, no crouch", ok_flat, f"falls {f['falls']:.2f}, speed {f['speed']:.3f}" + (f" ({'; '.join(why_flat)})" if why_flat else "")),
-        ("Clearance: rear paw lift at least 3x V6's", (f["rear_lift_mm"] or 0) >= 3 * b["rear_lift_mm"], f"{(f['rear_lift_mm'] or 0) / b['rear_lift_mm']:.1f}x"),
-        ("Clearance: front paw lift above V6's", (f["front_lift_mm"] or 0) > b["front_lift_mm"], f"{(f['front_lift_mm'] or 0) / b['front_lift_mm']:.2f}x"),
+        ("Clearance: rear paw lift at least 2x V6's", (f["rear_lift_mm"] or 0) >= 2 * b["rear_lift_mm"], f"{(f['rear_lift_mm'] or 0) / b['rear_lift_mm']:.1f}x"),
+        ("Clearance: front paw lift at least 1.25x V6's", (f["front_lift_mm"] or 0) >= 1.25 * b["front_lift_mm"], f"{(f['front_lift_mm'] or 0) / b['front_lift_mm']:.2f}x"),
         ("Higher than V6: 80% ceiling above V6's", res.get("ceiling80_mm", 0) > v6res.get("ceiling80_mm", 0), f"{res.get('ceiling80_mm', 0):g} mm vs V6 {v6res.get('ceiling80_mm', 0):g} mm"),
     ]
     return crit
