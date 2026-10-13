@@ -591,6 +591,8 @@ if __name__ == "__main__":
         _tkl = os.environ.get("G2E_TARGET_KL", "")
         print(f"chaining from {args.chain_from}: fresh-run schedule (lr start {3e-4 * lr_scale:.1e}, floor {lr_floor}), target_kl {_tkl or 'off'}", flush=True)
         model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None)
+        if os.environ.get("G2E_CHAIN_SEED"):                           # a chained stage never used G2E_SEED (only a fresh policy does), so a retry with another seed was an exact repeat (2026-10-13)
+            model.set_random_seed(int(os.environ["G2E_CHAIN_SEED"]))
         _rs = os.environ.get("G2E_RESET_LOG_STD", "")
         if _rs:                                                         # V6 layer 2: a settled policy has a small action noise; set it back so the stage can explore a new way over a ledge
             import torch
