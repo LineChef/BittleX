@@ -133,3 +133,23 @@ def test_windowed_edge_stall_fires_for_a_rocking_creep_and_paws_are_paid():
     assert d["r1"] == 2 * 100.0 + 2 * 30.0 + 150.0 and d["n"] == 4, d      # 2 rear x 100, 2 front x 30, all four 150
     old = _probe(STALL, {"G2E_FAC_EDGE_STALL": "2.0"})
     assert old["late"] == 0.0, old                                          # the V6 test really never fired on this motion
+
+
+MIDSWING = r"""
+import json, sys
+sys.path.insert(0, ".")
+import numpy as np, opencat_gym_env as E
+E.GUI_MODE = False
+ref = E.WKF_REF
+n = [0, 0, 0, 0]; multi = 0
+for i in range(100):
+    f = E.OpenCatGymEnv._mid_swing(ref[i])
+    multi += sum(f) > 1
+    for k in range(4): n[k] += f[k]
+print(json.dumps(dict(n=n, multi=multi)))
+"""
+
+
+def test_mid_swing_flags_each_leg_for_part_of_its_swing_and_never_two_at_once():
+    d = _probe(MIDSWING, {"G2E_SKILL_REF": "creep"})
+    assert all(8 <= x <= 25 for x in d["n"]) and d["multi"] == 0, d      # each leg flagged for part of its 20-frame swing; three feet stay down

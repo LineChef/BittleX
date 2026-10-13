@@ -1035,6 +1035,10 @@ REAR_KNEE_FLOOR_DEG = _g2e("REAR_KNEE_FLOOR_DEG", 0.0)
 #   EDGE_STALL_WINDOW > 0: the edge stall counts steps in which the body has not advanced 1 cm past its best x (the creep's own rocking pushes its instantaneous speed over
 #   2 cm/s, so V6's speed test never fired for it), and covers the zone up to 12 cm past the edge, where the rear paws still have to follow.
 FAC_PAW_UP = _g2e("FAC_PAW_UP", 0.0)
+#   FAC_SWING_CLEAR (2026-10-13 review, after the 20M's rear paws dragged: 1-10% of the time in the air, never above 7 mm, while the front paws hopped): each paw the BASE gait has
+#   in mid-swing must be at its clearance target (PAW_Z_FRONT / PAW_Z_REAR) or it pays FAC_SWING_CLEAR x (shortfall in m)^2. Unlike FAC_CLEARANCE it is not weighted by the
+#   paw's speed, which is near zero for a dragging paw, so dragging was free. Mid-swing = the reference knee more than 20 deg below its cycle mean (`_mid_swing`).
+FAC_SWING_CLEAR = _g2e("FAC_SWING_CLEAR", 0.0)
 EDGE_STALL_WINDOW = _g2e("EDGE_STALL_WINDOW", 0)
 
 
@@ -1607,6 +1611,13 @@ class OpenCatGymEnv(gym.Env):
             else:
                 paw_clearance += (_ppos[k][2] - _paw_tgt) ** 2 * _pw[k] ** 0.5
 
+        swing_clear_pen = 0.0
+        if FAC_SWING_CLEAR > 0 and not getattr(self, '_is_stand', False) and WKF_REF is not None:
+            _sw = self._mid_swing(self._ref_pose(int(self._phase)))
+            for k in range(4):
+                if _sw[k]:
+                    swing_clear_pen += max(0.0, _tgts[k] - _ppos[k][2]) ** 2
+
         # Stride-length reward: on each foot touchdown (contact False->True),
         # reward the forward x-distance that foot covered since its previous
         # touchdown. That is a real stride and can't be gamed by fast air-flicks.
@@ -2142,6 +2153,7 @@ class OpenCatGymEnv(gym.Env):
                     + resid_smooth_cost
                     + upright_penalty
                     + FAC_CLEARANCE * paw_clearance
+                    + FAC_SWING_CLEAR * swing_clear_pen
                     + FAC_SLIP * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
                     + FAC_JITTER * jitter_penalty
@@ -2189,6 +2201,7 @@ class OpenCatGymEnv(gym.Env):
             "r_body_stability": -penalty_scale * body_stability,
             "r_heading": -penalty_scale * heading_penalty,
             "r_paw_clearance": -penalty_scale * FAC_CLEARANCE * paw_clearance,
+            "r_swing_clear": -penalty_scale * FAC_SWING_CLEAR * swing_clear_pen,
             "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
             "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
@@ -3111,6 +3124,13 @@ class OpenCatGymEnv(gym.Env):
                 r += FAC_EDGE_LIFT * 20.0
                 self._edge_lift_paid = True
         return r
+
+    @staticmethod
+    def _mid_swing(ref):
+        """[FL, FR, BR, BL]: True for each leg whose reference knee is more than 20 deg below that knee's mean over the cycle (the middle of its swing dip; the sway moves a stance
+        knee by at most 12 deg, so a stance leg is never flagged)."""
+        rest = WKF_REF.mean(axis=0)
+        return [bool(ref[k] < rest[k] - np.deg2rad(20.0)) for k in (1, 3, 5, 7)]
 
     def _hs_ledge_reward(self, base_x) -> float:
         """High-step creep (see FAC_ALL_UP): -FAC_FACE_HIT for every step any part of G2 touches a step-up's vertical face (below its top), and FAC_ALL_UP once per episode when

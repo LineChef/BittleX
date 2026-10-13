@@ -149,7 +149,7 @@ LEVERS = {
                  "G2E_FAC_FOOT_PHASE": "0", "G2E_FAC_GAIT_SYMMETRY": "0",                                        # the trot-shaping terms punish three feet down: off
                  "G2E_FAC_UPRIGHT": "1.5", "G2E_FAC_STABILITY": "0.05",                                         # stability turned down, not off (falls still end the episode)
                  "G2E_HEIGHT_FLOOR": "0.074", "G2E_REAR_KNEE_FLOOR_DEG": "0", "G2E_FAC_REAR_POSTURE": "2.0",     # anti-crouch: body at least V6's height, rear legs not tucked
-                 "G2E_PAW_Z_FRONT": "0.025", "G2E_PAW_Z_REAR": "0.022", "G2E_CLEAR_ONE_SIDED": "1", "G2E_FAC_CLEARANCE": "8000",   # swing clearance, low paws only
+                 "G2E_PAW_Z_FRONT": "0.025", "G2E_PAW_Z_REAR": "0.022", "G2E_CLEAR_ONE_SIDED": "1", "G2E_FAC_CLEARANCE": "8000", "G2E_FAC_SWING_CLEAR": "30000",   # swing clearance, low paws only
                  "G2E_FR_LEDGE_UP_ONLY": "1", "G2E_HAZARD_EP_LEN": "1200", "G2E_FR_COMBO": "0.05",                                   # step-ups only; 15 s hazard episodes (the creep needs 5-8 s to get all four feet up); few combo episodes (they run only 3 s)
                  "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5",   # V6's ledge terms (stall cost back at 2: it never fired for the creep, see EDGE_STALL_WINDOW)
                  "G2E_FAC_ALL_UP": "150", "G2E_FAC_PAW_UP": "100", "G2E_FAC_FACE_HIT": "0.15", "G2E_EDGE_STALL_WINDOW": "120", "G2E_HAZ_POSTURE_RELAX": "0.1"},          # new: each paw on top pays (rear 100, front 30), all four 150 more, touching the step face costs a little; imitation almost off at the edge
