@@ -1,5 +1,7 @@
 # High-step gait plan (opened 2026-10-10)
 
+**2026-10-12: superseded by [`high-step-creep-training-plan.md`](high-step-creep-training-plan.md)** (a separate three-feet-down creep policy for stepping up, trained unattended; the sim found the rear legs, not the front, limit every step-up).
+
 Goal: real extra ground clearance for G2 (cables, thresholds, rubble) behind the "hi step" voice mode, now that gait switching works (`pi_pipeline/gait/gait_mode.py`).
 
 ## Why a new gait is needed

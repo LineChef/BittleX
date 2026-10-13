@@ -128,12 +128,26 @@ def heading_blind_for(onnx_path):
     return False
 
 
+def sidecar_field(onnx_path, key, default=None):
+    """One value from the policy's sidecar `<onnx_path>.json`, else `default` (also when there is no sidecar)."""
+    import json
+    side = str(onnx_path) + ".json"
+    if os.path.exists(side):
+        with open(side) as f:
+            return json.load(f).get(key, default)
+    return default
+
+
+def base_ref_path_for(onnx_path):
+    """The scripted base gait the policy's correction sits on: sidecar "base_ref" (the high-step creep, 2026-10-12: "creep" -> gait/creep_ref.npy), else wkF."""
+    return os.path.join(_HERE, f"{sidecar_field(onnx_path, 'base_ref', 'wkf')}_ref.npy")
+
+
 class ResidualGaitPolicy:
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort
         self.CONTROL_HZ = CONTROL_HZ
         onnx_path = onnx_path or default_policy_path()
-        wkf_path = wkf_path or os.path.join(_HERE, "wkf_ref.npy")
         if not os.path.exists(onnx_path):
             raise FileNotFoundError(
                 f"{os.path.basename(onnx_path)} not found (looked in pi_pipeline/gait/ and "
@@ -141,6 +155,8 @@ class ResidualGaitPolicy:
         self.onnx_path = onnx_path
         self.residual_scale_deg = residual_scale_for(onnx_path)
         self.send_every = send_every_for(onnx_path)
+        wkf_path = wkf_path or base_ref_path_for(onnx_path)                     # wkF unless the sidecar names another base (the creep)
+        self.phase_rate_nom_cmd = float(sidecar_field(onnx_path, "phase_rate_nom_cmd", PHASE_RATE_NOM_CMD))   # the command that plays the base at one frame per tick, as in training
         so = ort.SessionOptions()
         so.intra_op_num_threads = int(intra_op_threads)
         self._sess = ort.InferenceSession(onnx_path, so, providers=["CPUExecutionProvider"])
@@ -214,7 +230,7 @@ class ResidualGaitPolicy:
         # --- advance phase (tilt-slow disabled: PHASE_SLOW_RATE = 1.0) ---
         if not is_stand:
             pd = 1.0 if self._cmd_fwd >= 0 else -1.0
-            prate = float(np.clip(abs(self._cmd_fwd) / PHASE_RATE_NOM_CMD,
+            prate = float(np.clip(abs(self._cmd_fwd) / self.phase_rate_nom_cmd,
                                   PHASE_RATE_MIN, PHASE_RATE_MAX))
             self._phase += pd * prate
         self._tick += 1

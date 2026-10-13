@@ -61,6 +61,8 @@ def main():
                          "sends at the same cadence by default")
     ap.add_argument("--heading-blind", action="store_true",
                     help="the policy was trained with the heading_blind lever (it never saw yaw): written to the sidecar, so the Pi feeds it yaw 0")
+    ap.add_argument("--sidecar-extra", default=None,
+                    help='JSON merged into the sidecar, e.g. the high-step creep\'s {"modes": ["hi_step"], "base_ref": "creep", "phase_rate_nom_cmd": 0.035} (2026-10-12)')
     args = ap.parse_args()
     out = args.out or (args.model + ".onnx")
 
@@ -121,6 +123,8 @@ def main():
         if args.heading_blind:
             side["heading_blind"] = True
             side["levers"] = ["heading_blind"]                  # g2_profile.policy_levers_from_sidecar: score it with the same (yaw-free) inputs
+        if args.sidecar_extra:
+            side.update(json.loads(args.sidecar_extra))
         json.dump(side, f, indent=1)
     print(f"wrote {out}.json  (residual_scale_deg={scale:g})")
 

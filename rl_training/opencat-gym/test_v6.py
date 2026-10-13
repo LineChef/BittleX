@@ -119,6 +119,7 @@ assert rs[40] == 0.0 or rs[40] > -2.1, rs[38:44]
 assert rs[41] < 0 and rs[199] < rs[41] and rs[199] >= -6.0, (rs[41], rs[199])     # grows, capped at 3x
 # a taller ledge pays a bigger crossing bonus
 E.FAC_CROSS = 200.0
+e._obj_far, e._obj_passed = [], 0          # the unseeded reset sometimes placed an obstacle, whose own crossing bonus made this flaky (500 instead of 300)
 e._ledge_passed = False
 e._ledge_h = 0.0075; a = e._cross_reward(0.5)
 e._ledge_passed = False

@@ -902,7 +902,8 @@ PROBE_CMD_BANDS = ((0.32, 0.08, 0.12), (0.20, 0.04, 0.055), (0.18, 0.115, CMD_FW
 def probe_command(seed: int) -> float:
     """The forward command of probe episode `seed` (the same for the clean-floor run and every category, so their scores are compared on the same walk)."""
     rng = np.random.RandomState(int(seed) % (2 ** 31))
-    bands = (((0.58, 0.08, 0.12), (0.25, 0.04, 0.055)) if CMD_BANDS == "forward"
+    bands = (((1.0, 0.030, 0.042),) if CMD_BANDS == "creep"
+             else ((0.58, 0.08, 0.12), (0.25, 0.04, 0.055)) if CMD_BANDS == "forward"
              else ((0.50, 0.08, 0.12), (0.20, 0.04, 0.055)) if CMD_BANDS == "capped" else PROBE_CMD_BANDS)      # the training run's own forward bands
     w = np.array([b[0] for b in bands])
     band = bands[int(rng.choice(len(bands), p=w / w.sum()))]
@@ -920,6 +921,7 @@ FIX_PAW_VEL = _g2e("FIX_PAW_VEL", False)        # 2026-10-08 review: slip / clea
 #   (the gait tops out ~0.095 m/s): stand 17% (unchanged), creep 0.04-0.055 25%, cruise 0.08-0.12 58%. "" = the G4 bands.
 #   "capped" (2026-10-08 ablation of "forward"): ONLY the unreachable fast band is removed (its share goes to cruise 0.08-0.12); backward stays:
 #   cruise 50%, creep 0.04-0.055 20%, stand 17%, backward 13%. Tells whether dropping backward is what "forward" cost in speed and hazard falls.
+#   "creep" (2026-10-12, high-step creep): 0.028-0.045 m/s 83%, stand 17%; its probes walk at 0.030-0.042.
 CMD_BANDS = _g2e("CMD_BANDS", "")
 # IMU_NOISE_PER_FRAME: with IMU_HOLD_STEPS, draw the observation noise once per held IMU frame (G2's error is fixed for the whole 0.2 s frame) instead of every control step.
 IMU_NOISE_PER_FRAME = _g2e("IMU_NOISE_PER_FRAME", False)
@@ -1004,6 +1006,30 @@ HAZ_SPEED_RELAX = _g2e("HAZ_SPEED_RELAX", 1.0)
 HAZ_POSTURE_RELAX = _g2e("HAZ_POSTURE_RELAX", 1.0)
 HAZ_HOLD_STEPS = 40
 HAZ_SLOPE_DEG = 4.0
+# High-step creep (user, 2026-10-12: a separate, slow, careful gait with three feet down at all times, for stepping UP onto ledges; foot clearance first, stability is not ranked;
+#   plan: docs/plan-detail/high-step-creep-training-plan.md). Every knob defaults to the old behaviour.
+#   PHASE_RATE_NOM_CMD: the command that plays the base gait at one frame per control step (the creep walks about 0.035 m/s at that cadence, wkF about 0.10).
+#   FAC_FOOT_PHASE / FAC_GAIT_SYMMETRY: the trot-shaping terms (a creep keeps three feet down, which they punish): 0 for the creep. FAC_UPRIGHT / FAC_STABILITY: turned down, not off.
+#   HEIGHT_FLOOR > 0: the ride-height term only penalises the body BELOW this height (anti-crouch), never above it.
+#   PAW_Z_FRONT / PAW_Z_REAR > 0: separate swing-clearance targets for the front and rear paws; CLEAR_ONE_SIDED: only a paw below its target is penalised (a higher step is free).
+#   FR_LEDGE_UP_ONLY: every frontier ledge is a step-up (this gait is never trained to step down).
+#   FAC_ALL_UP: paid once per episode when all four paws have stood on a step-up's top surface. FAC_FACE_HIT: per step any part of G2 touches a step-up's vertical face.
+#   FAC_REAR_POSTURE / REAR_KNEE_FLOOR_DEG: per-step cost on how far the 1 s average rear knee angle sits below the floor (a crouch on tucked rear legs).
+PHASE_RATE_NOM_CMD = _g2e("PHASE_RATE_NOM_CMD", PHASE_RATE_NOM_CMD)
+FAC_FOOT_PHASE = _g2e("FAC_FOOT_PHASE", FAC_FOOT_PHASE)
+FAC_GAIT_SYMMETRY = _g2e("FAC_GAIT_SYMMETRY", FAC_GAIT_SYMMETRY)
+FAC_UPRIGHT = _g2e("FAC_UPRIGHT", FAC_UPRIGHT)
+FAC_STABILITY = _g2e("FAC_STABILITY", FAC_STABILITY)
+HEIGHT_FLOOR = _g2e("HEIGHT_FLOOR", 0.0)
+PAW_Z_FRONT = _g2e("PAW_Z_FRONT", 0.0)
+PAW_Z_REAR = _g2e("PAW_Z_REAR", 0.0)
+CLEAR_ONE_SIDED = _g2e("CLEAR_ONE_SIDED", False)
+FAC_CLEARANCE = _g2e("FAC_CLEARANCE", FAC_CLEARANCE)      # the creep weights its clearance term so it matters (0.1 = under 0.1% of the reward)
+FR_LEDGE_UP_ONLY = _g2e("FR_LEDGE_UP_ONLY", False)
+FAC_ALL_UP = _g2e("FAC_ALL_UP", 0.0)
+FAC_FACE_HIT = _g2e("FAC_FACE_HIT", 0.0)
+FAC_REAR_POSTURE = _g2e("FAC_REAR_POSTURE", 0.0)
+REAR_KNEE_FLOOR_DEG = _g2e("REAR_KNEE_FLOOR_DEG", 0.0)
 
 
 def frontier_default_weights():
@@ -1216,7 +1242,10 @@ class OpenCatGymEnv(gym.Env):
         elif np.random.rand() < p_rough:
             present.append("rough")
         if "rough" not in present and np.random.rand() < p_ledge:
-            present.append(self._deal("ledge", ("ledge_up", "ledge_down")) if BALANCED else ("ledge_up" if np.random.rand() < 0.5 else "ledge_down"))
+            if FR_LEDGE_UP_ONLY:
+                present.append("ledge_up")
+            else:
+                present.append(self._deal("ledge", ("ledge_up", "ledge_down")) if BALANCED else ("ledge_up" if np.random.rand() < 0.5 else "ledge_down"))
         for h in ("rubble", "boxes", "snag", "cutback"):
             if np.random.rand() < min(1.0, FR_SHARE[h] / q):
                 present.append(h)
@@ -1224,7 +1253,7 @@ class OpenCatGymEnv(gym.Env):
         focus = None
         if present and not combo:                  # the focus is drawn inversely to each hazard's share, so rare hazards (a ledge direction: 10%) gather evidence as fast as common ones
             _share = {h: FR_SHARE["slope"] / len(SLOPE_HAZARDS) for h in SLOPE_HAZARDS}
-            _share.update({"ledge_up": FR_SHARE["ledge"] / 2, "ledge_down": FR_SHARE["ledge"] / 2})
+            _share.update({"ledge_up": FR_SHARE["ledge"] / (1 if FR_LEDGE_UP_ONLY else 2), "ledge_down": FR_SHARE["ledge"] / 2})
             _w = np.array([1.0 / max(1e-3, _share.get(h, FR_SHARE.get(h, 0.2))) for h in present])
             focus = present[int(np.random.choice(len(present), p=_w / _w.sum()))]
         if FR_MAX_HAZARDS > 0 and len(present) > FR_MAX_HAZARDS:      # V5: no stacking past the limit; the focus always stays, then a slope (so the dealt slope kinds stay even), the rest at random
@@ -1549,12 +1578,20 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of paw from ground
         paw_clearance = 0
         _paw_tgt = PAW_Z_TARGET
+        _tgts = [PAW_Z_FRONT or PAW_Z_TARGET] * 2 + [PAW_Z_REAR or PAW_Z_TARGET] * 2      # paw order FL, FR, BR, BL; both 0 = PAW_Z_TARGET for all four (unchanged)
         if FAC_EDGE_LIFT > 0 and self._ledge_edge is not None and self._ledge_dir > 0 and not self._ledge_passed:
             _bx = p.getBasePositionAndOrientation(self.robot_id)[0][0]
             if self._ledge_edge - 0.12 <= _bx <= self._ledge_edge + 0.03:
                 _paw_tgt = max(PAW_Z_TARGET, self._ledge_h + 0.006)             # V6: near a step-up edge the feet are asked to clear the ledge, not to stay at 20 mm
+                _tgts = [max(t, self._ledge_h + 0.006) for t in _tgts]
         for k in range(4):
-            paw_clearance += (_ppos[k][2] - _paw_tgt) ** 2 * _pw[k] ** 0.5
+            if PAW_Z_FRONT > 0 or PAW_Z_REAR > 0:
+                _d = _ppos[k][2] - _tgts[k]
+                if CLEAR_ONE_SIDED:
+                    _d = min(0.0, _d)
+                paw_clearance += _d ** 2 * _pw[k] ** 0.5
+            else:
+                paw_clearance += (_ppos[k][2] - _paw_tgt) ** 2 * _pw[k] ** 0.5
 
         # Stride-length reward: on each foot touchdown (contact False->True),
         # reward the forward x-distance that foot covered since its previous
@@ -1581,7 +1618,7 @@ class OpenCatGymEnv(gym.Env):
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
         # gait-refinement G1: hold a target ride height
-        height_penalty = (base_clearance - HEIGHT_TARGET) ** 2
+        height_penalty = (base_clearance - HEIGHT_TARGET) ** 2 if HEIGHT_FLOOR <= 0 else max(0.0, HEIGHT_FLOOR - base_clearance) ** 2
         # gait-refinement G1: soft barrier as any commanded joint nears its limit
         _jl = np.maximum(0.0, np.abs(joint_angs) - (self.bound_ang - JOINT_LIMIT_MARGIN))
         joint_limit_penalty = float(np.sum(_jl ** 2))
@@ -1778,6 +1815,8 @@ class OpenCatGymEnv(gym.Env):
         _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
         r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
         r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0 or FAC_EDGE_PROGRESS > 0) else 0.0
+        r_hs = self._hs_ledge_reward(current_position) if (FAC_ALL_UP > 0 or FAC_FACE_HIT > 0) else 0.0      # high-step creep: all four paws up / face contact
+        rear_posture_cost = self._rear_posture_cost() if FAC_REAR_POSTURE > 0 else 0.0
 
         # Penalty and reward
         smooth_movement = np.sum(
@@ -2063,6 +2102,7 @@ class OpenCatGymEnv(gym.Env):
         reward = (FAC_MOVEMENT * capped_forward
                  + r_cross
                  + r_edge
+                 + r_hs
                  + r_goal_progress
                  + r_goal_reached
                  + obs_swerve_rew
@@ -2097,7 +2137,8 @@ class OpenCatGymEnv(gym.Env):
                     + obs_bump_pen
                     + FAC_SERVO_FEAS * servo_feas
                     + FAC_TOUCHDOWN * touchdown_cost
-                    + FAC_POWER * power_use))
+                    + FAC_POWER * power_use
+                    + FAC_REAR_POSTURE * rear_posture_cost))
 
         # Set state of the current state.
         terminated = False
@@ -2109,6 +2150,8 @@ class OpenCatGymEnv(gym.Env):
             "r_movement": FAC_MOVEMENT * capped_forward,
             "r_cross": r_cross,
             "r_edge": r_edge,
+            "r_hs": r_hs,
+            "r_rear_posture": -penalty_scale * FAC_REAR_POSTURE * rear_posture_cost,
             "on_hazard": float(_haz),
             "r_gait_symmetry": FAC_GAIT_SYMMETRY * gait_symmetry,
             "r_stride": FAC_STRIDE * stride_reward,
@@ -2332,6 +2375,12 @@ class OpenCatGymEnv(gym.Env):
                 self._cmd_fwd = np.random.uniform(-0.01, 0.02)
             else:
                 self._cmd_fwd = np.random.uniform(-0.09, -0.03)
+            return
+        if CMD_BANDS == "creep":        # 2026-10-12 high-step creep: slow forward only (the creep's own pace, about 0.035 m/s with PHASE_RATE_NOM_CMD 0.035), stand share as "forward"
+            if r < 0.83:
+                self._cmd_fwd = np.random.uniform(0.028, 0.045)
+            else:
+                self._cmd_fwd = np.random.uniform(-0.01, 0.02)
             return
         if CMD_BANDS == "forward":      # 2026-10-08: no backward, no unreachable fast band; stand share unchanged (see CMD_BANDS)
             if r < 0.58:
@@ -2996,6 +3045,8 @@ class OpenCatGymEnv(gym.Env):
         self._ledge_passed = False
         self._edge_stall_n = 0
         self._edge_lift_paid = False
+        self._hs_on_top, self._hs_all_up_paid, self._hs_ledge_inv = set(), False, None
+        self._rear_knee_avg = None
         self._haz_timer = 0
 
     def _on_hazard(self, base_x) -> bool:
@@ -3037,6 +3088,36 @@ class OpenCatGymEnv(gym.Env):
                 r += FAC_EDGE_LIFT * 20.0
                 self._edge_lift_paid = True
         return r
+
+    def _hs_ledge_reward(self, base_x) -> float:
+        """High-step creep (see FAC_ALL_UP): -FAC_FACE_HIT for every step any part of G2 touches a step-up's vertical face (below its top), and FAC_ALL_UP once per episode when
+        all four paws have stood on its top surface. Contacts are judged in the block's own frame (top at +h/2, the edge at x = -0.70). Reward only, nothing the policy sees."""
+        e = self._ledge_edge
+        if e is None or self._ledge_dir <= 0 or self._hs_all_up_paid or not (e - 0.15 <= base_x <= e + 0.35):
+            return 0.0
+        if self._hs_ledge_inv is None:
+            _lp, _lo = p.getBasePositionAndOrientation(self._ledge_id)
+            self._hs_ledge_inv = p.invertTransform(_lp, _lo)
+        ip, io = self._hs_ledge_inv
+        top, face = self._ledge_h / 2 - 0.0015, False
+        for c in p.getContactPoints(bodyA=self.robot_id, bodyB=self._ledge_id):
+            lc = p.multiplyTransforms(ip, io, c[6], [0, 0, 0, 1])[0]
+            if lc[2] < top:
+                face = True
+            elif c[3] in (3, 6, 9, 12) and lc[0] > -0.70 + 0.003:
+                self._hs_on_top.add(c[3])
+        r = -FAC_FACE_HIT if face else 0.0
+        if FAC_ALL_UP > 0 and len(self._hs_on_top) == 4:
+            self._hs_all_up_paid = True
+            r += FAC_ALL_UP
+        return r
+
+    def _rear_posture_cost(self) -> float:
+        """High-step creep: (degrees the 1 s average of the two rear knee angles sits below REAR_KNEE_FLOOR_DEG)^2 / 100 -- a crouch on tucked rear legs costs, the swing dips do not."""
+        js = p.getJointStates(self.robot_id, [self.joint_id[5], self.joint_id[7]])
+        k = float(np.degrees(0.5 * (js[0][0] + js[1][0])))
+        self._rear_knee_avg = k if self._rear_knee_avg is None else self._rear_knee_avg + (k - self._rear_knee_avg) / 80.0
+        return max(0.0, REAR_KNEE_FLOOR_DEG - self._rear_knee_avg) ** 2 / 100.0
 
     def _cross_reward(self, base_x) -> float:
         """V5 crossing bonus: FAC_CROSS for the whole obstacle field (split evenly over its pieces, paid as each one is cleared) and FAC_CROSS for the ledge edge."""
