@@ -134,7 +134,7 @@ def v6_baseline(st):
 def sweep(st):
     if st.get("sweep") == "done" and os.path.exists("reference_gait/creep_ref.npy"):
         return
-    log(f"BASE SWEEP: 36 creep candidates open loop on flat ground, then every passing one on step-ups (creep_sweep.py), about 15 min, done about {clock_in(15)}")
+    log(f"BASE SWEEP: 54 creep candidates open loop on flat ground, then every passing one on step-ups (creep_sweep.py), about 20 min, done about {clock_in(20)}")
     clean_environ()
     r = subprocess.run([sys.executable, "creep_sweep.py", "--v6-flat", f"{REPORT_DIR}/v6_baseline.json", "--out", f"{REPORT_DIR}/sweep.json"], capture_output=True, text=True)
     open(f"{REPORT_DIR}/sweep.log", "w").write(r.stdout + r.stderr)
@@ -145,7 +145,7 @@ def sweep(st):
         halt(f"HALT: creep_sweep.py failed: {(r.stdout + r.stderr)[-600:]}")
     w = json.load(open(f"{REPORT_DIR}/sweep.json"))["winner"]
     decision(f"Base gait chosen by the sweep: {w['params']} (step-up score {w['ledge_score']:.3f}, rear paw lift {w['flat']['rear_lift_mm']:.1f} mm, body {w['flat']['body_mm']:.1f} mm, "
-             f"open-loop flat falls {w['flat']['falls']:.2f}). Rule: pass the flat gates, then the best step-up score (success + all four up - falls / 4 at 7.5 / 12.5 / 15 mm) among every passing candidate.")
+             f"open-loop flat falls {w['flat']['falls']:.2f}). Rule: pass the flat gates (incl. front paw lift at least 1.5x V6's, relaxed to 1.25x / 1.0x only if none pass), then the best step-up score (success + all four up - falls / 4 at 7.5 / 12.5 / 15 mm) among every passing candidate.")
     shutil.copy("reference_gait/creep_ref.npy", "../../pi_pipeline/gait/creep_ref.npy")        # the Pi's base (not deployed: rsync is the user's call)
     st["sweep"] = "done"
     save_state(st)

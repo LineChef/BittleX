@@ -3,7 +3,7 @@
     ../../.venv/bin/python creep_sweep.py --v6-flat trained/hs_v6_baseline.json --out trained/hs_sweep.json      # writes reference_gait/creep_ref.npy (+ .json) for the winner
 
 Round A (flat): each candidate of the grid walks `--flat-episodes` calm 20 s walks at the creep's command. It passes the gates only with
-  no falls, rear paw lift >= REAR_LIFT_X x V6's, body height >= V6's, mean rear knee >= V6's - REAR_KNEE_SLACK deg, speed >= MIN_SPEED.
+  no falls, rear paw lift >= REAR_LIFT_X x V6's, body height >= V6's, mean rear knee >= V6's - REAR_KNEE_SLACK deg, speed >= MIN_SPEED, and front paw lift >= FRONT_LIFT_X x V6's (the strictest of 1.5 / 1.25 / 1.0 that leaves a candidate).
 Round B (step-ups): EVERY candidate that passed round A gets the step-up ladder (7.5 / 12.5 / 15 mm, 15 s); the winner has the best step-up score
   (mean over the sizes of success + all-four-up share - falls / 4). If nothing passes round A, the runner halts: the gates are not loosened silently.
   (2026-10-12, first run: sending only the 4 highest rear lifts to round B picked the most aggressive sway, which falls 80-100% at a step-up edge open loop; every passing
@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.join(HERE, "reference_gait"))
 import build_creep_reference as BC      # noqa: E402
 import hs_probe as HP                   # noqa: E402
 
-GRID = dict(sway=(12.0, 15.0, 18.0), lean=(0.0, 8.0), A=(10.0, 12.0, 14.0), Lr=(35.0, 42.0))
+GRID = dict(sway=(12.0, 15.0, 18.0), lean=(0.0,), A=(10.0, 12.0, 14.0), Lr=(35.0, 42.0), Lf=(29.0, 36.0, 42.0))      # lean dropped and front knee lift added (2026-10-12: lean 8 won the first sweeps and halved the front lift)
+FRONT_LIFT_X = (1.5, 1.25, 1.0)       # front paw lift >= this x V6's: the strictest level that leaves a passing candidate is used (and logged)
 REAR_LIFT_X, REAR_KNEE_SLACK, MIN_SPEED = 3.0, 5.0, 0.025
 LEDGES = (0.0075, 0.0125, 0.015)
 CMD = 0.035
@@ -63,10 +64,14 @@ def main():
             f = HP.summarize([dict(kind="flat", size=0.0, recs=prt["recs"])])["flat"]
             ok = (f["falls"] == 0 and (f["rear_lift_mm"] or 0) >= bar["rear_lift_mm"] and (f["body_mm"] or 0) >= bar["body_mm"]
                   and (f["rear_knee_deg"] if f["rear_knee_deg"] is not None else -99) >= bar["rear_knee_deg"] and f["speed"] >= bar["speed"])
-            rows.append(dict(i=i, params=c, flat=f, passes=bool(ok)))
+            ok_front = {x: bool(ok and (f["front_lift_mm"] or 0) >= x * v6["front_lift_mm"]) for x in FRONT_LIFT_X}
+            rows.append(dict(i=i, params=c, flat=f, passes=bool(ok), ok_front=ok_front))
             print(f"A {i:02d} {c} | falls {f['falls']:.2f} speed {f['speed']:.3f} lift F {f['front_lift_mm'] or 0:.1f} R {f['rear_lift_mm'] or 0:.1f} body {f['body_mm'] or 0:.1f} "
                   f"knee {f['rear_knee_deg'] if f['rear_knee_deg'] is not None else float('nan'):+.1f} roll {f['roll_sd_deg'] or 0:.1f} | {'PASS' if ok else '-'}", flush=True)
-        passing = sorted([r for r in rows if r["passes"]], key=lambda r: -r["flat"]["rear_lift_mm"])
+        level = next((x for x in FRONT_LIFT_X if any(r["ok_front"][x] for r in rows)), None)
+        passing = sorted([r for r in rows if level is not None and r["ok_front"][level]], key=lambda r: -r["flat"]["rear_lift_mm"])
+        bar["front_lift_mm"], bar["front_lift_x"] = (level or 0) * v6["front_lift_mm"], level
+        print(f"FRONT LIFT GATE: {level} x V6's front lift ({bar['front_lift_mm']:.1f} mm); {len(passing)} candidates pass", flush=True)
         out = dict(bar=bar, v6_flat=v6, grid=GRID, round_a=rows, round_b=[], winner=None)
         if not passing:
             json.dump(out, open(a.out, "w"), indent=1)
