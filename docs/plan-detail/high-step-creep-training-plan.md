@@ -65,6 +65,15 @@ nohup bash ../../tools/hs_watchdog.sh > /dev/null 2>&1 &   # (re)start: the runn
   (V6 4.6), body 78.0 mm; step-up success 0.85 / 0.45 / 0.25 / 0.05 at 7.5 / 10 / 12.5 / 15 mm (V6 0.85 / 0.10 / 0.07 / 0.00) with more falls at the edge (0.15-0.65).
   Clips: the "G2 Creep Base Gait" Artifact page.
 
+### Second correction, 2026-10-12 11:55 PM (during S1-S2 and the first 20M minutes)
+
+S1, S2 and the first 2M of the 20M scored below the open-loop base (success 0.30 at 7.5 mm, 0 above): front feet up in 1 s, one rear paw at about 5 s, then the body stopped advancing.
+With the training rewards, imitation paid about 19,000 per episode against edge terms of about +65 and a face-contact penalty of -130 to -250; the one-time all-four-up bonus (150) was never
+reached, so nothing led toward the climb. The edge stall cost also never fired for the creep (V6's test needs instantaneous speed under 2 cm/s for 40 consecutive steps, and the creep's
+rocking exceeds that). Fixes (all new knobs, off by default): `G2E_EDGE_STALL_WINDOW` (stall = no 1 cm progress for 1.5 s, zone to 12 cm past the edge), `G2E_FAC_PAW_UP` (each paw first
+standing on the step top is paid: rear 100, front 30), face-contact cost 0.15, imitation relaxed to 0.1 at the edge, edge stall cost 2. Stopped the 20M, moved the first S1/S2/20M files to
+`trained/hs_report/old_chain1/`, kept S0 (flat only) and re-ran S1 onward.
+
 ## 4. The chain (`phase_hs.py run`)
 
 | Step | What | About |

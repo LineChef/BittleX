@@ -100,3 +100,36 @@ print(json.dumps(dict(r1=r1, r2=r2, on_top=len(e._hs_on_top), hits=hits)))
 def test_all_up_paid_once():
     d = _probe(REWARD, {"G2E_FAC_ALL_UP": "150", "G2E_FAC_FACE_HIT": "0.5"})
     assert d["r1"] == 150.0 and d["r2"] == 0.0, d
+
+
+STALL = r"""
+import json, os, sys
+sys.path.insert(0, ".")
+import numpy as np, pybullet as p, opencat_gym_env as E
+E.GUI_MODE = False
+e = E.OpenCatGymEnv()
+e.set_forced_hazards({"ledge_up": 0.012}); e.set_command(fwd=0.035, yaw=0.0)
+e.reset(seed=3)
+# the creep rocks: instantaneous speed alternates 0.05 / 0.0 while the body goes nowhere. The old speed test (under 2 cm/s for 40 CONSECUTIVE steps) never fires on that.
+paws = [(0.0, 0.0, 0.0)] * 4
+rs = []
+for k in range(260):
+    p.resetBaseVelocity(e.robot_id, [0.05 if k % 2 else 0.0, 0, 0], [0, 0, 0])
+    rs.append(e._edge_reward(e._ledge_edge + 0.05, paws))
+# paw bonus: a rear paw first standing on top pays FAC_PAW_UP once, a front paw 0.3x
+e.reset(seed=4)
+rid, lid, h = e.robot_id, e._ledge_id, e._ledge_h
+p.resetBasePositionAndOrientation(rid, [e._ledge_edge + 0.20, 0, 0.08 + h], [0, 0, 0, 1])
+for _ in range(60):
+    p.stepSimulation()
+r1 = e._hs_ledge_reward(e._ledge_edge + 0.20)
+print(json.dumps(dict(early=min(rs[:100]), late=min(rs[200:]), r1=r1, n=len(e._hs_on_top))))
+"""
+
+
+def test_windowed_edge_stall_fires_for_a_rocking_creep_and_paws_are_paid():
+    d = _probe(STALL, {"G2E_FAC_EDGE_STALL": "2.0", "G2E_EDGE_STALL_WINDOW": "120", "G2E_FAC_ALL_UP": "150", "G2E_FAC_PAW_UP": "100", "G2E_FAC_FACE_HIT": "0.15"})
+    assert d["early"] == 0.0 and d["late"] < -2.0, d                      # nothing for the first 1.5 s, then the cost, growing
+    assert d["r1"] == 2 * 100.0 + 2 * 30.0 + 150.0 and d["n"] == 4, d      # 2 rear x 100, 2 front x 30, all four 150
+    old = _probe(STALL, {"G2E_FAC_EDGE_STALL": "2.0"})
+    assert old["late"] == 0.0, old                                          # the V6 test really never fired on this motion

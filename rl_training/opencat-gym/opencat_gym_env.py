@@ -1030,6 +1030,12 @@ FAC_ALL_UP = _g2e("FAC_ALL_UP", 0.0)
 FAC_FACE_HIT = _g2e("FAC_FACE_HIT", 0.0)
 FAC_REAR_POSTURE = _g2e("FAC_REAR_POSTURE", 0.0)
 REAR_KNEE_FLOOR_DEG = _g2e("REAR_KNEE_FLOOR_DEG", 0.0)
+#   FAC_PAW_UP (2026-10-12 review, after S1/S2 stalled with the rear paws on the floor): paid once per paw the first time it stands on a step-up's top: FAC_PAW_UP for each rear paw,
+#   0.3 x for each front paw, so a rear paw that gets over the edge is paid on its own, not only when the last paw arrives.
+#   EDGE_STALL_WINDOW > 0: the edge stall counts steps in which the body has not advanced 1 cm past its best x (the creep's own rocking pushes its instantaneous speed over
+#   2 cm/s, so V6's speed test never fired for it), and covers the zone up to 12 cm past the edge, where the rear paws still have to follow.
+FAC_PAW_UP = _g2e("FAC_PAW_UP", 0.0)
+EDGE_STALL_WINDOW = _g2e("EDGE_STALL_WINDOW", 0)
 
 
 def frontier_default_weights():
@@ -1823,7 +1829,7 @@ class OpenCatGymEnv(gym.Env):
         _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
         r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
         r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0 or FAC_EDGE_PROGRESS > 0) else 0.0
-        r_hs = self._hs_ledge_reward(current_position) if (FAC_ALL_UP > 0 or FAC_FACE_HIT > 0) else 0.0      # high-step creep: all four paws up / face contact
+        r_hs = self._hs_ledge_reward(current_position) if (FAC_ALL_UP > 0 or FAC_FACE_HIT > 0 or FAC_PAW_UP > 0) else 0.0      # high-step creep: all four paws up / face contact
         rear_posture_cost = self._rear_posture_cost() if FAC_REAR_POSTURE > 0 else 0.0
 
         # Penalty and reward
@@ -3052,6 +3058,7 @@ class OpenCatGymEnv(gym.Env):
         self._obj_passed = 0
         self._ledge_passed = False
         self._edge_stall_n = 0
+        self._edge_best_x = None
         self._edge_lift_paid = False
         self._hs_on_top, self._hs_all_up_paid, self._hs_ledge_inv = set(), False, None
         self._rear_knee_avg = None
@@ -3081,15 +3088,23 @@ class OpenCatGymEnv(gym.Env):
         vx = p.getBaseVelocity(self.robot_id)[0][0]
         if FAC_EDGE_PROGRESS > 0 and vx > 0:
             r += FAC_EDGE_PROGRESS * vx * (1.0 / 80.0)                          # metres moved this control step
-        if base_x > e + 0.06:
-            self._edge_stall_n = 0
-            return r
-        if vx < 0.02:
-            self._edge_stall_n += 1
+        if EDGE_STALL_WINDOW > 0:
+            if getattr(self, "_edge_best_x", None) is None or base_x > self._edge_best_x + 0.01:
+                self._edge_best_x, self._edge_stall_n = base_x, 0
+            else:
+                self._edge_stall_n += 1
+            if FAC_EDGE_STALL > 0 and self._edge_stall_n > EDGE_STALL_WINDOW:
+                r -= FAC_EDGE_STALL * min(3.0, 1.0 + (self._edge_stall_n - EDGE_STALL_WINDOW) / 80.0)
         else:
-            self._edge_stall_n = 0
-        if FAC_EDGE_STALL > 0 and self._edge_stall_n > 40:
-            r -= FAC_EDGE_STALL * min(3.0, 1.0 + (self._edge_stall_n - 40) / 80.0)
+            if base_x > e + 0.06:
+                self._edge_stall_n = 0
+                return r
+            if vx < 0.02:
+                self._edge_stall_n += 1
+            else:
+                self._edge_stall_n = 0
+            if FAC_EDGE_STALL > 0 and self._edge_stall_n > 40:
+                r -= FAC_EDGE_STALL * min(3.0, 1.0 + (self._edge_stall_n - 40) / 80.0)
         if FAC_EDGE_LIFT > 0 and self._ledge_dir > 0 and not self._edge_lift_paid:      # ONCE per episode: a per-step bonus was hoverable (a paw held over the ledge cancelled the stall cost)
             front = [pp for pp in ppos if e - 0.08 <= pp[0] <= e + 0.02]
             if front and max(pp[2] for pp in front) >= self._ledge_h + 0.002:
@@ -3107,14 +3122,15 @@ class OpenCatGymEnv(gym.Env):
             _lp, _lo = p.getBasePositionAndOrientation(self._ledge_id)
             self._hs_ledge_inv = p.invertTransform(_lp, _lo)
         ip, io = self._hs_ledge_inv
-        top, face = self._ledge_h / 2 - 0.0015, False
+        top, face, r_paw = self._ledge_h / 2 - 0.0015, False, 0.0
         for c in p.getContactPoints(bodyA=self.robot_id, bodyB=self._ledge_id):
             lc = p.multiplyTransforms(ip, io, c[6], [0, 0, 0, 1])[0]
             if lc[2] < top:
                 face = True
-            elif c[3] in (3, 6, 9, 12) and lc[0] > -0.70 + 0.003:
+            elif c[3] in (3, 6, 9, 12) and lc[0] > -0.70 + 0.003 and c[3] not in self._hs_on_top:
                 self._hs_on_top.add(c[3])
-        r = -FAC_FACE_HIT if face else 0.0
+                r_paw += FAC_PAW_UP * (1.0 if c[3] in (9, 12) else 0.3)
+        r = r_paw - (FAC_FACE_HIT if face else 0.0)
         if FAC_ALL_UP > 0 and len(self._hs_on_top) == 4:
             self._hs_all_up_paid = True
             r += FAC_ALL_UP
