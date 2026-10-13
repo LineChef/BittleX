@@ -1578,14 +1578,22 @@ class OpenCatGymEnv(gym.Env):
         # Read clearance of paw from ground
         paw_clearance = 0
         _paw_tgt = PAW_Z_TARGET
+        _hs_clear = PAW_Z_FRONT > 0 or PAW_Z_REAR > 0
         _tgts = [PAW_Z_FRONT or PAW_Z_TARGET] * 2 + [PAW_Z_REAR or PAW_Z_TARGET] * 2      # paw order FL, FR, BR, BL; both 0 = PAW_Z_TARGET for all four (unchanged)
-        if FAC_EDGE_LIFT > 0 and self._ledge_edge is not None and self._ledge_dir > 0 and not self._ledge_passed:
+        _edge_up = self._ledge_edge is not None and self._ledge_dir > 0 and not self._ledge_passed
+        if FAC_EDGE_LIFT > 0 and _edge_up and not _hs_clear:
             _bx = p.getBasePositionAndOrientation(self.robot_id)[0][0]
             if self._ledge_edge - 0.12 <= _bx <= self._ledge_edge + 0.03:
                 _paw_tgt = max(PAW_Z_TARGET, self._ledge_h + 0.006)             # V6: near a step-up edge the feet are asked to clear the ledge, not to stay at 20 mm
-                _tgts = [max(t, self._ledge_h + 0.006) for t in _tgts]
+        if _hs_clear and _edge_up:
+            # High-step creep (2026-10-12 review): each paw's OWN target rises while that paw is within 6 cm before the edge and not yet on top -- the rear paws trail the body by
+            # ~10 cm, so V6's body-position window above had switched off before they reached the edge. The paw ORIGIN sits ~7 mm above the floor, so clearing the top by 6 mm
+            # needs the origin at ledge height + 13 mm (V6's +6 mm on the origin asked for no real clearance).
+            for k, link in enumerate((3, 6, 9, 12)):
+                if self._ledge_edge - 0.06 <= _ppos[k][0] <= self._ledge_edge + 0.01 and link not in getattr(self, "_hs_on_top", ()):
+                    _tgts[k] = max(_tgts[k], self._ledge_h + 0.013)
         for k in range(4):
-            if PAW_Z_FRONT > 0 or PAW_Z_REAR > 0:
+            if _hs_clear:
                 _d = _ppos[k][2] - _tgts[k]
                 if CLEAR_ONE_SIDED:
                     _d = min(0.0, _d)

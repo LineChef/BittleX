@@ -49,6 +49,22 @@ nohup bash ../../tools/hs_watchdog.sh > /dev/null 2>&1 &   # (re)start: the runn
 - **Pi side** (built, not deployed): `residual_policy.py` reads `base_ref` and `phase_rate_nom_cmd` from the policy sidecar, so the Pi plays the creep exactly as training did
   (test: `pi_pipeline/tests/test_residual_policy_sidecar.py`). Switching V6 <-> this policy by voice is later work (`gait_mode.py` points "hi step" at `hsF` today).
 
+### Bug sweep before training (2026-10-12, 10:30 PM)
+
+- **Fixed: the step-edge clearance target missed the rear paws.** V6's raised target near a step-up switches on by the BODY's position (12 cm before to 3 cm past the edge); the rear
+  paws trail the body by about 10 cm, so it had switched off before they reached the edge, and it was set on the paw's centre (about 7 mm above the floor), so "ledge + 6 mm"
+  asked for no real clearance. The creep now raises each paw's own target while that paw is within 6 cm before the edge and not yet on top, to ledge height + 13 mm (6 mm under
+  the paw). V6's path is unchanged.
+- **Fixed: combo episodes run only 3 s** (too short for the creep to reach a step's top): 5% for the creep instead of 15%.
+- **Fixed: a flaky V6 test** (unseeded reset sometimes placed an obstacle whose bonus doubled the expected value) that could have failed a preflight at random.
+- Checked and fine: chained runs restart checkpoint numbering at 0 (one every 200k, so the tracker's 2M names exist); the preflight replay check rebuilds each episode from its own
+  recorded settings; forcing "no hazards" in the scorer really gives a clean floor; the Pi plays the base on the same phase clock as training.
+- S0 had started under the runner's old settings (no ledges in S0, so the combo change does not touch it); the runner was restarted at 10:31 PM so S1, S2 and the 20M use the fixed
+  settings; S0 kept training.
+- Base chosen by the corrected sweep: sway 12, lean 8, stride 10, rear knee dip 42 (`reference_gait/creep_ref.json`). Open loop (no learning): no flat falls, rear paw lift 15.8 mm
+  (V6 4.6), body 78.0 mm; step-up success 0.85 / 0.45 / 0.25 / 0.05 at 7.5 / 10 / 12.5 / 15 mm (V6 0.85 / 0.10 / 0.07 / 0.00) with more falls at the edge (0.15-0.65).
+  Clips: the "G2 Creep Base Gait" Artifact page.
+
 ## 4. The chain (`phase_hs.py run`)
 
 | Step | What | About |

@@ -150,7 +150,7 @@ LEVERS = {
                  "G2E_FAC_UPRIGHT": "1.5", "G2E_FAC_STABILITY": "0.05",                                         # stability turned down, not off (falls still end the episode)
                  "G2E_HEIGHT_FLOOR": "0.074", "G2E_REAR_KNEE_FLOOR_DEG": "0", "G2E_FAC_REAR_POSTURE": "2.0",     # anti-crouch: body at least V6's height, rear legs not tucked
                  "G2E_PAW_Z_FRONT": "0.025", "G2E_PAW_Z_REAR": "0.022", "G2E_CLEAR_ONE_SIDED": "1", "G2E_FAC_CLEARANCE": "8000",   # swing clearance, low paws only
-                 "G2E_FR_LEDGE_UP_ONLY": "1", "G2E_HAZARD_EP_LEN": "1200",                                   # step-ups only; 15 s hazard episodes (the creep needs 5-8 s to get all four feet up)
+                 "G2E_FR_LEDGE_UP_ONLY": "1", "G2E_HAZARD_EP_LEN": "1200", "G2E_FR_COMBO": "0.05",                                   # step-ups only; 15 s hazard episodes (the creep needs 5-8 s to get all four feet up); few combo episodes (they run only 3 s)
                  "G2E_FAC_EDGE_STALL": "1.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5",   # V6's ledge terms (stall cost halved: slow is fine)
                  "G2E_FAC_ALL_UP": "150", "G2E_FAC_FACE_HIT": "0.5", "G2E_HAZ_POSTURE_RELAX": "0.3"},          # new: all four paws up pays once, touching the step face costs
     "hs_s0_flat": {"G2E_FR_ANCHOR": "0.85", "G2E_FR_SHARE_SET": "rubble:0.05,boxes:0.0,snag:0.03,rough:0.05,ledge:0.0,slope:0.0,cutback:0.10"},
