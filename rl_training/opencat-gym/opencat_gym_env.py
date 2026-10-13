@@ -921,8 +921,12 @@ FIX_PAW_VEL = _g2e("FIX_PAW_VEL", False)        # 2026-10-08 review: slip / clea
 #   (the gait tops out ~0.095 m/s): stand 17% (unchanged), creep 0.04-0.055 25%, cruise 0.08-0.12 58%. "" = the G4 bands.
 #   "capped" (2026-10-08 ablation of "forward"): ONLY the unreachable fast band is removed (its share goes to cruise 0.08-0.12); backward stays:
 #   cruise 50%, creep 0.04-0.055 20%, stand 17%, backward 13%. Tells whether dropping backward is what "forward" cost in speed and hazard falls.
-#   "creep" (2026-10-12, high-step creep): 0.028-0.045 m/s 83%, stand 17%; its probes walk at 0.030-0.042.
+#   "creep" (2026-10-12, high-step creep): 0.030-0.040 m/s 83% (2026-10-13: was 0.028-0.045; above 0.040 the base's faster cadence falls), stand 17%; its probes walk at 0.030-0.042.
 CMD_BANDS = _g2e("CMD_BANDS", "")
+# STAND_MEAN_CMD (2026-10-13 review): an episode whose MEAN command is under this is a stand episode: scored 1 and never reported to the frontier / level curriculum. 0.04 for
+#   every earlier recipe (their moving bands start at 0.04); the creep walks 0.030-0.040, so 0.04 hid almost every creep episode and left only the unstable 0.04+ ones, whose
+#   hazard-free score (about 0) froze the ledge frontier at its first bin through whole stages. 0.025 for the creep (below it a command is a stand: STAND_FWD_THRESH).
+STAND_MEAN_CMD = 0.025 if CMD_BANDS == "creep" else 0.04
 # IMU_NOISE_PER_FRAME: with IMU_HOLD_STEPS, draw the observation noise once per held IMU frame (G2's error is fixed for the whole 0.2 s frame) instead of every control step.
 IMU_NOISE_PER_FRAME = _g2e("IMU_NOISE_PER_FRAME", False)
 # HAZARD_EP_LEN > 0: an episode whose focus is a hazard (frontier focus, or a terrain / ledge / slope focus category) runs this many steps, and the scattered obstacles
@@ -1304,7 +1308,7 @@ class OpenCatGymEnv(gym.Env):
 
     def _fr_report(self, terminated: bool, info: dict) -> None:
         """FRONTIER: the outcome of a finished anchor / focus episode, for the trainer (survived and covered >= LEVEL_PROGRESS_MIN of the commanded distance)."""
-        if self._lvl_steps <= 0 or abs(self._lvl_cmd_sum / self._lvl_steps) < 0.04:
+        if self._lvl_steps <= 0 or abs(self._lvl_cmd_sum / self._lvl_steps) < STAND_MEAN_CMD:
             return                                     # a stand episode never reaches a hazard (all sit ahead): it would count as a free success, so it is not reported
         ok = float((not terminated) and self._episode_score() >= LEVEL_PROGRESS_MIN)
         if self._fr_role == "anchor":
@@ -1383,7 +1387,7 @@ class OpenCatGymEnv(gym.Env):
         if self._lvl_steps <= 0:
             return 1.0
         cmd_mean = self._lvl_cmd_sum / self._lvl_steps
-        if abs(cmd_mean) < 0.04:
+        if abs(cmd_mean) < STAND_MEAN_CMD:
             return 1.0
         v = (p.getBasePositionAndOrientation(self.robot_id)[0][0] - self._lvl_x0) / (self._lvl_steps / CONTROL_HZ)
         score = float(np.clip(v / cmd_mean, 0.0, 1.0))
@@ -2405,7 +2409,7 @@ class OpenCatGymEnv(gym.Env):
             return
         if CMD_BANDS == "creep":        # 2026-10-12 high-step creep: slow forward only (the creep's own pace, about 0.035 m/s with PHASE_RATE_NOM_CMD 0.035), stand share as "forward"
             if r < 0.83:
-                self._cmd_fwd = np.random.uniform(0.028, 0.045)
+                self._cmd_fwd = np.random.uniform(0.030, 0.040)
             else:
                 self._cmd_fwd = np.random.uniform(-0.01, 0.02)
             return

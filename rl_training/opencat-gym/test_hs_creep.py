@@ -69,7 +69,7 @@ def test_step_ups_only_and_creep_commands():
     env = {"G2E_FRONTIER": "1", "G2E_FR_ANCHOR": "0.1", "G2E_FR_SHARE_SET": "ledge:0.6", "G2E_FR_LEDGE_UP_ONLY": "1", "G2E_CMD_BANDS": "creep"}
     d = _probe(LEDGES, env)
     assert d["dirs"] == ["ledge_up"] and d["n"] > 50, d
-    assert d["cmd_max"] <= 0.045 + 1e-9 and d["cmd_min"] >= -0.01 - 1e-9, d
+    assert d["cmd_max"] <= 0.040 + 1e-9 and d["cmd_min"] >= -0.01 - 1e-9, d
 
 
 REWARD = r"""
@@ -153,3 +153,27 @@ print(json.dumps(dict(n=n, multi=multi)))
 def test_mid_swing_flags_each_leg_for_part_of_its_swing_and_never_two_at_once():
     d = _probe(MIDSWING, {"G2E_SKILL_REF": "creep"})
     assert all(8 <= x <= 25 for x in d["n"]) and d["multi"] == 0, d      # each leg flagged for part of its 20-frame swing; three feet stay down
+
+
+REPORTED = r"""
+import json, sys
+sys.path.insert(0, ".")
+import numpy as np, opencat_gym_env as E
+E.GUI_MODE = False
+e = E.OpenCatGymEnv()
+out = {}
+for cmd in (0.02, 0.032, 0.038):
+    e.set_forced_hazards({}); e.set_command(fwd=cmd, yaw=0.0); e.reset(seed=2)
+    for _ in range(60): e.step(np.zeros(8))
+    info = {}
+    e._fr_report(False, info)
+    out[str(cmd)] = "fr_anchor" in info
+print(json.dumps(out))
+"""
+
+
+def test_creep_episodes_are_reported_to_the_frontier_but_stands_are_not():
+    d = _probe(REPORTED, {"G2E_CMD_BANDS": "creep"})
+    assert d == {"0.02": False, "0.032": True, "0.038": True}, d      # at the old 0.04 threshold no creep command was ever reported
+    old = _probe(REPORTED, {})
+    assert old == {"0.02": False, "0.032": False, "0.038": False}, old
