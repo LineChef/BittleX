@@ -1,0 +1,90 @@
+{
+ "flat": {
+  "episodes": 20,
+  "falls": 0.0,
+  "speed": 0.04836725288215067,
+  "heading_abs_deg": 10.484609418234722,
+  "front_lift_mm": 13.053901789887519,
+  "rear_lift_mm": 9.360566916891509,
+  "rear_air": 0.3405489809335963,
+  "body_mm": 76.15252690093601,
+  "rear_knee_deg": 6.113057135760939,
+  "roll_sd_deg": 3.7227163312917035
+ },
+ "ledges": [
+  {
+   "size_mm": 7.5,
+   "episodes": 20,
+   "success": 0.65,
+   "falls": 0.2,
+   "all_up": 1.0,
+   "front_up": 1.0,
+   "t_all_up_s": 4.78125
+  },
+  {
+   "size_mm": 10.0,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.75,
+   "all_up": 0.35,
+   "front_up": 1.0,
+   "t_all_up_s": 6.0
+  },
+  {
+   "size_mm": 12.5,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.55,
+   "all_up": 0.2,
+   "front_up": 1.0,
+   "t_all_up_s": 8.49375
+  },
+  {
+   "size_mm": 15.0,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.55,
+   "all_up": 0.0,
+   "front_up": 1.0,
+   "t_all_up_s": null
+  },
+  {
+   "size_mm": 17.5,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.5,
+   "all_up": 0.0,
+   "front_up": 1.0,
+   "t_all_up_s": null
+  },
+  {
+   "size_mm": 20.0,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.6,
+   "all_up": 0.0,
+   "front_up": 0.85,
+   "t_all_up_s": null
+  },
+  {
+   "size_mm": 25.0,
+   "episodes": 20,
+   "success": 0.0,
+   "falls": 0.0,
+   "all_up": 0.0,
+   "front_up": 0.0,
+   "t_all_up_s": null
+  }
+ ],
+ "policy": "trained/hs_s1_ppo",
+ "levers": [
+  "hs_creep",
+  "privileged_critic",
+  "heading_blind"
+ ],
+ "ref": "",
+ "cmd": 0.035,
+ "nom_cmd": null,
+ "seconds": 24.1,
+ "ceiling80_mm": 0.0
+}

@@ -5,6 +5,25 @@ The goal is foot clearance; stability is not ranked, but it must not fall on fla
 Switching between it and V6 on the Pi comes later. Approved by the user 2026-10-12 (steps 1-5 plus a 20M consolidation, run unattended, decisions made and documented by Claude,
 deployment the user's call). This page replaces the "Track C, two modes in one network" path of [`high-step-gait-plan.md`](high-step-gait-plan.md).
 
+## 0. Outcome (2026-10-13 8:52 AM): STOPPED, goal not met, 20M never run
+
+The creep did not clear steps: best step-up success above 7.5 mm was 0%, at 7.5 mm 25% (V6: 85%); the minimum target (80% at 12.5 mm) was missed at every stage. S2 failed its flat gates twice and the runner halted before
+the 20M; I (Claude) did not start it by hand because S2 showed no gain in step-up success. Nothing exported, promoted or deployed. The base gait, the scorer and the fixes below are kept as the research result.
+Final scores and every decision: `trained/hs_report/` (`decisions.md`, `hs_*.json`, `old_chain*`, `old_sweep*`); the results page was published as an Artifact ("High-Step Creep Report").
+
+What the run established (sim, open loop and trained):
+- V6's step-up limit is about 8 mm and its rear legs, not its front, stop it (they never unload: 54% of the weight is behind, no sideways hip joint). `hs_probe.py` shows this foot by foot.
+- A three-feet-down creep with sway lifts the rear paws 2.4x V6's (open loop) with no flat falls. A trained policy keeps 11-21 mm of rear lift once the clearance reward is speed-independent.
+- None of the trained stages crossed steps: the policy gets its front feet up and then stalls or tips; the open-loop base beat S1 and S2 at 7.5 mm (50% against 10-25%).
+- A 30-40 deg left drift appeared after step-up training began (cause not found; V6 and S0, also heading-blind, walk straight). Two sideways tip-overs in 20 flat walks (roll -75 deg, same side).
+- Seven bugs found and fixed (all new knobs default off, tests in `test_hs_creep.py`): rear paws never asked to clear the edge (V6's body-position window ended before they arrived); 3 s combo episodes; a flaky V6 test; the edge
+  stall cost never fired for a rocking gait (windowed stall `G2E_EDGE_STALL_WINDOW`); the clearance penalty weighted by paw speed made dragging free (`G2E_FAC_SWING_CLEAR`); the frontier curriculum never saw creep episodes
+  (stand threshold 0.04, now `STAND_MEAN_CMD`) so the step size stayed frozen at its first bin in every chain; chained-stage retries ignored the seed (`G2E_CHAIN_SEED`).
+- Chains run: five full restarts; the last (2:34 AM) reached S2 and halted at 8:52 AM.
+
+Open: the user remembers an earlier V6-based policy with a much higher step; it was not found on the Mac (the Pi was off). If found, benchmark it with `hs_probe.py --policy P --levers privileged_critic,heading_blind --cmd 0.10`.
+Ideas left if the creep is revisited: a speed incentive and longer episodes at the edge (the policy reaches all four paws on top only after 11-13 s), a stronger left/right balance for the sway, a heading penalty the policy can act on.
+
 ## 1. Resume here (new session)
 
 ```bash

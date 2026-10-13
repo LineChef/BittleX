@@ -1,0 +1,1884 @@
+{
+ "bar": {
+  "rear_lift_mm": 9.15680238581253,
+  "body_mm": 75.57016175910387,
+  "rear_knee_deg": 5.2648052598877335,
+  "speed": 0.025,
+  "front_lift_mm": 17.916823968434834,
+  "front_lift_x": 1.35
+ },
+ "v6_flat": {
+  "episodes": 20,
+  "falls": 0.0,
+  "speed": 0.09149650341038801,
+  "heading_abs_deg": 14.880789021378954,
+  "front_lift_mm": 13.271721458099876,
+  "rear_lift_mm": 4.578401192906265,
+  "rear_air": 0.2895792241946088,
+  "body_mm": 75.57016175910387,
+  "rear_knee_deg": 10.264805259887734,
+  "roll_sd_deg": 2.7867804451779623
+ },
+ "grid": {
+  "sway": [
+   12.0,
+   14.0,
+   16.0
+  ],
+  "lean": [
+   0.0
+  ],
+  "A": [
+   12.0,
+   14.0,
+   16.0
+  ],
+  "Lr": [
+   35.0,
+   42.0
+  ],
+  "Lf": [
+   29.0,
+   32.0,
+   35.0
+  ]
+ },
+ "round_a": [
+  {
+   "i": 0,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03174639989144712,
+    "heading_abs_deg": 11.225422892662463,
+    "front_lift_mm": 16.37583535068041,
+    "rear_lift_mm": 10.879977299685212,
+    "rear_air": 0.3071170282708744,
+    "body_mm": 78.96249369709676,
+    "rear_knee_deg": 8.560084606700183,
+    "roll_sd_deg": 4.124545518440376
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 1,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.031129231021346668,
+    "heading_abs_deg": 6.312814698220878,
+    "front_lift_mm": 16.59207259271644,
+    "rear_lift_mm": 10.841606025546396,
+    "rear_air": 0.2915179091006488,
+    "body_mm": 78.92856308911504,
+    "rear_knee_deg": 8.87305891439243,
+    "roll_sd_deg": 4.956616590821703
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 2,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.5,
+    "speed": 0.03151027285291753,
+    "heading_abs_deg": 8.505507927731882,
+    "front_lift_mm": 15.397997244638184,
+    "rear_lift_mm": 16.631478632400558,
+    "rear_air": 0.3664722433715878,
+    "body_mm": 78.91778612707219,
+    "rear_knee_deg": 8.948641330052583,
+    "roll_sd_deg": 7.608883406430123
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 3,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03279607679311484,
+    "heading_abs_deg": 12.235999459811891,
+    "front_lift_mm": 15.994725587616085,
+    "rear_lift_mm": 12.68233184030026,
+    "rear_air": 0.34619493754109143,
+    "body_mm": 78.76567703749639,
+    "rear_knee_deg": 6.9127224176875846,
+    "roll_sd_deg": 4.717194904303685
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 4,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.033667574174781764,
+    "heading_abs_deg": 5.22489041629642,
+    "front_lift_mm": 16.86540172291423,
+    "rear_lift_mm": 13.537141896774667,
+    "rear_air": 0.36345332018408943,
+    "body_mm": 78.48901663660236,
+    "rear_knee_deg": 6.3110472721110344,
+    "roll_sd_deg": 5.675960596047133
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 5,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.03179359424506863,
+    "heading_abs_deg": 11.760806177784477,
+    "front_lift_mm": 17.700000920732975,
+    "rear_lift_mm": 16.6764149991024,
+    "rear_air": 0.40426464561079944,
+    "body_mm": 79.1095406493186,
+    "rear_knee_deg": 5.985779573509124,
+    "roll_sd_deg": 8.494035901638537
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 6,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.035295753327123605,
+    "heading_abs_deg": 7.537703761325114,
+    "front_lift_mm": 16.948441345178736,
+    "rear_lift_mm": 10.787958442545056,
+    "rear_air": 0.2925706771860618,
+    "body_mm": 78.7288596195213,
+    "rear_knee_deg": 8.549639377305276,
+    "roll_sd_deg": 4.295016966491154
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 7,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03554132794928821,
+    "heading_abs_deg": 7.084278592303171,
+    "front_lift_mm": 17.574498432873444,
+    "rear_lift_mm": 10.30099684901171,
+    "rear_air": 0.2869822485207101,
+    "body_mm": 78.72604344895318,
+    "rear_knee_deg": 8.847774109368656,
+    "roll_sd_deg": 4.5840848493994155
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 8,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.25,
+    "speed": 0.036777242874585614,
+    "heading_abs_deg": 9.09756466372584,
+    "front_lift_mm": 17.398926477338364,
+    "rear_lift_mm": 9.84516550238065,
+    "rear_air": 0.3207535676992691,
+    "body_mm": 78.81475378776258,
+    "rear_knee_deg": 8.14772708395702,
+    "roll_sd_deg": 4.985125030157889
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 9,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.035702192641287066,
+    "heading_abs_deg": 15.220759384907351,
+    "front_lift_mm": 18.51035183601822,
+    "rear_lift_mm": 9.961655130065465,
+    "rear_air": 0.3159516765285996,
+    "body_mm": 78.213380658577,
+    "rear_knee_deg": 5.73587290576381,
+    "roll_sd_deg": 5.836204688616607
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.55,
+     "falls": 0.4,
+     "all_up": 0.65,
+     "front_up": 0.95,
+     "t_all_up_s": 5.45
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.1,
+     "falls": 0.9,
+     "all_up": 0.1,
+     "front_up": 0.9,
+     "t_all_up_s": 6.1875
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 1.0,
+     "all_up": 0.0,
+     "front_up": 0.85,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.2750000000000001
+  },
+  {
+   "i": 10,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.25,
+    "speed": 0.03614807264190134,
+    "heading_abs_deg": 11.720200694689701,
+    "front_lift_mm": 18.700180594380896,
+    "rear_lift_mm": 12.780127562370772,
+    "rear_air": 0.3365379885266249,
+    "body_mm": 78.33770782499738,
+    "rear_knee_deg": 6.053347571058305,
+    "roll_sd_deg": 6.520647771700924
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 11,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.03433958306822259,
+    "heading_abs_deg": 9.418908247110934,
+    "front_lift_mm": 18.88558920138177,
+    "rear_lift_mm": 15.532328978911451,
+    "rear_air": 0.3613936842121049,
+    "body_mm": 77.74085758553989,
+    "rear_knee_deg": 5.099044081935508,
+    "roll_sd_deg": 8.301366062478193
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 12,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03932218476230952,
+    "heading_abs_deg": 9.919990765182922,
+    "front_lift_mm": 18.456015954459374,
+    "rear_lift_mm": 6.320217366891843,
+    "rear_air": 0.23126232741617356,
+    "body_mm": 78.54417339236859,
+    "rear_knee_deg": 8.680868443688412,
+    "roll_sd_deg": 3.641951709098997
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 13,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.04038782372008037,
+    "heading_abs_deg": 6.782880435579682,
+    "front_lift_mm": 18.220932970611727,
+    "rear_lift_mm": 9.692527530238557,
+    "rear_air": 0.27642176199868507,
+    "body_mm": 78.54478093169078,
+    "rear_knee_deg": 8.95053877113703,
+    "roll_sd_deg": 4.457707879249074
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.5,
+     "falls": 0.2,
+     "all_up": 0.7,
+     "front_up": 1.0,
+     "t_all_up_s": 6.03125
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.05,
+     "falls": 0.55,
+     "all_up": 0.15,
+     "front_up": 1.0,
+     "t_all_up_s": 8.9875
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 0.7,
+     "all_up": 0.0,
+     "front_up": 0.95,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.34583333333333327
+  },
+  {
+   "i": 14,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.040615401629362065,
+    "heading_abs_deg": 6.585001387833964,
+    "front_lift_mm": 19.087929209293183,
+    "rear_lift_mm": 12.750317502592242,
+    "rear_air": 0.3179705435380088,
+    "body_mm": 78.69859765513604,
+    "rear_knee_deg": 8.813498157584176,
+    "roll_sd_deg": 6.100207292641096
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 15,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03728628584987988,
+    "heading_abs_deg": 13.75377644627617,
+    "front_lift_mm": 20.557139466823116,
+    "rear_lift_mm": 9.339185497100873,
+    "rear_air": 0.30908182408513973,
+    "body_mm": 77.6477295505612,
+    "rear_knee_deg": 4.675394819238559,
+    "roll_sd_deg": 7.140053932758212
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 16,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03937164980460674,
+    "heading_abs_deg": 9.811745830895084,
+    "front_lift_mm": 20.07441970136585,
+    "rear_lift_mm": 10.15759797438059,
+    "rear_air": 0.3044571126184634,
+    "body_mm": 77.8292355237944,
+    "rear_knee_deg": 5.479568054404931,
+    "roll_sd_deg": 6.5154529315064575
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 17,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.039240029266893794,
+    "heading_abs_deg": 6.134610425071958,
+    "front_lift_mm": 19.537889516604395,
+    "rear_lift_mm": 13.054634806752581,
+    "rear_air": 0.3662192160805158,
+    "body_mm": 78.417663707175,
+    "rear_knee_deg": 5.521953054515912,
+    "roll_sd_deg": 7.598778132608851
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 18,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.0302731773179361,
+    "heading_abs_deg": 8.72172352779863,
+    "front_lift_mm": 15.530799067434804,
+    "rear_lift_mm": 15.322685086702542,
+    "rear_air": 0.37052103879026954,
+    "body_mm": 78.80478568129269,
+    "rear_knee_deg": 8.161997956333778,
+    "roll_sd_deg": 6.148239889996125
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 19,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.029138823010203225,
+    "heading_abs_deg": 8.122070355707383,
+    "front_lift_mm": 13.907184492121075,
+    "rear_lift_mm": 17.462586622429086,
+    "rear_air": 0.3839579224194609,
+    "body_mm": 78.75790961063075,
+    "rear_knee_deg": 8.538670974552296,
+    "roll_sd_deg": 7.654508903137795
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 20,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.75,
+    "speed": 0.030941669704796754,
+    "heading_abs_deg": 7.6885045691560325,
+    "front_lift_mm": 15.456948218036079,
+    "rear_lift_mm": 18.96114179248877,
+    "rear_air": 0.4254937671634755,
+    "body_mm": 78.69944491813958,
+    "rear_knee_deg": 7.828230247415982,
+    "roll_sd_deg": 10.326549671088031
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 21,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03247117357819555,
+    "heading_abs_deg": 9.446674084806256,
+    "front_lift_mm": 16.82139440562942,
+    "rear_lift_mm": 12.340326449016548,
+    "rear_air": 0.3362097304404997,
+    "body_mm": 78.7948119714907,
+    "rear_knee_deg": 6.762530083368248,
+    "roll_sd_deg": 4.765717270956575
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 22,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03399405991029464,
+    "heading_abs_deg": 5.652766169008968,
+    "front_lift_mm": 15.627671034157856,
+    "rear_lift_mm": 16.569587969092687,
+    "rear_air": 0.38124589086127547,
+    "body_mm": 78.52870089946907,
+    "rear_knee_deg": 6.362968085403599,
+    "roll_sd_deg": 6.100981877363855
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 23,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.5,
+    "speed": 0.0318539489536219,
+    "heading_abs_deg": 8.121676073845208,
+    "front_lift_mm": 19.489956015466994,
+    "rear_lift_mm": 17.72563749342478,
+    "rear_air": 0.40117266809891966,
+    "body_mm": 78.9313807391548,
+    "rear_knee_deg": 5.150581175783748,
+    "roll_sd_deg": 9.657747423952584
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 24,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.032776377904113904,
+    "heading_abs_deg": 9.595124099252848,
+    "front_lift_mm": 16.26442868300709,
+    "rear_lift_mm": 15.761947596169342,
+    "rear_air": 0.36394641683103224,
+    "body_mm": 78.58628545457583,
+    "rear_knee_deg": 8.075638648451976,
+    "roll_sd_deg": 6.272225273348898
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 25,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03435429933997183,
+    "heading_abs_deg": 5.897063313902205,
+    "front_lift_mm": 17.894761449617192,
+    "rear_lift_mm": 15.290245740995855,
+    "rear_air": 0.35841134563867055,
+    "body_mm": 78.79772645300758,
+    "rear_knee_deg": 8.515890243412812,
+    "roll_sd_deg": 7.482585903725932
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 26,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.25,
+    "speed": 0.035472369316250654,
+    "heading_abs_deg": 8.019413994706579,
+    "front_lift_mm": 16.325177303896286,
+    "rear_lift_mm": 12.673616170579049,
+    "rear_air": 0.356270707896467,
+    "body_mm": 78.468439925564,
+    "rear_knee_deg": 7.2769719425904995,
+    "roll_sd_deg": 5.998092783570348
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 27,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.036145449583577086,
+    "heading_abs_deg": 12.66486452042196,
+    "front_lift_mm": 16.90933858941616,
+    "rear_lift_mm": 15.507979118437824,
+    "rear_air": 0.35474194608809995,
+    "body_mm": 78.44242992019602,
+    "rear_knee_deg": 6.33361435476069,
+    "roll_sd_deg": 5.697905624734716
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 28,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03667365912216618,
+    "heading_abs_deg": 13.509607227854918,
+    "front_lift_mm": 17.911552733049003,
+    "rear_lift_mm": 14.511244774017456,
+    "rear_air": 0.3508282117602702,
+    "body_mm": 78.39401308046176,
+    "rear_knee_deg": 6.099065713622743,
+    "roll_sd_deg": 5.669183860911069
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 29,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.5,
+    "speed": 0.03460423688825637,
+    "heading_abs_deg": 7.8151439209665465,
+    "front_lift_mm": 19.20048304559117,
+    "rear_lift_mm": 17.78992167848757,
+    "rear_air": 0.371388169960596,
+    "body_mm": 78.55608921197565,
+    "rear_knee_deg": 6.180495843757679,
+    "roll_sd_deg": 9.135731556356783
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 30,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.038067126033041424,
+    "heading_abs_deg": 8.085996783747898,
+    "front_lift_mm": 17.479076899018025,
+    "rear_lift_mm": 13.310262277975562,
+    "rear_air": 0.32778599605522685,
+    "body_mm": 78.3586502531605,
+    "rear_knee_deg": 8.117340126421505,
+    "roll_sd_deg": 5.356612971420868
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": true
+   }
+  },
+  {
+   "i": 31,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.04013015722516804,
+    "heading_abs_deg": 5.541803975752842,
+    "front_lift_mm": 15.315202627779666,
+    "rear_lift_mm": 18.81199383462767,
+    "rear_air": 0.39561417926802545,
+    "body_mm": 78.30827078543103,
+    "rear_knee_deg": 8.39947064377371,
+    "roll_sd_deg": 7.376300354500061
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 32,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.03945607337957014,
+    "heading_abs_deg": 6.849953535568117,
+    "front_lift_mm": 17.491808201479564,
+    "rear_lift_mm": 18.689746616214507,
+    "rear_air": 0.3952320343234894,
+    "body_mm": 78.63496618650511,
+    "rear_knee_deg": 8.535927485486063,
+    "roll_sd_deg": 9.181483255333333
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 33,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03732518554564869,
+    "heading_abs_deg": 11.206090219312205,
+    "front_lift_mm": 19.92035023055326,
+    "rear_lift_mm": 12.78519671084915,
+    "rear_air": 0.33550852580008905,
+    "body_mm": 77.6872410279053,
+    "rear_knee_deg": 4.885039577239684,
+    "roll_sd_deg": 6.404832425772992
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 34,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.04043998031540594,
+    "heading_abs_deg": 12.777553391305617,
+    "front_lift_mm": 19.147222762877462,
+    "rear_lift_mm": 14.246885737808624,
+    "rear_air": 0.3367439184746877,
+    "body_mm": 78.16925363572318,
+    "rear_knee_deg": 6.143568867802107,
+    "roll_sd_deg": 5.736027106543801
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.25,
+     "falls": 0.55,
+     "all_up": 0.7,
+     "front_up": 0.9,
+     "t_all_up_s": 4.8625
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.05,
+     "falls": 0.95,
+     "all_up": 0.05,
+     "front_up": 0.7,
+     "t_all_up_s": 9.6375
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 1.0,
+     "all_up": 0.0,
+     "front_up": 0.75,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.1416666666666667
+  },
+  {
+   "i": 35,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.5,
+    "speed": 0.0382928668524779,
+    "heading_abs_deg": 7.896584104982246,
+    "front_lift_mm": 19.883023031817995,
+    "rear_lift_mm": 12.959108756798196,
+    "rear_air": 0.3513584929524374,
+    "body_mm": 78.01697359093448,
+    "rear_knee_deg": 4.49965364298784,
+    "roll_sd_deg": 7.561625144204779
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 36,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.028632407515025576,
+    "heading_abs_deg": 11.40084632535885,
+    "front_lift_mm": 15.312421944005159,
+    "rear_lift_mm": 18.228191071109485,
+    "rear_air": 0.3945595003287311,
+    "body_mm": 78.57158861128167,
+    "rear_knee_deg": 7.901406408158211,
+    "roll_sd_deg": 7.5150088169596305
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 37,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.027375113900179375,
+    "heading_abs_deg": 9.347892535235594,
+    "front_lift_mm": 14.026259250375169,
+    "rear_lift_mm": 19.707101137056206,
+    "rear_air": 0.44045633289585345,
+    "body_mm": 78.8142902959178,
+    "rear_knee_deg": 8.242972276417074,
+    "roll_sd_deg": 9.512230830133289
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 38,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.75,
+    "speed": 0.027939219880140177,
+    "heading_abs_deg": 6.952282150736441,
+    "front_lift_mm": 13.714577301636872,
+    "rear_lift_mm": 17.705345898430142,
+    "rear_air": 0.4574696563146686,
+    "body_mm": 78.12630063130452,
+    "rear_knee_deg": 6.412741454369433,
+    "roll_sd_deg": 10.75471884621504
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 39,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.030747904951109958,
+    "heading_abs_deg": 12.887081487065311,
+    "front_lift_mm": 15.912183713847782,
+    "rear_lift_mm": 17.20460905684951,
+    "rear_air": 0.3924258620183466,
+    "body_mm": 78.35178602737071,
+    "rear_knee_deg": 5.911362585329995,
+    "roll_sd_deg": 7.545828880933369
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 40,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03327575949400552,
+    "heading_abs_deg": 10.352536833377371,
+    "front_lift_mm": 16.53826417777597,
+    "rear_lift_mm": 19.46561783049675,
+    "rear_air": 0.3967007277650842,
+    "body_mm": 78.3549163865859,
+    "rear_knee_deg": 5.810788943268777,
+    "roll_sd_deg": 8.336578011592461
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 41,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 12.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.625,
+    "speed": 0.030979022118174368,
+    "heading_abs_deg": 9.296268054417494,
+    "front_lift_mm": 15.951859731952478,
+    "rear_lift_mm": 20.79136267982271,
+    "rear_air": 0.4359939400866848,
+    "body_mm": 78.35415038610648,
+    "rear_knee_deg": 5.3848639802751626,
+    "roll_sd_deg": 10.59985414930221
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 42,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03253067259842907,
+    "heading_abs_deg": 7.904882448836027,
+    "front_lift_mm": 15.555781645240593,
+    "rear_lift_mm": 18.372644979201908,
+    "rear_air": 0.39209401709401714,
+    "body_mm": 78.4541794506138,
+    "rear_knee_deg": 7.727724795973019,
+    "roll_sd_deg": 7.510970261555475
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 43,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.375,
+    "speed": 0.03190889610300167,
+    "heading_abs_deg": 7.2211118853435945,
+    "front_lift_mm": 14.653690648733527,
+    "rear_lift_mm": 21.330642703146815,
+    "rear_air": 0.41710781183087403,
+    "body_mm": 78.42455884953793,
+    "rear_knee_deg": 8.00771187106745,
+    "roll_sd_deg": 9.655802104915729
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 44,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.75,
+    "speed": 0.03539337425819845,
+    "heading_abs_deg": 6.191868280023949,
+    "front_lift_mm": 14.430484483085639,
+    "rear_lift_mm": 20.03803177294752,
+    "rear_air": 0.4266668335274252,
+    "body_mm": 78.1726761705064,
+    "rear_knee_deg": 6.876073257993541,
+    "roll_sd_deg": 10.960467240597605
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 45,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.25,
+    "speed": 0.035493915077516626,
+    "heading_abs_deg": 12.59628442066225,
+    "front_lift_mm": 16.151746440014996,
+    "rear_lift_mm": 18.220505203219016,
+    "rear_air": 0.4008644299188343,
+    "body_mm": 78.10597571488121,
+    "rear_knee_deg": 5.518348662634292,
+    "roll_sd_deg": 7.628305591687621
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 46,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.036534368596763844,
+    "heading_abs_deg": 10.43413504685857,
+    "front_lift_mm": 17.427271544466763,
+    "rear_lift_mm": 17.547189732115125,
+    "rear_air": 0.38309839615414776,
+    "body_mm": 78.14467866051405,
+    "rear_knee_deg": 5.548651801708573,
+    "roll_sd_deg": 7.480740276220562
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 47,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.5,
+    "speed": 0.03518796696982748,
+    "heading_abs_deg": 4.018581292737782,
+    "front_lift_mm": 19.369634954055776,
+    "rear_lift_mm": 22.348364064178565,
+    "rear_air": 0.4071756531196197,
+    "body_mm": 78.31732701042951,
+    "rear_knee_deg": 5.833112759236819,
+    "roll_sd_deg": 10.612395724713416
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 48,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.03673756395234798,
+    "heading_abs_deg": 11.104613069750798,
+    "front_lift_mm": 15.482153238154204,
+    "rear_lift_mm": 19.045195013507254,
+    "rear_air": 0.4061061801446417,
+    "body_mm": 78.1145918436202,
+    "rear_knee_deg": 7.66156906095688,
+    "roll_sd_deg": 7.363715701312215
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 49,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.039262872128654806,
+    "heading_abs_deg": 6.522499313775951,
+    "front_lift_mm": 12.084204693639919,
+    "rear_lift_mm": 21.243415072882506,
+    "rear_air": 0.4358183327772357,
+    "body_mm": 78.03345355005294,
+    "rear_knee_deg": 7.952429532319261,
+    "roll_sd_deg": 8.85464142415671
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 50,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.75,
+    "speed": 0.037007027278931126,
+    "heading_abs_deg": 9.863424837129813,
+    "front_lift_mm": 15.57490178864099,
+    "rear_lift_mm": 24.5835974541781,
+    "rear_air": 0.45347852284749035,
+    "body_mm": 78.27222596051107,
+    "rear_knee_deg": 8.042054052893402,
+    "roll_sd_deg": 12.433262555977802
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 51,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.03973672377260532,
+    "heading_abs_deg": 11.154653888107779,
+    "front_lift_mm": 18.017737599280387,
+    "rear_lift_mm": 18.807154774286058,
+    "rear_air": 0.39587072517446,
+    "body_mm": 77.90241701300178,
+    "rear_knee_deg": 5.249153230819931,
+    "roll_sd_deg": 7.370519164912605
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 52,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.040952298652539826,
+    "heading_abs_deg": 11.802641902806577,
+    "front_lift_mm": 18.86028480558601,
+    "rear_lift_mm": 16.614819294754135,
+    "rear_air": 0.37414706569091905,
+    "body_mm": 77.95105920893297,
+    "rear_knee_deg": 5.585992707985341,
+    "roll_sd_deg": 6.989255066716783
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  },
+  {
+   "i": 53,
+   "params": {
+    "sway": 16.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 35.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.125,
+    "speed": 0.04039946362502804,
+    "heading_abs_deg": 8.82340876587174,
+    "front_lift_mm": 17.434933719138932,
+    "rear_lift_mm": 18.908523287731757,
+    "rear_air": 0.39833072282167303,
+    "body_mm": 77.86195443172603,
+    "rear_knee_deg": 5.630525234797757,
+    "roll_sd_deg": 8.073905479074815
+   },
+   "passes": false,
+   "ok_front": {
+    "1.5": false,
+    "1.35": false,
+    "1.25": false
+   }
+  }
+ ],
+ "round_b": [
+  {
+   "i": 34,
+   "params": {
+    "sway": 14.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 42.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.04043998031540594,
+    "heading_abs_deg": 12.777553391305617,
+    "front_lift_mm": 19.147222762877462,
+    "rear_lift_mm": 14.246885737808624,
+    "rear_air": 0.3367439184746877,
+    "body_mm": 78.16925363572318,
+    "rear_knee_deg": 6.143568867802107,
+    "roll_sd_deg": 5.736027106543801
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.25,
+     "falls": 0.55,
+     "all_up": 0.7,
+     "front_up": 0.9,
+     "t_all_up_s": 4.8625
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.05,
+     "falls": 0.95,
+     "all_up": 0.05,
+     "front_up": 0.7,
+     "t_all_up_s": 9.6375
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 1.0,
+     "all_up": 0.0,
+     "front_up": 0.75,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.1416666666666667
+  },
+  {
+   "i": 9,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 14.0,
+    "Lr": 42.0,
+    "Lf": 29.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.035702192641287066,
+    "heading_abs_deg": 15.220759384907351,
+    "front_lift_mm": 18.51035183601822,
+    "rear_lift_mm": 9.961655130065465,
+    "rear_air": 0.3159516765285996,
+    "body_mm": 78.213380658577,
+    "rear_knee_deg": 5.73587290576381,
+    "roll_sd_deg": 5.836204688616607
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.55,
+     "falls": 0.4,
+     "all_up": 0.65,
+     "front_up": 0.95,
+     "t_all_up_s": 5.45
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.1,
+     "falls": 0.9,
+     "all_up": 0.1,
+     "front_up": 0.9,
+     "t_all_up_s": 6.1875
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 1.0,
+     "all_up": 0.0,
+     "front_up": 0.85,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.2750000000000001
+  },
+  {
+   "i": 13,
+   "params": {
+    "sway": 12.0,
+    "lean": 0.0,
+    "A": 16.0,
+    "Lr": 35.0,
+    "Lf": 32.0
+   },
+   "flat": {
+    "episodes": 8,
+    "falls": 0.0,
+    "speed": 0.04038782372008037,
+    "heading_abs_deg": 6.782880435579682,
+    "front_lift_mm": 18.220932970611727,
+    "rear_lift_mm": 9.692527530238557,
+    "rear_air": 0.27642176199868507,
+    "body_mm": 78.54478093169078,
+    "rear_knee_deg": 8.95053877113703,
+    "roll_sd_deg": 4.457707879249074
+   },
+   "passes": true,
+   "ok_front": {
+    "1.5": false,
+    "1.35": true,
+    "1.25": true
+   },
+   "ledges": [
+    {
+     "size_mm": 7.5,
+     "episodes": 20,
+     "success": 0.5,
+     "falls": 0.2,
+     "all_up": 0.7,
+     "front_up": 1.0,
+     "t_all_up_s": 6.03125
+    },
+    {
+     "size_mm": 12.5,
+     "episodes": 20,
+     "success": 0.05,
+     "falls": 0.55,
+     "all_up": 0.15,
+     "front_up": 1.0,
+     "t_all_up_s": 8.9875
+    },
+    {
+     "size_mm": 15.0,
+     "episodes": 20,
+     "success": 0.0,
+     "falls": 0.7,
+     "all_up": 0.0,
+     "front_up": 0.95,
+     "t_all_up_s": null
+    }
+   ],
+   "ledge_score": 0.34583333333333327
+  }
+ ],
+ "winner": {
+  "i": 13,
+  "params": {
+   "sway": 12.0,
+   "lean": 0.0,
+   "A": 16.0,
+   "Lr": 35.0,
+   "Lf": 32.0
+  },
+  "flat": {
+   "episodes": 8,
+   "falls": 0.0,
+   "speed": 0.04038782372008037,
+   "heading_abs_deg": 6.782880435579682,
+   "front_lift_mm": 18.220932970611727,
+   "rear_lift_mm": 9.692527530238557,
+   "rear_air": 0.27642176199868507,
+   "body_mm": 78.54478093169078,
+   "rear_knee_deg": 8.95053877113703,
+   "roll_sd_deg": 4.457707879249074
+  },
+  "passes": true,
+  "ok_front": {
+   "1.5": false,
+   "1.35": true,
+   "1.25": true
+  },
+  "ledges": [
+   {
+    "size_mm": 7.5,
+    "episodes": 20,
+    "success": 0.5,
+    "falls": 0.2,
+    "all_up": 0.7,
+    "front_up": 1.0,
+    "t_all_up_s": 6.03125
+   },
+   {
+    "size_mm": 12.5,
+    "episodes": 20,
+    "success": 0.05,
+    "falls": 0.55,
+    "all_up": 0.15,
+    "front_up": 1.0,
+    "t_all_up_s": 8.9875
+   },
+   {
+    "size_mm": 15.0,
+    "episodes": 20,
+    "success": 0.0,
+    "falls": 0.7,
+    "all_up": 0.0,
+    "front_up": 0.95,
+    "t_all_up_s": null
+   }
+  ],
+  "ledge_score": 0.34583333333333327
+ }
+}
