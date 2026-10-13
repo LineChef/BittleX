@@ -54,7 +54,7 @@ nohup bash ../../tools/hs_watchdog.sh > /dev/null 2>&1 &   # (re)start: the runn
 | Step | What | About |
 |---|---|---|
 | V6 baseline | V6 through `hs_probe` at 0.10 m/s (20 flat walks, 40 episodes per step-up size): the bar | 4 min |
-| Base sweep | 36 creep candidates open loop on flat ground, gates below; the best 4 by rear lift get the step-up ladder; best step-up score wins | 10 min |
+| Base sweep | 36 creep candidates open loop on flat ground, gates below; every passing one gets step-ups at 7.5 / 12.5 / 15 mm; the best score (success + all four up - falls / 4) wins | 15 min |
 | Base check | the winner, open loop, full flat + ladder (the "no policy" row of the report) | 3 min |
 | Preflight | `preflight.py` on the recipe with the S2 stage: tests, wiring, audits, a 100k smoke run, replay check | 15 min |
 | S0 flat | 2M, fresh, 85% flat (small rubble/snags, cutback) | 20 min |
@@ -71,6 +71,8 @@ Launched about 10:30 PM 2026-10-12; expected done about 5 AM 2026-10-13 (range 4
 
 - **Base sweep (round A)**: no falls in 8 calm walks, rear paw lift at least 3x V6's, body height at least V6's, mean rear knee at least V6's minus 5 deg, speed at least 0.025 m/s.
   Nothing passing halts the runner (the gates are not loosened without a review).
+  First run (10:22 PM): round B took only the 4 highest rear lifts, all sway 18 deg, which fall 80-100% at an edge open loop; stopped before any training, re-run with every
+  passing candidate in round B and a score that weights all four feet up over falls (training fixes falls, not clearance).
 - **Every stage**: flat falls at most 5%, speed at least 0.025 m/s, body at least V6's minus 1 mm, rear knee at least V6's minus 5 deg. A stage failing this is retried
   once with seed 43; a second failure halts before the 20M.
 - **Stage step-up targets** (reported in the decisions, not gating; the 20M keeps training step-ups): S1 60% success at 10 mm, S2 50% at 12.5 mm.

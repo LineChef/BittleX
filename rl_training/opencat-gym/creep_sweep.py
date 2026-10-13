@@ -4,8 +4,10 @@
 
 Round A (flat): each candidate of the grid walks `--flat-episodes` calm 20 s walks at the creep's command. It passes the gates only with
   no falls, rear paw lift >= REAR_LIFT_X x V6's, body height >= V6's, mean rear knee >= V6's - REAR_KNEE_SLACK deg, speed >= MIN_SPEED.
-Round B (step-ups): the FINALISTS passing candidates with the highest rear lift get the step-up ladder (7.5-20 mm, 15 s); the winner has the best step-up score
-  (mean over the sizes of success, then all-four-up share, minus falls / 2). If nothing passes round A, the runner halts: the gates are not loosened silently.
+Round B (step-ups): EVERY candidate that passed round A gets the step-up ladder (7.5 / 12.5 / 15 mm, 15 s); the winner has the best step-up score
+  (mean over the sizes of success + all-four-up share - falls / 4). If nothing passes round A, the runner halts: the gates are not loosened silently.
+  (2026-10-12, first run: sending only the 4 highest rear lifts to round B picked the most aggressive sway, which falls 80-100% at a step-up edge open loop; every passing
+  candidate is scored on step-ups now.)
 """
 import argparse
 import itertools
@@ -21,8 +23,7 @@ import hs_probe as HP                   # noqa: E402
 
 GRID = dict(sway=(12.0, 15.0, 18.0), lean=(0.0, 8.0), A=(10.0, 12.0, 14.0), Lr=(35.0, 42.0))
 REAR_LIFT_X, REAR_KNEE_SLACK, MIN_SPEED = 3.0, 5.0, 0.025
-FINALISTS = 4
-LEDGES = (0.0075, 0.010, 0.0125, 0.015, 0.020)
+LEDGES = (0.0075, 0.0125, 0.015)
 CMD = 0.035
 NOM = 0.035
 
@@ -33,7 +34,7 @@ def cand_name(i):
 
 def ledge_score(summary):
     L = summary["ledges"]
-    return sum(x["success"] + 0.5 * x["all_up"] - 0.5 * x["falls"] for x in L) / max(1, len(L))
+    return sum(x["success"] + x["all_up"] - 0.25 * x["falls"] for x in L) / max(1, len(L))      # getting all four feet up counts most: training fixes falls, not clearance
 
 
 def main():
@@ -71,7 +72,7 @@ def main():
             json.dump(out, open(a.out, "w"), indent=1)
             print("NO CANDIDATE PASSED ROUND A", flush=True)
             sys.exit(2)
-        fin = passing[:FINALISTS]
+        fin = passing
         jl = []
         for r in fin:
             for s in LEDGES:
