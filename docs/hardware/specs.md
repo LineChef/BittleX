@@ -177,13 +177,73 @@ One measurement, the rest assumed. **Do not look these up again; re-weigh and ed
 | Part | Mass | Basis | In the sim (`PAYLOAD_PROFILE=case`) |
 |---|---|---|---|
 | **Whole G2** with case, Pi stack, camera, microphone and speaker | **422 g** | **measured** (one weighing, 2026-10-06) | total = 301 + 86 + 15 + 20 |
-| Base robot (Bittle X V2, alloy servos, battery) | about 301 g | assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare. | URDF links |
+| Base robot (Bittle X V2, alloy servos, battery) | about 301 g (superseded: 254 g, see the 2026-10-15 section below) | assumed: the URDF's 269 g x `BODY_MASS_SCALE` 1.12. Petoi publishes 269-353 g for the Bittle X; a third-party page says 265-290 g for the V2. Not weighed bare. | URDF links |
 | Camera cluster (Grove Vision AI V2 + OV5647 + case + cable) | 15 g | estimate; Seeed publishes no weight for the module | front body at (0.055, 0, 0.020) m, 15 +/- 5 g |
 | Speaker + amp (NS4168 kit) | 20 g | estimate; the nearest published figure is 18.6 g for M5Stack's ATOM Speaker Kit (NS4168), a similar but different kit | rear body at (-0.068, 0, 0.030) m, 20 +/- 5 g |
 | Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring | 86 g | derived: 422 - 301 - 15 - 20 | spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g |
 
 All of it is attached to the case, which sits on the middle of the spine: camera at the front, speaker at the very back, microphone on top of the lid.
 The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
+
+## Proposed build: component weights and balance (2026-10-15)
+
+Study of the "Bittle X Pi Add-on v0.16 on Platform v3.1" model published at
+<https://beetlebugorg.github.io/bittlex/viewer/> (66 part meshes, volumes read
+from the files; the meshes themselves are not kept in the repo and their
+license was not confirmed). Masses are estimates; no vendor publishes unit
+weights. The base robot is **254 g**, from the weighed total (422 g) minus the
+weighed payload (168 g). This supersedes the 301 g base assumed in the table
+above.
+
+| Group | Parts | Mass | Confidence |
+|---|---|---|---|
+| Printed (PLA, about 50% of solid volume) | cover 5.5 g, body 16.0 g, panel 6.7 g, switch 0.1 g | 28.3 g | low (solid would be 56.6 g) |
+| Pi and PiSugar | Pi Zero 2 W 10.0 g, header, pins and housings 5.0 g, microSD 0.4 g, PiSugar board 10.0 g, 1200 mAh cell with seal and leads 23.5 g | 48.9 g | medium |
+| Audio | speaker 14.0 g, amp 5.0 g, mic 1.3 g | 20.3 g | low |
+| Wires | UART 2.4 g, amp 4.0 g, mic 4.8 g, speaker 1.0 g, splices and BiBoard header plug 1.0 g | 13.2 g | low |
+| **Add-on from the viewer model** | | **110.7 g** | |
+| Camera (not in the viewer model; G2's current mast) | | 15.0 g | estimate |
+| Stock robot | | 254.0 g | weighed |
+| **Proposed total** | | **379.7 g** (current G2: 422 g) | |
+
+The heatsink drawn in the viewer is left out (not fitted on G2).
+
+**Front/rear balance** (project method: center of mass from link and payload
+masses over the paw positions at the reset stance, as in
+`test_v3_levers.py::test_the_sim_carries_the_weighed_mass_and_front_rear_balance`):
+
+| Layout | Front share | Total |
+|---|---|---|
+| Bare robot | 44.2% | 254 g |
+| Current G2 | 46.6% (real weighings: 44.9% and 47.3%) | 422 g |
+| Proposed with camera | **46.4%** | 380 g |
+| Proposed without camera | 44.1% | 365 g |
+
+Best estimate for the proposed build: about 46% on the front paws, plausible
+range 44 to 49%, center of mass about 0.16 in (4 mm) behind the paw midpoint,
+sideways offset about 0.01 in (0.2 mm), paw span 4.3 in (110 mm), center of
+mass 2.8 in (72 mm) above the paws (current: 2.9 in, 74 mm). Sensitivities:
+the AI head (42 g) in place of the camera gives 51.1%; 10 g more at the nose
+gives 49.0%; 20 g more printed mass gives 46.5%; the spine block 0.4 in (10 mm)
+further forward gives 48.7%.
+
+**Sim blocks used:** spine 96.7 g at 0.15 in (3.9 mm) behind, 0.03 in (0.7 mm)
+left of and 1.65 in (41.8 mm) above the hip midpoint; speaker 14 g at 1.8 in
+(45.6 mm) behind and 1.7 in (43 mm) above; camera 15 g at 2.2 in (55 mm) ahead
+and 0.8 in (20 mm) above.
+
+**V6 walking sim** (deployed policy, `privileged_critic` + `heading_blind`, 60
+paired episodes on each of 7 courses, 5 layouts: bare, current, measured
+payload, proposed with and without camera): flat, uphill and downhill had 0
+falls in every layout; side-hills 0 to 2; flat speed 0.093 m/s in every layout;
+downhill body pitch about 9.3 deg with any payload against 7.9 deg bare. Only
+the 20 mm and 30 mm step-ups differed: bare 0 falls, current 38 and 36 of 60,
+proposed with camera 32 and 33, proposed without camera 28 and 26. The paired
+difference between proposed and current is not significant (McNemar p about
+0.33 and 0.71). All sim; no real-robot comparison.
+
+**To tighten it:** weigh G2 again on a level scale, balance the bare robot on
+an edge, and weigh the printed parts and the cell once they exist.
 
 ## Bittle X body + battery
 

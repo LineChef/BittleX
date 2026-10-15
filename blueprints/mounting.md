@@ -584,6 +584,15 @@ PiSugar shown might itself be informative given the clearance question
 above); not a confirmed match for G2's actual parts.
 </details>
 
+## Balance of the proposed build
+
+Estimated 46% of the weight on the front paws with the camera on (plausible
+44 to 49%), center of mass about 0.16 in (4 mm) behind the paw midpoint, total
+about 380 g against 422 g now. The AI head in place of the camera moves the
+front share to about 51%. Component weights, method and sensitivities are in
+[`docs/hardware/specs.md`](../docs/hardware/specs.md) (section "Proposed build:
+component weights and balance"). Re-weigh the assembled stack and compare.
+
 ## Verify: what it should look like assembled
 
 No real photo of *this exact hardware combination* exists yet (see the
