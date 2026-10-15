@@ -113,7 +113,7 @@ def _steps() -> list[Step]:
             "through its full range). Shown, not auto-run: "
             "python -m pi_pipeline.link.check_serial allmoves\n"
             "(In parallel, off-frame: bench dry-fit the Pi + PiSugar + clip "
-            "assembly independently -- docs/build/biboard-pi-connector.md.)",
+            "assembly independently -- blueprints/mounting.md.)",
             manual_cmd="python -m pi_pipeline.link.check_serial allmoves"),
         # --- Phase 1+: the Pi is now physically wired to the frame ---
         Step("4", "Assembly & mechanical (Phase 1)", "Weigh the final build",

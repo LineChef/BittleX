@@ -203,7 +203,7 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
 - **Memory seam** — every turn pulls memory context before the API call and
   writes back after.
 - **Real mic + speaker** — ✅ the I2S mic and amp are wired and in daily use on the Pi; wake word, Vosk, Claude and Piper run
-  end to end. Wiring and bring-up: [`blueprints/biboard-pi-connector.md`](../blueprints/biboard-pi-connector.md).
+  end to end. Wiring: [`blueprints/wiring/g2-wiring-guide.html`](../blueprints/wiring/g2-wiring-guide.html); bring-up: [`hardware/i2s-audio-build-log.md`](hardware/i2s-audio-build-log.md).
 - **Never silent** — a turn that would end with no spoken words (a tool call only, or an empty reply) is retried once with
   tools disabled to force a sentence, then falls back to a short spoken line; API errors in conversation history are
   self-healed (orphaned tool calls, thinking blocks). Fuzz-tested.

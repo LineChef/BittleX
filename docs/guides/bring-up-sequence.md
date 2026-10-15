@@ -114,7 +114,7 @@ mechanically," not a guess.
    (`~/g2_logs/<session_id>/`) as the pre-Pi baseline to diff against later.
    *(In parallel, off-frame: bench dry-fit the Pi + PiSugar + clip assembly to
    de-risk that build independently — see
-   [`blueprints/biboard-pi-connector.md`](../../blueprints/biboard-pi-connector.md).)*
+   [`blueprints/mounting.md`](../../blueprints/mounting.md).)*
 
 **Phase 1 — the Pi is now physically wired to the frame**
 4. **Weigh the final build** on a kitchen scale, with the Pi + PiSugar S + camera

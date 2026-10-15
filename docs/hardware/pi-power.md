@@ -93,8 +93,9 @@ shared-power question entirely.
 RX2, GND, +5V, +5V), each pin its own solder pad — not a rigid block that
 forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
-from Petoi's own official board diagram, plus annotated photos:
-[`biboard-pi-connector.md`](../../blueprints/biboard-pi-connector.md).
+from Petoi's own official board diagram, see
+[`g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos are in
+[`pi-biboard-build-notes.md`](pi-biboard-build-notes.md).
 
 ---
 

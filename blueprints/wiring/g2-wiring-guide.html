@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>G2 Wiring Guide</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one guide, two parts. Part 1 builds the power and brain stack (PiSugar, Pi, BiBoard); Part 2 wires everything else into the Pi, ending with the AI head. Blueprint ink on paper. */
+:root{
+  --bg:#f3f3ef; --panel:#fbfbf8; --fg:#1d2430; --muted:#5d6676; --line:#c9ccd2;
+  --ink:#1f4e8c; --warn:#a4400f; --good:#1d6b4a;
+  --bib:#2563eb; --bib-bg:rgba(37,99,235,.10);
+  --aud:#7c3aed; --aud-bg:rgba(124,58,237,.10);
+  --scr:#b45309; --scr-bg:rgba(180,83,9,.08);
+  --psu:#0d9488; --psu-bg:rgba(13,148,136,.12);
+  --head:#c99a00; --wire:#c2410c; --wire-bib:#be185d; --head-bg:rgba(242,194,48,.18);
+  --free:rgba(120,120,130,.08);
+  --biboard:var(--bib); --biboard-bg:var(--bib-bg); --audio:var(--aud); --audio-bg:var(--aud-bg); --screen:var(--scr); --screen-bg:var(--scr-bg); --pisugar:var(--psu); --pisugar-bg:var(--psu-bg); --reserved-bg:var(--free); --border:var(--line);
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --good:#6fd0a3;
+  --bib:#6aa8ff; --bib-bg:rgba(106,168,255,.14); --aud:#b794f6; --aud-bg:rgba(183,148,246,.14);
+  --scr:#f5b942; --scr-bg:rgba(245,185,66,.12); --psu:#3fd8c9; --psu-bg:rgba(63,216,201,.14);
+  --head:#e0b83a; --head-bg:rgba(224,184,58,.16); --wire:#ff9a3c; --wire-bib:#ff7eb6; --free:rgba(200,200,210,.07); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --good:#6fd0a3;
+  --bib:#6aa8ff; --bib-bg:rgba(106,168,255,.14); --aud:#b794f6; --aud-bg:rgba(183,148,246,.14);
+  --scr:#f5b942; --scr-bg:rgba(245,185,66,.12); --psu:#3fd8c9; --psu-bg:rgba(63,216,201,.14);
+  --head:#e0b83a; --head-bg:rgba(224,184,58,.16); --wire:#ff9a3c; --wire-bib:#ff7eb6; --free:rgba(200,200,210,.07); color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 60px}
+main{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+h1{font-size:28px;line-height:1.15;margin:0;font-weight:600;text-wrap:balance}
+h2{font-size:21px;margin:0;font-weight:600;text-wrap:balance}
+h3{font-size:16px;margin:0 0 8px;font-weight:600;text-wrap:balance}
+p{margin:0} code,.mono{font-family:var(--mono);font-size:.9em}
+.tag{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lead{max-width:68ch;margin-top:10px}
+.part{display:flex;flex-direction:column;gap:18px}
+.parthead{border-top:2px solid var(--ink);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.parthead p{color:var(--muted);max-width:68ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px;min-width:0}
+.fig{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.fig svg.wm{min-width:700px}
+.fig svg{display:block;min-width:560px;width:100%;height:auto}
+svg:not(.wm) text{font-family:var(--mono);font-size:11px;fill:var(--fg)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:720px){.two{grid-template-columns:minmax(0,1fr)}}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+tr:last-child td{border-bottom:none}
+ul,ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+.warn{color:var(--warn)} .good{color:var(--good)} .muted{color:var(--muted)}
+.callout{border:1px solid var(--warn);border-radius:6px;padding:12px 16px;background:var(--panel)}
+.callout b:first-child{color:var(--warn)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;border:1px solid var(--line);flex:none}
+.grid40{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px;min-width:440px}
+.pin{border-radius:6px;padding:5px 9px;background:var(--free);border:1px solid var(--line);min-height:42px;display:flex;flex-direction:column;justify-content:center;gap:1px}
+.pin .r1{display:flex;gap:8px;align-items:baseline;font-family:var(--mono);font-size:12px}
+.pin .pn{font-weight:600} .pin .gp{color:var(--muted)}
+.pin .lb{font-size:12.5px;line-height:1.25}
+.pin.right{text-align:right;align-items:flex-end} .pin.right .r1{flex-direction:row-reverse}
+.p-free .lb{color:var(--muted);font-style:italic}
+.p-bib{background:var(--bib-bg);border-color:var(--bib)} .p-audio{background:var(--aud-bg);border-color:var(--aud)}
+
+.p-ps{box-shadow:inset 0 0 0 2px var(--psu)}
+.p-res{opacity:.55}
+
+.note{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:12px 14px;font-size:14px;margin-top:10px}
+.note .k{color:var(--muted)}
+.panel>h4{margin:14px 0 8px;font-size:14px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :root[data-theme="dark"] @media(max-width:760px){</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="tag">G2 · wiring</div>
+  <h1>G2 Wiring Guide</h1>
+  <p class="lead">Every wire and contact inside G2. Part 1 covers the power and brain stack: PiSugar under the Pi, and the Pi wired to the BiBoard. Part 2 covers everything else wired into the Pi: the microphone and amplifier, and the Petoi AI head.</p>
+</header>
+
+<nav class="panel" aria-label="Contents">
+  <ol>
+    <li><b>Part 1.</b> PiSugar, Pi and BiBoard
+      <ul><li>1.1 Stack and power · 1.2 PiSugar to Pi · 1.3 Pi to BiBoard · 1.4 Before power-on</li></ul></li>
+    <li><b>Part 2.</b> Everything wired into the Pi
+      <ul><li>2.1 Header map and wire map · 2.2 Mic and amp · 2.3 AI head · 2.4 Open items</li></ul></li>
+  </ol>
+</nav>
+
+<section class="part">
+  <div class="parthead"><div class="tag">Part 1</div><h2>PiSugar, Pi and BiBoard</h2>
+  <p>PiSugar powers the Pi through contact pins, and the Pi talks to the BiBoard over a three-wire serial link.</p></div>
+
+  <div class="panel">
+    <h3>1.1 Stack and power</h3>
+<div class="fig"><svg class="wm" viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="11" role="img" aria-label="PiSugar contacts the Pi header pins 2, 4, 5 and 6 from underneath. Three wires run from the Pi: pin 6 ground to BiBoard GND, pin 8 TXD to BiBoard RX2, pin 10 RXD to BiBoard TX2. BiBoard plus 5V pins are not wired.">
+<rect x="370" y="41" width="196" height="174" rx="8" fill="none" stroke="currentColor" stroke-width="1.8"/>
+<rect x="378" y="51" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386" y="68" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">1</text>
+<text x="454" y="68" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">3V3</text>
+<rect x="474" y="51" width="84" height="26" rx="4" fill="var(--pisugar-bg)" stroke="var(--pisugar)" stroke-width="1.3"/>
+<text x="482" y="68" font-size="10.5" font-weight="700" fill="currentColor">2</text>
+<text x="550" y="68" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">5V</text>
+<circle cx="553" cy="56" r="2.8" fill="var(--pisugar)"/>
+<rect x="378" y="83" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386" y="100" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">3</text>
+<text x="454" y="100" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">SDA</text>
+<rect x="474" y="83" width="84" height="26" rx="4" fill="var(--pisugar-bg)" stroke="var(--pisugar)" stroke-width="1.3"/>
+<text x="482" y="100" font-size="10.5" font-weight="700" fill="currentColor">4</text>
+<text x="550" y="100" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">5V</text>
+<circle cx="553" cy="88" r="2.8" fill="var(--pisugar)"/>
+<rect x="378" y="115" width="84" height="26" rx="4" fill="var(--pisugar-bg)" stroke="var(--pisugar)" stroke-width="1.3"/>
+<text x="386" y="132" font-size="10.5" font-weight="700" fill="currentColor">5</text>
+<text x="454" y="132" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">SCL</text>
+<circle cx="457" cy="120" r="2.8" fill="var(--pisugar)"/>
+<rect x="474" y="115" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482" y="132" font-size="10.5" font-weight="700" fill="currentColor">6</text>
+<text x="550" y="132" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<circle cx="553" cy="120" r="2.8" fill="var(--pisugar)"/>
+<rect x="378" y="147" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386" y="164" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">7</text>
+<text x="454" y="164" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G4</text>
+<rect x="474" y="147" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482" y="164" font-size="10.5" font-weight="700" fill="currentColor">8</text>
+<text x="550" y="164" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">TXD</text>
+<rect x="378" y="179" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386" y="196" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">9</text>
+<text x="454" y="196" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="474" y="179" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482" y="196" font-size="10.5" font-weight="700" fill="currentColor">10</text>
+<text x="550" y="196" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">RXD</text>
+<text x="468" y="235" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="currentColor">Pi Zero 2 W — pins 1 to 10</text>
+<text x="468" y="251" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".55">pins 11 to 40 are not used by this link · pin 1 left, pin 2 right</text>
+<rect x="20" y="70" width="190" height="130" rx="8" fill="none" stroke="var(--pisugar)" stroke-width="1.6" stroke-dasharray="3 3"/>
+<text x="115" y="92" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--pisugar)">PiSugar S</text>
+<text x="115" y="112" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".85">under the Pi, no wires</text>
+<text x="115" y="127" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".85">5 pogo pins touch the</text>
+<text x="115" y="142" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".85">header's solder joints:</text>
+<text x="115" y="157" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".85">5V→2  5V→4  SCL→5</text>
+<text x="115" y="172" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".85">GND→6  GND→6 (or nearby)</text>
+<path d="M210 135 H370" stroke="var(--pisugar)" stroke-width="2" stroke-dasharray="2 3" fill="none"/>
+<text x="290" y="127" text-anchor="middle" font-size="10" fill="var(--pisugar)">pogo contact</text>
+<rect x="740" y="170" width="140" height="180" rx="8" fill="none" stroke="var(--biboard)" stroke-width="1.6"/>
+<text x="810" y="188" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--biboard)">BiBoard</text>
+<circle cx="740" cy="200" r="3.5" fill="var(--wire-bib)"/>
+<text x="752" y="204" font-size="10" fill="var(--biboard)">TX2</text>
+<circle cx="740" cy="230" r="3.5" fill="var(--wire-bib)"/>
+<text x="752" y="234" font-size="10" fill="var(--biboard)">RX2</text>
+<circle cx="740" cy="260" r="3.5" fill="var(--wire-bib)"/>
+<text x="752" y="264" font-size="10" fill="var(--biboard)">GND</text>
+<circle cx="740" cy="290" r="3.5" fill="currentColor"/>
+<text x="752" y="294" font-size="10" fill="currentColor">+5V</text>
+<circle cx="740" cy="320" r="3.5" fill="currentColor"/>
+<text x="752" y="324" font-size="10" fill="currentColor">+5V</text>
+<text x="800" y="294" font-size="10" fill="currentColor">not wired</text>
+<text x="800" y="324" font-size="10" fill="currentColor">not wired</text>
+<text x="810" y="342" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".6">5-pin Pi header</text>
+<polyline points="558,192 600,192 600,200 740,200" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558" cy="192" r="3.5" fill="var(--wire-bib)"/>
+<polyline points="558,160 620,160 620,230 740,230" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558" cy="160" r="3.5" fill="var(--wire-bib)"/>
+<polyline points="558,128 640,128 640,260 740,260" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558" cy="128" r="3.5" fill="var(--wire-bib)"/>
+<text x="650" y="120" font-size="10" fill="var(--wire-bib)">3 wires, TX and RX cross</text>
+<text x="650" y="136" font-size="9.5" fill="currentColor" opacity=".7">pin 6 → GND · pin 8 → RX2 · pin 10 → TX2</text>
+</svg></div>
+    <p class="muted" style="margin-top:10px">PiSugar powers the Pi through its pogo pins, so the BiBoard's +5V pins and the Pi's pin 2 carry no supply for this link.</p>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h3>1.2 PiSugar to Pi (contact, no wires)</h3>
+      <ul>
+        <li>Four screws hold PiSugar under the Pi. The holes are symmetric, so it bolts on in two rotations and only one powers the Pi.</li>
+        <li><b>Correct:</b> PiSugar's micro-USB port, switch and battery end up under the Pi's mini-HDMI and USB edge, and its pogo pins land under the 40-pin header.</li>
+        <li>Check that the pogo pins sit on the header's solder joints before tightening. The screws fit either way.</li>
+      </ul>
+      <div class="scroll" style="margin-top:10px"><table>
+        <tr><th>Pogo pin</th><th>Pi pin (inferred)</th></tr>
+        <tr><td>5V</td><td class="mono">2</td></tr><tr><td>5V</td><td class="mono">4</td></tr>
+        <tr><td>SCL (auto-start)</td><td class="mono">5</td></tr>
+        <tr><td>GND</td><td class="mono">6</td></tr><tr><td>GND</td><td class="mono">6 or nearby</td></tr>
+      </table></div>
+      <p class="muted" style="margin-top:8px;font-size:13px">The 2/4/5/6 range is confirmed by PiSugar's PCB legend and FAQ. The pin-by-pin match is not independently verified.</p>
+    </div>
+    <div class="panel">
+      <h3>1.3 Pi to BiBoard (three wires, crossed)</h3>
+      <p style="margin-bottom:8px">BiBoard's 5-pin Pi header sits at the head-facing edge, above the G1 Grove socket. Left to right: TX2 (square pad), RX2, GND, +5V, +5V. Solder a 5-pin header there if none is fitted.</p>
+      <div class="scroll"><table>
+        <tr><th>BiBoard</th><th>Pi pin</th><th>Signal</th></tr>
+        <tr><td>TX2</td><td class="mono">10</td><td class="mono">GPIO15 · RXD</td></tr>
+        <tr><td>RX2</td><td class="mono">8</td><td class="mono">GPIO14 · TXD</td></tr>
+        <tr><td>GND</td><td class="mono">6</td><td class="mono">GND</td></tr>
+        <tr><td class="muted">+5V, +5V</td><td class="muted" colspan="2">not wired, PiSugar powers the Pi</td></tr>
+      </table></div>
+      <p class="muted" style="margin-top:8px;font-size:13px">TX and RX cross: each board's transmit line goes to the other's receive line. Pi TXD (pin 8) carries the Pi's outgoing data to BiBoard RX2, and BiBoard TX2 goes to Pi RXD (pin 10). Ground runs straight across. Use jumpers long enough to reach the header at the final mounting position (20 to 30 cm if the Pi sits at the back edge).</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>1.4 Before power-on</h3>
+    <ul>
+      <li>Both of BiBoard's +5V pins are empty.</li>
+      <li>No BiBoard wire is on the Pi's pin 2. (Pin 2 does carry the amp's 5 V in Part 2; that is a separate wire.)</li>
+      <li>BiBoard TX2 goes to Pi <b>pin 10</b>, not pin 8. They are easy to swap.</li>
+      <li>All three wires are seated at both ends.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="part">
+  <div class="parthead"><div class="tag">Part 2</div><h2>Everything wired into the Pi</h2>
+  <p>Once Part 1 is built, the Pi's 40-pin header also feeds the audio pair. The AI head connects to the BiBoard by its Grove cable and to the Pi over Wi-Fi, so it adds no wires to the header.</p></div>
+
+  <div class="panel">
+    <h3>2.1 Header map and wire map</h3>
+    <p class="muted" style="margin-bottom:10px">Pin 1 top-left, pin 2 top-right, running down to 39 and 40. Odd pins left, even pins right. A teal ring marks pins PiSugar also touches.</p>
+    <div class="legend" style="margin-bottom:12px">
+      <span><i class="sw" style="background:var(--bib-bg);border-color:var(--bib)"></i>BiBoard</span>
+      <span><i class="sw" style="background:var(--aud-bg);border-color:var(--aud)"></i>Mic / amp</span>
+      <span><i class="sw" style="box-shadow:inset 0 0 0 2px var(--psu)"></i>PiSugar</span>
+      <span><i class="sw"></i>Free</span>
+    </div>
+    <div class="fig" style="padding:14px"><div class="grid40">
+<div class="pin p-audio"><div class="r1"><span class="pn">1</span><span class="gp">3V3</span></div><div class="lb">Mic VIN</div></div>
+<div class="pin p-audio p-ps right"><div class="r1"><span class="pn">2</span><span class="gp">5V</span></div><div class="lb">Amp VIN · PiSugar 5V</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">3</span><span class="gp">GPIO2 · SDA</span></div><div class="lb">free</div></div>
+<div class="pin p-ps right"><div class="r1"><span class="pn">4</span><span class="gp">5V</span></div><div class="lb">PiSugar contact</div></div>
+<div class="pin p-ps"><div class="r1"><span class="pn">5</span><span class="gp">GPIO3 · SCL</span></div><div class="lb">PiSugar auto-start tap</div></div>
+<div class="pin p-bib p-ps right"><div class="r1"><span class="pn">6</span><span class="gp">GND</span></div><div class="lb">BiBoard GND</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">7</span><span class="gp">GPIO4</span></div><div class="lb">free</div></div>
+<div class="pin p-bib right"><div class="r1"><span class="pn">8</span><span class="gp">GPIO14 · TXD</span></div><div class="lb">BiBoard RX2</div></div>
+<div class="pin p-audio"><div class="r1"><span class="pn">9</span><span class="gp">GND</span></div><div class="lb">Mic or Amp GND</div></div>
+<div class="pin p-bib right"><div class="r1"><span class="pn">10</span><span class="gp">GPIO15 · RXD</span></div><div class="lb">BiBoard TX2</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">11</span><span class="gp">GPIO17</span></div><div class="lb">free</div></div>
+<div class="pin p-audio right"><div class="r1"><span class="pn">12</span><span class="gp">GPIO18</span></div><div class="lb">BCLK, splice to mic and amp</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">13</span><span class="gp">GPIO27</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">14</span><span class="gp">GND</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">15</span><span class="gp">GPIO22</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">16</span><span class="gp">GPIO23</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">17</span><span class="gp">3V3</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">18</span><span class="gp">GPIO24</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">19</span><span class="gp">GPIO10 · MOSI</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">20</span><span class="gp">GND</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">21</span><span class="gp">GPIO9 · MISO</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">22</span><span class="gp">GPIO25</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">23</span><span class="gp">GPIO11 · SCLK</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">24</span><span class="gp">GPIO8 · CE0</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">25</span><span class="gp">GND</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">26</span><span class="gp">GPIO7 · CE1</span></div><div class="lb">free</div></div>
+<div class="pin p-res"><div class="r1"><span class="pn">27</span><span class="gp">ID_SD</span></div><div class="lb">reserved, HAT EEPROM</div></div>
+<div class="pin p-res right"><div class="r1"><span class="pn">28</span><span class="gp">ID_SC</span></div><div class="lb">reserved, HAT EEPROM</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">29</span><span class="gp">GPIO5</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">30</span><span class="gp">GND</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">31</span><span class="gp">GPIO6</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">32</span><span class="gp">GPIO12</span></div><div class="lb">free</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">33</span><span class="gp">GPIO13</span></div><div class="lb">free</div></div>
+<div class="pin p-free right"><div class="r1"><span class="pn">34</span><span class="gp">GND</span></div><div class="lb">free</div></div>
+<div class="pin p-audio"><div class="r1"><span class="pn">35</span><span class="gp">GPIO19</span></div><div class="lb">LRCLK, splice to mic and amp</div></div>
+<div class="pin p-audio-opt right"><div class="r1"><span class="pn">36</span><span class="gp">GPIO16</span></div><div class="lb">Amp CTRL: no connection needed</div></div>
+<div class="pin p-free"><div class="r1"><span class="pn">37</span><span class="gp">GPIO26</span></div><div class="lb">free</div></div>
+<div class="pin p-audio right"><div class="r1"><span class="pn">38</span><span class="gp">GPIO20</span></div><div class="lb">Mic DOUT</div></div>
+<div class="pin p-audio"><div class="r1"><span class="pn">39</span><span class="gp">GND</span></div><div class="lb">Mic SEL (tied to ground)</div></div>
+<div class="pin p-audio right"><div class="r1"><span class="pn">40</span><span class="gp">GPIO21</span></div><div class="lb">Amp DIN</div></div>
+
+    </div></div>
+    <div style="margin-top:18px"><h3>Wire map: how everything connects</h3>
+    <p class="muted" style="margin-bottom:10px">The header drawn standing up, with each wire traced to the board it feeds. Mic and amp wires are orange and BiBoard wires are pink, so both stand apart from the purple and blue pin squares.</p>
+    <div class="fig">    <svg class="wm" viewBox="0 0 900 740" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="11">
+<rect x="370.0" y="41.0" width="196" height="654" rx="8" fill="none" stroke="currentColor" stroke-width="1.8"/>
+<text x="468.0" y="715.0" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="currentColor">Pi Zero 2 W — 40-pin header</text>
+<text x="468.0" y="731.0" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".55">SD card at the top · pin 1 left, pin 2 right</text>
+<rect x="378.0" y="51.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="386.0" y="68" font-size="10.5" font-weight="700" fill="currentColor">1</text>
+<text x="454.0" y="68" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">3V3</text>
+<rect x="474.0" y="51.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="482.0" y="68" font-size="10.5" font-weight="700" fill="currentColor">2</text>
+<text x="550.0" y="68" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">5V</text>
+<rect x="378.0" y="83.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="100" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">3</text>
+<text x="454.0" y="100" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">SDA</text>
+<rect x="474.0" y="83.0" width="84" height="26" rx="4" fill="var(--pisugar-bg)" stroke="var(--pisugar)" stroke-width="1.3"/>
+<text x="482.0" y="100" font-size="10.5" font-weight="700" fill="currentColor">4</text>
+<text x="550.0" y="100" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">5V</text>
+<rect x="378.0" y="115.0" width="84" height="26" rx="4" fill="var(--pisugar-bg)" stroke="var(--pisugar)" stroke-width="1.3"/>
+<text x="386.0" y="132" font-size="10.5" font-weight="700" fill="currentColor">5</text>
+<text x="454.0" y="132" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">SCL</text>
+<rect x="474.0" y="115.0" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482.0" y="132" font-size="10.5" font-weight="700" fill="currentColor">6</text>
+<text x="550.0" y="132" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="378.0" y="147.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="164" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">7</text>
+<text x="454.0" y="164" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G4</text>
+<rect x="474.0" y="147.0" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482.0" y="164" font-size="10.5" font-weight="700" fill="currentColor">8</text>
+<text x="550.0" y="164" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">TXD</text>
+<rect x="378.0" y="179.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="386.0" y="196" font-size="10.5" font-weight="700" fill="currentColor">9</text>
+<text x="454.0" y="196" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="474.0" y="179.0" width="84" height="26" rx="4" fill="var(--biboard-bg)" stroke="var(--biboard)" stroke-width="1.3"/>
+<text x="482.0" y="196" font-size="10.5" font-weight="700" fill="currentColor">10</text>
+<text x="550.0" y="196" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">RXD</text>
+<rect x="378.0" y="211.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="228" font-size="10.5" font-weight="700" fill="currentColor">11</text>
+<text x="454.0" y="228" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G17</text>
+<rect x="474.0" y="211.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="482.0" y="228" font-size="10.5" font-weight="700" fill="currentColor">12</text>
+<text x="550.0" y="228" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G18</text>
+<rect x="378.0" y="243.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="260" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">13</text>
+<text x="454.0" y="260" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G27</text>
+<rect x="474.0" y="243.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="482.0" y="260" font-size="10.5" font-weight="700" fill="currentColor">14</text>
+<text x="550.0" y="260" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="378.0" y="275.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="292" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">15</text>
+<text x="454.0" y="292" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G22</text>
+<rect x="474.0" y="275.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="292" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">16</text>
+<text x="550.0" y="292" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G23</text>
+<rect x="378.0" y="307.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="324" font-size="10.5" font-weight="700" fill="currentColor">17</text>
+<text x="454.0" y="324" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">3V3</text>
+<rect x="474.0" y="307.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="324" font-size="10.5" font-weight="700" fill="currentColor">18</text>
+<text x="550.0" y="324" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G24</text>
+<rect x="378.0" y="339.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="356" font-size="10.5" font-weight="700" fill="currentColor">19</text>
+<text x="454.0" y="356" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">MOSI</text>
+<rect x="474.0" y="339.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="356" font-size="10.5" font-weight="700" fill="currentColor">20</text>
+<text x="550.0" y="356" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="378.0" y="371.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="388" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">21</text>
+<text x="454.0" y="388" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">MISO</text>
+<rect x="474.0" y="371.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="388" font-size="10.5" font-weight="700" fill="currentColor">22</text>
+<text x="550.0" y="388" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G25</text>
+<rect x="378.0" y="403.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="420" font-size="10.5" font-weight="700" fill="currentColor">23</text>
+<text x="454.0" y="420" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">SCLK</text>
+<rect x="474.0" y="403.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="420" font-size="10.5" font-weight="700" fill="currentColor">24</text>
+<text x="550.0" y="420" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">CE0</text>
+<rect x="378.0" y="435.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="452" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">25</text>
+<text x="454.0" y="452" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="474.0" y="435.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="452" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">26</text>
+<text x="550.0" y="452" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">CE1</text>
+<rect x="378.0" y="467.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="484" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">27</text>
+<text x="454.0" y="484" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">ID_SD</text>
+<rect x="474.0" y="467.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="484" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">28</text>
+<text x="550.0" y="484" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">ID_SC</text>
+<rect x="378.0" y="499.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="516" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">29</text>
+<text x="454.0" y="516" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G5</text>
+<rect x="474.0" y="499.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="516" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">30</text>
+<text x="550.0" y="516" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="378.0" y="531.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="548" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">31</text>
+<text x="454.0" y="548" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G6</text>
+<rect x="474.0" y="531.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="548" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">32</text>
+<text x="550.0" y="548" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G12</text>
+<rect x="378.0" y="563.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="580" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">33</text>
+<text x="454.0" y="580" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G13</text>
+<rect x="474.0" y="563.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="580" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">34</text>
+<text x="550.0" y="580" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="378.0" y="595.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="386.0" y="612" font-size="10.5" font-weight="700" fill="currentColor">35</text>
+<text x="454.0" y="612" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G19</text>
+<rect x="474.0" y="595.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="482.0" y="612" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">36</text>
+<text x="550.0" y="612" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G16</text>
+<rect x="378.0" y="627.0" width="84" height="26" rx="4" fill="var(--reserved-bg)" stroke="var(--border)" stroke-width="1.3"/>
+<text x="386.0" y="644" font-size="10.5" font-weight="700" fill="currentColor" opacity=".6">37</text>
+<text x="454.0" y="644" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G26</text>
+<rect x="474.0" y="627.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="482.0" y="644" font-size="10.5" font-weight="700" fill="currentColor">38</text>
+<text x="550.0" y="644" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G20</text>
+<rect x="378.0" y="659.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="386.0" y="676" font-size="10.5" font-weight="700" fill="currentColor">39</text>
+<text x="454.0" y="676" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">GND</text>
+<rect x="474.0" y="659.0" width="84" height="26" rx="4" fill="var(--audio-bg)" stroke="var(--audio)" stroke-width="1.3"/>
+<text x="482.0" y="676" font-size="10.5" font-weight="700" fill="currentColor">40</text>
+<text x="550.0" y="676" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".8">G21</text>
+<circle cx="553.0" cy="56.0" r="2.8" fill="var(--pisugar)"/>
+<circle cx="553.0" cy="120.0" r="2.8" fill="var(--pisugar)"/>
+<rect x="40" y="100" width="110" height="170" rx="8" fill="none" stroke="var(--biboard)" stroke-width="1.6"/>
+<text x="95" y="116" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--biboard)">BiBoard</text>
+<text x="142" y="141.5" text-anchor="end" font-size="10" fill="var(--biboard)">TX2</text>
+<text x="142" y="171.5" text-anchor="end" font-size="10" fill="var(--biboard)">RX2</text>
+<text x="142" y="201.5" text-anchor="end" font-size="10" fill="var(--biboard)">GND</text>
+<text x="142" y="231.5" text-anchor="end" font-size="10" fill="currentColor">+5V</text>
+<text x="142" y="257.5" text-anchor="end" font-size="10" fill="currentColor">+5V</text>
+<circle cx="150" cy="138" r="3" fill="var(--wire-bib)"/>
+<circle cx="150" cy="168" r="3" fill="var(--wire-bib)"/>
+<circle cx="150" cy="198" r="3" fill="var(--wire-bib)"/>
+<circle cx="150" cy="228" r="3" fill="currentColor"/>
+<circle cx="150" cy="254" r="3" fill="currentColor"/>
+<polyline points="150,228 168,228" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-dasharray="3 3" opacity=".5"/>
+<polyline points="150,254 168,254" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-dasharray="3 3" opacity=".5"/>
+<text x="172" y="244.5" text-anchor="start" font-size="10" fill="currentColor">not wired</text>
+<polyline points="558.0,192 602,192 602,22 190,22 190,138 150,138" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="192" r="3.5" fill="var(--wire-bib)"/>
+<polyline points="558.0,160 590,160 590,30 206,30 206,168 150,168" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="160" r="3.5" fill="var(--wire-bib)"/>
+<polyline points="558.0,128 578,128 578,38 222,38 222,198 150,198" fill="none" stroke="var(--wire-bib)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="128" r="3.5" fill="var(--wire-bib)"/>
+<rect x="770" y="70" width="110" height="222" rx="8" fill="none" stroke="var(--audio)" stroke-width="1.6"/>
+<text x="825" y="86" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--audio)">Mic</text>
+<text x="780" y="115.5" text-anchor="start" font-size="10" fill="var(--audio)">SEL</text>
+<circle cx="770" cy="112" r="3.5" fill="var(--wire)"/>
+<text x="780" y="145.5" text-anchor="start" font-size="10" fill="var(--audio)">LRCL</text>
+<circle cx="770" cy="142" r="3.5" fill="var(--wire)"/>
+<text x="780" y="175.5" text-anchor="start" font-size="10" fill="var(--audio)">DOUT</text>
+<circle cx="770" cy="172" r="3.5" fill="var(--wire)"/>
+<text x="780" y="205.5" text-anchor="start" font-size="10" fill="var(--audio)">BCLK</text>
+<circle cx="770" cy="202" r="3.5" fill="var(--wire)"/>
+<text x="780" y="235.5" text-anchor="start" font-size="10" fill="var(--audio)">GND</text>
+<circle cx="770" cy="232" r="3.5" fill="var(--wire)"/>
+<text x="780" y="265.5" text-anchor="start" font-size="10" fill="var(--audio)">3V</text>
+<circle cx="770" cy="262" r="3.5" fill="var(--wire)"/>
+<rect x="770" y="476" width="110" height="190" rx="8" fill="none" stroke="var(--audio)" stroke-width="1.6"/>
+<text x="825" y="492" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--audio)">Amp</text>
+<text x="780" y="519.5" text-anchor="start" font-size="10" fill="var(--audio)">G</text>
+<circle cx="770" cy="516" r="3.5" fill="var(--wire)"/>
+<text x="780" y="549.5" text-anchor="start" font-size="10" fill="var(--audio)">V</text>
+<circle cx="770" cy="546" r="3.5" fill="var(--wire)"/>
+<text x="780" y="579.5" text-anchor="start" font-size="10" fill="var(--audio)">BCLK</text>
+<circle cx="770" cy="576" r="3.5" fill="var(--wire)"/>
+<text x="780" y="609.5" text-anchor="start" font-size="10" fill="var(--audio)">LRC</text>
+<circle cx="770" cy="606" r="3.5" fill="var(--wire)"/>
+<text x="780" y="639.5" text-anchor="start" font-size="10" fill="var(--audio)">DIN</text>
+<circle cx="770" cy="636" r="3.5" fill="var(--wire)"/>
+<polyline points="462,672 468,672 468,688 752,688 752,112 770,112" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="462" cy="672" r="3.5" fill="var(--wire)"/>
+<text x="764" y="704" text-anchor="start" font-size="9.5" fill="var(--wire)">mic SEL → pin 39 (GND)</text>
+<polyline points="558.0,64 680,64 680,546 770,546" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="64" r="3.5" fill="var(--wire)"/>
+<polyline points="558.0,256 644,256 644,516 770,516" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="256" r="3.5" fill="var(--wire)"/>
+<polyline points="558.0,672 704,672 704,636 770,636" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="672" r="3.5" fill="var(--wire)"/>
+<polyline points="558.0,640 692,640 692,172 770,172" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="558.0" cy="640" r="3.5" fill="var(--wire)"/>
+<polyline points="558.0,224 578,224" fill="none" stroke="var(--wire)" stroke-width="3.6" stroke-linejoin="round"/>
+<circle cx="558.0" cy="224" r="3.5" fill="var(--wire)"/>
+<polyline points="578,224 668,224 668,576 770,576" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<polyline points="578,224 656,224 656,202 770,202" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="578" cy="224" r="5.5" fill="var(--wire)"/>
+<text x="571" y="215.5" text-anchor="start" font-size="10" fill="var(--wire)">×2</text>
+<polyline points="462.0,192 468.0,192 468.0,208 716,208 716,232 770,232" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="462.0" cy="192" r="3.5" fill="var(--wire)"/>
+<polyline points="462.0,64 468.0,64 468.0,80 728,80 728,262 770,262" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="462.0" cy="64" r="3.5" fill="var(--wire)"/>
+<polyline points="462.0,608 468.0,608 468.0,624 590,624" fill="none" stroke="var(--wire)" stroke-width="3.6" stroke-linejoin="round"/>
+<circle cx="462.0" cy="608" r="3.5" fill="var(--wire)"/>
+<polyline points="590,624 632,624 632,606 770,606" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<polyline points="590,624 620,624 620,142 770,142" fill="none" stroke="var(--wire)" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="590" cy="624" r="5.5" fill="var(--wire)"/>
+<text x="583" y="641.5" text-anchor="start" font-size="10" fill="var(--wire)">×2</text>
+
+<circle cx="95" cy="270" r="3.5" fill="var(--head)"/>
+<text x="103" y="288" font-size="10" fill="var(--head)">G1 (Grove)</text>
+<rect x="20" y="400" width="150" height="130" rx="8" fill="var(--head-bg)" stroke="var(--head)" stroke-width="1.6"/>
+<text x="95" y="420" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="var(--head)">AI head</text>
+<circle cx="95" cy="400" r="3.5" fill="var(--head)"/>
+<text x="103" y="396" font-size="9.5" fill="currentColor" opacity=".8">R T V G</text>
+<text x="95" y="452" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">Wi-Fi to the Pi:</text>
+<text x="95" y="466" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">trigger, voice,</text>
+<text x="95" y="480" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">mic stream</text>
+<text x="95" y="494" text-anchor="middle" font-size="9.5" fill="currentColor" opacity=".7">(no wires)</text>
+<polyline points="95,270 95,400" fill="none" stroke="var(--head)" stroke-width="3.4" stroke-linejoin="round"/>
+<text x="106" y="334" font-size="10" fill="var(--head)">Grove cable</text>
+<text x="106" y="348" font-size="9.5" fill="currentColor" opacity=".7">5V · GND · RX</text>
+<text x="106" y="362" font-size="9.5" fill="currentColor" opacity=".7">head TX unconnected</text>
+</svg></div>
+    <p class="muted" style="margin-top:10px;font-size:13px">  Pin squares are colored by owner; pins 2, 4, 5 and 6 also touch PiSugar's pogo contacts (teal dot or fill). BiBoard's three wires land on pins 6, 8 and 10 in the right column, so they loop over the top of the header to reach it. The Pi drives BCLK and LRCLK only from pins 12 and 35, so each feeds a splice (thick wire, dot, ×2) that fans out to both the mic and the amp. Amp G is shown on pin 14, but any free GND pin works. The mic's SEL pin is tied to ground with a wire to pin 39 (a GND pin) — it is a fixed channel-select level, not a data signal. Board ports are in the order printed on each board (mic top to bottom as read; amp in plug order), so wires cross where those orders disagree with the header's pin order. The AI head (yellow) connects to BiBoard G1 by its four-pin Grove cable; its Wi-Fi links (trigger, voice, mic stream) need no wire.</p></div>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h3>2.2 Mic and amp (I2S)</h3>
+      <div class="scroll"><table>
+        <tr><th>Board pin</th><th>Pi pin</th><th>Signal</th></tr>
+        <tr><td>Mic VIN</td><td class="mono">1</td><td class="mono">3V3 only</td></tr>
+        <tr><td>Amp VIN</td><td class="mono">2</td><td class="mono">5V</td></tr>
+        <tr><td>Mic GND, Amp GND</td><td class="mono">9 or any free GND</td><td class="mono">GND</td></tr>
+        <tr><td>BCLK (both)</td><td class="mono">12</td><td class="mono">GPIO18, spliced</td></tr>
+        <tr><td>LRCLK (both)</td><td class="mono">35</td><td class="mono">GPIO19, spliced</td></tr>
+        <tr><td>Mic DOUT</td><td class="mono">38</td><td class="mono">GPIO20</td></tr>
+        <tr><td>Mic SEL</td><td class="mono">39</td><td class="mono">GND, left channel</td></tr>
+        <tr><td>Amp DIN</td><td class="mono">40</td><td class="mono">GPIO21</td></tr>
+        <tr><td class="muted">Amp CTRL</td><td class="muted">36</td><td class="muted">no connection needed</td></tr>
+      </table></div>
+    </div>
+    <div class="panel">
+      <h3>BCLK / LRCLK splice</h3>
+      <p>The Pi drives these clocks only from GPIO18 and GPIO19, and both boards only listen, so each signal fans out to two boards. Build each splitter from three jumper wires joined at one soldered joint away from either board:</p>
+      <ul style="margin-top:8px">
+        <li>female-to-female wire: female end to the Pi pin</li>
+        <li>female-to-female wire: female end to the mic's header pin</li>
+        <li>female-to-male wire: male end into the amp cable's matching wire</li>
+      </ul>
+      <p style="margin-top:8px">Strip the other ends, twist, solder, insulate with heat-shrink or tape. GND and VIN do not fan out; each board grounds and powers independently.</p>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="panel">
+      <h3>Mic board</h3>
+      <ul>
+        <li>SPH0645 I2S breakout with a single row of 6 through-hole pads: 3V, GND, BCLK, DOUT, LRCL, SEL. It has no header, so solder a 6-pin 0.1 in (2.54 mm) male header into the pads.</li>
+        <li>VIN runs at 1.6 to 3.6 V only. Connect it to a 3.3 V pin, never the 5 V pin.</li>
+        <li>SEL must be tied to a fixed level. It runs to pin 39 (GND), so the mic speaks on the left channel only and the right channel records silence. Capture software reads the left channel.</li>
+        <li>After soldering, check each pair of neighboring pins for continuity. A solder bridge makes every sample read the same value.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Amp board</h3>
+      <ul>
+        <li>NS4168 I2S amplifier with a 5-pin PH2.0 connector silkscreened G, V, BCLK, LRCLK, DIN.</li>
+        <li>The included cable is five separate wires, each ending in its own female socket. Leave it intact; the BCLK and LRCLK wires take the splice joints.</li>
+        <li>The speaker plugs into the amp's 2-pin PH2.0 output. This is a separate circuit from the Pi wiring.</li>
+        <li>Pin 36 (CTRL): the board shows no separate control pin, so nothing is wired.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Notes</h3>
+    <div class="note"><span class="k">"Fan-out" vs "either pin" —</span> two different things look similar in the table but aren't. <b>GND</b> is flexible: every GND pin on the Pi is the same electrical net, so mic and amp can each use a different free ground pin — nothing forces them onto pin 9 specifically. <b>BCLK/LRCLK are not flexible</b>: the Pi's I2S hardware only drives those clocks out of GPIO18/GPIO19 specifically, and both boards only ever listen — they never drive the line themselves. One driver with two listeners isn't a conflict, but it does mean both boards physically need to reach that exact pin.</div>
+    <div class="note"><span class="k">Pin 2 carries two things —</span> PiSugar feeds 5V in here, and the amp draws 5V from the same pin. That's normal — it's a shared power rail, not a conflict — but when the amp's VIN wire is unplugged, a live pin 2 does not mean the amp is still connected.</div>
+  </div>
+
+  <div class="panel">
+    <h3>2.3 Petoi AI head</h3>
+    <div class="scroll"><table>
+      <tr><th>Link</th><th>Path</th><th>Wires</th></tr>
+      <tr><td>Power and serial</td><td>Head's 4-pin R T V G connector to BiBoard G1 (Grove, UART2)</td><td>4-wire Grove cable. The head's transmit line is left unconnected, so the Pi stays the only sender.</td></tr>
+      <tr><td>Trigger, voice, mic stream</td><td>Pi to head over Wi-Fi</td><td class="good">None</td></tr>
+    </table></div>
+    <p class="muted" style="margin-top:8px;font-size:13px">G1 is the only UART-capable Grove socket on BiBoard V1 (G2 is I²C, G3 and G4 are analog).</p>
+  </div>
+
+  <div class="callout">
+    <h3 style="color:var(--warn)">2.4 Open items</h3>
+    <ul>
+      <li><b>One UART, two listeners.</b> The Pi's 5-pin header and the head's Grove socket both land on BiBoard UART2 (G1). Leaving the head's transmit line unconnected keeps the Pi as the only sender. Confirm which physical socket on the board is G1 before connecting the head.</li>
+      <li><b>Unmeasured:</b> the head's current on the Grove 5 V (BiBoard input is 7 to 9 V).</li>
+    </ul>
+  </div>
+</section>
+</main>
+</body>
+</html>

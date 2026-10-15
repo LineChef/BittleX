@@ -14,7 +14,7 @@
 | Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
 | PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
 | Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 | — |
-| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (Step 3, `blueprints/biboard-pi-connector.md`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run | — |
+| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run | — |
 | [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera) | — |
 | [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above) | — |
 
@@ -33,7 +33,7 @@
   18.6 mm is the full outer depth (shell walls included), same clearance
   bottleneck as the standoff clips below, just from the enclosure side. A
   custom-modified version is now planned alongside the clips — see "Build:
-  modified standoff clips + cover" below and `blueprints/biboard-pi-connector.md`
+  modified standoff clips + cover" below and `blueprints/mounting.md`
   for the full plan.
 - **BiBoard V1 MCU:** standard **ESP32-U4WDH** (Xtensa dual-core LX6, via an
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
@@ -52,8 +52,9 @@
 
 - ~~Confirm BiBoard V2 can be wired data-only~~ — **resolved 2026-09-14**: it's a
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
-  official board diagram. Data-only wiring is straightforward. Full pinout +
-  annotated photos: [`blueprints/biboard-pi-connector.md`](../../blueprints/biboard-pi-connector.md).
+  official board diagram. Data-only wiring is straightforward. Full pinout:
+  [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos:
+  [`pi-biboard-build-notes.md`](pi-biboard-build-notes.md).
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.
@@ -70,7 +71,7 @@
   defaults to `/dev/ttyS0` — same underlying serial architecture as the one
   family Petoi *does* confirm works, not an unconsidered edge case. Also
   found: Petoi's own Pi-mounting bracket (`Pi_StandOffRegular.stl`, already
-  in use — see `blueprints/biboard-pi-connector.md`) is Zero-specific, which
+  in use — see `blueprints/mounting.md`) is Zero-specific, which
   at minimum confirms Petoi designed real hardware for this board, even if
   that speaks to mechanical fit more than to serial compatibility. Net: good
   reason to expect it works, still worth the ~30-second confirmation once

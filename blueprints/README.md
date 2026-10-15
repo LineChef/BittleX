@@ -14,10 +14,9 @@ measurements, and anything that differed from the original plan.
 
 | | |
 |---|---|
-| [`biboard-pi-connector.md`](biboard-pi-connector.md) | Pi + PiSugar + BiBoard: the wiring build manual (steps 1-4, annotated real board photos) plus the standoff clip mounting investigation, mm-accurate installation diagram, and the modified-clip STLs (`cad/`) — kept together as one build reference rather than split from the pre-build research, since it's what gets used at the bench. |
+| [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html) | The wiring reference in one page: Part 1 PiSugar to Pi to BiBoard (stack diagram, exact pins, power-on checklist), Part 2 everything wired into the Pi (40-pin header map, color-coded wire map, mic and amp, the AI head on BiBoard G1). Open it directly in a browser. |
+| [`mounting.md`](mounting.md) | How the Pi + PiSugar stack mounts on the frame: the standoff clip and its history, screws, the mount investigation and decision, assembled-stack diagrams, and the modified-clip STLs (`cad/`). |
 | [`calibration.md`](calibration.md) | Real servo calibration procedure (bracket alignment per leg + `kbalance` verification), done post-firmware-reflash 2026-09-29 — includes the finding that the bracket step targets frame-relative perpendicularity, not floor contact. |
-| [`wiring/g2-wiring-blueprint.html`](wiring/g2-wiring-blueprint.html) | Pin-by-pin visual reference for every wire between the Pi, BiBoard, PiSugar, the mic/amp pair, and the reserved screen slot — open it directly in a browser. Also published as a [live Artifact](https://claude.ai/artifact/EYPDHBAgbLyTk9qSvaP6rB) that stays in sync with this file. |
-| [`wiring/ai-head-hybrid-plan.html`](wiring/ai-head-hybrid-plan.html) | Petoi AI head hybrid plan (agreed 2026-10-11, not started): architecture drawing of the Pi ↔ head links (F0 trigger, F1 audio to the head, F2 mic stream to the Pi, cloud conversation, tool calls), the phased roadmap with gates, trade-offs and rollback — open it directly in a browser. Also published as a [live Artifact](https://claude.ai/artifact/VMumAsdLHD9Je9yJjgxYXx). |
 
 Bittle X and the camera module have arrived and are assembled (2026-09-28/29):
 frame assembled, camera mounted + connected to BiBoard's G1 Grove socket
@@ -27,4 +26,4 @@ calibration done for real and `kbalance`-verified post-reflash (see
 (Step 3). Step 5 (Pi+PiSugar mount) has an interim solution — PiSugar's
 own official case velcroed to the outside of a modified back cover, not
 enclosed inside it (the case is thicker than the cover's internal cavity)
-— not the final mount; see [`biboard-pi-connector.md`](biboard-pi-connector.md).
+— not the final mount; see [`mounting.md`](mounting.md).

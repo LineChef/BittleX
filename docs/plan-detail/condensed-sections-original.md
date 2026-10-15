@@ -43,7 +43,7 @@
 
 > **2026-09-15 — no flipping/rolling tricks, mounted-payload risk.** The Pi +
 > PiSugar stack (~61–78 g) rides on a printed standoff off the rear frame, not
-> the molded body shell (`blueprints/biboard-pi-connector.md`) — not
+> the molded body shell (`blueprints/mounting.md`) — not
 > impact-rated for a hard tumble, and the elevated mass shifts G2's moment of
 > inertia off what these tricks were tuned for on a bare unit. `flip`/`flipD`/
 > `flipF`/`bf`/`tbl`/`rl`(as a trick)/`bx`/`lucky` excluded from any
