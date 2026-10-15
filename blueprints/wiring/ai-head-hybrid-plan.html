@@ -1,0 +1,231 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Head Hybrid Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one page, top to bottom: the plan in a paragraph, the architecture drawing, the roadmap as stacked phase cards with gates, then gains and losses, then the tests and fallbacks. Blueprint ink on paper. */
+:root{
+  color-scheme:light;
+  --bg:#f3f3ef; --panel:#fbfbf8; --fg:#1d2430; --muted:#5d6676; --line:#c9ccd2;
+  --ink:#1f4e8c; --warn:#a4400f; --good:#1d6b4a; --part:#e6e9ee; --head:#f2c230;
+  --sans:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --good:#6fd0a3; --part:#2a3342; --head:#c9a021; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161d; --panel:#1a202a; --fg:#e4e8ef; --muted:#9aa4b5; --line:#343c4a;
+  --ink:#7fb0f0; --warn:#f0a070; --good:#6fd0a3; --part:#2a3342; --head:#c9a021; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;padding-inline:16px;padding-block:28px}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+h1{font-size:28px;line-height:1.15;margin:0;font-weight:600;text-wrap:balance}
+h2{font-size:19px;margin:0 0 10px;font-weight:600;text-wrap:balance}
+h3{font-size:15px;margin:0;font-weight:600}
+p{margin:0}
+.tag{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lead{max-width:68ch;margin-top:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}
+.fig{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.fig svg{display:block;min-width:600px;width:100%;height:auto}
+svg text{font-family:var(--mono);font-size:11px;fill:var(--fg)}
+svg .m{fill:var(--muted)}
+svg .ln{stroke:var(--ink);stroke-width:2;fill:none}
+svg .lw{stroke:var(--warn);stroke-width:2;fill:none;stroke-dasharray:5 4}
+svg .pt{fill:var(--part);stroke:var(--line);stroke-width:1.5}
+svg .hd{fill:var(--head);stroke:var(--fg);stroke-width:1.5}
+.phases{display:flex;flex-direction:column;gap:12px}
+.ph{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px}
+@media(max-width:700px){.ph{grid-template-columns:minmax(0,1fr)}}
+.ph .name{display:flex;flex-direction:column;gap:6px}
+.ph .name .id{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--ink)}
+.chip{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;color:var(--muted);width:fit-content}
+.chip.go{color:var(--warn);border-color:var(--warn)}
+.chip.now{color:var(--good);border-color:var(--good)}
+dl{display:grid;grid-template-columns:90px minmax(0,1fr);gap:6px 12px;margin:0}
+dt{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:3px}
+dd{margin:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:700px){.two{grid-template-columns:minmax(0,1fr)}}
+ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.good{color:var(--good)} .warn{color:var(--warn)}
+ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
+</style></head><body>
+
+<main>
+  <header>
+    <div class="tag">G2 · Petoi AI head · agreed 2026-10-11 · not started</div>
+    <h1>AI Head Hybrid Plan</h1>
+    <p class="lead">The head becomes G2's microphone, speaker and face. A small fork of its firmware lets the Pi start the head's conversation by command, play G2's own voice through it, and later receive its microphone so the Pi's own mic and speaker can go. Conversation uses the head's free cloud model, which reaches G2 through tools on the Pi. There is no backend. Nothing is built past the tool-server proof. The head adds overhead and limits, so it has to be worth it: the reason for it is removing the Pi's own mic and speaker, and the first step, whenever you say go, is a spike that tests exactly that.</p>
+  </header>
+
+  <section>
+    <h2>How the pieces connect</h2>
+    <div class="fig">
+      <svg viewBox="0 0 760 330" role="img" aria-label="Architecture: the Pi, the head with the forked firmware, and the cloud model">
+        <rect class="pt" x="20" y="40" width="250" height="250" rx="8"/>
+        <text x="145" y="64" text-anchor="middle" style="font-weight:600">Pi (G2's brain)</text>
+        <text x="40" y="96">gait, safety, emergency stop</text>
+        <text x="40" y="118">vision, exploration</text>
+        <text x="40" y="140">memory, reflection</text>
+        <text x="40" y="170">"G2" wake word (F0)</text>
+        <text x="40" y="192">Piper voice (F1)</text>
+        <text x="40" y="214">tool server (recall, skills)</text>
+        <text class="m" x="40" y="250" style="font-size:10px">Claude only via the rate-limited</text>
+        <text class="m" x="40" y="264" style="font-size:10px">"ask the brain" tool</text>
+
+        <rect class="hd" x="480" y="40" width="250" height="150" rx="8"/>
+        <text x="605" y="64" text-anchor="middle" style="font-weight:600">Head (forked firmware)</text>
+        <text x="500" y="96">microphone, speaker, screen face</text>
+        <text x="500" y="118">F0: command = button click</text>
+        <text x="500" y="140">F1: plays audio from the Pi</text>
+        <text x="500" y="162">F2: streams idle mic to the Pi</text>
+
+        <rect class="pt" x="480" y="236" width="250" height="60" rx="8"/>
+        <text x="605" y="262" text-anchor="middle" style="font-weight:600">XiaoZhi cloud</text>
+        <text x="605" y="280" text-anchor="middle" class="m" style="font-size:10px">free model, speech in and out</text>
+
+        <path class="ln" d="M270 110 H480"/><text x="375" y="102" text-anchor="middle" style="font-size:10px">F0 trigger (Wi-Fi)</text>
+        <path class="ln" d="M270 150 H480"/><text x="375" y="142" text-anchor="middle" style="font-size:10px">F1 audio to the head</text>
+        <path class="ln" d="M480 170 H270"/><text x="375" y="188" text-anchor="middle" style="font-size:10px">F2 mic stream to the Pi</text>
+        <path class="ln" d="M605 190 V236"/><text x="615" y="218" style="font-size:10px">conversation</text>
+        <path class="lw" d="M480 266 H300 Q270 266 270 236"/><text x="395" y="258" text-anchor="middle" style="font-size:10px">tool calls (MCP)</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>Roadmap</h2>
+    <div class="phases">
+      <article class="ph">
+        <div class="name"><span class="id">S</span><h3>Spike</h3><span class="chip go">step 1 · needs your go</span></div>
+        <dl>
+          <dt>Goal</dt><dd>Find out whether the head can replace the Pi's microphone and speaker. This is the go or no-go for everything below.</dd>
+          <dt>Work</dt><dd>Install ESP-IDF v5.4.2. Build unchanged v2.0.4 for the head's board with a copy of Petoi's partition table, flash the app slot only, and check it boots, keeps its Wi-Fi and activation, and still talks. Then add a throwaway streamer: mic to a receiver, audio back to the speaker, the stock chat alive. Record speech at a few distances with his speaker playing; log CPU, memory and dropouts for a couple of hours.</dd>
+          <dt>Gate</dt><dd>The stock-equivalent build activates and talks; the C3 carries mic, playback and chat without dropouts; the recorded mic is usable for wake and speech recognition.</dd>
+          <dt>You</dt><dd><span class="warn">Yes to the toolchain download</span> (about 2 to 3 GB, plus an exception for its installer script) and a yes to each flash. About 1 to 2 hours of your time over one or two sessions.</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">0</span><h3>Talker</h3><span class="chip now">no fork, no hardware</span></div>
+        <dl>
+          <dt>Goal</dt><dd>A usable head on the bench that knows G2.</dd>
+          <dt>Work</dt><dd>Tool server as a service; read-only tools plus a recall tool (results under 1000 bytes); role text telling the model to recall first; a voice; a call log; persona and mood tool; the rate-limited "ask the brain" tool.</dd>
+          <dt>Gate</dt><dd>The model calls recall on at least 9 of 10 test turns; answers are correct; the call log shows Claude calls saved.</dd>
+          <dt>You</dt><dd>The developer-certification choice (a GitHub login, yours to do).</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">1</span><h3>Fork prep</h3><span class="chip now">read-only</span></div>
+        <dl>
+          <dt>Goal</dt><dd>Remove the unknowns before touching firmware.</dd>
+          <dt>Work</dt><dd>Read Petoi's server address and activation settings from the flash backup; ask Petoi for the source, the BiBoard serial pins and the push interface; measure the head's current on the Grove 5 V; simulate its mass on the gait.</dd>
+          <dt>Gate</dt><dd>Activation approach understood; head weight and current acceptable.</dd>
+          <dt>You</dt><dd><span class="warn">Yes to the toolchain download</span> (multi-GB; source, version, hash and folder per the protocol).</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">2</span><h3>F0: Pi trigger</h3><span class="chip go">needs your go</span></div>
+        <dl>
+          <dt>Goal</dt><dd>Hands-free "G2" with the Pi's mic; no button hardware.</dd>
+          <dt>Work</dt><dd>Build stock upstream unchanged first and prove it activates on the same account (restore path tested). Then add the listener: a click-equivalent command, refused during start-up, aware of start versus stop. Wire the Pi's "G2" wake word to it. The emergency stop stays on the Pi.</dd>
+          <dt>Gate</dt><dd>Activation works on the self-built firmware (if not, restore the backup); trigger 20 of 20 on the bench; ignored during boot; <code>app --halt</code> untouched.</dd>
+          <dt>You</dt><dd>Yes to flashing the head. It stays off G2 until this passes.</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">3</span><h3>Mount on G2</h3><span class="chip go">your hands</span></div>
+        <dl>
+          <dt>Goal</dt><dd>The head working on the body.</dd>
+          <dt>Work</dt><dd>Mount; Grove cable to the UART socket with the head's transmit line left unconnected; walk tests with hands near.</dd>
+          <dt>Gate</dt><dd>Gait unchanged within normal tolerance; no brownouts; antenna cable undisturbed.</dd>
+          <dt>You</dt><dd>You do the hardware. G2 never on his back; no walk test without your go.</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">4</span><h3>F1: Pi voice</h3><span class="chip go">needs your go</span></div>
+        <dl>
+          <dt>Goal</dt><dd>G2's own voice, and speech on his own initiative, through the head.</dd>
+          <dt>Work</dt><dd>The head plays audio the Pi sends (Piper with the robot effect). Pi speech for his own lines; the free model for conversation.</dd>
+          <dt>Gate</dt><dd>Loud enough for horns and "oof" over servo noise; no Wi-Fi dropouts in a normal room; sound sets still pass.</dd>
+          <dt>You</dt><dd>The listening test.</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">5</span><h3>F2: head mic</h3><span class="chip go">needs your go</span></div>
+        <dl>
+          <dt>Goal</dt><dd>Remove the Pi's own microphone and speaker.</dd>
+          <dt>Work</dt><dd>Stream the head's idle mic to the Pi; wake and stop words run on it. Echo test and capacity test (stream, play and cloud chat together). The eight-item gate. No autonomous movement while he speaks. The Pi's audio stays as a config fallback until the gate passes; hardware comes off last.</dd>
+          <dt>Gate</dt><dd>All eight items pass, including "stop" and "G2" heard at normal voice while his own speech plays; the emergency stop works with no mic (<code>--halt</code>).</dd>
+          <dt>You</dt><dd>The removal itself.</dd>
+        </dl>
+      </article>
+      <article class="ph">
+        <div class="name"><span class="id">6</span><h3>Later</h3><span class="chip">only if needed</span></div>
+        <dl>
+          <dt>Goal</dt><dd>Fix what the plan gives up.</dd>
+          <dt>Work</dt><dd>Pi-side echo cancellation; an S3 head (not an option for now; revisit only if the mic cannot be removed); our own backend (G2's voice and Claude with full memory in conversation, audio in the house); the face driven from the Pi.</dd>
+          <dt>Gate</dt><dd>Chosen only if the stock voice or the free model proves unacceptable in phases 0 to 4.</dd>
+          <dt>You</dt><dd>A new decision.</dd>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h2 class="good">What you get</h2>
+      <ul>
+        <li>Hands-free "G2", no button hardware (F0).</li>
+        <li>G2's own voice and speech on his own initiative (F1).</li>
+        <li>The Pi's microphone and speaker removed, after the gate (F2).</li>
+        <li>The free model kept; fewer Claude calls.</li>
+        <li>No server to run.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h2 class="warn">What it gives up</h2>
+      <ul>
+        <li>One voice during conversation: the free model speaks in a stock voice.</li>
+        <li>Claude's quality in conversation; memory arrives in small pieces by tool.</li>
+        <li>Conversation audio staying in the house.</li>
+        <li>Independence from XiaoZhi's free tier.</li>
+        <li>A custom wake word on the head and talking over him (C3 limits).</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>What you could end up with</h2>
+    <ul>
+      <li><b>A, the full hybrid:</b> the Pi's mic and speaker removed, hands-free, free model, memory. About 40-45%.</li>
+      <li><b>B, the backup:</b> speaker removed, a small mic kept. About 60%.</li>
+      <li><b>C:</b> hands-free, free model and memory, Pi audio unchanged. About 70-75%.</li>
+    </ul>
+    <p style="margin-top:10px" class="tag">Judgment estimates, revised after the spike. If full mic removal cannot work, stop and reassess whether the head is worth continuing.</p>
+  </section>
+
+  <section class="two">
+    <div class="panel">
+      <h2>The tests that decide things</h2>
+      <ol>
+        <li>Capacity and mic quality (the spike)</li>
+        <li>Activation of a self-built firmware (the spike's first half)</li>
+        <li>Recall-tool call rate (phase 0)</li>
+        <li>Head current and mass (phases 1 and 3)</li>
+        <li>Loudness (phase 4)</li>
+        <li>Servo noise at the mic (phase 5)</li>
+      </ol>
+      <p style="margin-top:10px" class="tag">A failure changes what comes next, not what came before.</p>
+    </div>
+    <div class="panel">
+      <h2>Fallbacks and rollback</h2>
+      <ul>
+        <li>Every firmware phase rolls back to the flash backup (private, on the Mac).</li>
+        <li>If F0 fails: the button by one wire or an outside pusher.</li>
+        <li>If F2 fails: stay on phases 0 to 4 with the Pi's mic.</li>
+        <li>Partial removal (the speaker only) is the backup if the mic cannot go.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+</body></html>
