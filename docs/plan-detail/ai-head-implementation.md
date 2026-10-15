@@ -128,6 +128,19 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 - **For us:** no documented public interface on xiaozhi.me for sending these to our own head. Searches in English and Chinese turned up none; the one lead is a community pattern of a platform-run scheduled task that calls an MCP tool and speaks the result (polling, not a push, and unverified on the free plan). Upstream's `xz-mqtt` forwarding is the vendor's internal server tooling.
 - **So** without firmware or a backend of our own, the Pi cannot make the head say something on its own. With **our own backend** (stage 8) we would be the server and could send `alert` now and `tts` audio; `notify` would also need a firmware newer than v2.0.4. With a **firmware change** (stage 7) a host-driven speaker is the other route.
 
+## 3d. What Petoi confirmed by email (2026-10-15)
+
+Technical facts only; the hybrid plan page carries the same list.
+
+- **Firmware:** Petoi fork of 78/xiaozhi-esp32 with a Quaddle-specific board, robot UART, MCP tools and prompts. Public repo and release expected about two weeks after 2026-10-15. Built with ESP-IDF 5.5.x (5.5.4), newer than the 5.4.2 base of the head's installed v2.0.4.
+- **Redirecting the head:** the OTA check URL is a compile-time default (`CONFIG_OTA_URL`) and can be overridden in NVS (`ota_url`). The JSON the OTA endpoint returns can push WebSocket or MQTT settings into NVS, so a server we run (or an OTA-compatible one) can redirect sessions after provisioning without reflashing. OTA sync is disabled by default to protect users' code. Wi-Fi setup alone does not change the URL. This changes row 18 of section 5a: pointing the head at our own server needs no rebuild, so Petoi's build, BiBoard link and face tools stay.
+- **MCP:** JSON-RPC 2.0 (`tools/list`, `tools/call`) over the WebSocket or MQTT session. Extra model tools are normally wired on the server (xiaozhi-esp32-server). Whether the xiaozhi.me Extensions tab attaches a tool server is not documented in the firmware tree.
+- **xiaozhi.me:** Qwen real-time for personal accounts; no stable public developer API (self-host xiaozhi-esp32-server for full control); a phone number is needed for the SMS code.
+- **Host audio:** not implemented. It would extend AudioService and WebsocketProtocol/MqttProtocol (Opus in and out, `docs/websocket.md`) or use a custom MCP/server path. Wake words are a fixed pre-trained set.
+- **UART:** no setting to disable motion output (commands go out when MCP, voice or gamepad sends them). Pins are board-specific in `second_uart.h`, not runtime configurable. The BiBoard's onboard voice command module can be disconnected and its port assigned to the head. The head can draw 5 V from the BiBoard.
+- **Camera:** no Grove Vision AI V2 tool and none planned (may need an ESP32-S3). Enabling the head's camera demo disables its IMU (sample code, fixable by patch).
+- **Motion firmware:** `gb` disables the balance reflex and `gu` turns the gyro off. The IMU could run faster without value printing; angular rate is an intermediate value that could be extracted. Servo feedback does not need USB (commands are sent over USB). Other triggers, such as the back touch pads, can call functions. A timer in the motion firmware can rest the robot when the UART is silent for a set period.
+
 ## 3b. The opened head: what the photos show (2026-10-11)
 
 Photos are kept locally and are gitignored (`*.jpeg`): `blueprints/images/ai-head/head-board-top.jpeg` (whole board, top side), `head-board-button-closeup.jpeg` (left edge, soft focus) and `head-shell-button-opening-ruler.jpeg` (outside of the shell, ruler in inches, low resolution).
@@ -247,7 +260,7 @@ The head is G2's **mouth, ears and face**. The Pi remains the body's brain (gait
 | 15 | G2 speaking on his own initiative (narration, alarms, announcements) in G2's voice | 4 and 8 | **Backend** (the newer push message, unverified on the C3); a developer push (unverified); or a **Fork** (a host-driven speaker) | the head only speaks inside a conversation unless the server pushes audio |
 | 16 | Claude with G2's memory as the live brain, not through a tool | 8 | **Backend** | our server calls Claude |
 | 17 | Audio stays in the house; independence from XiaoZhi's free service | 8 | **Backend** | our server replaces the cloud |
-| 18 | Pointing the head at our own server | 8 | **Settings build + Backend** | the address is a build setting (`Default OTA URL`) |
+| 18 | Pointing the head at our own server | 8 | **Backend** (no rebuild: `ota_url` in NVS, confirmed by Petoi 2026-10-15, section 3d) | the OTA JSON can set the WebSocket or MQTT endpoint |
 | 19 | Hands-free "G2" by the Pi pressing the head's button | none yet | **Other hardware** | two wires and a transistor on a Pi pin; needs the Pi's microphone to stay |
 | 20 | A custom wake word "G2" on the head itself | none yet | **Other hardware** (an S3 head, or an add-on module) | not possible on the C3 by a fork or a backend |
 | 21 | Interrupting the head while it speaks | none yet | **Other hardware** (an S3 head) | echo cancellation is an S3 feature |

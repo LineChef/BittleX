@@ -117,7 +117,7 @@ ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
         <div class="name"><span class="id">1</span><h3>Fork prep</h3><span class="chip now">read-only</span></div>
         <dl>
           <dt>Goal</dt><dd>Remove the unknowns before touching firmware.</dd>
-          <dt>Work</dt><dd>Read Petoi's server address and activation settings from the flash backup; ask Petoi for the source, the BiBoard serial pins and the push interface; measure the head's current on the Grove 5 V; simulate its mass on the gait.</dd>
+          <dt>Work</dt><dd>Read Petoi's server address and activation settings from the flash backup; read Petoi's public head repo when it is released (announced for about two weeks after 2026-10-15) for the BiBoard serial pins and the push interface; measure the head's current on the Grove 5 V; simulate its mass on the gait.</dd>
           <dt>Gate</dt><dd>Activation approach understood; head weight and current acceptable.</dd>
           <dt>You</dt><dd><span class="warn">Yes to the toolchain download</span> (multi-GB; source, version, hash and folder per the protocol).</dd>
         </dl>
@@ -167,6 +167,26 @@ ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
           <dt>You</dt><dd>A new decision.</dd>
         </dl>
       </article>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>What Petoi confirmed (2026-10-15)</h2>
+    <div class="two">
+      <ul>
+        <li>Head firmware is a Petoi fork of xiaozhi-esp32 (Quaddle board, robot UART, MCP, prompts). Public repo and release expected in about two weeks. Builds with ESP-IDF 5.5.x (they use 5.5.4).</li>
+        <li>The head checks an OTA URL (compile-time default <code>CONFIG_OTA_URL</code>, overridable in NVS as <code>ota_url</code>). The JSON it returns can write WebSocket or MQTT settings to NVS, so sessions can be redirected to another server after provisioning without reflashing. Petoi disabled OTA sync by default.</li>
+        <li>On-device tools use MCP (JSON-RPC 2.0, <code>tools/list</code> and <code>tools/call</code>) over the session. Extra model tools are normally added on the server side (xiaozhi-esp32-server). Whether the xiaozhi.me Extensions tab attaches a tool server is not documented in the firmware.</li>
+        <li>xiaozhi.me: Qwen real-time for personal accounts; no stable public developer API; an account needs a phone number for an SMS code.</li>
+      </ul>
+      <ul>
+        <li>Host-audio mode (head mic and speaker driven by a host) is not a product feature. It means extending AudioService and WebsocketProtocol or MqttProtocol (Opus in and out, <code>docs/websocket.md</code>).</li>
+        <li>Wake words: a fixed set of pre-trained ones.</li>
+        <li>Motion UART output has no user setting; it is sent when MCP, voice or gamepad issues a command (<code>self.robot.send_command</code>). UART pins are fixed in <code>second_uart.h</code>; changing them needs a board port and rebuild.</li>
+        <li>The BiBoard's onboard voice command module can be disconnected and its port given to the head, so the head does not share UART2 with the Pi. The head can draw 5 V from the BiBoard.</li>
+        <li>No Grove Vision AI V2 tool in the head firmware and none planned (may need an ESP32-S3). Enabling the head's camera demo disables its IMU.</li>
+        <li>Motion firmware: <code>gb</code> disables the balance reflex, <code>gu</code> turns the gyro off. A timer in the motion firmware can rest G2 when the UART is silent for a set period. The IMU runs faster without value printing; angular rate is available as an intermediate value. Back touch pads can be given other triggers.</li>
+      </ul>
     </div>
   </section>
 

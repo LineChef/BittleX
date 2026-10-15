@@ -564,6 +564,7 @@ ul,ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
     <h3 style="color:var(--warn)">2.4 Open items</h3>
     <ul>
       <li><b>One UART, two listeners.</b> The Pi's 5-pin header and the head's Grove socket both land on BiBoard UART2 (G1). Leaving the head's transmit line unconnected keeps the Pi as the only sender. Confirm which physical socket on the board is G1 before connecting the head.</li>
+      <li><b>Sharing option (Petoi, 2026-10-15):</b> the BiBoard's onboard voice command module can be disconnected and its port assigned to the head, so the head no longer shares UART2 with the Pi. The head can also take its 5 V from the BiBoard. Head UART pins are fixed in its firmware (<code>second_uart.h</code>).</li>
       <li><b>Unmeasured:</b> the head's current on the Grove 5 V (BiBoard input is 7 to 9 V).</li>
     </ul>
   </div>
