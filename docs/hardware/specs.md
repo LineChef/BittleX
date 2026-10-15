@@ -208,6 +208,8 @@ above.
 
 The heatsink drawn in the viewer is left out (not fitted on G2).
 
+**Status: study only.** This is a prototype; nothing from it is implemented. The sim payload (`PAYLOAD_PROFILE=case` and the 301 g base above) is unchanged until the owner says otherwise.
+
 **Front/rear balance** (project method: center of mass from link and payload
 masses over the paw positions at the reset stance, as in
 `test_v3_levers.py::test_the_sim_carries_the_weighed_mass_and_front_rear_balance`):
