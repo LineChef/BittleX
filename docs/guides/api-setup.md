@@ -29,26 +29,21 @@ local, and can warn *before* the hard stop is hit). Do both.
       (`config.api_key_expiry_status()`, surfaced at voice startup + in
       `livecheck`). Reset both the console expiry and this date when you rotate.
 
-## G2 side — local, faster, and can warn ahead of time — NOT YET BUILT
+## G2 side — local, faster, and can warn ahead of time — partly built (usage tracking yes; limiter and budget caps not yet)
 
 **The rule for every limit below, self-imposed or Anthropic's own: warn before
 it's hit, and clearly say/log when it IS hit — never a silent failure or a raw
 error, so it's never "why is G2 not responding and I have no idea why."**
 
-Three independent guardrails — they catch different things, one of them isn't
-even a G2 setting:
+Independent guardrails — they catch different things, one of them isn't
+even a G2 setting. The usage tracker and price config exist; the call-rate limiter
+and the budget caps are still to build:
 
 - [ ] **Call-rate limiter** — cap calls/minute (e.g. `G2_MAX_CALLS_PER_MIN`).
       Catches a *bug* (wake-word false-trigger loop, a retry storm) in seconds,
       before it's spent real money. Doesn't need to know cost at all.
-- [ ] **Local usage tracker** — every API response reports its exact token usage
-      (`usage.input_tokens` / `usage.output_tokens`); log each call + a running
-      daily/monthly total to a local gitignored store (not the repo, not synced
-      — same pattern as the memory DB).
-- [ ] **Price-per-token config**, filled in by hand from the current pricing
-      page (`G2_INPUT_COST_PER_MTOK`, `G2_OUTPUT_COST_PER_MTOK`) — tracked in
-      tokens for certain, estimated to $ from a knob you set, not a hardcoded
-      number that could go stale.
+- [x] **Local usage tracker: BUILT.** Every API call is logged with its exact token usage (`voice/api_log.py`, a gitignored file under `~/.local/share/g2/`), and a per-day report counts each turn and retry (`python -m pi_pipeline.voice.usage`). Read it any time with `g2api [hours]`, which shows calls, tokens and approximate cost by source.
+- [x] **Price-per-token config: BUILT** as `G2_PRICE_IN_PER_MTOK` and `G2_PRICE_OUT_PER_MTOK`, filled in by hand from the current pricing page. Tokens are tracked for certain; dollars are estimated from those two numbers, not a hard-coded price that could go stale.
 - [ ] **Our own budget caps** (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`).
       Once crossed, G2 **refuses further API calls itself** and says/logs so
       clearly — "I can't chat right now, I've hit today's budget" — fails safe,

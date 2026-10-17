@@ -8,6 +8,7 @@ How to do a thing on the current build.
 | [`voice-commands.md`](voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills, plus G2's character sounds. |
 | [`exploration-mode.md`](exploration-mode.md) | How exploration mode works: starting it, legs, picture stops, wall steering and hit detection, sounds, ending it, where the logs are. |
 | [`settings-switches.md`](settings-switches.md) | Every environment switch (sounds, exploration, walls, power, standing) with its default. |
+| [`env-reference.md`](env-reference.md) | Every `G2_*` variable the code reads, with its default, where it is read and where it is documented (generated; flags any that no guide mentions). |
 | [`pi-bring-up.md`](pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
 | [`gait-deployment.md`](gait-deployment.md) | The sim→real path (ONNX export, on-robot loop, bring-up steps). |
 | [`train-vision-model.md`](train-vision-model.md) | The SenseCraft capture→train→deploy flow. |

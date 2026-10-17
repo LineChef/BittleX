@@ -203,6 +203,21 @@ def results_index_errors(root):
     return []
 
 
+def env_reference_errors(root):
+    """docs/guides/env-reference.md is generated from the source; fail if it is stale (only for the real repo tree)."""
+    try:
+        import gen_env_reference
+    except ImportError:
+        return []
+    if os.path.realpath(root) != os.path.realpath(gen_env_reference.ROOT):
+        return []
+    target = os.path.join(root, "docs", "guides", "env-reference.md")
+    cur = open(target).read() if os.path.exists(target) else ""
+    if cur != gen_env_reference.build():
+        return ["docs/guides/env-reference.md is out of date with the code -- run: python tools/gen_env_reference.py"]
+    return []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--staged", action="store_true")
@@ -216,6 +231,7 @@ def main():
     errors += backlog_errors(root)
     errors += helpers_doc_errors(root)
     errors += results_index_errors(root)
+    errors += env_reference_errors(root)
     if not args.quiet_warnings:
         for w in warnings:
             print(f"warning: {w}")

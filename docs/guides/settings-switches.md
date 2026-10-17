@@ -71,4 +71,46 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_NARRATE_START_QUIET_S` | 8 | no narration for the first seconds of an exploration |
 | `G2_WALL_STEER` | on | `0` turns the wall turn-away off (used to let him walk into a wall and test the hit sequence) |
 
+## Locations, logs and limits (added 2026-10-17)
+
+Where G2 keeps things, and the limits people occasionally change. Every variable the code reads, with its default, is listed in [`env-reference.md`](env-reference.md).
+
+| Switch | Default | What it does |
+|---|---|---|
+| `G2_API_LOG` | `~/.local/share/g2/api_calls.jsonl` | the log of every Claude API call (one JSON line each); `off` turns it off. Read with `g2api` |
+| `G2_API_PRICE` | `3,15` | input and output dollars per million tokens, used for the cost estimate; set it to match the current price list |
+| `G2_USAGE_FILE` | `~/.local/share/g2/api_usage.json` | per-day call and token counts, including retries (`python -m pi_pipeline.voice.usage`) |
+| `G2_BATTERY_WATCH` | on | the low-battery watch for G2's pack; `0` turns it off |
+| `G2_BATTERY_LOG`, `G2_BATTERY_LOG_EVERY_S` | `~/.local/share/g2/battery_voltage.csv`, 300 | the pack-voltage history, one line per interval (an empty path turns it off) |
+| `G2_PI_RUNTIME_LOG` | `~/.local/share/g2/pi_runtime.json` | the measured Pi battery runs |
+| `G2_AUTOLOG_DIR` | `~/g2_runs/auto` | where the automatic walk logs go |
+| `G2_RUNS_DIR`, `G2_LOG_DIR` | `~/g2_runs`, `~/g2_logs` | walk logs and diagnostics sessions; both are tidied after `G2_TIDY_DAYS` |
+| `G2_CAP_DIR` | `~/g2_cap` | the camera preview's captures, cleared at every voice-service start (pull them first with `g2pcam-pull`) |
+| `G2_DETECTION_LOG_DIR` | `~/g2_runs/detections` | the detection log folder |
+| `G2_EXPLORE_PICTURES_DIR` | `~/.local/share/g2/explore_pictures` | the exploration pictures |
+| `G2_NOISE_LOG` | `~/.local/share/g2/noise.jsonl` | the log of BiBoard commands that make a noise; `off` turns the file off |
+| `G2_GAIT_MODE_FILE`, `G2_GALLERY_PENDING` | `~/.local/share/g2/gait_mode.json`, `.../gallery_pending.json` | the shared gait mode and the pictures queued for the object gallery |
+| `G2_STATE_DIR` | `~/.local/share/g2` | where `bringup` keeps its progress file |
+| `G2_DEFAULT_GAIT` | `policy` | `firmware` goes back to the stock scripted `wkF` for forward walking |
+| `G2_CONVERSATION_WINDOW_S`, `G2_CONVERSATION_MAX_S` | 20, 600 | conversation mode ("let's talk"): how long G2 waits for you to start each turn, and the session limit; 0 for the window turns the mode off |
+| `G2_CONVERSATION_MAX_WORDS`, `G2_SIDE_MAX_WORDS` | 30, 14 | a turn heard without the wake word that runs longer than this is dropped before Claude (the first number applies in conversation mode); 0 means no limit |
+| `G2_SIREN_PEAK` | the siren level | loudness of the Pi battery alert siren (a fraction of full scale) |
+| `G2_MEMORY_LOG_COMMANDS` | off | `1` logs the memory-related spoken commands |
+| `G2_NARRATE_HIDE_NAMES` | off | `1` makes G2 say "someone" instead of the names he knows when narrating |
+| `G2_INTEREST` | on | `0` turns off the interest watch that decides when an exploration stop is worth a picture |
+| `G2_WALL_LOOK_FAST_S` | 3 | seconds between wall looks while a wall is near |
+| `G2_OBJECT_GALLERY_MAX_ENTRIES`, `G2_OBJECT_GALLERY_MAX_SAMPLES`, `G2_OBJECT_GALLERY_MAX_MB` | 200, 5, 200 | capacity limits of the object gallery |
+
+On the Mac and in the tools:
+
+| Switch | Default | What it does |
+|---|---|---|
+| `G2_DATA_DIR` | `~/g2_data` | the Mac's real-data store |
+| `G2_CAL_POLICIES` | the frozen reference and the newest final policy | the policies a calibration must not harm (the harm check) |
+| `G2_REMOTE_MEMORY_DB` | `.local/share/g2/g2_memory.db` | the memory database `g2membackup` copies, relative to the Pi user's home |
+| `G2_REVIEW_NO_OPEN` | unset | set it to stop the review page (`g2pics`, `g2pimem`) from opening a browser |
+| `G2_VISION_CLASSES` | unset | the class order for the vision library, e.g. `a,b,dog,cat`; the real names are personal, so set it in your shell, not in the repo |
+| `G2_CAM_PORT`, `G2_CAM_AEBUMP`, `G2_CAM_IDLE_EXIT` | first camera port, `0x30`, 10 | the camera preview: serial port, auto-exposure lift (0 disables) and the idle-exit seconds |
+| `G2_ROOT` | the repo | set by the aliases; `install_voice_service.sh` defaults it to `~/bittleX` on the Pi |
+
 See also [`feature-flags.md`](feature-flags.md) for the `G2_FEATURES` subsystem flags.
