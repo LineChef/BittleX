@@ -5,7 +5,7 @@
     python -m pi_pipeline.voice.check_audio stt            # transcribe one spoken utterance
     python -m pi_pipeline.voice.check_audio mic [SECONDS]   # record the microphone, print its level each second, then transcribe it (stop g2-voice first)
     python -m pi_pipeline.voice.check_audio tts "hello"    # speak text with the current Piper voice
-    python -m pi_pipeline.voice.check_audio tts "hi" --model models/piper/en_US-amy-medium.onnx
+    python -m pi_pipeline.voice.check_audio tts "hi" --model models/piper/en_US-ryan-medium.onnx
 """
 from __future__ import annotations
 
