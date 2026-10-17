@@ -1,5 +1,5 @@
 """ResidualGaitPolicy -- run the trained residual-on-wkF walking policy
-(`DEFAULT_POLICY`, e.g. `hw1_20m_ppo.onnx`) on real IMU data, producing joint targets for the BiBoard.
+(`DEFAULT_POLICY`) on real IMU data, producing joint targets for the BiBoard.
 
 Pure numpy + onnxruntime. No pybullet, no serial. Exact deployment mirror of
 `opencat_gym_env.OpenCatGymEnv`'s observation build + residual->joint mapping;

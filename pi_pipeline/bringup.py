@@ -224,17 +224,15 @@ def _steps() -> list[Step]:
             manual_cmd="python pi_pipeline/gait/run_gait.py --probe-imu"),
         Step("13b", "RL sim-to-real (Phase 6)", "The H1 head-to-head -- FIRST TIME ON THE FLOOR",
             "Only after 13a's --openloop confirms correct servo signs. "
-            "--cmd (the learned gait) -> the H1 head-to-head vs firmware "
-            "kwkF. Methodology + decision rule: docs/rl/h1-rubric.md; "
-            "h1_score.py produces the verdict. Keep the emergency stop within "
+            "--cmd (the learned gait), on his feet on the floor with your hands "
+            "near. Policies are judged in the sim benchmark, not by a hardware "
+            "head-to-head (user rule, 2026-10-09; the old method is in "
+            "docs/rl/h1-rubric.md). Keep the emergency stop within "
             "reach (--halt, or say 'emergency stop') for the whole thing. "
-            "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1\n"
-            "ONCE H1 PASSES: rename run20m_ppo from its training-artefact name "
-            "to a deployment name (one rename commit) -- don't defer this, it "
-            "gets easy to forget once integration work starts.",
+            "Shown, not auto-run: python pi_pipeline/gait/run_gait.py --cmd 0.1",
             manual_cmd="python pi_pipeline/gait/run_gait.py --cmd 0.1"),
         Step("13c", "RL sim-to-real (Phase 6)", "OPTIONAL, not blocking: servo-thermal bench calibration",
-            "The thermal governor (gait/thermal_guard.py) has never seen real "
+            "The thermal guard (gait/thermal_guard.py) has never seen real "
             "hardware -- every constant is a placeholder. Whenever convenient "
             "post-H1 (not blocking further bring-up): hold the robot in a "
             "fixed hard stance (or one leg against a stop) until protection "

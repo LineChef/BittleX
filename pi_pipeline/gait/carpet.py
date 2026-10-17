@@ -1,6 +1,6 @@
 """CarpetDetector -- notice when G2 is bogging down on carpet and recommend a fix.
 
-The learned walk (`run20m_ppo`, residual on wkF) was tuned on hard flooring; on
+The learned walk (a residual on the scripted wkF) was originally tuned on hard flooring; on
 carpet the feet snag and forward progress collapses to a fraction of the
 commanded speed (the 2026-09-03 probe batch: "stalls on carpet"). OpenCat ships
 a gait tuned for carpet (`carpetF`, decoded to `reference_gait/carpet_ref.npy`),
