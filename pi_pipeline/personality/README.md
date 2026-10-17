@@ -1,4 +1,4 @@
-# personality
+# Personality
 
 G2's personality is a set of **traits**. Each trait is a small, self-contained
 bias that can touch three channels — you implement only the ones it needs:

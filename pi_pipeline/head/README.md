@@ -1,4 +1,4 @@
-# head/
+# Petoi AI Head tools (not in the build)
 
 **Not part of the running build.** An MCP tool server for the Petoi AI Head's agent (an exploration of 2026-10-11). The plan, findings and what adopting the head would take: [`../../docs/planned/ai-head/README.md`](../../docs/planned/ai-head/README.md).
 

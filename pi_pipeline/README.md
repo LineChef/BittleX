@@ -18,22 +18,40 @@ Every hardware-specific dependency sits behind a small interface with a **mock o
 
 ## Packages
 
+
+### Conversation
+
 | Package | What it does | README |
 |---|---|---|
 | [`voice/`](voice/README.md) | Wake word, speech to text, Claude, text to speech; `perform_skill` and `remember` tools; local spoken commands; sounds | yes |
 | [`memory/`](memory/README.md) | SQLite exchange log (BM25 search) and facts G2 saves himself; consolidation; review UI | yes |
 | [`personality/`](personality/README.md) | Composable traits that shape the Claude prompt, the behavior knobs and the cues | yes |
+| [`reflection/`](reflection/README.md) | Session recaps and the idle-time reflection notes | yes |
+
+### Autonomy
+
+| Package | What it does | README |
+|---|---|---|
 | [`behavior/`](behavior/README.md) | `BehaviorDriver.tick()` returns ordered effects: modes, exploration, idle, sleep, wall avoidance, chirps, emergency stop | yes |
 | [`vision/`](vision/README.md) | Camera feed, detections, pictures, wall distance, recognition by instance | yes |
 | [`gait/`](gait/README.md) | The 80 Hz policy loop, steering trim, stand-up ramp, guards, IMU speed and stall, bench and logging tools | yes |
 | [`link/`](link/README.md) | The shared serial link to the BiBoard, command tracing, `check_serial` | yes |
+
+### Runtime
+
+| Package | What it does | README |
+|---|---|---|
 | [`app/`](app/README.md) | The whole robot as one program: voice loop and behavior runtime over one link | yes |
 | [`diag/`](diag/README.md) | Per-session event log with a black-box ring buffer, control-loop watchdog, crash reports | yes |
 | [`power/`](power/README.md) | Pi power levers, battery watch, runtime estimate, sleep, power log | yes |
 | [`telemetry/`](telemetry/README.md) | Automatic walk logs, floor labels, hardware epochs, data-type labels | yes |
-| [`reflection/`](reflection/README.md) | Session recaps and the idle-time reflection notes | yes |
-| [`head/`](head/README.md) | An MCP tool server for the Petoi AI Head (not part of the running build) | yes |
 | [`util/`](util/README.md) | Disk-space warning, old-log tidy, a worker supervisor | yes |
+| [`head/`](head/README.md) | An MCP tool server for the Petoi AI Head (not part of the running build) | yes |
+
+### Tests
+
+| Package | What it does | README |
+|---|---|---|
 | `tests/` | The suite: no network, audio or API key; run it before committing | |
 
 Top-level modules: `config.py` (settings, read once from the environment and `.env`), `features.py`, `sound_levels.py` (all sound levels as percent of the maximum), `doctor.py` (bring-up readiness checklist), `bringup.py` (guided, resumable bring-up), `benchmark_pi.py` (voice pipeline benchmark), `explore_session.py` and `explore_launch.py` (the supervised exploration session and its voice hand-over), and the Pi scripts `setup_pi.sh`, `fetch_models.sh` and `install_voice_service.sh`.

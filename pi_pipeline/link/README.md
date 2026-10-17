@@ -1,4 +1,4 @@
-# Link — serial to the BiBoard
+# Link (serial to the BiBoard)
 
 The transport between the Pi and the robot's BiBoard (OpenCatEsp32 firmware).
 Shared plumbing: `voice`'s `SerialActuator` uses it, `vision` maps avoidance

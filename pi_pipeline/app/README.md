@@ -1,4 +1,4 @@
-# app/
+# App (the whole robot)
 
 `python -m pi_pipeline.app` runs the whole robot as one program: the voice loop and the behavior runtime side by side over one shared serial link. This package is **the only place with real I/O wiring**; every other package takes injected dependencies.
 

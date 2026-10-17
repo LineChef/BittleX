@@ -1,4 +1,4 @@
-# gait/
+# Gait
 
 Everything that makes G2 walk on the real robot: the 80 Hz loop that runs the exported policy, the steering trim, the eased stand-up, the guards, the IMU speed and stall estimates, and the bench and logging tools. Deployment, sidecars and rollback: [`../../docs/guides/gait-deployment.md`](../../docs/guides/gait-deployment.md). What the learned gait does: [`../../docs/rl/walking-policy.md`](../../docs/rl/walking-policy.md). Which policy is deployed: [`../../docs/STATUS.md`](../../docs/STATUS.md).
 

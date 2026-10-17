@@ -1,4 +1,4 @@
-# diag/
+# Diagnostics
 
 Diagnostics: leave enough behind that a hardware failure can be explained afterwards. Design and phases: [`../../docs/hardware/diagnostics.md`](../../docs/hardware/diagnostics.md).
 

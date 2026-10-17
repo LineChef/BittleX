@@ -28,6 +28,12 @@ A **page** entry has `route`, `title`, `section`, `source` (the repo path), `upd
 
 **Links** inside pages are rewritten when the bundle is built: a link to another page becomes `<base>/<route>#anchor` (default base `/docs`), a link to an asset becomes `<base>/_assets/<repo path>`, and a link to a file that is not a page (a script, for example) becomes a GitHub link on the `development` branch. Serve the bundle's `assets/` folder at `<base>/_assets/` in the site, or change the links with `--base` and `--assets-url` at build time.
 
+## Order and groups in the navigation
+
+The order of the pages in the site's sidebar is the order of the rows in each folder's `README.md`: change the order of the rows and rebuild. A page the README does not list goes to the end, alphabetically. A `###` heading in a folder README makes a **sidebar group**: the pages linked under it carry a `group` field in the manifest's `nav` (for example `Operate` and `Configure` under Guides). Use a `###` heading only for a group; `##` headings are ordinary sections. Pages above the first `###` have no group and come first.
+
+The order of the top-level overview pages is set in the builder (`TOP_ORDER` in `build_docs_bundle.py`), and the folders follow `FOLDER_ORDER`.
+
 ## Loading it from the React site (Vite)
 
 The site is a single-page app, so the simplest reliable approach is to **fetch the bundle at run time** from GitHub Pages, which allows cross-origin reads:

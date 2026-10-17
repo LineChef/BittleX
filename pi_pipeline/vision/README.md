@@ -1,4 +1,4 @@
-# Vision — Phase 8
+# Vision
 
 The AI Vision Camera Module runs object detection **on-device** and sends
 results to the Pi over serial (BiBoard's ESP32 can't stream frames — see the

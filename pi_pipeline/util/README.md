@@ -1,4 +1,4 @@
-# util/
+# Utilities
 
 Small helpers shared across the Pi code.
 

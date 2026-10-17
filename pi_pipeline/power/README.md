@@ -1,4 +1,4 @@
-# power/
+# Power
 
 The Pi's power levers and everything about batteries. Design and measurements: [`../../docs/hardware/pi-power.md`](../../docs/hardware/pi-power.md). Operator view: [`../../docs/guides/operating-g2.md`](../../docs/guides/operating-g2.md). Thresholds and switches: [`../../docs/guides/settings-switches.md`](../../docs/guides/settings-switches.md).
 

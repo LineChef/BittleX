@@ -1,4 +1,4 @@
-# reflection/
+# Reflection
 
 G2 reflecting on his own experience. Design and levels: [`../../docs/planned/reflection-plan.md`](../../docs/planned/reflection-plan.md). The notes are stored as ordinary memory facts: [`../memory/README.md`](../memory/README.md).
 

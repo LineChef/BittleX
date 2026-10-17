@@ -1,4 +1,4 @@
-# telemetry/
+# Telemetry
 
 Automatic capture of every walk, so real-robot data turns into sim calibration without anyone asking. The full plan and the Mac-side steps (`g2_ingest.py`, `g2_calibrate.py`): [`../../docs/rl/real-data-pipeline.md`](../../docs/rl/real-data-pipeline.md).
 

@@ -1,4 +1,4 @@
-# behavior
+# Behavior
 
 What G2 does on its own between conversations. Pure logic, driven by the
 `BehaviorParams` the `personality` produces — no I/O, mockable, same shape as

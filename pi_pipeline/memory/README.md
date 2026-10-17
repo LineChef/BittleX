@@ -1,4 +1,4 @@
-# Memory — Phase 9
+# Memory
 
 Persistent conversation memory so G2 carries context across sessions. Plugs into
 the voice loop through one seam (`Memory.recall` / `Memory.record`); it is not

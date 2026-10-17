@@ -31,7 +31,7 @@ sys.path.insert(0, HERE)
 GIT_EXES = ("git", "/Library/Developer/CommandLineTools/usr/bin/git")
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".html"}
 CODE_READMES = ("pi_pipeline/README.md", "tools/README.md", "rl_training/README.md", "rl_training/opencat-gym/reference_gait/README.md")
-TOP_ORDER = ["STATUS", "project-plan", "architecture", "how-it-works", "capabilities", "code-map", "backlog"]
+TOP_ORDER = ["STATUS", "how-it-works", "architecture", "capabilities", "project-plan", "code-map", "backlog"]
 FOLDER_TITLES = {"archive/plan-detail": "Archived plan write-ups", "archive/rl": "Archived training campaigns", "blueprints/build-logs": "Build logs",
                  "code": "Code READMEs", "legal": "Legal", "code/pi_pipeline": "Pi pipeline code"}
 FOLDER_ORDER = ["guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive"]
@@ -210,6 +210,29 @@ def order_children(children, readme_text, readme_src, pages):
     return sorted(children, key=lambda n: (rank.get(n["route"], 10_000), n["title"].lower()))
 
 
+def groups_of(readme_text, readme_src, pages):
+    """Sidebar groups: a `###` heading in a folder README labels the pages linked under it, until the next heading of level 2 or 3."""
+    groups, current = {}, None
+    srcdir = posixpath.dirname(readme_src)
+    for line in readme_text.split("\n"):
+        if re.match(r"^###\s+", line):
+            current = re.sub(r"[`*]", "", line[4:]).strip()
+            continue
+        if re.match(r"^#{1,2}\s+", line):
+            current = None
+            continue
+        if current:
+            for m in LINK.finditer(line):
+                t = m.group(2).split("#")[0]
+                if not t or re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", t):
+                    continue
+                res = posixpath.normpath(posixpath.join(srcdir, t)).rstrip("/")
+                r = pages.get(res) if res in pages else pages.get(res + "/README.md")
+                if r is not None and r not in groups:
+                    groups[r] = current
+    return groups
+
+
 def build_nav(entries, bodies, pages):
     """entries: route -> entry. Returns a nested nav list."""
     nodes = {r: {"route": r, "title": e["title"], "section": e["section"], "children": []} for r, e in entries.items()}
@@ -248,6 +271,11 @@ def build_nav(entries, bodies, pages):
         readme_src = entries.get(n["route"], {}).get("source", "")
         txt = bodies.get(n["route"]) if readme_src.endswith("/README.md") else None
         n["children"] = order_children(n["children"], txt, readme_src, pages)
+        if txt:
+            g = groups_of(txt, readme_src, pages)
+            for c in n["children"]:
+                if c["route"] in g:
+                    c["group"] = g[c["route"]]
         for c in n["children"]:
             finish(c)
         if not n["children"]:

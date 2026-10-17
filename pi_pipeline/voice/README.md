@@ -1,4 +1,4 @@
-# Voice — Phase 7
+# Voice
 
 The conversation loop: **wake word → speech-to-text → Claude → text-to-speech →
 optional physical skill**, repeat.
