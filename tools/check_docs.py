@@ -173,6 +173,21 @@ def backlog_errors(root):
     return []
 
 
+def helpers_doc_errors(root):
+    """docs/guides/shell-helpers.md is generated from tools/g2_aliases.sh; fail if it is stale (only for the real repo tree)."""
+    try:
+        import gen_helpers_doc
+    except ImportError:
+        return []
+    if os.path.realpath(root) != os.path.realpath(gen_helpers_doc.ROOT):
+        return []
+    target = os.path.join(root, "docs", "guides", "shell-helpers.md")
+    cur = open(target).read() if os.path.exists(target) else ""
+    if cur != gen_helpers_doc.build():
+        return ["docs/guides/shell-helpers.md is out of date with tools/g2_aliases.sh -- run: python tools/gen_helpers_doc.py"]
+    return []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--staged", action="store_true")
@@ -184,6 +199,7 @@ def main():
     files = md_files(root, staged=args.staged)
     errors, warnings = check(root, files)
     errors += backlog_errors(root)
+    errors += helpers_doc_errors(root)
     if not args.quiet_warnings:
         for w in warnings:
             print(f"warning: {w}")

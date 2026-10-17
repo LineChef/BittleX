@@ -67,7 +67,7 @@ g2cam() {
   Aim ~150-200 saved.  Vary room/light/hair between the 3 sessions.
 EOF
 }
-g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped" || echo "nothing running"; }
+g2cam-stop() { pkill -f "camera_preview.py|face_preview.py" && echo "preview stopped" || echo "nothing running"; }   # stop the capture preview   # stop the capture preview
 g2cam-info() { _g2py tools/camera_preview.py --info; }   # serial port + which model is on the module
 
 # ---- camera MOUNTED on G2 (plugged into the Pi, not the Mac) ----
@@ -205,7 +205,7 @@ g2libsubset() {
   _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cls" \
     --limit "$n" --neg-limit "$(( n / 4 ))" --images-only --out "$G2_LIB_ROOT/upload_$n"
 }
-g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }
+g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }   # print the vision library manifest (images per class)
 
 # g2auto [classes] [--dry-run]  -- the FULL automated pipeline: for every
 #   pending raw session (curate -> dedup-against-library -> promote), then
@@ -347,7 +347,7 @@ g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 # g2cal [build|status|show [ID]|harm-check ID POLICY...|approve ID|revert|auto]  -- the real-data calibration builder (docs/rl/real-data-pipeline.md, Phase 3): fits what G2's run logs
 #   support, writes numbered snapshots, scores policies in the old and new world (idle Mac only), and applies the approval rules. The background loop (`g2bg status`) runs `auto` every 30 min.
 g2cal() { "$G2_ROOT/.venv/bin/python" "$G2_ROOT/tools/g2_calibrate.py" "$@"; }
-g2calauto() { bash "$G2_ROOT/tools/g2_cal_auto.sh" "$@"; }
+g2calauto() { bash "$G2_ROOT/tools/g2_cal_auto.sh" "$@"; }   # run the real-data calibration step now (pull the Pi logs, ingest, calibrate); `g2calauto status` lists snapshots
 # g2bg [start [MIN]|stop|status|once]  -- the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again.
 g2bg() { bash "$G2_ROOT/tools/g2_bg_jobs.sh" "$@"; }
 
@@ -408,6 +408,7 @@ g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status |
 
 # --------------------------------------------------------------------- docs
 
+# g2docs  -- print the list of key docs (the full index is docs/README.md)
 g2docs() {
   cat <<'EOF'
 Key docs (in docs/):

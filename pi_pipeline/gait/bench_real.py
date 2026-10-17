@@ -7,7 +7,7 @@ On the Pi, run it in a venv that has onnxruntime + numpy:
     ~/g2/.venv/bin/python -m pi_pipeline.gait.bench_real
     # or:  python pi_pipeline/gait/bench_real.py --n 4000
 
-Compare against the synthetic [276-256-256-8] stub from pi_setup.sh (~0.43 ms on
+Compare against the synthetic [276-256-256-8] stub used in the first Pi bring-up (~0.43 ms on
 a Zero 2 W). The real number should be close -- a touch higher for the obs-build
 (numpy concat + a couple of trig calls) and the exact 278-wide first layer.
 """

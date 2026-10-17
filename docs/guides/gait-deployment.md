@@ -26,50 +26,18 @@ cannot — see "Network").
 
 Everything here is doable **without the robot/BiBoard connected**.
 
-The runbook is codified as a **one-command, hands-off** script. It's fully
-self-contained — reads nothing else from the repo (it builds its own synthetic
-`[276→256→256→8]` ONNX stub in-line just to benchmark inference speed; the
-real `run20m_ppo.onnx` and `pi_pipeline/` come later, in a separate step) — so
-it only needs the one script file on the Pi, **not a full repo clone**:
+The Pi's OS setup is the idempotent `pi_pipeline/setup_pi.sh`, run over SSH on the Pi as the normal user; the prose runbook with the reason for each step is [`pi-bring-up.md`](pi-bring-up.md) (sections 3 to 8). Power notes: [`../hardware/pi-power.md`](../hardware/pi-power.md). The PiSugar S has **no battery telemetry**; don't chase it.
 
-```
-# from whichever machine is driving this (has the repo checked out) —
-# copies just the one script, nothing else:
-scp scripts/pi_setup.sh g2pi@g2pi.local:~/pi_setup.sh    # or g2pi@192.168.1.181
-ssh g2pi@g2pi.local bash ~/pi_setup.sh
-```
+The numbers that matter from the first bring-up benchmark (`python -m pi_pipeline.benchmark_pi`):
+- inference per call must be **well under 12.5 ms** (the 80 Hz control budget). This was the deployment-viability check (backlog item H8);
+- peak temperature under stress below about 80 °C, `throttled` staying `0x0`, and SSH not freezing under load (confirms the Wi-Fi power-save fix held).
 
-Phase 1 (interactive, one sudo prompt, ~10–25 min): Wi-Fi power-save off, `apt
-full-upgrade`, base packages, swap (zram + 1 GB swapfile), serial/UART → `/dev/ttyAMA0`
-via `dtoverlay=disable-bt`. Then it installs a `@reboot` crontab hook and reboots
-(SSH drops — expected). Phase 2 runs automatically on next boot (no sudo, ~5–10
-min): verify serial, venv + `onnxruntime`, synthetic `[276→256→256→8]`
-policy-inference benchmark, 2-min thermal/Wi-Fi stress, then writes
-`~/g2_pi_report.txt`, uploads it, writes the URL to `~/g2_report_url.txt`,
-removes its own hook, touches `~/g2_pi_DONE`.
-
-After the reboot, wait ~15 min, SSH back in: `cat ~/g2_report_url.txt` for the
-uploaded report link, or `cat ~/g2_pi_report.txt` to read it directly.
-`bash …/pi_setup.sh --status` shows progress. Escape hatches: `--manual` (no auto-reboot), `--post-reboot` (run phase
-2 by hand).
-
-The report's numbers that matter:
-- `onnxruntime MLP … ms/call` — must be **well under 12.5 ms** (80 Hz control
-  budget). This is the deployment-viability check (backlog item H8).
-- peak temp under stress (< ~80 °C), `throttled` staying `0x0`, SSH not freezing
-  during the load (confirms the power-save fix held).
-
-Prose version with the "why" for each step: `docs/guides/pi-bring-up.md`
-(sections 3–8). Power notes: `docs/hardware/pi-power.md`. The PiSugar S has **no
-battery telemetry** — don't chase it.
-
-If you're driving the Pi over SSH directly, you can skip the script and do the
-steps by hand from `pi-bring-up.md` — same content.
+*(The original bring-up used a self-contained script, `scripts/pi_setup.sh`, that built a synthetic policy stub and uploaded its report to a public paste service. It was removed on 2026-10-17 in favor of `setup_pi.sh`; it is in git history.)*
 
 ## Status as of 2026-09-03 ~3:30 PM Eastern
 
-- **Pi bring-up: DONE, clean pass.** `pi_setup.sh` ran to completion. Report
-  (paste.rs, captured): kernel 6.12.25 aarch64, swap OK, onnxruntime installs
+- **Pi bring-up: DONE, clean pass.** the original bring-up script ran to completion. Report
+  (captured): kernel 6.12.25 aarch64, swap OK, onnxruntime installs
   fine, **synthetic policy inference 0.43 ms/call (3% of the 12.5 ms budget)**,
   no thermal throttling under 2-min load (73.6 °C peak). The Pi Zero 2 W is
   fast enough to be G2's brain — backlog item **H8 resolved** (no on-MCU route
