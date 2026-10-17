@@ -1,4 +1,4 @@
-# rl_training/
+# RL training code
 
 Simulation training for G2's walking gait: PyBullet, Stable-Baselines3 (PPO) and Gymnasium. The gait is a learned *residual* (bounded to ±30°) on Bittle's scripted `wkF` walk, corrected from the IMU every control step. How a trained policy reaches the robot: [`../docs/guides/gait-deployment.md`](../docs/guides/gait-deployment.md). The training pipeline end to end: [`../docs/rl/training-pipeline.md`](../docs/rl/training-pipeline.md). Which policy is deployed: [`../docs/STATUS.md`](../docs/STATUS.md).
 

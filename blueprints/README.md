@@ -1,4 +1,4 @@
-# blueprints/
+# Build record (blueprints)
 
 The physical build record for G2: how the hardware was assembled and wired, with enough detail to reproduce it. Specs, research and the current parts list are in [`../docs/hardware/`](../docs/hardware/README.md) (start with [`as-built.md`](../docs/hardware/as-built.md)); this folder is the how.
 
