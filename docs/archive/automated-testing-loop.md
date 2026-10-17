@@ -1,5 +1,7 @@
 # Automated Testing Loop — RL Gait Iteration
 
+> **Retired 2026-10-17.** This is the runbook for the unattended reward-iteration loop of the first training runs (2026-08 to 2026-09). Its scripts were removed; the training chains used now are in [`../rl/training-pipeline.md`](../rl/training-pipeline.md).
+
 A runbook for unattended reward-function iteration on the walking policy. This is
 a separate workflow from the normal collaborative one, where every replay is
 watched and every run approved. Trigger phrases: "automated testing", "an

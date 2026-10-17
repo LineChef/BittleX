@@ -44,7 +44,7 @@ Docs that mention this family: [`vision-in-gait.md`](../archive/rl/vision-in-gai
 
 ## `checkpoints`
 
-Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`gait-friction-log.md`](../archive/rl/gait-friction-log.md) +17.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md) +16.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -257,7 +257,7 @@ Docs that mention this family: [`shell-helpers.md`](../guides/shell-helpers.md),
 
 ## `report`
 
-Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +31.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +31.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -279,7 +279,7 @@ Docs that mention this family: [`high-step-creep-training-plan.md`](../archive/p
 
 ## `run20m`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) +24.
+Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) +23.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -288,7 +288,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-
 
 ## `slope`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +30.
+Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +29.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -310,7 +310,7 @@ Docs that mention this family: [`README.md`](../archive/README.md), [`history.md
 
 ## `summary`
 
-Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +30.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +30.
 
 | File | Size | Cited by |
 |---|---|---|

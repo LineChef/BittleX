@@ -22,6 +22,10 @@ Closed work, kept for the record. **Nothing here describes the current build**; 
 [`decisions-log-2026-10-08`](plan-detail/decisions-log-2026-10-08.md) (the V4 overnight decisions), [`high-step-gait-plan`](plan-detail/high-step-gait-plan.md) and
 [`high-step-creep-training-plan`](plan-detail/high-step-creep-training-plan.md) (stopped 2026-10-13, goal not met).
 
+## `guides/`: retired guides
+
+[`automated-testing-loop.md`](automated-testing-loop.md): the unattended reward-iteration loop of the first training runs (retired 2026-10-17).
+
 ## Other
 
 [`history.md`](history.md): the dated project narrative as of late September 2026.

@@ -468,14 +468,14 @@ g2tb() {
 g2docs() {
   cat <<'EOF'
 Key docs (in docs/):
-  guides/SOLO.md                       start here if carrying on without Claude
+  guides/cheatsheet.md                 the commands, grouped by what you are doing
+  guides/operating-g2.md               safety, stopping G2, power on and off
   guides/train-vision-model.md              full camera-model walkthrough
   vision/capture-checklist.md   the capture routine + standard pose set
   vision/person-recognition.md       recognition design + "G2, meet X" enrollment
   vision/detection-layer.md          one-model-slot / multi-model architecture
   vision/detector-bench.md    measured module behaviour + AE-lift + orientation
   guides/feature-flags.md                     staged bring-up (g2feat --profiles)
-  guides/cheatsheet.md              the command reference (this + RL commands)
 EOF
 }
 

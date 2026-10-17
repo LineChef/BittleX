@@ -11,7 +11,6 @@
 | [`architecture.md`](architecture.md) | How the pieces fit together: the robot, the Pi and the dev machine, the subsystems and their seams, how a walk happens and how training reaches the robot. |
 | [`code-map.md`](code-map.md) | Where each code package is documented: its README next to the code, and the docs pages that explain it. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, behavior, link). |
-| [`guides/SOLO.md`](guides/SOLO.md) | Working-solo notes. |
 
 ## Where to update what
 

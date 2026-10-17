@@ -52,5 +52,7 @@ Not automatic: the Pi's autolog skips any walk started with `--log`, and the Mac
 
 - macOS: `sed -i` differs (use Python edits), there is no `timeout`, and chained sleeps are blocked (use Monitor until-loops). A command chain with `;` does not stop on a failing test: use `&&` before committing.
 - A failing pytest assertion once printed an API key (a `Settings` repr); tests compare plain numbers now. Filter full-suite output for `sk-ant` before pasting it anywhere.
-- The privacy hook flags the user's first name in docs and docstrings.
+- The privacy hook flags the user's first name in docs and docstrings; use placeholders in tracked files.
+- Commit locally as often as you like, but `git push origin development` is a deliberate step: the repo is public.
+- Before deleting capture folders, `trained/` files or the memory database, look at what is there: they are not all reproducible.
 - Training-run pitfalls: [`../rl/training-upgrade-2026-10.md`](../rl/training-upgrade-2026-10.md) section 7.
