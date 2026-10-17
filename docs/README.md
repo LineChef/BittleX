@@ -67,6 +67,7 @@ person recognition, on-device detector measurements).
 | [`self-righting.md`](hardware/self-righting.md) | Bittle's built-in self-right — limited; no BiBoard-V1 IR trigger. |
 | [`petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) | Confirmed-from-source serial tokens, IMU thresholds, skill format. |
 | [`petoi-skills-survey.md`](hardware/petoi-skills-survey.md) | Which OpenCat built-in skills are worth pulling into G2. |
+| [`robot-arm.md`](hardware/robot-arm.md) | Petoi's Bittle X+Arm gripper module: install, claw calibration, skill tokens, voice commands, what the vendor page leaves out. |
 | [`calibration-and-bringup-research.md`](hardware/calibration-and-bringup-research.md) | Petoi's official calibration/first-power-on docs, cross-checked against our bring-up plan. |
 
 ## Hardware build blueprints
