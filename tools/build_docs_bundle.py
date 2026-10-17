@@ -349,6 +349,17 @@ def build(out, base, gh, branch, check=True):
             raise SystemExit(f"{len(bad)} private term(s) found in the bundle; not publishing (run the pre-commit privacy check)")
     version = digest.hexdigest()[:12]
     nav = build_nav(entries, bodies, pages)
+
+    def annotate(nodes, parent):
+        """Copy each node's place in the tree onto its flat page entry, so a site can reorder from the flat list without walking `nav`."""
+        for i, n in enumerate(nodes):
+            e = entries.get(n["route"])
+            if e is not None:
+                e["parent"], e["order"] = parent, i
+                if "group" in n:
+                    e["group"] = n["group"]
+            annotate(n.get("children", []), n["route"])
+    annotate(nav, None)
     built = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     manifest = {"version": version, "built": built, "repo": gh, "branch": branch, "base": base, "assetsUrl": assets_url,
                 "pages": [entries[r] for r in sorted(entries)], "nav": nav, "assets": asset_list}

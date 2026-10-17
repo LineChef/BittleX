@@ -22,7 +22,7 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 | `pages/<route>.md` | Each page's Markdown with its links already rewritten. `pages/index.md` is the home page |
 | `assets/<repo path>` | Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan) |
 
-A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary` and `headings` (`level`, `text`, `id`). Sections: `overview`, `guides`, `hardware`, `vision`, `rl`, `research`, `plan-detail`, `planned`, `archive`, `blueprints`, `code`, `about`. The `nav` tree is ordered the way each folder's README lists its pages.
+A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. Sections: `overview`, `guides`, `hardware`, `vision`, `rl`, `research`, `plan-detail`, `planned`, `archive`, `blueprints`, `code`, `about`. The `nav` tree is ordered the way each folder's README lists its pages.
 
 **Routes:** `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.md` is the folder route; `docs/README.md` is the home page (`""`); `blueprints/...` keeps its path; code READMEs live under `code/` (`code/pi_pipeline/voice`); the repository README is `about`.
 
@@ -33,6 +33,31 @@ A **page** entry has `route`, `title`, `section`, `source` (the repo path), `upd
 The order of the pages in the site's sidebar is the order of the rows in each folder's `README.md`: change the order of the rows and rebuild. A page the README does not list goes to the end, alphabetically. A `###` heading in a folder README makes a **sidebar group**: the pages linked under it carry a `group` field in the manifest's `nav` (for example `Operate` and `Configure` under Guides). Use a `###` heading only for a group; `##` headings are ordinary sections. Pages above the first `###` have no group and come first.
 
 The order of the top-level overview pages is set in the builder (`TOP_ORDER` in `build_docs_bundle.py`), and the folders follow `FOLDER_ORDER`.
+
+### Controlling the order from the site
+
+The bundle gives the site a **default** order and the site may override any of it. Every entry in `manifest.pages` carries its place in the tree: `parent` (the route of its parent page, or `null` at the top), `order` (its position among its siblings) and `group` (the sidebar group label, when it has one). `manifest.nav` is the same tree already assembled. So the site has two ways to work:
+
+1. **Use `nav` as delivered.** The order and groups come from the folder READMEs.
+2. **Own the order in the site.** Build the tree from the flat `pages` list and apply a small override config kept in the site's repo. Anything the config does not mention keeps its bundle order, so a new page still appears.
+
+```ts
+// src/config/docsNav.ts: a sketch of the overrides the site can keep
+export const docsNav = {
+  primary: [                                    // the top bar: label and the route prefixes it covers
+    { label: 'Hardware', roots: ['hardware', 'blueprints'] },
+    { label: 'Walking', roots: ['rl'] },
+  ],
+  order: { guides: ['guides/cheatsheet', 'guides/operating-g2'] },   // parent route to routes to put first, in this order
+  groups: { 'guides/env-reference': 'Configure' },                    // route to a group label, overriding the bundle's
+  hidden: ['guides/docs-bundle'],                                    // routes left out of the menus (still reachable by URL)
+}
+
+// sort the children of one parent: routes named in `order` first, in that order, then the rest by the bundle's `order`
+const rank = (p: PageEntry, first: string[]) => (first.includes(p.route) ? first.indexOf(p.route) : first.length + p.order)
+```
+
+Because the overrides are keyed by route, they survive a rebuild of the docs; a route that disappears is simply ignored.
 
 ## Loading it from the React site (Vite)
 
