@@ -243,15 +243,6 @@ g2visioneval() {
       "${port:-/dev/cu.usbmodem58FA1045341}" --label "${1:-}" --secs "${2:-30}" $extra )
 }
 
-# g2watchab [vision|blind] [latest|final]  -- replay the Phase D A/B run in the
-#   PyBullet GUI (latest checkpoint while training, or the final policy).
-g2watchab() { ( cd "$G2_ROOT/rl_training/opencat-gym" && bash watch_ab.sh "$@" ); }
-
-# g2climbwatch [episodes] [ledge-lo] [ledge-hi] [pin-tag]  -- replay the NEWEST
-#   climb_* checkpoint in the PyBullet GUI. Auto-follows the current Phase F
-#   climb run (picks the most-recently-written trained/climb_*.zip, incl mid-run
-#   _steps checkpoints). Defaults: 8 eps, ledge 2.5-5 cm.
-g2climbwatch() { ( "$G2_ROOT/rl_training/opencat-gym/climbwatch" "$@" ); }
 
 
 # g2watchrun [--realtime]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of

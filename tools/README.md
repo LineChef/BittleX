@@ -10,6 +10,7 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 |---|---|
 | [`check_docs.py`](check_docs.py) | Doc checks: broken links, facts in the wrong page, orphan pages, stale generated pages. The pre-commit hook runs it. |
 | [`gen_backlog.py`](gen_backlog.py) | Regenerates `docs/backlog.md` from the item headings. |
+| [`gen_results_index.py`](gen_results_index.py) | Regenerates `docs/rl/results-index.md`: every tracked result file under `rl_training/opencat-gym/trained/` with the docs that cite it. |
 | [`gen_helpers_doc.py`](gen_helpers_doc.py) | Regenerates `docs/guides/shell-helpers.md` from the comments in `g2_aliases.sh`. |
 | [`md_to_html.py`](md_to_html.py) | Turns one Markdown doc into a single self-contained HTML page. |
 | [`make_petoi_edition.py`](make_petoi_edition.py) | Builds the English edition of the XiaoZhi and Petoi head documentation for sending to Petoi (reads [`docs/research/xiaozhi-vendor-docs.md`](../docs/research/xiaozhi-vendor-docs.md), writes outside the repo). |
@@ -67,7 +68,7 @@ The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.m
 |---|---|
 | [`eta.py`](eta.py) | Timing estimates for training runs, read from the trainer's logs (`plan`, `now`, `check`). Read-only. |
 | [`build_decathlon_report.py`](build_decathlon_report.py) | Turns a decathlon result and its replays into a self-contained HTML report. |
-| `v3_watchdog.sh`, `v4_watchdog.sh`, `v5_watchdog.sh`, `v6_watchdog.sh`, `hs_watchdog.sh` | Keep each training chain's runner alive unattended; each stops on its own halt file. Their chains are finished or stopped; see [`docs/rl/training-upgrade-2026-10.md`](../docs/rl/training-upgrade-2026-10.md). |
+| `v5_watchdog.sh`, `v6_watchdog.sh` | Keep a training chain's runner alive unattended; each stops on its own halt file. Both chains are finished; they are the templates for the next one ([`docs/rl/training-pipeline.md`](../docs/rl/training-pipeline.md)). The V3, V4 and high-step watchdogs were removed on 2026-10-17. |
 
 ## Git hooks
 

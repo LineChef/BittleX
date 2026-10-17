@@ -188,6 +188,21 @@ def helpers_doc_errors(root):
     return []
 
 
+def results_index_errors(root):
+    """docs/rl/results-index.md is generated from git; fail if it is stale (only for the real repo tree)."""
+    try:
+        import gen_results_index
+    except ImportError:
+        return []
+    if os.path.realpath(root) != os.path.realpath(gen_results_index.ROOT):
+        return []
+    target = os.path.join(root, "docs", "rl", "results-index.md")
+    cur = open(target).read() if os.path.exists(target) else ""
+    if cur != gen_results_index.build():
+        return ["docs/rl/results-index.md is out of date -- run: python tools/gen_results_index.py"]
+    return []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--staged", action="store_true")
@@ -200,6 +215,7 @@ def main():
     errors, warnings = check(root, files)
     errors += backlog_errors(root)
     errors += helpers_doc_errors(root)
+    errors += results_index_errors(root)
     if not args.quiet_warnings:
         for w in warnings:
             print(f"warning: {w}")
