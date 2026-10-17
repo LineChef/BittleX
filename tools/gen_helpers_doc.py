@@ -25,15 +25,15 @@ def parse(lines):
     usage = {}  # name -> (usage text, description)
     for i, line in enumerate(lines):
         m = re.match(r"^#\s+(g2[a-z0-9-]*)\b(.*)$", line)
-        if not m or "--" not in m.group(2):
+        if not m or " -- " not in m.group(2):
             continue
         name = m.group(1)
         if name in usage:
             continue
-        head, _, rest = m.group(2).partition("--")
+        head, _, rest = m.group(2).partition(" -- ")
         text = [rest.strip()]
         j = i + 1
-        while j < len(lines) and re.match(r"^#\s{2,}\S", lines[j]) and not re.match(r"^#\s+g2[a-z0-9-]*\b.*--", lines[j]):
+        while j < len(lines) and re.match(r"^#\s{2,}\S", lines[j]) and not re.match(r"^#\s+g2[a-z0-9-]*\b.* -- ", lines[j]):
             text.append(lines[j][1:].strip())
             j += 1
         usage[name] = ((name + " " + head.strip()).strip(), " ".join(t for t in text if t))
@@ -48,7 +48,8 @@ def parse(lines):
             continue
         name, rest = d.group(1), d.group(2)
         seen.add(name)
-        trailing = rest.rsplit("#", 1)[1].strip() if "#" in rest else ""
+        t = re.search(r"[{}]\s*;?\s+#\s+(.*)$", rest)
+        trailing = t.group(1).strip() if t else (rest.strip()[1:].strip() if rest.strip().startswith("#") else "")
         use, desc = usage.get(name, (name, trailing))
         if not desc:
             desc = trailing

@@ -44,7 +44,7 @@ Docs that mention this family: [`vision-in-gait.md`](../archive/rl/vision-in-gai
 
 ## `checkpoints`
 
-Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`gait-friction-log.md`](../archive/rl/gait-friction-log.md) +18.
+Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`gait-friction-log.md`](../archive/rl/gait-friction-log.md) +17.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -52,7 +52,7 @@ Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-d
 
 ## `compare`
 
-Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +17.
+Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +16.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -60,7 +60,7 @@ Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mount
 
 ## `control`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +50.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +51.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -74,7 +74,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-r
 | File | Size | Cited by |
 |---|---|---|
 | `decathlon_hw1_20m_hw.json` | 53 KB | not cited |
-| `decathlon_hw1_i_hw.json` | 53 KB | [`cheatsheet.md`](../guides/cheatsheet.md) |
+| `decathlon_hw1_i_hw.json` | 53 KB | not cited |
 | `decathlon_resid30_r1_hw.json` | 53 KB | not cited |
 | `decathlon_run20m_ppo_hw.json` | 53 KB | not cited |
 | `decathlon_run20m_ppo_v2.json` | 53 KB | not cited |
@@ -162,7 +162,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../arc
 
 ## `imu`
 
-Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md), [`resiliency-log.md`](../archive/rl/resiliency-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +17.
+Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md), [`resiliency-log.md`](../archive/rl/resiliency-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +16.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -186,7 +186,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](
 
 ## `ledge`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +33.
+Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +32.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `Release_Candidate`
 
-Docs that mention this family: [`training-pipeline.md`](training-pipeline.md).
+Docs that mention this family: [`shell-helpers.md`](../guides/shell-helpers.md), [`training-pipeline.md`](training-pipeline.md).
 
 | File | Size | Cited by |
 |---|---|---|
@@ -257,7 +257,7 @@ Docs that mention this family: [`training-pipeline.md`](training-pipeline.md).
 
 ## `report`
 
-Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +32.
+Docs that mention this family: [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +31.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -279,16 +279,16 @@ Docs that mention this family: [`high-step-creep-training-plan.md`](../archive/p
 
 ## `run20m`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) +25.
+Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) +24.
 
 | File | Size | Cited by |
 |---|---|---|
-| `run20m_ppo.onnx` | 545 KB | [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md), [`cheatsheet.md`](../guides/cheatsheet.md) |
+| `run20m_ppo.onnx` | 545 KB | [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md), [`phase6-sim-to-real.md`](../archive/plan-detail/phase6-sim-to-real.md) |
 | `run20m_ppo.onnx.json` | 0 KB | not cited |
 
 ## `slope`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +31.
+Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +30.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -310,7 +310,7 @@ Docs that mention this family: [`README.md`](../archive/README.md), [`history.md
 
 ## `summary`
 
-Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +31.
+Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md) +30.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -352,7 +352,7 @@ Docs that mention this family: [`README.md`](real-walk-data/2026-10-01/README.md
 
 | File | Size | Cited by |
 |---|---|---|
-| `v3_world2` | 0 KB | [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`cheatsheet.md`](../guides/cheatsheet.md) |
+| `v3_world2` | 0 KB | [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) |
 
 ## `v4`
 

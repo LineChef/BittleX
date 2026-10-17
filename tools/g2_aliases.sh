@@ -285,7 +285,7 @@ g2audio() { _g2py -m pi_pipeline.voice.check_audio "${1:-devices}"; }   # device
 
 # ------------------------------------------------------------------- memory
 
-# g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]
+# g2mem [facts | log N | search <q> | recall <q> | export [--scrub] | wipe --yes]  -- inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi).
 g2mem() { _g2py -m pi_pipeline.memory "${@:-facts}"; }
 # g2pimem  -- G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo,
 # "Empty trash" is the only permanent delete). It runs in the background: the first call starts it, later calls just open the browser. `g2pimem stop` ends it.
@@ -397,6 +397,71 @@ g2serial() { _g2py -m pi_pipeline.link.check_serial "${@:-ports}"; }   # ports |
 g2gait()   { _g2py pi_pipeline/gait/run_gait.py "$@"; }               # on-robot gait loop (--dry-run, --openloop, ...)
 g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status | headless | interactive | governor <n>
 
+# ----------------------------------------------------------- operate G2 (Mac -> Pi)
+# These need G2_PI (user@host of the Pi) in your environment. They are the everyday controls; the workflows are in docs/guides/cheatsheet.md.
+
+# g2ssh  -- open a shell on the Pi.
+g2ssh() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "$@"; }
+# g2deploy [--once|--cancel|--max-hours N|--replace]  -- push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once;
+#   --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
+g2deploy() { bash "$G2_ROOT/tools/g2_deploy_when_online.sh" "$@"; }
+# g2explore [start [ROAM_S]|stationary|arm|disarm|halt|release|stop|status|logs|heard]  -- run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze.
+g2explore() { bash "$G2_ROOT/tools/g2_explore.sh" "$@"; }
+# g2stop [voice|explore]  -- the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride.
+g2stop() { bash "$G2_ROOT/tools/g2_safe_stop.sh" "$@"; }
+# g2rest  -- send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first.
+g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send d"; }
+# g2baseline [start [RUNS] [LABEL]|stop|status|logs|fetch]  -- logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac.
+g2baseline() { bash "$G2_ROOT/tools/g2_baseline.sh" "$@"; }
+# g2walk [RUNS] [LABEL]  -- RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here.
+g2walk() { bash "$G2_ROOT/tools/g2_baseline.sh" start "${1:-1}" "${2:-walk}"; }
+# g2turns [start [RUNS]|stop|status|logs|fetch]  -- logged firmware turn runs (kwkL and kwkR alternating) on the Pi, to measure the real turn rate.
+g2turns() { bash "$G2_ROOT/tools/g2_turns.sh" "$@"; }
+# g2walklog LOG.csv [LOG.csv ...]  -- summarize walk logs: roll, pitch and yaw, the first fall, battery voltage.
+g2walklog() { _g2py tools/walk_log_summary.py "$@"; }
+# g2policy TAG NAME [--dry-run]  -- promote a trained checkpoint to G2's default: export it with its sidecar as Release_Candidate<NAME>, set DEFAULT_POLICY, run the tests, commit, then arm the deploy. The user's call only.
+g2policy() { bash "$G2_ROOT/tools/g2_promote_policy.sh" "$@"; }
+# g2api [HOURS]  -- Claude API calls, tokens and approximate cost on the Pi over the last HOURS (default 24), by source. Use it to watch cost.
+g2api() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.voice.api_log --hours ${1:-24}"; }
+# g2crash [N]  -- why did the voice service or an exploration session crash? The last N (default 5) unclean ends, with the stage and the resources at the time.
+g2crash() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.diag.crashwatch ${1:-5}"; }
+
+# ---------------------------------------------------------- bring-up and checks
+# g2doctor [--serial]  -- the bring-up readiness checklist: .env, API key, models, dependencies, serial port, audio, disk. --serial also pings the board.
+g2doctor() { _g2py -m pi_pipeline.doctor "$@"; }
+# g2bringup [--list|--restart|--from ID]  -- the guided, resumable hardware bring-up sequence.
+g2bringup() { _g2py -m pi_pipeline.bringup "$@"; }
+# g2app [--serial|--bench|--trace FILE]  -- the whole robot as one program (voice loop + behavior runtime). Mock by default; --serial talks to the BiBoard; --bench blocks autonomous movement.
+g2app() { _g2py -m pi_pipeline.app "$@"; }
+# g2check  -- the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it).
+g2check() { _g2py tools/check_docs.py "$@"; }
+# g2docsgen  -- regenerate the generated docs: the backlog, the shell-helpers page and the results index. Run it after changing an item heading, an alias comment or the result files.
+g2docsgen() { ( cd "$G2_ROOT" && python3 tools/gen_backlog.py && python3 tools/gen_helpers_doc.py && python3 tools/gen_results_index.py ); }
+
+# ------------------------------------------------------- simulation and training
+# These run from rl_training/opencat-gym with the RL venv; they work from any directory.
+
+# g2train TAG [--steps N] [--force]  -- start a training run with the full pre-run checklist (start_run.sh): a new tag, no run already going, no leftover viewers. Never start a 20M unasked.
+g2train() { "$G2_ROOT/rl_training/opencat-gym/start_run.sh" "$@"; }
+# g2eta plan --steps 3e6 --tail stage | now --target 20e6 --tail final20m | check  -- timing estimates read from the trainer's logs. Quote them (with a completion clock) whenever you launch anything.
+g2eta() { _g2py tools/eta.py "$@"; }
+# g2preflight  -- must print ALL PASS before a 20M run is offered: the RL tests, audits, a smoke run, benchmark scoring and replay checks.
+g2preflight() { ( cd "$G2_ROOT/rl_training/opencat-gym" && "$G2_ROOT/.venv/bin/python" preflight.py "$@" ); }
+# g2rltest  -- run the RL test files (the pipeline's own suite is g2test).
+g2rltest() { ( cd "$G2_ROOT/rl_training/opencat-gym" && "$G2_ROOT/.venv/bin/python" -m pytest -q test_*.py ); }
+# g2watch [trained/TAG_ppo]  -- replay the newest finished policy (or the one named) in the PyBullet GUI. Needs your own terminal for the window.
+g2watch() {
+  ( cd "$G2_ROOT/rl_training/opencat-gym" || exit 1
+    ckpt="${1:-$(ls -t trained/*_ppo.zip | head -1 | sed 's/\.zip$//')}"
+    echo "watching $ckpt"; "$G2_ROOT/.venv/bin/python" watch_trained.py "$ckpt" )
+}
+# g2tb [stop]  -- open TensorBoard for the training runs at localhost:6006 (starts it if needed); `g2tb stop` ends it.
+g2tb() {
+  if [ "$1" = stop ]; then pkill -f "tensorboard.*tensorboard_logs" && echo "tensorboard stopped" || echo "not running"; return; fi
+  pgrep -f "tensorboard.*tensorboard_logs" >/dev/null || ( cd "$G2_ROOT/rl_training/opencat-gym" && nohup "$G2_ROOT/.venv/bin/python" -m tensorboard.main --logdir trained/tensorboard_logs/ --port 6006 >/dev/null 2>&1 & )
+  sleep 2; open http://localhost:6006/
+}
+
 # --------------------------------------------------------------------- docs
 
 # g2docs  -- print the list of key docs (the full index is docs/README.md)
@@ -414,4 +479,5 @@ Key docs (in docs/):
 EOF
 }
 
+# g2help  -- print the bare list of helpers with their one-line comments.
 g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | sed 's/() *{.*# */\t/; s/() *{.*//'; }

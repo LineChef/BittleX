@@ -20,7 +20,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | Command | What it does |
 |---|---|
 | `g2cam <name> [session]` | start the live capture preview at localhost:8080, saving to ~/Desktop/g2_face_capture/<name>/session_<n>/ |
-| `g2cam-stop` | stop the capture preview |
+| `g2cam-stop` | stop the capture preview # stop the capture preview |
 | `g2cam-info` | serial port + which model is on the module |
 | `g2pcam <name> [session]` | run the preview on the Pi, tunnel it to localhost:8080, open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/ |
 | `g2see` | just LOOK: live feed + detection boxes from the camera mounted on G2 (plugged into the Pi) at localhost:8080. No name, nothing saved, no capture folder. Closing the tab stops it. Same G2_PI requirement as g2pcam; stop early with g2pcam-stop. |
@@ -36,7 +36,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2libcombine [classes]` | build $G2_LIB_ROOT/upload/ (arg overrides $G2_VISION_CLASSES) |
 | `g2libsubset <N> <class>` | capped images-only upload set for the threshold test (negatives auto-capped at ~N/4; jpg only so SenseCraft auto-label isn't cluttered) |
 | `g2libstatus` | print the vision library manifest (images per class) |
-| `g2auto [classes] [` | dry-run] -- the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically. |
+| `g2auto [classes] [--dry-run]` | the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically. |
 
 ## vision runtime
 
@@ -45,8 +45,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2vision [labels]` | run the detection pipeline over serial, print live detections no arg -> uses VISION_LABELS / VISION_MIN_SCORE from .env (the deployed model) with arg -> overrides the label(s) for this run, e.g. g2vision person |
 | `g2vision-demo` | mock feed, no hardware |
 | `g2visioneval [label] [secs]` | timed measurement: detection rate / confidence / floor / flicker for the dataset-size threshold test. Stand in frame at close/mid/far. Add a 3rd arg 'empty' + point at a clear scene for the false-fire check. e.g. g2visioneval <label> 30 / g2visioneval <label> 30 empty |
-| `g2watchrun [` | realtime] -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of its own, not an approximation; it joins wherever the run is). Default = follow live at training speed (about 4-5x real time); --realtime = each episode at real speed, then the newest. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal  |
-| `g2watchsim [TAG] [watch_trained args]` | (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges. --calm = the flat scoring world instead. g2watchsim the run that wrote the newest checkpoint (the one in progress) |
+| `g2watchrun [--realtime]` | watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of its own, not an approximation; it joins wherever the run is). Default = follow live at training speed (about 4-5x real time); --realtime = each episode at real speed, then the newest. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal for the windo |
+| `g2watchsim [TAG] [watch_trained args]` | (the old g2watchrun) a FRESH simulation of a run's newest checkpoint in the PyBullet GUI (a fresh simulation with the run's environment, not a recording), by default WITH the training course: surface steps, snag obstacles, ledges. --calm = the flat scoring world instead. g2watchsim the run that wrote the newest checkpoint (the one in progress) g2watchsim v3_20m a given run; g2watchsim v3_20m --dr-push 0.35 adds rando |
 
 ## voice / conversation
 
@@ -60,7 +60,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 
 | Command | What it does |
 |---|---|
-| `g2mem [facts / log N / search <q> / recall <q> / export [` | scrub] / wipe --yes] |
+| `g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]` | inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi). |
 | `g2pimem` | G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo, |
 | `g2pics` | the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). |
 | `g2walls` | the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page. |
@@ -92,9 +92,47 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2gait` | on-robot gait loop (--dry-run, --openloop, ...) |
 | `g2power` | status / headless / interactive / governor <n> |
 
+## operate G2 (Mac -> Pi)
+
+| Command | What it does |
+|---|---|
+| `g2ssh` | open a shell on the Pi. |
+| `g2deploy [--once/--cancel/--max-hours N/--replace]` | push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing. |
+| `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard]` | run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze. |
+| `g2stop [voice/explore]` | the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride. |
+| `g2rest` | send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first. |
+| `g2baseline [start [RUNS] [LABEL]/stop/status/logs/fetch]` | logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac. |
+| `g2walk [RUNS] [LABEL]` | RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here. |
+| `g2turns [start [RUNS]/stop/status/logs/fetch]` | logged firmware turn runs (kwkL and kwkR alternating) on the Pi, to measure the real turn rate. |
+| `g2walklog LOG.csv [LOG.csv ...]` | summarize walk logs: roll, pitch and yaw, the first fall, battery voltage. |
+| `g2policy TAG NAME [--dry-run]` | promote a trained checkpoint to G2's default: export it with its sidecar as Release_Candidate<NAME>, set DEFAULT_POLICY, run the tests, commit, then arm the deploy. The user's call only. |
+| `g2api [HOURS]` | Claude API calls, tokens and approximate cost on the Pi over the last HOURS (default 24), by source. Use it to watch cost. |
+| `g2crash [N]` | why did the voice service or an exploration session crash? The last N (default 5) unclean ends, with the stage and the resources at the time. |
+
+## bring-up and checks
+
+| Command | What it does |
+|---|---|
+| `g2doctor [--serial]` | the bring-up readiness checklist: .env, API key, models, dependencies, serial port, audio, disk. --serial also pings the board. |
+| `g2bringup [--list/--restart/--from ID]` | the guided, resumable hardware bring-up sequence. |
+| `g2app [--serial/--bench/--trace FILE]` | the whole robot as one program (voice loop + behavior runtime). Mock by default; --serial talks to the BiBoard; --bench blocks autonomous movement. |
+| `g2check` | the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it). |
+| `g2docsgen` | regenerate the generated docs: the backlog, the shell-helpers page and the results index. Run it after changing an item heading, an alias comment or the result files. |
+
+## simulation and training
+
+| Command | What it does |
+|---|---|
+| `g2train TAG [--steps N] [--force]` | start a training run with the full pre-run checklist (start_run.sh): a new tag, no run already going, no leftover viewers. Never start a 20M unasked. |
+| `g2eta plan --steps 3e6 --tail stage / now --target 20e6 --tail final20m / check` | timing estimates read from the trainer's logs. Quote them (with a completion clock) whenever you launch anything. |
+| `g2preflight` | must print ALL PASS before a 20M run is offered: the RL tests, audits, a smoke run, benchmark scoring and replay checks. |
+| `g2rltest` | run the RL test files (the pipeline's own suite is g2test). |
+| `g2watch [trained/TAG_ppo]` | replay the newest finished policy (or the one named) in the PyBullet GUI. Needs your own terminal for the window. |
+| `g2tb [stop]` | open TensorBoard for the training runs at localhost:6006 (starts it if needed); `g2tb stop` ends it. |
+
 ## docs
 
 | Command | What it does |
 |---|---|
 | `g2docs` | print the list of key docs (the full index is docs/README.md) |
-| `g2help` | */\t/; s/() *{.*//'; } |
+| `g2help` | print the bare list of helpers with their one-line comments. |
