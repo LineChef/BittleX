@@ -288,7 +288,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-
 
 ## `slope`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +30.
+Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +31.
 
 | File | Size | Cited by |
 |---|---|---|

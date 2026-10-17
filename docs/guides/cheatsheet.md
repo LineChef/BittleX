@@ -336,7 +336,6 @@ All from `rl_training/opencat-gym/`, venv active. `<ckpt>` = e.g. `trained/run20
 | `python benchmark_commanded.py --learned <ckpt> --episodes 16 --json-out /tmp/cmd.json` | Speed-command tracking: creep / cruise / fast / backward / stand / turn — commanded vs achieved, heading drift |
 | `python benchmark_gaits.py --learned <ckpt> --episodes 28 --scripted-balance 0.5` | Head-to-head vs scripted `wkF` on flat + obstacle courses (distance, trot corr, falls) |
 | `python benchmark_recovery.py <ckpt-a> <ckpt-b>` | Bare-robot stance-recovery probe (payload OFF, rough + escalating shoves) — the decathlon can't see recovery with the payload on. Compares two checkpoints |
-| `python robustness_sweep.py --learned <ckpt> --seeds 16 --json-out /tmp/rob.json` | Sweep each sim-to-real axis (payload mass, cmd latency, joint offset, IMU noise, torque cutback) one at a time — where does the gait break? |
 | `python render_showcase.py --learned <ckpt> --out showcase.gif` | One annotated GIF of every skill back-to-back (cruise / creep / fast / stand / shoves / slopes / gauntlet / thresholds / steps). `--scripted-balance 0.5` for the scripted version |
 | `python render_gif.py <ckpt> out.gif --steps 250 --stride 2` | One episode → animated GIF |
 
@@ -433,7 +432,7 @@ python3.11 -m venv pi_pipeline/.venv && pi_pipeline/.venv/bin/pip install -r pi_
 | `bash tools/g2_baseline.sh start 4 NAME --foot-hold fl --hold-on-policy --seconds 25 --lead-s 5 --reset-s 5` | 4 logged V2.1 walks of 25 s (about 10 ft) with the front-left hold on |
 | `bash tools/g2_baseline.sh start 9 feet --scripted-mix scripted --foot-trim none,fl=-0.25,fl=+0.25,fr=-0.25,fr=+0.25 --lead-s 5 --reset-s 5` | per-foot fixed-trim test on the scripted walk (several feet at once: `fl=-0.3/fr=+0.3`) |
 | `G2_FOOT_HOLD=off` in the Pi `.env` | everyday walks without the heading hold (default: on, front-left) |
-| `python pi_pipeline/gait/run_gait.py --foot-hold off` | one walk with the hold off (the hold is on by default) |
+| `python pi_pipeline/gait/run_gait.py --foot-hold off` | one walk with the hold off (the hold is off by default; `G2_FOOT_HOLD=fl` turns it on) |
 
 ## Naming pictures by hand (g2pics page)
 

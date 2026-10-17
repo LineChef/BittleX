@@ -201,7 +201,7 @@ been structured.
    2 000–4 000-step episodes, thermal model live. Metrics: time-to-first-trip,
    whether the policy sheds effort as joints warm, distance before a trip.
    Compare `run20m_ppo` (no thermal obs) vs a thermal-aware residual.
-4. **Sustained-hold variant** in `robustness_sweep.py`: hold a hard stance /
+4. **Sustained-hold variant** (`robustness_sweep.py` was removed 2026-10-17; write a new probe or recover it from the tag): hold a hard stance /
    slow uphill with the thermal model on, report trip time per policy.
 5. **Hardware validation** (hardware-gated): once bring-up allows, run the
    robot in a fixed hard stance (or one leg against a stop) until protection
@@ -221,7 +221,7 @@ been structured.
 - **Reuse, don't rebuild**: the `TORQUE_CUTBACK` mechanism (re-trigger from live
   `T`), the `FAC_POWER` penalty (already pushing the right way), the behaviour
   layer (governor), the residual architecture (Stage-2 finetune, base frozen),
-  `robustness_sweep.py` (add the sustained-hold variant).
+  a robustness sweep (add the sustained-hold variant).
 - **Fastest usable mitigation with zero training**: Layer 1 (I²t estimator +
   indicator) + Layer 2 (behaviour-layer governor + cooldown pose). Ship that
   first. Layer 3 (thermal-aware residual) is the "do it properly" follow-up and

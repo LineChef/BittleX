@@ -1,5 +1,7 @@
 # Adapter skill probe — implementation spec
 
+> **Note (2026-10-17):** scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
+
 **Status:** SPECCED, NOT BUILT. Lives on `development` (this doc only, no code).
 The throwaway `adapter-skill-probe` branch was deleted 2026-09-07 — it only ever
 held an older copy of this spec. Deferred; resume by branching fresh from

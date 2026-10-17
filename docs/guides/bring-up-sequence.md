@@ -42,6 +42,8 @@ wired to the frame" and picks up the original step order (weighing,
 serial link, voice, RL, vision, integration) unchanged in substance —
 only renumbered.
 
+> **Update (2026-10-09): walking tests now start on his feet on the floor with your hands near; the user's rule is no held-in-the-air or air-first tests (see [`operating-g2.md`](operating-g2.md)). The stand-only steps below are for assembly, calibration and bench servo work; for anything that walks, follow the newer rule.**
+>
 > **Rule: stay on the calibration stand through step 13a. No floor time before
 > then.** Everything through "verify servo signs" — assembly, calibration,
 > first movement, voice, the RL joint-control bench, IMU probing, open-loop
@@ -123,7 +125,7 @@ mechanically," not a guess.
    mounts somewhere distinct, it needs its own sim body). Balance each piece on
    an edge for height + fore/aft CoM. Then set `PAYLOAD_MASS_*` / `HEAD_MASS_*` /
    positions in `opencat_gym_env.py` and retrain (or `--finetune-lr`) if the
-   delta from ~76 g is real — [`rl/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) **H2**.
+   delta from ~76 g is real — [`planned/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) **H2**.
 5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover still fits.
 

@@ -98,4 +98,4 @@ switch picks which net feeds the servos. Sub-ms either way.
 
 Harnesses: `climb_env.py` / `train_climb.py` / `eval_climb.py` / `climbwatch`
 (Phase F) are the template. `climb_test.py` is the keyframe-base authoring +
-scoring tool.
+scoring tool. (Removed from the working tree 2026-10-17; recover with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.)

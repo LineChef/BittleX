@@ -150,7 +150,7 @@ hardware before attempting a full climb.
 **Phase F (2026-09-08) attempted this in sim and hit a wall — this is a
 sim-fidelity limit on the training harness, not evidence the real robot can't
 climb.** Full harness built (`rl_training/opencat-gym/climb_env.py` /
-`train_climb.py` / `eval_climb.py` / `climbwatch`). Nothing climbs a ≥ 2.5 cm
+`train_climb.py` / `eval_climb.py` / `climbwatch`; removed 2026-10-17, tag `archive/rl-campaign-scripts-2026-10-17`). Nothing climbs a ≥ 2.5 cm
 ledge in PyBullet — not 6 scripted-base designs, not from-scratch RL, not
 **Petoi's own `cmh` keyframe** (`reference_gait/cmh_ref.npy`, same motion as
 the gif above), across standoff / torque / friction sweeps. Measured: front

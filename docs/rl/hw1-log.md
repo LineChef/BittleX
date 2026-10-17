@@ -1,5 +1,7 @@
 # hw1 — training under G2's real control path
 
+> **Note (2026-10-17):** scripts for closed campaigns named on this page (the vision goal and vision-in-gait work, climbing and foot probing, the resilience, friction and slope sweeps, the old hardware-IMU retrain chains) were removed from the working tree; recover one with `git show `archive/rl-campaign-scripts-2026-10-17`:rl_training/opencat-gym/<name>.py`.
+
 > **2026-10-01:** the deployed policy (`DEFAULT_POLICY`) is now `Release_CandidateV2.1` (see Round 4 below), exported with a `cmd_send_every_n: 3` sidecar. `hw1_20m` remains on the Pi as a baseline.
 
 **2026-09-22 → 23.** Started as the "IMU feedback rate" priority (stock firmware
