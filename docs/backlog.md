@@ -53,25 +53,25 @@ Status key: 🔴 hardware/camera-gated · 🟡 partial · ⚪ low priority · �
 | [B2](planned/behavior-ideas.md#b2--specialty-rl-gaits) | Specialty RL gaits | — |
 | [B3](planned/behavior-ideas.md#b3--skill-composer-authoring) | Skill Composer authoring | — |
 | [B9](planned/behavior-ideas.md#b9--vision--servo-resistance-obstacle-traversal) | Vision + servo-resistance obstacle traversal | — |
-| [B9a](planned/behavior-ideas.md#b9a--feedback-only-jam-reflex----implement-when-hardware-arrives) | Feedback-only jam reflex | 🔴 (implement when hardware arrives) |
+| [B9a](planned/behavior-ideas.md#b9a--feedback-only-jam-reflex----built-not-wired-in-gaitjam_guardpy-needs-real-strain-traces) | Feedback-only jam reflex | 🟡 BUILT, NOT WIRED IN (`gait/jam_guard.py`; needs real strain traces) |
 | [B13](planned/behavior-ideas.md#b13--climb-as-a-separate-skill-policy---confirmed-need-2026-09-15) | Climb as a separate skill policy | 🟢 CONFIRMED NEED (2026-09-15) |
 | [B14](planned/behavior-ideas.md#b14--jump--hop-as-an-on-command-skill----) | Jump / hop as an on-command skill | 🟡 ⚪ |
 | [B21](planned/behavior-ideas.md#b21--pick-up-small-objects-with-its-mouth) | Pick up small objects with its mouth | — |
 | [B22](planned/behavior-ideas.md#b22--actuated-tail-hardware-addition--tail-driven-behaviors) | Actuated tail (hardware addition + tail-driven behaviors) | — |
 | [B17](planned/behavior-ideas.md#b17--house-room-scene-generator-for-vision-detectors--reflex-rules-vision-gated---) | House-room scene generator, for vision detectors + reflex rules (vision-gated) | 🔴 ⚪ |
-| [B4](planned/behavior-ideas.md#b4--expressive-body-language) | Expressive body language | — |
+| [B4](planned/behavior-ideas.md#b4--expressive-body-language----partly-built-gestures-and-expressive-skills-exist) | Expressive body language | 🟡 PARTLY BUILT (gestures and expressive skills exist) |
 | [B5](planned/behavior-ideas.md#b5--emotive-sound-chirp-vocabulary---built--wired-2026-09-10) | Emotive sound (chirp vocabulary) | BUILT + WIRED 2026-09-10 |
 | [B6](planned/behavior-ideas.md#b6--mood-from-memory---built--wired-2026-09-10) | Mood from memory | BUILT + WIRED 2026-09-10 |
 | [B19](planned/behavior-ideas.md#b19--stylised-character-voicepersona-presets--) | Stylised character voice/persona presets | ⚪ |
 | [B7](planned/behavior-ideas.md#b7--patrol-mode) | Patrol mode | — |
 | [B8](planned/behavior-ideas.md#b8--go-to-object) | Go-to-object | — |
 | [B15](planned/behavior-ideas.md#b15--recognize-household-members----) | Recognize household members | 🟡 ⚪ |
-| [B16](planned/behavior-ideas.md#b16--cliffguard-ledge--desk-edge-avoidance---highest-priority--but-gated-on-camera-mounted-on-frame--) | `CliffGuard`: ledge / desk-edge avoidance | 🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame ⚪ |
+| [B16](planned/behavior-ideas.md#b16--cliffguard-ledge--desk-edge-avoidance---highest-priority--built-but-inert-no-floor-vs-edge-classifier-exists-yet--) | `CliffGuard`: ledge / desk-edge avoidance | 🔴 HIGHEST PRIORITY — BUILT but inert: no floor-vs-edge classifier exists yet ⚪ |
 | [B20](planned/behavior-ideas.md#b20--generic-objects-recognition-a-6th-detector-class-or-a-separate-pi-side-layer---partially-built-2026-09-14-behind-featuresobject_gallery-localizer--embedding-model-still-hardware-gated) | Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer | PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated) |
-| [B11](planned/behavior-ideas.md#b11--learn-its-way-around-the-house-topological-place-memory) | Learn its way around the house (topological place memory) | — |
+| [B11](planned/behavior-ideas.md#b11--learn-its-way-around-the-house-topological-place-memory----partly-built-p1-logging-built-not-deployed) | Learn its way around the house (topological place memory) | 🟡 PARTLY BUILT (P1 logging built, not deployed) |
 | [B10](planned/behavior-ideas.md#b10--teach-me-a-trick) | Teach me a trick | — |
-| [B25](planned/behavior-ideas.md#b25--kinesthetic-teaching-hand-guided-skills-recorded-from-g2s-own-joints--) | Kinesthetic teaching: hand-guided skills recorded from G2's own joints | 🟡 |
-| [B12](planned/behavior-ideas.md#b12--im-running-low--power-awareness) | "I'm running low" — power awareness | — |
+| [B25](planned/behavior-ideas.md#b25--kinesthetic-teaching-hand-guided-skills-recorded-from-g2s-own-joints----built-gaitteachpy-not-tried-on-g2) | Kinesthetic teaching: hand-guided skills recorded from G2's own joints | 🟡 BUILT (`gait/teach.py`), not tried on G2 |
+| [B12](planned/behavior-ideas.md#b12--im-running-low--power-awareness----built-battery-watch-pi-runtime-warning-power-status) | "I'm running low" — power awareness | 🟢 BUILT (battery watch, Pi runtime warning, power status) |
 | [B18](planned/behavior-ideas.md#b18--idle-power-management--feels-alive-idle-behaviour--) | Idle power management + "feels alive" idle behaviour | 🟡 |
 | [B23](planned/behavior-ideas.md#b23--bounded-self-modification-g2-adjusts-its-own-personality-knobs-from-experience) | Bounded self-modification: G2 adjusts its own personality knobs from experience | — |
 | [B24](planned/behavior-ideas.md#b24--agency-g2-forms-its-own-goals-not-just-executes-rule-based-autonomy) | Agency: G2 forms its own goals, not just executes rule-based autonomy | — |

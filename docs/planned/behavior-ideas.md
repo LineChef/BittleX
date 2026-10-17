@@ -66,7 +66,7 @@ once the vision module is installed and working. Related: the blind-clearance
 tradeoff (rejected as a standalone — costs speed/stability every step for an
 occasional benefit) and **B9a**, the feedback-only jam reflex below.
 
-### B9a — Feedback-only jam reflex  🔴  (implement when hardware arrives)
+### B9a — Feedback-only jam reflex  🟡  BUILT, NOT WIRED IN (`gait/jam_guard.py`; needs real strain traces)
 
 The vision-free half of B9, split out as its own task **now that the whole
 vision-navigation stack is flag-gated off** (`features.vision` default `False` —
@@ -430,7 +430,7 @@ to train scenes for, and no reflex layer to validate against them.
 
 ## Expression & personality
 
-### B4 — Expressive body language
+### B4 — Expressive body language  🟡  PARTLY BUILT (gestures and expressive skills exist)
 A small set of authored skills for emotion/emphasis — happy wiggle, play-bow,
 nod-yes, shake-no, moonwalk — added to the `perform_skill` catalogue so Claude
 can punctuate spoken replies with body language, not just perform functional
@@ -612,7 +612,7 @@ Measured detector behaviour + firmware facts: `docs/vision/detector-bench.md`.
 - The multi-model **detection layer** (safety / interaction / objects models +
   a model-manager that swaps by mode): `docs/vision/detection-layer.md`.
 
-### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
+### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — BUILT but inert: no floor-vs-edge classifier exists yet  ⚪
 G2 spends most of its time on the user's desk. It needs to explore and look
 around up there (curiosity, [B7]-style wandering) but must **never** walk off
 the edge — ranked above general exploring, since it's the precondition for
@@ -801,7 +801,7 @@ applies):**
   continuously running, so real volume also wants the body to exist and roam
   more than it currently does — a later design question, not blocking this.
 
-### B11 — Learn its way around the house (topological place memory)
+### B11 — Learn its way around the house (topological place memory)  🟡  PARTLY BUILT (P1 logging built, not deployed)
 **Plan agreed 2026-10-10 (rooms, phases P0 to P4): [`plan-detail/place-memory-plan.md`](place-memory-plan.md).** P0 = room labels on the saved pictures (`g2pics`, Room button) + `tools/eval_rooms.py`.
 
 G2 builds up a sense of *where it is* over time — as **place recognition + a
@@ -908,7 +908,7 @@ order:
   collision with a built-in skill should be rejected or require confirmation,
   not silently shadow it.
 
-### B25 — Kinesthetic teaching: hand-guided skills recorded from G2's own joints  🟡
+### B25 — Kinesthetic teaching: hand-guided skills recorded from G2's own joints  🟡  BUILT (`gait/teach.py`), not tried on G2
 Requested 2026-10-07: try teaching skills by moving G2's legs by hand and recording the joint angles, then replaying them as a skill. This is the
 "raw joint puppeteering" tier of [B10], promoted to its own item so it can be tried on the bench. Servos relaxed (`d`), joints polled with `j`
 (`READ_JOINTS`), keyframes saved under a name and replayed through the same path as any scripted skill. Fits sit, wave, shake, reach; playback has no
@@ -935,7 +935,7 @@ feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the n
 
 ## Self-awareness
 
-### B12 — "I'm running low" — power awareness
+### B12 — "I'm running low" — power awareness  🟢  BUILT (battery watch, Pi runtime warning, power status)
 G2 estimates its own remaining runtime and says so, in character, before it dies.
 The PiSugar S has no battery telemetry (only "external power present"), so this
 is a **timer**, not a gauge: track uptime since last on the charger, warn once it
