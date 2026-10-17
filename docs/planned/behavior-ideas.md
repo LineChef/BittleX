@@ -1135,3 +1135,11 @@ narrow — G2 tuning its own existing personality *parameters* from evidence.
 B24 is broader — G2 forming and acting on its own *goals* in the first
 place. B23 is the more tractable, lower-risk piece and the more natural
 first step if/when this gets picked back up.
+
+
+### B26 — Wire the servo-thermal governor into the behavior layer  🟡
+`behavior/thermal_governor.py` (servo-thermal Layer 2) is built and unit-tested but nothing imports it. The gait-side `ThermalGuard` already estimates per-joint heat and tags each joint GREEN, AMBER or RED; the governor would turn that into behavior: AMBER caps the forward speed and softens the gait and flags "avoid sustained uphill" for planners, RED holds a low-torque cooldown pose until the guard reports AMBER or better. To do: feed the driver the guard's tier, let the governor's decision shape the speed command and exploration legs, test on the bench with a sustained walk, and tune the thresholds against real heat data. See [`../hardware/servo-thermal.md`](../hardware/servo-thermal.md). Added 2026-10-17 when the module was found to be unwired.
+
+### B27 — Supervise the microphone and wake-word worker  ⚪
+`util/supervisor.py` is built and unit-tested (restart on a crash, a return or a missed heartbeat, with exponential backoff and a give-up ceiling) but no runtime module uses it. The voice service as a whole is already restarted by systemd, so the case it would catch is a worker thread that hangs or dies while the process stays up; a silent mic or wake-word failure is the likely one. To do: wrap the wake-word capture loop in a `Supervisor`, make it beat each audio block, and log restarts to the diagnostics log. Low priority until a worker is seen to die alone. Added 2026-10-17.
+

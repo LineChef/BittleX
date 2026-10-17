@@ -75,3 +75,5 @@ Status key: 🔴 hardware/camera-gated · 🟡 partial · ⚪ low priority · �
 | [B18](planned/behavior-ideas.md#b18--idle-power-management--feels-alive-idle-behaviour--) | Idle power management + "feels alive" idle behaviour | 🟡 |
 | [B23](planned/behavior-ideas.md#b23--bounded-self-modification-g2-adjusts-its-own-personality-knobs-from-experience) | Bounded self-modification: G2 adjusts its own personality knobs from experience | — |
 | [B24](planned/behavior-ideas.md#b24--agency-g2-forms-its-own-goals-not-just-executes-rule-based-autonomy) | Agency: G2 forms its own goals, not just executes rule-based autonomy | — |
+| [B26](planned/behavior-ideas.md#b26--wire-the-servo-thermal-governor-into-the-behavior-layer--) | Wire the servo-thermal governor into the behavior layer | 🟡 |
+| [B27](planned/behavior-ideas.md#b27--supervise-the-microphone-and-wake-word-worker--) | Supervise the microphone and wake-word worker | ⚪ |

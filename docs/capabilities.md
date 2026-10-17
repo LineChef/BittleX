@@ -35,7 +35,7 @@ file does not repeat it. Things not built yet (the Petoi AI Head, the robot-arm 
 | Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03 | ✅ on G2 (mic, speaker, Claude, real walk) |
 | Memory | Persistent fact store with recall, a CLI, and a localhost web UI | ✅ |
 | Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed | ✅ model / 🧩 mounted camera |
-| Safety reflexes | Jam reflex, servo thermal guard + governor, cliff/edge guard, watchdog, sleep mode, carpet detector | 🧩 |
+| Safety reflexes | Servo thermal guard, watchdog, sleep mode, carpet detector, fall and stall guards (running); jam reflex and thermal governor (built, not wired in); cliff/edge guard (gated on a classifier) | ✅ / 🧩 |
 | Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status) | ✅ logic / 🧩 HW sensors |
 | Power | Idle-REST staged descent + sleep mode (real power-profile switch, camera off) fully built and tested; on-demand vision is still just binary on/off, not scaled to activity | ✅ logic / 🧩 tuning |
 | Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ |
@@ -296,7 +296,7 @@ that need the camera mounted on the frame for a real point of view.
 
 ## Safety reflexes & guards
 
-All 🧩 — logic complete and unit-tested; thresholds need the real robot.
+Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and the fall and stall guards run on G2; the items marked *built, not wired in* below are complete and unit-tested but no runtime module uses them yet (listed in [`../pi_pipeline/README.md`](../pi_pipeline/README.md)). Thresholds for the rest need the real robot.
 
 - **Emergency stop** (`behavior/emergency.py`) — the manual override: latches
   `BehaviorDriver` above *everything* (enrollment / sleep / safety / mode), emits
@@ -304,11 +304,11 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   and holds until explicitly released. Triggered by a voice phrase ("emergency
   stop" / "freeze" / "halt" / "stop moving"), `python -m pi_pipeline.app --halt`,
   or `kill -USR1 <pid>`; cleared by "resume" / `--release` / `SIGUSR2`.
-- **Jam reflex** (`gait/jam_guard.py`, B9a) — vision-free: from commanded-vs-actual
+- **Jam reflex** (`gait/jam_guard.py`, B9a) — *built, not wired in* — vision-free: from commanded-vs-actual
   front-leg joint angle, detect a stuck push and run a fixed bump-and-turn.
 - **Servo thermal guard** (`gait/thermal_guard.py`) — per-joint temperature
   tiers GREEN / AMBER / RED, with a spoken "getting warm" warning.
-- **Thermal governor** (`behavior/thermal_governor.py`) — NORMAL → THROTTLED →
+- **Thermal governor** (`behavior/thermal_governor.py`, backlog B26) — *built, not wired in* — NORMAL → THROTTLED →
   COOLDOWN: scales speed, softens the gait, avoids uphill, and can hold a
   cooldown pose; escalates immediately, de-escalates only after a hold.
 - **Sleep mode** (`behavior/sleep_mode.py`) — AWAKE → DOZING → ASLEEP → ROUSING;
@@ -322,7 +322,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   bias-corrected leaky integrator; inert until a real accelerometer feed exists.
 - **Watchdog** (`diag/watchdog.py`) — no heartbeat within the stall window →
   latch STALL and send `d` (lie down, relax).
-- **Supervisor** (`util/supervisor.py`) — restart-with-backoff policy + a
+- **Supervisor** (`util/supervisor.py`, backlog B27) — *built, not wired in* — restart-with-backoff policy + a
   threading wrapper for long-running workers.
 
 ---

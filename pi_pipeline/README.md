@@ -1,99 +1,68 @@
-# Pi Pipeline
+# pi_pipeline
 
-Code that runs on the Raspberry Pi Zero 2 WH mounted on G2: the voice
-conversation loop, persistent memory, on-device vision, the on-robot gait loop,
-the autonomous behaviour layer, diagnostics, and Pi power management. Independent
-of `rl_training/` — separate venv, separate concerns.
+The code that runs on the Raspberry Pi Zero 2 W mounted on G2: the voice conversation loop, persistent memory, vision, the 80 Hz gait loop, autonomous behavior, diagnostics and power management. It is independent of `rl_training/` (its own venv, no shared code). A map from the docs to each package: [`../docs/code-map.md`](../docs/code-map.md). How the pieces fit: [`../docs/architecture.md`](../docs/architecture.md). What works right now: [`../docs/STATUS.md`](../docs/STATUS.md).
 
 ## Design
 
-Everything hardware-specific sits behind a small interface with a **mock/laptop
-implementation and a real implementation**, so the whole pipeline runs and is
-testable on a development machine now, and moving to the Pi is a config change,
-not a rewrite:
+Every hardware-specific dependency sits behind a small interface with a **mock or laptop implementation and a real one**, so the whole pipeline runs and is tested on a dev machine with no hardware, and moving to the Pi is a configuration change:
 
-| Interface | Laptop / dev | On the robot |
+| Interface | Dev machine | On the robot |
 |---|---|---|
-| `Actuator` | `MockActuator` — logs the command | `SerialActuator` — OpenCat serial (`kwkF`, …) |
-| `TTS` | `MacTTS` (`say`) / `PiperTTS` | `PiperTTS` → Pi speaker |
-| `STT` | `TextSTT` (type it) / `VoskSTT` | `VoskSTT` → Pi mic |
+| `Actuator` | `MockActuator` (logs the command) | `SerialActuator` (OpenCat serial: `kwkF`, …) |
+| `TTS` | `MacTTS` (`say`) / `PiperTTS` | `PiperTTS` to the Pi speaker |
+| `STT` | `TextSTT` (typed) / `VoskSTT` | `VoskSTT` on the Pi mic |
 | `WakeWord` | `AlwaysAwake` / `VoskWakeWord` | `VoskWakeWord` |
-| `Cue` | `LogCue` | `LogCue` + buzzer/posture later |
+| `Cue` | `LogCue` | `LogCue` (buzzer or posture cues later) |
 
-## Layout
+`app/` is the only place with real I/O wiring. Every major subsystem is gated by a feature flag (`features.py`, set with `G2_FEATURES`): [`../docs/guides/feature-flags.md`](../docs/guides/feature-flags.md).
 
-```
-pi_pipeline/
-  config.py            # Settings, loaded from environment (.env at repo root)
-  features.py          # staged bring-up feature flags (G2_FEATURES)
-  voice/               # Phase 7 — the conversation loop
-    conversation.py    # Claude client + turn mgmt; perform_skill + remember tools
-    skills.py          # OpenCat skill catalog + serial command mapping
-    actuator.py tts.py stt.py wake_word.py cues.py   # swappable mock/real backends
-    commands.py        # self-handled spoken commands (forget / sleep / character mode)
-    loop.py            # the orchestrator
-    livecheck.py       # real-API end-to-end check (needs a key)
-    __main__.py        # python -m pi_pipeline.voice
-  personality/         # traits that bias the prompt, behaviour params, and cues
-    traits.py          # Trait base + BehaviorParams + the name→class REGISTRY
-    curiosity.py gir.py            # concrete traits (gir = opt-in character mode)
-    mood.py            # B6 mood-from-memory (neutral/content/playful/lonely/subdued)
-    bonds.py           # B15 per-individual relationships (disposition + closeness)
-    character_state.py # runtime persistence for the opt-in character toggle
-    personality.py     # Personality: system_prompt() / behavior_params() / cues()
-  behavior/            # what G2 does on its own between conversations
-    driver.py          # BehaviorDriver.tick() -> ordered Effects (composes it all)
-    bindings.py        # DriverBindings: Effect -> real sink; MockBindings for tests
-    runtime.py         # BehaviorRuntime: ticks the driver, feeds it its inputs
-    __main__.py        # python -m pi_pipeline.behavior (mock demo of the loop)
-    mode_controller.py explore.py novelty.py idle_posture.py gestures.py
-    object_seek.py     # B20 -- *when* it's safe to grab an object-gallery scan
-    enrollment.py      # "G2, meet <name>" capture FSM
-    sleep_mode.py      # deep-idle FSM (curl + vision off + power-save), wired in the driver
-    thermal_governor.py # servo-thermal Layer 2 (AMBER throttle / RED cooldown pose)
-    chirps.py          # B5 emotive buzzer-melody vocabulary, wired in the driver
-    diag_bridge.py     # driver DIAG effects -> diag events
-  app/                 # Phase 10 integration: the ONLY place with real I/O wiring
-    sinks.py           # serial + power backed DriverBindings sinks; build_bindings()
-    sensors.py         # SensorHub: IMU stream + detection feed -> the sensors() dict
-    __main__.py        # python -m pi_pipeline.app — voice loop + behaviour runtime
-  doctor.py            # python -m pi_pipeline.doctor — bring-up readiness checklist
-  bringup.py           # python -m pi_pipeline.bringup — guided, resumable bring-up checklist
-  gait/                # Phase 6 — sim-to-real deployment of run20m_ppo
-    residual_policy.py deploy_map.py run_gait.py   # the 80 Hz on-robot loop
-    thermal_guard.py   # I2t heat estimate + 3-tier indicator
-    carpet.py speed_estimate.py   # carpet-slip detect + IMU-ZUPT speed estimate
-    jam_guard.py       # B9a vision-free servo-strain jam reflex
-    skill_layer.py skill_switch.py gait_selector.py   # Phase E scripted skill switching
-  vision/              # Phase 8 — camera / detection feed / avoidance / cliff guard
-    object_gallery.py  # B20 -- recognition-by-instance library (dedup/quality/capacity), no ML here
-  memory/              # Phase 9 — SQLite conversation memory; webui.py (browse/prune)
-  link/                # Phase 5 — resilient BiBoard serial link + recovery FSM
-    check_serial.py    # port/ping/skill checks + `firstmove` (guided first movement) + `allmoves` (full movement sweep, voltage/latency log)
-    trace.py           # TracingLink (log every command sent) + replay
-  diag/                # black-box logger + ring buffer + watchdog + sysmon stubs
-  power/               # CPU governor / Wi-Fi power-save / disable peripherals
-  util/                # supervisor.py — restart-on-death/hang for worker threads
-```
+## Packages
 
-Personality is set via `G2_TRAITS` (e.g. `curiosity=0.85, playfulness=0.4`);
-the opt-in character mode is `G2_CHARACTER=gir` (`G2_CHARACTER_LEVEL`, default
-0.4), toggleable at runtime by saying "enable/disable gir mode".
-`python -m pi_pipeline.personality` prints the resolved prompt + behaviour knobs.
+| Package | What it does | README |
+|---|---|---|
+| [`voice/`](voice/README.md) | Wake word, speech to text, Claude, text to speech; `perform_skill` and `remember` tools; local spoken commands; sounds | yes |
+| [`memory/`](memory/README.md) | SQLite exchange log (BM25 search) and facts G2 saves himself; consolidation; review UI | yes |
+| [`personality/`](personality/README.md) | Composable traits that shape the Claude prompt, the behavior knobs and the cues | yes |
+| [`behavior/`](behavior/README.md) | `BehaviorDriver.tick()` returns ordered effects: modes, exploration, idle, sleep, wall avoidance, chirps, emergency stop | yes |
+| [`vision/`](vision/README.md) | Camera feed, detections, pictures, wall distance, recognition by instance | yes |
+| [`gait/`](gait/README.md) | The 80 Hz policy loop, steering trim, stand-up ramp, guards, IMU speed and stall, bench and logging tools | yes |
+| [`link/`](link/README.md) | The shared serial link to the BiBoard, command tracing, `check_serial` | yes |
+| [`app/`](app/README.md) | The whole robot as one program: voice loop and behavior runtime over one link | yes |
+| [`diag/`](diag/README.md) | Per-session event log with a black-box ring buffer, control-loop watchdog, crash reports | yes |
+| [`power/`](power/README.md) | Pi power levers, battery watch, runtime estimate, sleep, power log | yes |
+| [`telemetry/`](telemetry/README.md) | Automatic walk logs, floor labels, hardware epochs, data-type labels | yes |
+| [`reflection/`](reflection/README.md) | Session recaps and the idle-time reflection notes | yes |
+| [`head/`](head/README.md) | An MCP tool server for the Petoi AI Head (not part of the running build) | yes |
+| [`util/`](util/README.md) | Disk-space warning, old-log tidy, a worker supervisor | yes |
+| `tests/` | The suite: no network, audio or API key; run it before committing | |
+
+Top-level modules: `config.py` (settings, read once from the environment and `.env`), `features.py`, `sound_levels.py` (all sound levels as percent of the maximum), `doctor.py` (bring-up readiness checklist), `bringup.py` (guided, resumable bring-up), `benchmark_pi.py` (voice pipeline benchmark), `explore_session.py` and `explore_launch.py` (the supervised exploration session and its voice hand-over), and the Pi scripts `setup_pi.sh`, `fetch_models.sh` and `install_voice_service.sh`.
+
+### Built and tested, but not wired in
+
+These modules have unit tests and a design, but no runtime module imports them yet. Each says what would wire it.
+
+| Module | What it is | Would be wired by |
+|---|---|---|
+| `gait/jam_guard.py` | Vision-free jam reflex: front-leg strain as a bump sensor | the feedback-only jam reflex, [B9a](../docs/planned/behavior-ideas.md); needs real strain traces |
+| `behavior/thermal_governor.py` | Servo-thermal Layer 2: throttle on AMBER, cooldown pose on RED, from the gait-side `ThermalGuard` | [B26](../docs/planned/behavior-ideas.md) |
+| `util/supervisor.py` | Restarts a worker thread that crashes, returns or stops heart-beating, with backoff | [B27](../docs/planned/behavior-ideas.md) |
+| `link/recovery.py` | `RecoveryFSM`: choose between the learned catch, `rc` and `rl` after a fall | the recovery items in [`../docs/project-plan.md`](../docs/project-plan.md); retest with the Pi in the loop first |
+| `behavior/diag_bridge.py` | Turns driver `DIAG` effects into diagnostic events | wiring into `app/` |
+| `vision/terrain_feature.py` | A terrain signal for the walking policy's own observation | closed with vision-in-the-gait: [`../docs/archive/rl/vision-in-gait.md`](../docs/archive/rl/vision-in-gait.md) |
 
 ## Setup
 
 ```bash
 python3.11 -m venv pi_pipeline/.venv
 source pi_pipeline/.venv/bin/activate
-pip install -r pi_pipeline/requirements.txt          # core (anthropic, dotenv)
+pip install -r pi_pipeline/requirements.txt          # core (anthropic, dotenv, pyserial)
 pip install -r pi_pipeline/requirements-audio.txt    # optional: vosk / piper / sounddevice
-pip install -r pi_pipeline/requirements-dev.txt      # optional: pytest
+pip install -r pi_pipeline/requirements-dev.txt      # pytest
+pip install -r pi_pipeline/requirements-vision.txt   # optional: Pillow, for tools/camera_preview.py
 ```
 
-Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`. Set a
-spend limit on the key before first use — see
-[`docs/guides/api-setup.md`](../docs/guides/api-setup.md).
+Copy `.env.example` to `.env` at the repo root and set `ANTHROPIC_API_KEY`. Set a spend limit on the key first: [`../docs/guides/api-setup.md`](../docs/guides/api-setup.md). The Pi's OS setup: [`../docs/guides/pi-bring-up.md`](../docs/guides/pi-bring-up.md). Voice models: [`../docs/guides/models.md`](../docs/guides/models.md).
 
 ## Tests
 
@@ -101,74 +70,25 @@ spend limit on the key before first use — see
 pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.toml
 ```
 
-`pi_pipeline/tests/` — no network, audio, or API key required (**599 pass, 1
-skips** without a key — the live-API check). Covers the skill catalogue, the
-conversation parse / tool-ack / retry / mood-hint paths (stub Anthropic client),
-memory store + recall + decay + recency + web UI, the vision feed + avoidance +
-cliff guard, the behaviour driver + bindings + runtime + all its state machines
-(mode / explore / idle / sleep / mood / chirps / enrollment), the app sinks +
-SensorHub, the gait guards (thermal / jam / carpet / speed estimate), diagnostics
-+ watchdog, the worker supervisor, the personality traits + character toggle, and
-the `doctor` preflight. Run before committing. With a key:
-`pytest pi_pipeline/tests/test_livecheck.py -s` hits the real API.
+The suite needs no network, audio or key. One live-API check is skipped unless `G2_LIVECHECK=1` (billed). Package-style imports mean it must run from the repo root, not from inside `pi_pipeline/`.
 
 ## Run
 
 ```bash
-# Text mode — type instead of speaking, G2 replies via macOS `say`. No audio deps.
-python -m pi_pipeline.voice --mode text
-
-# Voice mode — wake word + mic + Vosk STT + Piper TTS (needs the audio deps + models)
-python -m pi_pipeline.voice --mode voice
-
-# Either mode: --actuator mock (default) logs skill commands; --actuator serial sends them
-
-# The whole robot as one program — voice loop + behaviour runtime, side by side.
-python -m pi_pipeline.app                 # mock: no serial, dry-run power
-python -m pi_pipeline.app --serial        # talk to the BiBoard
-python -m pi_pipeline.app --bench         # on the calibration stand: no autonomous movement
-
-# EMERGENCY STOP a running app (freezes + holds until released)
-python -m pi_pipeline.app --halt          # or:  kill -USR1 <pid>
-python -m pi_pipeline.app --release       # clear it  (or: kill -USR2 <pid>)
-
-# The behaviour runtime alone, against mocks (idle -> sit -> rest -> sleep -> wake)
-python -m pi_pipeline.behavior
-
-# Bring-up readiness checklist (run the moment the Pi + body are wired)
-python -m pi_pipeline.doctor              # add --serial to also handshake the BiBoard
-
-# The guided, resumable 20-step hardware bring-up sequence (Phase 0 bare
-# hardware -> Phase 1+ with the Pi wired in, stand-only through step 13a;
-# 13b is the first floor test, gated behind a confirm)
-python -m pi_pipeline.bringup             # --list / --restart / --from <id>
-
-# Guided first movement: one joint at a time, confirmed, then kbalance + a wkF burst
-python -m pi_pipeline.link.check_serial firstmove
-
-# Full movement sweep: every known move (skills + gestures + sleep + carpet +
-# recovery keyframes), logging voltage and reply latency per move to diag
-python -m pi_pipeline.link.check_serial allmoves
-
-# Log every serial command sent, then replay the same sequence later
-python -m pi_pipeline.app --serial --trace ~/g2_trace.jsonl
-python -m pi_pipeline.link.trace replay ~/g2_trace.jsonl --dry-run
+python -m pi_pipeline.voice --mode text     # type instead of speaking; G2 replies via `say`; no audio deps
+python -m pi_pipeline.voice --mode voice    # wake word + mic + Vosk + Piper (needs the audio deps and models)
+python -m pi_pipeline.app                   # the whole robot: voice loop + behavior runtime, mocked I/O
+python -m pi_pipeline.app --serial          # talk to the real BiBoard
+python -m pi_pipeline.app --bench           # on the calibration stand: no autonomous movement
+python -m pi_pipeline.app --halt            # emergency stop a running app (or kill -USR1 <pid>)
+python -m pi_pipeline.app --release         # clear it (or kill -USR2 <pid>)
+python -m pi_pipeline.behavior              # the behavior runtime alone, against mocks
+python -m pi_pipeline.doctor [--serial]     # bring-up readiness checklist
+python -m pi_pipeline.bringup               # guided, resumable hardware bring-up (--list, --restart, --from <id>)
+python -m pi_pipeline.link.check_serial firstmove    # guided first movement, one joint at a time
+python -m pi_pipeline.link.check_serial allmoves     # full movement sweep, logging voltage and latency
+python -m pi_pipeline.app --serial --trace ~/g2_trace.jsonl    # log every serial command, replay later with link.trace
+python -m pi_pipeline.personality           # print the resolved prompt and behavior knobs
 ```
 
-Every recognised command (and every conversational turn) fires an instant
-"heard you" chirp + cue *before* the spoken reply, and G2 never acts silently —
-so a misheard command is obvious and you can cancel it ("resume" / "never mind").
-
-**Spoken commands** (handled locally, no Claude call) — full phrase list +
-the conversational skill catalogue in
-[`docs/guides/voice-commands.md`](../docs/guides/voice-commands.md):
-- "emergency stop" / "freeze" / "halt" / "stop moving" → latch the freeze;
-  "resume" / "as you were" → clear it.
-- "shut down" / "power down" / "go dormant" → lie flat, then go dormant.
-  "go to sleep" → the lighter curl-up variant.
-- "come here" / "come to me" → walk directly to whoever's nearest.
-- "go ahead and look around" / "exploration mode" → arm Tier 1 roam;
-  "that's enough" / "come back" → disarm. (Tier 0 stationary attentiveness is
-  always on.)
-- "forget that" → drop this session's exchanges + facts.
-- "enable / disable gir mode" → toggle the opt-in character.
+Every recognised command and every conversational turn fires an instant "heard you" cue before the spoken reply, and G2 never acts silently, so a misheard command is obvious and can be cancelled ("resume", "never mind"). The spoken commands that never call Claude, and the conversational skill catalogue: [`../docs/guides/voice-commands.md`](../docs/guides/voice-commands.md). Personality is set with `G2_TRAITS` and the opt-in character mode with `G2_CHARACTER`.
