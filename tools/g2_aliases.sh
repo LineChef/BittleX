@@ -406,8 +406,8 @@ g2app() { _g2py -m pi_pipeline.app "$@"; }
 g2check() { _g2py tools/check_docs.py "$@"; }
 # g2bundle [--out DIR] [--base /docs]  -- build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md.
 g2bundle() { _g2py tools/build_docs_bundle.py "$@"; }
-# g2docsgen  -- regenerate the generated docs: the backlog, the shell-helpers page and the results index. Run it after changing an item heading, an alias comment or the result files.
-g2docsgen() { ( cd "$G2_ROOT" && python3 tools/gen_backlog.py && python3 tools/gen_helpers_doc.py && python3 tools/gen_results_index.py ); }
+# g2docsgen  -- regenerate the generated docs: the backlog, the shell-helpers page, the environment-variable reference and the results index. Run it after changing an item heading, an alias comment or the result files.
+g2docsgen() { ( cd "$G2_ROOT" && python3 tools/gen_backlog.py && python3 tools/gen_helpers_doc.py && python3 tools/gen_env_reference.py && python3 tools/gen_results_index.py ); }
 
 # ------------------------------------------------------- simulation and training
 # These run from rl_training/opencat-gym with the RL venv; they work from any directory.
