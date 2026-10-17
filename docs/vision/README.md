@@ -19,4 +19,7 @@ scene). The SenseCraft single-class flow is [`../guides/train-vision-model.md`](
 
 ## Reviewing the pictures G2 takes
 
+Where the pictures live and how they flow from the Pi to the training data: [`picture-library.md`](picture-library.md).
+
+
 `g2pics` opens a local review page of the pictures G2 saved while exploring: thumbnails with an X on each (a Trash with Undo; only "Empty trash" deletes for good), a Name button, quality and duplicate filtering, and Promote, which copies a labelled picture into the training set the Pi's gallery learns from. `g2pics pull` copies the pictures from the Pi first. The page is `tools/g2_review.py`; all helpers: [`../guides/shell-helpers.md`](../guides/shell-helpers.md), tool index: [`../../tools/README.md`](../../tools/README.md).
