@@ -4,6 +4,7 @@ Specs, reference and research for the hardware that is installed. The physical a
 
 | | |
 |---|---|
+| [`as-built.md`](as-built.md) | **Start here.** What G2 is made of now: parts, connections, mass and balance, known characteristics. |
 | [`specs.md`](specs.md) | Vendor-doc specs for every part + "why it matters". |
 | [`parts-and-decisions.md`](parts-and-decisions.md) | The finalized parts list, resolved/open hardware questions, power-awareness plan. |
 | [`opencat-gait-structure.md`](opencat-gait-structure.md) | How OpenCat gaits are structured (reference). |

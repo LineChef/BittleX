@@ -1,216 +1,112 @@
 # How It Works
 
-A high-level tour of the five parts of the project — **walking, voice, memory,
-vision, link** — enough to understand the shape of each without reading the code.
-For specifics see each area's own README and `docs/project-plan.md`.
+A plain-language tour of G2's parts: **walking, voice, memory, vision, behavior and the link**. Enough to understand the shape of each without reading the code. How the modules fit together technically: [`architecture.md`](architecture.md). What is working right now: [`STATUS.md`](STATUS.md).
 
-The guiding design choice: these are **independent systems**, not one "brain."
-Voice, memory, vision, and the robot link are separate modules that don't reach
-into each other except through small, deliberate seams. Walking (the RL policy)
-is a separate effort again. This keeps each piece testable and replaceable on its
-own.
+The guiding design choice: these are **independent systems**, not one "brain." Voice, memory, vision, behavior and the robot link are separate modules that reach each other only through small, deliberate seams. Walking is a separate effort again, trained in simulation. That keeps each piece testable and replaceable on its own.
 
 ---
 
 ## Walking
 
-**The goal:** get a four-legged robot to walk without hand-authoring every joint
-movement, so the gait can *adapt* rather than replay a fixed animation.
+**The goal:** a four-legged robot that walks without every joint movement being hand-authored, so the gait can adapt instead of replaying a fixed animation.
 
-**The approach — reinforcement learning.** Instead of writing "move this joint to
-40°," you build a physics simulation of the robot, define a *reward* (points for
-moving forward, staying upright, matching a clean trot rhythm, not jittering),
-and let a training algorithm (PPO) try millions of times, keeping the behaviour
-that scores well. Training runs in a PyBullet simulation on the laptop — about 40
-minutes per run.
+**Reinforcement learning, on top of a scripted walk.** G2 does not learn to walk from nothing. Petoi's firmware ships a scripted walk (`wkF`). We train a policy in a physics simulation (PyBullet, Stable-Baselines3) whose output is a small *correction* added to that scripted walk, bounded to ±30° per joint. The training reward gives points for moving at the commanded speed, staying upright and not jittering, and the simulation throws hazards at it (slopes, ledges, rubble, shoves) on a curriculum that never ramps above what a capable policy can pass. A 20-million-step training run takes hours on the laptop.
 
-**What comes out** is a *policy*: a small neural network (~3 MB file). Many times
-a second it reads the robot's state — body tilt from the IMU, the last few joint
-positions, a rhythm clock — and outputs a small adjustment to each of the 8 leg
-joints. It's reactive by construction: it re-decides every fraction of a second
-based on what the body is actually doing, which is why it corrects its balance
-continuously and rarely falls.
+**What comes out** is a small neural network exported to a file under 1 MB (ONNX) plus a sidecar with its settings. On G2 it runs on the Pi at 80 Hz, reading the IMU and the last joint commands, and adding its correction to the scripted walk. It re-decides every few milliseconds from what the body is doing, which is why it corrects balance continuously.
 
-**On the real robot** the policy would run on the Pi, reading the IMU and
-streaming joint commands to the BiBoard over the serial *link*.
+**On the real robot, extra layers sit around it:**
 
-**What it can and can't do.** It makes constant tiny corrections (good balance,
-straight tracking, handles small obstacles and light shoves). It **cannot** do
-dramatic saves or get back up after tipping over — the robot physically lacks the
-joints for that (no roll-axis actuation, weak leg servos). So the learned walk is
-**paused** until it can be compared head-to-head against Petoi's built-in scripted
-walk on real hardware.
+- a closed-loop trim of the front-left foot that holds the starting heading (the front feet steer G2);
+- an eased stand-up ramp before any walk;
+- guards for servo heat, jams, falls and battery under load;
+- carpet detection from the IMU, since carpet changes how he slips.
 
-Baking *vision* into the walk policy was tried (four training campaigns) and
-**ruled out** — a policy that can see forward learned to plow through obstacles,
-not brace for them. Perception-assisted walking is instead a layer *above* the
-gait: a fast reflex that slows the speed command near an obstacle, plus scripted
-"step over / halt / back out" keyframe moves the vision layer picks — with the
-learned walk left frozen. That whole direction is on the back burner until G2
-gets a real forward depth sensor (the current camera detects *what* it sees, not
-*how far*).
+**What it can and cannot do.** It makes constant small corrections: good balance, straight tracking, small obstacles and light shoves. It cannot make dramatic saves or get up after tipping over; the robot physically lacks the joints. The sensors are also coarse (a 5 Hz IMU, no fast joint feedback), so the policy cannot anticipate hazards, only react to them.
+
+**Vision and walking stay separate.** Putting vision inside the walking policy was tried across several campaigns and closed: a policy that could see ahead learned to plow through obstacles instead of bracing. Vision instead acts above the gait, choosing a scripted skill or slowing the speed command. Details: [`archive/rl/vision-in-gait.md`](archive/rl/vision-in-gait.md), [`rl/walking-policy.md`](rl/walking-policy.md), [`guides/gait-deployment.md`](guides/gait-deployment.md).
 
 ---
 
 ## Voice
 
-**The goal:** talk to G2 and have it talk back, powered by Claude, with the robot
-also able to move in response.
+**The goal:** talk to G2 and have him talk back, powered by Claude, with the robot able to move in response.
 
 **One conversation turn, start to finish:**
 
-1. **Wake word** — G2 listens locally and cheaply for its name ("G2"). Nothing
-   else happens until it hears that, so it isn't constantly recording or calling
-   the network. For about a minute after each reply it stays open for a
-   follow-up so you don't repeat the name every turn; "go to sleep" closes that
-   window on demand.
-2. **Listen** — it records what you say and transcribes it to text on-device
-   (Vosk).
-3. **Think** — the text goes to Claude via the API, together with any relevant
-   *memory*. Claude replies with something to say, and optionally an instruction
-   to perform a physical skill.
-4. **Speak** — the reply is turned into speech on-device (Piper; default voice
-   `en_US-ryan-low`, the light one the Pi Zero 2 W can afford) and played.
-5. **Act** — if Claude asked for a skill (sit, wave, walk), that goes out over
-   the *link*.
+1. **Wake word.** G2 listens locally for his name ("gee two"). Nothing else happens until he hears it, so he is not constantly recording or calling the network. After a reply the microphone stays open for a short follow-up window so you do not repeat the name every turn; a question opens a longer one. "Let's talk" starts a conversation mode that listens without the wake word until a quiet gap.
+2. **Listen.** What you say is transcribed on the Pi (Vosk).
+3. **Local commands first.** A set of spoken commands never reach Claude: stop and emergency stop, sleep and shut down, "the floor is tile", "walk for ten seconds", and more. They are fast, free and work offline. [`guides/voice-commands.md`](guides/voice-commands.md)
+4. **Think.** Anything else goes to Claude through the API, together with relevant memory. Claude replies with words and may call a tool to move.
+5. **Speak.** The reply is turned into speech on the Pi (Piper), run through a robot-voice effect, and played on the speaker. The next sentence is synthesised while the previous one plays.
+6. **Act.** If Claude called `perform_skill` (sit, wave, walk), the command goes out over the link.
 
-Only step 3 uses the cloud. Listening and speaking are fully local.
+Only step 4 uses the cloud, and API calls are used sparingly. G2 also plays short sounds (a chime at the wake word, cues when the gait switches or a picture is taken) so you can tell what he is doing without looking.
 
-**How Claude triggers movement:** it's given a tool called `perform_skill` with a
-menu of things G2 can do. When it wants G2 to move it calls that tool; its spoken
-reply comes back as ordinary text in the same response. A second tool,
-`remember`, is how *memory* gets written (below).
-
-**Where it runs today:** end-to-end on a laptop — you type instead of speaking,
-and it replies through the laptop speakers. Moving to the Pi's real mic, speaker,
-and the robot is a configuration change, because every hardware-specific step
-sits behind a swappable interface with a mock version.
+**Where it runs:** on the Pi, started at boot as a service. On a laptop the same code runs in text mode with mock hardware.
 
 ---
 
 ## Memory
 
-**The problem:** Claude has no memory between calls. Every API request starts
-blank.
+**The problem:** Claude has no memory between calls. Every API request starts blank.
 
-**The fix:** a small local database (SQLite) on the Pi that holds two things —
-the full log of every exchange, and a short list of durable *facts* worth keeping
-("their name is Sam," "they have a cat named Biscuit").
+**The fix:** a small local database (SQLite) on the Pi holding the full log of every exchange and a short list of durable facts worth keeping ("their name is Sam," "they have a cat named Biscuit").
 
-**How it's used:** before each message to Claude, the memory system assembles a
-little context block — the current facts, plus any older conversations that look
-related to what you just said (a keyword relevance search over the log) — and
-prepends it to the prompt. Claude effectively "remembers" without us resending
-the entire history every time.
+**How it is used:** before each message to Claude, the memory system assembles a short context block: a pinned core of the most important facts, the highest-ranked other facts (importance and recency), and any older conversations that look related to what you just said (a keyword relevance search over the log). It is prepended to the prompt, so Claude seems to remember without the whole history being resent.
 
-**How facts get created:** Claude decides. When you say something durable, it
-calls the `remember` tool. No extra API call, no separate summarisation step.
+**How facts are created:** Claude decides. When you say something durable, it calls the `remember` tool, with no extra API call.
 
-**Keeping it tidy:** a fact you haven't come up in a while quietly drops out of
-the injected list once it fills up — it stays in the database, just isn't sent
-every turn. A command-line tool (`python -m pi_pipeline.memory …`) lets you view,
-search, add, or prune what G2 knows.
+**Keeping it tidy:** when G2 has been idle a while (or is told to go to sleep), one consolidation call merges duplicate facts and drops trivial ones, with every change logged. A command-line tool (`python -m pi_pipeline.memory …`) lets you view, search, add, pin or prune what G2 knows. Memory is not coupled to movement or vision.
 
 ---
 
 ## Vision
 
-**The hardware:** a small camera module that runs object detection *on itself*,
-not on the Pi. It sends the Pi a running list of what it sees — object labels and
-bounding-box positions — over serial. It cannot send actual images (the robot's
-control chip can't handle that), so everything downstream works from the
-detection list.
+**The hardware:** a small camera module that runs object detection on itself, not on the Pi. It sends the Pi a running list of what it sees (labels and bounding boxes) over USB serial. For a picture, the Pi asks for one small frame.
 
-**Two things are done with that stream:**
+**What is done with it:**
 
-1. **Obstacle avoidance** — a fast, local reflex. It watches the detection boxes;
-   a box that is large and centred means something is close and dead ahead, so it
-   decides *stop*, *back up*, or *steer around*. This has to react within a few
-   frames, so it uses no Claude and no network. It's debounced so a flickery
-   detection doesn't make it twitch, but a genuinely urgent hazard overrides the
-   debounce.
-2. **"What do you see"** — the detections are summarised into a sentence and
-   handed to Claude (through the voice layer's callable), so G2 can describe its
-   surroundings out loud when asked.
+1. **Awareness and avoidance.** A fast local reflex watches the detections and, with a wall-distance estimate from pictures, turns G2 away from a near wall. No Claude, no network.
+2. **"What do you see."** On request, one picture goes to Claude along with the detector's labels, and G2 describes the scene aloud.
+3. **Exploration pictures.** During exploration G2 stops at times to take pictures of things worth a look. A review page lets you name them, and named things are what recognition builds on.
 
-**Where it stands:** a custom 3-class detection model (a household member + dog +
-cat) is trained and **running on the actual camera** — the hard part was that the
-camera's firmware is frozen at Jan 2025 and broke every modern export toolchain
-until we pinned an older one (`docs/vision/custom-model-recipe.md`).
-The avoidance reflex and the "what do you see" path are wired against that feed
-(and a mock feed for tests). What's left is an obstacle / table-edge detector
-(the desk-edge one is the `CliffGuard` reflex's input) and threshold tuning —
-those need the camera physically mounted on the frame for the real point of view.
+**Recognition is by instance, not category.** The detector knows a handful of specific things. For everything else there is a second system that fingerprints a photo crop and compares it with a library of earlier ones: a close match means "the same thing again," nothing close means "something new," which joins the library unnamed until someone names it. It runs only in moments G2 is already standing still, caps its disk use, and never uploads anything. The pieces exist and are tested; wiring them into exploration is not finished.
 
-**Note:** this is *recognition*, not navigation. Feeding detections into the
-*walking policy* was tried and ruled out (see Walking, above) — vision assists
-walking as a reflex layer on top of the frozen gait, not inside it.
+The camera's firmware is frozen, which constrains which detection models can run: [`vision/custom-model-recipe.md`](vision/custom-model-recipe.md). Index: [`vision/README.md`](vision/README.md).
 
-### A second, separate kind of recognition (new, off by default)
+---
 
-The trained detector above knows five specific things, and isn't meant to grow
-much past that — adding a sixth, broad "generic object" class to that same
-model risks making the five it already does well *worse*, so that path was
-deliberately ruled out. Instead there's a second system, entirely separate
-from that model, for recognising things **by instance** rather than by
-category: "I've seen this exact thing before," not "this is a shoe."
+## Behavior
 
-It works by fingerprinting: a photo crop becomes a short vector, and a new
-sighting is compared against a library of vectors already stored. A close
-match means "the same thing again"; nothing close means "something new,"
-which joins the library **unnamed** until someone tells G2 what it is.
-Naming is optional and entirely separate from recognition working at all — G2
-can track "I've seen unnamed thing #17 four times" without ever knowing what
-it's called.
+**The goal:** G2 does things on his own, not only when asked.
 
-It only ever looks for new things during explore mode, and only in the
-moments it's already standing still for some other reason — it never
-interrupts a walk to take a photo. A cap on both how many things it
-remembers and the estimated space they take up keeps it from ever crowding
-out real disk space, and anything already named or flagged "done" is
-protected from ever being deleted to make room for something new. Reviewing
-and naming what it's found happens on a private, local page generated on
-demand — nothing about what's in the house is ever uploaded or shared
-anywhere.
+A single function, `BehaviorDriver.tick()`, reads the current inputs (detections, IMU, voice commands, battery) and returns an ordered list of effects (move, chirp, speak, take a picture). It never touches hardware itself; a binding layer turns effects into real actions. That keeps all of the autonomy testable with no robot.
 
-**Where it stands:** the accounting (what counts as a duplicate, when
-something's "done," what gets evicted under space pressure) is built and
-tested, behind a feature flag that's off by default. The two pieces that
-actually need the camera to build — deciding *where* in a frame something new
-is, and the model that turns a crop into a fingerprint — aren't chosen yet;
-see `docs/planned/behavior-ideas.md` **B20**.
+Composed into that one tick:
+
+- **Exploration**, in two tiers: an always-on stationary "attentive" tier (look at things, react, scan) and a voice-armed "roam" tier that walks, with wall avoidance, a hit detector from the IMU, and picture stops;
+- **idle posture** (sit, then lie down, with small signs of life) and **sleep mode**;
+- a **thermal governor** that backs off when servos run hot;
+- **emergency stop**, which outranks everything.
+
+**Personality** is a set of composable traits (curiosity, mood, bonds and others) that each shape both the prompt Claude sees and the behavior parameters. Guide to exploration: [`guides/exploration-mode.md`](guides/exploration-mode.md).
 
 ---
 
 ## Link
 
-**What it is:** the plumbing between the Pi and the robot's control board (the
-"BiBoard," running Petoi's OpenCat firmware). They communicate over a serial
-cable using short text commands — `kwkF` = walk forward, `ksit` = sit, `d` = lie
-down and relax.
+**What it is:** the plumbing between the Pi and the robot's control board (the BiBoard, running Petoi's OpenCat firmware). They talk over a serial cable using short text commands: `kwkF` is walk forward, `ksit` is sit, `d` is lie down and relax.
 
-**Why it's its own module:** *voice* needs it to send skills, *vision* needs it
-to send avoidance moves, and RL deployment would need it to stream joint angles.
-Rather than each reinventing serial handling, there is one shared link.
+**Why it is its own module:** voice, behavior and the gait loop all send commands, so there is one shared link instead of each reinventing serial handling.
 
-**What it handles:** opening the connection and reconnecting if the cable is
-pulled — without crashing whatever is using it; building the command strings
-correctly; and refusing dangerous commands (calibration, factory reset). It also
-ships a diagnostic tool to list serial ports, ping the board, send a single
-command, or cycle through every skill as a hardware bring-up test.
+**What it handles:** opening the connection and reconnecting after the cable is unplugged without crashing the caller; building command strings; refusing dangerous commands (calibration, factory reset); and logging every command to a replayable trace. Diagnostic tools list ports, ping the board and exercise each skill: [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md).
 
 ---
 
 ## How they fit together
 
-- **Memory → Voice:** one function call. The voice loop asks memory for context
-  before each Claude turn and hands it the result afterward.
-- **Vision → Voice:** vision produces a plain-text scene summary and calls an
-  injected "ask Claude" function; it never imports the voice code.
-- **Voice / Vision → Link:** both send the robot commands through the one shared
-  serial link.
-- **Walking** stands apart: its own training project, and on the robot it would
-  be a process streaming joint commands through that same link.
-- A future integration layer (Phase 10) runs these together — the voice loop
-  listening, the vision reflex watching for obstacles and occasionally narrating,
-  memory persisting across it all — sharing the link to the robot.
+- **Memory to Voice:** one function pair. The voice loop asks memory for context before each Claude turn and hands it the result afterward.
+- **Vision to Voice and Behavior:** vision produces detections and plain-text scene summaries; it calls an injected "ask Claude" function and never imports voice code.
+- **Voice, Behavior and the gait loop to Link:** all send commands through the one shared serial link.
+- **Walking** stands slightly apart: trained on a separate machine, deployed as one exported file, and run on the Pi as a loop that streams joint commands through the same link.
+- **Diagnostics** cut across all of it: a per-session event log with a black-box ring buffer, so a hardware failure leaves enough context to debug afterward.

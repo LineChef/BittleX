@@ -8,7 +8,8 @@
 | [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the next hardware session is [`plan-detail/hardware-session-plan-2026-10-09.md`](plan-detail/hardware-session-plan-2026-10-09.md). |
 | [`backlog.md`](backlog.md) | Open work by ID (H#, R#, B#) — generated from the item headings. |
 | [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
-| [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
+| [`architecture.md`](architecture.md) | How the pieces fit together: the robot, the Pi and the dev machine, the subsystems and their seams, how a walk happens and how training reaches the robot. |
+| [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, behavior, link). |
 | [`guides/SOLO.md`](guides/SOLO.md) | Working-solo notes. |
 
 ## Where to update what

@@ -15,5 +15,6 @@ How to do a thing on the current build.
 | [`api-setup.md`](api-setup.md) | Anthropic API key, workspace + spend-limit checklist. |
 | [`feature-flags.md`](feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
 | [`automated-testing-loop.md`](automated-testing-loop.md) | Runbook for unattended RL reward iteration. |
+| [`operating-g2.md`](operating-g2.md) | **Start here for day-to-day use.** Safety rules, how to stop G2, bench mode, power on and off, batteries, first checks. Printable version: [`operating-g2-quick-guide.pdf`](operating-g2-quick-guide.pdf). |
 | [`operating-lessons.md`](operating-lessons.md) | Lessons and standing practice from the hardware sessions: deploying and stopping safely, the voice service and microphone, session data processing, background jobs. |
 | [`bring-up-sequence.md`](bring-up-sequence.md) | The ordered day-1 hardware bring-up (executable version: `python -m pi_pipeline.bringup`). |
