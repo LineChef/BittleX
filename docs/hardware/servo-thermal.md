@@ -4,6 +4,25 @@ Research + mitigation plan for the servo "thermal cliff": the sharp, non-linear
 torque collapse when a P1S servo (or its driver) crosses a current/temperature
 limit under sustained load. Researched 2026-09-05.
 
+## Status at a glance
+
+| Layer | What | State |
+|---|---|---|
+| 0 | `FAC_POWER` penalty, `TORQUE_CUTBACK` randomisation, rest (`d`) on every gait-loop exit, a low target speed | In place |
+| 1 | `ThermalGuard` (`gait/thermal_guard.py`): a heat estimate per joint with GREEN, AMBER and RED tiers, a spoken warning, a duty-cycle backstop | **Built and wired into `run_gait.py`; unvalidated:** every constant is a placeholder, and it has never been calibrated on real servos |
+| 2 | `ThermalGovernor` (`behavior/thermal_governor.py`): throttle on AMBER, cooldown pose on RED | Built and tested, **not wired in** (backlog [B26](../planned/behavior-ideas.md)) |
+| 3 | A thermal-aware residual policy (the literature blueprint) | Designed, not built; needs training |
+
+**The estimator is unvalidated.** G2's servos report no temperature or current, so heat is estimated from commanded motion. Until it is checked against the real servos, treat the thresholds as guesses that err toward safety.
+
+**Bench-test checklist** (G2 on a stand or held by the user; one measurement at a time; details in section 4b):
+- [ ] Hold a hard stance and note the time until the servo protects itself: scales `_K_GEN` and `_H_TRIP`.
+- [ ] Release a hot servo and record the cooldown curve: sets `_K_DISS`.
+- [ ] Compare feedback-servo tracking error under a normal hard push with an actual stall: sets the stall constants.
+- [ ] Record the mean standing pose: replaces `_STAND_DEG` with the real value.
+- [ ] Cross-check the effort proxy against measured tracking, once the loop reads servo feedback.
+
+
 ---
 
 ## 1. What to expect on our hardware

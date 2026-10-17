@@ -51,7 +51,7 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 
 ## Hardware (parts, power, enclosure)
 
-Parts list ($567 as finalized), resolved questions (independent Pi power via the PiSugar S, BiBoard V1 is an ESP32-U4WDH, spec sheet) and
+Parts list (as finalized), resolved questions (independent Pi power via the PiSugar S, BiBoard V1 is an ESP32-U4WDH, spec sheet) and
 the battery-awareness plan: [`hardware/parts-and-decisions.md`](hardware/parts-and-decisions.md). Vendor specs: [`hardware/specs.md`](hardware/specs.md).
 Build record and wiring: [`../blueprints/README.md`](../blueprints/README.md).
 
@@ -69,7 +69,7 @@ Open:
 
 ## Phase 2 — Orientation ✅
 
-- [x] Community Bittle simulator; browsed the OpenCat firmware ([`hardware/opencat-gait-structure.md`](hardware/opencat-gait-structure.md)).
+- [x] Community Bittle simulator; browsed the OpenCat firmware ([`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) ("How OpenCat gaits are structured")).
 - [ ] Deferred: Petoi's beginner coding curriculum and Python fundamentals (picked up while building Phase 3). No official Petoi browser simulator exists.
 
 ## Phase 3 — RL training in simulation ✅ (paused)

@@ -12,7 +12,7 @@ open items on the bench once the parts are in hand.
 |---|---|
 | MCU | ESP32-U4WDH (Xtensa dual-core LX6), via an ESP32-MINI-1 module |
 | SRAM / ROM / Flash | 520 KB / 448 KB / **4 MB** |
-| IMU | **6-axis MPU6050** (or ICM42670 by availability) — 3-axis gyro + 3-axis accel |
+| IMU | **6-axis ICM42670 on G2's board** (the firmware supports the MPU6050 too; confirmed `ICM:` on G2, 2026-09-20) — 3-axis gyro + 3-axis accel |
 | Servo drive | 12 PWM channels (position PWM) |
 | Grove sockets | 4, typed: G1 = UART2, G2 = I²C, G3/G4 = analog in |
 | Input / operating voltage | 7–9 V in, 5 V operating, 0.1–0.2 A board draw |

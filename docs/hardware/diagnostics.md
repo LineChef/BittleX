@@ -1,10 +1,23 @@
-# Hardware diagnostics / black-box logging — plan
+# Hardware diagnostics and black-box logging
 
 Goal: when something unknown goes wrong on the real robot, have enough recorded
 context to figure out what happened without reproducing it. Drafted 2026-09-05,
 pre-hardware.
 
 ---
+
+## Status at a glance
+
+| Part | State |
+|---|---|
+| Structured session log, black-box ring buffer, session manifest, failure taxonomy, decision events (`diag/core.py`) | **Built and in use** |
+| Watchdog and heartbeat for the control loop (`diag/watchdog.py`), post-hoc tooling (`python -m pi_pipeline.diag`) | **Built and in use** |
+| System sampling for battery and Pi thermal (`diag/sysmon.py`) | Built; the Pi-specific reads degrade to nothing off the Pi |
+| Crash forensics for the voice service and exploration (`diag/crashwatch.py`) | **Built and in use** (2026-10-08) |
+| Disk-space warning (`util/disk.py`) | **Built and in use** |
+| Live Wi-Fi stream to a laptop, longer-term trend storage | **Designed, not built** (Phase 3, only if needed) |
+
+Package overview: [`../../pi_pipeline/diag/README.md`](../../pi_pipeline/diag/README.md).
 
 ## What exists today
 

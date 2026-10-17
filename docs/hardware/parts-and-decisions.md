@@ -1,22 +1,22 @@
 # Parts list and hardware decisions
 
 > **Moved verbatim from `docs/project-plan.md` on 2026-10-02** when the plan was trimmed to a roadmap. This is the full detail for
-> the finalized parts list ($567 as of this writing), resolved and open hardware questions, and the power-awareness plan. Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
+> the finalized parts list, resolved and open hardware questions, and the power-awareness plan. Current state is in [`../STATUS.md`](../STATUS.md); the roadmap item is in [`../project-plan.md`](../project-plan.md).
 
-## Parts list (finalized — $567)
+## Parts list (finalized)
 
-| Item | Price |
-|---|---|
-| Petoi Bittle X V2 (alloy servos) | $380 |
-| Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable) | $115 |
-| SanDisk 32 GB Ultra microSDHC (A1, Class 10, UHS-I) | $22 |
-| 5 V / 2.5 A micro-USB power supply | $10 |
-| Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) | $40 |
-| PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") | — |
-| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 | — |
-| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run | — |
-| [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera) | — |
-| [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above) | — |
+| Item |
+|---|
+| Petoi Bittle X V2 (alloy servos) |
+| Raspberry Pi Zero 2 WH kit (pre-soldered headers, heatsink, mini-HDMI adapter, OTG cable) |
+| SanDisk 32 GB Ultra microSDHC (A1, Class 10, UHS-I) |
+| 5 V / 2.5 A micro-USB power supply |
+| Petoi AI Vision Camera Module (Grove Vision AI V2, Arm Cortex-M55 + Ethos-U55) |
+| PiSugar S 1200 mAh (independent Pi power — fits Pi Zero W/WH/2W; **not** the "S Plus") |
+| Calibration stand (G2 sits with legs off the ground) — servo/gait bring-up without ever risking a fall; see `docs/guides/gait-deployment.md` step 6 |
+| Dupont jumper wires, female-to-female, 40pc/10cm (bociloy, [B0D9NCD1Z3](https://www.amazon.com/dp/B0D9NCD1Z3)) — in hand 2026-09-18; used for BiBoard↔Pi TX2/RX2/GND (`blueprints/wiring/g2-wiring-guide.html`); still need 20&ndash;30cm longer ones once the final mount position needs the longer run |
+| [NULLLAB NS4168 I2S Audio Amplifier & 3W Speaker Kit](https://www.amazon.com/NULLLAB-NS4168-Audio-Amplifier-Speaker/dp/B0GV33LRR5) — ordered 2026-09-29, Pi-side TTS output, wires to the GPIO header (no USB, that port's reserved for the camera) |
+| [HiLetgo SPH0645 I2S MEMS Microphone Breakout](https://www.amazon.com/HiLetgo-Microphone-Breakout-SPH0645LM4H-Raspberry/dp/B082KRJW62) — ordered 2026-09-29, Pi-side mic input, same GPIO header (shared I2S clock lines with the amp above) |
 
 ### Resolved
 
@@ -39,7 +39,7 @@
   ESP32-MINI-1 module), not an S3/C3. This is why Phase 8 sends structured
   detection results over serial rather than streaming raw frames. Flash is
   **4 MB**, SRAM **520 KB** (Petoi pages citing "16 MB / WROOM-32D" describe
-  BiBoard V0). Board also carries a **6-axis MPU6050 IMU (no magnetometer)**, an
+  BiBoard V0). Board also carries a **6-axis IMU (no magnetometer; G2's board carries an ICM42670, and the firmware supports the MPU6050 on other units)**, an
   onboard offline voice-recognition module, and a speaker.
 - **Full vendor-doc spec sheet** for every part — with the "why it matters" for
   each — is in [`docs/hardware/specs.md`](specs.md).

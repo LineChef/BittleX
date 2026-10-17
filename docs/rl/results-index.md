@@ -83,7 +83,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-r
 
 ## `decisions`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +28.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +27.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -288,7 +288,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-
 
 ## `slope`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +29.
+Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +28.
 
 | File | Size | Cited by |
 |---|---|---|

@@ -1,4 +1,19 @@
-# Powering the Raspberry Pi — Research Notes
+# Powering the Raspberry Pi and managing power
+
+## Status at a glance
+
+**The decision:** the Pi has its own battery (a PiSugar S 1200 mAh), and the BiBoard link is data only (TX, RX and GND). Drawing the Pi from G2's shared pack caused reduced motion and brownout risk. The first half of this page is the research that led there.
+
+| Measure | State |
+|---|---|
+| Disable unused peripherals, Wi-Fi power-save when headless, CPU governor `ondemand` (`pi_pipeline.power`) | **Built and in use** |
+| Idle rest posture and sleep mode (`behavior/idle_posture.py`, `sleep_mode.py`, plus the power-saving sleep in `power/sleep_watch.py`) | **Built and in use** (sleep after 5 minutes at rest) |
+| Battery watch for G2's pack; Pi runtime measurement and warning; power log | **Built and in use** |
+| Pi shutdown from a voice command | Built; the PiSugar S keeps powering the halted Pi, so its switch is flipped by hand |
+| On-demand vision (scale the camera to activity) | **Not built**: only on or off exists, tied to sleep |
+| A hardware battery readout for the Pi | Not available on the PiSugar S; the warning counts uptime against a measured runtime |
+
+Package overview: [`../../pi_pipeline/power/README.md`](../../pi_pipeline/power/README.md). Operator view: [`../guides/operating-g2.md`](../guides/operating-g2.md).
 
 ## The problem
 
