@@ -1,4 +1,4 @@
-"""Privileged critic (2026-10-08 training upgrade, lever `privileged_critic`; docs/plan-detail/handoff-2026-10-08.md section 12).
+"""Privileged critic (2026-10-08 training upgrade, lever `privileged_critic`; docs/rl/training-upgrade-2026-10.md).
 
 With G2E_PRIV_OBS the env appends opencat_gym_env.PRIV_DIM values to the observation: the true orientation, rates, body velocity and height, the foot contacts and
 the episode's hazards. Only the CRITIC may use them. PrivCriticPolicy gives the actor its own feature extractor that zeroes those values, so the actor's weights on

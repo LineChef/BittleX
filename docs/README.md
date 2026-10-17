@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | [`STATUS.md`](STATUS.md) | **What is true right now** — what is deployed, what has run on the robot, open problems, next steps. The only place for current state. |
-| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the latest session handoff is [`plan-detail/handoff-2026-10-10.md`](plan-detail/handoff-2026-10-10.md); the next hardware session is [`plan-detail/hardware-session-plan-2026-10-09.md`](plan-detail/hardware-session-plan-2026-10-09.md). |
+| [`project-plan.md`](project-plan.md) | The roadmap and decision log: phase checklists with statuses and links. Full per-phase detail is in [`plan-detail/`](plan-detail/); the next hardware session is [`plan-detail/hardware-session-plan-2026-10-09.md`](plan-detail/hardware-session-plan-2026-10-09.md). |
 | [`backlog.md`](backlog.md) | Open work by ID (H#, R#, B#) — generated from the item headings. |
 | [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
@@ -47,6 +47,7 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 | [`feature-flags.md`](guides/feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
 | [`automated-testing-loop.md`](guides/automated-testing-loop.md) | Runbook for unattended RL reward iteration. |
 
+| [`operating-lessons.md`](guides/operating-lessons.md) | Lessons and standing practice from the hardware sessions: deploying and stopping safely, the voice service and microphone, session data processing, background jobs. |
 | [`bring-up-sequence.md`](guides/bring-up-sequence.md) | The ordered day-1 hardware bring-up (executable version: `python -m pi_pipeline.bringup`). |
 
 ## `vision/` — camera, detection model, capture

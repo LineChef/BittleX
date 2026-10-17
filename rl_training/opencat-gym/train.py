@@ -226,7 +226,7 @@ class LeanInfo(gym.Wrapper):
 
 
 class FrontierCurriculum(BaseCallback):
-    """The per-hazard frontier curriculum (opencat_gym_env FRONTIER; docs/plan-detail/handoff-2026-10-08.md 12.5). Reads every finished episode's outcome from the
+    """The per-hazard frontier curriculum (opencat_gym_env FRONTIER; docs/rl/training-upgrade-2026-10.md section 5). Reads every finished episode's outcome from the
     training envs (anchors: hazard-free; focus: one hazard at a known size bin), keeps the last WINDOW outcomes per bin, and pushes new sampling weights every rollout.
       relative success of a bin = its success / max(anchor success, 0.30)
       frontier F = the highest bin, counting up from 0, whose bins all have >= MIN_N outcomes and relative success >= PASS (no bin below it clearly failing)

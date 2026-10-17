@@ -1,7 +1,7 @@
 # Hardware session plan (written 2026-10-09 night, for the next session)
 
 The user runs the hardware (places G2, holds him, measures tape and facing); Claude runs every command and records. Floor: hardwood unless the user says otherwise (then `g2floor <name>` first). Times are Eastern.
-Read first: [`handoff-2026-10-09-night.md`](handoff-2026-10-09-night.md) (state), [`../STATUS.md`](../STATUS.md) (what is deployed).
+Read first: [`../STATUS.md`](../STATUS.md) (what is deployed).
 
 ## Rules for this and every hardware session (user, 2026-10-09)
 - **Everything starts on his feet** (the user has no stand): hands near, never on his back, no "in the air first" step. Anything new still gets a short first walk (6 s).
@@ -37,7 +37,7 @@ Speaker works at all? (The Pi logged a sound-device error earlier.) Then: wake-w
 ## Block 3 -- hi step, scripted hsF (about 25 min)
 On the floor: 4 walks, note speed (expected about 0.04 m/s, slower than normal on purpose) and sway; a snag (cable or pencil) and a small rubble patch, where it should help most; then "walk normally" back. No comparison with the basic walk on G2 (sim only).
 
-## IMU capture for the speed estimate (DONE 2026-10-10; results in `handoff-2026-10-10.md`, Block B)
+## IMU capture for the speed estimate (DONE 2026-10-10; results in [`../STATUS.md`](../STATUS.md) items 0j to 0l)
 Done: rest and stand captures read 5.0 Hz with no sensor bias, and 3 wall stalls separated from 3 free walks on heading jitter (built as the IMU contact signal). Original plan, kept for the method:
 On the floor, not the stand: `python -m pi_pipeline.gait.imu_capture --seconds 60 --pose rest` and `--pose stand` (bias, noise and the real frame rate), then walk him into a book or a wall 3 times for 8 s each with the IMU logged (a real stall, on his feet) to see whether a stall shows at 5 Hz. Tuning the ZUPT constants needs floor walks against a measured distance. Nothing built today depends on it: the stuck and hit signals use the wall looks.
 

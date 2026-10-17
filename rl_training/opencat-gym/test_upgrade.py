@@ -1,4 +1,4 @@
-"""The 2026-10-08 training upgrade (docs/plan-detail/handoff-2026-10-08.md section 12): the frontier curriculum keeps the user's hazard shares and stays inside its bounds,
+"""The 2026-10-08 training upgrade (docs/rl/training-upgrade-2026-10.md): the frontier curriculum keeps the user's hazard shares and stays inside its bounds,
 its update rule finds the frontier and blocks unpassable bins, the privileged critic never leaks into the actor (or the ONNX export), the mirror maps cover the
 privileged values, and checkpoints land on the 3M / 5M / 10M names whatever the env count. Run with the RL venv: pytest test_upgrade.py."""
 import os

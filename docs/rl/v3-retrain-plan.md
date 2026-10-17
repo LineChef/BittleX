@@ -1,7 +1,7 @@
 # V3 retrain plan: calibrate the sim to G2, bake every tuning lesson into one fresh gait (approved 2026-10-06)
 
 **Status: APPROVED by the user 2026-10-06** (incl. the turning gate, mirror symmetry and speed optimizations 1-5). This is the working plan
-and the hand-off: a new session should be able to resume from this page alone. Background: [`v22-handoff.md`](v22-handoff.md) (the drift
+and the hand-off: a new session should be able to resume from this page alone. Background: [`v22-log.md`](v22-log.md) appendix (the drift
 campaign this replaces), [`hw1-log.md`](hw1-log.md) (how V2 / V2.1 were trained), [`real-walk-log.md`](real-walk-log.md) (real data).
 
 **Principle (user):** everything learned from tuning goes into the base training; **no tuning runs after the 20M consolidation run.** Each

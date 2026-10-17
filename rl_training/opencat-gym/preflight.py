@@ -1,4 +1,4 @@
-"""One command that must PASS before a 20M is offered for the user's go (2026-10-08 training upgrade; docs/plan-detail/handoff-2026-10-08.md section 12).
+"""One command that must PASS before a 20M is offered for the user's go (2026-10-08 training upgrade; docs/rl/training-upgrade-2026-10.md).
 
     ../../.venv/bin/python preflight.py                 # the recipe phase_v4 adopted (trained/v4_results.json)
     ../../.venv/bin/python preflight.py --levers mirror,big_batch,frontier

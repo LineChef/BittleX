@@ -916,7 +916,7 @@ SCALE_ALL_HAZARDS = _g2e("SCALE_ALL_HAZARDS", False)
 #   SERVO_KP / SERVO_KD: >0 sets the position / velocity gains of the joint motors (0 = pybullet's defaults).
 GROUND_FRICTION = _g2e("GROUND_FRICTION", 1.0)
 FIX_PAW_VEL = _g2e("FIX_PAW_VEL", False)        # 2026-10-08 review: slip / clearance penalties weighted by the paw's horizontal velocity (as intended), not its x position
-# --- 2026-10-08 training upgrade (docs/plan-detail/handoff-2026-10-08.md section 12). Every flag defaults OFF, so older checkpoints and scripts replay unchanged. ---
+# --- 2026-10-08 training upgrade (docs/rl/training-upgrade-2026-10.md). Every flag defaults OFF, so older checkpoints and scripts replay unchanged. ---
 # CMD_BANDS "forward": no backward commands (G2 walks backward with the firmware `bk` skill; the Pi never sends the policy a negative command) and no unreachable fast band
 #   (the gait tops out ~0.095 m/s): stand 17% (unchanged), creep 0.04-0.055 25%, cruise 0.08-0.12 58%. "" = the G4 bands.
 #   "capped" (2026-10-08 ablation of "forward"): ONLY the unreachable fast band is removed (its share goes to cruise 0.08-0.12); backward stays:

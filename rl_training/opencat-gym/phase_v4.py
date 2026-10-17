@@ -1,4 +1,4 @@
-"""Unattended screening of the 2026-10-08 training upgrade (docs/plan-detail/handoff-2026-10-08.md section 12), then the 20M on the user's go.
+"""Unattended screening of the 2026-10-08 training upgrade (docs/rl/training-upgrade-2026-10.md), then the 20M on the user's go.
 
     python phase_v4.py run       # work through SCREENS (resumable: a finished run is not redone, a run still training is waited for)
     python phase_v4.py status    # one line per screen

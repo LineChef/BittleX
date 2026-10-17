@@ -128,7 +128,7 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
       hazard episodes, imitation on measured joints, a privileged critic (training-only; the policy keeps G2's inputs), health checks, best checkpoint and a plateau stop.
       Behaviour changes were screened two seeds at a time (`phase_v4.py`). Result (overnight, unattended): the hazard curriculum had never advanced, training episodes were too short to cross obstacles, and the gait flipped between clean and one-sided; after fixing those, two
       exported candidates are about as good as V3 overall, smoother and faster on flat ground, better on 25 mm ledges and shoves, and a little worse on the 10 deg cross-slope and small rubble. Candidate A was promoted to V4 and deployed to the Pi on the user's instruction (2026-10-09); the first walks on G2 are next (STATUS next step 0c). State and decisions:
-      [`plan-detail/handoff-2026-10-08.md`](plan-detail/handoff-2026-10-08.md) sections 12, 13 and 13.1.
+      [`rl/training-upgrade-2026-10.md`](rl/training-upgrade-2026-10.md).
 - [ ] **V5 training plan (approved 2026-10-09, running unattended):** an evaluation of V4 found the old static caps had silently capped its curriculum (side-hills 8 deg,
       ledges 20 mm), a lopsided side-hill the benchmark could not see, stacked hazards and near-constant shoves, and a 3.1 s benchmark too short for hazards. V5 fixes the
       course (slopes in under 10% of episodes, dealt evenly both ways, no background tilt, two hazards at most, gentler shoves, 7.5 s hazard-free baseline), screens a crossing

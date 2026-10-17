@@ -3,7 +3,7 @@
 > **CLOSED 2026-10-06 (12:45 PM): no round passed and the 20M run was not started. Superseded by [`v3-retrain-plan.md`](v3-retrain-plan.md),
 > which also records R3's result and why the drift-torque approach was dropped.** Kept as the record of what was tried.
 
-**Starting a new session? Read [`v22-handoff.md`](v22-handoff.md) first** (what was tried, what remains, state snapshot). Plan, findings and round results for the next policy. Status of the run itself is in [`../STATUS.md`](../STATUS.md); this is the working log.
+**Closed campaign.** What was known at the end is in the appendix below. Plan, findings and round results for the next policy. Status of the run itself is in [`../STATUS.md`](../STATUS.md); this is the working log.
 
 ## Why
 Six real hard-floor V2.1 walks on the case (2026-10-06, [`real-walk-log.md`](real-walk-log.md)): no falls, but a steady turn to the right of about +142 deg over 12.7 s
@@ -74,3 +74,29 @@ a round passes if its calm falls are no more than the control's + 0.05 (and <= 0
   below) hold; otherwise stop and report.
 - **Promotion checks (agreed 2026-10-06):** calm flat falls <= 0.15 and speed >= 95% of V2.1 on the original ladder; drift under the reference disturbance at least 50% below V2.1's;
   no category worse than V2.1 by more than 0.10 in falls on the original ladder.
+
+
+## Appendix: what was known when the campaign closed (from the retired hand-off, 2026-10-06, 12:07 PM)
+
+**Goal:** make G2 walk straight with the learned gait and train a better gait on the heavier robot. Six hard-floor V2.1 walks with the case mounted ([`real-walk-log.md`](real-walk-log.md)) had no falls, roll std 5.7-6.2 deg, pitch std 1.9-2.7, but a steady turn right of about +142 deg in 12.7 s.
+
+**Hardware facts:** whole G2 422 g (sim had about 377 g); camera 15 g (front), speaker 20 g (very back), spine block 86 g (derived). The front-left shoulder servo (servo 8) stuck near 42 deg and would not go above it even when commanded 65, so the stand angle was 8 deg low and its swing clipped; whether it caused the drift was never established. The firmware step gait `kvtF` on the same leg walked straight. A full pack (8.5 V at rest) sags 0.3-0.45 V walking; G2 browned out walking at a resting 7.58 V. Real V2.1 commanded joint means over six walks: FL shoulder 47.2, FR shoulder 49.2, BR hip 52.9, BL hip 60.1 deg.
+
+**Sim versus real:** the policy observes heading (yaw zeroed at each walk start) and the reward penalizes heading error, but training episodes were 3.1 s and nothing pushed it off course. In the sim V2.1 (calm, 422 g, 12.5 s, 24 episodes) had 0 falls, heading error 9.7 deg, speed 0.051 m/s; the sim did not reproduce the real 140 deg drift.
+
+**Single-lever sim sweeps (`drift_probe.py --lever`, V2.1 frozen, 12 episodes):**
+
+| Lever | Result |
+|---|---|
+| servo zero offset FL shoulder -8 / -14 deg | heading abs 8 / 19 deg; falls 2 / 5 of 12 |
+| shortened FL shoulder swing (scale 0.5 / 0.2) | heading mean -15 / -11 deg; falls 4 / 3 |
+| motor force cut FL shoulder (0.4 / 0.15), FL knee 0.2 | abs 14 / 13 deg; knee cut: 10 of 12 fall |
+| one foot at 30% friction | abs 12-17 deg |
+| constant yaw torque 0.003-0.4 | little effect; 1.0 gives -43 deg, falls 2/12 |
+| FL shoulder capped at 42 / 46 / 38 deg (the stuck servo) | abs 18 / 15 / 10 deg, falls 6 / 5 / 5 of 12: does not reproduce 140 deg |
+
+**Rounds (fresh 3M runs, 422 g payload `G2E_PAYLOAD_PROFILE=case`):** R1 `v22_r1_drift` (yaw torque up to 0.5 on 70% of episodes): calm 0/24 falls, heading 9.3 deg, speed 0.018 (slow). R2 `v22_r2_len` (1000-step episodes): calm 1/24, speed 0.044, 8/24 falls under disturbance. V2.1 for context: 0/24, 9.7 deg, 0.051. R3 `v22_r3_control` was the 3M reference. Lessons: the first probe left random slopes and rubble on, so its "calm" falls meant nothing (use the decathlon `_apply({})` environment); a 3M scratch policy is not comparable with a 30M policy, judge rounds against the 3M control; 24-episode fall rates carry about ±15 points of noise.
+
+**Plan that was agreed:** up to six 3M rounds, one lever at a time; a hardware check-in before any 20M (swap servo 8, rerun the six baseline walks with `tools/g2_baseline.sh`); a fresh 20M with `G2E_HARD_SCALE=1.10`, gates at 3M and 5M; a ladder with each category's hardest rung +10% (`benchmark_decathlon.py --hard-scale`, never built). Parallel paths not started: swap servo 8, a heading hold on the Pi (built later, see [`real-walk-log.md`](real-walk-log.md) and [`v3-retrain-plan.md`](v3-retrain-plan.md)), mine the real logs (yaw reached +2.5 rad, far outside training).
+
+**Code added:** `G2E_PAYLOAD_PROFILE=case`, `G2E_DRIFT_TORQUE` (+ `G2E_DRIFT_PROB`, `G2E_DRIFT_STROKE`, `G2E_DRIFT_SHOULDER_DEG`), `G2E_HARD_SCALE`, a `_motor_max` stuck-servo hook (probe only); `drift_probe.py`, `phase_v22.py`, `pi_pipeline/gait/baseline_runs.py` + `tools/g2_baseline.sh`, `gait/policy_walker.py`, `link/fanout.py`. Gotchas: `G2E_` env vars; `DR_EVAL_FULL` is a module attribute, not an env var; closing the Mac's lid pauses training; `trained/` is gitignored (the files in [`v22-data/`](v22-data/) are snapshots only).

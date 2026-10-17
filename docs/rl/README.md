@@ -32,5 +32,5 @@ were removed 2026-09-10; their conclusions are condensed in
 - [`v3-decisions-log.md`](v3-decisions-log.md): decisions made while the V3 queue runs unattended, newest last.
 - [`next-20m-plan.md`](next-20m-plan.md): **the parked new 20M (starts only on the user's go)**: what it contains, the pre-launch checklist, how to launch, and the state of the finished 20M on G2.
 - [`passability-audit.md`](passability-audit.md): **standing rule: difficulty never ramps above what a capable policy can pass**; the audit that measures each hazard's top threshold and checks the course for impossible episodes.
-- [`v22-log.md`](v22-log.md): the v2.2 run (closed 2026-10-06, superseded by the V3 plan) (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.
-- [`v22-handoff.md`](v22-handoff.md): hand-off for the v2.2 campaign (state, everything tried, remaining steps, gotchas).
+- [`v22-log.md`](v22-log.md): the v2.2 run (closed 2026-10-06, superseded by the V3 plan; its appendix holds what was known at closing) (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.
+- [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md): the 2026-10-08 trainer upgrade (frontier curriculum, levers, bugs fixed, measurements, pitfalls) behind the V4, V5 and V6 chains.

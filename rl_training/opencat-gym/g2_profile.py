@@ -56,7 +56,7 @@ RECIPE = {
     # record about one training episode in 50 so it can be watched exactly as it happened (episode_recorder.py, watch_training.py); the newest 80 are kept per run
     "G2E_RECORD_EVERY": "50",
     "G2E_LEVEL_EXTERNAL": "1", "G2E_PROBE_EVERY": "98304", "G2E_PROBE_EPISODES": "12", "G2E_LEVEL_UP_SCORE": "0.80", "G2E_LEVEL_DOWN_SCORE": "0.50",
-    # 2026-10-08 training upgrade, applied directly (no change to what the policy learns, or a correction too small to screen; docs/plan-detail/handoff-2026-10-08.md 12):
+    # 2026-10-08 training upgrade, applied directly (no change to what the policy learns, or a correction too small to screen; docs/rl/training-upgrade-2026-10.md 12):
     # 6 env processes (the M1 Pro's performance cores), only the needed info between processes, the eval / best-checkpoint / health monitor every 1M steps,
     # IMU noise held for each 5 Hz frame (as on G2), and the paw slip / clearance penalties weighted by paw velocity (they read the paw's x position).
     "G2E_N_ENVS": "6", "G2E_LEAN_INFO": "1", "G2E_RUN_MONITOR": "1", "G2E_IMU_NOISE_PER_FRAME": "1", "G2E_FIX_PAW_VEL": "1",

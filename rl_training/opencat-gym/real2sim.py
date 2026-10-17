@@ -1,4 +1,4 @@
-"""Real-to-sim replay (user-approved 2026-10-08; docs/plan-detail/handoff-2026-10-08.md section 12): play the joint commands G2 actually sent (a `run_gait.py --log` CSV)
+"""Real-to-sim replay (user-approved 2026-10-08; docs/rl/training-upgrade-2026-10.md): play the joint commands G2 actually sent (a `run_gait.py --log` CSV)
 OPEN-LOOP through the TRAINING environment itself -- the scoring profile, the firmware command path, the servo speed limit, the world-2 payload -- and compare the sim's
 body motion with G2's real IMU. Unlike sysid_replay.py (Sept 2026, its own simplified sim), the fit here tunes exactly the sim that trains.
 

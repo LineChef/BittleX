@@ -86,7 +86,7 @@ Test it on G2 per [`../STATUS.md`](../STATUS.md): the front-foot hold stays on, 
 ## Other state to remember
 
 - The Pi was powered off for a recharge at about 9:50 AM; the voice-service fixes made after that (the floor voice command) are not on it yet.
-- Open exploration problems and the voice-service fixes are in [`../plan-detail/handoff-2026-10-08.md`](../plan-detail/handoff-2026-10-08.md).
+- The voice-service fixes and deploy practice are in [`../guides/operating-lessons.md`](../guides/operating-lessons.md).
 - All of 2026-10-08 is `unknown` in `~/g2_data/floor_overrides.json` (the morning walks were not all on tile) until the user says which time ranges were which floor.
 - The Mac background loop (`g2bg`) re-curates the exploration pictures and runs the calibration step every 30 minutes; it ends at a Mac restart (`g2bg start`).
 - Standing rules: [`passability-audit.md`](passability-audit.md) (difficulty never above capability), what you watch is what trains (`env_for_job`), ask the floor before runs, never deploy while the user is testing, wait for the user's go before any 20M.
