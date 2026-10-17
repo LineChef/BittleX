@@ -6,12 +6,27 @@ carpet, off the stand, payload = what V2.1 was trained with but **mounted only t
 `run_gait.py --log`, `run_gait.py --openloop --log` and `fw_skill_log.py` (`~/g2_runs/` on the
 Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 
-> **Status: paused on 2026-10-01. Read "Where we left off" first.**
+> **Status: a running log; the newest sections are last. Start with "Current conclusions" below.**
 >
 > Raw logs, an index of every file and the non-CSV measurements are archived in
 > [`real-walk-data/2026-10-01/`](real-walk-data/2026-10-01/README.md).
 
-## Where we left off
+## Current conclusions (as of 2026-10-17)
+
+What the dated sections below add up to. Each point links to the evidence; the data folders are in [`real-walk-data/`](real-walk-data/). Which policy is deployed and what is open: [`../STATUS.md`](../STATUS.md).
+
+- **Hardwood walking works.** V2.1 walked six steady 10-cycle runs (about 0.118 m/s). V4 walked at the commanded speed with no falls and less sway than the scripted walk ([`2026-10-09`](real-walk-data/2026-10-09/README.md)). V6 walks 20 s lanes within about 3.5 in of the line with a fixed front-left foot trim of `fl=-0.3` ([`2026-10-10`](real-walk-data/2026-10-10/README.md)); measured forward speed is about 0.093 m/s against 0.10 commanded.
+- **The front feet steer G2.** About 9 to 10 deg/s of turn per unit of front-foot trim; the back feet do not. Longer right strides turn him left, the opposite of the sim. See "Which foot steers G2" below.
+- **The big early drift was mostly a faulty servo.** V2.1 turned about 140 deg right in 12.7 s with the front-left shoulder servo faulty; after it was replaced (2026-10-06) the drift fell to about 40 deg. The rest is a learned left-right asymmetry and the floor.
+- **A fixed trim beats the closed-loop hold for the newer policies.** The hold straightened V2.1 (+148 deg without it, +13 to +21 deg with it), but V4's hold overshot to 60 deg left. The hold is now off by default (`G2_FOOT_HOLD=fl` turns it on). Trims were measured on hardwood only, and the drift grows faster than the distance: a trim that is right at 4 ft can be 29 in off at 6 ft. Logged yaw does not track the tape, so judge steering by the tape.
+- **Sway:** roll about 3.5 to 4 deg and pitch 2 to 3 deg for V4 and V6; the scripted walk sways 4.3 to 4.6 deg of roll. The sim sways about 30% less than G2, but the sway frequency matches (0.77 to 0.79 Hz real, 0.79 sim).
+- **A 6.4 mm ramped threshold costs nothing:** cleared 6 of 6 times by V4 and 3 of 3 by V6, with no snag and no speed cost. A taller threshold has not been tested.
+- **The eased stand-up fixed a 10 to 12 deg heading jolt.** A 0.8 s ramp from rest leaves the start heading disturbed by only 0.1 to 0.3 deg.
+- **Carpet is unsolved.** Every gait tried fails on about 1/4 in pile; falls are sideways to the right. **Tile** is unresolved too: two falls in four held V2.1 walks on 2026-10-07, and the V6 trim was never tuned for tile.
+- **Battery:** the pack sags 0.3 to 0.45 V while walking; a left-drift-with-low-voltage theory was tested and not supported.
+- **Never measured:** the low-pack repeat, bench servo tests, `real2sim.py --fit` with confidence (the fitted values are not separable on current data), and any gait comparison on G2 (sim only, by the user's rule).
+
+## Where we left off (as of 2026-10-01; superseded by the conclusions above)
 
 > **2026-10-06:** the gait's next steps are in [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) (start at §0), which supersedes the open questions
 > below for walking. The drift is explained as far as the data allows in "Why V2.1 drifts right" further down. Carpet questions (3-4 below)

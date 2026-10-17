@@ -4,6 +4,17 @@
 
 > **2026-10-01:** the deployed policy (`DEFAULT_POLICY`) is now `Release_CandidateV2.1` (see Round 4 below), exported with a `cmd_send_every_n: 3` sidecar. `hw1_20m` remains on the Pi as a baseline.
 
+## Current conclusions (as of 2026-10-17)
+
+What the rounds below add up to. The detail that follows is the evidence; later chains are in [`training-pipeline.md`](training-pipeline.md) and [`../STATUS.md`](../STATUS.md).
+
+- **The real control path shapes the gait.** The firmware's orientation stream is capped at 5 Hz and carries no angular rate; `m` moves joints one at a time (about 144 ms for 8 joints) while `i` moves them together at about 250 deg/s. A policy is trained and scored through that path (`--hw i`, a command every third tick).
+- **The "limp" was a simulator bug, not a gait problem.** The welded payload locked the body's rotation; fixing the payload inertia removed it. Conclusions drawn from locked-body results are flagged for re-checking ([`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md)).
+- **Staged, single-skill training beat training everything at once.** The parallel-combined candidate regressed on ledges as training went on; teaching one mechanic at a time (flat, transitions, carpet, step, snag, ledges last) and then consolidating gave V2, then V2.1 after yaw tuning.
+- **A retrain on a 93 to 249 Hz IMU premise was abandoned.** The faster rate was a stale-firmware artifact; on current firmware the real rate is 5.0 Hz, so V2.1's original assumptions stood and that lineage was dropped.
+- **Lineage since:** V2.1 (the default into early October), V3 (a retrain against the measured payload and steering), V4 (the frontier-curriculum upgrade; Candidate A deployed 2026-10-09), V5 (about equal to the scripted walk, not promoted), V6 (deployed, heading-blind, promoted by the user although it did not beat V4 on the sim benchmark). Details: [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) and the V5 and V6 plans.
+- **What still limits the sim result:** no policy crosses step-ups above 7.5 mm; the 10 deg cross-slope and small rubble are where V4 loses to V3. The high-step creep attempt (2026-10-12/13) did not improve on V6.
+
 **2026-09-22 → 23.** Started as the "IMU feedback rate" priority (stock firmware
 prints orientation at 5 Hz, the policy runs at 80 Hz). Tracing it through the
 firmware turned up a bigger gap in the joint-command path, two benchmark bugs,
