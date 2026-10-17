@@ -480,4 +480,4 @@ EOF
 }
 
 # g2help  -- print the bare list of helpers with their one-line comments.
-g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | sed 's/() *{.*# */\t/; s/() *{.*//'; }
+g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | grep -v '^g2help' | sed 's/() *{.*# */\t/; s/() *{.*//'; }
