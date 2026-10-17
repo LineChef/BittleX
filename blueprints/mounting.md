@@ -34,15 +34,16 @@ These are the blanks to fill in; nothing is guessed here.
 - [ ] A photo set of the assembled G2: top, side, rear, and the wiring under the lid.
 - [ ] The permanent mount, replacing the velcro.
 
-## A community design being followed
+## The case design in progress
 
-A related community project, [Bittle X Platform and Pi add-on](https://beetlebugorg.github.io/bittlex/) (3D viewer: [`/viewer/`](https://beetlebugorg.github.io/bittlex/viewer/)), is a work in progress as of 2026-10-17. It is **not installed on G2**; it is noted here as a reference for the permanent mount.
+The owner is designing a replacement mount with a collaborator: [Bittle X Platform and Pi add-on](https://beetlebugorg.github.io/bittlex/) (3D viewer: [`/viewer/`](https://beetlebugorg.github.io/bittlex/viewer/)). It is a work in progress as of 2026-10-17 and is **not installed on G2 yet**. This section summarises what the project page says; the page is the source, and this one will be updated as the design settles.
 
-- **Idea:** a peg platform that clips onto the stock Petoi Bittle X back cover (four pegs, slide forward 7 mm, click into place, no tools, glue or tape), and a sample Raspberry Pi add-on that drops onto it.
+- **Idea:** a peg platform that clips onto the stock Petoi Bittle X back cover (four pegs, slide forward 7 mm, click into place, no tools, glue or tape), and a Raspberry Pi add-on that drops onto it.
 - **The add-on (v0.24):** a rounded pod with a slide-on top panel holding a Pi Zero 2 W with a PiSugar 2 (1200 mAh); the Petoi AI Vision camera on a camera mount; a 3 W speaker on an NS4168 amplifier; an SPH0645 microphone. Printed parts: pod body, panel, button, camera mount, two low-camera parts for robots without a head, and logos. All print without supports.
-- **Same parts as G2's:** the camera, amplifier, microphone and battery family match what G2 uses (see [`../docs/hardware/as-built.md`](../docs/hardware/as-built.md)); the PiSugar is the 2 on that page and the S on G2, so the fit would need checking.
-- **Files published there:** the platform spec and build guide as PDFs, print files (`.stl`, `.3mf`), CAD (`.step`) and a packaged download for each of the platform and the add-on.
-- **Licenses (per that page):** code MIT; designs and documents CC BY 4.0 (credit the author); the Petoi models carry no stated license; the PiSugar models are GPL-3.0. Check these before copying anything into this repository; this page links instead of copying.
+- **Same parts as G2's:** the camera, amplifier and microphone match what G2 uses ([`../docs/hardware/as-built.md`](../docs/hardware/as-built.md)). The design uses the PiSugar 2 where G2 has the PiSugar S, so the fit needs checking.
+- **Published there:** the platform spec and the add-on build guide as PDFs, print files (`.stl`, `.3mf`), CAD (`.step`) and a packaged download for each of the platform and the add-on.
+- **Licenses (per the page):** code MIT; designs and documents CC BY 4.0; the Petoi models used carry no stated license; the PiSugar models are GPL-3.0. Anything copied into this repository should respect those terms; this page links instead of copying.
+- **Open:** once the design is installed, replace the "What is on G2 now" table above and fill in the "To be recorded" list.
 
 ## History
 
