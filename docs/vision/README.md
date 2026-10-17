@@ -1,4 +1,4 @@
-# docs/vision/
+# Camera and vision
 
 Everything about G2's camera, the on-device detection model, and building /
 capturing data for it.

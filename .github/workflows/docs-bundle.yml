@@ -1,0 +1,49 @@
+# Builds the docs bundle (tools/build_docs_bundle.py) on every push to development and publishes it to GitHub Pages.
+# The React site reads it from <pages url>/latest.json. Optional: set the repository secret SITE_DEPLOY_HOOK to a deploy-hook URL
+# (Vercel, Netlify, ...) and the site is rebuilt whenever the docs change. Pages must be enabled once: Settings > Pages > Source: GitHub Actions.
+name: docs-bundle
+
+on:
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-bundle
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the bundle reads each page's last-changed date from git history
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build the bundle (runs the docs checks first; fails on a broken link or a stale generated page)
+        run: python tools/build_docs_bundle.py --out build/docs-bundle --branch development
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/docs-bundle
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Ask the site to rebuild (only if a deploy hook is configured)
+        env:
+          HOOK: ${{ secrets.SITE_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK" >/dev/null && echo "site rebuild requested"; else echo "no SITE_DEPLOY_HOOK set"; fi

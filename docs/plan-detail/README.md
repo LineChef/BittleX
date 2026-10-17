@@ -1,4 +1,4 @@
-# docs/plan-detail/
+# Plan detail
 
 Detail behind [`../project-plan.md`](../project-plan.md): phase write-ups for the current build and the training-chain plans.
 

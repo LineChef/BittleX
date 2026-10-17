@@ -404,6 +404,8 @@ g2bringup() { _g2py -m pi_pipeline.bringup "$@"; }
 g2app() { _g2py -m pi_pipeline.app "$@"; }
 # g2check  -- the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it).
 g2check() { _g2py tools/check_docs.py "$@"; }
+# g2bundle [--out DIR] [--base /docs]  -- build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md.
+g2bundle() { _g2py tools/build_docs_bundle.py "$@"; }
 # g2docsgen  -- regenerate the generated docs: the backlog, the shell-helpers page and the results index. Run it after changing an item heading, an alias comment or the result files.
 g2docsgen() { ( cd "$G2_ROOT" && python3 tools/gen_backlog.py && python3 tools/gen_helpers_doc.py && python3 tools/gen_results_index.py ); }
 

@@ -1,4 +1,4 @@
-# tools/
+# Tools
 
 Scripts that sit around the robot and the training code: documentation checks, Mac-to-Pi operations, the real-data pipeline, vision dataset work, and training support. The code that runs on the robot is in [`../pi_pipeline/`](../pi_pipeline/README.md), and the sim training in [`../rl_training/`](../rl_training/opencat-gym).
 
@@ -10,6 +10,7 @@ Paths here are stable: the `g2*` shell helpers ([`g2_aliases.sh`](g2_aliases.sh)
 |---|---|
 | [`check_docs.py`](check_docs.py) | Doc checks: broken links, facts in the wrong page, orphan pages, stale generated pages. The pre-commit hook runs it. |
 | [`gen_backlog.py`](gen_backlog.py) | Regenerates `docs/backlog.md` from the item headings. |
+| [`build_docs_bundle.py`](build_docs_bundle.py) | Builds the docs bundle for the website (pages, navigation manifest, search index, assets) from git-tracked files; CI publishes it to GitHub Pages. [`docs-bundle.md`](../docs/guides/docs-bundle.md) |
 | [`gen_results_index.py`](gen_results_index.py) | Regenerates `docs/rl/results-index.md`: every tracked result file under `rl_training/opencat-gym/trained/` with the docs that cite it. |
 | [`gen_helpers_doc.py`](gen_helpers_doc.py) | Regenerates `docs/guides/shell-helpers.md` from the comments in `g2_aliases.sh`. |
 | [`md_to_html.py`](md_to_html.py) | Turns one Markdown doc into a single self-contained HTML page. |

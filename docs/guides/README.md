@@ -1,4 +1,4 @@
-# docs/guides/
+# Guides
 
 How to do a thing on the current build.
 
@@ -15,6 +15,7 @@ How to do a thing on the current build.
 | [`api-setup.md`](api-setup.md) | Anthropic API key, workspace + spend-limit checklist. |
 | [`feature-flags.md`](feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
 | [`models.md`](models.md) | Every model G2 runs (voice, vision, policy): where it lives, source, size, SHA-256, license, and how to fetch or switch it. |
+| [`docs-bundle.md`](docs-bundle.md) | How the docs are packaged and published for the website: the bundle format, the GitHub Action, and loading it from the React (Vite) site. |
 | [`shell-helpers.md`](shell-helpers.md) | Reference of every `g2*` shell helper (generated from `tools/g2_aliases.sh`). |
 | [`operating-g2.md`](operating-g2.md) | **Start here for day-to-day use.** Safety rules, how to stop G2, bench mode, power on and off, batteries, first checks. Printable version: [`operating-g2-quick-guide.pdf`](operating-g2-quick-guide.pdf). |
 | [`operating-lessons.md`](operating-lessons.md) | Lessons and standing practice from the hardware sessions: deploying and stopping safely, the voice service and microphone, session data processing, background jobs. |

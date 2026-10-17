@@ -1,4 +1,4 @@
-# docs/rl/
+# Walking and training (RL)
 
 Reinforcement-learning gait work that is part of the current build: how the deployed gait is trained, scored and logged on the real robot. Which policy is deployed
 and what has been tested on G2: [`../STATUS.md`](../STATUS.md). Roadmap: [`../project-plan.md`](../project-plan.md) Phase 3.

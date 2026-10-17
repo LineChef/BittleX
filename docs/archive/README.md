@@ -1,4 +1,4 @@
-# docs/archive/
+# Archive
 
 Closed work, kept for the record. **Nothing here describes the current build**; for that see [`../STATUS.md`](../STATUS.md) and [`../capabilities.md`](../capabilities.md).
 

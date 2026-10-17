@@ -113,6 +113,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2bringup [--list/--restart/--from ID]` | the guided, resumable hardware bring-up sequence. |
 | `g2app [--serial/--bench/--trace FILE]` | the whole robot as one program (voice loop + behavior runtime). Mock by default; --serial talks to the BiBoard; --bench blocks autonomous movement. |
 | `g2check` | the docs checks: broken links, facts in the wrong page, orphan pages, stale generated pages (the pre-commit hook runs it). |
+| `g2bundle [--out DIR] [--base /docs]` | build the docs bundle (every page as site-ready Markdown, a navigation manifest and a search index) into build/docs-bundle for the website. CI builds and publishes it on every push; this is the local preview. Format: docs/guides/docs-bundle.md. |
 | `g2docsgen` | regenerate the generated docs: the backlog, the shell-helpers page and the results index. Run it after changing an item heading, an alias comment or the result files. |
 
 ## simulation and training

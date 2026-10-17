@@ -1,4 +1,4 @@
-# docs/planned/ai-head/
+# Petoi AI Head (planned)
 
 The Petoi AI Head (XiaoZhi-based head module): not part of the running build. Vendor documentation summaries are in [`../../research/`](../../research/xiaozhi-vendor-docs.md); wiring is in [`../../../blueprints/`](../../../blueprints/README.md).
 

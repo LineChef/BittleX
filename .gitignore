@@ -109,3 +109,6 @@ rl_training/opencat-gym/trained/*.out
 rl_training/opencat-gym/trained/v4_report_*/
 rl_training/opencat-gym/trained/zz_*
 rl_training/opencat-gym/trained/*_at*M_ppo.zip
+
+# generated docs bundle (tools/build_docs_bundle.py)
+build/

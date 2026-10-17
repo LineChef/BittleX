@@ -1,4 +1,4 @@
-# pi_pipeline
+# Pi pipeline code
 
 The code that runs on the Raspberry Pi Zero 2 W mounted on G2: the voice conversation loop, persistent memory, vision, the 80 Hz gait loop, autonomous behavior, diagnostics and power management. It is independent of `rl_training/` (its own venv, no shared code). A map from the docs to each package: [`../docs/code-map.md`](../docs/code-map.md). How the pieces fit: [`../docs/architecture.md`](../docs/architecture.md). What works right now: [`../docs/STATUS.md`](../docs/STATUS.md).
 

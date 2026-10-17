@@ -1,4 +1,4 @@
-# docs/planned/
+# Planned (not built)
 
 Work that is **not part of the running build**: ideas, plans and parked projects. Nothing here is deployed on G2. What is deployed: [`../STATUS.md`](../STATUS.md); what is built: [`../capabilities.md`](../capabilities.md).
 

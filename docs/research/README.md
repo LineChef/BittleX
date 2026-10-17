@@ -1,4 +1,4 @@
-# docs/research/
+# Research
 
 External findings and vendor reviews that informed decisions.
 

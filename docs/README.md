@@ -1,4 +1,4 @@
-# docs/
+# Documentation
 
 ## Start here
 

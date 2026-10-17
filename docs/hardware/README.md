@@ -1,4 +1,4 @@
-# docs/hardware/
+# Hardware
 
 Specs, reference and research for the hardware that is installed. The physical assembly record (wiring, soldering, mounting, calibration, build logs) is in [`../../blueprints/`](../../blueprints/README.md).
 

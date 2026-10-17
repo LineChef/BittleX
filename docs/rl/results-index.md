@@ -310,7 +310,7 @@ Docs that mention this family: [`README.md`](../archive/README.md), [`history.md
 
 ## `summary`
 
-Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +30.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +31.
 
 | File | Size | Cited by |
 |---|---|---|
