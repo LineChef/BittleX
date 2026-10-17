@@ -98,7 +98,7 @@ How the pictures flow: [`../vision/picture-library.md`](../vision/picture-librar
 | `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
 | `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
 
-Building the camera's detection model (capture, curate, promote, upload to SenseCraft): `g2cam <name>` to capture, `g2curate <name>` to filter, `g2promote <class>` to add to the library, `g2auto` to run the rest, `g2libstatus` to see counts. Walkthrough: [`train-vision-model.md`](train-vision-model.md); capture routine: [`../vision/capture-checklist.md`](../vision/capture-checklist.md).
+Building the camera's detection model (capture, curate, promote, upload to SenseCraft): capture with `g2pcam <name>` (the camera on G2, run on the Pi; `g2pcam-pull <name>` copies the session to the Mac) or `g2cam <name>` (a camera plugged into the Mac); `g2curate <name>` filters it, `g2promote <class>` adds it to the library, `g2auto` runs the rest and builds the upload set, `g2libstatus` shows the counts. Walkthrough: [`train-vision-model.md`](train-vision-model.md); capture routine: [`../vision/capture-checklist.md`](../vision/capture-checklist.md).
 
 ## 8. Voice
 

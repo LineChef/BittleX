@@ -30,11 +30,8 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2wifi list/status/scan/add <ssid>/remove <ssid>` | manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI |
 | `g2pcam-stop` | kill the tunnel + the preview process on the Pi |
 | `g2curate <name> [session] [rotate]` | filter a raw capture -> <session>/curated/ (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera mounted upright); use 90/180/270 if the contact sheet comes out rotated. |
-| `g2combine <name>` | gather every session's curated set into <name>/upload/ (per-session subdirs) |
 | `g2promote <class> [session]` | copy a reviewed curated session into the library |
 | `g2neg [session] [rotate] [min-sharpness]` | curate an empty-room sweep as pure negatives + add to the library. min-sharpness defaults to 25 (drops the motion-blur from walking; a flat room scene still passes). |
-| `g2libcombine [classes]` | build $G2_LIB_ROOT/upload/ (arg overrides $G2_VISION_CLASSES) |
-| `g2libsubset <N> <class>` | capped images-only upload set for the threshold test (negatives auto-capped at ~N/4; jpg only so SenseCraft auto-label isn't cluttered) |
 | `g2libstatus` | print the vision library manifest (images per class) |
 | `g2auto [classes] [--dry-run]` | the FULL automated pipeline: for every pending raw session (curate -> dedup-against-library -> promote), then rebuild the 150/class optimized upload set. Capture (g2cam) is the only manual step; run this after and it produces $G2_LIB_ROOT/upload_optimized/upload/, ready to import into SenseCraft. Idempotent -- safe to re-run any time, already-promoted sessions are skipped automatically. |
 
@@ -89,7 +86,6 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | Command | What it does |
 |---|---|
 | `g2serial` | ports / ping / send <cmd> / skills / rest |
-| `g2gait` | on-robot gait loop (--dry-run, --openloop, ...) |
 | `g2power` | status / headless / interactive / governor <n> |
 
 ## operate G2 (Mac -> Pi)

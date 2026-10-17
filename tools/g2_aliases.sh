@@ -146,22 +146,6 @@ g2curate() {
     --positives 100 --negatives 15 --class-id 0 --label-region face --rotate "$rot"
   open "$d/curated/_contact_sheet.png" 2>/dev/null
 }
-# g2combine <name>  -- gather every session's curated set into <name>/upload/ (per-session subdirs)
-g2combine() {
-  local name="${1:?usage: g2combine <name>}"
-  local u="$G2_CAP_ROOT/$name/upload" ui="$G2_CAP_ROOT/$name/upload_images"
-  ( mkdir -p "$u"; rm -rf "$ui"; mkdir -p "$ui"; local k=0 m=0
-    for s in "$G2_CAP_ROOT/$name"/session_*/curated; do
-      [ -d "$s" ] || continue
-      local n; n="$(basename "$(dirname "$s")")"
-      mkdir -p "$u/$n"; cp "$s"/pos_*.jpg "$s"/pos_*.txt "$s"/neg_*.jpg "$u/$n/" 2>/dev/null
-      for f in "$s"/pos_*.jpg; do [ -e "$f" ] || continue; k=$((k+1)); cp "$f" "$ui/$(printf '%s_%03d.jpg' "$name" $k)"; done
-      for f in "$s"/neg_*.jpg; do [ -e "$f" ] || continue; m=$((m+1)); cp "$f" "$ui/$(printf '%s_neg_%03d.jpg' "$name" $m)"; done
-    done
-  )
-  echo "upload (Roboflow/Colab, per-session + .txt) -> $u"
-  echo "upload_images ($(ls "$ui"/*.jpg 2>/dev/null|wc -l|tr -d ' ') JPEGs only, for the SenseCraft browser) -> $ui"
-}
 
 # ---- persistent training library (multi-class) --------------------------------
 # docs/vision/capture-progress.md.  Two folders:
@@ -192,19 +176,6 @@ g2neg() {
 # are personal, so they're not committed):  export G2_VISION_CLASSES="a,b,dog,cat,ledge"
 : "${G2_VISION_CLASSES:=}"
 
-# g2libcombine [classes]  -- build $G2_LIB_ROOT/upload/  (arg overrides $G2_VISION_CLASSES)
-g2libcombine() {
-  local cl="${1:-$G2_VISION_CLASSES}"
-  [ -n "$cl" ] || { echo "set G2_VISION_CLASSES=\"...\" (id order) or pass it as an arg"; return 1; }
-  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cl"
-}
-# g2libsubset <N> <class>  -- capped images-only upload set for the threshold test
-#   (negatives auto-capped at ~N/4; jpg only so SenseCraft auto-label isn't cluttered)
-g2libsubset() {
-  local n="${1:?usage: g2libsubset <N> <class>}" cls="${2:?need a class name}"
-  _g2py tools/combine_for_upload.py "$G2_LIB_ROOT" --classes "$cls" \
-    --limit "$n" --neg-limit "$(( n / 4 ))" --images-only --out "$G2_LIB_ROOT/upload_$n"
-}
 g2libstatus() { cat "$G2_LIB_ROOT/_MANIFEST.md" 2>/dev/null || echo "no library yet at $G2_LIB_ROOT"; }   # print the vision library manifest (images per class)
 
 # g2auto [classes] [--dry-run]  -- the FULL automated pipeline: for every
@@ -242,7 +213,6 @@ g2visioneval() {
   ( cd "$G2_ROOT" && "$_G2_PY" -m pi_pipeline.vision eval \
       "${port:-/dev/cu.usbmodem58FA1045341}" --label "${1:-}" --secs "${2:-30}" $extra )
 }
-
 
 
 # g2watchrun [--realtime]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of
@@ -394,7 +364,6 @@ g2diag()   { _g2py -m pi_pipeline.diag "${@:-list}"; }          # list | summari
 # ------------------------------------------------------- robot serial link (HW)
 
 g2serial() { _g2py -m pi_pipeline.link.check_serial "${@:-ports}"; }   # ports | ping | send <cmd> | skills | rest
-g2gait()   { _g2py pi_pipeline/gait/run_gait.py "$@"; }               # on-robot gait loop (--dry-run, --openloop, ...)
 g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status | headless | interactive | governor <n>
 
 # ----------------------------------------------------------- operate G2 (Mac -> Pi)
