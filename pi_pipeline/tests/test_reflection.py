@@ -1,4 +1,4 @@
-"""Reflection (docs/plan-detail/reflection-plan.md): the session recap (level 1), the notes (level 2) and the spoken answers (level 3)."""
+"""Reflection (docs/planned/reflection-plan.md): the session recap (level 1), the notes (level 2) and the spoken answers (level 3)."""
 import json
 import time
 

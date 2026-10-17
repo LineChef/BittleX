@@ -1,6 +1,6 @@
 """Slope sweep: where are G2's real slope limits? (2026-09-23)
 
-The slope-ceiling campaign (docs/rl/slope-ceiling-log.md) was built on T9.1/T9.2
+The slope-ceiling campaign (docs/archive/rl/slope-ceiling-log.md) was built on T9.1/T9.2
 falls measured while the benchmark was silently running those cells WITHOUT the
 payload (the cell-knob leak fixed in hw1). This re-measures from scratch, as
 close to G2 as the sim gets:

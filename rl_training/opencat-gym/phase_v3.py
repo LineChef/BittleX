@@ -1,4 +1,4 @@
-"""Unattended runner for the V3 gait retrain (docs/rl/v3-retrain-plan.md section 4, phases 3, 4 and 6).
+"""Unattended runner for the V3 gait retrain (docs/archive/rl/v3-retrain-plan.md section 4, phases 3, 4 and 6).
 
     python phase_v3.py init            # write trained/v3_queue.json with the control + the ten screening rounds (edit it freely)
     python phase_v3.py run             # work through the queue; safe to restart (a job already training or finished is resumed, not redone)

@@ -1,4 +1,4 @@
-"""Score a gait for the high-step creep plan (docs/plan-detail/high-step-creep-training-plan.md): a calm flat walk and a step-up ladder judged foot by foot.
+"""Score a gait for the high-step creep plan (docs/archive/plan-detail/high-step-creep-training-plan.md): a calm flat walk and a step-up ladder judged foot by foot.
 
     ../../.venv/bin/python hs_probe.py --policy scripted --ref creep --json-out x.json                     # the creep base, open loop
     ../../.venv/bin/python hs_probe.py --policy trained/hs_s0_ppo --ref creep --levers hs_creep,privileged_critic,heading_blind --json-out x.json

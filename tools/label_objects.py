@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Review and label the B20 object-recognition gallery (`docs/behavior-ideas.md`
+"""Review and label the B20 object-recognition gallery (`docs/planned/behavior-ideas.md`
 B20, `pi_pipeline/vision/object_gallery.py`).
 
 The gallery recognises objects by visual similarity, not by name -- naming an

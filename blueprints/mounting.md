@@ -1,6 +1,6 @@
 # Mounting the Pi stack on the frame
 
-How the Pi + PiSugar stack attaches to the Bittle X frame: the standoff clip, screws, the mount investigation and decision, and the assembled-stack diagrams. The wiring is in [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html); the step-by-step build notes are in [`../docs/hardware/pi-biboard-build-notes.md`](../docs/hardware/pi-biboard-build-notes.md).
+How the Pi + PiSugar stack attaches to the Bittle X frame: the standoff clip, screws, the mount investigation and decision, and the assembled-stack diagrams. The wiring is in [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html); the step-by-step build notes are in [`build-logs/pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md).
 
 ### Print the standoff clip
 

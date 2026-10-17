@@ -1,7 +1,7 @@
 # XiaoZhi (`78/xiaozhi-esp32`) — what is in it that helps us
 
 Review of the upstream project the Petoi AI Head's firmware is built on ([github.com/78/xiaozhi-esp32](https://github.com/78/xiaozhi-esp32), MIT),
-2026-10-03. Context: [`petoi-ai-head-evaluation.md`](petoi-ai-head-evaluation.md) and [`firmware-fork-case.md`](firmware-fork-case.md). Read from the repo's
+2026-10-03. Context: [`petoi-ai-head-evaluation.md`](../planned/ai-head/petoi-ai-head-evaluation.md) and [`firmware-fork-case.md`](../planned/firmware-fork-case.md). Read from the repo's
 README and `docs/` through a fetch tool, not built or run; items marked *unverified* need checking against the source or the unit.
 
 ## Is the head's firmware its own repo?

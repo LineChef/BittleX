@@ -103,7 +103,7 @@ nav ol{{columns:2;column-gap:28px;margin:8px 0;padding-left:1.2rem}} nav li{{fon
 {body[0]}
 {nav_html}
 {chr(10).join(body[1:])}
-<p class="note">Generated from <code>docs/plan-detail/ai-head-implementation.md</code>. The Markdown file in the repository is the source of truth; edit that, not this page.</p>
+<p class="note">Generated from <code>docs/planned/ai-head/ai-head-implementation.md</code>. The Markdown file in the repository is the source of truth; edit that, not this page.</p>
 </div></body></html>"""
 open(OUT, "w", encoding="utf-8").write(page)
 print(len(page), "bytes,", len(toc), "sections,", sum(1 for b in body if b.startswith("<div class='tw'>")), "tables")

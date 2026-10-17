@@ -1,36 +1,20 @@
 # docs/rl/
 
-Reinforcement-learning gait work: the conclusions that still matter, the
-backlogs, and the specs for anything deferred. Sim locomotion is **done pending
-the real-robot H1 head-to-head** — see [`../project-plan.md`](../project-plan.md) Phase 3. Which policy is deployed and what has been tested on
-the robot: [`../STATUS.md`](../STATUS.md).
+Reinforcement-learning gait work that is part of the current build: how the deployed gait is trained, scored and logged on the real robot. Which policy is deployed
+and what has been tested on G2: [`../STATUS.md`](../STATUS.md). Roadmap: [`../project-plan.md`](../project-plan.md) Phase 3.
 
 | | |
 |---|---|
-| [`real-walk-log.md`](real-walk-log.md) | **Real-robot walks and servo troubleshooting** (10/01–), with the where-we-left-off list; raw data in [`real-walk-data/`](real-walk-data/). |
-| [`walking-policy.md`](walking-policy.md) | What the learned gait does and its limits (the original `run20m_ppo` description). |
-| [`hw1-log.md`](hw1-log.md) | Training under the real control path (5 Hz IMU, `i` command timing), the policy lineage and benchmark fixes. |
-| [`hardware-gated-backlog.md`](hardware-gated-backlog.md) | RL/gait work deferred to hardware (H#), each with a concrete trigger. Index of statuses: [`../backlog.md`](../backlog.md). |
-| [`h1-rubric.md`](h1-rubric.md) | The real-robot learned-vs-scripted comparison — methodology, course, decision rule. |
-| [`vision-in-gait.md`](vision-in-gait.md) | The vision-in-the-gait campaign (Phases A–F) — **closed**: what was tried, the verdict, what's built and dormant. |
-| [`refinement-regimen.md`](refinement-regimen.md) | The staged pre-hardware robustness push (concluded). |
-| [`robustness-backlog.md`](robustness-backlog.md) | Categorised real-world scenarios for future training. |
+| [`walking-policy.md`](walking-policy.md) | What the learned gait does and its limits. |
+| [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md) | The trainer behind the V4 to V6 chains: frontier curriculum, levers, bugs fixed, measurements, pitfalls. |
+| [`hw1-log.md`](hw1-log.md) | Training under the real control path (5 Hz IMU, command timing); the policy lineage and benchmark fixes. |
+| [`real-walk-log.md`](real-walk-log.md) | Real-robot walks and servo troubleshooting (10/01 on), with the where-we-left-off list. Raw data: [`real-walk-data/`](real-walk-data/). What each hardware log carries: [`hardware-logging.md`](hardware-logging.md). |
+| [`real-data-pipeline.md`](real-data-pipeline.md) | Always-on capture, ingest gates and sim calibration snapshots. |
+| [`sysid-capture-plan.md`](sysid-capture-plan.md) | The system-identification capture sessions. |
+| [`passability-audit.md`](passability-audit.md) | Standing rule: difficulty never ramps above what a capable policy can pass; the audit that measures each hazard's top threshold. |
+| [`h1-rubric.md`](h1-rubric.md) | The learned-vs-scripted real-robot comparison method. |
 | [`skill-learning-method.md`](skill-learning-method.md) | The agreed recipe for teaching G2 a new motor skill. |
-| [`adapter-skill-probe-spec.md`](adapter-skill-probe-spec.md) | Frozen base + small trained skill modules — specced, deferred. |
-| [`phase4-decision-log.md`](phase4-decision-log.md) | Phase 4 stance-recovery decisions. |
-| [`getup-sim-replay.md`](getup-sim-replay.md) | Replaying firmware `rc`/`rl` get-up in PyBullet (0/2 recover — sim can't validate it). |
-| [`gait-benchmark.md`](gait-benchmark.md) | Learned vs. scripted `wkF` head-to-head (sim). |
-| [`resid30-log.md`](resid30-log.md), [`gait-friction-log.md`](gait-friction-log.md), [`resiliency-log.md`](resiliency-log.md), [`slope-ceiling-log.md`](slope-ceiling-log.md) | The 2026-09 sim campaign logs (some superseded — each says so at the top). |
-| [`final-synthesis-plan.md`](final-synthesis-plan.md) | How the campaign findings become a fresh 20M training recipe. |
-| [`foot-probing-log.md`](foot-probing-log.md), [`crawl-climb-session-checkpoint.md`](crawl-climb-session-checkpoint.md) | Foot-probing and crawl-climb work (reference frames in [`reference-frames/`](reference-frames/)). |
+| [`getup-sim-replay.md`](getup-sim-replay.md) | Replaying firmware `rc`/`rl` get-up in PyBullet (the sim cannot validate it). |
 
-The per-round training logs (Runs 2–7, the automated loops, the survive loop)
-were removed 2026-09-10; their conclusions are condensed in
-[`../plan-detail/phase3-rl-training.md`](../plan-detail/phase3-rl-training.md) "Training history" and git history has the full text.
-
-- **[`v3-retrain-plan.md`](v3-retrain-plan.md): the current gait work (approved 2026-10-06): findings on V2.1's drift, the sim-vs-G2 gaps, the reward review, and the V3 plan; start here to resume.**
-- [`v3-decisions-log.md`](v3-decisions-log.md): decisions made while the V3 queue runs unattended, newest last.
-- [`next-20m-plan.md`](next-20m-plan.md): **the parked new 20M (starts only on the user's go)**: what it contains, the pre-launch checklist, how to launch, and the state of the finished 20M on G2.
-- [`passability-audit.md`](passability-audit.md): **standing rule: difficulty never ramps above what a capable policy can pass**; the audit that measures each hazard's top threshold and checks the course for impossible episodes.
-- [`v22-log.md`](v22-log.md): the v2.2 run (closed 2026-10-06, superseded by the V3 plan; its appendix holds what was known at closing) (fix the drift to one side, on the 422 g payload): sweep findings, round results, and how to resume.
-- [`training-upgrade-2026-10.md`](training-upgrade-2026-10.md): the 2026-10-08 trainer upgrade (frontier curriculum, levers, bugs fixed, measurements, pitfalls) behind the V4, V5 and V6 chains.
+Training plans for the V5 and V6 chains: [`../plan-detail/v5-training-plan.md`](../plan-detail/v5-training-plan.md), [`../plan-detail/v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md).
+Deferred RL work and backlogs: [`../planned/`](../planned/README.md). Closed campaigns and old sim logs: [`../archive/`](../archive/README.md).

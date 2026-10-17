@@ -5,7 +5,7 @@ V2 already does well, then the winner gets a 10M continuation (run_gated_10m,
 NOT the 20M-scheduled run_gated_20m) -- this is a narrow fine-tune on an
 ALREADY-consolidated gait, not a from-scratch or mechanic-combining run, and
 20M is very likely overkill for it: this project's own precedent
-(docs/rl/refinement-regimen.md's Phase 4 stance-recovery continuation was
+(docs/archive/rl/refinement-regimen.md's Phase 4 stance-recovery continuation was
 3-5M) and this campaign's own evidence (the sequential chain's final 20M
 continuation barely changed from its 3M checkpoint onward) both say so.
 First drafted this scheduled for 20M with a plateau-check safety net meant to

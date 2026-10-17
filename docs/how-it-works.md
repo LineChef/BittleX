@@ -178,7 +178,7 @@ something's "done," what gets evicted under space pressure) is built and
 tested, behind a feature flag that's off by default. The two pieces that
 actually need the camera to build — deciding *where* in a frame something new
 is, and the model that turns a crop into a fingerprint — aren't chosen yet;
-see `docs/behavior-ideas.md` **B20**.
+see `docs/planned/behavior-ideas.md` **B20**.
 
 ---
 

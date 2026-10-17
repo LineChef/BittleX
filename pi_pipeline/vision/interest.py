@@ -1,4 +1,4 @@
-"""What is worth a picture while G2 explores (user, 2026-10-09; plan: docs/vision/exploration-object-learning-plan.md).
+"""What is worth a picture while G2 explores (user, 2026-10-09; plan: docs/planned/exploration-object-learning-plan.md).
 
 "Interesting" = a clear object that is NOT a person and that the library does not already know completely:
 

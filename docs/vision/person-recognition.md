@@ -3,7 +3,7 @@
 How G2 comes to recognise household members, and the guided photo-capture
 routine that builds the training data. Companion doc:
 [`detection-layer.md`](detection-layer.md); behaviour backlog entry
-[`../behavior-ideas.md`](../behavior-ideas.md) **B15**.
+[`../planned/behavior-ideas.md`](../planned/behavior-ideas.md) **B15**.
 
 Status 2026-09-06: the enrollment **FSM is built** (`pi_pipeline/behavior/
 enrollment.py`, 15 tests). The **driver** that wires it to hardware is not.

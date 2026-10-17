@@ -2,7 +2,7 @@
 
 Reference for the training tooling built on 2026-10-08/09 (the stack behind the V4, V5 and V6 chains). Which policy is deployed: [`../STATUS.md`](../STATUS.md).
 Run plans and results: [`../plan-detail/v5-training-plan.md`](../plan-detail/v5-training-plan.md), [`../plan-detail/v6-staged-training-plan.md`](../plan-detail/v6-staged-training-plan.md);
-the dated decisions behind the V4 runs: [`../plan-detail/decisions-log-2026-10-08.md`](../plan-detail/decisions-log-2026-10-08.md). Code lives in `rl_training/opencat-gym/`.
+the dated decisions behind the V4 runs: [`../archive/plan-detail/decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md). Code lives in `rl_training/opencat-gym/`.
 
 ## 1. Bugs found and fixed in the review
 

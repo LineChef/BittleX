@@ -21,7 +21,7 @@ what you physically need to join the three boards:
 | Link | What connects | What to buy |
 |---|---|---|
 | **PiSugar S → Pi Zero 2 W** | pogo pins on the PiSugar mate to the copper pads on the **underside** of the Pi; it clips to the Pi's back with the **standoffs/screws in the PiSugar box** | **nothing extra** — no cable, no soldering. Charge it via its **own micro-USB** (have a USB-A→micro-USB cable). Does *not* touch the 40-pin header, so it coexists with the BiBoard wiring. |
-| **Pi → BiBoard (serial, data-only)** | 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: [`docs/hardware/pi-biboard-build-notes.md`](../hardware/pi-biboard-build-notes.md). | **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated. **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already. |
+| **Pi → BiBoard (serial, data-only)** | 3 lines: Pi **GPIO14 TXD → BiBoard RX2**, Pi **GPIO15 RXD → BiBoard TX2** (crossed), **GND↔GND**. The Pi's 5 V pin stays **unconnected** (PiSugar is sole power) — BiBoard's 5-pin header has two +5V pins, both also left unconnected. Confirmed pinout: [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos of exactly where to solder: [`blueprints/build-logs/pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md). | **female-to-female Dupont jumper wires** (get a 40-pack — you'll reuse them), and possibly a **5-pin header** to solder onto BiBoard if it's not already populated. **Check the Bittle X box first** — Petoi sometimes includes a BiBoard↔Pi cable, which would cover this already. |
 | **microSD → computer** (for flashing) | writing the Pi OS image | a **microSD-to-SD adapter** (usually in the SanDisk box) or a **USB microSD reader**. |
 
 Also nice to have: a small strip of **thermal tape** for the WH heatsink (no
@@ -417,7 +417,7 @@ lost/stolen robot as a full disclosure of those. Bring-up checklist:
       it, **"forget that"** drops the session's memory. A **listening LED**
       should be lit whenever the mic stream is open. The GPIO-load-switch +
       IMU-tap-wake design is parked as a future hardening option, not the
-      default. Detail in `docs/behavior-ideas.md` B18.
+      default. Detail in `docs/planned/behavior-ideas.md` B18.
       `scene.narrate` sends only the *text* summary to Claude; keep it that way
       (there's a guard in `vision/scene.py`).
 - [ ] **What still goes to the Anthropic API every turn:** the speech

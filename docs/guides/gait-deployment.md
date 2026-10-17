@@ -140,7 +140,7 @@ steps by hand from `pi-bring-up.md` — same content.
     walking / carpet / small-bump traces, then build `gait/jam_guard.py`
     (`JamGuard.update(cmd_deg, fbk_deg) -> NONE | BACK_OFF | TURN_AWAY`) and wire
     it into `run_gait.py` like `CliffGuard`. The threshold tuning is the whole
-    job and needs those real traces. Full spec: `docs/behavior-ideas.md` **B9a**.
+    job and needs those real traces. Full spec: `docs/planned/behavior-ideas.md` **B9a**.
 10. **Rename `run20m_ppo`** once it has walked on the real robot and passed H1.
     The name is a training artefact ("a 20M-step PPO run"); after it's the
     shipped gait it should say what it *is* — e.g. `gait_v1` / `walk_ppo_v1` /
@@ -157,7 +157,7 @@ is the frozen base gait. Do **not** start new gait-training loops.
 
 - Phase 4 (stance recovery) concluded 2026-09-03 with **no gait change** — 3
   reversible continuation rounds, no keeper. Full log:
-  `docs/rl/phase4-decision-log.md`. Report artifact: "Phase 4 Gait Post-Mortem".
+  `docs/archive/rl/phase4-decision-log.md`. Report artifact: "Phase 4 Gait Post-Mortem".
 - Byproduct kept: `train.py --finetune-lr` / `--finetune-target-kl` (every prior
   `--from` continuation was silently diverging — LR restart at 3e-4 on a
   converged policy → `approx_kl` 70–400). Always pass these for continuations.
@@ -167,7 +167,7 @@ is the frozen base gait. Do **not** start new gait-training loops.
   **not needed**. New env knobs `CMD_LATENCY_STEPS` / `JOINT_OFFSET_DEG` exist
   (default 0, inert) for re-checking once hardware gives real numbers.
 - What could still trigger a training run, each gated on a hardware
-  measurement: `docs/rl/hardware-gated-backlog.md` (H1–H9). H1 =
+  measurement: `docs/planned/hardware-gated-backlog.md` (H1–H9). H1 =
   the learned-vs-scripted head-to-head, the question the whole RL track hinges on.
 
 ## Network — Mac→Pi SSH (resolved 2026-09-22)

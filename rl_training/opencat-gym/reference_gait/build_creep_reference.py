@@ -1,5 +1,5 @@
 """The high-step creep base gait: a slow walk with three feet on the ground at all times, built from a few parameters (user, 2026-10-12; plan:
-docs/plan-detail/high-step-creep-training-plan.md). The numbers are picked by a sim parameter search (creep_sweep.py), not written by hand.
+docs/archive/plan-detail/high-step-creep-training-plan.md). The numbers are picked by a sim parameter search (creep_sweep.py), not written by hand.
 
     ../../../.venv/bin/python build_creep_reference.py --name creep [--params '{"sway": 15, "lean": 8}']      # -> creep_ref.npy (100, 8) rad + creep_ref.json (the parameters)
 

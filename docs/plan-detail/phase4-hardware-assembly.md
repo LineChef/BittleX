@@ -6,7 +6,7 @@
 ## Phase 4 — Hardware assembly
 
 - [x] **Assemble Bittle X V2 — done 2026-09-28.** Pi+PiSugar wiring/bring-up
-      (Steps 2-4, `docs/hardware/pi-biboard-build-notes.md`) and the mount
+      (Steps 2-4, `blueprints/build-logs/pi-biboard-build-notes.md`) and the mount
       redesign (Step 5) are now unblocked — BiBoard exists.
 - [x] **Check servo calibration — redone for real, 2026-09-29, post-reflash.**
       The 2026-09-28 zero-point calibration below was wiped by the same-night
@@ -61,7 +61,7 @@
   - Power the Pi from the PiSugar S, not the BiBoard. Wire BiBoard → Pi
     data-only (RX/TX/GND), Pi 5 V unconnected. See [`docs/hardware/pi-power.md`](../hardware/pi-power.md).
   - [x] Install the 5-pin Pi socket on BiBoard V1 — **soldered 2026-09-29**
-    (`docs/hardware/pi-biboard-build-notes.md` Step 2). Still need: the actual
+    (`blueprints/build-logs/pi-biboard-build-notes.md` Step 2). Still need: the actual
     RX/TX/GND jumpers to the Pi (Step 3), and use Petoi's back-cover STL with
     the Pi cutout.
   - Petoi's official Pi standoff bracket (`Pi_StandOffRegular.stl`) does
@@ -73,7 +73,7 @@
       mechanism, why the corner-clip and screw-through-bracket approaches
       were both ruled out, and the candidate options being weighed) live in
       [`blueprints/mounting.md`](../../blueprints/mounting.md)
-      (the mount, Step 5) and [`docs/hardware/pi-biboard-build-notes.md`](../hardware/pi-biboard-build-notes.md) (Steps 1-4) and the
+      (the mount, Step 5) and [`blueprints/build-logs/pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md) (Steps 1-4) and the
       [Pi Stack Build Guide](https://claude.ai/artifact/LGfD7LCP1KdUswz9DJCm8M)
       — that's the canonical reference, not this checklist.
   - Step 1 (Pi+PiSugar) is done and needed no mount. **Step 2 (solder BiBoard's

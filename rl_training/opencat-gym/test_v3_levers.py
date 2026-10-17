@@ -1,4 +1,4 @@
-"""Checks for the V3 retrain levers (docs/rl/v3-retrain-plan.md). Run from rl_training/opencat-gym with the RL venv:
+"""Checks for the V3 retrain levers (docs/archive/rl/v3-retrain-plan.md). Run from rl_training/opencat-gym with the RL venv:
 
     ../../.venv/bin/python -m pytest test_v3_levers.py -q
 """

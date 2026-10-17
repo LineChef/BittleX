@@ -123,7 +123,7 @@ mechanically," not a guess.
    mounts somewhere distinct, it needs its own sim body). Balance each piece on
    an edge for height + fore/aft CoM. Then set `PAYLOAD_MASS_*` / `HEAD_MASS_*` /
    positions in `opencat_gym_env.py` and retrain (or `--finetune-lr`) if the
-   delta from ~76 g is real — [`rl/hardware-gated-backlog.md`](../rl/hardware-gated-backlog.md) **H2**.
+   delta from ~76 g is real — [`rl/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md) **H2**.
 5. Wire Pi ↔ BiBoard **data-only** (RX/TX/GND); PiSugar S is the sole power
    source. Confirm the back cover still fits.
 

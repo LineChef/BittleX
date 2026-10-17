@@ -6,7 +6,7 @@
     tools/g2_dial_iter.py const N U                  # no feedback: a fixed stride difference U
 
 N numbers the run (it names the log dial3_iNN / dial3_cNN; reuse a number and the new log is picked by the newest file). Starts the run through tools/g2_baseline.sh
-(g2-voice is stopped for it and restarted after), waits, copies the CSV to docs/rl/v3-data/dial3/ and prints the final heading change (+ = right) with the heading at
+(g2-voice is stopped for it and restarted after), waits, copies the CSV to docs/archive/rl/v3-data/dial3/ and prints the final heading change (+ = right) with the heading at
 2 / 4 / ... 12 s and the controller output u. The spoken warning gives about 8 s to put G2 on the floor. Ask whoever is with G2 what they SAW (left / right / straight)
 and compare: a log that disagrees with the eyes means the run was handled (the yaw jumps when G2 is picked up) or the yaw is unreliable.
 """
@@ -39,7 +39,7 @@ def main():
         if st and st[0] == "inactive":
             break
         time.sleep(2)
-    out_dir = f"{ROOT}/docs/rl/v3-data/dial3"
+    out_dir = f"{ROOT}/docs/archive/rl/v3-data/dial3"
     os.makedirs(out_dir, exist_ok=True)
     subprocess.run(f'scp -q "$G2_PI:~/g2_runs/{label}_*.csv" {out_dir}/', shell=True, cwd=ROOT)
     f = sorted(glob.glob(f"{out_dir}/{label}_*.csv"), key=os.path.getmtime)[-1]

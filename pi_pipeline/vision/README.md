@@ -79,7 +79,7 @@ One JSON object per line, **921600 baud**:
 - **`CliffGuard` — cliff/edge avoidance, highest priority.** A "floor vs. edge
   ahead" classifier via the `classes()` path (single sensor slot is taken by
   this camera, so it must be camera-based), zero-debounce, preempts every other
-  behavior. Full design: `docs/behavior-ideas.md` B16. Higher stakes than
+  behavior. Full design: `docs/planned/behavior-ideas.md` B16. Higher stakes than
   anything else here: a miss is a fall.
 - Wire `Avoider` decisions to the actuator and `narrate` to the voice loop in the
   Phase 10 runtime.

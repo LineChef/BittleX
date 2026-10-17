@@ -6,7 +6,7 @@ in that keyframe where the front-left leg reaches furthest forward), then
 reaches the paw forward-and-up to clear the ledge edge, then searches back
 DOWN onto the platform to find its true top surface.
 
-Unlike the step-down case (closed negative, docs/rl/foot-probing-log.md):
+Unlike the step-down case (closed negative, docs/archive/rl/foot-probing-log.md):
 reaching up-and-forward doesn't have the retreat-in-x problem that sank the
 down case, and the platform surface spans a wide x-range starting right at
 the edge, so even the search-down phase's mild x-drift still lands on solid

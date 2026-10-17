@@ -9,7 +9,7 @@ Replaces the earlier probe_then_climb.py attempts (pure scripted continuation,
 trained residual, rigid single-leg anchor) which all failed because they
 either skipped body advancement entirely or tried to advance the body while
 keeping ONE leg rigidly fixed (which just rotates the body around that point
-instead of translating it -- see docs/rl/foot-probing-log.md round 3).
+instead of translating it -- see docs/archive/rl/foot-probing-log.md round 3).
 
     python crawl_climb.py trained/run20m_resid30_ppo out.gif --ledge-h 0.025
 """

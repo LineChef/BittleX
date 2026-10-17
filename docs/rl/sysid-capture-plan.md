@@ -2,7 +2,7 @@
 
 Real-robot data to fit the sim and to score policies. No video. Rules (user, 2026-10-07): real data sets the sim's numbers and ranges and serves as the real-world score; it is **never a source of drift**
 (drift direction and size stay out of the sim; command drift is the Pi heading hold's job). A value only counts as confident if a fit on one session reproduces on another (different day or battery).
-Why and what is in or out: [`v3-decisions-log.md`](v3-decisions-log.md). What each log carries: [`hardware-logging.md`](hardware-logging.md).
+Why and what is in or out: [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md). What each log carries: [`hardware-logging.md`](hardware-logging.md).
 
 **Before the first session:** the Pi has the `--log-extra` change (the deploy watcher installs it when the Pi next comes online; check `~/g2_logs/deploy_done`).
 
@@ -48,7 +48,7 @@ Judge: which foot changes the heading, in which direction, how much per unit of 
 
 ## How this relates to exploration mode (a separate capture)
 
-The exploration sessions ([`../vision/exploration-object-learning-plan.md`](../vision/exploration-object-learning-plan.md)) collect **pictures** for object learning; this plan collects **walk data** for the sim.
+The exploration sessions ([`../planned/exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md)) collect **pictures** for object learning; this plan collects **walk data** for the sim.
 They are different sessions with different goals. Exploration walks cross varied floors and make turns and hand interventions, so they are a poor controlled fit; they could serve later as a
 robustness check on the fit (different conditions), but only if the walk log is switched on during exploration, which is not wired today. A G2-on visit can do both back to back.
 

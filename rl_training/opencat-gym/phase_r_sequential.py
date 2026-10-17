@@ -23,7 +23,7 @@ holding up as later ones get added), not just "did the new one learn".
 Continuation uses train.py's existing --from + --finetune-lr 3e-5 +
 --finetune-target-kl 0.05 path (already used historically for Phase 4
 stance-recovery continuation onto a converged 20M policy -- see
-docs/rl/refinement-regimen.md). That LR was tuned for gently nudging an
+docs/archive/rl/refinement-regimen.md). That LR was tuned for gently nudging an
 ALREADY-CONVERGED policy; here every source checkpoint is itself only 3M
 deep, not fully converged, so if a stage's new-skill signal looks weak (not
 just "still improving"), the one permitted retry uses a higher LR (1e-4)

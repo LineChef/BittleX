@@ -1,4 +1,4 @@
-"""Image embedders for the object recognition library (docs/vision/exploration-object-learning-plan.md, Phase 3).
+"""Image embedders for the object recognition library (docs/planned/exploration-object-learning-plan.md, Phase 3).
 
 An embedder turns one picture (a PIL image, JPEG bytes or a numpy array) into a unit-length vector; the `ObjectGallery` compares those vectors by cosine similarity. Two come with the code:
 

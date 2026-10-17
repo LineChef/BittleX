@@ -1,4 +1,4 @@
-"""One definition of "G2 as the sim should model it", for training and every scorer (V3 plan, docs/rl/v3-retrain-plan.md section 2.1).
+"""One definition of "G2 as the sim should model it", for training and every scorer (V3 plan, docs/archive/rl/v3-retrain-plan.md section 2.1).
 
 Until 2026-10-06 the real-robot setup lived in four places that disagreed (run_pipeline.BASE, run_pipeline._score_checkpoint /
 phase_c_report's hard-coded lines, benchmark_decathlon --hw, drift_probe.BASE_ENV). Everything V3 trains or scores takes its environment
@@ -23,7 +23,7 @@ RECIPE = {
     "G2E_CMD_SEND_EVERY_N": "3",
     # the body: the base robot plus the case payload, 422 g in total (one weighing); the split between base and payload is the line below
     # 2026-10-07: the payload was weighed (168 g: Pi, PiSugar, camera, speaker, mic, wiring, lid; 100 x 40 x 38 mm block, centered): profile "case2", base 254 g = 269 g x 0.944.
-    # Runs started before 2026-10-07 used the old split ("case", scale 1.12: 301 g base + 121 g payload); see docs/rl/v3-decisions-log.md.
+    # Runs started before 2026-10-07 used the old split ("case", scale 1.12: 301 g base + 121 g payload); see docs/archive/rl/v3-decisions-log.md.
     "G2E_BODY_MASS_SCALE": "0.944", "G2E_PAYLOAD_PROFILE": "case2",
     # calibration error and mount tilt seen at bring-up
     # IMU, measured 2026-10-07 after the firmware gyro calibration (`gc`), G2 standing still with the firmware balance off (docs/rl/real-walk-log.md "IMU after the gyro calibration"):
@@ -68,14 +68,14 @@ IMU_WORLD_A = {"G2E_IMU_BIAS_DEG": "2", "G2E_RANDOM_GYRO": "0.02"}
 # --- Phase 1 output: parameters fitted so the sim matches the real walks. Empty until Phase 1 runs. ---
 CALIBRATION: dict[str, str] = {
     # 2026-10-06 (Phase 1, fast pass): V2.1 on benchmark_v4 cell N1 (12.5 s calm walk) matched to the 14 post-servo-swap real walks
-    # (roll std 5.14, pitch std 2.41, 0 falls, heading +36 +- 25 right). Sweep data: docs/rl/v3-data/calibration/. Chosen 200 deg/s + 0.15 N*m:
+    # (roll std 5.14, pitch std 2.41, 0 falls, heading +36 +- 25 right). Sweep data: docs/archive/rl/v3-data/calibration/. Chosen 200 deg/s + 0.15 N*m:
     # 0% falls, roll 4.59 (-11%), pitch 2.57 (+7%), speed 0.090 (G2 ~0.120: a known residual gap, handled by scaling the commanded speed on the Pi),
     # heading -4 (G2 -36 +- 25). Raising ground / foot friction or the servo gains did not help (stiffer gains made every episode fall).
     "G2E_SERVO_RATE_LIMIT_DEG_S": "200",
     "G2E_MOTOR_FORCE": "0.15",
 }
 
-# --- screening levers: one per 3M round (docs/rl/v3-retrain-plan.md sections 2.3-2.5) ---
+# --- screening levers: one per 3M round (docs/archive/rl/v3-retrain-plan.md sections 2.3-2.5) ---
 LEVERS = {
     "mirror": {"G2E_MIRROR_LOSS": "1.0", "G2E_MIRROR_VALUE_LOSS": "0.1"},                      # R1 (train.py reads these)
     "mirror_strong": {"G2E_MIRROR_LOSS": "2.0", "G2E_MIRROR_VALUE_LOSS": "0.2"},                 # 2026-10-09 (user): twice the mirror weight in every run after the first long-hazard run; the 20M mirror gap rose to 0.09 (V3: 0.039)
@@ -143,7 +143,7 @@ LEVERS = {
                     "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.45,ledge_down:0.45",
                     "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5", "G2E_HAZ_POSTURE_RELAX": "0.3"},
     "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
-    # 2026-10-12 high-step creep (user-approved; docs/plan-detail/high-step-creep-training-plan.md): a separate slow gait with three feet down, for stepping UP onto ledges.
+    # 2026-10-12 high-step creep (user-approved; docs/archive/plan-detail/high-step-creep-training-plan.md): a separate slow gait with three feet down, for stepping UP onto ledges.
     # hs_creep is the gait's world and reward recipe (every chain stage carries it); hs_s* are the stage mixes. Step-ups only, no slopes, no step-downs.
     "hs_creep": {"G2E_SKILL_REF": "creep", "G2E_PHASE_RATE_NOM_CMD": "0.035", "G2E_CMD_BANDS": "creep",          # the creep base (reference_gait/creep_ref.npy), its own cadence and slow commands
                  "G2E_FAC_FOOT_PHASE": "0", "G2E_FAC_GAIT_SYMMETRY": "0",                                        # the trot-shaping terms punish three feet down: off
@@ -265,7 +265,7 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
 # the sampler in passability_audit.py `mix`; they apply to new fresh finals only (old runs and the benchmark cells keep their own).
 FULL_COURSE = {"G2E_RUBBLE_PROB": "0.575", "G2E_RANDOM_TERRAIN_PROB": "0.34", "G2E_ROUGH_TERRAIN_PROB": "0.25", "G2E_SLOPE_TARGET_PROB": "0.14", "G2E_SLOPE_MAX_DEG": "10",
                "G2E_SNAG_OBSTACLE_PROB": "0.228", "G2E_LEDGE_PROB": "0.28",
-               # PROVISIONAL top-threshold caps (start values from the capability test, 2026-10-08; docs/rl/next-20m-plan.md). They are adjustable while the run trains
+               # PROVISIONAL top-threshold caps (start values from the capability test, 2026-10-08; docs/archive/rl/next-20m-plan.md). They are adjustable while the run trains
                # (trained/<tag>_caps.json) and reviewed every 1M steps with caps_report.py: too low and the policy never improves, too high and it cannot learn to succeed.
                "G2E_CAP_SIDEHILL_DEG": "8", "G2E_CAP_UPHILL_DEG": "10", "G2E_CAP_DOWNHILL_DEG": "10", "G2E_CAP_LEDGE_M": "0.02"}
 # The surface step (a hard floor that turns into a carpet-like slab with a 12 mm step) is deliberately NOT in the course: user, 2026-10-08, "don't re-enable surface step". Carpet-like physics stays out of

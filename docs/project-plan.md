@@ -27,15 +27,15 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 |---|---|---|
 | 1 Repo setup | ✅ | below |
 | 2 Orientation | ✅ (curriculum items deferred) | below |
-| 3 RL training in simulation | ✅ policies built; sim locomotion work paused pending the real-robot comparison | [`plan-detail/phase3-rl-training.md`](plan-detail/phase3-rl-training.md) |
-| Recovery (catch / get-up) | 🧩 built; partly tested on hardware | [`plan-detail/recovery.md`](plan-detail/recovery.md) |
+| 3 RL training in simulation | ✅ policies built; sim locomotion work paused pending the real-robot comparison | [`plan-detail/phase3-rl-training.md`](archive/plan-detail/phase3-rl-training.md) |
+| Recovery (catch / get-up) | 🧩 built; partly tested on hardware | [`plan-detail/recovery.md`](archive/plan-detail/recovery.md) |
 | 4 Hardware assembly | 🔧 assembled and bring-up done; Pi mount is temporary | [`plan-detail/phase4-hardware-assembly.md`](plan-detail/phase4-hardware-assembly.md) |
-| 5 Basic control | ✅ | [`plan-detail/phase5-basic-control.md`](plan-detail/phase5-basic-control.md) |
-| 6 Sim-to-real deployment | 🔧 loop and safety layers built; first walks done | [`plan-detail/phase6-sim-to-real.md`](plan-detail/phase6-sim-to-real.md) |
+| 5 Basic control | ✅ | [`plan-detail/phase5-basic-control.md`](archive/plan-detail/phase5-basic-control.md) |
+| 6 Sim-to-real deployment | 🔧 loop and safety layers built; first walks done | [`plan-detail/phase6-sim-to-real.md`](archive/plan-detail/phase6-sim-to-real.md) |
 | 7 Voice + Claude | ✅ voice loop running with the real mic and speaker on the Pi; command recognition still being tuned | [`plan-detail/phase7-voice.md`](plan-detail/phase7-voice.md) |
 | 8 Perception | 🧩 model on the camera and "what do you see" works; navigation reflexes gated off | [`plan-detail/phase8-perception.md`](plan-detail/phase8-perception.md) |
 | 9 Memory | ✅ built and live on the Pi; importance, consolidation (dry-run only) and a use log added | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
-| 10 Integration | 🧩 runtime built; not yet run on the robot | [`plan-detail/phase10-integration.md`](plan-detail/phase10-integration.md) |
+| 10 Integration | 🧩 runtime built; not yet run on the robot | [`plan-detail/phase10-integration.md`](archive/plan-detail/phase10-integration.md) |
 | Petoi AI Head vs the Pi | ⬜ decision pending, head arriving ~2026-10-10 | below |
 
 ## Open TODOs that affect everything
@@ -44,7 +44,7 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
   every policy since `run20m_ppo` trained on it. Still to do: classify past resilience conclusions as unaffected/suspect/invalidated,
   list the trainings to re-test (including approaches closed on locked-body results), re-baseline the deployed policy and the scripted
   walk, and recheck the fall-recovery replay (and the URDF's ±90° joint limits against the real `rc` keyframes).
-  Full text: [`plan-detail/sim-payload-bug.md`](plan-detail/sim-payload-bug.md). The replay tool `sysid_replay.py` carried the same bug
+  Full text: [`plan-detail/sim-payload-bug.md`](archive/plan-detail/sim-payload-bug.md). The replay tool `sysid_replay.py` carried the same bug
   and was fixed 2026-10-01.
 - **Hardware first:** the front-left shoulder servo fault and the carpet failures come before any new walking work —
   [`rl/real-walk-log.md`](rl/real-walk-log.md), [`STATUS.md`](STATUS.md).
@@ -53,12 +53,12 @@ Status key: ✅ done · 🧩 built and tested against mocks, needs the robot · 
 
 Parts list ($567 as finalized), resolved questions (independent Pi power via the PiSugar S, BiBoard V1 is an ESP32-U4WDH, spec sheet) and
 the battery-awareness plan: [`hardware/parts-and-decisions.md`](hardware/parts-and-decisions.md). Vendor specs: [`hardware/specs.md`](hardware/specs.md).
-Build record and wiring: [`../blueprints/`](../blueprints/README.md).
+Build record and wiring: [`../blueprints/README.md`](../blueprints/README.md).
 
 Open:
 - [ ] Mount the Pi/PiSugar stack properly (currently a temporary mount; the printed standoff is not impact-rated). See the build manual.
 - [ ] Confirm the back cover closes over the mounted Pi (measured too shallow for Pi + PiSugar; a modified cover/clips is planned).
-- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`hardware/i2s-audio-build-log.md`](hardware/i2s-audio-build-log.md)).
+- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`hardware/i2s-audio-build-log.md`](../blueprints/build-logs/i2s-audio-build-log.md)).
 - [ ] Battery-aware behavior: get real runtime data (idle/walking/talking on a full charge) before building the low-charge warning.
 - [ ] Measure G2's 2S pack runtime (BiBoard side) with a timed test, the way the Pi side was measured (Pi figure: [`STATUS.md`](STATUS.md); the pack's ~45–60 min of walking is only an estimate, [`hardware/pi-power.md`](hardware/pi-power.md)). Not scheduled. Why it matters: the Pi and pack look comparable on paper, so the result decides whether a second pack for the BiBoard is worth buying.
 
@@ -79,7 +79,7 @@ runs, not serial finetunes; promote only if it keeps base walking quality, adds 
 deployed policy and the lineage: [`STATUS.md`](STATUS.md), [`rl/hw1-log.md`](rl/hw1-log.md). What the gait does and its limits:
 [`rl/walking-policy.md`](rl/walking-policy.md). Logs: [`rl/`](rl/README.md).
 
-Open / deferred (detail in [`plan-detail/phase3-rl-training.md`](plan-detail/phase3-rl-training.md)):
+Open / deferred (detail in [`plan-detail/phase3-rl-training.md`](archive/plan-detail/phase3-rl-training.md)):
 - [ ] Real-time terrain adaptation is limited to what the IMU shows (no foot contact or torque feedback).
 - [ ] Heading on hardware: no magnetometer, yaw is gyro-integrated and drifts; the sim's sub-degree heading hold will not carry over.
 - [ ] Imitation-learning approaches from the Bittle research (optional).
@@ -91,7 +91,7 @@ Open / deferred (detail in [`plan-detail/phase3-rl-training.md`](plan-detail/pha
 Switch over separate skills: the learned gait (walking), its own reactive catch (stumbling), scripted `rc` (fallen on a side), `rl` then `rc`
 (on its back), selected by `RecoveryFSM` in `pi_pipeline/link/recovery.py`. A real flip and self-right worked on 2026-09-28 using the
 firmware's own auto-`rc` (the Pi was not in the loop). Reference: [`hardware/self-righting.md`](hardware/self-righting.md); detail:
-[`plan-detail/recovery.md`](plan-detail/recovery.md).
+[`plan-detail/recovery.md`](archive/plan-detail/recovery.md).
 
 - [ ] Test `rc` / `rl` against the fall types the policy produces; re-author the keyframes in Skill Composer if unreliable.
 - [ ] Enable gyro assist and decide whether the push reflex should fire mid-walk (firmware fork or a Pi-side version).
@@ -111,14 +111,14 @@ Pi↔BiBoard link working; camera set up on the Pi. Detail: [`plan-detail/phase4
 ## Phase 5 — Basic programming & control ✅
 
 Movement commands from Python, the OpenCat command structure, and the vision module's on-device detection are done; the hardware link
-(`check_serial ping`, IMU stream) was confirmed 2026-09-30. Detail: [`plan-detail/phase5-basic-control.md`](plan-detail/phase5-basic-control.md).
+(`check_serial ping`, IMU stream) was confirmed 2026-09-30. Detail: [`plan-detail/phase5-basic-control.md`](archive/plan-detail/phase5-basic-control.md).
 
 ## Phase 6 — RL sim-to-real deployment 🔧
 
 Done: Pi inference (<1 ms per step), ONNX export with a parity check, the 80 Hz on-robot loop, and the deployment-safety layers (thermal
 guard, carpet detector, jam guard, fall guard, watchdog). On hardware: IMU format fixed and verified at 5.0 Hz, open-loop servo-sign check
 and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log.md). Detail:
-[`plan-detail/phase6-sim-to-real.md`](plan-detail/phase6-sim-to-real.md).
+[`plan-detail/phase6-sim-to-real.md`](archive/plan-detail/phase6-sim-to-real.md).
 
 - [ ] Real sim-to-real gap work: re-score on the real path, the scripted-vs-learned comparison ([`rl/h1-rubric.md`](rl/h1-rubric.md)),
       sysid against real logs, and retrain if warranted. Blocked first on the FL shoulder servo.
@@ -134,13 +134,13 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
       course (slopes in under 10% of episodes, dealt evenly both ways, no background tilt, two hazards at most, gentler shoves, 7.5 s hazard-free baseline), screens a crossing
       bonus, hazard-aware reward relaxations and a heading-blind policy (no steering in the policy; the Pi steers), then runs a fresh 20M judged against the scripted walk.
       Plan, rules and decisions: [`plan-detail/v5-training-plan.md`](plan-detail/v5-training-plan.md).
-- [ ] **High-step gait for ground clearance (opened 2026-10-10; the path forward for clearance now that gait switching works):** the scripted high steps are a knee-folded crouch (`hsF`, 17.8 mm) or fell in the sim (`hsB`/`hsC`), and `carpetF` was rejected on G2. Plan: a better base (sim sweep of the generator, and/or a hand-taught step via Petoi's Skill Composer or our own recording, B3 / B25), a sim check, then a fresh screening run of the two-mode policy (Track C) on it, then G2 on the floor. Detail: [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md).
-- [ ] **Climbing movement, taught by hand with the same method (user, 2026-10-10; after the hi-step gait is built and walked on G2):** the hi-step is the trial of the hand-guided method (B25: the user shows G2's legs a movement, the poses are recorded, a gait is built from them and checked in the sim before G2 tries it on the floor). Once that works, the same method builds a movement for climbing obstacles (B13 / B9: front feet reach up onto the obstacle, the body hauls up, the rear legs push it over), in place of keyframes written by Claude, which the user ruled out. Plan and steps: [`plan-detail/high-step-gait-plan.md`](plan-detail/high-step-gait-plan.md) "After the hi-step: a climbing movement".
+- [ ] **High-step gait for ground clearance (opened 2026-10-10; the path forward for clearance now that gait switching works):** the scripted high steps are a knee-folded crouch (`hsF`, 17.8 mm) or fell in the sim (`hsB`/`hsC`), and `carpetF` was rejected on G2. Plan: a better base (sim sweep of the generator, and/or a hand-taught step via Petoi's Skill Composer or our own recording, B3 / B25), a sim check, then a fresh screening run of the two-mode policy (Track C) on it, then G2 on the floor. Detail: [`plan-detail/high-step-gait-plan.md`](archive/plan-detail/high-step-gait-plan.md).
+- [ ] **Climbing movement, taught by hand with the same method (user, 2026-10-10; after the hi-step gait is built and walked on G2):** the hi-step is the trial of the hand-guided method (B25: the user shows G2's legs a movement, the poses are recorded, a gait is built from them and checked in the sim before G2 tries it on the floor). Once that works, the same method builds a movement for climbing obstacles (B13 / B9: front feet reach up onto the obstacle, the body hauls up, the rear legs push it over), in place of keyframes written by Claude, which the user ruled out. Plan and steps: [`plan-detail/high-step-gait-plan.md`](archive/plan-detail/high-step-gait-plan.md) "After the hi-step: a climbing movement".
 - [ ] **Real-to-sim calibration from G2's own walks (approved 2026-10-08):** `rl_training/opencat-gym/real2sim.py` replays logged joint commands open-loop through the training
       env and compares roll / pitch spread and sway frequency with G2's IMU (heading excluded: real data is never a drift source); `--fit` ranks servo speed limit x motor
       force x ground friction (run with the Mac idle). First check (2026-10-06 tile walks): sway frequency matches (0.79 vs 0.78 Hz), sim roll about 10-13% low. Next: the
       controlled capture sessions at the next hardware visit (STATUS next steps 0b), then a fit; a fitted value enters training only through the real-data pipeline's gates.
-- [ ] **V3 gait retrain: plan approved 2026-10-06 — [`rl/v3-retrain-plan.md`](rl/v3-retrain-plan.md) (start at §0).** It replaces the item
+- [ ] **V3 gait retrain: plan approved 2026-10-06 — [`rl/v3-retrain-plan.md`](archive/rl/v3-retrain-plan.md) (start at §0).** It replaces the item
       below and the closed v2.2 campaign: calibrate the sim to G2, single-lever 3M screens (incl. mirror symmetry and a turning gate), a staged
       chain, a hardware check-in, then one 20M run with gait checks at 3M/5M/10M and no planned tuning runs after it. Why V2.1 drifts:
       [`rl/real-walk-log.md`](rl/real-walk-log.md) "Why V2.1 drifts right".
@@ -152,7 +152,7 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
       (the real robot travels about 16% farther). (3) Train a fresh from-scratch 20M run (not a fine-tune of V2.1), judged on its own 3M checkpoint against the
       previous 20M run's 3M checkpoint, then scored through the real path (`benchmark_decathlon.py --hw i`) and walked on G2 against V2.1.
       Goal: a sim that matches the real hardware more closely, and a better gait.
-- [ ] **Heading hold on the Pi (2026-10-07: works on G2).** The closed-loop stride-difference hold kept six V2.1 walks within 6 deg of straight (details: [`rl/real-walk-log.md`](rl/real-walk-log.md) "Closed-loop heading hold works"). **Superseded the same evening:** the per-foot test showed the front feet steer, and a closed-loop hold on the front-left foot alone kept V2.1 within 13 to 21 deg over 25 s (against +148 without); it is now the default in every policy walk (voice, exploration, `run_gait.py`), see [`rl/real-walk-log.md`](rl/real-walk-log.md) "Which foot steers G2". To do: tile and longer-walk data, a turn command, and the question of whether the base walk also needs drift training ([`rl/v3-decisions-log.md`](rl/v3-decisions-log.md)).
+- [ ] **Heading hold on the Pi (2026-10-07: works on G2).** The closed-loop stride-difference hold kept six V2.1 walks within 6 deg of straight (details: [`rl/real-walk-log.md`](rl/real-walk-log.md) "Closed-loop heading hold works"). **Superseded the same evening:** the per-foot test showed the front feet steer, and a closed-loop hold on the front-left foot alone kept V2.1 within 13 to 21 deg over 25 s (against +148 without); it is now the default in every policy walk (voice, exploration, `run_gait.py`), see [`rl/real-walk-log.md`](rl/real-walk-log.md) "Which foot steers G2". To do: tile and longer-walk data, a turn command, and the question of whether the base walk also needs drift training ([`rl/v3-decisions-log.md`](archive/rl/v3-decisions-log.md)).
 - [ ] Find and test the self-right trigger command for BiBoard V1 (serial, not the IR remote).
 
 ## Phase 7 — Voice + Claude 🧩
@@ -208,7 +208,7 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 The [Bittle AI Head](https://www.petoi.com/products/bittle-ai-head-upgrade-kit) ($39, 42 g; an ESP32-C3 with its own microphone and speaker; cloud LLM; no camera mentioned by Petoi)
 is **ordered, arriving ~2026-10-10**. It might replace the mic and speaker parts; Petoi expects it to **complement** the Pi, not replace it (single-core C3, firmware to be open-sourced,
 UART shared with the Pi by default). **Undecided; keeping the Pi is a fully valid outcome.** Criteria, behavior inventory, test steps and scorecard:
-[`research/petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md). Everything learned hands-on, the pros and cons, and the staged integration plan: [`plan-detail/ai-head-implementation.md`](plan-detail/ai-head-implementation.md).
+[`research/petoi-ai-head-evaluation.md`](planned/ai-head/petoi-ai-head-evaluation.md). Everything learned hands-on, the pros and cons, and the staged integration plan: [`plan-detail/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md).
 
 **The owner's goal for the head (2026-10-10): offload as much work as possible from Claude to the head, so there are as few API calls as possible.** Also judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
 behaviors that make it feel alive; (3) the trade-off — a streamlined ~42 g module vs the Pi build's wiring, weight and exposed hardware, against what
@@ -219,7 +219,7 @@ scorecard is filled.** Privacy gate before powering the head (throwaway account,
 ## Phase 10 — Full integration 🧩
 
 The behavior runtime (`BehaviorDriver`, `BehaviorRuntime`, `app/`) is built and tested against mocks; detail and the per-feature history:
-[`plan-detail/phase10-integration.md`](plan-detail/phase10-integration.md).
+[`plan-detail/phase10-integration.md`](archive/plan-detail/phase10-integration.md).
 
 - [ ] All four systems running alongside each other without conflicts; run `python -m pi_pipeline.app --serial` on the robot.
 - [ ] Expect timing/integration bugs even after each piece passes alone.

@@ -411,7 +411,7 @@ def run_gated_20m(tag, extra, all_cells, deployment_name, from_ckpt=None, label=
 
 def run_gated_10m(tag, extra, all_cells, deployment_name, from_ckpt=None, label="Tuning"):
     """For a narrow fine-tune continuation on an already-consolidated gait, where
-    the project's own precedent (docs/rl/refinement-regimen.md's Phase 4
+    the project's own precedent (docs/archive/rl/refinement-regimen.md's Phase 4
     stance-recovery continuation: 3-5M, not 20M) and this campaign's own evidence
     (the sequential chain's final 20M continuation barely changed from its 3M
     checkpoint onward) both say 20M is very likely overkill. Scheduled for

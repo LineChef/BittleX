@@ -1,4 +1,4 @@
-"""The high-step creep (2026-10-12, docs/plan-detail/high-step-creep-training-plan.md): the base gait generator, the env knobs (off = unchanged), step-ups only, and the
+"""The high-step creep (2026-10-12, docs/archive/plan-detail/high-step-creep-training-plan.md): the base gait generator, the env knobs (off = unchanged), step-ups only, and the
 new ledge rewards. Run with the RL venv."""
 import json
 import os

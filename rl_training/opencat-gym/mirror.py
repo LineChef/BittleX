@@ -1,4 +1,4 @@
-"""Left/right mirror symmetry for the gait policy (V3 plan, lever R1; docs/rl/v3-retrain-plan.md section 2.5).
+"""Left/right mirror symmetry for the gait policy (V3 plan, lever R1; docs/archive/rl/v3-retrain-plan.md section 2.5).
 
 The scripted wkF walk is left/right symmetric, so a policy should answer a mirrored situation with the mirrored action. V2.1 doesn't: it holds a
 fixed one-sided correction (back-left hip ~60 deg vs back-right ~53) that turned G2 about 140 deg on the real floor. MirrorPPO adds a loss that

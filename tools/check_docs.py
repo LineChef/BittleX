@@ -15,7 +15,7 @@ WARNINGS (printed, never fail):
   * a docs page that no other page links to (an orphan)
 
 The rule behind the volatile-fact checks: a fact that changes belongs in ONE place (docs/STATUS.md for what is deployed and
-what is true now; the code for the policy name; `pytest` for test results). Dated logs (docs/rl, docs/plan-detail, docs/history.md,
+what is true now; the code for the policy name; `pytest` for test results). Dated logs (docs/rl, docs/plan-detail, docs/archive/history.md,
 docs/research, blueprints) record what was true then and are exempt. See docs/README.md, "Where to update what".
 Bypass a genuine false positive with `git commit --no-verify`.
 """
@@ -152,7 +152,7 @@ def check(root, files):
                     errors.append(f"{f}:{i}: hard-coded test count '{m.group(0)}' -- don't quote counts, run pytest")
                 if policy and policy in line and f != "docs/STATUS.md":
                     errors.append(f"{f}:{i}: names the deployed policy '{policy}' -- say 'the deployed policy' and link docs/STATUS.md")
-        if f.startswith("docs/") and not f.startswith(("docs/plan-detail/", "docs/rl/")) and f != "docs/README.md" \
+        if f.startswith("docs/") and not f.startswith(("docs/plan-detail/", "docs/rl/", "docs/archive/", "docs/planned/", "docs/guides/", "docs/hardware/", "docs/research/")) and f != "docs/README.md" \
                 and inbound.get(f, 0) == 0:
             warnings.append(f"{f}: orphan page -- no other page links to it (add it to docs/README.md)")
     return errors, warnings

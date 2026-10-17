@@ -421,7 +421,7 @@ drop-in `FAC_IMITATION` anchor via `G2E_SKILL_REF=<name>` (env re-loads
 hand-tuned "high-step" `PAW_Z_TARGET` — it's a real firmware trajectory with the
 largest limb-coordination difference from wkF, so it's the clearest yes/no on
 "can a frozen base + adapter acquire a new skill." `tr` (trot) is the natural
-second skill for the 2-skill control run. See `docs/rl/adapter-skill-probe-spec.md`.
+second skill for the 2-skill control run. See `docs/planned/adapter-skill-probe-spec.md`.
 
 
 ## Pi UART (Serial-2) link — bring-up findings, 2026-09-30

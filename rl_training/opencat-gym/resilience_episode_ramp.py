@@ -2,7 +2,7 @@
 torque (battery/thermal sag) both ramp UP over the course of one long
 episode, instead of being fixed per-episode like CMD_LATENCY_STEPS /
 TORQUE_CUTBACK normally are. Reframed from the original static-offset idea
-to this ramping form per docs/rl/resiliency-log.md ("more realistic than a
+to this ramping form per docs/archive/rl/resiliency-log.md ("more realistic than a
 static offset").
 
 Mechanism (both done externally from the probe, no env code changes needed

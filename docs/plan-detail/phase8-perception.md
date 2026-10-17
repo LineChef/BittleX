@@ -31,8 +31,8 @@ by the reactive-recovery ceiling established in Runs 6–7.
 > (Phase E's `SkillSwitch`/`GaitSelector`, already sim-validated, shelved only
 > for lack of a sensor) — a second reason to solve the forward-sensor gap,
 > without reopening the separately-closed question of vision *inside* the
-> continuous walk policy. Details: [`docs/rl/hardware-gated-backlog.md`](../rl/hardware-gated-backlog.md),
-> [`docs/behavior-ideas.md`](../behavior-ideas.md) B13.
+> continuous walk policy. Details: [`docs/planned/hardware-gated-backlog.md`](../planned/hardware-gated-backlog.md),
+> [`docs/planned/behavior-ideas.md`](../planned/behavior-ideas.md) B13.
 >
 > **2026-09-19 — sim-fidelity wall closed; a real crawl-climb controller
 > works in sim.** The "sim couldn't clear a ledge" finding above was a gap
@@ -46,7 +46,7 @@ by the reactive-recovery ceiling established in Runs 6–7.
 > mechanism once close enough, advance the same-side front leg), which gets
 > all four paws reliably onto a raised ledge without the earlier "jump"
 > (explosive tail push) the mechanism depended on before. Full log:
-> [`docs/rl/crawl-climb-session-checkpoint.md`](../rl/crawl-climb-session-checkpoint.md).
+> [`docs/archive/rl/crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md).
 > One open problem remaining (front legs collapse into an unstable, tilted
 > crouch once both rear legs plant, root cause diagnosed but not yet fixed
 > cleanly — same doc). **Once that's resolved and the climb is reliable on
@@ -143,7 +143,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
       transfer). See B16.
 - [ ] **Cliff/edge avoidance — `CliffGuard`, designed 2026-09-04, HIGHEST
       PRIORITY once the camera lands** (G2 lives on the user's desk; must never
-      walk off it). Full design: `docs/behavior-ideas.md` **B16**. Confirmed not
+      walk off it). Full design: `docs/planned/behavior-ideas.md` **B16**. Confirmed not
       trainable into the gait (no forward perception, no real foot-force
       sensing either) — a zero-debounce local reflex that preempts every other
       behavior, using the light `classes()` floor-vs-edge path, custom-trained
@@ -170,7 +170,7 @@ tuning, and the Phase 10 wiring — all hardware-gated.
     queries, not continuous avoidance — matches the split above.
 - [~] **Perception-in-the-loop locomotion — RL approach CLOSED 2026-09-07; now a
       behaviour-layer reflex.** A 3-campaign autonomous investigation
-      (`docs/rl/vision-in-gait.md`) tried to bake a
+      (`docs/archive/rl/vision-in-gait.md`) tried to bake a
       forward-terrain feature + goal-bearing command + cliff feature into the
       gait policy so it could slow / step-over / detour / halt from vision.
       **Result: goal-directed turning is not achievable in this sim** — an
@@ -220,8 +220,8 @@ tuning, and the Phase 10 wiring — all hardware-gated.
         Vision AI feed or mock). Walk-around maneuver **can't be scripted** —
         no lateral leg DOF; a detour needs a firmware turn (nav-layer decision).
         Report: `claude.ai/code/artifact/88ea1a14-ab32-4000-8e87-422264667150`.
-        Plan: `docs/rl/vision-in-gait.md` (`>>> RESUME (Phase E)`).
-        The adapter skill probe (`docs/rl/adapter-skill-probe-spec.md`)
+        Plan: `docs/archive/rl/vision-in-gait.md` (`>>> RESUME (Phase E)`).
+        The adapter skill probe (`docs/planned/adapter-skill-probe-spec.md`)
         stays the route for *one* genuinely-learned skill if a scripted one
         proves too fragile on hardware.
 

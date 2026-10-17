@@ -161,7 +161,7 @@ Fraction of G2 body mass (~330 g): Config A ≈ 19%, Config B ≈ 23%.
   - `run20m_ppo` is **frozen at the old lumped 75 g rear** — not retrained for
     this. Training heavier/rear-biased than reality is the safe direction; the
     next training run uses the two-body model. Re-tune + maybe retrain once the
-    real stack is weighed — see [`hardware-gated-training-backlog.md`](../rl/hardware-gated-backlog.md) H2.
+    real stack is weighed — see [`hardware-gated-training-backlog.md`](../planned/hardware-gated-backlog.md) H2.
 - → **Battery is the biggest single line item** (~33 g with its board). Committed
   as PiSugar S 1200 mAh and counted above. If runtime is ever traded for weight
   later, a 500–700 mAh cell is where ~10–15 g would come from — not a change now.

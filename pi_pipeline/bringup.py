@@ -124,7 +124,7 @@ def _steps() -> list[Step]:
             "+ fore/aft center of mass. If the total is meaningfully off the "
             "~76 g estimate, update PAYLOAD_MASS_*/HEAD_MASS_* in "
             "opencat_gym_env.py and retrain or --finetune-lr "
-            "(docs/rl/hardware-gated-backlog.md H2)."),
+            "(docs/planned/hardware-gated-backlog.md H2)."),
         Step("5", "Assembly & mechanical (Phase 1)", "Wire Pi <-> BiBoard",
             "Data-only: RX/TX/GND (crossed), GND-GND. Leave the Pi's 5V pin "
             "unconnected -- PiSugar S is the sole power source. Confirm the "

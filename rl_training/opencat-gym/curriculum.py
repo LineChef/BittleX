@@ -1,4 +1,4 @@
-"""The difficulty-level update rule of train.py's Curriculum callback, as a pure function so it can be tested (V3 plan, docs/rl/v3-retrain-plan.md section 5b).
+"""The difficulty-level update rule of train.py's Curriculum callback, as a pure function so it can be tested (V3 plan, docs/archive/rl/v3-retrain-plan.md section 5b).
 
 update_levels() takes the probe's results for one round and changes `levels` / `streak` in place:
   * clean-floor score `base` below `collapse_base`: the policy is failing even with no hazards, so EVERY category drops one step;

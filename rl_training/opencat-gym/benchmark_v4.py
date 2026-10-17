@@ -1,4 +1,4 @@
-"""Benchmark v4 (V3 plan, docs/rl/v3-retrain-plan.md section 3): the decathlon ladder on the shared G2 profile, plus cells that look the way G2 is
+"""Benchmark v4 (V3 plan, docs/archive/rl/v3-retrain-plan.md section 3): the decathlon ladder on the shared G2 profile, plus cells that look the way G2 is
 actually tested, scored in parallel.
 
     python benchmark_v4.py --policy trained/<tag>_ppo --json-out out.json [--jobs 6] [--cells all|core|stage:s3_snag|T1.1,N1,...]
@@ -56,7 +56,7 @@ N_CELLS = [
     ("N5", "Constant yaw push (0..0.3 N*m, random sign), 12.5 s", {"DRIFT_TORQUE": 0.3, "DRIFT_PROB": 1.0}, 40, 1000, None),
     ("N6a", "Turn left at 0.20 rad/s, 6 s", {}, 20, 500, (0.10, 0.20)),
     ("N6b", "Turn right at 0.20 rad/s, 6 s", {}, 20, 500, (0.10, -0.20)),
-    # L1 (2026-10-07, the length level, docs/rl/v3-decisions-log.md): a 40 s straight walk under a constant yaw push of +/-0.25 N*m that ALTERNATES by episode (even episodes push right, odd push left), 16 episodes.
+    # L1 (2026-10-07, the length level, docs/archive/rl/v3-decisions-log.md): a 40 s straight walk under a constant yaw push of +/-0.25 N*m that ALTERNATES by episode (even episodes push right, odd push left), 16 episodes.
     # Reports the heading change per side (heading_even_abs_mean_deg = right pushes, heading_odd_abs_mean_deg = left pushes) and their gap, so a policy that corrects only one direction shows it.
     ("L1", "Long run, 40 s, alternating yaw push +/-0.25 N*m", {"LONG_RUN_PUSH": 0.25}, 16, 3200, None),
     # V5 (2026-10-09, docs/plan-detail/v5-training-plan.md): the side-hill in BOTH directions (T3.2 only tests the right side down; V4 fell 0.26 that way and 0.49 the

@@ -1,7 +1,7 @@
 """Foot-probing v2: deliberate commanded stop-and-settle, instead of an
 opportunistic freeze of whatever pose the walk's natural gait cycle happens
 to be in (probe_foot_test.py / probe_foot_gif.py's approach, closed
-negative -- see docs/rl/foot-probing-log.md).
+negative -- see docs/archive/rl/foot-probing-log.md).
 
 Walks normally until the front-left paw is within STOP_MARGIN_M of the
 ledge edge, then commands a full stop (fwd=0) and lets the TRAINED POLICY

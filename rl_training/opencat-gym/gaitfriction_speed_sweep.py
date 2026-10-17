@@ -1,5 +1,5 @@
 """Gait-friction campaign -- pinned-command speed sweep. The primary
-pass/fail signal per docs/rl/gait-friction-log.md: does mean residual usage
+pass/fail signal per docs/archive/rl/gait-friction-log.md: does mean residual usage
 at creep/cruise/fast speeds actually drop after the amplitude-scaling fix,
 compared to the ~7-8deg baseline -- not just "did fall rate stay flat."
 

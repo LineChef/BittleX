@@ -91,7 +91,7 @@ models/
 # Generated cosmetic carpet texture (watch.py), not source
 rl_training/opencat-gym/.carpet_tex_cache.png
 *.pt
-docs/rl/reference-frames/*.png
+docs/archive/rl/reference-frames/*.png
 pi_pipeline/.deployed_commit
 
 # V3 training runner state, not source: its stdout, the pause-release markers (`touch trained/v3_go_<name>`), the phase gates it checks, and the kept failed attempts

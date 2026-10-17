@@ -1,4 +1,4 @@
-"""V3 turning gate (docs/rl/v3-retrain-plan.md Phase 1): how fast does the calibrated sim turn the firmware turn gaits wkL / wkR open-loop (zero residual)?
+"""V3 turning gate (docs/archive/rl/v3-retrain-plan.md Phase 1): how fast does the calibrated sim turn the firmware turn gaits wkL / wkR open-loop (zero residual)?
 
     G2E_TURN_BLEND=1 python turn_gate_probe.py [--episodes 6] [--seconds 10]
 

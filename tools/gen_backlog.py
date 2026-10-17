@@ -4,8 +4,8 @@
     python tools/gen_backlog.py           # rewrite docs/backlog.md
     python tools/gen_backlog.py --check   # exit 1 if docs/backlog.md is out of date (the doc checker runs this)
 
-Single source of truth: each item's heading in its own file (docs/rl/hardware-gated-backlog.md `H#`,
-docs/rl/robustness-backlog.md `R#`, docs/behavior-ideas.md `B#`) carries its status icon/tag. The index is generated from those
+Single source of truth: each item's heading in its own file (docs/planned/hardware-gated-backlog.md `H#`,
+docs/planned/robustness-backlog.md `R#`, docs/planned/behavior-ideas.md `B#`) carries its status icon/tag. The index is generated from those
 headings, so it cannot drift: change a status in the heading, then re-run this (or let the pre-commit hook tell you).
 """
 import os
@@ -18,11 +18,11 @@ sys.path.insert(0, HERE)
 from check_docs import slug  # noqa: E402
 
 SOURCES = [
-    ("Hardware-gated training (waiting on real-robot data)", "docs/rl/hardware-gated-backlog.md",
+    ("Hardware-gated training (waiting on real-robot data)", "docs/planned/hardware-gated-backlog.md",
      re.compile(r"^## (H\d+) — (.*?)(?:\s{2,}(.*))?$")),
-    ("Robustness ablations", "docs/rl/robustness-backlog.md",
+    ("Robustness ablations", "docs/planned/robustness-backlog.md",
      re.compile(r"^### (R\d+) · (.*?) — (.*)$")),
-    ("Behavior ideas", "docs/behavior-ideas.md",
+    ("Behavior ideas", "docs/planned/behavior-ideas.md",
      re.compile(r"^### (B\d+[a-z]?) — (.*?)(?:\s{2,}(?:— )?(.*))?$")),
 ]
 LEGEND = {

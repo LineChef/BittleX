@@ -76,7 +76,7 @@ representing — the URDF's joint limits fully explain why `getup-sim-replay.md`
 "0/2 recovered" result came back negative, independent of every other
 approximation already documented there (open-loop, no IMU-triggered waits,
 decoded keyframes). This also independently corroborates
-`docs/rl/reference-frames/README.md` (climb work, 2026-09-19, unrelated
+`docs/archive/rl/reference-frames/README.md` (climb work, 2026-09-19, unrelated
 investigation): *"our sim's front knee ends up near its 90° physical
 limit"* during climbing — the same ceiling binding in a different context.
 
@@ -198,7 +198,7 @@ finding is.
    measurement suite does — servo type may differ (alloy vs. plastic gears
    per both BittleJuice's and bittle-mujoco's explicit caveats that this
    changes the numbers), so their 33ms/137°/s can't be assumed for G2
-   without checking. Add to `docs/rl/hardware-gated-backlog.md` as a new
+   without checking. Add to `docs/planned/hardware-gated-backlog.md` as a new
    H-item once this doc is reviewed.
 4. **If #3 shows a real mismatch**, model servo response lag properly (fit
    filter + actuator together, per their explicit warning against

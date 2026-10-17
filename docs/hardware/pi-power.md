@@ -95,7 +95,7 @@ forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
 from Petoi's own official board diagram, see
 [`g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos are in
-[`pi-biboard-build-notes.md`](pi-biboard-build-notes.md).
+[`pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md).
 
 ---
 
@@ -169,7 +169,7 @@ The voice service keeps a power diary at `~/.local/share/g2/power_log.jsonl` (`G
 - **Forward-looking caution, found on Petoi's community forum archive,
   2026-09-16:** if a *real* OS-level power-off is ever added (not needed
   today — G2's "shut down" voice command is deliberately not an OS power-off,
-  see `plan-detail/phase10-integration.md` "Graceful shutdown"), a community member
+  see `archive/plan-detail/phase10-integration.md` "Graceful shutdown"), a community member
   ([petoi.camp, "Next Steps: Pogo Pins..." thread](https://www.petoi.camp/))
   reported `sudo shutdown -h now` **just reboots** the Raspberry Pi when
   attached to a Petoi board via the 2×5 socket, rather than powering off —

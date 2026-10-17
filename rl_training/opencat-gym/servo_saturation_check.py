@@ -19,7 +19,7 @@ this script's ~26% at the intent level. The gap between "intent" and
 number we have -- not G2's own, servo type/board revision changes it):
 mean 98.9 deg/s, p95 261.2 deg/s, max 514.3 deg/s, 26.33% of joint-steps
 over the assumed ceiling AT THE INTENT LEVEL. Real number pending G2's own
-servo characterization (docs/rl/hardware-gated-backlog.md H13).
+servo characterization (docs/planned/hardware-gated-backlog.md H13).
 
     python servo_saturation_check.py --policy trained/base1_20m_ppo --ceiling-deg-s 137
 """

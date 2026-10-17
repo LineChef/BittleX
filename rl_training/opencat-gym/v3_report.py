@@ -1,4 +1,4 @@
-"""HTML report for the V3 pre-20M benchmark (docs/rl/v3-retrain-plan.md Phase 5-6; phase_v3.py's "report" job runs it).
+"""HTML report for the V3 pre-20M benchmark (docs/archive/rl/v3-retrain-plan.md Phase 5-6; phase_v3.py's "report" job runs it).
 
     python v3_report.py --v21 A.json --control B.json --k3 C.json --final D.json --results trained/v3_results.json --out report.html
     python v3_report.py --demo --out /tmp/demo.html          # builds a page from whatever is in trained/ (for checking the layout)
@@ -23,7 +23,7 @@ SERIES = [("v21", "V2.1 (deployed)", "var(--s1)"), ("control", "V3 control (no l
 DECISION_CELLS = ["T1.1", "N1", "N3", "N5", "T2.2", "T3.2", "T5.2", "T7.2", "T8.1", "T9.1", "T10.2", "T11.1"]
 CATS = ("terrain", "ledge", "slope", "fault")
 LEVELS = (0.25, 0.5, 0.75, 1.0)
-# the promotion rule, docs/rl/v3-retrain-plan.md Phase 7
+# the promotion rule, docs/archive/rl/v3-retrain-plan.md Phase 7
 CALM_FALLS_MAX, HEADING_MAX_DEG, FALLS_WORSE_MAX, SPEED_MIN_RATIO = 0.15, 30.0, 0.10, 0.95
 
 CSS = """

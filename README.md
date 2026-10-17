@@ -60,7 +60,7 @@ The current state — what is deployed, what has been tested on the robot, open 
 - What G2 can do, item by item: [`docs/capabilities.md`](docs/capabilities.md)
 - How each part works, in plain language: [`docs/how-it-works.md`](docs/how-it-works.md)
 - Roadmap and decisions: [`docs/project-plan.md`](docs/project-plan.md); open work by ID: [`docs/backlog.md`](docs/backlog.md)
-- Dated history and data: [`docs/history.md`](docs/history.md), [`docs/rl/real-walk-log.md`](docs/rl/real-walk-log.md)
+- Dated history and data: [`docs/archive/history.md`](docs/archive/history.md), [`docs/rl/real-walk-log.md`](docs/rl/real-walk-log.md)
 - Index of all docs: [`docs/README.md`](docs/README.md)
 
 ## Voice commands

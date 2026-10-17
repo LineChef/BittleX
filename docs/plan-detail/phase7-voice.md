@@ -60,7 +60,7 @@ Pi Zero 2 W voice-stack benchmark.
 **Result: it works end to end.** "gee two" (wake word) → "walk forward" → Vosk transcript → Claude chose `walk_forward` (about 2.6 s for
 the API call) → the Pi sent `kwkF` over `/dev/serial0` → G2 walked → a 5 s gait cap sent the stop command exactly 5.0 s later. G2 was
 standing on hard floor. No speaker yet, so replies were printed (`--tts print`); the mic is the SPH0645 on I2S (left channel only,
-see `docs/hardware/i2s-audio-build-log.md`).
+see `blueprints/build-logs/i2s-audio-build-log.md`).
 
 Run it (on the Pi; start the process in the background and track its pid, don't `pkill -f` a pattern that also appears in your own
 command line — that killed the shell twice):
@@ -181,7 +181,7 @@ Open / next:
     this wiring, confirmed against its own device-tree source, not
     inferred) plus a verify-each-step checklist before wiring
     `pi_pipeline` to it — fully spec'd in
-    `docs/hardware/i2s-audio-build-log.md`, nothing left to research at
+    `blueprints/build-logs/i2s-audio-build-log.md`, nothing left to research at
     install time. Mounting location and method (zip-tie through mounting
     holes if present, else foam tape — not plain velcro, given repeated
     footfall vibration on a walking robot) still open, pending the parts

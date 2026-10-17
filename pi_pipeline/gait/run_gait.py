@@ -108,7 +108,7 @@ def euler_to_quat(roll, pitch, yaw):
 
 # The firmware IMU stream (imu_parse) reports + yaw for a RIGHT turn (confirmed on G2 2026-10-02); the policy was
 # trained in PyBullet, where + yaw is a LEFT turn (z up). Until 2026-10-06 the rebased yaw went into the policy with
-# the wrong sign: harmless for V2.1 (it ignores heading, docs/rl/v3-retrain-plan.md §1.1), wrong for any policy that
+# the wrong sign: harmless for V2.1 (it ignores heading, docs/archive/rl/v3-retrain-plan.md §1.1), wrong for any policy that
 # uses it. Logs keep the firmware convention (+ = right); only the policy's input is flipped.
 POLICY_YAW_SIGN = float(os.environ.get("G2_POLICY_YAW_SIGN", "-1"))   # -1 is correct; +1 reproduces the pre-2026-10-06 behaviour, for A/B tests only
 

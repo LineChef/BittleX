@@ -2,7 +2,7 @@
 
 Goal (user): every run G2 makes is captured automatically, and every retrain inherits what has accumulated since the last one, so the sim gains data it would otherwise never have.
 Rule that overrides the goal: **only data that can help gait training reaches the sim; anything noisy or harmful is filtered, quarantined or left out, and the data is audited periodically.**
-Related: [`sysid-capture-plan.md`](sysid-capture-plan.md) (the planned dedicated sessions), [`hardware-logging.md`](hardware-logging.md) (what a log carries), [`v3-decisions-log.md`](v3-decisions-log.md).
+Related: [`sysid-capture-plan.md`](sysid-capture-plan.md) (the planned dedicated sessions), [`hardware-logging.md`](hardware-logging.md) (what a log carries), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md).
 
 ## Decisions (user, 2026-10-07)
 
@@ -105,7 +105,7 @@ Snapshots are immutable and numbered; "current" is a pointer, so reverting is sa
 
 A data-health report on a schedule: every 25 new usable runs or monthly (whichever first), after every epoch change, and before every retrain. It shows: runs per epoch, surface and policy; quarantine rate and reasons;
 each fitted value over time (flip-flopping or trending values are flagged); the sim-versus-real gap on the monitored statistics before and after each snapshot (it must shrink or hold); a forward check (fit on older runs, predict newer);
-and anything excluded that probably should not have been. Findings go in [`v3-decisions-log.md`](v3-decisions-log.md) and are summarised to the user.
+and anything excluded that probably should not have been. Findings go in [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) and are summarised to the user.
 
 ## Storage
 

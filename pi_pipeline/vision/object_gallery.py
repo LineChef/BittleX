@@ -1,5 +1,5 @@
 """ObjectGallery -- the recognition-by-instance library for B20's "separate
-Pi-side layer" path (`docs/behavior-ideas.md` B20): recognise a *specific*
+Pi-side layer" path (`docs/planned/behavior-ideas.md` B20): recognise a *specific*
 object it's seen before ("I've seen this exact thing"), not classify it into
 a trained category. No retraining, ever -- the library grows by accumulating
 **fingerprints** (embedding vectors) of things it's seen, matched by

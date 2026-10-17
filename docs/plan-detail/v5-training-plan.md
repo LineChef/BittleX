@@ -35,7 +35,7 @@ Measured on Candidate A (`v4_c2` at 1.0M, deployed as V4) with short read-only s
    term is effectively zero (a product of two per-step joint deltas). Nothing pays for getting across an obstacle; the speed-tracking penalty punishes slowing down on a hazard.
 6. **Symmetry:** on flat ground V4 is more symmetric than V3 (left/right residuals within 0.3 deg, mirror gap 0.029 vs 0.040). The problems are situational (the side-hill
    above; 12 mm step joint asymmetry 11.9 deg vs V3 5.6), checkpoint-to-checkpoint instability (one-sided gaits came and went with the learning rate and the curriculum,
-   see [`decisions-log-2026-10-08.md`](decisions-log-2026-10-08.md)), and per-episode heading wander (N1 heading spread 17 deg vs V3 13; 40 s run 66 vs 55).
+   see [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md)), and per-episode heading wander (N1 heading spread 17 deg vs V3 13; 40 s run 66 vs 55).
 7. **Heading:** V3 and V4 both trained with the accumulated-heading penalty at 5.0 (the 2026-10-07 "no command drift" decision dropped the extra steering levers, not this
    penalty). Neither policy steers on its yaw input: a fake +-30 deg yaw offset changed the turn rate by less than 0.4 deg/s. So the sim/real steering sign reversal cannot
    currently hurt, and in-policy steering was never really learned.

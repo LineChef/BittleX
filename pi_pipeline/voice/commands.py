@@ -315,7 +315,7 @@ _FLOOR_THIS_IS = re.compile(r"^this is (?:the |a )?([a-z]+(?: [a-z]+){0,2}) floo
 _BATTERY_QUERY = ("what is your power level", "whats your power level", "what is your battery level", "whats your battery level", "what is your battery", "whats your battery", "power level",
                   "battery level", "how much battery do you have left", "how much battery do you have", "how much battery is left", "how much battery left", "how much power do you have left",
                   "how is your battery", "hows your battery", "check your battery")
-# Reflection, level 3 (docs/plan-detail/reflection-plan.md): "what did you do", "how was your exploration" -> the recap of his last exploration; "what have you learned" -> the notes he holds
+# Reflection, level 3 (docs/planned/reflection-plan.md): "what did you do", "how was your exploration" -> the recap of his last exploration; "what have you learned" -> the notes he holds
 # about his own experience. Local, no API call.
 _RECAP_QUERY = ("what did you do", "what have you been up to", "what have you been doing", "how was your exploration", "how was your exploring", "how did your exploration go",
                 "how did exploring go", "how did your exploring go", "tell me about your exploration", "tell me about your exploring", "recap your exploration", "recap your day")

@@ -9,8 +9,6 @@
 | [`backlog.md`](backlog.md) | Open work by ID (H#, R#, B#) — generated from the item headings. |
 | [`capabilities.md`](capabilities.md) | Inventory of everything G2 can do, with status — the "what we've built" list. |
 | [`how-it-works.md`](how-it-works.md) | Plain-language tour of the parts (walking, voice, memory, vision, link). |
-| [`behavior-ideas.md`](behavior-ideas.md) | The behavior ideas themselves (B1…) — the "what next" reference; statuses roll up into the backlog. |
-| [`history.md`](history.md) | Dated narrative moved out of the README; not current. |
 | [`guides/SOLO.md`](guides/SOLO.md) | Working-solo notes. |
 
 ## Where to update what
@@ -24,31 +22,16 @@ One home per fact; everything else links. Don't restate the deployed policy, a s
 | A state change (new policy deployed, hardware fixed or broken, something tested for the first time) | [`STATUS.md`](STATUS.md) — plus a line in the log that holds the detail |
 | A capability lands or is parked | [`capabilities.md`](capabilities.md) (and [`STATUS.md`](STATUS.md) if it changes what is deployed) |
 | A decision is made or a phase item is done | the entry in [`project-plan.md`](project-plan.md) (checkbox + one line + link to the detail) |
-| A backlog item changes status | its own heading in `rl/hardware-gated-backlog.md`, `rl/robustness-backlog.md` or `behavior-ideas.md`, then `python tools/gen_backlog.py` ([`backlog.md`](backlog.md) is generated) |
+| A backlog item changes status | its own heading in `planned/hardware-gated-backlog.md`, `planned/robustness-backlog.md` or `planned/behavior-ideas.md`, then `python tools/gen_backlog.py` ([`backlog.md`](backlog.md) is generated) |
 | The deployed policy changes | `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py` and [`STATUS.md`](STATUS.md); nowhere else names it |
-| Wiring, pinouts, assembly | [`../blueprints/`](../blueprints/README.md); vendor specs in [`hardware/specs.md`](hardware/specs.md); firmware tokens in [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
+| Wiring, pinouts, assembly | [`../blueprints/README.md`](../blueprints/README.md); vendor specs in [`hardware/specs.md`](hardware/specs.md); firmware tokens in [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
 | Scratch / temp files pile up (Mac or Pi) | `python tools/g2_cleanup.py` (`g2clean`): dry run lists them, `--apply` deletes by exact path and cleans the Pi's `trained/` folder; a hook reminds on every prompt and the pre-commit hook warns about leftovers and blocks adds of >150 files or >5 MB |
 | A command worth remembering | [`guides/cheatsheet.md`](guides/cheatsheet.md) (grouped by task) |
 | A research question or vendor evaluation | [`research/`](research/) |
 
 ## `guides/` — how to do a thing
 
-| | |
-|---|---|
-| [`cheatsheet.md`](guides/cheatsheet.md) | Curated quick-reference, grouped by task (setup, robot, BiBoard tokens, walking, deploying, camera, voice, sim/RL) — command tables + full step sequences. |
-| [`voice-commands.md`](guides/voice-commands.md) | Every voice command G2 responds to — local commands + conversational skills, plus G2's character sounds. |
-| [`exploration-mode.md`](guides/exploration-mode.md) | How exploration mode works: starting it, legs, picture stops, wall steering and hit detection, sounds, ending it, where the logs are. |
-| [`settings-switches.md`](guides/settings-switches.md) | Every environment switch (sounds, exploration, walls, power, standing) with its default. |
-| [`pi-bring-up.md`](guides/pi-bring-up.md) | Headless Pi Zero 2 W OS setup runbook. |
-| [`gait-deployment.md`](guides/gait-deployment.md) | The sim→real path (ONNX export, on-robot loop, bring-up steps). |
-| [`train-vision-model.md`](guides/train-vision-model.md) | The SenseCraft capture→train→deploy flow. |
-| [`swappable-llm.md`](guides/swappable-llm.md) | Change the Claude model, or use a cheaper/free OpenAI-style model alone or routed with Claude. |
-| [`api-setup.md`](guides/api-setup.md) | Anthropic API key, workspace + spend-limit checklist. |
-| [`feature-flags.md`](guides/feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
-| [`automated-testing-loop.md`](guides/automated-testing-loop.md) | Runbook for unattended RL reward iteration. |
-
-| [`operating-lessons.md`](guides/operating-lessons.md) | Lessons and standing practice from the hardware sessions: deploying and stopping safely, the voice service and microphone, session data processing, background jobs. |
-| [`bring-up-sequence.md`](guides/bring-up-sequence.md) | The ordered day-1 hardware bring-up (executable version: `python -m pi_pipeline.bringup`). |
+See [`guides/README.md`](guides/README.md) for the index.
 
 ## `vision/` — camera, detection model, capture
 
@@ -57,38 +40,27 @@ person recognition, on-device detector measurements).
 
 ## `hardware/` — specs + hardware research
 
-| | |
-|---|---|
-| [`specs.md`](hardware/specs.md) | Vendor-doc specs for every part + "why it matters". |
-| [`parts-and-decisions.md`](hardware/parts-and-decisions.md) | The finalized parts list, resolved/open hardware questions, power-awareness plan. |
-| [`opencat-gait-structure.md`](hardware/opencat-gait-structure.md) | How OpenCat gaits are structured (reference). |
-| [`diagnostics.md`](hardware/diagnostics.md) | Black-box logging + watchdog design (Phase 1 + non-HW Phase 2 built). |
-| [`servo-thermal.md`](hardware/servo-thermal.md) | Servo overheat risk + the layered mitigation (Layer 1+2 built). |
-| [`pi-power.md`](hardware/pi-power.md) | Powering the Pi (PiSugar S; BiBoard data-only) + power-management levers. |
-| [`self-righting.md`](hardware/self-righting.md) | Bittle's built-in self-right — limited; no BiBoard-V1 IR trigger. |
-| [`petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) | Confirmed-from-source serial tokens, IMU thresholds, skill format. |
-| [`petoi-skills-survey.md`](hardware/petoi-skills-survey.md) | Which OpenCat built-in skills are worth pulling into G2. |
-| [`robot-arm.md`](hardware/robot-arm.md) | Petoi's Bittle X+Arm gripper module: install, claw calibration, skill tokens, voice commands, what the vendor page leaves out. |
-| [`calibration-and-bringup-research.md`](hardware/calibration-and-bringup-research.md) | Petoi's official calibration/first-power-on docs, cross-checked against our bring-up plan. |
+See [`hardware/README.md`](hardware/README.md) for the index.
 
 ## Hardware build blueprints
 
-The physical assembly record (wiring, soldering, mounting, calibration, real measurements) and the wiring diagrams live in
+The physical assembly record (wiring, soldering, mounting, calibration, real measurements, the I2S audio and Pi-to-BiBoard build logs) and the wiring diagrams live in
 [`/blueprints`](../blueprints/README.md) at the repo root — separate from `hardware/`'s specs and research.
 
 ## `research/` — community projects, external findings
 
-| | |
-|---|---|
-| [`buzzer-sounds.md`](research/buzzer-sounds.md) | The BiBoard buzzer: melody format (notes, durations, volume), what we measured, whether a ready-made chirp library exists (no; RTTTL is the source to convert), and the plan for more sounds. |
-| [`petoi-ai-head-evaluation.md`](research/petoi-ai-head-evaluation.md) | The Petoi AI Head: whether it replaces the Pi — criteria, behavior inventory, test steps, scorecard. |
-| [`ai-head-implementation.md`](plan-detail/ai-head-implementation.md) | The AI Head in one place: what we learned hands-on, pros and cons, what adopting it takes, and a staged integration path. |
-| [`xiaozhi-vendor-docs.md`](research/xiaozhi-vendor-docs.md) | **The XiaoZhi and Petoi head documentation in English** (unofficial summary and translation of the Chinese vendor pages, with a contents list, a page index with addresses and a glossary): setup, models and the developer program, voice cloning, wake words, firmware and building, the device protocol, MCP tools, the knowledge base, community servers and Petoi's head guide. |
-| [`xiaozhi-esp32-review.md`](research/xiaozhi-esp32-review.md) | Review of the upstream XiaoZhi project the AI Head is built on: protocol, MCP tools, self-hosted servers, and what it means for a backend we control. |
-| [`firmware-fork-case.md`](research/firmware-fork-case.md) | What forking the BiBoard (or AI Head) firmware would unblock, with pros, cons and decision triggers. |
-| [`robot-memory-patterns.md`](research/robot-memory-patterns.md) | Memory designs that have worked for robots and companion agents (scored retrieval, reflection, core/recall/archival tiers, sleep-time consolidation, observation logs) mapped onto G2's memory, with a ranked list of what to adopt. |
-| [`community-projects.md`](research/community-projects.md) | Findings from reviewing other Bittle/Petoi community projects (BittleJuice, bittle-mujoco, MH-FLOCKE, TypeFly) + the incorporation plan. |
+See [`research/README.md`](research/README.md) for the index.
 
 ## `rl/` — gait training: conclusions, backlogs, specs, real-robot logs
 
 See [`rl/README.md`](rl/README.md) for the index.
+
+## `planned/` — not built yet
+
+Ideas, plans and parked work that are not part of the running build: the Petoi AI Head ([`planned/ai-head/`](planned/ai-head/README.md)), the robot-arm
+module, place memory, reflection, a BiBoard firmware fork, hardware-gated and robustness backlogs, and the behavior ideas. See [`planned/README.md`](planned/README.md).
+
+## `archive/` — closed work, kept for the record
+
+Closed campaigns (v2.2, V3, the 2026-09 sim logs), finished phase write-ups, the old narrative history, and their data. Nothing here describes the current build.
+See [`archive/README.md`](archive/README.md).

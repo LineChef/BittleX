@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase P0 of the place memory plan (docs/plan-detail/place-memory-plan.md): can a picture's room be told from the other rooms' pictures? Run on the Mac over the pulled pictures
+"""Phase P0 of the place memory plan (docs/planned/place-memory-plan.md): can a picture's room be told from the other rooms' pictures? Run on the Mac over the pulled pictures
 (`g2pics pull`) after giving the pictures a room in the review page (`g2pics`, the Room button; the labels are in <root>/rooms.json).
 
     python tools/eval_rooms.py [--root DIR] [--embedder histogram] [--embedder onnx:/path/model.onnx] [--window 3] [--gate 0.75]

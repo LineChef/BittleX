@@ -85,9 +85,9 @@ serial:
 ### Ruled out — 🔬
 - **Vision inside the gait policy** — four training campaigns (Phases A–F). A
   policy that can see forward learned to plow through obstacles, not brace. Now a
-  reflex layer *above* the frozen walk instead. `docs/rl/vision-in-gait.md`.
+  reflex layer *above* the frozen walk instead. `docs/archive/rl/vision-in-gait.md`.
 - **Learned big-stumble recovery** — can't be reward-tuned; ~18–25 %
-  conditional-survival ceiling. `docs/rl/phase4-decision-log.md`.
+  conditional-survival ceiling. `docs/archive/rl/phase4-decision-log.md`.
 - **Learned turn-in-place** — sim-physics limit; turning routed to firmware gaits.
 
 ---
@@ -203,7 +203,7 @@ API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
 - **Memory seam** — every turn pulls memory context before the API call and
   writes back after.
 - **Real mic + speaker** — ✅ the I2S mic and amp are wired and in daily use on the Pi; wake word, Vosk, Claude and Piper run
-  end to end. Wiring: [`blueprints/wiring/g2-wiring-guide.html`](../blueprints/wiring/g2-wiring-guide.html); bring-up: [`hardware/i2s-audio-build-log.md`](hardware/i2s-audio-build-log.md).
+  end to end. Wiring: [`blueprints/wiring/g2-wiring-guide.html`](../blueprints/wiring/g2-wiring-guide.html); bring-up: [`hardware/i2s-audio-build-log.md`](../blueprints/build-logs/i2s-audio-build-log.md).
 - **Never silent** — a turn that would end with no spoken words (a tool call only, or an empty reply) is retried once with
   tools disabled to force a sentence, then falls back to a short spoken line; API errors in conversation history are
   self-healed (orphaned tool calls, thinking blocks). Fuzz-tested.
@@ -289,7 +289,7 @@ that need the camera mounted on the frame for a real point of view.
   local review/labeling interface (name / note / a complete flag / discard),
   nothing published or uploaded. Still hardware-gated: the localizer (what
   decides "something's here") and the embedding model (what fingerprints it)
-  are both unbuilt — see [`behavior-ideas.md`](behavior-ideas.md) B20.
+  are both unbuilt — see [`behavior-ideas.md`](planned/behavior-ideas.md) B20.
 
 ---
 

@@ -13,7 +13,7 @@ Pi, copied to the dev machine); summarize them with `tools/walk_log_summary.py`.
 
 ## Where we left off
 
-> **2026-10-06:** the gait's next steps are in [`v3-retrain-plan.md`](v3-retrain-plan.md) (start at §0), which supersedes the open questions
+> **2026-10-06:** the gait's next steps are in [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) (start at §0), which supersedes the open questions
 > below for walking. The drift is explained as far as the data allows in "Why V2.1 drifts right" further down. Carpet questions (3-4 below)
 > are deferred to their own session. The "Uncommitted at the pause" note at the end of this list is out of date (everything is pushed).
 
@@ -115,7 +115,7 @@ the rest pose is right when the leg first drops into it; (2) the firmware step g
   IMU calibration) was a steady ~10 deg/s right turn (+132 deg); later runs wander a few degrees
   because the user steered them back; hands-off run 6 drifted +16 deg. (Corrected 2026-10-06: the loop
   does feed the rebased yaw to the policy, since `79da931`, but with the opposite sign to the sim's and V2.1
-  ignores it, so nothing holds a heading; see [`v3-retrain-plan.md`](v3-retrain-plan.md) §1.1.)
+  ignores it, so nothing holds a heading; see [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) §1.1.)
 - **Distance is consistent run to run**; drift is the part that varies.
 - **Policy command bias (from the logs):** averaged over the hard-floor runs V2.1 commands the
   back-left shoulder ~+7.5 deg and back-right knee ~-7.8 deg off the scripted pose (the uneven
@@ -298,7 +298,7 @@ G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full ch
 > sim servo-speed limit) is still the record of what was ruled out and what remains open for the residual +40 deg.
 
 The six walks above all turned about +142 deg right in 12.7 s. This section is the record of what was tested and what it shows; the plan
-built on it is [`v3-retrain-plan.md`](v3-retrain-plan.md). Raw results and the exact commands: [`v3-data/`](v3-data/README.md).
+built on it is [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md). Raw results and the exact commands: [`v3-data/`](../archive/rl/v3-data/README.md).
 
 **Ruled out: the Pi's yaw sign.**
 - The firmware stream reports + yaw for a right turn (confirmed with `kvtF` on 10-02, below). PyBullet, where the policy was trained,
@@ -339,7 +339,7 @@ built on it is [`v3-retrain-plan.md`](v3-retrain-plan.md). Raw results and the e
 **Update 2026-10-06 (afternoon): the sim's servo-speed limit is the dominant sim-vs-G2 gap, and it hides the right turn.** The first version of this
 section used `drift_probe.py`, which did not force the commanded speed (the env redrew the command ~9 times per 1000 steps), so its speeds were too
 low and its "V2.1 slows down on long walks" reading was wrong. Re-measured with a forced command (`benchmark_v4.py`, V2.1, 422 g, the 12.5 s calm
-walk "N1", 20 episodes; raw results in [`v3-data/`](v3-data/README.md)):
+walk "N1", 20 episodes; raw results in [`v3-data/`](../archive/rl/v3-data/README.md)):
 
 | Sim servo speed limit (deg/s) | Falls | Speed (m/s) | Heading change over 12.5 s | Roll std | Pitch std |
 |---|---|---|---|---|---|
@@ -582,7 +582,7 @@ runs turn further right, about +30 deg over ten minutes), which a fixed offset c
 
 ## First kitchen exploration sessions on tile (2026-10-07, about 2:00 to 3:20 PM)
 
-Several exploration sessions in the kitchen (tile floor), hardware epoch `hw-2026-10-07`, V2.1 policy at 0.10 m/s, automatic capture on. What happened and what was learned (decisions and fixes: [`v3-decisions-log.md`](v3-decisions-log.md)):
+Several exploration sessions in the kitchen (tile floor), hardware epoch `hw-2026-10-07`, V2.1 policy at 0.10 m/s, automatic capture on. What happened and what was learned (decisions and fixes: [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md)):
 - **Data:** 64 automatic run logs (the walks come as 1 to 9 s segments between survey stops), loop timing unchanged by the capture (median tick 12.6 ms at 80 Hz, 99th percentile about 26 ms), pack voltage 8.4 V falling to a low-battery warning (7.94 V) by 3:14 PM. `g2data`: 27 usable runs, 91 s of steady-state walking.
 - **Falls:** a collision with the fridge and a fall at 2:17 PM (tilt 176 deg, on his back); two falls at about 3:01 PM (tilt 84 deg, then 178 deg). All three fall runs and the runs after them are excluded and labelled. Two falls of three ended on his back, not on his side.
 - **Crashes:** the exploration session crashed twice with a native segmentation fault seconds after narration started, while the speaker had a loose connection; fixed by reseating the connection; no further crashes with the fault trace on.

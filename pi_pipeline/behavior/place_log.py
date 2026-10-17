@@ -1,4 +1,4 @@
-"""Place memory phase P1 (docs/plan-detail/place-memory-plan.md): record every survey stop, change nothing.
+"""Place memory phase P1 (docs/planned/place-memory-plan.md): record every survey stop, change nothing.
 
 At a survey stop G2 stands still and takes one picture. `PlaceLog.record_stop(path, meta)` appends one JSON line for it to `<pictures root>/place_stops.jsonl` (so `g2pics pull` brings it to the Mac with the pictures):
 

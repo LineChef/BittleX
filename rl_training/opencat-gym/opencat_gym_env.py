@@ -53,15 +53,15 @@ FAC_OVERSPEED = 35.0      # surv_r1: penalty = FAC_OVERSPEED * max(0, vx_est - T
 # action = 0 reproduces the open-loop scripted walk exactly, so the policy can
 # only add a learned correction on top of a gait that's already robust -- a
 # learned version of the firmware's gyro-balance layer. Motivation: the
-# learned-vs-scripted benchmark (docs/rl/gait-benchmark.md) showed the scripted
+# learned-vs-scripted benchmark (docs/archive/rl/gait-benchmark.md) showed the scripted
 # keyframes are hard to beat on obstacles; this starts from them and climbs.
 RESIDUAL_MODE = True
-RESIDUAL_SCALE_DEG = 30   # resid30 campaign: 22 -> 30, matching URMA/Bittle_Symmetry's ~30 deg. FRESH run, not a continuation -- Phase 4c already showed continuation can't reach past the converged policy's ceiling (docs/rl/hardware-gated-backlog.md H4). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; G1 paired 22 with FAC_IMITATION 16. Current FAC_IMITATION=11 was tuned for 22 (G4b, for an unrelated speed-command reason) -- bumped back to 16 alongside this change as a starting anchor, watched closely for the same crawl signature. FAC_RESIDUAL_COST/FAC_RESID_SMOOTH scaled proportionally below since both act on the normalized action, not raw degrees.
+RESIDUAL_SCALE_DEG = 30   # resid30 campaign: 22 -> 30, matching URMA/Bittle_Symmetry's ~30 deg. FRESH run, not a continuation -- Phase 4c already showed continuation can't reach past the converged policy's ceiling (docs/planned/hardware-gated-backlog.md H4). r1's 18 warped wkF to a crawl WITH FAC_IMITATION=10; G1 paired 22 with FAC_IMITATION 16. Current FAC_IMITATION=11 was tuned for 22 (G4b, for an unrelated speed-command reason) -- bumped back to 16 alongside this change as a starting anchor, watched closely for the same crawl signature. FAC_RESIDUAL_COST/FAC_RESID_SMOOTH scaled proportionally below since both act on the normalized action, not raw degrees.
 FAC_RESIDUAL_COST = 2.8   # resid30: 1.5 -> 2.8 (x(30/22)^2 ~1.86). -mean(action^2) * this -- deviate from the scripted pose only when it helps. Scaled to preserve the real per-degree cost now that RESIDUAL_SCALE_DEG is wider (this term penalizes the normalized action, not raw degrees).
 FAC_RESID_SMOOTH = 8.2    # resid30: 6.0 -> 8.2 (x(30/22) ~1.36). rtune_r4: -mean(|action - prev_action|) * this (ramped). Penalise frame-to-frame jerk in the correction, not its magnitude -- a smoother residual should cut roll oscillation / heading drift without capping the authority needed for a 50mm trip. Scaled with RESIDUAL_SCALE_DEG for the same normalization reason as FAC_RESIDUAL_COST.
 FAC_RESID_CALM_BONUS = 0.0   # gait-friction campaign, option 2 -- ABANDONED (2026-09-18).
                              # EXTRA residual-cost weight, ramped by tilt (see git history /
-                             # docs/rl/gait-friction-log.md for the full mechanism). Two
+                             # docs/archive/rl/gait-friction-log.md for the full mechanism). Two
                              # rounds (3.0 confirmed, 1.0 called early on strong partial
                              # evidence) both regressed -- residual usage went UP, not down.
                              # Root cause: FAC_SPEED_TRACK (60.0) dominates FAC_RESIDUAL_COST
@@ -199,7 +199,7 @@ PHASE_RATE_MAX = 2.00   # gait-friction campaign, option 1 (cadence recalibratio
 # _ref_pose's swing around STAND_POSE by this same ratio (AMP_SCALE_MIN/MAX) --
 # reverted after two rounds, both regressions (roughly doubled residual usage
 # at every band, including the cmd==NOM_CMD no-op point). See _ref_pose's
-# docstring and docs/rl/gait-friction-log.md for the full result. Then tried
+# docstring and docs/archive/rl/gait-friction-log.md for the full result. Then tried
 # FAC_RESID_CALM_BONUS (reward-shaping, doesn't touch the reference) --
 # also regressed, twice, root cause: FAC_SPEED_TRACK dominates
 # FAC_RESIDUAL_COST by ~15-20x, so the residual's correction is
@@ -328,7 +328,7 @@ SERVO_RATE_LIMIT_DEG_S = 137.0  # 2026-09-24: physical servo speed ceiling, appl
                          # composed, not double-counted). Placeholder from a comparable project's
                          # measured Bittle X V2 alloy-servo/BiBoard V1 unit (same servo class as
                          # ours per docs/hardware/specs.md's P1S alloy servos) -- not G2's own
-                         # measurement yet (docs/rl/hardware-gated-backlog.md H13). Impact-tested
+                         # measurement yet (docs/planned/hardware-gated-backlog.md H13). Impact-tested
                          # 2026-09-24 against base1_20m (eval-only, no retraining): T1.1 -2% speed,
                          # T9.1 -7%, T7.1 -42% speed, T5.2 ledge fell 0%->15% -- a real effect, not
                          # negligible. 0 = off (legacy unlimited, pre-2026-09-24 behavior).
@@ -535,7 +535,7 @@ CARPET = 0.0             # OFF in training. run20m_carpet (2026-09-03, CARPET=0.
                           # DR episodes, 4M-step continuation from run20m_ppo) was a REVERT:
                           # no new capability (base already 0% falls on carpet + whole decathlon)
                           # and ~8-10% forward-speed loss on flat AND carpet. See
-                          # docs/rl/robustness-backlog.md log + the "Carpet Training Verdict"
+                          # docs/planned/robustness-backlog.md log + the "Carpet Training Verdict"
                           # report. The course stays defined for eval/viz (watch.py --challenge
                           # carpet, CHALLENGES dict overrides these).
 CARPET_SWELL = 0.022      # broad rolling undulation (m) on top of the CARPET bumps -- low-freq swell
@@ -550,7 +550,7 @@ CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 # G2's paws load the pile at a small fraction of a human footstep's pressure
 # (~a couple hundred grams peak per paw vs body weight through a human foot), so
 # "has some give" to a hand does not translate 1:1 -- a first estimate, meant to
-# be refined once real hardware data exists (docs/rl/robustness-backlog.md
+# be refined once real hardware data exists (docs/planned/robustness-backlog.md
 # style: probe before assuming). restitution is fixed at 0 -- carpet doesn't
 # bounce, no reason to randomise that up.
 CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
@@ -601,7 +601,7 @@ SLOPE_MAX_DEG = 14.0      # coverage R1: per-episode ground tilt, random roll & 
                           # DR ramp likely left the widened 14-20deg tail too thinly and late sampled
                           # in a 3M-step round to teach anything there. A denser-sampling round 2 was
                           # proposed but not run -- user's call to close the campaign here instead. See
-                          # docs/rl/slope-ceiling-log.md for the full result and options considered.
+                          # docs/archive/rl/slope-ceiling-log.md for the full result and options considered.
 SLOPE_TARGET_PROB = 0.0   # hw2 (2026-09-23): this fraction of episodes gets a TARGETED slope where the
                           # gait stalls (slope sweep, docs/rl/hw1-log.md): half side-hills of
                           # SIDEHILL_DEG (either side down), half climbs of UPHILL_DEG. Scaled by _dr;
@@ -789,7 +789,7 @@ RAMP_TOTAL_STEPS   = _g2e("RAMP_TOTAL_STEPS", RAMP_TOTAL_STEPS)
 # residual-smoothing penalty alone -4 to -7 per step at full strength, so full penalties at 1M steps turned the total reward negative (and falling attractive).
 RAMP_PENALTY_STEPS = _g2e("RAMP_PENALTY_STEPS", RAMP_TOTAL_STEPS)
 
-# --- V3 retrain levers (docs/rl/v3-retrain-plan.md). Every one defaults OFF, so older checkpoints and scripts replay unchanged. ---
+# --- V3 retrain levers (docs/archive/rl/v3-retrain-plan.md). Every one defaults OFF, so older checkpoints and scripts replay unchanged. ---
 # Y2 HEADING_OBS: the observation's raw quaternion becomes a yaw-FREE quaternion (roll / pitch only) and two inputs are appended,
 #    sin and cos of (heading - commanded heading). Observation size +2 (a fresh run only; the Pi needs the same inputs).
 HEADING_OBS = _g2e("HEADING_OBS", False)
@@ -876,7 +876,7 @@ LEVEL_EXTERNAL = _g2e("LEVEL_EXTERNAL", False)
 LEVEL_CAP_BY_TIME = _g2e("LEVEL_CAP_BY_TIME", False)
 LEVEL_MIN_BASELINE = _g2e("LEVEL_MIN_BASELINE", 0.5)
 LEVEL_COLLAPSE_BASELINE = _g2e("LEVEL_COLLAPSE_BASELINE", 0.35)
-# LENGTH LEVEL (user, 2026-10-07; docs/rl/v3-decisions-log.md): a fifth difficulty category, how LONG the episode runs, so the policy has to hold its course over a distance (training episodes are 250 steps = 3 s by default, but
+# LENGTH LEVEL (user, 2026-10-07; docs/archive/rl/v3-decisions-log.md): a fifth difficulty category, how LONG the episode runs, so the policy has to hold its course over a distance (training episodes are 250 steps = 3 s by default, but
 # G2's drift shows after 4 to 6 steps; a FIXED 25% mix of long episodes failed its screen, S4). Off by default (LENGTH_LEVEL). At level d a long episode lasts EPISODE_LENGTH + (LENGTH_MAX_STEPS - EPISODE_LENGTH) * d steps.
 #   Probe and focus episodes of this category are always long; in a combo episode the share of long episodes is LENGTH_SHARE_MAX * d (so at least 25% always stay short, the v2.2 lesson).
 #   Every long episode carries a constant yaw push of LENGTH_DRIFT_TORQUE * d N*m whose SIGN IS BALANCED: random 50/50 in training, strictly alternating in probes and benchmarks, so a policy that corrects only one side shows it.
@@ -1011,7 +1011,7 @@ HAZ_POSTURE_RELAX = _g2e("HAZ_POSTURE_RELAX", 1.0)
 HAZ_HOLD_STEPS = 40
 HAZ_SLOPE_DEG = 4.0
 # High-step creep (user, 2026-10-12: a separate, slow, careful gait with three feet down at all times, for stepping UP onto ledges; foot clearance first, stability is not ranked;
-#   plan: docs/plan-detail/high-step-creep-training-plan.md). Every knob defaults to the old behaviour.
+#   plan: docs/archive/plan-detail/high-step-creep-training-plan.md). Every knob defaults to the old behaviour.
 #   PHASE_RATE_NOM_CMD: the command that plays the base gait at one frame per control step (the creep walks about 0.035 m/s at that cadence, wkF about 0.10).
 #   FAC_FOOT_PHASE / FAC_GAIT_SYMMETRY: the trot-shaping terms (a creep keeps three feet down, which they punish): 0 for the creep. FAC_UPRIGHT / FAC_STABILITY: turned down, not off.
 #   HEIGHT_FLOOR > 0: the ride-height term only penalises the body BELOW this height (anti-crouch), never above it.
@@ -1058,7 +1058,7 @@ IMU_BIAS_DEG       = _g2e("IMU_BIAS_DEG", IMU_BIAS_DEG)              # hw1: IMU 
 RANDOM_GYRO         = _g2e("RANDOM_GYRO", RANDOM_GYRO)                # 2026-10-07: settable from the profile (g2_profile.RECIPE) so it can match the measured IMU noise
 JOINT_OFFSET_DEG   = _g2e("JOINT_OFFSET_DEG", JOINT_OFFSET_DEG)      # hw1: servo zero calibration error
 FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (default 60) so slowing at a seen obstacle isn't crushed (Phase E vision-refix smoke)
-# --- Anti-stall (R-NOSTALL, docs/rl/robustness-backlog.md) -------------
+# --- Anti-stall (R-NOSTALL, docs/planned/robustness-backlog.md) -------------
 # Dense: bleed when the ~1 s forward window drops under a fraction of the
 # commanded speed while a move command is active. Sparse: a bonus each ~0.15 m
 # of net progress cleared *while an obstacle was recently in view*. Originally
@@ -1085,7 +1085,7 @@ FAC_SPEED_TRACK    = _g2e("FAC_SPEED_TRACK", FAC_SPEED_TRACK)  # lower it (defau
 # drop speed ~73% on a sustained side-hill to stay upright, which
 # FAC_NOSTALL structurally fights regardless of cause. Two non-improving
 # rounds -- REVERTED to 0/off. Documented negative result, same standard
-# as every other failed lever this session. See docs/rl/resiliency-log.md
+# as every other failed lever this session. See docs/archive/rl/resiliency-log.md
 # for full data from both rounds.
 FAC_NOSTALL        = _g2e("FAC_NOSTALL", 0.0)        # dense bleed weight; 0 = off
 FAC_NOSTALL_BONUS  = _g2e("FAC_NOSTALL_BONUS", 8.0)  # per-0.15 m breakthrough bonus (only while resisted)
@@ -2035,7 +2035,7 @@ class OpenCatGymEnv(gym.Env):
         penalty_scale = self._ramp(PENALTY_STEPS, RAMP_PENALTY_STEPS)
         if PENALTY_RAMP_CAP > 0:
             penalty_scale = min(penalty_scale, PENALTY_RAMP_CAP)
-        # Scripted-gait lessons (docs/rl/gait-benchmark.md): keep feet on the ground
+        # Scripted-gait lessons (docs/archive/rl/gait-benchmark.md): keep feet on the ground
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
@@ -3411,7 +3411,7 @@ class OpenCatGymEnv(gym.Env):
         which ruled out a simple reward-imbalance explanation. Root cause
         read as: training one shared policy against a continuously-reshaping
         reference across the whole command range makes the whole-range
-        behavior worse, not just the extremes. See docs/rl/gait-friction-log.md.
+        behavior worse, not just the extremes. See docs/archive/rl/gait-friction-log.md.
         Superseded by FAC_RESID_CALM_BONUS (a reward-shaping lever, doesn't
         touch the reference) as the campaign's primary fix."""
         base = WKF_REF[phase_idx % len(WKF_REF)]

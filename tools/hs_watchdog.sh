@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keep the high-step creep plan (rl_training/opencat-gym/phase_hs.py run) alive unattended (docs/plan-detail/high-step-creep-training-plan.md). Every 2 minutes: if no runner process
+# Keep the high-step creep plan (rl_training/opencat-gym/phase_hs.py run) alive unattended (docs/archive/plan-detail/high-step-creep-training-plan.md). Every 2 minutes: if no runner process
 # exists and the plan is not complete, relaunch it (the runner resumes from trained/hs_state.json and waits for a run that is already training; it never restarts one)
 # and keep the Mac awake while it lives. Stops when the runner wrote trained/hs_halt (a DECISION NEEDED or a HALT) or logged "HS COMPLETE".
 # Start (from anywhere): nohup bash tools/hs_watchdog.sh > /dev/null 2>&1 &     Log: ~/g2_logs/hs_watchdog.log.  Stop: kill <pid of this script>.  Never uses pkill.

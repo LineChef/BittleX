@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Curate the pictures G2 saved while exploring into a clean, labelled set (Phase 2 of docs/vision/exploration-object-learning-plan.md).
+"""Curate the pictures G2 saved while exploring into a clean, labelled set (Phase 2 of docs/planned/exploration-object-learning-plan.md).
 
 Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `survey/<date>/*.jpg` from the survey stops and
 `named/<name>/*.jpg` from "this is a mug", each with a `.json` sidecar (pose, name, time, what the on-camera detector saw). It:

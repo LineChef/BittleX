@@ -46,4 +46,4 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       itself, with a restore step. Decide frequency and where it lands when the voice
       loop starts running live. Related: if the Petoi AI head ever replaces the Pi,
       memory would live in that vendor's backend (or on our own server) instead -- see
-      `docs/research/petoi-ai-head-evaluation.md`.
+      `docs/planned/ai-head/petoi-ai-head-evaluation.md`.

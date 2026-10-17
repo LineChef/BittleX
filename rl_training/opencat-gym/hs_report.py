@@ -99,7 +99,7 @@ Every number is from the simulator. Step-up success = not fallen, all four paws 
 <h2>The 20M as it trained (10 walks, 10 episodes per size)</h2><div class="t"><table><tr><th>Step</th><th>Flat falls</th><th>Rear lift mm</th>{chead}</tr>{curve or '<tr><td>-</td></tr>'}</table></div>
 {sweep_txt}
 <h2>Decisions made while you were away</h2><ul>{dec}</ul>
-<p class="mut">Plan and rules: docs/plan-detail/high-step-creep-training-plan.md. Runner: rl_training/opencat-gym/phase_hs.py; scorer: hs_probe.py; base gait: reference_gait/build_creep_reference.py.</p>
+<p class="mut">Plan and rules: docs/archive/plan-detail/high-step-creep-training-plan.md. Runner: rl_training/opencat-gym/phase_hs.py; scorer: hs_probe.py; base gait: reference_gait/build_creep_reference.py.</p>
 </body></html>"""
 
 

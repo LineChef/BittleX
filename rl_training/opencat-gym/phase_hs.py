@@ -1,4 +1,4 @@
-"""The high-step creep training plan, unattended end to end (user-approved 2026-10-12; plan, rules and resume steps: docs/plan-detail/high-step-creep-training-plan.md).
+"""The high-step creep training plan, unattended end to end (user-approved 2026-10-12; plan, rules and resume steps: docs/archive/plan-detail/high-step-creep-training-plan.md).
 
     python phase_hs.py run        # V6 baseline -> base sweep -> base check -> preflight -> S0 -> S1 -> S2 -> go/no-go -> S4 20M (trackers) -> pick -> export -> report
     python phase_hs.py status | plan

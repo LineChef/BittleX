@@ -1,4 +1,4 @@
-"""Pick the high-step creep's base gait by a sim parameter search (step 1 of docs/plan-detail/high-step-creep-training-plan.md). No training; every candidate is played open loop.
+"""Pick the high-step creep's base gait by a sim parameter search (step 1 of docs/archive/plan-detail/high-step-creep-training-plan.md). No training; every candidate is played open loop.
 
     ../../.venv/bin/python creep_sweep.py --v6-flat trained/hs_v6_baseline.json --out trained/hs_sweep.json      # writes reference_gait/creep_ref.npy (+ .json) for the winner
 

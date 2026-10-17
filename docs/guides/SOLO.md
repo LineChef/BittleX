@@ -103,7 +103,7 @@ nothing.
   pre-commit hook blocks personal terms (your SenseCraft name included), so use
   placeholders in tracked files.
 - **A from-scratch ~20M gait run.** Gated on the green-light checklist
-  (`docs/rl/hardware-gated-backlog.md` + `project_longrun_trigger`
+  (`docs/planned/hardware-gated-backlog.md` + `project_longrun_trigger`
   memory). The 2026-09-05 new-course run was a negative result — `run20m_ppo`
   stays the base.
 - **Deleting capture folders / `trained/` checkpoints / the memory DB.** Look

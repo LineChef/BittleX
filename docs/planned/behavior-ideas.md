@@ -1,0 +1,1137 @@
+# Learned Behaviors — Backlog
+
+A living list of behaviors to explore and implement for G2. "Learned" here spans
+three kinds:
+
+- **RL-trained** — a policy trained in simulation (the `rl_training/` pipeline).
+- **Keyframe-authored** — hand-built joint sequences (Petoi's Skill Composer),
+  saved as OpenCat skills.
+- **Composed** — software behaviors that stitch skills + Claude + memory + vision
+  together (mostly `pi_pipeline/`).
+
+Nothing here is started. Add freely; when one gets picked up, note it in
+`docs/project-plan.md` under the relevant phase.
+
+---
+
+## Locomotion / gait
+
+### B1 — On-MCU gait policy (Decision Transformer)
+Explore shrinking the trained gait policy so it runs on **Bittle's own ESP32
+(BiBoard V1), not the Pi** — following the "Tiny RL for Quadruped Locomotion
+using Decision Transformers" work ([arXiv 2402.13201](https://arxiv.org/pdf/2402.13201)),
+which trained gait controllers small enough for the Bittle microcontroller.
+Directly bears on the open Phase 6 question of whether a Pi Zero 2 W can run
+inference fast enough — if the policy fits on the MCU, the Pi is freed for
+voice/vision/memory. Research-heavy; a distinct approach from the PPO + PyBullet
+pipeline.
+
+### B2 — Specialty RL gaits
+Short RL runs (or Skill Composer sequences) for gaits beyond the forward walk:
+turn-in-place, sidestep, slow "sneak", backward. The turn and sidestep gaits
+directly improve later autonomy modes (person-following, obstacle steering,
+go-to-object).
+
+**Update:** for **turning specifically**, if we ever train it, the better path
+is a single **command-conditioned policy** (yaw-rate + speed command in the
+observation, reward tracks the command) rather than a separate turn gait. But
+it's **not scheduled** — OpenCat firmware turn gaits (`wkL` etc.) work today and
+the vision pursuit layer can use them. Build the RL version only if firmware
+turns oscillate in visual pursuit or fail on terrain. Sidestep / sneak /
+backward still fit the separate-run framing here.
+
+### B3 — Skill Composer authoring
+Stand up a workflow around **Petoi's Skill Composer** (the no-code desktop tool
+for authoring keyframe skills — puppet the robot over USB, loop/sequence poses,
+export to an `Instinct*.h` array). This is the authoring capability that B4
+(expressive body language) and B10 (teach-me-a-trick) build on. Needs hardware.
+
+### B9 — Vision + servo-resistance obstacle traversal
+When the **vision module** spots an obstacle it judges walkable-over (small box,
+close, low), use **servo-resistance / position-feedback divergence** (command vs.
+actual angle on the front joints — see `docs/hardware/specs.md` "Servo
+position feedback") as a **secondary confirmation signal** that a foot has
+actually made contact, then trigger one of two responses:
+- a dedicated **step-over gait** (exaggerated front-leg swing) for low obstacles, or
+- a **climbing protocol** (front feet up onto the obstacle, shift weight, pull
+  the rear up) for taller ones the step-over can't clear.
+
+Two independent signals gating the action — vision says "something's there and
+it's small", feedback says "I'm touching it now" — should be far more robust than
+either alone (vision at 192×192 / short range misses thin things; blind feedback
+alone can't tell a jam from normal stance load). Layered as a reflex outside the
+learned gait, like the `vision/avoidance.py` pattern. Firmware-side for the
+feedback read (skips the serial round-trip). **Needs vision + hardware;** revisit
+once the vision module is installed and working. Related: the blind-clearance
+tradeoff (rejected as a standalone — costs speed/stability every step for an
+occasional benefit) and **B9a**, the feedback-only jam reflex below.
+
+### B9a — Feedback-only jam reflex  🔴  (implement when hardware arrives)
+
+The vision-free half of B9, split out as its own task **now that the whole
+vision-navigation stack is flag-gated off** (`features.vision` default `False` —
+the camera only has a single-class face model, no obstacle detector). This is
+G2's "Roomba bump sensor" with no bump switch: the servos are the sensor.
+
+**Signal:** commanded joint angle vs. servo-reported actual angle on the
+forward-driving front-leg joints. Under normal load actual tracks commanded
+within a small error; when a foot is pressed against something immovable the
+servo strains at full torque but can't reach target, so the error stays wide
+open. Sustained divergence on those joints = "pushing against something, not
+moving."
+
+**Reflex:** a small threshold check outside the gait policy (same shape as
+`CliffGuard` / `ThermalGuard` — pure logic + tuned constants). On sustained
+front-leg divergence while a forward command is active → stop, back up a step,
+turn to a new heading, resume. Contact-triggered bump-and-turn.
+
+**Catches:** front feet jammed against a solid obstacle while walking forward.
+**Does NOT catch:** drop-offs (a foot finds *no* floor — opposite signal, needs
+its own check), soft obstacles, anything off to the side, anything not yet
+touched. Purely reactive, fires after contact.
+
+**Why hardware-gated (the trigger):** the divergence threshold can't be set
+without the real robot — normal carpet load, a leg brushing another leg,
+stepping a small bump, and working into a slope all produce divergence too, and
+Bittle is light (~290 g) + slow so the strain signal may be weak. Also need to
+confirm on hardware **which servos report feedback and at what rate**
+(`f` / `readAllFeedbackFast()` — "if supported"; `docs/hardware/specs.md`
+"Servo position feedback", `docs/hardware/petoi-firmware-reference.md`).
+
+**Status 2026-09-22:** logic built and made lag-tolerant. With the `i` command
+the servo trails the Pi's command by ~55 ms, so each front joint is now judged
+against the range its recent commands swept, not the latest command (0 false
+fires in sim on flat / obstacles / rough ground). Sim couldn't show the jam
+signal itself: walking into a wall stops the body but the legs keep tracking
+(feet slide). Bench question: does a real P1S pinned on an obstacle diverge?
+Feedback reads stall the firmware loop, so read at ~5 Hz, not every tick.
+
+**Build sketch:** `pi_pipeline/gait/jam_guard.py` — `JamGuard.update(cmd_deg[],
+fbk_deg[]) -> JamAction (NONE | BACK_OFF | TURN_AWAY)`, windowed per-joint error
+with enter/clear hysteresis, cooldown after a fire; wire into `run_gait.py` the
+way `CliffGuard` is (a reflex that can preempt the policy), emit a `jam.detected`
+diag event. Same proprioceptive family as carpet mode (`gait/carpet.py`), one
+level down: carpet compares commanded vs. actual *forward speed*; this compares
+commanded vs. actual *joint angle*. Unit-testable now against synthetic
+cmd/feedback traces; the constants wait for the bench.
+
+### B13 — Climb as a separate skill policy  🟢 CONFIRMED NEED (2026-09-15)
+**Update 2026-10-10:** the user wants a climbing movement taught by hand with the B25 method (after the hand-taught hi-step gait works), instead of keyframes written by Claude; plan in [`plan-detail/high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md).
+**Decided need, not a deferred idea.** Reference motion: Petoi's own `cmh`
+demo, [`step.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/step.gif)
+— front paws reach up onto a raised box, body hauls up and over, ends standing
+fully on top. (The same motion is Petoi's "Bittle Climbs a Step" video, reviewed 2026-10-07 from
+sampled frames: starts crouched low, rears up and plants both front feet on the box top, then the rear legs
+push the body up; a scripted keyframe motion with no balance feedback, and the frames do not resolve joint
+angles, so it is a strategy reference, not data.) This is exactly what Phase F tried in sim and hit a wall on (see
+[H7](hardware-gated-backlog.md) and
+[`vision-in-gait.md`](../archive/rl/vision-in-gait.md)) — **a sim-fidelity limit
+on the training harness, not evidence the real robot can't do it.** Scheduled
+to build for real once the body is in hand; not gated on "is there a concrete
+need" any more.
+
+**Second reference motion — the horizontal case, not a climb at all:** Petoi's
+[`gap.gif`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/gif/gap.gif)
+demo (real Bittle X, official, 8.5 cm gap between two same-height platforms).
+Checked frame-by-frame (2026-09-15) — **no airborne moment, this is quasi-static,
+not a jump**: rear feet stay planted on the near platform while the front legs
+stretch forward and down to plant on the far platform (body bridges the gap
+diagonally), *then* the rear legs release and follow across. Same reach → plant
+→ shift-weight → pull-through technique as `cmh`/B9's "climbing protocol," just
+applied horizontally instead of vertically. No matching named firmware skill
+found (doesn't match `jmp`'s crouch-load-explode shape or anything else in the
+~90-skill list) — almost certainly hand-choreographed via direct joint
+commands (`m<idx> <deg>`) for the demo, not a single callable token. Relevant
+here as a second worked example of the same technique, and because it's less
+demanding than a full ledge-climb (no need to *lift* the body onto a taller
+surface, just reach + balance on an extended asymmetric stance) — a plausible
+easier on-ramp to validate the reach-plant-shift primitive on real hardware
+before attempting a full climb.
+
+**Scripted vs. learned — explore both:**
+- **Scripted first (day-1 attempt):** port Petoi's `cmh` keyframe directly,
+  hand-tune approach distance + timing against a real step. Cheapest path to
+  "does it climb at all" on real hardware/friction, which sim couldn't tell us.
+- **Learned residual, worth exploring too:** a `cmh`-anchored residual policy
+  (same recipe as the walk gait —
+  [`skill-learning-method.md`](../rl/skill-learning-method.md)) could generalize
+  across ledge heights/materials/approach angles a single fixed keyframe can't.
+  Train on real IMU + whatever ledge-detection signal exists, not PyBullet —
+  the sim gap was specifically about contact/grip physics and body-pitch
+  limits, not about RL as a method.
+
+**A third option, narrower than either above — deliberate foot-probing before
+committing weight (2026-09-18).** Not continuous blind climbing (ruled out
+for G2 specifically: the successful proprioceptive-locomotion literature
+relies on real-time joint-torque sensing at full gait rate, e.g. ANYmal's
+IMU+encoders+torque-sensor stack, and G2 only has real-time IMU — the
+Bittle X V2's confirmed position-feedback servos are too slow and PWM-wire-
+disruptive for control-rate use, see [`specs.md`](../hardware/specs.md#servo-position-feedback-researched-2026-09-01)).
+But a *slow, deliberate* probe-then-decide action is a different, smaller
+problem: pause, extend a leg toward where the next foothold should be,
+check whether it met resistance around the expected point (or reached past
+it, or reached further than the climb should ever need), then decide to
+commit weight or retract and adjust. That's compatible with the real
+feedback servos' actual ~5-20 Hz blocking-read rate, because it doesn't
+need to happen at the 80 Hz gait/control rate — it's a discrete decision,
+not continuous locomotion. Buildable and testable in **sim now**, no
+hardware needed to start: PyBullet gives instant, unrestricted ground-truth
+joint state every step (none of the real hardware's shared-PWM-wire
+constraint exists in sim), so the probe-and-decide *logic* can be
+prototyped and validated before hardware arrives. What still needs real
+hardware is confirming the actual feedback signal's real-world rate/noise
+is good enough to execute the same decision procedure for real — a
+validation step, not a blocker on starting. Complementary to both options
+above, not a replacement: could inform *where* a scripted `cmh` places a
+foot, or give a learned residual a slow, discrete correction opportunity
+between the fast continuous corrections it already makes.
+
+**That validation step is now done, 2026-09-28 — real hardware confirms
+both halves.** `check_serial feedback` (one connection, before/after a
+hand-moved leg) showed a real position-sensing signal: exactly the moved
+leg's two joints changed (~150° and ~98°), everything else within noise,
+with no move command sent — not a fallback to a commanded angle. Latency
+measured clean at **mean 112 ms / min 51.6 ms / max 248 ms** (~4-19 Hz),
+matching the ~5-20 Hz predicted in `specs.md`. This confirms: (1) too slow
+for the 80 Hz gait loop, ruling out continuous blind climbing as before,
+and (2) genuinely fast enough for *this* slow, deliberate probe-then-decide
+idea, which was always designed around exactly this rate. Full detail +
+tooling: `docs/hardware/specs.md`'s "Servo position feedback" section,
+`pi_pipeline.link.check_serial feedback`.
+
+**Closed, step-down case, negative result (2026-09-19) — see
+[`rl/foot-probing-log.md`](../archive/rl/foot-probing-log.md) for the full campaign.**
+The sensing mechanism itself (joint tracking error reveals real ground
+contact) is validated and real. What isn't viable is the specific motion
+tested to get the leg into position to use it: lifting one leg from the
+walk's natural pose is geometrically unstable (center of mass sits outside
+the remaining 3-leg support triangle) — fixable with a weight-shift, but
+that shift costs enough reach that the leg only reaches ~12-15mm past the
+edge (not the ~30-60mm real depth needed), and what's left of its
+kinematic budget after that only searches ~4-5mm down before hitting its
+own limit. The only safe (level, <5°) trigger point in the gait cycle is
+also structurally ~25-30mm before the true edge — tightening the trigger
+doesn't help, it just removes the only safe option. Step-up was not
+explored (gated on step-down succeeding first, per the approved test
+plan). Revisiting this would need a deliberate commanded approach-and-stop
+motion rather than an opportunistic freeze of the walk's pose — a
+different design, not a tuning pass on this prototype — and could also try
+a rear leg, never tested here.
+
+**Round 2 (2026-09-19)** tried exactly that "different design" — a
+deliberate commanded stop-and-settle (via the trained policy's own stop
+behavior) instead of an opportunistic freeze, plus a shorter ledge. Fixed
+stability completely (tilt <2° throughout, vs. 10-17° before) via the
+settle plus two further fixes (direct knee-flexion lift, IK reach from
+that better-conditioned pose — reach improved to +40mm past the edge).
+But sensing still fails, confirmed with contact-normal checking (not just
+whether contact fires): every nonzero ledge, even 5mm, registers a
+sideways-pointing normal — the paw hits the ledge's own vertical riser
+wall, not the floor, because the leg's 2-DOF IK retreats in x as it
+searches deeper. Same root limitation as round 1 (can't hold reach and
+depth at once), now confirmed a second, independent way. See
+`rl/foot-probing-log.md` round 2 for the full trace.
+
+**Reopens the vision question — narrowly.** This needs a real forward sensor
+to trigger "invoke climb" (same architecture as B9/Phase E: vision spots a
+step too tall to walk over → skill switch → climb → hand back to the walk
+policy). That does **not** reverse the closed Phase D/`smoke_vfix3` finding
+(vision conditioning *inside* the continuous walk policy doesn't help — plow
+or stall). It reopens the *other* half that was never ruled out on its
+merits: Phase E's `SkillSwitch`/`GaitSelector` discrete skill-switching
+already showed real sim gains (+48% through low obstacles, 0% vs 34%
+edge-falls) and was only shelved for lack of a sensor, not because it didn't
+work. Climb is now a second, arguably stronger reason to solve the
+forward-sensor gap.
+
+**Original framing below, superseded by the above on the "is this worth
+doing" question — kept for the technical detail:**
+
+Real climbing — surfaces taller than G2's standing height: full stairs, a curb it
+can't walk up, onto a low platform — is **its own RL skill policy**, not part of
+the command-following walk policy. It needs a different motion (rear the front up,
+plant the front feet, shift weight, pull the rear up), a different reward (get
+up-and-over, not maintain a gait), a different terminal condition, and a posture
+repertoire the flat-trot residual can't express. Folding it into the walk policy
+would give a multi-modal policy that's worse at both.
+
+Architecture (matches the rest of the project): a **library of low-level
+policies** — the walk policy plus discrete skills (get-up, climb, later high-step)
+— with **Claude as the selector**. Vision spots a step too tall to walk over →
+Claude decides "invoke climb" → the low-level runs the climb policy → hands back
+to the walk policy. This is the trained version of the "climbing protocol"
+sub-bullet in **B9** (which framed it as a vision-gated reflex without saying
+scripted vs. learned).
+
+Tier split from the 2026-09-03 discussion:
+- **< ~25 mm (slopes, small steps):** already the walk policy's job (rough-terrain
+  DR). Nothing new.
+- **~25–70 mm (curbs, thresholds, single steps, up to leg reach):** an *extension*
+  of the walk policy — add a "terrain difficulty / high-step" conditioning input,
+  same network, wider envelope. The **Phase 4 stance-recovery / ledge work** is
+  the on-ramp (a "step up onto a lip and keep going" is the same primitive,
+  rewarded for progressing over rather than only recovering).
+- **> standing height (this idea, B13):** separate skill policy.
+
+Highest sim2real risk of anything on the roadmap — contact-rich, posture-
+dependent. **Need confirmed 2026-09-15 — no longer deferred**, see the note at
+the top of this entry. Get Tier 2 for near-free out of Phase 4. Needs hardware
+to validate; day-1 bring-up candidate once the body is in hand.
+
+### B14 — Jump / hop as an on-command skill  🟡  ⚪
+A discrete, deliberately-triggered hop — **never** in the walk policy's action
+space (so the gait can't decide to launch itself and flip over a bump). Fired
+like any OpenCat skill (`k<skill>`) or a `perform_skill` tool call, in a sane
+context (clear floor, not near an edge). Same "library of low-level policies +
+Claude as selector" architecture as [B13].
+
+Two tiers:
+- **Free / now:** expose the firmware's existing scripted `jump` skill as a
+  commandable action in `pi_pipeline`. Zero RL; risk is only what Petoi ships.
+  Modest lurch-hop — sets the baseline for whether more is worth it.
+- **Later, if the scripted hop is too weak:** an RL *jump skill policy*, trained
+  separately (approach → crouch → explode → flight → land → hand back to the walk
+  policy), its own reward / terminal condition, never merged with the gait.
+
+**Hardware is marginal for a useful jump.** P1S alloy servos peak ~0.29 N·m but
+lose most of it at speed (coreless) — jumping needs *power*, not just torque. A
+3–4 cm pop of the ~380 g loaded body is near the ceiling; our ~70 g payload
+(~20 % of body mass) eats directly into it. A leap that reliably clears a
+4–5 cm block is a stretch goal, not a plan.
+
+**Ballistic sim2real is the hard case** — open-loop during flight, high-impact
+landing (repeated hard landings on alloy gears strip servos). Any RL version
+needs careful hardware validation, landing-force limits, and a low rep budget.
+Orthogonal to the "don't-stall / power over a lip" walk-policy work — for
+clearing a small obstacle, muscling the *walk* over it is the higher-percentage
+bet. Do B14 as a fun on-hardware experiment when the gait work is settled.
+
+---
+
+### B21 — Pick up small objects with its mouth
+A grasp-and-retrieve skill: approach an object, pick it up, carry/deliver it.
+
+**Hardware reality check first.** G2 has 9 servo DOF total — 2 per leg (×4
+legs) + **1 neck joint**, no jaw, no gripper, no actuated mouth. The neck is a
+single pitch/tilt joint, not a closing mechanism — there's currently no way to
+grip and hold an object. This needs a hardware addition (a small servo-driven
+jaw, a passive spring-loaded mouth attachment, or a different mechanism like a
+scoop or electromagnet) before any software/behavior work is worth doing.
+
+**Market check (2026-09-15): no mouth/jaw product exists, buy-it-today
+fallback is an arm, not a mouth.** Searched Petoi's store and the community
+3D-print accessory list:
+- No official or community mouth/jaw gripper for Bittle/Bittle X was found.
+  The closest head-mounted accessory is a 3D-printed "Beetle Horn" that only
+  *pushes* objects, not grips them.
+- Petoi does sell a [Robotic Arm Gripper Extension Kit](https://www.petoi.com/products/bittle-arm-extension-with-metal-servos)
+  ($69, alloy servos, spring-loaded 2-DOF claw) — a separate arm-mounted
+  gripper, not a mouth mechanism. It's the realistic buy-it-today option if
+  the goal is object manipulation in general rather than specifically "with
+  its mouth"; a true mouth/jaw would still be a custom build.
+
+**If a gripping mechanism gets added later:** the retrieve skill itself
+(approach → position → grip → lift/carry → release) would follow the same
+scripted-base + bounded-residual + reward-iteration recipe as any other new
+skill (see [`skill-learning-method.md`](../rl/skill-learning-method.md)), same
+approach as B14's jump. Locating the object to grab would lean on the vision
+detection layer — B20's object gallery already tracks recognized objects by
+instance, which is the natural source for "where is the thing I should pick
+up."
+
+**Trigger:** a mouth/gripper hardware addition — not currently planned or
+purchased. Logged here as an idea, not a near-term item.
+
+---
+
+### B22 — Actuated tail (hardware addition + tail-driven behaviors)
+An add-on servo tail — a hardware addition, not something G2 has today (9
+servo DOF, no tail channel used; see `docs/hardware/pi-power.md`-adjacent
+research in the 2026-09-15 conversation history).
+
+**Hardware, researched 2026-09-15:**
+- Petoi's own CAD repo has an official **[`Bittle_tail.stl`](https://github.com/PetoiCamp/NonCodeFiles/blob/master/stl/Bittle%20%26%20BittleX/Bittle_tail.stl)** (found in
+  `stl/Bittle & BittleX/`, missed on an earlier store-only search). Downloaded
+  and inspected the mesh directly: the mount is a single oval hole with a
+  small central nub — a **pivot-pin joint, not a servo spline**. Reads as
+  **passive** — almost certainly the companion piece to the official
+  `BittleFoxHead` chin accessory (same fox aesthetic), swinging freely rather
+  than being driven.
+- A community **passive counterweight tail** also exists:
+  [Thingiverse #6875437](https://www.thingiverse.com/thing:6875437), clips
+  onto the rear bar, no servo.
+- **Retail Nybble ships a real driven tail** — confirmed 11 DOF (8 leg + 2
+  head + **1 tail servo**), proof a driven tail works on this firmware/board
+  family. Its actual CAD isn't in Petoi's public STL repo (proprietary
+  injection-molded part), so it can't be copied directly.
+- **Path to an actuated version:** take the `Bittle_tail.stl` shape (or the
+  Thingiverse one) and replace its pin-hole mount with a servo-horn adapter,
+  driven from one of BiBoard V1's **3 free PWM channels** (9 of 12 used today:
+  8 leg + 1 neck) — a horn-adapter redesign, not a from-scratch tail. OpenCat's
+  skill-array format already reserves a generic "tail" channel across the
+  product line (`docs/project-plan.md` "16 servo channels: 4 head/tail/gripper,
+  12 legs"), so firmware support for driving a tail servo isn't new work either.
+
+**Tail-driven behaviors, once actuated (personality/expression, not
+locomotion):** wag on greeting / person-recognition (ties into
+[[B15]]/`personality/`), droop in low-power or sleep mode, a startle-flick
+paired with the chirp vocabulary ([B5]), idle sway during explore/attentive
+mode as a "thinking" tell. All expressive-layer work — same category as [B4]
+(expressive body language), driven through `pi_pipeline/personality/` /
+`pi_pipeline/behavior/`, no RL training involved (it's a single servo, not a
+locomotion joint).
+
+**Trigger:** a servo + printed horn adapter, hand-built — not currently
+planned or purchased. Logged as an idea, not a near-term item, same status as
+[B21]'s mouth/gripper.
+
+---
+
+### B17 — House-room scene generator, for vision detectors + reflex rules (vision-gated)  🔴 ⚪
+A room-like sim scene: walls, floor-material transitions, toys/clutter on the
+floor, ledges — the actual shape of the place G2 will live in. **Not an RL
+training ground for the gait** (see below for why) — its job is generating
+varied synthetic scenes to train and test the **vision detectors and reflex
+rules** that B9 and `CliffGuard` (B16) already call for: "this is what a rug
+edge / step / obstacle looks like, here's the rule that fires when you see it."
+That's a deterministic reflex layer outside the walk policy, not something the
+gait itself needs to learn.
+
+**Why not RL-train the gait in it:** camera-pixels-to-action RL is a much
+heavier, different paradigm than anything this project has done — needs a
+vision encoder in the policy, and the sim-to-real gap for *vision* (PyBullet's
+renderer is crude, nothing like real camera imagery) is notoriously worse than
+the physics sim-to-real gap already being fought all through the 2026-09-04
+terrain-ground work. Also a poor fit for a Pi Zero 2W with no GPU and an
+already-tight inference budget. The walk policy doesn't need to see a wall to
+avoid it — a scripted reflex (B9-style) does that job far more cheaply and
+safely than teaching a whole new perception-conditioned gait behavior.
+
+**Most of the physical texture already exists as a locomotion mechanic, just
+not assembled into a "room":** tiled floors ≈ friction variation
+(`RANDOM_FRICTION`), toys on the floor ≈ scattered discrete obstacles
+(`RANDOM_TERRAIN`/`RUBBLE`, see the 2026-09-04 training-ground redesign),
+ledges ≈ `LEDGE_HEIGHT`. The genuinely new pieces for the scene generator are
+walls and room layout — needed for realistic detector training data, not for
+gait practice.
+
+**One piece is worth pulling into the actual gait training separately, no
+vision needed:** floor-material **transitions within a single episode** — tile
+onto carpet onto a rug edge, mid-walk — is a real locomotion question
+(different feet hitting different physics mid-stride) distinct from the
+vision/detector question above. The current sim picks one ground type per
+episode; multi-surface episodes would be a natural extension of the
+2026-09-04 terrain-ground redesign once that settles.
+
+**Trigger:** the vision module is installed. Before that, there's no detector
+to train scenes for, and no reflex layer to validate against them.
+
+---
+
+## Expression & personality
+
+### B4 — Expressive body language
+A small set of authored skills for emotion/emphasis — happy wiggle, play-bow,
+nod-yes, shake-no, moonwalk — added to the `perform_skill` catalogue so Claude
+can punctuate spoken replies with body language, not just perform functional
+gaits. Low effort once B3 exists; high payoff for how alive G2 feels. These are
+the tokens the `personality` `cues()` channel returns — wire them to real skills
+here.
+
+### B5 — Emotive sound (chirp vocabulary)  — BUILT + WIRED 2026-09-10
+`pi_pipeline/behavior/chirps.py` — `ChirpMood` (happy / confused / alert /
+sleepy / question / greeting) → `b<note> <duration> …` sequences via `opencat.beep` (duration = a divisor of a second, not ms);
+`cue_chirp(stage)` maps the voice listening/thinking/speaking cue; `Chirper`
+rate-limits (`ready()` / `fired()` added so the driver can emit an abstract
+effect without building the string). **Wired 2026-09-10:** `BehaviorDriver`
+emits a `CHIRP` effect (payload `ChirpMood`, one shared `Chirper` → ≤1/tick) on
+recognition (HAPPY), a startle / pickup / loud sound (ALERT), "say hi"
+(GREETING), an edge reflex (ALERT), and sleep entry (SLEEPY); `DriverBindings`
+routes `CHIRP` → `actuator.perform(opencat.beep(...))`. Tone/duration values are
+still placeholders — **tune by ear on the real buzzer**. Voice listening/thinking
+cue chirps (`cue_chirp`) still not sent by the loop.
+
+### B6 — Mood from memory  — BUILT + WIRED 2026-09-10
+`pi_pipeline/personality/mood.py` — `MoodModel.update(last_interaction_s,
+exchanges_recent, ...)` → `Mood` (neutral / content / playful / lonely /
+subdued); `phrasing_hint()` (a sentence for the system prompt) + `idle_bias()`
+(sit/rest delay multipliers + `seek_attention` for LONELY). `last_interaction_s
+is None` → NEUTRAL (unknown ≠ lonely). **Wired 2026-09-10:**
+- Voice loop — `Memory.recency()` (in-process: seconds since last `record()` +
+  session exchange count; *not* from the DB, whose `ts` is a date by privacy
+  design) feeds `MoodModel` each turn → `Conversation.set_mood_hint()` folds the
+  one-line hint into the live system prompt (survives a personality swap). A
+  "leave me alone"-style phrase (`commands.looks_like_rebuff`) → `note_rebuff()`.
+- Behaviour driver — runs its own `MoodModel` from `DriverInputs.last_interaction_s`
+  / `.exchanges_recent`, scales the `IdlePosture` sit/rest delays by the bias
+  each tick, and surfaces `DriverTick.mood` / `.seek_attention`.
+
+Thresholds are first-cut. Composes with B4/B5.
+
+### B19 — Stylised character voice/persona presets  ⚪
+A themed "character mode" for G2, selectable by env var
+(`G2_CHARACTER=gir|irken-computer|…`), no model training or actor cloning.
+Three independent components, each usable alone:
+
+1. **Timbre** — a `voice_fx` post-processing stage on Piper's WAV output:
+   `sox` / `ffmpeg` chain (`asetrate` pitch shift, formant shift, ring-mod or
+   light bitcrush, metallic comb filter, mild distortion). GIR ≈ pitch way up +
+   robotic artifacts; Irken computer ≈ flat monotone + vocoder. Runs on the Pi.
+2. **Manner** — a persona block appended to the system prompt via the existing
+   `pi_pipeline/personality/` trait mechanism: erratic, childlike, distractible,
+   topic-jumps, sudden enthusiasm, short outbursts (+ text tics: caps for
+   outbursts, stray interjections, an occasional `♪…♪`). Style pastiche only —
+   no verbatim show dialogue.
+3. **Cadence** — per-utterance random pitch/tempo jitter in the FX chain +
+   text-layer pauses/emphasis, for GIR's lurching pacing.
+
+Build as a **toggleable mode with a 0–1 intensity dial** (a full persona tanks
+task usefulness — GIR doesn't follow instructions). Composes with existing
+traits. Software only; slots into `voice/` + `personality/`.
+
+**MVP (user call 2026-09-06):** ship the **manner** component only — a prompt
+persona block, no custom voice FX. Timbre/cadence are a later nice-to-have, not
+worth the assistant-usefulness cost up front.
+*(User ask 2026-09-06 — Invader Zim / GIR.)*
+
+**BUILT 2026-09-10 — manner MVP.** `pi_pipeline/personality/gir.py` (`gir`
+trait): manner-only prompt block scaled by `level`, with a task-guard at every
+intensity ("the quirk is a garnish; still finish the task; drop character for
+anything serious"). **Opt-in, never the default** (user call 2026-09-10):
+`G2_CHARACTER=gir` turns it on at `G2_CHARACTER_LEVEL` (default **0.4**);
+`G2_TRAITS="gir=<lvl>"` overrides. `Personality.from_settings` folds the
+character env var into the trait spec. 11 tests. Timbre/cadence still parked.
+
+---
+
+## Autonomy modes
+
+### B7 — Patrol mode
+On command ("G2, keep watch"), G2 walks a short loop; on motion or person
+detection it stops, chirps (B5), and describes what it sees via Claude (the
+vision `narrate` path). A "mode" the voice loop can enter and exit. Exercises
+vision + avoidance + voice + link together — a good capstone. Add it as another
+`Mode` in `pi_pipeline/behavior/mode_controller.py` alongside EXPLORE.
+
+**Explore mode is built as two tiers** (design session 2026-09-10; see
+`project-plan.md` Phase 10):
+- **Tier 0 "attentive"** (`behavior/attentive.py`) — stationary, always-on
+  life-signs layer on IDLE: gaze-follow a person, react to novelty (look → peer
+  bow → curious chirp), periodic head scan, greet known people. No walking.
+- **Tier 1 "roam"** — `Mode.EXPLORE` (`ModeController` + `Explorer` + `Novelty`),
+  now **voice-armed only** ("G2, go ahead and look around"), leg-budget leash,
+  disarms on exit. Gated by `features.vision`.
+`BehaviorRuntime` + `pi_pipeline/app/` wire it to real I/O; still needs the
+camera + edge classifier (B16) for near-edge roam.
+
+Patrol mode (the walked-loop + narrate-on-motion capstone above) would be a
+third `Mode` layered on Tier 1.
+
+### B8 — Go-to-object
+"Go to the red cup" → detect the object (a custom SenseCraft model, or the
+built-in 80-class COCO classifier) → approach controller (the `Avoider`
+bearing/area math, inverted to close distance instead of open it) → stop when
+close. Ambitious; a headline demo.
+
+**Person-flavoured version built 2026-09-10** — `behavior/approach.py`
+(`ApproachTarget`), voice "come here" → `Mode.APPROACH`: walk toward the largest
+person detection, stop close, give up on lost sight. Generalising it to an
+arbitrary target label is the remaining B8 work (+ obstacle avoidance under it).
+
+### B15 — Recognize household members  🟡  ⚪
+Train the vision model to detect **specific individuals as their own classes**
+(household people and pets), not just generic "person" / "cat" / "dog". Petoi
+SenseCraft custom-model pipeline: a few dozen labelled photos of each → YOLOv8n →
+deployed on the Grove Vision module. Then G2:
+- **knows its household by relationship, not just by label.** A per-individual
+  **`bond`** in the `personality` layer, with:
+  - a **closeness level** (0..1) that scales warmth, how much G2 seeks that
+    person out, greeting intensity, and how much of their memory context gets
+    pulled;
+  - a **disposition** — `affectionate` / `playful` / `curious` / `wary` /
+    `fearful` / `neutral` — that steers the `Explorer`: affectionate → approach
+    + greet; playful → follow + try to engage (safety reflex still overrides);
+    **`curious` → approach and try to interact**; wary → keep distance;
+    **fearful → always avoid, not just react on sight** — invert the approach
+    math to open distance and suppress wandering toward that bearing the
+    instant it's seen, *and* bias wander headings away from its last-known
+    position (the opposite pull from `Novelty`'s curiosity) so exploring routes
+    around where it likely still is, not just flinches away after the fact;
+    heads for the closest trusted person if cornered.
+  Bonds are **seeded** (they don't start at zero for known members) and drift
+  with interaction over time. G2 tells Claude who is present so replies and
+  behaviour are personalised. `Novelty` already makes a regularly-seen face
+  low-interest and one unseen for a while interesting again.
+  - **New people default to `curious`, not `neutral`.** A detected person who
+    doesn't match any known bond — a guest, a new face — gets a fresh low bond
+    at `curious`: G2 approaches and tries to interact (greets, asks who they
+    are) rather than staying reserved. New *pets* default to plain `neutral`
+    (curious-about-people is specifically a people thing, not carried over to
+    every new animal). The bond then drifts from that first interaction, same
+    as any other.
+- **notes stable patterns, not a timeline** — "the dog likes the kitchen", not
+  "saw the dog at 3pm". No dated/timed logging of who was where when (the memory
+  layer rejects temporal detail anyway); feeds [B11] place memory;
+- optionally a gentle **follow / keep-an-eye-on** behaviour (composes with [B8]).
+
+> **The household roster — names, which pet, seed closeness + disposition per
+> member — is per-deployment personal data and lives ONLY in gitignored local
+> config** (`G2_BONDS` in `.env`; see `.env.example`). Nothing about a specific
+> real person or pet goes in a tracked file.
+
+**On-device only.** The Grove Vision module runs the model on-chip and sends
+*detections* (label + box) over serial — no images of anyone or the home leave
+the robot. A 192×192 detector recognising one specific person is coarse
+(lighting- and angle-sensitive); treat a hit as a guess, not proof, and let the
+voice interaction confirm.
+
+Needs the camera + the custom-model workflow (Phase 8 "train a custom detection
+model" bullet). The per-individual classes are the only new piece; downstream
+reuses the personality / behavior / memory layers (the `Bonds` layer is now
+built — `personality/bonds.py`; the "feels alive" motion layer still isn't).
+
+**Practice run 2026-09-06 (~1 AM):** ran the full SenseCraft loop end to end —
+Image Object Detection → Image Collection Training → import 40 frames → label →
+train (Grove Vision AI V2) → deploy. **Model was a dud: 0 detections / 1403
+frames.** Cause = the dataset, not the flow: ~37 frames, very dark (some
+near-black), one background, one lighting, one distance, sensor-rotated, nano
+YOLO from scratch. The toolchain works; the data was below the floor.
+**Next attempt (daylight):** camera propped up (hand out of frame), fixed
+orientation, 80-120+ images per person, genuinely varied lighting (window /
+lamp / overhead) + 3-4 spots + distance 1.5-6 ft + head turns + ~15 negatives.
+Then compare training paths: (a) fresh SenseCraft, (b) fine-tune from a
+person-aware Swift-YOLO checkpoint (SSCMA/Colab), (c) multi-class `person` +
+`self` SenseCraft project. Module currently holds the dud model — redeploy
+"Person Detection" from the library to get real detections back.
+Measured detector behaviour + firmware facts: `docs/vision/detector-bench.md`.
+
+**Implementation plans (2026-09-06):**
+- Person recognition + **enrollment mode** ("G2, meet X"): the enrollment FSM is
+  built (`behavior/enrollment.py`, 15 tests); full design + what the driver still
+  needs is in `docs/vision/person-recognition.md`.
+- The multi-model **detection layer** (safety / interaction / objects models +
+  a model-manager that swaps by mode): `docs/vision/detection-layer.md`.
+
+### B16 — `CliffGuard`: ledge / desk-edge avoidance  🔴 HIGHEST PRIORITY — but gated on camera-mounted-on-frame  ⚪
+G2 spends most of its time on the user's desk. It needs to explore and look
+around up there (curiosity, [B7]-style wandering) but must **never** walk off
+the edge — ranked above general exploring, since it's the precondition for
+ever letting explore mode run near one.
+
+**Deferred by the user 2026-09-05 until the camera is physically mounted on
+the Bittle frame.** The floor-vs-edge classifier has to be trained on frames
+from the real mounted POV (camera height ~9 cm, angled down, its actual FOV/
+distortion, walking motion blur) — hand-held photos won't transfer, and a
+classifier that's confident but wrong near a real edge is worse than none.
+So: no data collection, no training, no `CliffGuard` build until the camera
+is on G2. Still the #1 job the moment it is.
+
+**Not trainable into the gait.** Confirmed architectural fact, not a design
+choice: the walk policy has no forward perception, and the real Bittle has no
+foot-force/torque sensing either, so it can't even feel "no ground" reactively
+the way it feels a stumble. By the time a cliff would show up in the policy's
+own senses it's already committed. So this has to live entirely **above** the
+gait, as a hard reflex that decides whether to command forward motion at all —
+same reasoning as why folding ledges into walk-policy training (Phase 4a)
+just made it timid.
+
+**Decision logic BUILT 2026-09-07** (`pi_pipeline/vision/cliff_guard.py`,
+`CliffGuard` + tests): `EdgeReading` in → `CliffAction` out
+(`NONE`/`SLOW`/`STOP`/`TURN_AWAY_LEFT`/`TURN_AWAY_RIGHT`/`BACK_UP`/`FREEZE`),
+zero-debounce stop, N clear scans to resume, turn *away* from the edge bearing,
+pivot-too-close / boxed-in / floor-lost → `FREEZE`. The detector (`MockEdgeFeed`
+stub) and every `HARDWARE-GATED` config value (turn token, `pivot_safe_dist`,
+`rear_sensing`, …) still need the mounted camera + real-desk tuning. The rest of
+this entry stands.
+
+**Design — a new local reflex, stricter than `Avoider`:**
+- **Zero debounce.** `Avoider` waits a couple of consecutive frames before
+  reacting (avoids flinching at noise). One confident "not floor" reading here
+  is an immediate full stop — no waiting for confirmation. Bias entirely toward
+  false stops over a missed edge.
+- **Preempts everything** — explore mode, patrol, go-to-object, even a direct
+  voice command to keep walking. Sits above the personality/behavior layer, not
+  inside it.
+- **The light classification path** (`vision/scene.py`'s `classes()`, floor vs.
+  edge — no box regression) rather than full object detection: faster, simpler,
+  and every frame counts here.
+- **On trigger:** hard stop, back away from the triggering direction, re-orient
+  toward the confirmed-floor side.
+
+**Making the classifier actually reliable:**
+- **Custom-train it on the real desk**, not a generic "table edge" model — the
+  camera's actual mounted height/angle, multiple times of day, and deliberately
+  including tricky cases (an object near the edge, glare, a shadow crossing the
+  boundary).
+- **Calibrate the confidence threshold toward paranoia** — anything not
+  confidently "floor" counts as "edge." This is the one place in the whole
+  project where excess caution is the *correct* failure mode.
+
+**Buying reaction margin, not just accuracy:**
+- **Slow to creep speed specifically during desk exploration** — more frames
+  pass, less distance covered, before reaching wherever a missed frame put it
+  (the detection feed is ~10–30 FPS and holds stale between frames).
+- **Use the neck/head DOF to actively glance down-and-ahead** periodically while
+  exploring — a level gaze mostly just sees "the floor stopped being visible," a
+  weaker cue than actually seeing the drop. Dog-like, in-character for a curious
+  personality too.
+
+**The honest limit — vision alone can't promise "never":**
+- A physical boundary/lip on the desk as a backstop, at least early on.
+- Gate full *unsupervised* desk-roaming to when the primary bond is detected
+  present (ties into the `personality` bond work), building trust in the
+  reflex under supervision before ever leaving it alone.
+- Log every `CliffGuard` trigger, so false-positive rate and any close calls are
+  visible before loosening the leash.
+
+Needs the camera + a custom-trained classifier — fully gated, nothing to build
+or train on the RL/gait side right now. When the camera lands, this is a day-1
+custom-model priority (project-plan.md Phase 8),
+ahead of [B15].
+
+### B20 — Generic "objects" recognition: a 6th detector class, or a separate Pi-side layer  — PARTIALLY BUILT 2026-09-14 (behind `features.object_gallery`; localizer + embedding model still hardware-gated)
+Design session 2026-09-10. G2 currently only recognizes 5 trained classes
+(household member / spouse / dog / cat / ledge) and isn't expected to grow much
+past that for a while — so any behaviour that needs to notice *arbitrary*
+objects (clutter on the desk, an unfamiliar item) needs a different approach
+than "train another named class per object."
+
+**Two candidate paths — deliberately left undecided until this is built:**
+
+1. **A 6th "objects" class in the existing model.** Trained as a coarse
+   *localizer* only ("something foreign is here"), not a classifier of *what* —
+   identifying the specific thing would be a separate Pi-side step (see below).
+   Needs real labeled training data like every other class (no way around
+   it — there's no free "unknown blob" fallback the frozen firmware exposes;
+   YOLO's internal per-anchor "objectness" score isn't surfaced in this
+   device's serial output, only finished label+box+confidence detections).
+   **Real risk:** a broad, visually-incoherent class sharing the same model as
+   5 tightly-scoped ones can dilute all of them — the person class already
+   needed extra calibration data once (100 images wasn't enough). Would need
+   the same threshold-eval rigor as before before trusting it, and probably
+   needs *more* and *more varied* capture than a single-item class. One model
+   slot stays in use, though — no runtime swapping.
+2. **A separate Pi-side layer — no camera retraining.** Localize via motion /
+   frame-diffing or a pretrained generic saliency model on the Pi, then an
+   embedding/similarity comparison ("have I seen this specific thing before?")
+   to recognize instances without ever training a closed-set class for them —
+   the same idea already used for individual person recognition, generalized.
+   **Zero risk to the trained model's quality**, no new capture burden
+   competing with the 5 classes' budgets. Cost is different: needs raw camera
+   frames (a timeshare with the detection stream on this hardware — can't have
+   both at once) and its own compute budget on a 512 MB Pi with no GPU.
+
+**Build plan (2026-10-07): [`vision/exploration-object-learning-plan.md`](exploration-object-learning-plan.md).**
+
+**Decided 2026-09-14: option 2, the separate Pi-side layer.** Precisely
+because it can't degrade the primary detection — option 1 (6th model class)
+is no longer under consideration.
+
+**Built 2026-09-14, behind `features.object_gallery` (OFF by default, needs
+`vision` + `explore`):**
+- **`vision/object_gallery.py`** — `ObjectGallery`/`GalleryEntry`/
+  `ObjectGalleryConfig`. Pure decision logic (embedding + quality score in, a
+  `GalleryDecision` out — `NEW`/`ADD_SAMPLE`/`DUPLICATE`/`LOW_QUALITY`/
+  `LOCKED`/`REJECTED_AT_CAPACITY`), no I/O, no ML — same shape as
+  `cliff_guard.py`. Answers the storage-space design questions directly:
+  - **dedup** — `same_instance_threshold` (cosine sim, default 0.80) collapses
+    re-sightings into one entry; `near_duplicate_threshold` (0.93) skips
+    saving another sample once one's close enough to be redundant.
+  - **quality filter** — refuses anything under `min_quality` before it's ever
+    compared. The actual pixel score (blur/brightness/crop-size, `curate_
+    captures.py`-style) is the caller's job, same pattern as `Enrollment`'s
+    `face_quality` — keeps this module free of an image-processing dependency.
+  - **a cap, with eviction** — `max_entries` (200 default) plus an optional
+    `max_total_mb` byte ceiling the caller measures and passes in. Eviction is
+    oldest-`last_seen` first, and **never** touches a named or `locked`
+    entry — nothing you cared enough to label is ever silently dropped.
+  - **"enough data" per object** — `locked`, set automatically at
+    `max_samples_per_entry` (5 default) or manually via `mark_complete()`
+    from the review tool. A locked entry keeps recognising (its `last_seen`
+    still updates) but stops accumulating samples.
+  - JSON persistence (`save`/`load`) — `G2_OBJECT_GALLERY_DIR` (`.env`,
+    default `~/.local/share/g2/object_gallery`, same outside-the-repo rule as
+    `memory_db_path`).
+- **`behavior/object_seek.py`** — `ObjectSeek`, the *when is it safe to scan*
+  gate for explore mode. Only proposes a scan when `Explorer`'s decision this
+  tick was `HOLD` or `INVESTIGATE` (already stationary for its own reasons —
+  never asks G2 to stop walking for a photo, and a photo taken while walking
+  would be motion-blurred anyway), rate-limited (`scan_cooldown_s`, 20s
+  default), and skipped outright once the gallery signals no capacity.
+  Priority over "primary systems" is structural, not re-checked here: it's
+  only ever called from `_from_explore()`, which the driver reaches after
+  emergency stop / sleep / enrollment / choreography-safety / "come here" /
+  conversation have all already had first claim on the tick.
+- **Driven into `BehaviorDriver._from_explore()`** — a `SCAN` decision emits a
+  same-tick `CAPTURE` on/off pulse (`("on"/"off", "object_scan")`, the same
+  effect enrollment already uses) plus a `DIAG` event, gated on
+  `object_gallery_enabled and self._vision` (constructor args, mirroring how
+  `vision_available` already works — a runtime caller passes `features.
+  object_gallery` / `features.vision`).
+- **`tools/label_objects.py`** — the review/labeling interface, entirely
+  local (nothing published or uploaded, same rule as `training_data/`):
+  `generate <gallery_dir>` writes a local `review.html` (unlabeled entries by
+  default, `--all` for everything) with each entry's saved crop(s) and a
+  field for every relevant piece of data — name, a free-text note, a
+  "complete" flag, "discard" — plus a client-side "Download labels.json" button (no
+  server, no round-trip through Claude). `apply <gallery_dir> <labels.json>`
+  writes it all back into the gallery's index and deletes the crop files of
+  anything discarded.
+
+**Deliberately NOT built yet (hardware-gated, same as everywhere else this
+applies):**
+- **THE LOCALIZER** — what actually decides "something worth looking at is in
+  frame" (motion/frame-diff or a generic saliency model). Needs the real
+  camera to tune; `object_seek.py` only decides *when* it's safe to try, not
+  *what* to look at.
+- **THE EMBEDDING MODEL** — not chosen. `ObjectGallery` works with whatever
+  vector it's handed, so this is a swap-in once picked, not a rewrite. **A
+  candidate model's real accuracy (does it cluster same-object photos and
+  separate different ones cleanly) and its real inference latency on the Pi
+  Zero 2 W are both testable NOW, pre-hardware** — the Grove Vision AI V2 and
+  the Pi are both already bench-bring-up-done (Phase 6 / Phase 8), just not
+  mounted on the Bittle X body yet. Worth doing before wiring a model in.
+- **Live gallery-capacity feedback into `ObjectSeek`** — `gallery_has_
+  capacity` defaults `True` at the call site for now; threading the app
+  layer's real gallery instance through is the same "driver NOT BUILT
+  (hardware-gated)" gap `Enrollment`'s real driver has.
+- **A real house library at volume** — pre-hardware, the mechanism above only
+  sees whatever passes in front of a stationary bench camera. Tier 1 roam
+  (where the seek hook lives) is voice-armed only and leg-budget-leashed, not
+  continuously running, so real volume also wants the body to exist and roam
+  more than it currently does — a later design question, not blocking this.
+
+### B11 — Learn its way around the house (topological place memory)
+**Plan agreed 2026-10-10 (rooms, phases P0 to P4): [`plan-detail/place-memory-plan.md`](place-memory-plan.md).** P0 = room labels on the saved pictures (`g2pics`, Room button) + `tools/eval_rooms.py`.
+
+G2 builds up a sense of *where it is* over time — as **place recognition + a
+graph of places**, never a metric floor plan (no depth/lidar, and monocular
+VSLAM is out of reach on a 512 MB Pi with a 192×192 low-FPS camera).
+
+**Design explored + deferred 2026-09-10** — a `PlaceModel` (fingerprint
+clustering by detection-label sets, a guided multi-angle head scan before
+confirming a genuinely new place, risk learned from CliffGuard incidents there
++ relaxed after many incident-free visits, plus a human override "you're on
+the desk"/"you're on the floor") was designed and prototyped. **Deferred**: it
+hinges on landmark classes (furniture, doorways) the vision model isn't
+expected to gain soon — with only 5 classes, fingerprints have almost nothing
+to distinguish rooms by. Revisit once [B20] or a landmark-class expansion
+lands; the design above is the starting point, not a rewrite.
+
+**Simpler piece worth building standalone, whenever:** a caution *state*, not
+tied to place recognition at all — defaults cautious, a voice override
+("you're on the desk" → no roam/approach; "you're on the floor" → normal)
+gates Tier 1 roam and "come here", and a real CliffGuard incident (once that
+class is trained) pushes it to HIGH automatically. No clustering, no
+fingerprints, ships independent of the vision model growing.
+
+**First slice built 2026-09-10** — `behavior/place_memory.py` (`PlaceMemory`):
+while roaming, `observe(label, bearing)` accumulates sightings; once a label
+recurs in the same 4-way direction `min_sightings` times it writes a durable
+fact ("the dog is often to the left") via the runtime's `on_observation` seam →
+`Memory.store.add_fact`. Direction-relative-to-usual-spot only — no graph, no
+coordinates, no timestamps. The place *graph* + landmarks below are still TODO.
+
+- **Places:** at a spot, capture the view and store a scene description in the
+  memory DB ("kitchen: checkerboard floor, fridge base on the right, dark
+  doorway ahead"). Match a fresh view against stored ones to re-localize.
+  Matching, cheapest first: Claude compares descriptions → perceptual hash of
+  the thumbnail → image embeddings w/ cosine similarity (if the Grove module or
+  a tiny model can emit them).
+- **Map:** nodes = recognized places, edges = "walked forward ~15 s from A,
+  arrived at B." A graph, not coordinates.
+- **Landmarks:** persistent distinctive objects (fridge, couch, a rug, a door)
+  as anchors; Claude reasons over the detection list ("couch left, TV ahead →
+  living room, facing the hall").
+- **Between anchors:** short-range dead reckoning — gait-cycle count → distance,
+  yaw-rate integration → heading. Drifts; **resets on every recognized place**
+  (topological loop closure).
+- **Storage:** extend `pi_pipeline/memory/` with a `places` table (label,
+  description, hash/embedding, adjacency, last-seen, associated events). Same
+  cross-session mechanism as conversation memory, pointed at location. Needs
+  confidence + decay — furniture moves, doors change.
+- **Known failure modes:** perceptual aliasing (similar corners) → turn-and-scan
+  multi-view + context chaining; lighting/time-of-day drift → several
+  observations per place; low camera height → mostly baseboards/chair legs, a
+  pitch-up glance helps; no global frame, only "this place connects to that."
+
+Realistic end state: reliably answers "which room am I in?" and "roughly which
+way is the kitchen / my charger?", navigates there landmark-to-landmark
+re-localizing at each, and occasionally gets lost and has to wander until
+something looks familiar. Composes with B7 (patrol) and B8 (go-to-object).
+Software on top of vision + link + memory; no new hardware.
+
+**What comes "free" with Claude vs what you build:** the *reasoning* is free —
+match this view to a known place, "couch + TV = living room", pick a heading —
+and early on you can skip embeddings entirely and let Claude compare text
+descriptions. What is NOT free: Claude is stateless per call, so the persistent
+`places` store, loading the relevant subset back into each prompt, the
+perception pipeline that produces the scene description, a cheap retrieval
+pre-filter once the map outgrows the context window (recency / adjacency /
+hash), the actuation loop (intent → serial tokens → monitor → re-query), and
+the local reactive + safety layers. Same split as the rest of the project:
+Claude is the brain on a slow, billed, connectivity-dependent clock; the
+scaffolding that makes its decisions actionable and remembered is the work.
+
+---
+
+## Authoring
+
+### B10 — Teach me a trick
+Grow a persistent bank of user-taught tricks, each saved to the memory DB
+under a name and exposed to `perform_skill` exactly like a built-in skill —
+callable by voice from then on, in every future session. Two tiers, in build
+order:
+
+- **Now, software-only: compose from existing primitives.** "G2, when I say
+  'spin', turn left twice then sit" — Claude chains already-known skills /
+  gestures under a new name via the Skill Composer idea (B3). No new firmware
+  capability needed; works today, even in mock mode. This is "learning" only
+  in the sense of *recording a macro* — no generalisation, no ML — the trick
+  is the literal sequence you named, replayed the same way every time skill
+  selection would replay any other.
+- **Later, hardware-gated: raw joint puppeteering.** `d` (rest) already
+  relaxes the servos, and `j` (`READ_JOINTS`) reads back live joint angles
+  (`pi_pipeline/link/opencat.py`) — so physically posing G2 by hand while
+  polling `j` on a timer is a real, confirmed-from-firmware recording path,
+  not speculative. What that buys you, honestly: the recording is a
+  **sampled** reproduction of your motion (fidelity capped by the polling
+  rate and per-poll serial round-trip, not a continuous mocap-quality copy),
+  and playback drives through those keyframes via `POSITION_CONTROL` the same
+  point-to-point way any scripted skill does — so it will look similar to
+  what you did, not an exact replay of your continuous velocity, and it
+  carries the same "never test a new movement off the stand first" risk as
+  any other new joint sequence, since a puppeted pose you found stable in
+  your hands may not be one the robot can hold or recover from on its own.
+- **Bank semantics:** taught tricks persist in the memory DB (same store as
+  facts/memory, survives restarts), so the library only grows — a name
+  collision with a built-in skill should be rejected or require confirmation,
+  not silently shadow it.
+
+### B25 — Kinesthetic teaching: hand-guided skills recorded from G2's own joints  🟡
+Requested 2026-10-07: try teaching skills by moving G2's legs by hand and recording the joint angles, then replaying them as a skill. This is the
+"raw joint puppeteering" tier of [B10], promoted to its own item so it can be tried on the bench. Servos relaxed (`d`), joints polled with `j`
+(`READ_JOINTS`), keyframes saved under a name and replayed through the same path as any scripted skill. Fits sit, wave, shake, reach; playback has no
+balance feedback, so every new movement is checked in the sim first and then tried on G2 on his feet on the floor, hands near (no held-in-the-air
+tests since 2026-10-09). Reference video to study for technique:
+<https://www.youtube.com/watch?v=rRkVR3PO1o8> (Petoi's step-climb demo, the same motion as B13's reference; reviewed 2026-10-07, a strategy reference only). Decision the same day: skills are **not**
+authored by an LLM writing keyframes.
+
+**Second use (user, 2026-10-10): a climbing movement,** taught the same way after the hi-step works; see B13 and [`plan-detail/high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md).
+
+**First use: a real high-step gait (user, 2026-10-10; planned for the next session that has a charged Pi).** Plan: [`plan-detail/high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md). Petoi's Skill Composer (B3) is the other way to record the step and is to be compared with this first. The scripted options do not lift the
+feet: `hsF` is a knee-folded crouch (17.8 mm clearance against 13.5 mm for the normal walk), `carpetF` was rejected by eye on G2, and the taller
+`hsB`/`hsC` (25-27 mm) fell about 90% of the time open loop in the sim. Steps:
+1. **Make the joint read work.** On 2026-10-10 `j` and `f` at rest returned no joint data, so this comes first. Fallback if it cannot be made to
+   work: the user poses the leg, Claude nudges single joints by command (`i`) until the user approves the pose, and that pose is the keyframe.
+2. **Record one leg's step.** Servos relaxed, the user moves one front leg through the step (lift, reach, plant) and the Pi saves the joint
+   angles as keyframes; then a back leg the same way.
+3. **Build the 4-leg cycle** from those shapes with the normal walk's phase timing (as the `hs*` variants were built from `wkF`).
+4. **Sim check** (`gait_probe.py`): clearance, sway, falls and the ledge ladder; tune the timing until it stands up open loop.
+5. **On G2:** short floor walks, judged by eye; then it replaces `hsF` behind the "hi step" voice mode (`gait/gait_mode.py`).
+6. **Later:** a base for a trained high-step mode (fresh candidate, never on top of a finished 20M).
+
+---
+
+## Self-awareness
+
+### B12 — "I'm running low" — power awareness
+G2 estimates its own remaining runtime and says so, in character, before it dies.
+The PiSugar S has no battery telemetry (only "external power present"), so this
+is a **timer**, not a gauge: track uptime since last on the charger, warn once it
+passes a threshold learned from real battery-life testing, escalate as it nears
+the empirical limit, reset when placed on the charger. Optional later upgrade:
+an ADC on a BiBoard Grove analog pin (G3/G4) reading pack voltage for a true
+signal. Needs battery-life data first (idle / walking / talking / vision-on runs
+to brown-out, repeated). Software on the voice pipeline + memory.
+See the "Power awareness" note in `docs/hardware/parts-and-decisions.md`.
+
+### B18 — Idle power management + "feels alive" idle behaviour  🟡
+Runtime-maximising measures + the lifelike idle layer they hang off. Full
+analysis + the autonomy-impact table in
+[`hardware/pi-power.md`](../hardware/pi-power.md) "Power-management measures".
+**Principle: these are IDLE-STATE levers** — during active exploration the only
+savings are the clean set (efficient gait, disabled peripherals); you can't
+gate what autonomy depends on (vision, gait).
+Rest-pose power order: **REST (`d`) < sit < stand**; there is deliberately no
+standing-idle state (a held stand is the servo thermal gap); REST→walk resume
+is ~1–2 s so only fold when idle > a few seconds.
+
+**DONE**
+- [x] `pi_pipeline.power` — disable-unused peripherals, Wi-Fi power-save toggle
+      keyed to mode, CPU governor `ondemand` (refuses `powersave`).
+      `python -m pi_pipeline.power status|headless|interactive`; boot lines in
+      pi-set-up.md §5.
+- [x] **idle-REST decision layer** — `behavior/idle_posture.py` `IdlePosture`.
+      Staged descent `ACTIVE → SIT → RESTING → WAKING`; gates: `sit_after_s`
+      then `rest_after_s` quiet, `safe_to_rest` (level/stable/not held/not
+      recovering), not told to "stay"; person-present stretches the SIT→REST
+      timer; conversation holds SIT; `handled` (picked up) forces a rouse;
+      emits `PEEK` / `LIFE_SIGN` on the right triggers. Pure FSM + clock, 11
+      tests, `last_reason` for diag. **Emits abstract actions only.**
+
+**The driver loop is built** (`pi_pipeline/behavior/driver.py`, 2026-09-08):
+`BehaviorDriver.tick(DriverInputs) -> DriverTick` composes `ModeController` +
+`Explorer`/`Novelty` + `IdlePosture` + `GesturePicker` + `Enrollment` +
+optional `CliffGuard` and returns an ordered list of abstract `Effect`s
+(SKILL / STOP / WALK / TURN / HEAD / SPEAK / CAPTURE / CUE / DIAG). Still no I/O
+— a binding layer on the robot maps effects onto the actuator / TTS / frame
+grabber / session log. Priority: enrollment > running choreography (safety
+preempts) > CliffGuard reflex > CONVERSE > EXPLORE (+ sniff at a find) > IDLE
+descent (+ idle fidgets when settled). Recognition of a bonded label after an
+absence fires one excited hop. 11 tests, `last_reason` + `DIAG` effects for diag.
+
+**TODO — the motion / "feels alive" layer**
+- [x] **Driver loop** — `BehaviorDriver` (above). Emits `DIAG ("posture", ...)`
+      / `("mode", ...)` / `("enroll", ...)` transition events with `last_reason`.
+- [x] **Settle animation** — `_settle_steps`: look-around (head pan) + weight
+      shift, then the rest skill. Runs as a timed choreography before lie-down.
+- [x] **PEEK choreography** — `_peek_steps`: head-pan sweep + back to centre.
+- [ ] **Breathing bob** — driver emits `Effect(HEAD, "bob")` on `LIFE_SIGN`;
+      the actual body-height oscillation is still caller-side (needs `m`-command
+      or a keyframe). Config `breathing` off by default.
+- [x] **WAKE choreography** — `_wake_steps`: head-up → `kstr` → `kup`, then
+      `on_done` calls `idle.wake_done()`. Also armed when `IdlePosture` enters
+      WAKING via `on_activity()` (loud sound / picked up), not just via a
+      returned WAKE action.
+- [~] **Graduated response motions** — `loud_sound` → full rouse; `nearby_motion`
+      → PEEK (stay down); `picked_up`/`held` → clear any settle choreo and snap
+      to WAKING. A *distant* sound → head-turn-only (no rouse) is not yet a
+      distinct input.
+- [ ] **Sound / LED life signs** — soft sound in deep rest, eye/status LED
+      flicker while resting. (No CUE/LED effects emitted while RESTING yet.)
+- [~] **Personality → idle timing** — `idle_sit_secs` / `idle_rest_secs` added to
+      `BehaviorParams` (with clamp mins) and wired: `BehaviorDriver` builds
+      `IdlePostureConfig` from them unless the caller pins one. Still open: which
+      traits bias them and how much — the same "which traits, how much" call as
+      the rest of this layer; no trait touches them yet.
+- [ ] **On-demand vision gate** — **blocked on the camera** (expected
+      ~2026-09-05 evening; confirm in hand). Split into two consumers, not one
+      throttled feed: (a) a lean **edge-safety stream** (small model, low res,
+      "drop-off in the near field?") at a rate set by stop-distance math — at
+      ~0.10 m/s a <5 fps miss is a 50–100 mm blind gap, so ~5–10 fps *whenever
+      forward motion is possible*, and this one is NOT power-gated; (b) the
+      **rich perception stream** (scene / objects / nav) which scales with
+      activity, 1–2 fps or bursts when stationary. When physically stopped
+      (IMU + gait state confirm), even the safety stream can idle — can't walk
+      off a cliff standing still. Calibrate the detectable-range vs fps
+      numbers once the camera is here.
+- [~] **Sleep-mode state machine — LOGIC BUILT 2026-09-10.**
+      `pi_pipeline/behavior/sleep_mode.py` (`SleepMode`, 11 tests, pure FSM +
+      clock). AWAKE → DOZING → ASLEEP → ROUSING. Auto-sleeps after
+      `sleep_after_resting_s` of continuous `IdlePosture.RESTING` (person-present
+      blocks the *auto* path, not the explicit "go to sleep" command);
+      `min_sleep_s` anti-thrash; wakes on IMU tap / wake word / loud sound (the
+      last toggleable). Emits `ENTER_SLEEP` (caller: `kzz` + camera `Xc` +
+      `python -m pi_pipeline.power headless`) and `WAKE`. Still to wire: the
+      caller that runs those, in the behaviour driver (A8).
+- [x] **Mic privacy — DONE (decision + build, 2026-09-05).** The user weighed
+      the always-on options and chose a **continuous wake word while G2 is
+      powered on** — G2 is session-powered, not a 24/7 fixture, so the exposure
+      is bounded to "on and in `--mode voice`". Built (`voice/loop.py`,
+      `voice/commands.py`): wake phrase **"G2"** (`G2_WAKE_WORD=gee two`); a
+      ~60 s follow-up window (`G2_FOLLOW_UP_S`, resets each exchange, `0`
+      disables) so a conversation doesn't need the name every turn; **"go to
+      sleep"** ends the window; **"forget that"** deletes everything recorded
+      since the wake word (`Memory.forget_session`); nothing is stored until the
+      wake word fires. Still TODO on hardware: a **listening LED** lit whenever
+      the mic stream is open. Parked (future hardening, not now): mic VCC on a
+      GPIO load switch + IMU-tap wake + capacitive "pet to wake" pad.
+
+**Hardware-gated**
+- [ ] Real per-state power budget from an inline current meter (walking / sit /
+      REST / Pi under vision load / Pi asleep) — tunes the sleep timeout, feeds
+      B12.
+
+### B23 — Bounded self-modification: G2 adjusts its own personality knobs from experience
+Logged 2026-09-16, idea stage — not started. G2 already does a narrow form of
+this (calling `remember` on its own initiative during conversation, which then
+shapes future responses). This extends the same principle to the
+`personality/traits.py` / `BehaviorParams` knobs currently only changeable via
+explicit voice command (gir level, narration verbosity, mood decay, idle-REST
+timing, etc.) — G2 noticing a pattern over time and adjusting itself, not just
+storing a fact.
+
+**Guardrails, not blanket permission:**
+- **Explicit allowlist, enforced in code.** Only "personality knob" params —
+  anything already in `BehaviorParams`/traits. Safety-critical logic
+  (emergency stop, thermal governor, `CliffGuard` thresholds, motor limits)
+  is never reachable, not even softly. Hard min/max bounds per param, same
+  pattern as `gir.py`'s `LEVELS=5` clamping intensity between `_LEVEL_LO`/
+  `_LEVEL_HI`.
+- **Trigger on accumulated evidence, not a single turn.** Signal source:
+  `pi_pipeline/diag` session logs — a pattern across multiple sessions
+  ("explore cut short by CliffGuard 3 sessions running," "idle-REST firing
+  fast every evening conversation"), not a one-off reaction.
+- **Transparent + reversible, never silent.** Same convention as gir/narration
+  level changes today (spoken echo-back: "Okay, level 3 — normal detail").
+  Self-adjustments get announced out loud and logged as a durable,
+  inspectable record — what changed, when, why — plus an easy reset to the
+  trait `REGISTRY` defaults, and a rate limit (e.g. one self-adjustment per
+  session) so it can't thrash.
+
+**Staged rollout — how to actually validate this before trusting it:**
+mechanical correctness (bounds enforced, logged, revertible, rate-limited) is
+ordinary unit testing, same as the rest of `pi_pipeline/tests` — no judgment
+calls needed there. Whether the *adjustments themselves* are good is the hard
+part, since that's a subjective call about whether G2 got more pleasant to
+live with, not a metric. Trust it in stages:
+1. **Shadow mode** — G2 computes and logs what it *would* change, doesn't
+   apply anything. Review the log periodically, judge the reasoning with zero
+   risk before any of it takes effect.
+2. **Suggest, don't apply** — same detection, but G2 asks out loud instead of
+   acting ("I've noticed X — want me to dial back Y?"), routed through the
+   same confirm-before-acting pattern already used for anything consequential.
+3. **Auto-apply, easy revert** — only after (1) and (2) look consistently
+   reasonable, starting with the lowest-stakes knob (narration verbosity is
+   the natural first candidate — already reversible, already low-stakes).
+
+**Cheapest possible prototype, no new tool required:** let G2 `remember` a
+specific *kind* of fact — a preference override, same storage as everything
+else it remembers today — and have `Personality.behavior_params()` check for
+that category of memory when composing params each session. Tests whether the
+concept feels right in practice before building a dedicated tool with real
+guardrails around it.
+
+### B24 — Agency: G2 forms its own goals, not just executes rule-based autonomy
+Logged 2026-09-16, idea stage — deliberately **not a near-term item**.
+Explicit sequencing from the user: validate the existing base work
+(hardware bring-up, gait, voice, behavior driver — everything already
+built) running reliably first; agency and self-modification ([B23]) are a
+later phase once that foundation is solid, not concurrent with it.
+
+**The distinction that matters:** autonomy of *movement* (already partly
+built — explore mode, idle-REST, sleep all run as state machines without a
+person prompting each step) is not the same as autonomy of *decision-making*
+(mostly not built — those state machines follow fixed rules; Claude mainly
+handles conversation, not moment-to-moment behavior choices). Agency means
+the second one: G2 forming its own short-term goals ("I haven't checked the
+living room in a while") and acting on them, rather than executing a
+pre-built behavior tree — handing more real-time decisions to Claude's
+judgment instead of deterministic FSM logic.
+
+**Concrete axes this could extend along, once revisited:**
+- **Goal-formation** — Claude deciding what to do next during idle/attentive
+  ticks, not just the driver's fixed priority order.
+- **Initiative** — G2 speaking up or acting unprompted (beyond today's
+  rule-triggered chirps/reactions), based on its own judgment that something
+  is worth mentioning or doing.
+- **Priorities/drives** — something adjacent to homeostatic "wants," beyond
+  today's mood-from-memory ([B6]) and static personality traits.
+
+**The core tension, already partly navigated once:** the project has already
+made one deliberate call on exactly this tradeoff — explore mode's "roam"
+tier (actual walking around) requires explicit voice permission ("go ahead
+and look around"), while only the passive "attentive" tier runs always-on
+(see `project_explore_two_tier` memory). That precedent — gate the more
+agentic behavior behind consent — is the likely starting posture for
+extending agency further, not open-ended self-direction. More agency in a
+physical robot living with a family trades directly against predictability:
+the more G2 decides for itself, the harder it is to guarantee it won't do
+something inconvenient, unsafe, or just annoying at the wrong moment.
+
+**Relationship to [B23]:** complementary, not the same idea. B23 is
+narrow — G2 tuning its own existing personality *parameters* from evidence.
+B24 is broader — G2 forming and acting on its own *goals* in the first
+place. B23 is the more tractable, lower-risk piece and the more natural
+first step if/when this gets picked back up.
