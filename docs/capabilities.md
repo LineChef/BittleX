@@ -15,9 +15,10 @@ the *what*, kept current as capabilities land.
 | 🧩 | **Built, hardware-gated** — code complete and tested against mocks; needs the physical robot or camera to exercise and tune |
 | 🔬 | **Researched / parked** — investigated, outcome recorded, not currently active |
 
-Most on-robot behaviour is still 🧩: the logic exists and is unit-tested with the hardware
-mocked. What has actually been exercised on the robot, what is deployed, and what is
-broken right now is in [`STATUS.md`](STATUS.md) — this file does not repeat it. Run
+The 🧩 items are the ones not yet exercised on the robot; much has been since the first walk
+(voice, memory, exploration, the wall avoider and the learned gait all run on G2). What has actually
+been exercised, what is deployed, and what is broken right now is in [`STATUS.md`](STATUS.md) — this
+file does not repeat it. Things not built yet (the Petoi AI Head, the robot-arm module, place memory, reflection beyond its log-only mode) are in [`planned/`](planned/README.md), not here. Run
 `pytest` for the current test results (no counts are quoted in the docs).
 
 ---
@@ -31,13 +32,13 @@ broken right now is in [`STATUS.md`](STATUS.md) — this file does not repeat it
 | Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography | 🧩 |
 | Personality | Composable traits (curiosity, playfulness, "Gir" character mode), mood model, per-person bonds — all `.env`-driven | ✅ |
-| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03 | ✅ mic + Claude control verified / 🧩 speaker |
+| Voice | Wake-word → local STT → Claude conversation → local TTS, with `perform_skill` / `remember` / `diagnostics_query` tool-calls, live chirps/narration-verbosity toggles, and graceful degradation when the API is down. Mic → wake word → Claude → a real walk verified on G2 2026-10-03 | ✅ on G2 (mic, speaker, Claude, real walk) |
 | Memory | Persistent fact store with recall, a CLI, and a localhost web UI | ✅ |
 | Vision | Custom 3-class detector (household member + dog + cat) running **on the camera**; obstacle-avoidance reflex + "what do you see" narration wired to the feed | ✅ model / 🧩 mounted camera |
 | Safety reflexes | Jam reflex, servo thermal guard + governor, cliff/edge guard, watchdog, sleep mode, carpet detector | 🧩 |
 | Diagnostics | Black-box structured logger with manifest + crash hook, SoC/throttle/battery sampler, gait watchdog that halts on stall, queryable by voice (`diagnostics_query`: session summary / last failure / feature status) | ✅ logic / 🧩 HW sensors |
 | Power | Idle-REST staged descent + sleep mode (real power-profile switch, camera off) fully built and tested; on-demand vision is still just binary on/off, not scaled to activity | ✅ logic / 🧩 tuning |
-| Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ logic / 🧩 cable |
+| Robot link | One shared serial link with auto-reconnect, command builders, a dangerous-command denylist, and a bring-up self-test | ✅ |
 
 ---
 
@@ -122,11 +123,11 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
     bout cap, a leg-budget leash, or "that's enough" — and disarms, so each bout
     needs re-arming. Gated by `features.vision`; the desk-edge classifier (B16)
     upgrades it for near-edge use.
-  - **Exploration, as of 2026-10-09** (user decisions): the start is a rising "ba nun na NAAA" fanfare (buzzer arpeggio, brass-like on the speaker); each leg is 7 s and ends
+  - **Exploration, as of 2026-10-09** (user decisions): the start is a rising "ba nun na NAAA" fanfare (buzzer arpeggio, brass-like on the speaker); each leg is 8 s (since 2026-10-10) and ends
     in the standing pose, never lying down (rest only at the end of the session or on a fall); picture stops are at most one a minute and only when something is worth a picture
     (`behavior/interest_watch.py`: an unknown object-like thing or an unfinished named object, never a person; a slow fallback every 5 min), and the camera prep (the settle frames)
     is done for the first picture and once half way; no head gestures and no recognition hop (`G2_HEAD=1`, `G2_EXCITED_HOP=1` bring them back), a short play bow at a find instead;
-    the wall estimator (`vision/wall_distance.py`) only LOGS what it would do (`~/.local/share/g2/wall_dryrun.jsonl`) until it is calibrated and the user says to wire it in.
+    the wall estimator (`vision/wall_distance.py`) is wired in since 2026-10-10: a near wall makes G2 turn away with a sound, and an IMU contact signal starts the hit sequence (oof, back up, turn around); see [`guides/exploration-mode.md`](guides/exploration-mode.md).
     Gait switching: "hi step" / "walk normally" from any mode (voice loop or exploration), a double beep on a switch; today hi step is the scripted hsF gait (experimental), because the deployed policy has no hi-step mode.
     Stop a running session with `tools/g2_safe_stop.sh` (stop, balance, rest), never a plain service stop.
   - **"Come here"** (`behavior/approach.py`) — a directed one-shot walk toward
@@ -184,7 +185,7 @@ link, **mock by default, `--serial` on the robot**. All 🧩.
 ## Voice
 
 `pi_pipeline/voice/` — ✅ end-to-end against mocked audio and the **live Claude
-API** (`livecheck.py`, last run all-pass); 🧩 on a real mic + speaker.
+API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
 
 - **Full loop** — wake word → Vosk local speech-to-text → Claude conversation
   turn → Piper local text-to-speech, with follow-up windows and silence timeouts.
@@ -413,7 +414,7 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
 
 ## Robot link
 
-`pi_pipeline/link/` — ✅ logic; 🧩 the physical serial cable.
+`pi_pipeline/link/` — ✅ logic and the physical serial cable (in use since the first bring-up).
 
 - **One shared serial link** — voice, vision, and RL deployment all send through
   it; opens and **reconnects on cable pull** without crashing its caller.
@@ -437,13 +438,13 @@ All 🧩 — logic complete and unit-tested; thresholds need the real robot.
   decathlon, `watch_trained.py` with a vision ray-fan overlay, and `run20m_ppo`
   itself.
 - **Companion pipeline** — `pi_pipeline/`: every module above, every
-  hardware-specific stage behind a mock/real seam, `.env`-driven config, 599
-  tests, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
+  hardware-specific stage behind a mock/real seam, `.env`-driven config, a
+  test suite that needs no network, audio or key, `setup_pi.sh` + `fetch_models.sh` for a headless Pi Zero 2 W.
 - **The vision recipe** — a reproducible path to a custom on-camera detector for
   the frozen-firmware Grove Vision AI V2, with tooling in `tools/gv2/`.
 - **Deployment stack** — ONNX export + on-robot control loop, sim-validated.
 - **Documentation** — `docs/`: the living [`project-plan.md`](project-plan.md),
-  [`how-it-works.md`](how-it-works.md), a behaviour-ideas backlog, and
+  [`how-it-works.md`](how-it-works.md), [`architecture.md`](architecture.md), a behaviour-ideas backlog ([`planned/`](planned/README.md)), and
   subject-organised guides / vision / hardware / RL folders.
 
 ---
