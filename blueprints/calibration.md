@@ -2,7 +2,7 @@
 
 Real joint calibration on G2's BiBoard, done after the firmware reflash
 wiped the previous coarse/factory calibration (see
-`docs/hardware/petoi-firmware-reference.md` for the reflash itself).
+[`docs/hardware/petoi-firmware-reference.md`](../docs/hardware/petoi-firmware-reference.md) for the reflash itself).
 
 ## Procedure used
 
@@ -52,6 +52,15 @@ difference): **all four feet came down level both times.** Calibration
 confirmed good.
 
 This is the same pose used earlier (2026-09-28, pre-reflash) to rule out
-a per-leg zero-point offset while chasing the `vtF` stumble — see
-`project_hardware_arrived` memory / `docs/project-plan.md` Phase 4 for
-that investigation.
+a per-leg zero-point offset while chasing the `vtF` stumble; see
+[`../docs/plan-detail/phase4-hardware-assembly.md`](../docs/plan-detail/phase4-hardware-assembly.md)
+for that investigation.
+
+## After the front-left shoulder servo was replaced (2026-10-06)
+
+The front-left shoulder servo (servo 8) was replaced on 2026-10-06 and the
+joint calibration was redone afterwards; the date of the second calibration was
+not recorded. The walking evidence for the swap (drift fell from about 140 to
+about 40 degrees per 12.5 s) is in [`../docs/rl/real-walk-log.md`](../docs/rl/real-walk-log.md).
+Re-run the procedure above and the `kbalance` check after any servo
+replacement.
