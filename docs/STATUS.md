@@ -14,7 +14,7 @@ Each row carries the date it was last confirmed. The long dated write-ups that u
 | Microphone and speaker | I²S mic and amp installed and working (2026-10-04). The mic is very quiet, so a software gain is applied. [`blueprints/build-logs/i2s-audio-build-log.md`](hardware/build-logs/i2s-audio-build-log.md) |
 | Mass | About 422 g; about 46% of the weight over the front feet (2026-10-07) |
 | Pi battery | PiSugar S 1200 mAh, no readout. Measured full-charge runtime 3.28 h (mean of three runs, 2026-10-10); warning at 70% of it (about 2.29 h), critical at 80% (about 2.62 h). Recharge from flat takes about 40 minutes |
-| Petoi AI Head | Mounted on G2 (owner, 2026-10-18), 42 g, counted in the payload (details and the sim's numbers: [`hardware/specs.md`](hardware/specs.md)). A tool server on the Pi was reached from the head (2026-10-11). Plans: [`planned/ai-head/`](planned/ai-head/README.md) |
+| Petoi AI Head | Mounted on G2 (owner, 2026-10-18), on stock Petoi firmware, 42 g, counted in the payload. Used as an extra LLM by pressing its button; Claude stays the main brain. Wired to G1 with data, so its model can move G2 and change firmware settings (it sent `g`, the gyro toggle, in a test): use it only while G2 is idle or resting (details and the sim's numbers: [`hardware/specs.md`](hardware/specs.md)). A tool server on the Pi was reached from the head (2026-10-11). Plans: [`planned/ai-head/`](planned/ai-head/README.md) |
 | Robot arm | A Petoi Bittle X+Arm module arrives the week of 2026-10-19, not installed: [`planned/robot-arm.md`](planned/robot-arm.md) |
 | Attachments | One setting (`G2_ATTACHMENT`, `g2attach none\|head\|arm`) says what is on the neck and switches the gait policy saved for it, the firmware check and the arm's skills. Built 2026-10-18; G2 is on `none` until it is set. No gait is saved yet for any attachment (`none` with nothing saved = the legacy behaviour); the arm's firmware and skills are untested: [`guides/attachments.md`](guides/attachments.md) |
 
@@ -53,7 +53,7 @@ Each row carries the date it was last confirmed. The long dated write-ups that u
 
 ## Decisions pending
 
-- **Petoi AI Head:** implementation starts when the owner says; step 1 is the capacity and microphone spike. [`planned/ai-head/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md). Do not remove the Pi before the scorecard is filled.
+- **Petoi AI Head:** scope changed 2026-10-18: the head's LLM is an extra used by its button, Claude stays the main brain, nothing is integrated for now (see the plan doc's section 0). The BiBoard voice module switched to Korean again shortly after the head was wired to G1; whether the head caused it is unproven. [`planned/ai-head/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md). Do not remove the Pi before the scorecard is filled.
 - **A new 20M** starts only on the user's go and never on top of a consolidated 20M.
 - **Gait comparisons on G2** are not run (sim only, user rule 2026-10-09), so the original scripted-vs-learned hardware comparison (H1) is not being pursued.
 

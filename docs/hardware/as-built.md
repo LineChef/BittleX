@@ -21,6 +21,7 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 | Link | How |
 |---|---|
 | Pi to BiBoard | 5-pin header (TX2, RX2, GND, +5V, +5V); only TX, RX and GND are wired, so the two power systems stay separate. UART at 115200 on `/dev/serial0`. BiBoard module flags set: Serial-2 and the onboard voice module |
+| AI head to BiBoard | Servo in the stock head's servo port; Grove cable in G1 (UART2) with all four wires, so the head shares UART2 with the Pi and can send firmware commands (skills, rest, `g` = gyro toggle) when you talk to it. Kept this way by the owner's choice (2026-10-18) with the rules in [`../guides/operating-g2.md`](../guides/operating-g2.md); the no-risk alternative is power without the data lines, through a spare Grove cable or adapter with only +5 V and GND (the head's own cable is one molded plug) |
 | Pi to camera | USB |
 | Pi to mic and amp | The 40-pin header, I²S (`googlevoicehat-soundcard` overlay) |
 | Wi-Fi | Home network, with a phone hotspot saved as a backup |

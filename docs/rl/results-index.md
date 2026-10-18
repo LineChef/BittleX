@@ -257,7 +257,7 @@ Docs that mention this family: [`shell-helpers.md`](../guides/shell-helpers.md),
 
 ## `report`
 
-Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +32.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +33.
 
 | File | Size | Cited by |
 |---|---|---|
