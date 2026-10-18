@@ -67,6 +67,11 @@ class Survey:
             return False
         return True if self.gate is None else bool(self.gate(t))
 
+    def idle_s(self, now: float | None = None) -> float:
+        """Seconds since the last survey stop began (a session's first survey counts from `cooldown_s - first_delay_s` ago, so it can come early in a roam)."""
+        t = self._clock() if now is None else now
+        return t - self._last
+
     def began(self, now: float | None = None) -> None:
         self._last = self._clock() if now is None else now
 

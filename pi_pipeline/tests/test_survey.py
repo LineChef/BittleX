@@ -410,3 +410,33 @@ def test_a_survey_stop_runs_the_firmware_check_skill_between_the_bow_and_the_sta
     assert survey_config_from_env().check is True
     monkeypatch.setenv("G2_SURVEY_CHECK", "0")
     assert survey_config_from_env().check is False
+
+
+def test_a_finished_wall_turn_is_also_a_place_for_a_survey_picture(monkeypatch):
+    """2026-10-18: in a tight space the wall reflex fires every few seconds, a leg never ends cleanly and a 3-minute roam took no picture."""
+    from pi_pipeline.vision.wall_distance import WallReading
+    d, c = mk()
+    d.tick(DriverInputs(arm_explore=True, frame=[]))
+    walking(d)
+    c.adv(30.0)                                                                  # past the survey's first delay
+    d.tick(DriverInputs(frame=[], wall=WallReading(c() - 0.2, "near", 9.0, "left", True, 4, 2, None, None)))
+    assert d._wall_turn_until > c()
+    c.adv(2.0)
+    t = d.tick(DriverInputs(frame=[]))                                           # the turn is still being held: no survey yet
+    assert not [e for e in t.effects if e.kind is EffectKind.SKILL]
+    c.adv(2.5)                                                                   # the hold has ended
+    t = d.tick(DriverInputs(frame=[]))
+    assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["ksit"] and ("survey.start", "after a wall turn") in [e.payload for e in t.effects if e.kind is EffectKind.DIAG]
+    monkeypatch.setenv("G2_SURVEY_AFTER_WALL", "0")
+    d2, c2 = mk()
+    d2.tick(DriverInputs(arm_explore=True, frame=[])); walking(d2); c2.adv(30.0)
+    d2.tick(DriverInputs(frame=[], wall=WallReading(c2() - 0.2, "near", 9.0, "left", True, 4, 2, None, None)))
+    c2.adv(4.5)
+    assert not [e for e in d2.tick(DriverInputs(frame=[])).effects if e.kind is EffectKind.SKILL]
+
+
+def test_the_survey_gate_opens_after_a_minute_without_a_picture():
+    s = Survey(SurveyConfig(cooldown_s=60.0, first_delay_s=0.0), clock=lambda: 1000.0)
+    assert s.idle_s(1000.0) == float("inf") or s.idle_s(1000.0) > 1e6                  # no picture yet
+    s.began(1000.0)
+    assert s.idle_s(1030.0) == 30.0 and s.idle_s(1061.0) >= 60.0

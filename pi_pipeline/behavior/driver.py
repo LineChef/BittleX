@@ -616,6 +616,13 @@ class BehaviorDriver:
             return steer
         if self._roam_began_at is None:
             self._roam_began_at = now
+        # A wall turn-away that has just finished is also a place to stop for a picture (2026-10-18: in a tight space a leg never ends cleanly, the wall reflex fires every few seconds,
+        # and a 3-minute roam took no survey picture). The usual cooldown and gate apply; `G2_SURVEY_AFTER_WALL=0` turns it off.
+        if (self.survey is not None and self._vision and self._last_wall_reaction > -1e8 and self._wall_turn_until <= now < self._wall_turn_until + 6.0
+                and os.environ.get("G2_SURVEY_AFTER_WALL", "1") != "0" and self.survey.ready(now) and not self.explorer.listening(now)):
+            self.survey.began(now)
+            self._choreo.start("survey", _plan_steps(survey_plan(self.survey.cfg)), now=now)
+            return self._choreo.pump(now) + [Effect(EffectKind.DIAG, ("survey.start", "after a wall turn"), "survey stop")]
         w = i.wall
         if w is not None and w.nearest_in is not None and now - w.t <= self.WALL_STALE_S and w.nearest_in <= 60.0:
             self.explorer.cap_leg(max(1.5, (w.nearest_in - self.LEG_MARGIN_IN) / self.LEG_SPEED_IN_S))      # a wall ahead: cut this leg to what is left before it (look once per leg, shorten the walk)

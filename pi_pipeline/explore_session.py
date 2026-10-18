@@ -73,7 +73,11 @@ def _start_interest(survey, saver, vision, rt, settings, args):
                           active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
     seen_near = {"t": -1e9}                                               # when a wall was last seen NEAR_LOOK_IN (30 in) or closer (set by the wall look below)
 
+    relax_s = float(os.environ.get("G2_SURVEY_RELAX_S", "60"))             # 2026-10-18: after this long with no picture the near-wall and interest requirements are lifted (a tight room never opened the gate); 0 = never
+
     def _gate(now=None):
+        if relax_s > 0 and survey.idle_s() >= relax_s:
+            return True
         if time.monotonic() - seen_near["t"] <= 20.0:                     # surveys only when he is FAR from a wall (user, 2026-10-10): the same 20 s window as the fast wall looks; a survey also holds off the wall guard
             return False
         return watch.gate(now)
