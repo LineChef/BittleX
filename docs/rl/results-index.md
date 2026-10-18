@@ -267,7 +267,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +36.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +39.
 
 | File | Size | Cited by |
 |---|---|---|

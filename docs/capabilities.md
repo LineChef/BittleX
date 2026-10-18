@@ -106,7 +106,7 @@ feed, sensors, mood recency, bonded roster), and dispatches the effects.
 (`app/sinks.py`), a `SensorHub` that turns the IMU stream + detection feed into
 the driver's continuous inputs (`app/sensors.py`), and `python -m pi_pipeline.app`
 — the voice loop and the behaviour runtime running side by side over one shared
-link, **mock by default, `--serial` on the robot**. Exploration sessions (voice hand-over, `g2explore`) run the behavior runtime on G2; the full `app --serial` over a long run is still to do.
+link, **mock by default, `--serial` on the robot**. Exploration sessions (voice hand-over, `g2explore`) run the behavior runtime on G2; the full `app --serial` over a long run is still to do. Since 2026-10-18 an exploration can also run inside the voice service (`G2_EXPLORE_INPROCESS=1`, off by default and not yet tried on G2): one process, the same link, walker, memory, speech engine and microphone, no stop and restart of `g2-voice`.
 
 - **Modes** — `converse` / `idle` / `explore`, with a controller that switches
   between them.
@@ -175,6 +175,9 @@ link, **mock by default, `--serial` on the robot**. Exploration sessions (voice 
   interaction history; notices being rebuffed. Wired: the voice loop feeds it
   interaction recency each turn and folds its one-line hint into the system
   prompt; the behaviour driver applies its idle-timing bias.
+- **Body state** (`personality/body.py`, 2026-10-18; 🧩 not yet tried on G2) — a low-battery alert, a recent fall and how the
+  last exploration went add one sentence to each turn's mood hint and make idle settling come sooner (low battery, after a fall).
+  Every note expires by itself; servo heat is not an input.
 - **Bonds** (`G2_BONDS`) — per-person familiarity + disposition
   (affectionate / playful / fearful …) that colours how G2 greets and reacts.
   Personal identifiers live only in the gitignored `.env`.
@@ -246,6 +249,9 @@ API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
   browse, add, forget, and (confirmed) wipe.
 - **Importance and a core block** — facts carry an importance and a core flag; core facts are always in the prompt, the rest are
   recalled by relevance. A privacy rule keeps dates, times and schedules out of facts.
+- **Exploration recaps as sightings** (2026-10-18; 🧩 not yet tried on G2) — each exploration's recap (what the detector saw at the
+  survey stops, the room, bumps, falls) is saved as a sighting, and "where's the chair?" / "what did you find exploring?" recall it.
+  Local data only, no extra API call.
 - **Sightings and consolidation** — a date-only, text-only sightings log; a sleep-time consolidation pass merges and prunes
   facts with an audit log (`python -m pi_pipeline.memory consolidate`; only dry-run so far).
 - **Memory-use log** — per-fact counters of how often a fact was injected, declared and matched, with a report
@@ -347,6 +353,12 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
   `vcgencmd` throttle flags, battery voltage sag — emits rate-limited
   `battery.sag` / `pi.thermal_throttle` events; no-ops where a reader returns
   nothing.
+- **Session report** (`python -m pi_pipeline.diag report [SESSION] [--html out.html]`, 2026-10-18) — one page per session from
+  the logs that used to be read one by one: walks (end reasons, late ticks, floor), behaviour transitions, narration timing,
+  walks that did not stop in time, wake triggers, billed API calls, camera timeouts, worker restarts, every WARN+ event, the profile.
+- **Supervised workers** — the camera reader and (since 2026-10-18, backlog B27) the microphone stream are restarted by
+  `util/supervisor.py` when they die or stall; restarts are diagnostics events.
+- **Lint** — `ruff check` with correctness rules only (undefined names, mutable defaults, syntax errors), run by the pre-commit hook.
 - **Feature flags** (`G2_FEATURES`, `docs/guides/feature-flags.md`) — staged
   bring-up: perception / vision-nav stack gated **off** until a real detector
   exists.

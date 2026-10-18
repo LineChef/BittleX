@@ -222,6 +222,7 @@ The behavior runtime (`BehaviorDriver`, `BehaviorRuntime`, `app/`) is built and 
 [`plan-detail/phase10-integration.md`](archive/plan-detail/phase10-integration.md).
 
 - [ ] All four systems running alongside each other without conflicts; run `python -m pi_pipeline.app --serial` on the robot.
+- [x] One process for voice and exploration (2026-10-18, user-approved plan): `explore_session.run_session` runs standalone or inside the voice service (`G2_EXPLORE_INPROCESS=1`, off until tried on G2), borrowing the service's parts; the systemd hand-over stays the fallback. Also approved and built: per-session report, exploration recaps as memory sightings, body state in the mood, per-floor trims. Ruled out by the user: the jam guard and the thermal governor in this plan, and naming floors automatically (floor labels are always set by a person). [`STATUS.md`](STATUS.md)
 - [ ] Expect timing/integration bugs even after each piece passes alone.
 - [ ] README final setup instructions and a demo; a pinned dependency list.
 - [ ] INSPECT peer bow: done and sim-validated, needs on-robot tuning.

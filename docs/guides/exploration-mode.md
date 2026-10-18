@@ -9,6 +9,7 @@ Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and te
 
 - **By voice:** "G2, explore" (also "go ahead and look around", "exploration mode"). He says "Exploration mode.", waits 1 s, plays the Viking horn, and hands over: the voice service stops and
   a separate exploration session starts (about 30 s). The session lays him down first, then he stands with the eased stand-up and begins.
+- **In the voice service (opt-in, 2026-10-18, not yet tried on G2):** with `G2_EXPLORE_INPROCESS=1` the voice command runs the exploration inside the voice service instead: no stop and restart, no second load of the speech models, the same microphone; the service's stand guard, battery watch and sleep watch stand aside until it ends, then the voice loop carries on. It needs `explore`, `vision` and `vision_safety` on in the service's own `G2_FEATURES`; otherwise the separate session runs as above.
 - **By script:** `bash tools/g2_explore.sh start [ROAM_S]` (default 600 s; `0` = no cap), or `stationary` for the stay-put mode. Status, logs and a clean stop: `status | logs | halt | stop`.
 - Needs: a cleared area with no edges (there is no edge detector), G2 on his feet or at rest on the floor, the BiBoard powered, the pack not low. Never on a desk or the stand.
 - Do not deploy to the Pi while a session runs: a deploy at the same moment as a crash left him circling (2026-10-10).
@@ -63,7 +64,9 @@ However it ends (even a crash) the unit sends rest (`d`) before the voice servic
 
 - `journalctl -u g2-explore` on the Pi (or `bash tools/g2_explore.sh logs`): turns, `g2.wall.steer`, `g2.wall.hit`, chirps, pictures.
 - `G2_PROFILE=1 bash tools/g2_explore.sh start 240` writes `profile.txt` in the session's diagnostics folder (`~/g2_logs/<session>/`): which threads use the CPU and where. Each walk's log sidecar (`~/g2_runs/auto/<date>/*.json`) records `late_ticks_pct` and `worst_tick_gap_ms`.
-- **Narration** is fixed text chosen from what he does and sees (new leg, a wall about N inches ahead and which way he turns, a bump, straight starts); a local voice speaks it, no API call. Lines come at least 5 s apart, the same kind after 25 s.
+- **Narration** is fixed text chosen from what he does and sees (new leg, a wall about N inches ahead and which way he turns, a bump, straight starts); a local voice speaks it, no API call. Lines come at least 5 s apart, the same kind after 25 s. Since 2026-10-18 the synthesised lines are cached on disk (`~/.cache/g2/speech`, `voice/speech_cache.py`) and the fixed ones are made a minute after the voice service starts, so a session says them without synthesising; a line not ready 8 s after it was decided is dropped; each line logs `narration timing:` (queue, synthesis, play).
+- `python -m pi_pipeline.diag report --html out.html` (on the Pi): the whole session on one page, including the speech lag, walks that did not stop in time and camera timeouts.
+- After the session, its recap is kept in `~/.local/share/g2/experiences.jsonl` ("how was your exploration?"), saved as a memory sighting ("where's the chair?") and noted in the body state (`personality/body.py`).
 - `~/.local/share/g2/wall_dryrun.jsonl` and `python -m pi_pipeline.vision.wall_stats`: every wall look in inches, the state, the turn it would make, the saved near-wall pictures.
 - `~/g2_runs/auto/<date>/`: the policy walk logs (CSV plus a JSON sidecar).
 - `~/.local/share/g2/noise.jsonl`: every command sent to the BiBoard, with the source that sent it.

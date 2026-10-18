@@ -49,6 +49,17 @@ cues   = p.cues("novelty")                      # -> ["head_tilt", "chirp_rising
 
 `voice/conversation.py` already calls `system_prompt()` at construction.
 
+## Body state (`body.py`)
+
+How the body has been doing lately, kept in `~/.local/share/g2/body_state.json` (`G2_BODY_STATE`, `off` turns it off) so the
+voice service and an exploration session, which can be separate processes, both write it:
+
+- `note_battery(level)` from the low-battery alert, `note_fall()` from the walker and stand guard fall handlers,
+  `note_exploration(recap)` at the end of an exploration.
+- `hint()` → one sentence the voice loop adds to each turn's mood hint ("Your battery is low: ...", "You fell over a little while ago ...",
+  "Your last exploration went well ..."). `idle_mult()` → 0.6 / 0.75 / 1.0 on the idle delays, through the behaviour runtime.
+- Notes expire: battery 2 h, fall 30 min, exploration 3 h. Servo heat is deliberately not an input.
+
 ## Bonds (B15) — per-individual relationships
 
 `bonds.py` is a separate, self-contained piece: how G2 relates to **specific**

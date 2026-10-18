@@ -59,6 +59,8 @@ Never put G2 on his back; tests start on his feet with your hands near. More: [`
 | `g2baseline start|stop|status|logs|fetch` | the same walks with more options; `fetch` copies the logs to the Mac |
 | `g2turns start|fetch` | logged firmware turn runs, to measure the real turn rate |
 | `g2walklog <log.csv>` | summarize a walk log: roll, pitch, yaw, the first fall, battery |
+| `python -m pi_pipeline.diag report [SESSION] --html out.html` | one report for a session (on the Pi): walks, speech lag, wake triggers, API calls, camera timeouts, problems |
+| `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` | save a trim measured on one floor for the fitted attachment's gait (`off` removes it); used when `g2floor` is set and under 12 h old |
 | `g2imu rest|stand [secs]` | record the raw IMU on the Pi and print its rate, bias and noise (stop the voice service first with `g2stop voice`) |
 
 To walk by hand on the Pi (`g2stop voice` first, then `g2ssh`, then `cd ~/bittleX`):
@@ -113,6 +115,7 @@ Building the camera's detection model (capture, curate, promote, upload to Sense
 | `g2audio devices|wake|stt|tts` | audio diagnostics |
 | `g2reset` | restart the voice loop on the Pi |
 | `g2api [hours]` | what the voice loop has cost in API calls |
+| `python -m pi_pipeline.voice.wake_log --days 7` | wake triggers: how many looked false, their confidence and words-before counts, and a suggested `G2_WAKE_MIN_CONF` |
 
 The things you can say: [`voice-commands.md`](voice-commands.md). Settings and switches: [`settings-switches.md`](settings-switches.md).
 
@@ -171,6 +174,7 @@ Never send `Xa` or `XAd`.
 | `g2docsgen` | regenerate the generated docs: backlog, shell-helpers, results index |
 | `g2clean` | list scratch files on the Mac and Pi; `g2clean --apply` deletes them. Run before reporting a task done |
 | `g2test` | the `pi_pipeline` test suite |
+| `pi_pipeline/.venv/bin/ruff check` | lint, correctness rules only (the pre-commit hook runs it on staged `.py` files) |
 
 Where each kind of change is written down: [`../README.md`](../README.md#where-to-update-what). `git commit --no-verify` bypasses the hooks for a genuine false positive.
 

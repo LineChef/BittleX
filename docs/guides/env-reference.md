@@ -80,7 +80,7 @@ Every `G2_*` variable the Pi code and the tools read: **208**, of which **0** ar
 | `G2_EXCITED_HOP` | `"0"` | `gestures.py` | [`capabilities.md`](../capabilities.md) |
 | `G2_EXPERIENCES` | `DEFAULT_PATH` | `recap.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_HANDOVER` | `"1"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_EXPLORE_INPROCESS` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_EXPLORE_INPROCESS` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`exploration-mode.md`](exploration-mode.md) +2 |
 | `G2_EXPLORE_PICTURES_DIR` | `DEFAULT_ROOT` | `explore_session.py`, `exploration_pictures.py`, `promoted_loader.py` +1 | [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_ROAM_S` | `600.0` | `config.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_EXPLORE_SURVEY` | `"1"` | `explore_session.py` | [`exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md) |
@@ -91,8 +91,8 @@ Every `G2_*` variable the Pi code and the tools read: **208**, of which **0** ar
 | `G2_FAST_LLM_BASE_URL` | — | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
 | `G2_FAST_LLM_MODEL` | — | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
 | `G2_FAST_LLM_SEES_MEMORY` | — | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
-| `G2_FEATURES` | `""` | `config.py` | [`.env.example`](../../.env.example), [`architecture.md`](../architecture.md), [`capabilities.md`](../capabilities.md) +8 |
-| `G2_FLOOR_TRIM_MAX_AGE_H` | `FLOOR_LABEL_MAX_AGE_H` | `heading_hold.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_FEATURES` | `""` | `config.py` | [`.env.example`](../../.env.example), [`architecture.md`](../architecture.md), [`capabilities.md`](../capabilities.md) +9 |
+| `G2_FLOOR_TRIM_MAX_AGE_H` | `FLOOR_LABEL_MAX_AGE_H` | `heading_hold.py` | [`gait-deployment.md`](gait-deployment.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_FOLLOW_UP_S` | `5.0` | `config.py` | [`.env.example`](../../.env.example), [`pi-bring-up.md`](pi-bring-up.md), [`settings-switches.md`](settings-switches.md) +4 |
 | `G2_FOOT_HOLD` | `"off"` | `heading_hold.py` | [`.env.example`](../../.env.example), [`STATUS.md`](../STATUS.md), [`gait-deployment.md`](gait-deployment.md) +1 |
 | `G2_FOOT_HOLD_FF` | `"0"` | `heading_hold.py` | [`real-walk-log.md`](../rl/real-walk-log.md) |
@@ -203,7 +203,7 @@ Every `G2_*` variable the Pi code and the tools read: **208**, of which **0** ar
 | `G2_VOICE_STYLE` | — | `config.py` | [`.env.example`](../../.env.example), [`models.md`](models.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_WAKE_LOG` | `DEFAULT_PATH` | `wake_log.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WAKE_MAX_BEFORE` | `""` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
-| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`cheatsheet.md`](cheatsheet.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_WAKE_WORD` | `"gee two, hey buddy, hey bud"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md) +1 |
 | `G2_WALK_RAMP_S` | `"0"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WALL_CAL` | `"~/.local/share/g2/wall_calibration.json` | `wall_distance.py` | [`settings-switches.md`](settings-switches.md) |

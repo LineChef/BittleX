@@ -24,7 +24,9 @@ Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/rob
   always core, importance 5, and is a single slot (the newest replaces the older).
 * **Sightings.** When G2 looks, his spoken description and the detector's labels are kept as a sighting (text only, date only, no
   picture), searchable, pruned after `G2_OBSERVATION_DAYS` (30). They join the prompt only when you ask about the past ("what did you see
-  earlier", "did you notice...", "last time"). `python -m pi_pipeline.memory sightings`. "Forget that" removes the session's sightings too.
+  earlier", "did you notice...", "last time", and since 2026-10-18 "where's the ...", "what did you find", anything about exploring). `python -m pi_pipeline.memory sightings`. "Forget that" removes the session's sightings too.
+  Each exploration also leaves one sighting built from its recap (`reflection/recap.py` `observation_from_recap`): what the detector saw at the
+  survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
 * **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or you tell him to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
   (importance 1-2), and may write up to 3 reflections ("It seems ...", stored with source `reflection`, no dates or routines). At most

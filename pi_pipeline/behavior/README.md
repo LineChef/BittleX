@@ -37,6 +37,12 @@ assembles each `DriverInputs` from injected **sources**:
   / `recovering`.
 - `recency()` → `Memory.recency()` output, for the mood model.
 - `roster()` → bonded-person labels, for the recognition hop.
+- the body state (`personality/body.py`, re-read at most every 10 s) → `DriverInputs.body_idle_mult`: below 1 the idle sit / rest
+  delays shrink (a low battery, a recent fall).
+
+`DIAG` effects are logged by the bindings with the level and event name in `diag_bridge.py`'s map (`mode.transition`,
+`cliff.reflex` as a WARN, ...); `python -m pi_pipeline.diag report` reads them as the behaviour timeline. The exploration
+narrator (`narrator.py`) logs each line's queue / synthesis / play time and drops a line not ready 8 s after it was decided.
 
 `tick()` dispatches the effects through the `bindings`; `run_forever(max_ticks=…)`
 / `stop()` / `pause()` / `resume()` drive it. `halt()` / `release()` are the

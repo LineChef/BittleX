@@ -50,9 +50,9 @@ Each tick, about 80 times a second:
 4. Map the joints to OpenCat servo indices with sign and offset calibration (`deploy_map.py`) and clamp to ±120°.
 5. Send one `i` command with all joints.
 
-A stand-up before any walk uses the eased 0.8 s ramp (`standup.py`). Any exit rests G2 with `d`.
+A stand-up before any walk uses the eased 0.8 s ramp (`standup.py`). Any exit rests G2 with `d`. An end of walk slower than 2 s (the rest or balance blend and its sends) logs `walk.slow_end`; a walk that does not stop within 5 s of `stop()` logs the stack its thread is stuck in (`policy_walker.py`).
 
-**Steering.** The front feet steer G2. Each policy has a fixed front-left foot trim (`DEFAULT_TRIMS` in `heading_hold.py`, overridden with `G2_FOOT_TRIM`); the closed-loop heading hold is off unless `G2_FOOT_HOLD=fl`. Trims were measured on hardwood only.
+**Steering.** The front feet steer G2. Each policy has a fixed front-left foot trim (`DEFAULT_TRIMS` in `heading_hold.py`, overridden with `G2_FOOT_TRIM`); the closed-loop heading hold is off unless `G2_FOOT_HOLD=fl`. Trims were measured on hardwood only. A trim measured on one floor can be saved per policy (`python -m pi_pipeline.attachments floor-trim tile fl=-0.1`); it applies when the floor label (`g2floor`, always set by a person) is under 12 h old (`G2_FLOOR_TRIM_MAX_AGE_H`). Order: `G2_FOOT_TRIM`, the per-floor trim, the attachment's saved trim, `DEFAULT_TRIMS`. Each walk prints the floor it used.
 
 **Guards on every walk:** servo heat estimate and cutback (`thermal_guard.py`), jam reflex from joint strain (`jam_guard.py`), carpet detection from IMU speed (`carpet.py`, `speed_estimate.py`), fall guard, an IMU stall detector for wall contact, and a battery read every few seconds with a rest on a critical reading. The loop also stops if no IMU frame arrives for a set time or the loop overruns.
 

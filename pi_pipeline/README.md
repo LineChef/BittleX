@@ -88,6 +88,8 @@ pi_pipeline/.venv/bin/pytest        # from the repo root; config in pyproject.to
 
 The suite needs no network, audio or key. One live-API check is skipped unless `G2_LIVECHECK=1` (billed). Package-style imports mean it must run from the repo root, not from inside `pi_pipeline/`.
 
+Lint: `pi_pipeline/.venv/bin/ruff check` (from the repo root; installed by `requirements-dev.txt`). Correctness rules only (undefined names, mutable defaults, syntax errors; config in `pyproject.toml`); the pre-commit hook runs it on the staged `.py` files.
+
 ## Run
 
 ```bash

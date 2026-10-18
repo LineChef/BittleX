@@ -73,4 +73,4 @@ The capture, curate, promote and upload flow: [`docs/guides/train-vision-model.m
 
 ## Git hooks
 
-[`githooks/`](githooks), enabled with `git config core.hooksPath tools/githooks`: `pre-commit` (docs check, leftover-file warning, large-commit block, privacy terms), `commit-msg` (strips attribution lines) and the `post-*` hooks that keep a local backup of `CLAUDE.md`.
+[`githooks/`](githooks), enabled with `git config core.hooksPath tools/githooks`: `pre-commit` (docs check, leftover-file warning, large-commit block, privacy terms), `commit-msg` (strips attribution lines) and the `post-*` hooks that keep a local backup of `CLAUDE.md`. Since 2026-10-18 `pre-commit` also runs `ruff check` (correctness rules only, config in `pyproject.toml`) on the staged `.py` files when ruff is installed in `pi_pipeline/.venv` (`requirements-dev.txt`).

@@ -11,6 +11,10 @@ ends after `--max-s` (2 h). Voice works after the wake word: "emergency stop", "
 "tell me what you see" (what the detector sees, no API call), "shut down" (ends the session only). `kill -USR1 <pid>` or `halt` is the
 emergency stop, and G2's own fall guard is on.
 There is NO edge detector: never run this on a desk, a table or the stand.
+
+The session body is `run_session(args, shared=None)`. Standalone (above) it opens and closes everything itself. With `G2_EXPLORE_INPROCESS=1` the voice
+service calls `run_inprocess(SharedParts(...))` on its voice-loop thread instead: the session borrows the service's link, IMU fan-out, policy walker,
+memory, speech engine, wake word / speech-to-text and camera, and hands them back unclosed (walker callbacks restored, IMU consumers released).
 """
 from __future__ import annotations
 
