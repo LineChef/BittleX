@@ -52,3 +52,19 @@ def test_the_driver_asks_for_contact_pictures_and_the_binding_calls_the_camera_h
     b = DriverBindings(contact=lambda reason: asked.append(reason))
     assert b.dispatch([Effect(EffectKind.CAPTURE, ("contact", "hit"))]) == ["contact:hit"] and asked == ["hit"]
     assert DriverBindings().dispatch([Effect(EffectKind.CAPTURE, ("contact", "hit"))]) == ["drop:contact"]
+
+
+def test_contact_pictures_ask_for_an_urgent_frame_and_record_how_long_it_took(tmp_path):
+    asked = []
+
+    class Busy:
+        def snapshot(self, settle=None, urgent=False):
+            asked.append(urgent)
+            return types.SimpleNamespace(jpeg=b"\xff\xd8jpegdata", detections=[])
+
+    t = [100.0]
+    c = ContactPictures(Busy(), str(tmp_path), threaded=False, sleep=lambda s: t.__setitem__(0, t[0] + s), clock=lambda: t[0])
+    assert c.capture("hit")
+    assert asked == [True, True]
+    side = json.loads(sorted(tmp_path.glob("*_1.json"))[0].read_text())
+    assert side["delay_s"] == 0.0

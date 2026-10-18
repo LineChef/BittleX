@@ -148,6 +148,7 @@ class SerialDetectionFeed:
         self._ser = serial.Serial(port, baud, timeout=1)
         self._io_lock = threading.Lock()         # one reader or one snapshot on the port at a time
         self._paused = threading.Event()         # set while snapshot() has the port: frames() waits
+        self._urgent = threading.Event()         # set while an urgent snapshot (a contact picture) waits: a picture in progress skips its remaining settle frames
         self._frame_px = frame_px
         self._labels = labels or []
         self._min_score = min_score
@@ -236,13 +237,17 @@ class SerialDetectionFeed:
                 frame = self._filter(frame)
             yield frame
 
-    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None):
+    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None, urgent: bool = False):
         """Take ONE picture on this feed's own port and go back to detecting: stops the detection loop, asks for a single inference that
         comes back with its JPEG (`AT+INVOKE=1,0,0`), then restarts the loop. Returns a `vision.snapshot.Snapshot`, or None if the module
         did not answer in time. The detection stream is dark for about a second. The pause is in the reader (`frames()`), so this is safe
-        to call from another thread while a `BackgroundFrameSource` is reading. No network, no API call."""
+        to call from another thread while a `BackgroundFrameSource` is reading. No network, no API call.
+        `urgent` (a contact picture): a picture already in progress stops taking settle frames and hands the port over at once; a contact frame
+        waited up to 8 s behind a survey picture's settle frames (2026-10-10)."""
         from .snapshot import parse_invoke_line
         switched = False
+        if urgent:
+            self._urgent.set()
         self._paused.set()
         snap = None
         try:
@@ -256,7 +261,11 @@ class SerialDetectionFeed:
                     self._apply_sensor(self._snap_opt, self._ae_bump)
                 # right after a capture-mode switch the sensor's auto-exposure is still ramping (2026-10-08: survey pictures alternated between a mean
                 # brightness of about 65 and about 150): throw away `settle` frames first so the picture that is kept has settled
+                if urgent:
+                    self._urgent.clear()             # this one has the port now
                 for attempt in range((self._settle_frames if settle is None else max(0, int(settle))) + 1 if switched else 1):
+                    if attempt and snap is not None and self._urgent.is_set():
+                        break                        # an urgent picture is waiting: keep the (less settled) frame already taken and hand over the port
                     self._ser.reset_input_buffer()
                     self._ser.write(b"AT+INVOKE=1,0,0\r\n")
                     deadline = time.monotonic() + timeout_s
@@ -279,6 +288,8 @@ class SerialDetectionFeed:
                 self._ser.reset_input_buffer()
                 self._ser.write(self._START_CMD)     # back to detections
         finally:
+            if urgent:
+                self._urgent.clear()
             self._paused.clear()
         if snap is not None:
             from ..voice import shutter
@@ -361,13 +372,20 @@ class BackgroundFrameSource:
                 return []
             return list(self._frame)
 
-    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None):
+    def snapshot(self, timeout_s: float = 6.0, settle: int | None = None, urgent: bool = False):
         """One picture from the underlying feed (see `SerialDetectionFeed.snapshot`), or None if the feed cannot take pictures. The newest
         detection frame is cleared so a stale one is not read as current right after the pause. `settle`: throwaway frames after the mode switch (None = the feed's own)."""
         fn = getattr(self._feed, "snapshot", None)
         if fn is None:
             return None
-        snap = fn(timeout_s) if settle is None else fn(timeout_s, settle=settle)
+        kw = {} if settle is None else {"settle": settle}
+        if urgent:
+            kw["urgent"] = True
+        try:
+            snap = fn(timeout_s, **kw)
+        except TypeError:                             # a feed whose snapshot() has no `urgent`
+            kw.pop("urgent", None)
+            snap = fn(timeout_s, **kw)
         with self._lock:
             self._at = None
         return snap

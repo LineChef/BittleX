@@ -51,11 +51,15 @@ class ContactPictures:
 
     def _frame(self):
         try:
-            return self._source.snapshot(settle=0)
+            return self._source.snapshot(settle=0, urgent=True)       # a picture in progress hands the camera over at once (vision/feed.py)
         except TypeError:
-            return self._source.snapshot()
+            try:
+                return self._source.snapshot(settle=0)
+            except TypeError:
+                return self._source.snapshot()
 
     def _run(self, reason: str, extra: dict) -> None:
+        asked = self._clock()
         try:
             stamp = time.strftime("%Y%m%d_%H%M%S")
             self._root.mkdir(parents=True, exist_ok=True)
@@ -66,12 +70,14 @@ class ContactPictures:
             for n in (1, 2):
                 if n == 2:
                     self._sleep(self.second_after_s)
+                t_ask = self._clock()
                 snap = self._frame()
                 if snap is None or not getattr(snap, "jpeg", None):
                     continue
+                delay_s = round(self._clock() - (asked if n == 1 else t_ask), 2)          # how long the camera took to give it (it may have been busy with another picture)
                 base = self._root / f"contact_{stamp}_{reason}_{n}"
                 base.with_suffix(".jpg").write_bytes(snap.jpeg)
-                base.with_suffix(".json").write_text(json.dumps({"reason": reason, "frame": n, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "extra": extra, "context": ctx,
+                base.with_suffix(".json").write_text(json.dumps({"reason": reason, "frame": n, "time": time.strftime("%Y-%m-%d %H:%M:%S"), "delay_s": delay_s, "extra": extra, "context": ctx,
                                                                  "detections": [list(d) for d in (getattr(snap, "detections", None) or [])]}, default=str))
                 self.saved.append(str(base.with_suffix(".jpg")))
             self._trim()

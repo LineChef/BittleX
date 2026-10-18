@@ -138,3 +138,21 @@ def test_no_switch_when_the_detection_option_is_already_the_picture_option_or_un
         f._ser = fake
         f.snapshot(timeout_s=2.0)
         assert not any(b"AT+SENSOR" in x for x in fake.writes)
+
+
+def test_an_urgent_picture_cuts_a_picture_in_progress_short(feed, monkeypatch):
+    """A contact picture waited up to 8 s behind a survey picture's settle frames (2026-10-10). With an urgent one waiting, the picture in
+    progress keeps the frame it already has and hands the port over instead of taking its remaining settle frames."""
+    f, ser = feed
+    f._sensor_opt, f._snap_opt, f._settle_frames = 1, 0, 2                      # a capture-mode switch: 1 picture + 2 settle frames normally
+    monkeypatch.setattr(f, "_apply_sensor", lambda *a: None)
+    f._urgent.set()                                                             # an urgent picture is already waiting
+    snap = f.snapshot(timeout_s=1.0)
+    assert snap is not None and snap.jpeg == JPEG
+    assert ser.writes.count(b"AT+INVOKE=1,0,0\r\n") == 1                       # one shot instead of three
+    f._urgent.clear()
+    ser.writes.clear()
+    f.snapshot(timeout_s=1.0)
+    assert ser.writes.count(b"AT+INVOKE=1,0,0\r\n") == 3                       # nobody waiting: the settle frames are taken as before
+    ser.writes.clear()
+    assert f.snapshot(timeout_s=1.0, urgent=True) is not None and not f._urgent.is_set()   # the urgent picture itself clears the flag
