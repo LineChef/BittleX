@@ -54,7 +54,7 @@ def move_cmd(deg) -> str:
 def start_pose(last_motion_command):
     """The leg angles (URDF order) G2 is in after `last_motion_command`, or None if unknown."""
     c = (last_motion_command or "").strip()
-    if c in ("", "d"):
+    if c in ("", "d", "krest", "kzz"):
         return list(REST_URDF_DEG)
     if c in ("kbalance", "kup"):
         return list(BALANCE_URDF_DEG)

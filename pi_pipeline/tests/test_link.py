@@ -171,3 +171,36 @@ def test_a_firmware_walk_or_turn_started_from_sit_or_rest_is_eased_but_one_from_
     lk.last_motion_command = "kwkL"                                        # already walking: a turn token goes out as it is
     lk.send("kwkR", read_reply=False, settle=0.0)
     assert [w.decode().strip() for w in lk._ser.written] == ["kwkR"]
+
+
+def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(monkeypatch):
+    """Standing rule (user, 2026-10-18): wave, check, nod and the rest stand him up through the firmware un-eased, so the link ramps first and the skill starts from a stand."""
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.2")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    for last in ("", "d", "krest", "kzz", "ksit"):
+        for skill in ("khi", "kck", "kwh", "knd", "kscrh", "kstr", "kpu", "kcmh", "kbuttUp", "kwkF", "kup", "kbalance"):
+            lk = _link_with(b"")
+            lk.last_motion_command = last
+            lk.send(skill, read_reply=False, settle=0.0)
+            sent = [w.decode().strip() for w in lk._ser.written]
+            assert sent[-1] == skill and len(sent) == 5 and all(c.startswith("i") for c in sent[:-1]), (last, skill, sent)
+
+
+def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monkeypatch):
+    monkeypatch.setenv("G2_STAND_RAMP_S", "0.2")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    for skill in ("krest", "ksit", "kzz", "kzero"):
+        lk = _link_with(b"")
+        lk.last_motion_command = "d"
+        lk.send(skill, read_reply=False, settle=0.0)
+        assert [w.decode().strip() for w in lk._ser.written] == [skill]
+    for last in ("kbalance", "kup", "khi", "kwkF", "i8 50 12 0"):
+        lk = _link_with(b"")
+        lk.last_motion_command = last
+        lk.send("khi", read_reply=False, settle=0.0)
+        assert [w.decode().strip() for w in lk._ser.written] == ["khi"]
+    lk = _link_with(b"")
+    lk.last_motion_command = "d"
+    lk.send("b9 5 16 8", read_reply=False, settle=0.0)                       # a beep or a head move is not a stand-up
+    lk.send("m0 30", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written] == ["b9 5 16 8", "m0 30"]

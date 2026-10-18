@@ -27,6 +27,12 @@ def is_imu_line(line: str) -> bool:
     return line.lstrip().startswith(IMU_PREFIXES)
 
 
+# What the legs were last told to do, as far as the stand-up ramp is concerned. "" is a fresh process (assumed lying).
+LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit")
+# Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
+STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd"})
+
+
 class SerialLink:
     def __init__(
         self,
@@ -165,8 +171,10 @@ class SerialLink:
         """Standing rule (user, 2026-10-10): every stand-up is eased. `kup` / `kbalance` sent while G2 lies at rest (last motion `d`, or nothing yet) are preceded by a ~0.8 s ramp of `i` steps
         from the rest pose to that skill's pose (gait/standup.py). From any other state the command goes out as it is (a stop / freeze `kbalance` out of a stride must stay immediate)."""
         c = command.strip()
-        walks = c.startswith(("kwk", "kcr", "ktr", "kbk", "kvt", "kgp"))     # a firmware gait or turn started from lying or sitting stands him up by itself, un-eased (user, 2026-10-10: glitchy start of an exploration)
-        if not (c in ("kup", "kbalance") or walks) or self._ramping or self.last_motion_command not in ("", "d", "ksit"):
+        # Any firmware skill that is not itself a lying or sitting one stands him up by itself, un-eased, when it starts from lying or sitting (user, 2026-10-10: a gait or turn;
+        # 2026-10-18: every skill, `khi` / `kck` / `kwh` from rest looked rough). So the link stands him up first, eased, and the skill then starts from the balance pose.
+        raises = c.startswith("k") and c not in STAY_DOWN_SKILLS
+        if not raises or self._ramping or self.last_motion_command not in LYING_OR_SITTING:
             return
         try:
             try:
