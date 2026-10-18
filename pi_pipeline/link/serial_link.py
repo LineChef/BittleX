@@ -225,6 +225,8 @@ class SerialLink:
             secs = transitions.ramp_seconds(start, end, skew=skew)
             if secs <= 0:
                 return
+            if transitions.kind(c) != "gait" and c not in transitions.STOP_SKILLS:
+                self._write_pose("gb")        # firmware gyro balance off while the Pi eases (2026-10-18: with it on, the 5 Hz balance loop fought every ramp, the legs slipped and G2 "caught his balance"; the voice actuator sends gb after each posture, other callers do not)
             transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S, skew), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
         except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
             log.warning("transition ramp skipped (%s)", e)

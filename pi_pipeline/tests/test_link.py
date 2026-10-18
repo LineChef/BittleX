@@ -220,9 +220,9 @@ def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):
 def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
     from pi_pipeline.link import transitions as tr
     sent = _ramped(monkeypatch, "kbalance", "kck")
-    assert sent[-1] == "kck" and all(c.startswith("i8 ") for c in sent[:-1])
+    assert sent[0] == "gb" and sent[-1] == "kck" and all(c.startswith("i8 ") for c in sent[1:-1])        # balance off first, then the ramp
     hi = tr.table()["ck"]["first"]
-    assert len(sent) - 1 == 32                                                    # the test caps the ramp at 0.8 s (G2_TRANSITION_RAMP_S); uncapped it would be 1.55 s for the 82.5 deg move
+    assert len(sent) - 2 == 32                                                    # the leading gb, then the ramp: the test caps the ramp at 0.8 s (G2_TRANSITION_RAMP_S); uncapped it would be 1.55 s for the 82.5 deg move
     last_pose = [int(x) for x in sent[-2].split()[1::2]]
     assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
     assert "i0" not in " ".join(sent)                                             # the head is never moved by the ramp
@@ -354,7 +354,7 @@ def test_stage_2_eases_from_the_measured_pose_after_a_trick_only_when_switched_o
     sent = run("kck", "ksit")
     assert sent[0] == "f" and sent[-1] == "ksit" and sent[-2] == tr.leg_cmd(tr.table()["sit"]["first"])
     sk = tr.skew_for("ksit")
-    assert sent[1] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"], skew=sk), skew=sk)[0])
+    assert sent[1] == "gb" and sent[2] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"], skew=sk), skew=sk)[0])
     assert run("kwkF", "kwkL") == ["kwkL"]                                       # never between two gaits
     assert run("krc", "ksit") == ["ksit"]                                        # not while a get-up may still be running
     assert run("kbalance", "kck")[0] != "f"                                      # a known pose needs no read
@@ -419,3 +419,12 @@ def test_the_moves_that_tip_him_over_are_refused_with_the_wrong_answer_horn(monk
     lk = _link_with(b"")
     lk.send("kck", read_reply=False, settle=0.0)                                   # a mild move still goes out
     assert lk._ser.written and opencat.is_disabled(" khi ") and not opencat.is_disabled("kck")
+
+
+def test_firmware_balance_goes_off_before_an_eased_posture_but_not_before_a_gait(monkeypatch):
+    """2026-10-18: with firmware gyro balance on, the ramps into a sit and back to rest slipped and G2 fell; with it off they were smooth."""
+    sent = _ramped(monkeypatch, "kbalance", "ksit")
+    assert sent[0] == "gb" and sent[-1] == "ksit"
+    sent = _ramped(monkeypatch, "kbalance", "kwkL")                                 # a gait is tuned with balance on: the caller turns it on and the link leaves it alone
+    assert "gb" not in sent and sent[-1] == "kwkL"
+    assert "gb" not in _ramped(monkeypatch, "kbalance", "kbalance")
