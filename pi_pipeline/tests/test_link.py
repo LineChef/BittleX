@@ -136,7 +136,7 @@ def test_kup_from_rest_is_preceded_by_a_ramp_but_a_stop_kbalance_from_a_stride_i
     lk = _link_with(b"")
     lk.send("kup", read_reply=False, settle=0.0)
     sent = [w.decode().strip() for w in lk._ser.written]
-    assert sent[-1] == "kup" and len(sent) == 5 and all(c.startswith("i") for c in sent[:-1])     # 0.2 s x 20 steps/s = 4 ramp steps, then the skill
+    assert sent[-1] == "kup" and len(sent) == 9 and all(c.startswith("i") for c in sent[:-1])     # 0.2 s x 40 steps/s = 8 ramp steps, then the skill
     assert lk.last_motion_command == "kup"
     lk._ser.written.clear()
     lk.last_motion_command = "i8 50 12 0 9 50 13 0 10 50 14 0 11 50 15 0"                          # mid-policy-walk: a freeze must be immediate
@@ -161,12 +161,12 @@ def test_a_firmware_walk_or_turn_started_from_sit_or_rest_is_eased_but_one_from_
     lk.last_motion_command = "ksit"                                       # he was sitting (the idle posture): the old start jerked into the gait un-eased (2026-10-10)
     lk.send("kwkL", read_reply=False, settle=0.0)
     sent = [w.decode().strip() for w in lk._ser.written]
-    assert sent[-1] == "kwkL" and len(sent) == 21 and all(c.startswith("i") for c in sent[:-1])           # 16 steps down to rest, 4 up
+    assert sent[-1] == "kwkL" and len(sent) == 89 and all(c.startswith("i") for c in sent[:-1])           # 80 steps (2 s) down to rest, 8 up
     assert standup.start_pose("ksit") == standup.SIT_URDF_DEG
     lk._ser.written.clear()
     lk.last_motion_command = "d"
     lk.send("kwkR", read_reply=False, settle=0.0)
-    assert [w.decode().strip() for w in lk._ser.written][-1] == "kwkR" and len(lk._ser.written) == 5
+    assert [w.decode().strip() for w in lk._ser.written][-1] == "kwkR" and len(lk._ser.written) == 9
     lk._ser.written.clear()
     lk.last_motion_command = "kwkL"                                        # already walking: a turn token goes out as it is
     lk.send("kwkR", read_reply=False, settle=0.0)
@@ -183,7 +183,7 @@ def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(mon
             lk.last_motion_command = last
             lk.send(skill, read_reply=False, settle=0.0)
             sent = [w.decode().strip() for w in lk._ser.written]
-            assert sent[-1] == skill and len(sent) == (21 if last == "ksit" else 5) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
+            assert sent[-1] == skill and len(sent) == (89 if last == "ksit" else 9) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
 
 
 def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monkeypatch):
@@ -222,7 +222,7 @@ def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
     sent = _ramped(monkeypatch, "kbalance", "khi")
     assert sent[-1] == "khi" and all(c.startswith("i8 ") for c in sent[:-1])
     hi = tr.table()["hi"]["first"]
-    assert len(sent) - 1 == 15                                                    # largest joint move 82.5 deg (mirror mean) / 110 deg/s = 0.75 s at 20 steps/s
+    assert len(sent) - 1 == 32                                                    # the test caps the ramp at 0.8 s (G2_TRANSITION_RAMP_S); uncapped it would be 1.55 s for the 82.5 deg move
     last_pose = [int(x) for x in sent[-2].split()[1::2]]
     assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
     assert "i0" not in " ".join(sent)                                             # the head is never moved by the ramp
@@ -230,15 +230,15 @@ def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
 
 def test_the_ramp_length_follows_the_largest_joint_move(monkeypatch):
     sent = _ramped(monkeypatch, "kbalance", "kvtL")                               # 8 deg: the 0.25 s minimum
-    assert sent[-1] == "kvtL" and len(sent) - 1 == 5
-    sent = _ramped(monkeypatch, "kbalance", "ktrL")                               # 31 deg -> 0.28 s
-    assert len(sent) - 1 == 6
+    assert sent[-1] == "kvtL" and len(sent) - 1 == 10
+    sent = _ramped(monkeypatch, "kbalance", "ktrL")                               # 31 deg -> 1.5 x 31 / 80 = 0.58 s
+    assert len(sent) - 1 == 23
     assert _ramped(monkeypatch, "kbalance", "kup") == ["kup"]                      # already there / a stop: as it is
 
 
 def test_from_lying_the_stand_up_runs_first_then_the_transition(monkeypatch):
     sent = _ramped(monkeypatch, "d", "kwkL", stand="0.2")
-    assert sent[-1] == "kwkL" and len(sent) == 4 + 7 + 1                           # 4 stand-up steps, 37 deg balance -> wkL in 0.34 s, the skill
+    assert sent[-1] == "kwkL" and len(sent) == 8 + 28 + 1                          # 8 stand-up steps, 37 deg balance -> wkL in 0.69 s, the skill
 
 
 def test_lying_down_and_sitting_from_a_stand_are_eased_too(monkeypatch):
@@ -370,5 +370,17 @@ def test_standing_up_from_a_sit_goes_down_to_rest_first(monkeypatch):
     lk.last_motion_command = "ksit"
     lk.send("kbalance", read_reply=False, settle=0.0)
     sent = [w.decode().strip() for w in lk._ser.written]
-    assert len(sent) == 16 + 16 + 1 and sent[-1] == "kbalance"                 # 0.8 s down to rest, 0.8 s up from rest, the skill
-    assert sent[15] == standup.move_cmd(standup.REST_URDF_DEG)                  # the first ramp ends exactly on the rest pose
+    assert len(sent) == 80 + 32 + 1 and sent[-1] == "kbalance"                # 2 s down to rest, 0.8 s up from rest, the skill
+    assert sent[79] == standup.move_cmd(standup.REST_URDF_DEG)                  # the first ramp ends exactly on the rest pose
+
+
+def test_ramp_steps_go_out_on_a_fixed_schedule_even_when_writes_are_slow():
+    """2026-10-18: the stand-up looked slightly jerky; a sleep after each write let the timing drift and the steps arrive unevenly."""
+    from pi_pipeline.link import transitions as tr
+    t = {"now": 0.0}
+    stamps = []
+    def write(p):
+        stamps.append(t["now"])
+        t["now"] += 0.010                                                           # every write takes 10 ms
+    tr.play([0] * 40, write, sleep=lambda w: t.__setitem__("now", t["now"] + w), clock=lambda: t["now"])
+    assert abs(stamps[-1] - 39 / 40) < 1e-6 and all(abs(b - a - 0.025) < 1e-6 for a, b in zip(stamps, stamps[1:]))      # 40 steps a second, no drift

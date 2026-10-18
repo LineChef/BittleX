@@ -30,7 +30,7 @@ def ramp_seconds() -> float:
         return DEFAULT_RAMP_S
 
 
-SIT_TO_REST_S = 0.8          # a stand-up that starts from a sit first eases down to rest this long (SerialLink._stand_up), then stands up from rest
+SIT_TO_REST_S = 2.0          # a stand-up that starts from a sit first eases down to rest this long (SerialLink._stand_up; the front knee moves 100 deg, so 2.0 s keeps its peak near 75 deg/s), then stands up from rest
 
 
 def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):

@@ -170,7 +170,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 
 ## `joint`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +62.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +63.
 
 | File | Size | Cited by |
 |---|---|---|

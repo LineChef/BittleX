@@ -15,8 +15,8 @@ What is not (left exactly as before):
 Mirroring: the firmware plays a skill whose name does not end in L or R mirrored at random (skill.h `loadBySkillName`), so the Pi cannot know which side it will use.
 For such a skill the target is the mean of the frame and its mirror (identical for symmetric skills); for an asymmetric one the firmware then covers half the difference.
 
-`G2_TRANSITION_RAMP_S` caps the ramp length in seconds (default 0.8, the tuned stand-up length; 0 or `off` = the old jump). The length scales with the largest joint move
-(`DEG_PER_S`), at least `MIN_S`, so a 30 deg adjustment takes 0.27 s and the 85 deg rest-to-stand 0.77 s.
+`G2_TRANSITION_RAMP_S` caps the ramp length in seconds (default 2.0; 0 or `off` = the old jump). The length scales with the largest joint move so that no joint
+peaks above `PEAK_DEG_S` (80 deg/s), at least `MIN_S`: a 30 deg adjustment takes 0.56 s, the 82 deg move into a wave 1.5 s.
 """
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ import time
 from pathlib import Path
 
 FRAMES_PATH = Path(__file__).with_name("skill_frames.json")
-DEFAULT_MAX_S = 0.8
+DEFAULT_MAX_S = 2.0
 MIN_S = 0.25
-DEG_PER_S = 110.0
-STEPS_PER_S = 20
+PEAK_DEG_S = 80.0       # the fastest any joint may move: the S-curve peaks at 1.5 x the move / the duration. 2026-10-18 on G2: the ramps into a sit (back legs) and down to rest (front legs) peaked at 125-190 deg/s and the legs jittered; the servos top out near 137 deg/s
+STEPS_PER_S = 40         # position updates per second (2026-10-18: at 20 the legs moved in visible 4-8 deg jumps; the walk loop sends about 27 a second)
 MIN_DELTA_DEG = 3
 STREAM_GAP_S = 0.3
 LEG_JOINTS = tuple(range(8, 16))                  # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]
@@ -129,7 +129,7 @@ def ramp_seconds(start, end, cap=None) -> float:
     delta = max(abs(a - b) for a, b in zip(start, end))
     if cap <= 0 or delta < MIN_DELTA_DEG:
         return 0.0
-    return min(cap, max(MIN_S, delta / DEG_PER_S))
+    return min(cap, max(MIN_S, 1.5 * delta / PEAK_DEG_S))
 
 
 def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
@@ -141,6 +141,17 @@ def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
         k = u * u * (3 - 2 * u)
         out.append([s + (e - s) * k for s, e in zip(start, end)])
     return out
+
+
+def play(poses, write, *, steps_per_s=STEPS_PER_S, sleep=time.sleep, clock=time.monotonic) -> None:
+    """Send each pose with `write(pose)` at an even rate: every step has its own deadline from the start, so a slow write or a late wake-up is made up
+    by the next step instead of stretching the whole ramp (a plain sleep after each write drifted, and the legs moved unevenly)."""
+    t0, dt = clock(), 1.0 / steps_per_s
+    for i, pose in enumerate(poses, 1):
+        write(pose)
+        wait = t0 + i * dt - clock()
+        if wait > 0:
+            sleep(wait)
 
 
 def leg_cmd(pose) -> str:

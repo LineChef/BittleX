@@ -216,14 +216,15 @@ class SerialLink:
             secs = transitions.ramp_seconds(start, end)
             if secs <= 0:
                 return
-            for pose in transitions.ramp_poses(start, end, secs):
-                self._ser.write((transitions.leg_cmd(pose) + "\n").encode("ascii"))
-                self._ser.flush()
-                time.sleep(1.0 / transitions.STEPS_PER_S)
+            transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
         except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
             log.warning("transition ramp skipped (%s)", e)
         finally:
             self._ramping = False
+
+    def _write_pose(self, command: str) -> None:
+        self._ser.write((command + "\n").encode("ascii"))
+        self._ser.flush()
 
     def _stand_up(self):
         """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None."""
@@ -243,15 +244,9 @@ class SerialLink:
         if self.last_motion_command == "ksit":
             # Rising straight from a sit puts G2's weight on the back legs while the front is loaded: on 2026-10-18 the back legs skipped and jittered and he fell
             # forward, at 0.8 s and again at 1.4 s. The stand-up from rest has been clean every time, so ease down to rest first, then stand up from there.
-            for pose in standup.ramp_poses(start, standup.REST_URDF_DEG, standup.SIT_TO_REST_S):
-                self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
-                self._ser.flush()
-                time.sleep(1.0 / standup.STEPS_PER_S)
+            transitions.play(standup.ramp_poses(start, standup.REST_URDF_DEG, standup.SIT_TO_REST_S, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
             start = list(standup.REST_URDF_DEG)
-        for pose in standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs):
-            self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
-            self._ser.flush()
-            time.sleep(1.0 / standup.STEPS_PER_S)
+        transitions.play(standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
         return list(transitions.BALANCE)
 
     def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):
