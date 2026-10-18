@@ -161,7 +161,7 @@ def test_a_firmware_walk_or_turn_started_from_sit_or_rest_is_eased_but_one_from_
     lk.last_motion_command = "ksit"                                       # he was sitting (the idle posture): the old start jerked into the gait un-eased (2026-10-10)
     lk.send("kwkL", read_reply=False, settle=0.0)
     sent = [w.decode().strip() for w in lk._ser.written]
-    assert sent[-1] == "kwkL" and len(sent) == 33 and all(c.startswith("i") for c in sent[:-1])           # 16 steps down to rest, 16 up
+    assert sent[-1] == "kwkL" and len(sent) == 21 and all(c.startswith("i") for c in sent[:-1])           # 16 steps down to rest, 4 up
     assert standup.start_pose("ksit") == standup.SIT_URDF_DEG
     lk._ser.written.clear()
     lk.last_motion_command = "d"
@@ -183,7 +183,7 @@ def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(mon
             lk.last_motion_command = last
             lk.send(skill, read_reply=False, settle=0.0)
             sent = [w.decode().strip() for w in lk._ser.written]
-            assert sent[-1] == skill and len(sent) == (33 if last == "ksit" else 5) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
+            assert sent[-1] == skill and len(sent) == (21 if last == "ksit" else 5) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
 
 
 def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monkeypatch):
