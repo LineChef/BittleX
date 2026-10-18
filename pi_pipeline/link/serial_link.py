@@ -240,6 +240,8 @@ class SerialLink:
         if secs <= 0:
             return None
         start = standup.start_pose(self.last_motion_command) or standup.REST_URDF_DEG
+        if self.last_motion_command == "ksit":
+            secs = standup.loaded_ramp_seconds(start, standup.BALANCE_URDF_DEG, secs)       # rising from a sit puts weight on the back legs: slower (see standup.LOADED_PEAK_DEG_S)
         for pose in standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs):
             self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
             self._ser.flush()
