@@ -53,7 +53,7 @@ Each row carries the date it was last confirmed. The long dated write-ups that u
 
 ## Decisions pending
 
-- **Petoi AI Head:** scope changed 2026-10-18: the head's LLM is an extra used by its button, Claude stays the main brain, nothing is integrated for now (see the plan doc's section 0). The BiBoard voice module switched to Korean again shortly after the head was wired to G1; whether the head caused it is unproven. [`planned/ai-head/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md). Do not remove the Pi before the scorecard is filled.
+- **Petoi AI Head:** scope changed 2026-10-18: the head's LLM is an extra used by its button, Claude stays the main brain, nothing is integrated for now (see the plan doc's section 0). [`planned/ai-head/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md). Do not remove the Pi before the scorecard is filled.
 - **A new 20M** starts only on the user's go and never on top of a consolidated 20M.
 - **Gait comparisons on G2** are not run (sim only, user rule 2026-10-09), so the original scripted-vs-learned hardware comparison (H1) is not being pursued.
 

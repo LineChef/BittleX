@@ -18,7 +18,6 @@ The one home for facts about the head, the pros and cons of adopting it, what it
 **Tests on G2 (2026-10-18, Pi `?` and `P` queries, voice service paused):**
 - 300 read-only queries with the head plugged in: **0 missing or garbled replies** (banner `Bittle X` / `B10_260527`, voltage 7.98 V). The shared line does not corrupt the Pi's commands at G2's normal rate. It cannot show electrical stress between the two transmit pins (needs an oscilloscope on the RX2 pad: lows sitting at 1 to 1.6 V would mean the head fights the Pi).
 - 2.5 minutes of passive listening while the owner talked to the head: the BiBoard echoed **`kck`, `kstr`, `g` and `krest`** sent by the head. So the head's model drives the BiBoard directly, outside the Pi's emergency stop, fall guard and eased stand-up, and it sent `g` (the gyro and balance toggle) unasked.
-- The BiBoard voice module had switched to Korean shortly after the head was wired to G1. No `X` command appeared in the capture, so a link to the head is unproven.
 
 ## 1. Where we are
 
