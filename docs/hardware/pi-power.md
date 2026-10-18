@@ -110,7 +110,7 @@ forces power and data together. Data-only wiring (3 jumpers: TX2/RX2/GND,
 both +5V pins left unconnected) is straightforward. Full pinout, confirmed
 from Petoi's own official board diagram, see
 [`g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos are in
-[`pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md).
+[`pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md).
 
 ---
 

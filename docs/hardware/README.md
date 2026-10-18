@@ -1,6 +1,6 @@
 # Hardware
 
-Specs, reference and research for the hardware that is installed. The physical assembly record (wiring, soldering, mounting, calibration, build logs) is in [`../../blueprints/`](../../blueprints/README.md).
+Specs, reference and research for the hardware that is installed. The physical assembly record (wiring, soldering, mounting, calibration) is in [`../../blueprints/`](../../blueprints/README.md).
 
 | | |
 |---|---|
@@ -24,3 +24,10 @@ Specs, reference and research for the hardware that is installed. The physical a
 | [`petoi-firmware-reference.md`](petoi-firmware-reference.md) | How OpenCat gaits are structured, Confirmed-from-source serial tokens, IMU thresholds, skill format. |
 | [`petoi-skills-survey.md`](petoi-skills-survey.md) | Which OpenCat built-in skills are worth pulling into G2. |
 | [`calibration-and-bringup-research.md`](calibration-and-bringup-research.md) | Petoi's official calibration/first-power-on docs, cross-checked against our bring-up plan. |
+
+### Build logs
+
+| | |
+|---|---|
+| [`build-logs/pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md) | Step-by-step history of connecting PiSugar, the Pi Zero 2 W and BiBoard. |
+| [`build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) | The microphone and speaker build: connectors, header pins, the BCLK/LRCLK splice, bring-up, the exact overlay. |

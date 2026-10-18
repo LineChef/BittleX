@@ -11,7 +11,7 @@ How the Pi, the PiSugar battery, the camera, the speaker and the microphone are 
 | Camera | Front of the case | 2026-10-06 |
 | Speaker | Very back of the case | 2026-10-06 |
 | Microphone | Top of the lid | 2026-10-06 |
-| BiBoard link | Three jumper wires (TX, RX, GND) from the Pi header to BiBoard's 5-pin socket; the Pi has its own power | [`build-logs/pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md) |
+| BiBoard link | Three jumper wires (TX, RX, GND) from the Pi header to BiBoard's 5-pin socket; the Pi has its own power | [`build-logs/pi-biboard-build-notes.md`](../docs/hardware/build-logs/pi-biboard-build-notes.md) |
 
 Why the case sits outside the cover: PiSugar's case shell measures 75.00 × 31.00 × 36.00 mm, and its 31 mm dimension is nearly twice the stock cover's 18.6 mm internal depth, so it cannot be enclosed inside it. Velcro avoids the conflict instead of solving it, and the payload (Pi, PiSugar, camera, speaker, mic, wiring and lid) is about 168 g, roughly 100 × 40 × 38 mm, centred on the spine. Balance and weights: [`../docs/hardware/specs.md`](../docs/hardware/specs.md) "Weight distribution, standing".
 

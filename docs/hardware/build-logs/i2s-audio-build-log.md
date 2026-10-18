@@ -1,6 +1,6 @@
 # I2S microphone and speaker build log
 
-How the Pi's microphone and speaker were chosen, wired, brought up and configured: the part choices and why, connector and splice details as built, the microphone bring-up diagnosis, the speaker bring-up, and the exact software configuration. The wiring as a reference is in [`blueprints/wiring/g2-wiring-guide.html`](../wiring/g2-wiring-guide.html).
+How the Pi's microphone and speaker were chosen, wired, brought up and configured: the part choices and why, connector and splice details as built, the microphone bring-up diagnosis, the speaker bring-up, and the exact software configuration. The wiring as a reference is in [`blueprints/wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
 
 ## Speaker + mic for Pi-side voice I/O — mic verified 2026-10-03, speaker/amp verified 2026-10-04
 
@@ -140,7 +140,7 @@ not 100% certain without the datasheet. Non-blocking either way: the
 overlay works the same with pin 36 unwired.
 
 **Full pin-by-pin wiring reference, kept in sync with this file:**
-[`blueprints/wiring/g2-wiring-guide.html`](../wiring/g2-wiring-guide.html)
+[`blueprints/wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html)
 — physical 40-pin header layout, device-to-device lookup tables, and the
 same fan-out/SEL notes above, laid out for quick reference when
 unplugging/rewiring at the bench.

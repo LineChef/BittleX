@@ -8,9 +8,9 @@ Every `G2_*` variable the Pi code and the tools read: **189**, of which **0** ar
 
 | Variable | Default at the read | Read in | Documented in |
 |---|---|---|---|
-| `G2_ACK_PEAK` | `0.0225` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
+| `G2_ACK_PEAK` | `0.0225` | `config.py` | [`.env.example`](../../.env.example), [`i2s-audio-build-log.md`](../hardware/build-logs/i2s-audio-build-log.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_ACK_TONE` | `"short_tone"` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
-| `G2_ALERT_PEAK` | `0.045` | `config.py` | [`.env.example`](../../.env.example) |
+| `G2_ALERT_PEAK` | `0.045` | `config.py` | [`.env.example`](../../.env.example), [`i2s-audio-build-log.md`](../hardware/build-logs/i2s-audio-build-log.md) |
 | `G2_ANNOUNCE_ONLINE` | `"on"` | `__main__.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_API_KEEPALIVE_S` | `300.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_API_KEY_EXPIRY_WARN_DAYS` | `30` | `config.py` | [`.env.example`](../../.env.example), [`api-setup.md`](api-setup.md) |
@@ -38,7 +38,7 @@ Every `G2_*` variable the Pi code and the tools read: **189**, of which **0** ar
 | `G2_BUZZER_VOLUME` | `10` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_CAL_ID` | — | `g2_calibrate.py` | [`real-data-pipeline.md`](../rl/real-data-pipeline.md), [`training-pipeline.md`](../rl/training-pipeline.md) |
 | `G2_CAL_POLICIES` | — | `g2_calibrate.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_CAMERA_PEAK` | `sound_levels.CAMERA` | `config.py` | [`.env.example`](../../.env.example) |
+| `G2_CAMERA_PEAK` | `sound_levels.CAMERA` | `config.py` | [`.env.example`](../../.env.example), [`i2s-audio-build-log.md`](../hardware/build-logs/i2s-audio-build-log.md) |
 | `G2_CAMERA_REMINDER_S` | `60.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_CAMERA_SOUNDS` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_CAM_AEBUMP` | `"0x30"` | `camera_preview.py` | [`settings-switches.md`](settings-switches.md) |

@@ -54,7 +54,7 @@
   discrete 5-pin header (TX2/RX2/GND/+5V/+5V), confirmed from Petoi's own
   official board diagram. Data-only wiring is straightforward. Full pinout:
   [`blueprints/wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); annotated photos:
-  [`pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md).
+  [`pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md).
 - BiBoard V1's spec lists Pi compatibility as "Pi 3A+, 4, 5" — the Pi Zero 2 WH
   isn't listed (the PiSugar S side *does* officially list Pi Zero 2 W/WH). Verify
   the 5-pin socket and serial wiring are compatible.

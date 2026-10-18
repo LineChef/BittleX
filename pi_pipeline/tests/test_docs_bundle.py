@@ -17,7 +17,7 @@ spec.loader.exec_module(B)
     ("docs/guides/README.md", "guides"),
     ("docs/planned/ai-head/README.md", "planned/ai-head"),
     ("blueprints/README.md", "blueprints"),
-    ("blueprints/build-logs/i2s-audio-build-log.md", "blueprints/build-logs/i2s-audio-build-log"),
+    ("docs/hardware/build-logs/i2s-audio-build-log.md", "hardware/build-logs/i2s-audio-build-log"),
     ("pi_pipeline/voice/README.md", "code/pi_pipeline/voice"),
     ("pi_pipeline/README.md", "code/pi_pipeline"),
     ("tools/README.md", "code/tools"),

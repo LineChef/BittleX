@@ -1,6 +1,6 @@
 # Pi, PiSugar and BiBoard build notes
 
-Step-by-step build history for connecting PiSugar, the Pi Zero 2 W and BiBoard: parts list, Pi port orientation, PiSugar orientation, BiBoard header preparation, the three-wire link, and the original annotated photos. The wiring as a reference is in [`wiring/g2-wiring-guide.html`](../wiring/g2-wiring-guide.html); mounting is in [`mounting.md`](../mounting.md); the microphone and amplifier build is in [`i2s-audio-build-log.md`](i2s-audio-build-log.md).
+Step-by-step build history for connecting PiSugar, the Pi Zero 2 W and BiBoard: parts list, Pi port orientation, PiSugar orientation, BiBoard header preparation, the three-wire link, and the original annotated photos. The wiring as a reference is in [`wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html); mounting is in [`mounting.md`](../../../blueprints/mounting.md); the microphone and amplifier build is in [`i2s-audio-build-log.md`](i2s-audio-build-log.md).
 
 ## Before you start
 
@@ -14,13 +14,13 @@ Step-by-step build history for connecting PiSugar, the Pi Zero 2 W and BiBoard: 
 - [ ] A 5-pin header to solder onto BiBoard, if one isn't already there
 - [x] Female-to-female Dupont jumper wires — 40pc/10cm in hand (2026-09-18).
       Longer ones (20&ndash;30cm) may be needed for the final mount position;
-      see [`../mounting.md`](../mounting.md)
+      see [`../mounting.md`](../../../blueprints/mounting.md)
 - [ ] Soldering iron + solder, only if BiBoard's header isn't already
       populated
 - [ ] M2 pan-head self-tapping screws, small mixed assortment (6&ndash;12mm)
 - [ ] A way to mount the assembled stack to the frame: the current mount is
       interim (PiSugar's case velcroed to a modified back cover); see
-      [`../mounting.md`](../mounting.md). Only Step 1 (Pi+PiSugar) is
+      [`../mounting.md`](../../../blueprints/mounting.md). Only Step 1 (Pi+PiSugar) is
       mount-independent. BiBoard ships as part of the frame kit
       **unassembled**, so Steps 2&ndash;4 need the frame built first.
 
@@ -103,7 +103,7 @@ This edge is also, per Petoi's official BiBoard V1 wiring diagram
 (`4-connect-the-wires/biboard-v1.md`), the edge that faces the robot's
 **head** &mdash; joint 0 (the head-pan servo) sits directly against it.
 That matters for where the Pi mounts; see
-[`../mounting.md`](../mounting.md).
+[`../mounting.md`](../../../blueprints/mounting.md).
 
 *(Image not included: third-party artwork. See [the vendor's page](https://docs.petoi.com/apis/raspberry-pi-serial-port-as-an-interfac/for-biboard-v1).)* BiBoard V1 front, with the 5-pin Raspberry Pi header outlined near the top edge
 
@@ -143,7 +143,7 @@ see exactly which pin goes where:
 | 10 | GPIO15, RXD (green) | TX2 (10) |
 | 2 | 5 V | not wired (skip) |
 
-The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [`../wiring/g2-wiring-guide.html`](../wiring/g2-wiring-guide.html).
+The two +5V pins on BiBoard's socket stay unused. The drawn version of this table is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
 
 **Why TX and RX cross:** one device's "I'm sending" line has to reach the
 other device's "I'm listening" line. Pi TXD carries the Pi's outgoing data,
@@ -195,7 +195,7 @@ Full pinout, both boards:
 Only pins 2, 6, 8, 10 are used in this build (Step 3) — the rest shown for
 context, since G2's own future GPIO use is unplanned:
 
-Pins used: 6 (GND), 8 (GPIO14, TXD) and 10 (GPIO15, RXD); pin 2 (5V) is not used. The full 40-pin map is in [`../wiring/g2-wiring-guide.html`](../wiring/g2-wiring-guide.html).
+Pins used: 6 (GND), 8 (GPIO14, TXD) and 10 (GPIO15, RXD); pin 2 (5V) is not used. The full 40-pin map is in [`../wiring/g2-wiring-guide.html`](../../../blueprints/wiring/g2-wiring-guide.html).
 
 Pi pin numbers are standard across every 40-pin Raspberry Pi, including the
 Zero 2 W. BiBoard's pin order is confirmed from Petoi's own official

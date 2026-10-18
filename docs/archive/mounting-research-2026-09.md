@@ -2,7 +2,7 @@
 
 > **Not current.** This is the original mounting page, kept for the record. It researches a corner-clip mount that was found not to work, plus the measurements behind it. The mount that is actually on G2 (an interim one) is described in [`../../blueprints/mounting.md`](../../blueprints/mounting.md). The three clip STL files and the illustrative diagrams this page links to were removed from the repository on 2026-10-17 (they are in git history); the measurements stay valid.
 
-How the Pi + PiSugar stack attaches to the Bittle X frame: the standoff clip, screws, the mount investigation and decision, and the assembled-stack diagrams. The wiring is in [`wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); the step-by-step build notes are in [`build-logs/pi-biboard-build-notes.md`](../../blueprints/build-logs/pi-biboard-build-notes.md).
+How the Pi + PiSugar stack attaches to the Bittle X frame: the standoff clip, screws, the mount investigation and decision, and the assembled-stack diagrams. The wiring is in [`wiring/g2-wiring-guide.html`](../../blueprints/wiring/g2-wiring-guide.html); the step-by-step build notes are in [`build-logs/pi-biboard-build-notes.md`](../hardware/build-logs/pi-biboard-build-notes.md).
 
 ### Print the standoff clip
 

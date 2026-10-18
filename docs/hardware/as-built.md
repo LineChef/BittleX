@@ -12,8 +12,8 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 | Computer | Raspberry Pi Zero 2 W (WH kit), 32 GB microSD | Debian 12 on the Pi; deployed to by `rsync` | [`../guides/pi-bring-up.md`](../guides/pi-bring-up.md) |
 | Pi power | PiSugar S, 1200 mAh | Powers the Pi independently of the robot's pack; no battery readout (runtime is estimated from uptime); after a clean shutdown the Pi stays powered until the PiSugar switch is flipped by hand | [`pi-power.md`](pi-power.md) |
 | Camera | Petoi AI Vision Camera Module (Grove Vision AI V2: Cortex-M55 + Ethos-U55) | On the Pi's USB (`/dev/ttyACM0`); runs the detector on itself and sends detections, not video; mounted at the front | [`../vision/README.md`](../vision/README.md) |
-| Microphone | HiLetgo SPH0645 I²S MEMS breakout | On the Pi header; top of the case lid. Very quiet: digital gain is applied in software | [`../../blueprints/build-logs/i2s-audio-build-log.md`](../../blueprints/build-logs/i2s-audio-build-log.md) |
-| Speaker | NULLLAB NS4168 I²S amplifier with 3 W speaker | On the Pi header (shares the mic's I²S clock lines); at the very back | [`../../blueprints/build-logs/i2s-audio-build-log.md`](../../blueprints/build-logs/i2s-audio-build-log.md) |
+| Microphone | HiLetgo SPH0645 I²S MEMS breakout | On the Pi header; top of the case lid. Very quiet: digital gain is applied in software | [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) |
+| Speaker | NULLLAB NS4168 I²S amplifier with 3 W speaker | On the Pi header (shares the mic's I²S clock lines); at the very back | [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) |
 | Case | Modified Petoi back cover plus PiSugar's case, velcroed on | An interim mount: the case is thicker than the cover's cavity | [`../../blueprints/mounting.md`](../../blueprints/mounting.md) |
 
 ## Connections

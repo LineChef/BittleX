@@ -32,7 +32,7 @@ GIT_EXES = ("git", "/Library/Developer/CommandLineTools/usr/bin/git")
 ASSET_EXT = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf", ".html"}
 CODE_READMES = ("pi_pipeline/README.md", "tools/README.md", "rl_training/README.md", "rl_training/opencat-gym/reference_gait/README.md")
 TOP_ORDER = ["STATUS", "how-it-works", "architecture", "capabilities", "project-plan", "code-map", "backlog"]
-FOLDER_TITLES = {"archive/plan-detail": "Archived plan write-ups", "archive/rl": "Archived training campaigns", "blueprints/build-logs": "Build logs",
+FOLDER_TITLES = {"archive/plan-detail": "Archived plan write-ups", "archive/rl": "Archived training campaigns", "hardware/build-logs": "Build logs",
                  "code": "Code READMEs", "legal": "Legal", "code/pi_pipeline": "Pi pipeline code"}
 FOLDER_ORDER = ["guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive"]
 LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")

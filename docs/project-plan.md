@@ -58,7 +58,7 @@ Build record and wiring: [`../blueprints/README.md`](../blueprints/README.md).
 Open:
 - [ ] Mount the Pi/PiSugar stack properly (currently a temporary mount; the printed standoff is not impact-rated). See the build manual.
 - [ ] Confirm the back cover closes over the mounted Pi (measured too shallow for Pi + PiSugar; a modified cover/clips is planned).
-- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`hardware/i2s-audio-build-log.md`](../blueprints/build-logs/i2s-audio-build-log.md)).
+- [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`hardware/i2s-audio-build-log.md`](hardware/build-logs/i2s-audio-build-log.md)).
 - [ ] Battery-aware behavior: get real runtime data (idle/walking/talking on a full charge) before building the low-charge warning.
 - [ ] Measure G2's 2S pack runtime (BiBoard side) with a timed test, the way the Pi side was measured (Pi figure: [`STATUS.md`](STATUS.md); the pack's ~45–60 min of walking is only an estimate, [`hardware/pi-power.md`](hardware/pi-power.md)). Not scheduled. Why it matters: the Pi and pack look comparable on paper, so the result decides whether a second pack for the BiBoard is worth buying.
 

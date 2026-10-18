@@ -8,7 +8,7 @@ The physical build record for G2: how the hardware was assembled and wired, with
 | [`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html) | The wiring reference in one page: Part 1 PiSugar to Pi to BiBoard (stack, exact pins, power-on checklist), Part 2 everything wired into the Pi (40-pin header map, wire map, mic and amp, the AI head). Open it in a browser. A printable PDF is [`wiring/g2-wiring-guide.pdf`](wiring/g2-wiring-guide.pdf); the page is also published as a [live Artifact](https://claude.ai/artifact/EYPDHBAgbLyTk9qSvaP6rB). |
 | [`mounting.md`](mounting.md) | How the Pi stack, camera, speaker and microphone are attached (interim mount; sections still to be recorded), the measurements a mount must respect, and the case design now in progress. |
 | [`calibration.md`](calibration.md) | The servo calibration procedure (bracket alignment per leg, `kbalance` verification) and what to redo after a servo replacement. |
-| [`build-logs/pi-biboard-build-notes.md`](build-logs/pi-biboard-build-notes.md) | Step-by-step history of connecting PiSugar, the Pi Zero 2 W and BiBoard. |
-| [`build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) | The microphone and speaker build: connectors, header pins, the BCLK/LRCLK splice, bring-up, the exact overlay. |
+
+The dated build logs (the Pi, PiSugar and BiBoard connection; the microphone and speaker) are in [`../docs/hardware/build-logs/`](../docs/hardware/README.md#build-logs).
 
 Bittle X, the camera module and the Pi + PiSugar stack are assembled and in use. What works and what is open: [`../docs/STATUS.md`](../docs/STATUS.md). The first mounting research (an abandoned clip design) is archived in [`../docs/archive/mounting-research-2026-09.md`](../docs/archive/mounting-research-2026-09.md).
