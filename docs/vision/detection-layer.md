@@ -148,7 +148,7 @@ Priority if forced to choose: **safety > recognition > objects.**
 | `vision/feed.py` `SerialDetectionFeed` | parses INVOKE → `Detection` | built; auto-starts inference; `VISION_LABELS` names classes |
 | `vision/avoidance.py` `Avoider` | box area → closeness, `center_x` → bearing | built; thresholds need real-detection + stopping-distance calibration |
 | `vision/scene.py` | detections → text → Claude narration | built |
-| `vision/terrain_feature.py` | box → (dist, bearing, tall_flag) for the gait obs | built; `fov_scale` / `s_near` / `s_far` / `h_tall` need mounted-camera calibration |
+| `vision/terrain_feature.py` | box → (dist, bearing, tall_flag) for the gait obs | removed 2026-10-18 with vision-in-the-gait closed; recover it from git (it is in commit f6f133d) |
 | `personality/bonds.py` | detection label → disposition / closeness | built (API only) |
 | `memory` + B11 place memory | accumulate "kitchen has a table", "dog near couch" | memory built; place-graph not |
 
