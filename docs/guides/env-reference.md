@@ -34,7 +34,7 @@ Every `G2_*` variable the Pi code and the tools read: **192**, of which **0** ar
 | `G2_BATTERY_LOW_V` | `7.54` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_BATTERY_POLL_S` | `1800.0` | `config.py` | [`operating-lessons.md`](operating-lessons.md) |
 | `G2_BATTERY_WATCH` | `"1"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_BONDS` | `""` | `config.py` | [`.env.example`](../../.env.example), [`capabilities.md`](../capabilities.md), [`pi-bring-up.md`](pi-bring-up.md) +6 |
+| `G2_BONDS` | `""` | `config.py` | [`.env.example`](../../.env.example), [`capabilities.md`](../capabilities.md), [`pi-bring-up.md`](pi-bring-up.md) +7 |
 | `G2_BUZZER_LEN` | `1.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_BUZZER_SHIFT` | `0.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_BUZZER_VOLUME` | `10` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
@@ -98,7 +98,7 @@ Every `G2_*` variable the Pi code and the tools read: **192**, of which **0** ar
 | `G2_GALLERY_PENDING` | `"~/.local/share/g2/gallery_pending.json"` | `promoted_loader.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GRUNT` | `"1"` | `loop.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_HEAD` | `"0"` | `sinks.py`, `gestures.py` | [`capabilities.md`](../capabilities.md) |
-| `G2_HEAD_RECALL` | `""` | `recall.py` | [`ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md) |
+| `G2_HEAD_RECALL` | `""` | `recall.py` | [`ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md), [`head-role-prompts.md`](../planned/ai-head/head-role-prompts.md) |
 | `G2_HISTORY_TURNS` | `12` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_HIT_SOUND` | `"1"` | `sinks.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
 | `G2_HIT_WALL` | `"1"` | `driver.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
