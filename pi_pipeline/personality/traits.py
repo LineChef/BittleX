@@ -36,6 +36,7 @@ class BehaviorParams:
     approach_novelty: bool = True           # walk up to a novel detection vs. just orient to it (on by default since 2026-10-07, user)
     revisit_secs: float = 150.0             # how long until a seen thing counts as novel again
     wander_turn_bias: float = 0.30          # 0..1 how much it changes heading between legs
+    wander_turn_prob: float = 0.20          # 0..1 chance a new leg turns at all; otherwise it carries straight on (user, 2026-10-18: mostly straight, a random turn once in a while; walls are handled separately)
 
     # --- expression ---
     vocalize_prob: float = 0.20            # 0..1 chance of an unprompted cue on an event
@@ -50,7 +51,7 @@ class BehaviorParams:
     # --- caution (feeds Avoider / terrain thresholds later) ---
     caution: float = 0.50                # 0..1 how early to slow / stop near obstacles & edges
 
-    _UNIT_FIELDS = ("novelty_pull", "wander_turn_bias", "vocalize_prob",
+    _UNIT_FIELDS = ("novelty_pull", "wander_turn_bias", "wander_turn_prob", "vocalize_prob",
                     "fidget_prob", "caution")
     _MIN_SECS = {"idle_secs_before_explore": 5.0, "explore_leg_secs": 1.0,
                  "investigate_secs": 0.5, "revisit_secs": 10.0,

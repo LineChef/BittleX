@@ -155,3 +155,27 @@ def test_explorer_ignores_specks_and_low_confidence():
     ex, _ = _explorer("curiosity=0.9")
     d = ex.decide([det(0.02, label="dust"), det(0.3, label="cat", conf=0.1)], now=0.0)
     assert d.action is ExploreAction.TURN        # nothing qualified -> wander
+
+
+def test_most_new_legs_carry_straight_on_and_a_few_turn():
+    import random
+    p = Personality.from_spec("").behavior_params()
+    assert p.wander_turn_prob == 0.20
+    ex = Explorer(p, Novelty(NoveltyConfig(revisit_secs=100)), rng=random.Random(7))
+    turns, straight = 0, 0
+    for k in range(600):                          # a tick every 10 s: a leg, its "leg done" tick, then the next leg starts
+        d = ex.decide([], now=10.0 * k)
+        if d.action is ExploreAction.TURN:
+            turns += abs(d.turn) > 0.0
+            straight += d.turn == 0.0
+    assert straight > turns * 2 and turns > 0     # about 80% straight, 20% turning
+
+
+def test_a_turn_probability_of_one_turns_every_leg_and_zero_never_does():
+    import random
+    for prob, want_turn in ((1.0, True), (0.0, False)):
+        p = Personality.from_spec("").behavior_params()
+        p.wander_turn_prob = prob
+        ex = Explorer(p, Novelty(NoveltyConfig(revisit_secs=100)), rng=random.Random(1))
+        d = ex.decide([], now=0.0)
+        assert d.action is ExploreAction.TURN and (abs(d.turn) > 0.0) is want_turn

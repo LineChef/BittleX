@@ -11,6 +11,7 @@ instead of only turning to look.
 """
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from enum import Enum
 
@@ -51,7 +52,8 @@ class ExploreConfig:
 
 class Explorer:
     def __init__(self, params: BehaviorParams, novelty: Novelty,
-                 cfg: ExploreConfig | None = None):
+                 cfg: ExploreConfig | None = None, rng: random.Random | None = None):
+        self._rng = rng or random.Random()
         self.p = params
         self.nov = novelty
         self.cfg = cfg or ExploreConfig()
@@ -150,6 +152,9 @@ class Explorer:
             self._leg_start = now
             self._leg_cap = None
             self._legs += 1
+            if self._rng.random() >= self.p.wander_turn_prob:      # most legs carry straight on; a wall ahead still turns him (the driver's wall steering is separate)
+                return self._d(ExploreAction.TURN, turn=0.0,
+                               reason=f"new leg, straight ({self._legs}/{self.cfg.max_legs})")
             heading = self.nov.stalest_heading(now)
             self.nov.see_heading(heading, now)
             turn = heading * self.p.wander_turn_bias

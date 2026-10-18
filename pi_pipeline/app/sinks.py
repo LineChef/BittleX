@@ -56,6 +56,8 @@ class SerialActuatorSink:
     def stop(self) -> None:
         if self._policy is not None:
             self._policy.stop(rest=True)
+        if getattr(self._link, "last_motion_command", None) == opencat.REST:
+            return                          # already lying down and nothing has moved the legs since: the emergency halt re-asserts its STOP every few seconds, and each rest re-applies the rest pose (neck turns, frame lifts, weight on the servos) even when he is already resting (2026-10-18, after a fall)
         self._link.send(opencat.REST, read_reply=False)
 
 

@@ -335,3 +335,23 @@ def test_head_sink_does_nothing_while_no_head_is_connected(monkeypatch):
     monkeypatch.setenv("G2_HEAD", "1")
     HeadSink(lk).move("center")
     assert lk.sent == ["m0 0"]
+
+
+def test_a_repeated_stop_does_not_resend_rest_to_a_resting_g2():
+    """The emergency halt re-asserts STOP every few seconds; each rest re-applies the rest pose (neck turns, frame lifts), so it is sent once."""
+    lk = FakeLink()
+    lk.last_motion_command = ""
+    real_send = lk.send
+    def send(cmd, **kw):
+        if cmd[:1] in ("k", "d", "i", "m"):
+            lk.last_motion_command = cmd
+        return real_send(cmd, **kw)
+    lk.send = send
+    s = SerialActuatorSink(lk)
+    s.stop()
+    s.stop()
+    s.stop()
+    assert lk.sent == ["d"]
+    s.perform("kbalance")                                  # the legs moved: the next stop rests him again
+    s.stop()
+    assert lk.sent == ["d", "kbalance", "d"]

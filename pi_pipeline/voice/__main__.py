@@ -212,7 +212,7 @@ def main() -> None:
                 # the voice service has no behavior runtime: hand over to an exploration session once the spoken reply is finished
                 import threading
                 from ..explore_launch import launch
-                threading.Timer(5.0, lambda: launch(settings.explore_roam_s)).start()
+                threading.Timer(0.3, lambda: launch(settings.explore_roam_s)).start()      # the words and the horn have already finished when this event fires; the old 5 s wait was pure delay (2026-10-18)
 
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
             from ..power import power as _power

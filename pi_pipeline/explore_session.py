@@ -105,6 +105,10 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     return watch
 
 
+class _FellExit(Exception):
+    """Raised inside the clean-up to skip the stand-up / jingle / rest sequence after a fall."""
+
+
 def parse_args(argv=None):
     """Roaming (Tier 1) starts at once by default; `--stationary` is the opt-in stay-put mode (Tier 0 only, until `arm`)."""
     ap = argparse.ArgumentParser(prog="pi_pipeline.explore_session")
@@ -135,6 +139,24 @@ def main() -> None:
 
     if not features.explore:
         raise SystemExit("exploration is off in G2_FEATURES (+explore, +vision, +vision_safety are needed); nothing to test")
+
+    boot_t0 = time.monotonic()
+    from concurrent.futures import ThreadPoolExecutor
+    prefetch = ThreadPoolExecutor(max_workers=2, thread_name_prefix="prefetch")        # the two slowest start-up steps on the Pi (Piper about 14 s, Vosk about 10 s, measured 2026-10-18) load in the background while the link, camera and policy come up
+    tts_future = vosk_future = None
+    if not args.no_narrate:
+        def _load_tts():
+            from .voice.tts import make_tts
+            return make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        tts_future = prefetch.submit(_load_tts)
+    if features.mic and features.wake_word:
+        def _load_vosk():
+            try:
+                from .voice import vosk_model
+                vosk_model.get_model(settings.vosk_model_path)              # cached: the listener below takes the same object
+            except Exception:  # noqa: BLE001 -- the listener reports its own load failure
+                log.debug("vosk prefetch failed", exc_info=True)
+        vosk_future = prefetch.submit(_load_vosk)
 
     with diag.session("explore", extra={"roam_s": args.roam_s}):
         from .diag.crashwatch import CrashWatch
@@ -209,8 +231,8 @@ def main() -> None:
         narrator = None
         say = lambda text: None  # noqa: E731
         if not args.no_narrate:
-            from .voice.tts import make_tts
-            raw = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+            raw = tts_future.result()                                            # started at the top of main()
+            log.info("speech engine ready %.1f s after the session started", time.monotonic() - boot_t0)
             lock = threading.Lock()
 
             class _Locked:                                                    # narration and replies never talk over each other
@@ -236,9 +258,13 @@ def main() -> None:
                 from .voice import prompt_tones
                 prompt_tones.play_start_horn(wait=True)
 
+        fell = threading.Event()                          # a fall ends the session (the main loop below leaves at once): he never sits in a half-halted exploration
+        announce_threads: list = []
+
         def _on_fall():
             tally.note("fall")
-            log.warning("G2 fell: halting the exploration so he does not keep trying to walk (release with `g2_explore.sh release`, or end the session)")
+            log.warning("G2 fell: stopping and ending the exploration session")
+            fell.set()
             rt.halt()
             try:
                 link.send("gb", read_reply=False, settle=0.0)         # balance off: lying (or held) upside down, the gyro balance loop fights the servos and G2 twitches
@@ -248,7 +274,9 @@ def main() -> None:
                 from .voice import prompt_tones
                 prompt_tones.play_horn_if_enabled("G2_FALL_HORN", wait=True)              # the losing horn (user, 2026-10-10), then the words
                 say("I fell down. I have stopped.")
-            threading.Thread(target=_announce, daemon=True).start()   # this runs on the walker thread: never wait for the speaker here
+            th = threading.Thread(target=_announce, daemon=True)
+            announce_threads.append(th)
+            th.start()   # this runs on the walker thread: never wait for the speaker here (the main loop waits for it before the process exits)
         fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard
@@ -299,6 +327,7 @@ def main() -> None:
             os.remove(CMD_FILE)                              # a command left behind by an earlier session must not act on this one
         except OSError:
             pass
+        log.info("start-up took %.1f s", time.monotonic() - boot_t0)
         log.info("exploration session running (Tier 0 on). commands via %s: arm / disarm / halt / release / stop", CMD_FILE)
 
         started = time.monotonic()
@@ -313,6 +342,9 @@ def main() -> None:
         try:
             while t.is_alive() and not stop_flag.is_set() and time.monotonic() - started < args.max_s:
                 time.sleep(0.5)
+                if fell.is_set():
+                    ended_by = "fell"
+                    break
                 while memory is not None and not notes.empty():
                     try:
                         memory.store.add_fact(notes.get_nowait())
@@ -364,6 +396,11 @@ def main() -> None:
                 listener.stop()
             log.info("ending the exploration session")
             try:
+                if fell.is_set() or ended_by == "fell":
+                    ended_by = "fell"                                         # he is on his side or back: no stand-up, no "complete" jingle, no second rest (the fall already stopped and rested him); only let the "I fell" announcement finish
+                    for th in announce_threads:
+                        th.join(timeout=12.0)
+                    raise _FellExit()
                 rt.post(disarm_explore=True)
                 time.sleep(1.0)
                 if policy_walker is not None:
@@ -375,9 +412,11 @@ def main() -> None:
                     from .voice import prompt_tones
                     prompt_tones.play_complete(wait=True)
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed
+            except _FellExit:
+                pass
             except Exception:  # noqa: BLE001
                 log.exception("clean-up failed")
-            if policy_walker is not None:
+            if policy_walker is not None and not fell.is_set():
                 policy_walker.stop(rest=True)
             rt.stop()
             t.join(timeout=2.0)

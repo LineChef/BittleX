@@ -71,3 +71,23 @@ def test_a_roam_bout_is_not_cut_off_by_the_behavior_layers_own_caps():
     d = BehaviorDriver(BehaviorParams(), clock=c, rng=random.Random(0))
     E.apply_roam_limits(d, 0.0)
     assert d.mode.cfg.explore_max_secs > 1e6 and d.explorer.cfg.max_legs > 10 ** 6
+
+
+def test_a_fall_ends_the_exploration_session_and_skips_the_stand_up_sequence():
+    import inspect
+    from pi_pipeline import explore_session as E
+    src = inspect.getsource(E.main)
+    assert "fell = threading.Event()" in src and "fell.set()" in src
+    loop = src[src.index("while t.is_alive() and not stop_flag.is_set()"):]
+    assert 'if fell.is_set():\n                    ended_by = "fell"\n                    break' in loop        # the main loop leaves within half a second of a fall
+    cleanup = src[src.index('log.info("ending the exploration session")'):]
+    assert cleanup.index("raise _FellExit()") < cleanup.index('say("Exploration complete.")')      # the fall path never stands him up or plays the jingle
+
+
+def test_the_slow_start_up_loads_run_in_the_background_and_the_hand_over_does_not_wait_five_seconds():
+    import inspect
+    from pi_pipeline import explore_session as E
+    from pi_pipeline.voice import __main__ as V
+    src = inspect.getsource(E.main)
+    assert "prefetch.submit(_load_tts)" in src and "tts_future.result()" in src and "prefetch.submit(_load_vosk)" in src
+    assert "threading.Timer(0.3, lambda: launch(" in inspect.getsource(V)
