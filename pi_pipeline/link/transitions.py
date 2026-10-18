@@ -7,7 +7,9 @@ The first frames come from `skill_frames.json` (decoded from the firmware's Inst
 What is eased: any skill in the table, from a pose the link knows (rest, sit, balance or another posture skill it sent, a full-leg `i` pose that is being held).
 What is not (left exactly as before):
   - a stop / freeze: `kbalance` / `kup` keep only the stand-up rule (eased from lying or sitting, immediate from anything else), `d` is never eased;
-  - an unknown pose: after a firmware gait or a behaviour (a trick) the legs could be anywhere, so the firmware's own start is used (reading the servos is stage 2);
+  - an unknown pose: after a firmware gait or a behaviour (a trick) the legs could be anywhere, so the firmware's own start is used, unless stage 2 is on
+    (`G2_TRANSITION_READ_POSE=1`): the link then reads the servos' measured angles (`SerialLink.read_leg_pose`, two agreeing `f` rows, about 0.2-0.5 s) and eases
+    from there; never between two gaits, and a failed or disagreeing read falls back to the firmware's start;
   - an `i` stream in progress (the policy walk, a look), i.e. the last leg command is under `STREAM_GAP_S` old: the caller owns that motion;
   - the get-up, calibration and placeholder skills in `NEVER_EASE`.
 Mirroring: the firmware plays a skill whose name does not end in L or R mirrored at random (skill.h `loadBySkillName`), so the Pi cannot know which side it will use.
@@ -144,6 +146,25 @@ def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
 def leg_cmd(pose) -> str:
     """The `i` command that sets the eight leg joints (the head is left where it is)."""
     return "i" + " ".join(f"{j} {max(-120, min(120, int(round(a))))}" for j, a in zip(LEG_JOINTS, pose))
+
+
+def read_pose_enabled() -> bool:
+    """Stage 2 (`G2_TRANSITION_READ_POSE`, default off until `check_serial posecheck` shows the servo read works over the Pi's link and G2 holds still while it runs)."""
+    return os.environ.get("G2_TRANSITION_READ_POSE", "").strip().lower() in ("1", "on", "true", "yes")
+
+
+def kind(token: str):
+    row, _ = _skill((token or "").strip())
+    return row["kind"] if row else None
+
+
+def may_read_before(last_command: str, token: str) -> bool:
+    """Whether the link may read the servos to ease from an unknown pose into `token`. Not between two gaits (a change of walk or turn keeps
+    its rhythm; reading would stop him mid-stride), and not after a get-up or calibration skill (he may still be getting up)."""
+    last = (last_command or "").strip()
+    if last in NEVER_EASE or (kind(last) == "gait" and kind(token) == "gait"):
+        return False
+    return True
 
 
 def is_stream(last_command: str, last_t, now=None) -> bool:

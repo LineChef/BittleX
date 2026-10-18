@@ -81,8 +81,8 @@ def test_burst_sends_token_then_rests_in_one_connection(monkeypatch):
 
 def test_feedback_check_reads_twice_around_one_prompt_same_connection(monkeypatch, capsys):
     lk = FakeLink()
-    readings = iter(["28.0", "41.0"])   # different -- looks like real feedback
-    lk.send = lambda cmd, read_reply=True: (lk.sent.append(cmd), next(readings))[1]
+    readings = iter([[28.0] * 8, [41.0] + [28.0] * 7])   # different -- looks like real feedback
+    lk.read_leg_pose = lambda **kw: (lk.sent.append("f"), next(readings))[1]
     monkeypatch.setattr("builtins.input", lambda *_: "")
     _feedback_check(lk)
     assert lk.sent == ["f", "f"]   # both reads in the one connection, no reboot between
@@ -93,7 +93,7 @@ def test_feedback_check_reads_twice_around_one_prompt_same_connection(monkeypatc
 
 def test_feedback_check_flags_unchanged_reading_as_likely_not_real(monkeypatch, capsys):
     lk = FakeLink()
-    lk.send = lambda cmd, read_reply=True: (lk.sent.append(cmd), "28.0")[1]
+    lk.read_leg_pose = lambda **kw: (lk.sent.append("f"), [28.0] * 8)[1]
     monkeypatch.setattr("builtins.input", lambda *_: "")
     _feedback_check(lk)
     out = capsys.readouterr().out

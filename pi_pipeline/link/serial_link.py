@@ -28,6 +28,17 @@ def is_imu_line(line: str) -> bool:
     return line.lstrip().startswith(IMU_PREFIXES)
 
 
+def feedback_row(line: str):
+    """The 8 leg angles of one `f` servo-feedback row (servos 8..15, tab separated, measured 2026-10-02), or None if the line is not one."""
+    parts = line.replace("\t", " ").split()
+    if len(parts) != 8:
+        return None
+    try:
+        return [float(p) for p in parts]
+    except ValueError:
+        return None
+
+
 # What the legs were last told to do, as far as the stand-up ramp is concerned. "" is a fresh process (assumed lying).
 LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit")
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
@@ -58,6 +69,7 @@ class SerialLink:
         self._rx = b""
         self._imu = collections.deque(maxlen=64)
         self._other = collections.deque(maxlen=64)      # non-IMU lines seen by poll_imu(), see pop_other()
+        self._fb = collections.deque(maxlen=16)         # `f` servo-feedback rows: a stream (~5 rows/s) that runs until the next command, never a reply
 
     @staticmethod
     def _diag(level: str, name: str, **kv) -> None:
@@ -169,6 +181,7 @@ class SerialLink:
 
     _ramping = False
     _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)
+    last_pose_read: dict | None = None           # the outcome of the last read_leg_pose() (ok, rows, ms, spread, pose)
 
     def _ease_transition(self, command: str) -> None:
         """Every move into a firmware skill is eased (user, 2026-10-18; link/transitions.py has the rules). Two steps, each a short ramp of `i` commands:
@@ -193,8 +206,10 @@ class SerialLink:
                 if transitions.is_stream(self.last_motion_command, self._last_motion_t):
                     return                                     # a walk or another streamed motion is running: the caller owns it
                 start = transitions.pose_after(self.last_motion_command)
+            if start is None and transitions.read_pose_enabled() and transitions.may_read_before(self.last_motion_command, c):
+                start = self.read_leg_pose()                   # stage 2: after a firmware gait or a trick, ask the servos where the legs are
             if start is None:
-                return                                         # unknown pose (after a firmware gait or a trick): the firmware's own start
+                return                                         # unknown pose: the firmware's own start
             secs = transitions.ramp_seconds(start, end)
             if secs <= 0:
                 return
@@ -227,6 +242,39 @@ class SerialLink:
             self._ser.flush()
             time.sleep(1.0 / standup.STEPS_PER_S)
         return list(transitions.BALANCE)
+
+    def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):
+        """Measured leg angles (servos 8..15, Petoi order) from the firmware's `f` feedback stream, or None.
+
+        `f` starts a ~5 rows/s stream that the next command stops (measured over USB 2026-10-02; over the Pi's UART it returned only an echo on the
+        firmware of that day, so `check_serial posecheck` re-tests it). The first `rows` rows must agree within `agree_deg` on every joint: a single
+        glitched reading (the FR shoulder read -15 at 65 once) would otherwise start a ramp from a wrong angle, which is a jerk, the thing this avoids."""
+        if not self.is_connected:
+            return None
+        try:
+            self._fb.clear()
+            self._ser.write(b"f\n")
+            self._ser.flush()
+            got, deadline = [], time.monotonic() + timeout_s
+            while time.monotonic() < deadline and len(got) < rows:
+                self._next_line(block_until=deadline)
+                while self._fb:
+                    got.append(self._fb.popleft()[1])
+            ms = round((time.monotonic() - deadline + timeout_s) * 1000)
+            if len(got) < rows:
+                self.last_pose_read = {"ok": False, "rows": len(got), "ms": ms}
+                self._diag("INFO", "link.pose_read", **self.last_pose_read)
+                return None
+            got = got[:rows]
+            spread = max(max(r[j] for r in got) - min(r[j] for r in got) for j in range(8))
+            pose = [sum(r[j] for r in got) / len(got) for j in range(8)]
+            ok = spread <= agree_deg and all(abs(v) <= 130 for r in got for v in r)
+            self.last_pose_read = {"ok": ok, "rows": len(got), "ms": ms, "spread": round(spread, 1), "pose": [round(v, 1) for v in pose]}
+            self._diag("INFO", "link.pose_read", **self.last_pose_read)
+            return pose if ok else None
+        except Exception as e:  # noqa: BLE001  -- a failed read only means no easing
+            log.warning("pose read failed (%s)", e)
+            return None
 
     def read_line(self) -> str:
         """Read one non-IMU line the board sent (a reply, a banner). Waits up to
@@ -338,6 +386,10 @@ class SerialLink:
         line = raw.decode("utf-8", "replace").strip()
         if is_imu_line(line):
             self._imu.append(line)
+            return ""
+        row = feedback_row(line)
+        if row is not None:
+            self._fb.append((time.monotonic(), row))
             return ""
         return line
 

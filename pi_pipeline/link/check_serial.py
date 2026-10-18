@@ -7,6 +7,7 @@
     python -m pi_pipeline.link.check_serial skills              # cycle the conversational skill set
     python -m pi_pipeline.link.check_serial rest                # send 'd' (safe state)
     python -m pi_pipeline.link.check_serial feedback            # before/after 'f' reads around a hand-moved leg, one connection -- is servo feedback real?
+    python -m pi_pipeline.link.check_serial posecheck [--trick khi]   # stage 2 of the eased transitions: does the servo read work over this link, and does G2 hold still while it runs
     python -m pi_pipeline.link.check_serial firstmove           # guided, confirmed first movement
     python -m pi_pipeline.link.check_serial allmoves            # cycle EVERY known move + log voltage/latency
     python -m pi_pipeline.link.check_serial allmoves --skip-gaits --skip-recovery  # stationary moves only
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import math
 import time
 
 from ..config import settings
@@ -95,12 +97,12 @@ def _feedback_check(link: SerialLink) -> None:
     the last commanded angle rather than a true sensor read -- see the
     connectedFeedbackServo note in docs/hardware/petoi-firmware-reference.md."""
     link.drain(0.3)
-    before = (link.send(opencat.SERVO_FEEDBACK) or "").strip()
+    before = link.read_leg_pose(rows=1, timeout_s=1.5)          # feedback rows are routed off the reply path (SerialLink.feedback_row)
     print(f"reading 1 (before): {before!r}")
     input("\nNow move one leg by hand to a clearly different position, "
          "then press Enter... ")
     link.drain(0.3)
-    after = (link.send(opencat.SERVO_FEEDBACK) or "").strip()
+    after = link.read_leg_pose(rows=1, timeout_s=1.5)
     print(f"reading 2 (after) : {after!r}")
     if before and after and before != after:
         print("Different -- consistent with real position feedback.")
@@ -109,6 +111,73 @@ def _feedback_check(link: SerialLink) -> None:
              "(likely just reporting the last commanded angle).")
     else:
         print("Inconclusive -- one or both reads came back empty.")
+
+
+def _imu_deg(link: SerialLink, seconds: float) -> list:
+    """(roll, pitch) in degrees of every IMU frame that arrives in `seconds` (needs `gP` on)."""
+    from ..gait.imu_parse import parse_imu_line
+    out, end = [], time.monotonic() + seconds
+    while time.monotonic() < end:
+        for ln in link.poll_imu():
+            v = parse_imu_line(ln)
+            if v:
+                out.append((math.degrees(v[0]), math.degrees(v[1])))
+        time.sleep(0.03)
+    return out
+
+
+def _pose_check(link: SerialLink, reads: int = 5, trick: str | None = None, log_path: str = "~/g2_runs/posecheck.jsonl") -> None:
+    """Stage 2 of the eased transitions (link/transitions.py) needs two answers from G2 before it can be switched on:
+    1. does the servo read (`f`) answer over the Pi's link (on 2026-10-02 it gave only an echo there; the board has been reflashed since)?
+    2. does G2 hold still while it runs (the firmware briefly releases each servo to read it)?
+    G2 stands on the floor, hands near, the voice service stopped. He stands up (eased), then the servos are read `reads` times, each followed by
+    about 1 s of the feedback stream running, while the IMU watches roll and pitch. With `--trick khi`, a trick is then played and `ksit`
+    sent with stage 2 on, so the move into the sit starts from the measured pose. Ends lying down. One line per run in `log_path`."""
+    import json
+    import os
+    link.send("gP", read_reply=False)
+    link.send("kbalance", read_reply=False)
+    base = _imu_deg(link, 2.5)
+    if not base:
+        print("no IMU frames: is the IMU stream on? stopping")
+        link.send(opencat.REST, read_reply=False)
+        return
+    r0, p0 = (sum(v[i] for v in base) / len(base) for i in (0, 1))
+    print(f"standing: roll {r0:+.1f}, pitch {p0:+.1f}")
+    out = {"t": time.strftime("%Y-%m-%d %H:%M:%S"), "reads": []}
+    for k in range(reads):
+        link.poll_imu()
+        pose = link.read_leg_pose(rows=2, timeout_s=1.5)
+        info = dict(link.last_pose_read or {})
+        imu = _imu_deg(link, 1.0)                                  # the stream keeps running until the next command
+        link.send("kbalance", read_reply=False)                   # stops the stream, holds the stand
+        _imu_deg(link, 0.8)
+        dev = max((max(abs(r - r0), abs(p - p0)) for r, p in imu), default=None)
+        info["max_tilt_change_deg"] = None if dev is None else round(dev, 1)
+        out["reads"].append(info)
+        shown = "no rows" if not info.get("rows") else f"{info['rows']} rows in {info['ms']} ms, spread {info.get('spread')} deg, pose {info.get('pose')}"
+        print(f"read {k + 1}: {'ok' if pose else 'FAILED'}: {shown}; largest roll/pitch change while reading {info['max_tilt_change_deg']} deg")
+    if trick:
+        os.environ["G2_TRANSITION_READ_POSE"] = "1"
+        print(f"trick {trick}, then ksit eased from the measured pose")
+        link.send(trick, read_reply=False)
+        _imu_deg(link, 4.0)
+        link.last_pose_read = None
+        link.send("ksit", read_reply=False)
+        sit = _imu_deg(link, 2.5)
+        out["trick"] = {"skill": trick, "read": link.last_pose_read,
+                        "max_tilt_change_deg": round(max((max(abs(r - r0), abs(p - p0)) for r, p in sit), default=0.0), 1)}
+        print(f"  read before the sit: {link.last_pose_read}; largest roll/pitch change in the sit {out['trick']['max_tilt_change_deg']} deg")
+        link.send("kbalance", read_reply=False)
+        _imu_deg(link, 2.0)
+    link.send(opencat.REST, read_reply=False)
+    ok = sum(1 for r in out["reads"] if r.get("ok"))
+    print(f"\n{ok} of {reads} reads ok. Stage 2 can be switched on (G2_TRANSITION_READ_POSE=1) only if the reads work and G2 held still.")
+    path = os.path.expanduser(log_path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "a") as f:
+        f.write(json.dumps(out) + "\n")
+    print(f"logged to {path}")
 
 
 def _all_moves() -> list:
@@ -273,6 +342,9 @@ def main() -> None:
     sk = sub.add_parser("skills"); sk.add_argument("--hold", type=float, default=2.5)
     sub.add_parser("rest")
     sub.add_parser("feedback")
+    pc = sub.add_parser("posecheck", help="stage 2 hardware check: servo read over the Pi's link, and does G2 hold still during it")
+    pc.add_argument("--reads", type=int, default=5)
+    pc.add_argument("--trick", default=None, help="e.g. khi: play it, then ksit eased from the measured pose")
     fm = sub.add_parser("firstmove")
     fm.add_argument("--deg", type=float, default=15.0, help="degrees to nudge each joint")
     fm.add_argument("--walk-s", type=float, default=2.0, help="seconds to run wkF before auto-rest")
@@ -331,6 +403,8 @@ def main() -> None:
                 print("sent 'd' (rest)")
             elif args.cmd == "feedback":
                 _feedback_check(link)
+            elif args.cmd == "posecheck":
+                _pose_check(link, reads=args.reads, trick=args.trick)
             elif args.cmd == "firstmove":
                 _firstmove(link, deg=args.deg, walk_s=args.walk_s)
             elif args.cmd == "allmoves":

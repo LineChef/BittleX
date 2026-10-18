@@ -298,3 +298,63 @@ def test_the_skill_frame_table_matches_the_firmware_header():
     from pi_pipeline.gait import standup
     assert tr.REST == [standup.REST_URDF_DEG[k] for k in (0, 2, 4, 6, 1, 3, 5, 7)] and tr.table()["rest"]["first"] == tr.REST
     assert tr.table()["sit"]["first"] == [standup.SIT_URDF_DEG[k] for k in (0, 2, 4, 6, 1, 3, 5, 7)]
+
+
+# ------------------------------------------------------------------ stage 2: read the servos when the pose is unknown
+class _FeedbackSerial(_FakeSerial):
+    """Answers `f` with feedback rows (tab separated, servos 8..15, as measured 2026-10-02), or only an echo."""
+
+    def __init__(self, rows):
+        super().__init__(b"")
+        self.rows = rows
+
+    def write(self, b):
+        super().write(b)
+        if b == b"f\n":
+            self.buf += b"f\r\n" + b"".join(("\t".join(f"{v:.1f}" for v in r) + "\t\r\n").encode() for r in self.rows)
+
+
+def _fb_link(rows):
+    lk = SerialLink("/dev/null", read_timeout=0.05)
+    lk._ser = _FeedbackSerial(rows)
+    return lk
+
+
+def test_feedback_rows_are_read_and_never_returned_as_a_reply():
+    from pi_pipeline.link.serial_link import feedback_row
+    assert feedback_row("30.1\t29.8\t30.0\t30.2\t29.9\t30.0\t30.1\t30.0\t") == [30.1, 29.8, 30.0, 30.2, 29.9, 30.0, 30.1, 30.0]
+    assert feedback_row("Voltage: 7.81 V") is None and feedback_row("1\t2\t3") is None
+    lk = _link_with(b"30\t30\t30\t30\t30\t30\t30\t30\t\r\n8.1\r\n")
+    assert lk.send("P", settle=0.0) == "8.1"
+
+
+def test_a_pose_read_needs_two_agreeing_rows():
+    lk = _fb_link([[40, 41, 60, 59, 10, 11, -5, -4], [40.5, 41, 60, 59.5, 10, 11, -5, -4]])
+    assert lk.read_leg_pose(timeout_s=0.3) == [40.25, 41, 60, 59.25, 10, 11, -5, -4] and lk.last_pose_read["ok"]
+    glitch = _fb_link([[40, 41, 60, 59, 10, 11, -5, -4], [40, -15, 60, 59, 10, 11, -5, -4]])      # the FR shoulder misread seen 2026-10-02
+    assert glitch.read_leg_pose(timeout_s=0.3) is None and glitch.last_pose_read["spread"] == 56
+    echo = _fb_link([])                                                                          # what the Pi's UART gave on 2026-10-02
+    assert echo.read_leg_pose(timeout_s=0.1) is None and echo.last_pose_read["rows"] == 0
+
+
+def test_stage_2_eases_from_the_measured_pose_after_a_trick_only_when_switched_on(monkeypatch):
+    from pi_pipeline.link import transitions as tr
+    monkeypatch.setenv("G2_TRANSITION_RAMP_S", "0.8")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    measured = [35, 35, 50, 50, 20, 20, 10, 10]
+
+    def run(last, skill):
+        lk = _fb_link([measured, measured])
+        lk.last_motion_command = last
+        lk.send(skill, read_reply=False, settle=0.0)
+        return [w.decode().strip() for w in lk._ser.written]
+
+    assert run("khi", "ksit") == ["ksit"]                                        # off by default
+    monkeypatch.setenv("G2_TRANSITION_READ_POSE", "1")
+    sent = run("khi", "ksit")
+    assert sent[0] == "f" and sent[-1] == "ksit" and sent[-2] == tr.leg_cmd(tr.table()["sit"]["first"])
+    assert sent[1] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"]))[0])
+    assert run("kwkF", "kwkL") == ["kwkL"]                                       # never between two gaits
+    assert run("krc", "ksit") == ["ksit"]                                        # not while a get-up may still be running
+    assert run("kbalance", "khi")[0] != "f"                                      # a known pose needs no read
+    assert run("kwkF", "kbalance") == ["kbalance"]                               # a stop stays immediate
