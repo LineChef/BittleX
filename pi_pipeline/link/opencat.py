@@ -28,6 +28,8 @@ resets.
 from __future__ import annotations
 
 REST = "d"                       # lie down, servos relaxed
+VOICE_MODULE_ENABLE = "XAc"      # BiBoard voice module: enable it (harmless when already on). NEVER send XAd or a bare Xa (they silently break its voice commands)
+VOICE_MODULE_ENGLISH = "XAa"     # BiBoard voice module: English as the default language (it falls back to Chinese after some power cycles)
 ENTER_SERIAL2_MODE = "XS"        # BiBoard: talk to the Pi over UART2
 PRINT_VOLTAGE = "P"              # T_POWER -- battery voltage
 READ_JOINTS = "j"                # T_JOINTS -- bare: all angles; "j <idx>": one

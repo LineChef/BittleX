@@ -20,7 +20,7 @@ g2attach list        # every attachment, the firmware it needs, its saved gaits
 
 In this order: `G2_ATTACHMENT` in the environment (or `.env`), else the state file `~/.local/share/g2/attachment.json` that `g2attach` writes (moved with `G2_ATTACHMENT_FILE`), else `none`. An unknown name logs a warning and counts as `none`.
 
-`none` means no attachment: no firmware question is sent, no attachment skill is added and the head tool server is never imported. It has its own saved-gait slot like the others. **While nothing is saved for `none`, it is exactly the behaviour G2 had before attachments existed**: the policy is `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py` and the trim comes from `DEFAULT_TRIMS`. Tests pin this (`pi_pipeline/tests/test_attachments.py`).
+`none` means no attachment: no firmware question is sent, no attachment skill is added and the head tool server is never imported. (Every attachment, `none` included, also sets the BiBoard's voice module to English at each start-up: `XAc`, a 1.2 s pause, then `XAa`. The profile key `voice_module_language` in `gait_profiles.json` says `english` for each; a missing profile still means English, and `off` turns it off. The module falls back to Chinese after some power cycles; the sequence runs when the voice service or the app starts, not when the board alone is power-cycled.) It has its own saved-gait slot like the others. **While nothing is saved for `none`, it is exactly the behaviour G2 had before attachments existed**: the policy is `DEFAULT_POLICY` in `pi_pipeline/gait/residual_policy.py` and the trim comes from `DEFAULT_TRIMS`. Tests pin this (`pi_pipeline/tests/test_attachments.py`).
 
 ## Saved gaits
 

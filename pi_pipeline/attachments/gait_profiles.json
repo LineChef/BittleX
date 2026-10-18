@@ -2,7 +2,8 @@
   "none": {
     "payload_profile": null,
     "current": null,
-    "history": []
+    "history": [],
+    "voice_module_language": "english"
   },
   "head": {
     "payload_profile": "pod",
@@ -13,11 +14,13 @@
       "saved": "2026-10-18",
       "note": "V6 recipe retrained from scratch on the pod + AI head payload (20M, final weights picked); promoted without the benchmark rule at the user's instruction"
     },
-    "history": []
+    "history": [],
+    "voice_module_language": "english"
   },
   "arm": {
     "payload_profile": null,
     "current": null,
-    "history": []
+    "history": [],
+    "voice_module_language": "english"
   }
 }

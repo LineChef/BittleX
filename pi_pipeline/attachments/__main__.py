@@ -28,6 +28,8 @@ def _list() -> int:
         print(f"{name}: {a.description}; firmware {fw}")
         p = prof.get(name, {})
         print(f"  sim payload: {p.get('payload_profile') or 'not set'}")
+        if p.get("voice_module_language"):
+            print(f"  voice module: set to {p['voice_module_language']} at every start-up")
         cur = p.get("current")
         print(f"  current: {cur['policy']} (trim {cur.get('trim') or 'default'}, saved {cur.get('saved')})" if cur
               else "  current: none saved (runs the legacy DEFAULT_POLICY)")

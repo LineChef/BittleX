@@ -220,11 +220,49 @@ def skills_for(attachment: str | None = None) -> dict:
     return dict(ATTACHMENTS[attachment or current()].skills)
 
 
+VOICE_RESET_GAP_S = 1.2                    # the voice module needs about this long between X commands (the 2026-09-28 recovery)
+
+
+DEFAULT_VOICE_LANGUAGE = "english"         # used when a profile (or the whole profile file) is missing or unreadable, so the board is set to English even when the profile fails
+
+
+def voice_module_language(attachment: str | None = None, profiles: dict | None = None) -> str | None:
+    """The language the BiBoard's voice module is set to at start-up: the attachment's profile (gait_profiles.json, key `voice_module_language`), else English.
+    "off" in the profile turns it off (None)."""
+    att = attachment or current()
+    value = ((profiles if profiles is not None else load_profiles()).get(att) or {}).get("voice_module_language")
+    value = value.strip().lower() if isinstance(value, str) and value.strip() else DEFAULT_VOICE_LANGUAGE
+    return None if value == "off" else value
+
+
+def apply_voice_module_language(link, attachment: str | None = None) -> bool:
+    """Send the profile's voice-module language to the BiBoard: `XAc` (enable), a pause, then `XAa` (English). Only English is supported; any other value is logged and ignored.
+    Returns whether the commands were sent. Never raises."""
+    att = attachment or current()
+    want = voice_module_language(att)
+    if want is None or link is None:
+        return False
+    if want != "english":
+        log.warning("attachment %s: voice_module_language %r is not supported (only 'english'); nothing sent", att, want)
+        return False
+    try:
+        from ..link import opencat
+        link.send(opencat.VOICE_MODULE_ENABLE, read_reply=False)
+        time.sleep(VOICE_RESET_GAP_S)
+        link.send(opencat.VOICE_MODULE_ENGLISH, read_reply=False)
+    except Exception as e:  # noqa: BLE001 -- must never stop the service
+        log.warning("attachment %s: could not set the voice module to English (%s)", att, e)
+        return False
+    log.info("attachment %s: BiBoard voice module set to English (profile)", att)
+    return True
+
+
 def startup_check(link) -> bool | None:
-    """Called once at start-up by the voice service and the app, with the shared serial link (or None). Attachment `none`: does nothing
-    and sends nothing (returns None). Otherwise logs the attachment and its gait, asks the BiBoard `?`, and when the firmware does not
+    """Called once at start-up by the voice service and the app, with the shared serial link (or None). Attachment `none`: sets only the voice
+    module's language (no `?`, no skills; returns None). Otherwise logs the attachment and its gait, sets the voice module's language when the profile says so, asks the BiBoard `?`, and when the firmware does not
     fit, logs it and takes the attachment's skills back out. Returns whether the firmware fits (None when nothing was checked)."""
     att = current()
+    apply_voice_module_language(link, att)         # every profile says English (the module falls back to Chinese after some power cycles): sent for `none` too, before anything else talks to the board
     if att == NONE:
         return None
     log.info("attachment: %s (%s); gait: %s", att, ATTACHMENTS[att].description, gait_for(att).why)

@@ -32,7 +32,8 @@ def test_none_keeps_the_legacy_policy_trim_and_skills(monkeypatch):
     assert not set(A._ARM_SKILLS) & set(S.SKILLS)
 
 
-def test_none_sends_nothing_at_start_up():
+def test_none_sets_only_the_voice_module_language_at_start_up(monkeypatch):
+    monkeypatch.setattr(A.time, "sleep", lambda _s: None)
     class Link:
         sent = []
 
@@ -40,7 +41,7 @@ def test_none_sends_nothing_at_start_up():
             self.sent.append(cmd)
             return "Bittle X"
     lk = Link()
-    assert A.startup_check(lk) is None and lk.sent == []
+    assert A.startup_check(lk) is None and lk.sent == ["XAc", "XAa"]            # no `?`, no skills, no firmware question
 
 
 def test_none_never_imports_the_head_tool_server():
@@ -184,3 +185,44 @@ def test_the_cli(capsys):
     assert main(["use", "head"]) == 0 and A.current() == "head"
     assert "attachment: head" in capsys.readouterr().out
     assert main(["list"]) == 0 and "arm:" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------------------------------------- voice module language
+
+def test_the_head_profile_sets_the_voice_module_to_english_at_start_up(monkeypatch):
+    monkeypatch.setattr(A.time, "sleep", lambda _s: None)
+    sent = []
+    class Link:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return "Bittle X"
+    A.use("head")
+    A.startup_check(Link())
+    assert sent[:2] == ["XAc", "XAa"] and "XAd" not in sent and "Xa" not in sent
+
+
+def test_every_profile_says_english_and_a_missing_profile_still_does(monkeypatch):
+    for name in ("none", "head", "arm"):
+        assert A.voice_module_language(name) == "english"
+    assert A.voice_module_language("head", {}) == "english"                       # the profile file is missing or unreadable
+    assert A.voice_module_language("head", {"head": {"voice_module_language": "  "}}) == "english"
+    assert A.voice_module_language("head", {"head": {"voice_module_language": "off"}}) is None
+    monkeypatch.setattr(A.time, "sleep", lambda _s: None)
+    sent = []
+    class Link:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return "Bittle X"
+    assert A.apply_voice_module_language(None, "head") is False
+    assert A.apply_voice_module_language(Link(), "arm") is True and sent == ["XAc", "XAa"]
+
+
+def test_an_unsupported_language_or_a_failing_link_sends_nothing_and_never_raises(monkeypatch):
+    monkeypatch.setattr(A.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(A, "load_profiles", lambda path=None: {"head": {"voice_module_language": "klingon"}})
+    class Link:
+        def send(self, cmd, **kw):
+            raise OSError("gone")
+    assert A.apply_voice_module_language(Link(), "head") is False
+    monkeypatch.setattr(A, "load_profiles", lambda path=None: {"head": {"voice_module_language": "english"}})
+    assert A.apply_voice_module_language(Link(), "head") is False
