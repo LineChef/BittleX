@@ -440,3 +440,80 @@ def test_the_survey_gate_opens_after_a_minute_without_a_picture():
     assert s.idle_s(1000.0) == float("inf") or s.idle_s(1000.0) > 1e6                  # no picture yet
     s.began(1000.0)
     assert s.idle_s(1030.0) == 30.0 and s.idle_s(1061.0) >= 60.0
+
+
+def test_four_milestone_pictures_are_scheduled_at_25_50_75_and_99_percent_of_the_roam():
+    """Owner, 2026-10-18: one survey picture at 25, 50, 75 and 99 percent of the exploration, so there are always four."""
+    from pi_pipeline.explore_session import apply_roam_limits
+    d, c = mk()
+    apply_roam_limits(d, 200.0)                                     # as the session does: the roam lasts as long as --roam-s says (this also arms the milestones)
+    d.survey.cfg.cooldown_s = 1e9                                   # the usual cooldown must not matter for them
+    d.tick(DriverInputs(arm_explore=True, frame=[]))
+    walking(d)
+    d.tick(DriverInputs(frame=[]))                                  # the first explore tick starts the roam clock
+    t0 = d._roam_began_at
+    lead = d.survey.shot_lead_s
+    kinds = []
+    for n, (pct, kind) in enumerate(((0.25, "after_bow_m25"), (0.50, "after_bow_m50"), (0.75, "after_bow_m75"), (0.99, "after_bow_m99"))):
+        c.t = t0 + pct * 200.0 - lead - 1.0
+        assert not [e for e in d.tick(DriverInputs(frame=[])).effects if e.kind is EffectKind.SKILL]      # not yet due
+        c.t = t0 + pct * 200.0 - lead + 0.1
+        out = d.tick(DriverInputs(frame=[])).effects                                                      # due, but no good moment yet: it waits (the last one cannot: the roam is ending)
+        if n < 3:
+            assert not [e for e in out if e.kind is EffectKind.SKILL]
+            c.t += d.survey.milestone_wait_s(n) + 0.5                                                      # nothing better came: stop where he is
+            out = d.tick(DriverInputs(frame=[])).effects
+        assert [e.payload for e in out if e.kind is EffectKind.SKILL] == ["ksit"]
+        shots = []
+        for _ in range(60):
+            c.adv(0.25)
+            shots += [e.payload for e in d.tick(DriverInputs(frame=[])).effects if e.kind is EffectKind.CAPTURE]
+        kinds += [p[1] for p in shots]
+        c.t = t0 + 200.0 * pct + 35.0
+    assert kinds == ["after_bow_m25", "after_bow_m50", "after_bow_m75", "after_bow_m99"]
+
+
+def test_a_milestone_takes_a_good_moment_at_once_and_no_milestones_without_a_roam_cap():
+    d, c = mk()
+    d.survey.set_roam(0.0)
+    assert d.survey.milestone_due(10_000.0) is None
+    from pi_pipeline.explore_session import apply_roam_limits
+    apply_roam_limits(d, 100.0)
+    d.survey.cfg.cooldown_s = 1e9
+    walking(d)
+    d.tick(DriverInputs(arm_explore=True, frame=[]))
+    c.t = d._roam_began_at + 100 * 0.25 - d.survey.shot_lead_s + 0.5
+    leg_done(d)                                                      # a leg just ended and milestone 1 is due: start now, no waiting
+    t = d.tick(DriverInputs(frame=[]))
+    assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["ksit"]
+
+
+def test_the_sharper_of_three_frames_is_kept_and_milestone_pictures_are_never_dropped_as_duplicates(tmp_path):
+    import io
+    from PIL import Image, ImageFilter
+    from pi_pipeline.vision.exploration_pictures import _sharpness
+    base = Image.new("RGB", (64, 64), (200, 200, 200))
+    for x in range(0, 64, 4):
+        for y in range(64):
+            base.putpixel((x, y), (20, 20, 20))
+    def jpg(img):
+        b = io.BytesIO(); img.save(b, "JPEG", quality=95); return b.getvalue()
+    sharp, blurred = jpg(base), jpg(base.filter(ImageFilter.GaussianBlur(3)))
+    assert _sharpness(sharp) > _sharpness(blurred) > 0
+    frames = iter([types.SimpleNamespace(jpeg=blurred, detections=[], width=64, height=64), types.SimpleNamespace(jpeg=sharp, detections=[], width=64, height=64),
+                   types.SimpleNamespace(jpeg=blurred, detections=[], width=64, height=64)])
+    src = types.SimpleNamespace(snapshot=lambda settle=None: next(frames))
+    saver = ExplorationPictureSaver(src, str(tmp_path))
+    saver._extra_frames = 2
+    import time as _t
+    saver_sleep = _t.sleep
+    _t.sleep = lambda s: None
+    try:
+        p = saver("after_bow_m25")
+    finally:
+        _t.sleep = saver_sleep
+    assert p and open(p, "rb").read() == sharp                       # the middle frame won
+    src2 = types.SimpleNamespace(snapshot=lambda settle=None: types.SimpleNamespace(jpeg=sharp, detections=[], width=64, height=64))
+    s2 = ExplorationPictureSaver(src2, str(tmp_path / "b"))
+    s2._extra_frames = 0
+    assert s2("after_bow_m25") and s2("after_bow_m50") and s2("after_bow_m75")        # identical pictures all kept

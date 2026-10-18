@@ -102,6 +102,13 @@ def _no_autolog(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
+def _one_frame_per_survey_picture(monkeypatch):
+    """Survey pictures take extra frames and keep the sharpest on the Pi; tests that count camera calls take one (the best-of-three test sets it itself)."""
+    from pi_pipeline.vision.exploration_pictures import ExplorationPictureSaver
+    monkeypatch.setattr(ExplorationPictureSaver, "_extra_frames", 0)
+
+
+@pytest.fixture(autouse=True)
 def _no_detection_log(monkeypatch):
     """Tests never write detection logs into the real ~/g2_runs/detections."""
     monkeypatch.setenv("G2_DETECTION_LOG", "off")

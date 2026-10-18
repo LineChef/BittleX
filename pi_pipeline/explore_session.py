@@ -42,6 +42,8 @@ def apply_roam_limits(driver, roam_s: float) -> None:
     (a periodic look-around, then sit and rest, which looks like being stuck): the explorer's leg budget (8 legs) and the mode controller's 90 s cap on one armed bout.
     The session ends the bout itself at `roam_s` (0 = no cap), so the controller's cap is set just above it."""
     from dataclasses import replace
+    if getattr(driver, "survey", None) is not None:
+        driver.survey.set_roam(roam_s)                                  # four scheduled pictures at 25, 50, 75 and 99 percent of the roam
     driver.explorer.cfg = replace(driver.explorer.cfg, max_legs=10 ** 9)
     driver.mode.cfg = replace(driver.mode.cfg, explore_max_secs=(roam_s + 5.0) if roam_s > 0 else 1e9)
 

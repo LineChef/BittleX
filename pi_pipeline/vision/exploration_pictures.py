@@ -61,6 +61,19 @@ def _badly_exposed(jpeg: bytes) -> bool:
     return st is not None and (st.mean > 170.0 or st.clip_high > 0.05)           # too bright only: a retake of a dark picture is dark again (a dim room, 2026-10-10: brightness 30, retaken, still 30) and costs another warm-up
 
 
+def _sharpness(jpeg: bytes) -> float:
+    """Edge detail of a picture (variance of a Laplacian-like difference, grey, local); higher = sharper. 0.0 if it cannot be measured (no Pillow / numpy)."""
+    try:
+        import io
+        import numpy as np
+        from PIL import Image
+        g = np.asarray(Image.open(io.BytesIO(jpeg)).convert("L"), dtype=np.float32)
+        lap = g[1:-1, 1:-1] * 4 - g[:-2, 1:-1] - g[2:, 1:-1] - g[1:-1, :-2] - g[1:-1, 2:]
+        return float(lap.var())
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
 class ExplorationPictureSaver:
     def __init__(self, source, root: str = DEFAULT_ROOT, *, clock=time.time, warn_mb: float = 2000.0, on_saved=None,
                  survey_distance: int = 12, named_distance: int = 3, prep_every_s: float = 0.0, wait_still=None, on_failure=None, on_survey_stop=None):
@@ -87,6 +100,20 @@ class ExplorationPictureSaver:
         except TypeError:                                                                       # a source whose snapshot() takes no settle argument
             return self._source.snapshot()
 
+    _extra_frames = int(os.environ.get("G2_SURVEY_EXTRA_FRAMES", "2"))      # survey pictures: this many more frames half a second apart, and the sharpest of all is kept (0 = one frame)
+
+    def _best_of(self, first):
+        best, best_score = first, _sharpness(first.jpeg)
+        for _ in range(self._extra_frames):
+            time.sleep(0.5)
+            more = self._take(False)
+            if more is None or not _decodes(more.jpeg):
+                continue
+            score = _sharpness(more.jpeg)
+            if score > best_score:
+                best, best_score = more, score
+        return best
+
     def folder_for(self, kind: str, now: float) -> Path:
         if kind.startswith("name:"):
             return self._root / "named" / slug(kind[5:])
@@ -107,6 +134,8 @@ class ExplorationPictureSaver:
         snap = self._take(prep)
         if prep and snap is not None:
             self._last_prep = self._clock()
+        if snap is not None and kind.startswith("after_bow") and self._extra_frames > 0:
+            snap = self._best_of(snap)
         retaken = False
         if snap is not None and not quick and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
             again = self._take(True)
@@ -130,7 +159,7 @@ class ExplorationPictureSaver:
         folder.mkdir(parents=True, exist_ok=True)
         pose = "named" if kind.startswith("name:") else kind
         prefix = slug(kind[5:]) if kind.startswith("name:") else pose
-        if self._is_duplicate(folder, prefix, snap.jpeg, self._named_distance if kind.startswith("name:") else self._survey_distance):
+        if not kind.startswith("after_bow_m") and self._is_duplicate(folder, prefix, snap.jpeg, self._named_distance if kind.startswith("name:") else self._survey_distance):      # the four scheduled pictures are always kept
             self.duplicates += 1
             log.info("picture not kept: a near-duplicate of one already saved (%s)", kind)
             self._survey_stop(kind, None, {}, snap.jpeg)
@@ -165,7 +194,7 @@ class ExplorationPictureSaver:
         return str(path)
 
     def _survey_stop(self, kind: str, path, meta: dict, jpeg: bytes) -> None:
-        if self._on_survey_stop is not None and kind == "after_bow":
+        if self._on_survey_stop is not None and kind.startswith("after_bow"):
             try:
                 self._on_survey_stop(path, meta, jpeg)
             except Exception:  # noqa: BLE001 -- a place record never stops a picture

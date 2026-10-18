@@ -67,6 +67,40 @@ class Survey:
             return False
         return True if self.gate is None else bool(self.gate(t))
 
+    # Four scheduled pictures per roam (owner, 2026-10-18): at 25, 50, 75 and 99 percent of the roam, whatever the cooldown and the gate say.
+    MILESTONES = (0.25, 0.50, 0.75, 0.99)
+    MILESTONE_WAIT_S = 15.0       # a milestone waits this long for a good moment (a finished wall turn, the end of a leg) before he stops where he is
+    roam_s: float = 0.0
+    _taken: set = frozenset()
+
+    def set_roam(self, roam_s: float) -> None:
+        """Arm the milestone pictures for a roam of `roam_s` seconds (0 = no cap: no milestones)."""
+        self.roam_s, self._taken = float(roam_s or 0.0), set()
+
+    def milestone_time(self, i: int) -> float:
+        """Seconds into the roam at which milestone `i` should be STARTED: the survey takes `shot_lead_s` to reach its picture, and the picture is due at the milestone."""
+        return self.MILESTONES[i] * self.roam_s - self.shot_lead_s
+
+    @property
+    def shot_lead_s(self) -> float:
+        return _picture_steps(self.cfg, "after_bow", "survey")[1]
+
+    def milestone_due(self, elapsed: float) -> int | None:
+        if self.roam_s <= 0:
+            return None
+        for i in range(len(self.MILESTONES)):
+            if i not in self._taken and elapsed >= self.milestone_time(i):
+                return i
+        return None
+
+    def milestone_wait_s(self, i: int) -> float:
+        """How long milestone `i` may wait for a good moment: `MILESTONE_WAIT_S`, less when the roam is about to end (the 99 percent picture must not run past the end)."""
+        return max(0.0, min(self.MILESTONE_WAIT_S, (1.0 - self.MILESTONES[i]) * self.roam_s - self.shot_lead_s - 2.0))
+
+    def milestone_taken(self, i: int) -> str:
+        self._taken.add(i)
+        return f"after_bow_m{int(round(self.MILESTONES[i] * 100))}"
+
     def idle_s(self, now: float | None = None) -> float:
         """Seconds since the last survey stop began (a session's first survey counts from `cooldown_s - first_delay_s` ago, so it can come early in a roam)."""
         t = self._clock() if now is None else now
@@ -121,9 +155,10 @@ def picture_pose_steps(cfg: SurveyConfig, settle_only: bool = False):
     return [(d, payload) for d, kind, payload, _why in plan if kind == "skill"]
 
 
-def survey_plan(cfg: SurveyConfig) -> list:
-    """A survey stop: bow, look up, stand, settle, one picture, then walk on."""
+def survey_plan(cfg: SurveyConfig, shot_kind: str = "after_bow") -> list:
+    """A survey stop: bow, look up, stand, settle, one picture, then walk on. `shot_kind` names the picture (a scheduled milestone picture is `after_bow_m25` and so on)."""
     plan, t = _picture_steps(cfg, "after_bow", "survey")
+    plan = [(d, k, (shot_kind if k == "shot" and p == "after_bow" else p), w) for d, k, p, w in plan]
     t += 0.4
     plan.append((t, "diag", "survey.done", "survey: finished, walking on"))
     return plan
