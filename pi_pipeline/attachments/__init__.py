@@ -247,9 +247,9 @@ def apply_voice_module_language(link, attachment: str | None = None) -> bool:
         return False
     try:
         from ..link import opencat
-        link.send(opencat.VOICE_MODULE_ENABLE, read_reply=False)
+        link.send(opencat.VOICE_MODULE_ENABLE, read_reply=True)         # the board answers every X command with a stray 'X': read it so the later `?` reads the real banner
         time.sleep(VOICE_RESET_GAP_S)
-        link.send(opencat.VOICE_MODULE_ENGLISH, read_reply=False)
+        link.send(opencat.VOICE_MODULE_ENGLISH, read_reply=True)
     except Exception as e:  # noqa: BLE001 -- must never stop the service
         log.warning("attachment %s: could not set the voice module to English (%s)", att, e)
         return False

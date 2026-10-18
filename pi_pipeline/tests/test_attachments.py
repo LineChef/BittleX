@@ -226,3 +226,21 @@ def test_an_unsupported_language_or_a_failing_link_sends_nothing_and_never_raise
     assert A.apply_voice_module_language(Link(), "head") is False
     monkeypatch.setattr(A, "load_profiles", lambda path=None: {"head": {"voice_module_language": "english"}})
     assert A.apply_voice_module_language(Link(), "head") is False
+
+
+def test_the_voice_module_replies_are_read_so_the_firmware_check_sees_the_real_banner(monkeypatch):
+    monkeypatch.setattr(A.time, "sleep", lambda _s: None)
+    class Link:
+        def __init__(self):
+            self.pending = []
+
+        def send(self, cmd, *, read_reply=True, **kw):
+            if cmd.startswith("X"):
+                self.pending.append("X")                      # the board's stray answer to an X command
+            elif cmd == "?":
+                self.pending.append("Bittle X")
+            if not read_reply:
+                return ""
+            return self.pending.pop(0)
+    A.use("head")
+    assert A.startup_check(Link()) is True
