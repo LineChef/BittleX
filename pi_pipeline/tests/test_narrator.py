@@ -63,3 +63,11 @@ def test_quiet_mutes_and_forgets_a_waiting_line_and_a_stale_line_is_dropped():
     assert n.narrate([Effect(EffectKind.HEAD, "pan_sweep", "look-around")]) is None      # muted while a command window is open
     n.quiet(False)
     assert n.narrate([Effect(EffectKind.HEAD, "pan_sweep", "look-around")]) == "Looking around."
+
+
+def test_walls_and_bumps_are_narrated_with_what_he_sees_and_which_way_he_goes():
+    from pi_pipeline.behavior.narrator import line_for
+    assert line_for("wall ahead (8 in, 3 groups): turn right") == ("wall", "I see a wall about 8 inches ahead. Turning right.")
+    assert line_for("wall blocked (0 in, 5 groups): turn left") == ("wall", "I'm right up against a wall. Turning left.")
+    assert line_for("hit: back up")[1].startswith("Oof!") and line_for("hit: turn around")[1] == "Turning around."
+    assert line_for("straight first")[1] == "Walking straight ahead."

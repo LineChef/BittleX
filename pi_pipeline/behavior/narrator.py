@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import re
 import threading
 import time
 
@@ -32,12 +33,24 @@ _RULES = (
     ("look-around", "scan", "Looking around."),
     ("recognised ", "recognised", "I recognise someone."),
     ("cliff:", "cliff", "There's an edge. Backing away."),
+    ("hit: back up", "hit", "Oof! I bumped into something. Backing up."),
+    ("hit: turn around", "hit_turn", "Turning around."),
+    ("straight first", "straight", "Walking straight ahead."),
 )
+
+# Wall turns (behavior/driver.py `_wall_reflex`): "wall ahead (8 in, 3 groups): turn right" / "wall blocked (0 in, 5 groups): turn left"; said with what he sees and which way he goes
+_WALL = re.compile(r"^wall (ahead|blocked) \(([\d.]+) in.*?\): turn (left|right)")
 
 
 def line_for(reason: str, private=()) -> tuple[str, str] | None:
     """(kind, text) for a behavior reason, or None if it is not worth saying."""
     r = (reason or "").strip().lower()
+    m = _WALL.match(r)
+    if m:
+        state, inches, side = m.groups()
+        if state == "blocked" or float(inches) <= 6:
+            return "wall", f"I'm right up against a wall. Turning {side}."
+        return "wall", f"I see a wall about {int(round(float(inches)))} inches ahead. Turning {side}."
     for prefix, kind, text in _RULES:
         if r.startswith(prefix):
             x = r[len(prefix):].strip() or "thing"
@@ -48,7 +61,7 @@ def line_for(reason: str, private=()) -> tuple[str, str] | None:
 
 
 class Narrator:
-    def __init__(self, speak, *, min_gap_s: float = 8.0, repeat_s: float = 40.0, clock=time.monotonic, threaded: bool = True, private=()):
+    def __init__(self, speak, *, min_gap_s: float = 5.0, repeat_s: float = 25.0, clock=time.monotonic, threaded: bool = True, private=()):
         self._private = tuple(private)
         self._speak, self._min_gap, self._repeat, self._clock = speak, min_gap_s, repeat_s, clock
         self._last_any: float | None = None
