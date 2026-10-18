@@ -104,3 +104,46 @@ def test_a_real_websocket_round_trip_serves_the_cloud_side_and_reconnects():
 
     replies, server, n = asyncio.run(scenario())
     assert n >= 2 and [r["id"] for r in replies] == [1, 2, 3] and replies[1]["result"]["tools"][0]["name"] == "g2_about" and server.calls == ["g2_about"]
+
+
+def _store(tmp_path):
+    from pi_pipeline.memory.store import Store
+    st = Store(str(tmp_path / "m.db"))
+    st.add_fact("Sam has a cat named Biscuit.", importance=4)
+    st.add_fact("The kitchen floor is hardwood.", importance=2)
+    st.add_fact("Sam lives here.", importance=5, core=True)
+    st.add_observation("a red ball under the table")
+    st.log_exchange("secret chat line", "reply", [])
+    return st
+
+
+def test_recall_returns_facts_and_sightings_scrubs_names_and_never_transcripts(tmp_path):
+    from pi_pipeline.head.recall import recall_text
+    st = _store(tmp_path)
+    out = recall_text(st, "", names=["Sam"])
+    assert "Sam" not in out and "[name] lives here" in out and "red ball" in out and "secret chat" not in out
+    cat = recall_text(st, "cat", names=["Sam"])
+    assert "Biscuit" in cat and "hardwood" not in cat
+    assert "nothing saved" in recall_text(st, "dragons")
+    assert len(recall_text(st, "", limit_bytes=40).encode()) <= 40
+
+
+def test_recall_does_not_touch_the_fact_recency_and_is_off_unless_enabled(tmp_path, monkeypatch):
+    from pi_pipeline.head import recall
+    st = _store(tmp_path)
+    before = [r["last_recalled"] for r in st.list_facts()]
+    recall.recall_text(st, "cat")
+    assert [r["last_recalled"] for r in st.list_facts()] == before
+    monkeypatch.delenv("G2_HEAD_RECALL", raising=False)
+    assert not recall.enabled()
+    monkeypatch.setenv("G2_HEAD_RECALL", "1")
+    assert recall.enabled()
+
+
+def test_recall_tool_is_called_through_the_server_with_a_topic(tmp_path):
+    from pi_pipeline.head.recall import make_tool
+    s = ToolServer([make_tool(lambda: _store(tmp_path), ["Sam"])])
+    assert s.handle(_req("tools/list", 1))["result"]["tools"][0]["inputSchema"]["properties"]["topic"]
+    r = s.handle(_req("tools/call", 2, name="g2_recall", arguments={"topic": "cat"}))
+    assert r["result"]["isError"] is False and "Biscuit" in r["result"]["content"][0]["text"] and s.calls == ["g2_recall"]
+    assert s.handle(_req("tools/call", 3, name="g2_recall", arguments={"topic": 5}))["result"]["isError"] is True

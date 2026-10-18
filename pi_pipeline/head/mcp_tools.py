@@ -155,7 +155,11 @@ def main() -> int:
     if not endpoint:
         print("XIAOZHI_MCP_ENDPOINT is missing or does not start with wss:// in .env")
         return 2
-    server = ToolServer()
+    tools = DEFAULT_TOOLS
+    from . import recall
+    if recall.enabled():                             # off by default: what it returns leaves the house
+        tools = tools + (recall.make_tool(),)
+    server = ToolServer(tools)
     try:
         asyncio.run(serve(endpoint, server))
     except KeyboardInterrupt:
