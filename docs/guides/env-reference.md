@@ -146,7 +146,7 @@ Every `G2_*` variable the Pi code and the tools read: **201**, of which **0** ar
 | `G2_POWER_LOG` | `DEFAULT_PATH` | `power_log.py` | [`settings-switches.md`](settings-switches.md), [`pi-power.md`](../hardware/pi-power.md) |
 | `G2_PRICE_IN_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
 | `G2_PRICE_OUT_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
-| `G2_PROFILE` | `"0"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_PROFILE` | `"0"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md), [`real-walk-log.md`](../rl/real-walk-log.md) |
 | `G2_QUESTION_WINDOW_S` | `8.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
 | `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md), [`reflection-plan.md`](../planned/reflection-plan.md) |
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |

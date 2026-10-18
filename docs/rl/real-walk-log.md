@@ -661,3 +661,40 @@ Isolation tests on G2 (voice service stopped, Pi sending only what is listed; th
 ### Exploration stop commands not heard; a halted session twitched G2 (2026-10-08, 8:20 to 8:30 AM)
 
 During an exploration test the wake word was heard three times ("gee two", 8:24:03, 8:24:37, 8:25:21) and "nothing recognized after the wake word" followed each time, while G2 walked. Likely cause: the walking servos drown the microphone (the same weakness as the 10-07 kitchen sessions). A fall at 8:25:56 then crashed the halt dispatch (`cannot join current thread`: the fall callback runs on the walker thread and `stop()` joined it), and the halted session kept sending `d` (rest) every 5 s, which made the resting G2 twitch until the session was ended (8:28:23). Fixes: the wake word makes him stand still for the command window (listen_hold, 12 s, with a 1.2 s settle before the window opens), the exploration-ending phrases are in the tight recognizer's grammar, a repeated rest is skipped when nothing has moved the legs (`SerialLink.last_motion_command`), and `PolicyWalker.stop()` no longer joins its own thread. Also seen: timed turns work in exploration (right 30 / 45 / 75 deg for 1.4 / 2.1 / 3.5 s, left 90 deg capped at 6.0 s, left 60 deg 4.6 s).
+
+## 2026-10-18: V7 on the pod payload, poses, two explorations
+
+Pod (185 g) and AI head (42 g) mounted, about 481 g in all; hardwood. Policy V7. Summary and open items: [`../STATUS.md`](../STATUS.md).
+
+**Walks (12 s, 0.10 m/s, `run_gait.py`, tape-measured by the owner):**
+
+| Walk | Trim | Distance | Ended | Log |
+|---|---|---|---|---|
+| 1 | none | 4 ft 3 in | 5 in right of centre | roll mean -1.0, swing ±5.3 deg, no fall |
+| 2 | none | 4 ft 3 in | 5 in right (the same) | roll swing ±5.3 deg, no fall |
+| 3 | `fl=-0.3` | 4 ft | 1 in right of centre | ended normally |
+
+The logged yaw read +146 and +124 deg on the untrimmed walks and does not follow the real heading (IMU yaw drift); the tape measure is the record. `fl=-0.3` became V7's default trim.
+
+**Poses (IMU at 5 Hz, G2 on the floor, stand / sit / stand-from-sit):**
+
+| Variant | Stand (max tilt) | Sit (roll swing) | Result |
+|---|---|---|---|
+| 0.8 s ramp from the sit | 2 deg | n/a | back legs skipped and jittered, he fell forward |
+| 1.4 s ramp from the sit | 3 deg | 18-25 deg | same, fell forward |
+| via rest, 2 s, firmware balance left on | 3 deg | 25 deg | slipping at the bottom of the sit, "catching his balance" |
+| via rest, firmware balance off after each skill | 3 deg | 2 deg | smooth |
+
+The wave (`khi`): 47 deg pitch swing, flipped him twice (both triggered by mis-heard speech, 13:10 and 13:16). Stage-2 servo read over the Pi's link: 0 of 5 reads returned angles, and a request tilted him up to 21 deg (raw capture).
+
+**Explorations (tight room, `G2_PROFILE=1`):**
+
+| | 1:57 PM, 3 min | 2:29 PM, 4 min |
+|---|---|---|
+| Walk ticks late (over 18.75 ms) | 32% (782 of 2440), worst gap 303 ms | 30% in the one walk checked (488 of 1631), 477 of them the send tick |
+| Survey pictures | none (surveys wait for a clean leg end; the gate wants G2 far from a wall) | 2 of 4 milestones saved; the other two lost to camera timeouts (8 of 6 s) |
+| Contact picture delay | 7.2 s and 8.6 s | n/a |
+| Settle before a walk | 0.02 s and 2.0 s (the cap) | twitching with firmware balance on |
+| Falls | none | one tip-over (112 deg) at the 99% survey stop |
+
+Profile (208 s): the wake-word listener 30.7% running (48.4 s CPU), the walk thread 21.3% (11.0 s), the narrator 90% in the speech model. CPU governor `ondemand` at 1 GHz, not throttled. Fixes made afterwards are listed in STATUS (not retested).
