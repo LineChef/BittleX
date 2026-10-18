@@ -137,6 +137,7 @@ class SerialLink:
     # --- messaging --------------------------------------------------------
 
     last_motion_command: str = ""
+    balance_epoch: int = 0       # counts the commands sent that can switch the firmware balance on (see send)
     on_failure = None            # callable(why): the "wrong answer" signal when a MOTION command (k / d / i / m) could not be sent (user, 2026-10-10); set by the services, never raises
 
     def _failed(self, command: str, why: str) -> None:
@@ -164,6 +165,8 @@ class SerialLink:
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
+            if command.strip() == "gB" or command[:1] == "k":
+                self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
             if command[:1] in ("k", "d") or (command[:1] in ("i", "m") and transitions.leg_pairs(command)):
                 self.last_motion_command = command.strip()      # what the legs were last told to do (a quiet P / gb / gP, or a head-only `i0 30` look, does not change it)
                 self._last_motion_t = time.monotonic()

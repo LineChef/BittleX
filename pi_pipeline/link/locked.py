@@ -38,6 +38,10 @@ class LockedLink:
         return getattr(self._link, "last_motion_command", "")
 
     @property
+    def balance_epoch(self):
+        return getattr(self._link, "balance_epoch", None)
+
+    @property
     def is_connected(self) -> bool:
         return getattr(self._link, "is_connected", False)
 

@@ -99,6 +99,7 @@ class StandGuard:
         self._reenabled_at: float | None = None
         self._quiet_until = 0.0
         self._last_gb = -1e9
+        self._gb_epoch = None                # the link's balance_epoch when the guard last sent `gb`: unchanged = nothing has switched balance on since
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.trips = 0
@@ -109,6 +110,8 @@ class StandGuard:
         self._tilt_since: float | None = None
         self._fell = False
 
+    OFF_RESEND_S = 30.0
+
     def note_activity(self) -> None:
         self._quiet_until = self._clock() + self._quiet_s
         self._det.reset()
@@ -117,6 +120,7 @@ class StandGuard:
         try:
             self._link.send("gb", read_reply=False, settle=0.0)
             self._last_gb = self._clock()
+            self._gb_epoch = getattr(self._link, "balance_epoch", None)
             log.info("firmware gyro balance off (%s)", why)
         except Exception:  # noqa: BLE001 -- the guard must never take the service down
             log.debug("sending gb failed", exc_info=True)
@@ -229,6 +233,16 @@ class StandGuard:
             if self._det.update(now, math.degrees(r[0]), math.degrees(r[1])):
                 tripped = True
         if tripped:
+            epoch = getattr(self._link, "balance_epoch", None)
+            if epoch is not None and epoch == self._gb_epoch:
+                # nothing the Pi sent has switched balance on since its own `gb`: the swing is G2 being moved, lying down or settling, not the
+                # balance loop (2026-10-17/18: four "wobbles" in 20 s, each with balance already off). Still re-send `gb` at most every 30 s:
+                # the BiBoard voice module or the AI head can switch balance on without the Pi knowing.
+                log.info("swing seen while firmware balance is off (motion, not a balance wobble)")
+                if now - self._last_gb >= self.OFF_RESEND_S:
+                    self._gb("swing while off")
+                self._det.reset()
+                return True
             self.trips += 1
             log.warning("standing wobble detected -- turning firmware gyro balance off")
             try:

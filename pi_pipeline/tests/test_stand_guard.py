@@ -192,3 +192,37 @@ def test_a_fall_at_any_time_calls_on_fall_once_and_rearms_when_he_is_back_up():
         link.queue = [imu_line(30.0, 20.0)]
         g2.tick()
     assert quiet == []                              # a big lean is not a fall
+
+
+class EpochLink(FakeLink):
+    """Counts the commands that can switch firmware balance on, as SerialLink.balance_epoch does."""
+    def __init__(self):
+        super().__init__()
+        self.balance_epoch = 0
+
+    def send(self, cmd, **kw):
+        if cmd == "gB" or cmd.startswith("k"):
+            self.balance_epoch += 1
+        return super().send(cmd, **kw)
+
+
+def test_a_swing_while_balance_is_already_off_is_motion_not_a_balance_wobble():
+    """2026-10-17/18: four "wobbles" in 20 s, each with balance already off (G2 lying down, being moved): only one gb per 30 s, no WARN trip."""
+    link, clock = EpochLink(), Clock()
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, quiet_after_activity_s=0, reassert_s=1e9)
+    g.start(); g._stop.set()
+    assert link.sent.count("gb") == 1                        # the idle policy at start
+    run_guard(g, link, clock, 40)
+    assert g.trips == 0 and link.sent.count("gb") <= 3       # swings seen, classed as motion; gb re-sent at most every 30 s
+    link.send("kbalance")                                    # a skill can switch balance on again
+    n = g.trips
+    run_guard(g, link, clock, 15, start=500)
+    assert g.trips > n                                       # now a swing IS a balance wobble
+
+
+def test_the_link_counts_commands_that_can_switch_balance_on(monkeypatch):
+    from pi_pipeline.tests.test_link import _link_with
+    lk = _link_with(b"")
+    for c in ("gb", "gP", "d", "i8 30", "gB", "kbalance", "b9 5"):
+        lk.send(c, read_reply=False, settle=0.0)
+    assert lk.balance_epoch == 2 and LockedLink(lk).balance_epoch == 2
