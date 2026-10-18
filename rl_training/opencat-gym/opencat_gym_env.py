@@ -481,28 +481,36 @@ if PAYLOAD_PROFILE == "case":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
-elif PAYLOAD_PROFILE in ("case2", "pod"):
+elif PAYLOAD_PROFILE == "case2":
     # 2026-10-07: the user weighed the whole payload (Pi, PiSugar, camera, speaker, mic, wiring and the lid they hang from) at 168 g, and measured it about 1.5 in (38 mm) tall and a
     # little over half as wide as the 71 mm lid (taken as 40 mm). With the 422 g total unchanged, the base robot is 422 - 168 = 254 g (run with G2E_BODY_MASS_SCALE=0.944 = 254 / 269), not
     # 301 g. 133 g on the spine = 168 - 15 camera - 20 speaker (both still estimates). The box sits with its bottom where the 16 mm "case" box's bottom was (17 mm up).
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.133, 0.020
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
-    if PAYLOAD_PROFILE == "pod":
-        # 2026-10-17: G2 now carries the Bittle X Pi add-on pod (blueprints/mounting.md); the user weighed the whole payload at 185 g (was 168 g), the base robot is unchanged (254 g), so the
-        # whole robot is 439 g. Same split as case2 (camera 15 g and speaker 20 g are still estimates), so the spine block is 185 - 15 - 20 = 150 g. The box size and positions stay at case2's
-        # until the pod is measured (the pod's own design figure is 135 g, centre of mass 9 mm from the robot centre).
-        PAYLOAD_MASS_NOM = 0.150
     # The block is the case the camera is mounted to: back edge on the hip-joint line (x = -0.055, as before), front edge flush with the BACK of the camera (x = +0.045; the camera
     # body, modeled separately, is at x = 0.045..0.065 in front of it). Tried and rejected 2026-10-07: running the block on to the camera's front face (120 mm).
     PAYLOAD_BOX_HALF = (0.050, 0.020, 0.019)
     PAYLOAD_POS = (-0.005, 0.0, 0.036)
+elif PAYLOAD_PROFILE == "pod":
+    # 2026-10-17/18: G2 carries the Bittle X Pi add-on pod (blueprints/mounting.md) AND the Petoi AI Head. Weighed payload 185 g (pod, Pi, PiSugar S, camera, speaker, mic, wiring; was 168 g) on the
+    # unchanged 254 g base, plus the AI head (42 g, Petoi's figure; its mass is added in full: the stock head it replaces is already inside the 254 g and has not been weighed), 481 g in all.
+    # Block = the pod: 94.0 mm long, 37.9 mm tall (project viewer), width taken as the 59.2 mm envelope (|X| <= 29.6); it sits 9.2 mm behind the cover's middle (envelope Z -37.8..56.2), bottom on the cover
+    # at 17 mm up as before. The camera (on top of the pod's front) and the speaker (inside its rear) are inside that box, so they are part of its 185 g and there is no separate rear body.
+    # The AI head is a separate body at the nose, size and position estimated (not measured): about 50 x 60 x 50 mm, its centre 77.5 mm ahead of the torso centre, 20 mm up.
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.020
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.042, 0.003
+    REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
+    PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
+    PAYLOAD_POS = (-0.0092, 0.0, 0.0360)
+    HEAD_BOX_HALF = (0.025, 0.030, 0.025)
+    HEAD_MASS_POS = (0.0775, 0.0, 0.020)
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
 # both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
 # height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
 PAYLOAD_LAYOUT = os.environ.get("G2E_PAYLOAD_LAYOUT", "").strip().lower()
 PAYLOAD_JITTER_XY = 0.003      # m, per-episode x / y position jitter of each welded body (z keeps +-3 mm)
-if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE in ("case2", "pod"):
+if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE == "case2":
     SPINE_HALF_X = 0.0525
     PAYLOAD_BOX_HALF = (SPINE_HALF_X, PAYLOAD_BOX_HALF[1], PAYLOAD_BOX_HALF[2])
     PAYLOAD_POS = (0.0, 0.0, PAYLOAD_POS[2])

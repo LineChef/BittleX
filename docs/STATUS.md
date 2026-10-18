@@ -14,7 +14,7 @@ Each row carries the date it was last confirmed. The long dated write-ups that u
 | Microphone and speaker | I²S mic and amp installed and working (2026-10-04). The mic is very quiet, so a software gain is applied. [`blueprints/build-logs/i2s-audio-build-log.md`](hardware/build-logs/i2s-audio-build-log.md) |
 | Mass | About 422 g; about 46% of the weight over the front feet (2026-10-07) |
 | Pi battery | PiSugar S 1200 mAh, no readout. Measured full-charge runtime 3.28 h (mean of three runs, 2026-10-10); warning at 70% of it (about 2.29 h), critical at 80% (about 2.62 h). Recharge from flat takes about 40 minutes |
-| Petoi AI Head | On the bench, not mounted; a tool server on the Pi was reached from the head (2026-10-11). Not part of the running build: [`planned/ai-head/`](planned/ai-head/README.md) |
+| Petoi AI Head | Mounted on G2 (owner, 2026-10-18), 42 g, counted in the payload (details and the sim's numbers: [`hardware/specs.md`](hardware/specs.md)). A tool server on the Pi was reached from the head (2026-10-11). Plans: [`planned/ai-head/`](planned/ai-head/README.md) |
 | Robot arm | A Petoi Bittle X+Arm module is documented, not installed: [`planned/robot-arm.md`](planned/robot-arm.md) |
 
 ## What is deployed

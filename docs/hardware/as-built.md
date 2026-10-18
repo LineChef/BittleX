@@ -33,8 +33,9 @@ Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../..
 |---|---|
 | Base robot | about 254 g |
 | Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod) | **185 g** weighed 2026-10-17 (the project's own model figure is 135 g). The previous mount's payload was 168 g, roughly 100 × 40 × 38 mm |
-| Whole robot | about 439 g (254 g base + 185 g payload). With the previous mount: about 422 g |
-| Front/rear share, standing | to be measured with the pod. With the previous mount: about 46% front, 54% rear (measured range roughly 44 to 50%) |
+| Petoi AI Head | 42 g (Petoi's figure), on the head servo in place of the stock head; counted on top of the payload above | |
+| Whole robot | about 481 g (254 g base + 185 g payload + 42 g AI head). With the previous mount and no AI head: about 422 g |
+| Front/rear share, standing | not weighed with the pod and AI head; the sim says about 51% front. With the previous mount: about 46% front, 54% rear (measured range roughly 44 to 50%) |
 
 The measurements and the sim's payload model: [`specs.md`](specs.md) "Weight distribution, standing".
 
