@@ -7,6 +7,10 @@ Everything that makes G2 walk on the real robot: the 80 Hz loop that runs the ex
 | Module | Role |
 |---|---|
 | `run_gait.py` | The on-Pi control loop and its command line (`--cmd`, `--seconds`, `--log`, `--probe-imu`, `--openloop`, `--dry-run`, …). Sends `d` (rest) on any exit |
+| `walk_start.py` | Checks before a policy walk: settle into a still stand after a firmware gait or skill, never start tilted past 30°, the opt-in speed ramp-in |
+| `walk_tools.py` | The bench walks behind `run_gait.py`'s `--probe-imu`, `--openloop` and `--dry-run` |
+| `walk_vision.py` | The Phase E vision-skill pieces of the walk loop (skill layer, background camera reader, edge hand-off, feed factory) |
+| `walk_common.py` | The IMU-to-policy quaternion, loop constants and the fire-and-forget send shared by the above (`run_gait.py` re-exports all of these) |
 | `policy_walker.py` | The same loop as a background thread (`PolicyWalker`): G2's default forward gait for the voice service and exploration |
 | `residual_policy.py` | `ResidualGaitPolicy`: builds the 278-value observation, runs the ONNX policy, adds its residual to the scripted `wkF` walk. `DEFAULT_POLICY` names the deployed file |
 | `deploy_map.py` | Maps the policy's joint order to OpenCat servo indices, with per-servo sign and offset hooks, and clamps commands |

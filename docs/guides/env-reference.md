@@ -141,7 +141,7 @@ Every `G2_*` variable the Pi code and the tools read: **196**, of which **0** ar
 | `G2_PI_RUNTIME_LOG` | `"~/.local/share/g2/pi_runtime.json"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_PI_WARN_FRACTION` | `0.70` | `config.py` | [`operating-lessons.md`](operating-lessons.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_PLACE_LOG` | `"1"` | `explore_session.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_POLICY_YAW_SIGN` | `"-1"` | `run_gait.py` | [`real-walk-log.md`](../rl/real-walk-log.md) |
+| `G2_POLICY_YAW_SIGN` | `"-1"` | `walk_common.py` | [`real-walk-log.md`](../rl/real-walk-log.md) |
 | `G2_POWEROFF_ON_SHUTDOWN` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_POWER_LOG` | `DEFAULT_PATH` | `power_log.py` | [`settings-switches.md`](settings-switches.md), [`pi-power.md`](../hardware/pi-power.md) |
 | `G2_PRICE_IN_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
