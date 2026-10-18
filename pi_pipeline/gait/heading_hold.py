@@ -143,6 +143,9 @@ def default_foot_trim(policy_name: str | None):
     import os
     v = os.environ.get("G2_FOOT_TRIM")
     if v is None:
+        from pi_pipeline.attachments import trim_override  # the trim saved with the fitted attachment's gait; None for attachment none (absolute: run_gait.py imports this as a script)
+        v = trim_override(policy_name)
+    if v is None:
         v = DEFAULT_TRIMS.get(os.path.basename(str(policy_name or "")), "")
     return None if v.strip().lower() in ("", "off", "none", "0", "false") else parse_foot_trims(v)
 

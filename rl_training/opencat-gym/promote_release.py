@@ -25,6 +25,9 @@ def main() -> int:
     ap.add_argument("--name", required=True, help="release number, e.g. V5")
     ap.add_argument("--note", default="")
     ap.add_argument("--dry-run", action="store_true", help="check everything and print what would happen; change nothing")
+    ap.add_argument("--attachment", default=None, help="also save the release as this attachment's current gait (head or arm; pi_pipeline/attachments/gait_profiles.json)")
+    ap.add_argument("--payload-profile", default=None, help="the sim payload the candidate was trained on (written into the release sidecar when it has none)")
+    ap.add_argument("--trim", default=None, help="the foot trim saved with the attachment's gait (e.g. fl=-0.3); default none until measured")
     a = ap.parse_args()
     src = a.candidate if os.path.isabs(a.candidate) else os.path.join(HERE, a.candidate)
     dst = os.path.join(HERE, "trained", f"Release_Candidate{a.name}_ppo.onnx")
@@ -49,17 +52,27 @@ def main() -> int:
         print(f"DRY RUN: would copy {src} (+ .json) to {dst}, point DEFAULT_POLICY at {os.path.basename(dst)}, run the pi_pipeline tests, then commit and push those three files", flush=True)
         return 0
     shutil.copy(src, dst)
-    shutil.copy(src + ".json", dst + ".json")
+    if a.payload_profile and not side.get("payload_profile"):
+        side["payload_profile"] = a.payload_profile                             # the attachment check reads it (pi_pipeline/attachments)
+    json.dump(side, open(dst + ".json", "w"), indent=1)
     open(POLICY_PY, "w").write(text)
+    profiles_old = None
+    if a.attachment:
+        sys.path.insert(0, ROOT)
+        from pi_pipeline import attachments as att                              # stdlib only, safe in this venv
+        profiles_old = open(att.PROFILES_PATH).read()
+        att.register(a.attachment, os.path.basename(dst), trim=a.trim, payload_profile=side.get("payload_profile"), note=a.note)
     t = subprocess.run([os.path.join(ROOT, "pi_pipeline", ".venv", "bin", "pytest"), "-q", "-x"], cwd=ROOT, capture_output=True, text=True)
     if t.returncode != 0:
         open(POLICY_PY, "w").write(old)
+        if profiles_old is not None:
+            open(att.PROFILES_PATH, "w").write(profiles_old)
         os.remove(dst)
         os.remove(dst + ".json")
         print("pi_pipeline tests FAILED, promotion undone:\n" + (t.stdout + t.stderr)[-800:], flush=True)
         return 2
     rel = lambda p: os.path.relpath(p, ROOT)                                    # noqa: E731
-    paths = [rel(POLICY_PY), rel(dst), rel(dst + ".json")]
+    paths = [rel(POLICY_PY), rel(dst), rel(dst + ".json")] + ([rel(att.PROFILES_PATH)] if a.attachment else [])
     subprocess.run(["git", "add", "-f", *paths], cwd=ROOT, check=True)
     c = subprocess.run(["git", "commit", "-qm", f"Promote {a.name} to the default policy ({a.note}); the previous release stays as the fallback"], cwd=ROOT, capture_output=True, text=True)
     if c.returncode != 0:

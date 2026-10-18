@@ -78,6 +78,14 @@ Never send `Xa`/`XAd` to the voice module (see the project rule in the repo CLAU
   ([page](https://docs.petoi.com/extensible-modules/advanced-development-and-application-of-ai-vision-modules)). Adding sensors
   needs source-code changes; the page says a sample demo is "in progress" and gives none.
 
+## What the firmware source shows (2026-10-18)
+
+Petoi's `OpenCatEsp32` source (`src/OpenCat.h`): the arm is a **compile-time** option, `ROBOT_ARM`, inside the Bittle branch. It names the model
+"Bittle X+Arm" (the first line of the `?` banner), uses its own skill table (`InstinctBittleESP_arm.h`), assigns the claw to the **tail joint**
+("the robot arm's clip is assigned to the tail joint"), widens joint 1's limit to -10..180 deg (±85 otherwise) and sets the leg servo model to P1S.
+The servo count (16) and the pin table do not change. So the plain build and the arm build differ, and a swap needs either a reflash or one build
+that serves both (untested: [`../guides/attachments.md`](../guides/attachments.md) "Open").
+
 ## What the page does not say
 
 Degrees of freedom, servo model and count, payload, reach, weight, power draw, price, minimum firmware or app versions, and the
@@ -85,8 +93,9 @@ BiBoard connector/pin the claw servo uses. Resolve these from Petoi's shop page 
 
 ## Relevance to G2 (open, not a decision)
 
-- The arm uses the same serial skill path G2 already drives (`pi_pipeline/link/opencat.py`, `voice/skills.py`'s `SKILLS`), so the
-  tokens above could be added there if the module is ever fitted.
+- The arm uses the same serial skill path G2 already drives (`pi_pipeline/link/opencat.py`, `voice/skills.py`'s `SKILLS`). Five of the tokens above
+  (`pickF`, `putF`, `tossF`, `showOff`, `clap`) are added to the skill table when the arm is the fitted attachment and the BiBoard answers "Bittle X+Arm"
+  ([`../guides/attachments.md`](../guides/attachments.md)); none has been run on G2 yet.
 - It changes the mass and front/rear balance, which the gait policy is trained against (payload study:
   [`specs.md`](../hardware/specs.md) and the proposed-build weights). The arm's weight is not published, so that needs a measurement.
 - The arm build is a separate firmware, and a firmware change interacts with the BiBoard flashing and calibration state; see

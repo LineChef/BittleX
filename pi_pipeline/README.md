@@ -47,6 +47,7 @@ Every hardware-specific dependency sits behind a small interface with a **mock o
 | [`telemetry/`](telemetry/README.md) | Automatic walk logs, floor labels, hardware epochs, data-type labels | yes |
 | [`util/`](util/README.md) | Disk-space warning, old-log tidy, a worker supervisor | yes |
 | [`head/`](head/README.md) | An MCP tool server for the Petoi AI Head (not part of the running build) | yes |
+| [`attachments/`](attachments/__init__.py) | Which attachment is on the neck (`G2_ATTACHMENT` / `g2attach`), the gait policy saved for each, the firmware check; `none` keeps the legacy path ([guide](../docs/guides/attachments.md)) | yes |
 
 ### Tests
 

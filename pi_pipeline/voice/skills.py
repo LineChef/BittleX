@@ -52,6 +52,25 @@ SKILLS: dict[str, Skill] = {
 _BLOCKED = {"c", "cd", "kc"}
 
 
+def _add_attachment_skills() -> None:
+    """The fitted attachment's own skills (the arm's claw tokens), added once at import; attachment `none` adds nothing."""
+    from ..attachments import skills_for
+    for name, (token, description, continuous) in skills_for().items():
+        SKILLS.setdefault(name, Skill(token, description, continuous))
+
+
+def remove_attachment_skills() -> list[str]:
+    """Take the attachment's skills back out (the app does this when the BiBoard firmware does not fit the attachment)."""
+    from ..attachments import skills_for
+    gone = [n for n in skills_for() if n in SKILLS]
+    for n in gone:
+        del SKILLS[n]
+    return gone
+
+
+_add_attachment_skills()
+
+
 def is_valid(name: str) -> bool:
     return name in SKILLS
 

@@ -88,7 +88,12 @@ def proj_gravity_body(q):
 
 def default_policy_path():
     """The deployed policy: pi_pipeline/gait/<DEFAULT_POLICY> on the Pi (rsync'd there),
-    else rl_training/opencat-gym/trained/<DEFAULT_POLICY> on the dev machine."""
+    else rl_training/opencat-gym/trained/<DEFAULT_POLICY> on the dev machine. With an attachment fitted (G2_ATTACHMENT / `g2attach`), the gait
+    saved for it in pi_pipeline/attachments/gait_profiles.json comes first; attachment `none` keeps exactly this legacy path."""
+    from pi_pipeline.attachments import policy_path_override     # absolute: run_gait.py imports this module as a plain sibling script
+    chosen = policy_path_override()
+    if chosen:
+        return chosen
     train = os.path.normpath(os.path.join(
         _HERE, "..", "..", "rl_training", "opencat-gym", "trained", DEFAULT_POLICY))
     return next((p for p in (os.path.join(_HERE, DEFAULT_POLICY), train) if os.path.exists(p)),

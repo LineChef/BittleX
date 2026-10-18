@@ -104,3 +104,10 @@ def _no_autolog(monkeypatch, tmp_path_factory):
 def _no_detection_log(monkeypatch):
     """Tests never write detection logs into the real ~/g2_runs/detections."""
     monkeypatch.setenv("G2_DETECTION_LOG", "off")
+
+
+@pytest.fixture(autouse=True)
+def _no_attachment(monkeypatch, tmp_path):
+    """Tests run with attachment none unless they set one: the machine's G2_ATTACHMENT and ~/.local/share/g2/attachment.json are ignored."""
+    monkeypatch.delenv("G2_ATTACHMENT", raising=False)
+    monkeypatch.setenv("G2_ATTACHMENT_FILE", str(tmp_path / "attachment.json"))

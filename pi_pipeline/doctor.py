@@ -80,6 +80,11 @@ def _check_models(s) -> list:
                       + (")" if side else " -- NO .onnx.json sidecar, legacy default; rsync it with the .onnx)")))
     else:
         out.append(_r("Gait policy ONNX", WARN, f"{DEFAULT_POLICY} not found (export before the H1 run)"))
+    from .attachments import NONE, current, gait_for
+    att = current()
+    if att != NONE:
+        g = gait_for(att)
+        out.append(_r("Attachment gait", OK if g.path else WARN, g.why))
     return out
 
 
@@ -118,6 +123,10 @@ def _check_serial(s, ping: bool) -> list:
         banner = lk.send(opencat.QUERY, read_reply=True)
         out.append(_r("BiBoard responds", OK if banner else WARN,
                       banner[:60] or "no reply to '?' -- check baud / wiring"))
+        from .attachments import NONE, check_firmware, current
+        if current() != NONE:
+            fw_ok, fw_msg = check_firmware(banner)
+            out.append(_r("firmware fits the attachment", OK if fw_ok else WARN, fw_msg))
         voltage = lk.send(opencat.PRINT_VOLTAGE, read_reply=True)
         v_ok = bool(voltage) and any(ch.isdigit() for ch in voltage)
         out.append(_r("battery voltage reads back", OK if v_ok else WARN,

@@ -9,4 +9,6 @@ The Petoi AI Head (XiaoZhi-based head module): not part of the running build. Ve
 | [`ai-head-hybrid-plan.html`](ai-head-hybrid-plan.html) | The hybrid plan as a single page with the architecture drawing and the roadmap (open in a browser). |
 | [`head-button-pusher.html`](head-button-pusher.html) | The fallback for starting the head from the Pi: an outside pusher on its button (open in a browser). |
 
+Switching between the head and other attachments, and the gait saved for each: [`../../guides/attachments.md`](../../guides/attachments.md).
+
 Photos of the head board are kept locally in `images/` and are gitignored (`*.jpeg`).

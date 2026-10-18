@@ -86,6 +86,8 @@ def main() -> None:
             memory = Memory(settings)
 
         link = _open_shared_link(args.actuator)       # ONE locked serial link for the actuator, battery watch and stand guard
+        from ..attachments import startup_check
+        startup_check(link)                            # attachment none: nothing; otherwise logs it and checks the BiBoard firmware fits
         fan = policy_walker = None
         if link is not None:
             from . import fail_sound

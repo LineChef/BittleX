@@ -71,6 +71,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2bg [start [MIN]/stop/status/once]` | the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again. |
 | `g2data [sync/ingest/status]` | G2's automatic run logs on the Mac (docs/rl/real-data-pipeline.md). With no argument: sync, then ingest, then status. sync = copy the Pi's run logs and detection logs to ~/g2_data (the Pi keeps its copy); ingest = measure every run, apply the quality gates, store it compressed (nothing deleted; a run that fails a gate is quarantined with its reasons); status = how many runs are usable, by hardware epoch, floor and pa |
 | `g2reset [status/logs]` | restart G2's voice loop on the Pi (prints "restarting voice loop..." then "voice loop restarted"; G2 also says "I am online." out loud when he is back) (use it when G2 does not answer voice commands; works even when he cannot hear you). If an exploration session is running it is ended first. |
+| `g2attach [status/list/none/head/arm/save ATTACHMENT POLICY [--trim T] [--payload P]]` | which attachment G2 wears on the neck, and the gait saved for each (docs/planned/attachments.md). |
 | `g2floor [LABEL]` | show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs. |
 
 ## config introspection

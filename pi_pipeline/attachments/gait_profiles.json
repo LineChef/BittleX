@@ -1,0 +1,17 @@
+{
+  "none": {
+    "payload_profile": null,
+    "current": null,
+    "history": []
+  },
+  "head": {
+    "payload_profile": "pod",
+    "current": null,
+    "history": []
+  },
+  "arm": {
+    "payload_profile": null,
+    "current": null,
+    "history": []
+  }
+}

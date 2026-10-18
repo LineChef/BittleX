@@ -57,6 +57,19 @@ POLICY=$(sed -n 's/^DEFAULT_POLICY = "\([^"]*\)".*/\1/p' "$ROOT/pi_pipeline/gait
 say "rsync policy $POLICY"
 rsync -az "$ROOT/rl_training/opencat-gym/trained/$POLICY" "$ROOT/rl_training/opencat-gym/trained/$POLICY.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
 [ "${PIPESTATUS[0]}" = 0 ] || { say "rsync of the policy failed"; exit 1; }
+# every policy an attachment's saved gait names (pi_pipeline/attachments/gait_profiles.json), so switching attachments never needs another deploy
+# (plain json module only: the system python3 has no numpy, and this never imports pi_pipeline)
+EXTRA=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(sorted({e["policy"] for p in d.values() for e in ([p["current"]] if p.get("current") else []) + p.get("history", []) if e.get("policy")})))' \
+        "$ROOT/pi_pipeline/attachments/gait_profiles.json" 2>/dev/null || true)
+for P in $EXTRA; do
+  [ "$P" = "$POLICY" ] && continue
+  if [ -f "$ROOT/rl_training/opencat-gym/trained/$P" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$P.json" ]; then
+    say "rsync attachment policy $P"
+    rsync -az "$ROOT/rl_training/opencat-gym/trained/$P" "$ROOT/rl_training/opencat-gym/trained/$P.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
+  else
+    say "attachment policy $P (or its sidecar) is missing here: not synced"
+  fi
+done
 
 # keep the Pi's trained/ folder to the exported release candidates only (stray files there are leftovers of earlier syncs)
 STRAY=$(ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained 2>/dev/null && ls -1 | grep -vE "^Release_Candidate[^ /]*_ppo\.onnx(\.json)?$"' 2>/dev/null || true)

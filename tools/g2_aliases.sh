@@ -344,6 +344,19 @@ g2reset() {
   esac
 }
 
+# g2attach [status|list|none|head|arm|save ATTACHMENT POLICY [--trim T] [--payload P]]  -- which attachment G2 wears on the neck, and the gait saved for each (docs/planned/attachments.md).
+# g2attach head = set it on the Pi, print the hardware checklist, restart the voice loop (g2reset) so the matching gait and firmware check apply. save = make POLICY that
+# attachment's current gait in pi_pipeline/attachments/gait_profiles.json here on the Mac (then commit and deploy). Swap the hardware with G2 powered off.
+g2attach() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  case "${1:-status}" in
+    status|list) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.attachments $1" ;;
+    none|head|arm) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.attachments use $1" && g2reset ;;
+    save) shift; _g2py -m pi_pipeline.attachments save "$@" ;;
+    *) echo "usage: g2attach [status|list|none|head|arm|save ATTACHMENT POLICY [--trim T] [--payload P]]"; return 2 ;;
+  esac
+}
+
 # g2floor [LABEL]  -- show or set the floor G2 is on (hardwood, tile, carpet, ...); every automatic run log records it, and fits are per floor. g2floor status = the automatic run logs.
 g2floor() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"

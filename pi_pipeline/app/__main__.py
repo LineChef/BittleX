@@ -223,6 +223,8 @@ def main() -> None:
 
     memory = _make_memory()
     link = _make_link(args.serial, trace_path=args.trace)
+    from ..attachments import startup_check
+    startup_check(link)                           # attachment none: nothing; otherwise logs it and checks the BiBoard firmware fits
     voice_link = None if args.bench else link   # --bench: voice actuator stays mock too
     vision = _make_vision_source() if (link is not None and features.vision
                                        and not args.no_behavior) else None
