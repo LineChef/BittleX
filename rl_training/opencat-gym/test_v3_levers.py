@@ -735,7 +735,8 @@ def test_the_pod_payload_is_185_g_with_the_42_g_ai_head_and_the_recipe_uses_it()
     assert px < 0 and abs(pz - hz - 0.010) < 1e-9         # 9.2 mm behind the cover's middle, flush: its bottom is the torso box's top (10 mm up)
 
 
-def test_the_pod_block_is_perfectly_balanced_and_fixed_on_the_body():
+def test_the_pod_block_is_perfectly_balanced_and_fused_to_the_body():
+    """No per-episode offset, and while the robot moves under random commands the block stays within 1 mm and 0.5 deg of its weld (the AI head's own random mounting offset is separate)."""
     import subprocess, sys, textwrap
     code = textwrap.dedent('''
         import sys
@@ -747,12 +748,20 @@ def test_the_pod_block_is_perfectly_balanced_and_fixed_on_the_body():
         import benchmark_decathlon as B
         B._apply({})
         env = E.OpenCatGymEnv()
-        worst = 0.0
-        for k in range(6):
+        worst_mm, worst_deg = 0.0, 0.0
+        for k in range(3):
             env.reset(seed=k)
-            d = np.array(p.getBasePositionAndOrientation(env._payload_id)[0]) - np.array(p.getBasePositionAndOrientation(env.robot_id)[0])
-            worst = max(worst, float(np.abs(d - np.array(E.PAYLOAD_POS)).max()))
-        print(worst)
+            for t in range(300):
+                if t % 5 == 0:
+                    a = env.action_space.sample()
+                env.step(a)
+                pos, orn = p.getBasePositionAndOrientation(env.robot_id)
+                R = np.array(p.getMatrixFromQuaternion(orn)).reshape(3, 3)
+                bp, bo = p.getBasePositionAndOrientation(env._payload_id)
+                off = R.T @ (np.array(bp) - np.array(pos))
+                worst_mm = max(worst_mm, float(np.abs(off - np.array(E.PAYLOAD_POS)).max()) * 1000)
+                worst_deg = max(worst_deg, float(np.degrees(abs(p.getAxisAngleFromQuaternion(p.getDifferenceQuaternion(orn, bo))[1]))))
+        print(worst_mm, worst_deg)
     ''')
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300).stdout.strip().splitlines()[-1]
-    assert float(out) < 1e-6                              # no per-episode x / y / z offset of the pod block
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=600).stdout.strip().splitlines()[-1].split()
+    assert float(out[0]) < 1.0 and float(out[1]) < 0.5, out

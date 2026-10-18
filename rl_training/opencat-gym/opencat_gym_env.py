@@ -533,6 +533,7 @@ DRIFT_STROKE = float(os.environ.get("G2E_DRIFT_STROKE", "0") or 0)
 # turns ~140 deg; a direct yaw disturbance does, and it forces the policy to use the heading it already observes, whatever the real cause is.
 DRIFT_TORQUE = float(os.environ.get("G2E_DRIFT_TORQUE", "0") or 0)
 DRIFT_STROKE_CENTRE_DEG = 50.0    # the stance angle of the shoulder / hip joints (run_gait.STAND_URDF_DEG)
+PAYLOAD_WELD_FORCE = 1e5 if PAYLOAD_PROFILE == "pod" else 5e3   # max force of the welds that fuse the payload bodies to the torso (pod: much stiffer than the old 5e3, owner 2026-10-18: fused to the body, no separate swing)
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
@@ -2461,14 +2462,15 @@ class OpenCatGymEnv(gym.Env):
             p.applyExternalTorque(self.robot_id, -1, [0.0, 0.0, t], p.LINK_FRAME)
 
     @staticmethod
-    def _payload_body(mass, half, pos):
+    def _payload_body(mass, half, pos, orn=None):
         """A welded payload body. "box": real inertia from a non-colliding box; "legacy":
         the pre-2026-09-23 shapeless body (zero inertia = locks the robot's rotation)."""
         if PAYLOAD_INERTIA == "legacy":
             return p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=-1, basePosition=pos)
         cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
         vs = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half), rgbaColor=[1.0, 0.55, 0.1, 0.6]) if PAYLOAD_VISUAL else -1
-        b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=pos)
+        b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=pos,
+                              **({"baseOrientation": orn} if orn is not None else {}))
         p.setCollisionFilterGroupMask(b, -1, 0, 0)     # inertia from the box; touches nothing
         return b
 
@@ -2861,20 +2863,23 @@ class OpenCatGymEnv(gym.Env):
             if BALANCED:                       # the payload sits off-centre to the left as often as to the right
                 pj[1] = abs(pj[1]) * self._deal("payload_y", (-1.0, 1.0))
             off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
-            self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF,
-                [start_pos[0] + off[0], start_pos[1] + off[1], start_pos[2] + off[2]])
+            def _spawn(o):                     # pod: the block starts exactly where its weld holds it (the robot's start pose is tilted), so nothing snaps into place in the first steps
+                if PAYLOAD_PROFILE == "pod":
+                    Rm = np.array(p.getMatrixFromQuaternion(start_orient)).reshape(3, 3)
+                    return list(np.array(start_pos) + Rm @ np.array(o)), list(start_orient)
+                return [start_pos[0] + o[0], start_pos[1] + o[1], start_pos[2] + o[2]], None
+            self._payload_id = self._payload_body(pm, PAYLOAD_BOX_HALF, *_spawn(off))
             _c = p.createConstraint(self.robot_id, -1, self._payload_id, -1,
                                     p.JOINT_FIXED, [0, 0, 0], off, [0, 0, 0])
-            p.changeConstraint(_c, maxForce=5e3)
+            p.changeConstraint(_c, maxForce=PAYLOAD_WELD_FORCE)
             if HEAD_MASS_NOM > 0:
                 hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
                 hj = np.random.uniform(-0.003, 0.003, 3); hj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
                 hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
-                self._head_id = self._payload_body(hm, HEAD_BOX_HALF,
-                    [start_pos[0] + hoff[0], start_pos[1] + hoff[1], start_pos[2] + hoff[2]])
+                self._head_id = self._payload_body(hm, HEAD_BOX_HALF, *_spawn(hoff))
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
-                p.changeConstraint(_hc, maxForce=5e3)
+                p.changeConstraint(_hc, maxForce=PAYLOAD_WELD_FORCE)
             self._rear_id = None
             if REAR_MASS_NOM > 0:
                 rm = REAR_MASS_NOM + np.random.uniform(-REAR_MASS_RAND, REAR_MASS_RAND)
@@ -2884,7 +2889,7 @@ class OpenCatGymEnv(gym.Env):
                     [start_pos[0] + roff[0], start_pos[1] + roff[1], start_pos[2] + roff[2]])
                 _rc = p.createConstraint(self.robot_id, -1, self._rear_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], roff, [0, 0, 0])
-                p.changeConstraint(_rc, maxForce=5e3)
+                p.changeConstraint(_rc, maxForce=PAYLOAD_WELD_FORCE)
 
         # gait-refinement G3: per-joint motor-force scale (overheat cutback)
         self._torque_scale = np.ones(8)
