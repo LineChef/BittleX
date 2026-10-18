@@ -164,3 +164,19 @@ def test_roster_plus_frame_drives_the_recognition_hop():
     perf = [a[0] for n, a, _k in mb.calls if n == "actuator.perform"]
     assert perf                                 # an excited-hop skill / HAPPY chirp
     assert any(str(x).startswith("b") for x in perf)   # the HAPPY chirp string
+
+
+def test_one_bad_tick_is_skipped_but_three_in_a_row_stop_the_runtime(monkeypatch):
+    rt, _mb, _c = _rt()
+    calls = {"n": 0}
+    pattern = [None, RuntimeError("x"), None, RuntimeError("a"), RuntimeError("b"), RuntimeError("c"), None]
+
+    def tick(now=None):
+        e = pattern[calls["n"]] if calls["n"] < len(pattern) else None
+        calls["n"] += 1
+        if e:
+            raise e
+
+    monkeypatch.setattr(rt, "tick", tick)
+    rt.run_forever(max_ticks=50)
+    assert calls["n"] == 6                    # the lone failure was skipped; the third failure in a row stopped it

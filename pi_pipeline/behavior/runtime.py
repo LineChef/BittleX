@@ -186,13 +186,24 @@ class BehaviorRuntime:
         self.last_tick = t
         return t
 
+    MAX_TICK_FAILURES = 3
+
     def run_forever(self, *, max_ticks: int | None = None) -> None:
         """Tick at `hz` until `stop()`. `max_ticks` bounds it for tests / demos."""
         self._stop = False
         n = 0
         log.info("behavior runtime up (%.1f Hz)", 1.0 / self._period if self._period else 0.0)
+        failures = 0
         while not self._stop and (max_ticks is None or n < max_ticks):
-            self.tick()
+            try:
+                self.tick()
+                failures = 0
+            except Exception:  # noqa: BLE001 -- one bad tick is skipped; MAX_TICK_FAILURES in a row stops the runtime (the session then ends safely)
+                failures += 1
+                log.exception("behavior tick failed (%d in a row)", failures)
+                if failures >= self.MAX_TICK_FAILURES:
+                    log.error("behavior runtime stopping: %d ticks in a row failed", failures)
+                    break
             n += 1
             if self._period:
                 self._sleep(self._period)

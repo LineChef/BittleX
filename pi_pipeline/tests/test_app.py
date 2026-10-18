@@ -219,7 +219,7 @@ def test_background_frame_source_returns_latest_and_goes_stale():
     src = BackgroundFrameSource(feed, max_age_s=1.0, clock=lambda: t[0])
     assert src() == []                              # nothing read yet
     src.start()
-    src._thread.join(timeout=2.0)
+    _wait_for(lambda: [d.label for d in src()] == ["dog"])
     assert [d.label for d in src()] == ["dog"]      # newest frame wins
     t[0] = 5.0
     assert src() == []                              # stale -> "nothing seen"
@@ -238,9 +238,52 @@ def test_background_frame_source_reports_reader_death():
         def close(self):
             pass
 
-    src = BackgroundFrameSource(_Broken()).start()
-    src._thread.join(timeout=2.0)
+    src = BackgroundFrameSource(_Broken(), supervisor_cfg=_fast_cfg()).start()
+    _wait_for(lambda: src.failed)
     assert src() == [] and "unplugged" in src.failed
+    _wait_for(lambda: src.gave_up)
+    assert src.gave_up                              # it kept failing: the supervisor stopped trying
+    src.close()
+
+
+def _wait_for(cond, timeout=3.0):
+    import time
+    end = time.monotonic() + timeout
+    while not cond() and time.monotonic() < end:
+        time.sleep(0.01)
+
+
+def _fast_cfg():
+    from pi_pipeline.util.supervisor import WatchdogConfig
+    return WatchdogConfig(heartbeat_timeout_s=float("inf"), restart_window_s=60.0, max_restarts_in_window=2, backoff_base_s=0.01, backoff_max_s=0.02)
+
+
+def test_a_reader_that_dies_is_restarted_after_reopening_the_port():
+    """Before 2026-10-18 a single error left the camera dark for the rest of an exploration."""
+    from pi_pipeline.vision.feed import BackgroundFrameSource
+
+    class _Hiccup:
+        def __init__(self):
+            self.calls, self.reopened = 0, 0
+
+        def frames(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise OSError("USB reset")
+            while True:
+                yield [Detection("wall", 0.9, 0.1, 0.1, 0.2, 0.2)]
+
+        def reopen(self):
+            self.reopened += 1
+
+        def close(self):
+            pass
+
+    feed = _Hiccup()
+    src = BackgroundFrameSource(feed, supervisor_cfg=_fast_cfg()).start()
+    _wait_for(lambda: src())
+    assert [d.label for d in src()] == ["wall"] and feed.reopened == 1 and src.failed is None and not src.gave_up
+    src.close()
 
 
 def test_sensor_hub_person_present_is_case_insensitive_and_roster_aware():

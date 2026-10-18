@@ -144,6 +144,7 @@ class SerialDetectionFeed:
     ):
         import serial
 
+        self._port, self._baud = port, baud
         self._ser = serial.Serial(port, baud, timeout=1)
         self._io_lock = threading.Lock()         # one reader or one snapshot on the port at a time
         self._paused = threading.Event()         # set while snapshot() has the port: frames() waits
@@ -155,15 +156,30 @@ class SerialDetectionFeed:
         self._settle_frames = max(0, int(snapshot_settle_frames))
         self._t = 0.0
         if auto_start:
-            time.sleep(2.5)              # let the module boot (port open resets it)
-            self._ser.reset_input_buffer()
-            self._ser.write(self._STOP_CMD)     # clear any prior INVOKE loop
-            time.sleep(0.2)
-            self._apply_sensor(sensor_opt, ae_bump)
-            self._ser.reset_input_buffer()
-            self._ser.write(self._START_CMD)
+            self._start_inference()
         log.info("vision serial on %s @ %d (frame %dpx, sensor_opt=%s, ae_bump=%s)",
                  port, baud, frame_px, sensor_opt, ae_bump)
+
+    def _start_inference(self) -> None:
+        time.sleep(2.5)              # let the module boot (port open resets it)
+        self._ser.reset_input_buffer()
+        self._ser.write(self._STOP_CMD)     # clear any prior INVOKE loop
+        time.sleep(0.2)
+        self._apply_sensor(self._sensor_opt, self._ae_bump)
+        self._ser.reset_input_buffer()
+        self._ser.write(self._START_CMD)
+
+    def reopen(self) -> None:
+        """Close and reopen the port and start inference again (the reader's restart after a USB hiccup; `BackgroundFrameSource`)."""
+        import serial
+        with self._io_lock:
+            try:
+                self._ser.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._ser = serial.Serial(self._port, self._baud, timeout=1)
+            self._start_inference()
+        log.info("vision serial reopened on %s", self._port)
 
     def _apply_sensor(self, sensor_opt: int | None, ae_bump: int) -> None:
         if sensor_opt in (0, 1, 2):
@@ -293,7 +309,7 @@ class BackgroundFrameSource:
     last-seen scene. `failed` is set if the reader thread dies.
     """
 
-    def __init__(self, feed, *, max_age_s: float = 1.0, clock=time.monotonic):
+    def __init__(self, feed, *, max_age_s: float = 1.0, clock=time.monotonic, supervisor_cfg=None):
         self._feed = feed
         self._max_age_s = max_age_s
         self._clock = clock
@@ -301,25 +317,43 @@ class BackgroundFrameSource:
         self._frame: Frame = []
         self._at: float | None = None
         self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        self._sup = None
+        self._cfg = supervisor_cfg
+        self._runs = 0
         self.failed: str | None = None
 
     def start(self) -> "BackgroundFrameSource":
-        self._thread = threading.Thread(target=self._run, name="vision-feed", daemon=True)
-        self._thread.start()
+        """Read the feed under a supervisor (util/supervisor.py, backlog B27): a reader that dies (a USB hiccup) is restarted with backoff,
+        reopening the port first when the feed can (`reopen()`); after 5 deaths in 2 minutes it gives up and `failed` says why. Before this a single
+        error left the camera dark for the rest of the session, so exploration went on blind (no wall avoider, no contact pictures)."""
+        from ..util.supervisor import Supervisor, WatchdogConfig
+        cfg = self._cfg or WatchdogConfig(heartbeat_timeout_s=float("inf"), restart_window_s=120.0, max_restarts_in_window=5, backoff_base_s=1.0, backoff_max_s=20.0)
+        self._sup = Supervisor("vision-feed", self._run, cfg=cfg)
+        self._sup.start()
         return self
 
-    def _run(self) -> None:
+    def _run(self, ctx) -> None:
+        self._runs += 1
+        if self._runs > 1 and hasattr(self._feed, "reopen"):
+            self._feed.reopen()
         try:
             for frame in self._feed.frames():
-                if self._stop.is_set():
+                if self._stop.is_set() or ctx.stopping.is_set():
                     return
+                ctx.beat()
                 with self._lock:
                     self._frame, self._at = frame, self._clock()
-        except Exception as e:  # noqa: BLE001 -- a reader death must not kill the app
+                self.failed = None
+        except Exception as e:  # noqa: BLE001 -- logged here, restarted by the supervisor
             if not self._stop.is_set():
                 self.failed = repr(e)
-                log.error("vision feed reader died: %r", e)
+                log.error("vision feed reader died: %r (restarting)", e)
+            raise
+        ctx.stopping.wait()                       # the feed simply ended (a mock, a closed port): idle, nothing to restart
+
+    @property
+    def gave_up(self) -> bool:
+        return bool(self._sup is not None and self._sup.given_up)
 
     def __call__(self) -> Frame:
         with self._lock:
@@ -340,4 +374,6 @@ class BackgroundFrameSource:
 
     def close(self) -> None:
         self._stop.set()
+        if self._sup is not None:
+            self._sup.stop(timeout=0.5)
         self._feed.close()
