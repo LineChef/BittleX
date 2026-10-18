@@ -56,8 +56,8 @@ the battery-awareness plan: [`hardware/parts-and-decisions.md`](hardware/parts-a
 Build record and wiring: [`../blueprints/README.md`](../blueprints/README.md).
 
 Open:
-- [ ] Mount the Pi/PiSugar stack properly (currently a temporary mount; the printed standoff is not impact-rated). See the build manual.
-- [ ] Confirm the back cover closes over the mounted Pi (measured too shallow for Pi + PiSugar; a modified cover/clips is planned).
+- [x] Mount the Pi/PiSugar stack properly: done 2026-10-17, the Bittle X Pi add-on pod on the platform cover ([`../blueprints/mounting.md`](../blueprints/mounting.md)). Still to record: the new weight and the camera's view from the new position.
+- [x] Back cover over the mounted Pi: no longer needed; the pod sits on top of the platform cover and holds the Pi and PiSugar S inside it.
 - [ ] Wire and test the microphone and speaker (parts ordered 2026-09-29) — if the Pi stays in the build. **Microphone done 2026-10-03, speaker/amp done 2026-10-04** (clear capture over I2S, spoken replies through the voiceHAT card; [`hardware/i2s-audio-build-log.md`](hardware/build-logs/i2s-audio-build-log.md)).
 - [ ] Battery-aware behavior: get real runtime data (idle/walking/talking on a full charge) before building the low-charge warning.
 - [ ] Measure G2's 2S pack runtime (BiBoard side) with a timed test, the way the Pi side was measured (Pi figure: [`STATUS.md`](STATUS.md); the pack's ~45–60 min of walking is only an estimate, [`hardware/pi-power.md`](hardware/pi-power.md)). Not scheduled. Why it matters: the Pi and pack look comparable on paper, so the result decides whether a second pack for the BiBoard is worth buying.
@@ -104,7 +104,7 @@ Done: Bittle X V2 assembled (2026-09-28); firmware erased and reflashed to curre
 verified with `kbalance`; Pi Zero 2 W set up headless; 5-pin Pi socket soldered on the BiBoard; Serial-2 enabled with `XS` (2026-09-30);
 Pi↔BiBoard link working; camera set up on the Pi. Detail: [`plan-detail/phase4-hardware-assembly.md`](plan-detail/phase4-hardware-assembly.md).
 
-- [ ] Pi+PiSugar mount to the frame: power confirmed, mount mechanism not yet solved.
+- [x] Pi+PiSugar mount to the frame: solved 2026-10-17 with the clip-on pod ([`../blueprints/mounting.md`](../blueprints/mounting.md)).
 - [ ] Pi housekeeping: disable the serial login shell, the 1-wire interface, and Wi-Fi power-save (`raspi-config`).
 - [ ] Use `ardSerial.py` from the OpenCat repo as the reference serial commander (optional).
 

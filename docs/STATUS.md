@@ -9,8 +9,8 @@ Each row carries the date it was last confirmed. The long dated write-ups that u
 | Part | State (as last confirmed) |
 |---|---|
 | Body and board | Bittle X V2 with a BiBoard V1, alloy feedback servos; assembled, calibrated, running official OpenCat firmware (B10_260527) with the Serial-2 and onboard-voice module flags set and the IMU calibrated (2026-10-08). The front-left shoulder servo was replaced 2026-10-06. [`hardware/as-built.md`](hardware/as-built.md) |
-| Pi | Zero 2 W on the PiSugar S, UART to the BiBoard at 115200; IMU stream is the stock 5.0 Hz. Mounted with an interim bracket. Runs the voice service (`g2-voice`) from boot. Deployed by `rsync` ([`guides/pi-bring-up.md`](guides/pi-bring-up.md)) |
-| Camera | Grove Vision AI V2 on the Pi's USB (`/dev/ttyACM0`), custom detector on the camera; the module is mounted rotated 90°. Vision-based navigation is gated off |
+| Pi | Zero 2 W on the PiSugar S, UART to the BiBoard at 115200; IMU stream is the stock 5.0 Hz. Mounted in the Bittle X Pi add-on pod on the platform cover (since 2026-10-17, [`../blueprints/mounting.md`](../blueprints/mounting.md)); the new weight and camera view are not measured yet. Runs the voice service (`g2-voice`) from boot. Deployed by `rsync` ([`guides/pi-bring-up.md`](guides/pi-bring-up.md)) |
+| Camera | Grove Vision AI V2 on the Pi's USB (`/dev/ttyACM0`), custom detector on the camera; the module was mounted rotated 90° on the old mount; since 2026-10-17 it is on top of the pod, lens forward, USB up, and the orientation is to be re-checked. Vision-based navigation is gated off |
 | Microphone and speaker | I²S mic and amp installed and working (2026-10-04). The mic is very quiet, so a software gain is applied. [`blueprints/build-logs/i2s-audio-build-log.md`](hardware/build-logs/i2s-audio-build-log.md) |
 | Mass | About 422 g; about 46% of the weight over the front feet (2026-10-07) |
 | Pi battery | PiSugar S 1200 mAh, no readout. Measured full-charge runtime 3.28 h (mean of three runs, 2026-10-10); warning at 70% of it (about 2.29 h), critical at 80% (about 2.62 h). Recharge from flat takes about 40 minutes |

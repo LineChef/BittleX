@@ -183,6 +183,8 @@ One measurement, the rest assumed. **Do not look these up again; re-weigh and ed
 | Spine block: Pi Zero 2 W, PiSugar S + cell, case, microphone (on the lid), wiring | 86 g | derived: 422 - 301 - 15 - 20 | spine body at (-0.022, 0, 0.025) m, 86 +/- 20 g |
 
 All of it is attached to the case, which sits on the middle of the spine: camera at the front, speaker at the very back, microphone on top of the lid.
+
+**Superseded mount (2026-10-17):** the weights and positions in this section and the one above were measured with the previous case (PiSugar's case velcroed on a modified cover). G2 now carries the Bittle X Pi add-on, whose design figure is 135 g with the electronics and a center of mass 9.0 mm from the robot center ([`../../blueprints/mounting.md`](../../blueprints/mounting.md)). The camera is now on top of the pod, the microphone on its right wall near the front, the speaker at the rear. The new whole-robot weight and front/rear split are to be measured; the sim's `PAYLOAD_PROFILE` has not been changed.
 The mic weighs almost nothing and is counted in the spine block. Mass randomization in training stays at +/-18% on every body link.
 
 ## Proposed build: component weights and balance (2026-10-15)

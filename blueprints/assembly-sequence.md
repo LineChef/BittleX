@@ -13,7 +13,7 @@ The order G2 was built in, with the record for each step. Follow it top to botto
 | 7 | Enable Serial-2 on the BiBoard (`XS`) and check the link (`check_serial ping`) | 2026-09-30 | [`../docs/guides/pi-bring-up.md`](../docs/guides/pi-bring-up.md) |
 | 8 | Connect the camera module to the Pi's USB port | 2026-09-30 | [`../docs/vision/README.md`](../docs/vision/README.md) |
 | 9 | Wire the I2S microphone and amplifier to the Pi header | mic 2026-10-03, speaker 2026-10-04 | [`build-logs/i2s-audio-build-log.md`](../docs/hardware/build-logs/i2s-audio-build-log.md) |
-| 10 | Mount the Pi stack, camera, speaker and microphone on the back cover (interim mount) | 2026-09-29 to 2026-10-06 | [`mounting.md`](mounting.md) |
+| 10 | Mount the Pi stack, camera, speaker and microphone: first on the modified back cover (interim mount), then, from 2026-10-17, in the Bittle X Pi add-on pod on the platform cover | interim 2026-09-29 to 2026-10-06; pod 2026-10-17 | [`mounting.md`](mounting.md) |
 | 11 | Replace the front-left shoulder servo and re-run calibration | 2026-10-06 (calibration date not recorded) | [`calibration.md`](calibration.md) |
 
 After the hardware is together: [`../docs/guides/bring-up-sequence.md`](../docs/guides/bring-up-sequence.md) is the ordered software and first-movement bring-up (run it with `python -m pi_pipeline.bringup`).
