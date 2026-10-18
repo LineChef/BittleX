@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 from datetime import datetime
 
 import pytest
@@ -67,9 +68,24 @@ def test_unfinished_runs_are_marked(on):
     r = autolog.new_run("policy_walk")
     done = autolog.new_run("policy_walk", now=datetime(2026, 10, 7, 13, 0, 0).timestamp())
     done.finish("complete")
-    assert autolog.close_orphans(on) == 1
+    assert autolog.close_orphans(on) == 0                                            # started just now: it may still be walking
+    assert autolog.close_orphans(on, now=time.time() + 3600) == 1
     assert json.load(open(r.csv_path[:-4] + ".json"))["end_reason"] == "unfinished"
     assert json.load(open(done.csv_path[:-4] + ".json"))["end_reason"] == "complete"
+
+
+def test_a_run_still_open_when_the_process_exits_is_closed_as_process_exit(on):
+    """2026-10-07..13: 53 walks run on daemon threads were left with no end reason when their process ended."""
+    import atexit
+    r = autolog.new_run("policy_walk")
+    r._at_exit()                                                                     # what atexit runs
+    side = json.load(open(r.csv_path[:-4] + ".json"))
+    assert side["end_reason"] == "process_exit" and side["ended"]
+    done = autolog.new_run("policy_walk")
+    done.finish("complete")
+    done._at_exit()                                                                  # a finished run is never overwritten (and is unregistered)
+    assert json.load(open(done.csv_path[:-4] + ".json"))["end_reason"] == "complete"
+    atexit.unregister(r._at_exit)
 
 
 class _Link:

@@ -57,6 +57,12 @@ def main() -> None:
         from ..diag.core import _log_root
         from ..util.tidy import tidy_startup
         tidy_startup([_log_root(), settings.runs_dir], settings.tidy_days)
+    try:
+        from ..telemetry import autolog
+        if autolog.enabled() and (n := autolog.close_orphans()):
+            logging.getLogger("g2.voice").info("marked %d walk log(s) that never finished as unfinished", n)
+    except Exception:  # noqa: BLE001 -- bookkeeping only
+        logging.getLogger("g2.voice").debug("could not close orphaned walk logs", exc_info=True)
 
     _lvl, _msg = settings.api_key_expiry_status()
     if _msg:

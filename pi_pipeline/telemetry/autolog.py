@@ -4,6 +4,7 @@
 `G2_AUTOLOG=off` turns it off (the tests do). `G2_AUTOLOG_DIR` moves the folder. Nothing here may ever stop a walk: every failure falls back to no log."""
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
@@ -62,14 +63,24 @@ def deployed_commit() -> str | None:
 
 
 class RunLog:
-    """One run's log: `csv_path` to write rows to, and a sidecar that is complete from the start and updated by `finish()`."""
+    """One run's log: `csv_path` to write rows to, and a sidecar that is complete from the start and updated by `finish()`.
+
+    If the process exits before `finish()` (a walk on a daemon thread when the session ends: its `finally` never runs), the sidecar is closed at exit
+    with `end_reason="process_exit"`; 53 runs from 2026-10-07..13 were left with no end reason at all. A kill that skips exit handlers is caught by
+    `close_orphans()` at the next service start."""
 
     def __init__(self, csv_path: Path, meta: dict):
         self.csv_path = str(csv_path)
         self._side = csv_path.with_suffix(".json")
         self._meta = meta
         self._t0 = time.time()
+        self._finished = False
         self._write()
+        atexit.register(self._at_exit)
+
+    def _at_exit(self) -> None:
+        if not self._finished:
+            self.finish("process_exit")
 
     def _write(self) -> None:
         try:
@@ -80,6 +91,8 @@ class RunLog:
             log.debug("could not write the run sidecar", exc_info=True)
 
     def finish(self, reason: str, **extra) -> None:
+        self._finished = True
+        atexit.unregister(self._at_exit)
         self._meta.update(ended=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), end_reason=reason, duration_s=round(time.time() - self._t0, 2), **extra)
         self._write()
 
@@ -113,13 +126,20 @@ def run_sidecars(root: Path | None = None) -> list[Path]:
     return sorted(s for s in (root or base_dir()).glob("*/*.json") if not s.name.endswith(".labels.json"))
 
 
-def close_orphans(root: Path | None = None) -> int:
-    """Flag the sidecars of runs that never finished (the service or the Pi stopped mid-run) so they are not mistaken for complete ones. Returns how many."""
+def close_orphans(root: Path | None = None, *, min_age_s: float = 1800.0, now: float | None = None) -> int:
+    """Flag the sidecars of runs that never finished (the service or the Pi stopped mid-run) so they are not mistaken for complete ones. Returns how many.
+    Runs started under `min_age_s` ago, or whose CSV was written in the last 5 minutes, are left alone: they may still be walking (an exploration runs
+    in its own service, so a voice-service start can overlap one). Called at every voice-service start."""
     n = 0
+    now = time.time() if now is None else now
     for side in run_sidecars(root):
         try:
             d = json.loads(side.read_text())
             if d.get("ended") is None and d.get("end_reason") is None:
+                started = datetime.strptime(d.get("started") or "", "%Y-%m-%dT%H:%M:%S").timestamp() if d.get("started") else side.stat().st_mtime
+                csv = side.with_suffix(".csv")
+                if now - started < min_age_s or (csv.exists() and now - csv.stat().st_mtime < 300):
+                    continue
                 d["end_reason"] = "unfinished"
                 side.write_text(json.dumps(d, indent=1))
                 n += 1
