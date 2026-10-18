@@ -353,7 +353,8 @@ def test_stage_2_eases_from_the_measured_pose_after_a_trick_only_when_switched_o
     monkeypatch.setenv("G2_TRANSITION_READ_POSE", "1")
     sent = run("khi", "ksit")
     assert sent[0] == "f" and sent[-1] == "ksit" and sent[-2] == tr.leg_cmd(tr.table()["sit"]["first"])
-    assert sent[1] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"]))[0])
+    sk = tr.skew_for("ksit")
+    assert sent[1] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"], skew=sk), skew=sk)[0])
     assert run("kwkF", "kwkL") == ["kwkL"]                                       # never between two gaits
     assert run("krc", "ksit") == ["ksit"]                                        # not while a get-up may still be running
     assert run("kbalance", "khi")[0] != "f"                                      # a known pose needs no read
@@ -384,3 +385,22 @@ def test_ramp_steps_go_out_on_a_fixed_schedule_even_when_writes_are_slow():
         t["now"] += 0.010                                                           # every write takes 10 ms
     tr.play([0] * 40, write, sleep=lambda w: t.__setitem__("now", t["now"] + w), clock=lambda: t["now"])
     assert abs(stamps[-1] - 39 / 40) < 1e-6 and all(abs(b - a - 0.025) < 1e-6 for a, b in zip(stamps, stamps[1:]))      # 40 steps a second, no drift
+
+
+def test_the_sit_arrives_slowly_and_still_stays_under_the_speed_limit():
+    """2026-10-18: the feet slipped at the bottom of the squat back into a sit, where the back legs reach the floor."""
+    from pi_pipeline.link import transitions as tr
+    start, end = tr.BALANCE, tr.table()["sit"]["first"]
+    plain = tr.ramp_poses(start, end, 1.5, skew=1.0)
+    soft = tr.ramp_poses(start, end, 1.5, skew=tr.SOFT_END_SKEW)
+    def last_third_speed(poses):
+        n = len(poses); a, b = poses[2 * n // 3], poses[-1]
+        return max(abs(x - y) for x, y in zip(a, b)) / 3          # the final third of the steps: how far they cover
+    assert last_third_speed(soft) < last_third_speed(plain)       # less of the move is left for the end
+    assert soft[-1] == [float(v) for v in end] or soft[-1] == list(map(float, end))
+    secs = tr.ramp_seconds(start, end, cap=2.0, skew=tr.SOFT_END_SKEW)
+    assert 1.0 < secs < 2.0                                                   # about 1.4 s for the 75 deg move, within a few percent of the plain curve
+    steps = tr.ramp_poses(start, end, secs, skew=tr.SOFT_END_SKEW)
+    fastest = max(max(abs(x - y) for x, y in zip(a, b)) for a, b in zip(steps, steps[1:])) * tr.STEPS_PER_S
+    assert fastest <= tr.PEAK_DEG_S * 1.1
+    assert tr.skew_for("ksit") == tr.SOFT_END_SKEW and tr.skew_for("khi") == 1.0

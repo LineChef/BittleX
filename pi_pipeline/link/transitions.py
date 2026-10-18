@@ -123,22 +123,39 @@ def leg_pairs(command: str) -> dict:
     return {j: a for j, a in zip(nums[0::2], nums[1::2]) if j in LEG_JOINTS}
 
 
-def ramp_seconds(start, end, cap=None) -> float:
+SOFT_END_SKEW = 0.75     # the sit: progress is made early and the last stretch is a slow creep (2026-10-18: the feet slipped where the back legs reach the floor)
+
+
+def curve(u: float, skew: float = 1.0) -> float:
+    """Smoothstep of `u ** skew`: skew 1 is the plain S-curve (as gait/standup.py); below 1 it moves early and arrives slowly."""
+    v = u ** skew
+    return v * v * (3 - 2 * v)
+
+
+def peak_factor(skew: float = 1.0) -> float:
+    """The curve's fastest speed in units of (move / duration): 1.5 for the plain S-curve."""
+    return max((curve((i + 1) / 400, skew) - curve(i / 400, skew)) * 400 for i in range(400))
+
+
+def skew_for(token: str) -> float:
+    return SOFT_END_SKEW if token.strip() == "ksit" else 1.0
+
+
+def ramp_seconds(start, end, cap=None, skew: float = 1.0) -> float:
     """How long to take from `start` to `end`: 0 if the move is under MIN_DELTA_DEG or easing is off."""
     cap = max_seconds() if cap is None else cap
     delta = max(abs(a - b) for a, b in zip(start, end))
     if cap <= 0 or delta < MIN_DELTA_DEG:
         return 0.0
-    return min(cap, max(MIN_S, 1.5 * delta / PEAK_DEG_S))
+    return min(cap, max(MIN_S, peak_factor(skew) * delta / PEAK_DEG_S))
 
 
-def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
-    """S-curve (smoothstep) steps from `start` to `end`, the last one exactly `end` (same curve as gait/standup.py)."""
+def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S, skew: float = 1.0):
+    """S-curve steps from `start` to `end`, the last one exactly `end` (the same curve as gait/standup.py when skew is 1)."""
     n = max(1, int(round(seconds * steps_per_s)))
     out = []
     for i in range(1, n + 1):
-        u = i / n
-        k = u * u * (3 - 2 * u)
+        k = curve(i / n, skew)
         out.append([s + (e - s) * k for s, e in zip(start, end)])
     return out
 

@@ -213,10 +213,11 @@ class SerialLink:
                 start = self.read_leg_pose()                   # stage 2: after a firmware gait or a trick, ask the servos where the legs are
             if start is None:
                 return                                         # unknown pose: the firmware's own start
-            secs = transitions.ramp_seconds(start, end)
+            skew = transitions.skew_for(c)
+            secs = transitions.ramp_seconds(start, end, skew=skew)
             if secs <= 0:
                 return
-            transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
+            transitions.play(transitions.ramp_poses(start, end, secs, transitions.STEPS_PER_S, skew), lambda pose: self._write_pose(transitions.leg_cmd(pose)), sleep=time.sleep)
         except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
             log.warning("transition ramp skipped (%s)", e)
         finally:
