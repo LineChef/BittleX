@@ -106,6 +106,8 @@ correct in practice, not just in research. Tooling:
 test, avoids the reboot-per-invocation confound of testing this with two
 separate CLI calls).
 
+**Over the Pi's UART, 2026-10-18 (firmware B10_260527, G2 standing on a desk, pod and AI head on):** `f` still returns only its echo on Serial 2 (0 of 5 reads, `check_serial posecheck`; a raw 2 s capture held the echo and IMU frames only). Sending it is not harmless: in the raw capture roll went from -1.5 to -21 deg within 1.5 s of one request (the next request stayed level), and the check logged tilt changes of 15-77 deg during four of five reads. The firmware apparently still releases the servos to read them and prints the result only to USB. So the eased-transition stage 2 (read the pose when it is unknown) stays off; servo reads are not safe while G2 stands.
+
 **Implications for our work:**
 - → **The RL policy must not depend on fast measured joint angles.** Good news:
   in **residual mode** (the whole resid + survive line) `opencat_gym_env.py`

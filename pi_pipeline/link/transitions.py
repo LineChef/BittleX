@@ -149,7 +149,8 @@ def leg_cmd(pose) -> str:
 
 
 def read_pose_enabled() -> bool:
-    """Stage 2 (`G2_TRANSITION_READ_POSE`, default off until `check_serial posecheck` shows the servo read works over the Pi's link and G2 holds still while it runs)."""
+    """Stage 2 (`G2_TRANSITION_READ_POSE`, default off). Do not switch it on with the current firmware: `check_serial posecheck` on 2026-10-18 got no rows over the
+    Pi's link (only the `f` echo) and the read request made G2 lean up to 21 deg while standing (docs/hardware/specs.md, "Servo position feedback")."""
     return os.environ.get("G2_TRANSITION_READ_POSE", "").strip().lower() in ("1", "on", "true", "yes")
 
 
