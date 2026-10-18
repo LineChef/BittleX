@@ -491,6 +491,52 @@ def _extra_cols(feed, now, volt, on):
 
 
 # --------------------------------------------------------------------- loop
+START_TILT_MAX_DEG = 30.0       # a walk never starts with more tilt than this (2026-10-18: a walk was started while G2 lay upside down, roll 161 deg at its first sample)
+SETTLE_MAX_S = 2.0              # after a firmware gait or skill: how long to wait for the body to stop swaying before the walk takes over
+_SETTLED_DEG = 1.0             # 5 IMU frames (1 s) within this spread of roll and pitch = still
+_DOWN_POSES = ("", "d", "krest", "kzz", "ksit")
+
+
+def pre_walk(send, poll_imu, last_motion_command, *, sleep=time.sleep, clock=time.monotonic, settle_max_s=SETTLE_MAX_S, tilt_max_deg=START_TILT_MAX_DEG):
+    """Checks before a policy walk takes the legs (2026-10-18, early-stride falls on the pod payload).
+    1. If the last leg command was a firmware gait or skill (a turn, `kwkR`, a trick), the legs are mid-stride in an unknown pose: settle into `kbalance` first and wait
+       until the IMU shows the body is still (up to `settle_max_s`), so the walk starts from a known, steady stand instead of jumping there while balance is switched off.
+    2. If G2 is tilted past `tilt_max_deg` (lying, fallen), the walk does not start: raises SystemExit (the caller logs "could not start").
+    Returns what was done, for the log. `send(cmd)` and `poll_imu()` are the link's."""
+    last = (last_motion_command or "").strip()
+    handoff = last.startswith("k") and last not in ("kbalance", "kup") + _DOWN_POSES
+    send("gP")                                             # the 5 Hz IMU print (harmless if already on)
+    if handoff:
+        send("kbalance")
+    frames: list = []
+    t0 = clock()
+    limit = settle_max_s if handoff else 1.0
+    while clock() - t0 < limit:
+        for line in poll_imu():
+            r = parse_imu_line(line)
+            if r is not None:
+                frames.append((math.degrees(r[0]), math.degrees(r[1])))
+        if frames and max(abs(frames[-1][0]), abs(frames[-1][1])) > tilt_max_deg:
+            send("d")
+            raise SystemExit(f"not upright at the start (roll {frames[-1][0]:.0f}, pitch {frames[-1][1]:.0f} deg): the walk did not start")
+        if not handoff and frames:
+            break
+        if handoff and len(frames) >= 5:
+            w = frames[-5:]
+            if max(x for x, _ in w) - min(x for x, _ in w) <= _SETTLED_DEG and max(y for _, y in w) - min(y for _, y in w) <= _SETTLED_DEG:
+                break
+        sleep(0.05)
+    return {"handoff": handoff, "frames": len(frames), "settle_s": round(clock() - t0, 2)}
+
+
+def cmd_ramp_factor(t, ramp_s, start=0.4):
+    """The share of the commanded speed at `t` seconds into a walk: from `start` up to 1 over `ramp_s` (0 = off, always 1). Sim check 2026-10-18 (100 episodes, flat, pod payload):
+    no falls either way, mean early roll 6.1 vs 6.6 deg, worst 13.5 vs 9.5 deg, so it is opt-in (G2_WALK_RAMP_S)."""
+    if ramp_s <= 0 or t >= ramp_s:
+        return 1.0
+    return start + (1.0 - start) * max(0.0, t) / ramp_s
+
+
 def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=None,
         thermal_guard=True, skill_layer=None, vision=None, skill_labels=None,
         turn_burst_s=1.0, carpet=False, imu_rate="zero", policy_path=None, send_every=None, fall_abort_deg=60.0,
@@ -575,6 +621,10 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         hold.fixed_u = float(steer_const)
     steer_u = 0.0
 
+    pre = pre_walk(lambda c: _send(lk, c), lk.poll_imu, getattr(lk, "last_motion_command", None))    # settle after a firmware gait; never start while tilted (raises)
+    if pre["handoff"]:
+        print(f"settled into a stand before the walk ({pre['settle_s']} s, {pre['frames']} IMU frames)", flush=True)
+
     if disable_firmware_balance:
         # firmware balance OFF -> policy has full control. "gb", not bare "g":
         # bare "g" TOGGLES gyroBalanceQ, so after any session that already sent
@@ -638,10 +688,16 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                                     on_reading=(lambda v: (last_volt.__setitem__(0, v), diag.event("gait", "INFO", "battery.load", volts=round(v, 2)) if diag is not None else None)))
     try:
         i = 0
+        try:
+            walk_ramp_s = max(0.0, float(os.environ.get("G2_WALK_RAMP_S", "0") or 0))       # opt-in speed ramp-in at the start of a walk (cmd_ramp_factor)
+        except ValueError:
+            walk_ramp_s = 0.0
         while n is None or i < n:
             if stop_event is not None and stop_event.is_set():
                 end_reason[0] = "stopped"
                 break
+            if walk_ramp_s > 0 and skill_layer is None and i / hz <= walk_ramp_s + 0.1:
+                pol.set_command(fwd=cmd_fwd * cmd_ramp_factor(i / hz, walk_ramp_s), yaw=0.0)
             # never wait on the IMU: take what has arrived, step on the held frame
             now = time.monotonic()
             if volt_chk is not None:

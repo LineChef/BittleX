@@ -73,15 +73,17 @@ def test_unfinished_runs_are_marked(on):
 
 
 class _Link:
+    """Upright for the walk's pre-start check (first poll), then `line` on every poll."""
     def __init__(self, line):
-        self.sent, self._line = [], line
+        self.sent, self._line, self._n = [], line, 0
 
     def send(self, cmd, **kw):
         self.sent.append(cmd)
         return ""
 
     def poll_imu(self):
-        return [self._line]
+        self._n += 1
+        return ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0" if self._n == 1 else self._line]
 
 
 def _only_run(root):

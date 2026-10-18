@@ -74,7 +74,7 @@ class _TurningRightLink:
 
     def poll_imu(self):
         self._n += 1
-        return ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0" if self._n == 1
+        return ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0" if self._n <= 2       # the pre-walk check reads one frame, the reset reads the next
                 else "MCU:  0.00  0.00  1.00  -20.0   0.0   0.0"]
 
 
@@ -216,7 +216,8 @@ def test_loop_ticks_at_control_rate_not_imu_print_rate(rg, monkeypatch):
     assert len(moves) >= 70            # ~80 ticks in 1 s, minus the stand pose
     assert lk._emitted <= 16           # while only ~5 IMU frames/s arrived (incl. setup pauses)
     # balance off is the explicit "gb" (bare "g" toggles), restored on exit
-    assert "g" not in lk.sent and lk.sent.index("gb") < lk.sent.index("gP")
+    last_gp = len(lk.sent) - 1 - lk.sent[::-1].index("gP")                     # the pre-walk check starts the IMU print early; the loop's own start is the last gP
+    assert "g" not in lk.sent and lk.sent.index("gb") < last_gp
     assert lk.sent[-1] == "d" and lk.sent[-2] == "gB"     # balance restored first, the rest LAST (gB right after d left G2 standing, 2026-10-06)
 
 
@@ -260,17 +261,18 @@ def test_default_policy_sends_at_its_trained_cadence(rg, monkeypatch):
 
 
 class _FallenLink:
-    """Reports a steady 90-degree roll (G2 on its side) on every poll."""
+    """Upright for the pre-walk check, then a steady 90-degree roll (G2 on its side) on every poll."""
 
     def __init__(self):
-        self.sent = []
+        self.sent, self._n = [], 0
 
     def send(self, cmd, **kw):
         self.sent.append(cmd)
         return ""
 
     def poll_imu(self):
-        return ["MCU:  0.00  0.00  1.00    0.0   0.0  90.0"]
+        self._n += 1
+        return ["MCU:  0.00  0.00  1.00    0.0   0.0   0.0" if self._n == 1 else "MCU:  0.00  0.00  1.00    0.0   0.0  90.0"]
 
 
 def test_fall_guard_rests_and_stops_the_loop_when_tilted_past_the_limit(rg, monkeypatch):
@@ -606,3 +608,43 @@ def test_watchdog_starts_after_the_stand_up_setup_not_before(rg, monkeypatch):
     ramp_steps = [c for c in lk.sent[:lk.sent.index("WD_START")] if c.startswith("i")]
     assert len(ramp_steps) >= 17                    # the 16 ramp steps and the exact stand pose all went out before the watchdog started
     assert lk.sent.index("gP") < lk.sent.index("WD_START")
+
+
+# ---- pre-walk checks (2026-10-18: early-stride falls on the pod payload)
+def _imu(roll_deg, pitch_deg):
+    return f"ICM:  0.00  0.00  9.80   0.0 {pitch_deg:6.1f} {roll_deg:6.1f}"
+
+
+def _pre(rg, last, poses, **kw):
+    sent, state = [], {"t": 0.0, "k": 0}
+    def poll():
+        k = min(state["k"], len(poses) - 1)
+        state["k"] += 1
+        return [_imu(*poses[k])]
+    def sleep(s):
+        state["t"] += s
+    res = rg.pre_walk(sent.append, poll, last, sleep=sleep, clock=lambda: state["t"], **kw)
+    return sent, res
+
+
+def test_after_a_firmware_turn_the_walk_first_settles_into_a_still_stand(rg):
+    sent, res = _pre(rg, "kwkR", [(5, 3), (-4, 6), (2, 1), (2.2, 1.1), (2.1, 1.0), (2.3, 1.2), (2.2, 1.1), (2.2, 1.0)])
+    assert sent[:2] == ["gP", "kbalance"] and res["handoff"] and res["frames"] >= 5 and "d" not in sent
+
+
+def test_from_a_known_stand_or_rest_there_is_no_hand_off(rg):
+    for last in ("kbalance", "d", "", "ksit", "i8 30 12 30"):
+        sent, res = _pre(rg, last, [(1, 1)])
+        assert sent == ["gP"] and not res["handoff"]
+
+
+def test_a_walk_never_starts_while_he_is_tilted(rg):
+    with pytest.raises(SystemExit):
+        _pre(rg, "kwkF", [(161, -104)])
+    with pytest.raises(SystemExit, match="not upright"):
+        _pre(rg, "d", [(-80, 4)])
+
+
+def test_the_speed_ramp_is_off_by_default_and_reaches_full_speed(rg):
+    assert rg.cmd_ramp_factor(0.0, 0.0) == 1.0
+    assert rg.cmd_ramp_factor(0.0, 1.0) == pytest.approx(0.4) and rg.cmd_ramp_factor(0.5, 1.0) == pytest.approx(0.7) and rg.cmd_ramp_factor(1.2, 1.0) == 1.0
