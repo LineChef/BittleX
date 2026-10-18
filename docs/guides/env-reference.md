@@ -146,7 +146,7 @@ Every `G2_*` variable the Pi code and the tools read: **201**, of which **0** ar
 | `G2_POWER_LOG` | `DEFAULT_PATH` | `power_log.py` | [`settings-switches.md`](settings-switches.md), [`pi-power.md`](../hardware/pi-power.md) |
 | `G2_PRICE_IN_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
 | `G2_PRICE_OUT_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
-| `G2_PROFILE` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_PROFILE` | `"0"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_QUESTION_WINDOW_S` | `8.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
 | `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md), [`reflection-plan.md`](../planned/reflection-plan.md) |
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
@@ -176,17 +176,17 @@ Every `G2_*` variable the Pi code and the tools read: **201**, of which **0** ar
 | `G2_STREAM` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_STT_COMMAND_GRAMMAR` | `"1"` | `stt.py` | [`capabilities.md`](../capabilities.md) |
 | `G2_STT_SILENCE_S` | `0.5` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
-| `G2_SURVEY_AFTER_WALL` | `"1"` | `driver.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_SURVEY_AFTER_WALL` | `"1"` | `driver.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_SURVEY_CHECK` | `"1"` | `survey.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_SURVEY_COOLDOWN_S` | — | `survey.py`, `g2_explore.sh` | [`settings-switches.md`](settings-switches.md) |
-| `G2_SURVEY_EXTRA_FRAMES` | `"2"` | `exploration_pictures.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_SURVEY_EXTRA_FRAMES` | `"2"` | `exploration_pictures.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_SURVEY_FIRST_S` | — | `survey.py`, `g2_explore.sh` | [`settings-switches.md`](settings-switches.md) |
 | `G2_SURVEY_LOOKS` | `"0"` | `survey.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_SURVEY_RELAX_S` | `"60"` | `explore_session.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_SURVEY_RELAX_S` | `"60"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_SYSTEM_PROMPT` | — | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_TIDY_DAYS` | `30.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_TRAITS` | `"curiosity=0.8"` | `config.py` | [`.env.example`](../../.env.example), [`capabilities.md`](../capabilities.md), [`shell-helpers.md`](shell-helpers.md) +1 |
-| `G2_TRANSITION_RAMP_S` | `""` | `transitions.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
+| `G2_TRANSITION_RAMP_S` | `""` | `transitions.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_TRANSITION_READ_POSE` | — | `check_serial.py`, `transitions.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_TTS` | `"auto"` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_USAGE_FILE` | `"~/.local/share/g2/api_usage.json"` | `config.py` | [`settings-switches.md`](settings-switches.md) |

@@ -28,9 +28,11 @@ Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and te
    `(nearest wall - 12 in) / 3.5 in/s`, never under 1.5 s.
 3. **Looks.** A cheap camera look (not saved, no API call) every 3 s while a wall was seen within 40 in in the last 20 s, otherwise every 6 s. The same look feeds the interest watch (is there an unknown
    object worth a picture stop?) and the wall estimator.
-4. **Picture stops.** At the end of a leg, at most every 60 s (the first after 30 s), and only when something is worth it: look down (the bow), look up, stand again (eased stand-up), wait 3.3 s, wait until the IMU
-   shows he has stopped swaying (up to 6 s), warm the camera up and meter the light, take the picture (retaken once if it is too dark or bright), walk on. Pictures: `~/.local/share/g2/explore_pictures/`,
-   reviewed with `g2pics`.
+4. **Picture stops.** A survey stop is: look up (`ksit`), look down (the bow), stand, the firmware `check` lean, stand again, settle, then the picture. Before the shutter the body must stop swaying on the IMU (up to 6 s); the camera is warmed up and the light metered; the picture is the sharpest of three frames half a second apart (`G2_SURVEY_EXTRA_FRAMES`), retaken once if too dark or bright. A picture never holds him more than 10 s: after one 3 s retry he walks on and says "My camera isn't answering." Three kinds of stop:
+   - **Scheduled:** every roam with a time cap takes four, at 25, 50, 75 and 99 percent of the roam, whatever the cooldown and gate say. Each waits up to 15 s for a good moment (a finished wall turn, so he faces open space, or the end of a leg), then happens where he is; the last one does not wait. They are never dropped as near-duplicates.
+   - **After a wall turn or a clean leg end,** at most every 60 s (the first after 30 s), when the interest watch finds something worth it, or after 60 s with no picture at all (`G2_SURVEY_RELAX_S`; `G2_SURVEY_AFTER_WALL=0` turns the wall-turn trigger off).
+   - **By voice:** "this is a <name>" takes a named picture.
+   Interest peeks pause while a picture is being taken, and exploration detects at the camera's picture capture option so a picture needs no capture-mode switch. Pictures: `~/.local/share/g2/explore_pictures/`, reviewed with `g2pics`; the scheduled ones are `after_bow_m25` to `after_bow_m99`.
 5. **Wall steering.** The estimator turns the picture's floor line into inches per column group (calibration in `~/.local/share/g2/wall_calibration.json`). A wall ahead means three of five groups at 24 in or
    closer on two of the newest three looks (about 50 degrees away, toward the side with more room), or any look at 12 in or closer, or a blocked picture. The turn replaces any turn already running, and a
    two-note falling sound plays so you know why he turned.
@@ -47,6 +49,7 @@ Commands you can say: [`voice-commands.md`](voice-commands.md). Wall work and te
 | turning away from a wall | two soft falling notes |
 | hit a wall | a long "ooooof" |
 | a picture is taken | the shutter double click |
+| the camera does not answer | he says "My camera isn't answering." |
 | a command fails | the losing horn |
 | fell over | the losing horn |
 | end | "Exploration complete.", the ta-da, he lies down; "G2 online." when the voice service is back |
@@ -59,6 +62,8 @@ However it ends (even a crash) the unit sends rest (`d`) before the voice servic
 ## Where to look afterwards
 
 - `journalctl -u g2-explore` on the Pi (or `bash tools/g2_explore.sh logs`): turns, `g2.wall.steer`, `g2.wall.hit`, chirps, pictures.
+- `G2_PROFILE=1 bash tools/g2_explore.sh start 240` writes `profile.txt` in the session's diagnostics folder (`~/g2_logs/<session>/`): which threads use the CPU and where. Each walk's log sidecar (`~/g2_runs/auto/<date>/*.json`) records `late_ticks_pct` and `worst_tick_gap_ms`.
+- **Narration** is fixed text chosen from what he does and sees (new leg, a wall about N inches ahead and which way he turns, a bump, straight starts); a local voice speaks it, no API call. Lines come at least 5 s apart, the same kind after 25 s.
 - `~/.local/share/g2/wall_dryrun.jsonl` and `python -m pi_pipeline.vision.wall_stats`: every wall look in inches, the state, the turn it would make, the saved near-wall pictures.
 - `~/g2_runs/auto/<date>/`: the policy walk logs (CSV plus a JSON sidecar).
 - `~/.local/share/g2/noise.jsonl`: every command sent to the BiBoard, with the source that sent it.
