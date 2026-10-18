@@ -732,4 +732,4 @@ def test_the_pod_payload_is_185_g_with_the_42_g_ai_head_and_the_recipe_uses_it()
     pod, head, rear, hx, hy, hz, px, py, pz = map(float, out)
     assert (pod, head, rear) == (0.185, 0.042, 0.0)       # the weighed payload (2026-10-17; case2 was 0.168), the AI head, no separate speaker body (it is inside the pod)
     assert (hx, hy, hz) == (0.047, 0.0296, 0.01895)       # the pod: 94.0 mm long, 37.9 mm tall, 59.2 mm wide
-    assert px < 0 and pz == 0.036                         # 9.2 mm behind the cover's middle, bottom on the cover
+    assert px < 0 and abs(pz - hz - 0.010) < 1e-9         # 9.2 mm behind the cover's middle, flush: its bottom is the torso box's top (10 mm up)

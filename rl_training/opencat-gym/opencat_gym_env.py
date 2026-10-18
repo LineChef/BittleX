@@ -495,14 +495,14 @@ elif PAYLOAD_PROFILE == "case2":
 elif PAYLOAD_PROFILE == "pod":
     # 2026-10-17/18: G2 carries the Bittle X Pi add-on pod (blueprints/mounting.md) AND the Petoi AI Head. Weighed payload 185 g (pod, Pi, PiSugar S, camera, speaker, mic, wiring; was 168 g) on the
     # unchanged 254 g base, plus the AI head (42 g, Petoi's figure; its mass is added in full: the stock head it replaces is already inside the 254 g and has not been weighed), 481 g in all.
-    # Block = the pod: 94.0 mm long, 37.9 mm tall (project viewer), width taken as the 59.2 mm envelope (|X| <= 29.6); it sits 9.2 mm behind the cover's middle (envelope Z -37.8..56.2), bottom on the cover
-    # at 17 mm up as before. The camera (on top of the pod's front) and the speaker (inside its rear) are inside that box, so they are part of its 185 g and there is no separate rear body.
+    # Block = the pod: 94.0 mm long, 37.9 mm tall (project viewer), width taken as the 59.2 mm envelope (|X| <= 29.6); it sits 9.2 mm behind the cover's middle (envelope Z -37.8..56.2), flush on the torso
+    # (bottom at the torso box's top, 10 mm up: the pod is firmly secured to the body, owner 2026-10-18; the old case sat 17 mm up). The camera (on top of the pod's front) and the speaker (inside its rear) are inside that box, so they are part of its 185 g and there is no separate rear body.
     # The AI head is a separate body at the nose, size and position estimated (not measured): about 50 x 60 x 50 mm, its centre 77.5 mm ahead of the torso centre, 20 mm up.
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.020
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.042, 0.003
     REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
     PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
-    PAYLOAD_POS = (-0.0092, 0.0, 0.0360)
+    PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
     HEAD_BOX_HALF = (0.025, 0.030, 0.025)
     HEAD_MASS_POS = (0.0775, 0.0, 0.020)
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
