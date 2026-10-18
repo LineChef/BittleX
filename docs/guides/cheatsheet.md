@@ -13,6 +13,10 @@ source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh
 export G2_PI=<user>@g2pi.local          # the Pi login; kept out of the repo
 ```
 
+If the Mac sometimes cannot resolve `g2pi.local` while the Pi is up, run `bash tools/g2_pi_ssh_setup.sh` once: it adds a `Host g2pi.local` block to `~/.ssh/config` that falls back to the Pi's last known address (`tools/g2_pi_connect.sh`), still checking the Pi's host key, so every alias, deploy and tool keeps working. `--remove` takes it out.
+
+Deploys (`tools/g2_deploy_when_online.sh`) ship the last commit, never uncommitted changes; the log lists anything under `pi_pipeline/` that was left out.
+
 Every alias works from any directory and leaves you where you were, except `g2` and `g2rl`, which move you on purpose. In Claude Code, the `!` prefix runs each line in a fresh shell, so `source` and the alias must be on one line.
 
 | Alias | Does |
