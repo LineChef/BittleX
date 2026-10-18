@@ -161,6 +161,10 @@ def main() -> None:
     with diag.session("explore", extra={"roam_s": args.roam_s}):
         from .diag.crashwatch import CrashWatch
         crash = CrashWatch("explore", extras=lambda: getattr(stt_holder.get("stt"), "last_info", None)).start()
+        profiler = None
+        if os.environ.get("G2_PROFILE", "0") == "1":                   # where the Python time goes (late walk ticks, late speech): diag/sampler.py, report in the session folder
+            from .diag.sampler import Sampler
+            profiler = Sampler().start()
         stt_holder: dict = {}
         memory = _make_memory()
         link = _make_link(True)
@@ -434,6 +438,10 @@ def main() -> None:
                 log.exception("could not keep the session recap")
             if watch is not None:
                 watch.stop()
+            if profiler is not None:
+                profiler.stop()
+                out = profiler.write(diag.session_dir) if diag.session_dir else None
+                log.info("profile written to %s", out)
             if vision is not None:
                 vision.close()
             if memory is not None:
