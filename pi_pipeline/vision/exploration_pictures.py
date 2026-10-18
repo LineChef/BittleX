@@ -94,25 +94,45 @@ class ExplorationPictureSaver:
         self.last_path: str | None = None
         self.last_kind: str | None = None
 
-    def _take(self, prep: bool):
+    PICTURE_BUDGET_S = 10.0        # one picture never holds G2 longer than this: no retake or extra frames once it is spent (2026-10-18: he stood 50 s through repeated 6 s camera timeouts)
+    EXTRA_TIMEOUT_S = 3.0          # an extra best-of frame waits at most this long
+    on_camera_slow = None          # callable(): said once when the camera keeps him waiting (explore_session: "My camera isn't answering.")
+
+    def _take(self, prep: bool, timeout_s: float | None = None):
+        kw = {} if prep else {"settle": 0}                                                      # no prep: the picture right after the mode switch
+        if timeout_s is not None:
+            kw["timeout_s"] = timeout_s
         try:
-            return self._source.snapshot() if prep else self._source.snapshot(settle=0)       # no prep: the picture right after the mode switch
-        except TypeError:                                                                       # a source whose snapshot() takes no settle argument
+            return self._source.snapshot(**kw)
+        except TypeError:                                                                       # a source whose snapshot() takes fewer arguments
             return self._source.snapshot()
+
+    def _budget_left(self) -> float:
+        return self.PICTURE_BUDGET_S - (time.monotonic() - self._started)
 
     _extra_frames = int(os.environ.get("G2_SURVEY_EXTRA_FRAMES", "2"))      # survey pictures: this many more frames half a second apart, and the sharpest of all is kept (0 = one frame)
 
     def _best_of(self, first):
         best, best_score = first, _sharpness(first.jpeg)
         for _ in range(self._extra_frames):
+            if self._budget_left() < self.EXTRA_TIMEOUT_S + 0.5:
+                break
             time.sleep(0.5)
-            more = self._take(False)
+            more = self._take(False, timeout_s=self.EXTRA_TIMEOUT_S)
             if more is None or not _decodes(more.jpeg):
-                continue
+                break                                                   # the camera is struggling: keep the frame already taken
             score = _sharpness(more.jpeg)
             if score > best_score:
                 best, best_score = more, score
         return best
+
+    def _camera_slow(self) -> None:
+        log.warning("the camera is slow to answer; one short retry")
+        if self.on_camera_slow is not None:
+            try:
+                self.on_camera_slow()
+            except Exception:  # noqa: BLE001
+                pass
 
     def folder_for(self, kind: str, now: float) -> Path:
         if kind.startswith("name:"):
@@ -123,6 +143,7 @@ class ExplorationPictureSaver:
 
     def __call__(self, kind) -> str | None:
         kind = str(kind or "picture")
+        self._started = time.monotonic()
         quick = kind.startswith("look_")                                                         # throwaway look pictures: no camera warm-up, no retake, a short wait for stillness (a full picture took 15 s)
         prep = False if quick else (self._prep_every_s <= 0 or kind.startswith("name:") or self._last_prep is None or self._clock() - self._last_prep >= self._prep_every_s)
         still = None
@@ -132,12 +153,15 @@ class ExplorationPictureSaver:
             except Exception:  # noqa: BLE001
                 log.debug("wait for stillness failed", exc_info=True)
         snap = self._take(prep)
+        if snap is None and self._budget_left() > 3.5:                  # one short second try, inside the budget
+            self._camera_slow()
+            snap = self._take(False, timeout_s=3.0)
         if prep and snap is not None:
             self._last_prep = self._clock()
         if snap is not None and kind.startswith("after_bow") and self._extra_frames > 0:
             snap = self._best_of(snap)
         retaken = False
-        if snap is not None and not quick and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
+        if snap is not None and not quick and self._budget_left() > 6.5 and _badly_exposed(snap.jpeg):                                       # too dark or too bright: warm the camera up again and take it once more, keep the better one
             again = self._take(True)
             retaken = True
             if again is not None and _exposure_cost(again.jpeg) < _exposure_cost(snap.jpeg):

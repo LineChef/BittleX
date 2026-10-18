@@ -517,3 +517,32 @@ def test_the_sharper_of_three_frames_is_kept_and_milestone_pictures_are_never_dr
     s2 = ExplorationPictureSaver(src2, str(tmp_path / "b"))
     s2._extra_frames = 0
     assert s2("after_bow_m25") and s2("after_bow_m50") and s2("after_bow_m75")        # identical pictures all kept
+
+
+def test_a_camera_that_stops_answering_costs_one_short_retry_and_a_spoken_line(tmp_path):
+    """2026-10-18: G2 stood silent for 50 s while a survey picture waited through repeated 6 s camera timeouts."""
+    calls, slow = [], []
+    src = types.SimpleNamespace(snapshot=lambda settle=None, timeout_s=None: calls.append(timeout_s))       # never answers
+    saver = ExplorationPictureSaver(src, str(tmp_path))
+    saver.on_camera_slow = lambda: slow.append(1)
+    saver._extra_frames = 2
+    assert saver("after_bow_m50") is None
+    assert calls == [None, 3.0] and slow == [1]                     # the first try, one 3 s retry, the line said once; no extra frames, no retake
+
+
+def test_the_extra_frames_stop_at_the_first_one_the_camera_misses(tmp_path):
+    import time as _t
+    frames = iter([types.SimpleNamespace(jpeg=_real_jpeg(), detections=[], width=16, height=16), None])
+    asked = []
+    def snap(settle=None, timeout_s=None):
+        asked.append(timeout_s)
+        return next(frames, types.SimpleNamespace(jpeg=_real_jpeg(), detections=[], width=16, height=16))
+    saver = ExplorationPictureSaver(types.SimpleNamespace(snapshot=snap), str(tmp_path))
+    saver._extra_frames = 2
+    real = _t.sleep
+    _t.sleep = lambda s: None
+    try:
+        assert saver("after_bow_m75")
+    finally:
+        _t.sleep = real
+    assert asked == [None, 3.0]                                     # the second extra frame is never asked for

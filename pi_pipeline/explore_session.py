@@ -252,6 +252,8 @@ def main() -> None:
 
             tts = _Locked()
             say = tts.speak
+            if saver is not None:
+                saver.on_camera_slow = lambda: threading.Thread(target=say, args=("My camera isn't answering.",), daemon=True).start()
             from .voice.__main__ import make_battery_alert
             alert["fn"] = make_battery_alert(tts, True)
             from .personality.bonds import Bonds
