@@ -35,6 +35,15 @@ python pi_pipeline/gait/getup_test.py rc --balance off    # the state the explor
 
 Place him on his side by hand first, on the floor, hands near; never on his back. The script refuses to start if he is upright, and every attempt is appended to `~/g2_runs/getup_results.jsonl`. Results go here when run.
 
+**Results (2026-10-18, pod + AI head payload, paused; resume later):**
+
+| # | Move | Side | Balance | Result |
+|---|---|---|---|---|
+| 1 | `rc` (firmware) | right (roll about 108 deg) | on | not up: the body rose about 20 deg toward vertical for under a second, then fell back |
+| 2 | `s_rl_rc` (streamed, head pinned, 1 s per keyframe) | left (roll about -99 deg) | off | not up: roll did not change at all in 21 s (not yet known whether the legs moved) |
+
+Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg and tilt 40 deg, into the legs' path with the AI head on; `rc` keeps the head straight for its flipping frames. Next when testing resumes: confirm whether the legs moved in test 2; then `s_rc --frame-s 0.4` (momentum), the firmware `rc` from the left side, and if none works, hand-guided teaching of a side roll (`gait/teach.py`).
+
 ## What it means for the project
 
 - Expect to right G2 by hand sometimes, especially after fast falls and while training new gaits.
