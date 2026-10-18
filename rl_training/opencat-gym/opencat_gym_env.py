@@ -2856,6 +2856,8 @@ class OpenCatGymEnv(gym.Env):
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
             pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
+            if PAYLOAD_PROFILE == "pod":
+                pj[:] = 0.0                    # pod: a perfectly balanced block, its centre of mass exactly at its middle and fixed on the body (owner, 2026-10-18); the mass still varies
             if BALANCED:                       # the payload sits off-centre to the left as often as to the right
                 pj[1] = abs(pj[1]) * self._deal("payload_y", (-1.0, 1.0))
             off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]

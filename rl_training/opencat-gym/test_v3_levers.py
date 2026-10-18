@@ -733,3 +733,26 @@ def test_the_pod_payload_is_185_g_with_the_42_g_ai_head_and_the_recipe_uses_it()
     assert (pod, head, rear) == (0.185, 0.042, 0.0)       # the weighed payload (2026-10-17; case2 was 0.168), the AI head, no separate speaker body (it is inside the pod)
     assert (hx, hy, hz) == (0.047, 0.0296, 0.01895)       # the pod: 94.0 mm long, 37.9 mm tall, 59.2 mm wide
     assert px < 0 and abs(pz - hz - 0.010) < 1e-9         # 9.2 mm behind the cover's middle, flush: its bottom is the torso box's top (10 mm up)
+
+
+def test_the_pod_block_is_perfectly_balanced_and_fixed_on_the_body():
+    import subprocess, sys, textwrap
+    code = textwrap.dedent('''
+        import sys
+        sys.path.insert(0, ".")
+        import g2_profile
+        g2_profile.set_environ(g2_profile.env_for())
+        import numpy as np, pybullet as p
+        import opencat_gym_env as E
+        import benchmark_decathlon as B
+        B._apply({})
+        env = E.OpenCatGymEnv()
+        worst = 0.0
+        for k in range(6):
+            env.reset(seed=k)
+            d = np.array(p.getBasePositionAndOrientation(env._payload_id)[0]) - np.array(p.getBasePositionAndOrientation(env.robot_id)[0])
+            worst = max(worst, float(np.abs(d - np.array(E.PAYLOAD_POS)).max()))
+        print(worst)
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300).stdout.strip().splitlines()[-1]
+    assert float(out) < 1e-6                              # no per-episode x / y / z offset of the pod block
