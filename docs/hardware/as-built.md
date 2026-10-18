@@ -14,7 +14,7 @@ What G2 is made of, how it is connected, and what it weighs. This is the summary
 | Camera | Petoi AI Vision Camera Module (Grove Vision AI V2: Cortex-M55 + Ethos-U55) | On the Pi's USB (`/dev/ttyACM0`); runs the detector on itself and sends detections, not video; on top of the pod at the front, lens forward (since 2026-10-17) | [`../vision/README.md`](../vision/README.md) |
 | Microphone | HiLetgo SPH0645 I²S MEMS breakout | On the Pi header; on the pod's right wall near the front (since 2026-10-17). Very quiet: digital gain is applied in software | [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) |
 | Speaker | NULLLAB NS4168 I²S amplifier with 3 W speaker | On the Pi header (shares the mic's I²S clock lines); speaker at the rear of the pod, amp on its right wall | [`../../blueprints/build-logs/i2s-audio-build-log.md`](build-logs/i2s-audio-build-log.md) |
-| Case | Bittle X Platform v3.2 (stock back cover with four pegs) plus the Bittle X Pi add-on v0.24 pod, designed for the PiSugar S and this project's parts; clicks on, no tools. Design figure 135 g with the electronics. Installed 2026-10-17; replaces the velcroed PiSugar case on a modified cover | [project page and files](https://beetlebugorg.github.io/bittlex/) | [`../../blueprints/mounting.md`](../../blueprints/mounting.md) |
+| Case | Bittle X Platform v3.2 (stock back cover with four pegs) plus the Bittle X Pi add-on v0.24 pod, designed for the PiSugar S and this project's parts; clicks on, no tools. Installed 2026-10-17; replaces the velcroed PiSugar case on a modified cover | [project page and files](https://beetlebugorg.github.io/bittlex/) | [`../../blueprints/mounting.md`](../../blueprints/mounting.md) |
 
 ## Connections
 
@@ -32,8 +32,8 @@ Pinouts and the wire map: [`../../blueprints/wiring/g2-wiring-guide.html`](../..
 | | |
 |---|---|
 | Base robot | about 254 g |
-| Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod) | design figure 135 g (the pod's own model; measured weight to be recorded). The previous mount's payload was about 168 g, roughly 100 × 40 × 38 mm |
-| Whole robot | to be measured with the pod. With the previous mount: about 422 g |
+| Payload (Pi, PiSugar, camera, speaker, mic, wiring, pod) | **185 g** weighed 2026-10-17 (the project's own model figure is 135 g). The previous mount's payload was 168 g, roughly 100 × 40 × 38 mm |
+| Whole robot | about 439 g (254 g base + 185 g payload). With the previous mount: about 422 g |
 | Front/rear share, standing | to be measured with the pod. With the previous mount: about 46% front, 54% rear (measured range roughly 44 to 50%) |
 
 The measurements and the sim's payload model: [`specs.md`](specs.md) "Weight distribution, standing".

@@ -19,11 +19,11 @@ Front is the head end; left and right are G2's left and right.
 
 What changed from the interim mount (2026-09-29 to 2026-10-17): the camera moved from the front of the case to the top of the pod, the speaker stays at the very back, and the microphone moved from the top of the lid to the right wall near the front. The payload is now inside one pod instead of PiSugar's own case velcroed to a modified cover. The pod is designed for the **PiSugar S**; the add-on's build guide text says "PiSugar 2", which is the same 1200 mAh class of battery.
 
-**Mass:** the design's own figure is **135 g with the electronics** (center of mass 9.0 mm from the robot center). G2's measured weight with this payload is *to be recorded* (the 422 g in [`../docs/hardware/specs.md`](../docs/hardware/specs.md) was measured with the previous mount).
+**Mass:** the design's own figure is **135 g with the electronics** (center of mass 9.0 mm from the robot center). **G2's weighed payload (Pi, PiSugar S, camera, speaker, microphone, wiring and the pod) is 185 g** (2026-10-17), against 168 g with the previous mount: 17 g (about 10%) more. With the base robot unchanged at about 254 g, the whole robot is about 439 g (was 422 g). The sim uses these numbers ([`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
 
 ## Wiring in the pod
 
-The pins are the same as G2's earlier wiring ([`../docs/hardware/build-logs/i2s-audio-build-log.md`](../docs/hardware/build-logs/i2s-audio-build-log.md)) except that the amp's ground is now on **pin 14** (it was pin 9; mic ground stays on pin 9).
+G2's own wiring guide ([`wiring/g2-wiring-guide.html`](wiring/g2-wiring-guide.html), [I²S build log](../docs/hardware/build-logs/i2s-audio-build-log.md)) is the source of truth for the pins and is not changed by the pod. The project's build guide shows the same pins except the amp ground on pin 14 (G2's is on pin 9); the table below is the project's, for comparison.
 
 | Signal | Pi pin |
 |---|---|
@@ -48,14 +48,13 @@ The mic's SEL is on pin 39 (a ground, left channel), as before. All wire lengths
 
 ## Back touch sensor
 
-On a Bittle X V2 the back touch sensor is a flexible circuit glued inside the cover top; the add-on covers most of its touch areas. The project advises disabling back-touch mode (serial command `Xb`) while an add-on is on the robot. Whether G2's sensor is fitted and whether `Xb` has been sent is *to be recorded*; do not send `Xa` or `XAd` to the BiBoard voice module (see the project rules).
+On a Bittle X V2 the back touch sensor is a flexible circuit glued inside the cover top; the add-on covers most of its touch areas, and the project advises disabling back-touch mode (serial command `Xb`) while an add-on is on the robot. G2's touch sensors are not enabled, so nothing needs to be done. Do not send `Xa` or `XAd` to the BiBoard voice module (see the project rules).
 
 ## Open items
 
-- [ ] G2's measured weight with the pod, and the front/rear weight split (then update the sim payload in [`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
-- [ ] The camera's real field of view from its new position and height, and whether the camera now stands upright (the old mount had it rotated 90°, so the detector only fired when the image was turned upright).
+- [ ] The front/rear weight split with the pod, and the pod's measured size and position (the sim uses the old block geometry for now; see [`../docs/hardware/specs.md`](../docs/hardware/specs.md)).
+- [ ] The camera's real field of view from its new position and height. Its orientation is unchanged from the old mount.
 - [ ] Mic gain and speaker loudness in the new positions (the mic moved to the wall, the speaker faces a rear grille).
-- [ ] Back touch sensor: fitted or not, and `Xb` state.
 
 ## Licenses
 

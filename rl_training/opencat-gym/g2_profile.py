@@ -24,7 +24,8 @@ RECIPE = {
     # the body: the base robot plus the case payload, 422 g in total (one weighing); the split between base and payload is the line below
     # 2026-10-07: the payload was weighed (168 g: Pi, PiSugar, camera, speaker, mic, wiring, lid; 100 x 40 x 38 mm block, centered): profile "case2", base 254 g = 269 g x 0.944.
     # Runs started before 2026-10-07 used the old split ("case", scale 1.12: 301 g base + 121 g payload); see docs/archive/rl/v3-decisions-log.md.
-    "G2E_BODY_MASS_SCALE": "0.944", "G2E_PAYLOAD_PROFILE": "case2",
+    # 2026-10-17: the new pod payload weighs 185 g (was 168 g; base unchanged, 254 g, so 439 g in all): profile "pod". Runs started before this used "case2" (168 g, 422 g in all).
+    "G2E_BODY_MASS_SCALE": "0.944", "G2E_PAYLOAD_PROFILE": "pod",
     # calibration error and mount tilt seen at bring-up
     # IMU, measured 2026-10-07 after the firmware gyro calibration (`gc`), G2 standing still with the firmware balance off (docs/rl/real-walk-log.md "IMU after the gyro calibration"):
     # roll zero error -0.69 deg, pitch -0.07 deg, noise sd 0.09 / 0.08 deg (so about 0.0008 in the quaternion), yaw drift 0.000 deg/s at rest, frames every 0.20 s (5 Hz: IMU_HOLD_STEPS 16).

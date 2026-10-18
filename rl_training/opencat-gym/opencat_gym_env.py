@@ -481,13 +481,18 @@ if PAYLOAD_PROFILE == "case":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.086, 0.020   # 422 - 301 base - 15 camera - 20 speaker = 86 g on the spine
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
-elif PAYLOAD_PROFILE == "case2":
+elif PAYLOAD_PROFILE in ("case2", "pod"):
     # 2026-10-07: the user weighed the whole payload (Pi, PiSugar, camera, speaker, mic, wiring and the lid they hang from) at 168 g, and measured it about 1.5 in (38 mm) tall and a
     # little over half as wide as the 71 mm lid (taken as 40 mm). With the 422 g total unchanged, the base robot is 422 - 168 = 254 g (run with G2E_BODY_MASS_SCALE=0.944 = 254 / 269), not
     # 301 g. 133 g on the spine = 168 - 15 camera - 20 speaker (both still estimates). The box sits with its bottom where the 16 mm "case" box's bottom was (17 mm up).
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.133, 0.020
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.015, 0.005
     REAR_MASS_NOM, REAR_MASS_RAND = 0.020, 0.005
+    if PAYLOAD_PROFILE == "pod":
+        # 2026-10-17: G2 now carries the Bittle X Pi add-on pod (blueprints/mounting.md); the user weighed the whole payload at 185 g (was 168 g), the base robot is unchanged (254 g), so the
+        # whole robot is 439 g. Same split as case2 (camera 15 g and speaker 20 g are still estimates), so the spine block is 185 - 15 - 20 = 150 g. The box size and positions stay at case2's
+        # until the pod is measured (the pod's own design figure is 135 g, centre of mass 9 mm from the robot centre).
+        PAYLOAD_MASS_NOM = 0.150
     # The block is the case the camera is mounted to: back edge on the hip-joint line (x = -0.055, as before), front edge flush with the BACK of the camera (x = +0.045; the camera
     # body, modeled separately, is at x = 0.045..0.065 in front of it). Tried and rejected 2026-10-07: running the block on to the camera's front face (120 mm).
     PAYLOAD_BOX_HALF = (0.050, 0.020, 0.019)
@@ -497,7 +502,7 @@ elif PAYLOAD_PROFILE == "case2":
 # height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
 PAYLOAD_LAYOUT = os.environ.get("G2E_PAYLOAD_LAYOUT", "").strip().lower()
 PAYLOAD_JITTER_XY = 0.003      # m, per-episode x / y position jitter of each welded body (z keeps +-3 mm)
-if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE == "case2":
+if PAYLOAD_LAYOUT == "spine" and PAYLOAD_PROFILE in ("case2", "pod"):
     SPINE_HALF_X = 0.0525
     PAYLOAD_BOX_HALF = (SPINE_HALF_X, PAYLOAD_BOX_HALF[1], PAYLOAD_BOX_HALF[2])
     PAYLOAD_POS = (0.0, 0.0, PAYLOAD_POS[2])

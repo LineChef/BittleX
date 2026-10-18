@@ -564,8 +564,8 @@ def test_no_drift_levers_and_k3_exclusion_and_fresh_final(tmp_path, monkeypatch)
 
 
 def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
-    """Real G2 (2026-10-07, case and payload on): 422 g in all and about 45% of the weight over the front paws (41-49.5% after the weighing's 35 g gap). The sim's payload profile
-    must keep that: median total mass and the median front share over several episode resets (the mass and payload are randomised each episode)."""
+    """Real G2 (2026-10-17, pod payload 185 g on the 254 g base: 439 g in all; before that 422 g, 2026-10-07) with about 45% of the weight over the front paws (41-49.5% after the weighing's
+    35 g gap; measured with the old mount, to be re-measured with the pod). The sim's payload profile must keep that: median total mass and the median front share over several episode resets (the mass and payload are randomised each episode)."""
     import subprocess, sys, textwrap
     code = textwrap.dedent('''
         import sys, numpy as np
@@ -604,7 +604,7 @@ def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
     mass, share = map(float, out.stdout.strip().splitlines()[-1].split())
-    assert 410 <= mass <= 435, mass
+    assert 425 <= mass <= 450, mass
     assert 41.0 <= share <= 49.5, share
 
 
@@ -713,3 +713,21 @@ def test_the_level_ceiling_is_1_0_by_default_and_world2_lets_a_level_be_earned_u
     assert [round(lv[c], 3) for c in cats] == [1.2] * 4                                   # a middling score earns nothing
     assert G.env_for()["G2E_LEVEL_MAX"] == "1.25" and G.scoring_env().get("G2E_LEVEL_MAX") is None      # every training run gets the 1.25 ceiling, scoring never sees it
     assert G.WORLD2_CALIBRATION == {"G2E_PAYLOAD_LAYOUT": "spine"}
+
+
+def test_the_pod_payload_is_185_g_and_the_recipe_uses_it():
+    import g2_profile as G
+    import subprocess, sys, textwrap
+    assert G.RECIPE["G2E_PAYLOAD_PROFILE"] == "pod"
+    code = textwrap.dedent('''
+        import sys
+        sys.path.insert(0, ".")
+        import os
+        os.environ["G2E_PAYLOAD_PROFILE"] = "pod"; os.environ["G2E_PAYLOAD_LAYOUT"] = "spine"
+        import opencat_gym_env as E
+        print(E.PAYLOAD_MASS_NOM, E.HEAD_MASS_NOM, E.REAR_MASS_NOM, E.PAYLOAD_BOX_HALF[0], E.PAYLOAD_BOX_HALF[1], E.PAYLOAD_BOX_HALF[2])
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120).stdout.strip().splitlines()[-1].split()
+    spine, cam, spk, hx, hy, hz = map(float, out)
+    assert round(spine + cam + spk, 6) == 0.185           # the weighed payload (2026-10-17); case2 was 0.168
+    assert (hx, hy, hz) == (0.0525, 0.020, 0.019)         # box still case2's until the pod is measured

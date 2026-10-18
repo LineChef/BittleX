@@ -41,7 +41,7 @@ person recognition, on-device detector measurements).
 
 ## `hardware/` — specs + hardware research
 
-See [`hardware/README.md`](hardware/README.md) for the index.
+See [`hardware/README.md`](hardware/README.md) for the index. The case G2 wears is a separate project: [Bittle X platform and Pi add-on](https://beetlebugorg.github.io/bittlex/) (our record: [`../blueprints/mounting.md`](../blueprints/mounting.md)).
 
 ## Hardware build blueprints
 
