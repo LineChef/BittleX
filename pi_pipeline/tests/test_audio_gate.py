@@ -77,7 +77,7 @@ def test_the_serial_link_never_blocks_for_a_beep_it_defers_it_from_a_thread_when
     link._auto_reconnect = False
     link._failed = lambda *a, **k: None
     monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
-    monkeypatch.setattr(SerialLink, "_ease_stand_up", lambda self, c: None)
+    monkeypatch.setattr(SerialLink, "_ease_transition", lambda self, c: None)
     monkeypatch.setattr(SerialLink, "_read_reply", lambda self, d: "")
     link.last_motion_command = ""
     t0 = time.monotonic()

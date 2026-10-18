@@ -17,7 +17,7 @@ The guiding design choice: these are **independent systems**, not one "brain." V
 **On the real robot, extra layers sit around it:**
 
 - a closed-loop trim of the front-left foot that holds the starting heading (the front feet steer G2);
-- an eased stand-up ramp before any walk;
+- an eased stand-up ramp before any walk, and an eased move into every firmware skill;
 - guards for servo heat, jams, falls and battery under load;
 - carpet detection from the IMU, since carpet changes how he slips.
 

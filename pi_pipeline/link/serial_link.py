@@ -13,6 +13,7 @@ import threading
 import time
 
 from . import noise_log  # noqa: E402
+from . import transitions  # noqa: E402
 
 log = logging.getLogger("g2.link")
 
@@ -141,7 +142,7 @@ class SerialLink:
             self._failed(command, "not connected")
             return ""
         try:
-            self._ease_stand_up(command)
+            self._ease_transition(command)
             if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep
                 from ..voice import audio_gate
                 if not _deferred and audio_gate.is_busy():          # speech or another beep is sounding: send this beep a moment later from its own thread. NEVER wait here: the link is shared and a wait starved the walk loop of IMU frames (2026-10-10)
@@ -151,8 +152,9 @@ class SerialLink:
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             self._ser.flush()
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
-            if command[:1] in ("k", "d", "i", "m"):
-                self.last_motion_command = command.strip()      # what the legs were last told to do (a quiet P / gb / gP does not change it)
+            if command[:1] in ("k", "d") or (command[:1] in ("i", "m") and transitions.leg_pairs(command)):
+                self.last_motion_command = command.strip()      # what the legs were last told to do (a quiet P / gb / gP, or a head-only `i0 30` look, does not change it)
+                self._last_motion_t = time.monotonic()
             if settle:
                 time.sleep(settle)
             if read_reply:
@@ -166,39 +168,65 @@ class SerialLink:
             return ""
 
     _ramping = False
+    _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)
 
-    def _ease_stand_up(self, command: str) -> None:
-        """Standing rule (user, 2026-10-10): every stand-up is eased. `kup` / `kbalance` sent while G2 lies at rest (last motion `d`, or nothing yet) are preceded by a ~0.8 s ramp of `i` steps
-        from the rest pose to that skill's pose (gait/standup.py). From any other state the command goes out as it is (a stop / freeze `kbalance` out of a stride must stay immediate)."""
+    def _ease_transition(self, command: str) -> None:
+        """Every move into a firmware skill is eased (user, 2026-10-18; link/transitions.py has the rules). Two steps, each a short ramp of `i` commands:
+        1. the stand-up (standing rule, user, 2026-10-10): a skill that raises him, sent while he lies or sits, is preceded by the ~0.8 s ramp to the balance pose (gait/standup.py);
+        2. the transition: from the pose the link knows to the skill's first frame. `kbalance` / `kup` only ever get step 1, so a stop / freeze out of a stride stays immediate."""
         c = command.strip()
-        # Any firmware skill that is not itself a lying or sitting one stands him up by itself, un-eased, when it starts from lying or sitting (user, 2026-10-10: a gait or turn;
-        # 2026-10-18: every skill, `khi` / `kck` / `kwh` from rest looked rough). So the link stands him up first, eased, and the skill then starts from the balance pose.
-        raises = c.startswith("k") and c not in STAY_DOWN_SKILLS
-        if not raises or self._ramping or self.last_motion_command not in LYING_OR_SITTING:
+        if not c.startswith("k") or self._ramping:
             return
+        self._ramping = True
         try:
-            try:
-                from pi_pipeline.gait import standup
-            except ImportError:                       # scripts run by path (fw_skill_log.py, run_gait.py) have pi_pipeline/ itself on sys.path, not the repo root
-                import importlib.util as _ilu
-                import os as _os
-                _p = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "gait", "standup.py")
-                _spec = _ilu.spec_from_file_location("g2_standup", _p)
-                standup = _ilu.module_from_spec(_spec)
-                _spec.loader.exec_module(standup)
-            secs = standup.ramp_seconds()
+            start = None
+            # Any firmware skill that is not itself a lying or sitting one stands him up by itself, un-eased, when it starts from lying or sitting (user, 2026-10-10: a gait or turn;
+            # 2026-10-18: every skill, `khi` / `kck` / `kwh` from rest looked rough). So the link stands him up first, eased, and the skill then starts from the balance pose.
+            if c not in STAY_DOWN_SKILLS and self.last_motion_command in LYING_OR_SITTING:
+                start = self._stand_up()
+            if c in transitions.STOP_SKILLS:
+                return
+            end = transitions.target(c)
+            if end is None:
+                return
+            if start is None:
+                if transitions.is_stream(self.last_motion_command, self._last_motion_t):
+                    return                                     # a walk or another streamed motion is running: the caller owns it
+                start = transitions.pose_after(self.last_motion_command)
+            if start is None:
+                return                                         # unknown pose (after a firmware gait or a trick): the firmware's own start
+            secs = transitions.ramp_seconds(start, end)
             if secs <= 0:
                 return
-            self._ramping = True
-            start = standup.start_pose(self.last_motion_command) or standup.REST_URDF_DEG
-            for pose in standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs):
-                self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
+            for pose in transitions.ramp_poses(start, end, secs):
+                self._ser.write((transitions.leg_cmd(pose) + "\n").encode("ascii"))
                 self._ser.flush()
-                time.sleep(1.0 / standup.STEPS_PER_S)
+                time.sleep(1.0 / transitions.STEPS_PER_S)
         except Exception as e:  # noqa: BLE001  -- the ramp must never stop the command that follows
-            log.warning("stand-up ramp skipped (%s)", e)
+            log.warning("transition ramp skipped (%s)", e)
         finally:
             self._ramping = False
+
+    def _stand_up(self):
+        """The eased stand-up from lying or sitting to the balance pose. Returns the balance pose (Petoi leg order) if it ran, else None."""
+        try:
+            from pi_pipeline.gait import standup
+        except ImportError:                       # scripts run by path (fw_skill_log.py, run_gait.py) have pi_pipeline/ itself on sys.path, not the repo root
+            import importlib.util as _ilu
+            import os as _os
+            _p = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "gait", "standup.py")
+            _spec = _ilu.spec_from_file_location("g2_standup", _p)
+            standup = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(standup)
+        secs = standup.ramp_seconds()
+        if secs <= 0:
+            return None
+        start = standup.start_pose(self.last_motion_command) or standup.REST_URDF_DEG
+        for pose in standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs):
+            self._ser.write((standup.move_cmd(pose) + "\n").encode("ascii"))
+            self._ser.flush()
+            time.sleep(1.0 / standup.STEPS_PER_S)
+        return list(transitions.BALANCE)
 
     def read_line(self) -> str:
         """Read one non-IMU line the board sent (a reply, a banner). Waits up to

@@ -204,3 +204,97 @@ def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monke
     lk.send("b9 5 16 8", read_reply=False, settle=0.0)                       # a beep or a head move is not a stand-up
     lk.send("m0 30", read_reply=False, settle=0.0)
     assert [w.decode().strip() for w in lk._ser.written] == ["b9 5 16 8", "m0 30"]
+
+
+# ------------------------------------------------------------------ eased transitions into every skill (user, 2026-10-18)
+def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):
+    monkeypatch.setenv("G2_TRANSITION_RAMP_S", "0.8")
+    monkeypatch.setenv("G2_STAND_RAMP_S", stand)
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    lk = _link_with(b"")
+    lk.last_motion_command, lk._last_motion_t = last, last_t
+    lk.send(skill, read_reply=False, settle=0.0)
+    return [w.decode().strip() for w in lk._ser.written]
+
+
+def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
+    from pi_pipeline.link import transitions as tr
+    sent = _ramped(monkeypatch, "kbalance", "khi")
+    assert sent[-1] == "khi" and all(c.startswith("i8 ") for c in sent[:-1])
+    hi = tr.table()["hi"]["first"]
+    assert len(sent) - 1 == 15                                                    # largest joint move 82.5 deg (mirror mean) / 110 deg/s = 0.75 s at 20 steps/s
+    last_pose = [int(x) for x in sent[-2].split()[1::2]]
+    assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
+    assert "i0" not in " ".join(sent)                                             # the head is never moved by the ramp
+
+
+def test_the_ramp_length_follows_the_largest_joint_move(monkeypatch):
+    sent = _ramped(monkeypatch, "kbalance", "kvtL")                               # 8 deg: the 0.25 s minimum
+    assert sent[-1] == "kvtL" and len(sent) - 1 == 5
+    sent = _ramped(monkeypatch, "kbalance", "ktrL")                               # 31 deg -> 0.28 s
+    assert len(sent) - 1 == 6
+    assert _ramped(monkeypatch, "kbalance", "kup") == ["kup"]                      # already there / a stop: as it is
+
+
+def test_from_lying_the_stand_up_runs_first_then_the_transition(monkeypatch):
+    sent = _ramped(monkeypatch, "d", "kwkL", stand="0.2")
+    assert sent[-1] == "kwkL" and len(sent) == 4 + 7 + 1                           # 4 stand-up steps, 37 deg balance -> wkL in 0.34 s, the skill
+
+
+def test_lying_down_and_sitting_from_a_stand_are_eased_too(monkeypatch):
+    from pi_pipeline.link import transitions as tr
+    for skill, pose in (("krest", tr.REST), ("ksit", tr.table()["sit"]["first"])):
+        sent = _ramped(monkeypatch, "kbalance", skill)
+        assert sent[-1] == skill and sent[-2] == tr.leg_cmd(pose) and len(sent) > 5
+
+
+def test_stops_unknown_poses_streams_and_get_ups_are_not_eased(monkeypatch):
+    import time
+    stride = "i8 50 9 50 10 50 11 50 12 0 13 0 14 0 15 0"
+    assert _ramped(monkeypatch, stride, "kbalance") == ["kbalance"]               # a stop / freeze out of a stride
+    assert _ramped(monkeypatch, "kwkF", "khi") == ["khi"]                         # after a firmware gait the legs could be anywhere
+    assert _ramped(monkeypatch, "khi", "ksit") == ["ksit"]                        # after a trick too
+    assert _ramped(monkeypatch, "kwkL", "kwkR") == ["kwkR"]                       # gait to gait
+    assert _ramped(monkeypatch, stride, "khi", last_t=time.monotonic()) == ["khi"]   # a walk is streaming poses: the caller owns the motion
+    assert len(_ramped(monkeypatch, stride, "khi", last_t=time.monotonic() - 2)) > 1  # a held pose is eased from
+    for skill in ("krc", "krl", "kdropRec", "kzero", "kcalib", "kzz"):
+        assert _ramped(monkeypatch, "kbalance", skill) == [skill]
+    assert _ramped(monkeypatch, "kbalance", "d") == ["d"]                         # rest by `d` is also the fall / freeze token
+    monkeypatch.setenv("G2_TRANSITION_RAMP_S", "off")
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    lk = _link_with(b""); lk.last_motion_command = "kbalance"
+    lk.send("khi", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written] == ["khi"]
+
+
+def test_pose_tracking_and_mirroring():
+    from pi_pipeline.link import transitions as tr
+    assert tr.pose_after("d") == tr.REST and tr.pose_after("kbalance") == tr.BALANCE and tr.pose_after("ksit") == tr.table()["sit"]["first"]
+    assert tr.pose_after("kwkF") is None and tr.pose_after("khi") is None and tr.pose_after("i0 30") is None
+    assert tr.pose_after("i8 1 9 2 10 3 11 4 12 5 13 6 14 7 15 8") == [1, 2, 3, 4, 5, 6, 7, 8]
+    wkl = tr.table()["wkL"]["first"]
+    assert tr.target("kwkL") == wkl and tr.target("kwkR") == tr.mirror(wkl)        # L is never mirrored, R is its L mirrored
+    assert tr.target("kbalance") is None and tr.target("knosuch") is None
+
+
+def test_a_head_only_look_does_not_count_as_a_leg_move(monkeypatch):
+    monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
+    lk = _link_with(b"")
+    lk.send("d", read_reply=False, settle=0.0)
+    lk.send("i0 30", read_reply=False, settle=0.0)
+    assert lk.last_motion_command == "d"                                          # still lying: the next skill still gets the stand-up
+
+
+def test_the_skill_frame_table_matches_the_firmware_header():
+    import importlib.util
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    if not (root / "rl_training/opencat-gym/reference_gait/InstinctBittleESP.h").exists():
+        pytest.skip("firmware header not in this checkout")
+    spec = importlib.util.spec_from_file_location("gen_skill_frames", root / "tools/gen_skill_frames.py")
+    gen = importlib.util.module_from_spec(spec); spec.loader.exec_module(gen)
+    assert gen.main(["--check"]) == 0
+    from pi_pipeline.link import transitions as tr
+    from pi_pipeline.gait import standup
+    assert tr.REST == [standup.REST_URDF_DEG[k] for k in (0, 2, 4, 6, 1, 3, 5, 7)] and tr.table()["rest"]["first"] == tr.REST
+    assert tr.table()["sit"]["first"] == [standup.SIT_URDF_DEG[k] for k in (0, 2, 4, 6, 1, 3, 5, 7)]

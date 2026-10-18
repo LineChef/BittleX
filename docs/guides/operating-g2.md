@@ -33,7 +33,7 @@ When G2 sits on the calibration stand, or you are running calibration, `check_se
 | | |
 |---|---|
 | **Power on** | Switch the PiSugar on (the Pi boots and the `g2-voice` service starts the voice loop), and switch the robot's own pack on. Wait for "G2 online" |
-| **Normal movement** | Walks use the eased stand-up (0.8 s ramp); a stop out of a stride is immediate |
+| **Normal movement** | Walks use the eased stand-up (0.8 s ramp), and every move into a firmware skill is eased from the pose G2 is known to be in; a stop out of a stride is immediate |
 | **Sleep** | After about 5 minutes at rest he lies down and sleeps; say "gee two" to wake him. "Go to sleep" does it on request |
 | **Shut down** | Say a short, clear "shut down" (or "power down"): he lies down, announces it, and shuts the Pi down after 6 s (say "cancel" or "wait" to keep it on). **The PiSugar keeps powering the halted Pi, so flip its switch by hand** to cut power. Switch the robot's pack off separately |
 | **Lock movement** | Add a systemd drop-in that swaps `--actuator serial` for `--actuator mock` for `g2-voice`, then reload and restart. Details: [`../STATUS.md`](../STATUS.md) |

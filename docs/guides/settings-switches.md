@@ -52,6 +52,8 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | Switch | Default | What it does |
 |---|---|---|
 | `G2_STAND_RAMP_S` | 0.8 | the eased stand-up (`off` / 0 = the old single jump; tests turn it off) |
+| `G2_TRANSITION_RAMP_S` | 0.8 | the longest eased move into a firmware skill's first frame (`link/transitions.py`; shorter moves take less, at least 0.25 s; `off` / 0 = the firmware's own jump; tests turn it off) |
+| `G2_WALK_RAMP_S` | 0 | opt-in speed ramp-in at the start of a policy walk, in seconds (the sim check showed no gain) |
 | `G2_FOOT_TRIM` | policy default | `off` disables the foot trim (V6 default `fl=-0.3`) |
 | `G2_ANNOUNCE_ONLINE` | on | `off` silences "G2 online." |
 
