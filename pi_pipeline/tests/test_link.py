@@ -161,7 +161,7 @@ def test_a_firmware_walk_or_turn_started_from_sit_or_rest_is_eased_but_one_from_
     lk.last_motion_command = "ksit"                                       # he was sitting (the idle posture): the old start jerked into the gait un-eased (2026-10-10)
     lk.send("kwkL", read_reply=False, settle=0.0)
     sent = [w.decode().strip() for w in lk._ser.written]
-    assert sent[-1] == "kwkL" and len(sent) == 29 and all(c.startswith("i") for c in sent[:-1])           # 28 steps: the slower ramp up from a sit
+    assert sent[-1] == "kwkL" and len(sent) == 33 and all(c.startswith("i") for c in sent[:-1])           # 16 steps down to rest, 16 up
     assert standup.start_pose("ksit") == standup.SIT_URDF_DEG
     lk._ser.written.clear()
     lk.last_motion_command = "d"
@@ -183,7 +183,7 @@ def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(mon
             lk.last_motion_command = last
             lk.send(skill, read_reply=False, settle=0.0)
             sent = [w.decode().strip() for w in lk._ser.written]
-            assert sent[-1] == skill and len(sent) == (29 if last == "ksit" else 5) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
+            assert sent[-1] == skill and len(sent) == (33 if last == "ksit" else 5) and all(c.startswith("i") for c in sent[:-1]), (last, skill, len(sent))
 
 
 def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monkeypatch):
@@ -360,19 +360,15 @@ def test_stage_2_eases_from_the_measured_pose_after_a_trick_only_when_switched_o
     assert run("kwkF", "kbalance") == ["kbalance"]                               # a stop stays immediate
 
 
-def test_standing_up_from_a_sit_is_slower_than_from_rest(monkeypatch):
-    """2026-10-18: the 0.8 s ramp from a sit peaked at 140 deg/s with weight on the back legs; they skipped and jittered and G2 fell."""
+def test_standing_up_from_a_sit_goes_down_to_rest_first(monkeypatch):
+    """2026-10-18: rising straight from a sit made the back legs skip and jitter and G2 fell forward (0.8 s and 1.4 s ramps both); the stand from rest is clean."""
     from pi_pipeline.gait import standup
     monkeypatch.setenv("G2_STAND_RAMP_S", "0.8")
     monkeypatch.setenv("G2_TRANSITION_RAMP_S", "off")
     monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
-    counts = {}
-    for last in ("d", "ksit"):
-        lk = _link_with(b"")
-        lk.last_motion_command = last
-        lk.send("kbalance", read_reply=False, settle=0.0)
-        counts[last] = len(lk._ser.written) - 1
-    assert counts["d"] == 16 and counts["ksit"] == 28                       # 0.8 s from rest (as tuned); 75 deg x 1.5 / 80 = 1.4 s from a sit
-    sit_ramp = standup.ramp_poses(standup.SIT_URDF_DEG, standup.BALANCE_URDF_DEG, 1.4)
-    steps = [max(abs(a - b) for a, b in zip(x, y)) * standup.STEPS_PER_S for x, y in zip(sit_ramp, sit_ramp[1:])]
-    assert max(steps) <= 85
+    lk = _link_with(b"")
+    lk.last_motion_command = "ksit"
+    lk.send("kbalance", read_reply=False, settle=0.0)
+    sent = [w.decode().strip() for w in lk._ser.written]
+    assert len(sent) == 16 + 16 + 1 and sent[-1] == "kbalance"                 # 0.8 s down to rest, 0.8 s up from rest, the skill
+    assert sent[15] == standup.move_cmd(standup.REST_URDF_DEG)                  # the first ramp ends exactly on the rest pose

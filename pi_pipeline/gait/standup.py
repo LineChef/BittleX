@@ -30,13 +30,7 @@ def ramp_seconds() -> float:
         return DEFAULT_RAMP_S
 
 
-LOADED_PEAK_DEG_S = 80.0     # the fastest a joint may move in a ramp that starts with weight on the legs (from a sit): 2026-10-18 the 0.8 s ramp from a sit peaked at 140 deg/s, at the servos' limit, and the back legs skipped and jittered under G2 until he fell
-
-
-def loaded_ramp_seconds(start, end, base_seconds):
-    """`base_seconds`, or longer if the S-curve between `start` and `end` would peak above LOADED_PEAK_DEG_S (the S-curve's peak speed is 1.5 x the move / duration)."""
-    delta = max(abs(a - b) for a, b in zip(start, end))
-    return max(base_seconds, 1.5 * delta / LOADED_PEAK_DEG_S)
+SIT_TO_REST_S = 0.8          # a stand-up that starts from a sit first eases down to rest this long (SerialLink._stand_up), then stands up from rest
 
 
 def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S):
