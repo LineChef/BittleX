@@ -6,11 +6,11 @@ def test_reply_splits_into_speech_actions_facts(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(
         Block("text", text="Hi Sam!"),
         Block("tool_use", name="remember", id="r1", input={"fact": "Their name is Sam."}),
-        Block("tool_use", name="perform_skill", id="s1", input={"skill": "wave"}),
+        Block("tool_use", name="perform_skill", id="s1", input={"skill": "nod"}),
     ))
     turn = Conversation(cfg).send("hi, I'm Sam")
     assert turn.speech == "Hi Sam!"
-    assert turn.actions == ["wave"]
+    assert turn.actions == ["nod"]
     assert turn.facts == ["Their name is Sam."]
 
 
@@ -125,10 +125,10 @@ def test_perform_skill_seconds_are_carried_and_clamped(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(
         Block("tool_use", name="perform_skill", id="a", input={"skill": "walk_forward", "seconds": 8}),
         Block("tool_use", name="perform_skill", id="b", input={"skill": "walk_forward", "seconds": 9999}),
-        Block("tool_use", name="perform_skill", id="c", input={"skill": "wave"}),
+        Block("tool_use", name="perform_skill", id="c", input={"skill": "nod"}),
     ))
     turn = Conversation(cfg).send("walk for eight seconds")
-    assert turn.actions == ["walk_forward", "walk_forward", "wave"]
+    assert turn.actions == ["walk_forward", "walk_forward", "nod"]
     assert turn.action_seconds == [8.0, 60.0, None]
 
 

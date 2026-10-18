@@ -85,9 +85,9 @@ def test_tools_translate_to_function_format():
 
 
 def test_response_parsing_handles_text_and_tool_calls_and_bad_json():
-    _, data = _reply("hi", [("c1", "perform_skill", {"skill": "wave"})])
+    _, data = _reply("hi", [("c1", "perform_skill", {"skill": "nod"})])
     r = llm.parse_openai_response(data)
-    assert [b.type for b in r.content] == ["text", "tool_use"] and r.content[1].input == {"skill": "wave"}
+    assert [b.type for b in r.content] == ["text", "tool_use"] and r.content[1].input == {"skill": "nod"}
     bad = {"choices": [{"message": {"tool_calls": [{"id": "x", "function": {"name": "remember", "arguments": "{oops"}}]}}]}
     assert llm.parse_openai_response(bad).content[0].input == {}
 

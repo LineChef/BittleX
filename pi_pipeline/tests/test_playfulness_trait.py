@@ -53,8 +53,8 @@ def test_cues():
     assert "play_bow" in Playfulness(0.6).cues("greet")
     assert "excited_hop" in Playfulness(0.6).cues("greet")
     assert Playfulness(0.3).cues("greet") == ["play_bow", "chirp_happy"]   # no hop at low
-    assert Playfulness(0.6).cues("recognize") == ["excited_hop", "wave"]
-    assert Playfulness(0.3).cues("recognize") == ["wave"]
+    assert Playfulness(0.6).cues("recognize") == ["excited_hop", "play_bow"]
+    assert Playfulness(0.3).cues("recognize") == ["play_bow"]
     assert Playfulness(0.3).cues("novelty") == ["sit_shift"]
     assert Playfulness(0.05).cues("greet") == []
 

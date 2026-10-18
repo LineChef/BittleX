@@ -226,12 +226,12 @@ def test_narration_level_sets_hint_not_claude():
 def test_loop_passes_seconds_to_the_actuator():
     lp, w, stt, conv, tts = _loop(["walk for eight seconds and then wave at me", ""])     # (a bare "walk for N seconds" is a local command since 2026-10-09)
     conv.send = lambda text, memory_context=None: types.SimpleNamespace(
-        speech="", actions=["walk_forward", "wave"], facts=[], action_seconds=[8.0, None])
+        speech="", actions=["walk_forward", "nod"], facts=[], action_seconds=[8.0, None])
     calls = []
     lp._act = types.SimpleNamespace(
         perform=lambda skill, seconds=None: calls.append((skill, seconds)), stop=lambda: None)
     _run(lp, 2)
-    assert calls == [("walk_forward", 8.0), ("wave", None)]
+    assert calls == [("walk_forward", 8.0), ("nod", None)]
 
 
 def test_wake_word_triggers_the_api_warm_up_once_per_session():

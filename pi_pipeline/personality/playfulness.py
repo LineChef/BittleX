@@ -70,7 +70,7 @@ class Playfulness(Trait):
                 c.append("excited_hop")
             return c
         if event == "recognize":                     # a bonded face after an absence
-            return ["excited_hop", "wave"] if lv >= 0.5 else ["wave"]
+            return ["excited_hop", "play_bow"] if lv >= 0.5 else ["play_bow"]
         if event == "novelty":
             return ["sit_shift", "chirp_happy"] if lv >= 0.6 else ["sit_shift"]
         if event == "explore_start":

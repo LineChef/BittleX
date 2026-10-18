@@ -53,7 +53,7 @@ GESTURE_TOKEN = {
 
 _HEAD_GESTURES = (Gesture.NOD, Gesture.SNIFF)      # gestures that are head moves: off while no head is connected (G2_HEAD=1 turns them back on)
 _IDLE_SET = (Gesture.STRETCH, Gesture.SCRATCH, Gesture.SNIFF, Gesture.NOD, Gesture.SIT_SHIFT)
-_GREETING_SET = (Gesture.WAVE, Gesture.SHAKE_PAW, Gesture.PLAY_BOW)
+_GREETING_SET = (Gesture.SHAKE_PAW, Gesture.PLAY_BOW)       # no WAVE (`khi`): it flipped G2 on the pod payload (owner, 2026-10-18)
 
 
 @dataclass

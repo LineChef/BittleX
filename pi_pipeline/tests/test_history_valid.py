@@ -43,7 +43,7 @@ def check(messages, pending=()):
         assert a["role"] != b["role"], "two consecutive messages with the same role"
 
 
-TOOLS = [("perform_skill", {"skill": "wave"}), ("perform_skill", {"skill": "sit"}), ("remember", {"fact": "They like jazz.", "importance": 4}),
+TOOLS = [("perform_skill", {"skill": "nod"}), ("perform_skill", {"skill": "sit"}), ("remember", {"fact": "They like jazz.", "importance": 4}),
          ("remember", {"fact": ""}), ("await_reply", {}), ("diagnostics_query", {"topic": "status"}),
          ("memory_used", {"notes": ["#1"]}), ("perform_skill", {"skill": "backflip"}), ("some_unknown_tool", {"x": 1})]
 PROMPTS = ["hi", "what do you see", "tell me about my dog", "walk forward", "remember that I like tea", "do you remember what I like?", "sit"]
@@ -108,7 +108,7 @@ def test_an_empty_reply_is_stored_as_a_placeholder_never_as_an_empty_message(cfg
 
 def test_trimming_never_leaves_a_tool_result_without_its_tool_use(cfg, fake_anthropic):
     c = dataclasses.replace(cfg, history_turns=2)
-    replies = iter([Resp(Block("tool_use", name="perform_skill", id=f"s{i}", input={"skill": "wave"}), stop_reason="tool_use")
+    replies = iter([Resp(Block("tool_use", name="perform_skill", id=f"s{i}", input={"skill": "nod"}), stop_reason="tool_use")
                     for i in range(8)])
     fake_anthropic.set_reply(lambda: next(replies))
     conv = Conversation(c)

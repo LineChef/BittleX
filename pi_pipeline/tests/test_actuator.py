@@ -26,8 +26,8 @@ def test_make_actuator_serial_passes_the_shared_link_through():
     lk = FakeLink()
     act = make_actuator("serial", port="ignored", baud=0, link=lk)
     assert isinstance(act, SerialActuator)
-    act.perform("wave")
-    assert lk.sent == ["khi"]
+    act.perform("nod")
+    assert lk.sent == ["knd"]
 
 
 def test_make_actuator_mock_ignores_link():

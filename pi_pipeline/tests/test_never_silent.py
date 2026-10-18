@@ -137,9 +137,9 @@ def test_a_question_answered_with_only_a_move_gets_the_words_only_retry(cfg, fak
 
 
 def test_a_command_answered_with_a_move_is_left_alone(cfg, fake_anthropic):
-    sequence(fake_anthropic, move_only("wave"))
+    sequence(fake_anthropic, move_only("nod"))
     turn = Conversation(cfg).send("wave hello")
-    assert turn.actions == ["wave"] and len(fake_anthropic.calls) == 1
+    assert turn.actions == ["nod"] and len(fake_anthropic.calls) == 1
 
 
 def test_question_detection():
