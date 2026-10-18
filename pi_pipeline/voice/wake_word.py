@@ -145,7 +145,13 @@ class VoskWakeWord:
             heard = heard.lower()
             hit = next((p for p in self._phrases if p in heard), None)
             if hit:
-                log.info("wake word heard (%r)", hit)
+                try:                                    # for telling a real call from noise afterwards: how loud the block was, the whole text Kaldi heard, and how long since G2 last made a sound
+                    import numpy as np
+                    level = float(np.sqrt(np.mean(np.frombuffer(data, dtype=np.int16).astype(np.float32) ** 2)))
+                except Exception:  # noqa: BLE001
+                    level = -1.0
+                log.info("wake word heard (%r) text=%r level=%.0f since_own_sound=%.1fs", hit, heard, level,
+                         time.monotonic() - last_speaking if last_speaking else -1.0)
                 self._handover = True                  # keep listening on this stream; the recogniser picks it up
                 return
 
