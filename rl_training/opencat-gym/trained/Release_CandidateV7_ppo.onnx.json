@@ -1,0 +1,11 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "pod_s4_ppo",
+ "exported": "2026-10-18",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ],
+ "payload_profile": "pod"
+}

@@ -6,7 +6,13 @@
   },
   "head": {
     "payload_profile": "pod",
-    "current": null,
+    "current": {
+      "policy": "Release_CandidateV7_ppo.onnx",
+      "trim": null,
+      "payload_profile": "pod",
+      "saved": "2026-10-18",
+      "note": "V6 recipe retrained from scratch on the pod + AI head payload (20M, final weights picked); promoted without the benchmark rule at the user's instruction"
+    },
     "history": []
   },
   "arm": {

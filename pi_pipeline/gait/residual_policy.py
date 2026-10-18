@@ -57,7 +57,7 @@ RESIDUAL_SCALE_DEG = 22          # LEGACY default: run20m_ppo's scale. Newer pol
                                  # own in a sidecar `<policy>.onnx.json` (export_onnx.py writes it);
                                  # see residual_scale_for(). A mismatch silently applies every
                                  # correction at the wrong size.
-DEFAULT_POLICY = "Release_CandidateV6_ppo.onnx"  # the deployed policy: V6 (V6 chain layer 1, heading-blind, 20M (promoted by the user, 2026-10-09)), set 2026-10-09; the previous release (Release_CandidateV4_ppo.onnx), V3 and V2.1 stay on the Pi as fallbacks; promoting a new one changes this line
+DEFAULT_POLICY = "Release_CandidateV7_ppo.onnx"  # the deployed policy: V7 (V6 recipe retrained from scratch on the pod + AI head payload (20M, final weights picked); promoted without the benchmark rule at the user's instruction), set 2026-10-18; the previous release (Release_CandidateV6_ppo.onnx), V4, V3 and V2.1 stay on the Pi as fallbacks; promoting a new one changes this line
 STAND_FWD_THRESH = 0.025
 ANG_FACTOR = 0.10
 LEN_JOINT_HISTORY = 30

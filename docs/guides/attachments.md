@@ -37,7 +37,7 @@ At start-up the fitted attachment's `current` runs. It is skipped when its file 
 Saving a gait:
 
 - **Promotion:** `promote_release.py --candidate trained/X.onnx --name V7 --attachment head --payload-profile pod [--trim fl=-0.3]` copies the release, points `DEFAULT_POLICY` at it as before, writes the payload into the release sidecar, and saves it as the attachment's current gait (the previous one moves to the history). It commits the profile file with the release.
-- **By hand:** `g2attach save head Release_CandidateV7_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
+- **By hand:** `g2attach save head Release_Candidate<name>_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
 - **Exports:** a new export records its payload with `export_onnx.py --sidecar-extra '{"payload_profile": "pod"}'`.
 
 `tools/g2_deploy_when_online.sh` sends every policy a saved gait names, as well as `DEFAULT_POLICY`, so a swap never needs a new deploy.
