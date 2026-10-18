@@ -25,7 +25,7 @@ import re
 import subprocess
 import sys
 
-SKIP_DIRS = {".git", ".venv", "node_modules", ".pytest_cache", "__pycache__", "trained"}
+SKIP_DIRS = {".git", ".venv", "node_modules", ".pytest_cache", "__pycache__", "trained", "build"}  # build/ = local docs-bundle output
 # pages that must not carry hard-coded counts / the current policy name (everything else is a log, a record, or generated)
 VOLATILE_FREE = ("README.md", "docs/README.md", "docs/STATUS.md", "docs/capabilities.md", "docs/how-it-works.md",
                  "docs/project-plan.md", "docs/backlog.md", "docs/guides/", "docs/hardware/", "pi_pipeline/")
