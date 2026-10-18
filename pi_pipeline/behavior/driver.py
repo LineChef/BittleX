@@ -527,6 +527,10 @@ class BehaviorDriver:
     WALL_STOP_IN = 12.0          # any wall this close (or closer) is acted on from a single look
     STEER_KEEP_SIDE_S = 3.0      # a hit this soon after a turn-away's hold ends still turns around toward the turn-away's side
 
+    def picture_choreo(self) -> str:
+        """The running choreography's label if it takes a picture ("survey", "naming"), else "" (the interest watch pauses its peeks meanwhile)."""
+        return self._choreo.label if self._choreo.busy and self._choreo.label in ("survey", "naming") else ""
+
     def _survey_shot(self, now: float, *, good_moment: bool) -> str | None:
         """Whether a survey stop starts now, and the kind of its picture. The four milestone pictures (25, 50, 75 and 99 percent of the roam) come first: at a good moment
         (a finished wall turn, the end of a leg), or after waiting `Survey.MILESTONE_WAIT_S` for one, wherever he is. Otherwise the usual cooldown and gate decide ("after_bow")."""

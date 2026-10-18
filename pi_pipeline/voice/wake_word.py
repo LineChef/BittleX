@@ -49,6 +49,20 @@ def _parse_phrases(phrase: str | list[str]) -> list[str]:
 _SELF_HEARING_TAIL_S = 0.8                # the speaker's echo lingers a moment after the speech ends
 
 
+def _log_trigger(hit, heard, data, conf, last_speaking, *, ignored) -> None:
+    """One line in the wake-trigger log (voice/wake_log.py). Never raises."""
+    try:
+        import numpy as np
+        level = float(np.sqrt(np.mean(np.frombuffer(data, dtype=np.int16).astype(np.float32) ** 2)))
+    except Exception:  # noqa: BLE001
+        level = None
+    try:
+        from . import wake_log
+        wake_log.record_trigger(hit, heard, level=level, confidence=conf, since_own_sound_s=time.monotonic() - last_speaking if last_speaking else None, ignored=ignored)
+    except Exception:  # noqa: BLE001
+        log.debug("wake log failed", exc_info=True)
+
+
 def min_confidence() -> float:
     """`G2_WAKE_MIN_CONF`: a wake phrase whose words Kaldi is less sure of than this is ignored (0 = off, the default until a day of logged
     triggers shows where real calls and background talk separate; 2026-10-18: 4 of 7 triggers were people talking nearby, and loudness did not
@@ -186,6 +200,7 @@ class VoskWakeWord:
                 floor = min_confidence()
                 if floor and (conf is None or conf < floor):
                     log.info("wake word ignored (%r, confidence %s < %.2f) text=%r", hit, "?" if conf is None else f"{conf:.2f}", floor, heard)
+                    _log_trigger(hit, heard, data, conf, last_speaking, ignored=True)
                     rec = self._new_recognizer()
                     continue
                 try:                                    # for telling a real call from noise afterwards: how loud the block was, the whole text Kaldi heard, and how long since G2 last made a sound
@@ -195,6 +210,7 @@ class VoskWakeWord:
                     level = -1.0
                 log.info("wake word heard (%r) text=%r level=%.0f confidence=%s since_own_sound=%.1fs", hit, heard, level,
                          "?" if conf is None else f"{conf:.2f}", time.monotonic() - last_speaking if last_speaking else -1.0)
+                _log_trigger(hit, heard, data, conf, last_speaking, ignored=False)
                 self._handover = True                  # keep listening on this stream; the recogniser picks it up
                 return
 

@@ -109,6 +109,12 @@ def _one_frame_per_survey_picture(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_wake_log(monkeypatch):
+    """Tests never write into the real wake-trigger log (its own tests point it at a temp file)."""
+    monkeypatch.setenv("G2_WAKE_LOG", "off")
+
+
+@pytest.fixture(autouse=True)
 def _no_detection_log(monkeypatch):
     """Tests never write detection logs into the real ~/g2_runs/detections."""
     monkeypatch.setenv("G2_DETECTION_LOG", "off")

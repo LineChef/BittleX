@@ -270,6 +270,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         volt_chk = LoadVoltageCheck(lambda c: _send(lk, c), getattr(lk, "pop_other", lambda: []),
                                     BatteryMonitor(_lo, _cr, confirm=2, hysteresis_v=0.15, repeat_s=60.0), every_s=volt_every_s,
                                     on_reading=(lambda v: (last_volt.__setitem__(0, v), diag.event("gait", "INFO", "battery.load", volts=round(v, 2)) if diag is not None else None)))
+    tick = {"n": 0, "late": 0, "worst": 0.0, "prev": None}      # tick-to-tick timing, written to the run log (2026-10-18: 32% late in exploration, almost all on the send tick)
     try:
         i = 0
         try:
@@ -475,6 +476,13 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 time.sleep(slack)
             else:
                 t_next = time.perf_counter()     # fell behind; resync
+            _now = time.perf_counter()
+            if tick["prev"] is not None:
+                gap = _now - tick["prev"]
+                tick["n"] += 1
+                tick["late"] += gap > dt * 1.5
+                tick["worst"] = max(tick["worst"], gap)
+            tick["prev"] = _now
             i += 1
         else:
             end_reason[0] = "complete"       # the loop ran its full length without a break
@@ -510,12 +518,15 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             logf.close()
             print(f"log written: {log_path}")
         if autolog_run is not None:
-            autolog_run.finish(end_reason[0], last_volt_v=None if last_volt[0] != last_volt[0] else round(last_volt[0], 2))
+            autolog_run.finish(end_reason[0], last_volt_v=None if last_volt[0] != last_volt[0] else round(last_volt[0], 2),
+                               late_ticks_pct=round(100.0 * tick["late"] / tick["n"], 1) if tick["n"] else None, worst_tick_gap_ms=round(tick["worst"] * 1000, 1) if tick["n"] else None)
         if diag is not None and not in_service:
             diag.close()
     if lat:
         a = np.array(lat) * 1e3
         print(f"policy step: {a.mean():.2f} ms mean, {a.max():.2f} ms max ({len(lat)} ticks)")
+    if tick["n"]:
+        print(f"tick timing: {100.0 * tick['late'] / tick['n']:.1f}% of ticks over {dt * 1500:.1f} ms, worst gap {tick['worst'] * 1000:.0f} ms")
     print("sent rest.")
     return end_reason[0]            # complete / stopped / fall / imu_stale / battery_critical / interrupted / error / other
 

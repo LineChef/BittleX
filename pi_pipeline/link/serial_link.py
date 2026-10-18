@@ -171,7 +171,10 @@ class SerialLink:
                     return ""
                 audio_gate.note_beep(audio_gate.beep_seconds(command))
             self._ser.write((command + "\n").encode("ascii", "ignore"))
-            self._ser.flush()
+            if read_reply or settle:
+                self._ser.flush()                  # wait until it is on the wire (a reply or a settle follows)
+            # fire-and-forget (the walk loop's joint commands): no flush. On the Pi's UART flush() is tcdrain, which blocked every send tick ~5 ms and made
+            # 30% of walk ticks late (2026-10-18, almost all on the send tick); the kernel sends the bytes in order anyway.
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it

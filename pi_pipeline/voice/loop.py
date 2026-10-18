@@ -397,6 +397,18 @@ class VoiceLoop:
             log.info("character mode %s OFF", cc.name)
             self._speak(f"Okay, {cc.name} mode off.")
 
+    _wake_outcome = None
+
+    def _log_wake_outcome(self, result: str) -> None:
+        """What became of the turn after a wake word, for the false-trigger count (voice/wake_log.py). Never raises."""
+        heard, peak = self._wake_outcome or ("", None)
+        self._wake_outcome = None
+        try:
+            from . import wake_log
+            wake_log.record_outcome(heard, result, mic_peak=peak)
+        except Exception:  # noqa: BLE001
+            log.debug("wake log failed", exc_info=True)
+
     def _is_side_chatter(self, text: str, woke: bool) -> bool:
         """True when a turn that is not a local command should not reach Claude: told it was for someone else, or (taken without the
         wake word) too long to be a request to a robot. A turn that followed the wake word is never dropped for length."""
@@ -440,7 +452,11 @@ class VoiceLoop:
         if info:
             log.info("command window: %s", info)          # mic peak, blocks read, the last partial transcripts: tells a deaf mic from a missed phrase
 
+        if woke:
+            self._wake_outcome = (user_text, (info or {}).get("mic_peak") if isinstance(info, dict) else None)
         if not user_text:
+            if woke:
+                self._log_wake_outcome("empty")
             if self._in_session:
                 log.info("%s elapsed -- wake word needed again", "conversation window" if self._conversing else "follow-up window")
                 self._cue.set("closed")          # the window ended: he has stopped listening
@@ -479,6 +495,13 @@ class VoiceLoop:
             # misheard command obvious so you can say "resume" / "never mind".
             self._events(ack=True)
             self._cue.set("heard")
+
+        if woke and cmd is not None:
+            self._log_wake_outcome("command")
+        elif woke and addressed_elsewhere(user_text):
+            self._log_wake_outcome("ignored")
+        elif woke:
+            self._log_wake_outcome("request")
 
         if cmd == "end_converse" and not self._conversing:
             cmd = None                                      # "that's all" outside conversation mode is just a sentence for Claude

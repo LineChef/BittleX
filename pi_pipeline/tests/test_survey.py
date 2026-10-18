@@ -546,3 +546,15 @@ def test_the_extra_frames_stop_at_the_first_one_the_camera_misses(tmp_path):
     finally:
         _t.sleep = real
     assert asked == [None, 3.0]                                     # the second extra frame is never asked for
+
+
+def test_peeks_can_see_when_a_survey_picture_is_being_taken():
+    d, c = mk()
+    d.tick(DriverInputs(arm_explore=True, frame=[]))
+    assert d.picture_choreo() == ""
+    leg_done(d)
+    d.tick(DriverInputs(frame=[]))
+    assert d.picture_choreo() == "survey"
+    walking(d)
+    run_for(d, c, 30)
+    assert d.picture_choreo() == ""

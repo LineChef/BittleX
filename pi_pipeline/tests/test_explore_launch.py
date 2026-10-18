@@ -91,3 +91,10 @@ def test_the_slow_start_up_loads_run_in_the_background_and_the_hand_over_does_no
     src = inspect.getsource(E.main)
     assert "prefetch.submit(_load_tts)" in src and "tts_future.result()" in src and "prefetch.submit(_load_vosk)" in src
     assert "threading.Timer(0.3, lambda: launch(" in inspect.getsource(V)
+
+
+def test_exploration_detects_at_the_picture_capture_option():
+    """2026-10-18: switching the camera between 480 (detection) and 240 (pictures) for every picture made it stop answering."""
+    from pi_pipeline import explore_launch
+    cmd = explore_launch.command(180)
+    assert "VISION_SENSOR_OPT=0" in cmd

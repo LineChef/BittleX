@@ -428,3 +428,14 @@ def test_firmware_balance_goes_off_before_an_eased_posture_but_not_before_a_gait
     sent = _ramped(monkeypatch, "kbalance", "kwkL")                                 # a gait is tuned with balance on: the caller turns it on and the link leaves it alone
     assert "gb" not in sent and sent[-1] == "kwkL"
     assert "gb" not in _ramped(monkeypatch, "kbalance", "kbalance")
+
+
+def test_streamed_sends_do_not_wait_for_the_bytes_to_drain():
+    """2026-10-18: flush() (tcdrain on the Pi's UART) after every walk command made 30% of walk ticks late, almost all on the send tick."""
+    lk = _link_with(b"")
+    flushes = []
+    lk._ser.flush = lambda: flushes.append(1)
+    lk.send("i8 30 9 30 10 30 11 30 12 30 13 30 14 30 15 30", read_reply=False, settle=0.0)
+    assert flushes == []
+    lk.send("P", read_reply=True, settle=0.0)                     # a reply follows: wait until it is on the wire
+    assert flushes == [1]

@@ -72,7 +72,7 @@ def _start_interest(survey, saver, vision, rt, settings, args):
     saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
     watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "8")),     # the wall look rides the peek: every 3 s while the wall steers him
                           fallback_s=float(os.environ.get("G2_INTEREST_FALLBACK_S", "300")),
-                          active=lambda: rt.driver.mode.mode is Mode.EXPLORE).start()
+                          active=lambda: rt.driver.mode.mode is Mode.EXPLORE and rt.driver.picture_choreo() == "").start()     # no peeks while a survey or naming picture is being taken: they crowded the camera (2026-10-18)
     seen_near = {"t": -1e9}                                               # when a wall was last seen NEAR_LOOK_IN (30 in) or closer (set by the wall look below)
 
     relax_s = float(os.environ.get("G2_SURVEY_RELAX_S", "60"))             # 2026-10-18: after this long with no picture the near-wall and interest requirements are lifted (a tight room never opened the gate); 0 = never

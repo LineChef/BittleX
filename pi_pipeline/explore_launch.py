@@ -14,6 +14,10 @@ import sys
 log = logging.getLogger("g2.explore_launch")
 
 UNIT = "g2-explore"
+# Exploration detects at the picture capture option (240 x 240), so a picture needs no capture-mode switch: with detection at 480 every picture switched the camera
+# twice (about 0.8 s each plus settle frames), peeks every few seconds kept it switching, and on 2026-10-18 it stopped answering for 6 s at a time (pictures 43-58 s,
+# two milestone pictures lost, contact pictures 7-9 s). The detector's model input is 192 px either way.
+EXPLORE_SENSOR_OPT = 0
 FEATURES = "+vision,+vision_perception,+vision_safety,+explore,-avoidance_act,-object_gallery"
 
 
@@ -26,7 +30,7 @@ def command(roam_s: float = 600.0, *, python: str | None = None, workdir: str | 
             # however the session ends (a stop, a crash, a kill) lay G2 down before the voice service starts again: a crash left his last firmware turn running and he walked in circles (2026-10-10)
             "-p", f"ExecStopPost=+/bin/sh -c '{python} -m pi_pipeline.link.check_serial send d >/dev/null 2>&1; true'",
             "-p", "ExecStopPost=+/bin/systemctl --no-block start g2-voice",
-            "-E", f"G2_FEATURES={FEATURES}", "-E", "G2_LOG_HEARD=1",
+            "-E", f"G2_FEATURES={FEATURES}", "-E", "G2_LOG_HEARD=1", "-E", f"VISION_SENSOR_OPT={EXPLORE_SENSOR_OPT}",
             python, "-m", "pi_pipeline.explore_session", "--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(int(roam_s))]
 
 
