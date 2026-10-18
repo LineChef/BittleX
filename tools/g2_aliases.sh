@@ -215,9 +215,9 @@ g2visioneval() {
 }
 
 
-# g2watchrun [--realtime]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of
-#   its own, not an approximation; it joins wherever the run is). Default = follow live at training speed (about 4-5x real time); --realtime = each episode at real
-#   speed, then the newest. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal for the window. Costs the run nothing when closed.
+# g2watchrun [--fast]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of
+#   its own, not an approximation; it joins wherever the run is). Default = each episode at real speed, then the newest; --fast = follow live at training speed
+#   (about 4-5x real time). Drag or scroll to change the view: it is kept. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal for the window. Costs the run nothing when closed.
 g2watchrun() {
   ( cd "$G2_ROOT/rl_training/opencat-gym" && "$G2_ROOT/.venv/bin/python" watch_live.py "$@" )
 }

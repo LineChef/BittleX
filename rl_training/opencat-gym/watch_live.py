@@ -42,10 +42,14 @@ def touch():
         os.utime(REQ, None)
 
 
-def build(p, scene):
-    """Rebuild the episode's scene as it was at its reset; returns (robot id, {streamed body id: our body id})."""
-    p.resetSimulation()
-    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
+def build(p, scene, rid=None, old_ids=None):
+    """Rebuild the episode's scene as it was at its reset; returns (robot id, {streamed body id: our body id}). Only the previous episode's scene bodies are removed and
+    the robot is kept (2026-10-18: a full resetSimulation per episode blanked the window every few seconds and threw the camera back to its far default view)."""
+    for bid in (old_ids or {}).values():
+        try:
+            p.removeBody(bid)
+        except p.error:
+            pass
     import pybullet_data
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     ids = {}
@@ -77,8 +81,8 @@ def build(p, scene):
                 pass
             ids[b["id"]] = bid
             break
-    rid = p.loadURDF(os.path.join(HERE, "models", "bittle_esp32.urdf"), [0, 0, 0.1], useFixedBase=False)
-    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+    if rid is None:
+        rid = p.loadURDF(os.path.join(HERE, "models", "bittle_esp32.urdf"), [0, 0, 0.1], useFixedBase=False)
     return rid, ids
 
 
@@ -180,7 +184,7 @@ def main():
                     shown_stale = scene["ep"]
                 try:
                     nf = open(os.path.join(LIVE, scene["frames"]))     # the run deletes an episode's frames when the next one starts: it can be gone already
-                    nrid, nids = build(p, scene)
+                    nrid, nids = build(p, scene, rid, ids)
                 except (OSError, KeyError, ValueError, p.error) as e:
                     print(f"skipping an episode that is already over ({type(e).__name__}); waiting for the next one", flush=True)
                     scene_m = None
@@ -192,7 +196,12 @@ def main():
                 ep, jids, rid, ids, f = scene["ep"], scene["joint_ids"], nrid, nids, nf
                 q.clear()
                 t0, end_t, last_k = 0.0, 0.0, time.time()
-                labels, banner = [], None
+                for item in labels + ([banner] if banner is not None else []):
+                    p.removeUserDebugItem(item)
+                # the overlay is pinned to G2 once per episode and rides with him (redrawing it every frame made it flicker)
+                labels = [p.addUserDebugText(line, [0, 0, 0.16 - 0.02 * n], textSize=1.0 if n else 1.3, textColorRGB=[0.05, 0.05, 0.05], parentObjectUniqueId=rid)
+                          for n, line in enumerate(describe(scene))]
+                banner = None
                 print(("(replay of the last recorded episode) " if scene["ep"] == shown_stale else "") + " | ".join(describe(scene)), flush=True)
                 continue
             if f is None:
@@ -229,20 +238,18 @@ def main():
             for k, v in fr.get("m", {}).items():
                 if int(k) in ids:
                     p.resetBasePositionAndOrientation(ids[int(k)], v[:3], v[3:7])
-            # follow G2 smoothly but keep whatever angle and distance the user has dragged the camera to
+            # follow G2 smoothly; the angle and distance are our own unless the user drags or scrolls the camera (then theirs is kept). The viewer's value is only
+            # adopted when it differs from what we last set, so nothing else (an episode change, a window resize) can throw the view far out.
             if new_cam:
-                dist, yaw, pitch, tgt, new_cam = 0.45, 50.0, -25.0, [b[0], b[1], 0.04], False
+                view, tgt, new_cam = (0.45, 50.0, -25.0), [b[0], b[1], 0.04], False
             else:
                 c = p.getDebugVisualizerCamera()
-                yaw, pitch, dist = c[8], c[9], c[10]
+                seen = (c[10], c[8], c[9])
+                if max(abs(seen[0] - view[0]) * 100, abs(seen[1] - view[1]), abs(seen[2] - view[2])) > 0.5 and 0.1 <= seen[0] <= 3.0:
+                    view = seen
                 tgt = [cam[0] + 0.25 * (b[0] - cam[0]), cam[1] + 0.25 * (b[1] - cam[1]), 0.04]
             cam = tgt
-            lines = describe(scene)                         # the overlay rides above G2 so it is never left behind
-            for n, line in enumerate(lines):
-                pos = [b[0], b[1], 0.20 - 0.02 * n]
-                kw = dict(textSize=1.0 if n else 1.3, textColorRGB=[0.05, 0.05, 0.05])
-                labels.append(p.addUserDebugText(line, pos, **kw)) if len(labels) <= n else p.addUserDebugText(line, pos, replaceItemUniqueId=labels[n], **kw)
-            p.resetDebugVisualizerCamera(cameraDistance=dist, cameraYaw=yaw, cameraPitch=pitch, cameraTargetPosition=tgt)
+            p.resetDebugVisualizerCamera(cameraDistance=view[0], cameraYaw=view[1], cameraPitch=view[2], cameraTargetPosition=tgt)
             if fr.get("end"):
                 p.addUserDebugText("FELL" if fr["end"] == "fell" else "episode over", [b[0], b[1], 0.15], textSize=1.6,
                                    textColorRGB=[0.8, 0.1, 0.1] if fr["end"] == "fell" else [0.1, 0.5, 0.1], lifeTime=1.5)
