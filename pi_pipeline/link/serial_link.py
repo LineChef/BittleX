@@ -13,7 +13,7 @@ import threading
 import time
 
 from . import noise_log  # noqa: E402
-from . import transitions  # noqa: E402
+from . import opencat, transitions  # noqa: E402
 
 log = logging.getLogger("g2.link")
 
@@ -150,6 +150,14 @@ class SerialLink:
     def send(self, command: str, *, read_reply: bool = True, settle: float = 0.05, _deferred: bool = False) -> str:
         """Write `command` (a newline is added). Optionally read one reply line.
         Returns the reply (or '' ). Raises nothing -- logs and returns '' on error."""
+        if opencat.is_disabled(command):
+            log.warning("refusing %r: a move that tips G2 over on this payload (link/opencat.py DISABLED_SKILLS)", command.strip())
+            try:
+                from ..voice import fail_sound
+                fail_sound.command_failed(f"disabled move {command.strip()}")        # the wrong-answer horn: he was asked for a move he will not do
+            except Exception:  # noqa: BLE001
+                pass
+            return ""
         if not self.is_connected and not (self._auto_reconnect and self.connect()):
             log.debug("send(%r) dropped -- not connected", command)
             self._failed(command, "not connected")

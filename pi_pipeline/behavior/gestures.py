@@ -52,8 +52,8 @@ GESTURE_TOKEN = {
 }
 
 _HEAD_GESTURES = (Gesture.NOD, Gesture.SNIFF)      # gestures that are head moves: off while no head is connected (G2_HEAD=1 turns them back on)
-_IDLE_SET = (Gesture.STRETCH, Gesture.SCRATCH, Gesture.SNIFF, Gesture.NOD, Gesture.SIT_SHIFT)
-_GREETING_SET = (Gesture.SHAKE_PAW, Gesture.PLAY_BOW)       # no WAVE (`khi`): it flipped G2 on the pod payload (owner, 2026-10-18)
+_IDLE_SET = (Gesture.STRETCH, Gesture.SNIFF, Gesture.NOD, Gesture.SIT_SHIFT)       # no SCRATCH: it tips G2 over on the pod payload (opencat.DISABLED_SKILLS)
+_GREETING_SET = (Gesture.PLAY_BOW,)       # no WAVE or SHAKE_PAW: they tip G2 over on the pod payload (owner, 2026-10-18; opencat.DISABLED_SKILLS)
 
 
 @dataclass
@@ -69,7 +69,7 @@ class GestureConfig:
     # weights for the idle pick (higher = more often). SIT_SHIFT is the safe default.
     idle_weights: dict = field(default_factory=lambda: {
         Gesture.SIT_SHIFT: 3.0, Gesture.NOD: 2.0, Gesture.STRETCH: 2.0,
-        Gesture.SCRATCH: 1.5, Gesture.SNIFF: 1.0})
+        Gesture.SNIFF: 1.0})
 
 
 class GesturePicker:

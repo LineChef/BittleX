@@ -86,6 +86,15 @@ WAVE = "khi"                   # wave hello -- greeting
 
 _BLOCKED_PREFIXES = ("c", "cd")  # calibration / factory -- never from the pipeline
 
+# Moves that end with G2 on three feet, extend the legs or jump: on the pod payload (about 481 g, 46% over the front feet) every one of them tips him over
+# (owner, 2026-10-18: the wave flipped him twice, "any pose that ends on 3 feet makes him tip"). The serial link refuses them and plays the wrong-answer horn.
+# Audit of the other moves: docs/hardware/disabled-moves.md. Take a token out of this set only after a hardware test the owner asks for.
+DISABLED_SKILLS = frozenset({"khi", "kscrh", "kgdb", "kfiv", "kjpF"})
+
+
+def is_disabled(command: str) -> bool:
+    return command.strip() in DISABLED_SKILLS
+
 
 def skill(token: str) -> str:
     """'wkF' -> 'kwkF'. `token` is the OpenCat skill token, not a friendly name."""

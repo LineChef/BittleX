@@ -178,7 +178,7 @@ def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(mon
     monkeypatch.setenv("G2_STAND_RAMP_S", "0.2")
     monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
     for last in ("", "d", "krest", "kzz", "ksit"):
-        for skill in ("khi", "kck", "kwh", "knd", "kscrh", "kstr", "kpu", "kcmh", "kbuttUp", "kwkF", "kup", "kbalance"):
+        for skill in ("kck", "kwh", "knd", "kstr", "kpu", "kcmh", "kbuttUp", "kwkF", "kup", "kbalance"):
             lk = _link_with(b"")
             lk.last_motion_command = last
             lk.send(skill, read_reply=False, settle=0.0)
@@ -194,11 +194,11 @@ def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monke
         lk.last_motion_command = "d"
         lk.send(skill, read_reply=False, settle=0.0)
         assert [w.decode().strip() for w in lk._ser.written] == [skill]
-    for last in ("kbalance", "kup", "khi", "kwkF", "i8 50 12 0"):
+    for last in ("kbalance", "kup", "kck", "kwkF", "i8 50 12 0"):
         lk = _link_with(b"")
         lk.last_motion_command = last
-        lk.send("khi", read_reply=False, settle=0.0)
-        assert [w.decode().strip() for w in lk._ser.written] == ["khi"]
+        lk.send("kck", read_reply=False, settle=0.0)
+        assert [w.decode().strip() for w in lk._ser.written] == ["kck"]
     lk = _link_with(b"")
     lk.last_motion_command = "d"
     lk.send("b9 5 16 8", read_reply=False, settle=0.0)                       # a beep or a head move is not a stand-up
@@ -219,9 +219,9 @@ def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):
 
 def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
     from pi_pipeline.link import transitions as tr
-    sent = _ramped(monkeypatch, "kbalance", "khi")
-    assert sent[-1] == "khi" and all(c.startswith("i8 ") for c in sent[:-1])
-    hi = tr.table()["hi"]["first"]
+    sent = _ramped(monkeypatch, "kbalance", "kck")
+    assert sent[-1] == "kck" and all(c.startswith("i8 ") for c in sent[:-1])
+    hi = tr.table()["ck"]["first"]
     assert len(sent) - 1 == 32                                                    # the test caps the ramp at 0.8 s (G2_TRANSITION_RAMP_S); uncapped it would be 1.55 s for the 82.5 deg move
     last_pose = [int(x) for x in sent[-2].split()[1::2]]
     assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
@@ -252,25 +252,25 @@ def test_stops_unknown_poses_streams_and_get_ups_are_not_eased(monkeypatch):
     import time
     stride = "i8 50 9 50 10 50 11 50 12 0 13 0 14 0 15 0"
     assert _ramped(monkeypatch, stride, "kbalance") == ["kbalance"]               # a stop / freeze out of a stride
-    assert _ramped(monkeypatch, "kwkF", "khi") == ["khi"]                         # after a firmware gait the legs could be anywhere
-    assert _ramped(monkeypatch, "khi", "ksit") == ["ksit"]                        # after a trick too
+    assert _ramped(monkeypatch, "kwkF", "kck") == ["kck"]                         # after a firmware gait the legs could be anywhere
+    assert _ramped(monkeypatch, "kck", "ksit") == ["ksit"]                        # after a trick too
     assert _ramped(monkeypatch, "kwkL", "kwkR") == ["kwkR"]                       # gait to gait
-    assert _ramped(monkeypatch, stride, "khi", last_t=time.monotonic()) == ["khi"]   # a walk is streaming poses: the caller owns the motion
-    assert len(_ramped(monkeypatch, stride, "khi", last_t=time.monotonic() - 2)) > 1  # a held pose is eased from
+    assert _ramped(monkeypatch, stride, "kck", last_t=time.monotonic()) == ["kck"]   # a walk is streaming poses: the caller owns the motion
+    assert len(_ramped(monkeypatch, stride, "kck", last_t=time.monotonic() - 2)) > 1  # a held pose is eased from
     for skill in ("krc", "krl", "kdropRec", "kzero", "kcalib", "kzz"):
         assert _ramped(monkeypatch, "kbalance", skill) == [skill]
     assert _ramped(monkeypatch, "kbalance", "d") == ["d"]                         # rest by `d` is also the fall / freeze token
     monkeypatch.setenv("G2_TRANSITION_RAMP_S", "off")
     monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
     lk = _link_with(b""); lk.last_motion_command = "kbalance"
-    lk.send("khi", read_reply=False, settle=0.0)
-    assert [w.decode().strip() for w in lk._ser.written] == ["khi"]
+    lk.send("kck", read_reply=False, settle=0.0)
+    assert [w.decode().strip() for w in lk._ser.written] == ["kck"]
 
 
 def test_pose_tracking_and_mirroring():
     from pi_pipeline.link import transitions as tr
     assert tr.pose_after("d") == tr.REST and tr.pose_after("kbalance") == tr.BALANCE and tr.pose_after("ksit") == tr.table()["sit"]["first"]
-    assert tr.pose_after("kwkF") is None and tr.pose_after("khi") is None and tr.pose_after("i0 30") is None
+    assert tr.pose_after("kwkF") is None and tr.pose_after("kck") is None and tr.pose_after("i0 30") is None
     assert tr.pose_after("i8 1 9 2 10 3 11 4 12 5 13 6 14 7 15 8") == [1, 2, 3, 4, 5, 6, 7, 8]
     wkl = tr.table()["wkL"]["first"]
     assert tr.target("kwkL") == wkl and tr.target("kwkR") == tr.mirror(wkl)        # L is never mirrored, R is its L mirrored
@@ -349,15 +349,15 @@ def test_stage_2_eases_from_the_measured_pose_after_a_trick_only_when_switched_o
         lk.send(skill, read_reply=False, settle=0.0)
         return [w.decode().strip() for w in lk._ser.written]
 
-    assert run("khi", "ksit") == ["ksit"]                                        # off by default
+    assert run("kck", "ksit") == ["ksit"]                                        # off by default
     monkeypatch.setenv("G2_TRANSITION_READ_POSE", "1")
-    sent = run("khi", "ksit")
+    sent = run("kck", "ksit")
     assert sent[0] == "f" and sent[-1] == "ksit" and sent[-2] == tr.leg_cmd(tr.table()["sit"]["first"])
     sk = tr.skew_for("ksit")
     assert sent[1] == tr.leg_cmd(tr.ramp_poses(measured, tr.table()["sit"]["first"], tr.ramp_seconds(measured, tr.table()["sit"]["first"], skew=sk), skew=sk)[0])
     assert run("kwkF", "kwkL") == ["kwkL"]                                       # never between two gaits
     assert run("krc", "ksit") == ["ksit"]                                        # not while a get-up may still be running
-    assert run("kbalance", "khi")[0] != "f"                                      # a known pose needs no read
+    assert run("kbalance", "kck")[0] != "f"                                      # a known pose needs no read
     assert run("kwkF", "kbalance") == ["kbalance"]                               # a stop stays immediate
 
 
@@ -403,4 +403,19 @@ def test_the_sit_arrives_slowly_and_still_stays_under_the_speed_limit():
     steps = tr.ramp_poses(start, end, secs, skew=tr.SOFT_END_SKEW)
     fastest = max(max(abs(x - y) for x, y in zip(a, b)) for a, b in zip(steps, steps[1:])) * tr.STEPS_PER_S
     assert fastest <= tr.PEAK_DEG_S * 1.1
-    assert tr.skew_for("ksit") == tr.SOFT_END_SKEW and tr.skew_for("khi") == 1.0
+    assert tr.skew_for("ksit") == tr.SOFT_END_SKEW and tr.skew_for("kck") == 1.0
+
+
+def test_the_moves_that_tip_him_over_are_refused_with_the_wrong_answer_horn(monkeypatch):
+    """Owner, 2026-10-18: any pose that ends on three feet tips G2 over on the pod payload. The link refuses them whoever asks (voice, gestures, survey)."""
+    from pi_pipeline.link import opencat
+    from pi_pipeline.voice import fail_sound
+    horns = []
+    monkeypatch.setattr(fail_sound, "command_failed", lambda why="": horns.append(why))
+    for tok in ("khi", "kscrh", "kgdb", "kfiv", "kjpF"):
+        lk = _link_with(b"")
+        assert lk.send(tok, read_reply=False, settle=0.0) == "" and lk._ser.written == [] and lk.last_motion_command == ""
+    assert len(horns) == 5 and all("disabled move" in h for h in horns)
+    lk = _link_with(b"")
+    lk.send("kck", read_reply=False, settle=0.0)                                   # a mild move still goes out
+    assert lk._ser.written and opencat.is_disabled(" khi ") and not opencat.is_disabled("kck")

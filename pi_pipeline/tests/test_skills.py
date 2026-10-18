@@ -6,8 +6,7 @@ from pi_pipeline.voice import skills
 def test_catalogue_maps_to_k_prefixed_serial():
     assert skills.serial_command("walk_forward") == "kwkF"
     assert skills.serial_command("sit") == "ksit"
-    assert skills.serial_command("nod") == "knd"
-    assert not skills.is_valid("wave")                       # the wave flipped G2 on the pod payload: never offered
+    assert skills.serial_command("wave") == "khi"            # still a known skill: asking for it gets the wrong-answer horn from the link (opencat.DISABLED_SKILLS)
 
 
 def test_every_skill_has_a_valid_command():

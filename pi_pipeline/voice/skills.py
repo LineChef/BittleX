@@ -37,9 +37,9 @@ SKILLS: dict[str, Skill] = {
     "rest":      Skill("rest", "lie down and relax the servos", False),
     "balance":   Skill("balance", "settle into a low, stable stand (same pose as 'stand'; used after a get-up)", False),
     "stretch":   Skill("str",  "stretch", False),
-    # no "wave" (`khi`): it tilts G2 47 deg in pitch and flipped him on the pod payload (owner, 2026-10-18); do not add it back without a hardware test
+    "wave":      Skill("hi",   "DISABLED (G2 tips over): wave hello with a front leg; asking for it makes him refuse with the wrong-answer sound", False),
     "push_ups":  Skill("pu",   "do push-ups", False),
-    "scratch":   Skill("scrh", "scratch with a hind leg", False),
+    "scratch":   Skill("scrh", "DISABLED (G2 tips over): scratch with a hind leg; asking for it makes him refuse with the wrong-answer sound", False),
     "nod":       Skill("nd",  "nod: yes, agreement, understanding", False),
     "shake_head": Skill("wh",  "shake the head: no, disagreement, confusion", False),
     "check_around": Skill("ck", "look around, checking the surroundings (also: thinking, inspecting)", False),
