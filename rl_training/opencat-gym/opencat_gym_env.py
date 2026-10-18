@@ -498,8 +498,8 @@ elif PAYLOAD_PROFILE == "pod":
     # Block = the pod: 94.0 mm long, 37.9 mm tall (project viewer), width taken as the 59.2 mm envelope (|X| <= 29.6); it sits 9.2 mm behind the cover's middle (envelope Z -37.8..56.2), flush on the torso
     # (bottom at the torso box's top, 10 mm up: the pod is firmly secured to the body, owner 2026-10-18; the old case sat 17 mm up). The camera (on top of the pod's front) and the speaker (inside its rear) are inside that box, so they are part of its 185 g and there is no separate rear body.
     # The AI head is a separate body at the nose, 2 in (50.8 mm) tall by 1.25 in (31.75 mm) wide (owner, 2026-10-18: those two sizes are the head lying on its side, so it stands with the 2 in vertical); its depth front to back is NOT given and is taken as 1.25 in (31.75 mm); back face on the torso's front end (x = 52.5 mm), centre 9.8 mm up (position estimated; dropped by 20% of its height on 2026-10-18).
-    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.020
-    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.042, 0.003
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.0      # weighed, so fixed (owner, 2026-10-18: no per-episode variation of the pod or the AI head)
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.042, 0.0
     REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
     PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
     PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
@@ -2875,6 +2875,8 @@ class OpenCatGymEnv(gym.Env):
             if HEAD_MASS_NOM > 0:
                 hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
                 hj = np.random.uniform(-0.003, 0.003, 3); hj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
+                if PAYLOAD_PROFILE == "pod":
+                    hj[:] = 0.0                # fixed on the body, like the pod block
                 hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
                 self._head_id = self._payload_body(hm, HEAD_BOX_HALF, *_spawn(hoff))
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,

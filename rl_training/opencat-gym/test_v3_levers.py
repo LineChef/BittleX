@@ -726,10 +726,11 @@ def test_the_pod_payload_is_185_g_with_the_42_g_ai_head_and_the_recipe_uses_it()
         import os
         os.environ["G2E_PAYLOAD_PROFILE"] = "pod"; os.environ["G2E_PAYLOAD_LAYOUT"] = "spine"
         import opencat_gym_env as E
-        print(E.PAYLOAD_MASS_NOM, E.HEAD_MASS_NOM, E.REAR_MASS_NOM, *E.PAYLOAD_BOX_HALF, *E.PAYLOAD_POS)
+        print(E.PAYLOAD_MASS_NOM, E.HEAD_MASS_NOM, E.REAR_MASS_NOM, *E.PAYLOAD_BOX_HALF, *E.PAYLOAD_POS, E.PAYLOAD_MASS_RAND, E.HEAD_MASS_RAND)
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120).stdout.strip().splitlines()[-1].split()
-    pod, head, rear, hx, hy, hz, px, py, pz = map(float, out)
+    pod, head, rear, hx, hy, hz, px, py, pz, prand, hrand = map(float, out)
+    assert prand == 0.0 and hrand == 0.0                  # the weighed masses are fixed, no per-episode variation
     assert (pod, head, rear) == (0.185, 0.042, 0.0)       # the weighed payload (2026-10-17; case2 was 0.168), the AI head, no separate speaker body (it is inside the pod)
     assert (hx, hy, hz) == (0.047, 0.0296, 0.01895)       # the pod: 94.0 mm long, 37.9 mm tall, 59.2 mm wide
     assert px < 0 and abs(pz - hz - 0.010) < 1e-9         # 9.2 mm behind the cover's middle, flush: its bottom is the torso box's top (10 mm up)
@@ -748,7 +749,7 @@ def test_the_pod_block_is_perfectly_balanced_and_fused_to_the_body():
         import benchmark_decathlon as B
         B._apply({})
         env = E.OpenCatGymEnv()
-        worst_mm, worst_deg = 0.0, 0.0
+        worst_mm, worst_deg, hmm = 0.0, 0.0, 0.0
         for k in range(3):
             env.reset(seed=k)
             for t in range(300):
