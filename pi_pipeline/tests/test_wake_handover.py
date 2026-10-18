@@ -43,6 +43,9 @@ class _Rec:
     def Result(self):
         return json.dumps({"text": ""})
 
+    def FinalResult(self):
+        return json.dumps({"text": "gee two", "result": [{"word": "gee", "conf": 1.0}, {"word": "two", "conf": 1.0}]})
+
 
 def _wake():
     w = object.__new__(VoskWakeWord)

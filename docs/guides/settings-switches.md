@@ -53,6 +53,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 |---|---|---|
 | `G2_STAND_RAMP_S` | 0.8 | the eased stand-up (`off` / 0 = the old single jump; tests turn it off) |
 | `G2_TRANSITION_RAMP_S` | 0.8 | the longest eased move into a firmware skill's first frame (`link/transitions.py`; shorter moves take less, at least 0.25 s; `off` / 0 = the firmware's own jump; tests turn it off) |
+| `G2_WAKE_MIN_CONF` | 0 | a wake phrase Kaldi is less sure of than this (0 to 1, lowest word confidence) is ignored; 0 = off. Every trigger logs its confidence (`journalctl -u g2-voice \| grep "wake word"`); pick the value once real calls and background talk separate |
 | `G2_PROFILE` | 0 | `1` runs a sampling profiler during an exploration session (`diag/sampler.py`): which threads use the CPU and where; the report is `profile.txt` in the session's diagnostics folder |
 | `G2_TRANSITION_READ_POSE` | off | stage 2 of the eased transitions: after a firmware gait or a trick (pose unknown) the link reads the servos (`f`, two agreeing rows) and eases from the measured pose; off until `python -m pi_pipeline.link.check_serial posecheck` passes on G2 |
 | `G2_WALK_RAMP_S` | 0 | opt-in speed ramp-in at the start of a policy walk, in seconds (the sim check showed no gain) |

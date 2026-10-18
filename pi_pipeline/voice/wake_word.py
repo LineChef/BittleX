@@ -47,6 +47,31 @@ def _parse_phrases(phrase: str | list[str]) -> list[str]:
 
 
 _SELF_HEARING_TAIL_S = 0.8                # the speaker's echo lingers a moment after the speech ends
+
+
+def min_confidence() -> float:
+    """`G2_WAKE_MIN_CONF`: a wake phrase whose words Kaldi is less sure of than this is ignored (0 = off, the default until a day of logged
+    triggers shows where real calls and background talk separate; 2026-10-18: 4 of 7 triggers were people talking nearby, and loudness did not
+    separate them, a false one at level 313 and a real one at 314)."""
+    import os
+    try:
+        return max(0.0, float(os.environ.get("G2_WAKE_MIN_CONF", "0") or 0))
+    except ValueError:
+        return 0.0
+
+
+def phrase_confidence(result_json: str, phrase: str) -> float | None:
+    """The lowest word confidence of `phrase` in a Kaldi result with words (`SetWords(True)`), or None if the result does not hold it."""
+    try:
+        words = json.loads(result_json).get("result") or []
+    except (ValueError, AttributeError):
+        return None
+    want = phrase.split()
+    seq = [w.get("word", "") for w in words]
+    for i in range(len(seq) - len(want) + 1):
+        if seq[i:i + len(want)] == want:
+            return min(float(words[i + k].get("conf", 0.0)) for k in range(len(want)))
+    return None
 _QUEUE_BLOCKS = 200                     # about 50 s of audio (4000-sample blocks at 16 kHz)
 
 
@@ -114,6 +139,14 @@ class VoskWakeWord:
         self._handover = False
         return self._q, (lambda: None)
 
+    def _new_recognizer(self):
+        rec = self._Recognizer(self._model, self._rate, self._grammar)
+        try:
+            rec.SetWords(True)                         # per-word confidence in the results (the wake gate)
+        except Exception:  # noqa: BLE001
+            pass
+        return rec
+
     def wait(self) -> None:
         self._ensure_stream()
         self._handover = False
@@ -123,7 +156,7 @@ class VoskWakeWord:
                 q.get_nowait()
         except queue.Empty:
             pass
-        rec = self._Recognizer(self._model, self._rate, self._grammar)
+        rec = self._new_recognizer()
         last_speaking = 0.0
         while True:
             if SPEAKING.is_set():                      # G2's own voice must not wake him (2026-10-08: the spoken battery alarm triggered "hey buddy")
@@ -136,22 +169,32 @@ class VoskWakeWord:
                     q = self._q
                 continue
             if time.monotonic() - last_speaking < _SELF_HEARING_TAIL_S:
-                rec = self._Recognizer(self._model, self._rate, self._grammar)       # drop what was heard while (and just after) G2 spoke
+                rec = self._new_recognizer()       # drop what was heard while (and just after) G2 spoke
                 continue
+            final = None
             if rec.AcceptWaveform(data):
-                heard = json.loads(rec.Result()).get("text", "")
+                final = rec.Result()
+                heard = json.loads(final).get("text", "")
             else:
                 heard = json.loads(rec.PartialResult()).get("partial", "")
             heard = heard.lower()
             hit = next((p for p in self._phrases if p in heard), None)
             if hit:
+                if final is None:
+                    final = rec.FinalResult()          # the partial matched: finish the decode now to get each word's confidence (the words said after it stay queued for the recogniser)
+                conf = phrase_confidence(final, hit)
+                floor = min_confidence()
+                if floor and (conf is None or conf < floor):
+                    log.info("wake word ignored (%r, confidence %s < %.2f) text=%r", hit, "?" if conf is None else f"{conf:.2f}", floor, heard)
+                    rec = self._new_recognizer()
+                    continue
                 try:                                    # for telling a real call from noise afterwards: how loud the block was, the whole text Kaldi heard, and how long since G2 last made a sound
                     import numpy as np
                     level = float(np.sqrt(np.mean(np.frombuffer(data, dtype=np.int16).astype(np.float32) ** 2)))
                 except Exception:  # noqa: BLE001
                     level = -1.0
-                log.info("wake word heard (%r) text=%r level=%.0f since_own_sound=%.1fs", hit, heard, level,
-                         time.monotonic() - last_speaking if last_speaking else -1.0)
+                log.info("wake word heard (%r) text=%r level=%.0f confidence=%s since_own_sound=%.1fs", hit, heard, level,
+                         "?" if conf is None else f"{conf:.2f}", time.monotonic() - last_speaking if last_speaking else -1.0)
                 self._handover = True                  # keep listening on this stream; the recogniser picks it up
                 return
 
