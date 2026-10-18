@@ -98,6 +98,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard]` | run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze. |
 | `g2stop [voice/explore]` | the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride. |
 | `g2rest` | send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first. |
+| `g2english` | set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart, |
 | `g2baseline [start [RUNS] [LABEL]/stop/status/logs/fetch]` | logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac. |
 | `g2walk [RUNS] [LABEL]` | RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here. |
 | `g2turns [start [RUNS]/stop/status/logs/fetch]` | logged firmware turn runs (kwkL and kwkR alternating) on the Pi, to measure the real turn rate. |

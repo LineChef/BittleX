@@ -393,6 +393,13 @@ g2explore() { bash "$G2_ROOT/tools/g2_explore.sh" "$@"; }
 g2stop() { bash "$G2_ROOT/tools/g2_safe_stop.sh" "$@"; }
 # g2rest  -- send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first.
 g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send d"; }
+
+# g2english  -- set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart,
+# the documented recovery (same as saying "G2, switch to English"). Never sends Xa or XAd (they silently break its voice commands).
+g2english() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  _g2ssh "$G2_PI" 'cd ~/bittleX && for t in XAc XAb XAa; do pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send "$t" >/dev/null || exit 1; sleep 1.2; done && echo "voice module set to English (XAc, XAb, XAa sent)"'
+}
 # g2baseline [start [RUNS] [LABEL]|stop|status|logs|fetch]  -- logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac.
 g2baseline() { bash "$G2_ROOT/tools/g2_baseline.sh" "$@"; }
 # g2walk [RUNS] [LABEL]  -- RUNS (default 1) logged 12.5 s walks at 0.10 m/s with the deployed policy, on the Pi. The voice service is stopped for them and restarted after; G2 speaks before each run so you can set him at the start of the lane. Logs: ~/g2_runs/<LABEL>_*.csv on the Pi; `g2baseline fetch` copies them here.
