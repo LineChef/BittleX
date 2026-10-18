@@ -857,7 +857,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         if getattr(stop_event, "rest", True):
             _send(lk, "d")     # rest, last, then a pause so the board has it before the port closes
             time.sleep(0.5)
-        elif getattr(stop_event, "end_pose", None) == "balance":
+        elif getattr(stop_event, "end_pose", None) == "balance" and end_reason[0] != "fall":      # after a fall he is lying on his side: commanding the stand pose there is a get-up attempt (the owner saw it repeat, 2026-10-18)
             try:
                 _standup.blend_to_balance(lambda c: _send(lk, c), last_motion_command=getattr(lk, "last_motion_command", None))      # ease out of the stride first: a foot in the air is not a stable stop
             except Exception:  # noqa: BLE001

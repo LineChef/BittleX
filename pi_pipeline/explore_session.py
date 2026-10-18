@@ -265,6 +265,7 @@ def main() -> None:
             tally.note("fall")
             log.warning("G2 fell: stopping and ending the exploration session")
             fell.set()
+            rt.driver.estop.freeze_token = "d"                # the emergency "hold stance" is the stand pose; on his side that is a get-up attempt, so after a fall the hold is rest
             rt.halt()
             try:
                 link.send("gb", read_reply=False, settle=0.0)         # balance off: lying (or held) upside down, the gyro balance loop fights the servos and G2 twitches
