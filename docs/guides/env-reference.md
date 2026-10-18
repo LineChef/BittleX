@@ -146,7 +146,7 @@ Every `G2_*` variable the Pi code and the tools read: **197**, of which **0** ar
 | `G2_POWER_LOG` | `DEFAULT_PATH` | `power_log.py` | [`settings-switches.md`](settings-switches.md), [`pi-power.md`](../hardware/pi-power.md) |
 | `G2_PRICE_IN_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
 | `G2_PRICE_OUT_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
-| `G2_PROFILE` | `"0"` | `explore_session.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_PROFILE` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_QUESTION_WINDOW_S` | `8.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
 | `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md), [`reflection-plan.md`](../planned/reflection-plan.md) |
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
@@ -192,7 +192,7 @@ Every `G2_*` variable the Pi code and the tools read: **197**, of which **0** ar
 | `G2_VISION_SAVE_DIR` | `""` | `config.py` | [`.env.example`](../../.env.example), [`capabilities.md`](../capabilities.md) |
 | `G2_VOICE_ROBOT_EFFECT` | `"1"` | `config.py` | [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_VOICE_STYLE` | — | `config.py` | [`.env.example`](../../.env.example), [`models.md`](models.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
-| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_WAKE_WORD` | `"gee two, hey buddy, hey bud"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md) +1 |
 | `G2_WALK_RAMP_S` | `"0"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WALL_CAL` | `"~/.local/share/g2/wall_calibration.json` | `wall_distance.py` | [`settings-switches.md`](settings-switches.md) |
