@@ -22,7 +22,7 @@ _SETTLED_DEG = 1.0             # 5 IMU frames (1 s) within this spread of roll a
 _DOWN_POSES = ("", "d", "krest", "kzz", "ksit")
 
 
-def pre_walk(send, poll_imu, last_motion_command, *, sleep=time.sleep, clock=time.monotonic, settle_max_s=SETTLE_MAX_S, tilt_max_deg=START_TILT_MAX_DEG):
+def pre_walk(send, poll_imu, last_motion_command, *, sleep=time.sleep, clock=time.monotonic, settle_max_s=SETTLE_MAX_S, tilt_max_deg=START_TILT_MAX_DEG, balance_off=True):
     """Checks before a policy walk takes the legs (2026-10-18, early-stride falls on the pod payload).
     1. If the last leg command was a firmware gait or skill (a turn, `kwkR`, a trick), the legs are mid-stride in an unknown pose: settle into `kbalance` first and wait
        until the IMU shows the body is still (up to `settle_max_s`), so the walk starts from a known, steady stand instead of jumping there while balance is switched off.
@@ -33,6 +33,8 @@ def pre_walk(send, poll_imu, last_motion_command, *, sleep=time.sleep, clock=tim
     send("gP")                                             # the 5 Hz IMU print (harmless if already on)
     if handoff:
         send("kbalance")
+        if balance_off:
+            send("gb")                                     # firmware balance off for the settle (the walk turns it off anyway): with it on, the 5 Hz balance loop twitched him for the whole 2 s and he never settled (exploration, 2026-10-18)
     frames: list = []
     t0 = clock()
     limit = settle_max_s if handoff else 1.0

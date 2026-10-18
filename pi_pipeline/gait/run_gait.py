@@ -205,7 +205,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
         hold.fixed_u = float(steer_const)
     steer_u = 0.0
 
-    pre = pre_walk(lambda c: _send(lk, c), lk.poll_imu, getattr(lk, "last_motion_command", None))    # settle after a firmware gait; never start while tilted (raises)
+    pre = pre_walk(lambda c: _send(lk, c), lk.poll_imu, getattr(lk, "last_motion_command", None), balance_off=disable_firmware_balance)    # settle after a firmware gait; never start while tilted (raises)
     if pre["handoff"]:
         print(f"settled into a stand before the walk ({pre['settle_s']} s, {pre['frames']} IMU frames)", flush=True)
 

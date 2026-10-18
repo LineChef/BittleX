@@ -629,7 +629,7 @@ def _pre(rg, last, poses, **kw):
 
 def test_after_a_firmware_turn_the_walk_first_settles_into_a_still_stand(rg):
     sent, res = _pre(rg, "kwkR", [(5, 3), (-4, 6), (2, 1), (2.2, 1.1), (2.1, 1.0), (2.3, 1.2), (2.2, 1.1), (2.2, 1.0)])
-    assert sent[:2] == ["gP", "kbalance"] and res["handoff"] and res["frames"] >= 5 and "d" not in sent
+    assert sent[:3] == ["gP", "kbalance", "gb"] and res["handoff"] and res["frames"] >= 5 and "d" not in sent      # balance off for the settle (it twitched him in exploration, 2026-10-18)
 
 
 def test_from_a_known_stand_or_rest_there_is_no_hand_off(rg):
