@@ -347,6 +347,7 @@ class BehaviorDriver:
         self._contact_t = -1e9                    # when the IMU last said he is pushing into something (`note_contact`), and the one already acted on
         self._contact_seen = -1e9
         self._hit_until = 0.0                     # no new hit-a-wall reaction until the last one should be done
+        self._steer_side, self._steer_t = None, -1e9      # the side and time of the last wall turn-away (a hit right after it keeps that side)
         self._t_last_activity = clock()
         # transition tracking, for DIAG events
         self._prev_mode = self.mode.mode
@@ -524,6 +525,7 @@ class BehaviorDriver:
     WALL_BLOCKED_RAD = 1.4       # about 80 degrees when the wall fills the floor strip itself
     WALL_TURN_HOLD_S = 4.0       # a turn takes a few seconds: no new reaction until it should be done
     WALL_STOP_IN = 12.0          # any wall this close (or closer) is acted on from a single look
+    STEER_KEEP_SIDE_S = 3.0      # a hit this soon after a turn-away's hold ends still turns around toward the turn-away's side
 
     def _wall_reflex(self, i: DriverInputs, now: float) -> list | None:
         """A near wall steers an exploring G2 away from it (the wall estimate is a prototype: it can be wrong in either direction, and the user is watching). Acts on a wall look
@@ -544,6 +546,7 @@ class BehaviorDriver:
         side = w.turn or "right"
         rad = (self.WALL_BLOCKED_RAD if blocked else self.WALL_TURN_RAD) * (1.0 if side == "right" else -1.0)
         self._wall_turn_until = now + self.WALL_TURN_HOLD_S
+        self._steer_side, self._steer_t = side, now
         why = f"wall {'blocked' if blocked else 'ahead'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.near_groups} groups): turn {side}"
         logging.getLogger("g2.wall.steer").info("%s", why)
         fx = [Effect(EffectKind.DIAG, ("wall.steer", why), why)]
@@ -576,12 +579,16 @@ class BehaviorDriver:
         seen = fresh and (w.state == "blocked" or (w.nearest_in is not None and w.nearest_in <= self.HIT_NEAREST_IN and w.near_groups >= 3) or stuck)
         if not (seen or contact):
             return None
+        if now < self._wall_turn_until and not contact:
+            return None                           # a new look at the wall he is already turning away from: let that turn finish (2026-10-10: the turn-away and the hit turn fought); a real bump (IMU) still counts
         if contact:
             self._contact_seen = self._contact_t
         wall_t, turn, state, near = (w.t, w.turn, w.state, w.nearest_in) if w is not None else (self._wall_seen_t, None, "none", None)
         self._wall_seen_t = max(self._wall_seen_t, wall_t)
         self._last_wall_reaction = now
         side = turn or "right"
+        if self._steer_side and now - self._steer_t <= self.WALL_TURN_HOLD_S + self.STEER_KEEP_SIDE_S:
+            side = self._steer_side               # he was just turning away toward this side: keep it, so the turn-around does not undo the turn-away
         rad = self.HIT_TURN_RAD * (1.0 if side == "right" else -1.0)
         why = (f"hit something (IMU: pushing without moving, {state}): oof, back up, turn {side}" if contact and not seen else
                f"{'stuck at a wall' if stuck and state != 'blocked' else 'hit a wall'} ({near if near is not None else 0:g} in, {state}): oof, back up, turn {side}")

@@ -230,3 +230,22 @@ def test_a_timed_turn_logs_how_far_the_imu_saw_him_turn(caplog, monkeypatch):
     with caplog.at_level(logging.INFO, logger="g2.app.sinks"):
         w.turn(0.8)                                                           # about 46 degrees right
     assert done.is_set() and any("turn result: asked right 46 deg, the IMU saw +42 deg" in r.getMessage() for r in caplog.records)
+
+
+def test_a_new_look_during_a_turn_away_does_not_start_the_hit_sequence_but_a_bump_does_and_keeps_the_side(monkeypatch):
+    """2026-10-10: the turn-away and the hit turn fought: a fresh look at the same wall mid-turn started the hit sequence, which then turned the other way."""
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="near", inches=10.0, groups=4, turn="right")))
+    assert ChirpMood.AVOID in payloads(t, EffectKind.CHIRP)                     # turning away to the right
+    c.adv(1.0)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", inches=0.0, groups=5, turn="left", age=0.1)))
+    assert ChirpMood.HIT not in payloads(t, EffectKind.CHIRP)                   # a camera look mid-turn: the turn-away carries on
+    d.note_contact({"mean_jitter_deg": 7.0})
+    c.adv(0.2)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, state="blocked", inches=0.0, groups=5, turn="left", age=0.1)))
+    assert ChirpMood.HIT in payloads(t, EffectKind.CHIRP)                       # a real bump still backs him up
+    c.adv(0.5); d.tick(DriverInputs(frame=[]))
+    c.adv(2.4); d.tick(DriverInputs(frame=[]))
+    c.adv(0.6)
+    big = payloads(d.tick(DriverInputs(frame=[])), EffectKind.TURN)
+    assert big and big[0] > 2.0                                                  # and turns around to the RIGHT, the turn-away's side, not the look's left
