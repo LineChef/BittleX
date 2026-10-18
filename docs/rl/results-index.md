@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`as-built.md`](../hardware/as-built.md), [`specs.md`](../hardware/specs.md) +1.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`attachments.md`](../guides/attachments.md), [`as-built.md`](../hardware/as-built.md), [`self-righting.md`](../hardware/self-righting.md) +2.
 
 | File | Size | Cited by |
 |---|---|---|

@@ -21,6 +21,20 @@ More detail on the firmware path: [`petoi-firmware-reference.md`](petoi-firmware
 - **With the Pi in the loop:** `pi_pipeline`'s `RecoveryFSM` (`link/recovery.py`) has flags marked hardware-gated for a possible conflict with the firmware's own flip-triggered `rc`. It is built and tested but not wired in, so today the firmware handles recovery on its own. Retest self-righting with the Pi connected before wiring the FSM in.
 - **The simulation cannot show it.** Replaying `rc` and `rl` open-loop in PyBullet recovers 0 of 2 fall states (approximate references, no balance loop, no stable side-lie in the model): [`../rl/getup-sim-replay.md`](../rl/getup-sim-replay.md). Judge self-righting on the robot, not in the sim.
 
+## Testing the get-up moves on the pod payload
+
+With the pod and the AI head on, G2 mostly cannot end up fully on his back (the camera stops him), so the case to test is a fall on his side or front. `pi_pipeline/gait/getup_test.py` runs one firmware get-up move per run from a side lie and reports from the IMU whether he got upright:
+
+```bash
+sudo systemctl stop g2-voice            # on the Pi: the voice service holds the serial port; start it again afterwards
+python pi_pipeline/gait/getup_test.py rc                  # recover (krc)
+python pi_pipeline/gait/getup_test.py rl_rc               # roll over (krl), a pause, then recover (krc)
+python pi_pipeline/gait/getup_test.py droprec             # the last-ditch flail (kdropRec)
+python pi_pipeline/gait/getup_test.py rc --balance off    # the state the exploration fall handler leaves him in
+```
+
+Place him on his side by hand first, on the floor, hands near; never on his back. The script refuses to start if he is upright, and every attempt is appended to `~/g2_runs/getup_results.jsonl`. Results go here when run.
+
 ## What it means for the project
 
 - Expect to right G2 by hand sometimes, especially after fast falls and while training new gaits.
