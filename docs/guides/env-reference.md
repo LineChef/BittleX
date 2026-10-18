@@ -98,7 +98,7 @@ Every `G2_*` variable the Pi code and the tools read: **192**, of which **0** ar
 | `G2_GALLERY_PENDING` | `"~/.local/share/g2/gallery_pending.json"` | `promoted_loader.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GRUNT` | `"1"` | `loop.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_HEAD` | `"0"` | `sinks.py`, `gestures.py` | [`capabilities.md`](../capabilities.md) |
-| `G2_HEAD_RECALL` | `""` | `recall.py` | [`ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md), [`head-role-prompts.md`](../planned/ai-head/head-role-prompts.md) |
+| `G2_HEAD_RECALL` | `""` | `recall.py` | [`STATUS.md`](../STATUS.md), [`ai-head-implementation.md`](../planned/ai-head/ai-head-implementation.md), [`head-role-prompts.md`](../planned/ai-head/head-role-prompts.md) |
 | `G2_HISTORY_TURNS` | `12` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_HIT_SOUND` | `"1"` | `sinks.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
 | `G2_HIT_WALL` | `"1"` | `driver.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
