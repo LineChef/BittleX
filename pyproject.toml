@@ -4,3 +4,13 @@
 [tool.pytest.ini_options]
 testpaths = ["pi_pipeline/tests"]
 addopts = "-q"
+
+# Correctness-only lint (no style rules): undefined names, redefinitions, mutable defaults, syntax errors.
+#   pi_pipeline/.venv/bin/ruff check
+[tool.ruff]
+target-version = "py311"
+extend-exclude = [".venv*", "models", "training_data", "rl_training/opencat-gym/trained"]
+
+[tool.ruff.lint]
+select = ["E9", "F", "B006"]
+ignore = ["F401", "F841", "F541"]      # unused imports (some are re-exports), unused locals and plain f-strings: noise, not bugs

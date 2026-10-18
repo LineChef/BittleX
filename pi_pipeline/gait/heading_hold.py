@@ -138,10 +138,37 @@ def default_foot_hold():
 DEFAULT_TRIMS = {"Release_CandidateV4_ppo.onnx": "fl=-0.2", "Release_CandidateV6_ppo.onnx": "fl=-0.3", "Release_CandidateV7_ppo.onnx": "fl=-0.3"}
 
 
-def default_foot_trim(policy_name: str | None):
-    """The fixed foot trim of the everyday policy walk (a list for `apply_foot_trims`, or None). `G2_FOOT_TRIM` overrides (`fl=-0.25`, or `off`); otherwise `DEFAULT_TRIMS` by policy file name."""
+FLOOR_LABEL_MAX_AGE_H = 12.0     # a floor label older than this is not trusted for a per-floor trim (the same 12 h the ingest gate uses)
+
+
+def current_floor() -> str | None:
+    """The floor label set with `g2floor` / "I'm on tile", or None when it is unknown or older than `G2_FLOOR_TRIM_MAX_AGE_H` (default 12 h)."""
+    import os
+    try:
+        from pi_pipeline.telemetry.autolog import get_surface_info
+        label, age = get_surface_info()
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        max_age = float(os.environ.get("G2_FLOOR_TRIM_MAX_AGE_H", FLOOR_LABEL_MAX_AGE_H))
+    except ValueError:
+        max_age = FLOOR_LABEL_MAX_AGE_H
+    if label in ("", "unknown") or age is None or age > max_age:
+        return None
+    return label
+
+
+def default_foot_trim(policy_name: str | None, floor: str | None = "auto"):
+    """The fixed foot trim of the everyday policy walk (a list for `apply_foot_trims`, or None). In order: `G2_FOOT_TRIM` (`fl=-0.25`, or `off`); the trim
+    saved for this policy on the current floor (`python -m pi_pipeline.attachments floor-trim tile fl=-0.1`; `floor="auto"` reads the floor label, None skips
+    it); the trim saved with the attachment's gait; `DEFAULT_TRIMS` by policy file name (all measured on hardwood)."""
     import os
     v = os.environ.get("G2_FOOT_TRIM")
+    if v is None and floor is not None:
+        fl = current_floor() if floor == "auto" else floor
+        if fl:
+            from pi_pipeline.attachments import floor_trim_override
+            v = floor_trim_override(policy_name, fl)
     if v is None:
         from pi_pipeline.attachments import trim_override  # the trim saved with the fitted attachment's gait; None for attachment none (absolute: run_gait.py imports this as a script)
         v = trim_override(policy_name)

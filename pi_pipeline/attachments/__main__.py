@@ -8,7 +8,7 @@
 import argparse
 import sys
 
-from . import ATTACHMENTS, current, gait_for, load_profiles, register, use
+from . import ATTACHMENTS, current, gait_for, load_profiles, register, set_floor_trim, use
 
 
 def _status() -> int:
@@ -51,6 +51,10 @@ def main(argv=None) -> int:
     s.add_argument("--trim", default=None)
     s.add_argument("--payload", default=None, help="the sim payload profile the policy was trained on (e.g. pod)")
     s.add_argument("--note", default="")
+    ft = sub.add_parser("floor-trim", help="save the trim measured on one floor for the current gait (off removes it)")
+    ft.add_argument("floor")
+    ft.add_argument("trim", help="e.g. fl=-0.1, or off")
+    ft.add_argument("--attachment", default=None, help="default: the fitted attachment")
     a = ap.parse_args(argv)
     if a.cmd in (None, "status"):
         return _status()
@@ -65,6 +69,17 @@ def main(argv=None) -> int:
     if a.cmd == "save":
         register(a.attachment, a.policy, trim=a.trim, payload_profile=a.payload, note=a.note)
         print(f"saved {a.policy} as the current gait for {a.attachment}; commit pi_pipeline/attachments/gait_profiles.json and deploy")
+        return 0
+    if a.cmd == "floor-trim":
+        att = a.attachment or current()
+        trim = None if a.trim.strip().lower() in ("off", "none", "") else a.trim
+        if trim is not None:
+            from ..gait.heading_hold import parse_foot_trims
+            if not parse_foot_trims(trim):
+                print(f"not a trim: {a.trim!r} (e.g. fl=-0.1)")
+                return 2
+        cur = set_floor_trim(att, a.floor, trim)
+        print(f"{att} / {cur['policy']}: per-floor trims {cur['trim_by_floor'] or 'none'}; commit pi_pipeline/attachments/gait_profiles.json and deploy")
         return 0
     return 2
 

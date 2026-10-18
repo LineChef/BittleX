@@ -765,7 +765,12 @@ class VoiceLoop:
         recency = getattr(self._memory, "recency", None)
         age, n_recent = recency() if callable(recency) else (None, 0)
         self._mood.update(last_interaction_s=age, exchanges_recent=n_recent)
-        self._conv.set_mood_hint(self._mood.phrasing_hint())
+        try:                                             # how the body has been doing (personality/body.py): a low battery, a recent fall, the last exploration
+            from ..personality import body
+            body_hint = body.hint()
+        except Exception:  # noqa: BLE001
+            body_hint = ""
+        self._conv.set_mood_hint(" ".join(x for x in (self._mood.phrasing_hint(), body_hint) if x))
         try:
             from ..gait import gait_mode
             setter = getattr(self._conv, "set_gait_hint", None)

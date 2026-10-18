@@ -426,7 +426,7 @@ def _summary(frames, pos, neg, rej, have_boxes, c: Config) -> str:
         L.append("  ! no detection sidecars -- capture with Person or (better) Face "
                  "Detection loaded so frames carry boxes for pre-labels + auto neg split")
     if c.all_negatives:
-        L.append(f"  all-negatives mode: {len(sel_neg)} background frames, no positives")
+        L.append(f"  all-negatives mode: {len(neg)} background frames, no positives")
     return "\n".join(L) + "\n"
 
 

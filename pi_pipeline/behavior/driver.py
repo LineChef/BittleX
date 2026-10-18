@@ -144,6 +144,7 @@ class DriverInputs:
     # --- mood inputs (from the memory store's recency, fed by the runtime) ---
     last_interaction_s: float | None = None  # seconds since the last exchange (None = unknown)
     exchanges_recent: int = 0                # exchanges within the mood window
+    body_idle_mult: float = 1.0              # personality/body.py: below 1 settles sooner (a low battery, a recent fall)
 
 
 @dataclass
@@ -782,8 +783,9 @@ class BehaviorDriver:
         self.mood_model.update(now, last_interaction_s=i.last_interaction_s,
                                exchanges_recent=i.exchanges_recent)
         bias: IdleBias = self.mood_model.idle_bias()
-        self.idle.cfg.sit_after_s = self._base_sit_after_s * bias.sit_mult
-        self.idle.cfg.rest_after_s = self._base_rest_after_s * bias.rest_mult
+        body = min(1.0, max(0.3, float(i.body_idle_mult or 1.0)))
+        self.idle.cfg.sit_after_s = self._base_sit_after_s * bias.sit_mult * body
+        self.idle.cfg.rest_after_s = self._base_rest_after_s * bias.rest_mult * body
         self._seek_attention = bias.seek_attention
 
         # --- deep-idle sleep -- the state below IdlePosture RESTING. Sits

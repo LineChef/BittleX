@@ -6,6 +6,7 @@
     python -m pi_pipeline.diag tail [SESSION]
     python -m pi_pipeline.diag replay SESSION [--around HH:MM:SS] [--window 5]
     python -m pi_pipeline.diag sync SESSION DEST
+    python -m pi_pipeline.diag report [SESSION] [--html out.html]   # one report: walks, speech lag, wake word, API, camera, problems (diag/report.py)
 
 `summarize`/`last-failure`'s actual logic lives in `core.py` as
 `summarize_session()`/`last_failure()` (plain functions returning text) --
@@ -96,6 +97,16 @@ def cmd_sync(a):
     subprocess.run(["rsync", "-av", str(d) + "/", a.dest], check=False)
 
 
+def cmd_report(a):
+    from . import report
+    d = _resolve(a.session)
+    rep = report.build(str(d))
+    print(report.to_text(rep))
+    if a.html:
+        Path(a.html).write_text(report.to_html(rep))
+        print(f"HTML report: {a.html}")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="python -m pi_pipeline.diag")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -107,6 +118,8 @@ def main():
     rp.set_defaults(fn=cmd_replay)
     yp = sub.add_parser("sync"); yp.add_argument("session"); yp.add_argument("dest")
     yp.set_defaults(fn=cmd_sync)
+    rr = sub.add_parser("report"); rr.add_argument("session", nargs="?"); rr.add_argument("--html", default=None)
+    rr.set_defaults(fn=cmd_report)
     a = ap.parse_args()
     a.fn(a)
 

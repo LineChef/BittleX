@@ -50,10 +50,10 @@ Everything below is on the Pi as of 2026-10-18 (the Pi's `pi_pipeline/.deployed_
 1. **The camera stops answering during exploration** (2026-10-18: 8 timeouts of 6 s in one roam, two of four milestone pictures lost, contact pictures 7 to 9 s). Likely cause: every picture switched the capture option (detection at 480, pictures at 240) while peeks asked for pictures every few seconds. Since then exploration detects at 240 and peeks pause during a picture; not yet tested.
 2. **Late walk ticks** (2026-10-18: 30 to 32% of ticks late in exploration, 477 of 488 on the tick that sends the joint command). Cause found: each streamed send waited for the serial bytes to drain. They no longer wait; walk logs now record the late-tick share. Not yet tested.
 3. **A tip-over at a survey stop** (2026-10-18, 112 deg, right after a walk leg). The survey poses on this payload (look up, the bow, the check lean) are the first suspect.
-4. **Wake word false triggers:** 4 of 7 triggers on 2026-10-18 were people talking nearby, each sending junk to Claude; loudness does not separate them. The trigger log is collecting data for `G2_WAKE_MIN_CONF`.
+4. **Wake word false triggers:** 4 of 7 triggers on 2026-10-18 were people talking nearby, each sending junk to Claude; loudness does not separate them. The trigger log is collecting data for `G2_WAKE_MIN_CONF`; `wake_log` now suggests a value once it has 3 real and 3 false triggers, and `G2_WAKE_MAX_BEFORE` can ignore a phrase buried in other talk (off until the log shows the split).
 5. **The wall estimator needs recalibrating** for the camera's new place on the pod; its gaps (beyond 24 in only far or near; left-angle walls, the right 45° wall and corners read far) are in [`vision/wall-check-plan.md`](vision/wall-check-plan.md).
 6. **The bump reflex misses thin obstacles** such as chair legs (owner, 2026-10-18): the IMU contact signal looks for a stalled walk.
-7. **Speech arrives 7 to 17 s after it is decided during exploration** (2026-10-10); the policy walk sometimes "did not stop within 5 s" (six times on 2026-10-18, none in the retest).
+7. **Speech arrives 7 to 17 s after it is decided during exploration** (2026-10-10); the policy walk sometimes "did not stop within 5 s" (six times on 2026-10-18, none in the retest). Code changes 2026-10-18, untested on G2: narration lines are cached on disk and pre-made at idle (`voice/speech_cache.py`), a line is dropped if not ready 8 s after it was decided, each line logs its queue/synthesis/play time (`narration timing:`), and a walk that does not stop logs the stack it is stuck in plus `walk.slow_end`.
 8. **Heading drift on other floors.** Hardwood is handled by the trim; tile is unresolved and carpet is open.
 9. **Carpet.** Every gait tried fails on about 1/4 in pile; falls are sideways to the right.
 10. **BiBoard ticking** during runner-started walks: unexplained, parked by the user. First suspect if it returns: a quiet command sent every second (`G2_NOISE_LOG_ALL=1`, then `python -m pi_pipeline.link.noise_log 60`).
@@ -70,11 +70,12 @@ Everything below is on the Pi as of 2026-10-18 (the Pi's `pi_pipeline/.deployed_
 
 ## Next steps
 
-1. **Next hardware session** (each run on the owner's go): an exploration in a bigger room to test the camera fix, the contact-picture speed, the late-tick share and the four milestone pictures; then the survey poses on their own, to find what tipped him.
-2. **Wake-word threshold:** after a day or two of triggers, `python -m pi_pipeline.voice.wake_log --days 7`, then set `G2_WAKE_MIN_CONF`.
-3. **Recalibrate the wall estimator** for the camera's new place; then the bump reflex for thin obstacles.
-4. **Sim calibration for the pod payload** (`g2cal`): needs a few more clean V7 walks with the floor set.
-5. **System-identification capture** (rest of it): [`rl/sysid-capture-plan.md`](rl/sysid-capture-plan.md).
-6. **Get-up from a side lie** (paused): [`hardware/self-righting.md`](hardware/self-righting.md).
+1. **Built 2026-10-18, not yet tried on G2:** exploration inside the voice service (`G2_EXPLORE_INPROCESS=1`, off by default; the separate session stays the fallback), per-floor trims (`g2attach floor-trim`), the per-session report (`python -m pi_pipeline.diag report --html`), exploration recaps saved as memory observations, and the body state in the mood (`personality/body.py`). Settings: [`guides/settings-switches.md`](guides/settings-switches.md).
+2. **Next hardware session** (each run on the owner's go): an exploration in a bigger room to test the camera fix, the contact-picture speed, the late-tick share and the four milestone pictures; then the survey poses on their own, to find what tipped him.
+3. **Wake-word threshold:** after a day or two of triggers, `python -m pi_pipeline.voice.wake_log --days 7`, then set `G2_WAKE_MIN_CONF`.
+4. **Recalibrate the wall estimator** for the camera's new place; then the bump reflex for thin obstacles.
+5. **Sim calibration for the pod payload** (`g2cal`): needs a few more clean V7 walks with the floor set.
+6. **System-identification capture** (rest of it): [`rl/sysid-capture-plan.md`](rl/sysid-capture-plan.md).
+7. **Get-up from a side lie** (paused): [`hardware/self-righting.md`](hardware/self-righting.md).
 
 Open work by item ID: [`backlog.md`](backlog.md). Roadmap and decisions: [`project-plan.md`](project-plan.md).

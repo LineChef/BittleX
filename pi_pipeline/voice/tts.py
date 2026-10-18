@@ -75,6 +75,11 @@ class PiperTTS:
         self._sd = sd
         self._rate = self._voice.config.sample_rate
         self._style = style or ("current" if robot_effect else "plain")   # a name from effects.VOICES
+        self._cache_tag = f"{p.name}:{self._style}"                       # the speech cache is keyed by voice file + style (voice/speech_cache.py)
+
+    def is_cached(self, text: str) -> bool:
+        from . import speech_cache
+        return speech_cache.load(text, self._cache_tag, self._rate) is not None
 
     def _synth(self, text: str):
         import numpy as np
@@ -93,8 +98,16 @@ class PiperTTS:
         next sentence while the previous one is still playing."""
         if not text:
             return None
+        from . import speech_cache
+        hit = speech_cache.load(text, self._cache_tag, self._rate)         # a line said before costs no synthesis
+        if hit is not None:
+            return (text, hit[0], hit[1])
         audio, rate = self._synth(text)
-        return None if audio is None else (text, audio, rate)
+        if audio is None:
+            return None
+        if rate == self._rate:
+            speech_cache.store(text, self._cache_tag, self._rate, audio)
+        return (text, audio, rate)
 
     def play(self, item) -> None:
         if item is None:

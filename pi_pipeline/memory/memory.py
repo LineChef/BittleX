@@ -25,7 +25,8 @@ log = logging.getLogger("g2.memory")
 # Questions about what G2 saw earlier: only then are stored sightings brought into the prompt.
 _PAST_SIGHT_RE = re.compile(
     r"\b(did you (see|notice|spot)|what did you see|you (saw|noticed|were looking at)|remember seeing|saw|earlier|before|last time|"
-    r"yesterday|a while ago|the other day)\b", re.I)
+    r"yesterday|a while ago|the other day|"
+    r"where(\'s| is| are| was| were) (the|my|our|a|an)|explor\w*|you (found|find))\b", re.I)      # "where's the chair?", "what did you find exploring?": the exploration recaps are observations too
 
 
 _CMD_MAX_USER_WORDS, _CMD_MAX_REPLY_WORDS = 5, 10

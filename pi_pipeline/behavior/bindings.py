@@ -177,9 +177,13 @@ class DriverBindings:
 
 
 def _default_diag(name, reason) -> None:
+    """A behaviour transition into the session's diagnostics log, with the level and event name `diag_bridge._MAP` gives it (a cliff reflex is a WARN, a mode
+    change is `mode.transition`), so the session report can read the behaviour timeline."""
     try:
         from ..diag import event
-        event("behavior", "INFO", str(name), reason=str(reason))
+        from .diag_bridge import _MAP
+        level, ev = _MAP.get(str(name), ("INFO", str(name)))
+        event("behavior", level, ev, reason=str(reason))
     except Exception:
         pass
 

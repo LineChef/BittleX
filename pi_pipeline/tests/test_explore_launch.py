@@ -76,7 +76,7 @@ def test_a_roam_bout_is_not_cut_off_by_the_behavior_layers_own_caps():
 def test_a_fall_ends_the_exploration_session_and_skips_the_stand_up_sequence():
     import inspect
     from pi_pipeline import explore_session as E
-    src = inspect.getsource(E.main)
+    src = inspect.getsource(E.run_session)
     assert "fell = threading.Event()" in src and "fell.set()" in src
     loop = src[src.index("while t.is_alive() and not stop_flag.is_set()"):]
     assert 'if fell.is_set():\n                    ended_by = "fell"\n                    break' in loop        # the main loop leaves within half a second of a fall
@@ -88,7 +88,7 @@ def test_the_slow_start_up_loads_run_in_the_background_and_the_hand_over_does_no
     import inspect
     from pi_pipeline import explore_session as E
     from pi_pipeline.voice import __main__ as V
-    src = inspect.getsource(E.main)
+    src = inspect.getsource(E.run_session)
     assert "prefetch.submit(_load_tts)" in src and "tts_future.result()" in src and "prefetch.submit(_load_vosk)" in src
     assert "threading.Timer(0.3, lambda: launch(" in inspect.getsource(V)
 
@@ -98,3 +98,49 @@ def test_exploration_detects_at_the_picture_capture_option():
     from pi_pipeline import explore_launch
     cmd = explore_launch.command(180)
     assert "VISION_SENSOR_OPT=0" in cmd
+
+
+def test_in_process_exploration_is_opt_in_and_needs_the_link_and_features(monkeypatch):
+    from pi_pipeline import explore_session as E
+    shared = E.SharedParts(link=object())
+    monkeypatch.delenv("G2_EXPLORE_INPROCESS", raising=False)
+    assert E.inprocess_ready(shared) == (False, "G2_EXPLORE_INPROCESS is off")
+    monkeypatch.setenv("G2_EXPLORE_INPROCESS", "1")
+    assert E.inprocess_ready(E.SharedParts(link=None)) == (False, "no serial link")
+    assert E.inprocess_ready(None)[0] is False
+    ok, why = E.inprocess_ready(shared)
+    from pi_pipeline.features import features
+    assert ok == all(getattr(features, f) for f in E.INPROCESS_FEATURES), why
+
+
+def test_in_process_exploration_borrows_and_never_closes_the_service_parts():
+    """The voice service lends its link, memory, speech engine and microphone: the session must give them back open, restore the walker and hand back its IMU streams."""
+    import inspect
+    from pi_pipeline import explore_session as E
+    src = inspect.getsource(E.run_session)
+    cleanup = src[src.index("if lent:                                    # hand back"):]
+    assert "fan.release(c)" in cleanup and "undo()" in cleanup
+    lent_part = cleanup[:cleanup.index("else:")]
+    assert "link.close()" not in lent_part and "memory.close()" not in lent_part
+    assert 'for k in ("_on_battery", "_on_fall", "_hold", "_on_stall", "_on_contact")' in src
+    assert "wake, stt = shared.wake, shared.stt" in src and "shared.camera.close()" in src
+
+
+def test_the_fanout_hands_back_a_released_consumer():
+    from pi_pipeline.link.fanout import ImuFanout
+
+    class Link:
+        def poll_imu(self):
+            return ["x"]
+    fan = ImuFanout(Link())
+    a, b = fan.consumer(), fan.consumer()
+    fan.release(b)
+    assert a.poll_imu() == ["x"] and len(fan._queues) == 1
+
+
+def test_the_voice_service_stands_aside_while_an_exploration_runs_in_it():
+    import inspect
+    from pi_pipeline.voice import __main__ as V
+    src = inspect.getsource(V.main)
+    assert src.count("exploring.is_set()") >= 2 and "paused=exploring.is_set" in src         # stand guard, sleep watch, battery watch
+    assert "run_inprocess(lend, settings.explore_roam_s)" in src and "launch(settings.explore_roam_s)" in src       # in-process when ready, else the separate session

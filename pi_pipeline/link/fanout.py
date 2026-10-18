@@ -29,6 +29,11 @@ class ImuFanout:
             self._queues.append(q)
         return _Consumer(self, q)
 
+    def release(self, consumer: "_Consumer") -> None:
+        """Stop feeding a consumer that is done (an in-process exploration session hands its streams back when it ends)."""
+        with self._lock:
+            self._queues = [q for q in self._queues if q is not consumer._q]
+
 
 class _Consumer:
     def __init__(self, fan: ImuFanout, q: deque):

@@ -48,10 +48,10 @@ def _append(row: dict) -> None:
         log.debug("wake log write failed", exc_info=True)
 
 
-def record_trigger(phrase: str, text: str, *, level: float | None, confidence: float | None, since_own_sound_s: float | None, ignored: bool = False) -> None:
+def record_trigger(phrase: str, text: str, *, level: float | None, confidence: float | None, since_own_sound_s: float | None, ignored: bool = False, before: int | None = None) -> None:
     _append({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "type": "trigger", "phrase": phrase, "text": text,
              "level": None if level is None else round(float(level)), "confidence": None if confidence is None else round(float(confidence), 3),
-             "since_own_sound_s": None if since_own_sound_s is None or since_own_sound_s < 0 else round(float(since_own_sound_s), 1), "ignored": bool(ignored)})
+             "since_own_sound_s": None if since_own_sound_s is None or since_own_sound_s < 0 else round(float(since_own_sound_s), 1), "ignored": bool(ignored), "before": before})
 
 
 def record_outcome(heard: str, result: str, *, mic_peak=None) -> None:
@@ -96,6 +96,26 @@ def pairs(rows: list[dict]) -> list[tuple[dict, dict | None]]:
     return out
 
 
+MIN_EACH = 3          # real and false triggers needed before a threshold is suggested
+
+
+def suggest_min_conf(real: list[float], false: list[float]) -> tuple[float, int, int] | None:
+    """The `G2_WAKE_MIN_CONF` that drops the most false triggers while costing real calls the least (a lost real call counts three false ones).
+    Returns (threshold, false dropped, real dropped), or None with fewer than MIN_EACH of either kind or when no threshold drops a false one for
+    less than it costs. The threshold sits just under the lowest confidence kept, so every logged real call above it still wakes G2."""
+    if len(real) < MIN_EACH or len(false) < MIN_EACH:
+        return None
+    best = None
+    for cand in sorted(set(real + false)):
+        thr = round(cand - 0.005, 3)          # words at `cand` or above pass
+        fd = sum(1 for c in false if c < thr)
+        rd = sum(1 for c in real if c < thr)
+        score = fd - 3 * rd
+        if fd and score > 0 and (best is None or score > best[0]):
+            best = (score, thr, fd, rd)
+    return None if best is None else (best[1], best[2], best[3])
+
+
 def summary(days: float = 7.0, path: Path | None = None) -> str:
     rows = read(days, path)
     triggers = [r for r in rows if r.get("type") == "trigger"]
@@ -113,6 +133,18 @@ def summary(days: float = 7.0, path: Path | None = None) -> str:
              f"  woke him: {len(ps)}; looked real: {len(real)}; looked false: {len(false)}" + (f" ({100.0 * len(false) / max(1, len(real) + len(false)):.0f}%)" if real or false else ""),
              f"  confidence when real:  {conf(real)}",
              f"  confidence when false: {conf(false)}"]
+    rc = [t["confidence"] for t, _o in real if t.get("confidence") is not None]
+    fc = [t["confidence"] for t, _o in false if t.get("confidence") is not None]
+    sug = suggest_min_conf(rc, fc)
+    if sug:
+        lines.append(f"  suggested: G2_WAKE_MIN_CONF={sug[0]:g}  (would have dropped {sug[1]} of {len(fc)} false and {sug[2]} of {len(rc)} real)")
+    else:
+        lines.append(f"  suggested: nothing yet (needs {MIN_EACH}+ real and {MIN_EACH}+ false triggers with a confidence that separates them)")
+
+    def before(group):
+        b = sorted(t["before"] for t, _o in group if t.get("before") is not None)
+        return "none logged" if not b else f"min {b[0]}, median {b[len(b) // 2]}, max {b[-1]} ({len(b)})"
+    lines += [f"  words before the phrase, real:  {before(real)}", f"  words before the phrase, false: {before(false)}  (G2_WAKE_MAX_BEFORE ignores a phrase with more before it)"]
     for t, o in false[-8:]:
         lines.append(f"    false? {t['t']}  {t['phrase']!r} conf {t.get('confidence')} level {t.get('level')}  then {o.get('result')}: {o.get('heard')!r}")
     return "\n".join(lines)

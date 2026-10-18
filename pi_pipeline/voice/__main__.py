@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 
 from ..config import settings
 from ..diag import diag
@@ -95,6 +96,8 @@ def main() -> None:
         from ..attachments import startup_check
         startup_check(link)                            # attachment none: nothing; otherwise logs it and checks the BiBoard firmware fits
         fan = policy_walker = None
+        import threading
+        exploring = threading.Event()                  # set while an exploration runs inside this service (explore_session.run_inprocess): the guard, battery and sleep watches stand aside
         if link is not None:
             from . import fail_sound
             link.on_failure = fail_sound.command_failed         # a motion command that cannot be sent plays the wrong-answer horn
@@ -106,7 +109,7 @@ def main() -> None:
                 from ..gait.policy_walker import PolicyWalker
                 from . import prompt_tones
                 policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: battery_alert["fn"] and battery_alert["fn"](lvl, v),
-                                             on_fall=lambda: prompt_tones.play_horn_if_enabled("G2_FALL_HORN"))     # the losing horn when he falls (user, 2026-10-10); it does not wait, the walker thread must rest him at once
+                                             on_fall=lambda: (_note_fall(), prompt_tones.play_horn_if_enabled("G2_FALL_HORN")))     # the losing horn when he falls (user, 2026-10-10); it does not wait, the walker thread must rest him at once
         actuator = make_actuator(
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
             max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,
@@ -114,10 +117,10 @@ def main() -> None:
         guard = None
         if link is not None and (settings.stand_guard or settings.balance_off_idle):
             from ..gait.stand_guard import StandGuard
-            guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False), guard=settings.stand_guard,
+            guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), guard=settings.stand_guard,
                                balance_off_idle=settings.balance_off_idle, reassert_s=settings.stand_reassert_s,
                                reenable_after_s=None if settings.balance_off_idle else 300.0,
-                               on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time: the losing horn
+                               on_fall=lambda: (_note_fall(), __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN"))).start()   # tipped over at any time: the losing horn
             actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there
         # is one, else the buzzer cues on the real robot
@@ -137,9 +140,11 @@ def main() -> None:
             api_log.set_call_hook(lambda api, source: api_tone.play(settings.api_peak))     # a unique tone on every billed Claude call
 
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        if voice and tts_mode == "piper":
+            _start_speech_prewarm(tts)
         audible = voice and tts_mode != "print"
         battery_alert["fn"] = make_battery_alert(tts, audible)     # also used for low readings taken while walking
-        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link)
+        watcher = _start_battery_watch(args.actuator, actuator, tts=tts, audible=audible, link=link, paused=exploring.is_set)
         if watcher is not None:
             actuator.on_before_gait = watcher.read_before          # a reading right before any walk starts (there is no idle timer)
         power_log = _start_power_log()
@@ -147,7 +152,6 @@ def main() -> None:
 
         camera = None
         if voice and features.vision and settings.vision_describe:
-            import os
             if os.path.exists(settings.vision_serial_port):
                 from ..vision.snapshot import CameraSnapshotter
                 # 240x240: the module truncates the 480x480 jpeg; ae_bump brightens a dim room as the detection feed does
@@ -168,7 +172,6 @@ def main() -> None:
 
         namer = None
         if camera is not None:                             # "this is the dishwasher" works in plain voice mode too, not only inside an exploration session
-            import os
             from ..vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
             namer = ExplorationPictureSaver(camera, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT))
 
@@ -207,6 +210,9 @@ def main() -> None:
         stt_ref["stt"] = stt
         if hasattr(wake, "hand_over") and hasattr(stt, "_Recognizer"):
             stt.audio_source = wake.hand_over      # one microphone stream from the wake word through the command
+        from ..explore_session import SharedParts
+        lend = SharedParts(link=link if args.actuator == "serial" else None, fan=fan, policy_walker=policy_walker, memory=memory,
+                           tts=tts if tts_mode == "piper" else None, wake=wake if use_wake else None, stt=stt if voice else None, camera=camera, exploring=exploring)
         def on_event(**kw):
             # no battery read at the wake word: each `P` makes the BiBoard tick, which sounded like the board answering the wake word and
             # landed inside the command window (2026-10-08). Readings are taken before each walk and on the slow backstop timer instead.
@@ -215,8 +221,13 @@ def main() -> None:
             if watcher_r and kw.get("told_sleep"):
                 watcher_r.nudge()
             if kw.get("arm_explore") and settings.explore_handover and args.actuator == "serial":
-                # the voice service has no behavior runtime: hand over to an exploration session once the spoken reply is finished
-                import threading
+                from ..explore_session import inprocess_ready, run_inprocess
+                ok, why = inprocess_ready(lend)
+                if ok:                                     # run the exploration here, on this (voice loop) thread: same link, walker, memory, speech engine and microphone
+                    run_inprocess(lend, settings.explore_roam_s)
+                    return
+                logging.getLogger("g2.voice").info("exploration as a separate session (%s)", why)
+                # hand over to an exploration session once the spoken reply is finished
                 from ..explore_launch import launch
                 threading.Timer(0.3, lambda: launch(settings.explore_roam_s)).start()      # the words and the horn have already finished when this event fires; the old 5 s wait was pure delay (2026-10-18)
 
@@ -230,7 +241,7 @@ def main() -> None:
                 _sleep_steps.append(guard.pause)
                 _wake_steps.append(guard.resume)
             sleep_watch = SleepWatch(is_resting=lambda: getattr(link, "last_motion_command", "") in ("", "d"),
-                                     is_busy=lambda: getattr(actuator, "busy", False), after_s=settings.sleep_after_s,
+                                     is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), after_s=settings.sleep_after_s,
                                      on_sleep=_sleep_steps, on_wake=_wake_steps,
                                      on_event=(power_log.event if power_log else None)).start()
             _prev_on_command = getattr(actuator, "on_command", None)
@@ -287,6 +298,11 @@ def main() -> None:
                 memory.close()
 
 
+def _note_fall() -> None:
+    from ..personality import body
+    body.note_fall()
+
+
 def _play_whistle() -> None:
     from . import ack_whistle
     ack_whistle.play(peak=settings.alert_peak, wait=True)
@@ -303,6 +319,23 @@ def _sound_then_say(tts, text: str, sound) -> None:
     tts.speak(text)
 
 
+def _start_speech_prewarm(tts) -> None:
+    """Make the fixed exploration narration lines into the speech cache (voice/speech_cache.py) while G2 is idle, at low priority, a minute after start-up, so an
+    exploration session says them without synthesising (the speech lag, STATUS open problem 7). Lines already cached are skipped."""
+    import threading
+    if os.environ.get("G2_SPEECH_PREWARM", "1") == "0":
+        return
+
+    def _go():
+        import time
+        from ..behavior.narrator import fixed_lines
+        from . import speech_cache
+        time.sleep(60.0)
+        n = speech_cache.prewarm(tts, fixed_lines())
+        logging.getLogger("g2.voice").info("speech cache: %d narration lines made", n)
+    threading.Thread(target=_go, name="speech-prewarm", daemon=True).start()
+
+
 def make_battery_alert(tts, audible: bool, sound=None):
     """G2's own pack (read as a voltage) is low: a diag event, then (when `audible`) the ack_whistle and a spoken line.
     `sound` replaces the whistle in tests."""
@@ -310,6 +343,8 @@ def make_battery_alert(tts, audible: bool, sound=None):
 
     def on_alert(level, volts):
         diag.event("sys", "WARN", "battery.low", battery_level=level.name.lower(), volts=round(volts, 2))
+        from ..personality import body
+        body.note_battery(level.name.lower())          # he feels it: shorter replies, settles sooner (personality/body.py)
         if audible:
             _sound_then_say(tts, ALERT_MESSAGES[level], sound or _play_whistle)
     return on_alert
@@ -404,7 +439,7 @@ def _open_shared_link(actuator_mode: str):
     return LockedLink(lk) if lk.connect() else None
 
 
-def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, link=None):
+def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, link=None, paused=lambda: False):
     """Watch the robot's battery and play the red_alert_siren siren when it is low. Reads the voltage through the serial
     actuator, or, when the actuator is a mock (G2 is not allowed to move), through a read-only link of its own, since asking
     for the voltage moves nothing. No serial port (e.g. a laptop) means no watch."""
@@ -415,10 +450,11 @@ def _start_battery_watch(actuator_mode: str, actuator, *, tts, audible: bool, li
     if not settings.battery_watch:
         return None
     if actuator_mode == "serial":
-        reader = actuator.read_voltage
+        def reader():
+            return None if paused() else actuator.read_voltage()      # an in-process exploration runs its own watch (it pauses reads during walks)
     elif link is not None:
         def reader():
-            return read_voltage(link)
+            return None if paused() else read_voltage(link)
     else:
         return None
 

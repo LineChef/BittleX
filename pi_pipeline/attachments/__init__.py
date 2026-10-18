@@ -132,6 +132,7 @@ class GaitChoice:
     path: str | None            # None = use the legacy DEFAULT_POLICY
     trim: str | None            # None = the legacy DEFAULT_TRIMS
     why: str
+    trim_by_floor: dict = field(default_factory=dict)      # floor label -> trim, measured on that floor (`floor-trim`); wins over `trim` on that floor
 
 
 def gait_for(attachment: str | None = None, profiles: dict | None = None) -> GaitChoice:
@@ -157,7 +158,7 @@ def gait_for(attachment: str | None = None, profiles: dict | None = None) -> Gai
         why = f"{att}: {'saved current' if i == 0 and prof.get('current') else 'last-known-good'} {name}" + (f" (skipped: {'; '.join(skipped)})" if skipped else "")
         if not got:
             why += " (its payload is not recorded)"
-        return GaitChoice(att, path, e.get("trim"), why)
+        return GaitChoice(att, path, e.get("trim"), why, dict(e.get("trim_by_floor") or {}))
     return GaitChoice(att, None, None, f"{att}: no usable saved gait ({'; '.join(skipped) or 'none saved'}), the legacy DEFAULT_POLICY")
 
 
@@ -183,6 +184,33 @@ def trim_override(policy_name: str | None) -> str | None:
     if g.path and os.path.basename(g.path) == os.path.basename(str(policy_name)):
         return g.trim
     return None
+
+
+def floor_trim_override(policy_name: str | None, floor: str | None) -> str | None:
+    """For heading_hold.default_foot_trim: the trim measured on `floor` for this policy and the fitted attachment, or None (no per-floor trim saved)."""
+    if not policy_name or not floor or floor == "unknown":
+        return None
+    g = gait_for(current())
+    if g.path and os.path.basename(g.path) == os.path.basename(str(policy_name)):
+        return g.trim_by_floor.get(floor)
+    return None
+
+
+def set_floor_trim(attachment: str, floor: str, trim: str | None, path: str | None = None) -> dict:
+    """Save (or with `trim` None, remove) the trim measured on `floor` for the attachment's current gait."""
+    data = load_profiles(path)
+    cur = (data.get(attachment) or {}).get("current")
+    if not cur:
+        raise ValueError(f"{attachment} has no saved current gait; save one first (`save {attachment} POLICY`)")
+    floor = "-".join(str(floor).strip().lower().split())
+    tbf = dict(cur.get("trim_by_floor") or {})
+    if trim is None:
+        tbf.pop(floor, None)
+    else:
+        tbf[floor] = trim
+    cur["trim_by_floor"] = tbf
+    save_profiles(data, path)
+    return cur
 
 
 def register(attachment: str, policy: str, *, trim: str | None = None, payload_profile: str | None = None, note: str = "",

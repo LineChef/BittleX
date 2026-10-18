@@ -66,7 +66,6 @@ These modules have unit tests and a design, but no runtime module imports them y
 | `gait/jam_guard.py` | Vision-free jam reflex: front-leg strain as a bump sensor | the feedback-only jam reflex, [B9a](../docs/planned/behavior-ideas.md); needs real strain traces |
 | `behavior/thermal_governor.py` | Servo-thermal Layer 2: throttle on AMBER, cooldown pose on RED, from the gait-side `ThermalGuard` | [B26](../docs/planned/behavior-ideas.md) |
 | `link/recovery.py` | `RecoveryFSM`: choose between the learned catch, `rc` and `rl` after a fall | the recovery items in [`../docs/project-plan.md`](../docs/project-plan.md); retest with the Pi in the loop first |
-| `behavior/diag_bridge.py` | Turns driver `DIAG` effects into diagnostic events | wiring into `app/` |
 
 ## Setup
 

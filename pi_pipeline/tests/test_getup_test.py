@@ -82,7 +82,7 @@ def test_a_fall_never_commands_the_stand_pose():
     import inspect
     from pi_pipeline import explore_session as E
     from pi_pipeline.gait import run_gait
-    assert 'rt.driver.estop.freeze_token = "d"' in inspect.getsource(E.main)
+    assert 'rt.driver.estop.freeze_token = "d"' in inspect.getsource(E.run_session)
     src = inspect.getsource(run_gait)
     assert 'end_pose", None) == "balance" and end_reason[0] != "fall"' in src
 

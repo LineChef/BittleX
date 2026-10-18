@@ -38,6 +38,7 @@ Saving a gait:
 
 - **Promotion:** `promote_release.py --candidate trained/X.onnx --name V7 --attachment head --payload-profile pod [--trim fl=-0.3]` copies the release, points `DEFAULT_POLICY` at it as before, writes the payload into the release sidecar, and saves it as the attachment's current gait (the previous one moves to the history). It commits the profile file with the release.
 - **By hand:** `g2attach save head Release_Candidate<name>_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
+- **Per floor:** `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` saves a trim measured on one floor for the fitted attachment's current gait (`off` removes it). When the floor label (`g2floor`) is set and under 12 hours old, a walk on that floor uses it; any other floor uses the general trim. The order is `G2_FOOT_TRIM`, then the per-floor trim, then the saved trim, then `DEFAULT_TRIMS`. Floor labels are always set by a person; nothing names the floor automatically.
 - **Exports:** a new export records its payload with `export_onnx.py --sidecar-extra '{"payload_profile": "pod"}'`.
 
 `tools/g2_deploy_when_online.sh` sends every policy a saved gait names, as well as `DEFAULT_POLICY`, so a swap never needs a new deploy.

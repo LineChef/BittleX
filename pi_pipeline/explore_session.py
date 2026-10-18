@@ -22,6 +22,7 @@ import signal
 import threading
 import time
 import types
+from dataclasses import dataclass, field
 
 log = logging.getLogger("g2.explore_session")
 CMD_FILE = os.path.expanduser("~/.g2_explore_cmd")
@@ -136,6 +137,65 @@ def main() -> None:
     _gate.install()                                   # one sound at a time: speech and sound effects wait for each other (voice/audio_gate.py)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s", datefmt="%H:%M:%S")
+    from .diag import diag
+    from .features import features
+
+    if not features.explore:
+        raise SystemExit("exploration is off in G2_FEATURES (+explore, +vision, +vision_safety are needed); nothing to test")
+    with diag.session("explore", extra={"roam_s": args.roam_s}):
+        run_session(args)
+
+
+@dataclass
+class SharedParts:
+    """What the voice service lends an in-process exploration (`run_inprocess`): it is opened once at boot and stays open after the session. Anything None is
+    made by the session for itself, as the standalone session does. `exploring` is set while the session runs, so the service's own stand guard, battery
+    watch and sleep watch stand aside."""
+    link: object
+    fan: object = None
+    policy_walker: object = None
+    memory: object = None
+    tts: object = None
+    wake: object = None
+    stt: object = None
+    camera: object = None
+    exploring: threading.Event = field(default_factory=threading.Event)
+
+
+INPROCESS_FEATURES = ("explore", "vision", "vision_safety")
+
+
+def inprocess_ready(shared: SharedParts | None) -> tuple[bool, str]:
+    """Whether an exploration can run inside the voice service, and why not. `G2_EXPLORE_INPROCESS=1` opts in (off until it has been tried on G2); the
+    features the separate session forces on must already be on here, since the feature set is fixed when a process starts."""
+    from .features import features
+    if os.environ.get("G2_EXPLORE_INPROCESS", "0").strip().lower() not in ("1", "on", "true", "yes"):
+        return False, "G2_EXPLORE_INPROCESS is off"
+    if shared is None or shared.link is None:
+        return False, "no serial link"
+    missing = [f for f in INPROCESS_FEATURES if not getattr(features, f, False)]
+    if missing:
+        return False, f"features off in this service: {', '.join(missing)}"
+    return True, ""
+
+
+def run_inprocess(shared: SharedParts, roam_s: float) -> str:
+    """Run an exploration inside the voice service, on the calling (voice loop) thread, and return how it ended. The voice loop is blocked meanwhile, so the
+    session's listener has the microphone to itself; when this returns the service carries on listening."""
+    from .diag import diag
+    args = parse_args(["--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(int(roam_s))])
+    diag.event("explore", "INFO", "explore.start", inprocess=True, roam_s=roam_s)
+    ended = "error"
+    try:
+        ended = run_session(args, shared)
+    finally:
+        diag.event("explore", "INFO", "explore.end", ended_by=ended)
+    return ended
+
+
+def run_session(args, shared: SharedParts | None = None) -> str:
+    """The exploration session. Standalone (`shared` None) it opens and closes everything itself; in-process it borrows the voice service's parts, gives
+    them back as it found them, and never closes them. Returns how the session ended."""
     from .app.__main__ import _build_runtime, _make_link, _make_memory, _make_vision_source
     from .behavior.mode_controller import Mode
     from .behavior.narrator import Narrator, attach
@@ -143,19 +203,26 @@ def main() -> None:
     from .diag import diag
     from .features import features
 
-    if not features.explore:
-        raise SystemExit("exploration is off in G2_FEATURES (+explore, +vision, +vision_safety are needed); nothing to test")
-
     boot_t0 = time.monotonic()
     from concurrent.futures import ThreadPoolExecutor
     prefetch = ThreadPoolExecutor(max_workers=2, thread_name_prefix="prefetch")        # the two slowest start-up steps on the Pi (Piper about 14 s, Vosk about 10 s, measured 2026-10-18) load in the background while the link, camera and policy come up
     tts_future = vosk_future = None
-    if not args.no_narrate:
+    lent = shared is not None
+    restore: list = []                                  # undo steps for what was borrowed from the voice service, run last
+    released: list = []                                 # IMU consumers to hand back to a borrowed fan-out
+    if lent:
+        shared.exploring.set()
+        restore.append(shared.exploring.clear)
+    if lent and shared.tts is not None and not args.no_narrate:
+        from concurrent.futures import Future
+        tts_future = Future()
+        tts_future.set_result(shared.tts)              # the service's speech engine is already loaded
+    elif not args.no_narrate:
         def _load_tts():
             from .voice.tts import make_tts
             return make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
         tts_future = prefetch.submit(_load_tts)
-    if features.mic and features.wake_word:
+    if features.mic and features.wake_word and not (lent and shared.wake is not None):
         def _load_vosk():
             try:
                 from .voice import vosk_model
@@ -164,35 +231,52 @@ def main() -> None:
                 log.debug("vosk prefetch failed", exc_info=True)
         vosk_future = prefetch.submit(_load_vosk)
 
-    with diag.session("explore", extra={"roam_s": args.roam_s}):
-        from .diag.crashwatch import CrashWatch
-        crash = CrashWatch("explore", extras=lambda: getattr(stt_holder.get("stt"), "last_info", None)).start()
+    if True:                                            # (the session body; the diagnostics session is opened by main() or is the voice service's own)
+        crash = None
+        if not lent:                                    # the voice service runs its own crash watch
+            from .diag.crashwatch import CrashWatch
+            crash = CrashWatch("explore", extras=lambda: getattr(stt_holder.get("stt"), "last_info", None)).start()
         profiler = None
         if os.environ.get("G2_PROFILE", "0") == "1":                   # where the Python time goes (late walk ticks, late speech): diag/sampler.py, report in the session folder
             from .diag.sampler import Sampler
             profiler = Sampler().start()
         stt_holder: dict = {}
-        memory = _make_memory()
-        link = _make_link(True)
-        if link is not None:
+        memory = shared.memory if lent else _make_memory()
+        link = shared.link if lent else _make_link(True)
+        if link is not None and not lent:
             from .voice import fail_sound
             link.on_failure = fail_sound.command_failed         # a motion command that cannot be sent plays the wrong-answer horn
         if link is None:
             raise SystemExit("no serial link to the BiBoard")
-        vision = _make_vision_source() if features.vision else None
+        if lent and shared.camera is not None:
+            shared.camera.close()                       # the picture snapshotter lets go of the camera port; it reopens by itself on its next picture
+        from .explore_launch import EXPLORE_SENSOR_OPT
+        vision = (_make_vision_source(sensor_opt=EXPLORE_SENSOR_OPT) if lent else _make_vision_source()) if features.vision else None
         # place notes ("the dog is often to the left") come from the behavior thread, but the memory database belongs to this one:
         # queue them and write them from the main loop below
         notes: "queue.Queue[str]" = queue.Queue()
         deferred = types.SimpleNamespace(store=types.SimpleNamespace(add_fact=notes.put)) if memory is not None else None
         from .link.fanout import ImuFanout
-        fan = ImuFanout(link)                              # the sensor hub, the stand guard and the learned walk each get their own IMU stream
+        fan = shared.fan if (lent and shared.fan is not None) else ImuFanout(link)      # the sensor hub, the stand guard and the learned walk each get their own IMU stream
+
+        def consumer():
+            c = fan.consumer()
+            if lent:
+                released.append(c)
+            return c
         alert = {"fn": None}                              # the battery alarm, set once the speaker exists
         policy_walker = None
         fall = {"fn": None}                               # set once the runtime and the voice exist: a fall halts the exploration
-        if features.gait != "off" and settings.default_gait == "policy":
+        on_battery = lambda lvl, v: alert["fn"] and alert["fn"](lvl, v)  # noqa: E731
+        on_fall = lambda: fall["fn"] and fall["fn"]()  # noqa: E731
+        if lent and shared.policy_walker is not None:
+            policy_walker = shared.policy_walker        # the service's walker, with the session's callbacks and no rest between legs until the session ends
+            saved = {k: getattr(policy_walker, k) for k in ("_on_battery", "_on_fall", "_hold", "_on_stall", "_on_contact")}
+            policy_walker._on_battery, policy_walker._on_fall, policy_walker._hold = on_battery, on_fall, True
+            restore.append(lambda: [setattr(policy_walker, k, v) for k, v in saved.items()])
+        elif features.gait != "off" and settings.default_gait == "policy":
             from .gait.policy_walker import PolicyWalker
-            policy_walker = PolicyWalker(fan.consumer(), on_battery=lambda lvl, v: alert["fn"] and alert["fn"](lvl, v),
-                                         on_fall=lambda: fall["fn"] and fall["fn"](), hold_between_legs=True)    # no rest between legs: hold a balanced stand, rest at the end of the session
+            policy_walker = PolicyWalker(consumer(), on_battery=on_battery, on_fall=on_fall, hold_between_legs=True)    # no rest between legs: hold a balanced stand, rest at the end of the session
         saver = None
         places = None
         from .reflection.recap import SessionTally
@@ -203,7 +287,7 @@ def main() -> None:
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
             from .gait.stillness import StillnessWaiter
             from .voice import fail_sound
-            still = StillnessWaiter(fan.consumer().poll_imu)               # waits, before every picture, until the IMU shows G2 has stopped swaying (camera shake)
+            still = StillnessWaiter(consumer().poll_imu)               # waits, before every picture, until the IMU shows G2 has stopped swaying (camera shake)
             if os.environ.get("G2_PLACE_LOG", "1") != "0":                 # place memory P1: one record per survey stop, no behavior change (behavior/place_log.py)
                 from .behavior.place_log import PlaceLog
                 places = PlaceLog(os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT), yaw_fn=lambda: getattr(getattr(getattr(rt, "_sensors", None), "__self__", None), "yaw_deg", lambda: None)(),
@@ -211,7 +295,7 @@ def main() -> None:
             saver = ExplorationPictureSaver(vision, os.environ.get("G2_EXPLORE_PICTURES_DIR", DEFAULT_ROOT), on_survey_stop=places.record_stop if places else None,
                                            prep_every_s=float(os.environ.get("G2_PICTURE_PREP_EVERY_S", "0")),      # the camera is warmed up for EVERY picture (user, 2026-10-10: pictures are rare now)
                                            wait_still=still.wait, on_failure=fail_sound.command_failed)
-        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=fan.consumer(),
+        rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
         rt.bindings.wrap_diag(tally.wrap)
         hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
@@ -250,6 +334,12 @@ def main() -> None:
                     with lock:
                         raw.speak(text)
 
+            if hasattr(raw, "prepare") and hasattr(raw, "play"):
+                _Locked.prepare = lambda self, text: raw.prepare(text)             # synthesis (or the cached audio) happens outside the lock
+                def _play(self, item):
+                    with lock:
+                        raw.play(item)
+                _Locked.play = _play
             tts = _Locked()
             say = tts.speak
             if saver is not None:
@@ -258,7 +348,7 @@ def main() -> None:
             alert["fn"] = make_battery_alert(tts, True)
             from .personality.bonds import Bonds
             hide = os.environ.get("G2_NARRATE_HIDE_NAMES") == "1"          # off by default: G2 may say the names he knows
-            narrator = Narrator(tts.speak, private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
+            narrator = Narrator(tts.speak, prepare=getattr(tts, "prepare", None), play=getattr(tts, "play", None), private=[b.label for b in Bonds.from_settings(settings)] if hide else ())
             attach(rt.bindings, narrator)
             narrator.quiet(True)                                              # no narration during the hand-over greeting, the eased stand-up and the first leg (the glitchy first 3 to 5 s, 2026-10-10)
             _t = threading.Timer(float(os.environ.get("G2_NARRATE_START_QUIET_S", "8")), lambda: narrator.quiet(False))
@@ -275,6 +365,8 @@ def main() -> None:
 
         def _on_fall():
             tally.note("fall")
+            from .personality import body
+            body.note_fall()
             log.warning("G2 fell: stopping and ending the exploration session")
             fell.set()
             rt.driver.estop.freeze_token = "d"                # the emergency "hold stance" is the stand pose; on his side that is a get-up attempt, so after a fall the hold is rest
@@ -293,7 +385,7 @@ def main() -> None:
         fall["fn"] = _on_fall
 
         from .gait.stand_guard import StandGuard
-        guard = StandGuard(fan.consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
+        guard = StandGuard(consumer(), is_busy=lambda: rt.driver.mode.mode in (Mode.EXPLORE, Mode.APPROACH) or (policy_walker is not None and policy_walker.busy), guard=settings.stand_guard,
                            balance_off_idle=True, reassert_s=settings.stand_reassert_s, reenable_after_s=None,
                            on_fall=lambda: __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN")).start()   # tipped over at any time (the walker's own fall also plays it once)
 
@@ -313,13 +405,16 @@ def main() -> None:
                 wake_chime.play()
         if features.mic and features.wake_word:
             from .behavior.explore_listener import ExploreListener
-            from .voice.stt import make_stt
-            from .voice.wake_word import make_wake_word
-            wake = make_wake_word("vosk", vosk_model_path=settings.vosk_model_path, phrase=settings.wake_word)
-            stt = make_stt("vosk", vosk_model_path=settings.vosk_model_path, silence_s=settings.stt_silence_s)
+            if lent and shared.wake is not None and shared.stt is not None:
+                wake, stt = shared.wake, shared.stt     # the service's one microphone stream (it cannot be opened twice); its voice loop is blocked meanwhile
+            else:
+                from .voice.stt import make_stt
+                from .voice.wake_word import make_wake_word
+                wake = make_wake_word("vosk", vosk_model_path=settings.vosk_model_path, phrase=settings.wake_word)
+                stt = make_stt("vosk", vosk_model_path=settings.vosk_model_path, silence_s=settings.stt_silence_s)
+                if hasattr(wake, "hand_over"):
+                    stt.audio_source = wake.hand_over
             stt_holder["stt"] = stt
-            if hasattr(wake, "hand_over"):
-                stt.audio_source = wake.hand_over
             def _gait_beep():                                              # a short double beep on the speaker and the buzzer when a gait command switches the gait
                 from .voice import prompt_tones
                 from .link import opencat
@@ -331,9 +426,13 @@ def main() -> None:
                                        quiet=narrator.quiet if narrator is not None else None).start()
             log.info("voice commands on: wake word, then arm/disarm roam, stop, resume, \"tell me what you see\", shut down (ends the session)")
 
-        signal.signal(signal.SIGUSR1, lambda *_: rt.halt())
-        signal.signal(signal.SIGUSR2, lambda *_: rt.release())
-        signal.signal(signal.SIGTERM, lambda *_: rt.stop())
+        if threading.current_thread() is threading.main_thread():      # signal handlers can only be set from the main thread
+            prev = {sig: signal.getsignal(sig) for sig in (signal.SIGUSR1, signal.SIGUSR2, signal.SIGTERM)}
+            signal.signal(signal.SIGUSR1, lambda *_: rt.halt())
+            signal.signal(signal.SIGUSR2, lambda *_: rt.release())
+            signal.signal(signal.SIGTERM, lambda *_: rt.stop())
+            if lent:
+                restore.append(lambda: [signal.signal(sig, h) for sig, h in prev.items()])
         t = threading.Thread(target=rt.run_forever, name="behavior", daemon=True)
         t.start()
         try:
@@ -404,7 +503,8 @@ def main() -> None:
         except KeyboardInterrupt:
             ended_by = "interrupted"
         finally:
-            crash.stop()
+            if crash is not None:
+                crash.stop()
             if listener is not None:
                 listener.stop()
             log.info("ending the exploration session")
@@ -441,7 +541,15 @@ def main() -> None:
                 from .vision.wall_distance import LOG_PATH as _WALL_LOG
                 stops = [s for s in read_stops(places.path) if s.get("session") == places.session] if places is not None else []
                 ended_by = ended_by or ("voice command" if stop_flag.is_set() else "time limit" if time.monotonic() - started >= args.max_s else "runtime stopped")
-                ExperienceLog().append(build_recap(tally, started=session_started, ended=time.time(), ended_by=ended_by, stops=stops, wall_path=_WALL_LOG))
+                rec = ExperienceLog().append(build_recap(tally, started=session_started, ended=time.time(), ended_by=ended_by, stops=stops, wall_path=_WALL_LOG))
+                if rec:
+                    from .personality import body
+                    body.note_exploration(rec)                                # how it went colours his mood for a few hours (personality/body.py)
+                if rec and memory is not None and hasattr(memory, "record_observation"):      # what he saw goes into the memory Claude recalls from ("where's the chair?")
+                    from .reflection.recap import observation_from_recap
+                    caption, labels = observation_from_recap(rec)
+                    if caption:
+                        memory.record_observation(caption, labels)
             except Exception:  # noqa: BLE001
                 log.exception("could not keep the session recap")
             if watch is not None:
@@ -452,10 +560,22 @@ def main() -> None:
                 log.info("profile written to %s", out)
             if vision is not None:
                 vision.close()
-            if memory is not None:
-                memory.close()
-            link.send("gp", read_reply=False, settle=0.0)
-            link.close()
+            if lent:                                    # hand back what was borrowed: the service keeps its link, memory, speech engine and microphone open
+                for c in released:
+                    fan.release(c)
+                if not settings.stand_guard:
+                    link.send("gp", read_reply=False, settle=0.0)       # the IMU print stays on only when the service's stand guard reads it
+                for undo in reversed(restore):
+                    try:
+                        undo()
+                    except Exception:  # noqa: BLE001
+                        log.exception("restoring the voice service after the exploration failed")
+            else:
+                if memory is not None:
+                    memory.close()
+                link.send("gp", read_reply=False, settle=0.0)
+                link.close()
+        return ended_by or "ended"
 
 
 if __name__ == "__main__":

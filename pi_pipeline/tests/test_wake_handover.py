@@ -111,3 +111,35 @@ def test_stt_uses_the_handed_over_stream_instead_of_opening_the_microphone():
     stt.audio_source = lambda: (q, lambda: closed.append(True))
     assert stt.listen(timeout_s=2) == "power down"
     assert closed == [True]
+
+
+def test_a_stalled_microphone_stream_is_replaced_by_the_keeper():
+    """B27: a stream that stays 'active' but stops delivering blocks is reopened by the supervised keeper."""
+    import time
+    from pi_pipeline.util.supervisor import Supervisor, WatchdogConfig
+    w, holder = _wake()
+    made = []
+    orig = w._sd.RawInputStream
+
+    def factory(**k):
+        s = orig(**k)
+        made.append(s)
+        return s
+    w._sd = types.SimpleNamespace(RawInputStream=factory)
+    w._ensure_stream()
+    first = made[0]
+    cfg = WatchdogConfig(heartbeat_timeout_s=0.4, startup_grace_s=0.4, backoff_base_s=0.05)
+    w._keeper = Supervisor("microphone-test", w._keep, cfg=cfg, emit=lambda *a, **k: None, poll_interval_s=0.05)
+    w._keeper.start()
+    try:
+        time.sleep(0.3)
+        assert len(made) == 1                      # blocks keep arriving: no restart
+        first.stopped_feeding = True               # the stream stalls
+        deadline = time.time() + 5
+        while len(made) < 2 and time.time() < deadline:
+            time.sleep(0.05)
+        assert len(made) == 2 and w._stream is made[1] and not first.closed
+    finally:
+        for s in made:
+            s.stopped_feeding = True
+        w._keeper.stop()

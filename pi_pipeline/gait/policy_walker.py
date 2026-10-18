@@ -22,6 +22,17 @@ DEFAULT_CMD_FWD = 0.10        # m/s, the speed the policy has been walked at on 
 MAX_SECONDS = 120.0           # a walk with no stated length still ends
 
 
+def _where(t: threading.Thread) -> str:
+    """The walker thread's current stack, so a walk that does not stop says which call it is stuck in (STATUS open problem 7: six of these on 2026-10-18)."""
+    try:
+        import sys
+        import traceback
+        frame = sys._current_frames().get(t.ident)
+        return "".join(traceback.format_stack(frame)[-6:]) if frame is not None else "(thread already gone)"
+    except Exception:  # noqa: BLE001
+        return "(stack unavailable)"
+
+
 class _Stop(threading.Event):
     rest = True
     end_pose = None            # "balance": when the walk ends without a rest, settle into a balanced stand instead of leaving the last stride
@@ -127,4 +138,4 @@ class PolicyWalker:
         if t is not threading.current_thread():     # a fall callback runs ON the walker thread: joining it raised "cannot join current thread" and cut the emergency stop short (2026-10-08)
             t.join(timeout)
         if t.is_alive() and t is not threading.current_thread():
-            log.warning("the policy walk did not stop within %.0f s", timeout)
+            log.warning("the policy walk did not stop within %.0f s; the walker thread is at:\n%s", timeout, _where(t))

@@ -131,8 +131,9 @@ Debugging behaviour needs the *reason*, not just the action. Convention:
   `behavior/mode_controller.py` (`ModeController`), `behavior/explore.py`
   (`Explorer`, 2026-09-08). To add: `RecoveryFSM`, vision `avoidance`.
 - **`BehaviorDriver`** composes those and emits the transition markers itself
-  (as `DIAG` effects); `behavior/diag_bridge.emit_tick()` is the "driving loop
-  logs the transition" step for the behaviour layer.
+  (as `DIAG` effects); the runtime's bindings log each one through `behavior/bindings.py`
+  `_default_diag`, with the level and event name from `behavior/diag_bridge.py`'s map
+  (wired 2026-10-18; `diag report` reads them as the behaviour timeline).
 - **The driving loop logs the transition** with the reason + the inputs that
   produced it, only when something actually changes:
 
@@ -154,6 +155,7 @@ every WARN+ event; INFO-level decision events show in `diag tail` and full
 
 ## Post-hoc tooling — `python -m pi_pipeline.diag`
 
+- `diag report [session] [--html out.html]` — one report per session (`diag/report.py`): the walks it ran (end reasons, late ticks, worst tick gap, floor), behaviour transitions, narration timing (decision to end of speech, synthesis, lines dropped as late), walks that did not stop in time, wake triggers (ignored, looked false), billed API calls, camera timeouts and supervised-worker restarts, every WARN+ event, and the profiler report when `G2_PROFILE=1`. It reads the other logs for the session's time window, so run it where they live (the Pi) or after syncing them.
 - `diag summarize <session>` — timeline of WARN+ events, duration, incident
   count, manifest highlights
 - `diag replay <session> [--around <ts>]` — dump / plot a black-box window

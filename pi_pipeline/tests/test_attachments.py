@@ -244,3 +244,38 @@ def test_the_voice_module_replies_are_read_so_the_firmware_check_sees_the_real_b
             return self.pending.pop(0)
     A.use("head")
     assert A.startup_check(Link()) is True
+
+
+def test_a_trim_measured_on_the_current_floor_wins_on_that_floor_only(policies, monkeypatch, tmp_path):
+    prof = tmp_path / "profiles.json"
+    prof.write_text(json.dumps(_prof("V7.onnx")))
+    monkeypatch.setattr(A, "PROFILES_PATH", str(prof))
+    monkeypatch.setenv("G2_ATTACHMENT", "head")
+    monkeypatch.delenv("G2_FOOT_TRIM", raising=False)
+    A.set_floor_trim("head", "Tile", "fl=-0.1", path=str(prof))
+    assert A.load_profiles(str(prof))["head"]["current"]["trim_by_floor"] == {"tile": "fl=-0.1"}
+    v7 = policies["V7.onnx"]
+    assert H.default_foot_trim(v7, floor="tile") == H.parse_foot_trims("fl=-0.1")
+    assert H.default_foot_trim(v7, floor="hardwood") == H.parse_foot_trims("fl=-0.3")      # no hardwood entry: the general trim
+    assert H.default_foot_trim(v7, floor=None) == H.parse_foot_trims("fl=-0.3")
+    monkeypatch.setattr(H, "current_floor", lambda: "tile")
+    assert H.default_foot_trim(v7) == H.parse_foot_trims("fl=-0.1")                        # "auto" reads the floor label
+    A.set_floor_trim("head", "tile", None, path=str(prof))
+    assert H.default_foot_trim(v7, floor="tile") == H.parse_foot_trims("fl=-0.3")
+
+
+def test_a_stale_or_unknown_floor_label_is_not_used(monkeypatch):
+    from pi_pipeline.telemetry import autolog
+    monkeypatch.setattr(autolog, "get_surface_info", lambda: ("tile", 30.0))
+    assert H.current_floor() is None
+    monkeypatch.setattr(autolog, "get_surface_info", lambda: ("tile", 1.0))
+    assert H.current_floor() == "tile"
+    monkeypatch.setattr(autolog, "get_surface_info", lambda: ("unknown", 0.1))
+    assert H.current_floor() is None
+
+
+def test_floor_trim_needs_a_saved_gait(tmp_path):
+    prof = tmp_path / "p.json"
+    prof.write_text(json.dumps({"arm": {"current": None, "history": []}}))
+    with pytest.raises(ValueError):
+        A.set_floor_trim("arm", "tile", "fl=-0.1", path=str(prof))

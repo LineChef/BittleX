@@ -64,3 +64,44 @@ def test_a_low_confidence_wake_word_is_ignored_only_when_the_gate_is_on(monkeypa
     w2._Recognizer = Rec
     w2.wait()
     assert len(made) == 1                                         # the gate is off by default: the first hit wakes him
+
+
+def test_words_before_and_the_gate_setting(monkeypatch):
+    from pi_pipeline.voice.wake_word import max_words_before, words_before
+    assert words_before("gee two", "gee two") == 0 and words_before("[unk] [unk] gee two", "gee two") == 2
+    monkeypatch.delenv("G2_WAKE_MAX_BEFORE", raising=False)
+    assert max_words_before() is None
+    monkeypatch.setenv("G2_WAKE_MAX_BEFORE", "1")
+    assert max_words_before() == 1
+    monkeypatch.setenv("G2_WAKE_MAX_BEFORE", "x")
+    assert max_words_before() is None
+
+
+def test_phrase_buried_in_talk_is_ignored_when_the_cap_is_set(monkeypatch):
+    import json
+    from pi_pipeline.tests.test_wake_handover import _Rec, _wake
+    texts = iter(["[unk] [unk] [unk] gee two", "gee two"])
+    made = []
+
+    class Rec(_Rec):
+        def __init__(self, *a):
+            super().__init__(*a)
+            made.append(self)
+            self.t = next(texts, "gee two")
+
+        def PartialResult(self):
+            return json.dumps({"partial": self.t if self.n >= 2 else ""})
+    monkeypatch.setenv("G2_WAKE_MAX_BEFORE", "1")
+    monkeypatch.setenv("G2_WAKE_LOG", "off")
+    w, _ = _wake()
+    w._Recognizer = Rec
+    w.wait()
+    assert len(made) == 2                      # the first (buried) hit was dropped and a fresh recogniser made
+
+
+def test_suggest_min_conf_needs_data_and_separation():
+    from pi_pipeline.voice.wake_log import suggest_min_conf
+    assert suggest_min_conf([0.9, 0.95], [0.3, 0.4, 0.5]) is None             # too few real ones
+    s = suggest_min_conf([0.8, 0.9, 0.95], [0.3, 0.4, 0.5])
+    assert s is not None and 0.5 < s[0] <= 0.8 and s[1] == 3 and s[2] == 0
+    assert suggest_min_conf([0.3, 0.4, 0.5], [0.8, 0.9, 0.95]) is None        # false ones are MORE confident: no threshold helps

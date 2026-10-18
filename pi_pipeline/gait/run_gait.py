@@ -179,7 +179,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     if foot_trim is None and not scripted and not foot_hold and not heading_hold and steer_const is None:     # the everyday policy walk: the measured constant trim (heading_hold.DEFAULT_TRIMS)
         foot_trim = _hh.default_foot_trim(getattr(pol, "onnx_path", None))
         if foot_trim:
-            print(f"[steer] constant foot trim {foot_trim} (G2_FOOT_TRIM=off disables)", flush=True)
+            print(f"[steer] constant foot trim {foot_trim} on floor {_hh.current_floor() or 'unknown/stale'} (G2_FOOT_TRIM=off disables)", flush=True)
     autolog_run, end_reason = None, ["other"]
     if not log_path:                     # no explicit --log: every policy walk (voice, exploration, command line) is captured automatically
         try:
@@ -495,6 +495,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
             diag.event("gait", "FATAL", "loop.exception", err=repr(e))
         raise
     finally:
+        _t_end = time.monotonic()                    # how long the end of the walk takes (the stop timeout in policy_walker.py is 5 s; it was hit six times on 2026-10-18)
         if wd is not None:
             wd.stop()
         if not in_service:
@@ -512,6 +513,11 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                 pass
             _send(lk, "kbalance")     # an exploration leg ended with another about to start (2026-10-09, user): hold a balanced stand, not the last stride; the session rests at its end
             time.sleep(0.8)
+        _end_s = time.monotonic() - _t_end
+        if _end_s > 2.0:
+            print(f"slow walk end: {_end_s:.1f} s from the loop's exit to the final pose (rest/balance blend, sends)", flush=True)
+            if diag is not None:
+                diag.event("gait", "WARN", "walk.slow_end", seconds=round(_end_s, 2), reason=end_reason[0])
         if vision is not None:
             vision.close()
         if logf:

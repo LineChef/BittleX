@@ -164,9 +164,12 @@ class BehaviorRuntime:
         sensors = {k: v for k, v in (self._sensors() or {}).items()
                    if k in _SENSOR_KEYS}
         age, n_recent = self._recency()
+        if getattr(self, "_body", None) is None:
+            from ..personality.body import CachedBody
+            self._body = CachedBody()
         return DriverInputs(
             now=now, frame=list(self._frame_source() or []),
-            last_interaction_s=age, exchanges_recent=n_recent,
+            last_interaction_s=age, exchanges_recent=n_recent, body_idle_mult=self._body.idle_mult(),
             known_person_labels=frozenset(self._roster() or ()),
             **sensors, **evt,
         )

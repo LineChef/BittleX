@@ -42,6 +42,15 @@ _RULES = (
 _WALL = re.compile(r"^wall (ahead|blocked) \(([\d.]+) in.*?\): turn (left|right)")
 
 
+def fixed_lines() -> list[str]:
+    """Every narration sentence that does not depend on a detection label, for pre-making the speech (voice/speech_cache.py)."""
+    out = [t for _p, _k, t in _RULES if "{x}" not in t]
+    for side in ("left", "right"):
+        out.append(f"I'm right up against a wall. Turning {side}.")
+        out += [f"I see a wall about {n} inches ahead. Turning {side}." for n in range(7, 31)]
+    return out
+
+
 def line_for(reason: str, private=()) -> tuple[str, str] | None:
     """(kind, text) for a behavior reason, or None if it is not worth saying."""
     r = (reason or "").strip().lower()
@@ -61,7 +70,9 @@ def line_for(reason: str, private=()) -> tuple[str, str] | None:
 
 
 class Narrator:
-    def __init__(self, speak, *, min_gap_s: float = 5.0, repeat_s: float = 25.0, clock=time.monotonic, threaded: bool = True, private=()):
+    def __init__(self, speak, *, min_gap_s: float = 5.0, repeat_s: float = 25.0, clock=time.monotonic, threaded: bool = True, private=(), prepare=None, play=None):
+        self._prepare, self._play = (prepare, play) if prepare and play else (None, None)      # synthesise and play apart, so a line that took too long to make can still be dropped
+        self.late_s = 8.0                        # a line not ready to play this long after it was decided is dropped (the speech lag, 2026-10-10: heard 7 to 17 s late)
         self._private = tuple(private)
         self._speak, self._min_gap, self._repeat, self._clock = speak, min_gap_s, repeat_s, clock
         self._last_any: float | None = None
@@ -81,9 +92,27 @@ class Narrator:
                 log.info("narration dropped (%s): %s", "muted" if not self.enabled else "stale", text)
                 continue
             try:
-                self._speak(text)
+                self._say_timed(queued_at, text)
             except Exception:  # noqa: BLE001 -- narration must never take the behavior loop down
                 log.debug("narration speak failed", exc_info=True)
+
+    def _say_timed(self, queued_at: float, text: str) -> None:
+        """Speak one line and log where the time went (queue, synthesis, waiting for the speaker, playing), so a late line can be traced."""
+        t0 = self._clock()
+        if self._prepare is None:
+            self._speak(text)
+            log.info("narration timing: queued %.1f s, speech call %.1f s: %s", t0 - queued_at, self._clock() - t0, text)
+            return
+        item = self._prepare(text)
+        t1 = self._clock()
+        if item is None:
+            return
+        if not self.enabled or t1 - queued_at > self.late_s:
+            log.info("narration dropped (%s): %s (queued %.1f s, synthesis %.1f s)", "muted" if not self.enabled else "late", text, t0 - queued_at, t1 - t0)
+            return
+        self._play(item)
+        t2 = self._clock()
+        log.info("narration timing: queued %.1f s, synthesis %.1f s, play %.1f s (incl. waiting for the speaker), %.1f s from decision to end: %s", t0 - queued_at, t1 - t0, t2 - t1, t2 - queued_at, text)
 
     def quiet(self, on: bool) -> None:
         """Mute narration (a command window is open: G2 must hear, not talk) and forget a line that is waiting."""

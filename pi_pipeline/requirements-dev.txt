@@ -2,3 +2,8 @@
 #   pip install -r pi_pipeline/requirements-dev.txt
 #   pytest pi_pipeline/tests -q
 pytest>=8.0
+
+# Lint (correctness rules only, config in pyproject.toml): ruff 0.8.4, sha256 of the wheel
+# ffb60904651c00a1e0b8df594591770018a0f04587f7deeb3838344fe3adabac (ruff-0.8.4-py3-none-macosx_10_12_x86_64.whl, PyPI)
+#   pi_pipeline/.venv/bin/ruff check
+ruff==0.8.4

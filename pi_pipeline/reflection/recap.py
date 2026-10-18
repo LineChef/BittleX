@@ -128,6 +128,30 @@ def recap_text(r: dict) -> str:
     return " ".join(parts)
 
 
+def observation_from_recap(r: dict) -> tuple[str, str]:
+    """(caption, labels) for the memory's observations table ("Things you saw earlier", recalled when someone asks what or where G2 saw something), from one
+    session's recap: what the detector saw at the survey stops, the room he was mostly in, the walls and bumps. Local data only, no picture, no API call.
+    ("", "") when the session saw nothing worth keeping."""
+    if not r:
+        return "", ""
+    seen = sorted((r.get("seen") or {}).items(), key=lambda kv: -kv[1])
+    rooms = sorted((r.get("rooms") or {}).items(), key=lambda kv: -kv[1])
+    ev = r.get("events") or {}
+    parts = []
+    if seen:
+        parts.append("while exploring I saw " + ", ".join(f"a {k}" + (f" (at {_n(v, 'stop')})" if v > 1 else "") for k, v in seen[:6]))
+    if rooms:
+        parts.append(f"I was mostly in the {rooms[0][0]}" + (f", also the {', the '.join(k for k, _v in rooms[1:3])}" if len(rooms) > 1 else ""))
+    if ev.get("wall.hit"):
+        parts.append(f"I bumped into something {_times(ev['wall.hit'])}")
+    if ev.get("fall"):
+        parts.append(f"I fell down {_times(ev['fall'])}")
+    if not parts:
+        return "", ""
+    caption = "; ".join(parts)
+    return caption[0].upper() + caption[1:] + ".", ",".join(k for k, _v in seen[:10])
+
+
 class ExperienceLog:
     def __init__(self, path: str | None = None):
         self.path = Path(path or experiences_path()).expanduser()

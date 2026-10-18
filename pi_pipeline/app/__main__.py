@@ -70,11 +70,12 @@ def _make_memory():
     return Memory(settings)
 
 
-def _make_vision_source():
+def _make_vision_source(sensor_opt: int | None = None):
     """Start the camera's detection feed on a background thread, or None.
 
     Only on real hardware with `features.vision` on; a missing/unplugged camera
-    degrades to "no vision" rather than stopping the app.
+    degrades to "no vision" rather than stopping the app. `sensor_opt` overrides
+    `settings.vision_sensor_opt` (an in-process exploration detects at 0, the picture option).
     """
     from ..vision.feed import BackgroundFrameSource, SerialDetectionFeed
     animal_filter = None
@@ -86,7 +87,7 @@ def _make_vision_source():
             settings.vision_serial_port, settings.vision_serial_baud,
             frame_px=settings.vision_frame_px, labels=settings.vision_labels,
             min_score=settings.vision_min_score,
-            sensor_opt=settings.vision_sensor_opt, ae_bump=settings.vision_ae_bump,
+            sensor_opt=settings.vision_sensor_opt if sensor_opt is None else sensor_opt, ae_bump=settings.vision_ae_bump,
             snapshot_sensor_opt=None if settings.vision_snapshot_sensor_opt < 0 else settings.vision_snapshot_sensor_opt,
             detection_filter=animal_filter)
     except Exception:  # noqa: BLE001

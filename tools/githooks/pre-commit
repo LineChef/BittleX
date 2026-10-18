@@ -16,6 +16,7 @@
 #      policy name in the wrong page, a stale generated docs/backlog.md.
 #   5. Commit hygiene: BLOCK a commit that adds more than 150 files or any file over 5 MB (override: G2_ALLOW_BIG_COMMIT=1), and WARN
 #      about leftover untracked files / scratch (tools/g2_cleanup.py) so they get committed by exact path or deleted.
+#   6. Lint (ruff, correctness rules only, pyproject.toml): undefined names, mutable defaults, syntax errors in staged .py files. Skipped if ruff is not installed.
 # Activate once per clone:  git config core.hooksPath tools/githooks
 # Bypass a genuine false positive:  git commit --no-verify
 set -u
@@ -69,6 +70,18 @@ if printf '%s\n' "$staged_all" | grep -qE '\.md$|^tools/(check_docs|gen_backlog)
   printf '%s\n' "$staged_all" | grep -qE '^pi_pipeline/gait/residual_policy\.py$' && doc_mode=""
   if ! python3 "$(git rev-parse --show-toplevel)/tools/check_docs.py" $doc_mode --quiet-warnings; then
     echo "pre-commit: doc checks failed (ERROR lines above). Fix them, or bypass with --no-verify."
+    exit 1
+  fi
+fi
+
+# --- 6. lint the staged Python files (correctness rules only; skipped when ruff is not installed) ---------
+_root="$(git rev-parse --show-toplevel)"
+_ruff="$_root/pi_pipeline/.venv/bin/ruff"
+[ -x "$_ruff" ] || _ruff="$(command -v ruff || true)"
+_py="$(git diff --cached --name-only --diff-filter=ACM -- '*.py')"
+if [ -n "$_ruff" ] && [ -n "$_py" ]; then
+  if ! printf '%s\n' "$_py" | (cd "$_root" && xargs "$_ruff" check --quiet); then
+    echo "pre-commit: ruff found a real problem in the staged Python files (fix it, or --no-verify for a false positive)"
     exit 1
   fi
 fi

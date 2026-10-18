@@ -115,6 +115,13 @@ def _no_wake_log(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_body_state_or_speech_cache(monkeypatch):
+    """Tests never write G2's real body-state file or speech cache (their own tests point them at temp paths)."""
+    monkeypatch.setenv("G2_BODY_STATE", "off")
+    monkeypatch.setenv("G2_SPEECH_CACHE", "off")
+
+
+@pytest.fixture(autouse=True)
 def _no_detection_log(monkeypatch):
     """Tests never write detection logs into the real ~/g2_runs/detections."""
     monkeypatch.setenv("G2_DETECTION_LOG", "off")
