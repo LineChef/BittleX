@@ -125,3 +125,13 @@ def test_a_floor_override_replaces_the_recorded_label_and_unknown_takes_runs_out
     json.dump([{"from": start[:11] + "00:00", "to": start[:11] + "23:59", "surface": "tile"}], open(str(tmp_path / "data" / "floor_overrides.json"), "w"))
     m = gi.ingest(raw, store, EPOCHS)
     assert {x["run"]: x["surface"] for x in gi.ingest(raw, store, EPOCHS)["runs"]}["b"] == "tile"          # the person's word replaces the recorded label
+
+
+def test_a_run_is_re_tagged_with_the_epoch_in_force_when_it_started():
+    import importlib.util, os
+    spec = importlib.util.spec_from_file_location("g2_ingest_t", os.path.join(os.path.dirname(__file__), "..", "..", "tools", "g2_ingest.py"))
+    G = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(G)
+    eps = {e["id"]: e for e in [{"id": "a", "start": "2026-10-07T08:00"}, {"id": "b", "start": "2026-10-17T00:00"}, {"id": "c", "start": "2026-10-18T00:00"}]}
+    assert G.epoch_at("2026-10-18T08:30:40", eps) == "c" and G.epoch_at("2026-10-17T12:00:00", eps) == "b"
+    assert G.epoch_at("2026-10-10T09:00:00", eps) == "a" and G.epoch_at("2026-10-01T09:00:00", eps) is None and G.epoch_at(None, eps) is None

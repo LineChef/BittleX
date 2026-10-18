@@ -55,6 +55,18 @@ def load_epochs(path: str = EPOCHS_PATH) -> dict:
         return {}
 
 
+def epoch_at(started, epochs: dict) -> str | None:
+    """The hardware epoch in force when a run started (the newest epoch whose start is not after it). The Mac's epoch file is the authority:
+    the Pi stamps each run from its own copy, which lags when hardware changes before the file reaches it (2026-10-18: the pod and AI head runs were stamped hw-2026-10-07)."""
+    if not started:
+        return None
+    best = None
+    for e in sorted((e for e in epochs.values() if e.get("start")), key=lambda e: e["start"]):     # an epoch without a start time never matches
+        if e["start"] <= str(started):
+            best = e["id"]
+    return best
+
+
 def read_csv(path: str) -> tuple[list[str], list[list[str]]]:
     with open(path, newline="") as f:
         lines = [ln for ln in f if ln.strip() and not ln.startswith("#")]
@@ -202,6 +214,9 @@ def ingest(raw: str, store: str, epochs: dict | None = None) -> dict:
                 continue
             lab_path = os.path.join(raw, day, stem + ".labels.json")
             labels = json.load(open(lab_path)) if os.path.isfile(lab_path) else []
+            by_time = epoch_at(side.get("started"), epochs)
+            if by_time and by_time != side.get("epoch"):
+                side = dict(side, epoch=by_time, epoch_stamped=side.get("epoch"))      # re-tagged from the start time (the stamp is kept)
             m = measure(csv_path) if os.path.isfile(csv_path) else {}
             why = gate(side, labels, m, epochs, overrides) if m else ["no log file"]
             status = "excluded" if (why and why[0].startswith("excluded")) else "quarantined" if why else "usable"

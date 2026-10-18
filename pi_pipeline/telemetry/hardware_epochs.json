@@ -8,5 +8,9 @@
   {"id": "hw-2026-10-06b", "start": "2026-10-06T14:15", "fit_ok": true,
    "note": "FL shoulder servo (servo 8) replaced and recalibrated; drift fell from about +142 to about +40 deg per 12.7 s. Start time approximate (about 2:15 PM, to confirm)."},
   {"id": "hw-2026-10-07", "start": "2026-10-07T08:00", "fit_ok": true,
-   "note": "User's joint and gyro calibration (IMU zero re-measured about 9:30 AM). Start time approximate (to confirm)."}
+   "note": "User's joint and gyro calibration (IMU zero re-measured about 9:30 AM). Start time approximate (to confirm)."},
+  {"id": "hw-2026-10-17", "start": "2026-10-17T00:00", "fit_ok": true,
+   "note": "Pi moved into the Bittle X Pi add-on pod on the platform cover, camera on top of the pod at the front; payload 185 g (was 168 g). Start time approximate (the day, to confirm)."},
+  {"id": "hw-2026-10-18", "start": "2026-10-18T00:00", "fit_ok": true,
+   "note": "Petoi AI head (42 g) mounted on the neck servo, Grove cable in G1 with data; with the pod about 481 g in all (sim profile pod). Start time approximate (the morning, to confirm)."}
 ]
