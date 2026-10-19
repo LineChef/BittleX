@@ -38,7 +38,7 @@ Everything below is on the Pi as of 2026-10-18 (the Pi's `pi_pipeline/.deployed_
 ## Exercised on the real robot
 
 - **Walking:** V2.1 on hardwood (six steady runs, drifts right, rolls about ±6°); V4 on hardwood and over a 1/4 in ramped threshold with no falls (2026-10-09); V6 calibrated on hardwood with a fixed trim (2026-10-10); V7 on hardwood with the pod and AI head, three 12 s walks, no falls (2026-10-18). Data: [`rl/real-walk-log.md`](rl/real-walk-log.md).
-- **Poses and transitions** on the pod payload (2026-10-18): stand, sit, rest, stand-from-sit smooth with balance off; the wave flipped him twice.
+- **Poses and transitions** on the pod payload (2026-10-18): stand, sit, rest, stand-from-sit smooth with balance off; the wave flipped him twice. Since 2026-10-19 every pose plays with the firmware gyro balance on (`G2_POSE_BALANCE`), turned off again by the stand guard once he is still; not yet tried on G2.
 - **Exploration** on the pod payload (2026-10-18, two tight-room roams of 3 and 4 minutes): wall turns, a hit sequence, survey and milestone pictures, narration; one tip-over at a survey stop.
 - **Voice to Claude to walk,** spoken replies, and the first full listen-talk-walk run (2026-10-04); exploration by voice hand-over (2026-10-05).
 - **Wall avoider and hit sequence** (2026-10-10 evening, camera in its old place): the user judged avoidance "working fairly well".

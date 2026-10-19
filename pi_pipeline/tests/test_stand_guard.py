@@ -124,12 +124,12 @@ def make_actuator(off_idle):
     return SerialActuator("x", 1, link=link, balance_off_idle=off_idle), link
 
 
-def test_gait_gets_balance_on_just_before_and_a_posture_gets_it_off_after():
+def test_gait_gets_balance_on_just_before_and_a_posture_keeps_it_on():
     act, link = make_actuator(True)
     act.perform("walk_forward")
     assert link.sent == ["gB", "kwkF"]
     link.sent.clear(); act.perform("sit")
-    assert link.sent[0].startswith("k") and link.sent[-1] == "gb"
+    assert link.sent == ["ksit"]                                              # a pose keeps balance on (user, 2026-10-19); the stand guard turns it off after
     link.sent.clear(); act.stop()
     assert link.sent == ["d", "gb"]
 
@@ -218,6 +218,21 @@ def test_a_swing_while_balance_is_already_off_is_motion_not_a_balance_wobble():
     n = g.trips
     run_guard(g, link, clock, 15, start=500)
     assert g.trips > n                                       # now a swing IS a balance wobble
+
+
+def test_balance_goes_off_once_a_pose_with_balance_on_is_over():
+    link, clock = EpochLink(), Clock()
+    link.pose_balance_epoch = 0
+    g = StandGuard(link, clock=clock, sleep=lambda s: None, quiet_after_activity_s=8.0, reassert_s=1e9)
+    g.start(); g._stop.set()
+    link.sent.clear()
+    link.pose_balance_epoch += 1; g.note_activity()                # the link sent `gB` before a pose
+    for _ in range(35):                                            # 7 s: inside the quiet window, the pose keeps balance on
+        clock.t += 0.2; g.tick()
+    assert "gb" not in link.sent
+    for _ in range(10):                                            # past the 8 s quiet window: balance off, once
+        clock.t += 0.2; g.tick()
+    assert link.sent.count("gb") == 1
 
 
 def test_the_link_counts_commands_that_can_switch_balance_on(monkeypatch):

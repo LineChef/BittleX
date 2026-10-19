@@ -130,6 +130,20 @@ PLAIN_SKILLS = frozenset({"kbuttUp", "ksit", "kck"})
 def is_plain(token: str) -> bool:
     """True if `token` is played without easing; `G2_EASE_PICTURE_POSES=1` eases them like every other skill again."""
     return token.strip() in PLAIN_SKILLS and os.environ.get("G2_EASE_PICTURE_POSES", "").strip().lower() not in ("1", "on", "true", "yes")
+
+
+# Every pose plays with the firmware gyro balance ON (user, 2026-10-19: the pod swinging tipped him over in poses that ran with balance off). Not the stand / stop
+# (balance on while standing idle wobbled him, 2026-10-17/18), not lying down, sleeping or calibration, and not the gaits (the callers already set balance for those).
+# The stand guard turns it off again once the pose is over (gait/stand_guard.py). `G2_POSE_BALANCE=0` goes back to poses with balance off.
+POSE_BALANCE_SKIP = STOP_SKILLS | frozenset({"krest", "kzz", "kzero", "kc", "kcd"})
+
+
+def pose_balance(token: str) -> bool:
+    """True if `token` is a pose that plays with the firmware gyro balance on (`gB` sent just before it)."""
+    t = (token or "").strip()
+    if not t.startswith("k") or t in POSE_BALANCE_SKIP or kind(t) == "gait":
+        return False
+    return os.environ.get("G2_POSE_BALANCE", "1").strip().lower() not in ("0", "off", "false", "no")
 SOFT_END_SKEW = 0.75     # the sit: progress is made early and the last stretch is a slow creep (2026-10-18: the feet slipped where the back legs reach the floor)
 
 

@@ -100,6 +100,7 @@ class StandGuard:
         self._quiet_until = 0.0
         self._last_gb = -1e9
         self._gb_epoch = None                # the link's balance_epoch when the guard last sent `gb`: unchanged = nothing has switched balance on since
+        self._pose_epoch = None              # the link's pose_balance_epoch then: changed = a pose has played with balance on since
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self.trips = 0
@@ -121,6 +122,7 @@ class StandGuard:
             self._link.send("gb", read_reply=False, settle=0.0)
             self._last_gb = self._clock()
             self._gb_epoch = getattr(self._link, "balance_epoch", None)
+            self._pose_epoch = getattr(self._link, "pose_balance_epoch", None)
             log.info("firmware gyro balance off (%s)", why)
         except Exception:  # noqa: BLE001 -- the guard must never take the service down
             log.debug("sending gb failed", exc_info=True)
@@ -212,8 +214,11 @@ class StandGuard:
             self._quiet_until = now + self._quiet_s
             self._det.reset()
             return False
-        if self._balance_off_idle and now - self._last_gb >= self._reassert_s:
-            self._gb("periodic re-assert")
+        if self._balance_off_idle and now >= self._quiet_until:            # never inside the quiet window: a pose plays with balance on (user, 2026-10-19)
+            if now - self._last_gb >= self._reassert_s:
+                self._gb("periodic re-assert")
+            elif getattr(self._link, "pose_balance_epoch", None) not in (None, self._pose_epoch):
+                self._gb("pose over")                                      # a pose played with balance on and he has been still since
         if self._forced_off_at is not None and self._reenable_s and now - self._forced_off_at >= self._wait_s:
             try:                                                   # probation: put the firmware balance back
                 self._link.send("gB", read_reply=False, settle=0.0)

@@ -11,6 +11,7 @@ import logging
 import threading
 from typing import Protocol
 
+from ..link import transitions
 from . import skills
 
 log = logging.getLogger("g2.actuator")
@@ -151,8 +152,8 @@ class SerialActuator:
         if continuous:
             self._balance(True)            # the firmware gaits are tuned with balance on
         self._send(cmd, read_reply=False)
-        if not continuous:
-            self._balance(False)           # a posture or trick: balance stays off
+        if not continuous and not transitions.pose_balance(cmd):
+            self._balance(False)           # a posture or trick: balance stays off (a pose keeps it on until the stand guard turns it off, user 2026-10-19)
         self._gait_active = continuous
         if skills.SKILLS[skill_name].continuous:
             # a requested duration bounds the walk; if a standing cap is set it is a hard ceiling on top

@@ -42,6 +42,10 @@ class LockedLink:
         return getattr(self._link, "balance_epoch", None)
 
     @property
+    def pose_balance_epoch(self):
+        return getattr(self._link, "pose_balance_epoch", None)
+
+    @property
     def is_connected(self) -> bool:
         return getattr(self._link, "is_connected", False)
 

@@ -212,7 +212,19 @@ def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monke
 @pytest.fixture(autouse=True)
 def _ease_the_picture_poses(monkeypatch):
     monkeypatch.setenv("G2_EASE_PICTURE_POSES", "1")                    # the ramp tests use ksit / kck as examples; the plain default has its own test
+    monkeypatch.setenv("G2_POSE_BALANCE", "0")                          # the ramp tests count the commands sent; pose balance has its own test
 
+
+def test_a_pose_plays_with_gyro_balance_on_but_not_a_stand_rest_or_gait(monkeypatch):
+    monkeypatch.delenv("G2_EASE_PICTURE_POSES")
+    monkeypatch.delenv("G2_POSE_BALANCE")
+    assert _ramped(monkeypatch, "kbalance", "kbuttUp") == ["gB", "kbuttUp"]                # user, 2026-10-19: the pod swinging tipped him in poses with balance off
+    sent = _ramped(monkeypatch, "kbalance", "kwh")
+    assert sent[0] == "gb" and sent[-2:] == ["gB", "kwh"]                                   # the ease runs with balance off, the pose with it on
+    for token in ("kup", "kbalance", "krest", "kwkF"):
+        assert "gB" not in _ramped(monkeypatch, "kbalance", token), token
+    monkeypatch.setenv("G2_POSE_BALANCE", "0")
+    assert _ramped(monkeypatch, "kbalance", "kbuttUp") == ["kbuttUp"]
 
 
 def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):

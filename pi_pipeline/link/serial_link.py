@@ -138,6 +138,7 @@ class SerialLink:
 
     last_motion_command: str = ""
     balance_epoch: int = 0       # counts the commands sent that can switch the firmware balance on (see send)
+    pose_balance_epoch: int = 0  # counts the poses sent with balance on (transitions.pose_balance)
     on_failure = None            # callable(why): the "wrong answer" signal when a MOTION command (k / d / i / m) could not be sent (user, 2026-10-10); set by the services, never raises
 
     def _failed(self, command: str, why: str) -> None:
@@ -164,6 +165,9 @@ class SerialLink:
             return ""
         try:
             self._ease_transition(command)
+            if transitions.pose_balance(command):
+                self._write_pose("gB")            # a pose plays with the firmware gyro balance on (user, 2026-10-19); after the ease, which runs with it off
+                self.pose_balance_epoch += 1      # the stand guard turns it off again once he has been still
             if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep
                 from ..voice import audio_gate
                 if not _deferred and audio_gate.is_busy():          # speech or another beep is sounding: send this beep a moment later from its own thread. NEVER wait here: the link is shared and a wait starved the walk loop of IMU frames (2026-10-10)
