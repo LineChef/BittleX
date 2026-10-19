@@ -222,7 +222,7 @@ def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
     sent = _ramped(monkeypatch, "kbalance", "kck")
     assert sent[0] == "gb" and sent[-1] == "kck" and all(c.startswith("i8 ") for c in sent[1:-1])        # balance off first, then the ramp
     hi = tr.table()["ck"]["first"]
-    assert len(sent) - 2 == 32                                                    # the leading gb, then the ramp: the test caps the ramp at 0.8 s (G2_TRANSITION_RAMP_S); uncapped it would be 1.55 s for the 82.5 deg move
+    assert len(sent) - 2 == 25                                                    # the leading gb, then the ramp: the check skill's own peak speed (120 deg/s, `transitions.PEAK_BY_SKILL`) makes it 0.62 s for the 82.5 deg move, 25 steps at 40 a second
     last_pose = [int(x) for x in sent[-2].split()[1::2]]
     assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
     assert "i0" not in " ".join(sent)                                             # the head is never moved by the ramp

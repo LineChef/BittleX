@@ -196,7 +196,7 @@ class _Choreo:
     def __init__(self, *, clock=time.monotonic):
         self._clock = clock
         self._queue: list = []          # (due_time, Effect), sorted by due_time
-        self._after_shot = None         # the due time of a picture step just released: the camera call BLOCKS (stillness wait, warm-up), so the steps behind it keep their gaps from it
+        self._after_shot = None         # the due time of a picture or skill step just released: the camera call BLOCKS (stillness wait, warm-up) and so does an eased skill (up to 2 s of ramp), so the steps behind it keep their gaps from the end of it (2026-10-18: the check was given 2 s of its 3 and the stand cut it off mid-lean)
         self._on_done = None
         self._label = ""
 
@@ -229,7 +229,7 @@ class _Choreo:
         while self._queue and self._queue[0][0] <= t:
             due, eff = self._queue.pop(0)
             out.append(eff)
-            if eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, (tuple, list)) and eff.payload[:1] == ("shot",) or (eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, tuple) and eff.payload and eff.payload[0] == "shot"):
+            if eff.kind is EffectKind.SKILL and self._label in ("survey", "naming") and self._queue and self._queue[0][0] > due or eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, (tuple, list)) and eff.payload[:1] == ("shot",) or (eff.kind is EffectKind.CAPTURE and isinstance(eff.payload, tuple) and eff.payload and eff.payload[0] == "shot"):
                 self._after_shot = due
                 break                                               # nothing behind the picture is released in the same pump
         if not self._queue and self._on_done is not None:

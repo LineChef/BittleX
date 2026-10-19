@@ -94,7 +94,7 @@ def test_driver_surveys_at_the_end_of_a_leg_then_walks_on():
     assert [e.payload for e in t.effects if e.kind is EffectKind.SKILL] == ["ksit"]       # the first thing is the look up
     assert EffectKind.STOP not in [e.kind for e in t.effects]                               # never a rest in the middle of exploring
     walking(d)                                           # from now on the explorer would keep walking, if the choreography let it
-    during = run_for(d, c, 5.9)                         # the plan runs to 5.6 s (1.8 + 1.8 + the 2.0 s stand settle): kbuttUp, kup and the picture fall inside this window
+    during = run_for(d, c, 6.6)                         # the plan runs to 5.6 s (1.8 + 1.8 + the 2.0 s stand settle) plus a pump interval after each skill, whose gap now counts from the end of the (blocking) skill: kbuttUp, kup and the picture fall inside this window
     skills = [e.payload for e in during if e.kind is EffectKind.SKILL]
     shots = [e.payload for e in during if e.kind is EffectKind.CAPTURE]
     assert skills == ["kbuttUp", "kup"] and shots == [("shot", "after_bow")]
@@ -558,3 +558,18 @@ def test_peeks_can_see_when_a_survey_picture_is_being_taken():
     walking(d)
     run_for(d, c, 30)
     assert d.picture_choreo() == ""
+
+
+def test_a_blocking_skill_does_not_eat_into_the_gap_behind_it():
+    """An eased skill blocks for up to 2 s while it ramps: the step behind it keeps its planned gap from the END of the ramp (2026-10-18: the check got 2 s of its 3 and the stand cut it off)."""
+    from pi_pipeline.behavior.driver import _Choreo
+    now = [0.0]
+    ch = _Choreo(clock=lambda: now[0])
+    ch.start("survey", [(0.0, Effect(EffectKind.SKILL, "ksit", "a")), (1.8, Effect(EffectKind.SKILL, "kbuttUp", "b"))])
+    assert [e.payload for e in ch.pump()] == ["ksit"]
+    now[0] = 2.0                                             # the sit ramp took 2 s
+    assert ch.pump() == []                                   # 1.8 s after the END of it, not after its start
+    now[0] = 3.7
+    assert ch.pump() == []
+    now[0] = 3.9
+    assert [e.payload for e in ch.pump()] == ["kbuttUp"]

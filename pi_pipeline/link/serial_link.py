@@ -225,7 +225,7 @@ class SerialLink:
             if start is None:
                 return                                         # unknown pose: the firmware's own start
             skew = transitions.skew_for(c)
-            secs = transitions.ramp_seconds(start, end, skew=skew)
+            secs = transitions.ramp_seconds(start, end, skew=skew, peak=transitions.peak_for(c))
             if secs <= 0:
                 return
             if transitions.kind(c) != "gait" and c not in transitions.STOP_SKILLS:
