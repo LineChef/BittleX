@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`as-built.md`](../hardware/as-built.md) +5.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`as-built.md`](../hardware/as-built.md) +7.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -343,7 +343,7 @@ Docs that mention this family: [`automated-testing-loop.md`](../archive/automate
 
 ## `v21`
 
-Docs that mention this family: [`README.md`](real-walk-data/2026-10-01/README.md), [`real-walk-log.md`](real-walk-log.md), [`sysid-capture-plan.md`](sysid-capture-plan.md).
+Docs that mention this family: [`README.md`](real-walk-data/2026-10-01/README.md), [`real-walk-log.md`](real-walk-log.md).
 
 | File | Size | Cited by |
 |---|---|---|

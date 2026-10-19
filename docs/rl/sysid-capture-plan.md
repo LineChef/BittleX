@@ -6,22 +6,25 @@ Why and what is in or out: [`v3-decisions-log.md`](../archive/rl/v3-decisions-lo
 
 **Before the first session:** the Pi has the `--log-extra` change (the deploy watcher installs it when the Pi next comes online; check `~/g2_logs/deploy_done`).
 
+**Policy (updated 2026-10-18):** the walks are V7 on the pod and AI head payload (the plan was written for V2.1; the baseline runner walks whatever policy is deployed). V7's hardwood calibration is already done (2026-10-18, its fixed trim `fl=-0.3`, [`real-walk-log.md`](real-walk-log.md)); this capture is for fitting the sim, not for calibrating the walk again.
+Under today's ingest gates, a walk that carries the everyday trim is quarantined as a steering test run, so until that gate changes these walks feed no fit (the proposed change: [`real-data-pipeline.md`](real-data-pipeline.md)).
+
 ## Session A (full pack, hardwood lane, same start spot as the baselines)
 
 | # | What | Command | Notes |
 |---|---|---|---|
 | 1 | Pack voltage at rest | `check_serial send P` (g2-voice stopped) | write it down at the start and the end |
-| 2 | 6 V2.1 walks, extra columns | `bash tools/g2_baseline.sh start 6 sysidA_v21` | `--log-extra` is on by default; fetch with `g2_baseline.sh fetch` |
-| 3 | 6 scripted `wkF` walks (no policy) | `bash tools/g2_baseline.sh start 6 sysidA_wkF --scripted-mix abab` runs V2.1 and `wkF` alternately; use it for 12 runs | the scripted walk is the open-loop reference |
+| 2 | 6 V7 walks, extra columns | `bash tools/g2_baseline.sh start 6 sysidA_v7` | `--log-extra` is on by default; fetch with `g2_baseline.sh fetch` |
+| 3 | 6 scripted `wkF` walks (no policy) | `bash tools/g2_baseline.sh start 6 sysidA_wkF --scripted-mix abab` runs V7 and `wkF` alternately; use it for 12 runs | the scripted walk is the open-loop reference |
 | 4 | Ground truth after every run, by tape | forward distance and sideways offset at the end (cm, + = right) | tell me the numbers in chat; no video |
 | 5 | Bench servo tests (Pi off the lid, Mac USB) | `tools/servo_static_test.py`, then the H13 step test | unloaded in the air, then loaded standing; repeat with the pack at about 7.9 V |
-| 6 | Low-pack walks | the same 6 V2.1 walks when the resting pack reads about 7.9 V | gives speed and servo strength against voltage (the `volt` column) |
+| 6 | Low-pack walks | the same 6 V7 walks when the resting pack reads about 7.9 V | gives speed and servo strength against voltage (the `volt` column) |
 
 ## Session B (another day, another charge): repeat 1-4 and 6 only. The fit on A is checked against B.
 
 ## Ledge (after A; low heights only, G2 never above the floor)
 
-One or two heights are enough (user, 2026-10-07), inside the sim's range (up to 35 mm), for example a book at about 12 mm and one at about 25 mm. Three V2.1 runs into each, tape the end position, note success or failure and where it caught. Logged with `--log-extra`.
+One or two heights are enough (user, 2026-10-07), inside the sim's range (up to 35 mm), for example a book at about 12 mm and one at about 25 mm. Three V7 runs into each, tape the end position, note success or failure and where it caught. Logged with `--log-extra`.
 Not a climb test; the climb skill is a separate item (B13/H7).
 
 ## First kitchen session (the first G2-on visit; user, 2026-10-07)

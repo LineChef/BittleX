@@ -46,6 +46,35 @@ Statistical screen: a run whose metrics sit outside the epoch's median by more t
 Per-parameter rules in the builder: a minimum number of supporting runs; fit on one half of the runs and check it on the other (a value that moves more than its own noise is not used); physical bounds;
 left-right symmetry for fitted *parameters* (approved 2026-10-07; see below); **no drift parameter exists in the builder** (drift direction and size never feed the sim; a test enforces it).
 
+### Proposed 2026-10-18: loosen the gates (the user asked for more data in; not decided, nothing changed yet)
+
+The store held 625 runs on 2026-10-18: 38 usable, 564 quarantined, 23 excluded by a person. Only 2 of the usable runs are from the current epoch (`hw-2026-10-18`, the pod and AI head). Why the rest are out (a run can have several reasons):
+
+| Reason | Runs | The only reason for |
+|---|---|---|
+| steering test run (every one is `foot_trim`, the everyday constant trim since 2026-10-10) | 456 | 87 |
+| too few rows (239 of them are empty: the log was opened and no walk row was written) | 247 | 11 |
+| steady window under 2 s | 190 | 12 |
+| did not end cleanly (53 process exits, 12 falls, 1 stale IMU) | 66 | 0 |
+| floor marked unknown by a person (`floor_overrides.json`) | 55 | 8 |
+| over 5% of ticks late | 48 | 1 |
+| floor label older than 72 h | 27 | 4 |
+| heading hold worked hard | 7 | 2 |
+| statistical outlier | 6 | 6 |
+
+The builder today fits only two loop-timing numbers (IMU frames per control tick, tick jitter). Neither depends on the floor or a foot trim, yet every run must pass every gate. The proposals:
+
+1. **Gate per fit, not per run.** Each fitted parameter names the gates it needs; the store keeps one status per run and the reasons, and the builder picks. The timing fits need a clean clock and IMU counter; the floor label, trim and epoch matter to body fits (roll and pitch spread, fall and snag rates).
+2. **Count the everyday trim as G2's normal gait.** A walk whose `foot_trim` equals the policy's default from `DEFAULT_TRIMS` (or its per-floor trim) is how G2 walks every day. Test trims, the heading hold, `steer_const` and scripted walks stay out. Drift still never feeds a fit: the trim is not fitted, the builder reads no yaw, and the drift-proxy screen and canary stay. Alone this brings in 87 runs (4 of them V7).
+3. **Shorter steady window, 1 s instead of 2 s,** for the timing fits, which pool seconds across runs anyway: about 30 more runs.
+4. **Drop the late-tick gate for the timing fits.** It removes the very runs whose jitter the jitter fit measures (a biased sample). Keep it for body fits: about 16 more.
+5. **Floor-free fits ignore the floor label** (unknown or older than 72 h): about 25 more, 9 of them V7. Body fits keep the 72 h rule and the person's overrides.
+6. **Keep the walk before a fall or exit.** Cut the last second before the end and use the rest; the fall itself still counts for event rates. Few runs gain today (most also have too few rows), more once walks run longer.
+7. **Pool timing fits across epochs since `hw-2026-10-07`.** The loop timing is the Pi's software, not the body; an epoch boundary (a new payload) matters for body fits only. A software change that alters timing (the 2026-10-18 send-without-drain fix) would start a new timing epoch.
+8. **Report empty logs separately** (not quarantined, nothing to recover), and find why 239 walks wrote no row (walks refused at the tilt check or stopped before the first tick are the first suspects).
+
+With 2 to 6 the usable count goes from 38 to about 200 (about 160 more runs; the current epoch from 2 to about 18). The outlier screen, the person's exclusions and every drift guard below stay as they are.
+
 ## Keeping drift out of the sim (guards, agreed 2026-10-07)
 
 Hardware drift is not a stable property of G2 (it moved from about +142 to about +40 deg per 12.7 s with one servo swap and grew from +44 to +178 deg as the pack sagged); a sim trained against it learns a one-sided correction (the V2.1 problem). The guards:

@@ -674,7 +674,7 @@ Pod (185 g) and AI head (42 g) mounted, about 481 g in all; hardwood. Policy V7.
 | 2 | none | 4 ft 3 in | 5 in right (the same) | roll swing ±5.3 deg, no fall |
 | 3 | `fl=-0.3` | 4 ft | 1 in right of centre | ended normally |
 
-The logged yaw read +146 and +124 deg on the untrimmed walks and does not follow the real heading (IMU yaw drift); the tape measure is the record. `fl=-0.3` became V7's default trim.
+The logged yaw read +146 and +124 deg on the untrimmed walks and does not follow the real heading (IMU yaw drift); the tape measure is the record. `fl=-0.3` became V7's default trim. **This is V7's calibration on G2 (hardwood), done.** More V7 walks are wanted only for another floor's trim or for the sim fit ([`sysid-capture-plan.md`](sysid-capture-plan.md)), not to calibrate V7 again.
 
 **Poses (IMU at 5 Hz, G2 on the floor, stand / sit / stand-from-sit):**
 

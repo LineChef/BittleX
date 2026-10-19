@@ -1,4 +1,4 @@
-"""A series of logged, closed-loop V2.1 walks on the hard floor, for a fresh sim-vs-real baseline (run as `g2-baseline` by tools/g2_baseline.sh).
+"""A series of logged, closed-loop walks of the deployed policy (`DEFAULT_POLICY`) on the hard floor, for a fresh sim-vs-real baseline (run as `g2-baseline` by tools/g2_baseline.sh).
 
 Each run is the proven CLI path (`run_gait.py --cmd 0.10 --seconds 12.5 --log <csv> --log-extra`, fall guard on; `--no-log-extra` for the old columns). G2 speaks before each run and between runs, so
 whoever is with him can put him back at the start of the lane. `touch ~/.g2_baseline_skip` after hearing the prompt to skip the wait.
@@ -35,7 +35,7 @@ def preflight(open_link, speak, *, attempts: int = 3, sleep=time.sleep):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", type=int, default=6)
-    ap.add_argument("--label", default="case_v21")
+    ap.add_argument("--label", default="baseline")
     ap.add_argument("--cmd", type=float, default=0.10)
     ap.add_argument("--seconds", type=float, default=12.5)
     ap.add_argument("--lead-s", type=float, default=20.0, help="spoken warning before a run")
@@ -55,7 +55,7 @@ def main() -> None:
     ap.add_argument("--volt-every", type=float, default=0.0, metavar="S", help="policy walks: ask the BiBoard for the pack voltage (P) this often (0 = the loop's default, 5 s); used to test whether P makes the board click")
     ap.add_argument("--foot-hold-ff", default=None, metavar="F[,F..]", help="feed-forward trim of the foot hold, cycling per run (sets G2_FOOT_HOLD_FF for that run): the A/B of 0 against -0.25")
     ap.add_argument("--hold-off", action="store_true", help="run every walk with the heading hold OFF (G2_FOOT_HOLD=off for the child): the system-identification capture needs G2's natural gait")
-    ap.add_argument("--hold-on-policy", action="store_true", help="--foot-hold on the learned policy (V2.1) instead of the scripted walk")
+    ap.add_argument("--hold-on-policy", action="store_true", help="--foot-hold on the learned policy instead of the scripted walk")
     ap.add_argument("--foot-trim", default=None,
                     help="comma list of per-foot step trims, e.g. none,bl=+0.25,bl=-0.25,br=+0.25,br=-0.25,fl=+0.25,fl=-0.25,fr=+0.25,fr=-0.25: run k uses item k (cycling), 'none' = no trim. The per-foot steering test")
     ap.add_argument("--reset-s", type=float, default=35.0, help="time to put G2 back at the start between runs")
@@ -133,7 +133,7 @@ def main() -> None:
             path = path.replace(".csv", f"_ff{ffv.replace('-', 'm').replace('.', 'p')}.csv")
         scripted = (args.scripted_mix == "scripted" or (args.scripted_mix == "abab" and k % 2 == 1)) and not args.foot_hold     # --foot-hold runs go through the full loop (IMU), scripted via --scripted
         if args.scripted_mix:
-            path = path.replace(".csv", "_wkF.csv" if scripted else "_V21.csv")
+            path = path.replace(".csv", "_wkF.csv" if scripted else "_policy.csv")
         if scripted:                     # the scripted wkF walk, no policy: the base the learned policy corrects (run_gait --openloop)
             rc = subprocess.call([sys.executable, os.path.join(HERE, "run_gait.py"), "--openloop", "--cycles", "10", "--ramp-cycles", "1",
                                   "--openloop-balance-off", "--log", path] + ([] if ft is None else ["--foot-trim", ft]) + ([] if args.no_log_extra else ["--volt-every", "1"]), env=child_env)
