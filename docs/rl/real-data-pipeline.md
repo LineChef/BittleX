@@ -38,7 +38,7 @@ Every run gets a sidecar with: kind, policy name, commands, git commit, hardware
 
 ## Ingest gates: what is kept out of the fits (nothing is deleted; excluded runs are quarantined with a reason)
 
-A run is usable for fitting only if all hold: it is not flagged `excluded` (a person marks a run that must never be used, for example a collision or a pick-up, with `python -m pi_pipeline.telemetry exclude RUN WHY` on the Pi; the log is kept and the sidecar records who, when and why); file complete and time strictly increasing; control loop on time (dropped ticks under a limit); IMU frames arriving (no long stale stretch);
+A run is usable for fitting only if all hold (since 2026-10-18 some of these guard the body fits only, see "Looser gates" below; the list is the full set): it is not flagged `excluded` (a person marks a run that must never be used, for example a collision or a pick-up, with `python -m pi_pipeline.telemetry exclude RUN WHY` on the Pi; the log is kept and the sidecar records who, when and why); file complete and time strictly increasing; control loop on time (dropped ticks under a limit); IMU frames arriving (no long stale stretch);
 no NaN or out-of-range values; the run's hardware epoch is current; surface label known; policy known; length above a minimum; the surface label was set within the last 72 hours (an older label is treated as unknown: the label stays on the Pi until someone changes it, so a stale one would mislabel the next session); no operator pick-up (accel / tilt spike) inside the window used;
 no fall or guard trip inside the window used (those runs still count for event rates); battery above the low-battery line, or tagged by voltage band and never mixed with full-pack data;
 the first seconds after the stand excluded; thermal cooldown stretches excluded.
@@ -46,34 +46,19 @@ Statistical screen: a run whose metrics sit outside the epoch's median by more t
 Per-parameter rules in the builder: a minimum number of supporting runs; fit on one half of the runs and check it on the other (a value that moves more than its own noise is not used); physical bounds;
 left-right symmetry for fitted *parameters* (approved 2026-10-07; see below); **no drift parameter exists in the builder** (drift direction and size never feed the sim; a test enforces it).
 
-### Proposed 2026-10-18: loosen the gates (the user asked for more data in; not decided, nothing changed yet)
+### Looser gates, built 2026-10-18 (user: "implement 1-6")
 
-The store held 625 runs on 2026-10-18: 38 usable, 564 quarantined, 23 excluded by a person. Only 2 of the usable runs are from the current epoch (`hw-2026-10-18`, the pod and AI head). Why the rest are out (a run can have several reasons):
+Why: on 2026-10-18 the store held 625 runs, 38 usable and only 2 from the current epoch (`hw-2026-10-18`, the pod and AI head). The builder fits two loop-timing numbers that do not depend on the floor or a foot trim, yet every run had to pass every gate. What changed (`tools/g2_ingest.py`, `tools/g2_calibrate.py`):
 
-| Reason | Runs | The only reason for |
-|---|---|---|
-| steering test run (every one is `foot_trim`, the everyday constant trim since 2026-10-10) | 456 | 87 |
-| too few rows (239 of them are empty: the log was opened and no walk row was written) | 247 | 11 |
-| steady window under 2 s | 190 | 12 |
-| did not end cleanly (53 process exits, 12 falls, 1 stale IMU) | 66 | 0 |
-| floor marked unknown by a person (`floor_overrides.json`) | 55 | 8 |
-| over 5% of ticks late | 48 | 1 |
-| floor label older than 72 h | 27 | 4 |
-| heading hold worked hard | 7 | 2 |
-| statistical outlier | 6 | 6 |
+1. **Gate per fit.** Each run in `manifest.json` lists the kinds of fit it may feed, `uses`: `timing` (the loop-timing fits) and/or `body` (roll and pitch spread, event rates). `status` is `usable` when `uses` is not empty, `excluded` when a person said so, otherwise `quarantined`. Each reason has a code (`reason_codes`); the checks for the floor label (unknown or older than 72 h), a steady window under 2 s, over 5% late ticks and the outlier screen keep a run out of body fits only. Every other check (a steering test run, the hold working hard, a fall / collision / pickup label, an epoch not `fit_ok`, a damaged clock, a stale IMU, missing values, under 1 s steady) keeps it out of every fit. The builder reads `timing` for its fits and `body` for the roll / pitch monitor. A manifest from before this change has no `uses`: its usable runs count for both.
+2. **The everyday trim is his normal gait.** A walk with `foot_trim` equal to the policy's `DEFAULT_TRIMS` entry, a trim saved with an attachment's gait for that policy (or its per-floor trim for the floor of the run), or marked `foot_trim_source: "everyday"` (the walk loop writes it since 2026-10-18 when the default trim was applied) is no longer a steering test. An explicit `--foot-trim`, the heading hold, `steer_const` and scripted walks still are. Drift still never feeds a fit: the trim is not fitted, the builder reads no yaw, and the whitelist, the drift-proxy screen and the canary stand.
+3. **Timing fits need a 1 s steady window** (body fits keep 2 s); the timing fits pool seconds across runs.
+4. **The late-tick check guards body fits only.** For the timing fits it would remove exactly the runs whose jitter the jitter fit measures.
+5. **The floor label is a body-fit gate.** The timing fits do not depend on the floor; the person's overrides and the 72 h limit still apply to body fits.
+6. **A run that did not end cleanly (a fall, a crash, a stale IMU, any stop but `stopped` or `complete`) is used up to its last second.** The cut is one second (`END_CUT_S`); the late-tick, stale-IMU and missing-value checks and the fitted rows ignore the cut part (`window()` in the ingest tool is shared with the builder). The end reason stays in the manifest, so falls still count for event rates.
 
-The builder today fits only two loop-timing numbers (IMU frames per control tick, tick jitter). Neither depends on the floor or a foot trim, yet every run must pass every gate. The proposals:
-
-1. **Gate per fit, not per run.** Each fitted parameter names the gates it needs; the store keeps one status per run and the reasons, and the builder picks. The timing fits need a clean clock and IMU counter; the floor label, trim and epoch matter to body fits (roll and pitch spread, fall and snag rates).
-2. **Count the everyday trim as G2's normal gait.** A walk whose `foot_trim` equals the policy's default from `DEFAULT_TRIMS` (or its per-floor trim) is how G2 walks every day. Test trims, the heading hold, `steer_const` and scripted walks stay out. Drift still never feeds a fit: the trim is not fitted, the builder reads no yaw, and the drift-proxy screen and canary stay. Alone this brings in 87 runs (4 of them V7).
-3. **Shorter steady window, 1 s instead of 2 s,** for the timing fits, which pool seconds across runs anyway: about 30 more runs.
-4. **Drop the late-tick gate for the timing fits.** It removes the very runs whose jitter the jitter fit measures (a biased sample). Keep it for body fits: about 16 more.
-5. **Floor-free fits ignore the floor label** (unknown or older than 72 h): about 25 more, 9 of them V7. Body fits keep the 72 h rule and the person's overrides.
-6. **Keep the walk before a fall or exit.** Cut the last second before the end and use the rest; the fall itself still counts for event rates. Few runs gain today (most also have too few rows), more once walks run longer.
-7. **Pool timing fits across epochs since `hw-2026-10-07`.** The loop timing is the Pi's software, not the body; an epoch boundary (a new payload) matters for body fits only. A software change that alters timing (the 2026-10-18 send-without-drain fix) would start a new timing epoch.
-8. **Report empty logs separately** (not quarantined, nothing to recover), and find why 239 walks wrote no row (walks refused at the tilt check or stopped before the first tick are the first suspects).
-
-With 2 to 6 the usable count goes from 38 to about 200 (about 160 more runs; the current epoch from 2 to about 18). The outlier screen, the person's exclusions and every drift guard below stay as they are.
+Result on the same 625 runs: 195 usable (111 for body fits, 195 for timing fits), 407 quarantined, 23 excluded; the current epoch has 18 runs and 132 s for the timing fits (it had 2). The builder's accepted number is unchanged (`G2E_IMU_HOLD_STEPS` 16); `G2E_CMD_PATH_EXTRA_MS_MAX` stays refused (user, 2026-10-08).
+The 247 runs with too few rows (239 of them empty: the log was opened and no walk row was written) are unchanged and still need an explanation. Not built, asked for later: pooling the timing fits across hardware epochs, and reporting empty logs separately.
 
 ## Keeping drift out of the sim (guards, agreed 2026-10-07)
 

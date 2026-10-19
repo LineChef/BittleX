@@ -228,3 +228,18 @@ def test_a_snapshot_that_already_has_its_harm_check_is_approved_without_new_data
     json.dump({"status": "passed", "problems": []}, open(gc.harm_path(1), "w"))   # the check finished elsewhere (the Mac was idle later)
     assert gc.read_current() is None
     assert "auto-approved" in gc.auto(log=lambda *_: None) and gc.read_current() == 1
+
+
+def test_timing_only_runs_feed_the_timing_fits_and_a_bad_ending_is_cut(gc, tmp_path):
+    """User, 2026-10-18: a run kept out of the body statistics (unknown floor, late ticks) still counts for the loop-timing fits; its last second is cut when it did not end cleanly."""
+    names = [f"r{i}" for i in range(12)]
+    for n in names:
+        write_run(gc.STORE, n, seconds=8, imu_hz=5.0)
+    m = manifest(names)
+    for r in m["runs"][6:]:
+        r["uses"] = ["timing"]
+        r["surface"] = "unknown"
+    snap = gc.build(m, gc.STORE, EPOCHS, old_values=lambda k: None)
+    assert snap["runs_used"] == 12 and set(snap["monitor"]) == {"tile"} and snap["monitor"]["tile"]["runs"] == 6
+    head, rows = gc.read_run(os.path.join(gc.STORE, "20261007", "r0.csv.gz"))
+    assert gc.run_estimates(head, rows, "fall")["seconds"] == pytest.approx(gc.run_estimates(head, rows, "stopped")["seconds"] - 1.0, abs=0.05)

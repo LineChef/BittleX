@@ -176,16 +176,18 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
               + ("" if vision is not None else " (no feed -- terrain always clear)"),
               flush=True)
 
+    trim_source = None
     if foot_trim is None and not scripted and not foot_hold and not heading_hold and steer_const is None:     # the everyday policy walk: the measured constant trim (heading_hold.DEFAULT_TRIMS)
         foot_trim = _hh.default_foot_trim(getattr(pol, "onnx_path", None))
         if foot_trim:
+            trim_source = "everyday"               # the ingest gate counts this as his normal gait, not a steering test (an explicit --foot-trim stays one)
             print(f"[steer] constant foot trim {foot_trim} on floor {_hh.current_floor() or 'unknown/stale'} (G2_FOOT_TRIM=off disables)", flush=True)
     autolog_run, end_reason = None, ["other"]
     if not log_path:                     # no explicit --log: every policy walk (voice, exploration, command line) is captured automatically
         try:
             from pi_pipeline.telemetry import autolog as _autolog
             autolog_run = _autolog.new_run("policy_walk", policy=os.path.basename(str(getattr(pol, "onnx_path", "") or "")) or None, cmd_fwd=cmd_fwd, hz=hz,
-                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const, "foot_trim": foot_trim, "foot_hold": foot_hold, "scripted": bool(scripted)})
+                                           extra={"in_service": bool(in_service), "heading_hold": bool(heading_hold), "steer_const": steer_const, "foot_trim": foot_trim, "foot_trim_source": trim_source, "foot_hold": foot_hold, "scripted": bool(scripted)})
         except Exception:  # noqa: BLE001 -- never let logging stop a walk
             autolog_run = None
         if autolog_run is not None:

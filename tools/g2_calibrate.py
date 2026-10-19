@@ -81,13 +81,13 @@ def read_run(path: str):
     return ingest.read_csv(path)
 
 
-def run_estimates(head, rows) -> dict | None:
-    """Per-run estimates from the steady window (after the stand): loop rate, IMU frame rate, tick jitter. Reads no yaw and no heading."""
+def run_estimates(head, rows, end_reason=None) -> dict | None:
+    """Per-run estimates from the steady window (after the stand; a run that did not end cleanly also loses its last second): loop rate, IMU frame rate, tick jitter. Reads no yaw and no heading."""
     t = ingest.column(head, rows, "t")
     n = ingest.column(head, rows, "imu_n")
     if t is None or n is None or len(t) < 20:
         return None
-    s = t >= t[0] + ingest.FIRST_SKIP_S
+    s = ingest.window(t, end_reason)[1]
     if s.sum() < 20:
         return None
     ts, ns = t[s], n[s]
@@ -178,7 +178,8 @@ def build(manifest: dict, store: str | None = None, epochs: dict | None = None, 
     old_values = old_values or profile_value
     epochs = epochs if epochs is not None else ingest.load_epochs()
     epoch = current_epoch(manifest, epochs)
-    runs = [r for r in manifest["runs"] if r["status"] == "usable" and r["epoch"] == epoch]
+    runs = [r for r in manifest["runs"] if "timing" in ingest.uses_of(r) and r["epoch"] == epoch]          # the loop-timing fits; the body statistics below use `body_runs`
+    body_runs = [r for r in runs if "body" in ingest.uses_of(r)]
     per: dict[str, list] = {k: [] for k in WHITELIST}
     proxy: list[float] = []
     secs, used = 0.0, 0
@@ -186,7 +187,7 @@ def build(manifest: dict, store: str | None = None, epochs: dict | None = None, 
         path = os.path.join(store, r["day"], r["run"] + ".csv.gz")
         if not os.path.isfile(path):
             continue
-        est = run_estimates(*read_run(path))
+        est = run_estimates(*read_run(path), r.get("end_reason"))
         if est is None:
             continue
         used += 1
@@ -199,7 +200,7 @@ def build(manifest: dict, store: str | None = None, epochs: dict | None = None, 
         if k in params:
             params[k] = dict(params[k], status="rejected", reason=f"rejected by the user on {why.get('at', '?')}" + (f": {why['note']}" if why.get("note") else ""))
     monitor: dict = {}
-    for r in runs:
+    for r in body_runs:
         g = monitor.setdefault(r["surface"], {"runs": 0, "seconds": 0.0, "roll": [], "pitch": []})
         g["runs"] += 1
         g["seconds"] += r["metrics"].get("steady_s", 0.0)

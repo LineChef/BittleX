@@ -7,7 +7,7 @@ Why and what is in or out: [`v3-decisions-log.md`](../archive/rl/v3-decisions-lo
 **Before the first session:** the Pi has the `--log-extra` change (the deploy watcher installs it when the Pi next comes online; check `~/g2_logs/deploy_done`).
 
 **Policy (updated 2026-10-18):** the walks are V7 on the pod and AI head payload (the plan was written for V2.1; the baseline runner walks whatever policy is deployed). V7's hardwood calibration is already done (2026-10-18, its fixed trim `fl=-0.3`, [`real-walk-log.md`](real-walk-log.md)); this capture is for fitting the sim, not for calibrating the walk again.
-Under today's ingest gates, a walk that carries the everyday trim is quarantined as a steering test run, so until that gate changes these walks feed no fit (the proposed change: [`real-data-pipeline.md`](real-data-pipeline.md)).
+Since 2026-10-18 a walk with the everyday trim counts as his normal gait in the ingest gates, so these walks can feed the fits ([`real-data-pipeline.md`](real-data-pipeline.md), "Looser gates"); only a test trim (`--foot-trim`), the heading hold or a scripted walk keeps a run out. Set the floor first (`g2floor`): without a fresh label a run feeds the timing fits only.
 
 ## Session A (full pack, hardwood lane, same start spot as the baselines)
 

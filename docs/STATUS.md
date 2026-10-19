@@ -65,18 +65,18 @@ Everything below is on the Pi as of 2026-10-18 (the Pi's `pi_pipeline/.deployed_
 
 - **Petoi AI Head:** the head's LLM is an extra used by its button, Claude stays the main brain, nothing is integrated for now. [`planned/ai-head/ai-head-implementation.md`](planned/ai-head/ai-head-implementation.md). Replacing the Pi's mic and speaker with the head's waits for Petoi's firmware repo.
 - **A description of survey pictures by Claude** (a billed call per picture): proposed 2026-10-18, on hold at the owner's request.
-- **Looser training-data gates** (more of G2's walk logs feeding the sim fits): proposed 2026-10-18, waiting for the user's pick: [`rl/real-data-pipeline.md`](rl/real-data-pipeline.md#proposed-2026-10-18-loosen-the-gates-the-user-asked-for-more-data-in-not-decided-nothing-changed-yet).
 - **A new 20M** starts only on the user's go and never on top of a consolidated 20M.
 - **Gait comparisons on G2** are not run (sim only, user rule 2026-10-09).
 
 ## Next steps
 
-1. **Built 2026-10-18, not yet tried on G2:** exploration inside the voice service (`G2_EXPLORE_INPROCESS=1`, off by default; the separate session stays the fallback), per-floor trims (`g2attach floor-trim`), the per-session report (`python -m pi_pipeline.diag report --html`), exploration recaps saved as memory observations, and the body state in the mood (`personality/body.py`). Settings: [`guides/settings-switches.md`](guides/settings-switches.md).
-2. **Next hardware session** (each run on the owner's go): an exploration in a bigger room to test the camera fix, the contact-picture speed, the late-tick share and the four milestone pictures; then the survey poses on their own, to find what tipped him.
-3. **Wake-word threshold:** after a day or two of triggers, `python -m pi_pipeline.voice.wake_log --days 7`, then set `G2_WAKE_MIN_CONF`.
-4. **Recalibrate the wall estimator** for the camera's new place; then the bump reflex for thin obstacles.
-5. **System-identification capture** (rest of it, now with V7): [`rl/sysid-capture-plan.md`](rl/sysid-capture-plan.md).
-6. **Get-up from a side lie** (paused): [`hardware/self-righting.md`](hardware/self-righting.md).
+1. **Training-data gates loosened 2026-10-18** (gate per fit, everyday trim counted, shorter windows, bad endings cut): 195 of 625 logged runs usable, the pod and head epoch 18 runs instead of 2 ([`rl/real-data-pipeline.md`](rl/real-data-pipeline.md)). Takes effect on the Pi's next walks (the sidecar records the everyday trim); the existing logs are re-read on the next `g2data ingest`.
+2. **Built 2026-10-18, not yet tried on G2:** exploration inside the voice service (`G2_EXPLORE_INPROCESS=1`, off by default; the separate session stays the fallback), per-floor trims (`g2attach floor-trim`), the per-session report (`python -m pi_pipeline.diag report --html`), exploration recaps saved as memory observations, and the body state in the mood (`personality/body.py`). Settings: [`guides/settings-switches.md`](guides/settings-switches.md).
+3. **Next hardware session** (each run on the owner's go): an exploration in a bigger room to test the camera fix, the contact-picture speed, the late-tick share and the four milestone pictures; then the survey poses on their own, to find what tipped him.
+4. **Wake-word threshold:** after a day or two of triggers, `python -m pi_pipeline.voice.wake_log --days 7`, then set `G2_WAKE_MIN_CONF`.
+5. **Recalibrate the wall estimator** for the camera's new place; then the bump reflex for thin obstacles.
+6. **System-identification capture** (rest of it, now with V7): [`rl/sysid-capture-plan.md`](rl/sysid-capture-plan.md).
+7. **Get-up from a side lie** (paused): [`hardware/self-righting.md`](hardware/self-righting.md).
 
 **Done, not a next step:** V7's calibration on G2 (2026-10-18, hardwood walks and its trim `fl=-0.3`, [`rl/real-walk-log.md`](rl/real-walk-log.md)). Walk again only for a new floor (`g2attach floor-trim`) or a hardware change.
 
