@@ -1,6 +1,7 @@
 """Small control and status commands for the automatic run logs (run on the Pi; the g2floor / g2data aliases call them over ssh).
 
     python -m pi_pipeline.telemetry surface [LABEL]    show or set the floor G2 is on (hardwood, tile, carpet, ...)
+    python -m pi_pipeline.telemetry surface-age        the label and the hours since it was set
     python -m pi_pipeline.telemetry status             runs captured, size, the newest runs and why they ended
     python -m pi_pipeline.telemetry epochs             the hardware epochs and the one in force now
     python -m pi_pipeline.telemetry label RUN TAG [NOTE..]  label a run with a data type (a person's label): snag_candidate, snag, fall, collision, pickup, steady_walk, short_segment, unfinished
@@ -19,6 +20,10 @@ def main(argv=None) -> int:
     cmd = a[0] if a else "status"
     if cmd == "surface":
         print(autolog.set_surface(a[1]) if len(a) > 1 else autolog.get_surface())
+        return 0
+    if cmd == "surface-age":                      # "tile 3.2" (label, hours since it was set; "?" when unknown): tools/g2_explore.sh asks for a fresh label before a roam
+        label, age = autolog.get_surface_info()
+        print(label, "?" if age is None else f"{age:.2f}")
         return 0
     if cmd == "epochs":
         now = epoch_at()

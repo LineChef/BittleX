@@ -6,6 +6,8 @@ These are privacy / session controls, not conversation:
   (this session's exchanges + facts). See `Memory.forget_session`.
 - **"go to sleep"** -> end the follow-up window now, so the next turn needs the
   wake word again.
+- **"dismissed"** (also "dismiss", "false alarm", "false trigger") -> said after G2 woke to a wake word nobody said: the listening window closes at
+  once, silently, and the wake log records the trigger as false (voice/wake_log.py). "sleep" could not be used: "go to sleep" already curls him up.
 
 Matching is deliberately strict (exact phrase, or the phrase followed by
 trailing speech-to-text cruft) so a normal sentence that merely contains the
@@ -47,6 +49,10 @@ _FORGET = (
 _SLEEP = (
     "go to sleep",
 )
+
+# G2 woke to a wake word nobody said: this closes the window now, with no spoken reply (a reply would only add noise) and no "heard you" chirp, and the wake log counts the
+# trigger as false. Strict, like the others ("dismiss the class" is a normal sentence): the phrase plus at most one more word.
+_DISMISS = ("dismissed", "dismiss", "false alarm", "false trigger", "wrong trigger")
 
 # Conversation mode: "let's talk" keeps G2 listening for a back-and-forth without the wake word until a quiet gap or "that's all".
 # Only a short phrase counts ("lets talk", "lets talk now"): "lets talk about my day" is a normal request and goes to Claude.
@@ -334,6 +340,29 @@ def parse_floor_command(text: str) -> str | None:
     return _SURFACES.get(" ".join(words)) if words else None
 
 
+# The answer to "Which floor am I on?" before an exploration: a bare floor ("tile"), a sentence the floor command already reads, or "same" / "still tile" for the label he holds.
+_FLOOR_FILLER = {"its", "it", "is", "the", "a", "an", "floor", "on", "were", "we", "are", "this", "here", "still", "same", "that", "thats", "right", "yes", "yeah", "correct", "still", "now"}
+_SAME = {"same", "the same", "same floor", "still the same", "yes", "yeah", "correct", "right", "thats right", "thats correct", "no change", "unchanged", "still"}
+
+
+def parse_floor_answer(text: str, current: str | None = None) -> str | None:
+    """'tile' / 'its hardwood' / 'we are on carpet' / 'the floor is tile' -> that floor; 'same' / 'still tile' / 'yes' -> `current` (the label he holds; None when he holds none);
+    anything else -> None."""
+    n = _normalize(text)
+    if not n:
+        return None
+    named = parse_floor_command(text)
+    if named:
+        return named
+    words = [w for w in n.split() if w not in _FLOOR_FILLER]
+    found = _SURFACES.get(" ".join(words)) if words else None
+    if found:
+        return found
+    if n in _SAME or (not words and current):
+        return current
+    return None
+
+
 def asks_recap(text: str) -> bool:
     n = _normalize(text)
     return _hit_short(n, _RECAP_QUERY, extra_words=2)
@@ -407,7 +436,7 @@ def asks_battery(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
-    ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
+    ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -438,6 +467,8 @@ def match_local_command(text: str) -> str | None:
         return "forget"
     if _hit(n, _SLEEP):
         return "sleep"
+    if _hit_short(n, _DISMISS, extra_words=1):
+        return "dismiss"
     if _hit_short(n, _CONVERSE):
         return "converse"
     if _hit_short(n, _END_CONVERSE, extra_words=3):

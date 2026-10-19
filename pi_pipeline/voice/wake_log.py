@@ -55,13 +55,13 @@ def record_trigger(phrase: str, text: str, *, level: float | None, confidence: f
 
 
 def record_outcome(heard: str, result: str, *, mic_peak=None) -> None:
-    """`result`: "command" (a local command), "request" (went to Claude), "ignored" (talk meant for someone else), "empty" (nothing heard)."""
+    """`result`: "command" (a local command), "request" (went to Claude), "ignored" (talk meant for someone else), "empty" (nothing heard), "dismissed" (a person said "dismissed": nobody called him)."""
     _append({"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "type": "outcome", "heard": heard, "words": len((heard or "").split()), "result": result, "mic_peak": mic_peak})
 
 
 def looks_false(outcome: dict) -> bool:
     r = outcome.get("result")
-    return r in ("empty", "ignored") or (r == "request" and outcome.get("words", 0) <= 2)
+    return r in ("empty", "ignored", "dismissed") or (r == "request" and outcome.get("words", 0) <= 2)
 
 
 def read(days: float = 7.0, path: Path | None = None) -> list[dict]:
@@ -130,7 +130,8 @@ def summary(days: float = 7.0, path: Path | None = None) -> str:
         c = sorted(t["confidence"] for t, _o in group if t.get("confidence") is not None)
         return "none logged" if not c else f"min {c[0]:.2f}, median {c[len(c) // 2]:.2f}, max {c[-1]:.2f} ({len(c)})"
     lines = [f"wake triggers, last {days:g} days: {len(triggers)} ({gated} ignored by the confidence gate)",
-             f"  woke him: {len(ps)}; looked real: {len(real)}; looked false: {len(false)}" + (f" ({100.0 * len(false) / max(1, len(real) + len(false)):.0f}%)" if real or false else ""),
+             f"  woke him: {len(ps)}; looked real: {len(real)}; looked false: {len(false)}" + (f" ({100.0 * len(false) / max(1, len(real) + len(false)):.0f}%)" if real or false else "")
+             + (f"; {sum(1 for _t, o in false if o.get('result') == 'dismissed')} of them said 'dismissed'" if any(o.get("result") == "dismissed" for _t, o in false) else ""),
              f"  confidence when real:  {conf(real)}",
              f"  confidence when false: {conf(false)}"]
     rc = [t["confidence"] for t, _o in real if t.get("confidence") is not None]

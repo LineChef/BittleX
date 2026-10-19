@@ -267,7 +267,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +39.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +40.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -275,11 +275,11 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-
 
 ## `report.html`
 
-Docs that mention this family: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +3.
+Docs that mention this family: [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +5.
 
 | File | Size | Cited by |
 |---|---|---|
-| `v6_report/report.html` | 5 KB | [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +3 |
+| `v6_report/report.html` | 5 KB | [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`next-20m-plan.md`](../archive/rl/next-20m-plan.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md), [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) +5 |
 
 ## `resp`
 

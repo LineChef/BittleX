@@ -387,7 +387,7 @@ g2ssh() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "$@"; }
 # g2deploy [--once|--cancel|--max-hours N|--replace]  -- push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once;
 #   --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
 g2deploy() { bash "$G2_ROOT/tools/g2_deploy_when_online.sh" "$@"; }
-# g2explore [start [ROAM_S]|stationary|arm|disarm|halt|release|stop|status|logs|heard]  -- run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze.
+# g2explore [start [ROAM_S]|stationary|arm|disarm|halt|release|stop|status|logs|heard|report [html]]  -- run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze.
 g2explore() { bash "$G2_ROOT/tools/g2_explore.sh" "$@"; }
 # g2stop [voice|explore]  -- the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride.
 g2stop() { bash "$G2_ROOT/tools/g2_safe_stop.sh" "$@"; }

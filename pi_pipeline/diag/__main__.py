@@ -99,7 +99,10 @@ def cmd_sync(a):
 
 def cmd_report(a):
     from . import report
-    d = _resolve(a.session)
+    d = report.latest_of_kind(a.kind) if a.kind else _resolve(a.session)
+    if d is None:
+        print(f"No {a.kind} session found." if a.kind else "No diagnostic sessions found.")
+        return
     rep = report.build(str(d))
     print(report.to_text(rep))
     if a.html:
@@ -119,6 +122,7 @@ def main():
     yp = sub.add_parser("sync"); yp.add_argument("session"); yp.add_argument("dest")
     yp.set_defaults(fn=cmd_sync)
     rr = sub.add_parser("report"); rr.add_argument("session", nargs="?"); rr.add_argument("--html", default=None)
+    rr.add_argument("--kind", default=None, help="the newest session of this kind (explore, voice, ...) instead of the newest session")
     rr.set_defaults(fn=cmd_report)
     a = ap.parse_args()
     a.fn(a)

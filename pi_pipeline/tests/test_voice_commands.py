@@ -29,6 +29,37 @@ def test_sleep_variants(text):
 
 
 @pytest.mark.parametrize("text", [
+    "dismissed",
+    "Dismissed.",
+    "hey G2 dismissed",
+    "dismiss",
+    "false alarm",
+    "false trigger",
+])
+def test_dismissed_closes_the_window_after_a_false_wake(text):
+    assert match_local_command(text) == "dismiss"
+
+
+@pytest.mark.parametrize("text", ["dismiss the class", "he was dismissed from the meeting yesterday", "sleep", "do you ever sleep", "the alarm is false"])
+def test_dismissed_is_not_swallowed_from_a_normal_sentence(text):
+    assert match_local_command(text) is None
+
+
+def test_go_to_sleep_is_still_sleep_not_dismiss():
+    assert match_local_command("go to sleep") == "sleep"
+
+
+@pytest.mark.parametrize("text, current, want", [
+    ("tile", None, "tile"), ("its hardwood", None, "hardwood"), ("we are on the carpet", None, "carpet"), ("the floor is tile", None, "tile"), ("hard wood", None, "hardwood"),
+    ("same", "tile", "tile"), ("still tile", "tile", "tile"), ("yes", "tile", "tile"), ("still hardwood floor", "tile", "hardwood"),
+    ("same", None, None), ("banana", "tile", None), ("", "tile", None), ("what time is it", None, None),
+])
+def test_the_answer_to_which_floor(text, current, want):
+    from pi_pipeline.voice.commands import parse_floor_answer
+    assert parse_floor_answer(text, current) == want
+
+
+@pytest.mark.parametrize("text", [
     "",
     "   ",
     "what's the weather",

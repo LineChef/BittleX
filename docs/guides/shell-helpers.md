@@ -95,7 +95,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 |---|---|
 | `g2ssh` | open a shell on the Pi. |
 | `g2deploy [--once/--cancel/--max-hours N/--replace]` | push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing. |
-| `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard]` | run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze. |
+| `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard/report [html]]` | run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze. |
 | `g2stop [voice/explore]` | the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride. |
 | `g2rest` | send rest (`d`) to G2 right now. For when he is moving and nothing is in control; if the voice service holds the port, run g2stop voice first. |
 | `g2english` | set the BiBoard's onboard voice module back to English (it falls back to Chinese after some power cycles): sends XAc (enable), XAb, XAa (English), 1.2 s apart, |

@@ -1,6 +1,6 @@
 """One report per session: everything G2 logged while a session ran, in one place (text, or a self-contained HTML page).
 
-    python -m pi_pipeline.diag report [SESSION] [--html out.html]
+    python -m pi_pipeline.diag report [SESSION | --kind explore] [--html out.html]
 
 A session's own diagnostics folder (`events.jsonl`, `manifest.json`, `profile.txt`) gives its time window; the other logs are read for that window:
 
@@ -13,7 +13,13 @@ A session's own diagnostics folder (`events.jsonl`, `manifest.json`, `profile.tx
   * problems       every WARN or worse event, in time order
   * profile        the sampling profiler's report when the session ran with `G2_PROFILE=1`
 
-Read-only; nothing is sent anywhere. Each section is best-effort: a missing log just leaves its section empty.
+  * checks         the numbers the 2026-10-18 fixes are meant to move, each marked ok / CHECK against its target (`checks()`), with the floor label of the walks
+                   (a walk with no floor label cannot feed the body fits, tools/g2_ingest.py)
+
+An exploration writes its own report when it ends (`write_after()`: `report.txt` and `report.html` in the session folder, or `explore_HHMMSS.*` for a session run inside
+the voice service, whose time window is passed in); `tools/g2_explore.sh report` shows the latest one.
+
+Read-only apart from those two files; nothing is sent anywhere. Each section is best-effort: a missing log just leaves its section empty.
 """
 from __future__ import annotations
 
@@ -86,13 +92,29 @@ def _jsonl_rows(path, t0: float, t1: float, key: str, fmt: str) -> list[dict]:
     return out
 
 
-def build(session: str | None = None) -> dict | None:
-    """Every section as plain data (lists and numbers), or None when there is no such session."""
+def latest_of_kind(kind: str) -> str | None:
+    """The newest session folder whose manifest says it was started as `kind` ("explore", "voice", ...), or None."""
+    from .core import _sessions
+    for d in reversed(_sessions()):
+        try:
+            if json.loads((d / "manifest.json").read_text()).get("subsystem_hint") == kind:
+                return str(d)
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def build(session: str | None = None, since: float | None = None, until: float | None = None) -> dict | None:
+    """Every section as plain data (lists and numbers), or None when there is no such session. `since` / `until` (wall-clock seconds) narrow the window to part of a
+    long session, for an exploration run inside the voice service."""
     d = _resolve_session(session)
     if d is None:
         return None
     evs = list(_read_events(d))
     t0, t1 = _window(d, evs)
+    if since is not None or until is not None:
+        t0, t1 = (t0 if since is None else float(since)), (t1 if until is None else float(until))
+        evs = [e for e in evs if t0 - 1 <= e.get("wall_ts", t0) <= t1 + 1]
     man = {}
     try:
         man = json.loads((d / "manifest.json").read_text())
@@ -154,7 +176,53 @@ def build(session: str | None = None) -> dict | None:
     rep["problems"] = [_line(e) for e in evs if _LEVELS.get(e.get("lvl", "INFO"), 20) >= 30][-60:]
     prof = d / "profile.txt"
     rep["profile"] = prof.read_text()[:6000] if prof.exists() else None
+    rep["checks"] = checks(rep)
     return rep
+
+
+# targets for the checks: what the 2026-10-18 fixes are meant to reach (STATUS "Open problems" has the numbers they started from)
+MAX_LATE_TICKS_PCT = 5.0            # was 30 to 32% in the 2026-10-18 explorations
+MAX_SPEECH_S = 8.0                  # the narrator's own late limit; was 7 to 17 s
+UNKNOWN_FLOORS = ("unknown", "", None)
+
+
+def checks(rep: dict) -> list[tuple[str, bool | None, str]]:
+    """(name, ok, detail) for the numbers a roam is read for. ok is None when the session has nothing to judge it by."""
+    w, s, c, wk = rep["walks"], rep["speech"], rep["camera"], rep.get("wake") or {}
+    out: list[tuple[str, bool | None, str]] = []
+    out.append(("no falls", w["falls"] == 0 if w["count"] else None, f"{w['falls']} of {w['count']} walks ended in a fall"))
+    lt = w["late_ticks_pct_median"]
+    out.append((f"late walk ticks under {MAX_LATE_TICKS_PCT:g}%", None if lt is None else lt <= MAX_LATE_TICKS_PCT, f"median {_fmt(lt)}%, max {_fmt(w['late_ticks_pct_max'])}%"))
+    out.append(("camera answered every time", c["timeouts"] == 0, f"{c['timeouts']} timeouts"))
+    sp = s["decision_to_end_max_s"]
+    out.append((f"speech within {MAX_SPEECH_S:g} s, none dropped", None if sp is None else (sp <= MAX_SPEECH_S and s["dropped"] == 0), f"max {_fmt(sp)} s, {s['dropped']} dropped of {s['lines']} lines"))
+    out.append(("walks stop when told", s["walk_stop_timeouts"] == 0 and s["slow_walk_ends"] == 0, f"{s['walk_stop_timeouts']} did not stop in 5 s, {s['slow_walk_ends']} slow ends"))
+    out.append(("no false wake triggers", None if not wk else wk.get("looked_false", 0) == 0, f"{_fmt(wk.get('looked_false'))} looked false of {_fmt(wk.get('triggers'))} triggers"))
+    out.append(("no worker gave up", not c["workers_gave_up"], ", ".join(map(str, c["workers_gave_up"])) or "none"))
+    unlabeled = sum(n for k, n in w["floors"].items() if k in UNKNOWN_FLOORS)
+    out.append(("every walk had a floor label", None if not w["count"] else unlabeled == 0, f"floors {_fmt(w['floors'])}"))
+    return out
+
+
+def headline(rep: dict) -> str:
+    """One line for a log: how many checks failed and which."""
+    bad = [n for n, ok, _d in rep.get("checks", []) if ok is False]
+    return f"session report: {len(rep.get('checks', [])) - len(bad)} of {len(rep.get('checks', []))} checks ok" + (f"; CHECK: {', '.join(bad)}" if bad else "")
+
+
+def write_after(session: str | None = None, since: float | None = None, until: float | None = None, name: str = "report") -> str | None:
+    """Build the report and save `<name>.txt` and `<name>.html` in the session folder. Returns the text, or None when there is nothing to report. Never raises."""
+    try:
+        d = _resolve_session(session)
+        rep = build(session, since, until)
+        if d is None or rep is None:
+            return None
+        text = to_text(rep)
+        (d / f"{name}.txt").write_text(text + "\n")
+        (d / f"{name}.html").write_text(to_html(rep))
+        return text
+    except Exception:  # noqa: BLE001 -- a report must never disturb the session it describes
+        return None
 
 
 def _count(it) -> dict:
@@ -194,6 +262,9 @@ def to_text(rep: dict) -> str:
          f"wake word: {_fmt(wk.get('triggers'))} triggers, {_fmt(wk.get('ignored_by_gates'))} ignored by the gates, {_fmt(wk.get('looked_real'))} looked real, {_fmt(wk.get('looked_false'))} looked false",
          f"API: {_fmt(a.get('billed_calls'))} billed calls, {_fmt(a.get('errors'))} errors",
          f"camera: {c['timeouts']} timeouts; worker restarts {_fmt(c['worker_restarts'])}" + (f"; GAVE UP: {', '.join(map(str, c['workers_gave_up']))}" if c["workers_gave_up"] else "")]
+    if rep.get("checks"):
+        L.append("checks (" + headline(rep).split(": ", 1)[1].split(";")[0] + "):")
+        L += [f"  [{'ok' if ok else 'CHECK' if ok is False else '--'}] {n}: {d}" for n, ok, d in rep["checks"]]
     if rep["problems"]:
         L.append("problems (WARN and worse):")
         L += [f"  {p}" for p in rep["problems"][-25:]]
@@ -220,6 +291,8 @@ def to_html(rep: dict) -> str:
     out = [f"<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>G2 session report</title><style>{_CSS}</style></head><body>",
            f"<h1>G2 session {e(rep['session'])}</h1><div class=mut>{e(str(rep['kind']))} · started {e(rep['started'])} · {rep['duration_s'] / 60:.1f} min · clean exit {e(_fmt(rep['clean_exit']))} · git {e(str(rep['git'])[:10])}</div>",
            "<div class=tiles>" + "".join(f"<div class=tile><span class=mut>{e(k)}</span><b>{e(_fmt(v))}</b></div>" for k, v in tiles) + "</div>",
+           "<h2>Checks</h2><table>" + "".join(
+               f"<tr><td class={'bad' if ok is False else ''}>{'ok' if ok else 'CHECK' if ok is False else '--'}</td><td>{e(n)}</td><td class=mut>{e(d)}</td></tr>" for n, ok, d in rep.get("checks", [])) + "</table>",
            "<h2>Walks</h2>"]
     if w["rows"]:
         cols = ["run", "started", "end_reason", "duration_s", "late_ticks_pct", "worst_tick_gap_ms", "surface", "foot_trim"]

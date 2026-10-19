@@ -32,7 +32,7 @@ Every alias works from any directory and leaves you where you were, except `g2` 
 |---|---|
 | `g2reset` | restart the voice loop on the Pi (also ends an exploration session). `g2reset status` shows what is running, `g2reset logs` the recent log |
 | `g2floor <label>` | set the floor G2 is on (`hardwood`, `tile`, `carpet`); every walk log records it. No argument shows it. **Set it before any walking run** |
-| `g2explore start [secs]` | start a supervised exploration on the floor. `g2explore stop`, `status`, `logs`, `heard` (what the listener heard) |
+| `g2explore start [secs]` | start a supervised exploration on the floor (asks the floor first if its label is unknown or over an hour old). `g2explore stop`, `status`, `logs`, `heard` (what the listener heard), `report` (the last roam's report and checks; `report html` opens the page) |
 | `g2deploy` | push `pi_pipeline/` and the deployed policy to the Pi and restart the voice service. Waits for the Pi to answer; `g2deploy --once` deploys now. Refuses during an exploration or a walk. **Never deploy while testing** |
 | `g2api [hours]` | Claude API calls and approximate cost on the Pi |
 | `g2crash [n]` | why the voice service or an exploration crashed |
@@ -59,7 +59,7 @@ Never put G2 on his back; tests start on his feet with your hands near. More: [`
 | `g2baseline start|stop|status|logs|fetch` | the same walks with more options; `fetch` copies the logs to the Mac |
 | `g2turns start|fetch` | logged firmware turn runs, to measure the real turn rate |
 | `g2walklog <log.csv>` | summarize a walk log: roll, pitch, yaw, the first fall, battery |
-| `python -m pi_pipeline.diag report [SESSION] --html out.html` | one report for a session (on the Pi): walks, speech lag, wake triggers, API calls, camera timeouts, problems |
+| `python -m pi_pipeline.diag report [SESSION | --kind explore] --html out.html` | one report for a session (on the Pi): walks, speech lag, wake triggers, API calls, camera timeouts, problems |
 | `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` | save a trim measured on one floor for the fitted attachment's gait (`off` removes it); used when `g2floor` is set and under 12 h old |
 | `g2imu rest|stand [secs]` | record the raw IMU on the Pi and print its rate, bias and noise (stop the voice service first with `g2stop voice`) |
 

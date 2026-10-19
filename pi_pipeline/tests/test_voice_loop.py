@@ -507,3 +507,74 @@ def test_what_did_you_do_and_what_have_you_learned_are_answered_locally_from_the
     lp, w, stt, conv, tts = _loop(["what have you learned", ""], memory=mem)
     _run(lp, 1)
     assert tts.said == ["I keep turning away from walls."] and conv.sent == []
+
+
+# ------------------------------------------------ "dismissed": a false wake, closed at once
+def test_dismissed_closes_the_window_silently_and_the_wake_log_counts_it_false(tmp_path, monkeypatch):
+    from pi_pipeline.voice import wake_log
+    monkeypatch.setenv("G2_WAKE_LOG", str(tmp_path / "wake.jsonl"))
+    events = []
+    lp, w, stt, conv, tts = _loop(["dismissed", "hello"], on_event=lambda **kw: events.append(kw))
+    wake_log.record_trigger("gee two", "gee two", level=100, confidence=0.5, since_own_sound_s=None)
+    _run(lp, 2)
+    assert conv.sent == ["hello"] and tts.said == ["ok"] and w.calls == 2       # "dismissed" went nowhere and drew no words (only the reply to "hello" was spoken); the next turn needed the wake word again
+    kinds = [next(iter(e)) for e in events]
+    assert kinds[:2] == ["wake_word", "conversation_ended"]                       # the dismissed turn: no "heard you" chirp, the session just ends
+    ps = wake_log.pairs(wake_log.read(1.0))
+    assert [o["result"] for _t, o in ps if o] == ["dismissed"] and wake_log.looks_false(ps[0][1])
+    assert "1 of them said 'dismissed'" in wake_log.summary(1.0)
+
+
+def test_dismissed_in_a_follow_up_window_also_closes_it():
+    lp, w, stt, conv, tts = _loop(["hello", "dismissed", "again"])
+    _run(lp, 3)
+    assert conv.sent == ["hello", "again"] and w.calls == 2
+
+
+# ------------------------------------------------ the floor question before an exploration
+def _explore_loop(monkeypatch, tmp_path, script, label=None, age_s=0.0):
+    import time
+    from pi_pipeline.telemetry import autolog
+    from pi_pipeline.voice import prompt_tones
+    surf = tmp_path / "surface"
+    if label:
+        surf.write_text(f"{label}\n{time.time() - age_s:.3f}\n")
+    monkeypatch.setattr(autolog, "SURFACE_FILE", str(surf))
+    monkeypatch.setattr(prompt_tones, "play_start_horn", lambda **kw: None)
+    monkeypatch.setenv("G2_FLOOR_PROMPT_S", "10")
+    events = []
+    lp, w, stt, conv, tts = _loop(script, on_event=lambda **kw: events.append(kw))
+    return lp, stt, tts, events, autolog
+
+
+def test_exploring_with_no_floor_label_asks_and_sets_it_from_the_answer(monkeypatch, tmp_path):
+    lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["go ahead and look around", "we are on tile"])
+    _run(lp, 1)
+    assert tts.said[0] == "Which floor am I on?" and "Okay, the floor is tile." in tts.said and autolog.get_surface() == "tile"
+    assert any(e.get("arm_explore") for e in events) and stt.timeouts[-1] == 10.0           # the roam still starts, after the answer
+
+
+def test_a_stale_label_is_confirmed_with_same_and_its_age_restarts(monkeypatch, tmp_path):
+    lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["explore", "same"], label="hardwood", age_s=5 * 3600)
+    _run(lp, 1)
+    assert "hardwood" in tts.said[0] and autolog.get_surface() == "hardwood" and autolog.get_surface_info()[1] < 0.01
+    assert any(e.get("arm_explore") for e in events)
+
+
+def test_a_fresh_label_is_not_asked_again(monkeypatch, tmp_path):
+    lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["explore"], label="tile", age_s=600)
+    _run(lp, 1)
+    assert "floor" not in " ".join(tts.said).lower() and stt.timeouts == [None] and any(e.get("arm_explore") for e in events)
+
+
+def test_no_answer_never_blocks_the_roam_and_says_what_it_means(monkeypatch, tmp_path):
+    lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["explore", ""])
+    _run(lp, 1)
+    assert any("will not count for training" in s for s in tts.said) and autolog.get_surface() == "unknown" and any(e.get("arm_explore") for e in events)
+
+
+def test_the_floor_question_can_be_switched_off(monkeypatch, tmp_path):
+    lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["explore"])
+    monkeypatch.setenv("G2_FLOOR_PROMPT_S", "0")
+    _run(lp, 1)
+    assert "Which floor am I on?" not in tts.said and any(e.get("arm_explore") for e in events)

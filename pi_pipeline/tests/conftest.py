@@ -122,6 +122,12 @@ def _no_body_state_or_speech_cache(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_floor_question(monkeypatch):
+    """The voice loop asks which floor he is on before an exploration (voice/loop.py `_ask_floor`); tests turn it on themselves."""
+    monkeypatch.setenv("G2_FLOOR_PROMPT_S", "0")
+
+
+@pytest.fixture(autouse=True)
 def _no_detection_log(monkeypatch):
     """Tests never write detection logs into the real ~/g2_runs/detections."""
     monkeypatch.setenv("G2_DETECTION_LOG", "off")

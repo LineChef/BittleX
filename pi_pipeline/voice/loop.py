@@ -35,7 +35,7 @@ from .actuator import Actuator
 from ..behavior.survey import SurveyConfig, clean_name, naming_plan, parse_naming, picture_pose_steps
 from .commands import (
     addressed_elsewhere, is_clear_shutdown, looks_like_rebuff, match_local_command, parse_character_command,
-    parse_floor_command, parse_walk_command,
+    parse_floor_answer, parse_floor_command, parse_walk_command,
     parse_narration_command,
 )
 from .conversation import Conversation, ConversationError
@@ -397,6 +397,38 @@ class VoiceLoop:
             log.info("character mode %s OFF", cc.name)
             self._speak(f"Okay, {cc.name} mode off.")
 
+    def _ask_floor(self) -> None:
+        """Before an exploration: if the floor label is unknown or older than `G2_FLOOR_PROMPT_MAX_AGE_H` (default 1 h), ask which floor he is on and set it from the answer
+        ("tile", "we are on carpet", or "same" to keep the one he holds). The walks of the roam record that label, and a run with no fresh label cannot feed the body fits
+        (tools/g2_ingest.py). `G2_FLOOR_PROMPT_S` is how long he listens for the answer (default 10; 0 turns the question off). No answer never blocks the roam."""
+        try:
+            window = float(os.environ.get("G2_FLOOR_PROMPT_S", "10"))
+            max_age = float(os.environ.get("G2_FLOOR_PROMPT_MAX_AGE_H", "1"))
+        except ValueError:
+            window, max_age = 10.0, 1.0
+        if window <= 0:
+            return
+        try:
+            from ..telemetry import autolog
+            label, age = autolog.get_surface_info()
+            known = label != "unknown"
+            if known and age is not None and age <= max_age:
+                return
+            self._cue.set("speaking")
+            self._speak("Which floor am I on?" if not known else f"I have the floor down as {label}. Which floor am I on now? Say same if it is still {label}.")
+            self._cue.set("listening")
+            reply = (self._stt.listen(timeout_s=window) or "").strip()
+            floor = parse_floor_answer(reply, label if known else None)
+            if floor:
+                label = autolog.set_surface(floor)
+                log.info("floor label set to %r before the exploration (voice)", label)
+                self._speak(f"Okay, the floor is {label}.")
+            else:
+                log.warning("no floor given before the exploration (heard %r): the label stays %r", reply, label)
+                self._speak("I did not catch a floor, so this roam will not count for training." if not known else f"I did not catch a floor, so I will keep {label}.")
+        except Exception:  # noqa: BLE001 -- a failed question must never stop the roam
+            log.exception("floor question failed")
+
     _wake_outcome = None
 
     def _log_wake_outcome(self, result: str) -> None:
@@ -489,20 +521,27 @@ class VoiceLoop:
                 self._cue.set("heard")
                 self._name_object(name)
                 return
-        if cmd is not None:
+        if cmd is not None and cmd != "dismiss":          # "dismissed" is silent: a chirp would only add to the noise that set off the false trigger
             # G2 always signals that he registered a command -- an instant "heard
             # you" chirp (+ cue), before the slower spoken reply. Makes a
             # misheard command obvious so you can say "resume" / "never mind".
             self._events(ack=True)
             self._cue.set("heard")
 
-        if woke and cmd is not None:
+        if woke and cmd == "dismiss":
+            self._log_wake_outcome("dismissed")             # a person saying nobody called him: a certain false trigger for the wake log
+        elif woke and cmd is not None:
             self._log_wake_outcome("command")
         elif woke and addressed_elsewhere(user_text):
             self._log_wake_outcome("ignored")
         elif woke:
             self._log_wake_outcome("request")
 
+        if cmd == "dismiss":
+            log.info("dismissed (voice): the wake word was a false trigger -- window closed")
+            self._cue.set("closed")                         # the short closing tone is the only acknowledgement
+            self._end_session()
+            return
         if cmd == "end_converse" and not self._conversing:
             cmd = None                                      # "that's all" outside conversation mode is just a sentence for Claude
         if cmd is None and self._is_side_chatter(user_text, woke):
@@ -564,6 +603,7 @@ class VoiceLoop:
             return
         if cmd == "explore":
             log.info("explore armed (voice)")
+            self._ask_floor()                            # a fresh floor label before every roam, so its walks can feed the fits (user, 2026-10-18)
             self._cue.set("speaking")
             from . import prompt_tones
             self._speak("Exploration mode.")             # said BEFORE the hand-over: the launch stops this service

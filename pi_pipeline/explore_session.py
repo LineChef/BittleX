@@ -147,7 +147,24 @@ def main() -> None:
     if not features.explore:
         raise SystemExit("exploration is off in G2_FEATURES (+explore, +vision, +vision_safety are needed); nothing to test")
     with diag.session("explore", extra={"roam_s": args.roam_s}):
+        session_dir = diag.session_dir
         run_session(args)
+    _write_report(session_dir)
+
+
+def _write_report(session_dir, since: float | None = None, until: float | None = None, name: str = "report") -> None:
+    """The report of a finished exploration (diag/report.py), saved in the session folder and summarised in the log, so reading it after a roam is one command
+    (`tools/g2_explore.sh report`). Never raises."""
+    if not session_dir:                                # no diagnostics session: nothing to report (and never fall back to some other session)
+        return
+    try:
+        from .diag import report
+        text = report.write_after(str(session_dir), since, until, name)
+        rep = report.build(str(session_dir), since, until) if text else None
+        if rep:
+            logging.getLogger("g2.explore").info("%s (saved as %s in %s)", report.headline(rep), name, session_dir)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("g2.explore").debug("could not write the session report", exc_info=True)
 
 
 @dataclass
@@ -190,10 +207,12 @@ def run_inprocess(shared: SharedParts, roam_s: float) -> str:
     args = parse_args(["--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(int(roam_s))])
     diag.event("explore", "INFO", "explore.start", inprocess=True, roam_s=roam_s)
     ended = "error"
+    t_start = time.time()
     try:
         ended = run_session(args, shared)
     finally:
         diag.event("explore", "INFO", "explore.end", ended_by=ended)
+        _write_report(diag.session_dir, t_start, time.time(), "explore_" + time.strftime("%H%M%S", time.localtime(t_start)))       # the service's session is long: only this roam's window
     return ended
 
 
