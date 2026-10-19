@@ -403,7 +403,7 @@ def test_a_survey_stop_runs_the_firmware_check_skill_between_the_bow_and_the_sta
     assert [p for _, k, p, _ in plan if k == "skill"] == ["ksit", "kbuttUp", "kup", "kck", "kup"]       # up, down, stand, check, stand again
     t_ck = next(d for d, k, p, _ in plan if p == "kck")
     t_up = [d for d, k, p, _ in plan if p == "kup"][-1]
-    assert abs((t_up - t_ck) - 3.0) < 1e-6                                          # the check skill gets 3 s to finish
+    assert abs((t_up - t_ck) - 4.6) < 1e-6                                          # the check skill gets 4.6 s to finish (it moves for 4.2 s on G2)
     assert [p for _, k, p, _ in plan if k == "shot"] == ["after_bow"]               # one picture, standing, after the settle
     assert [p for _, k, p, _ in survey_plan(SurveyConfig()) if k == "skill"] == ["ksit", "kbuttUp", "kup"]
     monkeypatch.delenv("G2_SURVEY_CHECK", raising=False)

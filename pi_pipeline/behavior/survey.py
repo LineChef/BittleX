@@ -32,7 +32,7 @@ class SurveyConfig:
     check: bool = False             # survey stops run the firmware `check` skill (`kck`: a head pan with a body lean; with no head connected only the lean shows) between the bow and the stand (user, 2026-10-10)
     check_skill: str = "kck"
     check_stand_s: float = 1.5      # after the first stand, before the check skill starts
-    check_s: float = 3.0            # how long the check skill is given to finish
+    check_s: float = 4.6            # how long the check skill is given to finish: measured on G2 2026-10-18 (pod + head, IMU log) it moves for 4.2 s, rolling 20-28 deg each way; at 3.0 s the stand cut it off mid-lean
     looks: bool = False             # survey stops also look left and right, a throwaway picture each, then settle and take the normal picture (user, 2026-10-10); False = the one standing picture
     look_deg: float = 45.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
     turn_rate_dps: tuple = (11.0, 18.0)      # measured yaw rates of the firmware left / right turn gaits (app/sinks.py WalkerSink.TURN_RATE_DPS)
