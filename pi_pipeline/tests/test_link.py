@@ -179,6 +179,8 @@ def test_every_firmware_skill_that_raises_him_is_eased_from_lying_or_sitting(mon
     monkeypatch.setattr("pi_pipeline.link.serial_link.time.sleep", lambda s: None)
     for last in ("", "d", "krest", "kzz", "ksit"):
         for skill in ("kck", "kwh", "knd", "kstr", "kpu", "kcmh", "kbuttUp", "kwkF", "kup", "kbalance"):
+            if skill in ("kbuttUp", "kck"):
+                continue                                                   # played plain (own test below)
             lk = _link_with(b"")
             lk.last_motion_command = last
             lk.send(skill, read_reply=False, settle=0.0)
@@ -207,6 +209,12 @@ def test_skills_that_leave_him_down_and_skills_from_a_stand_are_not_ramped(monke
 
 
 # ------------------------------------------------------------------ eased transitions into every skill (user, 2026-10-18)
+@pytest.fixture(autouse=True)
+def _ease_the_picture_poses(monkeypatch):
+    monkeypatch.setenv("G2_EASE_PICTURE_POSES", "1")                    # the ramp tests use ksit / kck as examples; the plain default has its own test
+
+
+
 def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):
     monkeypatch.setenv("G2_TRANSITION_RAMP_S", "0.8")
     monkeypatch.setenv("G2_STAND_RAMP_S", stand)
@@ -219,13 +227,19 @@ def _ramped(monkeypatch, last, skill, *, stand="off", last_t=None):
 
 def test_a_trick_from_a_stand_eases_into_its_first_frame(monkeypatch):
     from pi_pipeline.link import transitions as tr
-    sent = _ramped(monkeypatch, "kbalance", "kck")
-    assert sent[0] == "gb" and sent[-1] == "kck" and all(c.startswith("i8 ") for c in sent[1:-1])        # balance off first, then the ramp
-    hi = tr.table()["ck"]["first"]
-    assert len(sent) - 2 == 25                                                    # the leading gb, then the ramp: the check skill's own peak speed (120 deg/s, `transitions.PEAK_BY_SKILL`) makes it 0.62 s for the 82.5 deg move, 25 steps at 40 a second
+    sent = _ramped(monkeypatch, "kbalance", "kwh")
+    assert sent[0] == "gb" and sent[-1] == "kwh" and all(c.startswith("i8 ") for c in sent[1:-1])        # balance off first, then the ramp
+    hi = tr.table()["wh"]["first"]
     last_pose = [int(x) for x in sent[-2].split()[1::2]]
     assert last_pose == [round((a + b) / 2) for a, b in zip(hi, tr.mirror(hi))]   # `hi` may be mirrored by the firmware: the mean of both sides
     assert "i0" not in " ".join(sent)                                             # the head is never moved by the ramp
+
+
+def test_the_bow_look_up_and_check_are_not_eased_and_not_preceded_by_a_stand_up(monkeypatch):
+    monkeypatch.delenv("G2_EASE_PICTURE_POSES")
+    for last in ("kbalance", "ksit", "d"):
+        for skill in ("kbuttUp", "ksit", "kck"):
+            assert _ramped(monkeypatch, last, skill, stand="0.8") == [skill], (last, skill)           # user, 2026-10-18: too slow eased
 
 
 def test_the_ramp_length_follows_the_largest_joint_move(monkeypatch):

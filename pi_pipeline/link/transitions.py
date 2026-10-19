@@ -123,9 +123,13 @@ def leg_pairs(command: str) -> dict:
     return {j: a for j, a in zip(nums[0::2], nums[1::2]) if j in LEG_JOINTS}
 
 
-# 2026-10-18 (user: the bow, look up and check eases were too slow): the picture-pose skills may peak faster than the 80 deg/s default. The servos top out near 137 deg/s and the
-# jitter seen at 125-190 deg/s was in the sit (back legs) and the drop to rest (front legs), so the bow (front legs down) stays under that and the sit keeps its soft end.
-PEAK_BY_SKILL = {"kbuttUp": 110.0, "ksit": 100.0, "kck": 120.0}
+# The picture poses are NOT eased (user, 2026-10-18: the bow, look up and check were too slow eased, so they play as the firmware does: no ramp, and no eased stand-up before them).
+PLAIN_SKILLS = frozenset({"kbuttUp", "ksit", "kck"})
+
+
+def is_plain(token: str) -> bool:
+    """True if `token` is played without easing; `G2_EASE_PICTURE_POSES=1` eases them like every other skill again."""
+    return token.strip() in PLAIN_SKILLS and os.environ.get("G2_EASE_PICTURE_POSES", "").strip().lower() not in ("1", "on", "true", "yes")
 SOFT_END_SKEW = 0.75     # the sit: progress is made early and the last stretch is a slow creep (2026-10-18: the feet slipped where the back legs reach the floor)
 
 
@@ -144,18 +148,13 @@ def skew_for(token: str) -> float:
     return SOFT_END_SKEW if token.strip() == "ksit" else 1.0
 
 
-def peak_for(token: str) -> float:
-    """The fastest any joint may move on the way into `token` (deg/s): `PEAK_BY_SKILL`, else `PEAK_DEG_S`."""
-    return PEAK_BY_SKILL.get(token.strip(), PEAK_DEG_S)
-
-
-def ramp_seconds(start, end, cap=None, skew: float = 1.0, peak: float | None = None) -> float:
-    """How long to take from `start` to `end`: 0 if the move is under MIN_DELTA_DEG or easing is off. `peak` (deg/s) defaults to `PEAK_DEG_S`."""
+def ramp_seconds(start, end, cap=None, skew: float = 1.0) -> float:
+    """How long to take from `start` to `end`: 0 if the move is under MIN_DELTA_DEG or easing is off."""
     cap = max_seconds() if cap is None else cap
     delta = max(abs(a - b) for a, b in zip(start, end))
     if cap <= 0 or delta < MIN_DELTA_DEG:
         return 0.0
-    return min(cap, max(MIN_S, peak_factor(skew) * delta / (peak or PEAK_DEG_S)))
+    return min(cap, max(MIN_S, peak_factor(skew) * delta / PEAK_DEG_S))
 
 
 def ramp_poses(start, end, seconds, steps_per_s=STEPS_PER_S, skew: float = 1.0):

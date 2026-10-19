@@ -202,8 +202,8 @@ class SerialLink:
         1. the stand-up (standing rule, user, 2026-10-10): a skill that raises him, sent while he lies or sits, is preceded by the ~0.8 s ramp to the balance pose (gait/standup.py);
         2. the transition: from the pose the link knows to the skill's first frame. `kbalance` / `kup` only ever get step 1, so a stop / freeze out of a stride stays immediate."""
         c = command.strip()
-        if not c.startswith("k") or self._ramping:
-            return
+        if not c.startswith("k") or self._ramping or transitions.is_plain(c):
+            return                                             # the picture poses play as the firmware does (user, 2026-10-18: eased they were too slow)
         self._ramping = True
         try:
             start = None
@@ -225,7 +225,7 @@ class SerialLink:
             if start is None:
                 return                                         # unknown pose: the firmware's own start
             skew = transitions.skew_for(c)
-            secs = transitions.ramp_seconds(start, end, skew=skew, peak=transitions.peak_for(c))
+            secs = transitions.ramp_seconds(start, end, skew=skew)
             if secs <= 0:
                 return
             if transitions.kind(c) != "gait" and c not in transitions.STOP_SKILLS:
