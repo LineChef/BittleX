@@ -30,16 +30,24 @@ class Gait:
     phrases: tuple          # spoken forms, normalised (lower case, no punctuation); a command may carry up to two extra words
     echo_on: str            # what G2 says when it is switched on
     base_ref: str           # <base_ref>_ref.npy: the scripted base the learned correction sits on (pi_pipeline/gait/, reference_gait/ in the training tree)
+    scripted_fallback: bool = True   # a policy without this mode plays the gait's scripted base; False: it walks its normal learned gait instead (carpet: same base, only an input differs)
 
 
 GAITS = {
     "normal": Gait("normal", ("walk normally", "walk normal", "normal walk", "normal gait", "walk like normal", "walk mode", "walk mode on", "normal mode", "step mode off", "hi step off", "high step off",
-                                "switch to normal", "switch to normal walk", "switch to normal walking", "switch to walk mode", "switch to normal mode"),
+                                "switch to normal", "switch to normal walk", "switch to normal walking", "switch to walk mode", "switch to normal mode",
+                                "switch to default gait", "switch to default", "switch to default walk", "default gait", "default walk", "default mode",   # user, 2026-10-20: "G2, switch to default gait"
+                                "carpet mode off", "carpet off", "carpet walk off"),
                    "Walking normally.", "wkf"),
     "hi_step": Gait("hi_step", ("hi step", "high step", "hi steps", "high steps", "hi step mode", "high step mode", "step mode", "step mode on", "hi step on", "high step on",
                                 "highstep", "highstep mode", "i step", "eye step", "die step", "hi stepp",      # the last four: what the recognizer actually heard on G2 (2026-10-10: "i step", "switch die step")
                                  "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
                     "Hi step on.", "hsF"),
+    # carpet (user, 2026-10-20: "G2, carpet mode"): the same wkF base, played by a policy trained with the carpet-mode input (sidecar "modes" lists "carpet") with that input on.
+    # Bare "carpet" is not a phrase: "we're on carpet" answers the floor question and must not switch the gait.
+    "carpet": Gait("carpet", ("carpet mode", "carpet mode on", "carpet walk", "carpet gait", "carpet walking", "switch to carpet mode", "switch to carpet", "switch to carpet walk",
+                              "switch to carpet gait", "walk on carpet mode"),
+                   "Carpet mode on.", "wkf", scripted_fallback=False),
 }
 DEFAULT = "normal"
 _PUNCT = re.compile(r"[^\w\s]")
@@ -55,7 +63,7 @@ def parse_gait_command(text: str) -> str | None:
     n = " ".join({"switched": "switch", "switching": "switch", "changed": "change"}.get(w, w) for w in n.split()).replace(" to a ", " to ").replace(" to the ", " to ")      # the recognizer's "switched to a high step" (2026-10-10); an article elsewhere ("what is a high step") stays so it is not a command
     if not n or len(n.split()) > 6:
         return None
-    for name in ("normal", "hi_step"):
+    for name in ("normal", "hi_step", "carpet"):
         for p in sorted(GAITS[name].phrases, key=len, reverse=True):
             if n == p or (n.startswith(p + " ") and len(n.split()) - len(p.split()) <= 2) or (n.endswith(" " + p) and len(n.split()) - len(p.split()) <= 2):
                 return name
@@ -122,9 +130,33 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     if gait is None:
         return None, ""
     set_mode(gait, path)
-    if not supports(policy_onnx, gait):                   # played as the gait's scripted base, no learned correction: said out loud
-        return gait, f"{GAITS[gait].echo_on} It is a scripted walk without my learned correction, so it is slow and experimental."
+    if not supports(policy_onnx, gait):
+        if not GAITS[gait].scripted_fallback:             # carpet on a policy that never learned it: its normal walk, said out loud
+            return gait, f"{GAITS[gait].echo_on} My walk has not learned carpet yet, so I will use my normal walk for now."
+        return gait, f"{GAITS[gait].echo_on} It is a scripted walk without my learned correction, so it is slow and experimental."   # the gait's scripted base, no learned correction
     return gait, GAITS[gait].echo_on
+
+
+def uses_scripted(policy_onnx: str | None, gait: str) -> bool:
+    """Whether a walk in `gait` is played as its scripted base: the policy never learned the gait and the gait falls back to its base (the high step), not to the normal walk (carpet)."""
+    return gait != DEFAULT and not supports(policy_onnx, gait) and GAITS[gait].scripted_fallback
+
+
+def follow_floor(label: str | None, path: str | None = None) -> str:
+    """The floor label decides carpet mode (carpet plan, 2026-10-20): a carpet floor switches to it, any other floor switches out of it (another gait the person chose stays)."""
+    cur = current(path)
+    if (label or "").strip().lower() == "carpet":
+        return set_mode("carpet", path) if cur != "carpet" else cur
+    return set_mode(DEFAULT, path) if cur == "carpet" else cur
+
+
+def floor_note(label: str | None, path: str | None = None) -> str:
+    """follow_floor, plus what G2 adds after "Okay, the floor is ...": the gait change it made, if any."""
+    before = current(path)
+    after = follow_floor(label, path)
+    if after == before:
+        return ""
+    return " " + GAITS["carpet"].echo_on if after == "carpet" else " Back to my default gait."
 
 
 def split_compound(text: str):
@@ -139,9 +171,12 @@ def split_compound(text: str):
 def claude_hint() -> str:
     """One system-prompt line for Claude: G2's current walking gait, so a conversational walk uses it and never swaps in another skill."""
     mode = current()
+    if mode == "carpet":
+        return ("Your walking gait is set to CARPET MODE (for soft carpet). When asked to walk or go forward, use perform_skill walk_forward and it walks in carpet mode. "
+                "The person switches back with 'switch to default gait'.")
     if mode == "hi_step":
         return ("Your walking gait is set to HI STEP (a slow scripted high-stepping walk, lifted feet for snags and rubble). It is real: when asked to walk "
                 "or go forward, use perform_skill walk_forward and it walks in hi step. Never substitute trot or another skill for it, and never say you do not have it. "
                 "The person switches back with 'walk normally'.")
     return ("Your walking gait is NORMAL. You also have a HI STEP gait (a slow scripted high-stepping walk); the person switches to it by saying 'hi step' or "
-            "'switch to high step'. Never substitute trot for a gait you are asked for.")
+            "'switch to high step', and a CARPET MODE for soft carpet ('carpet mode'). Never substitute trot for a gait you are asked for.")

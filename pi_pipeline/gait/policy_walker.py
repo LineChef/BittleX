@@ -85,7 +85,7 @@ class PolicyWalker:
                     extra["on_contact"] = self._on_contact
             from . import gait_mode
             mode = gait_mode.current()
-            if mode != gait_mode.DEFAULT and not gait_mode.supports(self._policy_path(), mode):
+            if gait_mode.uses_scripted(self._policy_path(), mode):
                 # the user switched gait ("hi step") and this policy never learned it: play the scripted base of that gait (slow, experimental), same stop and end-pose rules
                 sc = self._scripted_fn
                 if sc is None:

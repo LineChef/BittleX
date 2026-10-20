@@ -148,7 +148,18 @@ def base_ref_path_for(onnx_path):
     return os.path.join(_HERE, f"{sidecar_field(onnx_path, 'base_ref', 'wkf')}_ref.npy")
 
 
+def _gait_mode():
+    """gait_mode, whether this module was imported from the package or as a plain script (run_gait.py puts gait/ on the path)."""
+    try:
+        from . import gait_mode
+    except ImportError:
+        import gait_mode
+    return gait_mode
+
+
 class ResidualGaitPolicy:
+    carpet_input, carpet = False, 0.0          # carpet plan (2026-10-20): set in __init__ from the sidecar's "modes"
+
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort
         self.CONTROL_HZ = CONTROL_HZ
@@ -175,6 +186,8 @@ class ResidualGaitPolicy:
         self._cmd_yaw = 0.0
         self._obs = None
         self.last_action = None
+        self.carpet_input = "carpet" in _gait_mode().modes_of(onnx_path + ".json")   # carpet plan (2026-10-20): the policy's last input is the carpet mode
+        self.carpet = 0.0                                                         # that input: 1 while the gait is set to carpet (read at each walk's reset)
 
     # -- setup ------------------------------------------------------------
     def set_command(self, fwd=None, yaw=None):
@@ -206,8 +219,13 @@ class ResidualGaitPolicy:
         pg = np.clip(proj_gravity_body(q), -1.0, 1.0)
         state_robot = np.concatenate((q, vel_clip, pg, [0.0],
                                       self.tilt_history, np.zeros(2), self._cmd_obs()))
-        self._obs = np.concatenate((state_robot, self.angle_history)).astype(np.float32)
+        if self.carpet_input:
+            self.carpet = 1.0 if _gait_mode().current() == "carpet" else 0.0
+        self._obs = self._with_mode(np.concatenate((state_robot, self.angle_history)))
         return self._obs
+
+    def _with_mode(self, obs):
+        return (np.append(obs, self.carpet) if self.carpet_input else obs).astype(np.float32)
 
     # -- one control tick ----------------------------------------------
     def step(self, quat_xyzw, gyro_xyz_radps):
@@ -253,7 +271,7 @@ class ResidualGaitPolicy:
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         state_robot = np.concatenate((q, vel_clip, pg, [time_obs],
                                       self.tilt_history, ang_acc, self._cmd_obs()))
-        self._obs = np.concatenate((state_robot, self.angle_history)).astype(np.float32)
+        self._obs = self._with_mode(np.concatenate((state_robot, self.angle_history)))
 
         return joint_deg
 

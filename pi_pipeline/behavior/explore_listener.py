@@ -109,7 +109,8 @@ class ExploreListener:
             from ..telemetry import autolog
             if cmd == "floor":
                 label = autolog.set_surface(parse_floor_command(text) or "unknown")
-                return self._reply(f"Okay, the floor is {label}.")
+                from ..gait import gait_mode
+                return self._reply(f"Okay, the floor is {label}.{gait_mode.floor_note(label)}")
             label, _age = autolog.get_surface_info()
             return self._reply(f"I have the floor down as {label}." if label != "unknown" else "I don't know what floor I'm on.")
         if cmd == "end_explore":

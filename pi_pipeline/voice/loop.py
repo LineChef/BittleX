@@ -408,7 +408,8 @@ class VoiceLoop:
             if floor:
                 label = autolog.set_surface(floor)
                 log.info("floor label set to %r before the exploration (voice)", label)
-                self._speak(f"Okay, the floor is {label}.")
+                from ..gait import gait_mode
+                self._speak(f"Okay, the floor is {label}.{gait_mode.floor_note(label)}")      # a carpet floor switches to carpet mode, another floor out of it
             else:
                 log.warning("no floor given before the exploration (heard %r): the label stays %r", reply, label)
                 self._speak("I did not catch a floor, so this roam will not count for training." if not known else f"I did not catch a floor, so I will keep {label}.")
@@ -739,7 +740,8 @@ class VoiceLoop:
             if cmd == "floor":
                 label = autolog.set_surface(parse_floor_command(user_text) or "unknown")
                 log.info("floor label set to %r (voice)", label)
-                self._speak(f"Okay, the floor is {label}.")
+                from ..gait import gait_mode
+                self._speak(f"Okay, the floor is {label}.{gait_mode.floor_note(label)}")
             else:
                 label, age = autolog.get_surface_info()
                 self._speak(f"I have the floor down as {label}." if label != "unknown" else "I don't know what floor I'm on. Tell me, like the floor is tile.")

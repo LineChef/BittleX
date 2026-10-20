@@ -170,6 +170,7 @@ Saying "explore" / "go ahead and look around": he says "Exploration mode.", then
 | Say | Does |
 |---|---|
 | "hi step" / "high step" / "highstep" / "switch to high step" / "switch to hi step" / "switch to highstep" / "step mode" | switches to the hi-step gait. With today's V4 this is the scripted hsF gait without a learned correction (G2 says so: slow, experimental); a policy trained for the mode would use its learned correction. |
-| "walk normally" / "switch to normal" / "switch to walk mode" / "walk mode" / "normal mode" / "normal walk" | back to the normal walk (the V4 policy). |
+| "carpet mode" / "switch to carpet mode" / "carpet walk" / "carpet gait" (2026-10-20) | switches to carpet mode. A policy trained for it (its sidecar lists the `carpet` mode) walks with its carpet input on; the deployed policy is not trained for it yet, so G2 says so and keeps his normal learned walk (never a scripted fallback). Answering "carpet" to "What surface will I be walking on?" (or "the floor is carpet") switches to it too, and naming another floor switches back. A bare "carpet" is a floor answer, never a gait switch. |
+| "switch to default gait" / "default gait" / "walk normally" / "switch to normal" / "switch to walk mode" / "walk mode" / "normal mode" / "normal walk" / "carpet mode off" | back to the normal walk (the deployed policy). |
 
 Works in the voice loop and during an exploration session (one shared state, `gait/gait_mode.py`); a short double beep plays when the gait really switches. The switch takes effect at the next walk or exploration leg.

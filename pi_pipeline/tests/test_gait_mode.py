@@ -146,3 +146,49 @@ def test_no_gait_is_ever_refused_for_a_policy_that_lacks_it(tmp_path, monkeypatc
     monkeypatch.setattr(gm, "parse_gait_command", lambda text: "crawl")
     gait, said = gm.request("crawl mode", str(onnx), f)
     assert gait == "crawl" and gm.current(f) == "crawl" and "Crawling." in said and "experimental" in said
+
+
+def test_carpet_mode_and_the_default_gait_phrases():
+    for t in ("carpet mode", "G2, carpet mode", "Carpet mode!", "switch to carpet mode", "carpet walk"):
+        assert gm.parse_gait_command(t) == "carpet", t
+    for t in ("switch to default gait", "G2, switch to default gait", "switch to the default gait", "default gait", "carpet mode off"):
+        assert gm.parse_gait_command(t) == "normal", t
+    for t in ("we're on carpet", "the floor is carpet", "carpet"):                 # floor answers, not gait switches
+        assert gm.parse_gait_command(t) is None, t
+    assert match_local_command("G2, carpet mode") == "gait" and match_local_command("switch to default gait") == "gait"
+
+
+def test_carpet_on_a_policy_without_it_keeps_the_learned_walk_and_says_so(tmp_path):
+    f = str(tmp_path / "mode.json")
+    plain, carpet = tmp_path / "v7.onnx", tmp_path / "carpet.onnx"
+    (tmp_path / "v7.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0}))
+    (tmp_path / "carpet.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0, "modes": ["normal", "carpet"]}))
+    gait, said = gm.request("carpet mode", str(plain), f)
+    assert gait == "carpet" and gm.current(f) == "carpet" and "normal walk" in said and "scripted" not in said
+    assert not gm.uses_scripted(str(plain), "carpet") and gm.uses_scripted(str(plain), "hi_step")       # carpet falls back to the learned walk, hi step to its scripted base
+    assert gm.request("carpet mode", str(carpet), f) == ("carpet", "Carpet mode on.")
+
+
+def test_the_floor_label_switches_carpet_mode_in_and_out(tmp_path):
+    f = str(tmp_path / "mode.json")
+    assert gm.floor_note("carpet", f) == " Carpet mode on." and gm.current(f) == "carpet"
+    assert gm.floor_note("carpet", f) == ""                                         # already on: nothing to add
+    assert gm.floor_note("hardwood", f) == " Back to my default gait." and gm.current(f) == "normal"
+    gm.set_mode("hi_step", f)
+    assert gm.floor_note("tile", f) == "" and gm.current(f) == "hi_step"           # a gait the person chose is left alone
+
+
+def test_a_carpet_policy_gets_the_carpet_input_last_and_only_in_carpet_mode(tmp_path, monkeypatch):
+    import numpy as np
+    from pi_pipeline.gait.residual_policy import ResidualGaitPolicy
+    f = str(tmp_path / "mode.json")
+    monkeypatch.setattr(gm, "STATE_PATH", f)
+    pol = object.__new__(ResidualGaitPolicy)                                       # the input building only, no ONNX session
+    pol._cmd_fwd = pol._cmd_yaw = 0.0
+    pol.carpet_input, pol.carpet = True, 0.0
+    quat, gyro, joints = [0, 0, 0, 1], [0, 0, 0], [0.8, 0, 0.8, 0, 0.8, 0, 0.8, 0]
+    assert pol.reset(joints, quat, gyro)[-1] == 0.0 and len(pol.obs) == 279          # the 278 base inputs + the carpet mode
+    gm.set_mode("carpet", f)
+    assert pol.reset(joints, quat, gyro)[-1] == 1.0
+    pol.carpet_input = False
+    assert len(pol.reset(joints, quat, gyro)) == 278 and np.isfinite(pol.obs).all()   # a policy without the mode: inputs unchanged
