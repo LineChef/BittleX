@@ -188,7 +188,6 @@ class VoiceLoop:
         question_window_s: float = 0.0,  # how long to keep listening after G2 asks a question (0 = never)
         on_event=None,  # Phase 10: called with wake_word= / conversation_ended= / told_sleep=
         camera=None,  # object with .snapshot() -> Snapshot | None; a picture is attached when the user asks what G2 sees
-        on_power=None,  # called with True when told "you're unplugged", False for "you're plugged in" (the Pi-battery warning's arming)
         on_poweroff=None,  # called to power the Pi off cleanly after a clear "shut down" (and no "cancel" within `shutdown_confirm_s`)
         shutdown_confirm_s: float = 6.0,
         announce_online: bool = False,  # say "G2 online." once the loop is ready (the voice service turns this on; G2_ANNOUNCE_ONLINE=off silences it)
@@ -208,7 +207,6 @@ class VoiceLoop:
         self._cue = cue
         self._memory = memory
         self._camera = camera
-        self._on_power = on_power
         self._on_poweroff = on_poweroff
         self._shutdown_confirm_s = shutdown_confirm_s
         self._last_look = None                         # the Snapshot of the look in progress, for the sighting note
@@ -352,21 +350,9 @@ class VoiceLoop:
         if saved:
             self._speak(f"Okay, I will remember the {name}.")
         else:
-            self._speak("I could not keep that picture. It may be too like one I already have, or the camera did not answer.")
+            self._speak("Image discarded.")
         self._set_session()
         self._cue.set("idle")
-
-    def _restart_service(self) -> None:
-        """Restart this voice service: ask systemd (`sudo -n systemctl restart g2-voice`); if that is not allowed, exit with an error so the unit's `Restart=on-failure` brings it back. Never returns when it works."""
-        import subprocess
-        import sys
-        try:
-            subprocess.Popen(["sudo", "-n", "systemctl", "restart", "g2-voice"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return
-        except Exception:  # noqa: BLE001
-            log.warning("could not ask systemd to restart the voice service; exiting so it restarts", exc_info=True)
-            self._fail("could not restart the voice service")
-        sys.exit(1)
 
     def _end_session(self) -> None:
         if self._conversing:
@@ -381,7 +367,7 @@ class VoiceLoop:
         personality on the live Conversation and persists it for next start."""
         self._cue.set("speaking")
         if cc is None:
-            self._speak("I didn't catch which mode you meant.")
+            self._speak("Sorry, I didn't catch what you said.")
             return
         p = self._conv.personality
         if cc.on:
@@ -415,7 +401,7 @@ class VoiceLoop:
             if known and age is not None and age <= max_age:
                 return
             self._cue.set("speaking")
-            self._speak("Which floor am I on?" if not known else f"I have the floor down as {label}. Which floor am I on now? Say same if it is still {label}.")
+            self._speak("What surface will I be walking on?" if not known else f"I have the floor down as {label}. Which floor am I on now? Say same if it is still {label}.")
             self._cue.set("listening")
             reply = (self._stt.listen(timeout_s=window) or "").strip()
             floor = parse_floor_answer(reply, label if known else None)
@@ -568,7 +554,7 @@ class VoiceLoop:
             return
         if cmd == "end_converse":
             self._cue.set("speaking")
-            self._speak("Okay, back to the wake word.")
+            self._speak("Understood.")
             self._end_session()
             return
         if cmd == "halt":
@@ -583,21 +569,6 @@ class VoiceLoop:
             self._events(release=True)
             self._cue.set("speaking")
             self._speak("Okay, moving again.")
-            self._set_session()
-            self._cue.set("idle")
-            return
-        if cmd in ("unplugged", "plugged"):
-            on_battery = cmd == "unplugged"
-            log.info("told %s", "he is on battery" if on_battery else "he is plugged in")
-            if self._on_power is not None:
-                self._on_power(on_battery)
-            self._cue.set("speaking")
-            if self._on_power is None:
-                self._speak("Okay. I can't track my battery here, though.")
-            elif on_battery:
-                self._speak("Okay, I'm on battery. I'll count from now and warn you before I run low.")
-            else:
-                self._speak("Okay, I'm charging. I'll pause my battery warning.")
             self._set_session()
             self._cue.set("idle")
             return
@@ -659,32 +630,25 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
-        if cmd == "restart_voice":
-            log.info("voice service restart requested (voice)")
-            self._cue.set("speaking")
-            self._speak("Restarting voice loop. I will say G2 online when I am back.")
-            self._restart_service()
-            return
         if cmd == "shutdown":
             log.info("shutdown requested (voice) -- lie down then dormant")
             self._events(shutdown=True)
             self._cue.set("speaking")
             if self._on_poweroff is not None and is_clear_shutdown(user_text):
-                self._speak(f"Okay, lying down and switching the computer off in {int(self._shutdown_confirm_s)} seconds. Say cancel to stop me.")
+                self._speak("Powering down.")             # he still listens `shutdown_confirm_s` for "cancel"
                 reply = (self._stt.listen(timeout_s=self._shutdown_confirm_s) or "") if self._shutdown_confirm_s > 0 else ""
                 if any(w in _normalize_words(reply) for w in _CANCEL_WORDS):
                     log.info("power-off cancelled (voice): %r", reply)
                     self._speak("Okay, staying on.")
                     self._end_session()
                     return
-                self._speak("Goodbye. Please flip my battery switch off.")   # the PiSugar S keeps powering the Pi after it halts
                 self._end_session()
                 try:
                     self._on_poweroff()
                 except Exception:  # noqa: BLE001 -- say so rather than fail silently
                     log.exception("power-off failed")
                     self._fail("power-off failed")
-                    self._speak("I lay down, but I couldn't switch the computer off.")
+                    self._speak("Shut down failed.")
                 return
             self._speak("Okay, lying down and shutting down. Wake me when you need me.")
             self._end_session()
@@ -889,7 +853,7 @@ class VoiceLoop:
             if pic.get("image") and not speaker.said:
                 speaker.say(_SILENT_LOOK)                # asked what G2 sees, a picture was taken, nothing was said
             elif done and not speaker.said:
-                speaker.say("Okay.")                     # never move silently -- always a spoken ack
+                speaker.say("Moving to a new location.")  # never move silently -- always a spoken ack
             speaker.finish()
         else:
             if speaker:
@@ -905,7 +869,7 @@ class VoiceLoop:
             elif pic.get("image"):
                 self._speak(_SILENT_LOOK)
             elif turn.actions:
-                self._speak("Okay.")
+                self._speak("Moving to a new location.")
         if "claude_start" in trace.times:
             trace.meta["actions"] = len(turn.actions)
             trace.meta["streamed"] = bool(getattr(turn, "streamed", False))

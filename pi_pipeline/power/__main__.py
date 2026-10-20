@@ -77,7 +77,7 @@ def _runtime(a):
         timed = t.mean_runtime_s(sources=MEASURED)
         wf = settings.pi_warn_fraction
         state, secs = t.battery_state()
-        now = {"paused": "PAUSED for this boot (you said plugged in; say \"you're unplugged\" to restart the count)",
+        now = {"paused": "PAUSED for this boot (you said plugged in; run `runtime unplugged` to restart the count)",
                "since_unplugged": f"counting since you said unplugged: {(secs or 0) / 3600:.2f} h so far",
                "since_boot": f"counting from boot: {(secs or 0) / 3600:.2f} h so far"}[state]
         print((f"the warning uses measured runs only (timed tests and power losses in the power log): {timed / 3600:.2f} h, so it fires after "

@@ -87,12 +87,6 @@ _EXPLORE = (
     "exploration mode", "explore", "go explore", "go and explore",
     "check things out", "go for a wander", "wander around", "go for walkies",
 )
-# Restart the voice service itself ("restart your voice service"): it says so, then the service restarts and is back in about 30 s.
-_RESTART_VOICE = (
-    "restart your voice service", "reset your voice service", "restart the voice service", "reset the voice service", "restart voice service", "reset voice service",
-    "restart your voice", "reset your voice", "restart voice", "reset voice", "reboot your voice", "reload your voice",
-)
-
 # End exploration mode entirely (the exploration session closes and the normal voice service comes back), without the emergency-stop words.
 _END_EXPLORE = (
     "end exploration mode", "end explore mode", "end exploring mode", "exit exploration mode", "exit explore mode", "stop exploration mode",
@@ -109,17 +103,6 @@ _UNEXPLORE = (
 _COME = (
     "come here", "come to me", "over here", "here boy", "walk to me",
     "come over here",
-)
-
-# "You're unplugged" / "you're plugged in": the Pi cannot sense its charger, so the person says when it is running on battery. The Pi-battery
-# warning (power/runtime_tracker.py) counts only from that moment.
-_UNPLUGGED = (
-    "you are unplugged", "youre unplugged", "i unplugged you", "i have unplugged you", "unplugged you",
-    "you are on battery", "youre on battery", "you are running on battery", "youre running on battery",
-)
-_PLUGGED = (
-    "you are plugged in", "youre plugged in", "i plugged you in", "i have plugged you in", "plugged you in",
-    "you are charging", "youre charging", "i put you on the charger", "i put you on charge",
 )
 
 # chirps on/off -- live-toggleable, matches Features.sound_cues in spirit but
@@ -340,7 +323,7 @@ def parse_floor_command(text: str) -> str | None:
     return _SURFACES.get(" ".join(words)) if words else None
 
 
-# The answer to "Which floor am I on?" before an exploration: a bare floor ("tile"), a sentence the floor command already reads, or "same" / "still tile" for the label he holds.
+# The answer to "What surface will I be walking on?" before an exploration: a bare floor ("tile"), a sentence the floor command already reads, or "same" / "still tile" for the label he holds.
 _FLOOR_FILLER = {"its", "it", "is", "the", "a", "an", "floor", "on", "were", "we", "are", "this", "here", "still", "same", "that", "thats", "right", "yes", "yeah", "correct", "still", "now"}
 _SAME = {"same", "the same", "same floor", "still the same", "yes", "yeah", "correct", "right", "thats right", "thats correct", "no change", "unchanged", "still"}
 
@@ -436,7 +419,7 @@ def asks_battery(text: str) -> bool:
 
 def match_local_command(text: str) -> str | None:
     """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
-    ``"unexplore"``, ``"end_explore"``, ``"restart_voice"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"unplugged"``, ``"plugged"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
+    ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
     n = _normalize(text)
@@ -455,8 +438,6 @@ def match_local_command(text: str) -> str | None:
         return "gait"                                  # "hi step" / "walk normally": before "walk" so "walk normally" is never read as a walk command
     if parse_walk_command(text) is not None:
         return "walk"
-    if _hit(n, _RESTART_VOICE):
-        return "restart_voice"
     if _hit(n, _END_EXPLORE):
         return "end_explore"                          # before "explore": "end exploration mode" must never arm it
     if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):
@@ -473,10 +454,6 @@ def match_local_command(text: str) -> str | None:
         return "converse"
     if _hit_short(n, _END_CONVERSE, extra_words=3):
         return "end_converse"
-    if _hit(n, _UNPLUGGED):
-        return "unplugged"
-    if _hit(n, _PLUGGED):
-        return "plugged"
     if _hit_short(n, _VOICE_LANGUAGE, extra_words=2):
         return "voice_language"
     if _hit(n, _CHIRPS_ON):

@@ -228,15 +228,10 @@ def test_end_exploration_mode_ends_the_session_and_never_arms_or_halts():
     assert lst.handle("that's enough") == "Okay, that's enough." and posts == [{"disarm_explore": True}] and ended == [1]
 
 
-def test_restart_voice_phrases_and_the_exploration_session_hands_back_to_a_fresh_voice_service():
+def test_there_is_no_restart_your_voice_command_any_more():
     from pi_pipeline.voice.commands import match_local_command
     for phrase in ("restart your voice service", "reset the voice service", "restart voice", "reset your voice", "reload your voice"):
-        assert match_local_command(phrase) == "restart_voice", phrase
-    assert match_local_command("restart") is None and match_local_command("reset your memory") != "restart_voice"          # nothing broader than the voice service
-    ended, said = [], []
-    rt = types.SimpleNamespace(post=lambda **kw: None, halt=lambda: None, release=lambda: None)
-    lst = ExploreListener(None, None, said.append, rt, lambda: [], on_stop=lambda: ended.append(1))
-    assert lst.handle("restart your voice service") == "Okay, restarting my voice." and ended == [1]
+        assert match_local_command(phrase) is None, phrase                         # removed (user, 2026-10-20); g2reset on the Mac restarts the service
 
 
 def test_the_exploration_listener_says_when_the_wake_word_registered_but_no_speech_was_caught(caplog):

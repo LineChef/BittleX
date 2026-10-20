@@ -12,8 +12,8 @@ battery state afterwards is unknown), so reboots can't be mistaken for an empty 
 
 `RuntimeWatcher` is on by default (G2_PI_BATTERY_WATCH=0 turns it off) but stays silent until a timed test has measured a full runtime.
 Then it warns at 70% of that runtime (about 30% left) and again at 80% (about 20% left, critical), counting from boot (a Pi is normally booted on a full battery and then
-unplugged). The Pi cannot sense a charger, so you can tell it: "you're plugged in" (or `runtime plugged`) pauses the warning for this boot,
-and "you're unplugged" (or `runtime unplugged`) restarts the count from that moment. G2_PI_BATTERY_ARM=manual counts only after "unplugged".
+unplugged). The Pi cannot sense a charger, so you can tell it: `runtime plugged` pauses the warning for this boot,
+and `runtime unplugged` restarts the count from that moment. G2_PI_BATTERY_ARM=manual counts only after "unplugged".
 A reboot forgets both."""
 from __future__ import annotations
 
@@ -171,15 +171,15 @@ class RuntimeTracker:
     def uptime_s(self) -> float:
         return self._uptime()
 
-    # -- "running on battery": the Pi cannot sense a charger, so the person says so ---------------------------------
+    # -- "running on battery": the Pi cannot sense a charger, so the person runs the command ---------------------------------
     def arm_now(self) -> None:
-        """"You're unplugged": count battery time from this moment (for this boot)."""
+        """`runtime unplugged`: count battery time from this moment (for this boot)."""
         data = self._load()
         data["armed"] = {"boot_id": self._boot_id(), "uptime_s": self._uptime(), "paused": False}
         self._save(data)
 
     def disarm(self) -> None:
-        """"You're plugged in": pause the warning for this boot."""
+        """`runtime plugged`: pause the warning for this boot."""
         data = self._load()
         data["armed"] = {"boot_id": self._boot_id(), "uptime_s": self._uptime(), "paused": True}
         self._save(data)

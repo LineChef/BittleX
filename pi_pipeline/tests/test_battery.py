@@ -77,8 +77,8 @@ def test_alert_plays_the_siren_then_speaks_the_matching_line():
     on_alert = make_battery_alert(tts, audible=True, sound=lambda: events.append(("siren",)))
     on_alert(BatteryLevel.LOW, 6.9)
     on_alert(BatteryLevel.CRITICAL, 6.5)
-    assert events == [("siren",), ("say", "My battery is low."), ("siren",),
-                      ("say", "My battery is critically low. Please charge me.")]
+    assert events == [("siren",), ("say", "Low battery detected."), ("siren",),
+                      ("say", "Critical battery level detected.")]
 
 
 def test_a_silent_setup_neither_sounds_the_siren_nor_speaks():

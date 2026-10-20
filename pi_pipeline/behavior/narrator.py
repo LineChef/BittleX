@@ -22,8 +22,8 @@ _RULES = (
     ("approach ", "approach", "I'm heading over to the {x}."),
     ("found novelty", "found", "Found something."),
     ("investigate ", "investigate", "Let me look at this {x}."),
-    ("new leg", "leg", "Heading off in a new direction."),
-    ("leg done", "pause", "Stopping for a moment."),
+    ("new leg", "leg", "Searching."),
+    ("leg done", "pause", "Stopping for a moment to look around."),
     ("dwelling", "pause", "Having a good look around."),
     ("on leg", "wander", "Exploring."),
     ("what was that", "sound", "What was that?"),
@@ -35,7 +35,7 @@ _RULES = (
     ("cliff:", "cliff", "There's an edge. Backing away."),
     ("hit: back up", "hit", "Oof! I bumped into something. Backing up."),
     ("hit: turn around", "hit_turn", "Turning around."),
-    ("straight first", "straight", "Walking straight ahead."),
+    ("straight first", "straight", "Patrolling."),
 )
 
 # Wall turns (behavior/driver.py `_wall_reflex`): "wall ahead (8 in, 3 groups): turn right" / "wall blocked (0 in, 5 groups): turn left"; said with what he sees and which way he goes

@@ -425,7 +425,7 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
 - **BiBoard battery alerts** — the voice service reads the pack voltage at start, at the wake word, before a walk and on a 30-minute backstop (every read makes the board tick), also in exploration sessions, and a walk checks it every 5 s; a low reading sounds the alarm plus a spoken line, and a critical reading under load rests the legs. Thresholds are settings ([`guides/settings-switches.md`](guides/settings-switches.md)); G2 answers power questions in percent, never volts.
 - **Pi battery estimate** — the PiSugar S has no telemetry, so the Pi's runtime is learned from deliberate timed tests
   (`python -m pi_pipeline.power runtime test start|collect|cancel`, `runtime list|add|forget`); the warning fires at 70 % and
-  80 % of the measured runtime, counted from boot. "You're unplugged" / "you're plugged in" start and pause the count.
+  80 % of the measured runtime, counted from boot. `python -m pi_pipeline.power runtime unplugged|plugged` starts and pauses the count.
 - **Wi-Fi fallback** — `tools/g2_wifi.sh` (`g2wifi`) manages a backup phone-hotspot network on the Pi.
 - **Standing-wobble guard** — the firmware's gyro balance, run on a 5 Hz IMU, can sit in a ~1.9 Hz limit cycle when G2 stands.
   The voice service keeps `gb` (balance off) while G2 is idle, re-sends it every minute, and trips the guard if the IMU shows the

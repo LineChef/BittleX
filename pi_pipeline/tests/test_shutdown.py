@@ -28,8 +28,7 @@ def test_a_clear_shut_down_lies_down_waits_for_a_cancel_then_powers_off():
     lp, said, _, events = make(["shut down", ""], on_poweroff=lambda: said.append("<POWER OFF>"))
     lp._one_turn()
     assert {"shutdown": True} in events
-    assert any("switching the computer off" in s and "cancel" in s for s in said)
-    assert said[-2:] == ["Goodbye. Please flip my battery switch off.", "<POWER OFF>"]      # the goodbye is spoken BEFORE the power goes
+    assert said[-2:] == ["Powering down.", "<POWER OFF>"]                     # nothing is said between the cancel window and the power going
 
 
 def test_saying_cancel_in_the_window_keeps_the_pi_on():
@@ -59,7 +58,7 @@ def test_a_failing_power_off_is_said_out_loud_not_swallowed():
         raise RuntimeError("sudo needs a password")
     lp, said, _, _ = make(["shut down", ""], on_poweroff=boom)
     lp._one_turn()
-    assert said[-1] == "I lay down, but I couldn't switch the computer off."
+    assert said[-1] == "Shut down failed."
 
 
 def test_power_off_pi_lies_g2_down_then_runs_the_shutdown_only_on_linux():

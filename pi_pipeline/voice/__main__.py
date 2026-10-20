@@ -270,7 +270,6 @@ def main() -> None:
             namer=namer,
             announce_online=os.environ.get("G2_ANNOUNCE_ONLINE", "on").strip().lower() not in ("off", "0", "false", "no"),
             on_event=on_event,
-            on_power=(stop_pi_watch.set_on_battery if stop_pi_watch else None),
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),
             shutdown_confirm_s=settings.shutdown_confirm_s,
         )
@@ -400,7 +399,7 @@ def _start_pi_battery_watch(*, tts, audible: bool):
     watcher = RuntimeWatcher(tracker, make_pi_battery_alert(tts, audible), full_runtime_s=settings.pi_full_runtime_s or None, warn_fraction=settings.pi_warn_fraction, critical_fraction=settings.pi_critical_fraction,
                              require_arm=settings.pi_battery_arm == "manual").start()
     import types
-    return types.SimpleNamespace(stop=watcher.stop, set_on_battery=lambda on: tracker.arm_now() if on else tracker.disarm())
+    return types.SimpleNamespace(stop=watcher.stop)
 
 
 def power_off_pi(actuator, *, run=None, platform=None, sleep=None) -> None:

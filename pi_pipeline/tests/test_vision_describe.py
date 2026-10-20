@@ -423,7 +423,7 @@ def test_a_picture_that_could_not_be_kept_is_not_confirmed(monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda s: None)
     lp, conv, said, skills, shots = _naming_loop(None, ["remember this as my red mug"])
     lp._one_turn()
-    assert shots == ["name:red mug"] and "Okay, I will remember" not in " ".join(said) and "could not keep that picture" in said[-1]
+    assert shots == ["name:red mug"] and "Okay, I will remember" not in " ".join(said) and said[-1] == "Image discarded."
 
 
 def test_ordinary_sentences_and_questions_are_not_mistaken_for_naming():

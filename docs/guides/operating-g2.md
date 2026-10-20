@@ -41,7 +41,7 @@ When G2 sits on the calibration stand, or you are running calibration, `check_se
 ## Batteries
 
 - The **robot's pack** is read through the firmware; G2 warns by voice when it is low and when it is critical, and the walk loop reads voltage while walking and rests the legs on a critical reading. Thresholds are settings: [`settings-switches.md`](settings-switches.md).
-- The **Pi's battery** (PiSugar S) has no readout; its warning counts uptime against the measured full-charge runtime. Say "you're plugged in" to pause the count while charging and "you're unplugged" to restart it; a reboot forgets both. After charging, reboot the Pi. [`../hardware/pi-power.md`](../hardware/pi-power.md)
+- The **Pi's battery** (PiSugar S) has no readout; its warning counts uptime against the measured full-charge runtime. Run `python -m pi_pipeline.power runtime plugged` on the Pi to pause the count while charging and `runtime unplugged` to restart it; a reboot forgets both. After charging, reboot the Pi. [`../hardware/pi-power.md`](../hardware/pi-power.md)
 - Start sessions with both packs full. Stop a block if the robot's pack passes about 30% resting or the Pi's low alarm sounds.
 
 ## What to check when something is off

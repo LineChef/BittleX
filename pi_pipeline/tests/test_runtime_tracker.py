@@ -156,27 +156,10 @@ def test_the_plugged_in_and_unplugged_state_belongs_to_one_boot(tmp_path):
     assert m2.tracker(p).armed_elapsed_s(from_boot=True) == 60.0
 
 
-def test_voice_phrases_for_unplugged_and_plugged_in():
+def test_unplugged_and_plugged_in_are_not_voice_commands_any_more():
     from pi_pipeline.voice.commands import match_local_command
-    for text in ("you're unplugged", "I unplugged you", "you are on battery", "you're running on battery"):
-        assert match_local_command(text) == "unplugged", text
-    for text in ("you're plugged in", "I plugged you in", "you are charging", "I put you on the charger"):
-        assert match_local_command(text) == "plugged", text
-    for text in ("walk forward", "what do you see", "tell me about the charger"):
-        assert match_local_command(text) not in ("unplugged", "plugged"), text
-
-
-def test_telling_g2_he_is_unplugged_arms_the_warning_and_he_says_so():
-    import types as _t
-    from pi_pipeline.voice.loop import VoiceLoop
-    said, flags = [], []
-    stt = _t.SimpleNamespace(listen=lambda timeout_s=None: "you're unplugged")
-    lp = VoiceLoop(wake_word=_t.SimpleNamespace(wait=lambda: None), stt=stt, conversation=_t.SimpleNamespace(
-                       send=lambda *a, **k: None, set_mood_hint=lambda h: None, set_narration_hint=lambda h: None),
-                   tts=_t.SimpleNamespace(speak=said.append), actuator=_t.SimpleNamespace(perform=lambda *a, **k: None, stop=lambda: None),
-                   cue=_t.SimpleNamespace(set=lambda s: None), follow_up_s=0.0, on_power=flags.append)
-    lp._one_turn()
-    assert flags == [True] and said and "on battery" in said[0]
+    for text in ("you're unplugged", "I unplugged you", "you are on battery", "you're plugged in", "you are charging", "I put you on the charger"):
+        assert match_local_command(text) is None, text                             # removed (user, 2026-10-20); `power runtime unplugged|plugged` remains
 
 
 def test_battery_state_reports_paused_unplugged_or_since_boot(tmp_path):

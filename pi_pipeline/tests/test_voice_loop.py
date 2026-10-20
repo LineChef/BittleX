@@ -197,7 +197,7 @@ def test_actions_without_speech_still_get_a_spoken_ok():
     conv.send = lambda text, memory_context=None: __import__("types").SimpleNamespace(
         speech="", actions=["sit"], facts=[])
     _run(lp, 2)
-    assert "Okay." in tts.said
+    assert "Moving to a new location." in tts.said
 
 
 # ------------------------------------------------------ chirps / narration
@@ -287,7 +287,7 @@ def test_streamed_action_without_speech_still_says_okay():
     conv.send = send
     lp._act = types.SimpleNamespace(perform=lambda s, seconds=None: None, stop=lambda: None)
     _run(lp, 2)
-    assert "Okay." in tts.said
+    assert "Moving to a new location." in tts.said
 
 
 def test_speech_worker_synthesises_the_next_sentence_while_the_previous_plays():
@@ -413,7 +413,7 @@ def test_thats_all_ends_conversation_mode():
     for _ in range(4):
         lp._one_turn()
     assert conv.sent == ["hello there", "next"] and len(waits) == 2
-    assert any("wake word" in s.lower() for s in tts.said)
+    assert "Understood." in tts.said
 
 
 def test_thats_all_outside_conversation_mode_is_just_a_sentence():
@@ -550,7 +550,7 @@ def _explore_loop(monkeypatch, tmp_path, script, label=None, age_s=0.0):
 def test_exploring_with_no_floor_label_asks_and_sets_it_from_the_answer(monkeypatch, tmp_path):
     lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["go ahead and look around", "we are on tile"])
     _run(lp, 1)
-    assert tts.said[0] == "Which floor am I on?" and "Okay, the floor is tile." in tts.said and autolog.get_surface() == "tile"
+    assert tts.said[0] == "What surface will I be walking on?" and "Okay, the floor is tile." in tts.said and autolog.get_surface() == "tile"
     assert any(e.get("arm_explore") for e in events) and stt.timeouts[-1] == 10.0           # the roam still starts, after the answer
 
 
@@ -577,4 +577,4 @@ def test_the_floor_question_can_be_switched_off(monkeypatch, tmp_path):
     lp, stt, tts, events, autolog = _explore_loop(monkeypatch, tmp_path, ["explore"])
     monkeypatch.setenv("G2_FLOOR_PROMPT_S", "0")
     _run(lp, 1)
-    assert "Which floor am I on?" not in tts.said and any(e.get("arm_explore") for e in events)
+    assert "What surface will I be walking on?" not in tts.said and any(e.get("arm_explore") for e in events)

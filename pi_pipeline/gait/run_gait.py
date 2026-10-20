@@ -294,7 +294,7 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
                     print(f"!! battery {lvl.name.lower()} under load: {v:.2f} V", flush=True)
                     try:
                         (on_battery or (lambda l, vv: _speak_best_effort(
-                            "My battery is critically low. Please charge me." if l is BatteryLevel.CRITICAL else "My battery is low.")))(lvl, v)
+                            "Critical battery level detected." if l is BatteryLevel.CRITICAL else "Low battery detected.")))(lvl, v)
                     except Exception:  # noqa: BLE001
                         pass
                     if lvl is BatteryLevel.CRITICAL:

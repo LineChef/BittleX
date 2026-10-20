@@ -112,10 +112,6 @@ class ExploreListener:
                 return self._reply(f"Okay, the floor is {label}.")
             label, _age = autolog.get_surface_info()
             return self._reply(f"I have the floor down as {label}." if label != "unknown" else "I don't know what floor I'm on.")
-        if cmd == "restart_voice":
-            if self._on_stop:
-                self._on_stop()                       # closes the session; the voice service then starts fresh
-            return self._reply("Okay, restarting my voice.")
         if cmd == "end_explore":
             if self._on_stop:
                 self._on_stop()                       # closes the session; the voice service comes back

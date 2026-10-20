@@ -67,8 +67,8 @@ class BatteryLevel(IntEnum):
 
 # What G2 says after the siren (spoken in its robot voice by the voice service)
 ALERT_MESSAGES = {
-    BatteryLevel.LOW: "My battery is low.",
-    BatteryLevel.CRITICAL: "My battery is critically low. Please charge me.",
+    BatteryLevel.LOW: "Low battery detected.",
+    BatteryLevel.CRITICAL: "Critical battery level detected.",
 }
 
 
