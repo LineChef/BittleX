@@ -55,9 +55,14 @@ def git(*args):
     return ""
 
 
+def unemphasize(text):
+    """Drop Markdown emphasis marks (backticks, asterisks, and underscores at a word edge) but keep underscores inside names (pi_pipeline, gait_mode.py)."""
+    return re.sub(r"(?<!\w)_+|_+(?!\w)", "", re.sub(r"[`*]", "", text))
+
+
 def slug(text):
-    """GitHub-style heading id."""
-    s = re.sub(r"[`*_]", "", text.strip().lower())
+    """GitHub-style heading id (what rehype-slug / github-slugger produce): lower case, markup marks and punctuation other than hyphens and underscores removed, each space a hyphen."""
+    s = unemphasize(text.strip().lower())
     s = re.sub(r"[^\w\- ]", "", s, flags=re.UNICODE)
     return s.replace(" ", "-")
 
@@ -191,7 +196,7 @@ def summary_of(text):
             continue
         para.append(s)
     t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", " ".join(para))
-    t = re.sub(r"[`*_]", "", t)
+    t = unemphasize(t)
     if len(t) <= SUMMARY_MAX:
         return t
     cut = t[:SUMMARY_MAX - 1].rsplit(" ", 1)[0].rstrip(" ,;:.-—–")     # cut at a word boundary, never mid-word
