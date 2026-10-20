@@ -85,6 +85,12 @@ for P in $EXTRA; do
     say "attachment policy $P (or its sidecar) is missing here: not synced"
   fi
 done
+# the carpet-only policy ("G2, carpet mode" loads it; residual_policy.CARPET_POLICY), once one is promoted under that name; without it carpet mode keeps the default policy
+CARPET=$(sed -n 's/^CARPET_POLICY = "\([^"]*\)".*/\1/p' "$EXPORT/pi_pipeline/gait/residual_policy.py" | head -1)
+if [ -n "$CARPET" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$CARPET" ] && [ -f "$ROOT/rl_training/opencat-gym/trained/$CARPET.json" ]; then
+  say "rsync carpet policy $CARPET"
+  rsync -az "$ROOT/rl_training/opencat-gym/trained/$CARPET" "$ROOT/rl_training/opencat-gym/trained/$CARPET.json" "$G2_PI:bittleX/rl_training/opencat-gym/trained/" 2>&1 | tee -a "$LOG"
+fi
 
 # keep the Pi's trained/ folder to the exported release candidates only (stray files there are leftovers of earlier syncs)
 STRAY=$(ssh "$G2_PI" 'cd ~/bittleX/rl_training/opencat-gym/trained 2>/dev/null && ls -1 | grep -vE "^Release_Candidate[^ /]*_ppo\.onnx(\.json)?$"' 2>/dev/null || true)
