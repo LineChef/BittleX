@@ -8,6 +8,7 @@ Reads git-tracked files only (nothing gitignored, no CLAUDE.md, no training data
     latest.json          a tiny pointer: version, build time, the file names below (fetch this first; it is never cached for long)
     manifest.json        the navigation tree and every page's route, title, section, summary, headings and last-changed date
     search.json          one plain-text record per page for a client-side search library
+    schema.json          the JSON Schema of latest.json, manifest.json and search.json (source: docs/guides/docs-bundle.schema.json)
     pages/<route>.md     each page's Markdown, with links rewritten to site routes (pages/index.md is the home page)
     assets/<repo path>   images, PDFs and the standalone HTML pages, served by the site under `<base>/_assets/`
 
@@ -37,6 +38,10 @@ FOLDER_TITLES = {"archive/plan-detail": "Archived plan write-ups", "archive/rl":
 FOLDER_ORDER = ["guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive"]
 LINK = re.compile(r"(!?\[[^\]]*\]\()([^)\s]+)((?:\s+\"[^\"]*\")?\))")
 FENCE = re.compile(r"^(```|~~~)")
+# The closed sets the schema (docs/guides/docs-bundle.schema.json, shipped as schema.json) promises; the build refuses a value outside them, so the schema cannot drift.
+SECTIONS = ["overview", "guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive", "blueprints", "code", "legal", "about"]
+ASSET_KINDS = ["png", "jpg", "jpeg", "gif", "svg", "pdf", "html"]      # one per ASSET_EXT; the files in the bundle today are html and pdf
+SUMMARY_MAX = 220
 
 
 def git(*args):
@@ -90,6 +95,8 @@ def section_for(path, route):
         return "blueprints"
     if route.startswith("code/"):
         return "code"
+    if route.startswith("legal/"):
+        return "legal"
     return "about"
 
 
@@ -184,7 +191,11 @@ def summary_of(text):
             continue
         para.append(s)
     t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", " ".join(para))
-    return re.sub(r"[`*_]", "", t)[:220]
+    t = re.sub(r"[`*_]", "", t)
+    if len(t) <= SUMMARY_MAX:
+        return t
+    cut = t[:SUMMARY_MAX - 1].rsplit(" ", 1)[0].rstrip(" ,;:.-—–")     # cut at a word boundary, never mid-word
+    return cut + "…"
 
 
 def plain_text(text):
@@ -280,7 +291,8 @@ def build_nav(entries, bodies, pages):
             finish(c)
         if not n["children"]:
             n.pop("children")
-        n.pop("folder", None)
+        elif not n["section"]:                       # a folder node has no page of its own: it takes its first child's section
+            n["section"] = next((c["section"] for c in n["children"] if c["section"]), "")
     top = {}
     for n in roots:
         top[n["route"]] = n
@@ -349,10 +361,19 @@ def build(out, base, gh, branch, check=True):
             raise SystemExit(f"{len(bad)} private term(s) found in the bundle; not publishing (run the pre-commit privacy check)")
     version = digest.hexdigest()[:12]
     nav = build_nav(entries, bodies, pages)
+    bad_sections = sorted({e["section"] for e in entries.values()} - set(SECTIONS))
+    bad_kinds = sorted({a_["kind"] for a_ in asset_list} - set(ASSET_KINDS))
+
+    def empty_sections(nodes):
+        return [n["route"] for n in nodes if not n["section"]] + [r for n in nodes for r in empty_sections(n.get("children", []))]
+    if bad_sections or bad_kinds or empty_sections(nav):
+        raise SystemExit(f"bundle values outside the schema: sections {bad_sections}, asset kinds {bad_kinds}, nav nodes without a section {empty_sections(nav)}; "
+                         "add the value to SECTIONS / ASSET_KINDS, docs/guides/docs-bundle.schema.json and docs/guides/docs-bundle.md together")
 
     def annotate(nodes, parent):
         """Copy each node's place in the tree onto its flat page entry, so a site can reorder from the flat list without walking `nav`."""
         for i, n in enumerate(nodes):
+            n["order"] = i
             e = entries.get(n["route"])
             if e is not None:
                 e["parent"], e["order"] = parent, i
@@ -365,7 +386,8 @@ def build(out, base, gh, branch, check=True):
                 "pages": [entries[r] for r in sorted(entries)], "nav": nav, "assets": asset_list}
     json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), indent=1)
     json.dump(search, open(os.path.join(out, "search.json"), "w"))
-    json.dump({"version": version, "built": built, "manifest": "manifest.json", "search": "search.json", "pageCount": len(entries),
+    shutil.copyfile(os.path.join(ROOT, "docs", "guides", "docs-bundle.schema.json"), os.path.join(out, "schema.json"))
+    json.dump({"version": version, "built": built, "manifest": "manifest.json", "search": "search.json", "schema": "schema.json", "pageCount": len(entries),
                "assetCount": len(asset_list)}, open(os.path.join(out, "latest.json"), "w"), indent=1)
     open(os.path.join(out, ".nojekyll"), "w").close()
     return manifest, warnings

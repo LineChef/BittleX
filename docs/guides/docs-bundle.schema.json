@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs-bundle.schema.json",
+  "title": "Docs bundle",
+  "description": "The JSON files of the docs bundle (latest.json, manifest.json, search.json). Shipped in the bundle as schema.json. Fields listed under `required` are always present; the others are optional and omitted, never null, when they do not apply (exception: PageEntry.parent is always present and is null at the top level).",
+  "$defs": {
+    "section": {
+      "description": "A closed set. Every page, and every navigation node (folder nodes included), carries exactly one. The build fails on a value outside this list.",
+      "enum": ["overview", "guides", "hardware", "vision", "rl", "research", "plan-detail", "planned", "archive", "blueprints", "code", "legal", "about"]
+    },
+    "Heading": {
+      "type": "object",
+      "required": ["level", "text", "id"],
+      "properties": {
+        "level": {"type": "integer", "minimum": 1, "maximum": 6},
+        "text": {"type": "string"},
+        "id": {"type": "string", "description": "GitHub-style heading anchor"}
+      },
+      "additionalProperties": false
+    },
+    "PageEntry": {
+      "type": "object",
+      "required": ["route", "title", "section", "source", "updated", "summary", "headings", "parent", "order"],
+      "properties": {
+        "route": {"type": "string", "description": "Site route without base; the home page is the empty string"},
+        "title": {"type": "string"},
+        "section": {"$ref": "#/$defs/section"},
+        "source": {"type": "string", "description": "Repo path of the Markdown file"},
+        "updated": {"type": "string", "format": "date", "description": "Date of the file's last commit"},
+        "summary": {"type": "string", "description": "First paragraph as plain text, at most 220 characters. When longer it is cut at a word boundary and ends with an ellipsis (U+2026)"},
+        "headings": {"type": "array", "items": {"$ref": "#/$defs/Heading"}},
+        "parent": {
+          "type": ["string", "null"],
+          "description": "Route of the parent navigation node, null at the top level. The parent is a page (a folder's README) or, where a folder has no README, a folder node that exists only in `nav` and has no PageEntry (for example `code`, `legal`)"
+        },
+        "order": {"type": "integer", "minimum": 0, "description": "Position among the siblings under the same parent, from 0; the same as the node's `order` in `nav`"},
+        "group": {"type": "string", "description": "Sidebar group label from a `###` heading in the parent folder's README; absent when the page has none"}
+      },
+      "additionalProperties": false
+    },
+    "NavNode": {
+      "type": "object",
+      "required": ["route", "title", "section", "order"],
+      "properties": {
+        "route": {"type": "string"},
+        "title": {"type": "string"},
+        "section": {"$ref": "#/$defs/section", "description": "A page node has its page's section; a folder node (folder: true) takes the section of its first child"},
+        "order": {"type": "integer", "minimum": 0, "description": "Position among its siblings, from 0; siblings are already listed in this order. The top level starts with the home page"},
+        "folder": {"const": true, "description": "Present and true only for a node that has no page of its own (no PageEntry, no pages/<route>.md); absent for page nodes"},
+        "group": {"type": "string", "description": "Sidebar group label; absent when the node has none"},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/NavNode"}, "minItems": 1, "description": "Absent on a leaf, never an empty array"}
+      },
+      "additionalProperties": false
+    },
+    "Asset": {
+      "type": "object",
+      "required": ["path", "kind", "size"],
+      "properties": {
+        "path": {"type": "string", "description": "Repo path; served at <assetsUrl>/<path>"},
+        "kind": {
+          "enum": ["png", "jpg", "jpeg", "gif", "svg", "pdf", "html"],
+          "description": "The file extension, lower case. Only html and pdf exist today; the other values are possible when such a file is added under docs/ or blueprints/. No other value ever appears"
+        },
+        "size": {"type": "integer", "description": "Bytes"}
+      },
+      "additionalProperties": false
+    },
+    "Latest": {
+      "type": "object",
+      "description": "latest.json",
+      "required": ["version", "built", "manifest", "search", "schema", "pageCount", "assetCount"],
+      "properties": {
+        "version": {"type": "string", "description": "12 hex characters; changes whenever any page or asset changes. Use as the cache-busting query string"},
+        "built": {"type": "string", "format": "date-time"},
+        "manifest": {"const": "manifest.json"},
+        "search": {"const": "search.json"},
+        "schema": {"const": "schema.json"},
+        "pageCount": {"type": "integer"},
+        "assetCount": {"type": "integer"}
+      },
+      "additionalProperties": false
+    },
+    "Manifest": {
+      "type": "object",
+      "description": "manifest.json",
+      "required": ["version", "built", "repo", "branch", "base", "assetsUrl", "pages", "nav", "assets"],
+      "properties": {
+        "version": {"type": "string"},
+        "built": {"type": "string", "format": "date-time"},
+        "repo": {"type": ["string", "null"], "description": "GitHub repository URL used for links to non-page files; null when the build was given none"},
+        "branch": {"type": "string"},
+        "base": {"type": "string", "description": "URL path the links were built for, no trailing slash"},
+        "assetsUrl": {"type": "string", "description": "<base>/_assets"},
+        "pages": {"type": "array", "items": {"$ref": "#/$defs/PageEntry"}, "description": "Flat, sorted by route"},
+        "nav": {"type": "array", "items": {"$ref": "#/$defs/NavNode"}},
+        "assets": {"type": "array", "items": {"$ref": "#/$defs/Asset"}}
+      },
+      "additionalProperties": false
+    },
+    "SearchRecord": {
+      "type": "object",
+      "required": ["route", "title", "section", "headings", "text"],
+      "properties": {
+        "route": {"type": "string"},
+        "title": {"type": "string"},
+        "section": {"$ref": "#/$defs/section"},
+        "headings": {"type": "array", "items": {"type": "string"}},
+        "text": {"type": "string", "description": "Plain text of the page, the first 4,000 characters (a raw cut-off, not a summary)"}
+      },
+      "additionalProperties": false
+    },
+    "Search": {"type": "array", "description": "search.json", "items": {"$ref": "#/$defs/SearchRecord"}}
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/Latest"},
+    {"$ref": "#/$defs/Manifest"},
+    {"$ref": "#/$defs/Search"}
+  ]
+}

@@ -16,13 +16,18 @@ Build it locally with `g2bundle` (output in `build/docs-bundle/`, gitignored).
 
 | File | What it is |
 |---|---|
-| `latest.json` | A tiny pointer: `version`, `built`, the names of the other files, page and asset counts. Fetch this first; it changes whenever any page changes |
+| `latest.json` | A tiny pointer: `version`, `built`, the names of the other files (`manifest`, `search`, `schema`), page and asset counts. Fetch this first; it changes whenever any page changes |
 | `manifest.json` | The navigation tree (`nav`), every page's metadata (`pages`), the assets list, and the settings the links were built with (`base`, `assetsUrl`, `repo`, `branch`) |
+| `schema.json` | The JSON Schema of `latest.json`, `manifest.json` and `search.json` (source: [`docs-bundle.schema.json`](docs-bundle.schema.json)); the contract below in machine-readable form |
 | `search.json` | One plain-text record per page (title, headings, the first 4,000 characters) for a client-side search library |
 | `pages/<route>.md` | Each page's Markdown with its links already rewritten. `pages/index.md` is the home page |
 | `assets/<repo path>` | Images, PDFs and the standalone HTML pages (the wiring guide, the AI Head plan) |
 
-A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. Sections: `overview`, `guides`, `hardware`, `vision`, `rl`, `research`, `plan-detail`, `planned`, `archive`, `blueprints`, `code`, `about`. The `nav` tree is ordered the way each folder's README lists its pages.
+A **page** entry has `route`, `title`, `section`, `source` (the repo path), `updated` (the date of its last commit), `summary`, `headings` (`level`, `text`, `id`), and its place in the navigation: `parent`, `order` and, where it has one, `group`. `summary` is the first paragraph as plain text, at most 220 characters; a longer one is cut at a word boundary and ends with `…`. `search.json`'s `text` is the opposite, a raw cut-off at 4,000 characters.
+
+**Sections** are a closed set: `overview`, `guides`, `hardware`, `vision`, `rl`, `research`, `plan-detail`, `planned`, `archive`, `blueprints`, `code`, `legal`, `about`. The build refuses any other value (so a new folder under `docs/` needs its section added to `SECTIONS` in the builder, the schema and this list). **Asset `kind`** is the lower-case file extension and is one of `png`, `jpg`, `jpeg`, `gif`, `svg`, `pdf`, `html`; only `html` and `pdf` occur today, and no other value ever appears.
+
+**Navigation nodes** (`nav`) have `route`, `title`, `section` and `order` always, and `children` (never an empty array) and `group` only when they apply. `order` is the node's position among its siblings, from 0, and the siblings are already listed in that order (it equals the page entry's `order`). A node with `folder: true` is a folder with no page of its own (`code`, `legal`, `hardware/build-logs` and similar): it has no `manifest.pages` entry and no `pages/<route>.md`, and its `section` is its first child's, so no node has an empty section. **`parent`** of a page entry is the route of its parent nav node, `null` at the top level; for a page inside a folder without a README it is that folder node's route. Required and optional fields of every file are listed in the schema (`required`). The `nav` tree is ordered the way each folder's README lists its pages.
 
 **Routes:** `docs/guides/cheatsheet.md` is `guides/cheatsheet`; a folder's `README.md` is the folder route; `docs/README.md` is the home page (`""`); `blueprints/...` keeps its path; code READMEs live under `code/` (`code/pi_pipeline/voice`); the repository README is `about`.
 
