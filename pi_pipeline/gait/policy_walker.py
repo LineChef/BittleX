@@ -94,7 +94,13 @@ class PolicyWalker:
                 log.info("scripted %s walk, %d cycles (the policy has no %s mode)", mode, cycles, mode)
                 reason = sc(self._link, cycles, CONTROL_HZ, ramp_cycles=1.0, send_every=3, ref_name=gait_mode.GAITS[mode].base_ref, stop_event=self._stop)
             else:
-                reason = run(self._link, self._cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
+                cmd = self._cmd
+                if mode == "carpet" and gait_mode.carpet_available():          # carpet mode: the carpet policy, at the carpet speed it was trained for
+                    from .residual_policy import policy_for_gait, sidecar_field
+                    extra["policy_path"] = policy_for_gait(mode)
+                    cmd = min(cmd, float(sidecar_field(extra["policy_path"], "cmd_fwd_on_carpet", cmd)))
+                    log.info("carpet mode: %s at %.3f m/s", extra["policy_path"], cmd)
+                reason = run(self._link, cmd, seconds, CONTROL_HZ, "auto", True, stop_event=self._stop, in_service=True,
                              on_battery=self._on_battery, **extra)
             if reason == "fall" and self._on_fall is not None:
                 try:

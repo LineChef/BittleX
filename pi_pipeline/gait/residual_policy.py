@@ -100,6 +100,22 @@ def default_policy_path():
                 os.path.join(_HERE, DEFAULT_POLICY))
 
 
+# The carpet-only gait (carpet plan, 2026-10-20): its own policy file, loaded while the gait is set to carpet ("G2, carpet mode"); "switch to default gait" goes back
+# to DEFAULT_POLICY. Present only once a carpet policy is promoted; until then carpet mode keeps the default policy.
+CARPET_POLICY = "Release_CandidateCarpet_ppo.onnx"
+
+
+def carpet_policy_path():
+    """The carpet policy's file (pi_pipeline/gait/ on the Pi, else trained/ on the dev machine), or None when there is none."""
+    train = os.path.normpath(os.path.join(_HERE, "..", "..", "rl_training", "opencat-gym", "trained", CARPET_POLICY))
+    return next((p for p in (os.path.join(_HERE, CARPET_POLICY), train) if os.path.exists(p)), None)
+
+
+def policy_for_gait(gait):
+    """The policy file a walk in `gait` plays: the carpet policy in carpet mode when there is one, else the deployed default."""
+    return (carpet_policy_path() if gait == "carpet" else None) or default_policy_path()
+
+
 def residual_scale_for(onnx_path):
     """Residual scale (deg) the policy was trained with: from its sidecar
     `<onnx_path>.json` ("residual_scale_deg"), else the legacy RESIDUAL_SCALE_DEG."""
@@ -148,18 +164,7 @@ def base_ref_path_for(onnx_path):
     return os.path.join(_HERE, f"{sidecar_field(onnx_path, 'base_ref', 'wkf')}_ref.npy")
 
 
-def _gait_mode():
-    """gait_mode, whether this module was imported from the package or as a plain script (run_gait.py puts gait/ on the path)."""
-    try:
-        from . import gait_mode
-    except ImportError:
-        import gait_mode
-    return gait_mode
-
-
 class ResidualGaitPolicy:
-    carpet_input, carpet = False, 0.0          # carpet plan (2026-10-20): set in __init__ from the sidecar's "modes"
-
     def __init__(self, onnx_path=None, wkf_path=None, intra_op_threads=2):
         import onnxruntime as ort
         self.CONTROL_HZ = CONTROL_HZ
@@ -186,8 +191,6 @@ class ResidualGaitPolicy:
         self._cmd_yaw = 0.0
         self._obs = None
         self.last_action = None
-        self.carpet_input = "carpet" in _gait_mode().modes_of(onnx_path + ".json")   # carpet plan (2026-10-20): the policy's last input is the carpet mode
-        self.carpet = 0.0                                                         # that input: 1 while the gait is set to carpet (read at each walk's reset)
 
     # -- setup ------------------------------------------------------------
     def set_command(self, fwd=None, yaw=None):
@@ -219,13 +222,8 @@ class ResidualGaitPolicy:
         pg = np.clip(proj_gravity_body(q), -1.0, 1.0)
         state_robot = np.concatenate((q, vel_clip, pg, [0.0],
                                       self.tilt_history, np.zeros(2), self._cmd_obs()))
-        if self.carpet_input:
-            self.carpet = 1.0 if _gait_mode().current() == "carpet" else 0.0
-        self._obs = self._with_mode(np.concatenate((state_robot, self.angle_history)))
+        self._obs = np.concatenate((state_robot, self.angle_history)).astype(np.float32)
         return self._obs
-
-    def _with_mode(self, obs):
-        return (np.append(obs, self.carpet) if self.carpet_input else obs).astype(np.float32)
 
     # -- one control tick ----------------------------------------------
     def step(self, quat_xyzw, gyro_xyz_radps):
@@ -271,7 +269,7 @@ class ResidualGaitPolicy:
         time_obs = np.fmod(self._phase / TIME_PHASE_PERIOD, 1.0)
         state_robot = np.concatenate((q, vel_clip, pg, [time_obs],
                                       self.tilt_history, ang_acc, self._cmd_obs()))
-        self._obs = self._with_mode(np.concatenate((state_robot, self.angle_history)))
+        self._obs = np.concatenate((state_robot, self.angle_history)).astype(np.float32)
 
         return joint_deg
 

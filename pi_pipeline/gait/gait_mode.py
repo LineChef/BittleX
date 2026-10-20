@@ -43,7 +43,7 @@ GAITS = {
                                 "highstep", "highstep mode", "i step", "eye step", "die step", "hi stepp",      # the last four: what the recognizer actually heard on G2 (2026-10-10: "i step", "switch die step")
                                  "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
                     "Hi step on.", "hsF"),
-    # carpet (user, 2026-10-20: "G2, carpet mode"): the same wkF base, played by a policy trained with the carpet-mode input (sidecar "modes" lists "carpet") with that input on.
+    # carpet (user, 2026-10-20: "G2, carpet mode"): its own carpet-only policy file (residual_policy.CARPET_POLICY) on the same wkF base; without one, the default policy.
     # Bare "carpet" is not a phrase: "we're on carpet" answers the floor question and must not switch the gait.
     "carpet": Gait("carpet", ("carpet mode", "carpet mode on", "carpet walk", "carpet gait", "carpet walking", "switch to carpet mode", "switch to carpet", "switch to carpet walk",
                               "switch to carpet gait", "walk on carpet mode"),
@@ -81,7 +81,17 @@ def modes_of(sidecar_path: str | None) -> tuple:
 
 
 def supports(policy_onnx: str | None, gait: str) -> bool:
+    if gait == "carpet":                                  # a policy file of its own, not a mode of the default policy
+        return carpet_available()
     return gait in modes_of(f"{policy_onnx}.json" if policy_onnx else None)
+
+
+def carpet_available() -> bool:
+    try:
+        from .residual_policy import carpet_policy_path
+    except ImportError:                                   # imported as a plain script (run_gait.py puts gait/ on the path)
+        from residual_policy import carpet_policy_path
+    return carpet_policy_path() is not None
 
 
 def _read(path: str) -> dict:
