@@ -13,6 +13,7 @@ Work that is **not part of the running build**: ideas, plans and parked projects
 | [`behavior-ideas.md`](behavior-ideas.md) | The behavior ideas (B#), the "what next" reference. |
 | [`hardware-gated-backlog.md`](hardware-gated-backlog.md) | RL/gait work deferred until the real robot can supply data (H#), each with a trigger. |
 | [`robustness-backlog.md`](robustness-backlog.md) | Categorised real-world scenarios for future training (R#). |
+| [`heavy-load-training-plan.md`](heavy-load-training-plan.md) | A new policy that stays stable carrying up to 1 lb (slower is fine): measure, train, judge. |
 | [`adapter-skill-probe-spec.md`](adapter-skill-probe-spec.md) | Frozen base walk plus small trained skill modules: specced, deferred. |
 
 Statuses roll up into the generated [`../backlog.md`](../backlog.md) (`python tools/gen_backlog.py` after changing an item's heading).

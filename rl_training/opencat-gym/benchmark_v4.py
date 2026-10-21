@@ -255,9 +255,9 @@ def _ladder_worker(job):
     from benchmark_gaits import ScriptedGait, _load_learned
     env = E.OpenCatGymEnv()
     env.set_ramp_steps(1e12)
-    if job["policy"] == "scripted":
+    if job["policy"].split(":")[0] == "scripted":                # "scripted:K" adds the crude gyro-balance stand-in (benchmark_gaits.ScriptedGait balance_k)
         E.CMD_SEND_EVERY_N = 1
-        model = ScriptedGait(env)
+        model = ScriptedGait(env, balance_k=float(job["policy"].split(":")[1]) if ":" in job["policy"] else 0.0)
     else:
         model = _load_learned(job["policy"])
     out = []
@@ -336,9 +336,9 @@ def _worker(job):
     defaults = {k: getattr(E, k) for k in NEW_KNOBS if hasattr(E, k)}
     env = OpenCatGymEnv()
     env.set_command(fwd=0.10, yaw=0.0)
-    if job["policy"] == "scripted":
+    if job["policy"].split(":")[0] == "scripted":
         E.CMD_SEND_EVERY_N = 1                                  # the open-loop wkF run sends a command every tick
-        model = ScriptedGait(env)
+        model = ScriptedGait(env, balance_k=float(job["policy"].split(":")[1]) if ":" in job["policy"] else 0.0)
     else:
         model = _load_learned(job["policy"])
     rows = {r[0]: r for r in cell_table(job["hard_scale"])}
@@ -361,7 +361,7 @@ def _worker(job):
         print(f"  [{os.getpid()}] {cid}: fell {m['fell_fraction']:.0%}  speed {m['speed_mps']:.3f}  heading {m['heading_mean_deg']:+.0f} deg  "
               f"({time.time() - t0:.0f} s)", flush=True)
     mg = None
-    if job["policy"] != "scripted" and job.get("mirror_gap"):
+    if job["policy"].split(":")[0] != "scripted" and job.get("mirror_gap"):
         mg = _mirror_gap(env, model, E)
     return out, mg
 

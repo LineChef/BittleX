@@ -143,7 +143,39 @@ LEVERS = {
     "v6_l2_mixed": {"G2E_FR_ANCHOR": "0.15", "G2E_FR_SHARE_SET": "ledge:0.30", "G2E_LR_SCALE": "0.3", "G2E_LR_FLOOR": "0.0",
                     "G2E_FRONTIER_FLOOR": "ledge_up:2,ledge_down:6", "G2E_FR_PASS_H": "ledge_up:0.45,ledge_down:0.45",
                     "G2E_FAC_EDGE_STALL": "2.0", "G2E_FAC_EDGE_LIFT": "1.0", "G2E_FAC_EDGE_PROGRESS": "100", "G2E_CROSS_LEDGE_GAIN": "0.5", "G2E_HAZ_POSTURE_RELAX": "0.3"},
-    "kl_limit": {"G2E_TARGET_KL": "0.03"},                                                       # PPO early stop on update size through a whole fresh run
+    "kl_limit": {"G2E_TARGET_KL": "0.03"},
+    # 2026-10-19 heavy load (user-approved plan: docs/planned/heavy-load-training-plan.md). heavy_world = the load range and the slower commands (training);
+    # load_obs = the policy is told the load (an observation lever: scoring must build it too); heavy_reward = the load-scaled stability, heat and slip costs.
+    "heavy_world": {"G2E_LOAD_MAX_KG": "0.227", "G2E_LOAD_SKEW": "0.6", "G2E_LOAD_RAMP_STEPS": "1.5e6", "G2E_LOAD_START_FRAC": "0.3", "G2E_LOAD_SPEED_DROP": "0.4"},
+    "load_obs": {"G2E_LOAD_OBS": "1", "G2E_LOAD_OBS_NOISE": "0.15"},
+    # Carpet plan (user, 2026-10-20; the fit: carpet_fit.py). The body fitted on 12 real hardwood walks: servo strength drawn 0.10-0.15 per episode, the pod's weight 0-8 mm to G2's right
+    # (his measured first-step right lean). The carpet: a springy, grippy cushion on half the flat-floor episodes, drawn around the fitted one (stiffness 120, damping 2, 12 mm, grip 2.2).
+    # carpet_obs: one input, 1 on a carpet episode (the carpet mode; on G2 it would come from the floor label).
+    "carpet_body": {"G2E_MOTOR_FORCE_LO": "0.10", "G2E_POD_RIGHT_MAX": "0.008"},
+    "carpet_world": {"G2E_CARPET_PAD_K": "80", "G2E_CARPET_PAD_K_MAX": "250", "G2E_CARPET_PAD_C": "1.5", "G2E_CARPET_PAD_C_MAX": "5", "G2E_CARPET_PAD_DEPTH": "0.008",
+                     "G2E_CARPET_PAD_DEPTH_MAX": "0.014", "G2E_CARPET_PAD_MU": "1.6", "G2E_CARPET_PAD_MU_MAX": "2.6", "G2E_CARPET_PAD_PROB": "0.5"},
+    "carpet_obs": {"G2E_CARPET_OBS": "1"},
+    # carpet plan round 2 (user-approved 2026-10-20): carpet-only reward / curriculum changes, one screen each (phase_carpet.py); a hard floor's reward stays V7's
+    "carpet_speed": {"G2E_CARPET_SPEED_DROP": "0.5", "G2E_CARPET_TRACK_SCALE": "0.5"},
+    "carpet_loose": {"G2E_CARPET_IMIT_SCALE": "0.5", "G2E_CARPET_PHASE_SCALE": "0.5"},
+    "carpet_ramp": {"G2E_CARPET_RAMP_STEPS": "2e6", "G2E_CARPET_PAD_PROB": "0.7"},
+    "carpet_recover": {"G2E_CARPET_BALANCE_SCALE": "2.0"},
+    # carpet ground (user, 2026-10-20: "remove all obstacles ... a new training ground that only involves carpet"; then: 100% carpet, a carpet-only gait): every episode
+    # hazard-free, 12.5 s, on carpet, at one difficulty point between near-hard (level 0: stiffness 1000, damping 5, 6 mm, grip 1.0) and past the fitted carpet (level 1: 80,
+    # 1.5, 14 mm, 2.6; the fitted carpet is about 0.85), set by how the policy does (CARPET_ADAPT: start 0.3, top-band episodes decide, steps 0.025 from 0.5 up)
+    "carpet_ground": {"G2E_FR_ANCHOR": "1.0", "G2E_FR_ANCHOR_LONG": "1", "G2E_HAZARD_EP_LEN": "1000", "G2E_CARPET_PAD_K": "80", "G2E_CARPET_PAD_K_MAX": "1000",
+                      "G2E_CARPET_PAD_C": "1.5", "G2E_CARPET_PAD_C_MAX": "5", "G2E_CARPET_PAD_DEPTH": "0.006", "G2E_CARPET_PAD_DEPTH_MAX": "0.014",
+                      "G2E_CARPET_PAD_MU": "1.0", "G2E_CARPET_PAD_MU_MAX": "2.6", "G2E_CARPET_PAD_PROB": "1.0", "G2E_CARPET_ADAPT": "1", "G2E_CARPET_LEVEL0": "0.3"},
+    "carpet_consol": {"G2E_LR_SCALE": "0.4", "G2E_LR_FLOOR": "0.0"},             # the 20M consolidation's learning rate (V7's 20M stage: 0.4 of 3e-4, decaying to zero)
+    "heavy_reward": {"G2E_LOAD_STAB_GAIN": "1.5", "G2E_LOAD_POWER_GAIN": "1.0"},
+    "heavy_skew35": {"G2E_LOAD_SKEW": "0.35"},                                                   # round-2 variant: more episodes near 1 lb
+    "heavy_stab3": {"G2E_LOAD_STAB_GAIN": "3.0", "G2E_LOAD_POWER_GAIN": "1.0"},                  # round-2 variant: twice the load-scaled stability weight
+    "heavy_margin": {"G2E_LOAD_MARGIN_FAC": "1.0"},                                              # round-2 variant (2026-10-19): keep the capture point over the middle of the paws (1.0: about twice the load-scaled tilt cost at 1 lb)
+    "heavy_low": {"G2E_LOAD_HEIGHT_DROP": "0.008", "G2E_LOAD_POSTURE_RELAX": "0.3"},             # round-2 variant (2026-10-19): ride 8 mm lower at 1 lb, the scripted pose held 30% more loosely                                                       # PPO early stop on update size through a whole fresh run
+    "heavy_ft": {"G2E_LOAD_MAX_KG": "0.227", "G2E_LOAD_SKEW": "1.0", "G2E_LOAD_BASE_PROB": "0.5", "G2E_LOAD_RAMP_STEPS": "6e6", "G2E_LOAD_START_FRAC": "0.0",   # heavy-load fine-tune of V7 (user, 2026-10-19): half the episodes at today's payload, the rest up to +227 g (1 lb), the cap growing from 0 over the first 6M
+                 "G2E_LOAD_RAMP_START": "-1", "G2E_LOAD_SPEED_DROP": "0.4", "G2E_LOAD_CROUCH0": "0.0015", "G2E_LOAD_HEIGHT_DROP": "0.004", "G2E_LOAD_POSTURE_RELAX": "0.3",  # slower with extra weight; crouch 1.5 mm today .. 4 mm (0.16 in) at 1 lb
+                 "G2E_HAZARD_EP_LEN": "1000", "G2E_RESET_LOG_STD": "-1.9"},                     # 12.5 s obstacle episodes (obstacles where they were); action noise back to std 0.15 (V7 ended at 0.06)
+    "ft_ctrl": {"G2E_HAZARD_EP_LEN": "1000", "G2E_RESET_LOG_STD": "-1.9"},                       # the heavy_ft control (user, 2026-10-19): the same fine-tune of V7 without the weight changes
     # 2026-10-12 high-step creep (user-approved; docs/archive/plan-detail/high-step-creep-training-plan.md): a separate slow gait with three feet down, for stepping UP onto ledges.
     # hs_creep is the gait's world and reward recipe (every chain stage carries it); hs_s* are the stage mixes. Step-ups only, no slopes, no step-downs.
     "hs_creep": {"G2E_SKILL_REF": "creep", "G2E_PHASE_RATE_NOM_CMD": "0.035", "G2E_CMD_BANDS": "creep",          # the creep base (reference_gait/creep_ref.npy), its own cadence and slow commands
@@ -165,7 +197,7 @@ LEVERS = {
 # The high-step creep's world settings a SCORER needs too (hs_probe.py): the base gait, its cadence and its command bands.
 HS_WORLD_KEYS = ("G2E_SKILL_REF", "G2E_PHASE_RATE_NOM_CMD", "G2E_CMD_BANDS")
 # Levers that change what the POLICY observes: a policy trained with one must be scored with it (scoring_env, benchmark_v4.ladder_env, phase_v3.policy_levers).
-OBS_LEVERS = ("heading_obs", "privileged_critic", "heading_blind")
+OBS_LEVERS = ("heading_obs", "privileged_critic", "heading_blind", "load_obs", "carpet_obs")
 # Settings only train.py reads (how training runs, not the world): never part of a scoring or ladder environment.
 TRAINER_ONLY_PREFIXES = ("G2E_N_ENVS", "G2E_LEAN_INFO", "G2E_RUN_MONITOR", "G2E_MONITOR_EVERY", "G2E_PLATEAU", "G2E_PPO_", "G2E_NORM_REWARD", "G2E_LOG_STD_INIT",
                          "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_LR_SCALE", "G2E_FRONTIER_FLOOR", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS",

@@ -568,6 +568,47 @@ CARPET_PROB = 1.0          # fraction of episodes on the carpet when CARPET > 0
 # style: probe before assuming). restitution is fixed at 0 -- carpet doesn't
 # bounce, no reason to randomise that up.
 CARPET_SOFT = 0.0        # OFF by default (inert). Probe at ~0.2-0.4 first.
+# CARPET_PAD (2026-10-20, carpet plan): wall-to-wall carpet as G2 meets it at home -- 1/4 in (6.4 mm) cut pile on a springy cushion pad; a fingertip sinks the full 1/4 in
+# (owner's measurement). CARPET_SOFT's stiffness (4e4-1.2e5 N/m) sinks a G2 paw only 0.02-0.06 mm, a hard floor in practice, which is why no policy ever fell on it while V7
+# fell on the first step on that carpet six times out of six (2026-10-20: the weight goes onto the right pair as the left legs lift, the right legs sink, he is over in 1-1.5 s).
+# CARPET_PAD_K > 0 makes the flat floor a soft spring (contact stiffness in N/m per contact point, damping CARPET_PAD_C) with a hard floor CARPET_PAD_DEPTH below it, where the
+# pad bottoms out; CARPET_PAD_PROB of the flat episodes get it. Off by default (inert).
+CARPET_PAD_K = 0.0
+CARPET_PAD_C = 0.0
+CARPET_PAD_DEPTH = 0.0064
+CARPET_PAD_MU = 1.0
+CARPET_PAD_PROB = 1.0
+# Carpet training (carpet plan, user 2026-10-20): each *_MAX above its base draws that pad setting per episode in [base, MAX] (stiffness log-uniform), so the policy meets a band of
+# carpets around the fitted one (carpet_fit.py: stiffness 120, damping 2, 12 mm, grip 2.2 with the body below). 0 = the fixed base value.
+CARPET_PAD_K_MAX = 0.0
+CARPET_PAD_C_MAX = 0.0
+CARPET_PAD_DEPTH_MAX = 0.0
+CARPET_PAD_MU_MAX = 0.0
+CARPET_OBS = False        # one input, 1.0 on a carpet-pad episode (the carpet mode; on G2 it would come from the floor label), after the load input and before the critic-only values
+# The body as fitted on 12 real hardwood walks (2026-10-20, replayed open loop): G2's servos behave like MOTOR_FORCE 0.10-0.11 (the calibration's 0.15 rolls 4.8 deg on the first step
+# against G2's 8.8), and his first-step lean is to the right (the pod's weight about 8 mm to his right reproduces it and the right-side carpet falls). Both drawn per episode; 0 = off.
+MOTOR_FORCE_LO = 0.0      # > 0: every servo's force drawn per episode in [MOTOR_FORCE_LO, MOTOR_FORCE]
+POD_RIGHT_MAX = 0.0       # > 0: the pod's centre moved toward G2's right by U(0, this) m per episode
+# Carpet-only reward and curriculum changes (carpet plan round 2, user-approved 2026-10-20). Each applies on carpet-pad episodes only, so a hard floor's reward stays V7's; 1.0 / 0 = off.
+CARPET_SPEED_DROP = 0.0   # > 0: a carpet episode's forward commands are scaled by U(1 - this, 1) (slower is fine on carpet; the policy sees the slower command)
+CARPET_TRACK_SCALE = 1.0  # multiplies the speed-tracking and minimum-speed penalties on carpet
+CARPET_IMIT_SCALE = 1.0   # multiplies the imitation reward (the wkF anchor) on carpet
+CARPET_PHASE_SCALE = 1.0  # multiplies the diagonal-footfall terms (foot phase, gait symmetry) on carpet
+CARPET_BALANCE_SCALE = 1.0  # multiplies the stumble "fight back toward level" reward on carpet
+CARPET_RAMP_STEPS = 0.0   # > 0: the carpet band opens over this many training steps, from its mild end (stiffest, shallowest, most damped, least grip) to the full band
+# CARPET_ADAPT (carpet ground, 2026-10-20): the band opens by how the policy does instead of by steps. Each env keeps a level in [0, 1] (0 = only the mild end); after every
+# CARPET_ADAPT_WINDOW carpet episodes it goes up CARPET_ADAPT_STEP if at least CARPET_ADAPT_UP of them succeeded (stayed up and covered LEVEL_PROGRESS_MIN of the commanded distance),
+# down if at most CARPET_ADAPT_DOWN did. Never harder than the policy can manage (the standing rule), and no scripted gait is needed to set the top. Only top-band episodes
+# (half of them, drawn in [level - CARPET_ADAPT_BAND, level]) count, so the easy review carpets below cannot carry the level up.
+CARPET_ADAPT = False
+CARPET_ADAPT_WINDOW = 20
+CARPET_ADAPT_UP = 0.7
+CARPET_ADAPT_DOWN = 0.4
+CARPET_ADAPT_STEP = 0.05
+CARPET_ADAPT_STEP_FINE = 0.025   # the step from CARPET_ADAPT_FINE_FROM up, where the difficulty climbs fastest (V7: easy below about 0.5, falls from about 0.5 to 0.9)
+CARPET_ADAPT_FINE_FROM = 0.5
+CARPET_ADAPT_BAND = 0.05         # a top-band episode's carpet is drawn in [level - this, level]
+CARPET_LEVEL0 = 0.0              # the level each env starts at
 
 # SURFACE_TRANSITION (2026-09-04, B17 follow-up): a floor-material change
 # WITHIN a single episode -- hard floor for the first stretch, carpet-like
@@ -793,6 +834,33 @@ TORQUE_SLOPE_CORRELATE = _g2e("TORQUE_SLOPE_CORRELATE", TORQUE_SLOPE_CORRELATE)
 CARPET             = _g2e("CARPET", CARPET)
 CARPET_PROB        = _g2e("CARPET_PROB", CARPET_PROB)
 CARPET_SOFT        = _g2e("CARPET_SOFT", CARPET_SOFT)
+CARPET_PAD_K       = _g2e("CARPET_PAD_K", CARPET_PAD_K)
+CARPET_PAD_C       = _g2e("CARPET_PAD_C", CARPET_PAD_C)
+CARPET_PAD_DEPTH   = _g2e("CARPET_PAD_DEPTH", CARPET_PAD_DEPTH)
+CARPET_PAD_MU      = _g2e("CARPET_PAD_MU", CARPET_PAD_MU)
+CARPET_PAD_PROB    = _g2e("CARPET_PAD_PROB", CARPET_PAD_PROB)
+CARPET_PAD_K_MAX   = _g2e("CARPET_PAD_K_MAX", CARPET_PAD_K_MAX)
+CARPET_PAD_C_MAX   = _g2e("CARPET_PAD_C_MAX", CARPET_PAD_C_MAX)
+CARPET_PAD_DEPTH_MAX = _g2e("CARPET_PAD_DEPTH_MAX", CARPET_PAD_DEPTH_MAX)
+CARPET_PAD_MU_MAX  = _g2e("CARPET_PAD_MU_MAX", CARPET_PAD_MU_MAX)
+CARPET_OBS         = _g2e("CARPET_OBS", CARPET_OBS)
+MOTOR_FORCE_LO     = _g2e("MOTOR_FORCE_LO", MOTOR_FORCE_LO)
+POD_RIGHT_MAX      = _g2e("POD_RIGHT_MAX", POD_RIGHT_MAX)
+CARPET_SPEED_DROP  = _g2e("CARPET_SPEED_DROP", CARPET_SPEED_DROP)
+CARPET_TRACK_SCALE = _g2e("CARPET_TRACK_SCALE", CARPET_TRACK_SCALE)
+CARPET_IMIT_SCALE  = _g2e("CARPET_IMIT_SCALE", CARPET_IMIT_SCALE)
+CARPET_PHASE_SCALE = _g2e("CARPET_PHASE_SCALE", CARPET_PHASE_SCALE)
+CARPET_BALANCE_SCALE = _g2e("CARPET_BALANCE_SCALE", CARPET_BALANCE_SCALE)
+CARPET_RAMP_STEPS  = _g2e("CARPET_RAMP_STEPS", CARPET_RAMP_STEPS)
+CARPET_ADAPT       = _g2e("CARPET_ADAPT", CARPET_ADAPT)
+CARPET_ADAPT_WINDOW = _g2e("CARPET_ADAPT_WINDOW", CARPET_ADAPT_WINDOW)
+CARPET_ADAPT_UP    = _g2e("CARPET_ADAPT_UP", CARPET_ADAPT_UP)
+CARPET_ADAPT_DOWN  = _g2e("CARPET_ADAPT_DOWN", CARPET_ADAPT_DOWN)
+CARPET_ADAPT_STEP  = _g2e("CARPET_ADAPT_STEP", CARPET_ADAPT_STEP)
+CARPET_ADAPT_STEP_FINE = _g2e("CARPET_ADAPT_STEP_FINE", CARPET_ADAPT_STEP_FINE)
+CARPET_ADAPT_FINE_FROM = _g2e("CARPET_ADAPT_FINE_FROM", CARPET_ADAPT_FINE_FROM)
+CARPET_ADAPT_BAND  = _g2e("CARPET_ADAPT_BAND", CARPET_ADAPT_BAND)
+CARPET_LEVEL0      = _g2e("CARPET_LEVEL0", CARPET_LEVEL0)
 CARPET_SWELL       = _g2e("CARPET_SWELL", CARPET_SWELL)
 SERVO_RATE_LIMIT_DEG_S = _g2e("SERVO_RATE_LIMIT_DEG_S", SERVO_RATE_LIMIT_DEG_S)
 PENALTY_RAMP_CAP   = _g2e("PENALTY_RAMP_CAP", PENALTY_RAMP_CAP)      # 0 = legacy uncapped
@@ -844,6 +912,8 @@ FAC_SMOOTH_1 = _g2e("FAC_SMOOTH_1", FAC_SMOOTH_1)
 FAC_SMOOTH_2 = _g2e("FAC_SMOOTH_2", FAC_SMOOTH_2)
 # R6 FAC_TOUCHDOWN: penalty on a paw's downward speed (m/s) at the step it touches down (impacts drive the roll swing).
 FAC_TOUCHDOWN = _g2e("FAC_TOUCHDOWN", 0.0)
+FAC_Z_VELOCITY = _g2e("FAC_Z_VELOCITY", FAC_Z_VELOCITY)
+CARPET_STALL = _g2e("CARPET_STALL", 0.0)     # carpet only: fraction of a stance leg's servo strength lost while its paw stands in the pad (0 = off)
 # --- Adaptive difficulty level (2026-10-06): the "dr" value that scales every hazard / randomization (ledge, rubble and box heights, slopes, pushes, overheat
 # cutback, faults, IMU noise ...) used to be a pure step-count ramp (0 -> 1 over RAMP_TOTAL_STEPS, then flat). ADAPTIVE_LEVEL makes it a per-env LEVEL in [0, 1]
 # that starts at LEVEL_START (0 = a clean, passable floor: nothing scaled by it exists), rises by LEVEL_STEP after a LEVEL_WINDOW-episode window in which at least
@@ -959,6 +1029,39 @@ PRIV_OBS = _g2e("PRIV_OBS", False)
 # PRIV_YAW (2026-10-09, lever heading_blind): two more critic-only values, sin / cos of the heading error, so the critic can predict the heading penalty the blind actor is scored on.
 PRIV_YAW = _g2e("PRIV_YAW", False)
 PRIV_DIM = 24 if PRIV_YAW else 22
+# Heavy load (user, 2026-10-19; docs/planned/heavy-load-training-plan.md): G2 carries up to 1 lb (454 g) in all, the block on his back plus the head (227 g today), so up to
+# LOAD_REF_KG more goes into the block (same box, same place). All off by default: with LOAD_MAX_KG and LOAD_FIXED_KG at 0 nothing here changes the world.
+#   LOAD_MAX_KG       extra block mass drawn each episode in [0, cap], cap = LOAD_MAX_KG x the load ramp; LOAD_SKEW < 1 puts more episodes near the heavy end (u ** LOAD_SKEW)
+#   LOAD_RAMP_STEPS   the cap grows from LOAD_START_FRAC to 1 over this many total training steps (a chained stage starts at full strength, as the other ramps)
+#   LOAD_FIXED_KG     scoring: this exact extra mass every episode (overrides the draw)
+#   LOAD_OBS          the policy is told the load: one input, the extra mass / LOAD_REF_KG, randomized per episode by LOAD_OBS_NOISE (a fraction) while training
+#   LOAD_SPEED_DROP   every forward command above 0.02 m/s is scaled by 1 - drop x (extra / LOAD_REF_KG): slower is fine under a heavy load (user)
+#   LOAD_STAB_GAIN    the tilt and roll / pitch rate penalties are scaled by 1 + gain x (extra / LOAD_REF_KG); LOAD_POWER_GAIN does the same for the power (heat) and paw slip terms
+LOAD_REF_KG = 0.227
+LOAD_MAX_KG = _g2e("LOAD_MAX_KG", 0.0)
+LOAD_SKEW = _g2e("LOAD_SKEW", 1.0)
+LOAD_RAMP_STEPS = _g2e("LOAD_RAMP_STEPS", 0.0)
+LOAD_START_FRAC = _g2e("LOAD_START_FRAC", 0.3)
+LOAD_FIXED_KG = _g2e("LOAD_FIXED_KG", -1.0)
+LOAD_OBS = _g2e("LOAD_OBS", False)
+LOAD_OBS_NOISE = _g2e("LOAD_OBS_NOISE", 0.0)
+LOAD_SPEED_DROP = _g2e("LOAD_SPEED_DROP", 0.0)
+LOAD_STAB_GAIN = _g2e("LOAD_STAB_GAIN", 0.0)
+LOAD_POWER_GAIN = _g2e("LOAD_POWER_GAIN", 0.0)
+#   LOAD_MARGIN_FAC   cost on how far the capture point (centre of mass + its velocity x sqrt(height / g), the whole body with the payload) sits from the middle of the
+#                     four paws, in units of the paws' half-spread front-back and side-to-side, scaled by the load: it acts before the body starts to tilt (added 2026-10-19)
+#   LOAD_HEIGHT_DROP  the ride-height target is lowered by this many metres at 1 lb (a lower centre of mass under a heavy load; 0 = the usual target)
+LOAD_MARGIN_FAC = _g2e("LOAD_MARGIN_FAC", 0.0)
+LOAD_HEIGHT_DROP = _g2e("LOAD_HEIGHT_DROP", 0.0)
+LOAD_POSTURE_RELAX = _g2e("LOAD_POSTURE_RELAX", 0.0)   # the scripted-pose (imitation) and residual costs are scaled by 1 - this x the load fraction (with LOAD_HEIGHT_DROP: room to crouch)
+#   LOAD_CROUCH0      the ride-height drop (m) already at today's payload (user, 2026-10-19: "start crouching a little even for today's payload"); it grows linearly to LOAD_HEIGHT_DROP
+#                     at 1 lb, and LOAD_POSTURE_RELAX follows the crouch (relax x crouch / LOAD_HEIGHT_DROP). 0 = the crouch starts at 0 (as before)
+LOAD_CROUCH0 = _g2e("LOAD_CROUCH0", 0.0)
+#   LOAD_BASE_PROB    this fraction of episodes carries today's payload exactly (no extra), the rest draw as above (user, 2026-10-19: today's payload is the main target)
+#   LOAD_RAMP_START   the load ramp counts from this total step (a fine-tune starts its other ramps at full strength, train.py ramp_offset; the load still grows from its start);
+#                     below 0 = from the first step count the trainer reports (the fine-tune's own start, whatever its offset)
+LOAD_BASE_PROB = _g2e("LOAD_BASE_PROB", 0.0)
+LOAD_RAMP_START = _g2e("LOAD_RAMP_START", 0.0)
 # HEADING_BLIND (2026-10-09, user: "leave steering out of the policy"): the policy sees no yaw at all (the quaternion it gets is yaw-free, the Pi sends yaw 0 for a policy whose
 #   sidecar says heading_blind). It cannot steer, so the heading penalty can only shape a base walk with no built-in turn; steering is the Pi's front-foot hold.
 HEADING_BLIND = _g2e("HEADING_BLIND", False)
@@ -1039,6 +1142,9 @@ FAC_GAIT_SYMMETRY = _g2e("FAC_GAIT_SYMMETRY", FAC_GAIT_SYMMETRY)
 FAC_UPRIGHT = _g2e("FAC_UPRIGHT", FAC_UPRIGHT)
 FAC_STABILITY = _g2e("FAC_STABILITY", FAC_STABILITY)
 HEIGHT_FLOOR = _g2e("HEIGHT_FLOOR", 0.0)
+FAC_SLIP = _g2e("FAC_SLIP", FAC_SLIP)                  # carpet probes (2026-10-20): scrubbing paws drag the body on a grippy carpet
+PAW_Z_TARGET = _g2e("PAW_Z_TARGET", PAW_Z_TARGET)
+HEIGHT_TARGET = _g2e("HEIGHT_TARGET", HEIGHT_TARGET)
 PAW_Z_FRONT = _g2e("PAW_Z_FRONT", 0.0)
 PAW_Z_REAR = _g2e("PAW_Z_REAR", 0.0)
 CLEAR_ONE_SIDED = _g2e("CLEAR_ONE_SIDED", False)
@@ -1224,7 +1330,10 @@ class OpenCatGymEnv(gym.Env):
         # The observation space are the torso roll, pitch and the 
         # angular velocities and a history of the last 30 joint angles.
         _n_obs = (SIZE_OBSERVATION + (4 if TERRAIN_FEATURE else 0) + (4 if GOAL_MODE else 0) + (3 if CLIFF else 0)
-                  + (2 if HEADING_OBS else 0) + (PRIV_DIM if PRIV_OBS else 0))
+                  + (2 if HEADING_OBS else 0) + (1 if LOAD_OBS else 0) + (1 if CARPET_OBS else 0) + (PRIV_DIM if PRIV_OBS else 0))
+        self._load_kg, self._load_obs_val = 0.0, 0.0
+        self._pad_on, self._pad = False, None
+        self._carpet_level, self._carpet_win, self._carpet_top = CARPET_LEVEL0, [], False   # CARPET_ADAPT: this env's carpet level, its recent top-band outcomes
         self.observation_space = gym.spaces.Box(np.array([-1]*_n_obs),
                                                 np.array([1]*_n_obs))
 
@@ -1419,6 +1528,17 @@ class OpenCatGymEnv(gym.Env):
         """Adaptive push curriculum (surv_r12): once ADAPT_WINDOW episodes are in,
         nudge the per-env push multiplier up if the policy is mostly surviving,
         down if it's mostly falling. Persists across resets within this env."""
+        if CARPET_ADAPT and self._pad_on and getattr(self, "_carpet_top", False):   # the carpet level, from top-band episodes only: success = stayed up and covered LEVEL_PROGRESS_MIN of the commanded distance
+            self._carpet_win.append(1.0 if (survived and self._episode_score() >= LEVEL_PROGRESS_MIN) else 0.0)
+            if len(self._carpet_win) >= CARPET_ADAPT_WINDOW:
+                m = sum(self._carpet_win) / len(self._carpet_win)
+                old = self._carpet_level
+                if m >= CARPET_ADAPT_UP:
+                    self._carpet_level = min(1.0, old + (CARPET_ADAPT_STEP_FINE if old >= CARPET_ADAPT_FINE_FROM else CARPET_ADAPT_STEP))
+                elif m <= CARPET_ADAPT_DOWN:
+                    self._carpet_level = max(0.0, old - (CARPET_ADAPT_STEP_FINE if old > CARPET_ADAPT_FINE_FROM else CARPET_ADAPT_STEP))
+                self._carpet_win = []
+                print(f"[carpet level] {old:.2f} -> {self._carpet_level:.2f} (success {m:.2f})", flush=True)
         if ADAPTIVE_LEVEL and LEVEL_FIXED < 0 and CATEGORY_LEVELS and LEVEL_EXTERNAL:
             pass                                                                        # levels come from the Curriculum callback
         elif ADAPTIVE_LEVEL and LEVEL_FIXED < 0 and CATEGORY_LEVELS:
@@ -1654,14 +1774,20 @@ class OpenCatGymEnv(gym.Env):
         # Check if elbows or lower arm are in contact with ground
         arm_idx = [1, 2, 4, 5]
         for idx in arm_idx:
-            if p.getContactPoints(bodyA=self.robot_id, linkIndexA=idx):
+            if self._pad_on and idx in (2, 5):   # carpet pad: a lower arm sinks into the pile with its paw (2026-10-20: -4.9 a step for V7 just standing on carpet); only the floor under the pad counts
+                hit = p.getContactPoints(bodyA=self.robot_id, bodyB=self._pad_floor, linkIndexA=idx)
+            else:
+                hit = p.getContactPoints(bodyA=self.robot_id, linkIndexA=idx)
+            if hit:
                 self.arm_contact += 1
 
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
 
         # gait-refinement G1: hold a target ride height
-        height_penalty = (base_clearance - HEIGHT_TARGET) ** 2 if HEIGHT_FLOOR <= 0 else max(0.0, HEIGHT_FLOOR - base_clearance) ** 2
+        _h_target = HEIGHT_TARGET - self._crouch()                                # heavy load: a lower ride height is the target (LOAD_CROUCH0 .. LOAD_HEIGHT_DROP)
+        height_penalty = (base_clearance - _h_target) ** 2 if HEIGHT_FLOOR <= 0 else max(0.0, HEIGHT_FLOOR - base_clearance) ** 2
+        margin_penalty = self._margin_cost(_ppos) if LOAD_MARGIN_FAC > 0 and self._load_frac() > 0 else 0.0
         # gait-refinement G1: soft barrier as any commanded joint nears its limit
         _jl = np.maximum(0.0, np.abs(joint_angs) - (self.bound_ang - JOINT_LIMIT_MARGIN))
         joint_limit_penalty = float(np.sum(_jl ** 2))
@@ -1715,11 +1841,17 @@ class OpenCatGymEnv(gym.Env):
             _motor_angs = np.asarray(_motor_angs, dtype=float).copy()
             for _j in (0, 2, 4, 6):
                 _motor_angs[_j] = _c + self._stroke_scale[_j] * (_motor_angs[_j] - _c)
+        _force_scale = self._torque_scale
+        if CARPET_STALL > 0 and self._pad_on:      # carpet stall (2026-10-20): a leg whose paw stands in the pile loses part of its strength (the grippy, sinking pile stalls the stance servos on the real carpet)
+            _force_scale = self._torque_scale.copy()
+            for _leg, _down in enumerate(getattr(self, "_last_contact", [False] * 4)):
+                if _down:
+                    _force_scale[2 * _leg:2 * _leg + 2] *= (1.0 - getattr(self, "_stall_ep", CARPET_STALL))
         p.setJointMotorControlArray(self.robot_id,
                                     self.joint_id,
                                     p.POSITION_CONTROL,
                                     _motor_angs + self._joint_offset,   # JOINT_OFFSET_DEG: servo zero miscalibration
-                                    forces=np.ones(8)*(0.5 if self._in_recovery else MOTOR_FORCE)*self._torque_scale,
+                                    forces=np.ones(8)*(0.5 if self._in_recovery else MOTOR_FORCE)*_force_scale,
                                     **({"positionGains": [SERVO_KP] * 8, "velocityGains": [SERVO_KD or SERVO_KP * 10] * 8} if SERVO_KP > 0 else {}))
         self._drift_push()
         p.stepSimulation() # Delay of data transfer
@@ -1856,6 +1988,7 @@ class OpenCatGymEnv(gym.Env):
         current_position = p.getBasePositionAndOrientation(self.robot_id)[0][0]
         _haz = self._on_hazard(current_position) if (HAZ_SPEED_RELAX != 1.0 or HAZ_POSTURE_RELAX != 1.0) else False      # V5 hazard-aware relaxation
         _posture_k = HAZ_POSTURE_RELAX if _haz else 1.0
+        _posture_k *= 1.0 - LOAD_POSTURE_RELAX * (self._crouch() / LOAD_HEIGHT_DROP if LOAD_HEIGHT_DROP > 0 else self._load_frac())     # room to crouch: the pose matters less
         r_cross = self._cross_reward(current_position) if FAC_CROSS > 0 else 0.0
         r_edge = self._edge_reward(current_position, _ppos) if (FAC_EDGE_STALL > 0 or FAC_EDGE_LIFT > 0 or FAC_EDGE_PROGRESS > 0) else 0.0
         r_hs = self._hs_ledge_reward(current_position) if (FAC_ALL_UP > 0 or FAC_FACE_HIT > 0 or FAC_PAW_UP > 0) else 0.0      # high-step creep: all four paws up / face contact
@@ -1891,7 +2024,9 @@ class OpenCatGymEnv(gym.Env):
         z_velocity = p.getBaseVelocity(self.robot_id)[0][2]
 
         # gait-refinement G2: yaw term tracks the *commanded* yaw rate
-        body_stability = (FAC_STABILITY * (state_vel_clip[0]**2
+        _load_stab = 1.0 + LOAD_STAB_GAIN * self._load_frac()          # heavy load: stay level matters more the heavier he is
+        _load_pow = 1.0 + LOAD_POWER_GAIN * self._load_frac()          # heavy load: heat (power) and paw slip cost more
+        body_stability = (FAC_STABILITY * _load_stab * (state_vel_clip[0]**2
                                           + state_vel_clip[1]**2)
                                           + FAC_Z_VELOCITY * z_velocity**2
                                           + FAC_YAW_TRACK * (state_vel_raw[2] - self._cmd_yaw) ** 2)
@@ -2053,7 +2188,7 @@ class OpenCatGymEnv(gym.Env):
         # (duty factor), stay level (tilt^2), and -- in residual mode -- deviate
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
-        upright_penalty = FAC_UPRIGHT * tilt ** 2
+        upright_penalty = FAC_UPRIGHT * _load_stab * tilt ** 2
         residual_cost = FAC_RESIDUAL_COST * _posture_k * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE and FAC_RESID_CALM_BONUS > 0:
             calm_factor = max(0.0, 1.0 - tilt / IMITATION_TILT_FADE)
@@ -2142,6 +2277,10 @@ class OpenCatGymEnv(gym.Env):
                 _vlat = -_wv[0] * np.sin(_yaw_now) + _wv[1] * np.cos(_yaw_now)
                 obs_swerve_rew = FAC_OBS_SWERVE * max(0.0, -np.sign(_pb) * _vlat)
 
+        _cpt = bool(getattr(self, "_pad_on", False))         # carpet-only reward weights (CARPET_*_SCALE)
+        _cti, _cim, _cph, _cba = ((CARPET_TRACK_SCALE, CARPET_IMIT_SCALE, CARPET_PHASE_SCALE, CARPET_BALANCE_SCALE) if _cpt else (1.0, 1.0, 1.0, 1.0))
+        speed_track_penalty, min_speed_penalty, balance_reward = speed_track_penalty * _cti, min_speed_penalty * _cti, balance_reward * _cba
+        imitation_reward, gait_symmetry, foot_phase_pen = imitation_reward * _cim, gait_symmetry * _cph, foot_phase_pen * _cph
         reward = (FAC_MOVEMENT * capped_forward
                  + r_cross
                  + r_edge
@@ -2172,16 +2311,17 @@ class OpenCatGymEnv(gym.Env):
                     + upright_penalty
                     + FAC_CLEARANCE * paw_clearance
                     + FAC_SWING_CLEAR * swing_clear_pen
-                    + FAC_SLIP * paw_slipping**2
+                    + FAC_SLIP * _load_pow * paw_slipping**2
                     + FAC_ARM_CONTACT * self.arm_contact
                     + FAC_JITTER * jitter_penalty
                     + FAC_HEIGHT * height_penalty
+                    + LOAD_MARGIN_FAC * margin_penalty
                     + FAC_JOINT_LIMIT * joint_limit_penalty
                     + FAC_FOOT_PHASE * foot_phase_pen
                     + obs_bump_pen
                     + FAC_SERVO_FEAS * servo_feas
                     + FAC_TOUCHDOWN * touchdown_cost
-                    + FAC_POWER * power_use
+                    + FAC_POWER * _load_pow * power_use
                     + FAC_REAR_POSTURE * rear_posture_cost))
 
         # Set state of the current state.
@@ -2220,16 +2360,17 @@ class OpenCatGymEnv(gym.Env):
             "r_heading": -penalty_scale * heading_penalty,
             "r_paw_clearance": -penalty_scale * FAC_CLEARANCE * paw_clearance,
             "r_swing_clear": -penalty_scale * FAC_SWING_CLEAR * swing_clear_pen,
-            "r_paw_slip": -penalty_scale * FAC_SLIP * paw_slipping**2,
+            "r_paw_slip": -penalty_scale * FAC_SLIP * _load_pow * paw_slipping**2,
             "r_arm_contact": -penalty_scale * FAC_ARM_CONTACT * self.arm_contact,
             "r_jitter": -penalty_scale * FAC_JITTER * jitter_penalty,
             "r_height": -penalty_scale * FAC_HEIGHT * height_penalty,
+            "r_load_margin": -penalty_scale * LOAD_MARGIN_FAC * margin_penalty,
             "r_joint_limit": -penalty_scale * FAC_JOINT_LIMIT * joint_limit_penalty,
             "r_foot_phase": -penalty_scale * FAC_FOOT_PHASE * foot_phase_pen,
             "paw_contact": [bool(c) for c in paw_contact],   # FL FR BR LB, as the reward terms see it
             "phase_step0": self._phase_step0,
             "base_height_m": base_clearance,
-            "r_power": -penalty_scale * FAC_POWER * power_use,
+            "r_power": -penalty_scale * FAC_POWER * _load_pow * power_use,
             "difficulty_level": float(self._dr),
             "difficulty_focus": -1.0 if self._focus is None else float(CATS.index(self._focus)),
             "r_servo_feas": -penalty_scale * FAC_SERVO_FEAS * servo_feas,
@@ -2342,7 +2483,8 @@ class OpenCatGymEnv(gym.Env):
 
         self.observation = np.hstack((self.state_robot, self.angle_history,
                                       self._terrain_obs(), self._goal_obs(),
-                                      self._cliff_obs()) + ((self._priv_obs(paw_contact),) if PRIV_OBS else ()))
+                                      self._cliff_obs()) + (([self._load_obs_val],) if LOAD_OBS else ()) + (([1.0 if self._pad_on else 0.0],) if CARPET_OBS else ())
+                                      + ((self._priv_obs(paw_contact),) if PRIV_OBS else ()))
         if (terminated or truncated) and self._fz is not None:
             self._fr_report(terminated, info)          # FRONTIER: the episode's outcome for the trainer
         if getattr(self, "_live_f", None) is not None:
@@ -2374,6 +2516,8 @@ class OpenCatGymEnv(gym.Env):
     def set_ramp_steps(self, total_steps):
         """Trainer hook (train.py RampSync): the run's total env steps so far, for the penalty / DR ramps."""
         self._train_total_steps = float(total_steps)
+        if not hasattr(self, "_ramp_t0"):
+            self._ramp_t0 = float(total_steps)            # the first count seen: LOAD_RAMP_START < 0 ramps the load from here (a fine-tune's offset)
 
     def _ramp(self, per_env_steps, total=None):
         """Ramp progress, uncapped (callers cap it). See RAMP_MODE. `total`: the total-step length to use in "total" mode (default RAMP_TOTAL_STEPS)."""
@@ -2392,7 +2536,62 @@ class OpenCatGymEnv(gym.Env):
         else:
             self._forced_goal = (float(bearing), float(dist if dist is not None else 1.5))
 
+    def _draw_load(self):
+        """Heavy load (LOAD_* above): this episode's extra block mass, the policy's load input, and nothing at all when both LOAD_MAX_KG and LOAD_FIXED_KG are off."""
+        if LOAD_FIXED_KG >= 0:
+            kg = LOAD_FIXED_KG
+        elif LOAD_MAX_KG > 0:
+            ramp = 1.0 if LOAD_RAMP_STEPS <= 0 else min(1.0, LOAD_START_FRAC + (1.0 - LOAD_START_FRAC) * max(0.0, self._ramp(LOAD_RAMP_STEPS, LOAD_RAMP_STEPS) - (LOAD_RAMP_START if LOAD_RAMP_START >= 0 else getattr(self, "_ramp_t0", 0.0)) / LOAD_RAMP_STEPS))
+            kg = 0.0 if np.random.rand() < LOAD_BASE_PROB else LOAD_MAX_KG * ramp * float(np.random.rand() ** LOAD_SKEW)
+        else:
+            kg = 0.0
+        self._load_kg = float(kg)
+        seen = kg * (1.0 + np.random.uniform(-LOAD_OBS_NOISE, LOAD_OBS_NOISE)) if LOAD_OBS_NOISE > 0 and LOAD_FIXED_KG < 0 else kg
+        self._load_obs_val = float(np.clip(seen / LOAD_REF_KG, 0.0, 1.5))
+
+    def _margin_cost(self, paw_pos):
+        """Heavy load (LOAD_MARGIN_FAC): (dx^2 + dy^2) x the load fraction, where (dx, dy) is the capture point's offset from the middle of the four paws in the body's
+        heading frame, each divided by the paws' half-spread on that axis (1 = over the edge of the stance). Masses are read once per episode."""
+        if getattr(self, "_mass_cache", None) is None:
+            links = list(range(p.getNumJoints(self.robot_id)))
+            bodies = [b for b in (self._payload_id, self._head_id, getattr(self, "_rear_id", None)) if b is not None]
+            self._mass_cache = (links, [p.getDynamicsInfo(self.robot_id, -1)[0]] + [p.getDynamicsInfo(self.robot_id, l)[0] for l in links],
+                                bodies, [p.getDynamicsInfo(b, -1)[0] for b in bodies])
+        links, lm, bodies, bm = self._mass_cache
+        bpos, born = p.getBasePositionAndOrientation(self.robot_id)
+        pts = [bpos] + [s[0] for s in p.getLinkStates(self.robot_id, links)] + [p.getBasePositionAndOrientation(b)[0] for b in bodies]
+        w = np.asarray(lm + bm)
+        com = (np.asarray(pts) * w[:, None]).sum(0) / w.sum()
+        v = np.asarray(p.getBaseVelocity(self.robot_id)[0])
+        cp = com[:2] + v[:2] * np.sqrt(max(com[2], 0.02) / 9.81)
+        feet = np.asarray(paw_pos)[:, :2]
+        yaw = p.getEulerFromQuaternion(born)[2]
+        c, s = np.cos(-yaw), np.sin(-yaw)
+        rel = (feet - feet.mean(0)) @ np.array([[c, s], [-s, c]])
+        d = (cp - feet.mean(0)) @ np.array([[c, s], [-s, c]])
+        hx, hy = max(np.ptp(rel[:, 0]) / 2, 0.02), max(np.ptp(rel[:, 1]) / 2, 0.02)
+        return float(((d[0] / hx) ** 2 + (d[1] / hy) ** 2) * self._load_frac())
+
+    def _load_frac(self):
+        return min(1.0, getattr(self, "_load_kg", 0.0) / LOAD_REF_KG)
+
+    def _crouch(self):
+        """The ride-height drop (m) for this episode's load: LOAD_CROUCH0 at today's payload, LOAD_HEIGHT_DROP at 1 lb, linear in between."""
+        return LOAD_CROUCH0 + (LOAD_HEIGHT_DROP - LOAD_CROUCH0) * self._load_frac() if LOAD_HEIGHT_DROP > 0 else 0.0
+
+    def _load_speed(self, fwd):
+        """Forward commands slow with the load (LOAD_SPEED_DROP); a stand or a creep-in-place command is left alone."""
+        if LOAD_SPEED_DROP <= 0 or fwd <= 0.02:
+            return fwd
+        return fwd * (1.0 - LOAD_SPEED_DROP * self._load_frac())
+
     def _sample_command(self):
+        self._sample_command_raw()
+        self._cmd_fwd = float(self._load_speed(self._cmd_fwd))
+        if self._cmd_fwd > 0.02:
+            self._cmd_fwd *= getattr(self, "_carpet_speed", 1.0)
+
+    def _sample_command_raw(self):
         if getattr(self, '_forced_cmd', None) is not None:
             fwd, yaw = self._forced_cmd
             if fwd is not None:
@@ -2505,6 +2704,8 @@ class OpenCatGymEnv(gym.Env):
         self._cmd_heading = 0.0          # integral of cmd_yaw -- the heading the policy should be holding
         self._vf_window = []             # body-frame forward-speed estimate window
         self._forced_cmd = getattr(self, '_forced_cmd', None)
+        self._draw_load()                # heavy load: this episode's extra block mass (before the command, which slows with it)
+        self._carpet_speed = 1.0         # CARPET_SPEED_DROP: set once the floor is chosen
         self._sample_command()
         self._reflex_timer = 0           # a fresh episode starts with no reflex active
         self._reflex_dir = 0.0
@@ -2770,6 +2971,39 @@ class OpenCatGymEnv(gym.Env):
                              contactStiffness=float(np.random.uniform(3e4, 1e5) * (1 - 0.7 * k) + 1e5 * (1 - k)),
                              contactDamping=float(np.random.uniform(500, 3000) * (1 + k)),
                              restitution=float(np.random.uniform(0.0, 0.15 * k)))
+        self._pad_on, self._pad = False, None
+        if (CARPET_PAD_K > 0 and not _carpet and not _rough and not _surface_transition and not self._cliff_this_ep
+                and np.random.rand() < CARPET_PAD_PROB):
+            _pq = p.getQuaternionFromEuler([self._slope_rp[0], self._slope_rp[1], 0])
+            _draw = lambda lo, hi: float(np.random.uniform(lo, hi)) if hi > lo else float(lo)          # noqa: E731
+            if CARPET_ADAPT:                               # one carpet at one difficulty point: half the episodes in the top band of this env's level (they move the level), half below
+                _lv = self._carpet_level
+                self._carpet_top = bool(np.random.rand() < 0.5)
+                _e = float(np.random.uniform(max(0.0, _lv - CARPET_ADAPT_BAND), _lv)) if self._carpet_top else float(np.random.uniform(0.0, _lv))
+                _k = float(np.exp(np.log(CARPET_PAD_K_MAX) - _e * (np.log(CARPET_PAD_K_MAX) - np.log(CARPET_PAD_K))))
+                _c = CARPET_PAD_C_MAX - _e * (CARPET_PAD_C_MAX - CARPET_PAD_C)
+                _d = CARPET_PAD_DEPTH + _e * (CARPET_PAD_DEPTH_MAX - CARPET_PAD_DEPTH)
+                _mu = CARPET_PAD_MU + _e * (CARPET_PAD_MU_MAX - CARPET_PAD_MU)
+            else:
+                _f = 1.0                                   # CARPET_RAMP_STEPS: how far the band is open (0 = only its mild end)
+                if CARPET_RAMP_STEPS > 0 and getattr(self, "_train_total_steps", None) is not None:
+                    _f = float(np.clip((self._train_total_steps - getattr(self, "_ramp_t0", 0.0)) / CARPET_RAMP_STEPS, 0.0, 1.0))
+                _kl = float(np.exp(np.log(CARPET_PAD_K_MAX) - _f * (np.log(CARPET_PAD_K_MAX) - np.log(CARPET_PAD_K)))) if CARPET_PAD_K_MAX > CARPET_PAD_K else CARPET_PAD_K
+                _k = float(np.exp(np.random.uniform(np.log(_kl), np.log(CARPET_PAD_K_MAX)))) if CARPET_PAD_K_MAX > _kl else float(_kl)
+                _c = _draw(CARPET_PAD_C_MAX - _f * (CARPET_PAD_C_MAX - CARPET_PAD_C), CARPET_PAD_C_MAX) if CARPET_PAD_C_MAX > CARPET_PAD_C else float(CARPET_PAD_C)
+                _d = _draw(CARPET_PAD_DEPTH, CARPET_PAD_DEPTH + _f * (CARPET_PAD_DEPTH_MAX - CARPET_PAD_DEPTH)) if CARPET_PAD_DEPTH_MAX > CARPET_PAD_DEPTH else float(CARPET_PAD_DEPTH)
+                _mu = _draw(CARPET_PAD_MU, CARPET_PAD_MU + _f * (CARPET_PAD_MU_MAX - CARPET_PAD_MU)) if CARPET_PAD_MU_MAX > CARPET_PAD_MU else float(CARPET_PAD_MU)
+            self._pad = (_k, _c, _d, _mu)
+            self._stall_ep = CARPET_STALL * (_e if CARPET_ADAPT else 1.0)       # the stall grows with the carpet level, so the easy end of the ramp is a mild carpet and the success rule (stay up AND advance) sets the pace
+            p.changeDynamics(plane_id, -1, contactStiffness=_k, contactDamping=_c, restitution=0.0, lateralFriction=_mu)
+            _pf, _ = p.multiplyTransforms([0, 0, 0], _pq, [0, 0, -_d], [0, 0, 0, 1])
+            self._pad_floor = p.loadURDF("plane.urdf", list(_pf), _pq)                  # where the pad bottoms out
+            p.changeVisualShape(self._pad_floor, -1, rgbaColor=[0, 0, 0, 0])
+            self._pad_on = True
+            if CARPET_SPEED_DROP > 0:                      # the command was drawn before the floor: slow it now, and every resample this episode (_sample_command)
+                self._carpet_speed = float(np.random.uniform(1.0 - CARPET_SPEED_DROP, 1.0))
+                if self._cmd_fwd > 0.02:
+                    self._cmd_fwd *= self._carpet_speed
         if SLIP_PATCH > 0 and self._dr > 0 and np.random.rand() < SLIP_PATCH:
             sx, sy = np.random.uniform(0.10, 0.45), np.random.uniform(-0.15, 0.15)
             patch = p.createMultiBody(
@@ -2853,16 +3087,19 @@ class OpenCatGymEnv(gym.Env):
         # wiring + mount, behind centre) and HEAD (camera cluster, front mast) --
         # so the fore/aft CoM split matches the real fully-loaded robot.
         self._payload_id = None
+        self._mass_cache = None
         self._head_id = None
         self._rear_id = None
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
-            pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND)
+            pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND) + self._load_kg      # heavy load: the extra mass goes into the block
             pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
             if PAYLOAD_PROFILE == "pod":
                 pj[:] = 0.0                    # pod: a perfectly balanced block, its centre of mass exactly at its middle and fixed on the body (owner, 2026-10-18); the mass still varies
             if BALANCED:                       # the payload sits off-centre to the left as often as to the right
                 pj[1] = abs(pj[1]) * self._deal("payload_y", (-1.0, 1.0))
             off = [PAYLOAD_POS[0] + PAYLOAD_SHIFT_X + pj[0], PAYLOAD_POS[1] + pj[1], PAYLOAD_POS[2] + pj[2]]
+            if POD_RIGHT_MAX > 0:              # stands in for G2's measured right lean (the pod itself is centred, owner 2026-10-18); -y is G2's right
+                off[1] -= float(np.random.uniform(0.0, POD_RIGHT_MAX))
             def _spawn(o):                     # pod: the block starts exactly where its weld holds it (the robot's start pose is tilted), so nothing snaps into place in the first steps
                 if PAYLOAD_PROFILE == "pod":
                     Rm = np.array(p.getMatrixFromQuaternion(start_orient)).reshape(3, 3)
@@ -2909,6 +3146,8 @@ class OpenCatGymEnv(gym.Env):
             if BALANCED and self._deal("cutback_mirror", (False, True)):     # every overheated-servo set comes up as often as its mirror image
                 k = np.array([[2, 3, 0, 1, 6, 7, 4, 5][j] for j in k])
             self._torque_scale[k] = np.random.uniform(1.0 - TORQUE_CUTBACK * self._d_fault, 1.0, len(k))
+        if 0 < MOTOR_FORCE_LO < MOTOR_FORCE:   # the fitted body: every servo this episode at a force in [MOTOR_FORCE_LO, MOTOR_FORCE]
+            self._torque_scale = self._torque_scale * float(np.random.uniform(MOTOR_FORCE_LO, MOTOR_FORCE)) / MOTOR_FORCE
 
         # sim-to-real transfer knobs (default 0 -> inert)
         self._act_buf = [np.zeros(8) for _ in range(CMD_LATENCY_STEPS)]
@@ -3058,7 +3297,8 @@ class OpenCatGymEnv(gym.Env):
                                            self.angle_history,
                                            self._terrain_obs(),
                                            self._goal_obs(),
-                                           self._cliff_obs()) + ((self._priv_obs([False] * 4),) if PRIV_OBS else ()))
+                                           self._cliff_obs()) + (([self._load_obs_val],) if LOAD_OBS else ()) + (([1.0 if self._pad_on else 0.0],) if CARPET_OBS else ())
+                                           + ((self._priv_obs([False] * 4),) if PRIV_OBS else ()))
 
         if DEPLOY_DEBUG:
             self._deploy_dbg = {

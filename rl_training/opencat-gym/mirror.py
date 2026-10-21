@@ -18,7 +18,7 @@ The mirror is a reflection across the body's x-z plane (y -> -y):
     action (8 joint residuals)                        the same joint swap
 No joint sign flips: all eight joints share one sign convention in this URDF (and the half-cycle wkF check above used none).
 
-Layout (opencat_gym_env.SIZE_OBSERVATION): 38 robot-state values [+2 heading input], then 240 joint-history values.
+Layout (opencat_gym_env.SIZE_OBSERVATION): 38 robot-state values [+2 heading input], then 240 joint-history values [+1 load input, unchanged by the mirror].
 """
 import numpy as np
 import torch as th
@@ -38,14 +38,19 @@ PRIV_YAW = os.environ.get("G2E_PRIV_YAW", "0") not in ("0", "", "false", "False"
 PRIV_DIM = 24 if PRIV_YAW else 22
 PRIV_NEG = (0, 2, 4, 6, 13) + ((22,) if PRIV_YAW else ())    # roll, roll rate, yaw rate, sideways velocity, ground roll [, sin heading error] flip sign
 PRIV_SWAP = {9: 10, 10: 9, 11: 12, 12: 11}      # paw contacts FL<->FR, BR<->BL
+# opencat_gym_env.LOAD_OBS (heavy load, 2026-10-19): one input, the carried load, after the joint history and before the critic-only values; it does not change under the mirror
+LOAD_OBS = os.environ.get("G2E_LOAD_OBS", "0") not in ("0", "", "false", "False", "no")
+# opencat_gym_env.CARPET_OBS (carpet plan, 2026-10-20): one input, the carpet mode, right after the load input; it does not change under the mirror either
+CARPET_OBS = os.environ.get("G2E_CARPET_OBS", "0") not in ("0", "", "false", "False", "no")
 
 
 def _maps(obs_dim):
     """(perm, sign) so that mirrored = obs[..., perm] * sign, except the phase column, which is shifted separately."""
-    priv = obs_dim in (278 + PRIV_DIM, 280 + PRIV_DIM)
-    heading = {278: False, 280: True}.get(obs_dim - (PRIV_DIM if priv else 0))
+    load = (1 if LOAD_OBS else 0) + (1 if CARPET_OBS else 0)      # the extra unmirrored inputs before the critic-only values
+    priv = obs_dim in (278 + load + PRIV_DIM, 280 + load + PRIV_DIM)
+    heading = {278: False, 280: True}.get(obs_dim - load - (PRIV_DIM if priv else 0))
     if heading is None:
-        raise ValueError(f"mirror.py supports the 278-value base observation and the 280-value HEADING_OBS one (+{PRIV_DIM} PRIV_OBS), not {obs_dim}")
+        raise ValueError(f"mirror.py supports the 278-value base observation and the 280-value HEADING_OBS one (+1 LOAD_OBS, +1 CARPET_OBS, +{PRIV_DIM} PRIV_OBS), not {obs_dim}")
     perm = list(range(obs_dim))
     sign = np.ones(obs_dim)
     sign[0:4] = [-1, 1, -1, 1]          # quaternion

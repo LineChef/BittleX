@@ -590,7 +590,33 @@ if __name__ == "__main__":
     if args.chain_from:
         _tkl = os.environ.get("G2E_TARGET_KL", "")
         print(f"chaining from {args.chain_from}: fresh-run schedule (lr start {3e-4 * lr_scale:.1e}, floor {lr_floor}), target_kl {_tkl or 'off'}", flush=True)
-        model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None)
+        _prev = PPOCls.load(args.chain_from, device="cpu")
+        _grow = env.observation_space.shape[0] - _prev.observation_space.shape[0]
+        if _grow > 0:
+            # A stage that adds inputs (carpet plan, 2026-10-20: the carpet mode, CARPET_OBS): the previous stage's weights cannot load into the wider policy, so build it as a fresh run
+            # would and copy every weight across, with zero weights from the new inputs. They sit just before the critic-only values, so the policy starts out acting exactly as before.
+            import torch
+            _at = _prev.observation_space.shape[0] - (_E.PRIV_DIM if _E.PRIV_OBS else 0)
+            model = PPOCls(policy_cls, env, seed=int(os.environ.get("G2E_SEED", "42")), policy_kwargs=custom_arch, n_steps=n_steps,
+                           batch_size=_prev.batch_size, n_epochs=_prev.n_epochs, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None),
+                           verbose=1, tensorboard_log=None)
+            _old, _new = _prev.policy.state_dict(), model.policy.state_dict()
+            with torch.no_grad():
+                for _k, _w in _new.items():
+                    _o = _old[_k]
+                    if _w.shape == _o.shape:
+                        _w.copy_(_o)
+                    elif _w.dim() == 2 and _w.shape[0] == _o.shape[0] and _w.shape[1] == _o.shape[1] + _grow:
+                        _w.zero_()
+                        _w[:, :_at] = _o[:, :_at]
+                        _w[:, _at + _grow:] = _o[:, _at:]
+                    else:
+                        raise SystemExit(f"cannot widen {_k}: {tuple(_o.shape)} -> {tuple(_w.shape)}")
+            model.policy.load_state_dict(_new)
+            print(f"chained with {_grow} new input(s) at {_at}: every weight copied, the new inputs start at zero weight", flush=True)
+        else:
+            model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None)
+        del _prev
         if os.environ.get("G2E_CHAIN_SEED"):                           # a chained stage never used G2E_SEED (only a fresh policy does), so a retry with another seed was an exact repeat (2026-10-13)
             model.set_random_seed(int(os.environ["G2E_CHAIN_SEED"]))
         _rs = os.environ.get("G2E_RESET_LOG_STD", "")
@@ -614,6 +640,12 @@ if __name__ == "__main__":
                          learning_rate=args.finetune_lr,
                          target_kl=args.finetune_target_kl,
                          tensorboard_log=None)
+        _rs = os.environ.get("G2E_RESET_LOG_STD", "")
+        if _rs:                                                         # heavy-load fine-tune (2026-10-19): a finished policy barely explores (std 0.06); set its action noise back up
+            import torch
+            with torch.no_grad():
+                model.policy.log_std.fill_(float(_rs))
+            print(f"action noise reset to log_std {float(_rs)} (std {np.exp(float(_rs)):.2f})", flush=True)
         if args.mirror_loss > 0:
             model.mirror_w, model.mirror_wv = args.mirror_loss, float(os.environ.get("G2E_MIRROR_VALUE_LOSS", "0.1"))
         model.learn(args.steps, callback=checkpoint_callback,

@@ -186,7 +186,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](
 
 ## `ledge`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +32.
+Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +33.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +9.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +10.
 
 | File | Size | Cited by |
 |---|---|---|
