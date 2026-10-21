@@ -44,19 +44,19 @@ body still somewhat arched, front standing normally.
 **07-final-standing-tall.png** -- THE KEY REFERENCE FRAME for the "sitting
 on its belly" problem. All four feet planted on top of the box, and the
 robot is standing TALL, LEVEL, and NATURALLY -- legs in a normal moderate
-bend (nothing like our simulated result's ~90deg front-knee fold), body
+bend (nothing like the simulated result's ~90deg front-knee fold), body
 well clear of the platform surface, not sunk down between the legs at all.
 
-## What this confirms vs. what's still open in our sim (as of 2026-09-19)
+## What this confirms vs. what's still open in the sim (as of 2026-09-19)
 
-- Confirms the front legs plant DEEP (matches our "slide deeper" fix).
+- Confirms the front legs plant DEEP (matches the "slide deeper" fix).
 - Confirms the rear-leg-extended "tall stance" IS the leverage mechanism
   during the steep-arch phase (frame 03) -- not cosmetic.
-- Confirms one-leg-extended-while-other-steps (frame 04) -- something we
-  tried and had to revert (broke reliability); worth another isolated
+- Confirms one-leg-extended-while-other-steps (frame 04) -- something that was
+  tried and had to be reverted (broke reliability); worth another isolated
   attempt now that the tuck-swing-extend mechanism works.
 - Frame 07 is the target for the still-open "front legs go limp / sitting
-  on belly" problem -- our sim's front knee ends up near its 90deg physical
+  on belly" problem -- the sim's front knee ends up near its 90deg physical
   limit by the time all four feet are secured (see
   `docs/archive/rl/crawl-climb-session-checkpoint.md`, "UPDATE 4"), nothing like
   this frame's natural, moderate standing bend. The real robot never

@@ -134,7 +134,7 @@ and an `ANTHROPIC_API_KEY` for the Claude leg.
 - Buzzer / posture cue implementations (`cues.py`) — hardware.
 - `SerialActuator` end-to-end test + `XS` "Serial-2" mode on the BiBoard — hardware.
 - Confirm the loop coexists with OpenCat's 35+ built-in voice commands (they're a
-  separate firmware path; our commands go over serial).
+  separate firmware path; the commands go over serial).
 - Thread health-monitoring / auto-restart once mic + serial threads are real.
 
 ## API call log

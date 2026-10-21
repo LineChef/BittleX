@@ -58,12 +58,12 @@ open items on the bench once the parts are in hand.
 
 ## Servo position feedback (researched 2026-09-01)
 
-**Confirmed it exists on our hardware.** Petoi added position feedback to servos
+**Confirmed it exists on the hardware.** Petoi added position feedback to servos
 manufactured after **March 2024** (all with a label/laser-mark after May 2024,
-possibly earlier). It works **only on ESP32 BiBoards** (our BiBoard V1 qualifies),
+possibly earlier). It works **only on ESP32 BiBoards** (the BiBoard V1 qualifies),
 not NyBoards. Current **Bittle X V2 ships with feedback servos as standard** —
 Amazon/eBay/Petoi listings all say "alloy feedback servos" for the V2 alloy
-model, which is what we ordered. Petoi *does* also sell a servo set "without
+model, which is what was ordered. Petoi *does* also sell a servo set "without
 feedback control", so it's not universal across all their SKUs — but the V2 kit
 has them. **Still do the 30-second check on arrival:** flash latest firmware,
 send serial `f`; if it prints a row of changing numbers as you move the joints by
@@ -108,7 +108,7 @@ separate CLI calls).
 
 **Over the Pi's UART, 2026-10-18 (firmware B10_260527, G2 standing on a desk, pod and AI head on):** `f` still returns only its echo on Serial 2 (0 of 5 reads, `check_serial posecheck`; a raw 2 s capture held the echo and IMU frames only). Sending it is not harmless: in the raw capture roll went from -1.5 to -21 deg within 1.5 s of one request (the next request stayed level), and the check logged tilt changes of 15-77 deg during four of five reads. The firmware apparently still releases the servos to read them and prints the result only to USB. So the eased-transition stage 2 (read the pose when it is unknown) stays off; servo reads are not safe while G2 stands.
 
-**Implications for our work:**
+**Implications for the work:**
 - → **The RL policy must not depend on fast measured joint angles.** Good news:
   in **residual mode** (the whole resid + survive line) `opencat_gym_env.py`
   already builds its joint-angle observation history from the **commanded**
@@ -265,7 +265,7 @@ an edge, and weigh the printed parts and the cell once they exist.
   decision protects against (see [`pi-power.md`](pi-power.md)).
 - → **~1 h runtime** caps how long a hardware eval/training session runs before a
   battery swap.
-- → Our RL `TARGET_SPEED` of 0.10 m/s is ~1/4 of the servo envelope — a
+- → The RL `TARGET_SPEED` of 0.10 m/s is ~1/4 of the servo envelope — a
   deliberate stability choice, not a hardware ceiling.
 
 ## Petoi AI Vision Camera Module (Seeed Grove Vision AI V2)

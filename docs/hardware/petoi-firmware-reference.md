@@ -22,7 +22,7 @@ data — vendored), `OpenCat.h` (token macros + config constants).
 
 **No official Petoi RL/sim repo.** Petoi points to community work: `ger01d/opencat-gym`
 (the lineage of `rl_training/opencat-gym`) and `ger01d/opencat-gym-sim2real`, plus
-forum MuJoCo/Isaac efforts. Our fork is already the canonical community base.
+forum MuJoCo/Isaac efforts. The fork is already the canonical community base.
 
 ## Serial command tokens (`OpenCat.h` `T_*` macros)
 
@@ -59,7 +59,7 @@ why the delay varies — flag if it recurs somewhere that matters.
 
 BiBoard V1 carries a built-in offline voice-recognition module + speaker
 (`project-plan.md`'s parts notes), separate from the `T_*` command parser
-above and not decoded from our own firmware source — confirmed instead
+above and not decoded from the project's own firmware source — confirmed instead
 from [Petoi's official docs](https://docs.petoi.com/extensible-modules/voice-command-module)
 and against the real board 2026-09-28:
 
@@ -93,7 +93,7 @@ remember: module answers "ok" but the body does not move → send `XA`, and chec
 
 **2026-09-28 incident: module found stuck defaulting to Chinese, with
 voice commands unresponsive, for no identified trigger (nothing bumped/
-dropped, unrelated to our serial link work, broken before this session
+dropped, unrelated to the serial link work, broken before this session
 started).** Matches a closed PetoiCamp/OpenCatEsp32-Quadruped-Robot PR
 (#51) where an identical symptom on BiBoard V1.0 was root-caused to the
 module getting stuck in a bad persistent armed state that survives
@@ -212,7 +212,7 @@ reflash. Full story, in order:**
    whatever reads next — same class of bug as the `allmoves` desync
    documented below): line 1 `Bittle X`, line 2 a version string,
    **`B10_251121`** — read as a 2025-11-21 build, ~10 months older than
-   our `main`-branch source review (2026-09-07/09-20). Strong
+   the `main`-branch source review (2026-09-07/09-20). Strong
    circumstantial evidence the stale build had different IMU timing.
 4. **Separately that same night**, found and fixed a real firmware bug
    (below) requiring a full flash erase + reflash to Petoi's *current*
@@ -320,24 +320,24 @@ section above) since that was EEPROM-persisted too.
 on — nothing urgent, one thing to know about.** `B10_260527` (2026-05-27)
 is ~6 weeks behind `main`'s newest firmware-code commit (`DATE "260717"`,
 2026-07-17); every commit in that gap was reviewed directly via the
-GitHub API. None of it matters for us: the camera-kills-IMU bug above is
+GitHub API. None of it matters for the project: the camera-kills-IMU bug above is
 still present unfixed on `main` (a `camera.h` commit in the gap is a
 comment-only clarification); a `moduleManager.h` refactor that also
 touches Serial2 init resolves to the same pins (9/10) for
 `BiBoard_V1_0` either way — no pinout regression; the rest is an
-Xiaozhi-voice-UART echo feature (not applicable, we don't use a Xiaozhi
+Xiaozhi-voice-UART echo feature (not applicable, the project does not use a Xiaozhi
 module) and unrelated marketing/README commits.
 
 **One real, small thing this surfaced: the voice-module Chinese-default
 bug (see the voice module section above, first hit 2026-09-28) has an
-actual upstream root-cause fix — but it lands one day after our build.**
+actual upstream root-cause fix — but it lands one day after the build.**
 `main` commit `9cf4e8d` (2026-05-28) changes `configConstants.h`'s
 factory EEPROM default for `EEPROM_CURRENT_LAN` from `'b'` (Chinese) to
 `'a'` (English); a same-day commit (`b189c34`) simplifies
 `voiceSyncAtStartup()`'s language-sync logic (the `Ac->Ab->Aa` special
-case for English, matching our own manual workaround, is replaced with a
-single `A<lan>` send). **Checked whether the Petoi Desktop App could get
-us this fix: its release feed (`PetoiCamp/DesktopAppRelease`) tops out at
+case for English, matching the project's own manual workaround, is replaced with a
+single `A<lan>` send). **Checked whether the Petoi Desktop App could provide
+this fix: its release feed (`PetoiCamp/DesktopAppRelease`) tops out at
 v1.2.9, published 2026-05-28 — the same version already installed and
 used for tonight's reflash — so re-running it would just re-flash the
 identical `260527` build, not the newer one.** Reaching the fix would
@@ -379,7 +379,7 @@ if (gyroBalanceQ) {
   re-triggers next tick → effectively "keep trying `rc`" until upright or gyro off.
 
 **Sim-fidelity gap (why self-right failed to train — see `self-righting-research.md`):**
-our sim terminates the episode at 1.3 rad ≈ **74° tilt**, *below* the firmware's
+the sim terminates the episode at 1.3 rad ≈ **74° tilt**, *below* the firmware's
 85° `FLIPPED` line — the policy never sees the flipped state the real robot
 recovers from. And the scripted `rc` keyframes were never an available action in
 sim. Real-robot recovery = detect flip → scripted `rc` → repeat. To reproduce in

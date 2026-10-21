@@ -75,7 +75,7 @@ echo $! > ~/voice.pid          # stop it with: kill $(cat ~/voice.pid)
 `--actuator mock` runs the same loop but only logs the serial command it would send (nothing moves) — use it first. The Pi needs
 `ANTHROPIC_API_KEY` in `~/bittleX/.env` and the Vosk + Piper models copied to `~/bittleX/models/` (rsync, not git).
 
-What we learned:
+What was learned:
 
 - **Speech recognition is the weak link.** The small Vosk model mishears short phrases: "command mode off" came out as "man mode off",
   "the man load off". "walk forward", "stand up" and the wake word "gee two" were all heard correctly. A second recognition pass
@@ -165,7 +165,7 @@ Open / next:
       (canned command language switching, not raw audio capture). No
       community project (Petoi's own official ChatGPT-Bittle example
       included) has actually routed synthesized speech through it either —
-      they all play audio from whatever computer runs the script, same as our
+      they all play audio from whatever computer runs the script, same as the
       own `--tts mac` test. Full research: `docs/research/community-projects.md`
       Finding 7. **Went with a GPIO-wired I2S solution over USB**, since the
       Pi's one USB data port is reserved for the camera's raw-frame path

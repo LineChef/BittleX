@@ -8,7 +8,7 @@ deployment the user's call). This page replaces the "Track C, two modes in one n
 ## 0. Outcome (2026-10-13 8:52 AM): STOPPED, goal not met, 20M never run
 
 The creep did not clear steps: best step-up success above 7.5 mm was 0%, at 7.5 mm 25% (V6: 85%); the minimum target (80% at 12.5 mm) was missed at every stage. S2 failed its flat gates twice and the runner halted before
-the 20M; I (Claude) did not start it by hand because S2 showed no gain in step-up success. Nothing exported, promoted or deployed. The base gait, the scorer and the fixes below are kept as the research result.
+the 20M; Claude did not start it by hand because S2 showed no gain in step-up success. Nothing exported, promoted or deployed. The base gait, the scorer and the fixes below are kept as the research result.
 Final scores and every decision: `trained/hs_report/` (`decisions.md`, `hs_*.json`, `old_chain*`, `old_sweep*`); the results page was published as an Artifact ("High-Step Creep Report").
 
 What the run established (sim, open loop and trained):
@@ -104,7 +104,7 @@ standing on the step top is paid: rear 100, front 30), face-contact cost 0.15, i
 | S0 flat | 2M, fresh, 85% flat (small rubble/snags, cutback) | 20 min |
 | S1 low steps | 3M from S0, 55% step-ups 0-15 mm (frontier) | 30 min |
 | S2 tall steps | 3M from S1, 60% step-ups, frontier floor 8.3 mm, top 25 mm | 30 min |
-| Go / no-go | flat-ground safety and posture (mine) | - |
+| Go / no-go | flat-ground safety and posture (Claude's) | - |
 | S4 20M | from S2, 45% step-ups (floor 6 mm, top 25 mm), 35% flat, plateau stop on; a tracker every 2M (10 flat walks, 10 episodes at 10 / 12.5 / 15 / 20 mm) | 141 min |
 | Pick + export | the final and the average of the last 5 checkpoints, both scored in full (30 flat, 40 per size); export `trained/HS1cand_ppo.onnx` | 15 min |
 | Report | `trained/hs_report/report.html` | 1 min |

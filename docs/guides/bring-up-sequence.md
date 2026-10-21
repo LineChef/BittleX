@@ -58,11 +58,11 @@ only renumbered.
 > **2026-09-28 — stand mismatch.** Petoi shipped the Nybble calibration
 > stand, not the Bittle one; it doesn't fit G2 cleanly. Order the correct
 > one in parallel. In the meantime, the actual hazard this rule guards
-> against is *our own* joint commands with an unknown servo sign
+> against is *the project's own* joint commands with an unknown servo sign
 > (`run_gait.py --openloop`, the RL joint-control bench) — stock-firmware
 > postures/gaits like `vtF` are Petoi-designed for normal floor operation,
 > so observing those on the floor is a reasonable stand-in for now. Keep
-> the no-floor-time rule for anything past step 13a (our own control code)
+> the no-floor-time rule for anything past step 13a (the project's own control code)
 > until a stand (correct or improvised) is in place.
 
 **Diagnostics-mode impact of the Phase-0 split.** Checked this directly

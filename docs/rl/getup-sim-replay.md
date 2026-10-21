@@ -26,7 +26,7 @@ through the 8 leg joints via `POSITION_CONTROL` (`FORCE = 0.40` N·m/joint, abov
 | prone, belly-down flat | 0.00 / 0.00 | 0.00 / 0.00 | 0.022 m | **no** — `rc` reaches a transient 4-leg crouch mid-play (tilt-sum hits 0.0) then collapses flat again |
 | supine, on its back | 3.14 / 0.00 | 3.02 / 0.07 | 0.030 m | **no** — `rl` → `rc` flails the legs; the roll-over never happens, ends still on its back |
 
-## Why this is expected, and what it does / doesn't tell us
+## Why this is expected, and what it does / doesn't show
 
 The replay is a **crude lower bound**, and a poor result was the predicted
 outcome, not a surprise:
@@ -123,7 +123,7 @@ Exploratory edits to `verify_getup_reference.py` in the working tree only —
 | 3 | Torque budget, `FORCE`=0.4/0.6/0.9/1.2 N·m (up to 3x) | No change at all. |
 | 4 | Ground friction, 1.0/2.0/4.0 | No meaningful change — max height reached is friction-insensitive. |
 | 5 | `PLAY_CYCLES`=1/2/3, and holding the final pose 200 extra steps | No change — rules out "the loop drags it back down." |
-| 6 | Slowdown (HumanUP-style 2x/4x/8x), same path played slower | No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; ours is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed. |
+| 6 | Slowdown (HumanUP-style 2x/4x/8x), same path played slower | No change — that technique fixes a *policy-discovered* trajectory that's unstable at speed; the project's is a hand-decoded reference that doesn't trace a "stay standing" path regardless of speed. |
 
 **Root cause, found via a frame-by-frame trace of `supine`** (`rl` = frames
 0-99, `rc` = frames 100-199, chained): the reference *can* reach a genuinely
@@ -156,20 +156,20 @@ ranked by relevance to the specific failure mode found here:
    Motor Skills for Legged Robot Fall Recovery," IEEE RA-L 2023 (UCL).
    Builds a graph of key postures along the recovery sequence and
    initializes *training* episodes starting from those intermediate
-   postures, not only from the raw fall. Directly targets our exact
+   postures, not only from the raw fall. Directly targets the exact
    symptom (losing progress at a handoff/tail) -- but it's a technique for
    training a policy, not for open-loop replay; doesn't apply until/unless
    this moves to option 3 or 4 below.
 2. **HumanUP's 8x slowdown** — "Learning Getting-Up Policies for Real-World
    Humanoid Robots" (arXiv 2502.12152). Tested directly above (test 6);
-   didn't transfer to our case, for the reason given there.
+   didn't transfer to the case, for the reason given there.
 3. **DeepMimic-style motion imitation** — the standard technique for making
    a fragile reference execute robustly: train a policy with a reward
    tracking pose/velocity/root-pose error against the reference, instead of
    commanding it open-loop. `erwincoumans/motion_imitation` on GitHub is
    PyBullet-native (maintained by PyBullet's own creator) and built for
    arbitrary reference motions, not just mocap -- directly reusable with
-   our existing `rc_ref.npy`/`rl_ref.npy`. Real lift: a genuine PPO training
+   the existing `rc_ref.npy`/`rl_ref.npy`. Real lift: a genuine PPO training
    loop, not a script tweak.
 4. **From-scratch fall-recovery RL** (no reference trajectory -- reward-
    shaped exploration from domain-randomized fallen starting poses; never

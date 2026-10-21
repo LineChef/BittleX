@@ -2,7 +2,7 @@
 
 Reference for the "should we fork?" question (2026-10-03). The standing decision is **no fork** — the Pi stays an application layer on stock
 firmware, and a fork is allowed only narrowly and later, if a capability truly can't be done Pi-side ([`../project-plan.md`](../project-plan.md)).
-This page collects the evidence for revisiting that. Facts below come from our firmware notes ([`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md)),
+This page collects the evidence for revisiting that. Facts below come from the firmware notes ([`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md)),
 the walk log ([`../rl/real-walk-log.md`](../rl/real-walk-log.md)) and a read of OpenCatEsp32 `main`; items marked *unverified* have not been tested.
 
 ## Which fork
@@ -34,7 +34,7 @@ Both are separable decisions. Most of the list below needs only the first.
 | Problem | What a patch would do |
 |---|---|
 | The Pi can't use the head's mic or speaker | Expose audio to the Pi (stream or I2S), so the head replaces the external mic and speaker |
-| Cloud backend is Petoi's/XiaoZhi's | Point the head at a backend we control (Claude, our memory and personality) |
+| Cloud backend is Petoi's/XiaoZhi's | Point the head at a project-controlled backend (Claude, the memory and personality) |
 | "What do you see?" has no data | Add a tool that returns the Vision Module's detections |
 | UART conflict with the Pi | Move motion commands to a different port, or turn them off |
 
@@ -46,25 +46,25 @@ model's frozen-firmware limits, and any sim-to-real gap not caused by the firmwa
 ## Pros
 
 - **Removes real firmware ceilings** (items 1–6) that no Pi-side code can get around.
-- **MIT licence;** the code is public and already read by us (reaction thresholds, camera and module code are all understood).
+- **MIT licence;** the code is public and already read (reaction thresholds, camera and module code are all understood).
 - **Removes one blocker for a Pi-less build** (item 1 lets the camera and IMU coexist). The rest of a Pi-less build is still a large downgrade: no learned gait,
-  no behavior runtime, no memory design of our own, and no known way yet for the head to read the camera.
+  no behavior runtime, no memory design of the project's own, and no known way yet for the head to read the camera.
 - **Narrow patches are small:** most items are a few functions, and Petoi's own bugs (camera/IMU, buggy IR module) can be fixed rather than worked around.
-- **Opens head integration** if Petoi's firmware ships: a backend we control instead of a cloud we don't.
+- **Opens head integration** if Petoi's firmware ships: a project-controlled backend instead of a cloud the project does not control.
 
 ## Cons
 
-- **Maintenance:** Petoi releases often (we've already gone B10_251121 → B10_260527). Every upstream release means a rebase, retest and reflash.
+- **Maintenance:** Petoi releases often (the firmware has already gone from B10_251121 to B10_260527). Every upstream release means a rebase, retest and reflash.
 - **Tooling:** Petoi's Desktop App uploads only official builds with the right partition layout. A fork needs an Arduino/PlatformIO or esptool toolchain
-  we haven't set up, plus a repeatable way to reproduce Petoi's four-file flash. *Unverified: build time and effort.*
+  not yet set up, plus a repeatable way to reproduce Petoi's four-file flash. *Unverified: build time and effort.*
 - **Risk to the robot:** firmware controls the servos and balance. A bad patch can break gyro balance, calibration or the reflexes G2 relies on today.
   BOOT-button recovery exists, but an erase wipes calibration and module flags (recalibrate, `gc`, voice fix).
-- **Coupling:** IMU or timing changes invalidate the deployed policy and push us into another sim retrain and hardware validation cycle.
+- **Coupling:** IMU or timing changes invalidate the deployed policy and force another sim retrain and hardware validation cycle.
 - **Many wins are unproven:** e.g. a faster IMU has no hardware evidence of helping; the policy comparison (H1) is still open. Forking before that adds work on a guess.
-- **Solo upkeep:** every patch is ours to own, document and keep current, on a project that already has an open servo fault and untested pipeline.
+- **Solo upkeep:** every patch is the project's to own, document and keep current, on a project that already has an open servo fault and untested pipeline.
 - **Public repo rules** still apply: no personal data, no attribution, clean history.
 
-## How to keep it cheap if we do it
+## How to keep it cheap if it is done
 
 - Keep a **small patch series on top of a pinned upstream tag** so each Petoi release is a rebase. This is the same mechanism as a fork, applied with discipline: the
   changes are few and separate, and are re-applied on each new tag instead of merged into a diverging copy. Two ways to hold it: (a) a GitHub fork or local
@@ -79,7 +79,7 @@ model's frozen-firmware limits, and any sim-to-real gap not caused by the firmwa
 
 - The AI Head arrives and a Pi-less or camera-on-BiBoard build looks worthwhile (items 1, 8, head fork).
 - The hardware H1 comparison shows the 5 Hz IMU or the joint-command timing is what limits the learned gait (items 4, 6).
-- We want mid-walk reflexes or firmware/Pi recovery to coexist (items 2, 3) and the Pi-side version isn't good enough.
+- Mid-walk reflexes or firmware/Pi recovery should coexist (items 2, 3) and the Pi-side version isn't good enough.
 - Petoi publishes the head firmware.
 
 Until one of these fires, the standing decision stays: no fork.

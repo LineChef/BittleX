@@ -47,7 +47,7 @@ the same combo at cycle 3). Underlying local files, if needed again:
    verified checkpoint to revert to; quality (does it visually match the
    reference climb) beats raw pass-rate as the deciding factor when the two
    conflict (see UPDATE 11); give the user any new replay link FIRST, before
-   reviewing frames myself (see `feedback_review_replay_myself` memory).
+   reviewing frames directly (see `feedback_review_replay_myself` memory).
 
 ---
 
@@ -310,7 +310,7 @@ isn't firing reliably enough across all cycles to hold the margin
 throughout** -- likely because the rear leg's own forward drag happens
 continuously through the cycle, not just once, so a single end-of-cycle
 check-and-correct isn't enough to keep up over multiple cycles. Reviewed
-our own replay frames again post-fix -- visually similar to before,
+the project's own replay frames again post-fix -- visually similar to before,
 consistent with the numbers (the final posture is governed more by where
 things end up after cycles 2-4, where the margin has already eroded, than
 by the correctly-held cycle 0-1 state).
@@ -360,7 +360,7 @@ loss, which remains open. Tried combining this fix with UPDATE 7's reduced
 tuck-swing amplitude (which alone flipped at cycle 7) -- delayed the
 failure to cycle 8 but didn't prevent it; weaker rear propulsion still
 needs too many cycles and something else gives out eventually. Reviewed
-our own replay frames again post-fix (per the now-permanent practice) --
+the project's own replay frames again post-fix (per the now-permanent practice) --
 visually similar to before, consistent with the numbers.
 
 **Where this leaves it**: two real, validated, non-destabilizing fixes are
@@ -380,7 +380,7 @@ and address that, rather than continuing to recover height after the fact.
 
 **First hypothesis, disproven directly**: thought the front-knee-PULL
 mechanism's own accumulated retraction was the driver, and that the
-original `REPLANT_EVERY=5` reset (which never fires within our 3-cycle
+original `REPLANT_EVERY=5` reset (which never fires within the 3-cycle
 convergence) was the missing safety valve. Exposed `--replant-every` as a
 CLI arg and tested 1 and 2 -- **the front-leg replant attempts mostly
 failed outright ("FL=stuck", no new contact found)** since there's too
@@ -489,7 +489,7 @@ genuine equilibrium around 20deg tilt that more settle time doesn't
 recover from (not a transient spike), so returns diminish fast past the
 current tuning.
 
-**Honest assessment after extracting and reviewing our own replay frames
+**Honest assessment after extracting and reviewing the project's own replay frames
 again post-fix**: the fix is real and measurably correct in the
 underlying physics, but NOT yet a dramatic visual improvement -- the robot
 still looks meaningfully lower/flatter than the reference climb's natural
@@ -501,7 +501,7 @@ at the end -- rather than continuing to patch the landing after the fact.
 This is a real, well-scoped open problem for next time, not a mystery.
 
 **New standing practice adopted**: extract and look at frames from BOTH
-the reference video AND our own replay output whenever verifying a fix,
+the reference video AND the project's own replay output whenever verifying a fix,
 not just printed numeric diagnostics. `tilt` (or any single scalar) can be
 blind to failure modes a human eye catches immediately -- confirmed
 directly this session, twice now (once for the reference-video comparison
@@ -566,7 +566,7 @@ extended driving the body into a steep mantle position BEFORE any rear
 stepping -- direct visual confirmation that "tall stance = leverage" is
 real, not a stylistic guess. Frame 07 (`07-final-standing-tall.png`) is the
 target for the open problem: the real robot ends up standing tall, level,
-and naturally on top, nothing like our sim's collapse.
+and naturally on top, nothing like the sim's collapse.
 
 **Root cause traced precisely** (through several failed hypotheses, each
 tested and ruled out directly rather than guessed):
@@ -731,7 +731,7 @@ fixes:
    the per-call change to 4deg keeps convergence (still reaches the true
    anchor, just gradually) without permitting the snap.
 2. **Root cause of the shallow-footing vulnerability, separately diagnosed
-   by the user**: our footholds land right at the edge (many contacts under
+   by the user**: the footholds land right at the edge (many contacts under
    15mm past the edge, several outright negative/marginal) while the
    reference gait plants noticeably deeper -- a shallow foothold has almost
    no margin before ANY perturbation (jerky or not) knocks it loose. Added a
@@ -813,7 +813,7 @@ step is already identified.
 
 ## Where this session landed, in one paragraph
 
-We proved climbing a step-up ledge is simulatable at all (earlier finding:
+Climbing a step-up ledge was shown to be simulatable at all (earlier finding:
 `cmh`'s own front-leg reach was the blocker, not sim fidelity -- see
 `docs/archive/rl/foot-probing-log.md`, though that file's own closing verdict predates
 this reversal and hasn't been updated to match). Built `crawl_climb.py`: probe
@@ -828,13 +828,13 @@ confirmed empirically, was that the approach distance was off, which cascaded
 into everything else looking wrong.
 
 Tonight's thread (after the last context compaction): user asked for a
-"middle ground" between pure scripted `cmh` and our fully-reactive mechanism,
+"middle ground" between pure scripted `cmh` and the fully-reactive mechanism,
 same architecture as the walk gait (scripted base + bounded residual). Then
 watched the reference PetoiCamp climb video
-(https://www.youtube.com/watch?v=rRkVR3PO1o8) side by side with our replay
+(https://www.youtube.com/watch?v=rRkVR3PO1o8) side by side with the replay
 and gave five concrete, correct critiques (see below). Iterated hard on
 matching those. **Bottom line finding, confirmed with a direct measurement
-tonight**: our "successes" have been relying on the tail's explosive push
+tonight**: the "successes" have been relying on the tail's explosive push
 (`cmh` ticks 166-171, force ramped to 6.5) to do the real work of closing
 the front-to-rear gap -- i.e. a jump, not a climb. Measured directly:
 **before the tail phase even starts, RB is still 132-162mm behind the edge**
@@ -844,7 +844,7 @@ been raised since early in the session, now root-caused precisely.
 
 ## The reference-video critique (user's 5 points, verbatim intent)
 
-Watching https://www.youtube.com/watch?v=rRkVR3PO1o8 vs. our replay:
+Watching https://www.youtube.com/watch?v=rRkVR3PO1o8 vs. the replay:
 
 1. It reaches way farther for the ledge before committing (front legs).
 2. The rear legs are almost fully extended for the entire first part of the
@@ -862,7 +862,7 @@ the leverage mechanism** (an extended leg rotating at the hip is a longer,
 more effective lever than a bent one). And: **get both front feet solidly
 planted BEFORE standing tall** (sequencing) -- tall stance should be the
 thing that gets the rear legs up WITHOUT needing the final tail jump, which
-so far is the only way we've reliably gotten all 4 paws on top.
+so far is the only way found to reliably get all 4 paws on top.
 
 ## What was tried tonight, and what happened (all empirically tested, not guessed)
 

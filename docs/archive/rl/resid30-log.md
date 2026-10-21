@@ -187,8 +187,8 @@ confirmed weak point: T9.1 (18deg slope, beyond the 14deg training ceiling)
   already use.
 - **Reassurance:** the actual benchmark tools that will produce Stage 3's
   real keep/revert verdict (`benchmark_decathlon.py`, `benchmark_gaits.py`)
-  already set `DR_EVAL_FULL = True` correctly -- this bug only affected my
-  own supplementary spot-checks, not the pipeline that actually decides
+  already set `DR_EVAL_FULL = True` correctly -- this bug only affected the
+  supplementary spot-checks, not the pipeline that actually decides
   anything.
 - **Corrected Stage 1/Stage 2 numbers, full DR, 12 episodes each, matched
   seeds:**

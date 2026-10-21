@@ -27,7 +27,7 @@ reviewed at all.
 ## Finding 1 — Confirmed servo-speed sim/real mismatch (highest priority)
 
 BittleJuice measured G2-class servos directly: **step response τ = 33 ms,
-speed ceiling ≈ 137°/s**. Measured against our own trained policy directly
+speed ceiling ≈ 137°/s**. Measured against the project's own trained policy directly
 (`servo_saturation_check.py`, built 2026-09-24, reproduces
 `opencat_gym_env.py`'s exact residual-mode target computation — an earlier
 back-of-envelope estimate using `STEP_ANGLE`/`maxJointVelocity` was wrong,
@@ -40,19 +40,19 @@ own (pending H13).
 
 BittleJuice's own docs name the trap directly: *"The filter and the
 actuator have to be fitted together, or the same lag gets counted twice."*
-Our `firmware_model.py` already models the **firmware's own software ramp**
+The `firmware_model.py` already models the **firmware's own software ramp**
 (the `i` command's cosine-eased interpolation, ~250°/s) as if each
 interpolated waypoint is instantly achieved — it does not separately model
 **physical servo lag on top of that**. If real servos can't track even the
-firmware's own ramp, we're currently *under*-counting lag, not
-double-counting it — but we don't know, because we've never measured G2's
-actual servos.
+firmware's own ramp, lag is currently *under*-counted, not
+double-counted — but that is not known, because G2's
+actual servos have never been measured.
 
 They also ship a concrete methodology worth copying: `tools/mj_deployability.py`
 checks what fraction of a trained policy's commanded joint deltas would
 saturate the servo's real speed ceiling, gated at a 15% threshold (their
 shipped policy: 2.6%). This is exactly what `servo_saturation_check.py`
-above does for us now.
+above does for the project now.
 
 ## Finding 1b — Confirmed: URDF joint limits are too narrow for real `rc`
 
@@ -77,15 +77,15 @@ representing — the URDF's joint limits fully explain why `getup-sim-replay.md`
 approximation already documented there (open-loop, no IMU-triggered waits,
 decoded keyframes). This also independently corroborates
 `docs/archive/rl/reference-frames/README.md` (climb work, 2026-09-19, unrelated
-investigation): *"our sim's front knee ends up near its 90° physical
+investigation): *"the sim's front knee ends up near its 90° physical
 limit"* during climbing — the same ceiling binding in a different context.
 
-## Finding 2 — Firmware fork: a real, working alternative to our workarounds
+## Finding 2 — Firmware fork: a real, working alternative to the workarounds
 
 BittleJuice's patched OpenCat fork cuts command→motion latency 198ms→54ms
 and raises IMU streaming 5Hz→250Hz, off at boot by default (a flashed robot
 behaves exactly like stock until something explicitly requests the realtime
-mode). We spent much of this campaign building **workarounds** for exactly
+mode). Much of this campaign went into building **workarounds** for exactly
 these two stock-firmware limits (`IMU_HOLD_STEPS`, `IMU_RATE_ZERO`,
 `CMD_PATH`'s whole timing model in `firmware_model.py`) rather than fixing
 them at the source, per an explicit 2026-09-10 decision
@@ -97,19 +97,19 @@ should be in the room next time firmware-fork is discussed.
 ## Finding 3 — Joint-position feedback design: independent convergent confirmation
 
 Both BittleJuice and TypeFly's Petoi wrapper are shaped by the same hardware
-fact we already know (`petoi-firmware-reference.md`): the firmware can't
+fact already known (`petoi-firmware-reference.md`): the firmware can't
 give a fast real joint-position read. BittleJuice's solution — track
 commanded state internally, never poll real joint position mid-loop — is
 **exactly what `pi_pipeline/gait/run_gait.py` already does**
 (`pol.step(quat, gyro)` never re-reads joint position; only IMU feeds every
 step, joint state is seeded once at `reset()`). No action needed — this is
-reassurance that our design converged on the right answer independently,
+reassurance that the design converged on the right answer independently,
 not a new idea to adopt.
 
 ## Finding 4 — Gyro/angular-rate: external confirmation, not new information
 
 BittleJuice: *"There's no raw gyro. Angular rates are finite-differenced
-from the fused attitude stream."* Matches our own 2026-09-22/23 finding
+from the fused attitude stream."* Matches the project's own 2026-09-22/23 finding
 exactly (`G2E_IMU_RATE_ZERO`, "stream has no gyro"). Independent
 confirmation from a second project measuring the same firmware family.
 
@@ -119,12 +119,12 @@ Already surfaced and logged earlier this session
 (`docs/project-plan.md`'s fall-recovery TODO): measured real component
 masses (273.5g vs Petoi's 265–290g spec), found battery/CoM *position* (not
 just inertia) measurably affects trot stability and sim-to-real transfer —
-same general bug class as our own zero-inertia payload discovery this
+same general bug class as the project's own zero-inertia payload discovery this
 session, different mechanism. Also: their contact-solver tuning (Newton
 solver, elliptic cones, `impratio=100`) cut foot slip ~13% — not directly
 portable (different physics engine, PyBullet doesn't expose the same
 knobs), but a reminder that "foot slip looks visually off" can be a solver
-artifact, not just a friction-coefficient question, if we ever chase that
+artifact, not just a friction-coefficient question, if ever chase that
 kind of issue again.
 
 ## Finding 6 — MH-FLOCKE: a fundamentally different technique, not directly portable
@@ -134,12 +134,12 @@ small cerebellar model, trained with **no external reward at all** — only
 an intrinsic signal (falling = bad, moving = good). 50,000 MuJoCo steps,
 zero unrecovered falls, a CPG-weight handoff from ~90% to ~40% as the
 spiking network takes over, and a "motor babbling" exploration phase before
-real learning starts (loosely parallel to our own curriculum-staging
+real learning starts (loosely parallel to the project's own curriculum-staging
 discussion this session — start easy/passable before hard skills). This is
 a different enough architecture (SNN vs. PPO, intrinsic-only vs. engineered
 reward shaping) that adopting the technique wholesale isn't realistic — but
 it's a useful existence proof that *reward-shaping complexity itself* isn't
-the only path to a stable gait, worth keeping in mind if our own reward
+the only path to a stable gait, worth keeping in mind if the project's own reward
 audit this session turns out not to be the end of that story.
 
 ## Finding 7 — TypeFly: LLM robot control, with a real Petoi/OpenCatESP32 integration
@@ -147,15 +147,15 @@ audit this session turns out not to be the end of that story.
 Natural-language → GPT-generated small Python program built from registered
 "skills," grounded by a YOLO vision service over gRPC. Directly supports
 Petoi Bittle/Nybble/Cub over OpenCatESP32's **HTTP JSON API on port 80** — a
-control channel that exists on our own firmware but that `pi_pipeline` has
-never used (we're serial-only). Their vision approach is a separate
+control channel that exists on the project's own firmware but that `pi_pipeline` has
+never used (the project is serial-only). Their vision approach is a separate
 ESP32-CAM streaming MJPEG to an external YOLO service, architecturally
-different from our on-device Grove Vision AI V2 detection. No explicit
+different from the on-device Grove Vision AI V2 detection. No explicit
 safety mechanisms are documented in their design — a contrast point,
 not a model to follow, given how much of `pi_pipeline`'s design (feature
 flags, halt/release, bench mode) is specifically about *not* doing that. The
 skill-registration pattern itself (a name → Python callable, LLM composes
-programs from the registry) is structurally the same shape as our own
+programs from the registry) is structurally the same shape as the project's own
 `voice/skills.py` `SKILLS` dict — convergent design again, not a new idea.
 
 ---
@@ -205,14 +205,14 @@ finding is.
    double-counting) rather than just clamping velocity — this needs real
    measurement data to fit against, so it can't happen before hardware.
 
-### Strategic / needs your explicit decision, not mine to make
-5. **Firmware-fork reconsideration.** Not urgent, not something I'd raise
-   again without you bringing it up, but the option is now demonstrated
-   working elsewhere with concrete wins (54ms vs our ~198ms-modeled stock
-   latency, 250Hz vs our accepted 5Hz IMU) against an explicit standing
+### Strategic / needs the user's explicit decision, not Claude's to make
+5. **Firmware-fork reconsideration.** Not urgent, and not to be raised
+   again unless the user brings it up, but the option is now demonstrated
+   working elsewhere with concrete wins (54ms vs the ~198ms-modeled stock
+   latency, 250Hz vs the accepted 5Hz IMU) against an explicit standing
    decision not to fork. Worth one deliberate conversation at some point,
-   ideally after hardware arrives and we know what our workarounds actually
-   cost us in practice.
+   ideally after hardware arrives and it is known what the workarounds actually
+   cost in practice.
 6. **HTTP JSON API as a supplementary control channel** (TypeFly's finding)
    — not something to switch to, `pi_pipeline`'s whole architecture is
    built around serial, but worth knowing it exists on stock firmware in
@@ -253,7 +253,7 @@ projects show:**
   Read `Text2SpeechEn.py` directly: it calls Google Cloud TTS, decodes the
   MP3 response, and plays it with `pydub`'s `play(sound)` — straight to
   whatever computer is running the script's own sound device. Same
-  architecture as our `MacTTS`/`--tts mac` test, not routed through Bittle
+  architecture as the `MacTTS`/`--tts mac` test, not routed through Bittle
   at all; the "robot talking" in the demo videos is audio from a nearby
   laptop.
 - [FinoBot](https://www.petoi.com/blogs/blog/finobot-ai-robot-dog-bittle-x-follows-someone)

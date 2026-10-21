@@ -228,7 +228,7 @@ footfall (contact-model stiffness/damping only approximates this).
   fixed sequence on the real carpet — matched commands, so it's a clean A/B.
   `sysid_collect.py` currently only logs *commanded* joint angles; extend it to
   also log the servo **position feedback readback** (`readAllFeedbackFast()` —
-  confirmed to exist on our alloy servos, slow but fine for offline sysid, see
+  confirmed to exist on the alloy servos, slow but fine for offline sysid, see
   `docs/hardware/specs.md`) so tracking-error (commanded vs actual
   angle) is available, not just IMU tilt/rate. No torque/current feedback exists
   on these servos — resistance has to be inferred from tracking-error + IMU
@@ -325,9 +325,9 @@ generalises to real thresholds; the rubble swap (rounded shapes, `RUBBLE_PROB`
 
 Found reviewing community Bittle/Petoi projects (2026-09-24,
 [`../research/community-projects.md`](../research/community-projects.md)):
-our sim never measured a real servo response. A comparable project
+the sim never measured a real servo response. A comparable project
 (BittleJuice) measured its own Bittle X servos at τ = 33 ms, ceiling ≈
-137°/s. Measured against our own trained policy (`servo_saturation_check.py`,
+137°/s. Measured against the project's own trained policy (`servo_saturation_check.py`,
 against `base1_20m`): mean commanded joint speed 98.9°/s, p95 261.2°/s, max
 514.3°/s, and **26.33% of all joint-step commands exceed the assumed 137°/s
 ceiling**. `firmware_model.py` models the firmware's own command-timing ramp

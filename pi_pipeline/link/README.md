@@ -27,7 +27,7 @@ python -m pi_pipeline.link.check_serial rest         # 'd' — lie down, relax s
 Configured by `G2_SERIAL_PORT` / `G2_SERIAL_BAUD` (`.env`). Likely `/dev/ttyS0`
 on the Pi Zero 2 W.
 
-## Command reference (what we use)
+## Command reference (what is used)
 
 Confirmed against `PetoiCamp/OpenCatEsp32` `OpenCat.h` `T_*` macros (2026-09-07 —
 `docs/hardware/petoi-firmware-reference.md`) + project Phase 4 notes:

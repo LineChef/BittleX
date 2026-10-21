@@ -19,7 +19,7 @@ Package overview: [`../../pi_pipeline/power/README.md`](../../pi_pipeline/power/
 
 Bittle X's BiBoard can power a mounted Raspberry Pi through the same 2×5 GPIO
 socket used for serial communication — Petoi's own FAQ confirms this is the
-stock, default way to run a Pi on Bittle: *"All of our robots run on
+stock, default way to run a Pi on Bittle: *"All of the robots run on
 NyBoard/BiBoard which can power the Pi and communicate with the Pi through the
 serial port in the 2x5 socket."*
 

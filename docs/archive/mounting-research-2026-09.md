@@ -64,7 +64,7 @@ corner clip is needed (no separate notch screw — see
 2026-09-16 that hardware in this exact spec is real and purchasable — not
 just assumed to exist:
 
-| Option | What it is | Covers our range? |
+| Option | What it is | Covers the range? |
 |---|---|---|
 | [800pc M2 Pan Head Self-Tapping Assortment (Amazon, `B0GV338JJK`)](https://www.amazon.com/800pcs-Self-Tapping-Head-Screws-Assortment/dp/B0GV338JJK) | 100 pcs each of M2×4/5/6/8/10/12/16/20, carbon steel, nickel-plated | **Best pick** — every length from 4–20mm in one kit, no guessing needed before test-fit |
 | [1200pc M2 Phillips Pan Head Self-Tapping Kit (Amazon, `B0146E9ZAQ`)](https://www.amazon.com/1200pcs-Phillips-Head-Tapping-Screws/dp/B0146E9ZAQ) | Larger mixed-length box kit, same head/drive/thread type | Alternative to the above if it's unavailable or a bigger box is wanted |
@@ -153,7 +153,7 @@ reachable, or accept leaving PiSugar always powered on as a fallback.
 **Interim solution in place, 2026-09-29 — not the final mount, sidesteps the
 depth problem rather than solving it.** The frame has arrived; parts sourced:
 PiSugar's own official case set ([`JdaieLin/PiSugar`](https://github.com/JdaieLin/PiSugar)
-model repo) — `pisugar_case_shell_xl` (the 1200 mAh variant, matching our
+model repo) — `pisugar_case_shell_xl` (the 1200 mAh variant, matching the
 PiSugar S), `pisugar_case_common_cap`, `pisugar_case_pin_cap` — plus the
 stock `Bittle_Cover_with_hole_for_Pi.stl`, modified to expose the PiSugar's
 button/switch and widen the SD card port. Measured (binary STL bbox parse):
@@ -244,7 +244,7 @@ Researched against the real board photos already in this doc, not just
 reasoned abstractly:
 - **Pi Zero 2 W** (the vendor's picture (pizero-overview, not included)/the vendor's picture (pizero-detail, not included) above): the
   40-pin GPIO header runs along one **long edge**, spanning nearly the full
-  65mm width — pins 6/8/10 (the ones we wire) sit at that header's left
+  65mm width — pins 6/8/10 (the ones wired) sit at that header's left
   end, next to the microSD slot. The **opposite long edge** is fully
   occupied by mini-HDMI + 2 micro-USB ports. That leaves only the **two
   short edges** (microSD side, and the CSI camera-connector side — unused

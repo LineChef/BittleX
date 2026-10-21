@@ -1,6 +1,6 @@
 # Self-righting after a fall
 
-**Status:** G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for our hardware.
+**Status:** G2 can flip himself back over from fully on his back. This was confirmed on G2 on 2026-09-28, untethered and on his own battery, using the firmware's recovery keyframes. The earlier belief that Bittle cannot do this came from a simulation result and from another project's unit, and it was wrong for the hardware.
 
 ## How it works (firmware)
 
@@ -55,10 +55,10 @@ Findings: the firmware `rl` and `dropRec` command the head to pan 15 to 20 deg a
 - **Early research (2026-09-01):** the stock self-right was believed to be narrow: disabled for fast gaits, and one community project reported it does not self-right from a supine fall.
 - **Simulation (Run 6):** an RL policy that drives only the 8 walking joints did not learn to right the robot from a full tip-over (0% recovered). That is a simulation result: episodes ended at about 74° of tilt, below the firmware's 85° flip line, so the policy never saw the flipped state, and the scripted keyframes were not available as an action.
 - **Correction (2026-09-07):** a real Bittle X was observed flipping itself back over from its back, so the earlier framing was a simulation gap, not a physical limit.
-- **Confirmation on G2 (2026-09-28):** done on our own unit, as above.
+- **Confirmation on G2 (2026-09-28):** done on the project's own unit, as above.
 - **Literature (2026-09-01):** most learned fall-recovery work is on robots with hip abduction (a roll joint), which Bittle lacks, so the self-righting half does not transfer. What does transfer is treating recovery as a separate skill with a switch, trained against harsh disturbances.
 
 ## Sources
 - Petoi Bittle product page and Doc Center (remote controller, balance and recovery behavior, the BiBoard V1 remote incompatibility).
 - `PetoiCamp/OpenCat` and `PetoiCamp/OpenCatEsp32` firmware source.
-- `MarcHesse/mhflocke` (a community project that reported no supine self-right; contradicted by our unit).
+- `MarcHesse/mhflocke` (a community project that reported no supine self-right; contradicted by the unit).

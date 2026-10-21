@@ -39,7 +39,7 @@
 >    treated as settled — it is NOT payload-bug-tainted (the script loads the
 >    bare URDF directly, no `OpenCatGymEnv`/payload involved), but it carries
 >    its own documented approximations (open-loop, no IMU-triggered waits, no
->    gyro-balance layer, decoded keyframes). For all we know the real get-up
+>    gyro-balance layer, decoded keyframes). For all that is known, the real get-up
 >    commands do work; don't treat the old sim result as final.
 >    **2026-09-24 addition:** `models/bittle_esp32.urdf`'s joint limits are
 >    ±90° (±1.57 rad) across every joint — confirmed by inspection. A related
@@ -47,7 +47,7 @@
 >    researching community Bittle projects) widened its own limits to ±149°
 >    (shoulders) / −70°..+149° (knees) specifically because "OpenCat's own
 >    fall-recovery skill commands angles far outside the walking range." If
->    our URDF's ±90° is genuinely too narrow for `rc`'s real keyframes, the
+>    the URDF's ±90° is genuinely too narrow for `rc`'s real keyframes, the
 >    sim would be physically unable to represent the recovery motion at all —
 >    a concrete, checkable reason the "0/2 recovered" result could be a
 >    URDF-limit artifact rather than a real recovery failure. Check this

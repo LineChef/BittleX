@@ -37,7 +37,7 @@
       zero-point offset too; **`kwkF`** (the gait the trained policy is
       actually layered on) — back-right leg looked normal, no stumble.
       **Conclusion: isolated to `vtF` specifically, does not affect `wkF`.**
-      Deprioritized — `vtF` isn't used anywhere in our deployment path, so
+      Deprioritized — `vtF` isn't used anywhere in the deployment path, so
       this is parked as an unexplained quirk of that one stock gait rather
       than something to keep chasing; revisit only if it turns out to
       correlate with something that does matter (e.g. shows up again once

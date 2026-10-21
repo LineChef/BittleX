@@ -65,7 +65,7 @@ rerun, write a one-line update. Hard-won rules:
 - **Kill the do-nothing optimum.** "Stand still and stay safe" will win if it
   can. Add an anti-stall penalty / require forward progress / end the episode on
   a long stall.
-- **Intermediate rewards get hacked.** Examples we hit: a "front feet on the
+- **Intermediate rewards get hacked.** Examples encountered: a "front feet on the
   ledge" bonus → policy parks there; an asymmetric-clipped "height-gain" term →
   policy oscillates the feet to farm it. Prefer **potential-based shaping**:
   `R += SCALE · (Φ(s′) − Φ(s))` where `Φ` is negative distance-to-goal. It

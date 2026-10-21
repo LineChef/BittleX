@@ -1,7 +1,7 @@
 # Servo troubleshooting data, 2026-10-02
 
 After the user re-calibrated the limbs. Interpretation and the open list: see "Servo troubleshooting --
-where we left off" in [`../../real-walk-log.md`](../../real-walk-log.md).
+state at the end of the session" in [`../../real-walk-log.md`](../../real-walk-log.md).
 
 Servo position feedback (`f`) works only over the BiBoard's **USB** cable to the Mac (the Pi's UART returns just an
 echo). Servos 8..15 = FL, FR, BR, BL shoulders, then FL, FR, BR, BL knees (confirmed by eye: servos 8, 9, 10, 11 move

@@ -69,9 +69,9 @@ The direct servo readings on the new servo (USB to the Mac) are next; then the r
 1. **User, Phase 0 hardware (about 2-2.5 h; commands in §4 Phase 0):** roll/pitch sign check, `servo_static_test.py` on the new servo, **`servo_step_test.py`**
    (shoulder and knee), six V2.1 baseline walks with distance taped, six scripted `wkF` walks, `kwkL` / `kwkR` turn rates. Then record the results in
    `real-walk-log.md` and copy the raw logs into `real-walk-data/2026-10-0X/`.
-2. **Me, Phase 1 (about 4 h after the data):** calibrate the sim (servo speed first, then foot contact, motor strength vs voltage), decide the turning
+2. **Claude, Phase 1 (about 4 h after the data):** calibrate the sim (servo speed first, then foot contact, motor strength vs voltage), decide the turning
    gate and the roll-match flag, write the calibrated values into `g2_profile.CALIBRATION`, re-score V2.1 (`phase_v3.py` does it: `ref`).
-3. **Me, start the screening runner:** `cd rl_training/opencat-gym && ../../.venv/bin/python phase_v3.py init && nohup ../../.venv/bin/python phase_v3.py run &`
+3. **Claude, start the screening runner:** `cd rl_training/opencat-gym && ../../.venv/bin/python phase_v3.py init && nohup ../../.venv/bin/python phase_v3.py run &`
    (create `trained/v3_turning_gate_pass` / `trained/v3_roll_matched` first if Phase 1 earned them), and arm a watcher on `trained/phase_v3.log`.
 4. Hardware check-in (the runner pauses: `touch trained/v3_go_hardware_checkin` continues it), then the 20M, then Phase 7.
 
@@ -250,13 +250,13 @@ the phase slow-down and imitation fade (PPO diverged); a stride reward (gamed).
 2. Parallel benchmark scoring (§3).
 3. Run the full combination K3 first; run K1/K2 only if K3 fails, to find which group caused it.
 4. Reuse K3 as stage s0 (it's a fresh 3M run on the same flat starting course V2's s0 used), so one stage disappears from the chain.
-5. Overlap work: I code Phase 2 while the user does Phase 0 hardware; Phase 1 starts on the 10-06 walk data and waits only for the servo
+5. Overlap work: Claude codes Phase 2 while the user does Phase 0 hardware; Phase 1 starts on the 10-06 walk data and waits only for the servo
    speed and turn-rate numbers.
 
 Not adopted: early-stopping collapsed screens at 2M (optimization 6, left out by the user); bigger PPO batches or fewer epochs, shorter
 screens, fewer scoring episodes (all change quality).
 
-### Phase 0: real measurements (user on G2, about 2 h total; me: code)
+### Phase 0: real measurements (user on G2, about 2 h total; Claude: code)
 1. Yaw-sign fix + tests (**code done**, `c292431`; rsync to the Pi pending); roll/pitch sign check: hand-tilt G2 (nose down, then right side down, G2 upright, never on its
    back) under `python -m pi_pipeline.gait.run_gait --probe-imu`, compare with PyBullet's conventions (roll + = right side down about +x;
    check in PyBullet first).
@@ -268,7 +268,7 @@ screens, fewer scoring episodes (all change quality).
    Mac USB cable, G2 held upright in the air, charged pack; phone slow-motion video as a cross-check. Built 2026-10-06 (`pi_pipeline/gait/servo_step.py` fits it).
 5. Servo 8 replacement (user, in parallel, not blocking training); then repeat the six V2.1 walks.
 
-### Phase 1: calibrate the sim (me, ~half a day, no training)
+### Phase 1: calibrate the sim (Claude, ~half a day, no training)
 - Change one parameter at a time: payload `case` → servo speed (step 4) → foot friction/contact → motor strength vs pack voltage.
 - Score V2.1 and scripted `wkF` against the Phase 0 walks with the real-match probe (12.5 s, `drift_probe.py` style).
 - Targets: roll std, pitch std and speed within ~20%; scripted `wkF` curving the same way as on G2; **V2.1 turning right**, which would confirm
@@ -277,7 +277,7 @@ screens, fewer scoring episodes (all change quality).
   drop them: turns stay firmware tokens, and straightness rests on R1 plus heading feedback.
 - Output: `g2_profile.py`. **If the sim can't be matched: stop and report before any training.**
 
-### Phase 2: code (me, ~1 day, overlaps Phase 0)
+### Phase 2: code (Claude, ~1 day, overlaps Phase 0)
 - `g2_profile.py`; the base-recipe values (§2.2); benchmark v4 + parallel scoring (§3).
 - Levers, each behind a flag that is inert when off: Y2, Y3, Y5, R1 (PPO subclass + mirror maps + tests), R2, R3, R4, R5, R6.
 - A round runner like `phase_v22.py` (queue file, scoring vs C0, pass bars below, watcher-friendly log lines).
@@ -348,13 +348,13 @@ workers (the 60 s endurance cell is the long pole); 2 workers while a training i
 | Step | Duration | Case A: Phase 0 data in by ~4:45 PM today | Case B: Phase 0 tomorrow, done by ~11 AM Wed |
 |---|---|---|---|
 | Phase 0 hardware (user) | ~2-2.5 h | Tue 2:30 - 4:45 PM | Wed 8:30 - 11:00 AM |
-| Phase 1 sim calibration (me; sweeps run in the background) | ~4 h | Tue 4:45 - 9:00 PM | Wed 11:00 AM - 3:00 PM |
+| Phase 1 sim calibration (Claude; sweeps run in the background) | ~4 h | Tue 4:45 - 9:00 PM | Wed 11:00 AM - 3:00 PM |
 | V2.1 reference + C0 control | 65 min | Tue 9:00 - 10:05 PM | Wed 3:00 - 4:05 PM |
 | S1 mirror | 70 min | to 11:15 PM | to 5:15 PM |
 | S2, S3, S4, S6, S7, S8, S9, S10 (S5 turn only if its gate passes: +1 h) | 8 x 60 min | to Wed 7:15 AM | to Thu 1:15 AM |
 | K3 (all passing levers; also stage s0) | 70 min | to 8:25 AM | to 2:25 AM |
 | Stages s1-s4 (+ s5 turn range if kept) + s6 full strength | 5-6 x 70 min | to Wed ~2:15 PM (3:25 PM with turn) | to Thu ~8:15 AM (9:25 AM) |
-| Hardware check-in (runner pauses; user ~1 h, me ~20 min) | ~1.3 h | Wed ~2:30 - 4:00 PM | Thu ~9:30 - 11:00 AM |
+| Hardware check-in (runner pauses; user ~1 h, Claude ~20 min) | ~1.3 h | Wed ~2:30 - 4:00 PM | Thu ~9:30 - 11:00 AM |
 | 20M consolidation (gait checks at 3M, 5M, 10M) | ~7.5 h | Wed 4:00 - 11:30 PM | Thu 11:00 AM - 6:30 PM |
 | Final scoring (both ladders), `validate_deploy`, export | ~30 min | Wed ~midnight | Thu ~7:00 PM |
 | Deploy + six real walks (user) | ~1.5 h | Thu 9:00 - 10:30 AM | Fri 9:00 - 10:30 AM |

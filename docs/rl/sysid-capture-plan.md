@@ -16,7 +16,7 @@ Since 2026-10-18 a walk with the everyday trim counts as his normal gait in the 
 | 1 | Pack voltage at rest | `check_serial send P` (g2-voice stopped) | write it down at the start and the end |
 | 2 | 6 V7 walks, extra columns | `bash tools/g2_baseline.sh start 6 sysidA_v7` | `--log-extra` is on by default; fetch with `g2_baseline.sh fetch` |
 | 3 | 6 scripted `wkF` walks (no policy) | `bash tools/g2_baseline.sh start 6 sysidA_wkF --scripted-mix abab` runs V7 and `wkF` alternately; use it for 12 runs | the scripted walk is the open-loop reference |
-| 4 | Ground truth after every run, by tape | forward distance and sideways offset at the end (cm, + = right) | tell me the numbers in chat; no video |
+| 4 | Ground truth after every run, by tape | forward distance and sideways offset at the end (cm, + = right) | report the numbers in chat; no video |
 | 5 | Bench servo tests (Pi off the lid, Mac USB) | `tools/servo_static_test.py`, then the H13 step test | unloaded in the air, then loaded standing; repeat with the pack at about 7.9 V |
 | 6 | Low-pack walks | the same 6 V7 walks when the resting pack reads about 7.9 V | gives speed and servo strength against voltage (the `volt` column) |
 

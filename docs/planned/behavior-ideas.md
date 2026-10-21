@@ -32,7 +32,7 @@ turn-in-place, sidestep, slow "sneak", backward. The turn and sidestep gaits
 directly improve later autonomy modes (person-following, obstacle steering,
 go-to-object).
 
-**Update:** for **turning specifically**, if we ever train it, the better path
+**Update:** for **turning specifically**, if it is ever trained, the better path
 is a single **command-conditioned policy** (yaw-rate + speed command in the
 observation, reward tracks the command) rather than a separate turn gait. But
 it's **not scheduled** — OpenCat firmware turn gaits (`wkL` etc.) work today and
@@ -295,7 +295,7 @@ Two tiers:
 
 **Hardware is marginal for a useful jump.** P1S alloy servos peak ~0.29 N·m but
 lose most of it at speed (coreless) — jumping needs *power*, not just torque. A
-3–4 cm pop of the ~380 g loaded body is near the ceiling; our ~70 g payload
+3–4 cm pop of the ~380 g loaded body is near the ceiling; the ~70 g payload
 (~20 % of body mass) eats directly into it. A leap that reliably clears a
 4–5 cm block is a stretch goal, not a plan.
 

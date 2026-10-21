@@ -8,7 +8,7 @@ roadmap and decisions, [`project-plan.md`](../project-plan.md).
 calibrated, base stock-firmware functions tested (all normal, including
 `wkF`, the gait the trained policy is layered on — one stock gait, `vtF`
 ("step"), stumbles toward the back-right leg but isolates cleanly to that
-gait alone and isn't part of our deployment path, so it's parked), and the
+gait alone and isn't part of the deployment path, so it's parked), and the
 Pi deployed onto it over serial. **2026-09-29:** a firmware bug (enabling
 the onboard camera module permanently kills IMU streaming) required a full
 erase + reflash to current official firmware — this also resolved a real
@@ -60,7 +60,7 @@ ahead of this point.
 - **On-device vision** — a custom 3-class detection model (household member +
   `dog` + `cat`, YOLOv8n) runs on the Grove Vision AI V2 camera. The reproducible
   build path (the camera firmware is frozen at Jan 2025, which broke every modern
-  export toolchain until we pinned `ultralytics==8.2.8` + a local arm64 export)
+  export toolchain until `ultralytics==8.2.8` was pinned and a local arm64 export used)
   is in [`docs/vision/custom-model-recipe.md`](../vision/custom-model-recipe.md),
   with tooling in `tools/gv2/`.
 - **Pre-hardware prep** — a headless Pi Zero 2 W bring-up runbook, an idempotent

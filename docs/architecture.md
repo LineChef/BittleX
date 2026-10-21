@@ -6,7 +6,7 @@ How the pieces of G2 fit together: the hardware, the software that runs on each 
 
 | Where | What runs | Code |
 |---|---|---|
-| **Robot** (Petoi BiBoard, ESP32) | Petoi's OpenCat firmware: servo control, built-in skills (`kwkF`, `ksit`, `d` …), the IMU stream, its own voice module and buzzer | not ours; reference: [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
+| **Robot** (Petoi BiBoard, ESP32) | Petoi's OpenCat firmware: servo control, built-in skills (`kwkF`, `ksit`, `d` …), the IMU stream, its own voice module and buzzer | not part of this project; reference: [`hardware/petoi-firmware-reference.md`](hardware/petoi-firmware-reference.md) |
 | **Pi** (Zero 2 W, on G2's back) | Everything G2 decides: voice, memory, vision, behavior, the 80 Hz gait loop. Deployed with `rsync` | `pi_pipeline/` |
 | **Dev machine** (Mac) | Simulation training of the walking policy, ingest and calibration of real-robot logs, tools | `rl_training/`, `tools/` |
 

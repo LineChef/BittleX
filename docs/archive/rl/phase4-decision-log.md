@@ -127,7 +127,7 @@ Launched: 11:22 AM Eastern 2026-09-03, PPO_85. Commit 3cfa12e.
 
 **KILLED at 65K steps -- and the reason retroactively invalidates 4a + 4b as
 controlled experiments.** 4c's approx_kl was 76 -> 145 -> 226 in the first
-iterations, same divergence as 4b. So I checked 4a's log: **4a's KL was also
+iterations, same divergence as 4b. So 4a's log was checked: **4a's KL was also
 70-380 the whole run.** run20m (healthy from-scratch): kl ~0.01.
 
 Root cause is the finetune tooling, not any reward idea: `train.py` `--from`

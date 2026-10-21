@@ -1,7 +1,7 @@
 # What G2 can do
 
-A running inventory of everything we have taught **G2** (a Petoi Bittle X
-quadruped with a Raspberry Pi companion in the add-on pod and the Petoi AI Head on the neck) to do. Last brought up to date 2026-10-21.
+A running inventory of everything **G2** (a Petoi Bittle X
+quadruped with a Raspberry Pi companion in the add-on pod and the Petoi AI Head on the neck) can do. Last brought up to date 2026-10-21.
 
 For *how* the pieces work, see [`how-it-works.md`](how-it-works.md). For the
 roadmap and decision log, see [`project-plan.md`](project-plan.md). This file is

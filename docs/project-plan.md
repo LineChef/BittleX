@@ -134,7 +134,7 @@ and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log
       course (slopes in under 10% of episodes, dealt evenly both ways, no background tilt, two hazards at most, gentler shoves, 7.5 s hazard-free baseline), screens a crossing
       bonus, hazard-aware reward relaxations and a heading-blind policy (no steering in the policy; the Pi steers), then runs a fresh 20M judged against the scripted walk.
       Plan, rules and decisions: [`plan-detail/v5-training-plan.md`](plan-detail/v5-training-plan.md).
-- [ ] **High-step gait for ground clearance (opened 2026-10-10; the high-step creep attempt of 2026-10-12/13 did not clear steps better than V6, see [`archive/plan-detail/high-step-creep-training-plan.md`](archive/plan-detail/high-step-creep-training-plan.md); still wanted; the path forward for clearance now that gait switching works):** the scripted high steps are a knee-folded crouch (`hsF`, 17.8 mm) or fell in the sim (`hsB`/`hsC`), and `carpetF` was rejected on G2. Plan: a better base (sim sweep of the generator, and/or a hand-taught step via Petoi's Skill Composer or our own recording, B3 / B25), a sim check, then a fresh screening run of the two-mode policy (Track C) on it, then G2 on the floor. Detail: [`plan-detail/high-step-gait-plan.md`](archive/plan-detail/high-step-gait-plan.md).
+- [ ] **High-step gait for ground clearance (opened 2026-10-10; the high-step creep attempt of 2026-10-12/13 did not clear steps better than V6, see [`archive/plan-detail/high-step-creep-training-plan.md`](archive/plan-detail/high-step-creep-training-plan.md); still wanted; the path forward for clearance now that gait switching works):** the scripted high steps are a knee-folded crouch (`hsF`, 17.8 mm) or fell in the sim (`hsB`/`hsC`), and `carpetF` was rejected on G2. Plan: a better base (sim sweep of the generator, and/or a hand-taught step via Petoi's Skill Composer or the project's own recording, B3 / B25), a sim check, then a fresh screening run of the two-mode policy (Track C) on it, then G2 on the floor. Detail: [`plan-detail/high-step-gait-plan.md`](archive/plan-detail/high-step-gait-plan.md).
 - [ ] **Climbing movement, taught by hand with the same method (user, 2026-10-10; after the hi-step gait is built and walked on G2):** the hi-step is the trial of the hand-guided method (B25: the user shows G2's legs a movement, the poses are recorded, a gait is built from them and checked in the sim before G2 tries it on the floor). Once that works, the same method builds a movement for climbing obstacles (B13 / B9: front feet reach up onto the obstacle, the body hauls up, the rear legs push it over), in place of keyframes written by Claude, which the user ruled out. Plan and steps: [`plan-detail/high-step-gait-plan.md`](archive/plan-detail/high-step-gait-plan.md) "After the hi-step: a climbing movement".
 - [ ] **Real-to-sim calibration from G2's own walks (approved 2026-10-08):** `rl_training/opencat-gym/real2sim.py` replays logged joint commands open-loop through the training
       env and compares roll / pitch spread and sway frequency with G2's IMU (heading excluded: real data is never a drift source); `--fit` ranks servo speed limit x motor
@@ -171,7 +171,7 @@ shut-down commands. Detail: [`plan-detail/phase7-voice.md`](plan-detail/phase7-v
 - [ ] Free LLM instead of paying per turn (decided 2026-10-03: the provider will be the Petoi head's service, XiaoZhi). The swappable-LLM code is built
       ([`guides/swappable-llm.md`](guides/swappable-llm.md)): `fast` and `routed` modes, with Claude as the fallback. To do when the head arrives: create the
       account at xiaozhi.me (phone-number registration; the privacy gate applies, use a throwaway number and no household names), then find out whether it offers
-      anything our code can call. Today it is reached through the head's audio pipeline, with no documented developer API, so the likely route is the self-hosted
+      anything the code can call. Today it is reached through the head's audio pipeline, with no documented developer API, so the likely route is the self-hosted
       backend in [`research/xiaozhi-esp32-review.md`](research/xiaozhi-esp32-review.md). Then measure its quality on G2's tools and personality.
 - [ ] `SerialActuator` end-to-end for voice skills (the link is confirmed); confirm it runs independently of the 35+ built-in voice commands.
 - [ ] A buzzer-pattern or posture implementation of the state cue; connect to Claude live and measure latency.
@@ -201,7 +201,7 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 - [x] **Back up the memory DB off the robot** — manual `g2membackup` built 2026-10-04 (periodic scheduling still open). It is one SQLite file on the Pi's SD card
       (`~/.local/share/g2/g2_memory.db`, `G2_MEMORY_DB`); a bad card loses everything. Idea: a periodic copy to the dev machine with SQLite's
       online backup (not a plain `cp`), kept outside the repo, with a restore step. If the AI Head replaces the Pi, memory would live in its backend or
-      on our own server instead.
+      on the project's own server instead.
 
 ## Decision pending — Petoi AI Head vs the Raspberry Pi (opened 2026-10-02)
 
@@ -212,8 +212,8 @@ UART shared with the Pi by default). **Undecided; keeping the Pi is a fully vali
 
 **The owner's goal for the head (2026-10-10): offload as much work as possible from Claude to the head, so there are as few API calls as possible.** Also judged on: (1) is the scripted gait about as good as the learned gait (the owner would prefer to keep the RL policy); (2) can G2 still do most of the
 behaviors that make it feel alive; (3) the trade-off — a streamlined ~42 g module vs the Pi build's wiring, weight and exposed hardware, against what
-would be lost (custom control and safety layers, our Claude/memory path, local voice, the SSH/Python dev loop, privacy, vendor dependence).
-Outcomes: A keep the Pi · B Pi + head · C head only with scripted gaits · D head only with our logic elsewhere. **Do not remove the Pi before the
+would be lost (custom control and safety layers, the Claude/memory path, local voice, the SSH/Python dev loop, privacy, vendor dependence).
+Outcomes: A keep the Pi · B Pi + head · C head only with scripted gaits · D head only with the logic elsewhere. **Do not remove the Pi before the
 scorecard is filled.** Privacy gate before powering the head (throwaway account, no household faces or names).
 
 ## Phase 10 — Full integration 🧩

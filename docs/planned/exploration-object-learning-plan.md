@@ -16,7 +16,7 @@ so it can learn things the camera model was never trained on.
 | Explain how naming would work | Phase 5, and the user test script below |
 | A routine to process the exploration pictures, like the capture sessions, so training data is good | Phase 2: `tools/curate_exploration.py` (reuses the capture tools' quality gates) |
 | When G2 sees an object he has not seen and that has no name, he asks "what am I looking at?" | Phase 5: the ask |
-| When he recognizes an object, he says what he sees, so we can tell it is working as he learns | Phase 5: the announce, plus a log of every recognition |
+| When he recognizes an object, he says what he sees, so it can be told that it is working as he learns | Phase 5: the announce, plus a log of every recognition |
 | Start recognizing objects outside the AI camera model's training | The whole plan: the gallery recognizes by similarity, not by trained class |
 | A comprehensive plan that includes all of this feedback | This page |
 | "Loop me in when you are in a good spot to talk about it" | Checkpoints below: the first is after Phase 1 is built and tested, before it goes on G2 |
@@ -142,7 +142,7 @@ Storage cap and tidy for the picture folders, battery and heat while the camera 
 1. Floor, clear space of about 2 m, no desk edge (there is no edge detector). `bash tools/g2_explore.sh start`, then `arm` (or say "go ahead and look around").
 2. Watch for: he walks a leg, stops, stands, bows (looks down), a short pause (picture), sits up (looks up), a pause (picture), stands, walks on.
 3. Put a mug on the floor in front of him and say the wake word, then "this is a mug". Expect: he stops, bows, says "Okay, I will remember the mug", walks on.
-4. After about ten minutes: `bash tools/g2_explore.sh stop`, tell me, and I look at the pictures myself first.
+4. After about ten minutes: `bash tools/g2_explore.sh stop`, report back, and Claude looks at the pictures first.
 
 ## Retention and garbage collection (decided 2026-10-07)
 
@@ -180,7 +180,7 @@ Rule from you: **no picture is deleted unless it is a duplicate, and he does not
 ## Status after the first on-G2 sessions (2026-10-07)
 
 Phase 1 ran on G2 in the kitchen: survey stops (bow, look up, stand, settle, picture) work; after the camera fix (240 x 240, complete pictures) 15 survey pictures were curated by `tools/curate_exploration.py` (all kept: floor-level kitchen views, mean brightness 125, no duplicates, none cut off), the sheet is in `training_data/exploration/20261007_kitchen1/contact/`.
-**No named pictures yet** (0 objects): naming now works in plain voice mode and inside a session, with feedback. For Phase 3 (the embedding model comparison) we need several named objects with 5 or more pictures each, plus a few more survey sessions; the 15 survey pictures are enough to exercise the curation pipeline end to end and to start tuning its thresholds, not to choose a model.
+**No named pictures yet** (0 objects): naming now works in plain voice mode and inside a session, with feedback. For Phase 3 (the embedding model comparison) several named objects with 5 or more pictures each are needed, plus a few more survey sessions; the 15 survey pictures are enough to exercise the curation pipeline end to end and to start tuning its thresholds, not to choose a model.
 Camera lessons: the module's picture buffer cuts 480 x 480 pictures short (use 240 x 240 for pictures), and its detector reads bare floor as a cat or dog (filtered; see `vision/detection_filter.py`).
 
 ## Why the library matters (user, 2026-10-07)

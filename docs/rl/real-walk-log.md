@@ -26,7 +26,7 @@ What the dated sections below add up to. Each point links to the evidence; the d
 - **Battery:** the pack sags 0.3 to 0.45 V while walking; a left-drift-with-low-voltage theory was tested and not supported.
 - **Never measured:** the low-pack repeat, bench servo tests, `real2sim.py --fit` with confidence (the fitted values are not separable on current data), and any gait comparison on G2 (sim only, by the user's rule).
 
-## Where we left off (as of 2026-10-01; superseded by the conclusions above)
+## State at the end of the session (as of 2026-10-01; superseded by the conclusions above)
 
 > **2026-10-06:** the gait's next steps are in [`v3-retrain-plan.md`](../archive/rl/v3-retrain-plan.md) (start at §0), which supersedes the open questions
 > below for walking. The drift is explained as far as the data allows in "Why V2.1 drifts right" further down. Carpet questions (3-4 below)
@@ -45,7 +45,7 @@ What the dated sections below add up to. Each point links to the evidence; the d
   (the Pi link worked straight away).
 - Walk loop has a fall guard (`--fall-abort-deg`, default 60 deg for 0.3 s -> rest).
 
-**Open questions, in the order I would take them**
+**Open questions, in suggested order**
 1. *Which gait changes survive on the hard floor at all?* The lift/stride variants below were
    only ever run on carpet, and the lightest one **also falls on hard floor** (3.3 s), so the
    scaled `wkF` variants are themselves unstable open-loop; the carpet is not the only cause.
@@ -65,7 +65,7 @@ What the dated sections below add up to. Each point links to the evidence; the d
 **Uncommitted at the pause:** everything described here (code, tests, docs) is local. Nothing has
 been pushed since the camera/IMU-link work (`development` at `6a2e7e7`).
 
-## Servo troubleshooting -- where we left off (2026-10-02)
+## Servo troubleshooting -- state at the end of the session (2026-10-02)
 
 Raw data and printed tables: [`real-walk-data/2026-10-02/`](real-walk-data/2026-10-02/README.md). Detail below
 under "Servo feedback tests".
@@ -299,7 +299,7 @@ G2 put back at the start spot each run. Pack under load 7.8-8.1 V (not a full ch
 | After, series B (ABBA: the yaw sign alternated, order sealed from the user) | NEW sign: +80, +64, +29, -5 / OLD sign: +15, +46, +37, +49 | NEW +42, OLD +37 | |
 
 - **The drift fell from about +142 to about +35-40 deg per 12.7 s after the servo swap and recalibration.**
-- **The yaw-sign fix is not what cured it:** with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (My first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
+- **The yaw-sign fix is not what cured it:** with the pre-fix sign (OLD, `G2_POLICY_YAW_SIGN=+1`) the mean is +37 vs +42 with the corrected sign; within-group spread is about +-27 deg, so a 5 deg gap is noise. (The first reading, that the fix and the swap could not be told apart, was right to be cautious; the interleaved test separates them.)
 - **Run-to-run spread is large** (-5 to +80 deg) with no steady trend in series B (series A drifted upward, +18 to +77, which did not repeat). The user's eye and the IMU agree: runs called "super straight" were +29 and -5; runs called "curved" were +37 and more. Roll std 4.9-5.4 deg and pitch std 2.3-2.7 are unchanged from before the swap.
 - Distances (user, series A): 4 ft 11 in, 4 ft 10 in, 4 ft 12 in for the first three (the rest curved and were not measured).
 - Series A early runs looked like the policy visibly steering back on course; the ABBA test shows that is not a sign effect.
@@ -607,7 +607,7 @@ Several exploration sessions in the kitchen (tile floor), hardware epoch `hw-202
 - **False animals:** the camera model has no score cutoff and read bare tile as a cat or dog. A filter now drops animal detections that are low score, cover most of the frame, are flat wide strips, or are not seen in 3 frames in a row. Over the later part of the session it dropped 368 of 383 animal detections (232 for covering most of the frame, about 108 for score); 15 were kept and may include more false ones.
 - **Naming:** no named pictures were saved: naming did not exist in plain voice mode, and inside the stationary session the recognizer returned nothing after the wake word. Both fixed afterwards (naming works in plain voice mode; the session logs and says what it heard).
 - **Snags:** not labelled by hand (frequent on tile); to be counted statistically from IMU and correction signatures per metre walked, tile versus hardwood.
-- **Voice outage:** a stretch of unresponsive voice was caused by my own repeated service restarts and a deploy, not by the microphone (a speaker tone was heard clearly by the mic). `g2reset` and a voice command now restart the voice loop, and G2 says "I am online." when it is back.
+- **Voice outage:** a stretch of unresponsive voice was caused by repeated service restarts and a deploy, not by the microphone (a speaker tone was heard clearly by the mic). `g2reset` and a voice command now restart the voice loop, and G2 says "I am online." when it is back.
 
 
 ## Which foot steers G2, and the front-left heading hold (2026-10-07 evening, about 5:45 to 6:50 PM)

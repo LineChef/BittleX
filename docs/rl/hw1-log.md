@@ -384,7 +384,7 @@ be 10M).
 **Measurement methodology corrected: single checkpoint at the end of the 3M
 run, no averaging.** Was a 5-checkpoint average (2.2M-3.0M) for the gate, 3
 for the early check. Dropped per user instruction after finding a real case
-in our own data where averaging hid the signal: `b1_ledge`'s ledge cell had
+in the project's own data where averaging hid the signal: `b1_ledge`'s ledge cell had
 a clean improving trend 2.2M->2.8M (43.8%->25.0% fell) then jumped to 50%
 at 3.0M -- the average (35.8%) represented neither the trend nor the actual
 end state cleanly. `phase_b_orchestrator.py`/`run_pipeline.py` now both

@@ -50,7 +50,7 @@ default — if so, physically leave that pin's wire off. (`pi-power.md` "Open it
 ## 1. Flash the card (on the Mac, with Raspberry Pi Imager)
 
 1. Install **Raspberry Pi Imager** (`brew install --cask raspberry-pi-imager` or from raspberrypi.com).
-2. Choose OS → **Raspberry Pi OS Lite (64-bit)**. *Lite* = no desktop (we're headless). *64-bit* is non-negotiable for the ML packages. Stay on **Bookworm**, not the newer Trixie — Trixie has had headless-Wi-Fi regressions ([industrialmonitordirect](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)).
+2. Choose OS → **Raspberry Pi OS Lite (64-bit)**. *Lite* = no desktop (the Pi runs headless). *64-bit* is non-negotiable for the ML packages. Stay on **Bookworm**, not the newer Trixie — Trixie has had headless-Wi-Fi regressions ([industrialmonitordirect](https://industrialmonitordirect.com/blogs/knowledgebase/raspberry-pi-zero-2w-headless-wifi-fix-trixie-vs-bookworm)).
 3. Choose Storage → the 32 GB card.
 4. **Edit Settings (the gear / "OS customisation")** — this is the whole headless setup, do it now:
    - hostname: e.g. `g2pi`  → reachable as `g2pi.local` via mDNS
@@ -203,15 +203,15 @@ So:
 - **No `pisugar-power-manager` software** worth installing — it's built for the
   2/3, which expose battery % over I²C at `0x57`/`0x75`. On the S it has nothing
   to read.
-- **No battery-percentage or low-battery signal** for our code. If we want
-  "G2 is getting low" we need an external ADC on a Grove analog pin, or we just
-  time-box sessions. (Matches the plan's existing note.)
+- **No battery-percentage or low-battery signal** for the code. A "G2 is getting low"
+  warning needs an external ADC on a Grove analog pin; otherwise sessions are
+  simply time-boxed. (Matches the plan's existing note.)
 - Physical setup: charge it full over its own micro-USB; pogo-pins mate to the
   Pi's underside test pads; it just passes power through.
 - **The one config choice:** the S uses the I²C **SCL** GPIO as an auto-boot
   trigger, which clashes with using the Pi's I²C bus for anything else
   ([PiSugar/PiSugar#17](https://github.com/PiSugar/PiSugar/issues/17),
-  [#113](https://github.com/PiSugar/PiSugar/issues/113)). We don't use the Pi's
+  [#113](https://github.com/PiSugar/PiSugar/issues/113)). The project does not use the Pi's
   I²C for anything (BiBoard = UART, camera = on the BiBoard), so: leave the Pi's
   I²C **disabled** and the PiSugar's auto-boot / button features work fine.
   Only revisit if a future Grove I²C sensor hangs off the Pi directly.
@@ -228,7 +228,7 @@ tick) + serial — the Pi barely works; the deployment bench showed **no throttl
 73.6 °C peak** under a 2-min stress (`docs/guides/gait-deployment.md`). Off saves ~2 g of
 payload and avoids any back-cover / camera-mount clearance fight.
 
-**Install it if we ever see overheating** — i.e. `vcgencmd measure_temp`
+**Install it if overheating is ever seen** — i.e. `vcgencmd measure_temp`
 approaching ~80 °C in normal use, or `vcgencmd get_throttled` returning anything
 but `0x0` (bit 0 / 0x1 = under-voltage, bit 3 / 0x8 = currently throttled). Most
 likely trigger is Phase 8 (vision + STT/TTS co-resident on the Pi), not the gait

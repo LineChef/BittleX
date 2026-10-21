@@ -43,7 +43,7 @@ over ~5-6 unattended sessions) is manageable.
 
 Revisit the port only if, after the 20M run, the gait needs dozens more
 iterations, or a 100M-scale run is on the table, or commanded-locomotion +
-vision-conditioned gait becomes a multi-month effort. If we ever do port, this
+vision-conditioned gait becomes a multi-month effort. If a port is ever done, this
 PyBullet env stays as the **reference to match** (reproduce these benchmark
 numbers) -- which is what makes that rewrite tractable.
 

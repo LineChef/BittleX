@@ -2,7 +2,7 @@
 
 Written 2026-09-09 after a long session of dead ends. If you're picking this up,
 **read the "Core constraint" section first** — it explains why most tutorials
-fail on our device.
+fail on the device.
 
 Companion: `capture-progress.md` (data/capture tracker),
 `guides/train-vision-model.md` (the older SenseCraft-web single-class flow),
@@ -220,7 +220,7 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
   jpg, top-level, delete stale `calibration_image_sample_data_20x128x128x3_float32.npy`.
 - **SenseCraft web training is single-class only** — not an option for
   multi-class.
-- **Model size ceiling: ~2 MB** quantised (device flash slot). Our vela models
+- **Model size ceiling: ~2 MB** quantised (device flash slot). The vela models
   are ~1 MB, fine.
 - Firmware source: `github.com/Seeed-Studio/sscma-example-we2` (releases) /
   `SSCMA-Micro` submodule. No release since `20250102`; `main` has Dec-2025

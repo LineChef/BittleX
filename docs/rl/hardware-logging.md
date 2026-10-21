@@ -1,6 +1,6 @@
 # Hardware walk logging: what each log carries
 
-What `run_gait.py --log` writes, what the firmware can and cannot give us, and what is worth using as training evidence. Written 2026-10-07.
+What `run_gait.py --log` writes, what the firmware can and cannot provide, and what is worth using as training evidence. Written 2026-10-07.
 
 ## Columns
 

@@ -14,7 +14,7 @@ Status 2026-09-06: person-detection model deployed + validated end-to-end; the
 > obstacle/edge/person detector. There is **no sensor that "just sees" things in
 > G2's path** — a tiny
 > camera + NPU only reports the classes its loaded model was trained on. Every
-> vision-driven navigation behaviour we built assumes a detector that does not
+> vision-driven navigation behaviour built assumes a detector that does not
 > exist on the hardware yet, so it is now gated off by the master flag
 > **`features.vision`** (default `False`):
 > - `resolve()` forces `vision_safety`, `vision_perception`, `avoidance_act` and

@@ -58,7 +58,7 @@ The sensor outputs its native orientation — often **90° rotated**. That matte
 - **Person Detection is trained on *upright* people.** On a sideways feed it
   misses you in most frames → few pre-labels. (Session-1 test: 46 boxes / 342
   frames sideways.)
-- **We can't rotate on the module** — no AT command, and camera sensors can't do
+- **Rotating on the module is not possible** — no AT command, and camera sensors can't do
   a 90° transpose (only H/V flip).
 
 So **physically rotate the camera module 90°** until its raw feed is upright

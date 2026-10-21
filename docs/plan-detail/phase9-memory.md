@@ -45,5 +45,5 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       `.backup`, not a plain `cp` of a live file), kept outside the repo like the DB
       itself, with a restore step. Decide frequency and where it lands when the voice
       loop starts running live. Related: if the Petoi AI head ever replaces the Pi,
-      memory would live in that vendor's backend (or on our own server) instead -- see
+      memory would live in that vendor's backend (or on the project's own server) instead -- see
       `docs/planned/ai-head/petoi-ai-head-evaluation.md`.

@@ -34,17 +34,17 @@ frozen near the training-average position — under-calibrated INT8 (100 calib
 images; recipe wants 300+) and a thin/close-framed `<you>` set. Fix = a `<you>`
 capture pass for distance + position variety, then re-export.
 
-### How we got here (the diagnosis)
+### How it got here (the diagnosis)
 
 The device firmware (`SSCMA-Micro`, latest release `20250102`) does the
 post-processing (anchor decode / objectness gate / NMS) around the flashed
 `.tflite`, so the model's output **head must match its decoder**. That decoder
 is frozen at Jan 2025; every training toolchain drifted forward since.
 
-- `boxes:[]` forever → head unrecognised (we hit this with `ultralytics==8.4.146`
+- `boxes:[]` forever → head unrecognised (hit with `ultralytics==8.4.146`
   — its LiteRT export ≠ the 8.2.8 graph the firmware knows).
 - **box flood**, 10-30/frame on an anchor grid, `postprocess:0ms`, sliders inert
-  → firmware dumping raw anchors, no NMS (we hit this with SSCMA `main`-branch
+  → firmware dumping raw anchors, no NMS (hit with SSCMA `main`-branch
   Swift-YOLO — both a junk-box model AND a real-box mAP@50 0.87 model flooded
   *identically*, proving it's the export head not the data).
 
@@ -382,7 +382,7 @@ Auto-label attrition ran ~10–15% (120 uploaded → ~118 trained), so capture
 > dedup) worked well — empty room quiet, walk-ins acquired instantly, score
 > ~60–80. So the ceiling is known; the experiment is only about **how far down**
 > the count can go. Testing the full 238 re-proves the ceiling and wastes a
-> cycle unless 120 fails and we need to rule out a pipeline regression.
+> cycle unless 120 fails and a pipeline regression needs to be ruled out.
 
 | empty-scene run | false-fire rate | worst score | verdict |
 |---|---|---|---|

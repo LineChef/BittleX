@@ -25,7 +25,7 @@ limit under sustained load. Researched 2026-09-05.
 
 ---
 
-## 1. What to expect on our hardware
+## 1. What to expect on the hardware
 
 ### The P1S servo (×8 legs + 1 neck)
 
@@ -74,7 +74,7 @@ So the failure chain on G2 is:
 - **Driver IC**: sustained over-current cooks the servo's onboard H-bridge —
   "melted gears and a shorted driver IC" is the classic coreless-servo autopsy.
 - **Magnet**: at extreme temps, partial demagnetisation of the rotor magnet =
-  permanent torque loss even after cooling. Unlikely at our loads but the
+  permanent torque loss even after cooling. Unlikely at the loads but the
   end-stop of the cliff.
 
 ### Battery interaction (compounds it)
@@ -88,13 +88,13 @@ a servo from cold — the risk window is *sustained hard work within* that hour
 
 ### Bottom line for G2
 
-- We have **no direct signal** of servo temperature. Feedback servos give
+- There is **no direct signal** of servo temperature. Feedback servos give
   joint *angle* back (slow, ~10–30 Hz), not current or temp.
 - `TARGET_SPEED` 0.10 m/s (~¼ of the ~0.38 m/s envelope) and sim effective
   torque ~0.2 N·m of 0.29 peak keep the *average* joint well out of the stall
   regime. The risk is **individual joints intermittently near stall** under
   slopes / shoves / payload, integrated over a long session.
-- **We have no hardware data on trip time or cooldown rate.** Getting that (one
+- **There is no hardware data on trip time or cooldown rate.** Getting that (one
   bench test, §4) is the single biggest unknown.
 
 ---
@@ -131,8 +131,8 @@ H_j += k_gen · tau_hat_j**2 · dt        # Joule heating  ∝ I²  ∝ τ²
 H_j -= k_diss · (H_j - H_amb) · dt      # Newton cooling toward ambient
 ```
 
-`tau_hat_j` = a torque estimate per joint. We don't have per-joint current, but
-we do have: (a) commanded vs actual joint-angle error from the feedback servos
+`tau_hat_j` = a torque estimate per joint. There is no per-joint current, but
+these are available: (a) commanded vs actual joint-angle error from the feedback servos
 (bigger error under load ⇒ higher current), (b) the gait/policy's commanded
 joint target vs the wkF reference, (c) total pack current from the board
 (~2 A typ / 5 A peak). Blend into a per-joint proxy; **calibrate `k_gen`,
@@ -148,7 +148,7 @@ joint target vs the wkF reference, (c) total pack current from the board
 
 Surface it: LED pattern, the Pi status channel, and — since G2 has the voice
 pipeline — a spoken heads-up ("my left-front leg is getting warm"). Always log
-per-joint `H_j` so we can tune the model from real runs.
+per-joint `H_j` so the model can be tuned from real runs.
 
 ### Layer 2 — behaviour-layer duty-cycle governor (no retraining)
 
@@ -174,12 +174,12 @@ In `pi_pipeline/behavior/` (same pattern as explore mode):
 
 ### Layer 3 — thermal-aware residual policy (needs training; the literature blueprint)
 
-**Almost exactly our architecture already.** See
+**Almost exactly the architecture already.** See
 [arXiv:2605.27046](https://arxiv.org/abs/2605.27046), *"Learning to Balance
 Motor Thermal Safety and Quadrupedal Locomotion Performance with Residual
 Policy"* (Unitree A1):
 
-- **Two-stage**: frozen nominal policy (= our `run20m_ppo`), then a **residual
+- **Two-stage**: frozen nominal policy (= the `run20m_ppo`), then a **residual
   policy** on top that receives **per-motor temperatures** in its observation
   and a **thermal-safety reward**. Nominal policy is untouched.
 - **Thermal reward**:
@@ -195,7 +195,7 @@ Policy"* (Unitree A1):
   < 50 °C. From a hot 58 °C start on stairs/slopes, overheat rate **70 % →
   < 10 %**.
 
-**Adapting to G2**: our gait is *already* residual-on-wkF. Add the per-joint
+**Adapting to G2**: the gait is *already* residual-on-wkF. Add the per-joint
 temperature estimate to the obs (from the sim thermal model in training; from
 the Layer-1 I²t estimator at deploy), add `R_th`, and run a Stage-2 residual
 finetune from `run20m_ppo` with randomised initial joint temperatures. Frozen
@@ -215,7 +215,7 @@ been structured.
    with bench-fitted values from §4.
 2. **Thermal observation**: append normalised `T_j` (8) to the obs, plus a
    `hottest_joint` scalar + its rate. Behind a flag so the base policy's obs
-   shape is unchanged until we commit.
+   shape is unchanged until the approach is committed.
 3. **Long-episode eval** (this is deferred eval item 5, now with a purpose):
    2 000–4 000-step episodes, thermal model live. Metrics: time-to-first-trip,
    whether the policy sheds effort as joints warm, distance before a trip.
@@ -275,8 +275,8 @@ err toward safety. If real sessions show it interrupting normal use — `diag
 summarize` reporting COOLDOWNs when the heat estimate was well below the danger
 line, or the WARN speech firing on ordinary walks — dial it back:
 - Fast dial, no code edit: `ThermalGuard(aggressiveness=0.6)` pushes every
-  threshold later (0.5 = roughly half as eager). Plumb it from config when we
-  get there.
+  threshold later (0.5 = roughly half as eager). Plumb it from config when
+  that point is reached.
 - Slower dial: raise `_H_TRIP`, lower `_K_GEN`, raise `_MAX_CONTINUOUS_S`,
   widen `_WARN_FRAC`/`_COOLDOWN_FRAC` per the table above.
 The `guard_state` / `hottest_frac` columns in the diag black box and the
@@ -295,8 +295,8 @@ soft cutback have no teeth until then.
 2. **Layer 1 + 2** (I²t estimator, indicator, behaviour governor, cooldown
    pose) — no training, biggest risk reduction per unit effort, deployable
    without a policy change.
-3. **Sim dynamic thermal model + long-episode eval** — validates and lets us
-   iterate; feeds Layer 3.
+3. **Sim dynamic thermal model + long-episode eval** — validates and allows
+   iteration; feeds Layer 3.
 4. **Layer 3 thermal-aware residual finetune** — the arXiv approach; best final
    result; needs 2 + 3 first.
 

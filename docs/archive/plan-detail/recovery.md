@@ -41,7 +41,7 @@ also auto-runs `rc` on an IMU-detected flip when gyro assist is on. Full detail:
 - [x] Test the stock `rc`/`rl` against a real flip — **done 2026-09-28,
       untethered (off USB, on battery), before the Pi was ever wired in**:
       worked, including a full self-right from fully flipped (supine).
-      Strongest confirmation yet (our own hardware, not a video) — updates
+      Strongest confirmation yet (the project's own hardware, not a video) — updates
       `docs/hardware/self-righting.md`'s "does not self-right from supine"
       caveat, which was sourced from a different community project.
       **Risk flagged, not yet resolved:** this tested firmware's *own*

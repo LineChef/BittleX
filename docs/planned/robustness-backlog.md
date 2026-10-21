@@ -1,6 +1,6 @@
 # Robustness backlog — pre-hardware walking-policy hardening
 
-Scenarios we want the walking policy to survive on the real robot, with an
+Scenarios the walking policy should survive on the real robot, with an
 env-knob sketch and a keep/revert plan for each. Worked while the frame ships
 (2026-09-03 onward). Companion to [`behavior-ideas.md`](behavior-ideas.md)
 (new *behaviours*) and
@@ -85,7 +85,7 @@ reason a sim policy wobbles on real hardware.
   for the episode) and `mount_rp ~ uniform(±2°)` applied to the quaternion before
   it enters the obs. New `IMU_BIAS_STD` / `IMU_MOUNT_TILT_DEG`.
 - **Held-out eval:** sweep bias magnitude; where does heading drift / fall% break?
-- **Pairs with:** `sysid_replay.py` — once we have a real log, fit the actual
+- **Pairs with:** `sysid_replay.py` — once a real log exists, fit the actual
   bias and set these to match.
 
 ### R3 · Pick-up & set-down — `TODO` (not yet triaged)
@@ -157,7 +157,7 @@ horn doesn't move, plus hysteresis on direction reversal.
   episode. New `SERVO_DEADBAND_DEG`.
 
 ### R8 · Aggressive command dynamics — `DROPPED` (2026-09-03)
-We train speed *tracking* but not fast *transitions*: full-speed → hard reverse,
+Speed *tracking* is trained but not fast *transitions*: full-speed → hard reverse,
 sharp yaw while cruising, repeated stop/start. Also: a long sustained arc
 (`fwd + yaw` held for the whole episode) — does heading spiral or drift?
 - **Knob sketch:** a command-schedule mode that steps `cmd_fwd` / `cmd_yaw`

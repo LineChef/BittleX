@@ -44,11 +44,11 @@ and the budget caps are still to build:
       before it's spent real money. Doesn't need to know cost at all.
 - [x] **Local usage tracker: BUILT.** Every API call is logged with its exact token usage (`voice/api_log.py`, a gitignored file under `~/.local/share/g2/`), and a per-day report counts each turn and retry (`python -m pi_pipeline.voice.usage`). Read it any time with `g2api [hours]`, which shows calls, tokens and approximate cost by source.
 - [x] **Price-per-token config: BUILT** as `G2_PRICE_IN_PER_MTOK` and `G2_PRICE_OUT_PER_MTOK`, filled in by hand from the current pricing page. Tokens are tracked for certain; dollars are estimated from those two numbers, not a hard-coded price that could go stale.
-- [ ] **Our own budget caps** (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`).
+- [ ] **The project's own budget caps** (`G2_DAILY_BUDGET_USD`, `G2_MONTHLY_BUDGET_USD`).
       Once crossed, G2 **refuses further API calls itself** and says/logs so
       clearly — "I can't chat right now, I've hit today's budget" — fails safe,
       locally, without waiting on Anthropic's own limit.
-- [ ] **Early warning on our own budget** — a configurable threshold *below* the
+- [ ] **Early warning on the project's own budget** — a configurable threshold *below* the
       cap (`G2_BUDGET_WARN_PCT`, default ~0.8). The first time a period crosses
       it, G2 says/logs a warning once — not every subsequent call, so it doesn't
       nag — e.g. "heads up, I'm at 80% of today's chat budget."

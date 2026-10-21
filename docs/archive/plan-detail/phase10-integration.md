@@ -115,7 +115,7 @@ that ties everything together with hardware:
   sinks log through the same file, since they share one link).
   `python -m pi_pipeline.link.trace replay <path> [--dry-run] [--speed N]
   [--serial]` re-sends the same commands with the same relative pacing — "it
-  did something weird, what did we send it" becomes a file to read and a
+  did something weird, what was sent to it" becomes a file to read and a
   sequence you can reproduce, not a memory to trust.
 
 **Full movement sweep — built 2026-09-10.** `check_serial`'s `skills` cycle

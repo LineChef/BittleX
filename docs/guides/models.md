@@ -6,7 +6,7 @@ Every model G2 uses, where it lives, where it came from and under what terms. Mo
 |---|---|---|
 | Speech recognition and wake word (Vosk), text-to-speech voices (Piper) | `models/` in the repo checkout (gitignored), on the Mac and on the Pi | `bash pi_pipeline/fetch_models.sh` |
 | Vision models used on the Mac (embedder, person detector) | `~/g2_data/models/` | by hand, with approval: [`../vision/downloaded-models.md`](../vision/downloaded-models.md) |
-| The detector on the camera | the camera module's flash | trained by us: [`../vision/custom-model-recipe.md`](../vision/custom-model-recipe.md) |
+| The detector on the camera | the camera module's flash | trained in this project: [`../vision/custom-model-recipe.md`](../vision/custom-model-recipe.md) |
 | The walking policy | `rl_training/opencat-gym/trained/` (exported `.onnx` plus sidecar), deployed to the Pi | [`gait-deployment.md`](gait-deployment.md) |
 
 ## Voice models (`models/`)

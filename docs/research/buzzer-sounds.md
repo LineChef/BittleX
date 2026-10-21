@@ -11,7 +11,7 @@ Researched 2026-10-04 for the voice cues (acknowledgement chirp) and the behavio
   as a mute toggle, a binary variant `B`, and `u` as a cat-sound command listed for Nybble. The melody guide does not mention volume; whether `b10` works on this
   firmware (B10_260527) is unconfirmed — it echoes `b` and was being listened-for on 2026-10-04. Never send a bare `b`.
 - Measured on G2's buzzer 2026-10-04: notes 26 and 30 are faint, notes 33+ were not heard at all, and the loudest was the lowest pair tried
-  (notes 4 and 8). So everything we want to hear should live low, well below the 1-35 ceiling.
+  (notes 4 and 8). So everything meant to be heard should live low, well below the 1-35 ceiling.
 
 ## Is there a ready-made library of chirps?
 - **No built-in Petoi sound library.** The guide has only the format and one worked example (Twinkle, Twinkle). Petoi's curriculum has a
@@ -22,20 +22,20 @@ Researched 2026-10-04 for the voice cues (acknowledgement chirp) and the behavio
   [PlayRtttl](https://arduino.cc/reference/en/libraries/playrtttl),
   [NonBlockingRTTTL](https://github.com/end2endzone/nonblockingrtttl),
   [Melody Player](https://reference.arduino.cc/reference/en/libraries/melody-player)). Those libraries drive a buzzer pin directly, so they
-  do not help here: the buzzer belongs to the BiBoard and we only send it `b` tokens. What we can reuse is the **format and the songs**: a small
+  do not help here: the buzzer belongs to the BiBoard and only `b` tokens are sent to it. What can be reused is the **format and the songs**: a small
   RTTTL parser that converts note names to semitone numbers and durations to divisors, then transposes the result into notes 1-35.
 - **R2-D2 / emotional-robot sounds** are design references, not libraries: the
   [R2D2 sound generator](https://instructables.com/R2D2-Sound-Generator),
   an [Arduino forum thread](https://forum.arduino.cc/t/r2d2-sounds-via-tone-command/52697) and a Politecnico di Milano
   [emotional sounds project](https://pii.deib.polimi.it/emotional-sound-like-r2d2-or-bb8/) describe fast glides, trills and
-  rising/falling contours for moods. They suit our `ChirpMood` set (happy, confused, alert, sleepy, question, greeting, ack).
+  rising/falling contours for moods. They suit the `ChirpMood` set (happy, confused, alert, sleepy, question, greeting, ack).
 
-## Plan, when we want more sounds
+## Plan, when more sounds are wanted
 1. Write the RTTTL converter (~40 lines, in `pi_pipeline/link/`), with the transpose-into-1-35 step and a token chunker (already have one in `voice/cues.py`).
-2. Curate a handful of melodies from public RTTTL collections as named cues; check licensing for anything we commit.
+2. Curate a handful of melodies from public RTTTL collections as named cues; check licensing for anything committed.
 3. Move the seven behavior chirps (`behavior/chirps.py`) into the audible low range and give each a distinct contour.
 
 The acknowledgement cue in use is the low rising two-note pair (`voice/cues.py`, `LOW_CUES["thinking"]`: note 4 then 9). A bosun's-call style rising
 whistle (a fast glide from note 8 up to 20, a warble at 23/21, a drop, about 0.9 s) was drafted and set aside; the buzzer cannot whistle, so it would be
 the gesture rather than the timbre, and a cue longer than about a second risks delaying the next command since the board plays a beep before reading more
-serial. Revisit it when we pick the larger sound set.
+serial. Revisit it when the larger sound set is picked.

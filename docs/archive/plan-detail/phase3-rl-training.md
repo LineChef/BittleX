@@ -9,9 +9,9 @@ Software only; no physical robot needed until Phase 6 deployment.
 
 ### Operating model (pre-hardware, 2026-09-07)
 
-Everything we train now is a **deployment candidate**. `run20m_ppo` is already a
+Everything trained now is a **deployment candidate**. `run20m_ppo` is already a
 deployment-quality policy and stays frozen and untouched, so no experiment can
-leave us without a shippable gait — worst case is a wasted overnight.
+leave no shippable gait — worst case is a wasted overnight.
 - Fresh tagged runs against deliberately-designed envs, **not serial finetunes**
   on the frozen base (history: finetunes erode more than they add).
 - A candidate is promoted only if it (1) holds the decathlon's **obstacle-free /
@@ -175,7 +175,7 @@ leave us without a shippable gait — worst case is a wasted overnight.
 `rl_training/opencat-gym/` is a curated copy of
 [`ger01d/opencat-gym`](https://github.com/ger01d/opencat-gym) (MIT, commit
 `12b39ff`) — PyBullet + Stable-Baselines3 + Gymnasium. It ships
-`models/bittle_esp32.urdf`, our exact hardware. `opencat_gym_env.py` is the whole
+`models/bittle_esp32.urdf`, the exact hardware. `opencat_gym_env.py` is the whole
 environment and the main lever; `train.py` runs 8 parallel envs with PPO.
 
 Setup blockers hit and resolved (kept in case they recur elsewhere):

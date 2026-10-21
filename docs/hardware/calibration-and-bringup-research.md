@@ -1,6 +1,6 @@
 # Calibration & first-power-on: research from Petoi's official docs
 
-Pre-build research (Bittle X hasn't arrived yet) — cross-checking our own
+Pre-build research (Bittle X hasn't arrived yet) — cross-checking the project's own
 bring-up plan (`pi_pipeline/bringup.py`, `docs/guides/bring-up-sequence.md`, "When the
 hardware arrives") against Petoi's official Bittle X V2 user manual and doc
 center, to catch gaps before the stand-only bring-up starts. Genuinely new
@@ -44,9 +44,9 @@ This is one of five ways into calibration mode:
 4. **Arduino IDE serial monitor** — type `c` and send.
 5. **IR remote** — row 3, column 3 (Bittle X V2 / BiBoard V1 has **no** IR
    receiver per `hardware/self-righting.md`, so this one's not available to
-   us).
+   this project).
 
-**Relevant to us**: method 4 confirms the actual serial token is bare `c`,
+**Relevant to the project**: method 4 confirms the actual serial token is bare `c`,
 not `c16` — `bringup.py` and `project-plan.md` both currently say `c16`.
 Worth a quick correction, or at minimum verifying against the real BiBoard
 once serial is up (`check_serial` already refuses both `c` and `cd`
@@ -63,7 +63,7 @@ calibration mode with legs already mounted on the servo horns risks legs
 swinging into each other or the body as the servos power up into arbitrary
 positions, which can jam/damage a servo if something gets physically stuck.
 
-**This does not apply to us directly** — Bittle X V2 here is the
+**This does not apply to the project directly** — Bittle X V2 here is the
 pre-assembled unit, and Petoi's own calibration page confirms pre-assembled
 units do *not* need the head/legs detached for calibration touch-ups (the
 app's +/- buttons just nudge already-mounted joints). The warning matters
@@ -98,7 +98,7 @@ before touching wiring, serial config, or firmware.
   (`project_carpet_mode` memory) — toe covers would be a confound, not a
   fix, for carpet slip.
 
-## What this changes in our plan
+## What this changes in the plan
 
 Nothing structural — Phase 0's stand-only sequence
 (assemble → range-of-motion → calibrate → `firstmove` → `allmoves`) already
