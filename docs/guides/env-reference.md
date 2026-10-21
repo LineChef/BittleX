@@ -11,7 +11,7 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_ACK_PEAK` | `0.0225` | `config.py` | [`.env.example`](../../.env.example), [`i2s-audio-build-log.md`](../hardware/build-logs/i2s-audio-build-log.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_ACK_TONE` | `"short_tone"` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_ALERT_PEAK` | `0.045` | `config.py` | [`.env.example`](../../.env.example), [`i2s-audio-build-log.md`](../hardware/build-logs/i2s-audio-build-log.md) |
-| `G2_ANNOUNCE_ONLINE` | `"on"` | `__main__.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_ANNOUNCE_ONLINE` | `"on"` | `__main__.py` | [`capabilities.md`](../capabilities.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_API_KEEPALIVE_S` | `300.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_API_KEY_EXPIRY_WARN_DAYS` | `30` | `config.py` | [`.env.example`](../../.env.example), [`api-setup.md`](api-setup.md) |
 | `G2_API_LOG` | `"~/.local/share/g2/api_calls.jsonl"` | `api_log.py` | [`settings-switches.md`](settings-switches.md) |
@@ -19,10 +19,10 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_API_PRICE` | `"3,15"` | `api_log.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_API_TONE` | `"on"` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_API_WARMUP` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
-| `G2_ATTACHMENT` | `""` | `__init__.py` | [`STATUS.md`](../STATUS.md), [`attachments.md`](attachments.md) |
+| `G2_ATTACHMENT` | `""` | `__init__.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](attachments.md) |
 | `G2_ATTACHMENT_FILE` | `"~/.local/share/g2/attachment.json"` | `__init__.py` | [`attachments.md`](attachments.md) |
 | `G2_AUDIO_GATE` | `"1"` | `audio_gate.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_AUTOLOG` | `"on"` | `autolog.py` | [`real-data-pipeline.md`](../rl/real-data-pipeline.md) |
+| `G2_AUTOLOG` | `"on"` | `autolog.py` | [`capabilities.md`](../capabilities.md), [`real-data-pipeline.md`](../rl/real-data-pipeline.md) |
 | `G2_AUTOLOG_DIR` | `"~/g2_runs/auto"` | `autolog.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_BACKUP_DIR` | — | `g2_aliases.sh`, `g2_memory_backup.sh` | [`shell-helpers.md`](shell-helpers.md), [`phase9-memory.md`](../plan-detail/phase9-memory.md) |
 | `G2_BALANCE_OFF_IDLE` | `"1"` | `config.py` | [`.env.example`](../../.env.example), [`petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md) |
@@ -158,7 +158,7 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_PRICE_OUT_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
 | `G2_PROFILE` | `"0"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md), [`diagnostics.md`](../hardware/diagnostics.md) +1 |
 | `G2_QUESTION_WINDOW_S` | `8.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
-| `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md), [`reflection-plan.md`](../planned/reflection-plan.md) |
+| `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`settings-switches.md`](settings-switches.md) +1 |
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_REMOTE_MEMORY_DB` | — | `g2_memory_backup.sh` | [`settings-switches.md`](settings-switches.md) |
 | `G2_REVIEW_NO_OPEN` | — | `g2_review.py` | [`settings-switches.md`](settings-switches.md) |
@@ -209,7 +209,7 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_VOICE_STYLE` | — | `config.py` | [`.env.example`](../../.env.example), [`models.md`](models.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_WAKE_LOG` | `DEFAULT_PATH` | `wake_log.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WAKE_MAX_BEFORE` | `""` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
-| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`cheatsheet.md`](cheatsheet.md), [`settings-switches.md`](settings-switches.md) +1 |
+| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`cheatsheet.md`](cheatsheet.md) +2 |
 | `G2_WAKE_WORD` | `"gee two, hey buddy, hey bud"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md) +1 |
 | `G2_WALK_RAMP_S` | `"0"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WALL_CAL` | `"~/.local/share/g2/wall_calibration.json` | `wall_distance.py` | [`settings-switches.md`](settings-switches.md) |
