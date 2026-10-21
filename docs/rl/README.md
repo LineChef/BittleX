@@ -21,6 +21,7 @@ and what has been tested on G2: [`../STATUS.md`](../STATUS.md). Roadmap: [`../pr
 |---|---|
 | [`real-walk-log.md`](real-walk-log.md) | Real-robot walks and servo troubleshooting (10/01 on), with the where-we-left-off list. Raw data: [`real-walk-data/`](real-walk-data/). What each hardware log carries: [`hardware-logging.md`](hardware-logging.md). |
 | [`hardware-logging.md`](hardware-logging.md) | What rungait.py --log writes, what the firmware can and cannot give us, and what is worth using as training evidence. Written 2026-10-07. |
+| [`carpet-findings-2026-10-20.md`](carpet-findings-2026-10-20.md) | The carpet work of 2026-10-20: the failure, the sim carpet model, every probe and real walk, what helped, what did not, and what to try next. Read before touching carpet again. |
 | [`real-data-pipeline.md`](real-data-pipeline.md) | Always-on capture, ingest gates and sim calibration snapshots. |
 | [`sysid-capture-plan.md`](sysid-capture-plan.md) | The system-identification capture sessions. |
 

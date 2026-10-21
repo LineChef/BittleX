@@ -170,7 +170,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 
 ## `joint`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +63.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +64.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +8.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +9.
 
 | File | Size | Cited by |
 |---|---|---|

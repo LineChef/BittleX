@@ -85,7 +85,15 @@ class PolicyWalker:
                     extra["on_contact"] = self._on_contact
             from . import gait_mode
             mode = gait_mode.current()
-            if gait_mode.uses_scripted(self._policy_path(), mode):
+            if gait_mode.GAITS[mode].skill:
+                # a firmware gait (carpet mode: Petoi's kcarpetF): the BiBoard plays it, we watch the IMU and keep the same stop and end-pose rules
+                try:
+                    from .fw_skill_log import walk_skill
+                except ImportError:                                                  # a plain-script import (gait/ on the path)
+                    from fw_skill_log import walk_skill
+                log.info("%s mode: firmware skill %s for up to %.0f s", mode, gait_mode.GAITS[mode].skill, seconds)
+                reason = walk_skill(self._link, gait_mode.GAITS[mode].skill, float(seconds), self._stop)
+            elif gait_mode.uses_scripted(self._policy_path(), mode):
                 # the user switched gait ("hi step") and this policy never learned it: play the scripted base of that gait (slow, experimental), same stop and end-pose rules
                 sc = self._scripted_fn
                 if sc is None:

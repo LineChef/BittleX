@@ -81,6 +81,61 @@ def run_skill(lk, token, seconds, log_path=None, fall_abort_deg=60.0, *,
     return {"fell": fell, "ticks": rows}
 
 
+def walk_skill(lk, token, seconds, stop_event=None, *, fall_abort_deg=60.0, sleep=time.sleep, clock=time.monotonic) -> str:
+    """A firmware gait skill as a walk inside the voice service (carpet mode plays Petoi's carpet gait this way): `gB` -> `kbalance` stand -> the skill token -> watch the IMU for
+    `seconds` or until `stop_event` is set. Returns "complete", "stopped" or "fall". A fall rests at once; otherwise the walk ends in a balanced stand (`kbalance`), then `gb` (balance
+    off again, as the voice actuator does after every skill) and, unless `stop_event.rest` is False, the rest pose. The IMU lines come from `lk.poll_imu()` (the caller's own consumer)."""
+    def tx(cmd):
+        lk.send(cmd, read_reply=False, settle=0.0)
+
+    def stopping():
+        return stop_event is not None and stop_event.is_set()
+
+    def wait(sec):                               # a sleep that a stop request can cut short
+        end = clock() + sec
+        while clock() < end and not stopping():
+            sleep(min(0.05, max(0.0, end - clock())))
+
+    reason, tilt_since = "complete", None
+    tx("gB")
+    wait(0.3)
+    tx("kbalance")
+    wait(3.0)
+    try:
+        if stopping():
+            reason = "stopped"
+        else:
+            tx(token)
+            t0 = clock()
+            while clock() - t0 < seconds:
+                if stopping():
+                    reason = "stopped"
+                    break
+                for line in lk.poll_imu():
+                    r = parse_imu_line(line)
+                    if r is None:
+                        continue
+                    if fall_abort_deg and max(abs(r[0]), abs(r[1])) > math.radians(fall_abort_deg):
+                        tilt_since = tilt_since if tilt_since is not None else clock()
+                        if clock() - tilt_since >= FALL_ABORT_S:
+                            reason = "fall"
+                            break
+                    else:
+                        tilt_since = None
+                if reason == "fall":
+                    break
+                sleep(0.02)
+    finally:
+        rest = getattr(stop_event, "rest", True)
+        if reason != "fall":
+            tx("kbalance")
+            sleep(1.0)
+        tx("gb")
+        if reason == "fall" or rest:
+            tx("d")
+    return reason
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("token", help="firmware skill token, e.g. kcarpetF")

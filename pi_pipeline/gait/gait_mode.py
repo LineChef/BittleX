@@ -30,7 +30,8 @@ class Gait:
     phrases: tuple          # spoken forms, normalised (lower case, no punctuation); a command may carry up to two extra words
     echo_on: str            # what G2 says when it is switched on
     base_ref: str           # <base_ref>_ref.npy: the scripted base the learned correction sits on (pi_pipeline/gait/, reference_gait/ in the training tree)
-    scripted_fallback: bool = True   # a policy without this mode plays the gait's scripted base; False: it walks its normal learned gait instead (carpet: same base, only an input differs)
+    scripted_fallback: bool = True   # a policy without this mode plays the gait's scripted base; False: it walks its normal learned gait instead
+    skill: str | None = None         # a gait that lives in the BiBoard firmware (no policy, no scripted base): the token the walker sends (carpet: Petoi's kcarpetF)
 
 
 GAITS = {
@@ -43,11 +44,12 @@ GAITS = {
                                 "highstep", "highstep mode", "i step", "eye step", "die step", "hi stepp",      # the last four: what the recognizer actually heard on G2 (2026-10-10: "i step", "switch die step")
                                  "switch to high step", "switch to hi step", "switch to highstep", "switch to high steps", "switch to high step mode", "switch to hi step mode", "switch to step mode"),
                     "Hi step on.", "hsF"),
-    # carpet (user, 2026-10-20: "G2, carpet mode"): its own carpet-only policy file (residual_policy.CARPET_POLICY) on the same wkF base; without one, the default policy.
+    # carpet (user, 2026-10-20: "G2, carpet mode"; user, 2026-10-21: "set petoi's carpet gait as the carpet policy"): Petoi's own firmware carpet gait (kcarpetF), so a walk in this
+    # mode is the firmware skill, with no learned policy. (residual_policy.CARPET_POLICY, a carpet-only learned policy file, is no longer what carpet mode plays.)
     # Bare "carpet" is not a phrase: "we're on carpet" answers the floor question and must not switch the gait.
     "carpet": Gait("carpet", ("carpet mode", "carpet mode on", "carpet walk", "carpet gait", "carpet walking", "switch to carpet mode", "switch to carpet", "switch to carpet walk",
                               "switch to carpet gait", "walk on carpet mode"),
-                   "Carpet mode on.", "wkf", scripted_fallback=False),
+                   "Carpet mode on.", "wkf", scripted_fallback=False, skill="kcarpetF"),
 }
 DEFAULT = "normal"
 _PUNCT = re.compile(r"[^\w\s]")
@@ -81,8 +83,8 @@ def modes_of(sidecar_path: str | None) -> tuple:
 
 
 def supports(policy_onnx: str | None, gait: str) -> bool:
-    if gait == "carpet":                                  # a policy file of its own, not a mode of the default policy
-        return carpet_available()
+    if GAITS[gait].skill:                                 # a firmware gait: independent of the policy
+        return True
     return gait in modes_of(f"{policy_onnx}.json" if policy_onnx else None)
 
 

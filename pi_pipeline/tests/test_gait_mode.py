@@ -158,17 +158,70 @@ def test_carpet_mode_and_the_default_gait_phrases():
     assert match_local_command("G2, carpet mode") == "gait" and match_local_command("switch to default gait") == "gait"
 
 
-def test_carpet_mode_without_a_carpet_policy_keeps_the_learned_walk_and_says_so(tmp_path, monkeypatch):
-    from pi_pipeline.gait import residual_policy as rp
+def test_carpet_mode_is_petois_firmware_gait_whatever_the_policy(tmp_path):
     f = str(tmp_path / "mode.json")
     v7 = tmp_path / "v7.onnx"
     (tmp_path / "v7.onnx.json").write_text(json.dumps({"residual_scale_deg": 30.0}))
-    monkeypatch.setattr(rp, "carpet_policy_path", lambda: None)
-    gait, said = gm.request("carpet mode", str(v7), f)
-    assert gait == "carpet" and gm.current(f) == "carpet" and "normal walk" in said and "scripted" not in said
-    assert not gm.uses_scripted(str(v7), "carpet") and gm.uses_scripted(str(v7), "hi_step")      # carpet falls back to the learned walk, hi step to its scripted base
-    monkeypatch.setattr(rp, "carpet_policy_path", lambda: str(tmp_path / "carpet.onnx"))
-    assert gm.request("carpet mode", str(v7), f) == ("carpet", "Carpet mode on.")
+    assert gm.GAITS["carpet"].skill == "kcarpetF" and gm.GAITS["hi_step"].skill is None
+    assert gm.request("carpet mode", str(v7), f) == ("carpet", "Carpet mode on.") and gm.current(f) == "carpet"       # no caveat: it needs no policy
+    assert not gm.uses_scripted(str(v7), "carpet") and gm.uses_scripted(str(v7), "hi_step")
+
+
+def _fake_time():
+    t = [0.0]
+    return (lambda: t[0]), (lambda s: t.__setitem__(0, t[0] + max(float(s), 0.01)))
+
+
+def test_the_walker_plays_the_firmware_carpet_skill_in_carpet_mode(tmp_path, monkeypatch):
+    import time
+    from pi_pipeline.gait import fw_skill_log
+    from pi_pipeline.gait.policy_walker import PolicyWalker
+    f = str(tmp_path / "mode.json")
+    monkeypatch.setattr(gm, "STATE_PATH", f)
+    gm.set_mode("carpet", f)
+    sent = []
+
+    class Link:
+        def send(self, cmd, read_reply=False, settle=0.0):
+            sent.append(cmd)
+
+        def poll_imu(self):
+            return []
+
+    real, (clock, sleep) = fw_skill_log.walk_skill, _fake_time()
+    monkeypatch.setattr(fw_skill_log, "walk_skill", lambda lk, tok, secs, ev: real(lk, tok, secs, ev, sleep=sleep, clock=clock))
+    calls = []
+    w = PolicyWalker(Link(), run_fn=lambda *a, **k: calls.append("policy") or "complete", foot_hold=None)
+    w.walk(2.0)
+    for _ in range(300):
+        if not w.busy:
+            break
+        time.sleep(0.01)
+    assert not calls                                              # the learned policy never ran
+    assert sent[:3] == ["gB", "kbalance", "kcarpetF"] and sent[-3:] == ["kbalance", "gb", "d"], sent
+
+
+def test_walk_skill_ends_in_a_balanced_stand_when_asked_not_to_rest_and_stops_on_request():
+    import threading
+    from pi_pipeline.gait.fw_skill_log import walk_skill
+    clock, sleep = _fake_time()
+    sent = []
+
+    class Link:
+        def send(self, cmd, read_reply=False, settle=0.0):
+            sent.append(cmd)
+
+        def poll_imu(self):
+            return []
+
+    stop = threading.Event()
+    stop.rest = False                                             # exploration: leave him standing
+    assert walk_skill(Link(), "kcarpetF", 2.0, stop, sleep=sleep, clock=clock) == "complete"
+    assert sent[-2:] == ["kbalance", "gb"]
+    assert "d" not in sent
+    sent.clear()
+    stop.set()                                                    # a stop before the walk starts: no gait token at all
+    assert walk_skill(Link(), "kcarpetF", 2.0, stop, sleep=sleep, clock=clock) == "stopped" and "kcarpetF" not in sent
 
 
 def test_the_floor_label_switches_carpet_mode_in_and_out(tmp_path):
