@@ -42,35 +42,10 @@ def touch():
         os.utime(REQ, None)
 
 
-POD_MESH = os.path.join(HERE, "models", "local", "pod_mesh.json")      # build_pod_mesh.py: the pod's real look (looks only; the physics is the box)
+DRESSED = os.path.join(HERE, "models", "local", "bittle_dressed{}.urdf")     # build_body_mesh.py: G2's real parts and the pod as visuals (looks only; the physics is the plain model)
 PART_RGBA = {"neck_bracket": [0.23, 0.23, 0.25, 1], "lift_servo": [0.15, 0.15, 0.17, 1], "claw_servo": [0.15, 0.15, 0.17, 1], "arm_link": [0.55, 0.57, 0.6, 1],
              "jaw_left": [0.91, 0.39, 0.11, 1], "jaw_right": [0.91, 0.39, 0.11, 1], "camera": [0.95, 0.95, 0.94, 1], "claw": [1.0, 0.55, 0.1, 0.85],
              "head": [0.23, 0.23, 0.25, 1]}
-
-
-def pod_body(p, arm, pos, orn):
-    """A visual-only body made of the pod's meshes, one link per part in its own colour (None without the meshes); the camera case is left out with the arm, where the
-    camera rides on the claw."""
-    try:
-        idx = json.load(open(POD_MESH))
-    except (OSError, ValueError):
-        return None
-    parts = [q for q in idx["parts"] if q["in_arm"] or not arm]
-    files = [os.path.join(os.path.dirname(POD_MESH), q["file"]) for q in parts]
-    if not files or not all(os.path.exists(x) for x in files):
-        return None
-    try:
-        vs = [p.createVisualShape(p.GEOM_MESH, fileName=x, meshScale=[1, 1, 1]) for x in files]
-        n = len(vs) - 1
-        bid = p.createMultiBody(0, baseVisualShapeIndex=vs[0], basePosition=pos, baseOrientation=orn,
-                                linkMasses=[0] * n, linkCollisionShapeIndices=[-1] * n, linkVisualShapeIndices=vs[1:], linkPositions=[[0, 0, 0]] * n,
-                                linkOrientations=[[0, 0, 0, 1]] * n, linkInertialFramePositions=[[0, 0, 0]] * n, linkInertialFrameOrientations=[[0, 0, 0, 1]] * n,
-                                linkParentIndices=[0] * n, linkJointTypes=[p.JOINT_FIXED] * n, linkJointAxis=[[0, 0, 1]] * n)
-        for i, q in enumerate(parts):
-            p.changeVisualShape(bid, i - 1, rgbaColor=q["rgba"])
-        return bid
-    except p.error:
-        return None
 
 
 def build(p, scene, rid=None, old_ids=None):
@@ -85,12 +60,11 @@ def build(p, scene, rid=None, old_ids=None):
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     ids = {}
     arm = any(b.get("part") == "camera" for b in scene["bodies"])
+    dressed = DRESSED.format("_arm" if arm else "")
+    dressed = dressed if os.path.exists(dressed) else None
     for b in scene["bodies"]:
-        if b.get("part") == "pod":
-            bid = pod_body(p, arm, b["pos"], b["orn"])
-            if bid is not None:
-                ids[b["id"]] = bid
-                continue
+        if b.get("part") == "pod" and dressed:
+            continue                                                # drawn by the dressed model, on the cover where it really sits
         for sh in b["shapes"]:
             if sh["type"] == "heightfield":
                 import numpy as np
@@ -119,7 +93,7 @@ def build(p, scene, rid=None, old_ids=None):
             ids[b["id"]] = bid
             break
     if rid is None:
-        rid = p.loadURDF(os.path.join(HERE, "models", "bittle_esp32.urdf"), [0, 0, 0.1], useFixedBase=False)
+        rid = p.loadURDF(dressed or os.path.join(HERE, "models", "bittle_esp32.urdf"), [0, 0, 0.1], useFixedBase=False)
     return rid, ids
 
 
