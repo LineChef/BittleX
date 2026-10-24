@@ -186,7 +186,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](
 
 ## `ledge`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +33.
+Docs that mention this family: [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`high-step-gait-plan.md`](../archive/plan-detail/high-step-gait-plan.md) +34.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +10.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +11.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -298,7 +298,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase10-
 
 ## `slope`
 
-Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +28.
+Docs that mention this family: [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md) +29.
 
 | File | Size | Cited by |
 |---|---|---|

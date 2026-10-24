@@ -167,6 +167,36 @@ the floor. The source does not say so; check the direction on the bench before r
 −10 shift does not apply to them. No other arm-specific recovery skill was found. G2's Pi code streams only the eight leg joints during a
 walk (`i` commands), so the arm stays where the last firmware posture put it.
 
+### Timing and gyro balance
+
+- **Frame rate.** A firmware gait advances one frame per pass of the main loop, with no delay in the gait branch (`skill.h`), so its cycle
+  time is set by the loop speed and is not in the source. `wkArmF` has 43 frames against `wkF`'s 116, so at the same loop speed it cycles
+  about 2.7 times faster. Measure it on G2 (`fw_skill_log.py kwkF` under the arm build) before matching it in the sim, where the base is
+  played at `PHASE_RATE_NOM_CMD` (today 1.25 s per cycle at the nominal command).
+- **Gyro balance** (`motion.h` `adjust()`, applied in `perform()` only while `gyroBalanceQ` is on, firmware default on): every few frames
+  it takes roll and pitch minus the skill's expected roll and pitch, ignores a dead band (5 deg roll, 3 deg pitch), and adds a
+  proportional per-joint correction (pitch pushes front and rear legs opposite ways, roll left and right). The change per update is capped
+  by `ADJUSTMENT_DAMPER` and the total is clamped. The source shown does not say whether it also acts on angles streamed with `i`. G2 keeps
+  it off during policy walks (`run_gait.py` sends `gb`) and while idle (on, a standing G2 rang for 40 s or more after a nudge:
+  [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md)), and turns it on for firmware gaits and poses.
+
+### Sim check: the arm walk as a base (2026-10-24)
+
+`gait_probe.py wkf wkArm` (no policy, no gyro balance, the 481 g `pod` payload with the AI head, no claw mass; both walks at the same
+1.25 s cycle; 40 episodes per cell, 20 per ladder rung). Reference file: `reference_gait/wkArm_ref.npy` (`build_skill_reference.py wkArmF`).
+
+| | `wkF` | `wkArmF` |
+|---|---|---|
+| Falls, six cells (flat, downhill, cross-slope, rubble, boxes, ledge) | 0 to 10% | 0% in every cell |
+| Calm walk speed | 3.6 in/s | 2.6 in/s (shorter stride at the same cycle) |
+| Roll spread / heading after 12.5 s | 2.2 deg / −4 deg | 1.6 deg / −1 deg |
+| Foot clearance (90th percentile) | 0.53 in | 0.38 in |
+| Step up 0.3 in: success | 40% | 0% (no step-up rung cleared) |
+| Step down 0.9 in: falls / success | 95% / 5% | 25% / 20% |
+
+Open loop, the arm walk is steadier than `wkF` on today's payload and cannot step up at all. Not yet tested: the claw's mass and position,
+and Petoi's faster cycle.
+
 ### What this means for G2's own code (nothing changed yet)
 
 - **The learned walk is not affected by 1 or 2.** The Pi computes the walk from `wkf_ref.npy` (stock `wkF`) and streams joint angles,
