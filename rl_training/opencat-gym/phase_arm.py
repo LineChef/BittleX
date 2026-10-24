@@ -57,6 +57,7 @@ TAG = lambda n: f"arm_{n}"                                          # noqa: E731
 STAGE_EPISODES, STAGE_LADDER_EPISODES = 40, 20
 TRACK_EPISODES, TRACK_LADDER_EPISODES = 40, 20
 PICK_WINDOW = 5
+TRACK_EVERY = 2_000_000                                             # user, 2026-10-24 (save time): the 20M's progress check every 2M (it only logs)
 V7_ZIP = "trained/pod_s4_ppo"                                       # V7 (Release_CandidateV7_ppo.onnx was exported from it)
 CAND_ONNX = "trained/ARM1cand_ppo.onnx"
 # Promotion rule (set before the result, user approved 2026-10-24), against V7 in the claw world
@@ -186,9 +187,12 @@ def run_stage(name, lever, steps, minutes, prev, ref):
         halt(f"HALT: {tag} did not finish: {why}")
 
 
+SCORED_STAGES = ("s3",)                                             # user, 2026-10-24 (save time): only S3 is scored, the last check before the 20M; S0-S2 scores fed no decision
+
+
 def score_stage(name, ref):
     out = f"trained/arm_score_{name}.json"
-    if not os.path.exists(out):
+    if name in SCORED_STAGES and not os.path.exists(out):
         t0 = time.time()
         res = score(f"trained/{TAG(name)}_ppo", ref, STAGE_EPISODES, STAGE_LADDER_EPISODES)
         json.dump(res, open(out, "w"), indent=1)
@@ -260,12 +264,12 @@ def final(st, ref):
     if not RP.training(tag) and not os.path.exists(f"trained/{tag}_ppo.zip"):
         log(f"{tag} START: the 20M consolidation from {TAG('s3')} (plateau stop on), about {minutes} min, done about {clock_in(minutes)}")
         RP.launch(tag, stage_env(name, lever, ref, last=True), steps=steps, base=False, chain_from=f"trained/{TAG('s3')}_ppo")
-    done, step = set(st.get("tracked", [])), 1_000_000
+    done, step = set(st.get("tracked", [])), TRACK_EVERY
     while step <= 20_000_000:
         if os.path.exists(f"trained/{tag}_ppo.zip") and not os.path.exists(RP.ckpt(tag, step)):
             break
         if step in done:
-            step += 1_000_000
+            step += TRACK_EVERY
             continue
         ok, why = RP.wait_for_ckpt(tag, step)
         if not ok:
@@ -273,12 +277,12 @@ def final(st, ref):
                 break
             halt(f"HALT: the 20M stopped before {step // 10**6}M: {why}")
         row = track(step)
-        if step in V5.FINAL_CHECKS and row is not None and max(row["t11"], row["n1"]) > 0.25:
+        if row is not None and max(row["t11"], row["n1"]) > 0.25:
             log(f"{tag} NOTE {step // 10**6}M: flat-ground falls T1.1 {row['t11']:.2f}, N1 {row['n1']:.2f} (no gate: training goes on)")
         done.add(step)
         st["tracked"] = sorted(done)
         save_state(st)
-        step += 1_000_000
+        step += TRACK_EVERY
     ok, why = RP.wait_for_finish(tag)
     if not ok:
         halt(f"HALT: the 20M did not finish: {why}")
@@ -351,8 +355,7 @@ def compare(st, ref):
     v7, a1 = json.load(open(f)), json.load(open(f"{REPORT_DIR}/arm1.json"))
     log(f"V7 (claw) | {V5.summary(v7)}")
     log(f"ARM1      | {V5.summary(a1)}")
-    load_ladder("arm1", st["picked_path"], ref)
-    load_ladder("v7", V7_ZIP, None)
+    # the load ladders (extra weight in the back block) are not run (user, 2026-10-24, save time): the claw is already the load this policy is for
     cv, ca = cm(v7), cm(a1)
     ids = [i for i in cv if i in ca and not i.startswith(("Z.", "N")) and i != "Z0"]
     fa, fv = mean_cell_falls(a1, ids)[0], mean_cell_falls(v7, ids)[0]
