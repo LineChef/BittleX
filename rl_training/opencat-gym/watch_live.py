@@ -86,6 +86,26 @@ def build(p, scene, rid=None, old_ids=None):
     return rid, ids
 
 
+PAYLOAD_RGBA = [1.0, 0.55, 0.1, 0.85]
+
+
+def mark_payload(p, ids, scene, fr, rid):
+    """The bodies welded to G2 (the ones a frame moves with him: the pod, the AI head or the arm's claw) in orange, the front one labelled with its weight, so the
+    payload stands out from the course (both are plain boxes; the claw is a 60 x 30 x 25 mm box at the nose, 2026-10-24). Returns the label ids."""
+    mass = {int(b["id"]): b["mass"] for b in scene["bodies"]}
+    welded = [int(k) for k in fr.get("m", {}) if int(k) in ids]
+    for k in welded:
+        p.changeVisualShape(ids[k], -1, rgbaColor=PAYLOAD_RGBA)
+    if len(welded) < 2:
+        return []
+    import numpy as np
+    b = fr["b"]
+    fwd = np.array(p.getMatrixFromQuaternion(b[3:7])).reshape(3, 3)[:, 0]
+    front = max(welded, key=lambda k: float(np.dot(np.array(fr["m"][str(k)][:3]) - np.array(b[:3]), fwd)))
+    grams = f" {mass[front] * 1000:.0f} g" if front in mass else ""
+    return [p.addUserDebugText(f"head / claw{grams}", [0, 0, 0.03], textSize=1.0, textColorRGB=[0.75, 0.35, 0.0], parentObjectUniqueId=ids[front])]
+
+
 NAMES = {"ledge_up": "step up", "ledge_down": "step down", "rubble": "rubble", "boxes": "boxes", "snags": "snags", "slope": "slope", "sidehill": "side-hill",
          "threshold": "threshold", "shove": "shoves", "snag": "snag", "cutback": "switchback turn", "sidehill_r": "side-hill (right side down)",
          "sidehill_l": "side-hill (left side down)"}
@@ -145,6 +165,7 @@ def main():
     last_touch, ep, f, rid, ids, jids = time.time(), None, None, None, {}, []
     waited, scene, scene_t, scene_m = time.time(), None, 0.0, None
     q, t0, k0, last_k, end_t, cam, new_cam = collections.deque(), 0.0, 0, 0, 0.0, None, True
+    marked = None                                                   # the episode whose payload bodies are coloured and labelled
     print("watching trained/live (close the window or Ctrl-C to stop)", flush=True)
     try:
         while p.isConnected():
@@ -238,6 +259,9 @@ def main():
             for k, v in fr.get("m", {}).items():
                 if int(k) in ids:
                     p.resetBasePositionAndOrientation(ids[int(k)], v[:3], v[3:7])
+            if marked != ep and fr.get("m"):
+                marked = ep
+                labels += mark_payload(p, ids, scene, fr, rid)
             # follow G2 smoothly; the angle and distance are our own unless the user drags or scrolls the camera (then theirs is kept). The viewer's value is only
             # adopted when it differs from what we last set, so nothing else (an episode change, a window resize) can throw the view far out.
             if new_cam:
