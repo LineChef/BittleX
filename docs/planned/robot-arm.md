@@ -145,6 +145,28 @@ shift that becomes front shoulders 15, rear 20, front knees 56, rear 50: a stanc
 - **Lifted recovery:** the automatic `dropRec` when G2 is picked up is disabled (the skill itself is still in the table).
 - **Skill table:** 85 skills instead of 93. Not checked: which eight were dropped, and what the `R` serial token (`T_ROBOT_ARM`) does.
 
+### Rest and recovery poses in the arm build
+
+Joint 1 (the arm's lift) per pose, arm build against stock (stock joint 1 is the head tilt). Legs are the same as stock unless noted, and
+postures then get the −10 shift from 2.
+
+| Skill | Arm build | Stock | Note |
+|---|---|---|---|
+| `rest` | joint 1 at 60, pan and claw 0 | head −30 / −80 (tilted down), tail −45 | the stock rest dips the head down; the arm build holds the arm at 60 instead |
+| `sit` | 0 | 0, tail −45 | same legs |
+| `balance` / `up` | 0 | 0 | legs differ (see 2) |
+| `dropped` | 101 | 30 | |
+| `str` (stretch) | 100 | 30 | legs −60 front shoulders (stock −75) |
+| `buttUp` (bow) | 95 | 40 | a much shallower bow: front shoulders 40 (stock 90), rear 18 (stock 45) |
+| `lifted` | −20 | −20 | identical |
+| `dropRec` | 40 | 40 | identical first frames |
+| `rc` (self-right) | 7 frames | 5 frames | two new opening frames hold the arm at 25 with the legs tucked (35 / −28), then the stock flip sequence with the arm at 30 |
+
+The nose-down poses (`dropped`, `str`, `buttUp`) and `rest` put joint 1 highest, which suggests positive joint 1 lifts the arm clear of
+the floor. The source does not say so; check the direction on the bench before relying on it. `rc` and `dropRec` are behaviours, so the
+−10 shift does not apply to them. No other arm-specific recovery skill was found. G2's Pi code streams only the eight leg joints during a
+walk (`i` commands), so the arm stays where the last firmware posture put it.
+
 ### What this means for G2's own code (nothing changed yet)
 
 - **The learned walk is not affected by 1 or 2.** The Pi computes the walk from `wkf_ref.npy` (stock `wkF`) and streams joint angles,
