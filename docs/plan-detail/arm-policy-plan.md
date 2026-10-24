@@ -34,6 +34,11 @@ uncertain values are varied per episode.
 When the claw is weighed and measured, the profile takes the real numbers (fixed, no variation, as for the pod). If the weight is more than 15 g
 off the estimate, a retrain on the real numbers is offered.
 
+The camera moves too (user, 2026-10-24): with the arm it is mounted on the claw, not on top of the pod. The camera (Grove Vision AI V2, about 15 g, not
+weighed) comes out of the pod's weighed 185 g and goes onto the claw, so the pod is about 170 g and the claw carries arm + camera, far forward. The claw is
+rebuilt from the real parts (photos or print files, weights from a scale) before the chain starts; the runner holds after the screen until then
+(`trained/arm_hold`).
+
 Note: the user judged G2 at his limit at 481 g (2026-10-21); the arm build is about 21 g heavier, with the weight further forward.
 
 ## Training (unattended runner `phase_arm.py`, a copy of `phase_pod.py`)
@@ -103,10 +108,10 @@ report in between. Battery as percent at the start of each step.
 
 | Step | What | Pass | Time |
 |---|---|---|---|
-| H0 | Before the swap: photograph the Joint Calibrator offsets; weigh the arm module and measure where it sits (forward of the neck, how low the claw hangs with the arm at its walking angle) | numbers recorded here | 15 min |
+| H0 | Before the swap: photograph the Joint Calibrator offsets; weigh the arm module, the camera, and the arm with the camera on; photograph and measure where it sits (forward of the neck, how low the claw hangs with the arm at its walking angle) | numbers recorded here | 15 min |
 | H1 | Swap and flash: AI head off, arm on (J-hook neck part); Desktop App, product **Bittle X+Arm**, board BiBoard_V1_0, the `cu.usbmodem` port; `?` reads `Bittle X+Arm`; recalibrate every joint and the claw (`c-2` / Auto); voice module English | banner right, the calibration pose looks right (this also checks the servo range) | 45 to 60 min |
 | H2 | `g2attach arm`; `python -m pi_pipeline.doctor --serial` | firmware check passes, the arm's gait and settings shown | 5 min |
-| H3 | Bench poses: a small joint 1 move (which way is up), claw open / close, `kbalance`, `ksit`, `krest` from standing (does the claw clear the floor?), back to stand; one camera picture (does the arm block the view?) | no contact, no jump, view noted | 15 min |
+| H3 | Bench poses: a small joint 1 move (which way is up), claw open / close, `kbalance`, `ksit`, `krest` from standing (does the claw clear the floor?), back to stand; one camera picture from the claw-mounted camera (where it points at the arm's walking angle, whether the cable reaches through the lift and claw moves) | no contact, no jump, view noted | 15 min |
 | H4 | Petoi's walk: `fw_skill_log.py kwkF --seconds 10` (plays `wkArmF`), balance off, with a phone video; twice | distance and drift recorded; the cycle time counted from the video | 10 min |
 | H5 | The same walk from the Pi at the training pace: `run_gait.py --openloop --base wkArm --cycles 6` | compared with H4 | 10 min |
 | H6 | ARM1: `run_gait.py --cmd 0.10 --seconds 12.5`, three walks; then V7 once for comparison | no falls; distance and drift; a foot trim if needed (`g2attach save arm ... --trim`) | 25 min |
@@ -116,7 +121,8 @@ report in between. Battery as percent at the start of each step.
 About 2.5 to 3 hours in all, at the pace of one go per step. H0 to H3 do not need ARM1 and can run tonight while it trains; H4 and H5 need the
 Pi work above deployed (after the user says the arm is installed); H6 needs ARM1 (about 11:35 PM, or the next morning).
 
-Not in this round: self-right with the arm, exploration, the arm's pick and toss skills on the floor, voice-driven walks.
+Not in this round: self-right with the arm, exploration, the arm's pick and toss skills on the floor, voice-driven walks. With the camera on the claw,
+every camera-using behaviour (exploration pictures, gaze, the cliff guard) sees from wherever the arm points; checking those is a later round.
 
 ## After the first hardware round
 
