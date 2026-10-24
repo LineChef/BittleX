@@ -580,6 +580,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="full loop with synthetic IMU and no serial -- rate check")
     ap.add_argument("--cycles", type=int, default=6, help="--openloop: wkF cycles")
+    ap.add_argument("--base", default="wkf", metavar="NAME", help="--openloop: the scripted walk to play, gait/<NAME>_ref.npy (wkArm = Petoi's arm walk, 2026-10-24)")
     ap.add_argument("--lift-scale", type=float, default=1.0, metavar="K",
                     help="--openloop: scale the wkF swing about its mean (1.3/1.6/2.0 -> ~14/21/31 mm foot lift, est.)")
     ap.add_argument("--lift-joints", default="all", choices=("all", "knees"),
@@ -679,7 +680,7 @@ def main():
                      lift_joints=args.lift_joints, shoulder_scale=args.shoulder_scale,
                      ramp_cycles=args.ramp_cycles, volt_every_s=args.volt_every,
                      send_every=args.send_every if args.send_every else 3,
-                     foot_trim=_hh.parse_foot_trims(args.foot_trim))   # default: the policy loop's cadence (i@27)
+                     foot_trim=_hh.parse_foot_trims(args.foot_trim), ref_name=args.base)   # default: the policy loop's cadence (i@27)
         else:
             run(lk, args.cmd, args.seconds, args.hz, args.imu_format,
                 disable_firmware_balance=not args.keep_firmware_balance, log_path=args.log,

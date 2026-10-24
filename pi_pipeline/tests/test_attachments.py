@@ -160,11 +160,15 @@ def test_firmware_check():
     assert A.check_firmware("Bittle X+Arm\nB10_260101", "arm")[0]
     assert not A.check_firmware("Bittle X\nB10_260101", "arm")[0]        # the plain build is not the arm build
     assert A.check_firmware("Bittle X\n", "head")[0]
+    assert not A.check_firmware("Bittle X+Arm\nB10_260101", "head")[0]   # the arm build shifts every posture: not for the AI head
     assert not A.check_firmware("", "arm")[0]
     assert A.check_firmware("anything", "none")[0]
 
 
-def test_arm_skills_come_and_go_with_the_firmware(monkeypatch):
+def test_arm_skills_come_and_go_with_the_firmware(monkeypatch, tmp_path):
+    prof = tmp_path / "profiles.json"
+    prof.write_text(json.dumps({"arm": {"payload_profile": "arm", "current": None, "history": [], "skills": True}}))
+    monkeypatch.setattr(A, "PROFILES_PATH", str(prof))
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     S._add_attachment_skills()
     try:
@@ -178,6 +182,85 @@ def test_arm_skills_come_and_go_with_the_firmware(monkeypatch):
     finally:
         S.remove_attachment_skills()
     assert not set(A._ARM_SKILLS) & set(S.SKILLS)
+
+
+# ------------------------------------------------------------------------------------------------- the arm's first hardware round: switches off
+
+def test_switches_are_on_unless_a_profile_says_false():
+    assert all(A.flag(k, "none") and A.flag(k, "head") for k in ("easing", "gyro_balance", "gait_switching", "skills"))
+    assert A.flag("easing", "arm", {"arm": {"easing": False}}) is False
+    assert A.flag("easing", "arm", {"arm": {}}) is True
+
+
+def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_skills():
+    data = A.load_profiles()["arm"]
+    assert data["payload_profile"] == "arm"
+    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "skills"))
+
+
+def test_the_arm_keeps_its_claw_skills_out_of_the_conversation(monkeypatch):
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    S._add_attachment_skills()
+    assert not set(A._ARM_SKILLS) & set(S.SKILLS)
+
+
+def test_no_easing_with_the_arm(monkeypatch):
+    from pi_pipeline.gait import standup
+    from pi_pipeline.link import transitions
+    monkeypatch.delenv("G2_STAND_RAMP_S", raising=False)
+    monkeypatch.delenv("G2_TRANSITION_RAMP_S", raising=False)
+    assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() > 0
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    assert standup.ramp_seconds() == 0.0 and transitions.max_seconds() == 0.0
+    sent = []
+    assert standup.blend_to_balance(sent.append, sleep=lambda s: None, last_motion_command="i8 40 9 40") is False and not sent
+
+
+def test_the_arm_turns_every_gB_into_gb(monkeypatch):
+    from pi_pipeline.link.serial_link import SerialLink
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    monkeypatch.setattr(SerialLink, "is_connected", property(lambda self: True))
+    lk.send("gB", read_reply=False, settle=0.0)
+    assert lk._ser.out == ["gB"]
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    lk.send("gB", read_reply=False, settle=0.0)
+    assert lk._ser.out[-1] == "gb"
+
+
+def test_startup_turns_the_gyro_off_for_the_arm(monkeypatch):
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    sent = []
+
+    class Arm:
+        def send(self, cmd, **kw):
+            sent.append(cmd)
+            return "Bittle X+Arm\nB10_260101" if cmd == "?" else ""
+    assert A.startup_check(Arm()) is True
+    assert sent[-1] == "gb"
+
+
+def test_the_arm_holds_the_normal_gait(monkeypatch, tmp_path):
+    from pi_pipeline.gait import gait_mode as G
+    p = str(tmp_path / "gait_mode.json")
+    G.set_mode("hi_step", p)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    assert G.current(p) == "normal" and G.blend(p)[:2] == ("normal", "normal")
+    gait, said = G.request("high step", path=p)
+    assert gait == "normal" and "arm" in said
+    assert G.follow_floor("carpet", p) == "normal"
+    assert "fixed" in G.claude_hint()
+    monkeypatch.delenv("G2_ATTACHMENT")
+    assert G.current(p) == "hi_step"                       # the head and no attachment are unchanged
 
 
 def test_the_cli(capsys):

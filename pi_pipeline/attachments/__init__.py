@@ -16,7 +16,13 @@ used, the legacy `DEFAULT_POLICY` runs and the reason is logged.
 
 Each attachment also names the BiBoard firmware model it needs (the first line of the `?` banner); `check_firmware` compares them. The
 arm is a separate build of Petoi's firmware ("Bittle X+Arm", compile-time option `ROBOT_ARM`), so its skills are only offered when the
-banner says so. Guide: docs/guides/attachments.md.
+banner says so. The AI head accepts only the plain "Bittle X" build: the arm build shifts every posture and swaps the gaits (docs/planned/robot-arm.md).
+
+A profile may also switch Pi behaviour off while that attachment is fitted (`flag`; a missing key means on): `easing` (the stand-up ramp, the eased
+moves into skills and the blend to balance at the end of a walk), `gyro_balance` (the firmware gyro balance: every `gB` becomes `gb`),
+`gait_switching` (the gait stays normal; spoken gait commands are answered, not obeyed) and `skills` (the attachment's own skills in the
+conversation). The arm has all four off for its first hardware round (docs/plan-detail/arm-policy-plan.md).
+Guide: docs/guides/attachments.md.
 """
 from __future__ import annotations
 
@@ -58,7 +64,7 @@ _ARM_SKILLS = {
 
 ATTACHMENTS: dict[str, Attachment] = {
     NONE: Attachment(NONE, "no attachment on the neck (the stock head or nothing)", ()),
-    "head": Attachment("head", "the Petoi AI head", ("Bittle X", "Bittle X+Arm"),
+    "head": Attachment("head", "the Petoi AI head", ("Bittle X",),
                        checklist=("power G2 off", "fit the AI head on the neck servo", "Grove cable to the UART socket, the head's transmit line left unconnected")),
     "arm": Attachment("arm", "the Petoi robot arm (claw on the tail joint, index 2)", ("Bittle X+Arm",), skills=_ARM_SKILLS,
                       checklist=("power G2 off", "fit the arm on the neck servo (J-hook neck part, two M2x5 screws)",
@@ -230,6 +236,22 @@ def register(attachment: str, policy: str, *, trim: str | None = None, payload_p
     return prof
 
 
+def flag(key: str, attachment: str | None = None, profiles: dict | None = None) -> bool:
+    """A behaviour switch from the fitted attachment's profile (easing, gyro_balance, gait_switching, skills): on unless the profile says false."""
+    att = attachment or current()
+    v = ((profiles if profiles is not None else load_profiles()).get(att) or {}).get(key)
+    return True if v is None else bool(v)
+
+
+def flag_safe(key: str) -> bool:
+    """`flag` for the gait and link code, which must never fail on it: any error logs and counts as on (the behaviour from before profiles had switches)."""
+    try:
+        return flag(key)
+    except Exception as e:  # noqa: BLE001
+        log.warning("attachment switch %s unreadable (%s): on", key, e)
+        return True
+
+
 # ---------------------------------------------------------------------------------------------------------------------- firmware
 
 def check_firmware(banner: str, attachment: str | None = None) -> tuple[bool, str]:
@@ -305,6 +327,9 @@ def startup_check(link) -> bool | None:
     ok, msg = check_firmware(banner, att)
     if ok:
         log.info("attachment %s: %s", att, msg)
+        if not flag("gyro_balance", att):
+            link.send("gb", read_reply=False, settle=0.0)          # the firmware boots with its gyro balance on; this attachment runs with it off
+            log.info("attachment %s: firmware gyro balance off (profile)", att)
         return True
     from ..voice import skills
     gone = skills.remove_attachment_skills()

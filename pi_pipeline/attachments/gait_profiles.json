@@ -18,9 +18,13 @@
     "voice_module_language": "english"
   },
   "arm": {
-    "payload_profile": null,
+    "payload_profile": "arm",
     "current": null,
     "history": [],
-    "voice_module_language": "english"
+    "voice_module_language": "english",
+    "easing": false,
+    "gyro_balance": false,
+    "gait_switching": false,
+    "skills": false
   }
 }

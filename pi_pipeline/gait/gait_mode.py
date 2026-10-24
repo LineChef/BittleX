@@ -104,14 +104,34 @@ def _read(path: str) -> dict:
         return {}
 
 
+def switching_allowed() -> bool:
+    """False while the fitted attachment has `gait_switching` off (the arm's first tests, user 2026-10-24): the gait is held at normal whatever the state file says."""
+    try:
+        from pi_pipeline.attachments import flag_safe
+    except ImportError:
+        return True
+    return flag_safe("gait_switching")
+
+
+def _held_message() -> str:
+    try:
+        from pi_pipeline.attachments import current as _att
+        what = f"the {_att()}"
+    except ImportError:
+        what = "this attachment"
+    return f"Not with {what} fitted. I'm staying on my normal walk."
+
+
 def current(path: str | None = None) -> str:
+    if not switching_allowed():
+        return DEFAULT
     return _read(path or STATE_PATH).get("mode", DEFAULT)
 
 
 def blend(path: str | None = None, now: float | None = None) -> tuple[str, str, float]:
     """(from_gait, to_gait, alpha): alpha runs 0 -> 1 over BLEND_S after a switch, so the base is a mix of the old and new gait until then."""
     d = _read(path or STATE_PATH)
-    if not d:
+    if not d or not switching_allowed():
         return DEFAULT, DEFAULT, 1.0
     now = time.time() if now is None else now
     a = min(1.0, max(0.0, (now - float(d.get("since", 0.0))) / BLEND_S))
@@ -141,6 +161,8 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     gait = parse_gait_command(text)
     if gait is None:
         return None, ""
+    if not switching_allowed():
+        return DEFAULT, (GAITS[DEFAULT].echo_on if gait == DEFAULT else _held_message())
     set_mode(gait, path)
     if not supports(policy_onnx, gait):
         if not GAITS[gait].scripted_fallback:             # carpet on a policy that never learned it: its normal walk, said out loud
@@ -157,6 +179,8 @@ def uses_scripted(policy_onnx: str | None, gait: str) -> bool:
 def follow_floor(label: str | None, path: str | None = None) -> str:
     """The floor label decides carpet mode (carpet plan, 2026-10-20): a carpet floor switches to it, any other floor switches out of it (another gait the person chose stays)."""
     cur = current(path)
+    if not switching_allowed():
+        return DEFAULT
     if (label or "").strip().lower() == "carpet":
         return set_mode("carpet", path) if cur != "carpet" else cur
     return set_mode(DEFAULT, path) if cur == "carpet" else cur
@@ -183,6 +207,8 @@ def split_compound(text: str):
 def claude_hint() -> str:
     """One system-prompt line for Claude: G2's current walking gait, so a conversational walk uses it and never swaps in another skill."""
     mode = current()
+    if not switching_allowed():
+        return "Your walking gait is NORMAL and fixed while your attachment is fitted: the other gaits (hi step, carpet mode) are switched off for now."
     if mode == "carpet":
         return ("Your walking gait is set to CARPET MODE (for soft carpet). When asked to walk or go forward, use perform_skill walk_forward and it walks in carpet mode. "
                 "The person switches back with 'switch to default gait'.")

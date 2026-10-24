@@ -19,7 +19,7 @@ import sys
 import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-for _p in (_HERE, os.path.join(_HERE, "..")):
+for _p in (_HERE, os.path.join(_HERE, ".."), os.path.join(_HERE, "..", "..")):     # the repo root too: the link reads the fitted attachment's switches (pi_pipeline.attachments)
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -35,7 +35,7 @@ def run_skill(lk, token, seconds, log_path=None, fall_abort_deg=60.0, *,
     def tx(cmd):
         lk.send(cmd, read_reply=False, settle=0.0)
 
-    tx("gB")                     # balance ON for firmware skills
+    tx("gB")                     # balance ON for firmware skills (SerialLink sends gb instead while the fitted attachment has gyro_balance off: the arm)
     sleep(0.3)
     tx("kbalance")               # stand
     sleep(3.0)

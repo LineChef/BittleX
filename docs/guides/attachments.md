@@ -37,6 +37,7 @@ At start-up the fitted attachment's `current` runs. It is skipped when its file 
 Saving a gait:
 
 - **Promotion:** `promote_release.py --candidate trained/X.onnx --name V7 --attachment head --payload-profile pod [--trim fl=-0.3]` copies the release, points `DEFAULT_POLICY` at it as before, writes the payload into the release sidecar, and saves it as the attachment's current gait (the previous one moves to the history). It commits the profile file with the release.
+- **One attachment only:** add `--attachment-only` to save the release as that attachment's gait without moving `DEFAULT_POLICY` (the arm's ARM1, so V7 stays the head and no-attachment policy). A sidecar `base_ref` must have its `pi_pipeline/gait/<base_ref>_ref.npy` (ARM1: `wkArm_ref.npy`, Petoi's arm walk).
 - **By hand:** `g2attach save head Release_Candidate<name>_ppo.onnx --trim fl=-0.3 --payload pod` edits the profile file on the Mac; commit it and deploy.
 - **Per floor:** `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` saves a trim measured on one floor for the fitted attachment's current gait (`off` removes it). When the floor label (`g2floor`) is set and under 12 hours old, a walk on that floor uses it; any other floor uses the general trim. The order is `G2_FOOT_TRIM`, then the per-floor trim, then the saved trim, then `DEFAULT_TRIMS`. Floor labels are always set by a person; nothing names the floor automatically.
 - **Exports:** a new export records its payload with `export_onnx.py --sidecar-extra '{"payload_profile": "pod"}'`.
@@ -50,17 +51,30 @@ Each attachment names the BiBoard firmware it needs: the first line of the BiBoa
 | Attachment | Firmware accepted |
 |---|---|
 | `none` | not checked |
-| `head` | `Bittle X` or `Bittle X+Arm` |
+| `head` | `Bittle X` (the arm build shifts every posture and swaps the gaits, so it is not accepted for the head) |
 | `arm` | `Bittle X+Arm` |
 
-The arm's skills (`pick_up`, `put_down`, `toss`, `show_off`, `clap`: tokens `pickF`, `putF`, `tossF`, `showOff`, `clap` from Petoi's arm page, [`../planned/robot-arm.md`](../planned/robot-arm.md)) are offered to the conversation only with the arm fitted and the arm firmware answering. None has been run on G2 yet.
+The arm's skills (`pick_up`, `put_down`, `toss`, `show_off`, `clap`: tokens `pickF`, `putF`, `tossF`, `showOff`, `clap` from Petoi's arm page, [`../planned/robot-arm.md`](../planned/robot-arm.md)) are offered to the conversation only with the arm fitted, the arm firmware answering and the profile's `skills` switch on. None has been run on G2 yet, so the arm profile has it off until they pass a bench test.
+
+## Behaviour switches
+
+A profile in `gait_profiles.json` can switch Pi behaviour off while its attachment is fitted. A missing key means on, so `none` and `head` behave as before.
+
+| Key | Off means | Arm |
+|---|---|---|
+| `easing` | no stand-up ramp, no eased move into a skill, no blend to balance at the end of a walk (`G2_STAND_RAMP_S` / `G2_TRANSITION_RAMP_S` are ignored) | off |
+| `gyro_balance` | the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb` | off |
+| `gait_switching` | the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it | off |
+| `skills` | the attachment's own skills stay out of the conversation | off |
+
+The arm has all four off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
 
 ## Open, for when the arm arrives
 
 1. Back up the BiBoard calibration before any reflash (a reflash interacts with calibration state: [`../hardware/calibration-and-bringup-research.md`](../hardware/calibration-and-bringup-research.md)).
 2. Test whether the Bittle X+Arm firmware also runs G2 without the arm and with the AI head (walking, calibration, the head). If it does, it stays on the BiBoard and a swap is hardware only; if not, each swap is a reflash with the calibration restored.
 3. A no-attachment policy: the sim has no payload profile yet for the pod without the head (185 g); add one, train it with the same recipe and save it for `none` (until then `none` runs the legacy `DEFAULT_POLICY`).
-4. Weigh the arm and measure where it sits; add a sim payload profile for it, train its policy with the same recipe, and save it as the arm's gait.
+4. Weigh the arm and measure where it sits (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, until then); ARM1 trains on it: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md).
 5. Run the arm's skill tokens on the bench before they are trusted.
 
 ## What a setting cannot switch

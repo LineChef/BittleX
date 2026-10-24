@@ -43,6 +43,12 @@ NEVER_EASE = frozenset({"krc", "krl", "kdropRec", "kcalib", "kzero", "kzz", "kc"
 
 
 def max_seconds() -> float:
+    try:
+        from pi_pipeline.attachments import flag_safe
+        if not flag_safe("easing"):                  # the fitted attachment runs without easing (the arm's first tests, user 2026-10-24)
+            return 0.0
+    except ImportError:
+        pass
     v = os.environ.get("G2_TRANSITION_RAMP_S", "").strip().lower()
     if v in ("off", "none", "false", "no"):
         return 0.0

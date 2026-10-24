@@ -20,7 +20,18 @@ DEFAULT_RAMP_S = 0.8
 STEPS_PER_S = 20
 
 
+def _easing_on() -> bool:
+    """The fitted attachment's `easing` switch (the arm turns every ramp off for its first tests, user 2026-10-24); on when it cannot be read."""
+    try:
+        from pi_pipeline.attachments import flag_safe
+    except ImportError:
+        return True
+    return flag_safe("easing")
+
+
 def ramp_seconds() -> float:
+    if not _easing_on():
+        return 0.0
     v = os.environ.get("G2_STAND_RAMP_S", "").strip().lower()
     if v in ("off", "none", "false", "no"):
         return 0.0
@@ -91,5 +102,8 @@ BLEND_S = 0.6
 
 def blend_to_balance(send, make_cmd=move_cmd, sleep=time.sleep, last_motion_command=None, seconds=BLEND_S) -> bool:
     """Ease the legs from where the last command left them (often mid-stride, a foot in the air) to the balance pose before the `kbalance` token, instead of snapping there (user, 2026-10-10: exploration walks
-    ended with one foot in the air and were unstable). Returns True if a blend ran; an unknown last pose (a firmware gait, a skill) is left to the firmware, as for the stand-up."""
+    ended with one foot in the air and were unstable). Returns True if a blend ran; an unknown last pose (a firmware gait, a skill) is left to the firmware, as for the stand-up.
+    No blend while the fitted attachment has easing off."""
+    if not _easing_on():
+        return False
     return ramp_to_stand(send, make_cmd, BALANCE_URDF_DEG, sleep=sleep, last_motion_command=last_motion_command, seconds=seconds)

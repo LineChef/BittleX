@@ -53,8 +53,11 @@ _BLOCKED = {"c", "cd", "kc"}
 
 
 def _add_attachment_skills() -> None:
-    """The fitted attachment's own skills (the arm's claw tokens), added once at import; attachment `none` adds nothing."""
-    from ..attachments import skills_for
+    """The fitted attachment's own skills (the arm's claw tokens), added once at import; attachment `none` adds nothing, and neither does a profile
+    with `skills` false (the arm until its skills pass a bench test)."""
+    from ..attachments import flag, skills_for
+    if not flag("skills"):
+        return
     for name, (token, description, continuous) in skills_for().items():
         SKILLS.setdefault(name, Skill(token, description, continuous))
 

@@ -163,9 +163,11 @@ class SerialLink:
             log.debug("send(%r) dropped -- not connected", command)
             self._failed(command, "not connected")
             return ""
+        if command.strip() == "gB" and not self._gyro_allowed():
+            command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
             self._ease_transition(command)
-            if transitions.pose_balance(command):
+            if transitions.pose_balance(command) and self._gyro_allowed():
                 self._write_pose("gB")            # a pose plays with the firmware gyro balance on (user, 2026-10-19); after the ease, which runs with it off
                 self.pose_balance_epoch += 1      # the stand guard turns it off again once he has been still
             if command[:1] == "b" and len(command) > 1 and command[1] in "-0123456789":      # a BiBoard buzzer beep
@@ -196,6 +198,14 @@ class SerialLink:
             self._mark_down(f"send failed: {e}")
             self._failed(command, f"send failed: {e}")
             return ""
+
+    @staticmethod
+    def _gyro_allowed() -> bool:
+        try:
+            from pi_pipeline.attachments import flag_safe
+        except ImportError:
+            return True
+        return flag_safe("gyro_balance")
 
     _ramping = False
     _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)

@@ -125,7 +125,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
     ref = m + (ref - m) * scale
     ramp_n = int(ramp_cycles * len(ref))
     dt = 1.0 / hz
-    print(f"open-loop wkF playback: {cycles} cycles, {hz} Hz, lift x{lift_scale:g}"
+    print(f"open-loop {ref_name} playback: {cycles} cycles, {hz} Hz, lift x{lift_scale:g}"
           f"{' (knees only' + (f', shoulders x{shoulder_scale:g}' if shoulder_scale != 1.0 else '') + ')' if lift_joints == 'knees' else ''}"
           f"{', balance off' if balance_off else ''}. Ctrl-C to stop.")
     log = open(log_path, "w") if log_path else None
@@ -139,7 +139,7 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))   # stand first: no jump from rest into mid-stride
         sleep(2.0)
         if log:
-            log.write(f"# openloop wkF  cycles={cycles} hz={hz} lift_scale={lift_scale:g} balance_off={balance_off}\n")
+            log.write(f"# openloop {ref_name}  cycles={cycles} hz={hz} lift_scale={lift_scale:g} balance_off={balance_off}\n")
             log.write("t,roll,pitch,yaw,gx,gy,gz,guard_state,volt\n")
             _send(lk, "gP")
             sleep(0.3)

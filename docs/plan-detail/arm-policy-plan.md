@@ -88,11 +88,13 @@ no-attachment setups) does not change. If it fails, the full report says why, an
    (no `gB`), gait commands answered "not with the arm" and the gait held at normal.
 4. The arm's skills (`pickF`, `putF`, `tossF`, `showOff`, `clap`) kept out of the conversation until they pass the bench test.
 5. The head attachment stops accepting the `Bittle X+Arm` firmware (the arm build changes every posture).
-6. A new hardware epoch for the real-data pipeline (`arm`), so arm-build walks never mix with the AI head epoch.
+6. A new hardware epoch for the real-data pipeline (`arm`), so arm-build walks never mix with the AI head epoch. Added with the install time
+   when the user says the arm is on (epochs are dated by their start).
 
-All of it is deployed when the Pi is idle and committed first; none of it changes the head or no-attachment behaviour (tests pin that).
-About 90 minutes of work, done while the screens and chain run: ready about 8:00 PM (items 2 and 3 first, about 7:00 PM, so the walk steps
-can start).
+Items 1 to 5 are built and tested on the Mac (2026-10-24): the profile switches `easing`, `gyro_balance`, `gait_switching` and `skills` are
+off for the arm ([`../guides/attachments.md`](../guides/attachments.md) "Behaviour switches"); `run_gait.py --openloop --base wkArm` plays
+the arm walk (H5). None of it changes the head or no-attachment behaviour (tests pin that). **Not deployed: the Pi gets it only after the
+user says the arm is installed** (user, 2026-10-24), when the Pi is idle and everything is committed.
 
 ## Hardware test plan (after the arm is installed)
 
@@ -106,13 +108,13 @@ report in between. Battery as percent at the start of each step.
 | H2 | `g2attach arm`; `python -m pi_pipeline.doctor --serial` | firmware check passes, the arm's gait and settings shown | 5 min |
 | H3 | Bench poses: a small joint 1 move (which way is up), claw open / close, `kbalance`, `ksit`, `krest` from standing (does the claw clear the floor?), back to stand; one camera picture (does the arm block the view?) | no contact, no jump, view noted | 15 min |
 | H4 | Petoi's walk: `fw_skill_log.py kwkF --seconds 10` (plays `wkArmF`), balance off, with a phone video; twice | distance and drift recorded; the cycle time counted from the video | 10 min |
-| H5 | The same walk from the Pi at the training pace: `run_gait.py --openloop --cycles 6` on the arm walk base | compared with H4 | 10 min |
+| H5 | The same walk from the Pi at the training pace: `run_gait.py --openloop --base wkArm --cycles 6` | compared with H4 | 10 min |
 | H6 | ARM1: `run_gait.py --cmd 0.10 --seconds 12.5`, three walks; then V7 once for comparison | no falls; distance and drift; a foot trim if needed (`g2attach save arm ... --trim`) | 25 min |
 | H7 | Turns: `kwkL` / `kwkR` (play the arm turn) | turns without tipping | 10 min |
 | H8 | Rest and stand: `d`, then stand (no easing) | no fall, heading jump noted | 5 min |
 
 About 2.5 to 3 hours in all, at the pace of one go per step. H0 to H3 do not need ARM1 and can run tonight while it trains; H4 and H5 need the
-Pi work below deployed (about 7:00 PM, see that section); H6 needs ARM1 (about 11:35 PM, or the next morning).
+Pi work above deployed (after the user says the arm is installed); H6 needs ARM1 (about 11:35 PM, or the next morning).
 
 Not in this round: self-right with the arm, exploration, the arm's pick and toss skills on the floor, voice-driven walks.
 

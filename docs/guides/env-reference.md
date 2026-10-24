@@ -182,7 +182,7 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_SPEECH_PREWARM` | `"1"` | `__main__.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_STALL_LOG` | `"1"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_STAND_GUARD` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
-| `G2_STAND_RAMP_S` | `""` | `standup.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_STAND_RAMP_S` | `""` | `standup.py` | [`attachments.md`](attachments.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_STAND_REASSERT_S` | `600.0` | `config.py` | [`operating-lessons.md`](operating-lessons.md) |
 | `G2_STATE_DIR` | — | `bringup.py`, `character_state.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_STREAM` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
@@ -198,7 +198,7 @@ Every `G2_*` variable the Pi code and the tools read: **214**, of which **0** ar
 | `G2_SYSTEM_PROMPT` | — | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_TIDY_DAYS` | `30.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_TRAITS` | `"curiosity=0.8"` | `config.py` | [`.env.example`](../../.env.example), [`capabilities.md`](../capabilities.md), [`shell-helpers.md`](shell-helpers.md) +1 |
-| `G2_TRANSITION_RAMP_S` | `""` | `transitions.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_TRANSITION_RAMP_S` | `""` | `transitions.py` | [`attachments.md`](attachments.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_TRANSITION_READ_POSE` | — | `check_serial.py`, `transitions.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_TTS` | `"auto"` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_USAGE_FILE` | `"~/.local/share/g2/api_usage.json"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
