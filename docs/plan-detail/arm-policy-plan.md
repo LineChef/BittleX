@@ -124,6 +124,15 @@ Pi work above deployed (after the user says the arm is installed); H6 needs ARM1
 Not in this round: self-right with the arm, exploration, the arm's pick and toss skills on the floor, voice-driven walks. With the camera on the claw,
 every camera-using behaviour (exploration pictures, gaze, the cliff guard) sees from wherever the arm points; checking those is a later round.
 
+## After ARM1 finishes (user, 2026-10-24: viewer updates apply to training once it completes)
+
+- One shared "looks" module (pod meshes from `build_pod_mesh.py`, the arm part colours, the white camera) used by every viewer: `g2watchrun`, `g2watchsim`, the
+  training-episode replays and the simulator's own GUI view, so a look changed in one shows in all. Looks only; no physics change.
+- The pod's physics box to its CAD position: the platform project's model puts the pod 15.7 mm (0.6 in) higher than the sim's box and 71 mm wide (the box is
+  59 mm). Raising the box raises G2's centre of mass, so it applies to the next training run (ARM2 or an ARM1 retrain), not to ARM1.
+- The arm's parts table (`opencat_gym_env.ARM_PARTS`) is already the single source for both the physics and the viewer: refining it from the user's photos
+  changes both.
+
 ## After the first hardware round
 
 - If Petoi's cycle (H4) differs from 1.25 s by more than 20%: a 3M screen at the matched speed (`phase_rate_nom_cmd` in the sidecar).
