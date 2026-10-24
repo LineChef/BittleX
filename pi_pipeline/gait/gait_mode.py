@@ -161,8 +161,8 @@ def request(text: str, policy_onnx: str | None = None, path: str | None = None) 
     gait = parse_gait_command(text)
     if gait is None:
         return None, ""
-    if not switching_allowed():
-        return DEFAULT, (GAITS[DEFAULT].echo_on if gait == DEFAULT else _held_message())
+    if not switching_allowed():                           # held at normal: "walk normally" is fine, any other gait is refused (None) with the reason
+        return (DEFAULT, GAITS[DEFAULT].echo_on) if gait == DEFAULT else (None, _held_message())
     set_mode(gait, path)
     if not supports(policy_onnx, gait):
         if not GAITS[gait].scripted_fallback:             # carpet on a policy that never learned it: its normal walk, said out loud

@@ -256,7 +256,8 @@ def test_the_arm_holds_the_normal_gait(monkeypatch, tmp_path):
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     assert G.current(p) == "normal" and G.blend(p)[:2] == ("normal", "normal")
     gait, said = G.request("high step", path=p)
-    assert gait == "normal" and "arm" in said
+    assert gait is None and "arm" in said                 # refused (the losing horn), with the reason
+    assert G.request("walk normally", path=p)[0] == "normal"
     assert G.follow_floor("carpet", p) == "normal"
     assert "fixed" in G.claude_hint()
     monkeypatch.delenv("G2_ATTACHMENT")

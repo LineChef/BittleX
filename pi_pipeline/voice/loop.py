@@ -499,6 +499,8 @@ class VoiceLoop:
                     self._speak("Hi step on." if gait == "hi_step" else "Walking normally.")
                 else:
                     self._refuse_sound()
+                    if said:
+                        self._speak(said)                 # why (the arm holds the normal gait)
                 user_text = both[1]
                 cmd = match_local_command(user_text)
         if cmd is None and self._namer is not None:
