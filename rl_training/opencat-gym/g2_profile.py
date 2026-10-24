@@ -201,7 +201,7 @@ OBS_LEVERS = ("heading_obs", "privileged_critic", "heading_blind", "load_obs", "
 # Settings only train.py reads (how training runs, not the world): never part of a scoring or ladder environment.
 TRAINER_ONLY_PREFIXES = ("G2E_N_ENVS", "G2E_LEAN_INFO", "G2E_RUN_MONITOR", "G2E_MONITOR_EVERY", "G2E_PLATEAU", "G2E_PPO_", "G2E_NORM_REWARD", "G2E_LOG_STD_INIT",
                          "G2E_LR_FLOOR", "G2E_FRONTIER", "G2E_HAZARD_EP_LEN", "G2E_HAZARD_X_SCALE", "G2E_LR_SCALE", "G2E_FRONTIER_FLOOR", "G2E_CMD_BANDS", "G2E_SEED", "G2E_TORCH_THREADS",
-                         "G2E_FR_", "G2E_TARGET_KL")
+                         "G2E_FR_", "G2E_TARGET_KL", "G2E_HEALTH_")
 
 # --- the staged chain (cumulative course settings); K3 is stage s0 ---
 # The SURFACE STEP / TRANSITION (a hard floor turning into a soft, high-friction carpet-like slab with a 12 mm step) is taken out of the training course COMPLETELY (user, 2026-10-08): no stage,

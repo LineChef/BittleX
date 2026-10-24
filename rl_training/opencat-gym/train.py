@@ -372,6 +372,7 @@ class RunMonitor(BaseCallback):
         self.best = -1.0
         self.bad = {"ev": 0, "clean": 0}
         self.health_stop = None
+        self.warn_only = os.environ.get("G2E_HEALTH_WARN_ONLY", "0") not in ("0", "")     # ARM1 (user, 2026-10-24: "nothing should fail the arm walk"): the learning checks only warn; a non-finite loss still stops
         self.cool = None             # (start step, start lr, end step)
         self.env = None
 
@@ -444,11 +445,17 @@ class RunMonitor(BaseCallback):
             if ev < 0.5:
                 flags.append(f"explained variance {ev:.2f} < 0.5")
             if self.bad["ev"] >= 2:
-                self.health_stop = f"explained variance below 0.2 twice in a row ({ev:.2f})"
+                if self.warn_only:
+                    flags.append(f"explained variance below 0.2 twice in a row ({ev:.2f}; warn only)")
+                else:
+                    self.health_stop = f"explained variance below 0.2 twice in a row ({ev:.2f})"
         if self.num_timesteps >= 3_000_000:
             self.bad["clean"] = self.bad["clean"] + 1 if res["clean"] < 0.35 else 0
             if self.bad["clean"] >= 2:
-                self.health_stop = f"clean-floor eval below 0.35 twice in a row ({res['clean']:.2f})"
+                if self.warn_only:
+                    flags.append(f"clean-floor eval below 0.35 twice in a row ({res['clean']:.2f}; warn only)")
+                else:
+                    self.health_stop = f"clean-floor eval below 0.35 twice in a row ({res['clean']:.2f})"
         cf = lg.get("train/clip_fraction")
         if cf is not None and cf > 0.3:
             flags.append(f"clip fraction {cf:.2f} > 0.3")

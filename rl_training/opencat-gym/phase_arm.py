@@ -2,6 +2,10 @@
 AI head; stock shoulders and feet). Plan, rules and results: docs/plan-detail/arm-policy-plan.md (user approved 2026-10-24, the 20M included). A copy of phase_pod.py with its own
 tags (arm_*), state, log, report and candidate names; it never promotes or deploys anything.
 
+Nothing fails the arm walk (user, 2026-10-24: "nothing should fail the arm walk. we need to train a policy"): the chain always trains on wkArm; the screen, the S3 check, the 20M's
+flat-ground checks, the trainer's learning checks (G2E_HEALTH_WARN_ONLY) and the promotion rule are all measured and logged, and none of them stops or redirects the training.
+Only a crash (or a non-finite loss) stops it.
+
     python phase_arm.py run       # preflight -> screens armwk / armctl (3M) -> S0 -> S1 -> S2 -> S3 -> flat check -> S4 (20M) -> pick -> export -> score V7 in the claw world -> verdict
     python phase_arm.py status | plan
 
@@ -39,8 +43,7 @@ ADOPTED = ["cross_bonus", "haz_speed", "haz_posture", "heading_blind"]
 BASE6 = V5.BASE + ADOPTED + ["ledge30"]                            # the V7 recipe
 ARM_REF = "wkArm"
 SCREENS = [   # (tag, base walk or None for wkF, what it is)
-    ("armwk", ARM_REF, "the arm walk base (the candidate recipe)"),
-    ("armctl", None, "today's wkF base (the control)"),
+    ("armwk", ARM_REF, "the arm walk base, an early read (no gate)"),
 ]
 SCREEN_MIN = 30
 STAGES = [   # (name, lever, steps, minutes estimate)
@@ -87,6 +90,7 @@ def score(policy, ref, episodes, ladder_episodes):
 def stage_env(name, lever, ref, last=False):
     env = g2_profile.env_for_job({"kind": "final", "tag": TAG(name), "fresh": True, "levers": list(BASE6) + [lever]})
     env["G2E_SEED"] = "42"
+    env["G2E_HEALTH_WARN_ONLY"] = "1"
     if ref:
         env["G2E_SKILL_REF"] = ref
     if not last:
@@ -156,20 +160,13 @@ def screens(st):
     if "base" in st:
         return
     res = {tag: screen(tag, ref, what) for tag, ref, what in SCREENS}
-    wk, ctl = res["armwk"], res["armctl"]
-    wk_ok = learned(wk) and (not learned(ctl) or flat_falls(wk) <= flat_falls(ctl))
-    if wk_ok:
-        st["base"] = ARM_REF
-        why = "it learns and falls no more on flat ground than the control"
-    elif learned(ctl):
-        st["base"] = None
-        why = "the arm walk screen failed the gate (learns / flat falls no more than the control); the chain trains on wkF, the control recipe"
-    else:
-        halt("DECISION NEEDED: neither screen learned on the claw payload; see trained/arm_score_armwk.json and trained/arm_score_armctl.json")
     for tag in res:
-        if not res[tag].get("health_stop"):
+        if res[tag].get("health_stop"):
+            log(f"SCREEN {tag}: the trainer's health check stopped it (reported only)")
+        else:
             log(f"SCREEN {tag}: learned {learned(res[tag])} | flat falls {flat_falls(res[tag]):.2f} | mean cell falls {mean_cell_falls(res[tag])[0]:.3f}")
-    log(f"SCREENS: the chain trains on {st['base'] or 'wkF'} ({why})")
+    st["base"] = ARM_REF
+    log("SCREENS: the chain trains on wkArm (no gate: the user wants the arm walk policy trained)")
     save_state(st)
 
 
@@ -199,7 +196,7 @@ def score_stage(name, ref):
 
 
 def go_no_go(st):
-    """The user approved the 20M (2026-10-24); it starts unless S3 falls on flat ground or its calm-walk heading is over 30 deg."""
+    """The user approved the 20M (2026-10-24) and it always starts: the S3 flat-ground and heading check is logged, not a gate."""
     if st.get("go"):
         return
     c = cm(json.load(open("trained/arm_score_s3.json")))
@@ -207,7 +204,7 @@ def go_no_go(st):
     head, asym = c["N1"]["heading_abs_mean_deg"], c["N1"]["lr_asym_max_deg"]
     log(f"S3 CHECK | flat falls none = {flat} | calm walk heading {head:.0f} asym {asym:.1f}")
     if not flat or head > 30:
-        halt(f"DECISION NEEDED: S3 falls on flat ground or its heading is over 30 deg (flat none = {flat}, heading {head:.0f}); review trained/arm_score_s3.json before the 20M")
+        log(f"S3 NOTE: flat-ground falls or heading over 30 deg (flat none = {flat}, heading {head:.0f}); the 20M starts anyway (no gate)")
     st["go"] = True
     save_state(st)
     log("S3 GO: the 20M consolidation starts now (approved by the user)")
@@ -277,8 +274,7 @@ def final(st, ref):
             halt(f"HALT: the 20M stopped before {step // 10**6}M: {why}")
         row = track(step)
         if step in V5.FINAL_CHECKS and row is not None and max(row["t11"], row["n1"]) > 0.25:
-            RP.stop(tag)
-            halt(f"DECISION (mine): the 20M falls on flat ground at {step // 10**6}M (T1.1 {row['t11']:.2f}, N1 {row['n1']:.2f}); stopped for review")
+            log(f"{tag} NOTE {step // 10**6}M: flat-ground falls T1.1 {row['t11']:.2f}, N1 {row['n1']:.2f} (no gate: training goes on)")
         done.add(step)
         st["tracked"] = sorted(done)
         save_state(st)
@@ -385,6 +381,12 @@ def run():
     os.environ["G2E_V5_LEDGE_TOP"] = V5.LEDGE_TOP
     preflight(st)
     screens(st)
+    hold = "trained/arm_hold"                                        # the chain waits while this file exists (2026-10-24: the claw's real shape goes into the sim first)
+    if os.path.exists(hold):
+        log(f"HOLD: the chain waits until {hold} is removed ({open(hold).read().strip()})")
+        while os.path.exists(hold):
+            time.sleep(30)
+        log("HOLD released: the chain starts")
     ref = base_of(st)
     prev = None
     for name, lever, steps, minutes in STAGES:
