@@ -44,7 +44,7 @@ def touch():
 
 POD_MESH = os.path.join(HERE, "models", "local", "pod_mesh.json")      # build_pod_mesh.py: the pod's real look (looks only; the physics is the box)
 PART_RGBA = {"neck_bracket": [0.23, 0.23, 0.25, 1], "lift_servo": [0.15, 0.15, 0.17, 1], "claw_servo": [0.15, 0.15, 0.17, 1], "arm_link": [0.55, 0.57, 0.6, 1],
-             "jaw_left": [0.91, 0.39, 0.11, 1], "jaw_right": [0.91, 0.39, 0.11, 1], "camera": [0.17, 0.18, 0.2, 1], "claw": [1.0, 0.55, 0.1, 0.85],
+             "jaw_left": [0.91, 0.39, 0.11, 1], "jaw_right": [0.91, 0.39, 0.11, 1], "camera": [0.95, 0.95, 0.94, 1], "claw": [1.0, 0.55, 0.1, 0.85],
              "head": [0.23, 0.23, 0.25, 1]}
 
 
