@@ -4,6 +4,7 @@ Detail behind [`../project-plan.md`](../project-plan.md): phase write-ups for th
 
 | | |
 |---|---|
+| [`arm-policy-plan.md`](arm-policy-plan.md) | ARM1: the arm walk policy on the claw payload (stock legs), its hardware test plan. |
 | [`hardware-session-plan-2026-10-09.md`](hardware-session-plan-2026-10-09.md) | The hardware session plan and its dated log. |
 | [`phase4-hardware-assembly.md`](phase4-hardware-assembly.md) | Phase 4: hardware assembly. |
 | [`phase7-voice.md`](phase7-voice.md) | Phase 7: voice. |

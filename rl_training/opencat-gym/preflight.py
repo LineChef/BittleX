@@ -56,9 +56,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--levers", default=None)
     ap.add_argument("--steps", default="1e5")
+    ap.add_argument("--env", action="append", default=[], help="KEY=VALUE added to the job's environment, e.g. G2E_SKILL_REF=wkArm (another base walk)")
     a = ap.parse_args()
     if a.levers:
-        levers, extra = a.levers.split(","), {}
+        levers, extra = a.levers.split(","), dict(kv.split("=", 1) for kv in a.env)
     else:
         r = json.load(open(os.path.join(HERE, "trained/v4_results.json")))
         levers, extra = r["base"], r.get("base_extra", {})

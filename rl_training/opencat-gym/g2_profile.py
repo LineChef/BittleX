@@ -271,9 +271,17 @@ def world2() -> bool:
     return os.environ.get("G2_WORLD", "") == "2" or os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "trained", "v3_world2"))
 
 
+def payload_world() -> dict:
+    """G2_PAYLOAD_PROFILE (not a G2E_ setting, so the runners' env clean-up keeps it) swaps the payload for every training and scoring environment of that process:
+    the arm runner (phase_arm.py, 2026-10-24) sets it to "arm" so its screens, its chain and every policy it scores (V7 included) carry the claw. Unset: nothing changes."""
+    v = os.environ.get("G2_PAYLOAD_PROFILE", "").strip()
+    return {"G2E_PAYLOAD_PROFILE": v} if v else {}
+
+
 def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = None) -> dict:
     """The G2E_* environment for a training run: RECIPE + CALIBRATION + levers + (a stage's course settings) + extra."""
     out = dict(RECIPE)
+    out.update(payload_world())
     out.update(CALIBRATION)
     cal, cal_id = calibration_snapshot()
     out.update(cal)
@@ -337,7 +345,7 @@ def next_final_env(levers=("mirror",)) -> dict:
 def scoring_env(*lever_names: str) -> dict:
     """The physical setup for scoring: RECIPE + CALIBRATION, minus training-only settings. Levers that change the observation or the
     reward geometry a policy was trained with (heading_obs) must be passed so the scoring env builds the same inputs."""
-    out = {k: v for k, v in {**RECIPE, **CALIBRATION, **calibration_snapshot()[0], **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
+    out = {k: v for k, v in {**RECIPE, **payload_world(), **CALIBRATION, **calibration_snapshot()[0], **(WORLD2_CALIBRATION if world2() else {})}.items() if not k.startswith(TRAIN_ONLY_PREFIXES)}
     for name in lever_names:
         if name in OBS_LEVERS:
             out.update(LEVERS[name])

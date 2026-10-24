@@ -505,6 +505,21 @@ elif PAYLOAD_PROFILE == "pod":
     PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
     HEAD_BOX_HALF = (0.015875, 0.015875, 0.0254)
     HEAD_MASS_POS = (0.068375, 0.0, 0.00984)      # centre 9.8 mm up: 20% of the head's 50.8 mm height lower than before (owner, 2026-10-18)
+elif PAYLOAD_PROFILE == "arm":
+    # 2026-10-24 (docs/plan-detail/arm-policy-plan.md): the pod as above, with the Petoi robot arm (claw) on the neck in place of the AI head. Not yet weighed: Petoi's spec pages put the arm build at up to
+    # 353 g against 290 g for the plain Bittle X, so the arm adds about 63 g over the stock head (which stays inside the 254 g base), about 502 g in all. Its centre is taken 80 mm ahead of the body centre
+    # at the torso's mid height (the arm reaches forward from the neck); the mass is varied +-15 g and the centre +-10 mm in x and z per episode (HEAD_JITTER_XZ) until the real numbers replace them.
+    # The claw body collides with the floor and obstacles (not with G2's own legs), and a touch counts as an elbow contact (FAC_ARM_CONTACT), so a stumble onto the claw or a claw strike costs.
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.0
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.063, 0.015
+    REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
+    PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
+    PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
+    HEAD_BOX_HALF = (0.030, 0.015, 0.0125)        # 60 x 30 x 25 mm
+    HEAD_MASS_POS = (0.080, 0.0, 0.0)
+POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
+HEAD_JITTER_XZ = 0.010 if PAYLOAD_PROFILE == "arm" else 0.0
+HEAD_COLLIDES = PAYLOAD_PROFILE == "arm"
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
 # both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
 # height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
@@ -533,7 +548,7 @@ DRIFT_STROKE = float(os.environ.get("G2E_DRIFT_STROKE", "0") or 0)
 # turns ~140 deg; a direct yaw disturbance does, and it forces the policy to use the heading it already observes, whatever the real cause is.
 DRIFT_TORQUE = float(os.environ.get("G2E_DRIFT_TORQUE", "0") or 0)
 DRIFT_STROKE_CENTRE_DEG = 50.0    # the stance angle of the shoulder / hip joints (run_gait.STAND_URDF_DEG)
-PAYLOAD_WELD_FORCE = 1e5 if PAYLOAD_PROFILE == "pod" else 5e3   # max force of the welds that fuse the payload bodies to the torso (pod: much stiffer than the old 5e3, owner 2026-10-18: fused to the body, no separate swing)
+PAYLOAD_WELD_FORCE = 1e5 if POD_LIKE else 5e3   # max force of the welds that fuse the payload bodies to the torso (pod: much stiffer than the old 5e3, owner 2026-10-18: fused to the body, no separate swing)
 PAYLOAD_PROB = 1.0         # G4: always mounted (was 0.90). Bare-robot robustness is a canary in eval, not a train target.
 ROUGH_TERRAIN = 0.6        # 0..1 amplitude of a continuous heightfield (carpet ripple / thresholds), * _dr
 ROUGH_TERRAIN_PROB = 0.35  # fraction of episodes on the heightfield instead of the flat/sloped plane
@@ -1780,6 +1795,8 @@ class OpenCatGymEnv(gym.Env):
                 hit = p.getContactPoints(bodyA=self.robot_id, linkIndexA=idx)
             if hit:
                 self.arm_contact += 1
+        if HEAD_COLLIDES and self._head_id is not None and p.getContactPoints(bodyA=self._head_id):   # arm: the claw on the floor or an obstacle counts as an elbow contact
+            self.arm_contact += 1
 
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
@@ -2661,16 +2678,21 @@ class OpenCatGymEnv(gym.Env):
             p.applyExternalTorque(self.robot_id, -1, [0.0, 0.0, t], p.LINK_FRAME)
 
     @staticmethod
-    def _payload_body(mass, half, pos, orn=None):
+    def _payload_body(mass, half, pos, orn=None, collide_with=None):
         """A welded payload body. "box": real inertia from a non-colliding box; "legacy":
-        the pre-2026-09-23 shapeless body (zero inertia = locks the robot's rotation)."""
+        the pre-2026-09-23 shapeless body (zero inertia = locks the robot's rotation).
+        collide_with = a robot id: the box touches the floor and obstacles but none of that robot's links (the arm's claw)."""
         if PAYLOAD_INERTIA == "legacy":
             return p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=-1, basePosition=pos)
         cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
         vs = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half), rgbaColor=[1.0, 0.55, 0.1, 0.6]) if PAYLOAD_VISUAL else -1
         b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=pos,
                               **({"baseOrientation": orn} if orn is not None else {}))
-        p.setCollisionFilterGroupMask(b, -1, 0, 0)     # inertia from the box; touches nothing
+        if collide_with is None:
+            p.setCollisionFilterGroupMask(b, -1, 0, 0)     # inertia from the box; touches nothing
+        else:
+            for _l in range(-1, p.getNumJoints(collide_with)):
+                p.setCollisionFilterPair(b, collide_with, -1, _l, 0)
         return b
 
     def reset(self, seed=None, options=None):
@@ -3093,7 +3115,7 @@ class OpenCatGymEnv(gym.Env):
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND) + self._load_kg      # heavy load: the extra mass goes into the block
             pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
-            if PAYLOAD_PROFILE == "pod":
+            if POD_LIKE:
                 pj[:] = 0.0                    # pod: a perfectly balanced block, its centre of mass exactly at its middle and fixed on the body (owner, 2026-10-18); the mass still varies
             if BALANCED:                       # the payload sits off-centre to the left as often as to the right
                 pj[1] = abs(pj[1]) * self._deal("payload_y", (-1.0, 1.0))
@@ -3101,7 +3123,7 @@ class OpenCatGymEnv(gym.Env):
             if POD_RIGHT_MAX > 0:              # stands in for G2's measured right lean (the pod itself is centred, owner 2026-10-18); -y is G2's right
                 off[1] -= float(np.random.uniform(0.0, POD_RIGHT_MAX))
             def _spawn(o):                     # pod: the block starts exactly where its weld holds it (the robot's start pose is tilted), so nothing snaps into place in the first steps
-                if PAYLOAD_PROFILE == "pod":
+                if POD_LIKE:
                     Rm = np.array(p.getMatrixFromQuaternion(start_orient)).reshape(3, 3)
                     return list(np.array(start_pos) + Rm @ np.array(o)), list(start_orient)
                 return [start_pos[0] + o[0], start_pos[1] + o[1], start_pos[2] + o[2]], None
@@ -3112,10 +3134,12 @@ class OpenCatGymEnv(gym.Env):
             if HEAD_MASS_NOM > 0:
                 hm = HEAD_MASS_NOM + np.random.uniform(-HEAD_MASS_RAND, HEAD_MASS_RAND)
                 hj = np.random.uniform(-0.003, 0.003, 3); hj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
-                if PAYLOAD_PROFILE == "pod":
+                if POD_LIKE:
                     hj[:] = 0.0                # fixed on the body, like the pod block
+                if HEAD_JITTER_XZ > 0:         # arm: the claw's centre is an estimate, so it moves per episode (fixed within one)
+                    hj[0], hj[2] = np.random.uniform(-HEAD_JITTER_XZ, HEAD_JITTER_XZ, 2)
                 hoff = [HEAD_MASS_POS[0] + hj[0], HEAD_MASS_POS[1] + hj[1], HEAD_MASS_POS[2] + hj[2]]
-                self._head_id = self._payload_body(hm, HEAD_BOX_HALF, *_spawn(hoff))
+                self._head_id = self._payload_body(hm, HEAD_BOX_HALF, *_spawn(hoff), collide_with=self.robot_id if HEAD_COLLIDES else None)
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
                 p.changeConstraint(_hc, maxForce=PAYLOAD_WELD_FORCE)

@@ -44,7 +44,7 @@ Docs that mention this family: [`vision-in-gait.md`](../archive/rl/vision-in-gai
 
 ## `checkpoints`
 
-Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md) +16.
+Docs that mention this family: [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md), [`phase10-integration.md`](../archive/plan-detail/phase10-integration.md) +17.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -60,7 +60,7 @@ Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mount
 
 ## `control`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +51.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +52.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -170,7 +170,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 
 ## `joint`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +64.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +65.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -242,7 +242,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payl
 
 ## `pod`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +11.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`attachments.md`](../guides/attachments.md), [`settings-switches.md`](../guides/settings-switches.md) +12.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -267,7 +267,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +42.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +43.
 
 | File | Size | Cited by |
 |---|---|---|
