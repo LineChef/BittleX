@@ -603,10 +603,50 @@ def test_the_sim_carries_the_weighed_mass_and_front_rear_balance():
             Ms.append(ms.sum() * 1000); Ss.append(100 * float(np.dot(com - rear, ax) / L))
         print(round(float(np.median(Ms))), round(float(np.median(Ss)), 1))
     ''')
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300,
+                         env={k: v for k, v in os.environ.items() if k != "G2_PAYLOAD_PROFILE"})      # the default payload, whatever world the calling runner is in (phase_arm.py sets "arm")
     mass, share = map(float, out.stdout.strip().splitlines()[-1].split())
     assert 470 <= mass <= 492, mass
     assert 48.0 <= share <= 54.0, share
+
+
+def test_the_arm_world_swaps_the_payload_for_training_and_scoring(monkeypatch):
+    """G2_PAYLOAD_PROFILE=arm (phase_arm.py, 2026-10-24) puts the claw payload in every training and scoring environment; unset, nothing changes."""
+    import g2_profile as G
+    monkeypatch.delenv("G2_PAYLOAD_PROFILE", raising=False)
+    assert G.env_for()["G2E_PAYLOAD_PROFILE"] == "pod" and G.scoring_env()["G2E_PAYLOAD_PROFILE"] == "pod"
+    monkeypatch.setenv("G2_PAYLOAD_PROFILE", "arm")
+    assert G.env_for()["G2E_PAYLOAD_PROFILE"] == "arm" and G.scoring_env()["G2E_PAYLOAD_PROFILE"] == "arm"
+    assert G.env_for_job({"kind": "final", "tag": "t", "fresh": True, "levers": []})["G2E_PAYLOAD_PROFILE"] == "arm"
+
+
+def test_the_arm_profile_carries_the_pod_and_a_colliding_claw():
+    """The arm payload: the 185 g pod plus a 63 g (+-15 g) claw 80 mm ahead of the body centre that touches the floor but not G2's legs."""
+    import subprocess, sys, textwrap
+    code = textwrap.dedent('''
+        import os, sys, numpy as np
+        sys.path.insert(0, ".")
+        os.environ["G2_PAYLOAD_PROFILE"] = "arm"
+        import g2_profile
+        g2_profile.set_environ(g2_profile.scoring_env())
+        import pybullet as p
+        import opencat_gym_env as E
+        E.DR_EVAL_FULL = True
+        env = E.OpenCatGymEnv()
+        hm, legs = [], 0
+        for k in range(6):
+            env.reset(seed=k)
+            hm.append(p.getDynamicsInfo(env._head_id, -1)[0])
+            for _ in range(20):
+                p.stepSimulation()
+                legs += len(p.getContactPoints(env._head_id, env.robot_id))
+        print(E.POD_LIKE, E.HEAD_COLLIDES, round(min(hm) * 1000), round(max(hm) * 1000), round(p.getDynamicsInfo(env._payload_id, -1)[0] * 1000), legs)
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
+    pod_like, collides, lo, hi, pod, legs = out.stdout.strip().splitlines()[-1].split()
+    assert pod_like == "True" and collides == "True", out.stdout[-300:]
+    assert 48 <= int(lo) and int(hi) <= 78 and int(pod) == 185
+    assert int(legs) == 0                     # no contact pairs with G2's own links
 
 
 def test_world2_moves_the_payload_forward_only_when_asked(monkeypatch):
