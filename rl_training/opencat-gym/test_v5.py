@@ -183,14 +183,15 @@ print("OK", os.path.join(e._live_dir, "scene.json"))
     assert "OK" in out
     scene = out.split("OK", 1)[1].strip().split()[-1]
     out2 = _child(r"""
-import json, sys
+import json, os, sys
 sys.path.insert(0, ".")
 import pybullet as p
 import watch_live
 p.connect(p.DIRECT)
 sc = json.load(open(%r))
 rid, ids = watch_live.build(p, sc)
-solid = [b for b in sc["bodies"] if b["shapes"]]
+dressed = os.path.exists(watch_live.DRESSED.format(""))          # the dressed model (build_body_mesh.py) draws the pod itself
+solid = [b for b in sc["bodies"] if b["shapes"] and not (dressed and b.get("part") == "pod")]
 assert rid is not None and len(ids) == len(solid), (len(ids), len(solid))
 print("BUILT", len(ids))
 """ % scene)

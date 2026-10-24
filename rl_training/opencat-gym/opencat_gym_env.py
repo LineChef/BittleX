@@ -515,15 +515,17 @@ elif PAYLOAD_PROFILE == "arm":
     PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.170, 0.0  # the weighed 185 g pod minus the camera (about 15 g, not weighed), which rides on the claw
     HEAD_MASS_NOM, HEAD_MASS_RAND = 0.0, 0.0          # no head body: ARM_PARTS
     REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
-    PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
-    PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
+    # the pod box at its CAD place (user, 2026-10-24: the platform project's model, fitted to the sim's joint line): 94 x 71.2 x 37.2 mm, 28 to 65.2 mm above the joint
+    # line (it sits on the cover's pegs), 17.6 mm higher and 12 mm wider than the pod profile's box
+    PAYLOAD_BOX_HALF = (0.0470, 0.0356, 0.0186)
+    PAYLOAD_POS = (-0.0092, 0.0, 0.0466)
     HEAD_BOX_HALF = (0.030, 0.015, 0.0125)
     HEAD_MASS_POS = (0.080, 0.0, 0.0)
 # The arm (and the camera on it) as welded parts, base frame, in the WALKING pose (user, 2026-10-24): the arm hangs down in front of the chest from the neck servo and the claw
 # at its bottom points forward, parallel to the ground (a reverse L). All sizes and weights are ESTIMATES until measured (Petoi publishes no dimensions or CAD).
 # (name, mass kg, box half extents m, centre m): 63 g of arm over the stock head (Petoi's spec pages), 15 g of camera on the claw, lens forward.
 ARM_PARTS = [
-    ("neck_bracket", 0.010, (0.007, 0.010, 0.006), (0.050, 0.0, 0.014)),       # the J-hook neck part and horn
+    ("neck_bracket", 0.010, (0.0055, 0.0072, 0.0043), (0.0448, 0.0, 0.0131)),  # the J-hook neck part and horn, at the CAD neck mount
     ("lift_servo", 0.014, (0.006, 0.0115, 0.012), (0.062, 0.0, 0.014)),        # joint 1, P1S, at the neck
     ("arm_link", 0.010, (0.003, 0.012, 0.020), (0.070, 0.0, -0.018)),          # straight down in front of the chest
     ("claw_servo", 0.014, (0.012, 0.0115, 0.006), (0.080, 0.0, -0.044)),       # joint 2 (the claw), P1S, lying forward at the bottom of the arm
@@ -532,6 +534,7 @@ ARM_PARTS = [
     ("camera", 0.015, (0.0075, 0.0147, 0.0234), (0.0835, 0.0, -0.0146)),      # Grove Vision AI V2 case (29 x 47 x 15 mm), upright on the claw servo, lens forward
 ] if PAYLOAD_PROFILE == "arm" else []
 ARM_MASS_RAND = 0.20 if ARM_PARTS else 0.0     # the whole arm's mass x (1 +- this) per episode (63 + 15 g +- 16 g)
+URDF_NAME = "bittle_esp32_cad.urdf" if PAYLOAD_PROFILE == "arm" else "bittle_esp32.urdf"     # arm: the body's collision shape at G2's real size (models/bittle_esp32_cad.urdf)
 POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
 HEAD_JITTER_XZ = 0.010 if PAYLOAD_PROFILE == "arm" else 0.0
 HEAD_COLLIDES = PAYLOAD_PROFILE == "arm" and not ARM_PARTS
@@ -3122,7 +3125,7 @@ class OpenCatGymEnv(gym.Env):
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
 
         urdf_path = "models/"#"/content/drive/My Drive/opencat-gym-esp32/models/"
-        self.robot_id = p.loadURDF(urdf_path + "bittle_esp32.urdf", 
+        self.robot_id = p.loadURDF(urdf_path + URDF_NAME, 
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
 

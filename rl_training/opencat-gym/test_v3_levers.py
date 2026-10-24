@@ -642,13 +642,25 @@ def test_the_arm_profile_carries_the_pod_and_a_colliding_claw():
                 p.stepSimulation()
                 legs += sum(len(p.getContactPoints(b, env.robot_id)) for b in env._arm_ids)
                 legs += sum(len(p.getContactPoints(a, b)) for a in env._arm_ids for b in env._arm_ids if a < b)
-        print(E.POD_LIKE, len(env._arm_ids) == len(E.ARM_PARTS) == 7, round(min(hm) * 1000), round(max(hm) * 1000), round(p.getDynamicsInfo(env._payload_id, -1)[0] * 1000), legs)
+        print(E.POD_LIKE and E.URDF_NAME == "bittle_esp32_cad.urdf", len(env._arm_ids) == len(E.ARM_PARTS) == 7, round(min(hm) * 1000), round(max(hm) * 1000), round(p.getDynamicsInfo(env._payload_id, -1)[0] * 1000), legs)
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
     pod_like, parts, lo, hi, pod, legs = out.stdout.strip().splitlines()[-1].split()
     assert pod_like == "True" and parts == "True", out.stdout[-300:]
     assert 62 <= int(lo) and int(hi) <= 94 and int(pod) == 170
-    assert int(legs) == 0                     # no contact pairs with G2's own links
+    assert int(legs) == 0                     # no contact pairs with G2's own links or between the parts
+
+
+def test_only_the_arm_world_uses_the_cad_body():
+    """The arm profile loads models/bittle_esp32_cad.urdf (the body's collision shape at G2's real size); every other profile keeps bittle_esp32.urdf, so V7's world is unchanged."""
+    import subprocess, sys
+    out = {}
+    for prof in ("pod", "arm"):
+        env = {**os.environ, "G2E_PAYLOAD_PROFILE": prof}
+        env.pop("G2_PAYLOAD_PROFILE", None)
+        r = subprocess.run([sys.executable, "-c", "import opencat_gym_env as E; print(E.URDF_NAME)"], capture_output=True, text=True, timeout=120, env=env)
+        out[prof] = r.stdout.strip().splitlines()[-1]
+    assert out == {"pod": "bittle_esp32.urdf", "arm": "bittle_esp32_cad.urdf"}, out
 
 
 def test_world2_moves_the_payload_forward_only_when_asked(monkeypatch):
