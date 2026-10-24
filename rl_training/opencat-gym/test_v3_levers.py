@@ -621,7 +621,8 @@ def test_the_arm_world_swaps_the_payload_for_training_and_scoring(monkeypatch):
 
 
 def test_the_arm_profile_carries_the_pod_and_a_colliding_claw():
-    """The arm payload: the 185 g pod plus a 63 g (+-15 g) claw 80 mm ahead of the body centre that touches the floor but not G2's legs."""
+    """The arm payload (2026-10-24): the pod without its camera (170 g) plus the arm in welded parts (63 g of arm + 15 g of camera, x (1 +- 0.2) per episode), which touch the
+    floor and obstacles but not G2's legs or each other."""
     import subprocess, sys, textwrap
     code = textwrap.dedent('''
         import os, sys, numpy as np
@@ -636,16 +637,17 @@ def test_the_arm_profile_carries_the_pod_and_a_colliding_claw():
         hm, legs = [], 0
         for k in range(6):
             env.reset(seed=k)
-            hm.append(p.getDynamicsInfo(env._head_id, -1)[0])
+            hm.append(sum(p.getDynamicsInfo(b, -1)[0] for b in env._arm_ids))
             for _ in range(20):
                 p.stepSimulation()
-                legs += len(p.getContactPoints(env._head_id, env.robot_id))
-        print(E.POD_LIKE, E.HEAD_COLLIDES, round(min(hm) * 1000), round(max(hm) * 1000), round(p.getDynamicsInfo(env._payload_id, -1)[0] * 1000), legs)
+                legs += sum(len(p.getContactPoints(b, env.robot_id)) for b in env._arm_ids)
+                legs += sum(len(p.getContactPoints(a, b)) for a in env._arm_ids for b in env._arm_ids if a < b)
+        print(E.POD_LIKE, len(env._arm_ids) == len(E.ARM_PARTS) == 7, round(min(hm) * 1000), round(max(hm) * 1000), round(p.getDynamicsInfo(env._payload_id, -1)[0] * 1000), legs)
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
-    pod_like, collides, lo, hi, pod, legs = out.stdout.strip().splitlines()[-1].split()
-    assert pod_like == "True" and collides == "True", out.stdout[-300:]
-    assert 48 <= int(lo) and int(hi) <= 78 and int(pod) == 185
+    pod_like, parts, lo, hi, pod, legs = out.stdout.strip().splitlines()[-1].split()
+    assert pod_like == "True" and parts == "True", out.stdout[-300:]
+    assert 62 <= int(lo) and int(hi) <= 94 and int(pod) == 170
     assert int(legs) == 0                     # no contact pairs with G2's own links
 
 

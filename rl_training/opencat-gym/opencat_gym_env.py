@@ -510,16 +510,31 @@ elif PAYLOAD_PROFILE == "arm":
     # 353 g against 290 g for the plain Bittle X, so the arm adds about 63 g over the stock head (which stays inside the 254 g base), about 502 g in all. Its centre is taken 80 mm ahead of the body centre
     # at the torso's mid height (the arm reaches forward from the neck); the mass is varied +-15 g and the centre +-10 mm in x and z per episode (HEAD_JITTER_XZ) until the real numbers replace them.
     # The claw body collides with the floor and obstacles (not with G2's own legs), and a touch counts as an elbow contact (FAC_ARM_CONTACT), so a stumble onto the claw or a claw strike costs.
-    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.185, 0.0
-    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.063, 0.015
+    # 2026-10-24 later (user): the camera moves onto the claw, and the arm is built from its parts (best guesses from Petoi's arm: the lift servo at the neck, a link
+    # forward, the claw servo and two jaws at its end, the camera on the claw; Petoi publishes no dimensions or CAD). The parts replace the single claw box.
+    PAYLOAD_MASS_NOM, PAYLOAD_MASS_RAND = 0.170, 0.0  # the weighed 185 g pod minus the camera (about 15 g, not weighed), which rides on the claw
+    HEAD_MASS_NOM, HEAD_MASS_RAND = 0.0, 0.0          # no head body: ARM_PARTS
     REAR_MASS_NOM, REAR_MASS_RAND = 0.0, 0.0
     PAYLOAD_BOX_HALF = (0.0470, 0.0296, 0.01895)
     PAYLOAD_POS = (-0.0092, 0.0, 0.02895)
-    HEAD_BOX_HALF = (0.030, 0.015, 0.0125)        # 60 x 30 x 25 mm
+    HEAD_BOX_HALF = (0.030, 0.015, 0.0125)
     HEAD_MASS_POS = (0.080, 0.0, 0.0)
+# The arm (and the camera on it) as welded parts, base frame, in the WALKING pose (user, 2026-10-24): the arm hangs down in front of the chest from the neck servo and the claw
+# at its bottom points forward, parallel to the ground (a reverse L). All sizes and weights are ESTIMATES until measured (Petoi publishes no dimensions or CAD).
+# (name, mass kg, box half extents m, centre m): 63 g of arm over the stock head (Petoi's spec pages), 15 g of camera on the claw, lens forward.
+ARM_PARTS = [
+    ("neck_bracket", 0.010, (0.007, 0.010, 0.006), (0.050, 0.0, 0.014)),       # the J-hook neck part and horn
+    ("lift_servo", 0.014, (0.006, 0.0115, 0.012), (0.062, 0.0, 0.014)),        # joint 1, P1S, at the neck
+    ("arm_link", 0.010, (0.003, 0.012, 0.020), (0.070, 0.0, -0.018)),          # straight down in front of the chest
+    ("claw_servo", 0.014, (0.012, 0.0115, 0.006), (0.080, 0.0, -0.044)),       # joint 2 (the claw), P1S, lying forward at the bottom of the arm
+    ("jaw_left", 0.0075, (0.018, 0.002, 0.005), (0.108, 0.009, -0.044)),       # the jaws point forward, parallel to the ground
+    ("jaw_right", 0.0075, (0.018, 0.002, 0.005), (0.108, -0.009, -0.044)),
+    ("camera", 0.015, (0.0075, 0.0147, 0.0234), (0.0835, 0.0, -0.0146)),      # Grove Vision AI V2 case (29 x 47 x 15 mm), upright on the claw servo, lens forward
+] if PAYLOAD_PROFILE == "arm" else []
+ARM_MASS_RAND = 0.20 if ARM_PARTS else 0.0     # the whole arm's mass x (1 +- this) per episode (63 + 15 g +- 16 g)
 POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
 HEAD_JITTER_XZ = 0.010 if PAYLOAD_PROFILE == "arm" else 0.0
-HEAD_COLLIDES = PAYLOAD_PROFILE == "arm"
+HEAD_COLLIDES = PAYLOAD_PROFILE == "arm" and not ARM_PARTS
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
 # both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
 # height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
@@ -1797,6 +1812,8 @@ class OpenCatGymEnv(gym.Env):
                 self.arm_contact += 1
         if HEAD_COLLIDES and self._head_id is not None and p.getContactPoints(bodyA=self._head_id):   # arm: the claw on the floor or an obstacle counts as an elbow contact
             self.arm_contact += 1
+        if any(p.getContactPoints(bodyA=b) for b in getattr(self, "_arm_ids", ())):                     # an arm part (claw, camera ...) on the floor or an obstacle: an elbow contact
+            self.arm_contact += 1
 
         # Read clearance of torso from ground
         base_clearance = p.getBasePositionAndOrientation(self.robot_id)[0][2]
@@ -2571,7 +2588,7 @@ class OpenCatGymEnv(gym.Env):
         heading frame, each divided by the paws' half-spread on that axis (1 = over the edge of the stance). Masses are read once per episode."""
         if getattr(self, "_mass_cache", None) is None:
             links = list(range(p.getNumJoints(self.robot_id)))
-            bodies = [b for b in (self._payload_id, self._head_id, getattr(self, "_rear_id", None)) if b is not None]
+            bodies = self._welded_ids()
             self._mass_cache = (links, [p.getDynamicsInfo(self.robot_id, -1)[0]] + [p.getDynamicsInfo(self.robot_id, l)[0] for l in links],
                                 bodies, [p.getDynamicsInfo(b, -1)[0] for b in bodies])
         links, lm, bodies, bm = self._mass_cache
@@ -2595,6 +2612,10 @@ class OpenCatGymEnv(gym.Env):
     def _crouch(self):
         """The ride-height drop (m) for this episode's load: LOAD_CROUCH0 at today's payload, LOAD_HEIGHT_DROP at 1 lb, linear in between."""
         return LOAD_CROUCH0 + (LOAD_HEIGHT_DROP - LOAD_CROUCH0) * self._load_frac() if LOAD_HEIGHT_DROP > 0 else 0.0
+
+    def _welded_ids(self):
+        """Every body welded to G2 this episode: the payload block, the head, the rear body and the arm's parts."""
+        return [b for b in (getattr(self, "_payload_id", None), getattr(self, "_head_id", None), getattr(self, "_rear_id", None)) if b is not None] + list(getattr(self, "_arm_ids", ()))
 
     def _load_speed(self, fwd):
         """Forward commands slow with the load (LOAD_SPEED_DROP); a stand or a creep-in-place command is left alone."""
@@ -3112,6 +3133,8 @@ class OpenCatGymEnv(gym.Env):
         self._mass_cache = None
         self._head_id = None
         self._rear_id = None
+        self._arm_ids = []
+        self._part_names = {}
         if PAYLOAD_PROB > 0 and self._dr > 0 and np.random.rand() < PAYLOAD_PROB:
             pm = PAYLOAD_MASS_NOM + np.random.uniform(-PAYLOAD_MASS_RAND, PAYLOAD_MASS_RAND) + self._load_kg      # heavy load: the extra mass goes into the block
             pj = np.random.uniform(-0.003, 0.003, 3); pj[:2] = np.random.uniform(-PAYLOAD_JITTER_XY, PAYLOAD_JITTER_XY, 2)
@@ -3143,6 +3166,21 @@ class OpenCatGymEnv(gym.Env):
                 _hc = p.createConstraint(self.robot_id, -1, self._head_id, -1,
                                          p.JOINT_FIXED, [0, 0, 0], hoff, [0, 0, 0])
                 p.changeConstraint(_hc, maxForce=PAYLOAD_WELD_FORCE)
+            self._part_names[self._payload_id] = "pod" if POD_LIKE else "payload"
+            if self._head_id is not None:
+                self._part_names[self._head_id] = "claw" if HEAD_COLLIDES else "head"
+            if ARM_PARTS:                      # the arm as welded parts: one mass scale and one shift (x, z) for the whole arm per episode, fixed within it
+                ms = 1.0 + np.random.uniform(-ARM_MASS_RAND, ARM_MASS_RAND)
+                dx, dz = np.random.uniform(-HEAD_JITTER_XZ, HEAD_JITTER_XZ, 2) if HEAD_JITTER_XZ > 0 else (0.0, 0.0)
+                for _name, _m, _half, _pos in ARM_PARTS:
+                    aoff = [_pos[0] + dx, _pos[1], _pos[2] + dz]
+                    _b = self._payload_body(_m * ms, _half, *_spawn(aoff), collide_with=self.robot_id)
+                    _ac = p.createConstraint(self.robot_id, -1, _b, -1, p.JOINT_FIXED, [0, 0, 0], aoff, [0, 0, 0])
+                    p.changeConstraint(_ac, maxForce=PAYLOAD_WELD_FORCE)
+                    for _o in self._arm_ids:   # the parts touch each other; only the floor and obstacles count
+                        p.setCollisionFilterPair(_b, _o, -1, -1, 0)
+                    self._arm_ids.append(_b)
+                    self._part_names[_b] = _name
             self._rear_id = None
             if REAR_MASS_NOM > 0:
                 rm = REAR_MASS_NOM + np.random.uniform(-REAR_MASS_RAND, REAR_MASS_RAND)
@@ -3345,10 +3383,7 @@ class OpenCatGymEnv(gym.Env):
     def _index_hazards(self):
         """V5 (crossing bonus, hazard-aware relaxation): the solid objects in G2's way this episode, from the physics bodies (the same rule as exposure_probe.py: at least
         2 mm tall, not behind the start), their far edges for the crossing bonus, and the ledge. Bookkeeping only: nothing here changes the physics."""
-        skip = {self.robot_id, getattr(self, "_plane_id", -999), self._ledge_id}
-        for _a in ("_payload_id", "_head_id", "_rear_id"):
-            if getattr(self, _a, None) is not None:
-                skip.add(getattr(self, _a))
+        skip = {self.robot_id, getattr(self, "_plane_id", -999), self._ledge_id, *self._welded_ids()}
         self._obj_ids, self._obj_far = set(), []
         for _i in range(p.getNumBodies()):
             bid = p.getBodyUniqueId(_i)
@@ -3513,7 +3548,7 @@ class OpenCatGymEnv(gym.Env):
                         shapes.append({"type": int(sd[2]), "dims": [float(x) for x in sd[3]], "file": (sd[4].decode() if isinstance(sd[4], bytes) else str(sd[4])),
                                        "lpos": [float(x) for x in sd[5]], "lorn": [float(x) for x in sd[6]]})
                 bodies.append({"id": int(bid), "mass": float(mass), "pos": list(pos), "orn": list(orn), "shapes": shapes,
-                               "ground": bid == getattr(self, "_plane_id", None)})
+                               "ground": bid == getattr(self, "_plane_id", None), "part": getattr(self, "_part_names", {}).get(bid)})
             frames = f"frames_{os.getpid()}_{self._live_ep}.jsonl"
             scene = {"tag": self._live_tag, "ep": f"{os.getpid()}_{self._live_ep}", "frames": frames, "t": time.time(), "role": getattr(self, "_fr_role", None),
                      "hazards": {k: round(float(v), 4) for k, v in (self._fz or {}).items()}, "slope_deg": [round(float(np.degrees(x)), 2) for x in self._slope_rp],
@@ -3538,11 +3573,9 @@ class OpenCatGymEnv(gym.Env):
             pos, orn = p.getBasePositionAndOrientation(self.robot_id)
             js = [float(s[0]) for s in p.getJointStates(self.robot_id, self.joint_id)]
             mv = {}
-            for _a in ("_payload_id", "_head_id", "_rear_id"):
-                bid = getattr(self, _a, None)
-                if bid is not None:
-                    bp, bo = p.getBasePositionAndOrientation(bid)
-                    mv[int(bid)] = [round(v, 5) for v in list(bp) + list(bo)]
+            for bid in self._welded_ids():
+                bp, bo = p.getBasePositionAndOrientation(bid)
+                mv[int(bid)] = [round(v, 5) for v in list(bp) + list(bo)]
             self._live_f.write(json.dumps({"k": int(self.step_counter), "b": [round(v, 5) for v in list(pos) + list(orn)], "j": [round(v, 4) for v in js], "m": mv,
                                            "r": round(float(reward), 3), "end": ("fell" if terminated else "time") if (terminated or truncated) else None}) + "\n")
             self._live_f.flush()
@@ -3559,11 +3592,7 @@ class OpenCatGymEnv(gym.Env):
         nothing in physics / obs / reward, and ~15 lightweight calls per reset is
         negligible even over a 20M run -- so it always runs. Scattered obstacles
         get a warmer tone than the ground so they read as obstacles in a replay."""
-        skip = {self.robot_id}
-        for _a in ("_payload_id", "_head_id", "_rear_id"):
-            _v = getattr(self, _a, None)
-            if _v is not None:
-                skip.add(_v)
+        skip = {self.robot_id, *self._welded_ids()}
         ground = {getattr(self, "_plane_id", -999)}
         for _i in range(p.getNumBodies()):
             bid = p.getBodyUniqueId(_i)
@@ -3595,6 +3624,7 @@ class OpenCatGymEnv(gym.Env):
             ignore.add(self._payload_id)
         if getattr(self, "_head_id", None) is not None:
             ignore.add(self._head_id)
+        ignore.update(getattr(self, "_arm_ids", ()))
         if getattr(self, "_rear_id", None) is not None:
             ignore.add(self._rear_id)
         _self = ignore - {0}                          # everything but the ground plane

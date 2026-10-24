@@ -42,6 +42,37 @@ def touch():
         os.utime(REQ, None)
 
 
+POD_MESH = os.path.join(HERE, "models", "local", "pod_mesh.json")      # build_pod_mesh.py: the pod's real look (looks only; the physics is the box)
+PART_RGBA = {"neck_bracket": [0.23, 0.23, 0.25, 1], "lift_servo": [0.15, 0.15, 0.17, 1], "claw_servo": [0.15, 0.15, 0.17, 1], "arm_link": [0.55, 0.57, 0.6, 1],
+             "jaw_left": [0.91, 0.39, 0.11, 1], "jaw_right": [0.91, 0.39, 0.11, 1], "camera": [0.17, 0.18, 0.2, 1], "claw": [1.0, 0.55, 0.1, 0.85],
+             "head": [0.23, 0.23, 0.25, 1]}
+
+
+def pod_body(p, arm, pos, orn):
+    """A visual-only body made of the pod's meshes, one link per part in its own colour (None without the meshes); the camera case is left out with the arm, where the
+    camera rides on the claw."""
+    try:
+        idx = json.load(open(POD_MESH))
+    except (OSError, ValueError):
+        return None
+    parts = [q for q in idx["parts"] if q["in_arm"] or not arm]
+    files = [os.path.join(os.path.dirname(POD_MESH), q["file"]) for q in parts]
+    if not files or not all(os.path.exists(x) for x in files):
+        return None
+    try:
+        vs = [p.createVisualShape(p.GEOM_MESH, fileName=x, meshScale=[1, 1, 1]) for x in files]
+        n = len(vs) - 1
+        bid = p.createMultiBody(0, baseVisualShapeIndex=vs[0], basePosition=pos, baseOrientation=orn,
+                                linkMasses=[0] * n, linkCollisionShapeIndices=[-1] * n, linkVisualShapeIndices=vs[1:], linkPositions=[[0, 0, 0]] * n,
+                                linkOrientations=[[0, 0, 0, 1]] * n, linkInertialFramePositions=[[0, 0, 0]] * n, linkInertialFrameOrientations=[[0, 0, 0, 1]] * n,
+                                linkParentIndices=[0] * n, linkJointTypes=[p.JOINT_FIXED] * n, linkJointAxis=[[0, 0, 1]] * n)
+        for i, q in enumerate(parts):
+            p.changeVisualShape(bid, i - 1, rgbaColor=q["rgba"])
+        return bid
+    except p.error:
+        return None
+
+
 def build(p, scene, rid=None, old_ids=None):
     """Rebuild the episode's scene as it was at its reset; returns (robot id, {streamed body id: our body id}). Only the previous episode's scene bodies are removed and
     the robot is kept (2026-10-18: a full resetSimulation per episode blanked the window every few seconds and threw the camera back to its far default view)."""
@@ -53,7 +84,13 @@ def build(p, scene, rid=None, old_ids=None):
     import pybullet_data
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     ids = {}
+    arm = any(b.get("part") == "camera" for b in scene["bodies"])
     for b in scene["bodies"]:
+        if b.get("part") == "pod":
+            bid = pod_body(p, arm, b["pos"], b["orn"])
+            if bid is not None:
+                ids[b["id"]] = bid
+                continue
         for sh in b["shapes"]:
             if sh["type"] == "heightfield":
                 import numpy as np
@@ -74,7 +111,7 @@ def build(p, scene, rid=None, old_ids=None):
                 bid = p.createMultiBody(0, baseVisualShapeIndex=vs, basePosition=b["pos"], baseOrientation=b["orn"])
             else:
                 continue
-            color = [0.55, 0.55, 0.58, 1] if b.get("ground") else ([0.25, 0.45, 0.75, 1] if b["mass"] > 0 else [0.70, 0.55, 0.40, 1])
+            color = PART_RGBA.get(b.get("part")) or ([0.55, 0.55, 0.58, 1] if b.get("ground") else ([0.25, 0.45, 0.75, 1] if b["mass"] > 0 else [0.70, 0.55, 0.40, 1]))
             try:
                 p.changeVisualShape(bid, -1, rgbaColor=color)
             except Exception:  # noqa: BLE001
@@ -93,9 +130,16 @@ def mark_payload(p, ids, scene, fr, rid):
     """The bodies welded to G2 (the ones a frame moves with him: the pod, the AI head or the arm's claw) in orange, the front one labelled with its weight, so the
     payload stands out from the course (both are plain boxes; the claw is a 60 x 30 x 25 mm box at the nose, 2026-10-24). Returns the label ids."""
     mass = {int(b["id"]): b["mass"] for b in scene["bodies"]}
+    part = {int(b["id"]): b.get("part") for b in scene["bodies"]}
     welded = [int(k) for k in fr.get("m", {}) if int(k) in ids]
+    arm = [k for k in welded if part.get(k) in PART_RGBA and part.get(k) not in ("claw", "head")]
+    if arm:                                                         # the arm in parts (2026-10-24): drawn in its own colours, labelled once with its whole weight
+        anchor = next((k for k in arm if part[k] == "claw_servo"), arm[0])
+        grams = sum(mass.get(k, 0.0) for k in arm) * 1000
+        return [p.addUserDebugText(f"arm + camera {grams:.0f} g (estimate)", [0, 0, 0.05], textSize=1.0, textColorRGB=[0.75, 0.35, 0.0], parentObjectUniqueId=ids[anchor])]
     for k in welded:
-        p.changeVisualShape(ids[k], -1, rgbaColor=PAYLOAD_RGBA)
+        if part.get(k) != "pod":
+            p.changeVisualShape(ids[k], -1, rgbaColor=PAYLOAD_RGBA)
     if len(welded) < 2:
         return []
     import numpy as np
