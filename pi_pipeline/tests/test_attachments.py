@@ -479,8 +479,9 @@ def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_u
     assert lk._ser.out.count("kbalance") == 1
 
 
-def test_a_gait_gets_its_gb_before_it_starts_and_never_right_behind_it(monkeypatch):
-    """2026-10-25, hardware: a `gb` sent right behind `kwkF` stopped the walk (0.2 in in 3 s, against about 20 in without it). Gaits get it first; postures and tricks still get it after."""
+def test_a_gait_has_no_gb_next_to_it_but_a_posture_still_gets_one_after(monkeypatch):
+    """2026-10-25, hardware: a `gb` right behind `kwkF` stopped the walk (0.2 in in 3 s, against about 20 in without it) and a `gb` right before it did the same in the chase (the distance to the ball never changed). The gyro
+    is already off from the connect and the last posture; gaits get nothing; postures and tricks still get `gb` after."""
     from pi_pipeline.link.serial_link import SerialLink
 
     class FakeSerial:
@@ -501,9 +502,9 @@ def test_a_gait_gets_its_gb_before_it_starts_and_never_right_behind_it(monkeypat
         lk._ser = FakeSerial()
         lk._ease_transition = lambda c: None
         lk.send(gait, read_reply=False, settle=0.0)
-        assert lk._ser.out == ["gb", gait], (gait, lk._ser.out)                                 # before it, nothing behind it
+        assert lk._ser.out == [gait], (gait, lk._ser.out)
     lk = SerialLink("/dev/null")
     lk._ser = FakeSerial()
     lk._ease_transition = lambda c: None
     lk.send("kbalance", read_reply=False, settle=0.0)
-    assert lk._ser.out == ["kbalance", "gb"]                                                    # a posture: after it, as before
+    assert lk._ser.out == ["kbalance", "gb"]

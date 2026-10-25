@@ -183,8 +183,6 @@ class SerialLink:
                     threading.Thread(target=lambda: (audio_gate.wait_idle(2.0), self.send(command, read_reply=False, settle=settle, _deferred=True)), name="beep-wait", daemon=True).start()
                     return ""
                 audio_gate.note_beep(audio_gate.beep_seconds(command))
-            if command[:1] == "k" and transitions.kind(command.strip()) == "gait":
-                self._gyro_off_if_needed()                  # a gait is switched off BEFORE it starts: a `gb` right behind the gait token stops the walk (2026-10-25: 0.2 in moved in 3 s with it, about 20 in without)
             self._ser.write((command + "\n").encode("ascii", "ignore"))
             if read_reply or settle:
                 self._ser.flush()                  # wait until it is on the wire (a reply or a settle follows)
@@ -193,7 +191,7 @@ class SerialLink:
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
-            if command[:1] == "k" and transitions.kind(command.strip()) != "gait":
+            if command[:1] == "k" and transitions.kind(command.strip()) != "gait":      # (never around a gait, before or behind it: any `gb` next to `kwkF` stopped the walk, 2026-10-25 hardware; the gyro is already off from the stand-up or the last posture)
                 self._gyro_off_if_needed()                  # the arm (user, 2026-10-25): a skill turns the gyro assist back on, and with it on the firmware keeps trying its own self-right (`rc`) after a fall,
                                                             # which is what shakes the Pi plug loose; fall recovery is off for it, so the assist goes straight back off
             if command[:1] in ("k", "d") or (command[:1] in ("i", "m") and transitions.leg_pairs(command)):
