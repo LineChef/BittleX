@@ -83,3 +83,16 @@ joint, "Shoulder" (4 to 7) is unused on Bittle.
 
 If the arm firmware's calibration starts from zero, these are the leg values to enter before the `c-2` claw calibration; the calibration pose then shows whether
 any leg needs a touch-up.
+
+## Bittle X+Arm calibration (2026-10-24, about 10:10 PM)
+
+After the Petoi robot arm replaced the AI head and the BiBoard was flashed with Petoi's Bittle X+Arm firmware (software B10_260527, written with the Desktop App's
+own esptool command and files; the app's port list could not show the BiBoard's `cu.usbmodem` port). The flash kept the stored calibration: no first-boot
+questions, and every leg offset above was unchanged. In the arm build the calibrator names joints 0 to 2 Claw Pan (the neck servo), Claw Lift and Claw Open.
+
+| Joint | Offset |
+|---|---|
+| 0 claw pan | -14 |
+| 1 claw lift | 0 |
+| 2 claw open | 1 (Auto) |
+| 8 to 15 legs | as in the table above |
