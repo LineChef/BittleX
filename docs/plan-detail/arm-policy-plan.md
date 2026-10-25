@@ -191,6 +191,16 @@ from the platform project's model). No length specs for the arm are published.
   56 deg, back 75, yaw +12 deg, no fall. The user: more stable than ARM1, still a lot of roll. The reward had almost nothing against roll and a soft imitation term.
 - **Weights** (user): 532 g with the arm (sim 502 g); front feet 288 g, back 259 g (52.6% front; the sim matched). **Claw height** standing: 1.25 in (sim 22 to 26 mm).
 
+### Hardware, 2026-10-25 later (turns, claw, stand-up)
+
+- **H7, Petoi's turns** (`kwkL` / `kwkR`, 5 s): no falls, roll within +-3 deg; left turn 6 deg/s (the user saw it turn left), right turn about 5 deg/s.
+- **Claw bench** (standing): `kpickD` and `kputD` ran clean (`kpickD` tilts the body under 5 deg; `kputD` raises the nose about 9 deg). Decoded from the skill table: `pickD` is a pick for something right under the jaws (the legs crouch, the jaws drop to the floor); `pickF` is the forward lunge (arm to 75, front legs fold). With the 3 in treat ball under the jaws, `kpickD` tried to grab it but the jaws were too low (the crouch) and did not open wide enough. The claw opens at least to 125 with no strain; the user thinks the widest setting might just straddle the ball. Claw height standing: 1.25 in (user); ball about 3 in against an opening of about 2.75 in.
+- **Arm stood at the wrong angle (found today):** the Pi never sets the arm's lift servo. After `rest` it sits at 59 to 61 (claw on the floor), and a Pi walk that began from rest walked with the claw reaching forward. The arm build's own `kbalance` sets it to 0. With the arm at 0 the ARM1R walk (cmd 0.10, 12.5 s) went 4 ft 5 in, 5 in off line, roll spread 6.2 deg against 7.2 before; the user: the rocking was better.
+- **Stand-ups fell front right** (about four times this morning, the front right leg giving way; the user checked it for heat, play and weakness and a bench sweep of all four legs looked fine, so it is how the stand-up moves). The firmware `kbalance` lifts all eight leg joints at once with the claw out ahead. The arm build now stands up in order (`standup.stand_sequenced`, profile `poses.stand_via` = `sequenced`): the rear legs first, the front legs starting when the rear is half way (a fast start), the lift servo easing 60 to 0 inside the same `i` commands, `kbalance` last; 2.7 s, level (pitch +1.2 deg) in the first run, and the user: it looked good. Used by the walk loops (`ramp_to_stand`) and the link's stand-up.
+- **The Pi-to-BiBoard plug comes undone during falls** (user): the board then answers some commands and not others, or none. If the board does not answer, check the plug first.
+- **Fall recovery is off for the arm** (`fall_recovery: false`): the scripted self-right, roll-over and drop-recover moves are refused.
+- **Open:** the servo angle scale of the arm firmware (P1S, 290 deg range, against the P1L the stock build drives): the arm looked right at lift 90, the legs were not measured; a knee move tipped the body under 1 deg, too little to test a 7% difference. A phone level on a straight leg, or two photos of a knee, would settle it.
+
 ## ARM1X: the claw world as measured, a training system that keeps learning (user, 2026-10-25, plan approved)
 
 Why ARM1R's 20M stopped at about 11M: the plateau stop fired on noise (the best of three evals against one lucky early best, 8 + 6 episodes per check), the eval tested
