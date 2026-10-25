@@ -19,7 +19,13 @@
   },
   "arm": {
     "payload_profile": "arm",
-    "current": null,
+    "current": {
+      "policy": "Release_CandidateARM1_ppo.onnx",
+      "trim": null,
+      "payload_profile": "arm",
+      "saved": "2026-10-24",
+      "note": "ARM1: Petoi arm walk base, claw payload, stock legs (avg5 of the 20M)"
+    },
     "history": [],
     "voice_module_language": "english",
     "easing": false,
