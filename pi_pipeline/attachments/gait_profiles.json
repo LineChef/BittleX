@@ -20,11 +20,11 @@
   "arm": {
     "payload_profile": "arm",
     "current": {
-      "policy": "Release_CandidateARM1R_ppo.onnx",
+      "policy": "Release_CandidateARM1X_ppo.onnx",
       "trim": null,
       "payload_profile": "arm",
       "saved": "2026-10-25",
-      "note": "ARM1R: Petoi arm walk played at its own pace (phase rate nominal 0.064), claw payload, stock legs; final weights of a ~19M chain"
+      "note": "ARM1X: Petoi arm walk held close and level (imitation sharpness 8, roll terms, residual 15 deg), claw world as measured (532 g, claw 1.25 in), step-ups capped at 15 mm, 20M with trained/stuck hazards and the smoothed plateau rule off; avg5 weights"
     },
     "history": [
       {
@@ -33,6 +33,13 @@
         "payload_profile": "arm",
         "saved": "2026-10-24",
         "note": "ARM1: Petoi arm walk base, claw payload, stock legs (avg5 of the 20M)"
+      },
+      {
+        "policy": "Release_CandidateARM1R_ppo.onnx",
+        "trim": null,
+        "payload_profile": "arm",
+        "saved": "2026-10-25",
+        "note": "ARM1R: Petoi arm walk played at its own pace (phase rate nominal 0.064), claw payload, stock legs; final weights of a ~19M chain"
       }
     ],
     "voice_module_language": "english",

@@ -1,0 +1,14 @@
+{
+ "residual_scale_deg": 15.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "armx_s4_avg5_ppo",
+ "exported": "2026-10-25",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ],
+ "payload_profile": "arm",
+ "base_ref": "wkArm",
+ "gait": "ARM1X: Petoi's arm walk held close and level, claw world as measured (532 g, claw 1.25 in), stock legs",
+ "phase_rate_nom_cmd": 0.064
+}
