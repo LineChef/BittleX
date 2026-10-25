@@ -122,7 +122,7 @@ def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_comma
 
 SEQ_REAR_S, SEQ_FRONT_S = 1.0, 1.1          # the sequenced stand-up: the rear legs rise over this long; the front legs over this long, starting while the rear is about half way
 SEQ_FRONT_START_S = 0.5                     # (user, 2026-10-25: "too much time between the back legs standing up and the front legs")
-SEQ_LIFT_FROM_S, SEQ_LIFT_TO_S = 0.7, 1.5   # the arm's lift servo eases from its rest angle to its walking angle inside the leg commands, while the front legs rise (no jolt at the end)
+SEQ_LIFT_FROM_S, SEQ_LIFT_TO_S = 0.4, 2.0   # the arm's lift servo eases from its rest angle to its walking angle inside the leg commands, while the legs rise; 1.6 s for the 60 deg (2026-10-25: over 0.8 s the pull-back was jerky, 4 to 6 deg a step at its fastest)
 _REAR_URDF = (4, 5, 6, 7)                    # URDF order [FLs,FLk,FRs,FRk,BRs,BRk,BLs,BLk]: the rear legs ...
 _FRONT_URDF = (0, 1, 2, 3)                   # ... and the front legs
 
@@ -138,14 +138,14 @@ def _ease_out(u: float) -> float:
 def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build's stand-up in order (profile "poses": {"stand_via": "sequenced"}; 2026-10-25: the firmware kbalance moves all eight leg joints at once and G2 fell front right
     when the nose rose with the claw out ahead). From rest: the rear legs ease to the balance pose with the front paws and the claw on the floor; the front legs follow, starting when the
-    rear is about half way (a fast start, no pause between them); the lift servo eases 60 -> 0 inside the same commands; the firmware `kbalance` goes out last.
+    rear is about half way (a fast start, no pause between them); the lift servo eases 60 -> 0 inside the same commands; no firmware `kbalance` after it (it replays the whole stand-up).
     Returns True if it ran."""
     p = _poses()
     c = (last_motion_command or "").strip()
     if not p or p.get("stand_via") != "sequenced" or c not in ("", "d", "krest", "kzz"):
         return False
     start, goal = rest_pose(), balance_pose()
-    end_s = SEQ_FRONT_START_S + SEQ_FRONT_S
+    end_s = max(SEQ_FRONT_START_S + SEQ_FRONT_S, SEQ_LIFT_TO_S)
     n = int(round(end_s * STEPS_PER_S))
     lift0, lift1 = p.get("arm_rest"), p.get("arm_walk")
     for i in range(1, n + 1):
@@ -161,9 +161,8 @@ def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
             cmd = f"i1 {int(round(lift))} {cmd[1:]}"          # one `i` command with the lift pair first: "i1 <lift> 8 <deg> 12 <deg> ..."
         send(cmd)
         sleep(1.0 / STEPS_PER_S)
-    send("kbalance")                                            # the legs and the lift are there: the firmware's own pose changes nothing, and anything it still holds is set
-    sleep(1.0)
-    return True
+    sleep(0.5)                                                  # NO `kbalance` here (2026-10-25, hardware): the firmware starts a skill from the posture it believes he is in (rest: it never saw these `i` moves as a skill), so it played its own whole stand-up a second time
+    return True                                                 # and pulled the arm back to 60 again; the legs and the lift are already at the balance pose
 
 
 def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool:

@@ -390,7 +390,7 @@ def test_the_arm_stand_up_helpers_do_nothing_for_other_builds_and_the_plain_one_
     assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("kbalance") == standup.balance_pose()
     assert standup.stand_via_firmware(sent.append, lambda s: None, "d") is False and not sent                         # the arm's profile stands up "sequenced", not the plain way
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "d") is False            # no leg ramp (easing off) ...
-    assert sent[0].startswith("i1 ") and sent[-1] == "kbalance"                                                        # ... but the sequenced stand-up first, ending on the firmware kbalance
+    assert sent[0].startswith("i1 ") and "kbalance" not in sent                                                        # ... but the sequenced stand-up first, ending on the firmware kbalance
     sent.clear()
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "kbalance") is False and not sent   # already standing: nothing
 
@@ -402,10 +402,10 @@ def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kba
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     sent = []
     assert standup.stand_sequenced(sent.append, lambda s: None, "d") is True
-    assert sent[-1] == "kbalance" and all(c.startswith("i1 ") for c in sent[:-1])                                          # the lift pair rides in every leg command
-    lifts = [int(c.split()[1]) for c in sent[:-1]]
+    assert "kbalance" not in sent and all(c.startswith("i1 ") for c in sent)                                               # the lift pair rides in every leg command; no firmware stand-up after it
+    lifts = [int(c.split()[1]) for c in sent]
     assert lifts[0] == 60 and lifts[-1] == 0 and lifts == sorted(lifts, reverse=True)                                      # eased down from the rest angle to the walking angle
-    legs = [standup.start_pose("i" + c[3:].split(" ", 1)[1]) for c in sent[:-1]]
+    legs = [standup.start_pose("i" + c[3:].split(" ", 1)[1]) for c in sent]
     rest, goal = standup.rest_pose(), standup.balance_pose()
     first_front = next(i for i, p in enumerate(legs) if p[:4] != rest[:4])
     first_rear = next(i for i, p in enumerate(legs) if p[4:] != rest[4:])
@@ -413,6 +413,8 @@ def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kba
     rear_half = next(i for i, p in enumerate(legs) if abs(p[5] - goal[5]) < abs(rest[5] - goal[5]) / 2)
     assert first_front <= rear_half + 2                                                                                  # the front starts by the time the rear is half way
     assert legs[-1] == goal                                                                                              # the legs end on the balance pose
+    steps = [abs(a - b) for a, b in zip(lifts, lifts[1:])]
+    assert max(steps) <= 4                                                                                               # the lift moves at most 4 deg a step (it was 6 over a shorter ramp: jerky)
     assert standup.stand_sequenced(sent.append, lambda s: None, "kbalance") is False                                     # only from rest
     sent.clear()
     for att in ("none", "head"):
@@ -447,3 +449,31 @@ def test_with_fall_recovery_off_every_skill_and_every_connect_is_followed_by_gb(
         lk._gyro_off_if_needed()
         assert lk._ser.out[0] == "kbalance" and ("gb" in lk._ser.out[1:2]) is extra, (att, lk._ser.out)
         assert "i8 30 9 30" in lk._ser.out
+
+
+def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_up(monkeypatch):
+    """2026-10-25, hardware: G2 stood up, then again (the firmware plays kbalance from the rest posture it believes he is in) and the arm drew back: the kbalance that asked for the arm's own stand-up is not sent."""
+    from pi_pipeline.link.serial_link import SerialLink
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+        def reset_input_buffer(self):
+            pass
+        def close(self):
+            pass
+    import time as _t
+    monkeypatch.setattr(_t, "sleep", lambda s: None)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    lk.last_motion_command = "d"
+    lk.send("kbalance", read_reply=False, settle=0.0)
+    assert "kbalance" not in lk._ser.out and any(c.startswith("i1 ") for c in lk._ser.out) and lk.last_motion_command == "kbalance"
+    lk.send("kbalance", read_reply=False, settle=0.0)                      # standing now: a later kbalance goes through as a plain command
+    assert lk._ser.out.count("kbalance") == 1

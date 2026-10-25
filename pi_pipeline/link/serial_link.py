@@ -168,6 +168,12 @@ class SerialLink:
             command = "gb"                        # the fitted attachment runs with the firmware gyro balance off (attachments.flag "gyro_balance")
         try:
             self._ease_transition(command)
+            if self._skip_firmware_stand and command.strip() in ("kbalance", "kup"):
+                self._skip_firmware_stand = False       # the arm's own stand-up just ran (_stand_up): this stand-up command would make the firmware stand up a second time from the posture it believes he is in
+                self.last_motion_command = command.strip()
+                self._last_motion_t = time.monotonic()
+                return ""
+            self._skip_firmware_stand = False
             if transitions.pose_balance(command) and self._gyro_allowed():
                 self._write_pose("gB")            # a pose plays with the firmware gyro balance on (user, 2026-10-19); after the ease, which runs with it off
                 self.pose_balance_epoch += 1      # the stand guard turns it off again once he has been still
@@ -221,6 +227,7 @@ class SerialLink:
         return flag_safe("gyro_balance")
 
     _ramping = False
+    _skip_firmware_stand = False                  # set by _stand_up when the arm's own stand-up ran: the kbalance / kup that asked for it is not sent
     _last_motion_t: float | None = None          # when last_motion_command went out (monotonic)
     last_pose_read: dict | None = None           # the outcome of the last read_leg_pose() (ok, rows, ms, spread, pose)
 
@@ -278,7 +285,8 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
-        if standup.stand_sequenced(self._write_pose, time.sleep, self.last_motion_command):       # the arm build: rear legs, then front legs, then the firmware kbalance (lift to 0)
+        if standup.stand_sequenced(self._write_pose, time.sleep, self.last_motion_command):       # the arm build: rear legs, then front legs, the lift easing to 0
+            self._skip_firmware_stand = True
             return list(transitions.BALANCE)
         secs = standup.ramp_seconds()
         if secs <= 0:
