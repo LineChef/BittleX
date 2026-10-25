@@ -83,7 +83,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-r
 
 ## `decisions`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +28.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +29.
 
 | File | Size | Cited by |
 |---|---|---|
