@@ -92,8 +92,23 @@ _BLOCKED_PREFIXES = ("c", "cd")  # calibration / factory -- never from the pipel
 DISABLED_SKILLS = frozenset({"khi", "kscrh", "kgdb", "kfiv", "kjpF"})
 
 
+# Fall recovery (user, 2026-10-25: "it doesn't work with this payload"): the scripted self-right, roll-over and drop-recover moves, and the firmware's lifted / dropped reactions.
+# Refused while the fitted attachment's profile has `fall_recovery` false (the arm); every other attachment keeps them.
+RECOVERY_SKILLS = frozenset({"krc", "krl", "kdropRec", "klifted", "kdropped"})
+
+
+def recovery_off() -> bool:
+    """True when the fitted attachment's profile switches fall recovery off (a missing key means on)."""
+    try:
+        from pi_pipeline.attachments import flag_safe
+        return not flag_safe("fall_recovery")
+    except ImportError:
+        return False
+
+
 def is_disabled(command: str) -> bool:
-    return command.strip() in DISABLED_SKILLS
+    c = command.strip()
+    return c in DISABLED_SKILLS or (c in RECOVERY_SKILLS and recovery_off())
 
 
 def skill(token: str) -> str:

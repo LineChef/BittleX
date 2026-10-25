@@ -66,8 +66,9 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 | `gyro_balance` | the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb` | off |
 | `gait_switching` | the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it | off |
 | `skills` | the attachment's own skills stay out of the conversation | off |
+| `fall_recovery` | the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (user, 2026-10-25: they do not work with the claw payload); the firmware's own auto self-right already needs the gyro balance, which is off | off |
 
-The arm has all four off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
+The arm has all five off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
 
 ## Open with the arm fitted (2026-10-24)
 

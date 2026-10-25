@@ -195,7 +195,7 @@ def test_switches_are_on_unless_a_profile_says_false():
 def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_skills():
     data = A.load_profiles()["arm"]
     assert data["payload_profile"] == "arm"
-    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "skills"))
+    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "skills", "fall_recovery"))
 
 
 def test_the_arm_keeps_its_claw_skills_out_of_the_conversation(monkeypatch):
@@ -363,3 +363,14 @@ def test_floor_trim_needs_a_saved_gait(tmp_path):
     prof.write_text(json.dumps({"arm": {"current": None, "history": []}}))
     with pytest.raises(ValueError):
         A.set_floor_trim("arm", "tile", "fl=-0.1", path=str(prof))
+
+
+def test_fall_recovery_is_off_for_the_arm_and_on_everywhere_else(monkeypatch):
+    """User, 2026-10-25: the scripted self-right moves do not work with the claw payload; the serial link refuses them while the arm is fitted."""
+    from pi_pipeline.link import opencat
+    assert A.flag("fall_recovery", "arm") is False and A.flag("fall_recovery", "head") and A.flag("fall_recovery", "none")
+    for att, refused in (("arm", True), ("head", False), ("none", False)):
+        monkeypatch.setenv("G2_ATTACHMENT", att)
+        for tok in opencat.RECOVERY_SKILLS:
+            assert opencat.is_disabled(tok) is refused, (att, tok)
+        assert not opencat.is_disabled("kbalance") and not opencat.is_disabled("kwkF")

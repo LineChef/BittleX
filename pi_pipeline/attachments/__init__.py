@@ -20,8 +20,8 @@ banner says so. The AI head accepts only the plain "Bittle X" build: the arm bui
 
 A profile may also switch Pi behaviour off while that attachment is fitted (`flag`; a missing key means on): `easing` (the stand-up ramp, the eased
 moves into skills and the blend to balance at the end of a walk), `gyro_balance` (the firmware gyro balance: every `gB` becomes `gb`),
-`gait_switching` (the gait stays normal; spoken gait commands are answered, not obeyed) and `skills` (the attachment's own skills in the
-conversation). The arm has all four off for its first hardware round (docs/plan-detail/arm-policy-plan.md).
+`gait_switching` (the gait stays normal; spoken gait commands are answered, not obeyed), `skills` (the attachment's own skills in the
+conversation) and `fall_recovery` (the scripted self-right / roll-over / drop-recover moves are refused, link/opencat.py RECOVERY_SKILLS). The arm has all five off for its first hardware round (docs/plan-detail/arm-policy-plan.md).
 Guide: docs/guides/attachments.md.
 """
 from __future__ import annotations

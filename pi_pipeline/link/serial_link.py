@@ -152,7 +152,7 @@ class SerialLink:
         """Write `command` (a newline is added). Optionally read one reply line.
         Returns the reply (or '' ). Raises nothing -- logs and returns '' on error."""
         if opencat.is_disabled(command):
-            log.warning("refusing %r: a move that tips G2 over on this payload (link/opencat.py DISABLED_SKILLS)", command.strip())
+            log.warning("refusing %r: a move that tips G2 over on this payload, or fall recovery switched off for this attachment (link/opencat.py DISABLED_SKILLS, RECOVERY_SKILLS)", command.strip())
             try:
                 from ..voice import fail_sound
                 fail_sound.command_failed(f"disabled move {command.strip()}")        # the wrong-answer horn: he was asked for a move he will not do
