@@ -120,29 +120,49 @@ def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_comma
 
 
 
-SEQ_REAR_S, SEQ_FRONT_S = 1.0, 1.4           # the sequenced stand-up: the rear legs rise over this long, then the front legs
+SEQ_REAR_S, SEQ_FRONT_S = 1.0, 1.1          # the sequenced stand-up: the rear legs rise over this long; the front legs over this long, starting while the rear is about half way
+SEQ_FRONT_START_S = 0.5                     # (user, 2026-10-25: "too much time between the back legs standing up and the front legs")
+SEQ_LIFT_FROM_S, SEQ_LIFT_TO_S = 0.7, 1.5   # the arm's lift servo eases from its rest angle to its walking angle inside the leg commands, while the front legs rise (no jolt at the end)
 _REAR_URDF = (4, 5, 6, 7)                    # URDF order [FLs,FLk,FRs,FRk,BRs,BRk,BLs,BLk]: the rear legs ...
 _FRONT_URDF = (0, 1, 2, 3)                   # ... and the front legs
 
 
+def _smooth(u: float) -> float:
+    return u * u * (3 - 2 * u)
+
+
+def _ease_out(u: float) -> float:
+    return 1 - (1 - u) ** 2                  # fast at the start: no dead time before the front legs get going
+
+
 def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build's stand-up in order (profile "poses": {"stand_via": "sequenced"}; 2026-10-25: the firmware kbalance moves all eight leg joints at once and G2 fell front right
-    when the nose rose with the claw out ahead). From rest: (1) the rear legs ease to the balance pose with the front paws and the claw on the floor, (2) the front legs follow, slower,
-    (3) the firmware `kbalance` finishes, which only has the lift servo left to do (60 -> 0), the legs already being there. Returns True if it ran."""
+    when the nose rose with the claw out ahead). From rest: the rear legs ease to the balance pose with the front paws and the claw on the floor; the front legs follow, starting when the
+    rear is about half way (a fast start, no pause between them); the lift servo eases 60 -> 0 inside the same commands; the firmware `kbalance` goes out last.
+    Returns True if it ran."""
     p = _poses()
     c = (last_motion_command or "").strip()
     if not p or p.get("stand_via") != "sequenced" or c not in ("", "d", "krest", "kzz"):
         return False
     start, goal = rest_pose(), balance_pose()
-    now = list(start)
-    for group, secs in ((_REAR_URDF, SEQ_REAR_S), (_FRONT_URDF, SEQ_FRONT_S)):
-        for pose in ramp_poses([start[k] for k in group], [goal[k] for k in group], secs):
-            for k, v in zip(group, pose):
-                now[k] = v
-            send(move_cmd(now))
-            sleep(1.0 / STEPS_PER_S)
-    send("kbalance")
-    sleep(1.5)
+    end_s = SEQ_FRONT_START_S + SEQ_FRONT_S
+    n = int(round(end_s * STEPS_PER_S))
+    lift0, lift1 = p.get("arm_rest"), p.get("arm_walk")
+    for i in range(1, n + 1):
+        t = i / STEPS_PER_S
+        now = list(start)
+        for group, t0, dur, curve in ((_REAR_URDF, 0.0, SEQ_REAR_S, _smooth), (_FRONT_URDF, SEQ_FRONT_START_S, SEQ_FRONT_S, _ease_out)):
+            u = min(1.0, max(0.0, (t - t0) / dur))
+            for k in group:
+                now[k] = start[k] + (goal[k] - start[k]) * curve(u)
+        cmd = move_cmd(now)
+        if lift0 is not None and lift1 is not None:
+            lift = lift0 + (lift1 - lift0) * _smooth(min(1.0, max(0.0, (t - SEQ_LIFT_FROM_S) / (SEQ_LIFT_TO_S - SEQ_LIFT_FROM_S))))
+            cmd = f"i1 {int(round(lift))} {cmd[1:]}"          # one `i` command with the lift pair first: "i1 <lift> 8 <deg> 12 <deg> ..."
+        send(cmd)
+        sleep(1.0 / STEPS_PER_S)
+    send("kbalance")                                            # the legs and the lift are there: the firmware's own pose changes nothing, and anything it still holds is set
+    sleep(1.0)
     return True
 
 

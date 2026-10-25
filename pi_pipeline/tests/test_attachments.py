@@ -390,22 +390,30 @@ def test_the_arm_stand_up_helpers_do_nothing_for_other_builds_and_the_plain_one_
     assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("kbalance") == standup.balance_pose()
     assert standup.stand_via_firmware(sent.append, lambda s: None, "d") is False and not sent                         # the arm's profile stands up "sequenced", not the plain way
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "d") is False            # no leg ramp (easing off) ...
-    assert sent[0].startswith("i8") and sent[-1] == "kbalance"                                                          # ... but the sequenced stand-up first, ending on the firmware kbalance
+    assert sent[0].startswith("i1 ") and sent[-1] == "kbalance"                                                        # ... but the sequenced stand-up first, ending on the firmware kbalance
     sent.clear()
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "kbalance") is False and not sent   # already standing: nothing
 
 
-def test_the_arm_stands_up_rear_legs_then_front_legs_then_kbalance(monkeypatch):
-    """2026-10-25: the firmware stand-up lifts all eight leg joints at once and G2 fell front right with the claw out ahead; the arm build raises the rear first, then the front."""
+def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kbalance_before_the_end(monkeypatch):
+    """2026-10-25: the firmware stand-up lifts all eight leg joints at once and G2 fell front right with the claw out ahead; the arm build raises the rear first and the front
+    right behind it (no pause between), and the firmware kbalance (the lift servo's swing) goes out while the front legs finish."""
     from pi_pipeline.gait import standup
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     sent = []
-    assert standup.stand_sequenced(sent.append, lambda s: None, "d") is True and sent[-1] == "kbalance"
-    legs = [standup.start_pose(c) for c in sent[:-1]]
-    rear_done = next(i for i, p in enumerate(legs) if p[4:] == standup.balance_pose()[4:])
-    assert all(p[:4] == standup.rest_pose()[:4] for p in legs[:rear_done + 1])                 # the front has not moved while the rear rises
-    assert legs[-1] == standup.balance_pose() and legs[rear_done][4:] == standup.balance_pose()[4:]
-    assert standup.stand_sequenced(sent.append, lambda s: None, "kbalance") is False              # only from rest
+    assert standup.stand_sequenced(sent.append, lambda s: None, "d") is True
+    assert sent[-1] == "kbalance" and all(c.startswith("i1 ") for c in sent[:-1])                                          # the lift pair rides in every leg command
+    lifts = [int(c.split()[1]) for c in sent[:-1]]
+    assert lifts[0] == 60 and lifts[-1] == 0 and lifts == sorted(lifts, reverse=True)                                      # eased down from the rest angle to the walking angle
+    legs = [standup.start_pose("i" + c[3:].split(" ", 1)[1]) for c in sent[:-1]]
+    rest, goal = standup.rest_pose(), standup.balance_pose()
+    first_front = next(i for i, p in enumerate(legs) if p[:4] != rest[:4])
+    first_rear = next(i for i, p in enumerate(legs) if p[4:] != rest[4:])
+    assert first_rear < first_front and first_front <= int(standup.SEQ_FRONT_START_S * standup.STEPS_PER_S) + 2          # the rear moves first; the front starts about half a second in
+    rear_half = next(i for i, p in enumerate(legs) if abs(p[5] - goal[5]) < abs(rest[5] - goal[5]) / 2)
+    assert first_front <= rear_half + 2                                                                                  # the front starts by the time the rear is half way
+    assert legs[-1] == goal                                                                                              # the legs end on the balance pose
+    assert standup.stand_sequenced(sent.append, lambda s: None, "kbalance") is False                                     # only from rest
     sent.clear()
     for att in ("none", "head"):
         monkeypatch.setenv("G2_ATTACHMENT", att)
