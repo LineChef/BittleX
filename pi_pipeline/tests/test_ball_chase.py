@@ -88,7 +88,7 @@ def test_planner_backs_up_when_punts_do_not_move_the_ball():
 def test_planner_searches_toward_the_side_it_last_saw_and_never_gives_up():
     p = bc.ChasePlanner()
     p.decide(reading(20, -30))                                                                     # last seen on the left
-    assert p.decide(None).kind == "look"                                                           # one more look first
+    assert p.decide(None).kind == "look" and p.decide(None).kind == "look"                         # two more looks first (three real misses before a search)
     a = p.decide(None); assert a.kind == "search_turn" and a.degrees < 0
     kinds = [p.decide(None).kind for _ in range(bc.SEARCH_STEPS_PER_CIRCLE + 2)]
     assert "search_walk" in kinds and kinds[-1] in ("search_turn", "search_walk")                   # a full circle, a short walk, and on
@@ -173,3 +173,35 @@ def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
     ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # low: not ok
     assert battery.motion_gate(Link("G")) == (False, None, None)                                                   # unreadable: not ok, never "fine"
     assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False
+
+
+def test_one_attempt_ends_after_the_first_punt():
+    frames = [picture([disc(122, 110, 50)])]                                                      # the ball right in front of the claw, every look
+    robot = FakeRobot()
+    out = bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, sleep=lambda s: None, say=lambda m: None)
+    assert out == "punted" and [m[0] for m in robot.moves] == ["punt"]
+    robot = FakeRobot(fall_at=1)
+    assert bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=10, sleep=lambda s: None, say=lambda m: None) == "fell"      # a fall is not a punt
+
+
+def test_a_missing_picture_is_not_a_miss_and_the_voice_cues_say_what_he_sees():
+    ball = picture([disc(122, 110, 50)])
+    empty = picture()
+
+    class Cam:
+        def __init__(self, seq):
+            self.seq, self.i = seq, 0
+        def look(self):
+            f = self.seq[min(self.i, len(self.seq) - 1)]
+            self.i += 1
+            return f
+    said, spoken = [], []
+    robot = FakeRobot()
+    # no picture, no picture (ignored), then three empty looks (a search starts: "searching"), then the ball (target acquired), then a punt ends the attempt
+    bc.run_chase(robot, Cam([None, None, empty, empty, empty, ball]), lambda: False, max_punts=1, max_steps=12, announce=spoken.append, sleep=lambda s: None, say=said.append)
+    assert spoken == ["searching", "target acquired"], spoken
+    assert [m[0] for m in robot.moves][:1] == ["turn"] or "punt" in [m[0] for m in robot.moves]
+    assert not any("search" in m for m in said[:2])                                                 # the two missing pictures did not start a search
+    first = []
+    bc.run_chase(FakeRobot(), Cam([ball]), lambda: False, max_punts=1, max_steps=3, announce=first.append, sleep=lambda s: None, say=lambda m: None)
+    assert first[:1] == ["target acquired"]                                                          # seen at the very start: said once

@@ -36,7 +36,8 @@ ALIGN_DEG = 12.0               # farther off straight than this: turn before wal
 PUNT_ALIGN_DEG = 10.0          # ... and before a punt
 PUNT_MIN_IN, PUNT_MAX_IN = 2.0, 5.0      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
-SEARCH_STEP_DEG = 35.0
+SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
+LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
 MAX_TURN_DEG = 35.0
 MIN_MOVE_S = 1.2               # a gait started and stopped for less than this does not move him
@@ -66,8 +67,8 @@ class ChasePlanner:
         if ball is None:
             self.lost += 1
             self.punts_in_range = 0
-            if self.lost == 1:
-                return Action("look", 1.0, why="no ball: one more look before searching")
+            if self.lost < LOST_LOOKS:
+                return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
             self.search_steps += 1
             if self.search_steps > SEARCH_STEPS_PER_CIRCLE:
                 self.search_steps = 0
@@ -197,11 +198,14 @@ class PictureSaver:
         self.saved += 1
 
 
-def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False,
-              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, say: Callable[[str], None] = print) -> str:
-    """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery" or "steps". Never gives up on its own."""
+def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
+              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, say: Callable[[str], None] = print) -> str:
+    """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
+    Never gives up on its own."""
     planner = planner or ChasePlanner()
     steps = 0
+    punts = 0
+    seen = False
     while not stop():
         if max_steps is not None and steps >= max_steps:
             return "steps"
@@ -211,9 +215,18 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             return "battery"
         sleep(settle_s)                                   # let the body stop swaying before the picture
         jpeg = camera.look()
-        ball = find_ball(jpeg) if jpeg else None
-        if saver is not None and jpeg:
+        if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
+            say(f"[{steps}] no picture from the camera: looking again")
+            continue
+        ball = find_ball(jpeg)
+        if saver is not None:
             saver.maybe_save(jpeg, ball)
+        if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
+            if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or not seen):
+                announce("target acquired")
+            elif ball is None and planner.lost + 1 == LOST_LOOKS:                       # the look that starts a search
+                announce("searching")
+        seen = seen or ball is not None
         act = planner.decide(ball)
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
@@ -228,7 +241,11 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             state = robot.back(act.seconds)
         elif act.kind == "punt":
             state = robot.punt()
+            punts += 1
             sleep(1.5)                                    # the ball is rolling: look after it stops
+            if state != "fell" and max_punts is not None and punts >= max_punts:
+                say(f"punted {punts}: done")
+                return "punted"
         else:
             state = "ok"
         if state == "fell":
@@ -250,11 +267,31 @@ class _SnapshotCamera:
         return snap.jpeg if snap is not None else None
 
 
+def _stand_if_lying(link) -> None:
+    """If the legs read the rest pose, stand him up (the link runs the arm build's own stand-up for a kbalance from lying). Never raises."""
+    import re
+    try:
+        s = link._ser
+        s.reset_input_buffer()
+        s.write(b"j\n")
+        time.sleep(1.0)
+        rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
+        j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
+        if j is None or (j[8] < 40 and j[12] > 30):
+            return
+        print("lying down: standing up first")
+        link.send("kbalance", read_reply=False, settle=0.0)
+        time.sleep(3.0)
+    except Exception as e:  # noqa: BLE001
+        print("could not check the pose:", e)
+
+
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Chase the green ball and punt it until stopped.")
     ap.add_argument("--dry-run", action="store_true", help="look and report what it would do; send no move")
     ap.add_argument("--max-steps", type=int, default=None)
+    ap.add_argument("--punts", type=int, default=None, help="stop after this many punts (one attempt: walk up to the ball and punt it); default: until stopped")
     ap.add_argument("--save-to", default="~/.local/share/g2/explore_pictures/named/greenball", help="folder for the pictures with the ball found (where g2pics reads them)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
@@ -266,9 +303,17 @@ def main() -> None:
     p.unlink(missing_ok=True)
     link = SerialLink("/dev/serial0")
     link.connect()
+    announce = None
+    try:                                                 # the voice for "searching" / "target acquired"
+        from ..voice.tts import make_tts
+        _tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+        announce = lambda text: _tts.speak(text)         # noqa: E731
+    except Exception as e:  # noqa: BLE001
+        print("no voice (", e, "): the cues are printed only")
+    _stand_if_lying(link)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     try:
-        why = run_chase(SerialRobot(link), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps)
+        why = run_chase(SerialRobot(link), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, announce=announce)
         print("ended:", why)
     except KeyboardInterrupt:
         print("ended: stopped")
