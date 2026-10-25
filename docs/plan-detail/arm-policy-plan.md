@@ -131,6 +131,11 @@ Only what changes how G2 moves goes into the simulator: the pod's CAD place and 
 colours, loaded from gitignored `models/local/`); they are not copied into the other viewers or the training. A later change to the claw from the user's photos goes into
 the training only for its shape, weight and position.
 
+For the next model update (not ARM1, whose 20M started 8:50 PM): the arm's lift servo sits where the stock head's neck servo sat, in the same mount (user, 2026-10-24),
+so `lift_servo` moves to the CAD neck mount (about 12 mm further back than the estimate; the training already varies the whole arm +-10 mm). The user's scale weights
+of the arm and the camera replace the estimates (63 g from Petoi's spec pages; the camera's 15 g is a guess: Seeed publishes no weight, and the case is 29 x 47 x 15 mm
+from the platform project's model). No length specs for the arm are published.
+
 ## After the first hardware round
 
 - If Petoi's cycle (H4) differs from 1.25 s by more than 20%: a 3M screen at the matched speed (`phase_rate_nom_cmd` in the sidecar).
