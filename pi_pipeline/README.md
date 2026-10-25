@@ -65,6 +65,7 @@ These modules have unit tests and a design, but no runtime module imports them y
 |---|---|---|
 | `gait/jam_guard.py` | Vision-free jam reflex: front-leg strain as a bump sensor | the feedback-only jam reflex, [B9a](../docs/planned/behavior-ideas.md); needs real strain traces |
 | `behavior/thermal_governor.py` | Servo-thermal Layer 2: throttle on AMBER, cooldown pose on RED, from the gait-side `ThermalGuard` | [B26](../docs/planned/behavior-ideas.md) |
+| `behavior/ball_chase.py` (with `vision/ball_finder.py`) | Chase the green treat ball and punt it with `kpickF` until stopped: stop, look, step; colour finder, search, back up, saves pictures with the ball found for the future ball class; tested on synthetic pictures and a fake robot, dry-run and a 5-step live run on G2 (2026-10-25) | its own entry point: `python -m pi_pipeline.behavior.ball_chase [--dry-run]` on the Pi with the voice service stopped; not driven by the behavior layer yet |
 | `link/recovery.py` | `RecoveryFSM`: choose between the learned catch, `rc` and `rl` after a fall | the recovery items in [`../docs/project-plan.md`](../docs/project-plan.md); retest with the Pi in the loop first |
 
 ## Setup
