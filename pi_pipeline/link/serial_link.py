@@ -265,6 +265,8 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
+        if standup.stand_sequenced(self._write_pose, time.sleep, self.last_motion_command):       # the arm build: rear legs, then front legs, then the firmware kbalance (lift to 0)
+            return list(transitions.BALANCE)
         secs = standup.ramp_seconds()
         if secs <= 0:
             return None

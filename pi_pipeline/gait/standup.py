@@ -107,7 +107,7 @@ def start_pose(last_motion_command):
 def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_command=None, seconds=None) -> bool:
     """Ramp from where the last command left the legs to `stand_deg`. `send(cmd)` is the caller's fire-and-forget send, `make_cmd(deg_list)` builds the `i` command.
     Returns True if the ramp ran (the caller still sends the exact stand pose afterwards)."""
-    if stand_via_firmware(send, sleep, last_motion_command):
+    if stand_sequenced(send, sleep, last_motion_command) or stand_via_firmware(send, sleep, last_motion_command):
         last_motion_command = "kbalance"
     secs = ramp_seconds() if seconds is None else seconds
     start = start_pose(last_motion_command)
@@ -118,6 +118,32 @@ def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_comma
         sleep(1.0 / STEPS_PER_S)
     return True
 
+
+
+SEQ_REAR_S, SEQ_FRONT_S = 1.0, 1.4           # the sequenced stand-up: the rear legs rise over this long, then the front legs
+_REAR_URDF = (4, 5, 6, 7)                    # URDF order [FLs,FLk,FRs,FRk,BRs,BRk,BLs,BLk]: the rear legs ...
+_FRONT_URDF = (0, 1, 2, 3)                   # ... and the front legs
+
+
+def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
+    """The arm build's stand-up in order (profile "poses": {"stand_via": "sequenced"}; 2026-10-25: the firmware kbalance moves all eight leg joints at once and G2 fell front right
+    when the nose rose with the claw out ahead). From rest: (1) the rear legs ease to the balance pose with the front paws and the claw on the floor, (2) the front legs follow, slower,
+    (3) the firmware `kbalance` finishes, which only has the lift servo left to do (60 -> 0), the legs already being there. Returns True if it ran."""
+    p = _poses()
+    c = (last_motion_command or "").strip()
+    if not p or p.get("stand_via") != "sequenced" or c not in ("", "d", "krest", "kzz"):
+        return False
+    start, goal = rest_pose(), balance_pose()
+    now = list(start)
+    for group, secs in ((_REAR_URDF, SEQ_REAR_S), (_FRONT_URDF, SEQ_FRONT_S)):
+        for pose in ramp_poses([start[k] for k in group], [goal[k] for k in group], secs):
+            for k, v in zip(group, pose):
+                now[k] = v
+            send(move_cmd(now))
+            sleep(1.0 / STEPS_PER_S)
+    send("kbalance")
+    sleep(1.5)
+    return True
 
 
 def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool:

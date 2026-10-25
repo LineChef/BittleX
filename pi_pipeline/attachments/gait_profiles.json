@@ -62,8 +62,8 @@
         20,
         50
       ],
-      "stand_via": "kbalance",
-      "note": "2026-10-25: rest read from the board (j) on Bittle X+Arm B10_260527; balance from Petoi's firmware source (to confirm with j after a kbalance). The eased stand-up and the Pi's own arm-lift ramp (12 `i 1 N` at 20/s) reset the BiBoard on G2, so a walk from rest stands up with the plain kbalance, which puts the lift at 0 itself."
+      "stand_via": "sequenced",
+      "note": "2026-10-25: rest read from the board (j) on Bittle X+Arm B10_260527; balance read after kbalance (front 17 / 58, rear 22 / 52, lift 2, within the servo offsets of the table). stand_via sequenced: rear legs, then front legs, then kbalance, because the all-at-once firmware stand-up fell front right with the claw out ahead (the 12 `i 1 N` lift ramp and a single eased stand-up both ended in a silent board, so no lift ramp)."
     }
   }
 }
