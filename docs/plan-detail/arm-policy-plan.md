@@ -145,4 +145,21 @@ from the platform project's model). No length specs for the arm are published.
 
 ## Results
 
-(Filled in as the run goes: screens, chain, score, verdict.)
+### Hardware, 2026-10-24 evening (H0 to H3)
+
+- **H0:** joint offsets backed up from the stock firmware (`blueprints/calibration.md`); the arm and camera were not weighed yet (the sim keeps 63 g and 15 g).
+- **H1:** flashed Bittle X+Arm B10_260527. The Desktop App's port list could not show the BiBoard's `cu.usbmodem` port (its dropdown draws three rows and the
+  port was fourth), so the flash ran from the terminal with the app's own esptool command and files (`FirmwareUploader.py`); all four hashes verified. The
+  stored calibration survived (no first-boot questions, leg offsets unchanged); claw pan -14, lift 0, open 1 (Auto). The voice module came back in Chinese, as
+  after every reflash; the Pi's start-up sets English.
+- **H2:** deployed (commit 74c5967); with the BiBoard connected the service logs "firmware 'Bittle X+Arm' fits arm", voice module English, gyro balance off.
+- **H3 (battery 50% at the start):**
+  - arm lift: higher values swing the claw forward and out (0 hanging, 30 reaching forward); a 10 deg move reads as a twitch;
+  - claw: positive opens it (30 about 30 deg), 0 closes it fully, clean;
+  - stand (`kbalance`): stable, the arm in the reverse L, the claw about 1 in off the floor (sim estimate about 0.7 in);
+  - sit: claw clear; rest: the claw rests against the floor (Petoi's design, so every rest, including the Pi's idle rest, sets it down);
+  - stand from rest, no easing: good;
+  - the claw camera works at 240 x 240 only (480 and 640 frames arrive cut off, as before); its view is about 1 to 2 in off the floor, with the jaws at the
+    bottom of the frame; the on-device detector called the floor "cat 65%".
+- **Stopped at H4:** two unexpected poses traced to the Pi-to-BiBoard plug working loose (how it was connected, not the arm), then the battery ran out.
+  Before H4: a charged pack, the plug seated, and the Pi's voice service restarted with G2 on (its start-up checks need the board).
