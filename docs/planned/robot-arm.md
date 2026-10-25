@@ -1,8 +1,8 @@
 # Petoi robot arm (Bittle X+Arm)
 
 Research 2026-10-17. Source: Petoi docs, <https://docs.petoi.com/extensible-modules/robot-arm> (the page is thin: it gives
-no specs; everything below is what it states, and the gaps are listed at the end). **The module arrived 2026-10-24; it is not
-installed and the arm firmware has not been flashed.** How the arm firmware changes G2's movement:
+no specs; everything below is what it states, and the gaps are listed at the end). **Installed on G2 2026-10-24 and flashed (Bittle X+Arm
+B10_260527); bench results below ([confirmed on G2](#confirmed-on-g2-2026-10-24)).** How the arm firmware changes G2's movement:
 [below](#how-the-arm-firmware-changes-movement-2026-10-24).
 
 ## What it is
@@ -197,7 +197,12 @@ walk (`i` commands), so the arm stays where the last firmware posture put it.
 Open loop, the arm walk is steadier than `wkF` on today's payload and cannot step up at all. Not yet tested: the claw's mass and position,
 and Petoi's faster cycle.
 
-### What this means for G2's own code (nothing changed yet)
+### What this means for G2's own code
+
+What was done about it: the `arm` attachment profile turns easing, gyro balance, gait switching and the arm's skills off, the head no longer accepts the
+arm build, and ARM1 trains on `wkArmF` with the claw in the sim ([`../guides/attachments.md`](../guides/attachments.md) "Behaviour switches",
+[`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). The analysis as written before the install:
+
 
 - **The learned walk is not affected by 1 or 2.** The Pi computes the walk from `wkf_ref.npy` (stock `wkF`) and streams joint angles,
   so the firmware's gait swap and the shift never apply to it. Only the servo-model scaling would.
@@ -212,6 +217,22 @@ and Petoi's faster cycle.
 - **For a new policy:** the arm build's own answer to the claw's weight is front feet forward plus a faster, shorter walk. In sim terms that
   points to a payload profile with the claw's measured mass and position, and either the stock `wkF` reference with the policy left to
   learn the shift, or `wkArmF` decoded as the imitation reference (`build_skill_reference.py wkArmF`). Both are open choices, not decisions.
+
+## Confirmed on G2 (2026-10-24)
+
+- **Flashing:** the Desktop App's Firmware Uploader could not select the BiBoard: its port dropdown draws three rows, and the BiBoard's `cu.usbmodem` port
+  was the fourth (after `cu.debug-console` and two Bluetooth ports), so every try went to `cu.debug-console` ("No serial data received"). The flash ran from
+  the terminal with the app's own command and files (`FirmwareUploader.py`; `Contents/Resources/resources/esptoolMac/esptool --chip esp32 --port
+  /dev/cu.usbmodem... --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 4MB 0x1000
+  bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 app`, from `release/2.0/BittleX+Arm/BiBoard_V1_0/`). The app reports a `usbmodem` port as
+  "non-preferred" (it prefers `wchusbserial`, the name with WCH's own driver); that is harmless.
+- **The stored calibration survived the flash** (no first-boot questions); the calibrator names joints 0 to 2 Claw Pan, Claw Lift and Claw Open.
+- **Boot:** the firmware ends its start-up with `rest` then `d`, so the servos are off until a pose: an `i` command then updates the board's record but
+  does not move anything.
+- **Arm lift (joint 1):** higher values swing the claw forward and out; 0 is the walking pose (the arm hanging down in front of the chest, the claw level and
+  forward: a reverse L). **Claw (joint 2):** positive opens it, 0 closes it fully.
+- **Poses:** stand stable with the claw about 1 in off the floor; sit clear; at rest (lift 59) the claw rests against the floor.
+- **The voice module came back in Chinese**, as after every reflash; the Pi's start-up sets it to English.
 
 ## What the page does not say
 

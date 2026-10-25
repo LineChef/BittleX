@@ -295,6 +295,8 @@ streams real `ICM:` data again.
   `chip_id`/`erase_flash` steps; the actual application reflash still
   needs Petoi's Desktop App (has the correct partition layout + all 4
   files: bootloader/partitions/`boot_app0`/application).
+- The Firmware Uploader's port dropdown draws only three rows; with more ports (Bluetooth ones) the BiBoard's can be hidden and the upload goes to
+  `cu.debug-console`. Flash from the terminal with the app's own command instead: [`../planned/robot-arm.md`](../planned/robot-arm.md) "Confirmed on G2".
 - Petoi's own documented recovery if a flash gets interrupted: power off,
   hold the BOOT button, power on while still holding it, to force ESP32
   download mode.

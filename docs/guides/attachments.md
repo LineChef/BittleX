@@ -69,12 +69,12 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 
 The arm has all four off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
 
-## Open, for when the arm arrives
+## Open with the arm fitted (2026-10-24)
 
-1. Back up the BiBoard calibration before any reflash (a reflash interacts with calibration state: [`../hardware/calibration-and-bringup-research.md`](../hardware/calibration-and-bringup-research.md)).
-2. Test whether the Bittle X+Arm firmware also runs G2 without the arm and with the AI head (walking, calibration, the head). If it does, it stays on the BiBoard and a swap is hardware only; if not, each swap is a reflash with the calibration restored.
+1. Done: the calibration was backed up before the reflash and survived it ([`../../blueprints/calibration.md`](../../blueprints/calibration.md)).
+2. Decided: the head does not accept the Bittle X+Arm firmware (it shifts every posture and swaps the gaits), so going back to the AI head is a reflash to plain Bittle X with the calibration checked.
 3. A no-attachment policy: the sim has no payload profile yet for the pod without the head (185 g); add one, train it with the same recipe and save it for `none` (until then `none` runs the legacy `DEFAULT_POLICY`).
-4. Weigh the arm and measure where it sits (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, until then); ARM1 trains on it: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md).
+4. Weigh the arm and the camera (the sim's `arm` profile uses Petoi's spec-page estimate, 63 g, and 15 g); ARM1 trained on it: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md).
 5. Run the arm's skill tokens on the bench before they are trusted.
 
 ## What a setting cannot switch

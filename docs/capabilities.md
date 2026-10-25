@@ -18,7 +18,7 @@ the *what*, kept current as capabilities land.
 The 🧩 items are the ones not yet exercised on the robot; much has been since the first walk
 (voice, memory, exploration, the wall avoider and the learned gait all run on G2). What has actually
 been exercised, what is deployed, and what is broken right now is in [`STATUS.md`](STATUS.md) — this
-file does not repeat it. Things not built yet (the robot-arm module, which has not been fitted, place memory beyond its log, reflection beyond its log-only mode, a gait that walks on carpet, a high-step gait) are in [`planned/`](planned/README.md), not here. Run
+file does not repeat it. Things not built yet (the robot-arm module's walks and skills, not yet run on G2, place memory beyond its log, reflection beyond its log-only mode, a gait that walks on carpet, a high-step gait) are in [`planned/`](planned/README.md), not here. Run
 `pytest` for the current test results (no counts are quoted in the docs).
 
 ---
@@ -30,7 +30,7 @@ file does not repeat it. Things not built yet (the robot-arm module, which has n
 | Locomotion — learned | An RL walk that tracks speed/heading commands, trained under G2's real control path (5 Hz IMU, firmware `i` command timing); which policy is deployed and how it does on the robot: [`STATUS.md`](STATUS.md) | ✅ sim / 🧩 robot |
 | Locomotion — scripted | ~20 OpenCat keyframe skills wired with friendly names (walk, turn, back up, trot, crawl, carpet gait, get-up, sit, stretch, nod, play-bow); the one-foot and jumping moves (wave, scratch, shake paw, high five, hop) are refused because they tip G2 over on the pod payload | ✅ / 🧩 |
 | Carpet mode | "G2, carpet mode" plays Petoi's firmware carpet gait (`kcarpetF`) instead of the learned walk; no gait yet walks reliably on the real carpet ([`rl/carpet-findings-2026-10-20.md`](rl/carpet-findings-2026-10-20.md)) | 🧩 |
-| Attachments | One setting (`g2attach head\|arm\|none`) says what G2 wears on the neck; it picks the gait saved for it, checks the firmware and adds the arm's skills. G2 wears the Petoi AI Head | ✅ head / 🧩 arm |
+| Attachments | One setting (`g2attach head\|arm\|none`) says what G2 wears on the neck; it picks the gait saved for it, checks the firmware, and turns behaviour off per attachment (easing, gyro balance, gait switching, the arm's skills). G2 wears the Petoi robot arm since 2026-10-24 | ✅ head / 🧩 arm |
 | Real-data pipeline | Every real walk is logged with its floor and hardware epoch; the Mac gates the logs and fits numbered sim-calibration snapshots from the usable ones | ✅ |
 | Sim → real | Policies export to ONNX with a sidecar carrying their residual scale, bit-for-bit validated against the on-robot control loop; the loop polls the 5 Hz IMU and sends the simultaneous `i` joint command; Pi inference 0.43 ms/call | ✅ built / 🧩 deploy |
 | Autonomous behaviour | A `BehaviorDriver` that composes explore / idle / converse modes into abstract effects, plus novelty-seeking, gestures, enrollment choreography; exploration narrates what he sees and does and takes four scheduled survey pictures per roam | 🧩 |
@@ -398,7 +398,8 @@ Mixed: the emergency stop, sleep mode, the watchdog, the servo thermal guard and
 - **Per-attachment gait** — `gait_profiles.json` holds the saved gait for each attachment (current plus history), checked against the policy's
   payload profile; if nothing saved is usable, the default policy runs and the reason is logged (`g2attach status`, `doctor`).
 - **Firmware check** — for head and arm, start-up compares the BiBoard's `?` banner with the firmware the attachment needs; the arm adds its skill tokens
-  (pick, put, toss, show-off, clap). The arm module has not been fitted, and its firmware and skills are untested.
+  (pick, put, toss, show-off, clap) when its profile allows them. The arm is fitted and its firmware flashed (2026-10-24); its skills stay off until a
+  bench test, and its walks have not been run yet.
 - **Petoi AI Head** — 🧩 mounted on G2 (42 g, on stock Petoi firmware). It is an extra LLM used by pressing its button; Claude stays the main brain and
   nothing is integrated for now. Because it shares the serial link it can move G2, so it is used only while G2 is idle or at rest.
   [`planned/ai-head/README.md`](planned/ai-head/README.md).

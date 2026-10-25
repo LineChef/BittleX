@@ -58,6 +58,7 @@ Never put G2 on his back; tests start on his feet with your hands near. More: [`
 | `g2walk [runs] [label]` | logged 12.5 s walks at 0.10 m/s with the deployed policy; the voice service is stopped for them and restarted after, and G2 tells you when to set him down |
 | `g2baseline start|stop|status|logs|fetch` | the same walks with more options; `fetch` copies the logs to the Mac |
 | `g2turns start|fetch` | logged firmware turn runs, to measure the real turn rate |
+| `python pi_pipeline/gait/run_gait.py --openloop --base wkArm --cycles 6` | Petoi's arm walk played from the Pi, no policy (on the Pi; the arm build) |
 | `g2walklog <log.csv>` | summarize a walk log: roll, pitch, yaw, the first fall, battery |
 | `python -m pi_pipeline.diag report [SESSION | --kind explore] --html out.html` | one report for a session (on the Pi): walks, speech lag, wake triggers, API calls, camera timeouts, problems |
 | `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` | save a trim measured on one floor for the fitted attachment's gait (`off` removes it); used when `g2floor` is set and under 12 h old |
@@ -128,10 +129,10 @@ Run from anywhere; the RL venv is used automatically. Rules for every run (a fre
 | `g2eta plan --steps 3e6 --tail stage` | a timing estimate before launching. During a run: `g2eta now --target 20e6 --tail final20m` |
 | `g2train <tag>` | start a run with the pre-run checklist (the tag must be new) |
 | `g2preflight` | must print ALL PASS before a 20M is offered |
-| `g2watchrun` | watch the training run happening right now. `g2watch` replays the newest finished policy |
+| `g2watchrun` | watch the training run happening right now (it waits between a chain's stages). `g2watch` replays the newest finished policy. G2's real look needs `python build_body_mesh.py` once (looks only) |
 | `g2tb` | open TensorBoard (`g2tb stop` ends it) |
 | `g2rltest` | the RL test files. `g2test` is the pipeline suite |
-| `g2policy <tag> <name>` | promote a trained policy to G2's default and arm the deploy (your call only) |
+| `g2policy <tag> <name>` | promote a trained policy to G2's default and arm the deploy (your call only). One attachment only: `python promote_release.py --candidate trained/X.onnx --name ARM1 --attachment arm --attachment-only --payload-profile arm` |
 
 Score, export and check a policy, from `rl_training/opencat-gym` (`g2rl` takes you there):
 
