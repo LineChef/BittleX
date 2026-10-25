@@ -64,3 +64,22 @@ not recorded. The walking evidence for the swap (drift fell from about 140 to
 about 40 degrees per 12.5 s) is in [`../docs/rl/real-walk-log.md`](../docs/rl/real-walk-log.md).
 Re-run the procedure above and the `kbalance` check after any servo
 replacement.
+
+## Offsets before the arm firmware (2026-10-24)
+
+Read from the Petoi Desktop App's Joint Calibrator on the stock Bittle X firmware, with the AI head build, just before the swap to the Petoi robot arm and the Bittle
+X+Arm reflash (a reflash can reset the calibration). The arm's servo cables were unplugged from the BiBoard for the reading. Petoi's labels: "Arm" is the upper leg
+joint, "Shoulder" (4 to 7) is unused on Bittle.
+
+| Joint | Offset | | Joint | Offset |
+|---|---|---|---|---|
+| 0 head pan | 0 | | 2 tail pan | 0 |
+| 1 head tilt | 0 | | 3 (N/A) | 0 |
+| 8 left front upper leg | -1 | | 12 left front knee | 2 |
+| 9 right front upper leg | 0 | | 13 right front knee | 5 |
+| 10 right back upper leg | 5 | | 14 right back knee | -4 |
+| 11 left back upper leg | -6 | | 15 left back knee | 4 |
+| 4 to 7 shoulders | 0 | | | |
+
+If the arm firmware's calibration starts from zero, these are the leg values to enter before the `c-2` claw calibration; the calibration pose then shows whether
+any leg needs a touch-up.
