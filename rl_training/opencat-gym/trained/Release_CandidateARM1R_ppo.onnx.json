@@ -1,0 +1,14 @@
+{
+ "residual_scale_deg": 30.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "armr_s4_ppo",
+ "exported": "2026-10-25",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ],
+ "payload_profile": "arm",
+ "gait": "ARM1R: Petoi's arm walk at its own pace, claw payload, stock legs",
+ "phase_rate_nom_cmd": 0.064,
+ "base_ref": "wkArm"
+}

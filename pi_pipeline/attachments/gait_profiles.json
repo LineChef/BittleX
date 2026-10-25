@@ -20,13 +20,21 @@
   "arm": {
     "payload_profile": "arm",
     "current": {
-      "policy": "Release_CandidateARM1_ppo.onnx",
+      "policy": "Release_CandidateARM1R_ppo.onnx",
       "trim": null,
       "payload_profile": "arm",
-      "saved": "2026-10-24",
-      "note": "ARM1: Petoi arm walk base, claw payload, stock legs (avg5 of the 20M)"
+      "saved": "2026-10-25",
+      "note": "ARM1R: Petoi arm walk played at its own pace (phase rate nominal 0.064), claw payload, stock legs; final weights of a ~19M chain"
     },
-    "history": [],
+    "history": [
+      {
+        "policy": "Release_CandidateARM1_ppo.onnx",
+        "trim": null,
+        "payload_profile": "arm",
+        "saved": "2026-10-24",
+        "note": "ARM1: Petoi arm walk base, claw payload, stock legs (avg5 of the 20M)"
+      }
+    ],
     "voice_module_language": "english",
     "easing": false,
     "gyro_balance": false,
