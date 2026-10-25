@@ -20,10 +20,10 @@ REQ = os.path.join(LIVE, "request")
 
 
 def training_now():
-    """Is a training run going (the same test the pipeline uses)?"""
+    """Is a training run going (the same test the pipeline uses), or a chain runner between two of its stages (scoring one, about to launch the next)?"""
     import subprocess
     try:
-        return subprocess.run(["pgrep", "-f", "train.py --tag"], capture_output=True).returncode == 0
+        return any(subprocess.run(["pgrep", "-f", pat], capture_output=True).returncode == 0 for pat in ("train.py --tag", r"phase_[a-z0-9_]+\.py run"))
     except OSError:
         return True                                         # cannot tell: do not block the viewer
 
