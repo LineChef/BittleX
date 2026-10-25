@@ -46,16 +46,29 @@ _LEDGE_TOP = float(os.environ.get("G2E_V5_LEDGE_TOP", "0") or 0)       # set by 
 if _LEDGE_TOP > 0:
     for _h, _lab in (("ledge_up", "Step up"), ("ledge_down", "Step down")):
         LADDER[_h] = (_lab, "mm", 1000, tuple(round(_LEDGE_TOP * f, 5) for f in (0.25, 0.5, 0.75, 1.0)))
+# G2E_V5_BUILD_TOPS "h:top,..." (g2_profile.apply_build, build_limits.json): this body's physical top for a hazard. Its ladder is quarters of that top, and the old top is
+# scored once more as a "beyond this build" cell, reported apart from the summary (res["beyond"]) so a size the body cannot pass does not skew the means.
+_tops = os.environ.get("G2E_V5_BUILD_TOPS") or ",".join(f"{h}:{v}" for h, v in g2_profile.build_world().get("limits", {}).items())
+BUILD_TOPS = {k.strip(): float(v) for k, _, v in (p.partition(":") for p in filter(None, _tops.split(","))) if k.strip() in LADDER and v.strip()}
+BEYOND = {}
+for _h, _top in BUILD_TOPS.items():
+    _lab, _unit, _f, _sizes = LADDER[_h]
+    if _top < _sizes[-1]:
+        BEYOND[_h] = _sizes[-1]
+        LADDER[_h] = (_lab, _unit, _f, tuple(round(_top * f, 5) for f in (0.25, 0.5, 0.75, 1.0)))
 
 
 def ladder_cells(hazards=None):
-    """[(cell id, hazard or None, size)]: a 7.5 s hazard-free walk first (the ladder's own baseline), then every hazard x size."""
+    """[(cell id, hazard or None, size)]: a 7.5 s hazard-free walk first (the ladder's own baseline), then every hazard x size, then the beyond-this-build cells."""
     out = [("Z0", None, 0.0)]
     for h, (_, _, _, sizes) in LADDER.items():
         if hazards and h not in hazards:
             continue
         for i, s in enumerate(sizes):
             out.append((f"Z.{h}.{i + 1}", h, float(s)))
+    for h, s in BEYOND.items():
+        if not hazards or h in hazards:
+            out.append((f"Z.{h}.beyond", h, float(s)))
     return out
 
 
@@ -128,7 +141,7 @@ def run_ladder(policy, levers=(), episodes=40, seed=5000, jobs=8, hazards=None, 
     """The size ladder for one policy; returns {"cells": [...], "summary": ladder_summary(...)}."""
     env = {k: str(v) for k, v in g2_profile.scoring_env(*levers).items()}
     env["G2E_FR_SPLIT_SIDE"] = "1"                     # the forced side-hill names (no effect on anything else)
-    for k in ("G2E_SKILL_REF", "G2E_PHASE_RATE_NOM_CMD", "G2E_V5_LEDGE_TOP"):   # a base gait other than wkF (the gait probes) and its cadence must reach the ladder workers too
+    for k in ("G2E_SKILL_REF", "G2E_PHASE_RATE_NOM_CMD", "G2E_V5_LEDGE_TOP", "G2E_V5_BUILD_TOPS"):   # a base gait other than wkF (the gait probes) and its cadence must reach the ladder workers too
         if os.environ.get(k):
             env[k] = os.environ[k]
     cells = ladder_cells(hazards)
@@ -144,7 +157,9 @@ def run_ladder(policy, levers=(), episodes=40, seed=5000, jobs=8, hazards=None, 
     out = sorted([c for r in res for c in r], key=lambda c: order[c["id"]])
     if not quiet:
         print(f"ladder done in {time.time() - t0:.0f} s", flush=True)
-    return {"cells": out, "summary": ladder_summary(out), "episodes": episodes, "steps": LADDER_STEPS, "pass_falls": PASS_FALLS}
+    inside = [c for c in out if not str(c["id"]).endswith(".beyond")]
+    beyond = {c["hazard"]: dict(size=c["size"], falls=c["fell_fraction"], success=c["success"], past_ledge=c.get("past_ledge")) for c in out if str(c["id"]).endswith(".beyond")}
+    return {"cells": inside, "summary": ladder_summary(inside), "beyond": beyond, "episodes": episodes, "steps": LADDER_STEPS, "pass_falls": PASS_FALLS}
 
 
 def ladder_summary(cells):

@@ -14,6 +14,7 @@ Scoring uses `scoring_env()` = the same physical setup without training-only set
 """
 from __future__ import annotations
 
+import json
 import os
 
 # --- the base recipe: what V2 / V2.1 were trained with, plus the measured 422 g case payload (2026-10-06) ---
@@ -278,6 +279,32 @@ def payload_world() -> dict:
     return {"G2E_PAYLOAD_PROFILE": v} if v else {}
 
 
+def build_world() -> dict:
+    """This process's build (G2_PAYLOAD_PROFILE) in build_limits.json: {"limits": {hazard: top}, "env": {...}}; {} for a build with no entry."""
+    v = os.environ.get("G2_PAYLOAD_PROFILE", "").strip()
+    if not v:
+        return {}
+    try:
+        return json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_limits.json"))).get(v, {})
+    except (OSError, ValueError):
+        return {}
+
+
+def apply_build(out: dict) -> dict:
+    """The build's physics (its "env") and its hazard tops: each top caps that hazard in G2E_FR_BOUNDS (the lower of the two wins) and is passed to the scorers
+    (G2E_V5_BUILD_TOPS), so the ramp, the frontier's "trained" and the size ladder all stop at what this body can physically pass."""
+    b = build_world()
+    out.update(b.get("env", {}))
+    lim = b.get("limits", {})
+    if lim:
+        cur = dict(p.split(":", 1) for p in filter(None, out.get("G2E_FR_BOUNDS", "").split(",")))
+        for h, top in lim.items():
+            cur[h] = str(min(float(cur[h]), float(top))) if h in cur else str(top)
+        out["G2E_FR_BOUNDS"] = ",".join(f"{h}:{v}" for h, v in cur.items())
+        out["G2E_V5_BUILD_TOPS"] = ",".join(f"{h}:{v}" for h, v in lim.items())
+    return out
+
+
 def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = None) -> dict:
     """The G2E_* environment for a training run: RECIPE + CALIBRATION + levers + (a stage's course settings) + extra."""
     out = dict(RECIPE)
@@ -295,7 +322,7 @@ def env_for(*lever_names: str, stage: str | None = None, extra: dict | None = No
         out.update(stage_extra(stage, lever_names))
     if extra:
         out.update(extra)
-    return out
+    return apply_build(out)
 
 
 # The whole course in one place (user, 2026-10-08: every hazard enabled, in every run, unless there is a good reason): surface steps with a 12 mm step, snag obstacles and ledges, on top of the
@@ -349,6 +376,11 @@ def scoring_env(*lever_names: str) -> dict:
     for name in lever_names:
         if name in OBS_LEVERS:
             out.update(LEVERS[name])
+    apply_build(out)
+    for part in filter(None, os.environ.get("G2E_SCORE_OVERRIDES", "").split(",")):     # "G2E_K=V,...": a screen's own physics (residual scale, mass) reaches every scorer, ladder workers included
+        k, _, v = part.partition("=")
+        if k.strip().startswith("G2E_"):
+            out[k.strip()] = v.strip()
     return out
 
 

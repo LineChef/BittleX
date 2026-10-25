@@ -1,0 +1,9 @@
+{
+  "_doc": "Per build (G2_PAYLOAD_PROFILE): the measured physical top of each hazard (FR_BOUND units: deg for slopes, m for ledges) and the build's fixed physics. A hazard's top caps the training ramp (G2E_FR_BOUNDS), is where the frontier calls the hazard trained, and is the top of the scorers' size ladder (sizes past it go to a separate 'beyond this build' row). Change a top only from a measurement.",
+  "arm": {
+    "limits": {"ledge_up": 0.015},
+    "limits_why": {"ledge_up": "2026-10-25: claw 1.25 in off the floor standing (user), about 6-9 mm lower at the lowest point of a walk (sim); the back paws stop at 15 mm (stepup_contacts check on ARM1R)"},
+    "env": {"G2E_BODY_MASS_SCALE": "1.0555"},
+    "env_why": {"G2E_BODY_MASS_SCALE": "2026-10-25: G2 with the arm weighs 532 g (user; feet 288 front / 259 back); the sim was 502 g, the 30 g goes on the body (the front share already matched)"}
+  }
+}

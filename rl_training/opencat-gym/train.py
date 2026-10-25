@@ -257,6 +257,17 @@ class FrontierCurriculum(BaseCallback):
             if k in self.F and v.strip().isdigit():
                 self.floor[k] = min(int(v), self.K - 1)
         self._next_log = 0                 # the first update logs at once, then every log_every steps
+        # Trained / stuck (user, 2026-10-25: a hazard trained as far as the body can go should not hold the rest back). FR_TRAINED_SHARE > 0 turns it on: a hazard whose
+        # frontier sits on its top bin (FR_BOUNDS = the build's physical top) and passes there for TRAINED_UPDATES updates in a row is TRAINED: it comes up in
+        # FR_TRAINED_SHARE of its share of episodes, at sizes over its whole range (practice), and goes back to full share if its recent success (last RECENT outcomes,
+        # any size) falls RELAPSE under the pass bar. A hazard below its top whose frontier has not moved for STUCK_STEPS is STUCK: logged, nothing else changes.
+        self.trained_share = float(os.environ.get("G2E_FR_TRAINED_SHARE", "0") or 0)
+        self.TRAINED_UPDATES, self.RECENT, self.RELAPSE, self.STUCK_STEPS = 6, 40, 0.15, 3_000_000
+        self.trained = {h: False for h in E.FR_HAZARDS}
+        self._top_streak = {h: 0 for h in E.FR_HAZARDS}
+        self._recent = {h: deque(maxlen=self.RECENT) for h in E.FR_HAZARDS}
+        self._moved = {h: (0, 0) for h in E.FR_HAZARDS}          # (frontier bin, steps when it last changed)
+        self.stuck = {h: False for h in E.FR_HAZARDS}
 
     def frontier_sum(self):
         return float(sum(self.F.values()))
@@ -273,6 +284,7 @@ class FrontierCurriculum(BaseCallback):
             if "fr" in info:
                 hi, b, ok = info["fr"]
                 self.hist[self.E.FR_HAZARDS[int(hi)]][int(b)].append(float(ok))
+                self._recent[self.E.FR_HAZARDS[int(hi)]].append(float(ok))
         return True
 
     def _rel(self, h, b, a):
@@ -308,9 +320,28 @@ class FrontierCurriculum(BaseCallback):
                 if n >= self.WINDOW and rel < self.BLOCK:
                     self.blocked[h] = b
                     break
+            if new != self._moved[h][0]:
+                self._moved[h] = (new, self.num_timesteps)
+            if self.trained_share > 0:
+                bar = self.PASS_H.get(h, self.PASS)
+                rel_top, n_top = self._rel(h, self.K - 1, ref)
+                if not self.trained[h]:
+                    self._top_streak[h] = self._top_streak[h] + 1 if (new == self.K - 1 and n_top >= self.MIN_N and rel_top >= bar) else 0
+                    if self._top_streak[h] >= self.TRAINED_UPDATES:
+                        self.trained[h] = True
+                        self._recent[h].clear()
+                        print(f"[frontier] steps {self.num_timesteps}  {h} TRAINED at its top ({self.E.FR_BOUND[h]:.3g}, relative success {rel_top:.2f}): {self.trained_share:.0%} of its share from now on", flush=True)
+                else:
+                    d = self._recent[h]
+                    if len(d) >= self.RECENT and float(np.mean(d)) / max(ref, 0.30) < bar - self.RELAPSE:
+                        self.trained[h], self._top_streak[h] = False, 0
+                        print(f"[frontier] steps {self.num_timesteps}  {h} RELAPSED (recent relative success {float(np.mean(d)) / max(ref, 0.30):.2f}): back to its full share", flush=True)
+                self.stuck[h] = (not self.trained[h]) and new < self.K - 1 and self.num_timesteps - self._moved[h][1] >= self.STUCK_STEPS
 
     def weights(self, h):
         F, K = self.F[h], self.K
+        if self.trained.get(h):
+            return (np.ones(K) / K).tolist()                     # practice over the hazard's whole range
         w = np.zeros(K)
         if F >= 2:
             w[:F - 1] += 0.15 / (F - 1)
@@ -329,7 +360,8 @@ class FrontierCurriculum(BaseCallback):
         return (w / w.sum()).tolist()
 
     def _push(self):
-        payload = {"w": {h: self.weights(h) for h in self.E.FR_HAZARDS}, "comfort": {h: max(0, self.F[h] - 1) for h in self.E.FR_HAZARDS}}
+        payload = {"w": {h: self.weights(h) for h in self.E.FR_HAZARDS}, "comfort": {h: max(0, self.F[h] - 1) for h in self.E.FR_HAZARDS},
+                   "scale": {h: self.trained_share for h in self.E.FR_HAZARDS if self.trained.get(h)}}
         self.training_env.env_method("set_frontier", payload)
         return payload
 
@@ -344,11 +376,12 @@ class FrontierCurriculum(BaseCallback):
                 F = self.F[h]
                 lo, hi = F / self.K * self.E.FR_BOUND[h], (F + 1) / self.K * self.E.FR_BOUND[h]
                 rel, n = self._rel(h, F, a if a == a else 0.9)
-                parts.append(f"{h} F{F} ({lo:.3g}-{hi:.3g}) rel {rel:.2f} n {n}" + (f" BLOCKED at {self.blocked[h]}" if self.blocked[h] is not None else ""))
+                parts.append(f"{h} F{F} ({lo:.3g}-{hi:.3g}) rel {rel:.2f} n {n}" + (f" BLOCKED at {self.blocked[h]}" if self.blocked[h] is not None else "")
+                             + (" TRAINED" if self.trained.get(h) else "") + (" STUCK" if self.stuck.get(h) else ""))
             print(f"[frontier] steps {self.num_timesteps}  anchor {a:.2f} (n {len(self.anchor)}) | " + " | ".join(parts), flush=True)
             try:
                 import json
-                state = {"steps": int(self.num_timesteps), "anchor": a, "F": self.F, "blocked": self.blocked, "weights": payload["w"],
+                state = {"steps": int(self.num_timesteps), "anchor": a, "F": self.F, "blocked": self.blocked, "weights": payload["w"], "trained": self.trained, "stuck": self.stuck,
                          "bins": {h: [[float(np.mean(d)) if d else None, len(d)] for d in self.hist[h]] for h in self.E.FR_HAZARDS},
                          "bound": self.E.FR_BOUND, "n_bins": self.K}
                 json.dump(state, open(f"trained/{self.tag}_frontier.json", "w"))
@@ -374,6 +407,8 @@ class RunMonitor(BaseCallback):
         self.health_stop = None
         self.warn_only = os.environ.get("G2E_HEALTH_WARN_ONLY", "0") not in ("0", "")     # ARM1 (user, 2026-10-24: "nothing should fail the arm walk"): the learning checks only warn; a non-finite loss still stops
         self.cool = None             # (start step, start lr, end step)
+        self.eval_fr = os.environ.get("G2E_EVAL_FR", "0") not in ("0", "")
+        self.smooth = os.environ.get("G2E_PLATEAU_SMOOTH", "0") not in ("0", "")
         self.env = None
 
     def _progress(self):
@@ -391,6 +426,8 @@ class RunMonitor(BaseCallback):
             self.env = E.OpenCatGymEnv()
         rng_state = np.random.get_state()
         saved = (dict(E.CATEGORY_OVERRIDE), E.CATEGORY_FORCE)
+        if self.eval_fr:
+            return self._eval_fr(E, p, rng_state, saved)
         try:
             self.env.set_ramp_steps(1e12)
             res = {}
@@ -419,6 +456,69 @@ class RunMonitor(BaseCallback):
         hz = [res[c] / max(res["clean"], 0.3) for c in E.CATS]
         return 0.5 * res["clean"] + 0.5 * float(np.mean(np.minimum(1.0, hz))), res
 
+    def _episode(self, E, p, seed):
+        self.env.set_command(fwd=E.probe_command(seed), yaw=0.0)
+        self.env._push_curr, self.env._ep_outcomes = 1.0, []
+        obs, _ = self.env.reset(seed=seed)
+        peak = 0.0
+        while True:
+            act, _ = self.model.predict(obs, deterministic=True)
+            obs, _r, te, tr, _i = self.env.step(act)
+            rr, pp, _y = p.getEulerFromQuaternion(p.getBasePositionAndOrientation(self.env.robot_id)[1])
+            peak = max(peak, abs(rr), abs(pp))
+            if te or tr:
+                break
+        return 0.0 if peak > 1.3 else self.env._episode_score()
+
+    def _eval_fr(self, E, p, rng_state, saved):
+        """G2E_EVAL_FR (2026-10-25): the eval on the build's own course. 16 clean-floor episodes, then every frontier hazard at half and all of ITS top (FR_BOUNDS, which
+        build_limits.json caps at what the body can pass), 3 episodes each, so a size no policy can pass never weighs on the score. Score = 0.5 clean + 0.5 the mean of each
+        hazard's success relative to clean (capped at 1); res["learn"] is the same over the hazards the curriculum has not called trained (the plateau rule's measure)."""
+        try:
+            self.env.set_ramp_steps(1e12)
+            E.CATEGORY_OVERRIDE, E.CATEGORY_FORCE = {"terrain": 0.0}, False
+            res = {"clean": float(np.mean([self._episode(E, p, 777000 + k) for k in range(16)]))}
+            E.CATEGORY_OVERRIDE, E.CATEGORY_FORCE = {}, False
+            for h in E.FR_HAZARDS:
+                sc = []
+                for i, f in enumerate((0.5, 1.0)):
+                    self.env.set_forced_hazards({h: f * E.FR_BOUND[h]})
+                    sc += [self._episode(E, p, 778000 + 10 * i + k) for k in range(3)]
+                res[h] = float(np.mean(sc))
+        finally:
+            self.env.set_forced_hazards(None)
+            E.CATEGORY_OVERRIDE, E.CATEGORY_FORCE = saved
+            self.env._forced_cmd = None
+            np.random.set_state(rng_state)
+        rel = {h: min(1.0, res[h] / max(res["clean"], 0.3)) for h in E.FR_HAZARDS}
+        trained = getattr(self.curr, "trained", {}) or {}
+        left = [h for h in E.FR_HAZARDS if not trained.get(h)]
+        res["learn"] = 0.5 * res["clean"] + 0.5 * (float(np.mean([rel[h] for h in left])) if left else 1.0)
+        return 0.5 * res["clean"] + 0.5 * float(np.mean(list(rel.values()))), res
+
+    def _plateaued(self):
+        """Legacy: the best of the last PLATEAU_EVALS evals has not beaten the earlier best by PLATEAU_GAIN and the curriculum's last value is not above the one before.
+        G2E_PLATEAU_SMOOTH (2026-10-25): the mean of the last W evals of the LEARNING score (hazards not yet trained) has not beaten the best earlier W-eval mean by
+        PLATEAU_GAIN, the curriculum's best over those W evals is not above its best before (a hazard turning trained counts as progress), and nothing turned trained."""
+        W = self.PLATEAU_EVALS
+        if self.num_timesteps < self.MIN_STEPS or len(self.history) < (2 * W if self.smooth else W + 1):
+            return None
+        if not self.smooth:
+            recent, before = self.history[-W:], self.history[:-W]
+            best_before = max(h[1] for h in before)
+            if max(h[1] for h in recent) < best_before + self.PLATEAU_GAIN and recent[-1][2] <= before[-1][2]:
+                return f"eval best {max(h[1] for h in recent):.3f} vs {best_before:.3f} before, curriculum not rising"
+            return None
+        learn = [h[3] for h in self.history]
+        means = [float(np.mean(learn[i:i + W])) for i in range(len(learn) - W + 1)]
+        now, best_before = means[-1], max(means[:-W]) if len(means) > W else max(means[:-1])
+        prog_now, prog_before = max(h[2] for h in self.history[-W:]), max(h[2] for h in self.history[:-W])
+        trained_now, trained_before = self.history[-1][4], self.history[-W - 1][4]
+        if now < best_before + self.PLATEAU_GAIN and prog_now <= prog_before and trained_now <= trained_before:
+            return (f"learning score mean of the last {W} evals {now:.3f} vs best earlier {best_before:.3f}, curriculum {prog_now:.1f} vs {prog_before:.1f}, "
+                    f"trained hazards {trained_now} (unchanged)")
+        return None
+
     def _lr_now(self):
         return float(self.model.policy.optimizer.param_groups[0]["lr"])
 
@@ -436,7 +536,8 @@ class RunMonitor(BaseCallback):
         ev, loss = lg.get("train/explained_variance"), lg.get("train/loss")
         score, res = self._eval()
         prog = self._progress()
-        self.history.append((int(self.num_timesteps), score, prog))
+        n_trained = sum(1 for v in (getattr(self.curr, "trained", {}) or {}).values() if v)
+        self.history.append((int(self.num_timesteps), score, prog + n_trained, res.get("learn", score), n_trained))
         flags = []
         if loss is not None and not np.isfinite(loss):
             self.health_stop = "loss is not finite"
@@ -464,26 +565,27 @@ class RunMonitor(BaseCallback):
             self.model.save(f"trained/{self.tag}_best_ppo")
             flags.append("new best -> trained/%s_best_ppo.zip" % self.tag)
         print(f"[health] steps {self.num_timesteps}  eval {score:.3f} (clean {res['clean']:.2f}; " + " ".join(f"{k} {v:.2f}" for k, v in res.items() if k != "clean")
+              + (f"; trained {n_trained}" if self.eval_fr else "")
               + f")  curriculum {prog:.1f}  ev {ev if ev is None else round(ev, 2)}  " + ("; ".join(flags) if flags else "ok")
               + (f"  STOP: {self.health_stop}" if self.health_stop else ""), flush=True)
-        if self.plateau and self.health_stop is None and self.num_timesteps >= self.MIN_STEPS and len(self.history) > self.PLATEAU_EVALS:
-            recent, before = self.history[-self.PLATEAU_EVALS:], self.history[:-self.PLATEAU_EVALS]
-            best_before = max(h[1] for h in before)
-            if max(h[1] for h in recent) < best_before + self.PLATEAU_GAIN and recent[-1][2] <= before[-1][2]:
-                lr0 = self._lr_now()
-                end = self.num_timesteps + self.COOL_STEPS
-                self.cool = (self.num_timesteps, lr0, end)
-                floor = lr0 * self.lr_floor if self.lr_floor > 0 else lr0 * 0.1
-                start = self.num_timesteps
-                total = self.model._total_timesteps
+        why = self._plateaued() if self.health_stop is None else None
+        if why and not self.plateau and self.smooth:
+            print(f"[plateau] steps {self.num_timesteps}: WOULD STOP (log only, the plateau stop is off): {why}", flush=True)
+        if why and self.plateau:
+            lr0 = self._lr_now()
+            end = self.num_timesteps + self.COOL_STEPS
+            self.cool = (self.num_timesteps, lr0, end)
+            floor = lr0 * self.lr_floor if self.lr_floor > 0 else lr0 * 0.1
+            start = self.num_timesteps
+            total = self.model._total_timesteps
 
-                def cooled(progress_remaining, _start=start, _end=end, _lr0=lr0, _floor=floor, _total=total):
-                    t = _total * (1.0 - progress_remaining)            # SB3's progress -> steps (the run's own counter)
-                    f = min(1.0, max(0.0, (t - _start) / (_end - _start)))
-                    return _lr0 + (_floor - _lr0) * f
-                self.model.lr_schedule = cooled
-                print(f"[plateau] steps {self.num_timesteps}: eval best {max(h[1] for h in recent):.3f} vs {best_before:.3f} before, curriculum not rising -> "
-                      f"learning-rate cool-down {lr0:.2e} -> {floor:.2e} over {self.COOL_STEPS:,} steps, then the run ends", flush=True)
+            def cooled(progress_remaining, _start=start, _end=end, _lr0=lr0, _floor=floor, _total=total):
+                t = _total * (1.0 - progress_remaining)            # SB3's progress -> steps (the run's own counter)
+                f = min(1.0, max(0.0, (t - _start) / (_end - _start)))
+                return _lr0 + (_floor - _lr0) * f
+            self.model.lr_schedule = cooled
+            print(f"[plateau] steps {self.num_timesteps}: {why} -> "
+                  f"learning-rate cool-down {lr0:.2e} -> {floor:.2e} over {self.COOL_STEPS:,} steps, then the run ends", flush=True)
 
 
 if __name__ == "__main__":
@@ -561,6 +663,10 @@ if __name__ == "__main__":
         policy_cls = PrivCriticPolicy
         custom_arch["priv_dim"] = _E.PRIV_DIM
     ppo_batch, ppo_epochs = int(os.environ.get("G2E_PPO_BATCH", "64")), int(os.environ.get("G2E_PPO_EPOCHS", "10"))   # lever big_batch: 4096 x 5
+    ppo_ent = float(os.environ.get("G2E_PPO_ENT_COEF", "0") or 0)       # 2026-10-25: an entropy bonus, so the action noise does not shrink away late in a long run (SB3 default 0)
+    _chain_ppo = {k: v for k, v in (("batch_size", ppo_batch if os.environ.get("G2E_PPO_BATCH") else None),
+                                     ("n_epochs", ppo_epochs if os.environ.get("G2E_PPO_EPOCHS") else None),
+                                     ("ent_coef", ppo_ent if os.environ.get("G2E_PPO_ENT_COEF") else None)) if v is not None}   # a chained stage keeps the saved settings unless set
     lr_floor = float(os.environ.get("G2E_LR_FLOOR", "0") or 0)        # opt_bundle: the linear decay ends at this fraction of 3e-4 instead of 0
 
     lr_scale = float(os.environ.get("G2E_LR_SCALE", "1") or 1)          # lever lr_half: the whole schedule (start and floor) scaled, 0.5 = start at 1.5e-4
@@ -605,8 +711,8 @@ if __name__ == "__main__":
             import torch
             _at = _prev.observation_space.shape[0] - (_E.PRIV_DIM if _E.PRIV_OBS else 0)
             model = PPOCls(policy_cls, env, seed=int(os.environ.get("G2E_SEED", "42")), policy_kwargs=custom_arch, n_steps=n_steps,
-                           batch_size=_prev.batch_size, n_epochs=_prev.n_epochs, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None),
-                           verbose=1, tensorboard_log=None)
+                           **{"batch_size": _prev.batch_size, "n_epochs": _prev.n_epochs, "ent_coef": _prev.ent_coef, **_chain_ppo},
+                           learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), verbose=1, tensorboard_log=None)
             _old, _new = _prev.policy.state_dict(), model.policy.state_dict()
             with torch.no_grad():
                 for _k, _w in _new.items():
@@ -622,7 +728,7 @@ if __name__ == "__main__":
             model.policy.load_state_dict(_new)
             print(f"chained with {_grow} new input(s) at {_at}: every weight copied, the new inputs start at zero weight", flush=True)
         else:
-            model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None)
+            model = PPOCls.load(args.chain_from, env=env, n_steps=n_steps, learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None), tensorboard_log=None, **_chain_ppo)
         del _prev
         if os.environ.get("G2E_CHAIN_SEED"):                           # a chained stage never used G2E_SEED (only a fresh policy does), so a retry with another seed was an exact repeat (2026-10-13)
             model.set_random_seed(int(os.environ["G2E_CHAIN_SEED"]))
@@ -661,7 +767,7 @@ if __name__ == "__main__":
         _tkl = os.environ.get("G2E_TARGET_KL", "")                     # V5 lever kl_limit: PPO's early stop on the update size, through the whole fresh run
         model = PPOCls(policy_cls, env, seed=int(os.environ.get("G2E_SEED", "42")),
                     policy_kwargs=custom_arch,
-                    n_steps=n_steps, batch_size=ppo_batch, n_epochs=ppo_epochs,
+                    n_steps=n_steps, batch_size=ppo_batch, n_epochs=ppo_epochs, ent_coef=ppo_ent,
                     learning_rate=lr_schedule, target_kl=(float(_tkl) if _tkl else None),
                     verbose=1,
                     tensorboard_log=None)

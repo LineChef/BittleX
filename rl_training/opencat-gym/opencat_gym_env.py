@@ -533,6 +533,11 @@ ARM_PARTS = [
     ("jaw_right", 0.0075, (0.018, 0.002, 0.005), (0.108, -0.009, -0.044)),
     ("camera", 0.015, (0.0075, 0.0147, 0.0234), (0.0835, 0.0, -0.0146)),      # Grove Vision AI V2 case (29 x 47 x 15 mm), upright on the claw servo, lens forward
 ] if PAYLOAD_PROFILE == "arm" else []
+# The claw's real height (user, 2026-10-25): G2 standing, the lowest point of the claw is 1.25 in (32 mm) off the floor; the parts above put it at 22-26 mm. The arm hangs from
+# the lift servo, so the parts below it move up by ARM_LOWER_DZ (the arm link by half of it: its top stays at the servo). G2E_ARM_LOWER_DZ=0 is the ARM1 / ARM1R geometry.
+ARM_LOWER_DZ = float(os.environ.get("G2E_ARM_LOWER_DZ", "0.009") or 0.0)
+ARM_PARTS = [(n, m, h, (x, y, z + (ARM_LOWER_DZ / 2 if n == "arm_link" else ARM_LOWER_DZ if n not in ("neck_bracket", "lift_servo") else 0.0)))
+             for n, m, h, (x, y, z) in ARM_PARTS]
 ARM_MASS_RAND = 0.20 if ARM_PARTS else 0.0     # the whole arm's mass x (1 +- this) per episode (63 + 15 g +- 16 g)
 URDF_NAME = "bittle_esp32_cad.urdf" if PAYLOAD_PROFILE == "arm" else "bittle_esp32.urdf"     # arm: the body's collision shape at G2's real size (models/bittle_esp32_cad.urdf)
 POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
@@ -1174,6 +1179,9 @@ FAC_FOOT_PHASE = _g2e("FAC_FOOT_PHASE", FAC_FOOT_PHASE)
 FAC_GAIT_SYMMETRY = _g2e("FAC_GAIT_SYMMETRY", FAC_GAIT_SYMMETRY)
 FAC_UPRIGHT = _g2e("FAC_UPRIGHT", FAC_UPRIGHT)
 FAC_STABILITY = _g2e("FAC_STABILITY", FAC_STABILITY)
+FAC_ROLL = _g2e("FAC_ROLL", 0.0)                        # ARM1S: penalty weight on roll^2 (rad), ramped with the other penalties; 0 = off
+FAC_ROLL_RATE = _g2e("FAC_ROLL_RATE", 0.0)                # ARM1S: penalty weight on roll rate^2 (rad/s); 0 = off
+IMITATION_SHARPNESS = _g2e("IMITATION_SHARPNESS", IMITATION_SHARPNESS)   # ARM1S: stricter match to the base walk (default 2.0)
 HEIGHT_FLOOR = _g2e("HEIGHT_FLOOR", 0.0)
 FAC_SLIP = _g2e("FAC_SLIP", FAC_SLIP)                  # carpet probes (2026-10-20): scrubbing paws drag the body on a grippy carpet
 PAW_Z_TARGET = _g2e("PAW_Z_TARGET", PAW_Z_TARGET)
@@ -1374,6 +1382,7 @@ class OpenCatGymEnv(gym.Env):
         """Trainer hook (train.py FrontierCurriculum): {"w": {hazard: [FR_BINS weights]}, "comfort": {hazard: bin}} for the next episodes."""
         self._fr_w = {h: np.asarray(payload["w"][h], dtype=float) for h in FR_HAZARDS}
         self._fr_comfort = {h: int(payload["comfort"][h]) for h in FR_HAZARDS}
+        self._fr_scale = {h: float(v) for h, v in payload.get("scale", {}).items()}     # a trained hazard's share of episodes (train.py: FR_TRAINED_SHARE), 1 = its full share
 
     def _use_frontier(self) -> bool:
         if getattr(self, "_forced_fz", None) is not None:
@@ -1407,6 +1416,7 @@ class OpenCatGymEnv(gym.Env):
         p_rough = min(1.0, FR_SHARE["rough"] / q / max(1e-6, 1.0 - p_slope))
         p_ledge = min(1.0, FR_SHARE["ledge"] / q / max(1e-6, 1.0 - FR_SHARE["rough"] / q))
         present = []
+        _sc = getattr(self, "_fr_scale", {})          # trained hazards come up at a fraction of their share (drawn as before, then kept with that chance)
         if np.random.rand() < p_slope:
             present.append(self._slope_kind())
         elif np.random.rand() < p_rough:
@@ -1419,6 +1429,8 @@ class OpenCatGymEnv(gym.Env):
         for h in ("rubble", "boxes", "snag", "cutback"):
             if np.random.rand() < min(1.0, FR_SHARE[h] / q):
                 present.append(h)
+        if _sc:
+            present = [h for h in present if np.random.rand() < _sc.get(h, 1.0)]
         combo = np.random.rand() < FR_COMBO
         focus = None
         if present and not combo:                  # the focus is drawn inversely to each hazard's share, so rare hazards (a ledge direction: 10%) gather evidence as fast as common ones
@@ -2226,6 +2238,8 @@ class OpenCatGymEnv(gym.Env):
         # from the scripted pose only when it helps.
         duty_reward = FAC_DUTY * (sum(paw_contact) / 4.0)
         upright_penalty = FAC_UPRIGHT * _load_stab * tilt ** 2
+        if FAC_ROLL > 0 or FAC_ROLL_RATE > 0:     # the sway itself: roll angle and roll rate, on top of the max-tilt term
+            upright_penalty += FAC_ROLL * float(state_ang_euler[0]) ** 2 + FAC_ROLL_RATE * float(state_vel_clip[0]) ** 2
         residual_cost = FAC_RESIDUAL_COST * _posture_k * float(np.mean(np.asarray(action) ** 2)) if RESIDUAL_MODE else 0.0
         if RESIDUAL_MODE and FAC_RESID_CALM_BONUS > 0:
             calm_factor = max(0.0, 1.0 - tilt / IMITATION_TILT_FADE)
