@@ -188,6 +188,8 @@ Vision-based navigation is gated off (`features.vision`). Target capability and 
 - [ ] **Cliff/edge avoidance (`CliffGuard`)** — highest priority once the camera is mounted; the app does not construct one yet, so it needs both a classifier and wiring.
 - [ ] "Reasoning" layer: structured detections to Claude over serial (the BiBoard cannot run a vision-language model).
 - [ ] (Stretch) more robust self-righting with IMU-based flip detection.
+- [ ] Recalibrate the wall estimator for the camera on the claw (user, 2026-10-25); steps in [`plan-detail/arm-policy-plan.md`](plan-detail/arm-policy-plan.md) "Next hardware rounds".
+- [ ] **Fetch the green ball** with the claw (user, 2026-10-25): find, approach, pick, check the grasp, retry on a miss (turn back to the ball), bring it to the person; plan in [`plan-detail/arm-policy-plan.md`](plan-detail/arm-policy-plan.md) "Next hardware rounds".
 - Deferred on purpose: wiring `Avoider` decisions to the actuator (the model only knows face/dog/cat, so it would back away from people and pets).
 
 ## Phase 9 — Memory ✅

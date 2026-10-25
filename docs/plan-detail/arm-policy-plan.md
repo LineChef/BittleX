@@ -179,3 +179,58 @@ from the platform project's model). No length specs for the arm are published.
     bottom of the frame; the on-device detector called the floor "cat 65%".
 - **Stopped at H4:** two unexpected poses traced to the Pi-to-BiBoard plug working loose (how it was connected, not the arm), then the battery ran out.
   Before H4: a charged pack, the plug seated, and the Pi's voice service restarted with G2 on (its start-up checks need the board).
+
+### Hardware, 2026-10-25 (H4 to H6, hardwood, battery 100% then 88%)
+
+- **H4, Petoi's walk** (`kwkF`, 10 s): 4 ft 4 in and 4 ft 5 in (0.13 m/s), 5 to 7 in off line; roll swing 3.3 to 3.7 deg; cycle about 0.5 s (from the IMU roll period).
+- **H5, the arm walk from the Pi at the training pace** (1.25 s cycle): 1 ft 7 in in 7.5 s (0.064 m/s, the sim's figure), 1 in off line.
+- **H6, ARM1** (cmd 0.10): one fall at the stand-up, then no falls; roll swing 9 to 11 deg (sim 3.5), 20 to 26 deg left; the front right leg limped (not during Petoi's
+  walk). The user saw the cause: ARM1 put its front feet much further out (front shoulders 62 to 63 deg against Petoi's 55). Why: the sim played the base at
+  cmd / 0.10, and Petoi's walk moves only 0.064 m/s at that rate, so the policy closed a 56% speed gap with a longer reach.
+- **ARM1R** (the fix: `G2E_PHASE_RATE_NOM_CMD` 0.064, so a 0.10 command plays the base 1.56x faster; promoted for the arm and deployed 8:02 AM): front shoulders
+  56 deg, back 75, yaw +12 deg, no fall. The user: more stable than ARM1, still a lot of roll. The reward had almost nothing against roll and a soft imitation term.
+- **Weights** (user): 532 g with the arm (sim 502 g); front feet 288 g, back 259 g (52.6% front; the sim matched). **Claw height** standing: 1.25 in (sim 22 to 26 mm).
+
+## ARM1X: the claw world as measured, a training system that keeps learning (user, 2026-10-25, plan approved)
+
+Why ARM1R's 20M stopped at about 11M: the plateau stop fired on noise (the best of three evals against one lucky early best, 8 + 6 episodes per check), the eval tested
+every hazard at its hardest size (step-ups of 30 mm, which the claw build cannot pass: the jaws jam on the face from about 20 mm and the back paws stop at 15 mm,
+`stepup_contacts` check), the step-up frontier sat at 5 to 7.5 mm the whole run, PPO updates ran at a 0.25 to 0.29 clip fraction, and the action noise shrank with no
+entropy bonus. Changes (runner `phase_armx.py`, log `trained/phase_armx.log`):
+
+- **The world:** 532 g (`build_limits.json`), the claw 9 mm higher (`opencat_gym_env.ARM_LOWER_DZ`; standing 31 to 35 mm), the `armsmall` recipe (imitation
+  sharpness 8, roll and roll-rate terms, residual 15 deg; its 3M screen: roll 2.2 deg, side-hill 8 deg falls 7 / 12%, but less crossing of clutter).
+- **Per-build tops** (`build_limits.json`): step-ups 15 mm on the arm. The top caps the training ramp, is where a hazard counts as trained, and is the top of the
+  scorers' ladder; the old top is scored as a separate "beyond this build" row, outside the means.
+- **Trained and stuck hazards** (`G2E_FR_TRAINED_SHARE` 0.05): a hazard passing at its top for 6 updates in a row drops to 5% of its share (practice over its whole
+  range) and goes back to full share if its recent success falls 0.15 under the bar. A hazard below its top that has not moved for 3M steps is logged STUCK.
+- **The eval** (`G2E_EVAL_FR`): 16 clean episodes, then each hazard at half and all of its own top; the plateau rule uses the hazards not yet trained.
+- **The plateau rule** (`G2E_PLATEAU_SMOOTH`): three-eval means against the best earlier three-eval mean, the curriculum over the same windows, a hazard turning
+  trained counts as progress. Off in this 20M (log only: "WOULD STOP"), so the run goes the full 20M.
+- **Screens** (3M each, rule set before the results in `phase_armx.adopt`): control, PPO batch 512 x 5, entropy bonus 0.005, back paws at 20 mm in mid-swing.
+  Then S0 to S3 and the full 20M with what was adopted, pick final or avg5, export `ARM1Xcand`, compare with ARM1R and Petoi's walk in the same world.
+- The claw stays at its walking pose (lift 0): at 1.25 in standing and about 1 in at the lowest point of a walk it clears a 15 mm step; a 20 mm step would want
+  about 10 deg of lift, only once the legs can do 20 mm.
+
+## Next hardware rounds (user, 2026-10-25)
+
+**Wall estimator, camera on the claw.** `vision/wall_distance.py` is geometry, not a model: the row where the floor ends maps to a distance through a calibration.
+The camera moved twice (pod top, then the claw, lower and further forward), so the old calibration is wrong.
+1. One picture at the walking pose (lift 0) to check the view is upright and where the floor strip sits.
+2. `python -m pi_pipeline.vision.wall_distance calibrate`: boxes at tape-measured distances (6, 12, 18, 24, 36 in).
+3. The wall checks in [`../vision/wall-check-plan.md`](../vision/wall-check-plan.md) again, then a short dry-run roam.
+The calibration holds only at lift 0; any behaviour that lifts the arm must not use it meanwhile.
+
+**Fetch the green ball.** Find the ball, walk to it, pick it up, check the grasp, and on a miss (the claw closed on nothing, or the ball rolled away) back up,
+find it again, turn to it and try again (three tries, then say so); then bring it to the person and put it down. Built from what exists, no new firmware:
+1. **See the ball.** The camera's detector gives boxes at about 15 fps but knows face / dog / cat. Two paths: (a) first, colour on the Pi from the camera's
+   240 x 240 pictures (green pixels: bearing, size, where in the frame), a stop-look-step approach at the picture rate, no model change; (b) then a "ball" class
+   in the camera's detector (the custom-model recipe, pictures captured from the claw camera), for tracking while walking.
+2. **The pick.** Petoi's arm skills `kpickF` (in front) and `kpickD` (below), then `kput` to put it down; decode each one's keyframes first (no three-foot moves).
+   The ball must fit the open claw (measure the ball and the claw's opening).
+3. **Did it work.** The claw servo's position after closing (on the ball it stops part-open, on nothing it closes fully; servo feedback runs at about 9 Hz) and
+   one picture (the jaws are at the bottom of the frame, so a held ball fills that spot).
+4. **The loop.** A small state machine in `behavior/` (search, approach, align, pick, check, retry, return, put down), each step an `Effect`, tested with mocks;
+   the approach uses the arm walk policy at a slow command plus small turns (the arm turns are H7, not yet run). Returning uses the face class to find the person.
+5. **Learning, later.** Once the scripted version works, the misses are data: a learned correction on the approach or the grasp (the usual scripted base plus a
+   bounded residual), not before.
