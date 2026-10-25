@@ -145,6 +145,18 @@ from the platform project's model). No length specs for the arm are published.
 
 ## Results
 
+### ARM1 sim result, 2026-10-24 (11:13 PM training end, 11:35 PM verdict)
+
+20M steps on Petoi's arm walk (wkArm), claw payload, stock legs; 100 episodes per test, one seed. Weights picked: avg5 of the last five checkpoints (final scored the same on falls and speed, 13 deg heading instead of 18). Promoted as the arm attachment's walking policy (`--attachment-only`; `DEFAULT_POLICY` unchanged).
+
+- Strong: no falls on flat ground, carpet, slick tile or the carpet-to-hard transition; calm walk 0.099 m/s, roll 3.5 deg, left-right asymmetry 2.7 deg; uphill and downhill to 10 deg; rubble, thin cords and overheated servos at or under 12% falls at every size.
+- Needs work: step down (70% falls at 0.6 in, 97% at 0.9 in); side-hills (about half fall at 6 deg, over 80% at 8 deg, worse right side down); heading drift 18 deg on the 12.5 s walk; step up crosses only the smallest step (larger ones stall without falls); brutal shoves 44% falls.
+- 20M progress checks: speed 0.094 to 0.099 m/s, asymmetry 4.1 to 1.3 deg, heading 9 to 20 deg throughout, step-down falls 0.79 at 2M, 0.36 at 4M, 0.62 at 20M.
+- V7 in the same claw world (background only, scored on the stock walk it was trained on): mean falls 0.219 against 0.293, heading 7.6 against 17.6 deg, speed 0.105 against 0.099 m/s, right side-hill mean falls 0.08 against 0.33. The pre-set rule failed on falls and heading (footnote only; nothing was gated). V7 would not run as scored on G2, since the arm firmware plays the arm walk.
+- Caveats: one run and one scoring seed; the claw weight is an estimate (63 g plus the 15 g camera).
+- Report page: published as an Artifact (ARM1 Claw Gait Profile). Reports: `trained/arm_report/` (final, avg5, v7_claw).
+
+
 ### Hardware, 2026-10-24 evening (H0 to H3)
 
 - **H0:** joint offsets backed up from the stock firmware (`blueprints/calibration.md`); the arm and camera were not weighed yet (the sim keeps 63 g and 15 g).
