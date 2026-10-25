@@ -248,6 +248,13 @@ Faster and better on hazards than the scripted walk, steadier than ARM1R (a thir
 
 Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and deployed to the Pi 4:22 PM, with ARM1R and ARM1 kept as history; the Pi loads it with residual scale 15 deg and the 0.064 pace from its sidecar. **First hardware walk (2026-10-25 4:3x PM, hardwood, pack 100%):** cmd 0.10, 12.5 s, no fall, yaw -1 deg over the run, the user: walked straight down the line, ended 1 in off line (ARM1R 5 in, Petoi's walk 5 to 7 in); roll spread 4.3 deg (-11 to +7; ARM1R 6.2, Petoi 3.3 to 3.7); front shoulders 55 to 56 deg and back 75 (the sim says 53 / 73); no late ticks. Distance not measured; one run only (the user stopped the testing there).
 
+## Queued until the ball testing is done (user, 2026-10-25: no work on walking or standing before then)
+
+- **Stand-up "needs more work"** (user, 2026-10-25 4:3x PM): fixed so far, the second stand-up (the firmware `kbalance` after the sequence replayed it) and the jerky arm pull-back (1.6 s lift, 3 deg a step); more feedback to be added here as it comes.
+- The arm servo angle scale on the legs (P1S 290 deg against P1L 270 deg), unmeasured.
+- Walking: ARM1X repeat runs (one run so far, 1 in off line), the sim-hardware roll gap, a foot trim if needed.
+- Raising the slope evidence (30 to 15 episodes) and the snag hazard for the next training run; the trained ball class; the wall estimator for the claw camera; the dim-room picture set.
+
 ## Next hardware rounds (user, 2026-10-25)
 
 **Wall estimator, camera on the claw.** `vision/wall_distance.py` is geometry, not a model: the row where the floor ends maps to a distance through a calibration.
