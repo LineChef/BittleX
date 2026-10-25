@@ -154,6 +154,10 @@ from the platform project's model). No length specs for the arm are published.
 - 20M progress checks: speed 0.094 to 0.099 m/s, asymmetry 4.1 to 1.3 deg, heading 9 to 20 deg throughout, step-down falls 0.79 at 2M, 0.36 at 4M, 0.62 at 20M.
 - V7 in the same claw world (background only, scored on the stock walk it was trained on): mean falls 0.219 against 0.293, heading 7.6 against 17.6 deg, speed 0.105 against 0.099 m/s, right side-hill mean falls 0.08 against 0.33. The pre-set rule failed on falls and heading (footnote only; nothing was gated). V7 would not run as scored on G2, since the arm firmware plays the arm walk.
 - Caveats: one run and one scoring seed; the claw weight is an estimate (63 g plus the 15 g camera).
+- ARM1 against Petoi's scripted arm walk (wkArm, no learned correction), same claw world, 100 episodes, same seed (scored 2026-10-25, `trained/arm_report/scripted_wkarm.json`): the scripted walk is steadier and straighter, ARM1 is faster and gets through more clutter.
+  - Scripted wins: falls (step down 0.6 in 15% against 70%, 0.9 in 33% against 97%; side-hill 6 deg 0% against 45-57%; shoves 25% against 44%; ledges 0% against 43-49%), heading drift (2.4 deg against 17.6 on the 12.5 s walk), roll (1.4 against 3.5 deg).
+  - ARM1 wins: calm-walk speed (0.082 against 0.064 m/s on the 12.5 s walk, +28%; 0.081 against 0.058 on flat, +40%), rubble (62-78% crossed against 0-7%), box obstacles (100% against 45% at half size), thin cords, rough floor at 2x, overheated servos.
+  - Both stall at step ups above the smallest size; both fall on the brutal gauntlet (89% / 78%).
 - Report page: published as an Artifact (ARM1 Claw Gait Profile). Reports: `trained/arm_report/` (final, avg5, v7_claw).
 
 
