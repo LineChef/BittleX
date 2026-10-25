@@ -418,3 +418,32 @@ def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kba
     for att in ("none", "head"):
         monkeypatch.setenv("G2_ATTACHMENT", att)
         assert standup.stand_sequenced(sent.append, lambda s: None, "d") is False and not sent
+
+
+def test_with_fall_recovery_off_every_skill_and_every_connect_is_followed_by_gb(monkeypatch):
+    """User, 2026-10-25: the firmware turns its gyro assist on with a skill (and on a restart), and with it on it keeps trying its own self-right after a fall, which shakes the Pi plug
+    loose. The arm's link sends `gb` right after each skill and after connecting; the other attachments send nothing extra."""
+    from pi_pipeline.link.serial_link import SerialLink
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+        def reset_input_buffer(self):
+            pass
+        def close(self):
+            pass
+    for att, extra in (("arm", True), ("head", False), ("none", False)):
+        monkeypatch.setenv("G2_ATTACHMENT", att)
+        lk = SerialLink("/dev/null")
+        lk._ser = FakeSerial()
+        lk._ease_transition = lambda c: None
+        lk.send("kbalance", read_reply=False, settle=0.0)
+        lk.send("i8 30 9 30", read_reply=False, settle=0.0)
+        lk._gyro_off_if_needed()
+        assert lk._ser.out[0] == "kbalance" and ("gb" in lk._ser.out[1:2]) is extra, (att, lk._ser.out)
+        assert "i8 30 9 30" in lk._ser.out

@@ -120,6 +120,7 @@ class SerialLink:
         except Exception:  # noqa: BLE001
             pass
         self._rx = b""
+        self._gyro_off_if_needed()                # a restarted board has the gyro assist on (its default), and with it on the firmware keeps trying its own get-up after a fall
         log.info("serial connected: %s @ %d", self._port, self._baud)
         if self._was_connected:
             self._mark_up()
@@ -184,6 +185,9 @@ class SerialLink:
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
+            if command[:1] == "k":
+                self._gyro_off_if_needed()                  # the arm (user, 2026-10-25): a skill turns the gyro assist back on, and with it on the firmware keeps trying its own self-right (`rc`) after a fall,
+                                                            # which is what shakes the Pi plug loose; fall recovery is off for it, so the assist goes straight back off
             if command[:1] in ("k", "d") or (command[:1] in ("i", "m") and transitions.leg_pairs(command)):
                 self.last_motion_command = command.strip()      # what the legs were last told to do (a quiet P / gb / gP, or a head-only `i0 30` look, does not change it)
                 self._last_motion_t = time.monotonic()
@@ -198,6 +202,15 @@ class SerialLink:
             self._mark_down(f"send failed: {e}")
             self._failed(command, f"send failed: {e}")
             return ""
+
+    def _gyro_off_if_needed(self) -> None:
+        """Send `gb` when the fitted attachment has the gyro balance off or fall recovery off (the arm). Never raises."""
+        try:
+            from . import opencat
+            if self._ser is not None and (not self._gyro_allowed() or opencat.recovery_off()):
+                self._ser.write(b"gb\n")
+        except Exception:  # noqa: BLE001
+            pass
 
     @staticmethod
     def _gyro_allowed() -> bool:
