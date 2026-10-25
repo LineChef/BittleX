@@ -35,7 +35,10 @@ WALK_IN_S = 5.8                # Petoi's arm walk (kwkF): about 5 to 6 in a seco
 WALK_START_S = 0.7             # a firmware gait covers nothing in its first 0.7 s or so
 ALIGN_DEG = 12.0               # farther off straight than this: turn before walking
 PUNT_ALIGN_DEG = 12.0          # ... and before a punt
-PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 6.0      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
+PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 4.0      # camera to ball: the lunge reaches about this far (2.6 in threw the ball 18 in; 4.5 to 5 in was just out of reach, 2026-10-25)
+NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps closer, then punt anyway after NUDGES_BEFORE_PUNT of them
+NUDGE_S = 0.9
+NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
@@ -46,6 +49,7 @@ CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than th
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
 BACK_UP_S = 2.0
 SAVE_EVERY_S = 2.0
+PUNT_MIN_SWING_DEG = 6.0       # a real kpickF swings the pitch 15 to 20 deg
 STOP_FILE = "~/.local/share/g2/ball_chase_stop"
 
 
@@ -64,12 +68,14 @@ class ChasePlanner:
     search_steps: int = 0
     punts_in_range: int = 0
     after_punt: bool = False   # the last action was a punt
+    nudges: int = 0            # small steps closer taken since the ball was last far or in reach
     log: list = field(default_factory=list)
 
     def decide(self, ball: BallReading | None) -> Action:
         if ball is None:
             self.lost += 1
             self.punts_in_range = 0
+            self.nudges = 0
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
             self.search_steps += 1
@@ -81,7 +87,12 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
-        near = ball.distance_in <= PUNT_MAX_IN
+        near = ball.distance_in <= NUDGE_MAX_IN
+        in_reach = ball.distance_in <= PUNT_MAX_IN
+        if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
+            self.nudges += 1
+            self.after_punt = False
+            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.0f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})")
         if abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
             return Action("turn", max(MIN_MOVE_S, abs(deg) / TURN_DEG_S), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
@@ -97,6 +108,7 @@ class ChasePlanner:
             return Action("punt", 0.0, why=f"ball {ball.distance_in:.0f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
         self.punts_in_range = 0
         self.after_punt = False
+        self.nudges = 0
         secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - 4.0) / WALK_IN_S))      # aim for about 4 in: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
@@ -119,6 +131,7 @@ class SerialRobot:
     def __init__(self, link, poll_imu=None, fall_deg: float = 45.0, sleep=time.sleep, clock=time.monotonic):
         self._lk, self._sleep, self._clock = link, sleep, clock
         self._fall_rad = math.radians(fall_deg)
+        self._pitch, self._roll = [], []
 
     def _tx(self, c: str) -> None:
         self._lk.send(c, read_reply=False, settle=0.0)
@@ -130,11 +143,21 @@ class SerialRobot:
             from gait.imu_parse import parse_imu_line  # type: ignore
         for line in self._lk.poll_imu():
             r = parse_imu_line(line)
-            if r is not None and max(abs(r[0]), abs(r[1])) > self._fall_rad:
+            if r is None:
+                continue
+            self._pitch.append(math.degrees(r[1]))
+            self._roll.append(math.degrees(r[0]))
+            if max(abs(r[0]), abs(r[1])) > self._fall_rad:
                 return True
         return False
 
+    def swing_deg(self) -> float:
+        """How far the body tilted during the last skill (the larger of the pitch and roll ranges): 0 when it never moved."""
+        rng = lambda v: (max(v) - min(v)) if len(v) > 1 else 0.0   # noqa: E731
+        return max(rng(self._pitch), rng(self._roll))
+
     def _skill(self, token: str, seconds: float) -> str:
+        self._pitch, self._roll = [], []
         self._tx("gP")
         self._tx(token)
         t0, state = self._clock(), "ok"
@@ -160,6 +183,9 @@ class SerialRobot:
 
     def punt(self) -> str:
         state = self._skill("kpickF", 2.0)
+        if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved, it did not play (2026-10-25: a run said "punted" and he only lay down): send it again once
+            log.warning("the punt barely moved him (%.1f deg): sending it again", self.swing_deg())
+            state = self._skill("kpickF", 2.0)
         return state
 
     def battery_ok(self) -> bool:

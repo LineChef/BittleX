@@ -159,7 +159,7 @@ def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
     assert r.turn(20, 0.3) == "ok" and r.turn(-20, 0.3) == "ok" and r.walk(0.3) == "ok" and r.back(0.3) == "ok" and r.punt() == "ok"
     toks = [c for c in lk.sent if c.startswith("k")]
-    assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kwkF", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance"]
+    assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kwkF", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance", "kpickF", "kbalance"]      # (this fake link reports no IMU swing, so the punt is sent twice)
 
 
 def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
@@ -209,7 +209,20 @@ def test_a_missing_picture_is_not_a_miss_and_the_voice_cues_say_what_he_sees():
 
 def test_he_steps_closer_after_a_punt_that_left_the_ball_far_and_rests_never_backs_up_for_closeness():
     p = bc.ChasePlanner()
-    assert p.decide(reading(5, 2)).kind == "punt"                                                    # 5 in: punt
-    a = p.decide(reading(5, 2)); assert a.kind == "walk" and a.seconds < 1.2                         # still 5 in away after it: step closer
-    assert p.decide(reading(3, 2)).kind == "punt"                                                    # close now: punt again
+    assert p.decide(reading(3.5, 2)).kind == "punt"                                                  # in reach: punt
+    assert p.decide(reading(3.5, 2)).kind == "punt"                                                  # (the ball has not moved)
+    assert bc.ChasePlanner().decide(reading(5.5, 2)).kind == "walk"                                  # just out of reach: a small step closer first
+    q = bc.ChasePlanner()
+    kinds = [q.decide(reading(5.5, 2)).kind for _ in range(bc.NUDGES_BEFORE_PUNT + 1)]
+    assert kinds == ["walk"] * bc.NUDGES_BEFORE_PUNT + ["punt"]                                       # three nudges that did not help, then punt anyway
     assert bc.ChasePlanner().decide(reading(1.0, 0)).kind == "punt"                                   # right in front of the ball: punt, never back up
+
+
+def test_a_punt_that_barely_moved_him_is_sent_again_once():
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = Link()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    assert r.punt() == "ok" and [c for c in lk.sent if c == "kpickF"] == ["kpickF", "kpickF"]       # no IMU swing: the lunge did not play, so it is sent again, and only once
