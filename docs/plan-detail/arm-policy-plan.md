@@ -231,6 +231,23 @@ entropy bonus. Changes (runner `phase_armx.py`, log `trained/phase_armx.log`):
 - The claw stays at its walking pose (lift 0): at 1.25 in standing and about 1 in at the lowest point of a walk it clears a 15 mm step; a 20 mm step would want
   about 10 deg of lift, only once the legs can do 20 mm.
 
+### ARM1X result (sim, 2026-10-25, 2:53 PM) and promotion
+
+The full run (screens: control, batch 512 x 5 and the entropy bonus adopted, back-foot clearance not; S0 to S3; a 20M with no plateau stop) finished at 2:32 PM and scored 2:53 PM; avg5 weights picked (final tied). All three in the corrected world (532 g, claw 1.25 in, step-ups capped at 15 mm), 100 episodes per test, sim only:
+
+| | ARM1X | ARM1R | Petoi's scripted walk |
+|---|---|---|---|
+| Flat falls | 0 | 0 | 0 |
+| Calm walk | 0.111 m/s | 0.113 | 0.096 |
+| Roll / heading | 2.2 / 7 deg | 3.4 / 7 | 1.4 / 4 |
+| Front / back shoulders, peak | 53 / 73 deg | 52 / 74 | 52 / 71 |
+| Ladder falls / success | 2.0% / 69% | 6.1% / 72% | 3.0% / 57% |
+| Step-up success (to 15 mm) | 26% | 39% | 12% |
+
+Faster and better on hazards than the scripted walk, steadier than ARM1R (a third of the roll, a third of the falls), not as steady as the scripted walk; the sim has understated hardware roll about 1.8x for ARM1R. The 20M's training system: the plateau rule logged no "would stop"; clip fraction 0.08 (0.25 to 0.29 before); `ledge_down` was marked trained at 18M; the four slope frontiers reached F6 (ARM1R's reached F3); the frontier flagged hazards short of evidence (a slope bin needs 30 episodes) or failing (snag, from its second bin). Rubble stayed weak (success 0.12 to 0.36).
+
+Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and deployed to the Pi 4:22 PM, with ARM1R and ARM1 kept as history; the Pi loads it with residual scale 15 deg and the 0.064 pace from its sidecar. Not yet walked on G2 (the pack died; a charged pack is next).
+
 ## Next hardware rounds (user, 2026-10-25)
 
 **Wall estimator, camera on the claw.** `vision/wall_distance.py` is geometry, not a model: the row where the floor ends maps to a distance through a calibration.
