@@ -477,3 +477,33 @@ def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_u
     assert "kbalance" not in lk._ser.out and any(c.startswith("i1 ") for c in lk._ser.out) and lk.last_motion_command == "kbalance"
     lk.send("kbalance", read_reply=False, settle=0.0)                      # standing now: a later kbalance goes through as a plain command
     assert lk._ser.out.count("kbalance") == 1
+
+
+def test_a_gait_gets_its_gb_before_it_starts_and_never_right_behind_it(monkeypatch):
+    """2026-10-25, hardware: a `gb` sent right behind `kwkF` stopped the walk (0.2 in in 3 s, against about 20 in without it). Gaits get it first; postures and tricks still get it after."""
+    from pi_pipeline.link.serial_link import SerialLink
+
+    class FakeSerial:
+        def __init__(self):
+            self.out = []
+            self.is_open = True
+        def write(self, b):
+            self.out.append(b.decode().strip())
+        def flush(self):
+            pass
+        def reset_input_buffer(self):
+            pass
+        def close(self):
+            pass
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    for gait in ("kwkF", "kwkL", "kwkR", "kbkF"):
+        lk = SerialLink("/dev/null")
+        lk._ser = FakeSerial()
+        lk._ease_transition = lambda c: None
+        lk.send(gait, read_reply=False, settle=0.0)
+        assert lk._ser.out == ["gb", gait], (gait, lk._ser.out)                                 # before it, nothing behind it
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    lk._ease_transition = lambda c: None
+    lk.send("kbalance", read_reply=False, settle=0.0)
+    assert lk._ser.out == ["kbalance", "gb"]                                                    # a posture: after it, as before
