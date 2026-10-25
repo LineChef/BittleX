@@ -40,12 +40,6 @@ def balance_pose():
     return [float(x) for x in p["balance_urdf_deg"]] if p and p.get("balance_urdf_deg") else list(BALANCE_URDF_DEG)
 
 
-def _stand_ease_on() -> bool:
-    """The stand-up ramp alone can be on while the rest of easing is off (the arm: `stand_ease`), because the other ramps still use the stock pose tables."""
-    p = _poses()
-    return bool(p and p.get("stand_ease"))
-
-
 def _easing_on() -> bool:
     """The fitted attachment's `easing` switch (the arm turns every ramp off for its first tests, user 2026-10-24); on when it cannot be read."""
     try:
@@ -56,7 +50,7 @@ def _easing_on() -> bool:
 
 
 def ramp_seconds() -> float:
-    if not _easing_on() and not _stand_ease_on():
+    if not _easing_on():
         return 0.0
     v = os.environ.get("G2_STAND_RAMP_S", "").strip().lower()
     if v in ("off", "none", "false", "no"):
@@ -113,38 +107,30 @@ def start_pose(last_motion_command):
 def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_command=None, seconds=None) -> bool:
     """Ramp from where the last command left the legs to `stand_deg`. `send(cmd)` is the caller's fire-and-forget send, `make_cmd(deg_list)` builds the `i` command.
     Returns True if the ramp ran (the caller still sends the exact stand pose afterwards)."""
+    if stand_via_firmware(send, sleep, last_motion_command):
+        last_motion_command = "kbalance"
     secs = ramp_seconds() if seconds is None else seconds
     start = start_pose(last_motion_command)
-    ran = not (secs <= 0 or start is None or max(abs(a - b) for a, b in zip(start, stand_deg)) < 3)
-    if ran:
-        for pose in ramp_poses(start, stand_deg, secs):
-            send(make_cmd([int(round(x)) for x in pose]))
-            sleep(1.0 / STEPS_PER_S)
-    arm_to_walk(send, sleep, last_motion_command)          # the legs are under him: now the claw comes up off the floor to its walking pose
-    return ran
-
-
-ARM_RAMP_S = 0.6
-
-
-def arm_to_walk(send, sleep=time.sleep, last_motion_command=None) -> bool:
-    """The arm's lift servo (joint 1) to its walking angle (0: hanging in front of the chest, the pose the policy trained in). The Pi never set it before (2026-10-25: after `rest` it sat at 59, the
-    claw on the floor, and a walk started from rest walked with the arm reaching forward). From rest it is eased from the rest angle while the legs have already stood him up; from any other
-    pose it is a single `i 1 <angle>`. Nothing for a build with no "poses" entry. Returns True if a command went out."""
-    p = _poses()
-    if not p or p.get("arm_walk") is None:
+    if secs <= 0 or start is None or max(abs(a - b) for a, b in zip(start, stand_deg)) < 3:
         return False
-    target = int(p["arm_walk"])
+    for pose in ramp_poses(start, stand_deg, secs):
+        send(make_cmd([int(round(x)) for x in pose]))
+        sleep(1.0 / STEPS_PER_S)
+    return True
+
+
+
+def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool:
+    """The arm build stands up with the plain firmware `kbalance` (profile "poses": {"stand_via": "kbalance"}), which also sets the lift servo to its walking angle (0). Used by the walk
+    loops when they start from rest: the Pi never sets joint 1 itself, so a walk that began from `rest` walked with the claw reaching forward (lift 59, the claw on the floor).
+    The Pi's own ramp of the lift (12 `i 1 N` at 20 per second) and an eased leg stand-up reset the BiBoard on G2 (2026-10-25), so neither is used. Returns True if it ran
+    (the caller's stand command then follows, from the balance pose)."""
+    p = _poses()
     c = (last_motion_command or "").strip()
-    if c in ("", "d", "krest", "kzz") and p.get("arm_rest") is not None:
-        n = max(1, int(round(ARM_RAMP_S * STEPS_PER_S)))
-        for i in range(1, n + 1):
-            u = i / n
-            k = u * u * (3 - 2 * u)
-            send(f"i 1 {int(round(p['arm_rest'] + (target - p['arm_rest']) * k))}")
-            sleep(1.0 / STEPS_PER_S)
-    else:
-        send(f"i 1 {target}")
+    if not p or p.get("stand_via") != "kbalance" or c not in ("", "d", "krest", "kzz"):
+        return False
+    send("kbalance")
+    sleep(2.0)
     return True
 
 

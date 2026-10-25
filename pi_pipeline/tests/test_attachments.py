@@ -211,7 +211,7 @@ def test_no_easing_with_the_arm(monkeypatch):
     monkeypatch.delenv("G2_TRANSITION_RAMP_S", raising=False)
     assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() > 0
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() == 0.0         # 2026-10-25: the arm stands up eased (its own poses); every other ramp stays off
+    assert standup.ramp_seconds() == 0.0 and transitions.max_seconds() == 0.0
     sent = []
     assert standup.blend_to_balance(sent.append, sleep=lambda s: None, last_motion_command="i8 40 9 40") is False and not sent
 
@@ -376,24 +376,20 @@ def test_fall_recovery_is_off_for_the_arm_and_on_everywhere_else(monkeypatch):
         assert not opencat.is_disabled("kbalance") and not opencat.is_disabled("kwkF")
 
 
-def test_the_arm_stands_up_from_its_own_rest_pose_with_the_claw_held_until_the_legs_are_under_him(monkeypatch):
-    """2026-10-25: after `rest` the arm's lift sits at 59 (claw on the floor) and the arm firmware shifts every pose. The stand-up eases from the arm's rest pose to its own balance pose
-    with the claw untouched, then eases the lift to 0; the stock build and the head send no arm command at all."""
+def test_the_arm_walk_loops_stand_up_with_the_plain_kbalance_from_rest(monkeypatch):
+    """2026-10-25: the Pi never set the lift servo, so a walk from rest walked with the claw forward; the eased stand-up and a Pi-side lift ramp reset the BiBoard. The arm build
+    stands up with the firmware kbalance (which puts the lift at 0); the stock build and the head send nothing extra."""
     from pi_pipeline.gait import standup
     monkeypatch.delenv("G2_STAND_RAMP_S", raising=False)
     sent = []
     for att in ("none", "head"):
         monkeypatch.setenv("G2_ATTACHMENT", att)
         assert standup.rest_pose() == standup.REST_URDF_DEG and standup.balance_pose() == standup.BALANCE_URDF_DEG
-        assert standup.arm_to_walk(sent.append, lambda s: None, "d") is False and not sent
+        assert standup.stand_via_firmware(sent.append, lambda s: None, "d") is False and not sent
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("d") == standup.rest_pose()
-    stand = [30, 30] * 4
-    standup.ramp_to_stand(sent.append, standup.move_cmd, stand, lambda s: None, "d")
-    legs = [c for c in sent if not c.startswith("i 1 ")]
-    arm = [c for c in sent if c.startswith("i 1 ")]
-    assert legs and arm and sent.index(arm[0]) > sent.index(legs[-1])                    # the claw moves only after the legs have finished
-    assert arm[-1] == "i 1 0" and [int(c.split()[2]) for c in arm] == sorted((int(c.split()[2]) for c in arm), reverse=True) and int(arm[0].split()[2]) <= 59
+    assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("kbalance") == standup.balance_pose()
+    slept = []
+    assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, slept.append, "d") is False            # no leg ramp (easing off) ...
+    assert sent == ["kbalance"] and slept == [2.0]                                                                      # ... but the firmware stand-up first
     sent.clear()
-    standup.arm_to_walk(sent.append, lambda s: None, "kbalance")
-    assert sent == ["i 1 0"]                                                               # from any other pose: one command
+    assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "kbalance") is False and not sent   # already standing: nothing
