@@ -4,9 +4,9 @@ G2 cannot grab the 3 in ball (the claw opens to about 2.75 in), but `kpickF` thr
 
   SEARCH   no ball in the picture: turn toward the side it was last seen on, else in 35 deg steps all the way round, a short walk after a full circle
   TURN     the ball is more than 12 deg off straight: turn toward it
-  WALK     it is straight ahead but farther than 7 in: walk part of the way (never past 3 s: look again)
-  PUNT     it is 3 to 7 in ahead and within 10 deg of straight: `kpickF`; then look where it went
-  BACK UP  it is still where it was after three punts, or it is closer than 3 in: back up, then line it up again
+  WALK     it is straight ahead but farther than 3.5 in (measured from the camera): walk up to it, never more than 3 s at a time: look again
+  PUNT     it is 2 to 3.5 in ahead and within 10 deg of straight: `kpickF`; then look where it went
+  BACK UP  it is still where it was after three punts, or it is closer than 2 in: back up, then line it up again
 
 Pure logic in `ChasePlanner` (a reading in, an `Action` out) so it runs against a recorded picture series; `run_chase` is the loop around it with a robot, a camera, a stop flag and a picture saver
 (every picture with the ball found goes to the training set, at most one per 2 s: user, 2026-10-25). Walks, turns and the punt are Petoi's own firmware skills (`kwkF`, `kwkL` / `kwkR`, `kbkF`,
@@ -34,7 +34,7 @@ TURN_DEG_S = 6.0               # Petoi's arm turn (kwkL / kwkR), measured 2026-1
 WALK_IN_S = 5.1                # Petoi's arm walk (kwkF): 0.13 m/s
 ALIGN_DEG = 12.0               # farther off straight than this: turn before walking
 PUNT_ALIGN_DEG = 10.0          # ... and before a punt
-PUNT_MIN_IN, PUNT_MAX_IN = 3.0, 7.0
+PUNT_MIN_IN, PUNT_MAX_IN = 2.0, 3.5      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 35.0
 SEARCH_STEPS_PER_CIRCLE = 10
@@ -91,7 +91,7 @@ class ChasePlanner:
                 return Action("back", BACK_UP_S, why="three punts and the ball has not left: back up")
             return Action("punt", 0.0, why=f"ball {ball.distance_in:.0f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
         self.punts_in_range = 0
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, (ball.distance_in - 5.0) / WALK_IN_S))
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, (ball.distance_in - 3.0) / WALK_IN_S))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
 

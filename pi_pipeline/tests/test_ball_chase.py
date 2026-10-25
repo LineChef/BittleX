@@ -74,14 +74,14 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, 25)); assert a.kind == "turn" and a.degrees > 0
     a = p.decide(reading(30, -20)); assert a.kind == "turn" and a.degrees < 0
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
-    a = p.decide(reading(5, 3)); assert a.kind == "punt"
-    a = p.decide(reading(5, 14)); assert a.kind == "turn"                                          # near and off line: align before the punt
-    a = p.decide(reading(2, 0)); assert a.kind == "back"                                           # too close to punt
+    a = p.decide(reading(3, 3)); assert a.kind == "punt"
+    a = p.decide(reading(3, 14)); assert a.kind == "turn"                                          # near and off line: align before the punt
+    a = p.decide(reading(1.5, 0)); assert a.kind == "back"                                           # too close to punt
 
 
 def test_planner_backs_up_when_punts_do_not_move_the_ball():
     p = bc.ChasePlanner()
-    kinds = [p.decide(reading(5, 0)).kind for _ in range(bc.STUCK_PUNTS + 1)]
+    kinds = [p.decide(reading(3, 0)).kind for _ in range(bc.STUCK_PUNTS + 1)]
     assert kinds == ["punt"] * bc.STUCK_PUNTS + ["back"]
 
 
@@ -119,20 +119,20 @@ class FakeCamera:
 
 
 def test_the_loop_turns_walks_and_punts_on_a_series_of_pictures():
-    frames = [picture([disc(200, 110, 14)]), picture([disc(124, 110, 12)]), picture([disc(122, 110, 30)])]      # right of centre, ahead and farther, then close
+    frames = [picture([disc(200, 110, 14)]), picture([disc(124, 110, 12)]), picture([disc(122, 110, 50)])]      # right of centre, ahead and farther, then close
     robot = FakeRobot()
     out = bc.run_chase(robot, FakeCamera(frames), lambda: False, max_steps=3, sleep=lambda s: None, say=lambda m: None)
     assert out == "steps" and [m[0] for m in robot.moves] == ["turn", "walk", "punt"] and robot.moves[0][1] > 0
 
 
 def test_the_loop_stops_on_the_flag_on_a_fall_and_in_dry_run_sends_nothing():
-    cam = FakeCamera([picture([disc(122, 110, 30)])])
+    cam = FakeCamera([picture([disc(122, 110, 50)])])
     robot = FakeRobot()
     assert bc.run_chase(robot, cam, lambda: True, sleep=lambda s: None, say=lambda m: None) == "stopped" and not robot.moves
     robot = FakeRobot(fall_at=1)
-    assert bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 30)])]), lambda: False, sleep=lambda s: None, say=lambda m: None) == "fell"
+    assert bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, sleep=lambda s: None, say=lambda m: None) == "fell"
     robot = FakeRobot()
-    bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 30)])]), lambda: False, dry_run=True, max_steps=4, sleep=lambda s: None, say=lambda m: None)
+    bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, dry_run=True, max_steps=4, sleep=lambda s: None, say=lambda m: None)
     assert not robot.moves
 
 
