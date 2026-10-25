@@ -123,7 +123,7 @@ def main():
 
     for arm in (False, True):
         tree = ET.parse(URDF)
-        for link in tree.getroot().iter("link"):
+        for link in list(tree.getroot().iter("link")):              # the model's own links only (the visual-only links added below must keep their visuals)
             name = link.get("name")
             for v in link.findall("visual"):
                 link.remove(v)
@@ -136,10 +136,21 @@ def main():
                             v.append(el)
                     m = ET.SubElement(v, "material", name=f"m_{name}")
                     ET.SubElement(m, "color", rgba="0.10 0.10 0.11 1" if name.endswith("_paw") else "0 0 0 0")
-            for f, c, arm_ok in visuals.get(name, []):
-                if arm and not arm_ok:
-                    continue
-                v = ET.SubElement(link, "visual")
+            parts = [(f, c) for f, c, arm_ok in visuals.get(name, []) if arm_ok or not arm]
+            # the GUI's OpenGL renderer paints a link with several visuals in ONE colour (the last), so a link's first part stays on it and every further part gets its own
+            # massless link on a fixed joint, appended after the model's own links so the joint numbering the viewers rely on is unchanged
+            for n, (f, c) in enumerate(parts):
+                host = link
+                if n:
+                    host = ET.SubElement(tree.getroot(), "link", name=f"vis_{f[:-4]}")
+                    ine = ET.SubElement(host, "inertial")
+                    ET.SubElement(ine, "mass", value="0.000001")
+                    ET.SubElement(ine, "inertia", ixx="1e-9", iyy="1e-9", izz="1e-9", ixy="0", ixz="0", iyz="0")
+                    j = ET.SubElement(tree.getroot(), "joint", name=f"vis_{f[:-4]}_fixed", type="fixed")
+                    ET.SubElement(j, "parent", link=name)
+                    ET.SubElement(j, "child", link=f"vis_{f[:-4]}")
+                    ET.SubElement(j, "origin", xyz="0 0 0", rpy="0 0 0")
+                v = ET.SubElement(host, "visual")
                 ET.SubElement(v, "origin", xyz="0 0 0", rpy="0 0 0")
                 g = ET.SubElement(v, "geometry")
                 ET.SubElement(g, "mesh", filename=f, scale="1 1 1")
