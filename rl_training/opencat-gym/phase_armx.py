@@ -172,19 +172,19 @@ def adopt(res):
 
 
 def screens(st):
-    if "adopted" in st:
+    if "chain_extra" in st:
         return
     res = {tag: screen(tag, extra, what) for tag, extra, what in SCREENS}
-    st["adopted"], notes = adopt(res)
+    st["chain_extra"], notes = adopt(res)
     for n in notes:
         log(f"RULE: {n}")
-    log(f"RULE: the chain trains with {st['adopted'] or 'the recipe alone'}")
+    log(f"RULE: the chain trains with {st['chain_extra'] or 'the recipe alone'}")
     save_state(st)
 
 
 # ------------------------------------------------------------------------------------------------ the chain
 def stage_env(name, lever, st, last=False):
-    env = g2_profile.env_for_job({"kind": "final", "tag": TAG(name), "fresh": True, "levers": list(BASE6) + [lever], "extra": {**RECIPE, **st["adopted"]}})
+    env = g2_profile.env_for_job({"kind": "final", "tag": TAG(name), "fresh": True, "levers": list(BASE6) + [lever], "extra": {**RECIPE, **st["chain_extra"]}})
     env["G2E_SEED"] = "42"
     env.pop("G2E_PLATEAU_STOP", None)                              # no stage stops on a plateau (user, 2026-10-25: learn across the whole 20M); the smoothed rule only logs
     return {k: v for k, v in env.items() if v != ""}
@@ -197,7 +197,7 @@ def run_stage(name, lever, steps, minutes, prev, st):
     if not RP.training(tag):
         if os.path.exists(f"trained/{tag}_console.log"):
             halt(f"HALT: {tag} stopped without finishing (trained/{tag}_console.log): fix, move its files aside, rm {HALT}, restart")
-        clean_environ(st["adopted"])
+        clean_environ(st["chain_extra"])
         log(f"{tag} START: {lever}, {steps} steps{' from ' + prev if prev else ' (fresh)'}, about {minutes} min, done about {clock_in(minutes)}")
         RP.launch(tag, stage_env(name, lever, st), steps=steps, base=False, chain_from=(f"trained/{prev}_ppo" if prev else None))
     ok, why = RP.wait_for_finish(tag)
@@ -246,7 +246,7 @@ def final(st):
     if not RP.training(tag) and not os.path.exists(f"trained/{tag}_ppo.zip"):
         if os.path.exists(f"trained/{tag}_console.log"):
             halt(f"HALT: {tag} stopped without finishing (trained/{tag}_console.log): fix, move its files aside, rm {HALT}, restart")
-        clean_environ(st["adopted"])
+        clean_environ(st["chain_extra"])
         log(f"{tag} START: the full 20M from {TAG('s3')} (no plateau stop; the smoothed rule logs only), about {minutes} min, done about {clock_in(minutes)}")
         RP.launch(tag, stage_env(name, lever, st, last=True), steps=steps, base=False, chain_from=f"trained/{TAG('s3')}_ppo")
     done, step = set(st.get("tracked", [])), TRACK_EVERY
@@ -340,7 +340,7 @@ def status():
     st = load_state()
     for tag, _, what in SCREENS:
         print(f"  {tag:10s}", "scored" if os.path.exists(f"{REPORT_DIR}/{tag}.json") else ("training" if RP.training(tag) else "-"), "|", what)
-    print("  adopted:", st.get("adopted", "-"))
+    print("  adopted:", st.get("chain_extra", "-"))
     for name, lever, steps, _ in STAGES + [FINAL]:
         print(f"  {name} {lever:14s} {steps}:", "done" if os.path.exists(f"trained/{TAG(name)}_ppo.zip") else ("training" if RP.training(TAG(name)) else "-"))
     print("  tracked", [t // 10**6 for t in st.get("tracked", [])], "| picked:", st.get("picked", "-"), "| verdict:", st.get("verdict", "-"))
