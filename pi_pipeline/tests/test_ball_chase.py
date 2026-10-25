@@ -146,6 +146,8 @@ def test_pictures_with_the_ball_are_saved_with_a_box_at_most_every_two_seconds(t
     import json
     box = json.loads(next(tmp_path.glob("*.json")).read_text())["box_xywh"]
     assert abs(box[0] + box[2] / 2 - 120) < 3 and box[2] > 40
+    side = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert side["name"] == "greenball" and side["kind"] == "name:greenball" and side["file"].endswith(".jpg") and side["exposure"]["mean"]       # what the g2pics review page reads
 
 
 def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand():

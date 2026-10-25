@@ -180,8 +180,20 @@ class PictureSaver:
         self._dir.mkdir(parents=True, exist_ok=True)
         name = time.strftime(f"greenball_{tag}_%H%M%S")
         (self._dir / f"{name}.jpg").write_bytes(jpeg)
-        (self._dir / f"{name}.json").write_text(json.dumps({"box_xywh": [round(ball.x - ball.width / 2), round(ball.y - ball.height / 2), ball.width, ball.height],
-                                                           "distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}))
+        mean = None
+        try:                                                  # the sidecar format of the exploration pictures, so the review page (g2pics) lists them with the others
+            import io
+
+            import numpy as np
+            from PIL import Image
+            mean = round(float(np.asarray(Image.open(io.BytesIO(jpeg)).convert("L")).mean()), 1)
+        except Exception:  # noqa: BLE001
+            pass
+        (self._dir / f"{name}.json").write_text(json.dumps({
+            "file": f"{name}.jpg", "kind": "name:greenball", "pose": "named", "name": "greenball", "time": time.strftime("%Y-%m-%d %H:%M:%S"), "width": 240, "height": 240,
+            "detections": [], "exposure": {"mean": mean}, "named_by": "ball_chase",
+            "box_xywh": [round(ball.x - ball.width / 2), round(ball.y - ball.height / 2), ball.width, ball.height],
+            "distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}, indent=1))
         self.saved += 1
 
 
@@ -243,7 +255,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Chase the green ball and punt it until stopped.")
     ap.add_argument("--dry-run", action="store_true", help="look and report what it would do; send no move")
     ap.add_argument("--max-steps", type=int, default=None)
-    ap.add_argument("--save-to", default="~/g2_captures/greenball/chase", help="folder for the pictures with the ball found")
+    ap.add_argument("--save-to", default="~/.local/share/g2/explore_pictures/named/greenball", help="folder for the pictures with the ball found (where g2pics reads them)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     from ..config import settings
