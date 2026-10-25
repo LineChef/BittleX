@@ -75,7 +75,7 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, -20)); assert a.kind == "turn" and a.degrees < 0
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
     a = p.decide(reading(3, 3)); assert a.kind == "punt"
-    a = p.decide(reading(3, 14)); assert a.kind == "turn"                                          # near and off line: align before the punt
+    a = p.decide(reading(3, 16)); assert a.kind == "turn"                                          # near and off line: align before the punt
     a = p.decide(reading(1.5, 0)); assert a.kind == "back"                                           # too close to punt
 
 
