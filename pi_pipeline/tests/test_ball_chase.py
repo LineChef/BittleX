@@ -199,7 +199,7 @@ def test_a_missing_picture_is_not_a_miss_and_the_voice_cues_say_what_he_sees():
     robot = FakeRobot()
     # no picture, no picture (ignored), then three empty looks (a search starts: "searching"), then the ball (target acquired), then a punt ends the attempt
     bc.run_chase(robot, Cam([None, None, empty, empty, empty, ball]), lambda: False, max_punts=1, max_steps=12, announce=spoken.append, sleep=lambda s: None, say=said.append)
-    assert spoken == ["searching", "target acquired"], spoken
+    assert spoken == ["searching", "target acquired", "punting"], spoken
     assert [m[0] for m in robot.moves][:1] == ["turn"] or "punt" in [m[0] for m in robot.moves]
     assert not any("search" in m for m in said[:2])                                                 # the two missing pictures did not start a search
     first = []
@@ -226,3 +226,15 @@ def test_a_punt_that_barely_moved_him_is_sent_again_once():
     lk = Link()
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
     assert r.punt() == "ok" and [c for c in lk.sent if c == "kpickF"] == ["kpickF", "kpickF"]       # no IMU swing: the lunge did not play, so it is sent again, and only once
+
+
+def test_a_ball_that_vanishes_at_close_range_is_punted_not_searched_for_and_he_says_punting():
+    p = bc.ChasePlanner()
+    p.decide(reading(4, 1))                                                                         # seen 4 in away ...
+    a = p.decide(None); assert a.kind == "punt"                                                    # ... and gone: it is at the claw
+    assert p.decide(None).kind == "look"                                                           # a second miss is a real miss
+    far = bc.ChasePlanner(); far.decide(reading(30, 1)); assert far.decide(None).kind == "look"      # lost at 30 in: look again, then search
+    spoken = []
+    frames = [picture([disc(122, 110, 40)])]
+    bc.run_chase(FakeRobot(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=5, announce=spoken.append, sleep=lambda s: None, say=lambda m: None)
+    assert spoken == ["target acquired", "punting"], spoken

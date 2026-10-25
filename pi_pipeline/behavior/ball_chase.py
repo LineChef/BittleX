@@ -69,6 +69,7 @@ class ChasePlanner:
     punts_in_range: int = 0
     after_punt: bool = False   # the last action was a punt
     nudges: int = 0            # small steps closer taken since the ball was last far or in reach
+    last_dist: float | None = None   # how far the ball was when it was last seen (None once acted on)
     log: list = field(default_factory=list)
 
     def decide(self, ball: BallReading | None) -> Action:
@@ -76,6 +77,11 @@ class ChasePlanner:
             self.lost += 1
             self.punts_in_range = 0
             self.nudges = 0
+            if self.last_dist is not None and self.last_dist <= NUDGE_MAX_IN:      # it was right there and now it is gone: at the claw, too close for the camera to see (user, 2026-10-25: right in front of the ball and no punt, then a turn away)
+                self.last_dist = None
+                self.lost = 0
+                self.after_punt = True
+                return Action("punt", 0.0, why="the ball vanished at close range: it is at the claw: punt")
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
             self.search_steps += 1
@@ -86,6 +92,7 @@ class ChasePlanner:
             return Action("search_turn", abs(SEARCH_STEP_DEG) / TURN_DEG_S, SEARCH_STEP_DEG * side, f"searching {'right' if side > 0 else 'left'}")
         self.lost = 0
         self.search_steps = 0
+        self.last_dist = ball.distance_in
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
         near = ball.distance_in <= NUDGE_MAX_IN
         in_reach = ball.distance_in <= PUNT_MAX_IN
@@ -271,6 +278,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         elif act.kind == "back":
             state = robot.back(act.seconds)
         elif act.kind == "punt":
+            if announce is not None:
+                announce("punting")                       # he says it right before the lunge (user, 2026-10-25)
             state = robot.punt()
             punts += 1
             sleep(1.5)                                    # the ball is rolling: look after it stops
