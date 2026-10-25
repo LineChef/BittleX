@@ -151,6 +151,7 @@ def cost(row, default_eps):
 def v4_metrics(eps_list):
     """eps_list: [(rec, per_term, steps, fell, recovered)] from benchmark_gaits._bench."""
     heads, speeds, early, late, roll_s, pitch_s, jm, over, yrms, falls, clear = [], [], [], [], [], [], [], [], [], [], []
+    jhi, jlo = [], []                            # per episode: the 98th / 2nd percentile of each joint angle (the reach: Petoi's arm walk peaks at front shoulders 55 deg)
     ep_falls = []                                # per fallen episode: when and which way (2026-10-08 report: how each policy falls)
     path_s, path_e, path_l = [], [], []          # speed ALONG THE PATH (distance walked / time), which a drifting walk does not lose, unlike progress along the start direction
     for rec, pt, steps, fell, _ in eps_list:
@@ -168,6 +169,8 @@ def v4_metrics(eps_list):
         roll_s.append(float(np.degrees(np.std(rec["roll"]))))
         pitch_s.append(float(np.degrees(np.std(rec["pitch"]))))
         jm.append(np.degrees(np.mean(np.array(rec["joint"]), axis=0)))
+        jhi.append(np.degrees(np.percentile(np.array(rec["joint"]), 98, axis=0)))
+        jlo.append(np.degrees(np.percentile(np.array(rec["joint"]), 2, axis=0)))
         over.append(float(np.mean(pt.get("servo_over", [0.0]))))
         yrms.append(float(np.sqrt(np.mean(np.square(rec["yaw_rate"])))))
         if rec.get("foot_z"):                    # swing clearance: the 90th percentile of each paw's height over the episode, mm, averaged over the four paws (a lever must not lower it)
@@ -197,6 +200,7 @@ def v4_metrics(eps_list):
         servo_over_frac=float(np.mean(over)),
         foot_clear_p90_mm=float(np.mean(clear)) if clear else 0.0,
         joint_mean_deg=[float(v) for v in jm],
+        joint_hi_deg=[float(v) for v in np.mean(np.array(jhi), axis=0)], joint_lo_deg=[float(v) for v in np.mean(np.array(jlo), axis=0)],
         ep_fell=[bool(f) for f in falls], ep_speed=[round(float(v), 4) for v in speeds], ep_falls=ep_falls,      # per episode, for paired comparisons (same seeds for every policy)
     )
 

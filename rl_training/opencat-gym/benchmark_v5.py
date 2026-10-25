@@ -117,7 +117,7 @@ def _ladder_worker(job):
             m["past_all"] = float(np.mean([c["past_all"] for c in w])) if w else None
         if h in LEDGE_HAZARDS:
             m["past_ledge"] = float(np.mean([c["past_ledge"] for c in cross]))
-        for k in ("joint_mean_deg",):
+        for k in ("joint_mean_deg", "joint_hi_deg", "joint_lo_deg"):
             m.pop(k, None)
         out.append(m)
         print(f"  [{os.getpid()}] {cid}: fell {m['fell_fraction']:.0%}  success {m['success']:.0%}  dist {m['dist_median_m']:.2f} m  ({time.time() - t0:.0f} s)", flush=True)
@@ -128,7 +128,7 @@ def run_ladder(policy, levers=(), episodes=40, seed=5000, jobs=8, hazards=None, 
     """The size ladder for one policy; returns {"cells": [...], "summary": ladder_summary(...)}."""
     env = {k: str(v) for k, v in g2_profile.scoring_env(*levers).items()}
     env["G2E_FR_SPLIT_SIDE"] = "1"                     # the forced side-hill names (no effect on anything else)
-    for k in ("G2E_SKILL_REF", "G2E_V5_LEDGE_TOP"):                   # a base gait other than wkF (the gait probes) must reach the ladder workers too
+    for k in ("G2E_SKILL_REF", "G2E_PHASE_RATE_NOM_CMD", "G2E_V5_LEDGE_TOP"):   # a base gait other than wkF (the gait probes) and its cadence must reach the ladder workers too
         if os.environ.get(k):
             env[k] = os.environ[k]
     cells = ladder_cells(hazards)
