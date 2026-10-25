@@ -246,7 +246,7 @@ The full run (screens: control, batch 512 x 5 and the entropy bonus adopted, bac
 
 Faster and better on hazards than the scripted walk, steadier than ARM1R (a third of the roll, a third of the falls), not as steady as the scripted walk; the sim has understated hardware roll about 1.8x for ARM1R. The 20M's training system: the plateau rule logged no "would stop"; clip fraction 0.08 (0.25 to 0.29 before); `ledge_down` was marked trained at 18M; the four slope frontiers reached F6 (ARM1R's reached F3); the frontier flagged hazards short of evidence (a slope bin needs 30 episodes) or failing (snag, from its second bin). Rubble stayed weak (success 0.12 to 0.36).
 
-Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and deployed to the Pi 4:22 PM, with ARM1R and ARM1 kept as history; the Pi loads it with residual scale 15 deg and the 0.064 pace from its sidecar. Not yet walked on G2 (the pack died; a charged pack is next).
+Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and deployed to the Pi 4:22 PM, with ARM1R and ARM1 kept as history; the Pi loads it with residual scale 15 deg and the 0.064 pace from its sidecar. **First hardware walk (2026-10-25 4:3x PM, hardwood, pack 100%):** cmd 0.10, 12.5 s, no fall, yaw -1 deg over the run, the user: walked straight down the line, ended 1 in off line (ARM1R 5 in, Petoi's walk 5 to 7 in); roll spread 4.3 deg (-11 to +7; ARM1R 6.2, Petoi 3.3 to 3.7); front shoulders 55 to 56 deg and back 75 (the sim says 53 / 73); no late ticks. Distance not measured; one run only (the user stopped the testing there).
 
 ## Next hardware rounds (user, 2026-10-25)
 
