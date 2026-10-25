@@ -40,6 +40,32 @@
     "gyro_balance": false,
     "gait_switching": false,
     "skills": false,
-    "fall_recovery": false
+    "fall_recovery": false,
+    "poses": {
+      "rest_urdf_deg": [
+        64,
+        -50,
+        64,
+        -50,
+        74,
+        -56,
+        74,
+        -56
+      ],
+      "balance_urdf_deg": [
+        15,
+        56,
+        15,
+        56,
+        20,
+        50,
+        20,
+        50
+      ],
+      "arm_rest": 59,
+      "arm_walk": 0,
+      "stand_ease": true,
+      "note": "2026-10-25: rest read from the board (j) on Bittle X+Arm B10_260527; balance from Petoi's firmware source (the arm build's balance row plus the front shoulders -10 / front knees +6 shift: 15/56 front, 20/50 rear), to be confirmed by reading j after a kbalance"
+    }
   }
 }

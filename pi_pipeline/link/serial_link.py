@@ -268,13 +268,15 @@ class SerialLink:
         secs = standup.ramp_seconds()
         if secs <= 0:
             return None
-        start = standup.start_pose(self.last_motion_command) or standup.REST_URDF_DEG
+        start = standup.start_pose(self.last_motion_command) or standup.rest_pose()
+        came_from = self.last_motion_command
         if self.last_motion_command == "ksit":
             # Rising straight from a sit puts G2's weight on the back legs while the front is loaded: on 2026-10-18 the back legs skipped and jittered and he fell
             # forward, at 0.8 s and again at 1.4 s. The stand-up from rest has been clean every time, so ease down to rest first, then stand up from there.
-            transitions.play(standup.ramp_poses(start, standup.REST_URDF_DEG, standup.SIT_TO_REST_S, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
-            start = list(standup.REST_URDF_DEG)
-        transitions.play(standup.ramp_poses(start, standup.BALANCE_URDF_DEG, secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
+            transitions.play(standup.ramp_poses(start, standup.rest_pose(), standup.SIT_TO_REST_S, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
+            start = standup.rest_pose()
+        transitions.play(standup.ramp_poses(start, standup.balance_pose(), secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
+        standup.arm_to_walk(self._write_pose, time.sleep, "d" if came_from == "ksit" else came_from)       # the arm build: the claw up off the floor to its walking pose (nothing for the others)
         return list(transitions.BALANCE)
 
     def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):

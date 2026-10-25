@@ -20,6 +20,32 @@ DEFAULT_RAMP_S = 0.8
 STEPS_PER_S = 20
 
 
+def _poses():
+    """The fitted attachment's own stand-up poses (gait_profiles.json "poses"), or None for the stock build: the arm firmware shifts every pose (front shoulders -10, front knees +6) and its
+    lift servo (joint 1) rests at 59 with the claw on the floor. {"rest_urdf_deg", "balance_urdf_deg" (URDF order), "arm_rest", "arm_walk", "stand_ease"}."""
+    try:
+        from pi_pipeline.attachments import current, load_profiles
+        return (load_profiles().get(current()) or {}).get("poses") or None
+    except Exception:  # noqa: BLE001 -- scripts run by path have no package; the stock poses are the safe answer
+        return None
+
+
+def rest_pose():
+    p = _poses()
+    return [float(x) for x in p["rest_urdf_deg"]] if p and p.get("rest_urdf_deg") else list(REST_URDF_DEG)
+
+
+def balance_pose():
+    p = _poses()
+    return [float(x) for x in p["balance_urdf_deg"]] if p and p.get("balance_urdf_deg") else list(BALANCE_URDF_DEG)
+
+
+def _stand_ease_on() -> bool:
+    """The stand-up ramp alone can be on while the rest of easing is off (the arm: `stand_ease`), because the other ramps still use the stock pose tables."""
+    p = _poses()
+    return bool(p and p.get("stand_ease"))
+
+
 def _easing_on() -> bool:
     """The fitted attachment's `easing` switch (the arm turns every ramp off for its first tests, user 2026-10-24); on when it cannot be read."""
     try:
@@ -30,7 +56,7 @@ def _easing_on() -> bool:
 
 
 def ramp_seconds() -> float:
-    if not _easing_on():
+    if not _easing_on() and not _stand_ease_on():
         return 0.0
     v = os.environ.get("G2_STAND_RAMP_S", "").strip().lower()
     if v in ("off", "none", "false", "no"):
@@ -69,9 +95,9 @@ def start_pose(last_motion_command):
     """The leg angles (URDF order) G2 is in after `last_motion_command`, or None if unknown."""
     c = (last_motion_command or "").strip()
     if c in ("", "d", "krest", "kzz"):
-        return list(REST_URDF_DEG)
+        return rest_pose()
     if c in ("kbalance", "kup"):
-        return list(BALANCE_URDF_DEG)
+        return balance_pose()
     if c == "ksit":
         return list(SIT_URDF_DEG)
     if c.startswith("i"):
@@ -89,11 +115,36 @@ def ramp_to_stand(send, make_cmd, stand_deg, sleep=time.sleep, last_motion_comma
     Returns True if the ramp ran (the caller still sends the exact stand pose afterwards)."""
     secs = ramp_seconds() if seconds is None else seconds
     start = start_pose(last_motion_command)
-    if secs <= 0 or start is None or max(abs(a - b) for a, b in zip(start, stand_deg)) < 3:
+    ran = not (secs <= 0 or start is None or max(abs(a - b) for a, b in zip(start, stand_deg)) < 3)
+    if ran:
+        for pose in ramp_poses(start, stand_deg, secs):
+            send(make_cmd([int(round(x)) for x in pose]))
+            sleep(1.0 / STEPS_PER_S)
+    arm_to_walk(send, sleep, last_motion_command)          # the legs are under him: now the claw comes up off the floor to its walking pose
+    return ran
+
+
+ARM_RAMP_S = 0.6
+
+
+def arm_to_walk(send, sleep=time.sleep, last_motion_command=None) -> bool:
+    """The arm's lift servo (joint 1) to its walking angle (0: hanging in front of the chest, the pose the policy trained in). The Pi never set it before (2026-10-25: after `rest` it sat at 59, the
+    claw on the floor, and a walk started from rest walked with the arm reaching forward). From rest it is eased from the rest angle while the legs have already stood him up; from any other
+    pose it is a single `i 1 <angle>`. Nothing for a build with no "poses" entry. Returns True if a command went out."""
+    p = _poses()
+    if not p or p.get("arm_walk") is None:
         return False
-    for pose in ramp_poses(start, stand_deg, secs):
-        send(make_cmd([int(round(x)) for x in pose]))
-        sleep(1.0 / STEPS_PER_S)
+    target = int(p["arm_walk"])
+    c = (last_motion_command or "").strip()
+    if c in ("", "d", "krest", "kzz") and p.get("arm_rest") is not None:
+        n = max(1, int(round(ARM_RAMP_S * STEPS_PER_S)))
+        for i in range(1, n + 1):
+            u = i / n
+            k = u * u * (3 - 2 * u)
+            send(f"i 1 {int(round(p['arm_rest'] + (target - p['arm_rest']) * k))}")
+            sleep(1.0 / STEPS_PER_S)
+    else:
+        send(f"i 1 {target}")
     return True
 
 

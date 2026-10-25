@@ -211,7 +211,7 @@ def test_no_easing_with_the_arm(monkeypatch):
     monkeypatch.delenv("G2_TRANSITION_RAMP_S", raising=False)
     assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() > 0
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    assert standup.ramp_seconds() == 0.0 and transitions.max_seconds() == 0.0
+    assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() == 0.0         # 2026-10-25: the arm stands up eased (its own poses); every other ramp stays off
     sent = []
     assert standup.blend_to_balance(sent.append, sleep=lambda s: None, last_motion_command="i8 40 9 40") is False and not sent
 
@@ -374,3 +374,26 @@ def test_fall_recovery_is_off_for_the_arm_and_on_everywhere_else(monkeypatch):
         for tok in opencat.RECOVERY_SKILLS:
             assert opencat.is_disabled(tok) is refused, (att, tok)
         assert not opencat.is_disabled("kbalance") and not opencat.is_disabled("kwkF")
+
+
+def test_the_arm_stands_up_from_its_own_rest_pose_with_the_claw_held_until_the_legs_are_under_him(monkeypatch):
+    """2026-10-25: after `rest` the arm's lift sits at 59 (claw on the floor) and the arm firmware shifts every pose. The stand-up eases from the arm's rest pose to its own balance pose
+    with the claw untouched, then eases the lift to 0; the stock build and the head send no arm command at all."""
+    from pi_pipeline.gait import standup
+    monkeypatch.delenv("G2_STAND_RAMP_S", raising=False)
+    sent = []
+    for att in ("none", "head"):
+        monkeypatch.setenv("G2_ATTACHMENT", att)
+        assert standup.rest_pose() == standup.REST_URDF_DEG and standup.balance_pose() == standup.BALANCE_URDF_DEG
+        assert standup.arm_to_walk(sent.append, lambda s: None, "d") is False and not sent
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("d") == standup.rest_pose()
+    stand = [30, 30] * 4
+    standup.ramp_to_stand(sent.append, standup.move_cmd, stand, lambda s: None, "d")
+    legs = [c for c in sent if not c.startswith("i 1 ")]
+    arm = [c for c in sent if c.startswith("i 1 ")]
+    assert legs and arm and sent.index(arm[0]) > sent.index(legs[-1])                    # the claw moves only after the legs have finished
+    assert arm[-1] == "i 1 0" and [int(c.split()[2]) for c in arm] == sorted((int(c.split()[2]) for c in arm), reverse=True) and int(arm[0].split()[2]) <= 59
+    sent.clear()
+    standup.arm_to_walk(sent.append, lambda s: None, "kbalance")
+    assert sent == ["i 1 0"]                                                               # from any other pose: one command

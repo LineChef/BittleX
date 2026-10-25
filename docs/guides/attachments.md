@@ -68,6 +68,8 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 | `skills` | the attachment's own skills stay out of the conversation | off |
 | `fall_recovery` | the scripted self-right, roll-over and drop-recover moves (`krc`, `krl`, `kdropRec`, `klifted`, `kdropped`) are refused by the serial link, like the disabled tricks (user, 2026-10-25: they do not work with the claw payload); the firmware's own auto self-right already needs the gyro balance, which is off | off |
 
+The arm's `poses` entry (rest and balance angles of the arm firmware, the lift servo's rest 59 and walking 0, `stand_ease`) turns the stand-up ramp back on for the arm alone: it eases from the arm's own rest pose to its own balance pose, then lowers the lift from 59 to 0 so the claw leaves the floor (2026-10-25; before, the Pi never set the lift and a walk from rest walked with the arm forward). The other ramps stay off.
+
 The arm has all five off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
 
 ## Open with the arm fitted (2026-10-24)
