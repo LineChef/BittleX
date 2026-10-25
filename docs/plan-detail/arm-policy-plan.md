@@ -255,6 +255,15 @@ Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and 
 - Walking: ARM1X repeat runs (one run so far, 1 in off line), the sim-hardware roll gap, a foot trim if needed.
 - Raising the slope evidence (30 to 15 episodes) and the snag hazard for the next training run; the trained ball class; the wall estimator for the claw camera; the dim-room picture set.
 
+### Ball chase testing, 2026-10-25 evening: where it stands (needs more work, user: pick it back up later)
+
+Five live attempts (one punt per attempt, rest after each, stand at the start; he says "searching", "target acquired" and, since the last deploy, "punting"). One real punt through the chase (attempt 3, ball 5 in ahead at the start); the others did not reach one. Findings:
+- **The first walk steps after a stand-up often do not move him** (ball distance unchanged over 3 to 4 steps of 2 to 2.7 s: 13 in four times; 15 in three times), then one step moves him 7 in or more. Pictures were different frames, so the scene really did not change. Not yet explained: a `gb` next to the gait token stopped walks (fixed: no `gb` around gaits); the sequenced stand-up followed by a gait may leave the firmware believing it is in the rest posture (it did the same with the ball chase's `kbalance` after each walk); a clean test is five identical walks in a row with the ball as a ruler (script written: `walk_seq.py` in the session scratch; not run: the Pi dropped off the network).
+- **He often pushes the ball away while closing in** (walks are 6 in a second and the claw touches the ball at about 3 in); whether the ball "vanishes" because he bumped it or because the camera loses it (too close, under the claw) is untested (user, 2026-10-25).
+- **Punt range:** the lunge reaches about 3 to 4 in from the camera (2.6 in threw the ball 18 in; 4.5 to 5 in just out of reach, 6 to 7 in too far). The planner nudges closer from 4 to 7 in and punts at 4 in or less, and punts when the ball vanishes right after being close; the user saw him right in front of the ball many times without punting: not fixed.
+- **The Pi drops off the network while G2 moves** (ssh timeouts for minutes at a time); the Pi was powered off at the end of the evening.
+- **Queued:** "g2, fetch" as the voice command that starts the chase (user, 2026-10-25); the chase as a mode of the voice service, not a script with the voice service stopped; the ball and the wall estimator for the claw camera.
+
 ## Next hardware rounds (user, 2026-10-25)
 
 **Wall estimator, camera on the claw.** `vision/wall_distance.py` is geometry, not a model: the row where the floor ends maps to a distance through a calibration.
