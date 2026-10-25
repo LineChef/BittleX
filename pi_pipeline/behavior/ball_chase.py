@@ -5,8 +5,8 @@ G2 cannot grab the 3 in ball (the claw opens to about 2.75 in), but `kpickF` thr
   SEARCH   no ball in the picture: turn toward the side it was last seen on, else in 35 deg steps all the way round, a short walk after a full circle
   TURN     the ball is more than 12 deg off straight: turn toward it
   WALK     it is straight ahead but farther than 7 in (measured from the camera): walk up to it, never more than 3 s at a time: look again
-  PUNT     it is 2 to 7 in ahead and within 12 deg of straight: `kpickF`; then look where it went
-  BACK UP  it is still where it was after three punts, or it is closer than 2 in: back up, then line it up again
+  PUNT     it is within 6 in ahead and within 12 deg of straight: `kpickF` (never backs up for being too close: right in front of the ball, punt); then look where it went, and step closer if it is still more than 4 in away
+  BACK UP  it is still where it was after three punts: back up, then line it up again
 
 Pure logic in `ChasePlanner` (a reading in, an `Action` out) so it runs against a recorded picture series; `run_chase` is the loop around it with a robot, a camera, a stop flag and a picture saver
 (every picture with the ball found goes to the training set, at most one per 2 s: user, 2026-10-25). Walks, turns and the punt are Petoi's own firmware skills (`kwkF`, `kwkL` / `kwkR`, `kbkF`,
@@ -35,13 +35,14 @@ WALK_IN_S = 5.8                # Petoi's arm walk (kwkF): about 5 to 6 in a seco
 WALK_START_S = 0.7             # a firmware gait covers nothing in its first 0.7 s or so
 ALIGN_DEG = 12.0               # farther off straight than this: turn before walking
 PUNT_ALIGN_DEG = 12.0          # ... and before a punt
-PUNT_MIN_IN, PUNT_MAX_IN = 2.0, 7.0      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
+PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 6.0      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
 MAX_TURN_DEG = 35.0
 MIN_MOVE_S = 1.2               # a gait started and stopped for less than this does not move him
+CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than this, step closer before the next one (2026-10-25: a punt from 4.5 to 7 in was too far, from 2.6 in it threw the ball 18 in)
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
 BACK_UP_S = 2.0
 SAVE_EVERY_S = 2.0
@@ -62,6 +63,7 @@ class ChasePlanner:
     lost: int = 0              # looks in a row without the ball
     search_steps: int = 0
     punts_in_range: int = 0
+    after_punt: bool = False   # the last action was a punt
     log: list = field(default_factory=list)
 
     def decide(self, ball: BallReading | None) -> Action:
@@ -80,20 +82,22 @@ class ChasePlanner:
         self.search_steps = 0
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
         near = ball.distance_in <= PUNT_MAX_IN
-        if near and ball.distance_in < PUNT_MIN_IN:
-            self.punts_in_range = 0
-            return Action("back", BACK_UP_S, why=f"ball {ball.distance_in:.0f} in away, too close to punt: back up")
         if abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
             return Action("turn", max(MIN_MOVE_S, abs(deg) / TURN_DEG_S), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
+        if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
+            self.after_punt = False
+            return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer")
         if near:
+            self.after_punt = True
             self.punts_in_range += 1
             if self.punts_in_range > STUCK_PUNTS:
                 self.punts_in_range = 0
                 return Action("back", BACK_UP_S, why="three punts and the ball has not left: back up")
             return Action("punt", 0.0, why=f"ball {ball.distance_in:.0f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
         self.punts_in_range = 0
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - 5.0) / WALK_IN_S))      # aim for about 5 in: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
+        self.after_punt = False
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - 4.0) / WALK_IN_S))      # aim for about 4 in: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
 
@@ -320,7 +324,9 @@ def main() -> None:
         print("ended: stopped")
     finally:
         cam.close()
-        link.send("gb", read_reply=False, settle=0.0)
+        if not args.dry_run:                              # rest after each attempt (user, 2026-10-25); the next one stands him up first
+            link.send("krest", read_reply=False, settle=0.0)
+            time.sleep(2.5)
 
 
 if __name__ == "__main__":

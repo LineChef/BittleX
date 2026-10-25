@@ -76,7 +76,7 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
     a = p.decide(reading(3, 3)); assert a.kind == "punt"
     a = p.decide(reading(3, 16)); assert a.kind == "turn"                                          # near and off line: align before the punt
-    a = p.decide(reading(1.5, 0)); assert a.kind == "back"                                           # too close to punt
+    a = p.decide(reading(1.5, 0)); assert a.kind == "punt"                                           # too close to punt
 
 
 def test_planner_backs_up_when_punts_do_not_move_the_ball():
@@ -205,3 +205,11 @@ def test_a_missing_picture_is_not_a_miss_and_the_voice_cues_say_what_he_sees():
     first = []
     bc.run_chase(FakeRobot(), Cam([ball]), lambda: False, max_punts=1, max_steps=3, announce=first.append, sleep=lambda s: None, say=lambda m: None)
     assert first[:1] == ["target acquired"]                                                          # seen at the very start: said once
+
+
+def test_he_steps_closer_after_a_punt_that_left_the_ball_far_and_rests_never_backs_up_for_closeness():
+    p = bc.ChasePlanner()
+    assert p.decide(reading(5, 2)).kind == "punt"                                                    # 5 in: punt
+    a = p.decide(reading(5, 2)); assert a.kind == "walk" and a.seconds < 1.2                         # still 5 in away after it: step closer
+    assert p.decide(reading(3, 2)).kind == "punt"                                                    # close now: punt again
+    assert bc.ChasePlanner().decide(reading(1.0, 0)).kind == "punt"                                   # right in front of the ball: punt, never back up
