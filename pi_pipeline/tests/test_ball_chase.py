@@ -158,3 +158,16 @@ def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand
     assert r.turn(20, 0.3) == "ok" and r.turn(-20, 0.3) == "ok" and r.walk(0.3) == "ok" and r.back(0.3) == "ok" and r.punt() == "ok"
     toks = [c for c in lk.sent if c.startswith("k")]
     assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kwkF", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance"]
+
+
+def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
+    from pi_pipeline.power import battery
+
+    class Link:
+        def __init__(self, reply): self.reply = reply
+        def drain(self, s): pass
+        def send(self, c, **k): return self.reply
+    assert battery.motion_gate(Link("Voltage: 8.20 V")) == (True, 88, 8.2)
+    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # low: not ok
+    assert battery.motion_gate(Link("G")) == (False, None, None)                                                   # unreadable: not ok, never "fine"
+    assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False

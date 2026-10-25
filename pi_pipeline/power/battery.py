@@ -59,6 +59,19 @@ def pack_percent(volts: float, cells: int = 2) -> int:
     return 0
 
 
+MOTION_MIN_PERCENT = 30      # the hardware-session gate: below this no motion script starts or goes on (user, 2026-10-25: the pack died during a chase and nothing warned)
+
+
+def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 3) -> tuple[bool, int | None, float | None]:
+    """(ok, percent, volts) for a script that is about to move G2. Fails SAFE: a reading that cannot be taken after `attempts` tries, or one under `min_percent`, is not ok. The voice service's own
+    battery watch only runs while that service does, and it is stopped for every hardware test (it shares the serial port), so the test scripts and the ball chase use this instead."""
+    v = read_voltage(link, attempts=attempts)
+    if v is None:
+        return False, None, None
+    pct = pack_percent(v)
+    return pct >= min_percent, pct, v
+
+
 class BatteryLevel(IntEnum):
     OK = 0
     LOW = 1

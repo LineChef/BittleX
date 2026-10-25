@@ -157,15 +157,13 @@ class SerialRobot:
         return state
 
     def battery_ok(self) -> bool:
-        try:
-            import re
-
-            from ..link import check_serial
-            from ..power import battery
-            v = check_serial._read_voltage(self._lk)
-            return battery.pack_percent(float(re.findall(r"[0-9.]+", v)[0])) >= 20
-        except Exception:  # noqa: BLE001
-            return True            # an unreadable voltage does not stop the game; the board's own low-battery beep still sounds
+        from ..power import battery
+        ok, pct, volts = battery.motion_gate(self._lk)
+        if pct is None:
+            log.warning("battery unreadable: stopping (fail safe)")
+        else:
+            log.info("battery %d%% (%.2f V)", pct, volts)
+        return ok
 
 
 class PictureSaver:
@@ -197,7 +195,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             return "steps"
         steps += 1
         if steps % 15 == 1 and not dry_run and not robot.battery_ok():
-            say("battery low: stopping")
+            say("battery low or unreadable: stopping")
             return "battery"
         sleep(settle_s)                                   # let the body stop swaying before the picture
         jpeg = camera.look()
