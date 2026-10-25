@@ -124,14 +124,12 @@ Pi work above deployed (after the user says the arm is installed); H6 needs ARM1
 Not in this round: self-right with the arm, exploration, the arm's pick and toss skills on the floor, voice-driven walks. With the camera on the claw,
 every camera-using behaviour (exploration pictures, gaze, the cliff guard) sees from wherever the arm points; checking those is a later round.
 
-## After ARM1 finishes (user, 2026-10-24: viewer updates apply to training once it completes)
+## Looks and physics (user, 2026-10-24)
 
-- One shared "looks" module (pod meshes from `build_pod_mesh.py`, the arm part colours, the white camera) used by every viewer: `g2watchrun`, `g2watchsim`, the
-  training-episode replays and the simulator's own GUI view, so a look changed in one shows in all. Looks only; no physics change.
-- The pod's physics box to its CAD position: the platform project's model puts the pod 15.7 mm (0.6 in) higher than the sim's box and 71 mm wide (the box is
-  59 mm). Raising the box raises G2's centre of mass, so it applies to the next training run (ARM2 or an ARM1 retrain), not to ARM1.
-- The arm's parts table (`opencat_gym_env.ARM_PARTS`) is already the single source for both the physics and the viewer: refining it from the user's photos
-  changes both.
+Only what changes how G2 moves goes into the simulator: the pod's CAD place and size, the body's real height (`models/bittle_esp32_cad.urdf`) and the arm's parts
+(`opencat_gym_env.ARM_PARTS`: shapes, weights, walking pose) are in ARM1's training. Looks stay in the live viewer only (`build_body_mesh.py`: the real part meshes and
+colours, loaded from gitignored `models/local/`); they are not copied into the other viewers or the training. A later change to the claw from the user's photos goes into
+the training only for its shape, weight and position.
 
 ## After the first hardware round
 
