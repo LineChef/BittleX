@@ -156,7 +156,7 @@ def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand
         def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
         def poll_imu(self): return []
     lk = FakeLink()
-    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__, use_pick=True)
     assert r.turn(20, 0.3) == "ok" and r.turn(-20, 0.3) == "ok" and r.walk(0.3) == "ok" and r.back(0.3) == "ok" and r.punt() == "ok"
     toks = [c for c in lk.sent if c.startswith("k")]
     assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kwkF", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance", "kpickF", "kbalance"]      # (this fake link reports no IMU swing, so the punt is sent twice)
@@ -224,7 +224,7 @@ def test_a_punt_that_barely_moved_him_is_sent_again_once():
         def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
         def poll_imu(self): return []
     lk = Link()
-    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__, use_pick=True)
     assert r.punt() == "ok" and [c for c in lk.sent if c == "kpickF"] == ["kpickF", "kpickF"]       # no IMU swing: the lunge did not play, so it is sent again, and only once
 
 
@@ -238,3 +238,34 @@ def test_a_ball_that_vanishes_at_close_range_is_punted_not_searched_for_and_he_s
     frames = [picture([disc(122, 110, 40)])]
     bc.run_chase(FakeRobot(), FakeCamera(frames), lambda: False, max_punts=1, max_steps=5, announce=spoken.append, sleep=lambda s: None, say=lambda m: None)
     assert spoken == ["target acquired", "punting"], spoken
+
+
+def test_the_attempt_summary_says_where_the_punt_was_made():
+    said = []
+    bc.run_chase(FakeRobot(), FakeCamera([picture([disc(122, 110, 50)])]), lambda: False, max_punts=1, max_steps=5, sleep=lambda s: None, say=said.append)
+    line = next(m for m in said if m.startswith("ATTEMPT:"))
+    assert "punted at (" in line and "after 1 looks" in line
+
+
+def test_the_punch_keeps_the_claw_shut_sends_no_pick_skill_and_ends_on_the_balance_pose(monkeypatch):
+    """User, 2026-10-25: test the punch, not a pick with the claw. The punch is the lunge of pickF with the claw held closed, as `i` commands, ending on the balance pose."""
+    from pi_pipeline.link import transitions as T
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = Link()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    r._fell = lambda: False
+    assert r.punch() == "ok"
+    moves = [c for c in lk.sent if c.startswith("i1 ")]
+    assert moves and all(" 2 0 " in c for c in moves)                                         # the claw (joint 2) is at 0 in every command: it never opens
+    assert not any(c.startswith("kpick") for c in lk.sent) and "kbalance" not in lk.sent          # no pick skill, no firmware stand-up
+    lifts = [int(c.split()[1]) for c in moves]
+    assert max(lifts) == 75 and lifts[-1] == 0                                                  # the arm swings out to 75 and comes back
+    bal = [round(x) for x in T.balance_pose()]
+    assert moves[-1] == r._pose_cmd(0, bal[:4], bal[4:])                                       # it ends on the balance pose
+    lung = next(c for c in moves if c.startswith("i1 75 "))
+    assert " 8 -57 " in lung or " 8 43 " in lung                                               # the front shoulders carry the arm build's -10 shift (53 - 10)

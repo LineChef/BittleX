@@ -49,6 +49,16 @@ CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than th
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
 BACK_UP_S = 2.0
 SAVE_EVERY_S = 2.0
+# The punch (user, 2026-10-25: "test the punch, not attempting to pick it up with the claw"): the lunge of Petoi's `pickF` (decoded from InstinctBittleESP.h: a crouch, then front legs folded and the arm swung out to 75)
+# with the claw held CLOSED the whole time; `kpickF` opens the claw to 65 first and closes it on the way back, which is a grab attempt. Key poses are the skill's own angles (the arm firmware shifts the front
+# shoulders -10 and front knees +6 for a skill with no Arm variant, added below); (seconds to get there, arm lift, shoulders FL FR BR BL, knees FL FR BR BL).
+PUNCH_KEYS = (
+    (0.50, -10, (16, 16, 30, 30), (30, 30, 30, 30)),      # get ready (pickF frame 0, the claw stays shut)
+    (0.45, 10, (5, 5, 10, 10), (20, 20, 50, 50)),         # crouch (frame 2)
+    (0.12, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),     # the lunge: front legs fold forward, the arm swings out (frame 3)
+    (0.25, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),     # hold it (the claw is not closed on anything: it is already closed)
+)
+PUNCH_STEPS_PER_S = 40
 PUNT_MIN_SWING_DEG = 6.0       # a real kpickF swings the pitch 15 to 20 deg
 STOP_FILE = "~/.local/share/g2/ball_chase_stop"
 
@@ -70,6 +80,8 @@ class ChasePlanner:
     after_punt: bool = False   # the last action was a punt
     nudges: int = 0            # small steps closer taken since the ball was last far or in reach
     last_dist: float | None = None   # how far the ball was when it was last seen (None once acted on)
+    punt_log: list = field(default_factory=list)   # (distance in, bearing deg) of the ball at each punt the planner asked for (None: it had vanished at close range)
+    walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
 
     def decide(self, ball: BallReading | None) -> Action:
@@ -81,6 +93,7 @@ class ChasePlanner:
                 self.last_dist = None
                 self.lost = 0
                 self.after_punt = True
+                self.punt_log.append((None, None))
                 return Action("punt", 0.0, why="the ball vanished at close range: it is at the claw: punt")
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
@@ -99,7 +112,7 @@ class ChasePlanner:
         if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
             self.nudges += 1
             self.after_punt = False
-            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.0f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})")
+            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})")
         if abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
             return Action("turn", max(MIN_MOVE_S, abs(deg) / TURN_DEG_S), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
@@ -112,11 +125,13 @@ class ChasePlanner:
             if self.punts_in_range > STUCK_PUNTS:
                 self.punts_in_range = 0
                 return Action("back", BACK_UP_S, why="three punts and the ball has not left: back up")
-            return Action("punt", 0.0, why=f"ball {ball.distance_in:.0f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
+            self.punt_log.append((round(ball.distance_in, 1), round(ball.bearing_deg, 1)))
+            return Action("punt", 0.0, why=f"ball {ball.distance_in:.1f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
         self.punts_in_range = 0
         self.after_punt = False
         self.nudges = 0
         secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - 4.0) / WALK_IN_S))      # aim for about 4 in: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
+        self.walk_log.append((round(ball.distance_in, 1), round(secs, 1)))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
 
@@ -135,8 +150,9 @@ class Camera(Protocol):
 class SerialRobot:
     """The firmware skills over the serial link. Every move ends in a balanced stand (`kbalance`); the link sends `gb` after each skill. Each returns "ok" or "fell"."""
 
-    def __init__(self, link, poll_imu=None, fall_deg: float = 45.0, sleep=time.sleep, clock=time.monotonic):
+    def __init__(self, link, poll_imu=None, fall_deg: float = 45.0, sleep=time.sleep, clock=time.monotonic, use_pick: bool = False):
         self._lk, self._sleep, self._clock = link, sleep, clock
+        self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
         self._pitch, self._roll = [], []
 
@@ -188,7 +204,43 @@ class SerialRobot:
     def back(self, seconds: float) -> str:
         return self._skill("kbkF", seconds)
 
+    def _pose_cmd(self, lift, sh, kn) -> str:
+        return f"i1 {int(round(lift))} 2 0 8 {int(round(sh[0]))} 9 {int(round(sh[1]))} 10 {int(round(sh[2]))} 11 {int(round(sh[3]))} 12 {int(round(kn[0]))} 13 {int(round(kn[1]))} 14 {int(round(kn[2]))} 15 {int(round(kn[3]))}"
+
+    def punch(self) -> str:
+        """The lunge with the claw shut (PUNCH_KEYS), played as `i` commands at 40 a second from the pose he stands in, then back to the balance pose. No firmware skill is sent."""
+        from ..link import transitions
+        self._pitch, self._roll = [], []
+        self._tx("gP")
+        bal = transitions.balance_pose()                              # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]
+        cur = (0.0, list(bal[:4]), list(bal[4:]))
+        keys = [(t, lift, [a + (-10 if i < 2 else 0) for i, a in enumerate(sh)], [b + (6 if i < 2 else 0) for i, b in enumerate(kn)]) for t, lift, sh, kn in PUNCH_KEYS]
+        keys.append((0.40, 0, list(bal[:4]), list(bal[4:])))           # and back to the balance pose
+        n = 0
+        for t, lift, sh, kn in keys:
+            steps = max(1, int(round(t * PUNCH_STEPS_PER_S)))
+            for i in range(1, steps + 1):
+                u = i / steps
+                k = u * u * (3 - 2 * u)
+                self._tx(self._pose_cmd(cur[0] + (lift - cur[0]) * k, [a + (b - a) * k for a, b in zip(cur[1], sh)], [a + (b - a) * k for a, b in zip(cur[2], kn)]))
+                self._sleep(1.0 / PUNCH_STEPS_PER_S)
+                n += 1
+                if n % 5 == 0 and self._fell():
+                    self._tx("gp")
+                    return "fell"
+            cur = (lift, sh, kn)
+        self._sleep(0.3)
+        self._fell()
+        self._tx("gp")
+        return "ok"
+
     def punt(self) -> str:
+        if not self.use_pick:
+            state = self.punch()
+            if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved it did not play: once more
+                log.warning("the punch barely moved him (%.1f deg): once more", self.swing_deg())
+                state = self.punch()
+            return state
         state = self._skill("kpickF", 2.0)
         if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved, it did not play (2026-10-25: a run said "punted" and he only lay down): send it again once
             log.warning("the punt barely moved him (%.1f deg): sending it again", self.swing_deg())
@@ -285,6 +337,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             sleep(1.5)                                    # the ball is rolling: look after it stops
             if state != "fell" and max_punts is not None and punts >= max_punts:
                 say(f"punted {punts}: done")
+                say(f"ATTEMPT: punted at {planner.punt_log[-1] if planner.punt_log else '?'} (in, deg) after {steps} looks; walk steps (ball in, seconds): {planner.walk_log}")
                 return "punted"
         else:
             state = "ok"
@@ -327,14 +380,26 @@ def _stand_if_lying(link) -> None:
 
 
 def main() -> None:
+    global PUNT_MAX_IN, NUDGE_MAX_IN, NUDGES_BEFORE_PUNT
     import argparse
     ap = argparse.ArgumentParser(description="Chase the green ball and punt it until stopped.")
     ap.add_argument("--dry-run", action="store_true", help="look and report what it would do; send no move")
     ap.add_argument("--max-steps", type=int, default=None)
+    ap.add_argument("--use-pick", action="store_true", help="punt with Petoi's pick skill (it opens and closes the claw) instead of the punch (claw shut)")
+    ap.add_argument("--punt-max", type=float, default=None, help="punt when the ball is this close (inches from the camera); default %s" % PUNT_MAX_IN)
+    ap.add_argument("--nudge-max", type=float, default=None, help="between --punt-max and this: small steps closer first; default %s" % NUDGE_MAX_IN)
+    ap.add_argument("--nudges", type=int, default=None, help="small steps closer before punting from out of range anyway; default %s" % NUDGES_BEFORE_PUNT)
     ap.add_argument("--punts", type=int, default=None, help="stop after this many punts (one attempt: walk up to the ball and punt it); default: until stopped")
     ap.add_argument("--save-to", default="~/.local/share/g2/explore_pictures/named/greenball", help="folder for the pictures with the ball found (where g2pics reads them)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
+    if args.punt_max is not None:
+        PUNT_MAX_IN = args.punt_max
+    if args.nudge_max is not None:
+        NUDGE_MAX_IN = args.nudge_max
+    if args.nudges is not None:
+        NUDGES_BEFORE_PUNT = args.nudges
+    print(f"punt range: punt at {PUNT_MAX_IN} in or closer; small steps from there to {NUDGE_MAX_IN} in ({NUDGES_BEFORE_PUNT} of them before punting anyway)")
     from ..config import settings
     from ..link.serial_link import SerialLink
     from ..vision.snapshot import CameraSnapshotter
@@ -353,7 +418,7 @@ def main() -> None:
     _stand_if_lying(link)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     try:
-        why = run_chase(SerialRobot(link), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, announce=announce)
+        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, announce=announce)
         print("ended:", why)
     except KeyboardInterrupt:
         print("ended: stopped")
