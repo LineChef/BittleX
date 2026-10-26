@@ -389,18 +389,23 @@ def test_the_arm_stand_up_helpers_do_nothing_for_other_builds_and_the_plain_one_
         assert standup.stand_via_firmware(sent.append, lambda s: None, "d") is False and not sent
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     assert standup.rest_pose() == [64, -50, 64, -50, 74, -56, 74, -56] and standup.start_pose("kbalance") == standup.balance_pose()
-    assert standup.stand_via_firmware(sent.append, lambda s: None, "d") is False and not sent                         # the arm's profile stands up "sequenced", not the plain way
+    assert standup.stand_sequenced(sent.append, lambda s: None, "d") is False and not sent                            # the shipped arm profile stands up the plain way (2026-10-25 night, easing is off) ...
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "d") is False            # no leg ramp (easing off) ...
-    assert sent[0].startswith("i1 ") and "kbalance" not in sent                                                        # ... but the sequenced stand-up first, ending on the firmware kbalance
+    assert sent == ["kbalance"]                                                                                          # ... just the firmware's own stand-up
     sent.clear()
     assert standup.ramp_to_stand(sent.append, standup.move_cmd, [30, 30] * 4, lambda s: None, "kbalance") is False and not sent   # already standing: nothing
 
 
-def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kbalance_before_the_end(monkeypatch):
+def test_the_arm_stands_up_rear_legs_first_with_the_front_following_soon_and_kbalance_before_the_end(monkeypatch, tmp_path):
     """2026-10-25: the firmware stand-up lifts all eight leg joints at once and G2 fell front right with the claw out ahead; the arm build raises the rear first and the front
     right behind it (no pause between), and the firmware kbalance (the lift servo's swing) goes out while the front legs finish."""
     from pi_pipeline.gait import standup
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    prof = A.load_profiles()
+    prof["arm"]["poses"]["stand_via"] = "sequenced"                                                     # the shipped arm profile stands up with the plain firmware kbalance (2026-10-25 night); the sequence is still here
+    path = str(tmp_path / "profiles.json")
+    A.save_profiles(prof, path)
+    monkeypatch.setattr(A, "PROFILES_PATH", path)
     sent = []
     assert standup.stand_sequenced(sent.append, lambda s: None, "d") is True
     assert "kbalance" not in sent and all(c.startswith("i1 ") for c in sent)                                               # the lift pair rides in every leg command; no firmware stand-up after it
@@ -452,7 +457,7 @@ def test_with_fall_recovery_off_every_skill_and_every_connect_is_followed_by_gb(
         assert "i8 30 9 30" in lk._ser.out
 
 
-def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_up(monkeypatch):
+def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_up(monkeypatch, tmp_path):
     """2026-10-25, hardware: G2 stood up, then again (the firmware plays kbalance from the rest posture it believes he is in) and the arm drew back: the kbalance that asked for the arm's own stand-up is not sent."""
     from pi_pipeline.link.serial_link import SerialLink
 
@@ -471,6 +476,11 @@ def test_a_stand_up_the_link_runs_itself_is_not_followed_by_the_firmware_stand_u
     import time as _t
     monkeypatch.setattr(_t, "sleep", lambda s: None)
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    prof = A.load_profiles()
+    prof["arm"]["poses"]["stand_via"] = "sequenced"                                                     # the sequence is still in the code; the shipped arm profile uses the plain stand-up
+    path = str(tmp_path / "profiles_seq.json")
+    A.save_profiles(prof, path)
+    monkeypatch.setattr(A, "PROFILES_PATH", path)
     lk = SerialLink("/dev/null")
     lk._ser = FakeSerial()
     lk.last_motion_command = "d"
