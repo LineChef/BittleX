@@ -91,7 +91,14 @@ def test_planner_searches_toward_the_side_it_last_saw_and_never_gives_up():
     assert p.decide(None).kind == "look" and p.decide(None).kind == "look"                         # two more looks first (three real misses before a search)
     a = p.decide(None); assert a.kind == "search_turn" and a.degrees < 0
     kinds = [p.decide(None).kind for _ in range(bc.SEARCH_STEPS_PER_CIRCLE + 2)]
-    assert "search_walk" in kinds and kinds[-1] in ("search_turn", "search_walk")                   # a full circle, a short walk, and on
+    assert "search_walk" not in kinds and set(kinds) == {"search_turn"}                              # no blind walking by default (a desk): it keeps turning in place, never gives up
+    bc.SEARCH_WALK = True
+    try:
+        q = bc.ChasePlanner(); q.decide(reading(20, -30))
+        kinds = [q.decide(None).kind for _ in range(bc.SEARCH_STEPS_PER_CIRCLE + 3)]
+        assert "search_walk" in kinds                                                                # on a big floor (--search-walk): a full circle, a short walk, and on
+    finally:
+        bc.SEARCH_WALK = False
 
 
 # ------------------------------------------------------------------------------------------------- the loop
@@ -269,3 +276,12 @@ def test_the_punch_keeps_the_claw_shut_sends_no_pick_skill_and_ends_on_the_balan
     assert moves[-1] == r._pose_cmd(0, bal[:4], bal[4:])                                       # it ends on the balance pose
     lung = next(c for c in moves if c.startswith("i1 75 "))
     assert " 8 -57 " in lung or " 8 43 " in lung                                               # the front shoulders carry the arm build's -10 shift (53 - 10)
+
+
+def test_an_attempt_ends_when_its_time_is_up():
+    t = [0.0]
+    def clock():
+        t[0] += 10.0
+        return t[0]
+    out = bc.run_chase(FakeRobot(), FakeCamera([picture()]), lambda: False, max_seconds=35, clock=clock, sleep=lambda s: None, say=lambda m: None)
+    assert out == "time"

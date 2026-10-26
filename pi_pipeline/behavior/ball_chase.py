@@ -41,6 +41,7 @@ NUDGE_S = 0.9
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
+SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
 MAX_TURN_DEG = 35.0
@@ -98,9 +99,11 @@ class ChasePlanner:
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
             self.search_steps += 1
-            if self.search_steps > SEARCH_STEPS_PER_CIRCLE:
+            if SEARCH_WALK and self.search_steps > SEARCH_STEPS_PER_CIRCLE:
                 self.search_steps = 0
                 return Action("search_walk", 2.0, why="a full circle without the ball: walk on and search again")
+            if self.search_steps > SEARCH_STEPS_PER_CIRCLE:
+                self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
             side = self.last_side or 1
             return Action("search_turn", abs(SEARCH_STEP_DEG) / TURN_DEG_S, SEARCH_STEP_DEG * side, f"searching {'right' if side > 0 else 'left'}")
         self.lost = 0
@@ -289,16 +292,20 @@ class PictureSaver:
 
 
 def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
-              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, say: Callable[[str], None] = print) -> str:
+              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
     Never gives up on its own."""
     planner = planner or ChasePlanner()
     steps = 0
     punts = 0
     seen = False
+    t_start = clock()
     while not stop():
         if max_steps is not None and steps >= max_steps:
             return "steps"
+        if max_seconds is not None and clock() - t_start >= max_seconds:
+            say(f"time is up ({max_seconds:.0f} s): ending the attempt")
+            return "time"
         steps += 1
         if steps % 15 == 1 and not dry_run and not robot.battery_ok():
             say("battery low or unreadable: stopping")
@@ -380,11 +387,13 @@ def _stand_if_lying(link) -> None:
 
 
 def main() -> None:
-    global PUNT_MAX_IN, NUDGE_MAX_IN, NUDGES_BEFORE_PUNT
+    global PUNT_MAX_IN, NUDGE_MAX_IN, NUDGES_BEFORE_PUNT, SEARCH_WALK
     import argparse
     ap = argparse.ArgumentParser(description="Chase the green ball and punt it until stopped.")
     ap.add_argument("--dry-run", action="store_true", help="look and report what it would do; send no move")
     ap.add_argument("--max-steps", type=int, default=None)
+    ap.add_argument("--max-seconds", type=float, default=None, help="end the attempt after this many seconds (he rests): a short test")
+    ap.add_argument("--search-walk", action="store_true", help="after a full circle without the ball, walk on blind and search again (a big floor only; the default never walks without seeing the ball)")
     ap.add_argument("--use-pick", action="store_true", help="punt with Petoi's pick skill (it opens and closes the claw) instead of the punch (claw shut)")
     ap.add_argument("--punt-max", type=float, default=None, help="punt when the ball is this close (inches from the camera); default %s" % PUNT_MAX_IN)
     ap.add_argument("--nudge-max", type=float, default=None, help="between --punt-max and this: small steps closer first; default %s" % NUDGE_MAX_IN)
@@ -399,6 +408,7 @@ def main() -> None:
         NUDGE_MAX_IN = args.nudge_max
     if args.nudges is not None:
         NUDGES_BEFORE_PUNT = args.nudges
+    SEARCH_WALK = bool(args.search_walk)
     print(f"punt range: punt at {PUNT_MAX_IN} in or closer; small steps from there to {NUDGE_MAX_IN} in ({NUDGES_BEFORE_PUNT} of them before punting anyway)")
     from ..config import settings
     from ..link.serial_link import SerialLink
@@ -418,7 +428,7 @@ def main() -> None:
     _stand_if_lying(link)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     try:
-        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, announce=announce)
+        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce)
         print("ended:", why)
     except KeyboardInterrupt:
         print("ended: stopped")
