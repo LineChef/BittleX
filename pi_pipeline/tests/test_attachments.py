@@ -211,7 +211,8 @@ def test_no_easing_with_the_arm(monkeypatch):
     monkeypatch.delenv("G2_TRANSITION_RAMP_S", raising=False)
     assert standup.ramp_seconds() == standup.DEFAULT_RAMP_S and transitions.max_seconds() > 0
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
-    assert standup.ramp_seconds() == 0.0 and transitions.max_seconds() == 0.0
+    assert standup.ramp_seconds() == 0.0                                                                 # easing (the stand-up ramp, smoothing a skill's own motion): off for the arm
+    assert transitions.max_seconds() > 0                                                                 # blending (pose to pose) is back on for the arm (user, 2026-10-25)
     sent = []
     assert standup.blend_to_balance(sent.append, sleep=lambda s: None, last_motion_command="i8 40 9 40") is False and not sent
 
@@ -508,3 +509,25 @@ def test_a_gait_has_no_gb_next_to_it_but_a_posture_still_gets_one_after(monkeypa
     lk._ease_transition = lambda c: None
     lk.send("kbalance", read_reply=False, settle=0.0)
     assert lk._ser.out == ["kbalance", "gb"]
+
+
+def test_blending_on_the_arm_uses_the_arm_firmwares_poses_and_first_frames(monkeypatch):
+    """User, 2026-10-25: blending (pose to pose) is separate from easing and is back on for the arm; it blends into the ARM variant of a gait and the arm's shifted poses, not the stock tables."""
+    from pi_pipeline.link import transitions as T
+    monkeypatch.setenv("G2_ATTACHMENT", "none")
+    stock_walk, stock_rest, stock_balance = T.target("kwkF"), T.pose_after(""), T.balance_pose()
+    assert stock_rest == T.REST and stock_balance == T.BALANCE and stock_walk == T._resolve(T.table()["wkF"]["first"], None)      # the stock build is exactly as before (an F skill: the firmware picks a side at random, so the mean of the frame and its mirror)
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    rows = T.table()
+    assert T.target("kwkF") == T._resolve(rows["wkArmF"]["first"], None)                                    # the walk the arm firmware really plays (not the stock wkF)
+    assert T.target("kwkF") != T._resolve(rows["wkF"]["first"], None)
+    assert T.target("kwkL") == [float(x) for x in rows["wkArmL"]["first"]]
+    assert T.target("kwkR") == T.mirror([float(x) for x in rows["wkArmL"]["first"]])                         # R is the mirrored L
+    assert T.target("kbkF") == T._resolve(rows["bkArmF"]["first"], None)
+    assert T.pose_after("") == T.rest_pose() == [64.0, 64.0, 74.0, 74.0, -50.0, -50.0, -56.0, -56.0]       # the arm's rest, measured, in Petoi order
+    assert T.balance_pose() == [15.0, 15.0, 20.0, 20.0, 56.0, 56.0, 50.0, 50.0]
+    other = next(n for n, r in rows.items() if r["kind"] == "posture" and not n.endswith(("L", "R")) and n not in ("balance", "up", "rest") and "Arm" not in n and T.target("k" + n) is not None)
+    stock = T._resolve(rows[other]["first"], None)
+    shifted = T.target("k" + other)
+    assert shifted == [stock[0] - 10, stock[1] - 10, stock[2], stock[3], stock[4] + 6, stock[5] + 6, stock[6], stock[7]]   # any other skill: the stock frame, front shoulders -10 and front knees +6
+    assert T.target("kbalance") is None                                                                       # a stop stays a stop

@@ -45,7 +45,7 @@ NEVER_EASE = frozenset({"krc", "krl", "kdropRec", "kcalib", "kzero", "kzz", "kc"
 def max_seconds() -> float:
     try:
         from pi_pipeline.attachments import flag_safe
-        if not flag_safe("easing"):                  # the fitted attachment runs without easing (the arm's first tests, user 2026-10-24)
+        if not flag_safe("blending"):                # the fitted attachment runs without pose-to-pose blending (BLENDING, not easing: the arm has blending back on, user 2026-10-25)
             return 0.0
     except ImportError:
         pass
@@ -66,6 +66,45 @@ def table() -> dict:
         return {}
 
 
+# The arm build (Bittle X+Arm firmware, docs/planned/robot-arm.md): every posture and every skill without an arm variant is played shifted (front shoulders -10, front knees +6), and the
+# gaits with an `Arm` variant (wkF -> wkArmF, bkF -> bkArmF ...) play that one instead. Its rest and balance poses are in the arm profile's `poses` (measured on G2 2026-10-25).
+ARM_FRONT_SHOULDER_SHIFT, ARM_FRONT_KNEE_SHIFT = -10, 6        # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]: indices 0 and 1, then 4 and 5
+
+
+def _arm_poses():
+    """The fitted attachment's `poses` entry (the arm), or None for the stock build and for anything unreadable."""
+    try:
+        from pi_pipeline.attachments import current, load_profiles
+        return (load_profiles().get(current()) or {}).get("poses") or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _petoi(urdf8):
+    """URDF order [FLs, FLk, FRs, FRk, BRs, BRk, BLs, BLk] -> Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]."""
+    u = [float(x) for x in urdf8]
+    return [u[0], u[2], u[4], u[6], u[1], u[3], u[5], u[7]]
+
+
+def rest_pose():
+    p = _arm_poses()
+    return _petoi(p["rest_urdf_deg"]) if p and p.get("rest_urdf_deg") else list(REST)
+
+
+def balance_pose():
+    p = _arm_poses()
+    return _petoi(p["balance_urdf_deg"]) if p and p.get("balance_urdf_deg") else list(BALANCE)
+
+
+def _arm_shift(frame):
+    f = [float(x) for x in frame]
+    f[0] += ARM_FRONT_SHOULDER_SHIFT
+    f[1] += ARM_FRONT_SHOULDER_SHIFT
+    f[4] += ARM_FRONT_KNEE_SHIFT
+    f[5] += ARM_FRONT_KNEE_SHIFT
+    return f
+
+
 def mirror(frame):
     """Swap left and right legs, as the firmware's Skill::mirror() does for the leg joints."""
     f = list(frame)
@@ -76,11 +115,34 @@ def _skill(token: str):
     """(table row, mirror) for `k<name>`: mirror True / False, or None if the firmware picks at random. (None, None) if not a known skill."""
     name = token.strip()[1:]
     rows = table()
+    if _arm_poses():
+        return _arm_skill(name, rows)
     if name in rows:
         return rows[name], (False if name.endswith("L") else None)
     if name.endswith("R") and name[:-1] + "L" in rows:              # an R skill is its L skill mirrored
         return rows[name[:-1] + "L"], True
     return None, None
+
+
+def _arm_skill(name, rows):
+    """`_skill` for the arm build: the Arm variant of a gait when there is one, the arm's own rest and balance poses, and the front shift for everything else."""
+    base, side = (name[:-1], name[-1]) if name[-1:] in ("F", "L", "R") else (name, "")
+    for variant, mirrored in ((base + "Arm" + side, None if side != "L" else False), (base + "ArmL", True) if side == "R" else (None, None)):
+        if variant and variant in rows and not (side == "R" and variant == base + "ArmR"):
+            return rows[variant], (mirrored if side != "L" else False)
+    row, mirrored = (rows[name], (False if name.endswith("L") else None)) if name in rows else (None, None)
+    if row is None and name.endswith("R") and name[:-1] + "L" in rows:
+        row, mirrored = rows[name[:-1] + "L"], True
+    if row is None:
+        return None, None
+    row = dict(row)
+    if name in ("balance", "up"):
+        row["first"] = balance_pose()                               # already shifted: read off the board after a kbalance
+    elif name in ("rest",):
+        row["first"] = rest_pose()
+    else:
+        row["first"] = _arm_shift(row["first"])
+    return row, mirrored
 
 
 def _resolve(frame, mirrored):
@@ -106,7 +168,7 @@ def pose_after(command: str):
     """The leg pose (Petoi order, joints 8..15) after `command` once it has settled, or None if the link cannot know it."""
     c = (command or "").strip()
     if c in ("", "d", "kzz"):                                      # nothing yet = a fresh process, assumed lying (as gait/standup.py's start_pose)
-        return list(REST)
+        return rest_pose()
     if c[:1] in ("i", "m"):
         pairs = leg_pairs(c)
         return [float(pairs[j]) for j in LEG_JOINTS] if pairs and all(j in pairs for j in LEG_JOINTS) else None

@@ -62,7 +62,8 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 
 | Key | Off means | Arm |
 |---|---|---|
-| `easing` | no stand-up ramp, no eased move into a skill, no blend to balance at the end of a walk (`G2_STAND_RAMP_S` / `G2_TRANSITION_RAMP_S` are ignored) | off |
+| `easing` | smoothing a skill's own motion and the stock stand-up ramp stay off (`G2_STAND_RAMP_S` is ignored; the arm has its own sequenced stand-up, `poses`) | off |
+| `blending` | pose to pose (user, 2026-10-25: this is not easing): the link steps the legs from the pose it knows to the next skill's first frame before sending it (`link/transitions.py`; for the arm it blends into the ARM variant of a gait, `wkArmF`, and the arm's own shifted rest and balance poses), and a policy walk ends with a blend to balance (`G2_TRANSITION_RAMP_S` caps it). Off: the firmware jumps the legs there at full servo speed | on for the arm since 2026-10-25 |
 | `gyro_balance` | the firmware gyro balance stays off: every `gB` the Pi sends goes out as `gb`, poses no longer turn it on, and start-up sends `gb` | off |
 | `gait_switching` | the gait is held at normal; "hi step" or "carpet mode" is answered "Not with the arm fitted" and not obeyed; a carpet floor label does not switch it | off |
 | `skills` | the attachment's own skills stay out of the conversation | off |
@@ -70,7 +71,7 @@ A profile in `gait_profiles.json` can switch Pi behaviour off while its attachme
 
 The arm's `poses` entry (rest and balance angles of the arm firmware, the lift servo's rest 59 and walking 0, `stand_ease`) turns the stand-up ramp back on for the arm alone: it eases from the arm's own rest pose to its own balance pose, then lowers the lift from 59 to 0 so the claw leaves the floor (2026-10-25; before, the Pi never set the lift and a walk from rest walked with the arm forward). The other ramps stay off.
 
-The arm has all five off for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
+The arm has `easing`, `gyro_balance`, `gait_switching`, `skills` and `fall_recovery` off and `blending` on for its first hardware round (user, 2026-10-24: [`../plan-detail/arm-policy-plan.md`](../plan-detail/arm-policy-plan.md)). Turning one back on is a one-line profile edit and a deploy.
 
 ## Open with the arm fitted (2026-10-24)
 

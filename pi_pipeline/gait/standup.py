@@ -40,6 +40,16 @@ def balance_pose():
     return [float(x) for x in p["balance_urdf_deg"]] if p and p.get("balance_urdf_deg") else list(BALANCE_URDF_DEG)
 
 
+def _blending_on() -> bool:
+    """The fitted attachment's `blending` switch (pose-to-pose: the blend into balance at the end of a walk, and the link's blend into a skill's first frame); on when it cannot be read.
+    Easing (smoothing a skill's own motion) is the separate `easing` switch (user, 2026-10-25)."""
+    try:
+        from pi_pipeline.attachments import flag_safe
+    except ImportError:
+        return True
+    return flag_safe("blending")
+
+
 def _easing_on() -> bool:
     """The fitted attachment's `easing` switch (the arm turns every ramp off for its first tests, user 2026-10-24); on when it cannot be read."""
     try:
@@ -185,7 +195,7 @@ BLEND_S = 0.6
 def blend_to_balance(send, make_cmd=move_cmd, sleep=time.sleep, last_motion_command=None, seconds=BLEND_S) -> bool:
     """Ease the legs from where the last command left them (often mid-stride, a foot in the air) to the balance pose before the `kbalance` token, instead of snapping there (user, 2026-10-10: exploration walks
     ended with one foot in the air and were unstable). Returns True if a blend ran; an unknown last pose (a firmware gait, a skill) is left to the firmware, as for the stand-up.
-    No blend while the fitted attachment has easing off."""
-    if not _easing_on():
+    No blend while the fitted attachment has blending off."""
+    if not _blending_on():
         return False
-    return ramp_to_stand(send, make_cmd, BALANCE_URDF_DEG, sleep=sleep, last_motion_command=last_motion_command, seconds=seconds)
+    return ramp_to_stand(send, make_cmd, balance_pose(), sleep=sleep, last_motion_command=last_motion_command, seconds=seconds)

@@ -73,6 +73,7 @@
       "note": "2026-10-25: rest read from the board (j) on Bittle X+Arm B10_260527; balance read after kbalance (front 17 / 58, rear 22 / 52, lift 2). stand_via sequenced: rear legs, then front legs with the lift easing 60 -> 0 in the same `i` commands, then kbalance; the all-at-once firmware stand-up fell front right with the claw out ahead. A loose Pi-to-BiBoard plug (user: fix it by hand) silences the board after falls.",
       "arm_rest": 60,
       "arm_walk": 0
-    }
+    },
+    "blending": true
   }
 }

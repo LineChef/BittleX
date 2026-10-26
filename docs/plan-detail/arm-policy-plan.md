@@ -248,6 +248,10 @@ Faster and better on hazards than the scripted walk, steadier than ARM1R (a thir
 
 Promoted as the arm attachment's gait (`--attachment-only`, commit 226e22d) and deployed to the Pi 4:22 PM, with ARM1R and ARM1 kept as history; the Pi loads it with residual scale 15 deg and the 0.064 pace from its sidecar. **First hardware walk (2026-10-25 4:3x PM, hardwood, pack 100%):** cmd 0.10, 12.5 s, no fall, yaw -1 deg over the run, the user: walked straight down the line, ended 1 in off line (ARM1R 5 in, Petoi's walk 5 to 7 in); roll spread 4.3 deg (-11 to +7; ARM1R 6.2, Petoi 3.3 to 3.7); front shoulders 55 to 56 deg and back 75 (the sim says 53 / 73); no late ticks. Distance not measured; one run only (the user stopped the testing there).
 
+### Blending back on for the arm (user, 2026-10-25 evening)
+
+The user separated two things the code had under one `easing` switch: easing (smoothing a skill's own motion: stays off for every skill until we see what blending does) and blending (pose to pose, to stop the falls at stand-up to walk and similar changes: back on). New profile switch `blending` (on for the arm); `link/transitions.py` now knows the arm firmware: its rest and balance poses (`poses`), the Arm variant of a gait (`kwkF` blends into `wkArmF`, `kbkF` into `bkArmF`), and the front shift (shoulders -10, knees +6) for every other skill; the end-of-walk blend uses the arm's balance pose. In a simulation a stand-up followed by `kwkF` blends from the balance pose to the walk's first frame in 37 steps over 0.94 s, then plays the walk. Not yet run on G2 (the Pi was off); the walk_seq experiment (five identical walks after a stand-up, the ball as a ruler) is the test.
+
 ## Queued until the ball testing is done (user, 2026-10-25: no work on walking or standing before then)
 
 - **Stand-up "needs more work"** (user, 2026-10-25 4:3x PM): fixed so far, the second stand-up (the firmware `kbalance` after the sequence replayed it) and the jerky arm pull-back (1.6 s lift, 3 deg a step); more feedback to be added here as it comes.

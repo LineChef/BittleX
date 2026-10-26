@@ -18,8 +18,7 @@ Each attachment also names the BiBoard firmware model it needs (the first line o
 arm is a separate build of Petoi's firmware ("Bittle X+Arm", compile-time option `ROBOT_ARM`), so its skills are only offered when the
 banner says so. The AI head accepts only the plain "Bittle X" build: the arm build shifts every posture and swaps the gaits (docs/planned/robot-arm.md).
 
-A profile may also switch Pi behaviour off while that attachment is fitted (`flag`; a missing key means on): `easing` (the stand-up ramp, the eased
-moves into skills and the blend to balance at the end of a walk), `gyro_balance` (the firmware gyro balance: every `gB` becomes `gb`),
+A profile may also switch Pi behaviour off while that attachment is fitted (`flag`; a missing key means on): `easing` (the stock stand-up ramp and smoothing a skill's own motion) and `blending` (pose to pose: the link's move into a skill's first frame and the blend to balance at the end of a walk), `gyro_balance` (the firmware gyro balance: every `gB` becomes `gb`),
 `gait_switching` (the gait stays normal; spoken gait commands are answered, not obeyed), `skills` (the attachment's own skills in the
 conversation) and `fall_recovery` (the scripted self-right / roll-over / drop-recover moves are refused, link/opencat.py RECOVERY_SKILLS). The arm has all five off for its first hardware round (docs/plan-detail/arm-policy-plan.md).
 Guide: docs/guides/attachments.md.

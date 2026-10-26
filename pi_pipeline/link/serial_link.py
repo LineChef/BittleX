@@ -287,7 +287,7 @@ class SerialLink:
             _spec.loader.exec_module(standup)
         if standup.stand_sequenced(self._write_pose, time.sleep, self.last_motion_command):       # the arm build: rear legs, then front legs, the lift easing to 0
             self._skip_firmware_stand = True
-            return list(transitions.BALANCE)
+            return transitions.balance_pose()
         secs = standup.ramp_seconds()
         if secs <= 0:
             return None
@@ -298,7 +298,7 @@ class SerialLink:
             transitions.play(standup.ramp_poses(start, standup.rest_pose(), standup.SIT_TO_REST_S, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
             start = standup.rest_pose()
         transitions.play(standup.ramp_poses(start, standup.balance_pose(), secs, transitions.STEPS_PER_S), lambda pose: self._write_pose(standup.move_cmd(pose)), sleep=time.sleep)
-        return list(transitions.BALANCE)
+        return transitions.balance_pose()
 
     def read_leg_pose(self, *, rows: int = 2, timeout_s: float = 0.6, agree_deg: float = 5.0):
         """Measured leg angles (servos 8..15, Petoi order) from the firmware's `f` feedback stream, or None.
