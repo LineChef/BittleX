@@ -285,3 +285,26 @@ def test_an_attempt_ends_when_its_time_is_up():
         return t[0]
     out = bc.run_chase(FakeRobot(), FakeCamera([picture()]), lambda: False, max_seconds=35, clock=clock, sleep=lambda s: None, say=lambda m: None)
     assert out == "time"
+
+
+def test_the_punt_test_asks_for_each_distance_punches_once_and_writes_a_csv(tmp_path):
+    from pi_pipeline.behavior import punt_test as pt
+
+    class Robot:
+        def __init__(self): self.punts = 0
+        def punt(self): self.punts += 1; return "ok"
+        def swing_deg(self): return 15.0
+    answers = iter(["", "", "18", "y", "", "", "s", "", "", "10", "n", "hit the leg"])        # d1: ready, punch, 18 in, hit, no note | d2: ready, skip | d3: ready, punch, 10 in, no, a note
+    prompts = []
+    def ask(p):
+        prompts.append(p)
+        return next(answers)
+    cam = FakeCamera([picture([disc(122, 110, 40)])])
+    robot = Robot()
+    csv_path = str(tmp_path / "punts.csv")
+    rows = pt.run_tests(robot, cam, [2.0, 3.0, 4.0], ask=ask, say=lambda m: None, csv_path=csv_path, sleep=lambda s: None)
+    assert robot.punts == 2 and [r["asked_in"] for r in rows] == [2.0, 4.0]                            # the skipped distance is not punched
+    assert rows[0]["ball_went_in"] == "18" and rows[0]["claw_hit_first"] == "y" and rows[1]["note"] == "hit the leg"
+    text = open(csv_path).read().splitlines()
+    assert text[0].startswith("time,asked_in,read_in") and len(text) == 3
+    assert any("2 in ahead" in p for p in prompts) and any("4 in ahead" in p for p in prompts)
