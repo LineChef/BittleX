@@ -281,7 +281,7 @@ The camera moved twice (pod top, then the claw, lower and further forward), so t
 3. The wall checks in [`../vision/wall-check-plan.md`](../vision/wall-check-plan.md) again, then a short dry-run roam.
 The calibration holds only at lift 0; any behaviour that lifts the arm must not use it meanwhile.
 
-**Fetch the green ball.** Find the ball, walk to it, pick it up, check the grasp, and on a miss (the claw closed on nothing, or the ball rolled away) back up,
+**Fetch the green ball (superseded 2026-10-25 night: the claw cannot hold the 3 in ball, so the game is chase and PUNCH it; see the ball chase sections above).** Find the ball, walk to it, pick it up, check the grasp, and on a miss (the claw closed on nothing, or the ball rolled away) back up,
 find it again, turn to it and try again (three tries, then say so); then bring it to the person and put it down. Built from what exists, no new firmware:
 1. **See the ball.** The camera's detector gives boxes at about 15 fps but knows face / dog / cat. Two paths: (a) first, colour on the Pi from the camera's
    240 x 240 pictures (green pixels: bearing, size, where in the frame), a stop-look-step approach at the picture rate, no model change; (b) then a "ball" class

@@ -22,7 +22,7 @@ STEPS_PER_S = 20
 
 def _poses():
     """The fitted attachment's own stand-up poses (gait_profiles.json "poses"), or None for the stock build: the arm firmware shifts every pose (front shoulders -10, front knees +6) and its
-    lift servo (joint 1) rests at 59 with the claw on the floor. {"rest_urdf_deg", "balance_urdf_deg" (URDF order), "arm_rest", "arm_walk", "stand_ease"}."""
+    lift servo (joint 1) rests at 59 with the claw on the floor. {"rest_urdf_deg", "balance_urdf_deg" (URDF order), "arm_rest", "arm_walk", "stand_via": "kbalance" (the plain firmware stand-up, the default) or "sequenced"}."""
     try:
         from pi_pipeline.attachments import current, load_profiles
         return (load_profiles().get(current()) or {}).get("poses") or None

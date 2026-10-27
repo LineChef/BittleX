@@ -189,7 +189,7 @@ Vision-based navigation is gated off (`features.vision`). Target capability and 
 - [ ] "Reasoning" layer: structured detections to Claude over serial (the BiBoard cannot run a vision-language model).
 - [ ] (Stretch) more robust self-righting with IMU-based flip detection.
 - [ ] Recalibrate the wall estimator for the camera on the claw (user, 2026-10-25); steps in [`plan-detail/arm-policy-plan.md`](plan-detail/arm-policy-plan.md) "Next hardware rounds".
-- [ ] **Fetch the green ball** with the claw (user, 2026-10-25): find, approach, pick, check the grasp, retry on a miss (turn back to the ball), bring it to the person; plan in [`plan-detail/arm-policy-plan.md`](plan-detail/arm-policy-plan.md) "Next hardware rounds".
+- [ ] **Chase and punch the green ball** (the cat's treat ball; user, 2026-10-25): the claw cannot grab the 3 in ball, so the game is chase it, punch it straight ahead (the lunge with the claw shut, about 18 in) so treats fall out, retry until told to stop; built and tried on G2 (the colour finder, the chase, one punch through it on a desk), the punt distance is being dialed in by hand; still to do: "g2, fetch" as a voice command, a trained ball class (300+ pictures), a grab experiment with a smaller object; plan in [`plan-detail/arm-policy-plan.md`](plan-detail/arm-policy-plan.md) "Next hardware rounds" and the ball chase sections.
 - Deferred on purpose: wiring `Avoider` decisions to the actuator (the model only knows face/dog/cat, so it would back away from people and pets).
 
 ## Phase 9 — Memory ✅
