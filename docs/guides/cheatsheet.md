@@ -104,6 +104,7 @@ How the pictures flow: [`../vision/picture-library.md`](../vision/picture-librar
 | `g2walls` / `g2wallstats [days]` | the wall pictures; wall statistics from the Pi |
 | `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
 | `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
+| `g2punt [--punt-max IN]` / `g2puntstop` / `g2puntset [show\|init\|NAME VALUE]` (or voice: "G2, punt") | one punt attempt (stand, find the ball, walk, punch once, rest) and its settings file `~/.local/share/g2/punt_settings.json`; full guide [`punt.md`](punt.md) |
 | `python -m pi_pipeline.behavior.punt_test [--distances 2 3 4 5] [--repeat N]` | on the Pi (ssh -t), voice service stopped, G2 in rest: one punch (claw shut) at each ball distance, you place the ball and report how far it went; rows go to `~/g2_punt_tests.csv`. Dials in `PUNT_MAX_IN` in `behavior/ball_chase.py` |
 | `python -m pi_pipeline.behavior.ball_chase [--dry-run] [--max-steps N]` | on the Pi, voice service stopped, G2 standing (arm fitted): chase the green treat ball and punch it (claw shut) until stopped (`touch ~/.local/share/g2/ball_chase_stop` or Ctrl-C) or after one punch (`--punts 1`, he rests at the end); `--dry-run` only prints what it would do; `--punt-max IN --nudge-max IN --max-seconds S` set the punt distance and a time limit. Its pictures with the ball found go to `g2pics` (Named: greenball). Read the battery percent first |
 

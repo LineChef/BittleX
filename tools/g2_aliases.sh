@@ -384,6 +384,23 @@ g2power()  { _g2py -m pi_pipeline.power "${@:-status}"; }             # status |
 
 # g2ssh  -- open a shell on the Pi.
 g2ssh() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "$@"; }
+# g2punt  -- one punt attempt without the voice command (the same as saying "G2, punt"): stops the voice service on the Pi, runs `behavior.ball_chase --punts 1` (stand from rest, find the ball, walk to it, punch it once, rest), then starts the voice service again. Extra words go to the chase, e.g. g2punt --punt-max 3.5. G2 in rest, the ball in front of him; see docs/guides/punt.md.
+g2punt() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ssh "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && rm -f ~/.local/share/g2/ball_chase_stop && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.ball_chase --punts 1 $*; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice"
+}
+# g2puntstop  -- end a punt attempt now (he rests, the voice service comes back).
+g2puntstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/ball_chase_stop; sudo systemctl stop g2-punt 2>/dev/null; true"; }
+# g2puntset [NAME VALUE | init]  -- show the punt settings a run would use now (the file ~/.local/share/g2/punt_settings.json on the Pi), change one (g2puntset punt_max_in 3.5), or write the file with every default (init). Read at the start of every run: no deploy.
+g2puntset() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  case "${1:-show}" in
+    show) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings" ;;
+    init) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings --init" ;;
+    *) [ -n "${2:-}" ] || { echo "usage: g2puntset [show | init | NAME VALUE]"; return 2; }
+       ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings --set '$1' '$2'" ;;
+  esac
+}
 # g2deploy [--once|--cancel|--max-hours N|--replace]  -- push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once;
 #   --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
 g2deploy() { bash "$G2_ROOT/tools/g2_deploy_when_online.sh" "$@"; }

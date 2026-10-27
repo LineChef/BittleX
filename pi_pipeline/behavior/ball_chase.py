@@ -38,6 +38,7 @@ PUNT_ALIGN_DEG = 12.0          # ... and before a punt
 PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 4.0      # camera to ball: the lunge reaches about this far (2.6 in threw the ball 18 in; 4.5 to 5 in was just out of reach, 2026-10-25)
 NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps closer, then punt anyway after NUDGES_BEFORE_PUNT of them
 NUDGE_S = 0.9
+WALK_AIM_IN = 4.0              # a walk step is timed to leave the ball about this far from the camera (the ball is touched at about 3 in)
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
@@ -53,12 +54,20 @@ SAVE_EVERY_S = 2.0
 # The punch (user, 2026-10-25: "test the punch, not attempting to pick it up with the claw"): the lunge of Petoi's `pickF` (decoded from InstinctBittleESP.h: a crouch, then front legs folded and the arm swung out to 75)
 # with the claw held CLOSED the whole time; `kpickF` opens the claw to 65 first and closes it on the way back, which is a grab attempt. Key poses are the skill's own angles (the arm firmware shifts the front
 # shoulders -10 and front knees +6 for a skill with no Arm variant, added below); (seconds to get there, arm lift, shoulders FL FR BR BL, knees FL FR BR BL).
-PUNCH_KEYS = (
-    (0.50, -10, (16, 16, 30, 30), (30, 30, 30, 30)),      # get ready (pickF frame 0, the claw stays shut)
-    (0.45, 10, (5, 5, 10, 10), (20, 20, 50, 50)),         # crouch (frame 2)
-    (0.12, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),     # the lunge: front legs fold forward, the arm swings out (frame 3)
-    (0.25, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),     # hold it (the claw is not closed on anything: it is already closed)
-)
+PUNCH_READY_S, PUNCH_CROUCH_S, PUNCH_LUNGE_S, PUNCH_HOLD_S = 0.50, 0.45, 0.12, 0.25      # seconds to get to each key pose (punt_settings.json: punch_lunge_s, punch_hold_s)
+
+
+def punch_keys():
+    """The punch's key poses with the current times: (seconds to get there, arm lift, shoulders FL FR BR BL, knees FL FR BR BL)."""
+    return (
+        (PUNCH_READY_S, -10, (16, 16, 30, 30), (30, 30, 30, 30)),      # get ready (pickF frame 0, the claw stays shut)
+        (PUNCH_CROUCH_S, 10, (5, 5, 10, 10), (20, 20, 50, 50)),        # crouch (frame 2)
+        (PUNCH_LUNGE_S, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),     # the lunge: front legs fold forward, the arm swings out (frame 3)
+        (PUNCH_HOLD_S, 75, (53, 53, 40, 40), (-28, -28, 35, 35)),      # hold it (the claw is not closed on anything: it is already closed)
+    )
+
+
+PUNCH_KEYS = punch_keys()
 PUNCH_STEPS_PER_S = 40
 PUNT_MIN_SWING_DEG = 6.0       # a real kpickF swings the pitch 15 to 20 deg
 STOP_FILE = "~/.local/share/g2/ball_chase_stop"
@@ -133,7 +142,7 @@ class ChasePlanner:
         self.punts_in_range = 0
         self.after_punt = False
         self.nudges = 0
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - 4.0) / WALK_IN_S))      # aim for about 4 in: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - WALK_AIM_IN) / WALK_IN_S))      # aim for WALK_AIM_IN: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
         self.walk_log.append((round(ball.distance_in, 1), round(secs, 1)))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
@@ -217,7 +226,7 @@ class SerialRobot:
         self._tx("gP")
         bal = transitions.balance_pose()                              # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]
         cur = (0.0, list(bal[:4]), list(bal[4:]))
-        keys = [(t, lift, [a + (-10 if i < 2 else 0) for i, a in enumerate(sh)], [b + (6 if i < 2 else 0) for i, b in enumerate(kn)]) for t, lift, sh, kn in PUNCH_KEYS]
+        keys = [(t, lift, [a + (-10 if i < 2 else 0) for i, a in enumerate(sh)], [b + (6 if i < 2 else 0) for i, b in enumerate(kn)]) for t, lift, sh, kn in punch_keys()]
         keys.append((0.40, 0, list(bal[:4]), list(bal[4:])))           # and back to the balance pose
         n = 0
         for t, lift, sh, kn in keys:
@@ -402,14 +411,23 @@ def main() -> None:
     ap.add_argument("--save-to", default="~/.local/share/g2/explore_pictures/named/greenball", help="folder for the pictures with the ball found (where g2pics reads them)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
+    import sys as _sys
+    from . import punt_settings as _ps
+    _self = _sys.modules[__name__]                           # this module as it is running (as __main__ too), so the settings land in the constants this run uses
+    _eff, _problems = _ps.effective(_self)                  # the settings file (behavior/punt_settings.py) first: the command line below overrides it
+    for _p in _problems:
+        print("PUNT SETTINGS PROBLEM:", _p)
+    if args.max_seconds is None:
+        args.max_seconds = _eff["max_seconds"]
     if args.punt_max is not None:
         PUNT_MAX_IN = args.punt_max
     if args.nudge_max is not None:
         NUDGE_MAX_IN = args.nudge_max
     if args.nudges is not None:
         NUDGES_BEFORE_PUNT = args.nudges
-    SEARCH_WALK = bool(args.search_walk)
-    print(f"punt range: punt at {PUNT_MAX_IN} in or closer; small steps from there to {NUDGE_MAX_IN} in ({NUDGES_BEFORE_PUNT} of them before punting anyway)")
+    SEARCH_WALK = bool(args.search_walk) or SEARCH_WALK
+    print(f"punt settings: punch at {PUNT_MAX_IN} in or closer, small steps ({NUDGE_S} s) from there out to {NUDGE_MAX_IN} in ({NUDGES_BEFORE_PUNT} of them before punching anyway), "
+          f"walk steps aim for {WALK_AIM_IN} in, punch within {PUNT_ALIGN_DEG} deg of straight, lunge {PUNCH_LUNGE_S} s hold {PUNCH_HOLD_S} s, attempt limit {args.max_seconds:.0f} s, search walk {SEARCH_WALK}")
     from ..config import settings
     from ..link.serial_link import SerialLink
     from ..vision.snapshot import CameraSnapshotter

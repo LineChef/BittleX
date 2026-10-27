@@ -575,6 +575,14 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd == "punt":
+            log.info("punt attempt requested (voice)")
+            self._cue.set("speaking")
+            self._speak("Punting.")                      # said BEFORE the hand-over: the launch stops this service
+            self._events(arm_punt=True)
+            self._set_session()
+            self._cue.set("idle")
+            return
         if cmd == "explore":
             log.info("explore armed (voice)")
             self._ask_floor()                            # a fresh floor label before every roam, so its walks can feed the fits (user, 2026-10-18)

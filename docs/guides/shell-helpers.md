@@ -94,6 +94,9 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | Command | What it does |
 |---|---|
 | `g2ssh` | open a shell on the Pi. |
+| `g2punt` | one punt attempt without the voice command (the same as saying "G2, punt"): stops the voice service on the Pi, runs `behavior.ball_chase --punts 1` (stand from rest, find the ball, walk to it, punch it once, rest), then starts the voice service again. Extra words go to the chase, e.g. g2punt --punt-max 3.5. G2 in rest, the ball in front of him; see docs/guides/punt.md. |
+| `g2puntstop` | end a punt attempt now (he rests, the voice service comes back). |
+| `g2puntset [NAME VALUE / init]` | show the punt settings a run would use now (the file ~/.local/share/g2/punt_settings.json on the Pi), change one (g2puntset punt_max_in 3.5), or write the file with every default (init). Read at the start of every run: no deploy. |
 | `g2deploy [--once/--cancel/--max-hours N/--replace]` | push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once; --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing. |
 | `g2explore [start [ROAM_S]/stationary/arm/disarm/halt/release/stop/status/logs/heard/report [html]]` | run and supervise an exploration session on the Pi (the voice service is stopped for it and always comes back). `halt` freezes it, `release` clears the freeze. |
 | `g2stop [voice/explore]` | the SAFE stop: rest G2 first, then stop what controls him. Use this, never a plain service stop mid-stride. |

@@ -52,7 +52,7 @@ Docs that mention this family: [`automated-testing-loop.md`](../archive/automate
 
 ## `compare`
 
-Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +18.
+Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +19.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -194,7 +194,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`decision
 
 ## `limp`
 
-Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md), [`README.md`](../archive/rl/reference-frames/README.md) +2.
+Docs that mention this family: [`history.md`](../archive/history.md), [`sim-payload-bug.md`](../archive/plan-detail/sim-payload-bug.md), [`crawl-climb-session-checkpoint.md`](../archive/rl/crawl-climb-session-checkpoint.md), [`README.md`](../archive/rl/reference-frames/README.md) +3.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -273,7 +273,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +43.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +44.
 
 | File | Size | Cited by |
 |---|---|---|

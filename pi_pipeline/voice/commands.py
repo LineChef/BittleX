@@ -81,6 +81,9 @@ _SHUTDOWN = (
     "shut yourself down", "time to shut down",
 )
 
+# One punt attempt ("G2, punt": stand, approach the ball, punch it once, rest). Short on purpose: a heard word inside a sentence must never start it.
+_PUNT = ("punt", "punt it", "punt the ball", "go punt", "do a punt", "punt test", "do the punt test", "punt attempt")
+
 # Tier 1 roam -- voice-armed only ("G2, go ahead and look around").
 _EXPLORE = (
     "go ahead and look around", "look around", "have a look around",
@@ -418,7 +421,7 @@ def asks_battery(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"punt"``,
     ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -438,6 +441,8 @@ def match_local_command(text: str) -> str | None:
         return "gait"                                  # "hi step" / "walk normally": before "walk" so "walk normally" is never read as a walk command
     if parse_walk_command(text) is not None:
         return "walk"
+    if _hit_short(n, _PUNT, extra_words=1):
+        return "punt"
     if _hit(n, _END_EXPLORE):
         return "end_explore"                          # before "explore": "end exploration mode" must never arm it
     if _hit(n, _EXPLORE) or _has_verb(n, ("explore",)):

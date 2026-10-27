@@ -308,3 +308,47 @@ def test_the_punt_test_asks_for_each_distance_punches_once_and_writes_a_csv(tmp_
     text = open(csv_path).read().splitlines()
     assert text[0].startswith("time,asked_in,read_in") and len(text) == 3
     assert any("2 in ahead" in p for p in prompts) and any("4 in ahead" in p for p in prompts)
+
+
+def test_the_punt_settings_file_changes_the_constants_and_bad_values_are_reported(tmp_path, monkeypatch):
+    import json
+    import sys
+
+    from pi_pipeline.behavior import punt_settings as ps
+    me = sys.modules[bc.__name__]
+    keep = (bc.PUNT_MAX_IN, bc.NUDGE_MAX_IN, bc.NUDGES_BEFORE_PUNT, bc.PUNCH_LUNGE_S, bc.SEARCH_WALK)
+    try:
+        p = tmp_path / "punt_settings.json"
+        p.write_text(json.dumps({"_help": "x", "punt_max_in": 3.2, "nudges_before_punt": 1, "punch_lunge_s": 0.2, "search_walk": True, "max_seconds": 40, "punt_align_deg": 99, "nope": 1, "nudge_max_in": "far"}))
+        eff, problems = ps.effective(me, str(p))
+        assert eff["punt_max_in"] == 3.2 and bc.PUNT_MAX_IN == 3.2 and bc.NUDGES_BEFORE_PUNT == 1 and bc.PUNCH_LUNGE_S == 0.2 and bc.SEARCH_WALK is True and eff["max_seconds"] == 40.0
+        assert bc.punch_keys()[2][0] == 0.2                                                    # the punch uses the new lunge time
+        assert len(problems) == 3 and any("punt_align_deg" in x for x in problems) and any("nope" in x for x in problems) and any("nudge_max_in" in x for x in problems)
+        assert bc.PUNT_ALIGN_DEG == 12.0                                                         # a value out of range is not used
+        assert ps.effective(me, str(tmp_path / "missing.json"))[1] == []                         # no file: no problem, all defaults
+    finally:
+        bc.PUNT_MAX_IN, bc.NUDGE_MAX_IN, bc.NUDGES_BEFORE_PUNT, bc.PUNCH_LUNGE_S, bc.SEARCH_WALK = keep
+    monkeypatch.setenv("G2_PUNT_SETTINGS", str(tmp_path / "x.json"))
+    assert ps.path() == str(tmp_path / "x.json")
+    t = json.loads(ps.template(me))
+    assert set(ps.SPEC) <= set(t) and t["punt_max_in"] == bc.PUNT_MAX_IN
+
+
+def test_set_value_checks_then_writes_one_setting(tmp_path):
+    import json
+    import sys
+
+    from pi_pipeline.behavior import punt_settings as ps
+    me = sys.modules[bc.__name__]
+    p = str(tmp_path / "s.json")
+    assert ps.set_value(me, "punt_max_in", "3.5", p).startswith("punt_max_in: ") and json.load(open(p))["punt_max_in"] == 3.5       # created from the defaults
+    assert json.load(open(p))["nudges_before_punt"] == bc.NUDGES_BEFORE_PUNT                                                       # the other values are there
+    assert ps.set_value(me, "nudges_before_punt", "2", p) and json.load(open(p))["nudges_before_punt"] == 2
+    assert ps.set_value(me, "search_walk", "true", p) and json.load(open(p))["search_walk"] is True
+    for name, text in (("nope", "1"), ("punt_max_in", "99"), ("punt_max_in", "far"), ("search_walk", "maybe")):
+        try:
+            ps.set_value(me, name, text, p)
+        except ValueError:
+            continue
+        raise AssertionError((name, text))
+    assert json.load(open(p))["punt_max_in"] == 3.5                                                                                # a rejected value changes nothing
