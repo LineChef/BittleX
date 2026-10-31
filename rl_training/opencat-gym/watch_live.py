@@ -43,7 +43,7 @@ def touch():
 
 
 DRESSED = os.path.join(HERE, "models", "local", "bittle_dressed{}.urdf")     # build_body_mesh.py: G2's real parts and the pod as visuals (looks only; the physics is the plain model)
-PART_RGBA = {"neck_bracket": [0.23, 0.23, 0.25, 1], "lift_servo": [0.15, 0.15, 0.17, 1], "claw_servo": [0.15, 0.15, 0.17, 1], "arm_link": [0.95, 0.62, 0.1, 1],
+PART_RGBA = {"neck_bracket": [0.23, 0.23, 0.25, 1], "lift_servo": [0.15, 0.15, 0.17, 1], "claw_servo": [0.15, 0.15, 0.17, 1], "arm_link": [0.12, 0.12, 0.13, 1],
              "jaw_left": [0.12, 0.12, 0.13, 1], "jaw_right": [0.12, 0.12, 0.13, 1], "camera": [0.86, 0.93, 0.74, 1], "claw": [1.0, 0.55, 0.1, 0.85],
              "head": [0.23, 0.23, 0.25, 1]}
 
@@ -73,14 +73,11 @@ def build(p, scene, rid=None, old_ids=None):
                 bid = p.createMultiBody(0, cs, basePosition=b["pos"], baseOrientation=b["orn"])
             elif sh["type"] == p.GEOM_PLANE:
                 bid = p.loadURDF("plane.urdf", b["pos"], b["orn"])
-            elif sh["type"] == p.GEOM_BOX and b.get("part") in ("jaw_left", "jaw_right"):
-                import arm_shapes                                       # the claw's real shape (looks only: the run's physics keeps the thin jaw boxes)
-                jaw_f, plate_f = arm_shapes.jaw_meshes(b["part"].split("_")[1])
-                vs = p.createVisualShape(p.GEOM_MESH, fileName=jaw_f, rgbaColor=PART_RGBA[b["part"]])
-                vp = p.createVisualShape(p.GEOM_MESH, fileName=plate_f, rgbaColor=PLATE_RGBA)
-                bid = p.createMultiBody(0, baseVisualShapeIndex=vs, basePosition=b["pos"], baseOrientation=b["orn"], linkMasses=[0], linkCollisionShapeIndices=[-1],
-                                        linkVisualShapeIndices=[vp], linkPositions=[[0, 0, 0]], linkOrientations=[[0, 0, 0, 1]], linkInertialFramePositions=[[0, 0, 0]],
-                                        linkInertialFrameOrientations=[[0, 0, 0, 1]], linkParentIndices=[0], linkJointTypes=[p.JOINT_FIXED], linkJointAxis=[[0, 0, 1]])
+            elif sh["type"] == p.GEOM_BOX and b.get("part") in ARM_DRAWN:
+                import arm_shapes                                       # the arm's real shapes from the photos (looks only: the run's physics keeps the boxes)
+                bid = arm_shapes.make_body(p, b["part"], b["pos"], b["orn"], sh["dims"])
+                ids[b["id"]] = bid
+                break
             elif sh["type"] == p.GEOM_BOX:
                 he = [d / 2 for d in sh["dims"]]
                 vs = p.createVisualShape(p.GEOM_BOX, halfExtents=he, visualFramePosition=sh["lpos"], visualFrameOrientation=sh["lorn"])
@@ -127,7 +124,7 @@ def joint_ids(p, rid, scene):
 
 
 PAYLOAD_RGBA = [1.0, 0.55, 0.1, 0.85]
-PLATE_RGBA = [0.95, 0.62, 0.1, 1]                          # the claw's base plate (orange, like the arm bracket)
+ARM_DRAWN = ("jaw_left", "jaw_right", "camera", "lift_servo")      # drawn by arm_shapes.make_body in their own colours, not as boxes
 
 
 def mark_payload(p, ids, scene, fr, rid):
