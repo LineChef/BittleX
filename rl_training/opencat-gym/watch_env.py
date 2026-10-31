@@ -49,7 +49,8 @@ def arm2_env(tag):
     if lever is None:
         return None
     st = json.load(open(A.STATE)) if os.path.exists(A.STATE) else {}
-    env = A.stage_env(name, lever, {"chain_extra": st.get("chain_extra", {})}, seed=dict(A.FINALS).get(name, "42"))
+    seed = dict(A.FINALS).get(name, "42")
+    env = A.stage_env(name, lever, {"chain_extra": st.get("chain_extra", {})}, seed=seed, chain_seed=(seed if name in dict(A.FINALS) and name != A.FINALS[0][0] else None))
     env.update({"G2_PAYLOAD_PROFILE": "arm", "G2_BUILD": "arm_wide_clpaw"})
     return env
 

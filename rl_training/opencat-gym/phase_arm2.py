@@ -186,9 +186,11 @@ def screens(st):
 
 
 # ------------------------------------------------------------------------------------------------ the chain
-def stage_env(name, lever, st, seed="42"):
+def stage_env(name, lever, st, seed="42", chain_seed=None):
     env = g2_profile.env_for_job({"kind": "final", "tag": TAG(name), "fresh": True, "levers": list(BASE6) + [lever], "extra": {**RECIPE, **st["chain_extra"]}})
     env["G2E_SEED"] = seed
+    if chain_seed:                                                 # a chained stage ignores G2E_SEED (train.py reads it only for a fresh policy): without this the "seed 7" 20M of
+        env["G2E_CHAIN_SEED"] = str(chain_seed)                    # 2026-11-01 was an exact repeat of the seed-42 one (identical to the last digit at every check)
     env.pop("G2E_PLATEAU_STOP", None)                              # no stage stops on a plateau (user, 2026-10-25: learn across the whole 20M); the smoothed rule only logs
     return {k: v for k, v in env.items() if v != ""}
 
@@ -249,7 +251,7 @@ def final(name, seed, st):
             halt(f"HALT: {tag} stopped without finishing (trained/{tag}_console.log): fix, move its files aside, rm {HALT}, restart")
         clean_environ(st["chain_extra"])
         log(f"{tag} START: a full 20M from {TAG('s3')}, seed {seed} (no plateau stop; the smoothed rule logs only), about {FINAL_MIN} min, done about {clock_in(FINAL_MIN)}")
-        RP.launch(tag, stage_env(name, FINAL_LEVER, st, seed=seed), steps=FINAL_STEPS, base=False, chain_from=f"trained/{TAG('s3')}_ppo")
+        RP.launch(tag, stage_env(name, FINAL_LEVER, st, seed=seed, chain_seed=(seed if name != FINALS[0][0] else None)), steps=FINAL_STEPS, base=False, chain_from=f"trained/{TAG('s3')}_ppo")
     key = f"tracked_{name}"
     done, step = set(st.get(key, [])), TRACK_EVERY
     while step <= 20_000_000:

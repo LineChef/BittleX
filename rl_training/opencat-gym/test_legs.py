@@ -140,3 +140,19 @@ def test_the_live_viewer_draws_the_runs_legs():
     with tempfile.TemporaryDirectory() as tmp:
         out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300, cwd=HERE, env={**os.environ, "LIVE_TMP": tmp})
     assert "ok" in out.stdout.split(), out.stderr[-2000:]
+
+
+def test_a_second_20m_gets_its_own_random_stream():
+    """The seed-7 20M of 2026-11-01 repeated the seed-42 one exactly: a chained stage ignores G2E_SEED (train.py reads it only for a fresh policy). The extra 20M must carry G2E_CHAIN_SEED."""
+    code = textwrap.dedent('''
+        import sys
+        sys.path.insert(0, ".")
+        import phase_arm2 as A
+        st = {"chain_extra": {}}
+        first = A.stage_env("s4", A.FINAL_LEVER, st, seed="42")
+        second = A.stage_env("s4b", A.FINAL_LEVER, st, seed="7", chain_seed="7")
+        assert "G2E_CHAIN_SEED" not in first and second["G2E_CHAIN_SEED"] == "7" and second["G2E_SEED"] == "7"
+        print("ok")
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=HERE)
+    assert "ok" in out.stdout.split(), out.stderr[-1500:]
