@@ -156,3 +156,16 @@ def test_a_second_20m_gets_its_own_random_stream():
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=HERE)
     assert "ok" in out.stdout.split(), out.stderr[-1500:]
+
+
+def test_the_real_claw_outline():
+    import numpy as np
+    import arm_shapes as A
+    left, right = np.array(A.jaw_hull("left")), np.array(A.jaw_hull("right"))
+    for v, y0 in ((left, A.BOX_Y), (right, -A.BOX_Y)):                              # back in the claw's frame: the hull is relative to its jaw body
+        y = v[:, 1] + y0
+        assert abs(np.abs(y).max() - A.PLATE_R) < 1e-3                              # 1.9 in across in all (24 mm a side)
+        assert abs(v[:, 2].min() - A.BOX_Z_BOTTOM) < 1e-9                           # the same bottom edge as the thin bars: the height off the floor does not change
+        assert abs(v[:, 2].max() - (A.BOX_Z_BOTTOM + A.JAW_H)) < 1e-9
+    assert np.all(left[:, 1] + A.BOX_Y >= -1e-9) and np.all(right[:, 1] - A.BOX_Y <= 1e-9)    # each half stays on its own side
+    assert os.environ.get("G2E_CLAW_REAL", "0") == "0"                              # off unless asked: the recorded ARM runs used the bars

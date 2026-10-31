@@ -118,6 +118,12 @@ def jaw_meshes(side):
     return (_mesh(f"jaw_{side}", lambda: _shift(_jaw_left(), side)), _mesh(f"plate_{side}", lambda: _shift(_plate_left(), side)))
 
 
+def jaw_hull(side):
+    """The claw half's collision points for the sim's real-size claw (opencat_gym_env G2E_CLAW_REAL): the drawn jaw and base, relative to the jaw body; pybullet wraps them in a convex hull."""
+    v = np.concatenate([_shift(_jaw_left(), side).reshape(-1, 3), _shift(_plate_left(), side).reshape(-1, 3)])
+    return np.unique(np.round(v, 6), axis=0).tolist()
+
+
 def _body(p, base, links, pos, orn):
     """A welded body with a base visual and fixed-link visuals: base = a visual shape index, links = [(visual shape index, (x, y, z))]."""
     n = len(links)

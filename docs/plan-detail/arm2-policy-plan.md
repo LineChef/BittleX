@@ -71,7 +71,37 @@ Log `trained/phase_arm2.log`; `python phase_arm2.py status`; halt file `trained/
 ## When the parts are on G2
 
 Weigh G2 (a retrain on the real number is offered if he is more than 15 g off 553 g); promote ARM2 for the arm only (`promote_release.py ... --attachment-only`;
-`DEFAULT_POLICY` does not change) and deploy with the Pi idle; add a hardware epoch for the new legs. The first walks follow the blueprint's install checklist.
+`DEFAULT_POLICY` does not change) and deploy with the Pi idle; add a hardware epoch for the new legs. The first walks follow the blueprint's install checklist. Also collect
+the open details in "The arm in the sim against the real arm" below.
+
+## The arm in the sim against the real arm (2026-11-01, from the user's photos)
+
+Eight photos of G2's arm in the rest pose (top, side, front, underside, close-ups; no CAD, no calipers; scaled against the pod and the 29 x 47 mm camera case, good to about 10%).
+
+What the photos settled and what changed:
+- **The claw's shape and size.** The real claw is a round orange base (printed, honeycomb infill) with two black pointed, hollow jaws and a small spring across them: 1.9 in wide,
+  0.6 in tall, about 2.7 in from the base's back edge to the jaw tip. The sim collided with two thin bars, 0.9 in wide and 0.4 in tall, reaching about 1.3 in less far.
+  The viewers draw the real claw (`arm_shapes.py`), and `G2E_CLAW_REAL=1` gives the sim the same outline to collide with (same weight, same height off the floor).
+- **The camera** matches what the sim had: a 29 x 47 mm case, upright, lens centred and facing forward. No change.
+- **The claw servo** lies forward with its output face into the claw base, as in the sim. No change.
+- **Not modelled, details needed (below):** the arm is sprung (a pair of black crank arms and a long tension spring) where the sim's is rigid; a coiled USB cable runs from the
+  pod's top to the camera; servo and power wires loop loose in front of the chest; the arm's real weight.
+
+### Open details to provide once G2 is assembled (legs recalibrated, wide shoulders and paws on)
+
+- [ ] **Side photo standing in the walking pose:** level with the claw and square-on, with a coin or ruler next to the claw at the same distance from the camera. Gives the claw's
+      real reach ahead of the pod and its height off the floor (the sim's 1.25 in was measured on stock legs; the paws and the new pose may change it). The reach is the one
+      size the rest-pose photos could not give.
+- [ ] **Front photo standing**, the same way: is the claw centred, and are the jaws closed while walking?
+- [ ] **Weights (kitchen scale, grams):** G2 in full (the sim assumes about 553 g), the coiled cable alone, and if the arm comes off easily, the arm with the camera. The sim
+      assumes 78 g of arm and camera, varied by plus or minus 20%.
+- [ ] **How springy the arm is:** push the claw gently up, down and sideways with a finger and say how far it moves (in) and whether it springs back. A slow-motion phone
+      video from the side of G2 walking shows whether the claw bounces. The sim's arm is rigid; a bouncing claw could be part of why the real roll is about 2x the sim's.
+- [ ] **The coiled cable while walking:** how high it rises above the pod, whether it pulls the claw sideways or touches a leg, and whether it could be shortened or clipped down.
+- [ ] **The loose wires:** tie the servo and power wires in front of the chest out of the legs' way (a hardware fix), and a photo afterwards.
+- [ ] **Does the claw touch the floor while walking?** Scuff marks, or watching a few walks. The sim keeps it 1.25 in up.
+
+Each answer goes into this section with its date; what changes in the sim follows from it (the claw position, the arm's weight, a sprung arm if it bounces).
 
 ## Results
 

@@ -538,6 +538,9 @@ ARM_PARTS = [
 ARM_LOWER_DZ = float(os.environ.get("G2E_ARM_LOWER_DZ", "0.009") or 0.0)
 ARM_PARTS = [(n, m, h, (x, y, z + (ARM_LOWER_DZ / 2 if n == "arm_link" else ARM_LOWER_DZ if n not in ("neck_bracket", "lift_servo") else 0.0)))
              for n, m, h, (x, y, z) in ARM_PARTS]
+# The claw's collision shape (2026-11-01): G2E_CLAW_REAL=1 swaps the two thin jaw bars for the claw's real outline from the user's photos (arm_shapes.py: 1.9 in wide, 0.6 in tall,
+# the round base and the pointed jaws, as the viewer draws them), each half a convex hull on the same body, mass and bottom edge. Off by default: every earlier run used the bars.
+CLAW_REAL = os.environ.get("G2E_CLAW_REAL", "0") == "1"
 ARM_MASS_RAND = 0.20 if ARM_PARTS else 0.0     # the whole arm's mass x (1 +- this) per episode (63 + 15 g +- 16 g)
 URDF_NAME = "bittle_esp32_cad.urdf" if PAYLOAD_PROFILE == "arm" else "bittle_esp32.urdf"     # arm: the body's collision shape at G2's real size (models/bittle_esp32_cad.urdf)
 POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
@@ -2773,13 +2776,13 @@ class OpenCatGymEnv(gym.Env):
             p.applyExternalTorque(self.robot_id, -1, [0.0, 0.0, t], p.LINK_FRAME)
 
     @staticmethod
-    def _payload_body(mass, half, pos, orn=None, collide_with=None):
+    def _payload_body(mass, half, pos, orn=None, collide_with=None, verts=None):
         """A welded payload body. "box": real inertia from a non-colliding box; "legacy":
         the pre-2026-09-23 shapeless body (zero inertia = locks the robot's rotation).
         collide_with = a robot id: the box touches the floor and obstacles but none of that robot's links (the arm's claw)."""
         if PAYLOAD_INERTIA == "legacy":
             return p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=-1, basePosition=pos)
-        cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))
+        cs = p.createCollisionShape(p.GEOM_MESH, vertices=verts) if verts is not None else p.createCollisionShape(p.GEOM_BOX, halfExtents=list(half))   # verts: a convex hull (the real claw)
         vs = p.createVisualShape(p.GEOM_BOX, halfExtents=list(half), rgbaColor=[1.0, 0.55, 0.1, 0.6]) if PAYLOAD_VISUAL else -1
         b = p.createMultiBody(baseMass=float(mass), baseCollisionShapeIndex=cs, baseVisualShapeIndex=vs, basePosition=pos,
                               **({"baseOrientation": orn} if orn is not None else {}))
@@ -3253,7 +3256,11 @@ class OpenCatGymEnv(gym.Env):
                 dx, dz = np.random.uniform(-HEAD_JITTER_XZ, HEAD_JITTER_XZ, 2) if HEAD_JITTER_XZ > 0 else (0.0, 0.0)
                 for _name, _m, _half, _pos in ARM_PARTS:
                     aoff = [_pos[0] + dx, _pos[1], _pos[2] + dz]
-                    _b = self._payload_body(_m * ms, _half, *_spawn(aoff), collide_with=self.robot_id)
+                    _hull = None
+                    if CLAW_REAL and _name in ("jaw_left", "jaw_right"):
+                        import arm_shapes
+                        _hull = arm_shapes.jaw_hull(_name.split("_")[1])
+                    _b = self._payload_body(_m * ms, _half, *_spawn(aoff), collide_with=self.robot_id, verts=_hull)
                     _ac = p.createConstraint(self.robot_id, -1, _b, -1, p.JOINT_FIXED, [0, 0, 0], aoff, [0, 0, 0])
                     p.changeConstraint(_ac, maxForce=PAYLOAD_WELD_FORCE)
                     for _o in self._arm_ids:   # the parts touch each other; only the floor and obstacles count

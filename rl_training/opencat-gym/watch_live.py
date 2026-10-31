@@ -73,7 +73,7 @@ def build(p, scene, rid=None, old_ids=None):
                 bid = p.createMultiBody(0, cs, basePosition=b["pos"], baseOrientation=b["orn"])
             elif sh["type"] == p.GEOM_PLANE:
                 bid = p.loadURDF("plane.urdf", b["pos"], b["orn"])
-            elif sh["type"] == p.GEOM_BOX and b.get("part") in ARM_DRAWN:
+            elif b.get("part") in ARM_DRAWN and sh["type"] in (p.GEOM_BOX, p.GEOM_MESH):      # a mesh: the run's real-size claw (G2E_CLAW_REAL), same body frame
                 import arm_shapes                                       # the arm's real shapes from the photos (looks only: the run's physics keeps the boxes)
                 bid = arm_shapes.make_body(p, b["part"], b["pos"], b["orn"], sh["dims"])
                 ids[b["id"]] = bid

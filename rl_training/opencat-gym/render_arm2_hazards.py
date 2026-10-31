@@ -14,6 +14,7 @@ HERE = os.getcwd()
 sys.path.insert(0, HERE)
 LADDER_JSON = "trained/arm2_report/arm2.json"
 STRIDE, W, H = 6, 320, 240
+FRONT_YAW = 130                                  # the camera ahead of G2 and to his left: the claw in view
 
 
 def pick_sizes():
@@ -204,13 +205,15 @@ def main():
         gif = os.path.join(out, r["hazard"] + ".gif")
         title = f"{short.get(r['label'], r['label'])}: {r['size_text']}"
         foot = f"crossed {r['wins']} of {r['tries']} tries"
-        procs.append((r, gif, subprocess.Popen([sys.executable, __file__, "render", r["live"], gif, title, foot, str(yaw.get(r["hazard"], -55))], cwd=HERE)))
-    for r, gif, pr in procs:
+        for view, y in (("front", FRONT_YAW), ("back", yaw.get(r["hazard"], -55))):        # the claw shows from the front, the legs and the course from behind (user, 2026-11-01: both)
+            g = gif if view == "back" else gif[:-4] + "_front.gif"
+            procs.append((r, g, view, subprocess.Popen([sys.executable, __file__, "render", r["live"], g, title, foot, str(y)], cwd=HERE)))
+    for r, g, view, pr in procs:
         pr.wait()
-        r["path"], r["bytes"] = gif, (os.path.getsize(gif) if os.path.exists(gif) else None)
+        r[f"path_{view}"], r[f"bytes_{view}"] = g, (os.path.getsize(g) if os.path.exists(g) else None)
     json.dump(res, open(os.path.join(out, "index.json"), "w"), indent=1)
     for r in res:
-        print(r["hazard"], r["size_text"], "ladder", r["ladder_success"], "| tries", r["wins"], "/", r["tries"], "| seed", r["seed"], "|", r.get("bytes"))
+        print(r["hazard"], r["size_text"], "ladder", r["ladder_success"], "| tries", r["wins"], "/", r["tries"], "| seed", r["seed"], "|", r.get("bytes_front"), r.get("bytes_back"))
 
 
 if __name__ == "__main__":

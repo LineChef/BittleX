@@ -120,6 +120,7 @@ guard, carpet detector, jam guard, fall guard, watchdog). On hardware: IMU forma
 and the first hard-floor walks done — [`rl/real-walk-log.md`](rl/real-walk-log.md). Detail:
 [`plan-detail/phase6-sim-to-real.md`](archive/plan-detail/phase6-sim-to-real.md).
 
+- [ ] **The arm in the sim against the real arm (opened 2026-11-01 from the user's photos):** the claw's real shape is now drawn and simulated (`G2E_CLAW_REAL`); still open, to collect once G2 is assembled: the claw's reach and height standing, weights, how springy the arm is, the coiled cable, the loose wires. List: [`plan-detail/arm2-policy-plan.md`](plan-detail/arm2-policy-plan.md) "The arm in the sim against the real arm".
 - [ ] Real sim-to-real gap work: re-score on the real path, the scripted-vs-learned comparison ([`rl/h1-rubric.md`](rl/h1-rubric.md)),
       sysid against real logs, and retrain if warranted. Blocked first on the FL shoulder servo.
 - [x] **Training upgrade and the overnight V4 runs (2026-10-08 to 10-09, done; V4 deployed for hardware testing 2026-10-09):** a training-process review fixed 11 bugs (curriculum probes without their hazard, ignored seeds,
