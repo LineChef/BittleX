@@ -880,7 +880,7 @@ RUG_SLIDE_PROB     = _g2e("RUG_SLIDE_PROB", RUG_SLIDE_PROB)
 RUG_SLIDE_FRICTION = _g2e("RUG_SLIDE_FRICTION", RUG_SLIDE_FRICTION)
 SNAG_OBSTACLE_PROB = _g2e("SNAG_OBSTACLE_PROB", SNAG_OBSTACLE_PROB)
 SNAG_OBSTACLE_N    = _g2e("SNAG_OBSTACLE_N", SNAG_OBSTACLE_N)
-SNAG_ROUND         = _g2e("SNAG_ROUND", False)      # 2026-10-31: a snag is a round cord (a cylinder of the snag's height lying across the lane) instead of the square-edged bar; off = the bar
+SNAG_ROUND         = _g2e("SNAG_ROUND", True)       # 2026-10-31 (user: for all training, snags were broken): a snag is a round cord (a cylinder of the snag's height across the lane); 0 = the old square-edged bar
 TORQUE_SLOPE_CORRELATE = _g2e("TORQUE_SLOPE_CORRELATE", TORQUE_SLOPE_CORRELATE)
 # CARPET* previously had no G2E_ override -- settable only in-process via
 # benchmark_decathlon._apply(), not by a training subprocess (2026-09-23 gap

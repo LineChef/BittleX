@@ -281,10 +281,8 @@ def payload_world() -> dict:
 
 def build_world() -> dict:
     """This process's build in build_limits.json: {"limits": {hazard: top}, "env": {...}}; {} for a build with no entry. The build is G2_BUILD when set (a leg build on
-    a payload, e.g. arm_wide_clpaw: the arm with the 0.2 in wide shoulders and CLpaw; its "env" turns the legs on), otherwise G2_PAYLOAD_PROFILE (stock legs)."""
-    v = (os.environ.get("G2_BUILD") or os.environ.get("G2_PAYLOAD_PROFILE", "")).strip()
-    if not v:
-        return {}
+    a payload, e.g. arm_wide_clpaw: the arm with the 0.2 in wide shoulders and CLpaw; its "env" turns the legs on), otherwise G2_PAYLOAD_PROFILE (stock legs), otherwise "_default" (the pod world's own tops)."""
+    v = (os.environ.get("G2_BUILD") or os.environ.get("G2_PAYLOAD_PROFILE", "")).strip() or "_default"
     try:
         return json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_limits.json"))).get(v, {})
     except (OSError, ValueError):

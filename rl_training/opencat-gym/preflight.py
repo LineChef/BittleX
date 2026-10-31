@@ -41,7 +41,8 @@ def job_env(levers, extra):
 
 def wiring(env):
     """Every G2E_ key the job sets must be read somewhere (a silently ignored setting is how G2E_ROUGH_TERRAIN_PROB went unnoticed)."""
-    src = "".join(open(os.path.join(HERE, f)).read() for f in ("opencat_gym_env.py", "train.py", "mirror.py", "episode_recorder.py", "firmware_model.py", "priv_policy.py"))
+    src = "".join(open(os.path.join(HERE, f)).read() for f in ("opencat_gym_env.py", "train.py", "mirror.py", "episode_recorder.py", "firmware_model.py", "priv_policy.py",
+                                                            "benchmark_v5.py"))      # the scorers read a build's tops (G2E_V5_BUILD_TOPS, g2_profile.apply_build)
     missing = []
     for k in env:
         if not k.startswith("G2E_"):
@@ -65,7 +66,8 @@ def main():
         levers, extra = r["base"], r.get("base_extra", {})
     print(f"[preflight] recipe: levers {levers} {extra or ''}", flush=True)
     ok = True
-    t = subprocess.run([PY, "-m", "pytest", "-q", "-p", "no:warnings"] + sorted(glob.glob(os.path.join(HERE, "test_*.py"))), cwd=HERE, capture_output=True, text=True)
+    t = subprocess.run([PY, "-m", "pytest", "-q", "-p", "no:warnings"] + sorted(glob.glob(os.path.join(HERE, "test_*.py"))), cwd=HERE, capture_output=True, text=True,
+                       env={k: v for k, v in os.environ.items() if k not in ("G2_PAYLOAD_PROFILE", "G2_BUILD")})      # the tests set their own worlds, whatever build the job is for
     ok &= step("RL test suite", t.returncode == 0, t.stdout.strip().splitlines()[-1] if t.stdout.strip() else t.stderr[-300:])
     env = job_env(levers, extra)
     miss = wiring(env)

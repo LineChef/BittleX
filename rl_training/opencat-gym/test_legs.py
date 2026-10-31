@@ -82,3 +82,25 @@ def test_the_paw_model_in_the_environment():
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300, cwd=HERE)
     assert out.stdout.strip().endswith("ok"), out.stderr[-2000:]
+
+
+def test_snag_tops_for_every_build(monkeypatch):
+    """Snags (user, 2026-10-31: fixed for all training): every build caps the cord height at its measured top; the ladder takes the same top."""
+    import g2_profile as G
+    for payload, build, top in (("", "", "1.5"), ("pod", "", "1.5"), ("arm", "", "0.5"), ("arm", "arm_wide_clpaw", "0.5")):
+        monkeypatch.setenv("G2_PAYLOAD_PROFILE", payload)
+        monkeypatch.setenv("G2_BUILD", build)
+        env = G.env_for_job({"kind": "final", "tag": "t", "fresh": True, "levers": []})
+        assert f"snag:{top}" in env["G2E_FR_BOUNDS"].split(",") and f"snag:{top}" in env["G2E_V5_BUILD_TOPS"].split(","), (payload, build, env.get("G2E_FR_BOUNDS"))
+
+
+def test_snags_are_round_cords_by_default(monkeypatch):
+    code = textwrap.dedent('''
+        import os, sys
+        sys.path.insert(0, ".")
+        os.environ.pop("G2E_SNAG_ROUND", None)
+        import opencat_gym_env as E
+        print(E.SNAG_ROUND)
+    ''')
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=HERE)
+    assert out.stdout.strip().splitlines()[-1] == "True", out.stderr[-1000:]

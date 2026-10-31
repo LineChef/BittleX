@@ -1,11 +1,13 @@
 {
-  "_doc": "Per build (G2_PAYLOAD_PROFILE): the measured physical top of each hazard (FR_BOUND units: deg for slopes, m for ledges) and the build's fixed physics. A hazard's top caps the training ramp (G2E_FR_BOUNDS), is where the frontier calls the hazard trained, and is the top of the scorers' size ladder (sizes past it go to a separate 'beyond this build' row). Change a top only from a measurement. A leg build on a payload has its own entry, chosen with G2_BUILD (G2_PAYLOAD_PROFILE still sets the payload); without G2_BUILD the payload's own (stock legs) entry is used.",
+  "_doc": "Per build (G2_PAYLOAD_PROFILE): the measured physical top of each hazard (FR_BOUND units: deg for slopes, m for ledges) and the build's fixed physics. A hazard's top caps the training ramp (G2E_FR_BOUNDS), is where the frontier calls the hazard trained, and is the top of the scorers' size ladder (sizes past it go to a separate 'beyond this build' row). Change a top only from a measurement. A leg build on a payload has its own entry, chosen with G2_BUILD (G2_PAYLOAD_PROFILE still sets the payload); without G2_BUILD the payload's own (stock legs) entry is used. _default is the build when neither is set.",
   "arm": {
     "limits": {
-      "ledge_up": 0.015
+      "ledge_up": 0.015,
+      "snag": 0.5
     },
     "limits_why": {
-      "ledge_up": "2026-10-25: claw 1.25 in off the floor standing (user), about 6-9 mm lower at the lowest point of a walk (sim); the back paws stop at 15 mm (stepup_contacts check on ARM1R)"
+      "ledge_up": "2026-10-25: claw 1.25 in off the floor standing (user), about 6-9 mm lower at the lowest point of a walk (sim); the back paws stop at 15 mm (stepup_contacts check on ARM1R)",
+      "snag": "2026-10-31 (user: snag fixes for all training): round cords, ARM1X on stock legs crosses 5.5 / 7 / 10 mm 67 / 33 / 0%, Petoi's arm walk 0% from 5.5 mm (the arm walk lifts its feet about 8 mm front, 4 mm back). Top = size 0.5 (7 mm)"
     },
     "env": {
       "G2E_BODY_MASS_SCALE": "1.0555"
@@ -17,10 +19,12 @@
   "arm_wide_clpaw": {
     "payload": "arm",
     "limits": {
-      "ledge_up": 0.015
+      "ledge_up": 0.015,
+      "snag": 0.5
     },
     "limits_why": {
-      "ledge_up": "2026-10-31: re-measured for the new feet (hs_probe.py, ARM1X, 20 episodes a size): front paws onto 10 / 12.5 / 15 mm in 75 / 45 / 5% of episodes against 85 / 30 / 5% on stock legs, none above 15 mm on either; the claw jams from about 20 mm whatever the feet. Nothing supports a higher top: 15 mm kept"
+      "ledge_up": "2026-10-31: re-measured for the new feet (hs_probe.py, ARM1X, 20 episodes a size): front paws onto 10 / 12.5 / 15 mm in 75 / 45 / 5% of episodes against 85 / 30 / 5% on stock legs, none above 15 mm on either; the claw jams from about 20 mm whatever the feet. Nothing supports a higher top: 15 mm kept",
+      "snag": "2026-10-31 (user: keep snags, fixed): cable height = 10 mm x (0.4 + 0.6 x size). Measured (snag sizes forced, 12 episodes each): ARM1X gets over a round cord of 5.5 mm 67% (new legs and stock), 7 mm 33% (stock) / 0% (new legs), 10 mm and up 0% with either legs or shape, Petoi's arm walk 0% from 5.5 mm. The arm walk lifts its feet about 8 mm front, 4 mm back. Top = size 0.5 (7 mm), the tallest cord a policy crossed"
     },
     "env": {
       "G2E_BODY_MASS_SCALE": "1.0853",
@@ -31,6 +35,22 @@
       "G2E_BODY_MASS_SCALE": "2026-10-31: the arm build's 532 g plus about 8 g of wider shoulder plastic (estimate, not weighed) on the body: 269 g of links x 1.0853 = 292 g (was x 1.0555 = 284 g); the four paws (3.3 g each from the STL at 100% PETG) are their own links, about 553 g in all",
       "G2E_SHOULDER_WIDEN_MM": "the printed wide_shoulder_ends part: each leg servo 0.2 in further out (blueprints/paws-and-wide-shoulders.md)",
       "G2E_PAW": "CLpaw on every foot, free pivot (legs_model.py)"
+    }
+  },
+  "_default": {
+    "limits": {
+      "snag": 1.5
+    },
+    "limits_why": {
+      "snag": "2026-10-31 (user: snag fixes for all training): cable height = 10 mm x (0.4 + 0.6 x size), round cord, 12 episodes a size. V7 (pod_s4) crosses 7 / 10 / 13 / 16 mm 100 / 83 / 42 / 0%, Petoi's wkF 100 / 42 / 0 / 0%. Top = size 1.5 (13 mm), the tallest cord a policy crossed; 16 mm (size 2, the old top) nothing crossed. Used when no G2_BUILD / G2_PAYLOAD_PROFILE is set (the pod world)"
+    }
+  },
+  "pod": {
+    "limits": {
+      "snag": 1.5
+    },
+    "limits_why": {
+      "snag": "2026-10-31 (user: snag fixes for all training): cable height = 10 mm x (0.4 + 0.6 x size), round cord, 12 episodes a size. V7 (pod_s4) crosses 7 / 10 / 13 / 16 mm 100 / 83 / 42 / 0%, Petoi's wkF 100 / 42 / 0 / 0%. Top = size 1.5 (13 mm), the tallest cord a policy crossed; 16 mm (size 2, the old top) nothing crossed"
     }
   }
 }
