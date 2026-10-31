@@ -20,8 +20,8 @@ if [ -z "$G2_ROOT" ] || [ ! -d "$G2_ROOT/pi_pipeline" ]; then
   unset _g2_self
 fi
 # Raw capture root. Default is the multi-class library's raw folder; the old
-# single-class face flow needs `export G2_CAP_ROOT=~/Desktop/g2_face_capture`.
-export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/g2_capture_raw}"
+# single-class face flow needs `export G2_CAP_ROOT=~/Desktop/G2Memory/g2_face_capture`.
+export G2_CAP_ROOT="${G2_CAP_ROOT:-$HOME/Desktop/G2Memory/g2_capture_raw}"
 _G2_PY="$G2_ROOT/pi_pipeline/.venv/bin/python"            # companion-pipeline venv
 
 # run a python module/script from the repo, pipeline venv, WITHOUT moving the caller
@@ -38,7 +38,7 @@ g2test() { ( cd "$G2_ROOT" && "$_G2_PY" -m pytest pi_pipeline/tests/ -q ); }    
 # Walkthrough: docs/guides/train-vision-model.md   Routine + poses: docs/vision/capture-checklist.md
 
 # g2cam <name> [session]  -- start the live capture preview at localhost:8080,
-#                            saving to ~/Desktop/g2_face_capture/<name>/session_<n>/
+#                            saving to ~/Desktop/G2Memory/g2_face_capture/<name>/session_<n>/
 g2cam() {
   local name="${1:?usage: g2cam <name> [session]   e.g. g2cam alex 1}" sess="${2:-1}"
   local out="$G2_CAP_ROOT/$name/session_$sess"
@@ -124,7 +124,7 @@ g2pcam-pull() {
   rsync -av -e "ssh -o BatchMode=yes -o ConnectTimeout=6" "$host:g2_cap/$name/session_$sess/" "$G2_CAP_ROOT/$name/session_$sess/" \
     || { _g2log "rsync from $host failed or timed out (is the Pi on, and does ~/g2_cap/$name/session_$sess exist?)"; return 1; }
 }
-# g2membackup  -- snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups); needs G2_PI
+# g2membackup  -- snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups); needs G2_PI
 g2clean() { ( cd "$G2_ROOT" && "$_G2_PY" tools/g2_cleanup.py "$@" ); }          # dry-run list of scratch files (Mac + Pi); `g2clean --apply` deletes them
 g2membackup() { bash "$G2_ROOT/tools/g2_memory_backup.sh"; }
 # g2wifi list|status|scan|add <ssid>|remove <ssid>  -- manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI
@@ -149,12 +149,12 @@ g2curate() {
 
 # ---- persistent training library (multi-class) --------------------------------
 # docs/vision/capture-progress.md.  Two folders:
-#   raw (disposable):  ~/Desktop/g2_capture_raw/<class>/session_<k>/[curated/]
-#   library (KEEP):     ~/Desktop/g2_vision_library/<class>/  + _MANIFEST.md
-# Capture/curate into the raw root:  export G2_CAP_ROOT=~/Desktop/g2_capture_raw
+#   raw (disposable):  ~/Desktop/G2Memory/g2_capture_raw/<class>/session_<k>/[curated/]
+#   library (KEEP):     ~/Desktop/G2Memory/g2_vision_library/<class>/  + _MANIFEST.md
+# Capture/curate into the raw root:  export G2_CAP_ROOT=~/Desktop/G2Memory/g2_capture_raw
 # then  g2cam <class> <k>  ...  g2curate <class> <k> <rot>   (pass --class-id via
 # `_g2py tools/curate_captures.py` directly for a non-zero id / a --target).
-export G2_LIB_ROOT="${G2_LIB_ROOT:-$HOME/Desktop/g2_vision_library}"
+export G2_LIB_ROOT="${G2_LIB_ROOT:-$HOME/Desktop/G2Memory/g2_vision_library}"
 
 # g2promote <class> [session]  -- copy a reviewed curated session into the library
 g2promote() {

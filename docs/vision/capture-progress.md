@@ -116,13 +116,13 @@ any flat folder of jpgs as `<calib_dir>`.
 ## Two folders on the Desktop
 
 ```
-~/Desktop/g2_capture_raw/            DISPOSABLE — raw frames + curate output
+~/Desktop/G2Memory/g2_capture_raw/            DISPOSABLE — raw frames + curate output
   person/session_1/ *.jpg *.json                 (raw capture)
   person/session_1/curated/ pos_*.jpg pos_*.txt neg_*.jpg _contact_sheet.png
   dog/session_1/ ...
   ...
 
-~/Desktop/g2_vision_library/         KEEP — only curated, labelled, upload-ready
+~/Desktop/G2Memory/g2_vision_library/         KEEP — only curated, labelled, upload-ready
   <you>/    <you>_0001.jpg <you>_0001.txt ...
   <spouse>/ ...
   dog/      dog_0001.jpg ...
@@ -169,13 +169,13 @@ library grows:**
 ```bash
 # report only -- per-class bucket counts vs. target, flags exactly which
 # bucket is short and by how many images (no files touched)
-python tools/optimize_library.py ~/Desktop/g2_vision_library --report
+python tools/optimize_library.py ~/Desktop/G2Memory/g2_vision_library --report
 
 # materialize a quality-ranked, deduped, composition-capped 150-image subset
 # per class, ready for combine_for_upload.py -- within each distance bucket
 # it keeps the sharpest/best-exposed survivors after dedup, not just any N
-python tools/optimize_library.py ~/Desktop/g2_vision_library --classes <you>,dog,cat \
-    --target 150 --out ~/Desktop/g2_vision_library/upload_optimized
+python tools/optimize_library.py ~/Desktop/G2Memory/g2_vision_library --classes <you>,dog,cat \
+    --target 150 --out ~/Desktop/G2Memory/g2_vision_library/upload_optimized
 ```
 
 Re-run it after every promote — it always re-selects from the full current
@@ -188,7 +188,7 @@ under-filled bucket like far/mid — you want new information, not more
 near-duplicates of the close-up shots that already dominate):
 
 ```bash
-python tools/check_library_overlap.py <session_dir>/curated --library ~/Desktop/g2_vision_library \
+python tools/check_library_overlap.py <session_dir>/curated --library ~/Desktop/G2Memory/g2_vision_library \
     --class <you>            # add --remove to drop flagged near-dupes before promoting
 ```
 
@@ -248,7 +248,7 @@ g2cam <you> 1              # capture: live preview at localhost:8080, pose set
 g2cam-stop
 g2auto <you>                # curate -> dedup-against-library -> promote ->
                              # rebuild the 150/class optimized upload set
-#   -> ~/Desktop/g2_vision_library/upload_optimized/upload/  -- import into SenseCraft
+#   -> ~/Desktop/G2Memory/g2_vision_library/upload_optimized/upload/  -- import into SenseCraft
 ```
 
 `g2auto` (no argument) processes every class with a pending raw session, not
@@ -276,8 +276,8 @@ import it into SenseCraft, and train there as before (walkthrough §6).
 ```bash
 source pi_pipeline/.venv/bin/activate
 CLASS=<you>; K=1                           # <-- the class name + session number
-RAW=~/Desktop/g2_capture_raw/$CLASS/session_$K
-LIB=~/Desktop/g2_vision_library
+RAW=~/Desktop/G2Memory/g2_capture_raw/$CLASS/session_$K
+LIB=~/Desktop/G2Memory/g2_vision_library
 
 # 1. capture
 export G2_CAP_OUT=$RAW G2_CAP_LABEL=$CLASS G2_CAM_RES=1
@@ -308,9 +308,9 @@ Repeat for every class / session. When ready to (re)train — **pass the class
 list in a fixed order, that's your class-id order and your `VISION_LABELS`**:
 
 ```bash
-python tools/combine_for_upload.py ~/Desktop/g2_vision_library \
+python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library \
     --classes <you>,<spouse>,dog,cat,ledge
-#   -> ~/Desktop/g2_vision_library/upload/   — import THIS into a SenseCraft
+#   -> ~/Desktop/G2Memory/g2_vision_library/upload/   — import THIS into a SenseCraft
 #      multi-class Object Detection project (walkthrough §6)
 ```
 
@@ -325,7 +325,7 @@ G2_FEATURES="+vision"
 
 ## Progress log
 
-Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promote.
+Read the counts off `~/Desktop/G2Memory/g2_vision_library/_MANIFEST.md` after each promote.
 
 | date | class | session | promoted pos | promoted neg | library total (class) | notes |
 |---|---|---|---|---|---|---|
@@ -341,7 +341,7 @@ Read the counts off `~/Desktop/g2_vision_library/_MANIFEST.md` after each promot
 **Calibration checkpoint (`<you>`).** Runs as a **single-class** model (only one
 person captured so far). Subsets pre-built (jpg only — `--images-only`, so
 SenseCraft auto-label isn't cluttered):
-`~/Desktop/g2_vision_library/upload_{40,80,120,160,all}` — N person images +
+`~/Desktop/G2Memory/g2_vision_library/upload_{40,80,120,160,all}` — N person images +
 ~N/4 background negatives (spread-sampled from `_negatives/`). Import each into
 its own SenseCraft project, **auto-label**, deselect the `negative_*` images,
 train, deploy, then measure — **in a room none of the training images came

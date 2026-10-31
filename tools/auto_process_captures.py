@@ -83,8 +83,8 @@ def discover_sessions(raw_root: str, classes: list[str] | None) -> dict[str, lis
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--raw-root", default="~/Desktop/g2_capture_raw")
-    ap.add_argument("--library", default="~/Desktop/g2_vision_library")
+    ap.add_argument("--raw-root", default="~/Desktop/G2Memory/g2_capture_raw")
+    ap.add_argument("--library", default="~/Desktop/G2Memory/g2_vision_library")
     ap.add_argument("--classes", help="comma-separated filter (default: every class found)")
     ap.add_argument("--positives", type=int, default=200, help="curate_captures.py --positives")
     ap.add_argument("--negatives", type=int, default=20, help="curate_captures.py --negatives")

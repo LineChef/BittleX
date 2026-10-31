@@ -1,6 +1,6 @@
 # The picture library: where G2's exploration pictures live
 
-What happens to a picture G2 takes while exploring, which folder holds what, and which parts can be rebuilt. The pictures are local only: `training_data/` is gitignored, nothing is uploaded, and the repository holds none of it. How exploration takes the pictures: [`../guides/exploration-mode.md`](../guides/exploration-mode.md); the plan behind recognition: [`../planned/exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md). This is separate from the camera-model training library (`G2_LIB_ROOT`, default `~/Desktop/g2_vision_library`): [`../guides/train-vision-model.md`](../guides/train-vision-model.md).
+What happens to a picture G2 takes while exploring, which folder holds what, and which parts can be rebuilt. The pictures are local only: `training_data/` is gitignored, nothing is uploaded, and the repository holds none of it. How exploration takes the pictures: [`../guides/exploration-mode.md`](../guides/exploration-mode.md); the plan behind recognition: [`../planned/exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md). This is separate from the camera-model training library (`G2_LIB_ROOT`, default `~/Desktop/G2Memory/g2_vision_library`): [`../guides/train-vision-model.md`](../guides/train-vision-model.md).
 
 ## The flow
 

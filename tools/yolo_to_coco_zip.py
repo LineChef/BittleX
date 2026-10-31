@@ -7,7 +7,7 @@ into the COCO-format dataset zip the SSCMA Swift-YOLO Colab notebooks expect:
       valid/ _annotations.coco.json  + images
 
     python tools/yolo_to_coco_zip.py <in_dir> <classes> [--val-frac 0.15] [--out custom_data.zip]
-    e.g.  tools/yolo_to_coco_zip.py ~/Desktop/g2_vision_library/upload_3way you,dog,cat
+    e.g.  tools/yolo_to_coco_zip.py ~/Desktop/G2Memory/g2_vision_library/upload_3way you,dog,cat
 """
 import argparse, glob, json, os, random, shutil, sys, zipfile
 from PIL import Image

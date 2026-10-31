@@ -16,11 +16,11 @@ is flagged so you know what to capture more of.
 
     # report only -- how each class's pool breaks down vs the target, and
     # exactly how many more of each distance bucket would close the gap
-    python tools/optimize_library.py ~/Desktop/g2_vision_library --report
+    python tools/optimize_library.py ~/Desktop/G2Memory/g2_vision_library --report
 
     # materialize an optimized, deduped, capped subset per class for upload
-    python tools/optimize_library.py ~/Desktop/g2_vision_library --classes sam,dog,cat \\
-        --target 150 --out ~/Desktop/g2_vision_library/upload_optimized
+    python tools/optimize_library.py ~/Desktop/G2Memory/g2_vision_library --classes sam,dog,cat \\
+        --target 150 --out ~/Desktop/G2Memory/g2_vision_library/upload_optimized
 
 Default target composition (tune with --mix far:mid:close:vclose):
   far (sz<0.30) 20%   mid (0.30-0.50) 30%   close (0.50-0.70) 30%   vclose (>=0.70) 20%

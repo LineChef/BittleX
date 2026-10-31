@@ -78,7 +78,7 @@ Full detail incl. the **standard pose set** (run it every session): `vision/capt
    the real lever).
 3. Launch the live preview:
    ```
-   export G2_CAP_OUT=~/Desktop/g2_face_capture/alex/session_1
+   export G2_CAP_OUT=~/Desktop/G2Memory/g2_face_capture/alex/session_1
    export G2_CAP_LABEL=alex G2_CAM_RES=1
    mkdir -p "$G2_CAP_OUT"; rm -f "$G2_CAP_OUT"/*.jpg "$G2_CAP_OUT"/*.json
    python tools/camera_preview.py &
@@ -113,8 +113,8 @@ one look, e.g. hair up; 2–3 the normal look).
 
 ```
 python tools/curate_captures.py \
-    ~/Desktop/g2_face_capture/alex/session_1 \
-    ~/Desktop/g2_face_capture/alex/session_1/curated \
+    ~/Desktop/G2Memory/g2_face_capture/alex/session_1 \
+    ~/Desktop/G2Memory/g2_face_capture/alex/session_1/curated \
     --positives 100 --negatives 15 --class-id 0 --label-region face --rotate 0
 ```
 
@@ -153,8 +153,8 @@ per-class numbering and updates `_MANIFEST.md`:
 
 ```
 python tools/promote_to_library.py \
-    ~/Desktop/g2_capture_raw/person/session_1/curated \
-    --library ~/Desktop/g2_vision_library --class person
+    ~/Desktop/G2Memory/g2_capture_raw/person/session_1/curated \
+    --library ~/Desktop/G2Memory/g2_vision_library --class person
 ```
 (Idempotent — a promoted session is skipped unless `--force`.)
 
@@ -164,9 +164,9 @@ It renames to avoid collisions and rewrites each label's class-id from the
 list, not baked into the files):
 
 ```
-python tools/combine_for_upload.py ~/Desktop/g2_vision_library \
+python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library \
     --classes person,dog,cat,ledge
-# -> ~/Desktop/g2_vision_library/upload/   (import THIS folder in step 6)
+# -> ~/Desktop/G2Memory/g2_vision_library/upload/   (import THIS folder in step 6)
 ```
 
 `--classes` order = class-id order = your `VISION_LABELS`. It also runs on a raw

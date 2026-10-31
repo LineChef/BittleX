@@ -19,14 +19,14 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 
 | Command | What it does |
 |---|---|
-| `g2cam <name> [session]` | start the live capture preview at localhost:8080, saving to ~/Desktop/g2_face_capture/<name>/session_<n>/ |
+| `g2cam <name> [session]` | start the live capture preview at localhost:8080, saving to ~/Desktop/G2Memory/g2_face_capture/<name>/session_<n>/ |
 | `g2cam-stop` | stop the capture preview # stop the capture preview |
 | `g2cam-info` | serial port + which model is on the module |
 | `g2pcam <name> [session]` | run the preview on the Pi, tunnel it to localhost:8080, open it; captures land on the Pi in ~/g2_cap/<name>/session_<n>/ |
 | `g2see` | just LOOK: live feed + detection boxes from the camera mounted on G2 (plugged into the Pi) at localhost:8080. No name, nothing saved, no capture folder. Closing the tab stops it. Same G2_PI requirement as g2pcam; stop early with g2pcam-stop. |
 | `g2pcam-pull <name> [session]` | copy a Pi capture to $G2_CAP_ROOT/<name>/session_<n>/ (then g2curate/g2auto as usual) |
 | `g2clean` | dry-run list of scratch files (Mac + Pi); `g2clean --apply` deletes them |
-| `g2membackup` | snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups); needs G2_PI |
+| `g2membackup` | snapshot the Pi's memory DB (conversations + facts) to $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups); needs G2_PI |
 | `g2wifi list/status/scan/add <ssid>/remove <ssid>` | manage the Wi-Fi networks the Pi auto-joins (add a phone hotspot as a backup); needs G2_PI |
 | `g2pcam-stop` | kill the tunnel + the preview process on the Pi |
 | `g2curate <name> [session] [rotate]` | filter a raw capture -> <session>/curated/ (score, de-dup, rotate upright, YOLO pre-labels). rotate default 0 (camera mounted upright); use 90/180/270 if the contact sheet comes out rotated. |

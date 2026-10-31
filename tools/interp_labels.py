@@ -10,7 +10,7 @@ ends). Review + nudge the outliers afterwards.
   # 1. curate the capture -> pos_*.jpg with NO .txt
   # 2. in Roboflow / SenseCraft, box ~1 in 10 frames, export YOLO .txt next to the jpgs
   # 3. fill the gaps:
-  python tools/interp_labels.py ~/Desktop/g2_capture_raw/ledge/session_1/curated --class-id 2
+  python tools/interp_labels.py ~/Desktop/G2Memory/g2_capture_raw/ledge/session_1/curated --class-id 2
   # 4. spot-check the frames it flags as far from a keyframe, then g2promote
 
 Each keyframe .txt is one line `<cls> cx cy w h` (normalised). Multi-box frames

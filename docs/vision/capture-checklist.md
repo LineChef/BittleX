@@ -29,7 +29,7 @@ person (`count_completed_sessions` from `behavior/enrollment.py`, or count
 
 ## 2 · Prep the folder
 
-`~/Desktop/g2_face_capture/<name>/session_<k>/` (or the Desktop root for a
+`~/Desktop/G2Memory/g2_face_capture/<name>/session_<k>/` (or the Desktop root for a
 quick one-off). Clear any stale `*.jpg`/`*.json` first.
 
 ## 3 · Capture (live preview)

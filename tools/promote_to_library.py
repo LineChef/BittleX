@@ -3,11 +3,11 @@
 
 Two folders, kept apart:
 
-  ~/Desktop/g2_capture_raw/          disposable -- raw frames + curate output
+  ~/Desktop/G2Memory/g2_capture_raw/          disposable -- raw frames + curate output
     <class>/session_<k>/             *.jpg *.json  (raw)
     <class>/session_<k>/curated/     pos_*.jpg pos_*.txt neg_*.jpg _contact_sheet.png
 
-  ~/Desktop/g2_vision_library/       KEEP -- only curated, labelled, upload-ready
+  ~/Desktop/G2Memory/g2_vision_library/       KEEP -- only curated, labelled, upload-ready
     person/  person_0001.jpg person_0001.txt ...
     dog/     dog_0001.jpg ...
     cat/     ...
@@ -20,8 +20,8 @@ into the library, continuing the per-class numbering, and updates the manifest.
 Idempotent: a session already promoted is skipped unless --force.
 
     python tools/promote_to_library.py \\
-        ~/Desktop/g2_capture_raw/person/session_1/curated \\
-        --library ~/Desktop/g2_vision_library --class person
+        ~/Desktop/G2Memory/g2_capture_raw/person/session_1/curated \\
+        --library ~/Desktop/G2Memory/g2_vision_library --class person
 
 Run `combine_for_upload.py` on the library when it's time to (re)train.
 """
@@ -66,7 +66,7 @@ def _write_manifest(lib: str, m: dict) -> None:
     # hint uses first-promoted order (= intended class-id order), not alphabetical
     order = ",".join(m["classes"].keys()) or "person,dog,cat,ledge"
     lines += ["", "Rebuild the upload set:", "```",
-              "python tools/combine_for_upload.py ~/Desktop/g2_vision_library \\",
+              "python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library \\",
               f"    --classes {order}",
               "```", ""]
     open(os.path.join(lib, "_MANIFEST.md"), "w").write("\n".join(lines))

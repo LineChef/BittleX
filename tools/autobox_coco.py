@@ -4,9 +4,9 @@ write YOLO `.txt` boxes next to each `.jpg`. Retroactively does what "capture
 with a COCO-80 model loaded" would have — real boxes around the subject instead
 of the whole-frame `--box-fallback` placeholder.
 
-    python tools/autobox_coco.py ~/Desktop/g2_vision_library/dog      --coco-class dog
-    python tools/autobox_coco.py ~/Desktop/g2_vision_library/cat      --coco-class cat
-    python tools/autobox_coco.py ~/Desktop/g2_vision_library/<person> --coco-class person --overwrite
+    python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/dog      --coco-class dog
+    python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/cat      --coco-class cat
+    python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<person> --coco-class person --overwrite
 
 Writes class id 0 (a placeholder — `combine_for_upload.py --classes ...` rewrites
 it from the class order). Images with no detection get no `.txt` and are listed

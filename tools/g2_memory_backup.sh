@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Back up G2's memory DB (conversation log + facts) from the Pi to this machine.
 #   G2_PI=<user>@g2pi.local bash tools/g2_memory_backup.sh          # or: g2membackup (g2_aliases.sh)
-# Lands in $G2_BACKUP_DIR (default ~/Desktop/OneFolder/G2/memory-backups), outside the repo -- it holds conversations.
+# Lands in $G2_BACKUP_DIR (default ~/Desktop/G2Memory/memory-backups), outside the repo -- it holds conversations.
 # Uses SQLite's serialize() on the Pi (a consistent snapshot of a live DB, nothing written on the Pi), then
 # integrity-checks the copy. Restore: see docs/plan-detail/phase9-memory.md.
 set -euo pipefail
 host="${G2_PI:?set G2_PI=<user>@g2pi.local}"
-dest="${G2_BACKUP_DIR:-$HOME/Desktop/OneFolder/G2/memory-backups}"
+dest="${G2_BACKUP_DIR:-$HOME/Desktop/G2Memory/memory-backups}"
 remote_db="${G2_REMOTE_MEMORY_DB:-.local/share/g2/g2_memory.db}"   # relative to the Pi user's home
 mkdir -p "$dest"
 out="$dest/g2_memory-$(date +%Y%m%d-%H%M%S).db"

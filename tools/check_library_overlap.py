@@ -4,8 +4,8 @@ into the vision library, using the same average-hash `curate_captures.py`'s
 own dedup uses -- so a new capture session can't waste its distance/pose quota
 on frames the model has effectively already seen.
 
-    python tools/check_library_overlap.py <curated_dir> --library ~/Desktop/g2_vision_library --class sam
-    python tools/check_library_overlap.py <curated_dir> --library ~/Desktop/g2_vision_library --class sam --remove
+    python tools/check_library_overlap.py <curated_dir> --library ~/Desktop/G2Memory/g2_vision_library --class sam
+    python tools/check_library_overlap.py <curated_dir> --library ~/Desktop/G2Memory/g2_vision_library --class sam --remove
 
 Checks every `pos_*.jpg` in <curated_dir> against every already-promoted
 `<class>_*.jpg` under <library>/<class>/ -- i.e. against every prior session

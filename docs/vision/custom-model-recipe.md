@@ -94,9 +94,9 @@ notebook or a scratch dir any more.
 | 1 | **Capture** each class (motion-gated). Ask the tag name first; follow `docs/vision/capture-checklist.md`. | `g2cam <class> <session>` |
 | 2 | **Curate** — dedup, contact sheet, writes YOLO `.txt` from the capture-time detector. | `curate_captures.py … --class-id N` (aliases `g2neg` for empty rooms) |
 | 3 | **Promote** the good frames into the library. | `g2promote <class> <session>` |
-| 4 | **Auto-box** any class whose captures had no boxes (pets), using a COCO YOLOv8. | `python tools/autobox_coco.py ~/Desktop/g2_vision_library/<class> --coco-class {person,dog,cat} --weights yolov8m.pt --imgsz 800 --overwrite` |
-| 5 | **Combine** the library → one flat folder, class-ids rewritten from `--classes` order. | `python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/g2_vision_library/upload_vN` |
-| 6 | **Split + resize + zip** → the dataset the notebook eats. | `python tools/gv2/split_yolo_dataset.py ~/Desktop/g2_vision_library/upload_vN --classes <you>,dog,cat --imgsz 224 --out ~/Desktop/g2_vision_library/custom_data_yolo_vN.zip` |
+| 4 | **Auto-box** any class whose captures had no boxes (pets), using a COCO YOLOv8. | `python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<class> --coco-class {person,dog,cat} --weights yolov8m.pt --imgsz 800 --overwrite` |
+| 5 | **Combine** the library → one flat folder, class-ids rewritten from `--classes` order. | `python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library --classes <you>,dog,cat --out ~/Desktop/G2Memory/g2_vision_library/upload_vN` |
+| 6 | **Split + resize + zip** → the dataset the notebook eats. | `python tools/gv2/split_yolo_dataset.py ~/Desktop/G2Memory/g2_vision_library/upload_vN --classes <you>,dog,cat --imgsz 224 --out ~/Desktop/G2Memory/g2_vision_library/custom_data_yolo_vN.zip` |
 | 7 | **Train** on Colab — `g2_yolov8_828_3class.ipynb`, T4 GPU, upload the zip from step 6, run top-to-bottom, download `best.pt`. | notebook: `yolo train detect model=yolov8n.pt data=/content/ds/data.yaml imgsz=192 epochs=100` |
 | 8 | **Build a calibration set** — 300+ varied jpgs. Reuse `upload_vN` or a wider pull; a flat folder of `.jpg` is all the script needs. | (a folder path) |
 | 9 | **Export + vela locally** — makes the arm64 venv, patches onnx2tf, exports INT8 tflite, vela → 100% NPU. | `tools/gv2/export_yolov8_gv2.sh best.pt <calib_dir> 3 <you>,dog,cat` |
@@ -159,9 +159,9 @@ folder and writes real YOLO `.txt` boxes:
 
 ```bash
 # venv with ultralytics + numpy<2
-python tools/autobox_coco.py ~/Desktop/g2_vision_library/dog  --coco-class dog    --weights yolov8m.pt --conf 0.10 --imgsz 800 --overwrite
-python tools/autobox_coco.py ~/Desktop/g2_vision_library/cat  --coco-class cat    --weights yolov8m.pt --conf 0.20 --imgsz 800 --max-boxes 2 --overwrite
-python tools/autobox_coco.py ~/Desktop/g2_vision_library/<you> --coco-class person --weights yolov8m.pt --conf 0.25 --imgsz 800 --max-boxes 1 --overwrite
+python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/dog  --coco-class dog    --weights yolov8m.pt --conf 0.10 --imgsz 800 --overwrite
+python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/cat  --coco-class cat    --weights yolov8m.pt --conf 0.20 --imgsz 800 --max-boxes 2 --overwrite
+python tools/autobox_coco.py ~/Desktop/G2Memory/g2_vision_library/<you> --coco-class person --weights yolov8m.pt --conf 0.25 --imgsz 800 --max-boxes 1 --overwrite
 ```
 
 2026-09-09 results: `<you>` 230/238, `cat` 218/250, `dog` **127/250** (the rest
@@ -171,10 +171,10 @@ recapture with the subject held still). Writes class id `0` as a placeholder;
 
 Then combine → split → zip (steps 5–6 above):
 ```bash
-python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes <you>,dog,cat \
-  --out ~/Desktop/g2_vision_library/upload_vN
-python tools/gv2/split_yolo_dataset.py ~/Desktop/g2_vision_library/upload_vN --classes <you>,dog,cat \
-  --imgsz 224 --out ~/Desktop/g2_vision_library/custom_data_yolo_vN.zip
+python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library --classes <you>,dog,cat \
+  --out ~/Desktop/G2Memory/g2_vision_library/upload_vN
+python tools/gv2/split_yolo_dataset.py ~/Desktop/G2Memory/g2_vision_library/upload_vN --classes <you>,dog,cat \
+  --imgsz 224 --out ~/Desktop/G2Memory/g2_vision_library/custom_data_yolo_vN.zip
 ```
 `split_yolo_dataset.py` resizes (224; train runs at 192, the margin keeps the
 zip small), does the seeded class-stratified train/val split, and carries
@@ -232,12 +232,12 @@ Take this route if pinned-8.2.8 YOLOv8 also floods.
 
 Colab uploads the whole training set to the runtime VM. As soon as a model is
 flashed and confirmed on the device, and the local keepers exist under
-`~/Desktop/g2_vision_library/` (`best.pt`, the dataset zip, `*_vela.tflite`):
+`~/Desktop/G2Memory/g2_vision_library/` (`best.pt`, the dataset zip, `*_vela.tflite`):
 
 1. Every Colab notebook used this round → **Runtime → Disconnect and delete
    runtime**. That wipes the uploaded photos from Google's VM.
 2. The `.ipynb` files in Drive are **code only, no photos** — keep them (also
-   mirrored at `~/Desktop/g2_vision_library/` and `~/Downloads/`).
+   mirrored at `~/Desktop/G2Memory/g2_vision_library/` and `~/Downloads/`).
 
 This is part of the process, not optional: the photos are personal data and
 there's no reason to leave them on a third-party VM once the model is built.

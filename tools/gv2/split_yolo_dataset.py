@@ -6,13 +6,13 @@ The missing middle step between `tools/combine_for_upload.py` and training. The
 real, deterministic tool.
 
     # 1. build the flat folder (jpg + txt pairs, negatives = jpg with no txt)
-    python tools/combine_for_upload.py ~/Desktop/g2_vision_library \
-        --classes you,dog,cat --out ~/Desktop/g2_vision_library/upload_v4
+    python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library \
+        --classes you,dog,cat --out ~/Desktop/G2Memory/g2_vision_library/upload_v4
 
     # 2. split + resize + zip
-    python tools/gv2/split_yolo_dataset.py ~/Desktop/g2_vision_library/upload_v4 \
+    python tools/gv2/split_yolo_dataset.py ~/Desktop/G2Memory/g2_vision_library/upload_v4 \
         --classes you,dog,cat --imgsz 224 --val-frac 0.15 \
-        --out ~/Desktop/g2_vision_library/custom_data_yolo_v4.zip
+        --out ~/Desktop/G2Memory/g2_vision_library/custom_data_yolo_v4.zip
 
 Output zip layout (what g2_yolov8_828_3class.ipynb cell "Upload dataset" expects):
 

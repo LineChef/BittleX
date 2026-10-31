@@ -17,8 +17,8 @@ Two input layouts, auto-detected per class:
     <root>/person/session_1/curated/ pos_*.jpg pos_*.txt neg_*.jpg
     <root>/person/session_2/curated/ ...
 
-    python tools/combine_for_upload.py ~/Desktop/g2_vision_library --classes person,dog,cat,ledge
-    # -> ~/Desktop/g2_vision_library/upload/   (import THIS in walkthrough section 6)
+    python tools/combine_for_upload.py ~/Desktop/G2Memory/g2_vision_library --classes person,dog,cat,ledge
+    # -> ~/Desktop/G2Memory/g2_vision_library/upload/   (import THIS in walkthrough section 6)
 """
 from __future__ import annotations
 

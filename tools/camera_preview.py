@@ -14,7 +14,7 @@ pre-labels.
 
 Environment variables (all optional):
     G2_CAM_PORT    serial device      (default: first /dev/cu.usbmodem* or /dev/ttyACM*)
-    G2_CAP_OUT     where to save       (default: ~/Desktop/g2_face_capture)
+    G2_CAP_OUT     where to save       (default: ~/Desktop/G2Memory/g2_face_capture)
     G2_CAP_LABEL   filename prefix     (default: self)  -> <label>_0001.jpg
     G2_CAM_RES     sensor option       0=240x240  1=480x480 (default)  2=640x480
     G2_CAM_AEBUMP  auto-exposure lift  hex/int, default 0x30; 0 disables
@@ -45,7 +45,7 @@ _ports = glob.glob("/dev/cu.usbmodem*") or sorted(glob.glob("/dev/ttyACM*"))
 PORT_SERIAL = os.environ.get("G2_CAM_PORT") or (_ports[0] if _ports else "/dev/cu.usbmodem58FA1045341")
 BAUD = 921600
 HTTP_PORT = 8080
-OUT = os.environ.get("G2_CAP_OUT") or os.path.expanduser("~/Desktop/g2_face_capture")
+OUT = os.environ.get("G2_CAP_OUT") or os.path.expanduser("~/Desktop/G2Memory/g2_face_capture")
 LABEL = os.environ.get("G2_CAP_LABEL", "self")
 CAM_RES = os.environ.get("G2_CAM_RES", "1")
 AE_BUMP = int(os.environ.get("G2_CAM_AEBUMP", "0x30"), 0)
