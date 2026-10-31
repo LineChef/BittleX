@@ -87,6 +87,22 @@ What the photos settled and what changed:
 - **Not modelled, details needed (below):** the arm is sprung (a pair of black crank arms and a long tension spring) where the sim's is rigid; a coiled USB cable runs from the
   pod's top to the camera; servo and power wires loop loose in front of the chest; the arm's real weight.
 
+### Real-size claw check (2026-11-01, sim only, nothing retrained)
+
+ARM2 (final weights) and Petoi's walk scored again on the new legs with the claw's real outline as the collision shape (`G2E_CLAW_REAL=1`: 1.9 in wide, 0.6 in tall, about 1.3 in further forward), same scorer, seeds and episode counts as the results above (`trained/arm2_report/arm2_realclaw.json`, `scripted_realclaw.json`). Ladder success, thin bars -> real-size claw:
+
+| | ARM2 | Petoi's walk |
+|---|---|---|
+| Overall | 76.4 -> 76.8% | 66.8 -> 67.0% |
+| Step-up | 27.5 -> 24.4% | 20.0 -> 18.8% |
+| Rubble | 38.8 -> 38.8% | 20.0 -> 21.2% |
+| Boxes | 43.1 -> 44.4% | 18.8 -> 20.0% |
+| Snag cord | 38.8 -> 45.0% | 1.9 -> 1.2% |
+| Switchback turn | 91.9 -> 91.9% | 85.0 -> 85.6% |
+| Slopes, step-down, rough floor | 100% unchanged | 93 to 100% unchanged |
+
+No falls either way; flat-ground speed, roll and heading unchanged. Every difference is inside the scorer's noise (about 5 points). The claw's real size does not change the sim results because the obstacles in the course are lower than the claw is held (about 1.25 in), so the claw rarely meets them; it stays off by default. What could still change this: the claw's real height and reach while walking (the open details below), and a claw held lower.
+
 ### Open details to provide once G2 is assembled (legs recalibrated, wide shoulders and paws on)
 
 - [ ] **Side photo standing in the walking pose:** level with the claw and square-on, with a coin or ruler next to the claw at the same distance from the camera. Gives the claw's
