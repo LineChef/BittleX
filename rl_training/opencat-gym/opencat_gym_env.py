@@ -543,6 +543,7 @@ URDF_NAME = "bittle_esp32_cad.urdf" if PAYLOAD_PROFILE == "arm" else "bittle_esp
 POD_LIKE = PAYLOAD_PROFILE in ("pod", "arm")      # the pod block, fixed and fused to the body (the arm profile carries the same pod)
 HEAD_JITTER_XZ = 0.010 if PAYLOAD_PROFILE == "arm" else 0.0
 HEAD_COLLIDES = PAYLOAD_PROFILE == "arm" and not ARM_PARTS
+HEAD_MASS_NOM *= float(os.environ.get("G2E_HEAD_MASS_SCALE", "1") or 1.0)      # scoring probe: 0 takes the head body away (the stock head stays in the base); default 1 changes nothing
 # World 2 payload layout (user, 2026-10-07): the main block (Pi, PiSugar, case, mic, wiring: 133 g) is exactly the spine's size front to back (the URDF torso is 0.105 m long) and centred on it
 # both ways (no x / y jitter); only the camera (15 g) and the speaker (20 g) hang past the spine, each attached to the block's front / rear face and centred on the block (y = 0, the block's mid
 # height, and as tall as the block (38 mm). The block's width (40 mm) and height (38 mm) stay at what was measured. Used by the case2 profile when G2E_PAYLOAD_LAYOUT=spine (g2_profile world 2); otherwise the old layout.
@@ -791,6 +792,20 @@ if _SKILL_REF:
     WKF_REF = np.load(_skp)
     STAND_POSE = WKF_REF.mean(axis=0)
 
+# G2E_REF_SPREAD_DEG / G2E_REF_KNEE_DEG (user, 2026-10-21; stance probe): re-shape the scripted base walk every residual policy corrects. Bittle's joints all swing in the pitch plane
+# (no sideways leg motion), so a wider stance = a longer front-to-rear foot spread: SPREAD moves the front paws forward and the rear paws back by this shoulder angle (about 1.2 mm of
+# paw travel per degree), KNEE bends every knee by this much more (+) or less (-); both are added to every frame of wkF / wkL / wkR and so to STAND_POSE. 0 / 0 (default) changes nothing.
+_REF_SPREAD = float(os.environ.get("G2E_REF_SPREAD_DEG", "0") or 0.0)
+_REF_KNEE = float(os.environ.get("G2E_REF_KNEE_DEG", "0") or 0.0)
+if (_REF_SPREAD or _REF_KNEE) and WKF_REF is not None:
+    _ref_delta = np.deg2rad(np.array([-_REF_SPREAD, _REF_KNEE, -_REF_SPREAD, _REF_KNEE, _REF_SPREAD, _REF_KNEE, _REF_SPREAD, _REF_KNEE]))   # [FLs FLk FRs FRk BRs BRk BLs BLk]
+    WKF_REF = WKF_REF + _ref_delta
+    if WKL_REF is not None:
+        WKL_REF = WKL_REF + _ref_delta
+    if WKR_REF is not None:
+        WKR_REF = WKR_REF + _ref_delta
+    STAND_POSE = WKF_REF.mean(axis=0)
+
 TERRAIN_FEATURE      = _g2e("TERRAIN_FEATURE", bool(TERRAIN_FEATURE))
 TERRAIN_BLIND_NEAR   = _g2e("TERRAIN_BLIND_NEAR", TERRAIN_BLIND_NEAR)
 RANDOM_TERRAIN       = _g2e("RANDOM_TERRAIN", RANDOM_TERRAIN)
@@ -865,6 +880,7 @@ RUG_SLIDE_PROB     = _g2e("RUG_SLIDE_PROB", RUG_SLIDE_PROB)
 RUG_SLIDE_FRICTION = _g2e("RUG_SLIDE_FRICTION", RUG_SLIDE_FRICTION)
 SNAG_OBSTACLE_PROB = _g2e("SNAG_OBSTACLE_PROB", SNAG_OBSTACLE_PROB)
 SNAG_OBSTACLE_N    = _g2e("SNAG_OBSTACLE_N", SNAG_OBSTACLE_N)
+SNAG_ROUND         = _g2e("SNAG_ROUND", False)      # 2026-10-31: a snag is a round cord (a cylinder of the snag's height lying across the lane) instead of the square-edged bar; off = the bar
 TORQUE_SLOPE_CORRELATE = _g2e("TORQUE_SLOPE_CORRELATE", TORQUE_SLOPE_CORRELATE)
 # CARPET* previously had no G2E_ override -- settable only in-process via
 # benchmark_decathlon._apply(), not by a training subprocess (2026-09-23 gap
@@ -1084,6 +1100,14 @@ LOAD_FIXED_KG = _g2e("LOAD_FIXED_KG", -1.0)
 LOAD_OBS = _g2e("LOAD_OBS", False)
 LOAD_OBS_NOISE = _g2e("LOAD_OBS_NOISE", 0.0)
 LOAD_SPEED_DROP = _g2e("LOAD_SPEED_DROP", 0.0)
+import legs_model as _LEGS                              # the leg build (user, 2026-10-31): G2E_SHOULDER_WIDEN_MM and G2E_PAW, both off by default (stock legs, nothing changes)
+PAW_PIN_FRICTION = _g2e("PAW_PIN_FRICTION", _LEGS.pin_friction_default())   # hinged-paw settings, all only used when the model has paw plates (G2E_PAW, or G2E_URDF_FILE): friction torque (N m) of the paw's pin
+PAW_PIN_DAMP = _g2e("PAW_PIN_DAMP", 0.0)               # ... its viscous damping (N m s / rad)
+PAW_SPRING_K = _g2e("PAW_SPRING_K", 0.0)               # ... a return spring (N m / rad) toward PAW_REST_DEG (deg, + toe up), 0 = none
+PAW_REST_DEG = _g2e("PAW_REST_DEG", 0.0)
+PAW_PLATE_FRICTION = _g2e("PAW_PLATE_FRICTION", 0.5)   # ... and the plate's floor friction (the stock foot keeps the URDF's 1.0)
+PAW_RIM_MUR = _g2e("PAW_RIM_MUR", _LEGS.rim_mur_default())                # ... rim-seat friction that rises with the load on the paw: torque = this x the paw's floor normal force (N m per N; friction coefficient x rim radius), added to PAW_PIN_FRICTION; 0 = none
+CMD_SPEED_SCALE = _g2e("CMD_SPEED_SCALE", 1.0)       # every forward command above 0.02 m/s times this, at any payload (default 1: nothing changes)
 LOAD_STAB_GAIN = _g2e("LOAD_STAB_GAIN", 0.0)
 LOAD_POWER_GAIN = _g2e("LOAD_POWER_GAIN", 0.0)
 #   LOAD_MARGIN_FAC   cost on how far the capture point (centre of mass + its velocity x sqrt(height / g), the whole body with the payload) sits from the middle of the
@@ -1748,15 +1772,16 @@ class OpenCatGymEnv(gym.Env):
         # Simulate delay for data transfer. Delay has to be modeled to close 
         # "reality gap").
         self._drift_push()
+        self._plate_stops()
         p.stepSimulation()
 
         # Check for friction of paws, to prevent slipping while training.
         paw_contact = []
-        paw_idx = [3, 6, 9, 12]
-        for idx in paw_idx:
-            paw_contact.append(True if p.getContactPoints(bodyA=self.robot_id, 
-                                                          linkIndexA=idx) 
-                                    else False)
+        paw_idx = [self._lk(3), self._lk(6), self._lk(9), self._lk(12)]
+        for k, idx in enumerate(paw_idx):
+            _pl = self._paw_plates[k] if getattr(self, "_paw_plates", None) else None     # with a hinged paw fitted, the paw carries the foot's load: a touch of either counts
+            paw_contact.append(bool(p.getContactPoints(bodyA=self.robot_id, linkIndexA=idx)
+                                    or (_pl is not None and p.getContactPoints(bodyA=self.robot_id, linkIndexA=_pl))))
 
         # One batched read of the four paws (2026-10-08 speed pass; was up to 13 getLinkState calls per step).
         _pls = p.getLinkStates(self.robot_id, paw_idx, computeLinkVelocity=1)
@@ -1782,7 +1807,7 @@ class OpenCatGymEnv(gym.Env):
             # High-step creep (2026-10-12 review): each paw's OWN target rises while that paw is within 6 cm before the edge and not yet on top -- the rear paws trail the body by
             # ~10 cm, so V6's body-position window above had switched off before they reached the edge. The paw ORIGIN sits ~7 mm above the floor, so clearing the top by 6 mm
             # needs the origin at ledge height + 13 mm (V6's +6 mm on the origin asked for no real clearance).
-            for k, link in enumerate((3, 6, 9, 12)):
+            for k, link in enumerate(paw_idx):
                 if self._ledge_edge - 0.06 <= _ppos[k][0] <= self._ledge_edge + 0.01 and link not in getattr(self, "_hs_on_top", ()):
                     _tgts[k] = max(_tgts[k], self._ledge_h + 0.013)
         for k in range(4):
@@ -1817,9 +1842,9 @@ class OpenCatGymEnv(gym.Env):
         self._last_contact = list(paw_contact)
 
         # Check if elbows or lower arm are in contact with ground
-        arm_idx = [1, 2, 4, 5]
+        arm_idx = [self._lk(1), self._lk(2), self._lk(4), self._lk(5)]
         for idx in arm_idx:
-            if self._pad_on and idx in (2, 5):   # carpet pad: a lower arm sinks into the pile with its paw (2026-10-20: -4.9 a step for V7 just standing on carpet); only the floor under the pad counts
+            if self._pad_on and idx in (self._lk(2), self._lk(5)):   # carpet pad: a lower arm sinks into the pile with its paw (2026-10-20: -4.9 a step for V7 just standing on carpet); only the floor under the pad counts
                 hit = p.getContactPoints(bodyA=self.robot_id, bodyB=self._pad_floor, linkIndexA=idx)
             else:
                 hit = p.getContactPoints(bodyA=self.robot_id, linkIndexA=idx)
@@ -1903,6 +1928,7 @@ class OpenCatGymEnv(gym.Env):
                                     forces=np.ones(8)*(0.5 if self._in_recovery else MOTOR_FORCE)*_force_scale,
                                     **({"positionGains": [SERVO_KP] * 8, "velocityGains": [SERVO_KD or SERVO_KP * 10] * 8} if SERVO_KP > 0 else {}))
         self._drift_push()
+        self._plate_stops()
         p.stepSimulation() # Delay of data transfer
         # gait-refinement G3: mechanical-power proxy -> penalise thrash / heat
         _js = p.getJointStates(self.robot_id, self.joint_id)
@@ -1923,6 +1949,7 @@ class OpenCatGymEnv(gym.Env):
         # Read robot state (pitch, roll and their derivatives of the torso).
         state_pos, state_ang = p.getBasePositionAndOrientation(self.robot_id)
         self._drift_push()
+        self._plate_stops()
         p.stepSimulation() # Emulated delay of data transfer via serial port
         state_ang_euler = np.asarray(p.getEulerFromQuaternion(state_ang)[0:2])
         state_vel_raw = np.asarray(p.getBaseVelocity(self.robot_id)[1])
@@ -2634,9 +2661,39 @@ class OpenCatGymEnv(gym.Env):
         """Every body welded to G2 this episode: the payload block, the head, the rear body and the arm's parts."""
         return [b for b in (getattr(self, "_payload_id", None), getattr(self, "_head_id", None), getattr(self, "_rear_id", None)) if b is not None] + list(getattr(self, "_arm_ids", ()))
 
+    def _plate_stops(self):
+        """Hard stops for a hinged paw plate: PyBullet's own joint limits let a loaded plate swing up to 12 deg past them, so a plate beyond its stop is put back on it (and its
+        outward speed zeroed) before each physics step. Nothing to do without plates."""
+        for _pj in getattr(self, "_plate_j", ()):
+            _q, _v = p.getJointState(self.robot_id, _pj)[:2]
+            _lo, _hi = self._plate_lim[_pj]
+            if PAW_PIN_FRICTION or PAW_PIN_DAMP or PAW_SPRING_K or PAW_RIM_MUR:
+                _fric = PAW_PIN_FRICTION
+                if PAW_RIM_MUR:
+                    _fric += PAW_RIM_MUR * sum(c[9] for c in p.getContactPoints(bodyA=self.robot_id, linkIndexA=_pj))
+                p.setJointMotorControl2(self.robot_id, _pj, p.TORQUE_CONTROL, force=-PAW_SPRING_K * (_q - np.deg2rad(PAW_REST_DEG)) - PAW_PIN_DAMP * _v
+                                        - _fric * float(np.tanh(_v / 0.05)))
+            if _q > _hi and _v > 0 or _q > _hi + 1e-3:
+                p.resetJointState(self.robot_id, _pj, _hi, min(_v, 0.0))
+            elif _q < _lo and _v < 0 or _q < _lo - 1e-3:
+                p.resetJointState(self.robot_id, _pj, _lo, max(_v, 0.0))
+
+    def _foot_of(self, link):
+        """The stock foot a link stands for: a hinged paw plate counts as the foot it is fitted to; any other link is itself."""
+        if getattr(self, "_paw_plates", None) and link in self._paw_plates:
+            return (self._lk(3), self._lk(6), self._lk(9), self._lk(12))[self._paw_plates.index(link)]
+        return link
+
+    def _lk(self, i):
+        """The link index of stock link i (0-12 in the stock URDF's order); the same number unless a paw model added links."""
+        return self._lk_map[i] if getattr(self, "_lk_map", None) else i
+
     def _load_speed(self, fwd):
         """Forward commands slow with the load (LOAD_SPEED_DROP); a stand or a creep-in-place command is left alone."""
-        if LOAD_SPEED_DROP <= 0 or fwd <= 0.02:
+        if fwd <= 0.02:
+            return fwd
+        fwd = fwd * CMD_SPEED_SCALE                                            # stance probe (user, 2026-10-21): a flat slow-down at every payload; 1 = off
+        if LOAD_SPEED_DROP <= 0:
             return fwd
         return fwd * (1.0 - LOAD_SPEED_DROP * self._load_frac())
 
@@ -2741,6 +2798,7 @@ class OpenCatGymEnv(gym.Env):
         self.step_counter = 0
         self.arm_contact = 0
         self._foot_prev_contact = [False, False, False, False]
+        self._snag_ids = []                                 # this episode's snag bodies (_scatter_snags), for probes
         self._foot_td_x = [0.0, 0.0, 0.0, 0.0]
         # Fall-recovery window state (see FAC_RECOVERY).
         self._in_recovery = False
@@ -3139,7 +3197,11 @@ class OpenCatGymEnv(gym.Env):
             self._slope_rp[1] + np.random.uniform(-_pose_tilt, _pose_tilt), 0])
 
         urdf_path = "models/"#"/content/drive/My Drive/opencat-gym-esp32/models/"
-        self.robot_id = p.loadURDF(urdf_path + URDF_NAME, 
+        if not hasattr(self, "_urdf_file"):                 # the leg build is chosen once per environment: G2E_URDF_FILE wins, stock legs load the stock URDF as before
+            self._urdf_file = os.environ.get("G2E_URDF_FILE") or urdf_path + URDF_NAME
+            if not os.environ.get("G2E_URDF_FILE") and _LEGS.active():
+                self._urdf_file = _LEGS.build(os.path.join(os.path.dirname(os.path.abspath(__file__)), urdf_path, URDF_NAME), STAND_POSE)
+        self.robot_id = p.loadURDF(self._urdf_file, 
                                    start_pos, start_orient, 
                                    flags=p.URDF_USE_SELF_COLLISION) 
 
@@ -3285,21 +3347,40 @@ class OpenCatGymEnv(gym.Env):
         
         # Initialize urdf links and joints.
         self.joint_id = []
+        self._plate_j = []
         #paramIds = []
         for j in range(p.getNumJoints(self.robot_id)):
             info = p.getJointInfo(self.robot_id, j)
             joint_name = info[1]
             joint_type = info[2]
+            if info[12].decode().endswith("_pawplate"):      # hinged paw plate (G2E_URDF_FILE with a paw model): passive, never one of the 8 commanded joints
+                self._plate_j.append(j)
+                continue
 
-            if (joint_type == p.JOINT_PRISMATIC 
+            if (joint_type == p.JOINT_PRISMATIC
                 or joint_type == p.JOINT_REVOLUTE):
                 self.joint_id.append(j)
                 #paramIds.append(p.addUserDebugParameter(joint_name.decode("utf-8")))
                 # Limiting motor dynamics. Although bittle's dynamics seem to
                 # be be quite high like up to 7 rad/s.
                 p.changeDynamics(self.robot_id, j, maxJointVelocity = np.pi*10)
+        # Link indices follow the URDF's depth-first order, so a paw model that adds links shifts them: look the stock links up by name (identity for the stock URDF).
+        _lnames = [p.getJointInfo(self.robot_id, j)[12].decode() for j in range(p.getNumJoints(self.robot_id))]
+        self._lk_map = [_lnames.index(n) for n in ("battery", "left_upper_arm", "left_lower_arm", "left_front_paw", "right_upper_arm", "right_lower_arm", "right_front_paw",
+                                                   "right_upper_leg", "right_lower_leg", "right_back_paw", "left_upper_leg", "left_lower_leg", "left_back_paw")]
+        self._plate_lim = {_pj: (p.getJointInfo(self.robot_id, _pj)[8], p.getJointInfo(self.robot_id, _pj)[9]) for _pj in self._plate_j}
+        # the paw plate on each foot, in paw order FL FR BR BL (legs_model names a plate after its foot: left_front_paw -> left_front_pawplate); None without plates
+        self._paw_plates = [(_lnames.index(n.replace("_paw", "_pawplate")) if n.replace("_paw", "_pawplate") in _lnames else None)
+                            for n in ("left_front_paw", "right_front_paw", "right_back_paw", "left_back_paw")] if self._plate_j else None
+        for _pj in self._plate_j:
+            p.setJointMotorControl2(self.robot_id, _pj, p.VELOCITY_CONTROL, targetVelocity=0.0, force=0.0)       # a free pin; the pin's friction, damping and return spring are applied in _plate_stops
+            p.changeDynamics(self.robot_id, _pj, lateralFriction=PAW_PLATE_FRICTION, maxJointVelocity=np.pi * 40)
+            _par = p.getJointInfo(self.robot_id, _pj)[16]
+            for _other in (_par, _par + 1, _par - 1):            # the plate wraps the lower leg and the stock foot: never collide with them
+                if _other != _pj and 0 <= _other < p.getNumJoints(self.robot_id):
+                    p.setCollisionFilterPair(self.robot_id, self.robot_id, _pj, _other, 0)
         if FOOT_FRICTION > 0:
-            for _paw in (3, 6, 9, 12):
+            for _paw in (self._lk(3), self._lk(6), self._lk(9), self._lk(12)):
                 p.changeDynamics(self.robot_id, _paw, lateralFriction=FOOT_FRICTION)
 
         # Per-episode link-mass randomization (URDF masses are estimates; the
@@ -3308,7 +3389,7 @@ class OpenCatGymEnv(gym.Env):
             for link in range(-1, p.getNumJoints(self.robot_id)):
                 m0 = p.getDynamicsInfo(self.robot_id, link)[0]
                 if m0 > 0:
-                    k = BODY_MASS_SCALE
+                    k = 1.0 if link in self._plate_j else BODY_MASS_SCALE      # a paw plate's mass is the printed part's own (BODY_MASS_SCALE fits the body to the scale)
                     if RANDOM_MASS > 0:
                         k *= 1.0 + np.random.uniform(-RANDOM_MASS, RANDOM_MASS) * self._dr
                     p.changeDynamics(self.robot_id, link, mass=m0 * k)
@@ -3489,9 +3570,9 @@ class OpenCatGymEnv(gym.Env):
             lc = p.multiplyTransforms(ip, io, c[6], [0, 0, 0, 1])[0]
             if lc[2] < top:
                 face = True
-            elif c[3] in (3, 6, 9, 12) and lc[0] > -0.70 + 0.003 and c[3] not in self._hs_on_top:
-                self._hs_on_top.add(c[3])
-                r_paw += FAC_PAW_UP * (1.0 if c[3] in (9, 12) else 0.3)
+            elif self._foot_of(c[3]) in (self._lk(3), self._lk(6), self._lk(9), self._lk(12)) and lc[0] > -0.70 + 0.003 and self._foot_of(c[3]) not in self._hs_on_top:
+                self._hs_on_top.add(self._foot_of(c[3]))
+                r_paw += FAC_PAW_UP * (1.0 if self._foot_of(c[3]) in (self._lk(9), self._lk(12)) else 0.3)
         r = r_paw - (FAC_FACE_HIT if face else 0.0)
         if FAC_ALL_UP > 0 and len(self._hs_on_top) == 4:
             self._hs_all_up_paid = True
@@ -3897,15 +3978,20 @@ class OpenCatGymEnv(gym.Env):
         nrm = np.array([np.sin(pitch) * np.cos(roll), -np.sin(roll),
                         np.cos(pitch) * np.cos(roll)])
         box_orn = p.getQuaternionFromEuler([roll, pitch, 0])
+        self._snag_ids = []
         for _ in range(n):
             x = np.random.uniform(RANDOM_TERRAIN_X_RANGE[0], RANDOM_TERRAIN_X_RANGE[1] * getattr(self, "_x_scale", 1.0))
             y = np.random.uniform(-0.02, 0.02)
             z_ground = -(nrm[0] * x + nrm[1] * y) / nrm[2]
             _snag_h = SNAG_HEIGHT_M * ((0.4 + 0.6 * self._d_terrain) if SCALE_ALL_HAZARDS else 1.0)
-            cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[
-                SNAG_HALF_LEN_M, np.random.uniform(0.14, 0.22), _snag_h / 2])
-            p.createMultiBody(0, cs, basePosition=[x, y, z_ground + _snag_h / 2],
-                              baseOrientation=box_orn)
+            _half_w = np.random.uniform(0.14, 0.22)
+            if SNAG_ROUND:                                  # a cord: diameter = the snag height, its axis across the lane (the cylinder's own axis is z: turned 90 deg about x)
+                cs = p.createCollisionShape(p.GEOM_CYLINDER, radius=_snag_h / 2, height=2 * _half_w)
+                orn = p.multiplyTransforms([0, 0, 0], box_orn, [0, 0, 0], p.getQuaternionFromEuler([np.pi / 2, 0, 0]))[1]
+            else:
+                cs = p.createCollisionShape(p.GEOM_BOX, halfExtents=[SNAG_HALF_LEN_M, _half_w, _snag_h / 2])
+                orn = box_orn
+            self._snag_ids.append(p.createMultiBody(0, cs, basePosition=[x, y, z_ground + _snag_h / 2], baseOrientation=orn))
 
 
     def _scatter_rubble(self, chunk, n):

@@ -55,7 +55,7 @@ def run_episode(env, model, render_frames=0, frames_dir=None):
         rec["x"].append(pos[0]); rec["y"].append(pos[1]); rec["z"].append(pos[2])
         rec["roll"].append(roll); rec["pitch"].append(pitch); rec["yaw"].append(yaw)
         rec["yaw_rate"].append(ang_vel[2])
-        for i, link in enumerate(PAW_LINKS):
+        for i, link in enumerate(env._lk(l) for l in PAW_LINKS):          # stock numbering; shifted when paw plates are fitted
             ls = p.getLinkState(rid, link)
             rec["foot_z"][i].append(ls[0][2])
             rec["foot_x"][i].append(ls[0][0])

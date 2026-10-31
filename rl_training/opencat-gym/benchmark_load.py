@@ -22,7 +22,7 @@ sys.path.insert(0, HERE)
 LOADS_KG = (0.0, 0.075, 0.150, 0.227)          # payload 227 / 302 / 377 / 454 g
 CELLS = ("T1.1", "N1", "T1.2", "T2.1", "T2.2", "T3.1", "T3.2", "T5.1", "T6.1", "T7.1", "T8.1", "T10.2", "N4")
 CALM = ("N1", "T1.2")
-SPEED_DROP = "0.4"
+SPEED_DROP = os.environ.get("BENCH_SPEED_DROP", "0.4")            # the command at 1 lb is (1 - this) of the calm command; BENCH_SPEED_DROP lets a probe slow it further (stance probe, user 2026-10-21)
 CMD_N1 = 0.10                                  # the calm walk's command (benchmark_v4 N cells walk at 0.10 m/s)
 
 

@@ -141,6 +141,7 @@ def run_ladder(policy, levers=(), episodes=40, seed=5000, jobs=8, hazards=None, 
     """The size ladder for one policy; returns {"cells": [...], "summary": ladder_summary(...)}."""
     env = {k: str(v) for k, v in g2_profile.scoring_env(*levers).items()}
     env["G2E_FR_SPLIT_SIDE"] = "1"                     # the forced side-hill names (no effect on anything else)
+    env["G2E_SCALE_ALL_HAZARDS"] = "1"                 # 2026-10-31: a size means what it means in training (snag height and rubble exposure grow with it); before, every snag rung was the same 10 mm cable
     for k in ("G2E_SKILL_REF", "G2E_PHASE_RATE_NOM_CMD", "G2E_V5_LEDGE_TOP", "G2E_V5_BUILD_TOPS"):   # a base gait other than wkF (the gait probes) and its cadence must reach the ladder workers too
         if os.environ.get(k):
             env[k] = os.environ[k]

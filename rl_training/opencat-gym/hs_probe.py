@@ -75,6 +75,7 @@ def _worker(job):
             model.reset()
         obs, _ = env.reset(seed=job["seed"] + e)
         rid = env.robot_id
+        PAWS = tuple(env._lk(i) for i in (3, 6, 9, 12))      # the stock link numbers shift when paw plates are fitted (legs_model.py)
         x0 = p.getBasePositionAndOrientation(rid)[0][0]
         peak, n = 0.0, 0
         if kind == "ledge":
@@ -93,17 +94,18 @@ def _worker(job):
             peak = max(peak, abs(r_), abs(p_))
             if kind == "ledge":
                 for c in p.getContactPoints(bodyA=rid, bodyB=lid):
-                    if c[3] in on_top and not on_top[c[3]]:
+                    if env._foot_of(c[3]) in on_top and not on_top[env._foot_of(c[3])]:
                         lc = p.multiplyTransforms(ip, io, c[6], [0, 0, 0, 1])[0]
                         if lc[2] >= h / 2 - 0.0015 and lc[0] > -0.70 + 0.003:
-                            on_top[c[3]] = n
+                            on_top[env._foot_of(c[3])] = n
             elif n > 80 and peak < 1.0:
                 zs.append(pos[2])
                 rolls.append(np.degrees(r_))
                 for i, l in enumerate(PAWS):
                     fz[i].append(p.getLinkState(rid, l)[0][2])
-                for i, l in enumerate((9, 12)):
-                    air[i].append(not p.getContactPoints(bodyA=rid, linkIndexA=l))
+                for i, l in enumerate(PAWS[2:]):
+                    pl = env._paw_plates[2 + i] if env._paw_plates else None
+                    air[i].append(not p.getContactPoints(bodyA=rid, linkIndexA=l) and not (pl is not None and p.getContactPoints(bodyA=rid, linkIndexA=pl)))
                 js = p.getJointStates(rid, [env.joint_id[5], env.joint_id[7]])
                 rk.append(np.degrees(0.5 * (js[0][0] + js[1][0])))
             if te or tr:
@@ -113,7 +115,7 @@ def _worker(job):
         if kind == "ledge":
             past = p.multiplyTransforms(ip, io, pos, [0, 0, 0, 1])[0][0] + 0.70
             all_up = all(on_top.values())
-            recs.append(dict(fell=fell, all_up=bool(all_up), front_up=bool(on_top[3] and on_top[6]), past_m=float(past),
+            recs.append(dict(fell=fell, all_up=bool(all_up), front_up=bool(on_top[PAWS[0]] and on_top[PAWS[1]]), past_m=float(past),
                              t_all_up=(max(on_top.values()) / 80.0 if all_up else None),
                              success=bool((not fell) and all_up and past >= CROSS_PAST_M)))
         else:

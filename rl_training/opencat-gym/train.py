@@ -238,6 +238,12 @@ class FrontierCurriculum(BaseCallback):
     PASS = float(os.environ.get("G2E_FR_PASS", "") or PASS)
     # V6: a pass bar per hazard, "ledge_up:0.5,ledge_down:0.5" (the step-up band sat at 0.59 against the 0.62 bar for the whole V5 run and the frontier never moved)
     PASS_H = {k.strip(): float(v) for k, _, v in (part.partition(":") for part in filter(None, os.environ.get("G2E_FR_PASS_H", "").split(","))) if v.strip()}
+    # ARM2 (2026-10-31): the outcomes a bin needs before it counts, per hazard: "slopes:15" (every slope hazard) or "climb:15,descent:15". ARM1X's slope frontiers
+    # waited on evidence (slope episodes are rarer than the others). Unset, every hazard needs MIN_N.
+    MIN_N_H = {k.strip(): int(v) for k, _, v in (part.partition(":") for part in filter(None, os.environ.get("G2E_FR_MIN_N_H", "").split(","))) if v.strip()}
+
+    def _min_n(self, h):
+        return self.MIN_N_H.get(h, self.MIN_N_H.get("slopes", self.MIN_N) if h in self.E.SLOPE_HAZARDS else self.MIN_N)
 
     def __init__(self, tag, ramp_offset=0.0, log_every=196608):
         super().__init__()
@@ -300,11 +306,11 @@ class FrontierCurriculum(BaseCallback):
             f = 0
             for b in range(self.K):
                 rel, n = self._rel(h, b, ref)
-                if n >= self.MIN_N and rel >= self.PASS_H.get(h, self.PASS):
+                if n >= self._min_n(h) and rel >= self.PASS_H.get(h, self.PASS):
                     f = b
-                elif n >= self.MIN_N and rel < 0.35:
+                elif n >= self._min_n(h) and rel < 0.35:
                     break                                    # a clearly failing bin stops the climb
-                elif n < self.MIN_N and b > self.F[h]:
+                elif n < self._min_n(h) and b > self.F[h]:
                     break                                    # not enough evidence yet past the current frontier
             old = self.F[h]
             new = min(f, old + 1, max(0, tcap))
@@ -326,7 +332,7 @@ class FrontierCurriculum(BaseCallback):
                 bar = self.PASS_H.get(h, self.PASS)
                 rel_top, n_top = self._rel(h, self.K - 1, ref)
                 if not self.trained[h]:
-                    self._top_streak[h] = self._top_streak[h] + 1 if (new == self.K - 1 and n_top >= self.MIN_N and rel_top >= bar) else 0
+                    self._top_streak[h] = self._top_streak[h] + 1 if (new == self.K - 1 and n_top >= self._min_n(h) and rel_top >= bar) else 0
                     if self._top_streak[h] >= self.TRAINED_UPDATES:
                         self.trained[h] = True
                         self._recent[h].clear()

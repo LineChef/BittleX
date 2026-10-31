@@ -1,9 +1,36 @@
 {
-  "_doc": "Per build (G2_PAYLOAD_PROFILE): the measured physical top of each hazard (FR_BOUND units: deg for slopes, m for ledges) and the build's fixed physics. A hazard's top caps the training ramp (G2E_FR_BOUNDS), is where the frontier calls the hazard trained, and is the top of the scorers' size ladder (sizes past it go to a separate 'beyond this build' row). Change a top only from a measurement.",
+  "_doc": "Per build (G2_PAYLOAD_PROFILE): the measured physical top of each hazard (FR_BOUND units: deg for slopes, m for ledges) and the build's fixed physics. A hazard's top caps the training ramp (G2E_FR_BOUNDS), is where the frontier calls the hazard trained, and is the top of the scorers' size ladder (sizes past it go to a separate 'beyond this build' row). Change a top only from a measurement. A leg build on a payload has its own entry, chosen with G2_BUILD (G2_PAYLOAD_PROFILE still sets the payload); without G2_BUILD the payload's own (stock legs) entry is used.",
   "arm": {
-    "limits": {"ledge_up": 0.015},
-    "limits_why": {"ledge_up": "2026-10-25: claw 1.25 in off the floor standing (user), about 6-9 mm lower at the lowest point of a walk (sim); the back paws stop at 15 mm (stepup_contacts check on ARM1R)"},
-    "env": {"G2E_BODY_MASS_SCALE": "1.0555"},
-    "env_why": {"G2E_BODY_MASS_SCALE": "2026-10-25: G2 with the arm weighs 532 g (user; feet 288 front / 259 back); the sim was 502 g, the 30 g goes on the body (the front share already matched)"}
+    "limits": {
+      "ledge_up": 0.015
+    },
+    "limits_why": {
+      "ledge_up": "2026-10-25: claw 1.25 in off the floor standing (user), about 6-9 mm lower at the lowest point of a walk (sim); the back paws stop at 15 mm (stepup_contacts check on ARM1R)"
+    },
+    "env": {
+      "G2E_BODY_MASS_SCALE": "1.0555"
+    },
+    "env_why": {
+      "G2E_BODY_MASS_SCALE": "2026-10-25: G2 with the arm weighs 532 g (user; feet 288 front / 259 back); the sim was 502 g, the 30 g goes on the body (the front share already matched)"
+    }
+  },
+  "arm_wide_clpaw": {
+    "payload": "arm",
+    "limits": {
+      "ledge_up": 0.015
+    },
+    "limits_why": {
+      "ledge_up": "2026-10-31: re-measured for the new feet (hs_probe.py, ARM1X, 20 episodes a size): front paws onto 10 / 12.5 / 15 mm in 75 / 45 / 5% of episodes against 85 / 30 / 5% on stock legs, none above 15 mm on either; the claw jams from about 20 mm whatever the feet. Nothing supports a higher top: 15 mm kept"
+    },
+    "env": {
+      "G2E_BODY_MASS_SCALE": "1.0853",
+      "G2E_SHOULDER_WIDEN_MM": "5.08",
+      "G2E_PAW": "clpaw"
+    },
+    "env_why": {
+      "G2E_BODY_MASS_SCALE": "2026-10-31: the arm build's 532 g plus about 8 g of wider shoulder plastic (estimate, not weighed) on the body: 269 g of links x 1.0853 = 292 g (was x 1.0555 = 284 g); the four paws (3.3 g each from the STL at 100% PETG) are their own links, about 553 g in all",
+      "G2E_SHOULDER_WIDEN_MM": "the printed wide_shoulder_ends part: each leg servo 0.2 in further out (blueprints/paws-and-wide-shoulders.md)",
+      "G2E_PAW": "CLpaw on every foot, free pivot (legs_model.py)"
+    }
   }
 }

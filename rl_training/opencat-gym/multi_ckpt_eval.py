@@ -66,7 +66,7 @@ def flat_contacts(env, m, episodes=4, steps=320):
             mis.append(np.abs(c - ref[b]).mean())
             due = [i for i in range(4) if ref[b][i] > 0.9]
             if due:
-                pos = [p.getLinkState(env.robot_id, (3, 6, 9, 12)[i])[0] for i in due]
+                pos = [p.getLinkState(env.robot_id, env._lk((3, 6, 9, 12)[i]))[0] for i in due]
                 hs = p.rayTestBatch(pos, [(x, y, z - 0.06) for x, y, z in pos])
                 hov += [max(0.0, h[2] * 60.0 - 6.5) for h in hs if h[0] >= 0 and h[0] != env.robot_id]
             n += 1
