@@ -539,7 +539,7 @@ ARM_LOWER_DZ = float(os.environ.get("G2E_ARM_LOWER_DZ", "0.009") or 0.0)
 ARM_PARTS = [(n, m, h, (x, y, z + (ARM_LOWER_DZ / 2 if n == "arm_link" else ARM_LOWER_DZ if n not in ("neck_bracket", "lift_servo") else 0.0)))
              for n, m, h, (x, y, z) in ARM_PARTS]
 # The claw's collision shape (2026-11-01): G2E_CLAW_REAL=1 swaps the two thin jaw bars for the claw's real outline from the user's photos (arm_shapes.py: 1.9 in wide, 0.6 in tall,
-# the round base and the pointed jaws, as the viewer draws them), each half a convex hull on the same body, mass and bottom edge. Off by default: every earlier run used the bars.
+# the round base and the pointed jaws, as the viewer draws them), each half a convex hull on the same body, mass and bottom edge. On in the arm builds (build_limits.json, 2026-11-01); the env's own default stays off so every other build is unchanged. ARM1 / ARM1X / ARM2 trained with the bars.
 CLAW_REAL = os.environ.get("G2E_CLAW_REAL", "0") == "1"
 ARM_MASS_RAND = 0.20 if ARM_PARTS else 0.0     # the whole arm's mass x (1 +- this) per episode (63 + 15 g +- 16 g)
 URDF_NAME = "bittle_esp32_cad.urdf" if PAYLOAD_PROFILE == "arm" else "bittle_esp32.urdf"     # arm: the body's collision shape at G2's real size (models/bittle_esp32_cad.urdf)

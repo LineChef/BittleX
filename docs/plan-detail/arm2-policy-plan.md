@@ -74,6 +74,19 @@ Weigh G2 (a retrain on the real number is offered if he is more than 15 g off 55
 `DEFAULT_POLICY` does not change) and deploy with the Pi idle; add a hardware epoch for the new legs. The first walks follow the blueprint's install checklist. Also collect
 the open details in "The arm in the sim against the real arm" below.
 
+## Sim-to-real settings found off (sweep of 2026-11-01)
+
+The real-size claw was off; it is now on. Others that exist in the simulator to narrow the gap and are off in the ARM2 recipe (nothing changed for them; each needs the owner's decision or a measurement first):
+
+| Setting | What it models | Why it is off / state |
+|---|---|---|
+| `G2E_MOTOR_SCALE_RAND` (in the `faults` lever, 0.12) | Battery sag: a full pack sags 0.3 to 0.45 V walking, motors lose strength | Not in the V5 to ARM2 recipe; the faults lever was left out of the 20M plans (`archive/rl/next-20m-plan.md`) and no measured negative result is recorded. Owner's call: the real sag is measured, so it fits the "on if it narrows the gap" rule |
+| `G2E_FAULT_STUCK_PROB`, `FAULT_WEAK_PROB`, `FAULT_OFFSET_PROB` (the `faults` lever) | Sticky, weak or offset servos (the real front-left shoulder sticks) | Same as above |
+| `G2E_DRIFT_TORQUE`, `DRIFT_STROKE`, `DRIFT_SHOULDER_DEG` | One-sided drift in training | Owner decision 2026-10-07: no drift training; the policy is heading-blind and the Pi steers |
+| `G2E_PAW_PIN_DAMP`, `PAW_SPRING_K`, `PAW_REST_DEG` | The paw pivot's friction, return spring and resting angle | Unknown real values (owner: paw grip not varied in training); see the open details below |
+| Roll disturbance | Real roll about 1.7 to 2 times the sim's (ARM2 sim 1.8 deg) | No setting yet. The largest known and measured gap. Candidate for the next training plan once real ARM2 walks exist to calibrate against |
+| Foot slip / friction | Real G2 travels about 16% further than the sim for the same command (2026-10-06 note) | Friction and servo-gain sweeps did not help in 2026-10; the Pi scales the commanded speed instead |
+
 ## The arm in the sim against the real arm (2026-11-01, from the user's photos)
 
 Eight photos of G2's arm in the rest pose (top, side, front, underside, close-ups; no CAD, no calipers; scaled against the pod and the 29 x 47 mm camera case, good to about 10%).
@@ -81,7 +94,7 @@ Eight photos of G2's arm in the rest pose (top, side, front, underside, close-up
 What the photos settled and what changed:
 - **The claw's shape and size.** The real claw is a round orange base (printed, honeycomb infill) with two black pointed, hollow jaws and a small spring across them: 1.9 in wide,
   0.6 in tall, about 2.7 in from the base's back edge to the jaw tip. The sim collided with two thin bars, 0.9 in wide and 0.4 in tall, reaching about 1.3 in less far.
-  The viewers draw the real claw (`arm_shapes.py`), and `G2E_CLAW_REAL=1` gives the sim the same outline to collide with (same weight, same height off the floor).
+  The viewers draw the real claw (`arm_shapes.py`), and the sim collides with the same outline (`G2E_CLAW_REAL`, on in both arm builds in `build_limits.json` since 2026-11-01; same weight, same height off the floor; the older ARM runs trained with the bars).
 - **The camera** matches what the sim had: a 29 x 47 mm case, upright, lens centred and facing forward. No change.
 - **The claw servo** lies forward with its output face into the claw base, as in the sim. No change.
 - **Not modelled, details needed (below):** the arm is sprung (a pair of black crank arms and a long tension spring) where the sim's is rigid; a coiled USB cable runs from the
@@ -101,7 +114,7 @@ ARM2 (final weights) and Petoi's walk scored again on the new legs with the claw
 | Switchback turn | 91.9 -> 91.9% | 85.0 -> 85.6% |
 | Slopes, step-down, rough floor | 100% unchanged | 93 to 100% unchanged |
 
-No falls either way; flat-ground speed, roll and heading unchanged. Every difference is inside the scorer's noise (about 5 points). The claw's real size does not change the sim results because the obstacles in the course are lower than the claw is held (about 1.25 in), so the claw rarely meets them; it stays off by default. What could still change this: the claw's real height and reach while walking (the open details below), and a claw held lower.
+No falls either way; flat-ground speed, roll and heading unchanged. Every difference is inside the scorer's noise (about 5 points). The claw's real size does not change the sim results because the obstacles in the course are lower than the claw is held (about 1.25 in), so the claw rarely meets them. It is on in the arm builds anyway: it is the more accurate claw, and the earlier numbers stand. What could still change this: the claw's real height and reach while walking (the open details below), and a claw held lower.
 
 ### Open details to provide once G2 is assembled (legs recalibrated, wide shoulders and paws on)
 
@@ -116,6 +129,9 @@ No falls either way; flat-ground speed, roll and heading unchanged. Every differ
 - [ ] **The coiled cable while walking:** how high it rises above the pod, whether it pulls the claw sideways or touches a leg, and whether it could be shortened or clipped down.
 - [ ] **The loose wires:** tie the servo and power wires in front of the chest out of the legs' way (a hardware fix), and a photo afterwards.
 - [ ] **Does the claw touch the floor while walking?** Scuff marks, or watching a few walks. The sim keeps it 1.25 in up.
+
+- [ ] **The paws' pivot (CLpaw):** how stiff it is by hand (flops freely, drags a little, or holds its angle), the angle it rests at when lifted, and whether it springs back toe-up or toe-down. The sim has a free pivot with no spring (`G2E_PAW_PIN_DAMP`, `G2E_PAW_SPRING_K`, `G2E_PAW_REST_DEG` all 0; checked only at 1.8 and 3.6 mN.m of grip). A video of one foot lifting would do.
+- [ ] **The lift-servo angle while walking** (the claw's carrying height): which direction raises the claw and how many inches one degree gives, from two or three photos at set angles (`python -m pi_pipeline.attachments walk-lift N`, below). The setting exists and defaults to the firmware's own angle.
 
 Each answer goes into this section with its date; what changes in the sim follows from it (the claw position, the arm's weight, a sprung arm if it bounces).
 

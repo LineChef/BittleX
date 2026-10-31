@@ -8,7 +8,7 @@
 import argparse
 import sys
 
-from . import ATTACHMENTS, current, gait_for, load_profiles, register, set_floor_trim, use
+from . import ATTACHMENTS, current, gait_for, load_profiles, register, set_floor_trim, set_walk_lift, use
 
 
 def _status() -> int:
@@ -55,6 +55,9 @@ def main(argv=None) -> int:
     ft.add_argument("floor")
     ft.add_argument("trim", help="e.g. fl=-0.1, or off")
     ft.add_argument("--attachment", default=None, help="default: the fitted attachment")
+    wl = sub.add_parser("walk-lift", help="the claw's carrying height while walking: the arm's lift-servo angle (joint 1) in degrees, or off for the firmware's own")
+    wl.add_argument("degrees", help="e.g. 10, or off")
+    wl.add_argument("--attachment", default=None, help="default: the fitted attachment")
     a = ap.parse_args(argv)
     if a.cmd in (None, "status"):
         return _status()
@@ -80,6 +83,18 @@ def main(argv=None) -> int:
                 return 2
         cur = set_floor_trim(att, a.floor, trim)
         print(f"{att} / {cur['policy']}: per-floor trims {cur['trim_by_floor'] or 'none'}; commit pi_pipeline/attachments/gait_profiles.json and deploy")
+        return 0
+    if a.cmd == "walk-lift":
+        att = a.attachment or current()
+        off = a.degrees.strip().lower() in ("off", "none", "")
+        try:
+            deg = None if off else int(a.degrees)
+            set_walk_lift(att, deg)
+        except ValueError as e:
+            print(f"not set: {e}")
+            return 2
+        what = "off (the firmware's own)" if deg is None else f"{deg} deg"
+        print(f"{att}: walking lift {what}; commit pi_pipeline/attachments/gait_profiles.json and deploy; the first walk with it waits for your go")
         return 0
     return 2
 

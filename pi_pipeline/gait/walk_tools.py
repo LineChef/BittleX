@@ -138,6 +138,8 @@ def openloop(lk, cycles, hz, lift_scale=1.0, log_path=None, fall_abort_deg=60.0,
         _standup.ramp_to_stand(lambda c: _send(lk, c), deploy_map.policy_deg_to_move_cmd, STAND_URDF_DEG, sleep, getattr(lk, "last_motion_command", None))
         _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))   # stand first: no jump from rest into mid-stride
         sleep(2.0)
+        if _standup.apply_walk_lift(lambda c: _send(lk, c)):      # the arm's claw carrying height, if one is set
+            sleep(0.5)
         if log:
             log.write(f"# openloop {ref_name}  cycles={cycles} hz={hz} lift_scale={lift_scale:g} balance_off={balance_off}\n")
             log.write("t,roll,pitch,yaw,gx,gy,gz,guard_state,volt\n")

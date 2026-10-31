@@ -224,6 +224,8 @@ def run(lk, cmd_fwd, seconds, hz, imu_fmt, disable_firmware_balance, log_path=No
     _standup.ramp_to_stand(lambda c: _send(lk, c), deploy_map.policy_deg_to_move_cmd, STAND_URDF_DEG, last_motion_command=getattr(lk, "last_motion_command", None))
     _send(lk, deploy_map.policy_deg_to_move_cmd(STAND_URDF_DEG))
     time.sleep(1.0)
+    if _standup.apply_walk_lift(lambda c: _send(lk, c)):      # the arm's claw carrying height, if one is set (profile "walk_lift_deg")
+        time.sleep(0.5)
 
     _send(lk, "gP")                # start continuous 6-axis stream (see probe_imu's note)
     time.sleep(0.2)

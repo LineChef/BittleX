@@ -168,4 +168,7 @@ def test_the_real_claw_outline():
         assert abs(v[:, 2].min() - A.BOX_Z_BOTTOM) < 1e-9                           # the same bottom edge as the thin bars: the height off the floor does not change
         assert abs(v[:, 2].max() - (A.BOX_Z_BOTTOM + A.JAW_H)) < 1e-9
     assert np.all(left[:, 1] + A.BOX_Y >= -1e-9) and np.all(right[:, 1] - A.BOX_Y <= 1e-9)    # each half stays on its own side
-    assert os.environ.get("G2E_CLAW_REAL", "0") == "0"                              # off unless asked: the recorded ARM runs used the bars
+    import json as _j
+    b = _j.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_limits.json")))
+    assert b["arm"]["env"]["G2E_CLAW_REAL"] == "1" and b["arm_wide_clpaw"]["env"]["G2E_CLAW_REAL"] == "1"      # on in both arm builds
+    assert "G2E_CLAW_REAL" not in b["pod"].get("env", {}) and "G2E_CLAW_REAL" not in b["_default"].get("env", {})     # and nowhere else

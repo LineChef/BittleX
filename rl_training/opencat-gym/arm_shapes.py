@@ -200,7 +200,7 @@ def make_body(p, part, pos, orn, dims):
         spring_pos = (JAW_X + 0.004 - BOX_X, sgn * (SPRING_LEN / 4) - sgn * BOX_Y, BOX_Z_BOTTOM + PLATE_T + 0.004)
         return _body(p, base, [(plate, (0, 0, 0)), (spring, spring_pos)], pos, orn)
     if part == "camera":
-        path = _mesh("camera", lambda: _camera(dims))
+        path = _mesh(f"camera_{round(dims[0] * 1e4)}_{round(dims[1] * 1e4)}_{round(dims[2] * 1e4)}", lambda: _camera(dims))      # the size is in the name: a changed camera box never reuses an old file
         base = p.createVisualShape(p.GEOM_MESH, fileName=path, rgbaColor=CAMERA_GREEN)
         lens = p.createVisualShape(p.GEOM_CYLINDER, radius=0.0027, length=0.0012, rgbaColor=[0.05, 0.05, 0.06, 1], visualFrameOrientation=[0, 0.7071068, 0, 0.7071068])
         cable = p.createVisualShape(p.GEOM_MESH, fileName=_mesh("cable", _cable), rgbaColor=BLACK)

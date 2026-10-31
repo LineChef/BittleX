@@ -102,6 +102,8 @@ def use(name: str, path: str | None = None) -> None:
 
 # ---------------------------------------------------------------------------------------------------------------------- gait profiles
 
+WALK_LIFT_RANGE = (-30, 60)      # degrees of the arm's lift servo (joint 1) the walking lift may be set to: 0 is the firmware's walking angle, 60 the rest angle (claw on the floor); the low end is a cautious guess until measured
+
 def load_profiles(path: str | None = None) -> dict:
     try:
         return json.load(open(path or PROFILES_PATH))
@@ -216,6 +218,23 @@ def set_floor_trim(attachment: str, floor: str, trim: str | None, path: str | No
     cur["trim_by_floor"] = tbf
     save_profiles(data, path)
     return cur
+
+
+def set_walk_lift(attachment: str, degrees: int | None, path: str | None = None) -> dict:
+    """Save (or with `degrees` None, remove) the lift-servo angle (joint 1) the arm holds while walking: the claw's carrying height (2026-11-01, user). None = the firmware's own (kbalance leaves it at about 0-2)."""
+    data = load_profiles(path)
+    poses = (data.get(attachment) or {}).get("poses")
+    if poses is None:
+        raise ValueError(f"{attachment} has no saved poses; the walking lift is set for the arm build")
+    if degrees is None:
+        poses.pop("walk_lift_deg", None)
+    else:
+        lo, hi = WALK_LIFT_RANGE
+        if not lo <= degrees <= hi:
+            raise ValueError(f"walking lift {degrees} is outside {lo} to {hi} degrees")
+        poses["walk_lift_deg"] = int(degrees)
+    save_profiles(data, path)
+    return poses
 
 
 def register(attachment: str, policy: str, *, trim: str | None = None, payload_profile: str | None = None, note: str = "",

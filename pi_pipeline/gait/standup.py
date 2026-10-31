@@ -189,6 +189,31 @@ def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool
     return True
 
 
+def walk_lift():
+    """The lift-servo angle (joint 1) the fitted attachment holds while walking (profile "poses": {"walk_lift_deg": N}), or None to leave it where the firmware put it (about 0-2 after kbalance)."""
+    p = _poses()
+    try:
+        return int(p["walk_lift_deg"]) if p and p.get("walk_lift_deg") is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def apply_walk_lift(send) -> bool:
+    """Set the claw's carrying height for a walk: one `i1 N` after the stand-up and before the first stride (kbalance puts the lift back at the firmware's angle, so every walk start sets it).
+    Nothing unless the profile sets one; a value outside the saved range is ignored (the profile is hand-edited). Never raises: a walk must not fail over the claw's height."""
+    n = walk_lift()
+    if n is None:
+        return False
+    try:
+        from pi_pipeline.attachments import WALK_LIFT_RANGE
+        if not WALK_LIFT_RANGE[0] <= n <= WALK_LIFT_RANGE[1]:
+            return False
+        send(f"i1 {n}")
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 BLEND_S = 0.6
 
 

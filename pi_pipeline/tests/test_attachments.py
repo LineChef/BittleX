@@ -541,3 +541,33 @@ def test_blending_on_the_arm_uses_the_arm_firmwares_poses_and_first_frames(monke
     shifted = T.target("k" + other)
     assert shifted == [stock[0] - 10, stock[1] - 10, stock[2], stock[3], stock[4] + 6, stock[5] + 6, stock[6], stock[7]]   # any other skill: the stock frame, front shoulders -10 and front knees +6
     assert T.target("kbalance") is None                                                                       # a stop stays a stop
+
+
+def test_the_arms_walking_lift_is_off_until_set_and_sent_once_per_walk(monkeypatch, tmp_path):
+    """User, 2026-11-01: the claw's carrying height while walking. Unset = nothing sent (the firmware's own, about 0-2); set = one `i1 N` after the stand-up."""
+    from pi_pipeline.gait import standup
+    prof = tmp_path / "profiles.json"
+    prof.write_text(json.dumps({"arm": {"current": None, "history": [], "poses": {"stand_via": "kbalance", "arm_walk": 0}}, "head": {"current": None, "history": []}}))
+    monkeypatch.setattr(A, "PROFILES_PATH", str(prof))
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    sent = []
+    assert standup.walk_lift() is None and standup.apply_walk_lift(sent.append) is False and sent == []        # off by default
+    A.set_walk_lift("arm", 12, path=str(prof))
+    assert standup.walk_lift() == 12 and standup.apply_walk_lift(sent.append) is True and sent == ["i1 12"]
+    A.set_walk_lift("arm", -5, path=str(prof))
+    sent.clear()
+    standup.apply_walk_lift(sent.append)
+    assert sent == ["i1 -5"]
+    with pytest.raises(ValueError):                                                                           # outside the saved range
+        A.set_walk_lift("arm", 90, path=str(prof))
+    with pytest.raises(ValueError):                                                                           # no poses (the head build): nothing to hold a lift in
+        A.set_walk_lift("head", 10, path=str(prof))
+    d = json.loads(prof.read_text())
+    d["arm"]["poses"]["walk_lift_deg"] = 200                                                                  # a hand-edited value outside the range is ignored, not sent
+    prof.write_text(json.dumps(d))
+    sent.clear()
+    assert standup.apply_walk_lift(sent.append) is False and sent == []
+    A.set_walk_lift("arm", None, path=str(prof))
+    assert "walk_lift_deg" not in json.loads(prof.read_text())["arm"]["poses"]
+    monkeypatch.setenv("G2_ATTACHMENT", "none")
+    assert standup.walk_lift() is None                                                                        # another build never sends it
