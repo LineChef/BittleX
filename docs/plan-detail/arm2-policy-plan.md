@@ -76,7 +76,7 @@ the open details in "The arm in the sim against the real arm" below.
 
 ## Sim-to-real settings found off (sweep of 2026-11-01)
 
-The real-size claw was off; it is now on. Others that exist in the simulator to narrow the gap and are off in the ARM2 recipe (nothing changed for them; each needs the owner's decision or a measurement first):
+The real-size claw was off; it is now on. Others that exist in the simulator to narrow the gap and are off in the ARM2 recipe. **Owner decision 2026-11-01: no changes to these.** They stay off; the table is the record of what they are:
 
 | Setting | What it models | Why it is off / state |
 |---|---|---|
