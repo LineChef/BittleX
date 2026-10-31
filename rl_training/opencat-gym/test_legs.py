@@ -104,3 +104,39 @@ def test_snags_are_round_cords_by_default(monkeypatch):
     ''')
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=HERE)
     assert out.stdout.strip().splitlines()[-1] == "True", out.stderr[-1000:]
+
+
+@pytest.mark.skipif(not _paws_available() or not os.path.exists(os.path.join(HERE, "models", "local", "bittle_dressed_arm.urdf")), reason="the paw STL or the dressed display model is not on this machine")
+def test_the_live_viewer_draws_the_runs_legs():
+    """g2watchrun (user, 2026-11-01): the run streams its leg build (scene "legs") and the paw angles ("pj"); the viewer builds its display model to match, with the paws, and finds
+    the joints by name. Stock legs stream nothing extra."""
+    code = textwrap.dedent('''
+        import os, sys, json
+        sys.path.insert(0, ".")
+        os.environ["G2_PAYLOAD_PROFILE"] = "arm"; os.environ["G2_BUILD"] = "arm_wide_clpaw"
+        import g2_profile
+        g2_profile.set_environ(g2_profile.scoring_env("privileged_critic"))
+        import numpy as np, pybullet as p
+        import opencat_gym_env as E
+        E.GUI_MODE = False
+        e = E.OpenCatGymEnv(); e.set_command(fwd=0.1, yaw=0.0)
+        e.set_live_slot("legs_test"); e._live_dir = os.path.join(os.environ["LIVE_TMP"])
+        os.makedirs(e._live_dir, exist_ok=True); open(os.path.join(e._live_dir, "request"), "w").close()
+        e.reset(seed=3)
+        for k in range(10): e.step(np.zeros(8, dtype=np.float32))
+        sc = json.load(open(os.path.join(e._live_dir, "scene.json")))
+        fr = [json.loads(l) for l in open(os.path.join(e._live_dir, sc["frames"]))]
+        assert sc["legs"]["paw"] == "clpaw" and sc["legs"]["widen_mm"] == 5.08 and len(sc["legs"]["plate_names"]) == 4
+        assert len(fr[-1]["pj"]) == 4
+        import watch_live as W
+        c = p.connect(p.DIRECT)
+        rid, ids = W.build(p, sc, None, None)
+        jids, pj = W.joint_ids(p, rid, sc)
+        assert len(jids) == 8 and len(pj) == 4
+        assert [p.getJointInfo(rid, j)[1].decode() for j in jids] == sc["legs"]["joint_names"]
+        print("ok")
+    ''')
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300, cwd=HERE, env={**os.environ, "LIVE_TMP": tmp})
+    assert "ok" in out.stdout.split(), out.stderr[-2000:]

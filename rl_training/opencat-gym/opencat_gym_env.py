@@ -3651,7 +3651,13 @@ class OpenCatGymEnv(gym.Env):
             scene = {"tag": self._live_tag, "ep": f"{os.getpid()}_{self._live_ep}", "frames": frames, "t": time.time(), "role": getattr(self, "_fr_role", None),
                      "hazards": {k: round(float(v), 4) for k, v in (self._fz or {}).items()}, "slope_deg": [round(float(np.degrees(x)), 2) for x in self._slope_rp],
                      "ledge_mm": round(self._ledge_h * 1000 * (self._ledge_dir or 1), 1), "steps": int(self._step_budget), "cmd_fwd": round(float(self._cmd_fwd), 3),
-                     "joint_ids": [int(j) for j in self.joint_id], "bodies": bodies}
+                     "joint_ids": [int(j) for j in self.joint_id], "bodies": bodies,
+                     # the leg build (legs_model.py), so the viewer draws the same legs the run simulates: its settings and the stand pose it was built from; the joints by name
+                     # (the viewer's model numbers its links differently); absent for stock legs
+                     "legs": ({"widen_mm": _LEGS.widen_mm(), "paw": _LEGS.paw_name(), "stand_pose": [float(x) for x in STAND_POSE],
+                              "joint_names": [p.getJointInfo(self.robot_id, j)[1].decode() for j in self.joint_id],
+                              "plate_names": [p.getJointInfo(self.robot_id, j)[1].decode() for j in self._plate_j]}
+                              if (_LEGS.active() and not os.environ.get("G2E_URDF_FILE")) else None)}
             os.makedirs(self._live_dir, exist_ok=True)
             for old in os.listdir(self._live_dir):              # the previous episode's frames
                 if old.startswith(f"frames_{os.getpid()}_") and old != frames:
@@ -3670,11 +3676,12 @@ class OpenCatGymEnv(gym.Env):
         try:
             pos, orn = p.getBasePositionAndOrientation(self.robot_id)
             js = [float(s[0]) for s in p.getJointStates(self.robot_id, self.joint_id)]
+            pj = [round(float(p.getJointState(self.robot_id, j)[0]), 4) for j in self._plate_j] if self._plate_j else None      # the hinged paws' angles
             mv = {}
             for bid in self._welded_ids():
                 bp, bo = p.getBasePositionAndOrientation(bid)
                 mv[int(bid)] = [round(v, 5) for v in list(bp) + list(bo)]
-            self._live_f.write(json.dumps({"k": int(self.step_counter), "b": [round(v, 5) for v in list(pos) + list(orn)], "j": [round(v, 4) for v in js], "m": mv,
+            self._live_f.write(json.dumps({"k": int(self.step_counter), "b": [round(v, 5) for v in list(pos) + list(orn)], "j": [round(v, 4) for v in js], **({"pj": pj} if pj else {}), "m": mv,
                                            "r": round(float(reward), 3), "end": ("fell" if terminated else "time") if (terminated or truncated) else None}) + "\n")
             self._live_f.flush()
         except Exception:  # noqa: BLE001

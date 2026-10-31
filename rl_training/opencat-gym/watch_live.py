@@ -92,9 +92,30 @@ def build(p, scene, rid=None, old_ids=None):
                 pass
             ids[b["id"]] = bid
             break
+    legs = scene.get("legs")                                        # the run's leg build (wide shoulders, hinged paws): drawn the way the run simulates it (legs_model.py)
+    key = json.dumps(legs and {k: legs[k] for k in ("widen_mm", "paw")}, sort_keys=True)
+    if rid is not None and getattr(build, "_legs_key", key) != key:       # another run with other legs: load its robot
+        p.removeBody(rid)
+        rid = None
+    build._legs_key = key
     if rid is None:
-        rid = p.loadURDF(dressed or os.path.join(HERE, "models", "bittle_esp32.urdf"), [0, 0, 0.1], useFixedBase=False)
+        base = dressed or os.path.join(HERE, "models", "bittle_esp32.urdf")
+        if legs:
+            import numpy as np
+            sys.path.insert(0, HERE)
+            import legs_model
+            base = legs_model.build(base, np.array(legs["stand_pose"]), widen=legs["widen_mm"], paw=legs["paw"])
+        rid = p.loadURDF(base, [0, 0, 0.1], useFixedBase=False)
     return rid, ids
+
+
+def joint_ids(p, rid, scene):
+    """(the 8 leg joints, the hinged paws' joints) in this viewer's model: by name for a leg build (this model numbers its links differently from the run's), else the run's own numbers."""
+    legs = scene.get("legs")
+    if not legs:
+        return scene["joint_ids"], []
+    by_name = {p.getJointInfo(rid, j)[1].decode(): j for j in range(p.getNumJoints(rid))}
+    return [by_name[n] for n in legs["joint_names"]], [by_name[n] for n in legs["plate_names"]]
 
 
 PAYLOAD_RGBA = [1.0, 0.55, 0.1, 0.85]
@@ -180,7 +201,7 @@ def main():
     p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)         # shadow maps flicker and cost frames on a laptop GPU
     touch()
     labels, shown_stale, banner, check_t, gone_t = [], None, None, time.time(), 0.0
-    last_touch, ep, f, rid, ids, jids = time.time(), None, None, None, {}, []
+    last_touch, ep, f, rid, ids, jids, pjids = time.time(), None, None, None, {}, [], []
     waited, scene, scene_t, scene_m = time.time(), None, 0.0, None
     q, t0, k0, last_k, end_t, cam, new_cam = collections.deque(), 0.0, 0, 0, 0.0, None, True
     marked = None                                                   # the episode whose payload bodies are coloured and labelled
@@ -232,7 +253,8 @@ def main():
                     continue
                 if f is not None:
                     f.close()
-                ep, jids, rid, ids, f = scene["ep"], scene["joint_ids"], nrid, nids, nf
+                ep, rid, ids, f = scene["ep"], nrid, nids, nf
+                jids, pjids = joint_ids(p, rid, scene)
                 q.clear()
                 t0, end_t, last_k = 0.0, 0.0, time.time()
                 for item in labels + ([banner] if banner is not None else []):
@@ -273,6 +295,8 @@ def main():
             b = fr["b"]
             p.resetBasePositionAndOrientation(rid, b[:3], b[3:7])
             for j, v in zip(jids, fr["j"]):
+                p.resetJointState(rid, j, v)
+            for j, v in zip(pjids, fr.get("pj") or ()):                  # the hinged paws
                 p.resetJointState(rid, j, v)
             for k, v in fr.get("m", {}).items():
                 if int(k) in ids:

@@ -189,8 +189,12 @@ def build(base_urdf, stand_pose=None, widen=None, paw=None):
     if stl:
         h.update(open(stl, "rb").read())
     outdir = os.path.join(OUT_ROOT, f"{os.path.basename(base_urdf).split('.')[0]}_w{widen:g}_{paw}_{h.hexdigest()[:10]}")
-    path = os.path.join(outdir, "bittle_legs.urdf")
-    if os.path.exists(path):
+    base_dir = os.path.dirname(os.path.abspath(base_urdf))
+    # A base with relative mesh files (the viewers' dressed models) keeps its URDF next to them, because pybullet finds relative meshes from the URDF's own folder; the training
+    # body has no meshes and its URDF lives with the rest of the build.
+    has_rel_meshes = re.search(r'filename="[^"/][^"]*"', base) is not None
+    path = os.path.join(base_dir, os.path.basename(outdir) + ".urdf") if has_rel_meshes else os.path.join(outdir, "bittle_legs.urdf")
+    if os.path.exists(path) and os.path.isdir(outdir):
         return path
     # The training's parallel environments all build at once: each writes a private work folder and renames it into place in one step; a loser throws its copy away.
     work = f"{outdir}.work{os.getpid()}"
@@ -199,11 +203,13 @@ def build(base_urdf, stand_pose=None, widen=None, paw=None):
     text = widen_urdf(base, widen)
     info = {"base": base_urdf, "widen_mm": widen, "paw": paw}
     if stl:
-        tmp = os.path.join(work, "wide.urdf")
+        tmp = os.path.join(base_dir if has_rel_meshes else work, f"wide.{os.getpid()}.urdf")
         with open(tmp, "w") as f:
             f.write(text)
-        geo = _frames(tmp, stand_pose)
-        os.remove(tmp)
+        try:
+            geo = _frames(tmp, stand_pose)
+        finally:
+            os.remove(tmp)
         _f, pin_z, prot, up, down, _pf, _rm = PAWS[paw]
         tri = load_stl(stl)
         vol, com = volume_com(tri)
@@ -212,8 +218,9 @@ def build(base_urdf, stand_pose=None, widen=None, paw=None):
         text = text.replace("</robot>", "".join(p[0] for p in parts) + "".join(p[1] for p in parts) + "</robot>")
         info.update(stl=stl, stl_sha256=hashlib.sha256(open(stl, "rb").read()).hexdigest(), paw_mass_g=round(mass_g, 2),
                     com_mm=[round(float(x), 2) for x in com], pin_z_mm=pin_z, foot_showing_mm=prot, stops_deg=[up, down])
-    with open(os.path.join(work, "bittle_legs.urdf"), "w") as f:
-        f.write(text)
+    if not has_rel_meshes:
+        with open(os.path.join(work, "bittle_legs.urdf"), "w") as f:
+            f.write(text)
     with open(os.path.join(work, "build.json"), "w") as f:
         json.dump(info, f, indent=1)
     os.makedirs(OUT_ROOT, exist_ok=True)
@@ -221,6 +228,11 @@ def build(base_urdf, stand_pose=None, widen=None, paw=None):
         os.rename(work, outdir)
     except OSError:                                                       # another environment finished first: its model is the same
         shutil.rmtree(work, ignore_errors=True)
+    if has_rel_meshes:                                                    # written after the paw files are in place, in one step
+        tmp = f"{path}.{os.getpid()}"
+        with open(tmp, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
     return path
 
 
