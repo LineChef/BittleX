@@ -87,7 +87,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_EASE_PICTURE_POSES` | `""` | `transitions.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_EMBEDDER` | `"histogram"` | `explore_session.py`, `promoted_loader.py` | [`exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md) |
 | `G2_EXCITED_HOP` | `"0"` | `gestures.py` | [`capabilities.md`](../capabilities.md) |
-| `G2_EXPERIENCES` | `DEFAULT_PATH` | `recap.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_EXPERIENCES` | `DEFAULT_PATH` | `recap.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_HANDOVER` | `"1"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_INPROCESS` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`exploration-mode.md`](exploration-mode.md) +2 |
 | `G2_EXPLORE_PICTURES_DIR` | `DEFAULT_ROOT` | `explore_session.py`, `exploration_pictures.py`, `promoted_loader.py` +1 | [`settings-switches.md`](settings-switches.md) |
@@ -129,7 +129,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_LOG_HEARD` | — | `loop.py` | [`capabilities.md`](../capabilities.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md), [`project-plan.md`](../project-plan.md) |
 | `G2_MAX_GAIT_S` | `0.0` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_MEMORY` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |
-| `G2_MEMORY_CALL_LOG` | `DEFAULT_PATH` | `call_log.py` | [`settings-switches.md`](settings-switches.md) |
+| `G2_MEMORY_CALL_LOG` | `DEFAULT_PATH` | `call_log.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_MEMORY_CORE_MAX` | `12` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_MEMORY_DB` | `"~/.local/share/g2/g2_memory.db"` | `config.py` | [`.env.example`](../../.env.example), [`phase9-memory.md`](../plan-detail/phase9-memory.md), [`project-plan.md`](../project-plan.md) |
 | `G2_MEMORY_LOG_COMMANDS` | `"0"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
