@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 3 of the object recognition plan: how well does an embedder tell G2's pictures apart? Run on the Mac over the pulled pictures (`g2pics pull`; default ~/g2_pictures/explore).
+"""Phase 3 of the object recognition plan: how well does an embedder tell G2's pictures apart? Run on the Mac over the pulled pictures (`g2pics pull`; default ~/Desktop/G2Memory/g2_pictures/explore).
 
     python tools/eval_embedder.py [--root DIR] [--embedder histogram] [--embedder onnx:/path/model.onnx] [--threshold 0.80]
 
@@ -120,7 +120,7 @@ def sweep(spec: str, named, survey, thresholds) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=os.path.expanduser("~/g2_pictures/explore"))
+    ap.add_argument("--root", default=os.path.expanduser("~/Desktop/G2Memory/g2_pictures/explore"))
     ap.add_argument("--embedder", action="append", default=None)
     ap.add_argument("--threshold", type=float, default=0.80)
     ap.add_argument("--sweep", action="store_true", help="instead of one threshold, sweep 0.30-0.95 and show the hit rate and the false-recognition rate at each, and the best cut")

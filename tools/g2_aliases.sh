@@ -269,7 +269,7 @@ g2pimem() {
   esac
 }
 # g2pics  -- the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo).
-# g2pics status = text summary from the Pi; g2pics pull = copy them to ~/g2_pictures/explore; g2pics stop = end the page.
+# g2pics status = text summary from the Pi; g2pics pull = copy them to ~/Desktop/G2Memory/g2_pictures/explore; g2pics stop = end the page.
 g2pics() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-ui}" in
@@ -278,8 +278,8 @@ g2pics() {
     status) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.exploration_pictures" ;;
     pull)
       ssh "$G2_PI" 'test -d ~/.local/share/g2/explore_pictures' || { echo "no exploration pictures on the Pi yet"; return 0; }
-      mkdir -p "$HOME/g2_pictures/explore" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$HOME/g2_pictures/explore/" \
-        && echo "pictures copied to $HOME/g2_pictures/explore ($(find "$HOME/g2_pictures/explore" -name '*.jpg' | wc -l | tr -d ' ') jpg)" ;;
+      mkdir -p "$HOME/Desktop/G2Memory/g2_pictures/explore" && rsync -a "$G2_PI:.local/share/g2/explore_pictures/" "$HOME/Desktop/G2Memory/g2_pictures/explore/" \
+        && echo "pictures copied to $HOME/Desktop/G2Memory/g2_pictures/explore ($(find "$HOME/Desktop/G2Memory/g2_pictures/explore" -name '*.jpg' | wc -l | tr -d ' ') jpg)" ;;
     *) echo "usage: g2pics [open|status|pull|stop]"; return 2 ;;
   esac
 }
@@ -301,7 +301,7 @@ g2wallpic() {
 }
 # g2imu [rest|stand] [SECONDS]  -- record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
 g2imu() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.gait.imu_capture --pose ${1:-rest} --seconds ${2:-60}"; }
-# g2picscurate [IN_DIR] [OUT_DIR]  -- curate the pulled exploration pictures (default ~/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and
+# g2picscurate [IN_DIR] [OUT_DIR]  -- curate the pulled exploration pictures (default ~/Desktop/G2Memory/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and
 # sharpness, sets aside pictures with people, removes near-duplicates, writes keep/ rejects/ contact sheets, manifest.json and summary.txt. Run `g2pics pull` first.
 g2picscurate() { "$_G2_PY" "$G2_ROOT/tools/curate_exploration.py" "$@"; }
 

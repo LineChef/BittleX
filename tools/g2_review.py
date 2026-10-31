@@ -10,7 +10,7 @@ The page runs as a background server (so your terminal is free): the first call 
 Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Looks (throwaway left / right look pictures), Walls, Trash. The X moves a record to the Trash
 (you get an Undo for a few seconds, and the Trash tab restores anything later); only "Empty trash" deletes for good, and it asks twice. A safe copy of the
 memory database is made before the first delete of each session. Everything runs on the Pi through ssh (needs G2_PI, e.g. user@g2pi.local); the pictures
-are copied to ~/g2_pictures/explore on this Mac so the page can show them. The page listens on 127.0.0.1 only and every action needs a token that only the
+are copied to ~/Desktop/G2Memory/g2_pictures/explore on this Mac so the page can show them. The page listens on 127.0.0.1 only and every action needs a token that only the
 page you opened knows. Standard library only.
 """
 from __future__ import annotations
@@ -33,8 +33,8 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-CACHE = Path(os.path.expanduser("~/g2_pictures/explore"))
-WALL_CACHE = Path(os.path.expanduser("~/g2_pictures/wall"))       # the wall recognition pictures (~/g2_wall_pics on the Pi) and the ring of near-wall pictures: kept apart from the object pictures so that
+CACHE = Path(os.path.expanduser("~/Desktop/G2Memory/g2_pictures/explore"))
+WALL_CACHE = Path(os.path.expanduser("~/Desktop/G2Memory/g2_pictures/wall"))       # the wall recognition pictures (~/g2_wall_pics on the Pi) and the ring of near-wall pictures: kept apart from the object pictures so that
                                                                   # near-duplicates are never auto-pruned and nothing here is offered for naming or the object library
 KINDS = ("facts", "exchanges", "observations")
 

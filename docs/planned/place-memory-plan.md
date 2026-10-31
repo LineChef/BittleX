@@ -24,7 +24,7 @@ Agreed with the user 2026-10-10: **rooms** (not finer spots), tag the existing p
 
 ## Phase P0: how to run it
 
-1. `g2pics pull`, then `g2pics`: on the Pictures tab, the **Room** button on a picture (or **Set the room of all N** in a group header) sets its room; **Show only the N without a room** finds what is left. Rooms are kept on the Mac in `~/g2_pictures/explore/rooms.json`, by picture file name (so naming a picture does not lose it).
+1. `g2pics pull`, then `g2pics`: on the Pictures tab, the **Room** button on a picture (or **Set the room of all N** in a group header) sets its room; **Show only the N without a room** finds what is left. Rooms are kept on the Mac in `~/Desktop/G2Memory/g2_pictures/explore/rooms.json`, by picture file name (so naming a picture does not lose it).
 2. `python tools/eval_rooms.py` (add `--embedder onnx:/path/model.onnx` to compare a learned model). It needs 2+ rooms; the honest "returning visit" test also needs a room seen on 2+ days.
 3. **More pictures:** one roam in each of 2 to 3 rooms (kitchen, hallway, living room), on different days if possible, then pull and tag.
 

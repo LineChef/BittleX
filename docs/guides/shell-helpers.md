@@ -65,7 +65,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 | `g2wallreplay [DIR]` | what an exploring G2 would do with each saved wall picture (runs on the Pi; default ~/g2_wall_pics); nothing moves. |
 | `g2wallpic LABEL INCHES [ANGLE]` | take one labelled wall picture on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice); distance in inches from the lens to the base of the wall. |
 | `g2imu [rest/stand] [SECONDS]` | record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise. |
-| `g2picscurate [IN_DIR] [OUT_DIR]` | curate the pulled exploration pictures (default ~/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and |
+| `g2picscurate [IN_DIR] [OUT_DIR]` | curate the pulled exploration pictures (default ~/Desktop/G2Memory/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and |
 | `g2cal [build/status/show [ID]/harm-check ID POLICY.../approve ID/revert/auto]` | the real-data calibration builder (docs/rl/real-data-pipeline.md, Phase 3): fits what G2's run logs support, writes numbered snapshots, scores policies in the old and new world (idle Mac only), and applies the approval rules. The background loop (`g2bg status`) runs `auto` every 30 min. |
 | `g2calauto` | run the real-data calibration step now (pull the Pi logs, ingest, calibrate); `g2calauto status` lists snapshots |
 | `g2bg [start [MIN]/stop/status/once]` | the Mac-side background loop (every 30 min): re-curates the exploration pictures and runs the calibration step. It ends at a restart/logout: `g2bg start` again. |

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Curate the pictures G2 saved while exploring into a clean, labelled set (Phase 2 of docs/planned/exploration-object-learning-plan.md).
 
-Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `survey/<date>/*.jpg` from the survey stops and
+Input is the folder `g2pics pull` copies to the Mac (`~/Desktop/G2Memory/g2_pictures/explore`): `survey/<date>/*.jpg` from the survey stops and
 `named/<name>/*.jpg` from "this is a mug", each with a `.json` sidecar (pose, name, time, what the on-camera detector saw). It:
 
   1. scores every picture: brightness, contrast, sharpness, clipped highlights / shadows;
@@ -14,7 +14,7 @@ Input is the folder `g2pics pull` copies to the Mac (`~/g2_pictures/explore`): `
 
 Input is never modified. Deps: Pillow, numpy (dev machine).
 
-    python tools/curate_exploration.py [IN_DIR] [OUT_DIR] [options]       defaults: ~/g2_pictures/explore  training_data/exploration/<date_time>
+    python tools/curate_exploration.py [IN_DIR] [OUT_DIR] [options]       defaults: ~/Desktop/G2Memory/g2_pictures/explore  training_data/exploration/<date_time>
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ sys.path.insert(0, HERE)
 from curate_captures import ahash, brightness_contrast, hamming, sharpness  # noqa: E402  -- the capture tools' own quality functions
 
 ROOT = os.path.dirname(HERE)
-DEFAULT_IN = os.path.expanduser("~/g2_pictures/explore")
+DEFAULT_IN = os.path.expanduser("~/Desktop/G2Memory/g2_pictures/explore")
 
 
 @dataclass

@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL=com.g2.curate
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/g2_logs/curate_auto.log"
-IN="$HOME/g2_pictures/explore"
+IN="$HOME/Desktop/G2Memory/g2_pictures/explore"
 OUT="$ROOT/training_data/exploration/auto"
 mkdir -p "$HOME/g2_logs"
 

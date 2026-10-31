@@ -113,7 +113,7 @@ def evaluate(spec, items, same_stop_s, topk, window):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default=os.path.expanduser("~/g2_pictures/explore"))
+    ap.add_argument("--root", default=os.path.expanduser("~/Desktop/G2Memory/g2_pictures/explore"))
     ap.add_argument("--embedder", action="append", default=None)
     ap.add_argument("--topk", type=int, default=3)
     ap.add_argument("--window", type=int, default=3)
