@@ -96,3 +96,30 @@ questions, and every leg offset above was unchanged. In the arm build the calibr
 | 1 claw lift | 0 |
 | 2 claw open | 1 (Auto) |
 | 8 to 15 legs | as in the table above |
+
+## After the legs were removed and refitted (2026-10-31)
+
+The legs came off for the wide-shoulder and paw fitting, which meant unplugging their servo cables. After refitting, the calibration pose looked right on all four
+legs, but Stand folded both right legs up toward the body and jammed them against the frame, while the left legs stood normally.
+
+Cause: on both right legs the upper-leg and knee cables were plugged into each other's sockets (9 and 13 swapped on the front right, 10 and 14 on the back right).
+The calibration pose hides this because it puts every joint at 0 degrees, so a swapped pair still looks correct. Stand sends different angles to the upper leg and
+the knee, so each right servo got the other one's angle. With gyro balance off, the stand pose measured a 31 degree roll even though the commanded angles were
+symmetric left to right.
+
+How it was found: G2 on his feet, one joint moved at a time (`m<socket> <angle>`, 10 degrees for 1.5 s, then back) in the order 8, 12, 9, 13, 11, 15, 10, 14.
+On the left the upper leg moved first and then the knee. On the right the knee moved first and then the upper leg.
+
+Fix: swap the cables back (9 and 13, 10 and 14), then redo the right legs in the Joint Calibrator, because offsets entered while the cables were swapped went to the
+wrong servos.
+
+Socket map to check after any leg comes off:
+
+| Leg | Upper leg socket | Knee socket |
+|---|---|---|
+| Front left | 8 | 12 |
+| Front right | 9 | 13 |
+| Back right | 10 | 14 |
+| Back left | 11 | 15 |
+
+If the calibration pose looks right but Stand does not, check the cables before changing any offset.
