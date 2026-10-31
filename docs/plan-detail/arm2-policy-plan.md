@@ -75,4 +75,21 @@ Weigh G2 (a retrain on the real number is offered if he is more than 15 g off 55
 
 ## Results
 
-(filled in as the run goes)
+### ARM2 sim result, 2026-11-01 (training 1:58 AM to 10:45 AM; report: Artifact "ARM2 Training Report")
+
+The run needed no fixes and never halted. Baselines on the new legs: ARM1X success 74%, Petoi's scripted walk 67%. Screens: `arm2_ctrl` and `arm2_ev15` (slope evidence 15) both no falls, success 76%; `arm2_ev15` adopted by the rule. S0 to S3 done 4:27 AM; 20Ms (seeds 42 and 7) done 7:05 AM and 9:43 AM, every 2M-step check showing no falls, roll 1.8 to 2.0 deg, heading 3 to 4 deg. The four candidates (final and avg5 of each) scored alike (success 76 to 77%, step-ups 28%, no falls); the seed-42 final weights were picked (tied on falls) and exported as `trained/ARM2cand_ppo.onnx`.
+
+All in the new-leg world, 100 episodes per test:
+
+| | Petoi's walk | ARM1X | ARM2 |
+|---|---|---|---|
+| Calm-walk speed (m/s) | 0.101 | 0.114 | 0.111 |
+| Roll / heading (deg) | 1.2 / 1 | 1.6 / 3 | 1.8 / 3 |
+| Ladder success | 67% | 74% | 76% |
+| Snag / boxes / rubble / step-up | 2 / 19 / 20 / 20% | 30 / 33 / 35 / 22% | 39 / 43 / 39 / 28% |
+
+Promotion checks against ARM1X on the new legs: all five pass (reported only; nothing promoted or deployed). Paw pivot at 1.8 and 3.6 mN.m: no falls, success 80 and 81%, step-ups 37 and 36%, heading 6 and 5 deg.
+
+Stock legs against the new legs (`compare_legs.py`, scored the same day; `trained/arm2_report/legs_compare.json`): ARM1X on stock legs falls 1.8% over the hazards, roll 2.2, heading 7, success 73%, snag 46%, step-ups 26%; ARM1X on the new legs 0 falls, roll 1.6, heading 3, success 74%, snag 30%, step-ups 22%; Petoi's walk gains most from the parts (success 58% to 67%, step-down 57% to 96%, no falls). The parts help steadiness and hazard falls, cost cord and step-up crossing; ARM2 recovers part of it (snag 39%, step-ups 28%). Differences under about 5 points of success are inside the noise. Not tested: heavy loads (where the earlier sim tests found the parts' biggest gain), servo load and heat, the printed fit, the real pivot friction.
+
+Still stuck at 20M: step-ups, rubble, boxes (as ARM1X). Training with the paws ran 34% slower per step.
