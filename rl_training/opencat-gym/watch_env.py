@@ -38,7 +38,27 @@ def v4_env(tag):
     return None
 
 
+def arm2_env(tag):
+    """ARM2 runs (phase_arm2.py, 2026-10-31): the stage's own training environment, with the new legs (G2_BUILD arm_wide_clpaw: wide shoulders + CLpaw), from the runner's stage_env."""
+    if not tag.startswith("arm2_"):
+        return None
+    os.environ["G2_PAYLOAD_PROFILE"], os.environ["G2_BUILD"] = "arm", "arm_wide_clpaw"
+    import phase_arm2 as A
+    name = tag[len("arm2_"):]
+    lever = {n: l for n, l, _s, _m in A.STAGES}.get(name) or (A.FINAL_LEVER if name in dict(A.FINALS) else None)
+    if lever is None:
+        return None
+    st = json.load(open(A.STATE)) if os.path.exists(A.STATE) else {}
+    env = A.stage_env(name, lever, {"chain_extra": st.get("chain_extra", {})}, seed=dict(A.FINALS).get(name, "42"))
+    env.update({"G2_PAYLOAD_PROFILE": "arm", "G2_BUILD": "arm_wide_clpaw"})
+    return env
+
+
 tag = sys.argv[1] if len(sys.argv) > 1 else "v3_20m"
+_a2 = arm2_env(tag)
+if _a2 is not None:
+    print("; ".join(f"export {k}={v}" for k, v in _a2.items()))
+    sys.exit(0)
 queue = json.load(open("trained/v3_queue.json"))
 jobs = queue if isinstance(queue, list) else queue.get("jobs", queue)
 job = next((j for j in jobs if j.get("tag") == tag), None)
