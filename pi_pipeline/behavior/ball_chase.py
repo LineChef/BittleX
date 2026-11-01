@@ -76,7 +76,7 @@ SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
 CLAW_LIFT_DEG = 15.0
-CLAW_PAN_SIGN = "right"        # which way a positive pan turns the camera (NOT yet checked on G2: `python -m pi_pipeline.behavior.claw_look --calibrate` measures it with the ball)
+CLAW_PAN_SIGN = "left"         # which way a positive pan turns the camera: LEFT on G2 (user, 2026-11-01: at pan +35 the ball was on his left and he turned right toward nothing; also the 10-31 pictures); claw_look --calibrate can re-measure it
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
 CLAW_SETTLE_S = 0.6            # still before the picture
