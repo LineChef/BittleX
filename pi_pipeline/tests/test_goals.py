@@ -1542,6 +1542,8 @@ def test_a_wall_reading_that_would_hide_the_ball_or_never_changes_is_not_believe
     wall = bc.WallSeen(8.0, "left")
     got, why = bc.vet_wall(wall, ball, {})
     assert got.nearest_in is None and "hide the ball" in why                       # the wall is nearer than a ball seen almost straight on
+    side_ball = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 11.0, 45.0, False)
+    assert bc.vet_wall(wall, side_ball, {})[0].nearest_in is None                     # the 2026-11-01 fall: a ball at +45 deg, 11 in, and a "wall" at 8 in
     near_ball = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 6.0, -20.0, False)
     got, why = bc.vet_wall(wall, near_ball, {})
     assert got.nearest_in == 8.0 and not why                                       # the ball is nearer than the wall: the wall is believed
@@ -1625,3 +1627,12 @@ def test_an_align_turn_that_overshoots_backs_up_and_lines_up_again():
     pl.prev_kind = "back"
     again = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 14.0, False))
     assert again.kind == "align"                                                                # after the back-up he lines up again
+
+
+def test_with_the_ball_within_12_in_a_wall_never_turns_him_away():
+    from pi_pipeline.vision.ball_finder import BallReading
+    pl = bc.ChasePlanner()
+    a = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 11.0, 30.0, False), bc.WallSeen(10.0, "left"))
+    assert a.kind not in ("wall_turn", "three_point")                                        # a ball 11 in away: lining up goes on
+    far = bc.ChasePlanner().decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 20.0, 0.0, False), bc.WallSeen(10.0, "left"))
+    assert far.kind in ("wall_turn", "three_point")                                          # a ball 20 in away beyond a wall 10 in ahead: walls first, as before

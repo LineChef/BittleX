@@ -77,6 +77,8 @@ SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the l
 # (a wall close ahead, or a search turn near things). Wall turns use it (user, 2026-11-01: the hardware test works); search turns use it when SEARCH_ORDER is three_point_turn or claw_three_point, which the goal can try.
 THREE_POINT_BACK_S = 1.2       # the backing-up half
 THREE_POINT_BACK_TOKEN = {"right": "kbkR", "left": "kbkL"}      # the firmware's backward-turning gaits; which way each rotates the body is what the test measures
+NO_WALL_TURN_BALL_IN = 12.0    # the ball this close: a wall reading never turns him away (no 3-point turn, no plain turn), it only stops him walking closer (user, 2026-11-01:
+                               # the false wall readings come with the ball close, low in the picture, and a big turn there loses the ball or runs into it)
 WALL_THREE_POINT = True        # a wall ahead: a 3-point turn instead of a plain turn away (needs room to back up); works on G2 (user, 2026-11-01)
 SEARCH_THREE_POINT = False     # a search turn step is a 3-point turn
 SEARCH_MOVE_MAX_S = 2.0        # the longest search turn before the next picture (user, 2026-11-01: a few steps, then look again)
@@ -116,13 +118,13 @@ class WallSeen:
 
 WALL_MIN_READING_IN = 8.5      # the wall calibration's closest row (8 in): a reading at it says "8 in or nearer", and on the claw camera it came back almost every look (2026-11-01)
 WALL_STUCK_LOOKS = 3           # this many looks in a row at that reading and the reading is not believed
-WALL_BALL_CONE_DEG = 35.0      # a ball seen this close to straight ahead is seen THROUGH the space a wall would fill
+WALL_BALL_CONE_DEG = 50.0      # a ball seen this close to straight ahead is seen THROUGH the space a wall would fill (user, 2026-11-01: was 35; a ball at +45 deg let a false 8 in wall turn him, and he fell)
 
 
 def vet_wall(wall: "WallSeen | None", ball: BallReading | None, state: dict) -> tuple["WallSeen | None", str]:
     """Believe the wall reading only when it makes sense (user, 2026-11-01: he turned away from a ball right in front of him, three times in one run, and fell during one of the turns).
     Returns (the wall to use or None, why it was dropped or ""). Dropped when
-      - a ball is in view within WALL_BALL_CONE_DEG of straight ahead, the wall reads the closest row (the one that came back all the time) and the ball is more than 2 in beyond it:
+      - a ball is in view within WALL_BALL_CONE_DEG (50) of straight ahead, the wall reads the closest row (the one that came back all the time) and the ball is more than 2 in beyond it:
         a wall that near, dead ahead, would hide the ball (a nearer side wall at a real distance is still believed);
       - the reading has sat at the calibration's closest row for WALL_STUCK_LOOKS looks in a row (state["stuck"] counts them; any other reading resets it).
     A bump (the IMU contact signal) still stops him whatever the camera says."""
@@ -326,7 +328,7 @@ class ChasePlanner:
                     return Action("give_up", why=f"the ball is {behind - ball.distance_in:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
                 return Action("look", 1.0, why=f"the ball looks {behind - ball.distance_in:.0f} in from a wall: look again")
             self.by_wall = 0
-            if wall.nearest_in <= CHASE_WALL_IN:
+            if wall.nearest_in <= CHASE_WALL_IN and ball.distance_in > NO_WALL_TURN_BALL_IN:      # the ball within 12 in: no turn away (the walk is still capped by the loop)
                 self.wall_turns += 1
                 if self.wall_turns >= WALL_TURNS_GIVE_UP:
                     return Action("give_up", why=f"{self.wall_turns} turns away from walls with the ball in sight: walls keep me from it")
@@ -787,7 +789,9 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if wall is not None and wall.nearest_in is not None and act.kind in ("walk", "search_walk"):      # never walk closer than CHASE_WALL_IN to a wall
             from .chase_pace import WALL_PACE_START_S
             room = wall.nearest_in - CHASE_WALL_IN
-            if room <= 0.5:
+            if room <= 0.5 and ball is not None and ball.distance_in <= NO_WALL_TURN_BALL_IN:
+                act = Action("look", 1.0, why=f"a wall {wall.nearest_in:.0f} in ahead and the ball {ball.distance_in:.0f} in away: no turn away, no step closer; look again")
+            elif room <= 0.5:
                 act = planner._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away instead of walking")
             else:
                 cap = WALL_PACE_START_S + room / planner._walk_pace()

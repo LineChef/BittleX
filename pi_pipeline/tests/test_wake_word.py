@@ -105,3 +105,11 @@ def test_suggest_min_conf_needs_data_and_separation():
     s = suggest_min_conf([0.8, 0.9, 0.95], [0.3, 0.4, 0.5])
     assert s is not None and 0.5 < s[0] <= 0.8 and s[1] == 3 and s[2] == 0
     assert suggest_min_conf([0.3, 0.4, 0.5], [0.8, 0.9, 0.95]) is None        # false ones are MORE confident: no threshold helps
+
+
+def test_gg_and_gee_gee_never_wake_him():
+    from pi_pipeline.voice import wake_word as ww
+    phrases = ["gee two", "hey buddy", "hey bud"]
+    assert ww.wake_hit("gee two", phrases) == "gee two" and ww.wake_hit("hey buddy", phrases) == "hey buddy"
+    assert ww.wake_hit("gee gee", phrases) is None and ww.wake_hit("gee gee two", phrases) is None and ww.wake_hit("[unk] gee gee", phrases) is None
+    assert "gee gee" in ww.DECOYS

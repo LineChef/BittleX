@@ -65,6 +65,19 @@ def _log_trigger(hit, heard, data, conf, last_speaking, *, ignored) -> None:
         log.debug("wake log failed", exc_info=True)
 
 
+# Look-alikes that must never wake him (user, 2026-11-01: "GG" / "gee gee"). They go into the recogniser's grammar as decoys: restricted to the wake words alone, Kaldi has to
+# write a spoken "GG" as the closest allowed words, which can be "gee two"; with "gee gee" allowed it writes that instead, and a text holding a decoy never counts as a wake word.
+DECOYS = ("gee gee",)
+
+
+def wake_hit(heard: str, phrases) -> str | None:
+    """The wake phrase in `heard`, or None (also None when a decoy is in it: "gee gee two" is a GG, not a call)."""
+    h = (heard or "").lower()
+    if any(d in h for d in DECOYS):
+        return None
+    return next((p for p in phrases if p in h), None)
+
+
 def min_confidence() -> float:
     """`G2_WAKE_MIN_CONF`: a wake phrase whose words Kaldi is less sure of than this is ignored (0 = off, the default until a day of logged
     triggers shows where real calls and background talk separate; 2026-10-18: 4 of 7 triggers were people talking nearby, and loudness did not
@@ -127,7 +140,7 @@ class VoskWakeWord:
             raise ValueError("no wake phrase given (G2_WAKE_WORD is empty)")
         self._model = get_model(str(p))      # shared with the speech-to-text recogniser
         # restrict the recogniser to the wake phrases + [unk] -> very low CPU
-        self._grammar = json.dumps([*self._phrases, "[unk]"])
+        self._grammar = json.dumps([*self._phrases, *[d for d in DECOYS if d not in self._phrases], "[unk]"])      # + the look-alikes (DECOYS), so they are written as themselves
         self._Recognizer = KaldiRecognizer
         # ONE microphone stream for the life of the process, never closed: closing a PortAudio stream segfaulted the whole voice service
         # (2026-10-08: sounddevice `close()` from the command window's timeout, a native crash with no Python traceback; the crash report in
@@ -263,7 +276,9 @@ class VoskWakeWord:
             else:
                 heard = json.loads(rec.PartialResult()).get("partial", "")
             heard = heard.lower()
-            hit = next((p for p in self._phrases if p in heard), None)
+            hit = wake_hit(heard, self._phrases)
+            if hit is None and any(d in heard for d in DECOYS) and final is not None:
+                log.info("wake word ignored: a look-alike (%r)", heard)
             if hit:
                 if final is None:
                     final = rec.FinalResult()          # the partial matched: finish the decode now to get each word's confidence (the words said after it stay queued for the recogniser)
