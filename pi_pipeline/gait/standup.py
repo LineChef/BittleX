@@ -175,7 +175,7 @@ def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     return True                                                 # and pulled the arm back to 60 again; the legs and the lift are already at the balance pose
 
 
-SIT_REAR_S, SIT_FRONT_S, SIT_FRONT_START_S = 2.6, 1.6, 0.9      # the stand-up from a sit: the back legs rise slowly over SIT_REAR_S, the front legs (already nearly straight in a sit) follow from SIT_FRONT_START_S
+SIT_REAR_S, SIT_FRONT_S, SIT_FRONT_START_S = 1.8, 1.1, 0.6      # the stand-up from a sit: the back legs rise slowly over SIT_REAR_S, the front legs (already nearly straight in a sit) follow from SIT_FRONT_START_S
 
 
 def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
