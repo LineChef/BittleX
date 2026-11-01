@@ -83,9 +83,9 @@ CLAW_SETTLE_S = 0.6            # still before the picture
 # G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
 BACK_IN_S = 3.0                # a guess at the firmware back-up's pace (not measured: there is no reading before a back-up after a punt)
 
-# Walls while chasing (the "turn away from walls" standing goal ranks above the punt: user, 2026-10-31). Only with a wall check (run_chase's `wall_check`: the camera's wall
-# reading, calibrated on the current hardware): he never walks closer than CHASE_WALL_IN to a wall, turns away when he is that close, and leaves a ball lying nearer the wall than
-# CHASE_WALL_IN - BALL_TOUCH_IN alone (the attempt ends "ball_by_wall" after WALL_GIVE_UP looks agree).
+# Walls while chasing (the "turn away from walls" standing goal ranks above the punt: user, 2026-10-31). With a wall check (run_chase's `wall_check`: the camera's wall reading
+# as it is, calibrated or not): he never walks closer than CHASE_WALL_IN to a wall, turns away when he is that close, and leaves a ball lying nearer the wall than
+# CHASE_WALL_IN - BALL_TOUCH_IN alone (the attempt ends "ball_by_wall" after WALL_GIVE_UP looks agree). CHASE_WALL_IN is learned by the walls goal (goals/walls.py, never below 4 in).
 CHASE_WALL_IN = 10.0
 BALL_TOUCH_IN = 3.0            # he punches about this far from the ball
 WALL_GIVE_UP = 2
@@ -95,6 +95,11 @@ WALL_GIVE_UP = 2
 class WallSeen:
     nearest_in: float | None      # the nearest wall base ahead, inches (the ball's own columns left out)
     turn: str | None              # "left" / "right": the side with more room
+    near_ball_in: float | None = None     # the nearest wall base in the columns right beside the ball (is the ball against a wall?); None: no ball, or nothing there
+    # (a side wall elsewhere in the picture does not make a ball "by the wall")
+
+
+WALL_TURNS_GIVE_UP = 3         # turns away from walls with the ball in sight in one attempt before he leaves it (the ball sits where walls keep him from it)
 
 
 def wall_turn_deg() -> float:
@@ -165,6 +170,7 @@ class ChasePlanner:
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
     align_turns: int = 0       # fine-alignment pulses since the ball came within NUDGE_MAX_IN
     by_wall: int = 0           # looks in a row with the ball too close to a wall
+    wall_turns: int = 0        # turns away from walls this attempt while the ball was in sight
     pace: object = None        # a chase_pace.PaceBook (None: its defaults)
 
     def _walk_pace(self) -> float:
@@ -242,13 +248,17 @@ class ChasePlanner:
         self.search_steps = 0
         self.search_i = 0
         if wall is not None and wall.nearest_in is not None:                 # walls rank above the punt
-            if ball.distance_in < wall.nearest_in and wall.nearest_in - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
+            behind = wall.near_ball_in
+            if behind is not None and ball.distance_in < behind and behind - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
                 self.by_wall += 1
                 if self.by_wall >= WALL_GIVE_UP:
-                    return Action("give_up", why=f"the ball is {wall.nearest_in - ball.distance_in:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
-                return Action("look", 1.0, why=f"the ball looks {wall.nearest_in - ball.distance_in:.0f} in from a wall: look again")
+                    return Action("give_up", why=f"the ball is {behind - ball.distance_in:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
+                return Action("look", 1.0, why=f"the ball looks {behind - ball.distance_in:.0f} in from a wall: look again")
             self.by_wall = 0
             if wall.nearest_in <= CHASE_WALL_IN:
+                self.wall_turns += 1
+                if self.wall_turns >= WALL_TURNS_GIVE_UP:
+                    return Action("give_up", why=f"{self.wall_turns} turns away from walls with the ball in sight: walls keep me from it")
                 return self._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away")
         else:
             self.by_wall = 0
@@ -319,6 +329,7 @@ class SerialRobot:
         self._pitch, self._roll = [], []
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
+        self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
 
     def _tx(self, c: str) -> None:
         self._lk.send(c, read_reply=False, settle=0.0)
@@ -363,20 +374,27 @@ class SerialRobot:
         return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
 
     def _policy_walk(self, seconds: float) -> str:
-        """The learned walk (the attachment's saved gait) for `seconds`, ending in a balanced stand. "fell" if it ended in a fall."""
+        """The learned walk (the attachment's saved gait) for `seconds`, ending in a balanced stand. "fell" if it ended in a fall. A bump (the walk's IMU contact signal, the same one
+        exploration uses) stops the walk at once and sets `bumped` (the walls goal counts it)."""
         from ..gait.policy_walker import PolicyWalker
-        fell = []
+        fell, hit = [], []
         if self._walker is None:
-            self._walker = PolicyWalker(self._lk, hold_between_legs=True, on_fall=lambda: fell.append(1))
+            self._walker = PolicyWalker(self._lk, hold_between_legs=True, on_fall=lambda: fell.append(1), on_contact=lambda ev=None: hit.append(ev))
         else:
             self._walker._on_fall = lambda: fell.append(1)
+            self._walker._on_contact = lambda ev=None: hit.append(ev)
+        self.bumped = False
         self._walker.walk(seconds)
         t0 = self._clock()
         self._sleep(0.2)
         while self._walker.busy and self._clock() - t0 < seconds + 10.0:
+            if hit:
+                self._walker.stop(rest=False)                 # he walked into something: stop now, the next look decides (a wall ahead: turn away)
+                break
             self._sleep(0.05)
         if self._walker.busy:
             self._walker.stop(rest=False)
+        self.bumped = bool(hit)
         return "fell" if fell else "ok"
 
     def claw_pose(self, pan: float, lift: float) -> str:
@@ -492,9 +510,12 @@ class PictureSaver:
         self.saved += 1
 
 
-def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None) -> tuple[str, BallReading | None]:
+def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
+              stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
     """One look around with the arm: the camera to one side, the other side, and (with the lift up) straight ahead, a picture at each; stops at the first sight of the ball. The arm goes back
-    to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None)."""
+    to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None). `stamp()` times the trace entries (the scorer needs when the ball was
+    first seen); `after_punt` marks a look for where the ball went, which is not a search."""
+    extra = {"after_punt": True} if after_punt else {}
     side = planner.claw_side or planner.last_side or 1
     pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG] + ([0.0] if CLAW_LIFT_DEG > 0 else [])
     found, state = None, "ok"
@@ -510,13 +531,14 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
                 saver.maybe_save(jpeg, ball, tag="claw")
             found = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + claw_pan_body(pan))
             if trace is not None:
-                trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1)})
+                trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
+                              **({"t": stamp()} if stamp else {}), **extra})
             say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
             break
     if state != "fell":
         state = robot.claw_pose(0.0, 0.0)
     if trace is not None:
-        trace.append({"kind": "claw_look", "found": found is not None, "state": state})
+        trace.append({"kind": "claw_look", "found": found is not None, "state": state, **({"t": stamp()} if stamp else {}), **extra})
     return state, found
 
 
@@ -609,7 +631,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             say(act.why)
             return "ball_by_wall"
         if act.kind == "claw_look":
-            state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace)
+            state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2))
             note(kind="act", act="claw_look", why=act.why, state=state, found=pending is not None)
             if state == "fell":
                 say("G2 fell: stopping (fall recovery is off)")
@@ -624,6 +646,14 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 last_move = ("turn", act.seconds, act.degrees, ball)
         elif act.kind in ("walk", "search_walk"):
             state = robot.walk(act.seconds)
+            if getattr(robot, "bumped", False):
+                note(kind="wall", event="bump", wall_in=None if wall is None else wall.nearest_in, why="bumped into something while walking")
+                say(f"[{steps}] bumped into something while walking: backing off")
+                if state != "fell" and planner._can_back(VANISH_BACK_S):         # off the wall first (as exploration's hit sequence does); the next look decides the turn
+                    planner.back_s += VANISH_BACK_S
+                    state = robot.back(VANISH_BACK_S)
+                last_move = None
+                ball = None                                                       # no pace sample from a walk that ended on a bump
             if ball is not None and act.kind == "walk":
                 last_move = ("walk", act.seconds, 0.0, ball)
         elif act.kind in ("back", "search_back"):
@@ -640,7 +670,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                     jpeg = camera.look()
                     after = find_ball(jpeg) if jpeg else None
                     if after is None and planner.claw_ok:
-                        _st, after = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace)
+                        _st, after = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2), after_punt=True)
                         if _st == "fell":
                             say("G2 fell: stopping (fall recovery is off)")
                             return "fell"
@@ -768,8 +798,10 @@ def main() -> None:
         from ..goals.standing import apply as _apply_standing
         from ..goals.walls import make_wall_check
         walls_used = _apply_standing("walls")
+        if walls_used and "chase_wall_in" in walls_used:
+            _self.CHASE_WALL_IN = float(walls_used["chase_wall_in"])      # run as a program this module is __main__, not the copy the walls goal set
         wall_check = make_wall_check()
-        print("wall check:", "on" if wall_check else "off (no wall calibration made on this hardware, or walls do not rank above the punt)")
+        print("wall check:", "on" if wall_check else "off (no wall calibration at all, or walls do not rank above the punt)")
     except Exception as e:  # noqa: BLE001
         print("wall check off:", e)
     used = dict(_ps.defaults(_self), max_seconds=args.max_seconds)          # the settings this run uses (the file and the command line applied)

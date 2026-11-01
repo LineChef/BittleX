@@ -16,13 +16,16 @@ import os
 
 PATH = "~/.local/share/g2/wall_settings.json"
 
-# name -> (where, constant, kind, lowest, highest, what it does). where: "driver" (BehaviorDriver class), "explore" (explore_session module), "chase" (ball_chase module).
+# name -> (where, constant, kind, lowest, highest, what it does). where: "driver" (BehaviorDriver class), "explore" (explore_session module), "chase" (ball_chase module),
+# "walldist" (vision/wall_distance module). Distances are in the wall reading's own inches (its calibration): after a new calibration the walls goal carries them over through both
+# calibrations (goals/walls.py `translate_prior`).
 SPEC = {
+    "wall_turn_in": ("walldist", "TURN_IN", float, 12.0, 36.0, "exploring: a wall this close on two of three looks turns him away (the main turn distance), inches"),
     "wall_stop_in": ("driver", "WALL_STOP_IN", float, 6.0, 30.0, "exploring: a wall this close is acted on from a single look, inches"),
     "wall_turn_deg": ("driver", "WALL_TURN_RAD", float, 30.0, 120.0, "how far he turns away from a near wall, degrees (also in the ball chase)"),
     "leg_margin_in": ("driver", "LEG_MARGIN_IN", float, 6.0, 30.0, "exploring: the next walk is cut short so he stops this far from the nearest wall, inches"),
     "near_look_in": ("explore", "NEAR_LOOK_IN", float, 12.0, 48.0, "exploring: a wall this close starts the fast looks, inches"),
-    "chase_wall_in": ("chase", "CHASE_WALL_IN", float, 6.0, 24.0, "chasing the ball: never closer than this to a wall; a ball nearer the wall than this is left alone, inches"),
+    "chase_wall_in": ("chase", "CHASE_WALL_IN", float, 4.0, 24.0, "chasing the ball: never closer than this to a wall; a ball nearer the wall than this is left alone, inches (4 in is the hard minimum)"),
 }
 RADIANS = {"wall_turn_deg"}              # kept in degrees here, radians in the code
 
@@ -34,11 +37,25 @@ def path() -> str:
 def _targets():
     from . import ball_chase, driver
     from .. import explore_session
-    return {"driver": driver.BehaviorDriver, "explore": explore_session, "chase": ball_chase}
+    from ..vision import wall_distance
+    return {"driver": driver.BehaviorDriver, "explore": explore_session, "chase": ball_chase, "walldist": wall_distance}
+
+
+_PRISTINE: dict | None = None      # the code's own defaults, read before anything applied learned values (`apply` changes the same constants)
 
 
 def defaults(targets=None) -> dict:
-    t = targets or _targets()
+    """The code's own defaults. Read once, the first time, before any `apply`: the voice service runs one exploration after another in the same process, and the walls goal's
+    learned values must never come back as "your" values."""
+    global _PRISTINE
+    if targets is not None:
+        return _read(targets)
+    if _PRISTINE is None:
+        _PRISTINE = _read(_targets())
+    return dict(_PRISTINE)
+
+
+def _read(t) -> dict:
     out = {}
     for name, (where, const, _kind, _lo, _hi, _doc) in SPEC.items():
         v = getattr(t[where], const)
@@ -71,6 +88,8 @@ def load_file(p: str | None = None) -> tuple[dict, list]:
 
 def apply(values: dict, targets=None) -> None:
     """Put the values into the code's constants."""
+    if targets is None:
+        defaults()                                       # keep the pristine defaults before the first change
     t = targets or _targets()
     for name, v in values.items():
         if name not in SPEC:

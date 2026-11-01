@@ -37,9 +37,20 @@ def apply(goal_id: str = "walls", *, conditions: dict | None = None, state=None)
         parts = _parts(goal_id, conditions, state)
         if parts is None:
             return None
-        _goal, ap, _cond, _key, _state, judge = parts
+        goal, ap, cond, _key, state, judge = parts
         base = ap.base_settings()
-        values = judge.settings(base) if judge.state.get("count") else judge.begin_session(base)
+        if judge.state.get("count"):
+            values = judge.settings(base)
+        else:                                                             # new conditions (a floor, hardware, a wall calibration): start from his best elsewhere
+            from .prior import find_prior
+            prior, prior_from = find_prior(goal, ap, list(judge.knobs.values()), state, cond, base, judge.ov)
+            values = judge.begin_session(base, prior=prior, prior_from=prior_from)
+            if prior_from:
+                judge.state["started_from"] = prior_from
+        note = getattr(ap, "condition_note", None)
+        if callable(note):
+            judge.state.update(note())                                    # e.g. the wall calibration's points, for carrying settings to the next one
+        state.save()
         if callable(getattr(ap, "apply", None)):
             ap.apply(values)
         return values
@@ -63,13 +74,18 @@ def learn(goal_id: str, events: list, source: str, *, used: dict | None = None, 
         if not outcomes:
             return 0
         journal = journal or Journal()
+        note = getattr(ap, "condition_note", None)
+        if callable(note) and "wallcal_points" not in judge.state:
+            judge.state.update(note())
         settings = used or judge.settings(ap.base_settings())
         session = "s" + uuid.uuid4().hex[:7]
         journal.write("session_start", session=session, goal=goal.id, title=goal.title, mode=source, conditions=cond, settings=settings, controls={k: v.control for k, v in judge.knobs.items()},
                       learned_from=judge.state.get("count", 0))
         ok = 0
         for i, o in enumerate(outcomes, 1):
-            n = judge.state.get("count", 0) + 1
+            from .journal import next_number
+            n = next_number(judge.state)
+            judge.state["last_number"] = n
             journal.write("attempt", session=session, goal=goal.id, index=i, number=n, ended=o.code, seconds=0.0, settings=settings,
                           outcome={"code": o.code, "score": o.score, "success": o.success, "text": o.text, "stages": o.stages}, numbers=o.numbers, extra={}, trace=[])
             for d in judge.update(n, o, settings):

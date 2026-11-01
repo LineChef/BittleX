@@ -122,29 +122,56 @@ class Journal:
         return out
 
 
+def _read_json(p: str) -> dict:
+    try:
+        return json.load(open(p))
+    except (OSError, ValueError):
+        return {}
+
+
 class State:
+    """What the goals have learned. Several instances may be open at once (a goal session, and inside its attempts the walls goal), so `save` writes back only the goals this
+    instance touched (`for_goal`, `touch`), merged into the file as it is now: one cannot overwrite what another just learned."""
+
     def __init__(self, path: str | None = None):
         self.path = path or state_path()
-        try:
-            self.data = json.load(open(self.path))
-        except (OSError, ValueError):
-            self.data = {}
+        self.data = _read_json(self.path)
+        self._touched: set = set()
 
     def for_goal(self, goal: str, cond_key: str) -> dict:
+        self._touched.add(goal)
         return self.data.setdefault(goal, {}).setdefault(cond_key, {})
 
+    def touch(self, goal: str) -> None:
+        self._touched.add(goal)
+
     def save(self) -> None:
+        fresh = _read_json(self.path)
+        for goal in self._touched:
+            if goal in self.data:
+                fresh[goal] = self.data[goal]
+            else:
+                fresh.pop(goal, None)
+        for goal, v in fresh.items():                     # see the others' latest too (the judges keep their references to this instance's own goals)
+            if goal not in self._touched:
+                self.data[goal] = v
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
         tmp = self.path + ".tmp"
         with open(tmp, "w") as f:
-            f.write(json.dumps(self.data, indent=1, default=str) + "\n")
+            f.write(json.dumps(fresh, indent=1, default=str) + "\n")
         os.replace(tmp, self.path)
 
     def reset(self, goal: str) -> bool:
         had = goal in self.data
         self.data.pop(goal, None)
+        self._touched.add(goal)
         self.save()
         return had
+
+
+def next_number(rec: dict) -> int:
+    """The next attempt number under one goal and conditions: never reused, also after a verdict took an attempt out (the count goes down, this does not)."""
+    return max(int(rec.get("count", 0)), int(rec.get("last_number", 0))) + 1
 
 
 def lessons_from(decisions: list[dict], goal_title: str) -> list[str]:

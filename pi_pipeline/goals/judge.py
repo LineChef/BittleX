@@ -90,6 +90,7 @@ class Judge:
         st.setdefault("banned", {})            # knob -> {vkey: count when banned} (after a fall)
         st.setdefault("suggestions", {})       # knob -> {"new", "old", "because", "evidence", "status"}
         st.setdefault("settled", [])           # knobs left alone: their best value clearly beats its neighbours
+        st.setdefault("start", {})             # knob -> where these conditions started (the user's value, or his best elsewhere): the fallback until a value has a record
         self._start_best = None
         self.started_from = None
 
@@ -109,6 +110,11 @@ class Judge:
     @staticmethod
     def _mean(r) -> float:
         return (r["hits"] + 1) / (r["n"] + 2)
+
+    def _fallback(self, name: str, base_value):
+        """Where a knob stands before any of its values has MIN_TRIES attempts: the start of these conditions (it may be his best elsewhere), else the user's value."""
+        v = self.state.get("start", {}).get(name)
+        return v if v is not None and self._allowed(name, v) else base_value
 
     def best(self, name: str, fallback):
         """The best-supported value: the best record (hits, with one imagined hit and one imagined miss) among values tried MIN_TRIES times and still allowed;
@@ -176,7 +182,7 @@ class Judge:
             if k.control == "free":
                 v = self.state["current"].get(name)
                 if v is None or not self._allowed(name, v):
-                    v = self.best(name, out[name])
+                    v = self.best(name, self._fallback(name, out[name]))
                 out[name] = self._clamp_to_limits(name, v)
             pv, has = self.pinned(name)
             if has:
@@ -192,9 +198,10 @@ class Judge:
         used_prior = False
         for name, k in self.knobs.items():
             if k.control == "free" and name in base:
-                start = base[name]
+                start = self._fallback(name, base[name])
                 if prior and name in prior and not any(r["n"] for r in (self.state["values"].get(name) or {}).values()) and self._allowed(name, prior[name]):
                     start, used_prior = prior[name], True
+                    self.state["start"][name] = start                       # kept: a short first session must not lose it
                 self.state["current"][name] = self.best(name, start)
         self.started_from = prior_from if used_prior else None
         self._start_best = {n: self.state["current"][n] for n, k in self.knobs.items() if k.control == "free" and n in base}
@@ -399,9 +406,9 @@ class Judge:
         for name, k in self.knobs.items():
             if k.control != "free" or name not in base:
                 continue
-            b = self.best(name, base[name])
+            b = self.best(name, self._fallback(name, base[name]))
             self.state["current"][name] = b
-            was = start.get(name, base[name])
+            was = start.get(name, self._fallback(name, base[name]))
             if b != was:
                 r, r0 = self.record(name, b), self.record(name, was)
                 vs = f", against {r0['hits']} of {r0['n']} with {k.show(was)}" if r0 and r0["n"] else ""

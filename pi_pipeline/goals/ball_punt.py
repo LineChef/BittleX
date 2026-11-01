@@ -231,7 +231,10 @@ class BallPunt:
         first = nums.get("first_seen_s")
         searched = False
         for e in tr:
-            if (e.get("kind") == "look" and e.get("ball")) or e.get("kind") == "claw_seen":
+            if e.get("kind") == "claw_seen" and not e.get("after_punt"):
+                searched = True                                                 # found by a claw look: that look was the search (it is written before its own "act" line)
+                break
+            if e.get("kind") == "look" and e.get("ball"):
                 break
             if e.get("kind") == "act" and e.get("act") in SEARCH_MOVES:
                 searched = True
@@ -260,11 +263,15 @@ class BallPunt:
         max_s = float(settings.get("max_seconds", 75.0)) or 75.0
         tfrac = min(1.0, result.seconds / max_s)
         looks = [e for e in tr if e.get("kind") == "look"]
-        seen = [e["ball"] for e in looks if e.get("ball")] + [{"distance_in": e["distance_in"]} for e in tr if e.get("kind") == "claw_seen"]
-        first_seen = next((e.get("t") for e in tr if (e.get("kind") == "look" and e.get("ball")) or e.get("kind") == "claw_seen"), None)
-        found_by = "claw look" if any(e.get("kind") == "claw_seen" for e in tr) else ("straight look" if seen else None)
+        claws = [e for e in tr if e.get("kind") == "claw_seen" and not e.get("after_punt")]          # a look for where the ball went after the punt is not a search
+        seen = [e["ball"] for e in looks if e.get("ball")] + [{"distance_in": e["distance_in"]} for e in claws]
+        firsts = [e for e in tr if (e.get("kind") == "look" and e.get("ball")) or (e.get("kind") == "claw_seen" and not e.get("after_punt"))]
+        first_seen = next((e.get("t", 0.0) for e in firsts), None)
+        found_by = None
+        if firsts:
+            found_by = "claw look" if firsts[0].get("kind") == "claw_seen" else "straight look"
         nums = {"seconds": result.seconds, "first_seen_s": first_seen, "found_by": found_by, "looks": len(looks),
-                "claw_looks": sum(1 for e in tr if e.get("kind") == "claw_look"), "backed_up_s": result.extra.get("back_s", 0.0),
+                "claw_looks": sum(1 for e in tr if e.get("kind") == "claw_look" and not e.get("after_punt")), "backed_up_s": result.extra.get("back_s", 0.0),
                 "walks": sum(1 for e in tr if e.get("kind") == "act" and e.get("act") == "walk"), **align_stats(tr)}
         if result.ended == "fell":
             return Outcome("fell", 0.0, False, f"I fell after {_fmt_s(result.seconds)}", nums)
@@ -281,6 +288,8 @@ class BallPunt:
             after = after_e.get("ball")
             nums.update(punt_at_in=None if vanished else before[0], punt_bearing_deg=None if vanished else before[1], vanished=vanished)
             where = "at the claw (out of sight)" if vanished else f"from {before[0]:.1f} in"
+            if after is None and after_e and after_e.get("picture") is False:
+                return Outcome("punt_unseen_camera", None, False, f"I punched {where} but the camera gave no picture afterwards: not counted", nums)
             if after is None:
                 nums["moved_in"] = None
                 return Outcome("hit_unseen", round(0.6 - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went out of sight ({_fmt_s(result.seconds)})", nums)

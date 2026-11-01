@@ -161,7 +161,10 @@ def main(argv=None) -> None:
 
     if a.cmd == "list":
         for g in goals.values():
-            print(f"{g.id:12s} {g.title} ({g.approach}, {g.attempts} attempts): say {', '.join(repr('G2, ' + w) for w in g.start_words[:2]) or '(no phrase)'}")
+            if g.kind == "standing":
+                print(f"{g.id:12s} {g.title} (standing: always on, learns from every activity; 'G2, practise {g.practice_words[0] if g.practice_words else g.id}' = a {g.minutes:g}-minute roam)")
+            else:
+                print(f"{g.id:12s} {g.title} ({g.approach}, {g.attempts} attempts): say {', '.join(repr('G2, ' + w) for w in g.start_words[:2]) or '(no phrase)'}")
     elif a.cmd == "show":
         cmd_show(_goal(goals, a.goal))
     elif a.cmd == "set":
@@ -260,6 +263,7 @@ def main(argv=None) -> None:
         elif a.cmd == "undo":
             from .judge import vkey
             st = State()
+            st.touch(g.id)
             done = []
             for c, rec in (st.data.get(g.id) or {}).items():
                 if not ovr.scope_matches(scope, c):
@@ -279,6 +283,7 @@ def main(argv=None) -> None:
             msg = f"{k.name} = {v} allowed again ({scope})" if ovr.clear(g.id, "banned", k.name, scope, value_key=vkey(v)) else f"{k.name} = {v} was not undone under {scope}"
         else:
             st = State()
+            st.touch(g.id)
             n = 0
             for c, rec in (st.data.get(g.id) or {}).items():
                 if ovr.scope_matches(scope, c):

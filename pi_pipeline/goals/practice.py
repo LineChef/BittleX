@@ -113,7 +113,8 @@ def _sentence(g, why: dict) -> str:
         parts.append("and I can see the ball" if parts else "I can see the ball")
     elif why.get("ball_visible") is False:
         parts.append("though I'll have to find the ball first" if parts else "I'll have to find the ball first")
-    return f"I'll practise {g.title[:1].lower() + g.title[1:]}" + (f": {', '.join(parts)}." if parts else ".")
+    name = getattr(g, "practice_say", "") or (g.title[:1].lower() + g.title[1:])
+    return f"I'll practise {name}" + (f": {', '.join(parts)}." if parts else ".")
 
 
 def named_goal(text_normalized: str, goals=None):

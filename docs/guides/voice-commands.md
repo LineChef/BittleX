@@ -44,7 +44,7 @@ match more than one (e.g. emergency stop beats everything).
 | "what floor are you on", "which floor" | Asks which floor label is set. | G2 reads it back, or says he does not know. |
 | "punt", "punt it", "punt the ball", "go punt", "do a punt", "punt test" | One ball-punt attempt (arm fitted): stand, find the ball, walk up, punch once, rest. | The voice service steps aside for it and comes back. [`punt.md`](punt.md) |
 | "practise", "practice", "let's practise", "practise walls", "practise the punt" | He picks a goal to practise (your priority order, how much he needs it, what he can do now), says which and why, and starts it: the punt's goal session or a 5-minute exploration roam for walls. | Local, no API call. [`goals.md`](goals.md) section 8 |
-| "ball goal", "punt goal", "start the ball goal", "goal attempt", "start a goal attempt" | A goal session: up to 10 punt attempts, each one judged on the Pi and the next one changed from it. | The voice service steps aside and comes back; then he says any new suggestion: answer "confirm", "cancel" or "review" (silence = review). [`goals.md`](goals.md) |
+| "ball goal", "punt goal", "start the ball goal", "goal attempt", "start a goal attempt" | A goal session: up to 10 punt attempts, each one judged on the Pi and the next one changed from it. | The voice service steps aside and comes back; then he says any new suggestion: answer "confirm", "cancel" or "review" (silence = review). Without the arm fitted he says "I need the arm for that goal." [`goals.md`](goals.md) |
 
 A few short reproachful phrases ("leave me alone", "stop it", "be quiet", "shut
 up", "go away", "settle down", "calm down", "stop bothering me", ...) aren't

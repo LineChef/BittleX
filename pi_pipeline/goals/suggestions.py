@@ -73,6 +73,7 @@ def describe(goal_id: str, knob: str, entry: dict) -> str:
 def resolve(goal_id: str, cond: str, knob: str, answer: str, *, state: State | None = None, journal: Journal | None = None) -> str:
     """Apply an answer. Returns what happened, in a short sentence G2 can say."""
     state = state or State()
+    state.touch(goal_id)
     st = state.data.get(goal_id, {}).get(cond, {})
     e = (st.get("suggestions") or {}).get(knob)
     if e is None:

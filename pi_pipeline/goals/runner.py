@@ -11,7 +11,7 @@ import uuid
 from typing import Callable
 
 from .approach import Approach, AttemptContext
-from .journal import Journal, State, conditions_key, current_conditions, lessons_from, save_lessons
+from .journal import Journal, State, conditions_key, current_conditions, lessons_from, next_number, save_lessons
 from .judge import Judge
 from .spec import Goal
 
@@ -36,19 +36,11 @@ class GoalSession:
         self.session = uuid.uuid4().hex[:8]
 
     def _prior(self, base: dict) -> tuple[dict | None, str | None]:
-        """His best values under the nearest other conditions (journal.prior_conditions), for the knobs with no record here yet."""
+        """His best values under the nearest other conditions (goals/prior.py), for a goal with no record here yet."""
         if self.judge.state.get("count"):
             return None, None
-        import copy
-
-        from .journal import prior_conditions
-        goal_state = self.state.data.get(self.goal.id) or {}
-        for key in prior_conditions(goal_state, self.cond):
-            other = Judge(self.knobs, self.approach.diagnosis, copy.deepcopy(goal_state[key]), stage_of=getattr(self.approach, "stage_of", None), overrides=self.overrides)
-            vals = {n: other.best(n, base[n]) for n, k in other.knobs.items() if k.control == "free" and n in base and other.state["values"].get(n)}
-            if vals:
-                return vals, key
-        return None, None
+        from .prior import find_prior
+        return find_prior(self.goal, self.approach, self.knobs, self.state, self.cond, base, self.overrides)
 
     def _speak(self, text: str) -> None:
         if self.announce is not None:
@@ -59,6 +51,10 @@ class GoalSession:
 
     def run(self) -> dict:
         g = self.goal
+        need = getattr(g, "needs_attachment", None)
+        if need and self.cond.get("attachment") not in (need, None):
+            self.say(f"not starting {g.id}: it needs the {need} fitted (the attachment is {self.cond.get('attachment')})")
+            return {"session": self.session, "goal": g.id, "why": f"needs the {need}", "attempts": 0, "successes": 0, "minutes": 0.0, "lessons": [], "lessons_saved": 0, "settings_now": {}}
         base = self.approach.base_settings()
         prior, prior_from = self._prior(base)
         start_settings = self.judge.begin_session(base, prior=prior, prior_from=prior_from)
@@ -73,7 +69,6 @@ class GoalSession:
         successes, counted, why = 0, 0, "attempts"
         decisions_all: list[dict] = []
         ctx = AttemptContext(stop=self.stop, say=self.say, announce=self.announce)
-        n_prev = self.judge.state.get("count", 0)
         try:
             self.approach.open()
             for i in range(1, g.attempts + 1):
@@ -90,13 +85,15 @@ class GoalSession:
                     self._speak("My battery is low, so I'm stopping.")
                     break
                 settings = self.judge.settings(base)
-                n = n_prev + counted + 1                              # the attempt's number across sessions (this goal and these conditions)
+                n = next_number(self.judge.state)                     # the attempt's number across sessions (this goal and these conditions), never reused
                 self.say(f"attempt {i} of {g.attempts} (#{n}), {bat}")
                 result = self.approach.run_attempt(settings, ctx)
                 outcome = self.approach.score(result, settings)
                 self.journal.write("attempt", session=self.session, goal=g.id, index=i, number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,
                                    settings=settings, outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text, "stages": outcome.stages},
                                    numbers=outcome.numbers, extra=result.extra, trace=result.trace, pack_pct=getattr(self.approach, "last_pack_pct", None))
+                if outcome.counted:
+                    self.judge.state["last_number"] = n
                 decisions = self.judge.update(n, outcome, settings)
                 for d in decisions:
                     row = self.journal.write("decision", session=self.session, goal=g.id, index=i, **d.as_dict())
@@ -129,7 +126,7 @@ class GoalSession:
             except Exception:  # noqa: BLE001
                 pass
             try:
-                for d in self.judge.finish(base, n_prev + counted):
+                for d in self.judge.finish(base, self.judge.state.get("last_number")):
                     decisions_all.append(self.journal.write("decision", session=self.session, goal=g.id, index=None, **d.as_dict()))
                     self.say("  " + d.note)
             except Exception:  # noqa: BLE001

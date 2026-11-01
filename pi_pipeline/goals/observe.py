@@ -32,7 +32,10 @@ def plain_punt(trace: list, ended: str, seconds: float, settings: dict, pack_pct
         state = state or State()
         journal = journal or Journal()
         judge = Judge(goal.knobs(ap.knobs()), ap.diagnosis, state.for_goal(goal.id, key), stage_of=ap.stage_of, overrides=for_conditions(goal.id, key))
-        n = judge.state.get("count", 0) + 1
+        from .journal import next_number
+        n = next_number(judge.state)
+        if outcome.counted:
+            judge.state["last_number"] = n
         session = "p" + uuid.uuid4().hex[:7]
         journal.write("session_start", session=session, goal=goal.id, title=goal.title, mode="plain punt", conditions=cond, settings=settings, controls={}, learned_from=n - 1)
         journal.write("attempt", session=session, goal=goal.id, index=1, number=n if outcome.counted else None, ended=ended, seconds=result.seconds, settings=settings,

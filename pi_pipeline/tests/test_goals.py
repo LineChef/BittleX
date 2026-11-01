@@ -482,8 +482,9 @@ def test_the_goal_phrases_start_a_goal_and_punt_still_punts():
     assert mlc("punt") == "punt" and mlc("what is the goal of football and why do people love it") != "goal"
 
 
-def test_the_voice_loop_names_the_goal_and_asks_for_the_hand_over():
+def test_the_voice_loop_names_the_goal_and_asks_for_the_hand_over(monkeypatch):
     from pi_pipeline.tests.test_voice_loop import _loop, _run
+    monkeypatch.setattr("pi_pipeline.attachments.current", lambda: "arm")
     events = []
     lp, w, stt, conv, tts = _loop(["ball goal"], on_event=lambda **kw: events.append(kw))
     _run(lp, 1)
@@ -762,7 +763,12 @@ def test_wall_encounters_are_scored_from_the_events():
     ev = [{"t": 0.0, "kind": "steer", "nearest_in": 20.0}, {"t": 30.0, "kind": "steer", "nearest_in": 15.0}, {"t": 33.0, "kind": "hit"}, {"t": 34.0, "kind": "hit"},
           {"t": 60.0, "kind": "hit"}]
     codes = [o.code for o in score_encounters(ev)]
-    assert codes == ["turned_away", "turned_but_hit", "bumped"]                              # the two touches 1 s apart are one bump
+    assert codes == ["turned_early", "turned_but_hit", "bumped"]                             # 20 in was more careful than needed; the two touches 1 s apart are one bump
+    assert score_encounters([{"t": 0.0, "kind": "steer", "nearest_in": 9.0}])[0].code == "turned_away"
+    ch = [{"t": 0.0, "kind": "steer", "nearest_in": 10.0, "source": "chase"}, {"t": 20.0, "kind": "hit", "source": "chase"}, {"t": 40.0, "kind": "left_ball", "source": "chase"}]
+    out = score_encounters(ch)
+    assert [o.code for o in out] == ["chase_turned_away", "chase_bumped", "chase_left_ball"] and all(set(o.stages) == {"chase"} for o in out)
+    assert not score_encounters(ch)[2].success and score_encounters(ch)[2].score < 0.5         # leaving a ball is a miss that votes for going closer
 
 
 def test_the_exploration_tally_keeps_timed_wall_events_for_the_walls_goal():
@@ -774,7 +780,7 @@ def test_the_exploration_tally_keeps_timed_wall_events_for_the_walls_goal():
     tally.note("contact", "imu"); t[0] = 3.0
     tally.note("survey.start", "")
     ev = events_from_diag(tally.events)
-    assert ev == [{"t": 0.0, "kind": "steer", "nearest_in": 14.0}, {"t": 2.0, "kind": "hit"}] and tally.counts()["survey.start"] == 1
+    assert ev == [{"t": 0.0, "kind": "steer", "nearest_in": 14.0, "source": "explore"}, {"t": 2.0, "kind": "hit", "source": "explore"}] and tally.counts()["survey.start"] == 1
 
 
 def test_the_walls_goal_learns_from_encounters_and_puts_its_values_into_the_code(tmp_path):
@@ -789,7 +795,7 @@ def test_the_walls_goal_learns_from_encounters_and_puts_its_values_into_the_code
         ev = [{"t": float(i * 20), "kind": "hit"} for i in range(4)]                         # four bumps, no turn away
         assert standing.learn("walls", ev, "exploration", used=used, conditions=cond) == 4
         rec = State().data["walls"]["attachment=arm|floor=hardwood|hw=h|wallcal=none"]
-        assert rec["count"] == 4 and rec["focus"] in ("near_look_in", "wall_stop_in", "leg_margin_in")
+        assert rec["count"] == 4 and rec["focus"] == "wall_turn_in"                                # bumps point first at turning away sooner
         rows = Journal().sessions("walls")
         assert rows[0]["start"]["mode"] == "exploration" and len(rows[0]["attempts"]) == 4
         assert standing.learn("walls", [], "exploration", conditions=cond) == 0
@@ -808,8 +814,11 @@ def test_while_chasing_walls_come_first():
     a = p.decide(reading(20, 0), bc.WallSeen(8.0, "left"))                                  # he is within 10 in of a wall: turn away
     assert a.kind == "wall_turn" and a.degrees < 0
     q = bc.ChasePlanner()
-    assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right")).kind == "look"               # the ball is 4 in from the wall: look again first
-    assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right")).kind == "give_up"           # ... then leave it
+    assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right", 14.0)).kind == "look"         # the ball is 4 in from the wall behind it: look again first
+    assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right", 14.0)).kind == "give_up"     # ... then leave it
+    side = bc.ChasePlanner()
+    for _ in range(3):
+        assert side.decide(reading(20, 0), bc.WallSeen(14.0, "right", None)).kind == "walk"  # a side wall at 14 in is not "behind the ball": walk on (the walk is capped by the loop)
 
 
 def test_a_walk_is_cut_short_before_a_wall_and_a_ball_by_the_wall_ends_the_attempt_uncounted():
@@ -822,21 +831,19 @@ def test_a_walk_is_cut_short_before_a_wall_and_a_ball_by_the_wall_ends_the_attem
     assert walks and walks[0][1] <= 1.0 + 3.0 / 4.2 + 0.05                                      # only 3 in of room before the 10 in limit
     robot, trace = ClawRobot(), []
     out = bc.run_chase(robot, FakeCamera([picture([disc(120, 110, 25)])]), lambda: False, max_steps=5, sleep=lambda s: None, say=lambda m: None, trace=trace,
-                       wall_check=lambda jpeg, ball: bc.WallSeen(ball.distance_in + 3.0, "left"))
+                       wall_check=lambda jpeg, ball: bc.WallSeen(ball.distance_in + 3.0, "left", ball.distance_in + 3.0))
     assert out == "ball_by_wall" and not any(m[0] == "walk" for m in robot.moves)
     o = ball_punt.BallPunt().score(_res("ball_by_wall", trace), S)
     assert o.code == "ball_by_wall" and o.score is None                                       # not counted against the punt
 
 
-def test_the_chase_wall_check_needs_walls_first_and_a_calibration_from_this_hardware(tmp_path, monkeypatch):
+def test_the_chase_wall_check_needs_walls_first_and_any_calibration(tmp_path, monkeypatch):
     from pi_pipeline.goals import walls
     monkeypatch.setattr(walls, "calibration_info", lambda: (None, None))
     assert walls.make_wall_check() is None
     monkeypatch.setattr(walls, "calibration_info", lambda: (object(), "2026-10-20 10:00:00"))
     monkeypatch.setattr(walls, "calibration_current", lambda when: False)
-    assert walls.make_wall_check() is None                                                    # older than the latest hardware change
-    monkeypatch.setattr(walls, "calibration_current", lambda when: True)
-    assert callable(walls.make_wall_check())
+    assert callable(walls.make_wall_check())                                                  # an old calibration still works: he learns against the reading as it is
     spec.set_priority(["ball_punt", "walls"])
     assert walls.make_wall_check() is None                                                    # the punt ranked first: no wall limit in the chase
 
@@ -887,8 +894,235 @@ def test_practise_by_voice_starts_the_goal_or_a_walls_roam(monkeypatch):
     events = []
     lp, w, stt, conv, tts = _loop(["practise walls"], on_event=lambda **kw: events.append(kw))
     _run(lp, 1)
-    assert tts.said[0].startswith("I'll practise turn away from walls") and any(e.get("arm_explore") and e.get("roam_s") == 300.0 for e in events)
+    assert tts.said[0].startswith("I'll practise turning away from walls") and any(e.get("arm_explore") and e.get("roam_s") == 300.0 for e in events)
     events.clear()
     lp, w, stt, conv, tts = _loop(["practise the punt"], on_event=lambda **kw: events.append(kw))
     _run(lp, 1)
     assert any(e.get("arm_goal") == "ball_punt" for e in events)
+
+
+def test_a_bump_while_chasing_stops_the_walk_and_is_recorded_for_the_walls_goal(monkeypatch):
+    from pi_pipeline.gait import policy_walker
+    from pi_pipeline.goals.walls import events_from_trace
+
+    class BumpWalker:
+        def __init__(self, link, **kw):
+            self._on_contact = kw.get("on_contact"); self._on_fall = kw.get("on_fall"); self.n = 0; self.stopped = False
+        @property
+        def busy(self):
+            self.n += 1
+            if self.n == 2 and self._on_contact:
+                self._on_contact({"kind": "contact"})
+            return not self.stopped and self.n < 50
+        def walk(self, seconds): self.n = 0; self.stopped = False
+        def stop(self, rest=True): self.stopped = True
+    monkeypatch.setattr(policy_walker, "PolicyWalker", BumpWalker)
+
+    class Link:
+        def send(self, c, **kw): pass
+        def poll_imu(self): return []
+    r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.1)).__next__)
+    assert r.walk(2.0) == "ok" and r.bumped and r._walker.stopped
+    bc.LOST_LOOKS = 1
+    trace = []
+
+    class Bot(ClawRobot):
+        bumped = False
+        def walk(self, s):
+            self.bumped = True
+            return super().walk(s)
+    bc.run_chase(Bot(), FakeCamera([picture([disc(120, 90, 6)])]), lambda: False, max_steps=1, sleep=lambda s: None, say=lambda m: None, trace=trace)
+    assert [e["kind"] for e in events_from_trace(trace)] == ["hit"]
+
+
+import numpy as np  # noqa: E402
+
+
+def test_the_chase_wall_distance_settles_between_bumps_and_left_balls_in_a_made_up_world():
+    """A made-up world: closer than 7 in to a wall he often bumps (the turn needs room); farther than 7 in he more and more often leaves balls that were reachable.
+    Bumps push chase_wall_in out, left balls pull it in: it must settle near 7, from either side."""
+    from pi_pipeline.goals import walls
+    knobs = [Knob("chase_wall_in", "float", lo=4.0, hi=24.0, step=1.0)]
+    finals = []
+    rng = random.Random(3)
+    for start in (4.0, 14.0):
+        for _ in range(150):
+            j = Judge(knobs, walls.DIAGNOSIS, rng=rng, stage_of=walls.STAGE_OF)
+            base = {"chase_wall_in": start}
+            j.begin_session(base)
+            for n in range(1, 41):
+                v = j.settings(base)["chase_wall_in"]
+                r = rng.random()
+                if v < 7.0 and r < 0.15 * (7.0 - v) + 0.1:
+                    ev = [{"t": 0.0, "kind": "hit", "source": "chase"}]
+                elif v > 7.0 and r < 0.1 * (v - 7.0) + 0.05:
+                    ev = [{"t": 0.0, "kind": "left_ball", "source": "chase"}]
+                else:
+                    ev = [{"t": 0.0, "kind": "steer", "nearest_in": v, "source": "chase"}]
+                o = walls.score_encounters(ev)[0]
+                j.update(n, o, {"chase_wall_in": v})
+            finals.append(j.best("chase_wall_in", start))
+    near = sum(abs(f - 7.0) <= 1.01 for f in finals) / len(finals)
+    assert near >= 0.7, near
+
+
+def test_after_a_new_wall_calibration_the_settings_carry_over_to_the_same_real_distance():
+    from pi_pipeline.goals.walls import translate
+    from pi_pipeline.vision.wall_distance import IN_TO_CM
+    old = [[0.30, 100.0], [0.60, 50.0], [0.90, 20.0]]
+    new = [[0.30, 120.0], [0.60, 60.0], [0.90, 24.0]]                                          # the new calibration reads 20% farther for the same picture rows
+    out = translate({"chase_wall_in": 50.0 / IN_TO_CM, "wall_turn_in": 20.0 / IN_TO_CM, "wall_turn_deg": 50.0}, old, new)
+    assert abs(out["chase_wall_in"] - 60.0 / IN_TO_CM) < 0.15 and abs(out["wall_turn_in"] - 24.0 / IN_TO_CM) < 0.15 and out["wall_turn_deg"] == 50.0
+    assert translate({"chase_wall_in": 8.0}, old, old) == {"chase_wall_in": 8.0} and translate({"chase_wall_in": 8.0}, None, new) == {"chase_wall_in": 8.0}
+
+
+def test_a_new_calibration_starts_fresh_records_from_his_old_settings_carried_over(monkeypatch):
+    from pi_pipeline import explore_session
+    from pi_pipeline.behavior.driver import BehaviorDriver
+    from pi_pipeline.goals import standing, walls
+    from pi_pipeline.vision import wall_distance
+    keep = (BehaviorDriver.WALL_STOP_IN, BehaviorDriver.WALL_TURN_RAD, BehaviorDriver.LEG_MARGIN_IN, explore_session.NEAR_LOOK_IN, wall_distance.TURN_IN, bc.CHASE_WALL_IN)
+    try:
+        old_pts, new_pts = [[0.3, 100.0], [0.6, 50.0], [0.9, 20.0]], [[0.3, 120.0], [0.6, 60.0], [0.9, 24.0]]
+        cond_old = {"attachment": "arm", "floor": "hardwood", "hw": "h", "wallcal": "2026-10-25T10:00:00"}
+        cond_new = dict(cond_old, wallcal="2026-11-02T10:00:00")
+        monkeypatch.setattr(walls, "calibration_info", lambda: (wall_distance.Calibration([tuple(p) for p in old_pts]), "2026-10-25 10:00:00"))
+        standing.apply("walls", conditions=cond_old)
+        s0 = State()                                                                           # under the old calibration he learned to keep 12 in while chasing
+        rec_old = s0.for_goal("walls", "attachment=arm|floor=hardwood|hw=h|wallcal=2026-10-25T10:00:00")
+        rec_old["values"]["chase_wall_in"] = {"12.0": {"v": 12.0, "n": 6, "hits": 6, "sum": 6.0, "down": 0, "up": 0, "last": 6, "recent": [1] * 6}}
+        rec_old["count"] = 6
+        s0.save()
+        monkeypatch.setattr(walls, "calibration_info", lambda: (wall_distance.Calibration([tuple(p) for p in new_pts]), "2026-11-02 10:00:00"))
+        used = standing.apply("walls", conditions=cond_new)
+        rec = State().data["walls"]["attachment=arm|floor=hardwood|hw=h|wallcal=2026-11-02T10:00:00"]
+        assert abs(used["chase_wall_in"] - 14.4) < 0.3 and rec["started_from"].endswith("wallcal=2026-10-25T10:00:00")   # the same picture row, in the new inches
+        assert not any(r["n"] for r in rec["values"].get("chase_wall_in", {}).values())                                   # fresh records
+        assert rec["wallcal_points"] == new_pts
+    finally:
+        (BehaviorDriver.WALL_STOP_IN, BehaviorDriver.WALL_TURN_RAD, BehaviorDriver.LEG_MARGIN_IN, explore_session.NEAR_LOOK_IN, wall_distance.TURN_IN, bc.CHASE_WALL_IN) = keep
+
+
+def test_every_free_walls_knob_is_named_by_some_outcome():
+    from pi_pipeline.goals import walls
+    knobs = {k.name: k for k in walls.Walls().knobs()}
+    named = {n for items in walls.DIAGNOSIS.values() for n, _d in items}
+    assert all(n in knobs for n in named)
+    assert not [n for n, k in knobs.items() if k.control == "free" and n not in named]
+    assert knobs["chase_wall_in"].lo == 4.0 and knobs["chase_wall_in"].control == "free"
+
+
+# ------------------------------------------------------------------------------------------------- bug sweep (2026-10-31)
+
+def test_two_open_states_do_not_erase_each_others_learning(tmp_path):
+    p = str(tmp_path / "st.json")
+    a, b = State(p), State(p)                       # a goal session's state, and the walls goal saving from inside an attempt
+    a.for_goal("ball_punt", "c")["count"] = 3
+    b.for_goal("walls", "c")["count"] = 7
+    b.save()
+    a.save()                                        # the session saves after the walls goal did: the walls record must survive
+    data = json.load(open(p))
+    assert data["ball_punt"]["c"]["count"] == 3 and data["walls"]["c"]["count"] == 7
+    assert a.data["walls"]["c"]["count"] == 7       # and the session now sees it
+    a.reset("ball_punt")
+    assert "ball_punt" not in json.load(open(p)) and "walls" in json.load(open(p))
+
+
+def test_attempt_numbers_are_never_reused_after_a_verdict(tmp_path, capsys):
+    from pi_pipeline.goals.__main__ import main
+    from pi_pipeline.goals.observe import plain_punt
+    cond = {"attachment": "arm", "floor": "hardwood", "hw": "hw-x"}
+    tr = [{"kind": "act", "act": "punt", "at": (3.0, 0.0)}, {"kind": "after_punt", "ball": None}]
+    settings = dict(ball_punt.BallPunt().base_settings())
+    for _ in range(2):
+        plain_punt(tr, "punted", 20.0, settings, state=State(str(tmp_path / "state.json")), journal=Journal(str(tmp_path / "journal.jsonl")), conditions=cond)
+    main(["verdict", "ball_punt", "2", "wrong"])
+    plain_punt(tr, "punted", 20.0, settings, state=State(str(tmp_path / "state.json")), journal=Journal(str(tmp_path / "journal.jsonl")), conditions=cond)
+    nums = [r["number"] for r in Journal(str(tmp_path / "journal.jsonl")).read() if r["kind"] == "attempt"]
+    assert nums == [1, 2, 3]
+
+
+def test_a_start_from_his_best_elsewhere_survives_a_short_first_session():
+    j = J()
+    j.begin_session(BASE, prior={"a": 2.0}, prior_from="elsewhere")
+    j.update(1, oc("hit", 0.9, True), j.settings(BASE))                    # one attempt: no value has 2 yet
+    j.finish(BASE, 1)
+    assert j.begin_session(BASE)["a"] == 2.0                                # not back to your 3.0
+
+
+def test_walls_that_keep_turning_him_away_from_the_ball_end_the_attempt_uncounted():
+    bc.CHASE_WALL_IN = 10.0
+    p = bc.ChasePlanner()
+    kinds = [p.decide(reading(20, 0), bc.WallSeen(8.0, "left", None)).kind for _ in range(bc.WALL_TURNS_GIVE_UP)]
+    assert kinds == ["wall_turn"] * (bc.WALL_TURNS_GIVE_UP - 1) + ["give_up"]
+
+
+def test_after_a_bump_he_backs_off_and_the_walk_gives_no_pace_sample(tmp_path):
+    from pi_pipeline.behavior.chase_pace import PaceBook
+    bc.LOST_LOOKS = 1
+
+    class Bot(ClawRobot):
+        bumped = False
+        def walk(self, s):
+            self.bumped = True
+            return super().walk(s)
+    book = PaceBook("k", str(tmp_path / "p.json"))
+    robot, trace = Bot(), []
+    bc.run_chase(robot, FakeCamera([picture([disc(120, 90, 6)]), picture([disc(120, 110, 25)])]), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None, trace=trace, pace=book)
+    assert [m[0] for m in robot.moves][:2] == ["walk", "back"] and not book.log
+
+
+def test_no_picture_after_the_punt_is_not_counted_as_a_hit():
+    tr = [{"kind": "act", "act": "punt", "at": (3.0, 0.0)}, {"kind": "after_punt", "ball": None, "picture": False}]
+    o = ball_punt.BallPunt().score(_res("punted", tr), S)
+    assert o.code == "punt_unseen_camera" and o.score is None
+
+
+def test_a_ball_found_by_a_claw_look_scores_the_search_and_an_after_punt_look_is_not_a_search():
+    bc.LOST_LOOKS, bc.CLAW_PAN_SIGN = 1, "right"
+    none, far = picture(), picture([disc(120, 110, 12)])
+    robot, trace = ClawRobot(), []
+    bc.run_chase(robot, FakeCamera([none, far]), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None, trace=trace)
+    seen = [e for e in trace if e.get("kind") == "claw_seen"]
+    assert seen and "t" in seen[0]
+    res = _res("time", trace, 30.0)
+    o = ball_punt.BallPunt().score(res, S)
+    assert o.numbers["found_by"] == "claw look" and o.stages["search"] > 0.5                    # found by the claw look, early: a good search
+    tr = [{"kind": "look", "ball": {"distance_in": 12, "bearing_deg": 0}, "t": 1}, {"kind": "act", "act": "punt", "at": (3.0, 0.0)},
+          {"kind": "claw_seen", "distance_in": 20.0, "after_punt": True, "t": 9}, {"kind": "after_punt", "ball": {"distance_in": 20.0, "bearing_deg": 30.0}, "picture": True}]
+    assert ball_punt.BallPunt().score(_res("punted", tr), S).numbers["found_by"] == "straight look"
+
+
+def test_the_wall_reading_says_what_lies_right_beside_the_ball(monkeypatch):
+    from pi_pipeline.goals import walls
+    from pi_pipeline.vision import wall_distance as wd
+    monkeypatch.setattr(wd, "estimate", lambda img, cal: wd.WallEstimate(20.0, [90.0, 30.0, 20.0, None, 60.0], False, "left", "x"))
+    monkeypatch.setattr("pi_pipeline.vision.embedder.to_image", lambda j: j)
+    seen = walls.wall_seen(b"jpeg", reading(8, 0), object())                                    # the ball in the middle column group
+    assert seen.near_ball_in == round(30.0 / wd.IN_TO_CM, 1) and seen.nearest_in == round(30.0 / wd.IN_TO_CM, 1)
+
+
+def test_your_wall_values_stay_yours_after_he_applies_learned_ones():
+    from pi_pipeline import explore_session
+    from pi_pipeline.behavior import wall_settings as ws
+    from pi_pipeline.behavior.driver import BehaviorDriver
+    keep = (BehaviorDriver.WALL_STOP_IN, explore_session.NEAR_LOOK_IN)
+    try:
+        before = ws.defaults()
+        ws.apply({"wall_stop_in": 26.0, "near_look_in": 45.0})
+        assert BehaviorDriver.WALL_STOP_IN == 26.0 and ws.defaults() == before                 # the next exploration's "your values" are still the code's
+    finally:
+        BehaviorDriver.WALL_STOP_IN, explore_session.NEAR_LOOK_IN = keep
+
+
+def test_a_goal_that_needs_the_arm_does_not_start_without_it(tmp_path, monkeypatch):
+    from pi_pipeline.tests.test_voice_loop import _loop, _run
+    monkeypatch.setattr("pi_pipeline.attachments.current", lambda: "head")
+    events = []
+    lp, w, stt, conv, tts = _loop(["ball goal"], on_event=lambda **kw: events.append(kw))
+    _run(lp, 1)
+    assert tts.said[0] == "I need the arm for that goal." and not any(e.get("arm_goal") for e in events)
+    ap = FakeApproach([oc("hit", 1, True)])
+    g = Goal("g", "T", "fake", attempts=1, rest_between_s=0, needs_attachment="arm")
+    out = GoalSession(g, ap, journal=Journal(str(tmp_path / "j.jsonl")), state=State(str(tmp_path / "s.json")), say=lambda m: None, conditions={"attachment": "head"}, sleep=lambda s: None, save_memory=False).run()
+    assert out["why"] == "needs the arm" and not ap.ran and ap.opened == 0

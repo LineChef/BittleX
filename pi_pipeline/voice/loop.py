@@ -629,6 +629,19 @@ class VoiceLoop:
         if cmd == "goal":
             from .commands import goal_for_text
             g = goal_for_text(user_text)
+            need = getattr(g, "needs_attachment", None) if g is not None else None
+            if need:
+                try:
+                    from ..attachments import current as _att
+                    fitted = _att()
+                except Exception:  # noqa: BLE001
+                    fitted = None
+                if fitted != need:
+                    self._cue.set("speaking")
+                    self._speak(f"I need the {need} for that goal.")
+                    self._set_session()
+                    self._cue.set("idle")
+                    return
             if g is not None:
                 log.info("goal session requested (voice): %s", g.id)
                 self._cue.set("speaking")

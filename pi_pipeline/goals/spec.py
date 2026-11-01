@@ -92,6 +92,7 @@ class Goal:
     kind: str = "task"                # "task" | "standing"
     needs_attachment: str | None = None      # the attachment it needs ("arm" for the punt): "G2, practise" skips it otherwise
     practice_words: tuple = ()        # words that name it in "G2, practise <words>"
+    practice_say: str = ""            # how he names it in "I'll practise ...": "punting the ball"
 
     def control_of(self, knob: Knob) -> str:
         c = self.controls.get(knob.name, knob.control)
@@ -105,9 +106,9 @@ class Goal:
 BUILTIN = {
     "ball_punt": Goal("ball_punt", "Punt the ball", "ball_punt", attempts=10, minutes=20.0, min_pack_pct=30, target_successes=None,
                       start_words=("ball goal", "punt goal", "start the ball goal", "start the punt goal", "goal attempt", "start a goal attempt"),
-                      needs_attachment="arm", practice_words=("ball", "punt", "punting", "the ball", "the punt")),
+                      needs_attachment="arm", practice_words=("ball", "punt", "punting", "the ball", "the punt"), practice_say="punting the ball"),
     "walls": Goal("walls", "Turn away from walls", "walls", kind="standing", attempts=0, minutes=5.0, min_pack_pct=30,
-                  practice_words=("walls", "wall", "the walls", "turning", "turning away")),
+                  practice_words=("walls", "wall", "the walls", "turning", "turning away"), practice_say="turning away from walls"),
 }
 DEFAULT_PRIORITY = ("walls", "ball_punt")        # walls above the punt (user, 2026-10-31: always turn away from a wall, also while chasing the ball)
 
