@@ -832,9 +832,9 @@ class _SnapshotCamera:
         return snap.jpeg if snap is not None else None
 
 
-def _stand_if_lying(link, token: str = "kbalance") -> None:
+def _stand_if_lying(link, token: str = "kbalance") -> bool:
     """If the legs read the rest pose, stand him up with `token` (the plain firmware stand-up is `kbalance`; `kup` is the firmware's neutral stand: claw_look --stand kup compares them,
-    2026-11-01, when his legs went limp about 10 s after our stand-up and not after the board's own). Never raises."""
+    2026-11-01, when his legs went limp about 10 s after our stand-up and not after the board's own). Never raises. Returns whether the pose could be read (False: the board gave no pose rows)."""
     import re
     try:
         s = link._ser
@@ -844,13 +844,15 @@ def _stand_if_lying(link, token: str = "kbalance") -> None:
         rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
         j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
         if j is not None and not (j[8] < 40 and j[12] > 30):
-            return
+            return True
         # an unreadable pose (garbled serial reads, STATUS 15) counts as lying: a stand-up from standing changes nothing, a missed one leaves him lying while he "searches" (2026-11-01)
         print("lying down: standing up first" if j is not None else "could not read the pose: standing up first")
         link.send(token, read_reply=False, settle=0.0)
         time.sleep(3.0)
+        return j is not None
     except Exception as e:  # noqa: BLE001
         print("could not check the pose:", e)
+        return False
 
 
 def main() -> None:
@@ -913,7 +915,13 @@ def _main() -> None:
         announce = lambda text: _tts.speak(text)         # noqa: E731
     except Exception as e:  # noqa: BLE001
         print("no voice (", e, "): the cues are printed only")
-    _stand_if_lying(link)
+    pose_read = _stand_if_lying(link)
+    if not pose_read and not args.dry_run:                # no pose AND no pack reading: the BiBoard is not answering (hung or off), and he would "search" for the whole attempt without moving (2026-11-01, three times)
+        from ..power import battery as _battery
+        _ok, _pct, _v = _battery.motion_gate(link)
+        if _pct is None:
+            print("THE BIBOARD IS NOT ANSWERING: no pose and no battery reading. It needs a power-cycle (switch it off, wait, switch it on). Nothing was moved.")
+            raise SystemExit(3)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     trace: list = []
     robot = SerialRobot(link, use_pick=args.use_pick)

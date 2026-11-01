@@ -1513,3 +1513,22 @@ def test_a_look_drops_the_old_frame_the_module_answers_with():
             return type("S", (), {"jpeg": b"x"})()
     cam = Cam()
     assert bc._SnapshotCamera(cam).look() == b"x" and (cam.dropped, cam.taken) == (1, 1)
+
+
+def test_the_pose_check_says_when_the_board_gave_no_pose(monkeypatch):
+    monkeypatch.setattr(bc.time, "sleep", lambda s: None)
+
+    class Ser:
+        in_waiting = 0
+
+        def reset_input_buffer(self): pass
+        def write(self, b): pass
+        def read(self, n): return b""
+
+    class Link:
+        _ser = Ser()
+        sent = []
+
+        def send(self, *a, **k): self.sent.append(a)
+    lk = Link()
+    assert bc._stand_if_lying(lk) is False and lk.sent                       # unreadable: he is stood up to be safe, and the caller learns the board said nothing
