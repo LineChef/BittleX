@@ -418,3 +418,11 @@ def test_no_wall_turn_with_the_ball_in_reach():
     ball = bf.find_ball(picture([disc(120, 110, 70)]))               # about 2.4 in, straight ahead
     assert ball is not None and ball.distance_in <= bc.PUNT_MAX_IN
     assert p.decide(ball, bc.WallSeen(6.0, "left")).kind == "punt"
+
+
+def test_every_turn_is_logged_with_its_cause(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setenv("G2_TURN_LOG", str(tmp_path / "t.jsonl"))
+    bc.log_turn(bc.Action("wall_turn", 2.0, -45.0, "a wall 8 in ahead: turn away"), None, bc.WallSeen(8.0, "left"), "ok")
+    row = json.loads((tmp_path / "t.jsonl").read_text().splitlines()[0])
+    assert row["cause"] == "a wall ahead" and row["direction"] == "left" and row["wall_in"] == 8.0 and row["ball"] is None

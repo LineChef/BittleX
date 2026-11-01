@@ -12,6 +12,7 @@ from pi_pipeline.config import Settings
 def _isolate_api_log(tmp_path, monkeypatch):
     """The Claude API call log goes to a per-test tmp file, never the developer's ~/.local/share/g2."""
     monkeypatch.setenv("G2_API_LOG", str(tmp_path / "api_calls.jsonl"))
+    monkeypatch.setenv("G2_TURN_LOG", str(tmp_path / "turn_log.jsonl"))          # the chase's turn log, likewise
 
 
 @pytest.fixture(autouse=True)

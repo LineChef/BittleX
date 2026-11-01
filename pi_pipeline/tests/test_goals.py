@@ -838,7 +838,7 @@ def test_a_walk_is_cut_short_before_a_wall_and_a_ball_by_the_wall_ends_the_attem
     walks = [m for m in robot.moves if m[0] == "walk"]
     assert walks and walks[0][1] <= 1.0 + 3.0 / 4.2 + 0.05                                      # only 3 in of room before the 10 in limit
     robot, trace = ClawRobot(), []
-    out = bc.run_chase(robot, FakeCamera([picture([disc(120, 110, 25)])]), lambda: False, max_steps=5, sleep=lambda s: None, say=lambda m: None, trace=trace,
+    out = bc.run_chase(robot, FakeCamera([picture([disc(120, 110, 12)])]), lambda: False, max_steps=5, sleep=lambda s: None, say=lambda m: None, trace=trace,
                        wall_check=lambda jpeg, ball: bc.WallSeen(ball.distance_in + 3.0, "left", ball.distance_in + 3.0))
     assert out == "ball_by_wall" and not any(m[0] == "walk" for m in robot.moves)
     o = ball_punt.BallPunt().score(_res("ball_by_wall", trace), S)

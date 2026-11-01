@@ -251,7 +251,7 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
-        if wall is not None and wall.nearest_in is not None and ball.distance_in > PUNT_MAX_IN:    # walls rank above the punt; but with the ball in reach the punch (and lining up)
+        if wall is not None and wall.nearest_in is not None and ball.distance_in > NUDGE_MAX_IN:   # walls rank above the punt; but with the ball within a few inches lining up and punching
             # goes no closer to the wall, and the wall reading is not calibrated for the claw camera (user, 2026-11-01: he turned away from a ball right in front of him)
             behind = wall.near_ball_in
             if behind is not None and ball.distance_in < behind and behind - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
@@ -550,6 +550,25 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     return state, found
 
 
+TURN_CAUSE = {"wall_turn": "a wall ahead", "search_turn": "searching: no ball in sight", "align": "lining the claw up on a close ball", "turn": "the ball off to one side"}
+TURN_LOG = "~/.local/share/g2/turn_log.jsonl"
+
+
+def log_turn(act, ball, wall, state: str) -> None:
+    """One line per turn in TURN_LOG (user, 2026-11-01: every turn and why, to debug him turning away from a ball): the cause, the reason in words, which way and how far,
+    and what he saw (the ball and the wall reading) when he decided. Never raises."""
+    try:
+        path = os.path.expanduser(os.environ.get("G2_TURN_LOG", TURN_LOG))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        row = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "kind": act.kind, "cause": TURN_CAUSE.get(act.kind, act.kind), "why": act.why,
+               "direction": "right" if act.degrees > 0 else "left", "degrees": round(act.degrees, 1), "seconds": round(act.seconds, 2), "state": state,
+               "ball": _ball_dict(ball), "wall_in": None if wall is None or wall.nearest_in is None else round(wall.nearest_in, 1)}
+        with open(path, "a") as f:
+            f.write(json.dumps(row) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _ball_dict(ball: BallReading | None):
     return None if ball is None else {"distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}
 
@@ -692,6 +711,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         else:
             state = "ok"
         note(kind="act", act=act.kind, why=act.why, state=state, seconds=round(act.seconds, 2), degrees=round(act.degrees, 1))
+        if act.kind in TURN_CAUSE:
+            log_turn(act, ball, wall, state)
         if state == "fell":
             say("G2 fell: stopping (fall recovery is off)")
             return "fell"
