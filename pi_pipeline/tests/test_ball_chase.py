@@ -204,8 +204,21 @@ def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
         def send(self, c, **k): return self.reply
     assert battery.motion_gate(Link("Voltage: 8.20 V")) == (True, 88, 8.2)
     ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # low: not ok
-    assert battery.motion_gate(Link("G")) == (False, None, None)                                                   # unreadable: not ok, never "fine"
-    assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False
+    waits = []
+    assert battery.motion_gate(Link("G"), sleep=waits.append) == (False, None, None)                               # unreadable: not ok, never "fine"
+    assert waits == [battery.MOTION_GATE_WAIT_S] * (battery.MOTION_GATE_ROUNDS - 1)                                # ... after a short wait between rounds
+
+    class Late(Link):                                                                                                 # the first reads come back empty (the port just let go: 2026-10-31)
+        def __init__(self): self.n = 0
+        def send(self, c, **k):
+            self.n += 1
+            return "" if self.n <= 4 else "Voltage: 8.50 V"
+    assert battery.motion_gate(Late(), sleep=lambda s: None) == (True, 100, 8.5)
+    battery.MOTION_GATE_WAIT_S, keep = 0.0, battery.MOTION_GATE_WAIT_S
+    try:
+        assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False
+    finally:
+        battery.MOTION_GATE_WAIT_S = keep
 
 
 def test_one_attempt_ends_after_the_first_punt():

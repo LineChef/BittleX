@@ -62,10 +62,27 @@ def pack_percent(volts: float, cells: int = 2) -> int:
 MOTION_MIN_PERCENT = 30      # the hardware-session gate: below this no motion script starts or goes on (user, 2026-10-25: the pack died during a chase and nothing warned)
 
 
-def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 3) -> tuple[bool, int | None, float | None]:
-    """(ok, percent, volts) for a script that is about to move G2. Fails SAFE: a reading that cannot be taken after `attempts` tries, or one under `min_percent`, is not ok. The voice service's own
-    battery watch only runs while that service does, and it is stopped for every hardware test (it shares the serial port), so the test scripts and the ball chase use this instead."""
-    v = read_voltage(link, attempts=attempts)
+MOTION_GATE_ROUNDS = 3         # rounds of `attempts` reads before failing safe
+MOTION_GATE_WAIT_S = 1.5       # between rounds: right after the voice service lets go of the port, the first reads can come back empty (2026-10-31: the claw test stopped on "unreadable"
+                               # at 100%; the same reads a moment later all worked)
+
+
+def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 3, rounds: int | None = None, wait_s: float | None = None,
+                sleep=None) -> tuple[bool, int | None, float | None]:
+    """(ok, percent, volts) for a script that is about to move G2. Fails SAFE: a reading that cannot be taken after `rounds` x `attempts` tries (a short wait between rounds), or one
+    under `min_percent`, is not ok. The voice service's own battery watch only runs while that service does, and it is stopped for every hardware test (it shares the serial port),
+    so the test scripts and the ball chase use this instead."""
+    import time as _time
+    sleep = sleep or _time.sleep
+    rounds = MOTION_GATE_ROUNDS if rounds is None else rounds
+    wait_s = MOTION_GATE_WAIT_S if wait_s is None else wait_s
+    v = None
+    for r in range(max(1, rounds)):
+        v = read_voltage(link, attempts=attempts)
+        if v is not None:
+            break
+        if r + 1 < rounds:
+            sleep(wait_s)
     if v is None:
         return False, None, None
     pct = pack_percent(v)
