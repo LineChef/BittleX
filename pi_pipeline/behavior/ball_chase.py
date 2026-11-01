@@ -53,9 +53,9 @@ CHASE_WALL_TURN_MAX_DEG = 30.0  # the most a wall turn in the chase turns him (t
 MIN_MOVE_S = 1.2               # a gait started and stopped for less than this does not move him
 CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than this, step closer before the next one (2026-10-25: a punt from 4.5 to 7 in was too far, from 2.6 in it threw the ball 18 in)
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
-BACK_UP_S = 2.0
+BACK_UP_S = 1.0
 SAVE_EVERY_S = 2.0
-BACK_BUDGET_S = 6.0            # the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
+BACK_BUDGET_S = 3.0            # the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
 WHEN_VANISHED = "punt"         # the ball vanished at close range: "punt" (it is at the claw) or "back_up" (back off a little and look again)
 VANISH_BACK_S = 1.0
 
