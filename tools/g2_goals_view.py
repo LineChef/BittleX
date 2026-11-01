@@ -124,6 +124,23 @@ def _memory(path: str) -> dict:
             "oom_kills": (rows[-1].get("oom_kills", 0) or 0) - (rows[0].get("oom_kills", 0) or 0)}
 
 
+SYNC_STALE_H = {"goals": 24, "pictures": 48, "walklogs": 72, "walls": 72, "memorydb": 48, "logs": 72}     # the same limits as tools/g2_sync.sh
+
+
+def sync_status(path: str, now: float | None = None) -> list[dict]:
+    """[{task, last_ok (12-hour), age_h, stale, failed}] from ~/Desktop/G2Memory/sync_status.json (tools/g2_sync.sh)."""
+    d = _json(path) or {}
+    now = time.time() if now is None else now
+    out = []
+    for task, stale_h in SYNC_STALE_H.items():
+        t = d.get(task) or {}
+        ok = t.get("last_ok")
+        age = (now - time.mktime(time.strptime(ok, "%Y-%m-%d %H:%M:%S"))) / 3600 if ok else None
+        out.append({"task": task, "last_ok": nice_time(ok) if ok else "never", "age_h": None if age is None else round(age, 1),
+                    "stale": age is None or age > stale_h, "failed": t.get("result") == "failed"})
+    return out
+
+
 def build(folder: str | None = None) -> dict:
     d = os.path.expanduser(folder or os.environ.get("G2_GOALS_DIR", DEFAULT_DIR))
     journal = _lines(os.path.join(d, "goal_journal.jsonl"))
@@ -177,4 +194,5 @@ def build(folder: str | None = None) -> dict:
         else:
             unmatched.append(row)
     return {"pulled": _text(os.path.join(d, "pulled_at.txt")).strip(), "goals": list(goals.values()), "other_lessons": unmatched, "memory": _memory(os.path.join(d, "memory_log.jsonl")),
-            "turns": _turns(os.path.join(d, "turn_log.jsonl")), "curation": report.strip(), "folder": d}
+            "turns": _turns(os.path.join(d, "turn_log.jsonl")), "curation": report.strip(), "folder": d,
+            "sync": sync_status(os.path.join(os.path.dirname(d.rstrip("/")), "sync_status.json"))}

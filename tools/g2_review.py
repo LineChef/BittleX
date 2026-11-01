@@ -186,7 +186,27 @@ class App:
 
     def __init__(self, remote: Remote):
         self.remote = remote
+        self._sync: subprocess.Popen | None = None
         self._backed_up = False
+
+    def sync_now(self, start: bool = True) -> dict:
+        """The "Sync now" button (user, 2026-11-01): every copy from the Pi now (tools/g2_sync.sh run --force all), in the background. Returns whether one is running."""
+        if self._sync is not None and self._sync.poll() is None:
+            return {"running": True, "started": False}
+        if not start:
+            return {"running": False, "started": False, "result": None if self._sync is None else self._sync.returncode}
+        LOG_DIR = Path(os.path.expanduser("~/g2_logs"))
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        script = Path(__file__).resolve().parent / "g2_sync.sh"
+        self._sync = subprocess.Popen(["bash", str(script), "run", "--force", "all"], env={**os.environ, "G2_PI": self.remote.pi},
+                                      stdout=open(LOG_DIR / "sync_button.log", "a"), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
+        return {"running": True, "started": True}
+
+    def sync_status(self) -> list:
+        """When each copy from the Pi last worked, for the line under the title (tools/g2_sync.sh status)."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import g2_goals_view
+        return g2_goals_view.sync_status(os.path.expanduser("~/Desktop/G2Memory/sync_status.json"))
 
     def walls(self) -> list:
         """The wall pictures in the local cache: the recognition shots (with their labels, distance in inches, flags and what the estimator read) and the ring of pictures G2 kept
@@ -584,6 +604,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._send(200, f.read_bytes(), "image/jpeg") if f.is_file() else self._send(404, b"missing", "text/plain")
                 if u.path == "/api/list":
                     return self._json(app.list(qs.get("kind", [""])[0], qs.get("q", [""])[0]))
+                if u.path == "/api/sync":
+                    return self._json({"tasks": app.sync_status(), **app.sync_now(start=False)})
                 if u.path == "/api/goals":
                     return self._json(app.goals())
                 if u.path == "/api/counts":
@@ -657,6 +679,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._json(app.promote_pictures(list(body["paths"]), bool(body.get("value", True))))
                 if u.path == "/api/pictures/restore":
                     return self._json(app.restore_pictures(list(body["paths"])))
+                if u.path == "/api/sync":
+                    return self._json(app.sync_now(start=bool(body.get("start", True))))
                 if u.path == "/api/pictures/sync":
                     return self._json({"sync": app.remote.sync_pictures()})
                 if u.path == "/api/empty-trash":
@@ -695,9 +719,9 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;display:none;gap:12px;align-items:center;max-width:90vw}
 .toast button{background:none;border:0;color:var(--bg);text-decoration:underline}.empty{color:var(--muted);padding:24px 0}
 </style></head><body><div class="wrap">
-<h1>G2 Review</h1><div class="sub" id="status">connecting to the Pi…</div>
+<h1>G2 Review</h1><div class="sub" id="status">connecting to the Pi…</div><div class="sub" id="lastsync"></div>
 <div class="tabs" role="tablist" id="tabs"></div>
-<div class="bar"><input id="q" type="search" placeholder="Filter this tab"><button class="btn" id="refresh">Refresh</button><span id="extra"></span></div>
+<div class="bar"><input id="q" type="search" placeholder="Filter this tab"><button class="btn" id="refresh">Refresh</button><button class="btn" id="syncnow" title="Copy everything from the Pi to this Mac now: goal data, pictures, walk logs, wall pictures, the memory DB, the logs (a few minutes)">Sync from the Pi</button><span id="extra"></span></div>
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
@@ -742,6 +766,11 @@ function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Tra
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
 const TAB=Math.random().toString(36).slice(2);const beat=()=>{api("/api/hb",{id:TAB}).catch(()=>{})};beat();setInterval(beat,5000);       // tells the server this tab is open; closing the tab stops the server
 addEventListener("pageshow",beat);addEventListener("pagehide",()=>{try{navigator.sendBeacon("/api/bye?t="+encodeURIComponent(TOKEN)+"&id="+TAB)}catch(e){}});
+async function showSync(){try{const r=await api("/api/sync");const ls=$("#lastsync");ls.replaceChildren(document.createTextNode(r.running?"Syncing from the Pi… ":"Last copy from the Pi: "));
+  for(const t of r.tasks){const sp=el("span","",t.task+" "+t.last_ok+(t.failed?" (failed)":"")+"   ");if(t.stale||t.failed){sp.style.color="var(--x)";sp.style.fontWeight="600";sp.title="older than it should be"}ls.append(sp)}
+  const b=$("#syncnow");b.disabled=r.running;b.textContent=r.running?"Syncing…":"Sync from the Pi";return r}catch(e){return null}}
+async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: a few minutes":"A sync is already running");await showSync();
+  const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,5000);return}toast(s&&s.result===0?"Sync done":"Sync finished with a problem (see ~/g2_logs/sync.log)");load()};setTimeout(tick,5000)}catch(e){toast("Failed: "+e.message)}}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
   if(tab==="pictures"||tab==="looks"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
@@ -754,7 +783,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
 function fold(title,open){const d=document.createElement("details");d.open=!!open;const sm=document.createElement("summary");sm.textContent=title;sm.style.cssText="cursor:pointer;font-weight:600;color:var(--ink2);margin:10px 0 4px";d.append(sm);return d}
 function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div","empty","No goal data."));return}
- const sum=el("div","labelsum");sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));const m=d.memory||{};
+ const sum=el("div","labelsum");sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));
  if(m.lowest_mb!==undefined)sum.append(el("div","sub","Pi memory: lowest available "+Math.round(m.lowest_mb)+" MB ("+m.when+"), swap up to "+Math.round(m.swap_mb)+" MB"+(m.oom_kills?", OOM KILLS: "+m.oom_kills:"")));
  const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}list.append(sum);
  for(const g of d.goals){const rate=g.counted?Math.round(100*g.successes/g.counted):null;list.append(el("div","divider",g.title+" \u00b7 "+g.counted+" counted attempts, "+g.successes+" good"+(rate===null?"":" ("+rate+"%)")));
@@ -825,7 +854,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
    meta.append(db,document.createTextNode((r.core?" \u00b7 core":"")+" \u00b7 importance "+r.importance+" (change it with the number box)"));main.append(el("div","",r.fact),meta)}
   row.append(main);if(tab==="facts")row.append(factTools(r));if(tab==="observations")row.append(obsTools(r));row.append(xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
-$("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;drawTabs();load();
+$("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;drawTabs();load();showSync();
 </script></body></html>"""
 
 

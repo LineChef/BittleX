@@ -464,3 +464,35 @@ def test_the_goals_tab_reads_the_mac_copy_of_the_goal_data(tmp_path):
     assert g["lessons"][0]["flag"] and g["lessons"][0]["time"] == "Nov 1, 3:57 PM"                    # 12-hour Eastern
     assert g["learned"][0]["setting"] == "punt_max_in" and g["learned"][0]["focus"] and g["learned"][0]["tried"][0]["good"] == 2
     assert V.build(str(tmp_path / "nothing"))["goals"] == []                                          # no data yet: an empty page, no error
+
+
+def test_the_goals_tab_shows_each_copy_from_the_pi_and_flags_old_ones(tmp_path):
+    import time as _t
+    spec = importlib.util.spec_from_file_location("g2_goals_view", Path(__file__).resolve().parents[2] / "tools" / "g2_goals_view.py")
+    V = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(V)
+    now = _t.time()
+    fmt = lambda h: _t.strftime("%Y-%m-%d %H:%M:%S", _t.localtime(now - h * 3600))      # noqa: E731
+    (tmp_path / "sync_status.json").write_text(json.dumps({"goals": {"last_ok": fmt(1), "result": "ok"}, "memorydb": {"last_ok": fmt(72), "result": "failed"}}))
+    rows = {r["task"]: r for r in V.sync_status(str(tmp_path / "sync_status.json"), now)}
+    assert not rows["goals"]["stale"] and rows["memorydb"]["stale"] and rows["memorydb"]["failed"] and rows["logs"]["last_ok"] == "never"
+
+
+def test_the_sync_now_button_starts_one_sync_at_a_time(monkeypatch, tmp_path):
+    started = []
+
+    class Proc:
+        def __init__(self, args, **kw):
+            started.append(args)
+            self.returncode = None
+
+        def poll(self):
+            return self.returncode
+    monkeypatch.setattr(G.subprocess, "Popen", Proc)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    app = G.App(G.Remote("pi@x", runner=FakePi()))
+    assert app.sync_now() == {"running": True, "started": True}
+    assert app.sync_now()["started"] is False and len(started) == 1                 # one at a time
+    assert started[0][-3:] == ["run", "--force", "all"] and started[0][1].endswith("g2_sync.sh")
+    app._sync.returncode = 0
+    assert app.sync_now(start=False) == {"running": False, "started": False, "result": 0}

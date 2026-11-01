@@ -202,7 +202,7 @@ SQLite store (exchanges log + facts), FTS5 recall, the `remember` tool, a CLI an
 - [x] Importance, a core block, sightings log, sleep-time consolidation and a memory-use log (2026-10-05); consolidation has only been dry-run.
 - [ ] Semantic recall (embeddings) if keyword matching feels too literal.
 - [ ] Exercise it across real multi-session conversations once the voice loop runs live.
-- [x] **Back up the memory DB off the robot** — manual `g2membackup` built 2026-10-04 (periodic scheduling still open). It is one SQLite file on the Pi's SD card
+- [x] **Back up the memory DB off the robot** — manual `g2membackup` built 2026-10-04; scheduled since 2026-11-01: a daily snapshot by `g2sync` (14 daily and 8 weekly copies kept in `~/Desktop/G2Memory/memory-backups`). It is one SQLite file on the Pi's SD card
       (`~/.local/share/g2/g2_memory.db`, `G2_MEMORY_DB`); a bad card loses everything. Idea: a periodic copy to the dev machine with SQLite's
       online backup (not a plain `cp`), kept outside the repo, with a restore step. If the AI Head replaces the Pi, memory would live in its backend or
       on the project's own server instead.

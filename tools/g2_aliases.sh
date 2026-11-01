@@ -330,6 +330,16 @@ g2turn3() {
 }
 # g2cmds [--board] [--hours N] [--last N]  -- what the Pi sent to the BiBoard and what the board did on its own (a voice command you give the board, said without "G2", shows as BOARD (on its own)).
 g2cmds() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.link.command_log $*"; }
+# g2sync [status|run|now TASK]  -- every copy from the Pi to this Mac in one job (goal data, pictures, walk logs, wall pictures, the memory DB, the logs), each on its own schedule.
+#   status: when each last worked and STALE if too old. run: the ones that are due. now TASK (or now all): that one now. The background loop (g2_bg_jobs.sh) runs it every 30 min.
+g2sync() {
+  case "${1:-status}" in
+    status) bash "$G2_ROOT/tools/g2_sync.sh" status ;;
+    run) bash "$G2_ROOT/tools/g2_sync.sh" run ;;
+    now) bash "$G2_ROOT/tools/g2_sync.sh" run --force "${2:-all}" ;;
+    *) echo "usage: g2sync [status|run|now TASK|now all]"; return 2 ;;
+  esac
+}
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac
@@ -453,7 +463,7 @@ g2goal() {
   local d="$HOME/Desktop/G2Memory/goals"
   case "${1:-status}" in
     run) [ -n "${2:-}" ] || { echo "usage: g2goal run GOAL"; return 2; }
-         ssh -t "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.goals run '$2'; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice"; g2goal pull ;;
+         ssh -t "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.goals run '$2'; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice"; bash "$G2_ROOT/tools/g2_sync.sh" run --force goals ;;
     stop) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals stop; sudo systemctl stop g2-goal 2>/dev/null; true" ;;
     pull) G2_GOALS_DIR="$d" bash "$G2_ROOT/tools/g2_goal_pull.sh" ;;                # also runs after every deploy and every `g2goal run`; G2 off: says when the last copy was taken
     report) g2goal pull >/dev/null; local g="${2:-ball_punt}"

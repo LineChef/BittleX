@@ -297,7 +297,7 @@ API** (`livecheck.py`), and on G2's real mic + speaker since 2026-10-04.
   facts with an audit log (`python -m pi_pipeline.memory consolidate`; only dry-run so far).
 - **Memory-use log** — per-fact counters of how often a fact was injected, declared and matched, with a report
   (`python -m pi_pipeline.memory usage`); the free `match` mode is on, the `declare` mode costs extra API calls and is opt-in.
-- **Backup** — `tools/g2_memory_backup.sh` (`g2membackup`) copies the Pi's database to the Mac.
+- **Backup** — `tools/g2_memory_backup.sh` (`g2membackup`) copies the Pi's database to the Mac; `g2sync` does it once a day by itself (14 daily, 8 weekly copies kept).
 
 ---
 

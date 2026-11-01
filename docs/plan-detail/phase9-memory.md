@@ -36,7 +36,7 @@ into the voice loop through the `Memory.recall` / `Memory.record` seam.
       runs live (needs an API key / hardware) — and at that point re-check
       whether recall quality, the fact cap, and the decay ordering feel right on
       genuine history rather than test data.
-- [x] **Back up the memory DB off the robot — implemented 2026-10-04: `g2membackup` (`tools/g2_memory_backup.sh`).** The note below is the original design thinking; what was built is a manual snapshot (SQLite `serialize()` over ssh, integrity-checked, to `$G2_BACKUP_DIR`, default `~/Desktop/G2Memory/memory-backups`). Restore, by hand: stop `g2-voice`, copy a backup over the Pi's `~/.local/share/g2/g2_memory.db`, start it. Not yet scheduled to run periodically.
+- [x] **Back up the memory DB off the robot — implemented 2026-10-04: `g2membackup` (`tools/g2_memory_backup.sh`); scheduled daily by `g2sync` since 2026-11-01.** The note below is the original design thinking; what was built is a manual snapshot (SQLite `serialize()` over ssh, integrity-checked, to `$G2_BACKUP_DIR`, default `~/Desktop/G2Memory/memory-backups`). Restore, by hand: stop `g2-voice`, copy a backup over the Pi's `~/.local/share/g2/g2_memory.db`, start it. Not yet scheduled to run periodically.
       Original note:
       On the robot the whole memory is one SQLite file on the Pi's SD card (default
       `~/.local/share/g2/g2_memory.db`, set by `G2_MEMORY_DB`), so a failed or
