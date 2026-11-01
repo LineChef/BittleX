@@ -65,6 +65,7 @@ STAGE_OF = {
 SEARCH_MOVES = ("claw_look", "search_turn", "search_back", "search_walk")
 
 HIT_IN = 8.0                   # the ball moved at least this far: a hit
+FARTHER_IN = 2.0               # the ball this much farther away in the picture after the punt: punted (user, 2026-11-01)
 WEAK_IN = 3.0                  # less than this: a miss
 PUSH_IN = 4.0                  # the ball farther by this much right after a walk toward it: he pushed it
 VANISHED_AT_IN = 2.5           # where the ball is taken to be when it vanished at the claw
@@ -295,6 +296,9 @@ class BallPunt:
                 return Outcome("hit_unseen", round(0.6 - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went out of sight ({_fmt_s(result.seconds)})", nums)
             mv = moved_in(before, after)
             nums["moved_in"] = round(mv, 1)
+            farther = float(after["distance_in"]) - before[0]
+            if farther >= FARTHER_IN:                          # no longer in front of the claw: punted away (user, 2026-11-01)
+                return Outcome("hit", round(0.75 + 0.25 * min(1.0, mv / 24.0) - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went {mv:.0f} in, {farther:.0f} in farther away ({_fmt_s(result.seconds)})", nums)
             if mv >= HIT_IN:
                 return Outcome("hit", round(0.75 + 0.25 * min(1.0, mv / 24.0) - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went {mv:.0f} in ({_fmt_s(result.seconds)})", nums)
             if mv >= WEAK_IN:

@@ -2,7 +2,8 @@
 
 G2 works toward a goal you set. One spoken command starts a session of up to 10 attempts. After each attempt he scores it with his own camera and IMU, decides on the Pi what to change
 for the next attempt (no Claude call), and writes it all down. Design and decisions: [`../planned/goals-plan.md`](../planned/goals-plan.md). Code: `pi_pipeline/goals/`.
-The first goal is **the ball punt** (the arm fitted, the green treat ball on the floor).
+The first goal is **the ball punt** (the arm fitted, the green treat ball on the floor). A punt is judged by one straight picture about a second after the punch: the ball gone from
+in front of the claw, or at least 2 in farther away, counts as punted; still at the claw is a miss. Leave the ball where it rolls: the next attempt looks for it, then searches.
 
 ## 1. Before a session
 

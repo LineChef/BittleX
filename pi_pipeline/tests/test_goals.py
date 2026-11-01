@@ -219,6 +219,14 @@ def test_a_punt_that_leaves_the_ball_is_a_miss_and_one_at_the_claw_says_so():
     assert ball_punt.BallPunt().score(_res("punted", tr), S).code == "hit_unseen"
 
 
+def test_a_ball_farther_away_after_the_punt_or_gone_is_a_punt():
+    tr = [{"kind": "act", "act": "punt", "at": (2.5, 0.0)}, {"kind": "after_punt", "ball": {"distance_in": 5.0, "bearing_deg": 0.0}}]
+    o = ball_punt.BallPunt().score(_res("punted", tr), S)
+    assert o.code == "hit" and o.success                               # 2.5 in farther: no longer at the claw (user, 2026-11-01)
+    tr = [{"kind": "act", "act": "punt", "at": (2.5, 0.0)}, {"kind": "after_punt", "ball": {"distance_in": 3.0, "bearing_deg": 2.0}}]
+    assert not ball_punt.BallPunt().score(_res("punted", tr), S).success      # still at the claw: a miss
+
+
 def test_no_punt_is_scored_by_how_far_he_got():
     bp = ball_punt.BallPunt()
     assert bp.score(_res("time", [{"kind": "look", "ball": None}]), S).code == "never_found"

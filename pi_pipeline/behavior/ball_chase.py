@@ -675,35 +675,12 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             sleep(1.5)                                    # the ball is rolling: look after it stops
             if state != "fell" and max_punts is not None and punts >= max_punts:
                 if after_punt_look:
-                    # 2026-11-01: the picture taken right after the punch showed the ball where it had been (2.4 in, -6 deg) and the punt was scored a miss, while the very next
-                    # look from the same spot found no ball (the user saw it hit). Let him settle, throw one frame away (it can be from before the punch), and when the reading is
-                    # still where the ball was punched from, look once more before believing it.
+                    # One straight picture after the punch decides it (user, 2026-11-01): the ball gone from in front of the claw, or farther away, means it was punted. No claw look
+                    # or back-up here: if it is gone, the next attempt looks, then searches. Let him settle and drop one frame first (it can be from before the punch).
                     sleep(AFTER_PUNT_SETTLE_S)
                     camera.look()
                     jpeg = camera.look()
                     after = find_ball(jpeg) if jpeg else None
-                    at = planner.punt_log[-1] if planner.punt_log else None
-                    if after is not None and at and at[0] is not None and abs(after.distance_in - at[0]) < 1.5 and abs(after.bearing_deg - at[1]) < 8.0:
-                        sleep(1.0)
-                        jpeg2 = camera.look()
-                        if jpeg2:
-                            jpeg, after = jpeg2, find_ball(jpeg2)
-                    if after is None and planner.claw_ok:
-                        _st, after = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2), after_punt=True)
-                        if _st == "fell":
-                            say("G2 fell: stopping (fall recovery is off)")
-                            return "fell"
-                    if after is None and planner._can_back(VANISH_BACK_S):        # still not seen: it may be sitting under the claw (a miss), so back off a little and look again
-                        planner.back_s += VANISH_BACK_S
-                        if robot.back(VANISH_BACK_S) == "fell":
-                            say("G2 fell: stopping (fall recovery is off)")
-                            return "fell"
-                        sleep(settle_s)
-                        jpeg = camera.look()
-                        after = find_ball(jpeg) if jpeg else None
-                        if after is not None:                                        # he backed up: the ball's distance from where he punched is this reading less the back-up
-                            back_in = VANISH_BACK_S * BACK_IN_S
-                            after = dataclasses.replace(after, distance_in=max(0.0, after.distance_in - back_in))
                     note(kind="after_punt", ball=_ball_dict(after), picture=bool(jpeg))
                 say(f"punted {punts}: done")
                 say(f"ATTEMPT: punted at {planner.punt_log[-1] if planner.punt_log else '?'} (in, deg) after {steps} looks; walk steps (ball in, seconds): {planner.walk_log}")
