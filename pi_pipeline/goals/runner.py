@@ -82,7 +82,8 @@ class GoalSession:
                 if not ok:
                     why = "battery"
                     self.say(f"not starting attempt {i}: {bat}")
-                    self._speak("My battery is low, so I'm stopping.")
+                    if "unreadable" not in bat:
+                        self._speak("My battery is low, so I'm stopping.")           # (not for an unreadable pack: that is not the same thing)
                     break
                 settings = self.judge.settings(base)
                 n = next_number(self.judge.state)                     # the attempt's number across sessions (this goal and these conditions), never reused

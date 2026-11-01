@@ -62,6 +62,13 @@ def pack_percent(volts: float, cells: int = 2) -> int:
 MOTION_MIN_PERCENT = 30      # the hardware-session gate: below this no motion script starts or goes on (user, 2026-10-25: the pack died during a chase and nothing warned)
 
 
+def strict() -> bool:
+    """True when an unreadable pack reading must stop a test (G2_BATTERY_STRICT=1). Off since 2026-11-01 (user): serial reads came back garbled right after the voice service stopped
+    (docs/STATUS.md open problem 15) and blocked every test. A reading that works and is under the minimum still stops."""
+    import os
+    return os.environ.get("G2_BATTERY_STRICT", "0") == "1"
+
+
 MOTION_GATE_ROUNDS = 3         # rounds of `attempts` reads before failing safe
 MOTION_GATE_WAIT_S = 1.5       # between rounds: right after the voice service lets go of the port, the first reads can come back empty (2026-10-31: the claw test stopped on "unreadable"
                                # at 100%; the same reads a moment later all worked)
@@ -84,6 +91,9 @@ def motion_gate(link, *, min_percent: int = MOTION_MIN_PERCENT, attempts: int = 
         if r + 1 < rounds:
             sleep(wait_s)
     if v is None:
+        if not strict():
+            log.warning("battery unreadable: continuing (testing; G2_BATTERY_STRICT=1 refuses to move without a reading)")
+            return True, None, None                  # user, 2026-11-01: the garbled serial reads were blocking every test; a reading that works and is low still stops
         return False, None, None
     pct = pack_percent(v)
     return pct >= min_percent, pct, v

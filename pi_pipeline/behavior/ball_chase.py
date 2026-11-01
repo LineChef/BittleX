@@ -473,7 +473,7 @@ class SerialRobot:
         ok, pct, volts = battery.motion_gate(self._lk)
         self.last_pct = pct
         if pct is None:
-            log.warning("battery unreadable: stopping (fail safe)")
+            log.warning("battery unreadable: %s", "continuing (testing; G2_BATTERY_STRICT=1 stops)" if ok else "stopping (fail safe)")
         else:
             log.info("battery %d%% (%.2f V)", pct, volts)
         return ok

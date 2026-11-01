@@ -195,7 +195,7 @@ def test_walks_are_always_the_default_gait_policy(monkeypatch):
     assert not any(c == "kwkF" for c in lk.sent)                                                          # never Petoi's walk
 
 
-def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
+def test_the_battery_gate_is_strict_on_request_and_lets_an_unreadable_pack_through_in_testing(monkeypatch):
     from pi_pipeline.power import battery
 
     class Link:
@@ -203,10 +203,13 @@ def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
         def drain(self, s): pass
         def send(self, c, **k): return self.reply
     assert battery.motion_gate(Link("Voltage: 8.20 V")) == (True, 88, 8.2)
-    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # low: not ok
+    ok, pct, v = battery.motion_gate(Link("Voltage: 7.30 V")); assert ok is False and pct < 30 and v == 7.3         # a reading that works and is low always stops
     waits = []
-    assert battery.motion_gate(Link("G"), sleep=waits.append) == (False, None, None)                               # unreadable: not ok, never "fine"
-    assert waits == [battery.MOTION_GATE_WAIT_S] * (battery.MOTION_GATE_ROUNDS - 1)                                # ... after a short wait between rounds
+    monkeypatch.delenv("G2_BATTERY_STRICT", raising=False)
+    assert battery.motion_gate(Link("G"), sleep=waits.append) == (True, None, None)                               # testing (user, 2026-11-01): unreadable does not block
+    assert waits == [battery.MOTION_GATE_WAIT_S] * (battery.MOTION_GATE_ROUNDS - 1)                                # ... after the retries
+    monkeypatch.setenv("G2_BATTERY_STRICT", "1")
+    assert battery.motion_gate(Link("G"), sleep=lambda s: None) == (False, None, None)                            # strict: fail safe
 
     class Late(Link):                                                                                                 # the first reads come back empty (the port just let go: 2026-10-31)
         def __init__(self): self.n = 0
@@ -216,7 +219,9 @@ def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():
     assert battery.motion_gate(Late(), sleep=lambda s: None) == (True, 100, 8.5)
     battery.MOTION_GATE_WAIT_S, keep = 0.0, battery.MOTION_GATE_WAIT_S
     try:
-        assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False
+        assert bc.SerialRobot(Link("Voltage: 8.20 V")).battery_ok() is True and bc.SerialRobot(Link("junk")).battery_ok() is False       # strict still set
+        monkeypatch.delenv("G2_BATTERY_STRICT")
+        assert bc.SerialRobot(Link("junk")).battery_ok() is True
     finally:
         battery.MOTION_GATE_WAIT_S = keep
 

@@ -188,7 +188,7 @@ class BallPunt:
         ok, pct, volts = battery.motion_gate(self._link)
         self.last_pack_pct = pct
         if pct is None:
-            return False, "battery unreadable"
+            return ok, ("battery unreadable: continuing (testing)" if ok else "battery unreadable")
         if not ok or pct < min_pct:
             return False, f"battery {pct}% ({volts:.2f} V), below {min_pct}%"
         return True, f"battery {pct}% ({volts:.2f} V)"
