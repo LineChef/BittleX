@@ -436,3 +436,31 @@ def test_presence_expires_a_silent_tab_and_a_never_opened_server():
     assert not Q.due()                                   # the first look drops the silent tab and starts the grace
     now[0] += Q.GRACE_S + 1
     assert Q.due()                                       # the tab went silent (browser closed without a bye)
+
+
+def test_the_goals_tab_reads_the_mac_copy_of_the_goal_data(tmp_path):
+    spec = importlib.util.spec_from_file_location("g2_goals_view", Path(__file__).resolve().parents[2] / "tools" / "g2_goals_view.py")
+    V = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(V)
+    rows = [
+        {"kind": "session_start", "time": "2026-11-01 10:00:00", "session": "s1", "goal": "ball_punt", "title": "Punt the ball"},
+        {"kind": "attempt", "time": "2026-11-01 10:01:00", "session": "s1", "goal": "ball_punt", "index": 1, "number": 1, "ended": "punted", "seconds": 20.0,
+         "settings": {"search_order": "claw_scan", "punt_max_in": 4.0}, "outcome": {"code": "hit", "score": 1.0, "success": True, "text": "it went"}},
+        {"kind": "attempt", "time": "2026-11-01 10:05:00", "session": "s1", "goal": "ball_punt", "index": 2, "number": 2, "ended": "fell", "seconds": 5.0,
+         "settings": {}, "outcome": {"code": "fell", "score": 0.0, "success": False, "text": "I fell"}},
+        {"kind": "verdict", "time": "2026-11-01 10:06:00", "session": "s1", "goal": "ball_punt", "index": 2, "number": 2, "verdict": "wrong", "note": ""},
+        {"kind": "session_end", "time": "2026-11-01 10:10:00", "session": "s1", "goal": "ball_punt", "why": "attempts", "attempts": 2, "successes": 1, "minutes": 10.0, "settings_now": {"punt_max_in": 4.0}},
+    ]
+    (tmp_path / "goal_journal.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    (tmp_path / "lessons.jsonl").write_text(json.dumps({"id": 3, "time": "2026-11-01T20:57:36+00:00", "lesson": "Punt the ball: keep punching from 4 in."}) + "\n")
+    (tmp_path / "goal_state.json").write_text(json.dumps({"ball_punt": {"c": {"focus": "punt_max_in", "current": {"punt_max_in": 4.0},
+                                                                      "values": {"punt_max_in": {"4.0": {"v": 4.0, "n": 3, "hits": 2}}}}}}))
+    (tmp_path / "goal_curation").mkdir()
+    (tmp_path / "goal_curation" / "curation_report.md").write_text("# Curation report\n\n- lesson #3 flagged: later attempts disagree (0 of 3 good with it): x\n")
+    d = V.build(str(tmp_path))
+    g = d["goals"][0]
+    assert g["title"] == "Punt the ball" and g["counted"] == 1 and g["successes"] == 1                 # the retracted attempt does not count
+    assert [a["retracted"] for a in g["attempts"]] == [True, False] and g["lessons"][0]["text"] == "keep punching from 4 in."
+    assert g["lessons"][0]["flag"] and g["lessons"][0]["time"] == "Nov 1, 3:57 PM"                    # 12-hour Eastern
+    assert g["learned"][0]["setting"] == "punt_max_in" and g["learned"][0]["focus"] and g["learned"][0]["tried"][0]["good"] == 2
+    assert V.build(str(tmp_path / "nothing"))["goals"] == []                                          # no data yet: an empty page, no error

@@ -88,7 +88,7 @@ How G2's own walks become sim calibration: [`../rl/real-data-pipeline.md`](../rl
 
 | Alias | Does |
 |---|---|
-| `g2pics` | the pictures G2 took while exploring, in a review page (closing its browser tab stops it): name them, X to remove (Trash with Undo), promote to the training set. `g2pics pull` copies them from the Pi first |
+| `g2pics` | the pictures G2 took while exploring, in a review page (closing its browser tab stops it; its Goals tab shows what G2 learned for each goal, from the Mac copy, so it works with G2 off): name them, X to remove (Trash with Undo), promote to the training set. `g2pics pull` copies them from the Pi first |
 | `g2picscurate` | curate the pulled pictures (lighting, sharpness, duplicates, people left out); the background loop does this too |
 | `g2pimem` | G2's real memory on the Pi in the review page: facts, conversations, what he noticed. `g2pimem stop` ends it |
 | `g2mem facts|log N|search <q>` | the same memory from the command line |

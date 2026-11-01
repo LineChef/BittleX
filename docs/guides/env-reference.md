@@ -10,7 +10,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 
 | Variable | Default at the read | Read in | Documented in |
 |---|---|---|---|
-| `G2_GOALS_DIR` | — | `g2_aliases.sh`, `g2_goal_pull.sh` | not documented |
+| `G2_GOALS_DIR` | `DEFAULT_DIR` | `g2_goals_view.py` | not documented |
 | `G2_PUNT_SETTINGS` | `PATH` | `punt_settings.py` | not documented |
 | `G2_TURN_LOG` | `TURN_LOG` | `ball_chase.py`, `curate.py` | not documented |
 
@@ -117,7 +117,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_GAIT_MODE_FILE` | `"~/.local/share/g2/gait_mode.json"` | `gait_mode.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GALLERY_PENDING` | `"~/.local/share/g2/gallery_pending.json"` | `promoted_loader.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_GOALS` | `GOALS_PATH` | `spec.py` | [`goals.md`](goals.md) |
-| `G2_GOALS_DIR` | — | `g2_aliases.sh`, `g2_goal_pull.sh` | not documented |
+| `G2_GOALS_DIR` | `DEFAULT_DIR` | `g2_goals_view.py` | not documented |
 | `G2_GOAL_JOURNAL` | `JOURNAL` | `journal.py` | [`goals.md`](goals.md) |
 | `G2_GOAL_OVERRIDES` | `PATH` | `overrides.py` | [`goals.md`](goals.md) |
 | `G2_GOAL_STATE` | `STATE` | `journal.py` | [`goals.md`](goals.md) |

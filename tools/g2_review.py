@@ -259,6 +259,12 @@ class App:
             raise ValueError("unknown kind")
         return self.remote.memory("list", kind, "--limit", str(int(limit)), "--query", q)
 
+    def goals(self) -> dict:
+        """The Goals tab: what G2 learned for each goal, from the copy of the goal data on this Mac (works with the Pi off)."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import g2_goals_view
+        return g2_goals_view.build()
+
     def counts(self) -> dict:
         """Totals for the tab labels: records of each memory kind, pictures kept, and what is in the Trash."""
         out = dict(self.remote.memory("count"))
@@ -578,6 +584,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._send(200, f.read_bytes(), "image/jpeg") if f.is_file() else self._send(404, b"missing", "text/plain")
                 if u.path == "/api/list":
                     return self._json(app.list(qs.get("kind", [""])[0], qs.get("q", [""])[0]))
+                if u.path == "/api/goals":
+                    return self._json(app.goals())
                 if u.path == "/api/counts":
                     return self._json(app.counts())
                 if u.path == "/api/pictures":
@@ -693,7 +701,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
-const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["trash","Trash"]];
+const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["goals","Goals"],["trash","Trash"]];
 let data=[],undoFn=null,timer=null,confirmAt=0;      // declared: confirmAt was read before it was ever set, so the Empty trash button threw and did nothing
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts";
 const $=s=>document.querySelector(s);
@@ -738,11 +746,29 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
  try{
   if(tab==="pictures"||tab==="looks"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
   else if(tab==="walls"){await api("/api/walls/sync",{});data=await api("/api/walls")}
+  else if(tab==="goals"){data=await api("/api/goals")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
   $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
+function fold(title,open){const d=document.createElement("details");d.open=!!open;const sm=document.createElement("summary");sm.textContent=title;sm.style.cssText="cursor:pointer;font-weight:600;color:var(--ink2);margin:10px 0 4px";d.append(sm);return d}
+function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div","empty","No goal data."));return}
+ const sum=el("div","labelsum");sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));const m=d.memory||{};
+ if(m.lowest_mb!==undefined)sum.append(el("div","sub","Pi memory: lowest available "+Math.round(m.lowest_mb)+" MB ("+m.when+"), swap up to "+Math.round(m.swap_mb)+" MB"+(m.oom_kills?", OOM KILLS: "+m.oom_kills:"")));
+ const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}list.append(sum);
+ for(const g of d.goals){const rate=g.counted?Math.round(100*g.successes/g.counted):null;list.append(el("div","divider",g.title+" \u00b7 "+g.counted+" counted attempts, "+g.successes+" good"+(rate===null?"":" ("+rate+"%)")));
+  if(g.trend&&g.trend.length){list.append(el("div","meta","By session: "+g.trend.map(t=>t.successes+" of "+t.attempts+" ("+t.session+")").join(" \u2192 ")))}
+  const les=g.lessons.filter(l=>!f||l.text.toLowerCase().includes(f));const lf=fold("What he learned ("+les.length+")",true);
+  if(!les.length)lf.append(el("div","empty","No lessons saved yet."));
+  for(const l of les){const r=el("div","row");const mn=el("div","main");mn.append(el("div","",l.text),el("div","meta","#"+l.id+" \u00b7 "+l.time));if(l.flag){const b=el("div","meta","Flagged: "+l.flag);b.style.color="var(--x)";mn.append(b)}r.append(mn);lf.append(r)}list.append(lf);
+  if(g.learned&&g.learned.length){const sf=fold("Settings and what worked ("+g.learned.length+")",false);for(const k of g.learned){const r=el("div","row");const mn=el("div","main");mn.append(el("div","",(k.focus?"\u2605 ":"")+k.setting+": now "+k.now),el("div","meta",k.tried.map(t=>t.value+" ("+t.good+" of "+t.tries+" good)").join(" \u00b7 ")));r.append(mn);sf.append(r)}list.append(sf)}
+  const ov=g.overrides||{},pins=Object.keys(ov.pins||{});if(pins.length||Object.keys(ov.limits||{}).length){const of=fold("Your overrides",true);for(const k of pins)of.append(el("div","meta","Pinned "+k+" = "+JSON.stringify(ov.pins[k])));for(const k of Object.keys(ov.limits||{}))of.append(el("div","meta","Limit "+k+": "+JSON.stringify(ov.limits[k])));list.append(of)}
+  const att=g.attempts.filter(a=>!f||JSON.stringify(a).toLowerCase().includes(f));const af=fold("Attempts ("+att.length+")",false);
+  for(const a of att){const r=el("div","row");if(a.retracted)r.style.opacity=".5";const mn=el("div","main");mn.append(el("div","",(a.number?"#"+a.number:"not counted")+" \u00b7 "+a.time+" \u00b7 "+(a.success?"good":"not good")+" \u00b7 "+(a.text||a.outcome||a.ended)),el("div","meta",(a.retracted?(a.retired?"retired (old scoring)":"retracted by you")+" \u00b7 ":"")+(a.seconds?Math.round(a.seconds)+" s \u00b7 ":"")+"search by "+(a.settings.search_order||"?")+", punch within "+(a.settings.punt_max_in||"?")+" in"));r.append(mn);af.append(r)}list.append(af);
+  const sess=fold("Sessions ("+g.sessions.length+")",false);for(const s of g.sessions){sess.append(el("div","meta",s.time+" \u00b7 "+s.successes+" of "+s.attempts+" good \u00b7 "+(s.minutes||0).toFixed(1)+" min \u00b7 ended: "+s.why))}list.append(sess)}
+ const t=d.turns||{};const tf=fold("Turns in the last "+t.days+" days ("+(t.count||0)+")",false);for(const c of (t.causes||[]))tf.append(el("div","meta",c.n+" \u00d7 "+c.cause));for(const r of (t.recent||[]))tf.append(el("div","meta",r.time+" \u00b7 "+r.kind+" "+(r.direction||"")+" "+(r.degrees||"")+"\u00b0 \u00b7 "+r.why+(r.ball?" \u00b7 ball "+Math.round(r.ball)+" in at "+Math.round(r.ball_deg)+"\u00b0":"")+(r.wall_in?" \u00b7 wall reading "+r.wall_in+" in":"")));list.append(tf);
+ if((d.other_lessons||[]).length){const of=fold("Other lessons ("+d.other_lessons.length+")",false);for(const l of d.other_lessons)of.append(el("div","meta","#"+l.id+" \u00b7 "+l.time+": "+l.text));list.append(of)}}
 function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=data.filter(p=>(!onlyNew||(p.src==="roam"&&!p.labelled))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));const nun=data.filter(p=>p.src==="roam"&&!p.labelled).length;if(nun){const fb=el("button","btn",onlyNew?"Show all wall pictures":"Show only the "+nun+" roam pictures without a label");fb.onclick=()=>{window.wallsUnlabeled=!onlyNew;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",onlyNew?"Every roam picture has a label.":"No wall pictures yet."));return}
  const sum=el("div","labelsum");sum.append(el("b","","Wall pictures: "),document.createTextNode(items.filter(p=>p.src==="recognition").length+" recognition shots, "+items.filter(p=>p.src==="roam").length+" kept in roams. Distances are in inches from the camera lens to the base of the wall. These are kept apart from the object pictures."));list.append(sum);
  const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/wimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
@@ -750,7 +776,7 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
   const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
   if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
