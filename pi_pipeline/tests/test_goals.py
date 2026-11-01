@@ -1441,3 +1441,40 @@ def test_the_same_task_run_twice_in_one_process_starts_the_same_both_times_and_c
         s.run()
         assert not (tmp_path / ".local/share/g2/goal_stop").exists()
     assert seen[0] == seen[2]                                         # the first attempt of each run starts the same (inside a run the attempts apply their own values)
+
+
+# ---------------------------------------------------------------------------------------------- the claw look from a sit (user, 2026-11-01)
+
+class SitRobot(ClawRobot):
+    def sit_down(self): return self._do(("sit",))
+    def stand_from_sit(self): return self._do(("stand_from_sit",))
+
+
+def test_the_claw_look_sits_swings_left_then_right_returns_to_centre_and_stands_up_with_the_back_legs():
+    bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.CLAW_FROM_SIT = 35.0, 15.0, "left", True       # a positive pan points the camera left on G2
+    robot, trace = SitRobot(), []
+    state, found = bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=trace)
+    assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
+    assert robot.moves[1:4] == [("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)] and state == "ok" and found is None     # left first, then right, then centre
+
+
+def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_direction_is_used(monkeypatch):
+    bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.CLAW_FROM_SIT, bc.LOST_LOOKS = 35.0, 15.0, "left", True, 1
+    ahead = picture([disc(120, 110, 12)])
+    robot = SitRobot()
+    bc.run_chase(robot, FakeCamera([picture(), ahead, picture(), picture()]), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None, trace=[])
+    assert [m[0] for m in robot.moves][:5] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
+    turns = [m for m in robot.moves if m[0] == "turn"]
+    assert turns and turns[0][1] < -20                                   # seen in the left picture: he turns left toward it, and looks again standing instead of walking on a sit-height distance
+
+
+def test_the_stand_up_from_a_sit_lifts_the_back_legs_slowly_first(monkeypatch):
+    from pi_pipeline.gait import standup
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    sent = []
+    assert standup.stand_from_sit(sent.append, lambda s: None, "ksit") and len(sent) >= 40
+    assert not standup.stand_from_sit(sent.append, lambda s: None, "krest")                    # only from a sit
+    first, mid = sent[10], sent[len(sent) // 3]
+    nums = lambda c: dict(zip(*[iter(int(x) for x in c[1:].split())] * 2))                      # noqa: E731
+    rear = [k for k in nums(sent[-1]) if k in (12, 13, 14, 15, 8, 9, 10, 11)]
+    assert rear and nums(mid) != nums(first)

@@ -285,6 +285,9 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
+        if standup.stand_from_sit(self._write_pose, time.sleep, self.last_motion_command):        # the arm build from a sit (the claw look): the back legs rise slowly, then the front legs
+            self._skip_firmware_stand = True
+            return transitions.balance_pose()
         if standup.stand_sequenced(self._write_pose, time.sleep, self.last_motion_command):       # the arm build: rear legs, then front legs, the lift easing to 0
             self._skip_firmware_stand = True
             return transitions.balance_pose()

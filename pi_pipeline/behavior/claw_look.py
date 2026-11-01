@@ -33,7 +33,7 @@ def calibrate(robot, camera, *, say=print, sleep=time.sleep) -> str | None:
         if robot.claw_pose(pan, 0.0) == "fell":
             say("G2 fell: stopping")
             return None
-        sleep(0.8)
+        sleep(1.6)                                         # the camera's frames are about 1 s old: a shorter wait shows the pose before the move (2026-11-01)
         jpeg = camera.look()
         ball = find_ball(jpeg) if jpeg else None
         say(f"pan {pan:+.0f}: " + (f"ball {ball.distance_in:.0f} in, {ball.bearing_deg:+.1f} deg in the picture" if ball else "no ball"))
@@ -99,7 +99,7 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
     return {"sag_at_s": sag_at, "min_volts": min_v, "max_dev_deg": round(max_dev, 1), "board_lines": board_lines}
 
 
-def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=print, sleep=time.sleep, settle_s: float = 1.2) -> list:
+def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=print, sleep=time.sleep, settle_s: float = 1.6) -> list:
     """Three pictures from the claw camera, in this order: straight ahead (pan 0), then pan +`pan`, then pan -`pan`, all at `lift`; then the arm goes home. Each is saved as
     straight.jpg / pan_plus.jpg / pan_minus.jpg in `outdir`. After each move it says how far the body tilted during it (`robot.swing_deg()`): a big number means the arm move leans him.
     Stops at once on a fall. Returns [(name, pan, swing_deg, path or None)]."""

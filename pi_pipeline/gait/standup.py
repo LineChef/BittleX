@@ -175,6 +175,32 @@ def stand_sequenced(send, sleep=time.sleep, last_motion_command=None) -> bool:
     return True                                                 # and pulled the arm back to 60 again; the legs and the lift are already at the balance pose
 
 
+SIT_REAR_S, SIT_FRONT_S, SIT_FRONT_START_S = 2.6, 1.6, 0.9      # the stand-up from a sit: the back legs rise slowly over SIT_REAR_S, the front legs (already nearly straight in a sit) follow from SIT_FRONT_START_S
+
+
+def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
+    """The arm build's stand-up from a SIT (user, 2026-11-01: after the claw look he stands up slowly with the back legs). The back legs rise from the sit pose to the balance pose over SIT_REAR_S;
+    the front legs, which a sit holds almost straight, follow a little later; the lift servo stays where the claw look left it (home). No firmware `kbalance` after it (the caller skips it).
+    Only with the arm's profile and only from `ksit`. Returns True if it ran."""
+    p = _poses()
+    if not p or (last_motion_command or "").strip() != "ksit":
+        return False
+    start, goal = list(SIT_URDF_DEG), balance_pose()
+    end_s = max(SIT_REAR_S, SIT_FRONT_START_S + SIT_FRONT_S)
+    n = int(round(end_s * STEPS_PER_S))
+    for i in range(1, n + 1):
+        t = i / STEPS_PER_S
+        now = list(start)
+        for group, t0, dur in ((_REAR_URDF, 0.0, SIT_REAR_S), (_FRONT_URDF, SIT_FRONT_START_S, SIT_FRONT_S)):
+            u = min(1.0, max(0.0, (t - t0) / dur))
+            for k in group:
+                now[k] = start[k] + (goal[k] - start[k]) * _smooth(u)
+        send(move_cmd(now))
+        sleep(1.0 / STEPS_PER_S)
+    sleep(0.4)
+    return True
+
+
 def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build stands up with the plain firmware `kbalance` (profile "poses": {"stand_via": "kbalance"}), which also sets the lift servo to its walking angle (0). Used by the walk
     loops when they start from rest: the Pi never sets joint 1 itself, so a walk that began from `rest` walked with the claw reaching forward (lift 59, the claw on the floor).

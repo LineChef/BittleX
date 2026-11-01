@@ -76,10 +76,11 @@ SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
 CLAW_LIFT_DEG = 15.0
-CLAW_PAN_SIGN = "right"        # which way a positive arm pan turns the camera: right (2026-11-01 sweeps: pan -35 turned the camera about 39 deg LEFT); claw_look --calibrate can re-measure it
+CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: LEFT on G2 (2026-11-01, pictures taken 1.3 s after each move: pan +35 put the ball 73 px to the right = camera 35 deg left, pan -35 about 39 deg right; the user saw the claw swing left); claw_look --calibrate can re-measure it
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
-CLAW_SETTLE_S = 0.6            # still before the picture
+CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
+CLAW_SETTLE_S = 1.5            # after the arm move and before the picture: the camera's frames are about 1 s old (2026-11-01), a shorter wait showed the pose before the move
 
 # The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
 # G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
@@ -121,10 +122,9 @@ ALIGN_TRIES = 3
 WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
 
 
-# How far the camera really turns for each side of the pan, as a share of the pan (two 3-picture sweeps, 2026-11-01, the ball about 8 in to his left): pan -35 moved the ball
-# from the picture's left edge to its centre (about 39 deg, a share of 1.1); pan +35 left the picture almost as it was straight ahead (share about 0), so a ball seen in that
-# picture is where a straight picture puts it. Counting the full +35 there turned a ball on his LEFT into one "on his right" and he turned right, away from it.
-CLAW_PAN_SHARE = {"right": 0.0, "left": 1.1}
+# How far the camera really turns for each side of the pan, as a share of the pan (2026-11-01: about 1.0 on both sides, 35 deg of pan = 35 to 39 deg of camera). The sweeps of
+# that evening that said "pan +35 barely turns it" had taken the picture 0.6 to 1.2 s after the move: the camera's frames are about 1 s old, so they showed the pose BEFORE.
+CLAW_PAN_SHARE = {"right": 1.0, "left": 1.0}
 
 
 def claw_pan_body(pan: float) -> float:
@@ -384,6 +384,27 @@ class SerialRobot:
         self._tx("gp")
         return state
 
+    def sit_down(self) -> str:
+        """The claw look starts from a sit (user, 2026-11-01): the firmware sit, then still. No fall check while sitting (a sit tilts the body)."""
+        self._pitch, self._roll = [], []
+        self._tx("gP")
+        self._tx("ksit")
+        self._sleep(2.5)
+        return "ok"
+
+    def stand_from_sit(self) -> str:
+        """Up again after the claw look: the link stands him up slowly with the back legs first (gait/standup.py stand_from_sit), then still; "fell" if he went over."""
+        self._pitch, self._roll = [], []
+        self._tx("kbalance")
+        t0, state = self._clock(), "ok"
+        while self._clock() - t0 < 1.0:
+            if self._fell():
+                state = "fell"
+                break
+            self._sleep(0.05)
+        self._tx("gp")
+        return state
+
     def walk(self, seconds: float) -> str:
         return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
 
@@ -534,8 +555,15 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     fresh = getattr(camera, "refresh_exposure", None)
     if callable(fresh):
         fresh()                                                                      # one exposure check before the whole look around (user, 2026-10-31), not one per picture
-    side = planner.claw_side or planner.last_side or 1
-    pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
+    from_sit = CLAW_FROM_SIT and not after_punt and hasattr(robot, "sit_down") and hasattr(robot, "stand_from_sit")
+    if from_sit:
+        left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG            # the pan that points the camera to G2's left
+        pans = [left, -left]                                                          # always left first, then right (user, 2026-11-01)
+        if robot.sit_down() == "fell":
+            return "fell", None
+    else:
+        side = planner.claw_side or planner.last_side or 1
+        pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
     for pan in pans:
         state = robot.claw_pose(pan, CLAW_LIFT_DEG)
@@ -552,9 +580,12 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
                 trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
                               **({"t": stamp()} if stamp else {}), **extra})
             say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
-            break
+            if not from_sit:
+                break                                                                  # from a sit both pictures are always taken (the arm goes back to centre and he stands up next)
     if state != "fell":
         state = robot.claw_pose(0.0, 0.0)
+    if from_sit and state != "fell":
+        state = robot.stand_from_sit()
     if trace is not None:
         trace.append({"kind": "claw_look", "found": found is not None, "state": state, **({"t": stamp()} if stamp else {}), **extra})
     return state, found
@@ -673,6 +704,17 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             if state == "fell":
                 say("G2 fell: stopping (fall recovery is off)")
                 return "fell"
+            if CLAW_FROM_SIT and pending is not None:        # seen from a sit: the camera is lower and tilted, so only the DIRECTION is trusted. Turn toward it, then look again standing.
+                b = pending.bearing_deg
+                pending = None
+                planner.last_side = 1 if b >= 0 else -1
+                if abs(b) > 8.0:
+                    side = 1 if b > 0 else -1
+                    state = robot.turn(b, max(MIN_MOVE_S, abs(min(abs(b), MAX_TURN_DEG)) / planner._turn_rate(side, False)))
+                    note(kind="act", act="turn", why=f"the ball was {b:+.0f} deg off in the claw look from the sit: turn toward it", state=state, degrees=round(b, 1))
+                    if state == "fell":
+                        say("G2 fell: stopping (fall recovery is off)")
+                        return "fell"
             continue
         if act.kind == "wall_turn":
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
