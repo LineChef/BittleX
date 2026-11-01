@@ -26,14 +26,20 @@ def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
     return (y * 32767).astype(np.int16)
 
 
-def play(peak: float = DEFAULT_PEAK, rate: int = 48000) -> None:
+def play(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+    """`wait=True` plays it to the end before returning: a short-lived command (g2look) would otherwise end its process, and the sound, before it was heard."""
     def _run() -> None:
         try:
             import sounddevice as sd
             sd.play(render(rate, peak), rate)
+            if wait:
+                sd.wait()
         except Exception:  # noqa: BLE001
             log.debug("shutter sound failed", exc_info=True)
-    threading.Thread(target=_run, name="shutter", daemon=True).start()
+    if wait:
+        _run()
+    else:
+        threading.Thread(target=_run, name="shutter", daemon=True).start()
 
 
 def click() -> None:

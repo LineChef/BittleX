@@ -161,6 +161,7 @@ def shot(args) -> int:
     if subprocess.run(["systemctl", "is-active", "--quiet", "g2-voice"]).returncode == 0 and not args.force:
         print("the voice service is running and holds the camera and the serial port: bash tools/g2_safe_stop.sh voice first (or --force)")
         return 2
+    os.environ["G2_SHUTTER"] = "off"                                 # the snapshot's own click is a background thread that this short-lived command would cut off: it plays the click itself, to the end, below
     from ..config import settings
     from ..gait.stillness import StillnessWaiter
     from ..link.serial_link import SerialLink
@@ -199,6 +200,11 @@ def shot(args) -> int:
             info["estimator_error"] = repr(e)
         record(folder, n, info)
         at = f" at {args.inches} in" if args.inches is not None else ""
+        try:
+            from ..voice import shutter
+            shutter.play(wait=True)                                    # you hear the picture was taken (user, 2026-11-01: "I didn't hear a beep")
+        except Exception:  # noqa: BLE001
+            pass
         print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']}")
         return 0
     finally:
