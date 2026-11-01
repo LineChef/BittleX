@@ -174,6 +174,7 @@ class ChasePlanner:
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
     claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
+    seen_ball: bool = False    # the ball has been seen this attempt: from then on only straight pictures, never a claw look (user, 2026-11-01)
     search_i: int = 0          # moves into the current search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
@@ -196,7 +197,7 @@ class ChasePlanner:
 
     def _order(self) -> tuple[tuple, tuple]:
         once, cycle = SEARCH_ORDERS.get(SEARCH_ORDER, SEARCH_ORDERS["turn"])
-        if not self.claw_ok:
+        if not self.claw_ok or self.seen_ball:
             once, cycle = tuple(m for m in once if m != "claw"), tuple(m for m in cycle if m != "claw")
         return once, (cycle or ("turn",))
 
@@ -258,6 +259,7 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
+        self.seen_ball = True
         if wall is not None and wall.nearest_in is not None and ball.distance_in > NUDGE_MAX_IN:   # walls rank above the punt; but with the ball within a few inches lining up and punching
             # goes no closer to the wall, and the wall reading is not calibrated for the claw camera (user, 2026-11-01: he turned away from a ball right in front of him)
             behind = wall.near_ball_in
@@ -524,7 +526,8 @@ class PictureSaver:
 
 def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
               stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
-    """One look around with the arm: the camera to one side, the other side, and (with the lift up) straight ahead, a picture at each; stops at the first sight of the ball. The arm goes back
+    """One look around with the arm: the camera to one side, then the other, a picture at each (two pictures: user, 2026-11-01; straight ahead is what the plain looks
+    already see); stops at the first sight of the ball. The arm goes back
     to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None). `stamp()` times the trace entries (the scorer needs when the ball was
     first seen); `after_punt` marks a look for where the ball went, which is not a search."""
     extra = {"after_punt": True} if after_punt else {}
@@ -532,7 +535,7 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     if callable(fresh):
         fresh()                                                                      # one exposure check before the whole look around (user, 2026-10-31), not one per picture
     side = planner.claw_side or planner.last_side or 1
-    pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG] + ([0.0] if CLAW_LIFT_DEG > 0 else [])
+    pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
     for pan in pans:
         state = robot.claw_pose(pan, CLAW_LIFT_DEG)

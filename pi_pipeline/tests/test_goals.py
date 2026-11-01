@@ -273,11 +273,17 @@ def test_the_search_orders_match_the_settings_names():
 
 
 def test_the_default_search_starts_with_a_claw_look_then_turns_between_claw_looks():
-    p = bc.ChasePlanner()
-    p.decide(reading(20, 30))
+    p = bc.ChasePlanner()                                                       # the ball not seen yet this attempt
     kinds = [p.decide(None).kind for _ in range(2 + 5)]
     assert kinds[:2] == ["look", "look"] and kinds[2:] == ["claw_look", "search_turn", "claw_look", "search_turn", "claw_look"]
     assert p.claw_side == 1
+
+
+def test_once_the_ball_was_seen_only_straight_pictures_never_a_claw_look():
+    p = bc.ChasePlanner()
+    p.decide(reading(20, 30))                                                   # seen once (user, 2026-11-01: from then on straight pictures only)
+    kinds = [p.decide(None).kind for _ in range(2 + 5)]
+    assert "claw_look" not in kinds and kinds[:3] == ["look", "look", "search_turn"]
 
 
 def test_back_up_moves_stop_at_the_attempt_budget():
@@ -343,17 +349,17 @@ class ClawRobot:
     def battery_ok(self): return True
 
 
-def test_a_claw_look_that_finds_the_ball_turns_g2_toward_it_with_the_pan_added():
+def test_a_claw_look_takes_two_pictures_and_turns_g2_toward_the_ball_by_the_cameras_real_turn():
     bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.LOST_LOOKS = 35.0, 15.0, "right", 1
     none = picture()
-    ahead_in_picture = picture([disc(120, 110, 12)])                     # straight ahead in the camera's picture, which is pointed 35 deg right
-    cam = FakeCamera([picture([disc(200, 110, 14)]), none, ahead_in_picture, ahead_in_picture])
+    ahead_in_picture = picture([disc(120, 110, 12)])                     # straight ahead in the camera's picture, which is pointed about 39 deg left (pan -35)
+    cam = FakeCamera([none, none, ahead_in_picture, ahead_in_picture, ahead_in_picture])
     robot, trace = ClawRobot(), []
-    bc.run_chase(robot, cam, lambda: False, max_steps=4, sleep=lambda s: None, say=lambda m: None, trace=trace)
+    bc.run_chase(robot, cam, lambda: False, max_steps=3, sleep=lambda s: None, say=lambda m: None, trace=trace)
     claws = [m for m in robot.moves if m[0] == "claw"]
-    assert claws[0] == ("claw", 35, 15) and claws[-1] == ("claw", 0, 0)                 # the side it was last seen first, the arm home after
+    assert claws[:3] == [("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)]       # right, then left: two pictures, then the arm home
     turns = [m for m in robot.moves if m[0] == "turn"]
-    assert turns and turns[-1][1] > 20                                                   # it turned right, toward 35 deg
+    assert turns and turns[-1][1] < -20                                                  # it turned left, toward the ball
     assert any(e.get("kind") == "claw_seen" for e in trace)
 
 
