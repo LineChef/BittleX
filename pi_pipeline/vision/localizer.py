@@ -57,8 +57,15 @@ class ForegroundLocalizer:
     first filter whose false alarms (rug patterns, shadows, cables) the embedding match and the rate limits absorb. Pure numpy on a block grid."""
 
     def __init__(self, grid: int = 24, floor_rows: int = 3, min_area: float = 0.025, max_area: float = 0.5, max_width: float = 0.9, min_fill: float = 0.45, contrast: float = 3.0,
-                 min_score: float = 0.25):
+                 min_score: float = 0.25, floor_skip: int | None = None):
         self.grid, self.floor_rows = grid, floor_rows
+        if floor_skip is None:                      # with the arm fitted the claw camera sees its own jaws in the bottom of the picture (2026-11-01): the "floor strip" there was the dark jaws,
+            try:                                    # so every wall read near the bottom (rows 0.83 to 1.0 at 8 to 40 in). Skip those rows and take the floor above them.
+                from ..attachments import current
+                floor_skip = 6 if current() == "arm" else 0
+            except Exception:  # noqa: BLE001
+                floor_skip = 0
+        self.floor_skip = floor_skip
         self.min_area, self.max_area, self.max_width, self.min_fill = min_area, max_area, max_width, min_fill
         self.contrast, self.min_score = contrast, min_score
 
@@ -78,12 +85,13 @@ class ForegroundLocalizer:
         import numpy as np
         col, edge = self._blocks(img)
         g = self.grid
-        strip = col[g - self.floor_rows:, g // 5: g - g // 5].reshape(-1, 3)         # the floor right ahead of him, centre of the frame
+        lo, hi = g - self.floor_rows - self.floor_skip, g - self.floor_skip
+        strip = col[lo:hi, g // 5: g - g // 5].reshape(-1, 3)                       # the floor right ahead of him, centre of the frame (above the claw's jaws with the arm)
         med = np.median(strip, axis=0)
         mad = np.median(np.abs(strip - med), axis=0) * 1.4826
         scale = np.maximum(mad, 6.0)                                                   # never trust a floor that looks perfectly flat
         dist = np.sqrt((((col - med) / scale) ** 2).sum(axis=2) / 3.0)
-        e_strip = edge[g - self.floor_rows:, g // 5: g - g // 5]
+        e_strip = edge[lo:hi, g // 5: g - g // 5]
         e_lim = float(np.median(e_strip) + 3.0 * (np.median(np.abs(e_strip - np.median(e_strip))) * 1.4826 + 2.0))
         return (dist > self.contrast) | (edge > e_lim * 1.5)
 
