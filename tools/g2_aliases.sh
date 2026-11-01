@@ -300,7 +300,7 @@ g2wallpic() {
   ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '$1' --inches '$2' ${3:+--angle $3}"
 }
 # g2look [LABEL] [INCHES] [ANGLE]  -- take one picture with the claw camera right now, G2 STAYING WHERE HE IS (standing; you set him up between pictures), exposure balancing on, saved on the Pi with its label.
-# No arguments: label "look". LABEL says what it is (wall_straight, door, box ...); INCHES = distance from the lens to the thing's base when it matters (the wall calibration uses wall_straight pictures with a distance); ANGLE = degrees off square (left negative).
+# No arguments: it asks for the label, the distance and the angle (Enter skips; Enter at the label = look). LABEL says what it is (wall_straight, door, box ...); INCHES = distance from the lens to the thing's base when it matters (the wall calibration uses wall_straight pictures with a distance); ANGLE = degrees off square (left negative).
 # e.g. `g2look wall_straight 12` (a calibration picture), `g2look door`, `g2look`. The pictures go in the set $G2_LOOKSET (default looks). Stops the voice service first if it is running: `g2look done` starts it again; `g2look list` shows the latest ones.
 g2look() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
@@ -309,6 +309,15 @@ g2look() {
     list) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures list | tail -${2:-12}"; return ;;
     -*) echo "usage: g2look [LABEL] [INCHES] [ANGLE] | g2look list [N] | g2look done"; return 2 ;;
   esac
+  if [ -z "${1:-}" ] && [ -t 0 ]; then       # no label given (2026-11-01: pictures kept coming back saved as "look" with no label): ask before taking it
+    local _l _i _a
+    printf "Label for this picture (e.g. wall_straight, door, box; Enter = look): "; read -r _l
+    if [ -n "$_l" ]; then
+      printf "Distance from the lens to its base in inches (Enter = unknown): "; read -r _i
+      printf "Angle off square in degrees, left negative (Enter = 0): "; read -r _a
+      set -- "$_l" "$_i" "$_a"
+    fi
+  fi
   ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '${1:-look}' ${2:+--inches '$2'} --angle '${3:-0}' --set '${G2_LOOKSET:-looks}' --stay 2>&1 | grep -v 'g2.link\\|g2.snapshot exposure unchanged'"
 }
 # g2claw calibrate|pictures|test|hold  -- the claw look hardware checks on the Pi (behavior/claw_look.py), from any folder; stops the voice service first (g2look done / g2goal start it again). G2 standing or lying with his hands-near rule.
