@@ -299,16 +299,17 @@ g2wallpic() {
   [ $# -ge 2 ] || { echo "usage: g2wallpic LABEL INCHES [ANGLE_DEG]   e.g. g2wallpic wall_straight 16"; return 2; }
   ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '$1' --inches '$2' ${3:+--angle $3}"
 }
-# g2wallshot INCHES [ANGLE] [LABEL]  -- one wall picture for the calibration set, G2 STAYS STANDING (you set him up between pictures): square to the wall at INCHES from the camera lens to the wall's base, ANGLE degrees off square (left negative),
-# LABEL default wall_straight, saved in the set $G2_WALLSET (default claw1). Stops the voice service first if it is running. `g2wallshot done` starts the voice service again; `g2wallshot list` shows the pictures taken so far.
-g2wallshot() {
+# g2look [LABEL] [INCHES] [ANGLE]  -- take one picture with the claw camera right now, G2 STAYING WHERE HE IS (standing; you set him up between pictures), exposure balancing on, saved on the Pi with its label.
+# No arguments: label "look". LABEL says what it is (wall_straight, door, box ...); INCHES = distance from the lens to the thing's base when it matters (the wall calibration uses wall_straight pictures with a distance); ANGLE = degrees off square (left negative).
+# e.g. `g2look wall_straight 12` (a calibration picture), `g2look door`, `g2look`. The pictures go in the set $G2_LOOKSET (default looks). Stops the voice service first if it is running: `g2look done` starts it again; `g2look list` shows the latest ones.
+g2look() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-}" in
     done) ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"; return ;;
-    list) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures list | grep -i \"set ${G2_WALLSET:-claw1}\""; return ;;
-    ""|-*) echo "usage: g2wallshot INCHES [ANGLE] [LABEL] | g2wallshot list | g2wallshot done"; return 2 ;;
+    list) ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures list | tail -${2:-12}"; return ;;
+    -*) echo "usage: g2look [LABEL] [INCHES] [ANGLE] | g2look list [N] | g2look done"; return 2 ;;
   esac
-  ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '${3:-wall_straight}' --inches '$1' --angle '${2:-0}' --set '${G2_WALLSET:-claw1}' --stay 2>&1 | grep -v 'g2.link\\|g2.snapshot exposure unchanged'"
+  ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '${1:-look}' ${2:+--inches '$2'} --angle '${3:-0}' --set '${G2_LOOKSET:-looks}' --stay 2>&1 | grep -v 'g2.link\\|g2.snapshot exposure unchanged'"
 }
 # g2imu [rest|stand] [SECONDS]  -- record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
 g2imu() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.gait.imu_capture --pose ${1:-rest} --seconds ${2:-60}"; }

@@ -198,7 +198,8 @@ def shot(args) -> int:
         except Exception as e:  # noqa: BLE001
             info["estimator_error"] = repr(e)
         record(folder, n, info)
-        print(f"saved {path.name}: {args.label} at {args.inches} in; still={still} retaken={retaken} exposure={info['exposure']}")
+        at = f" at {args.inches} in" if args.inches is not None else ""
+        print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']}")
         return 0
     finally:
         try:
@@ -219,7 +220,7 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("shot")
     s.add_argument("--label", required=True, help="wall_straight | wall_far | wall_angle_left | wall_angle_right | corner | door | rug_edge | chair_leg | box | mirror | ...")
-    s.add_argument("--inches", type=float, required=True, help="distance from the camera lens to the base of the wall, in inches")
+    s.add_argument("--inches", type=float, default=None, help="distance from the camera lens to the base of the wall (or the thing), in inches; left out = not known (g2look)")
     s.add_argument("--angle", type=float, default=0.0, help="degrees the body is rotated from square to the wall (left negative)")
     s.add_argument("--note", default="")
     s.add_argument("--set", default="exposure-checked")

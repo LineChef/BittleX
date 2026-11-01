@@ -140,6 +140,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_LLM_MODE` | `"claude"` | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
 | `G2_LOG_DIR` | `str(Path.home(` | `core.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_LOG_HEARD` | — | `loop.py` | [`capabilities.md`](../capabilities.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md), [`project-plan.md`](../project-plan.md) |
+| `G2_LOOKSET` | — | `g2_aliases.sh` | [`cheatsheet.md`](cheatsheet.md) |
 | `G2_MAX_GAIT_S` | `0.0` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_MEMLOG` | `PATH` | `memlog.py` | not documented |
 | `G2_MEMLOG_S` | `INTERVAL_S` | `memlog.py` | not documented |
@@ -238,7 +239,6 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`cheatsheet.md`](cheatsheet.md) +2 |
 | `G2_WAKE_WORD` | `"gee two, hey buddy, hey bud"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md) +1 |
 | `G2_WALK_RAMP_S` | `"0"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_WALLSET` | — | `g2_aliases.sh` | [`cheatsheet.md`](cheatsheet.md) |
 | `G2_WALL_CAL` | `"~/.local/share/g2/wall_calibration.json` | `wall_distance.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WALL_DRYRUN` | `"1"` | `explore_session.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
 | `G2_WALL_KEEP_ALL` | `"0"` | `wall_distance.py` | [`settings-switches.md`](settings-switches.md) |
