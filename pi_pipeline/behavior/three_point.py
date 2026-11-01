@@ -1,4 +1,4 @@
-"""Hardware test of the 3-point turn (user, 2026-11-01): back up while turning, then walk forward while turning the same way.
+"""Hardware test of the 3-point turn (user, 2026-11-01): back up while turning one way, then walk forward turning the OPPOSITE way.
 
   python -m pi_pipeline.behavior.three_point --test [--side left|right] [--back-s 1.2] [--forward-s 1.5]     (g2turn3)
 
@@ -44,10 +44,11 @@ def run_test(robot, link, side: str, back_s: float, forward_s: float, say=print,
     say(f"backing up while turning {side} ({chase.THREE_POINT_BACK_TOKEN[side]}, {back_s:.1f} s): heading changed {out['back'] if out['back'] is None else format(out['back'], '+.0f')} deg ({'right' if sign > 0 else 'left'} is {'+' if sign > 0 else '-'})")
     if state == "fell":
         return out
-    state = robot._skill("kwkR" if side == "right" else "kwkL", forward_s)
+    fwd = "kwkL" if side == "right" else "kwkR"                                    # the forward half steers the OTHER way
+    state = robot._skill(fwd, forward_s)
     y2 = yaw(link)
     out.update(state=state, forward=_swing(y1, y2), total=_swing(y0, y2))
-    say(f"forward while turning {side} ({'kwkR' if side == 'right' else 'kwkL'}, {forward_s:.1f} s): heading changed {out['forward'] if out['forward'] is None else format(out['forward'], '+.0f')} deg; the whole turn {out['total'] if out['total'] is None else format(out['total'], '+.0f')} deg")
+    say(f"forward while turning the other way ({fwd}, {forward_s:.1f} s): heading changed {out['forward'] if out['forward'] is None else format(out['forward'], '+.0f')} deg; the whole turn {out['total'] if out['total'] is None else format(out['total'], '+.0f')} deg")
     return out
 
 

@@ -1601,7 +1601,7 @@ def test_the_three_point_turn_is_off_by_default_and_backs_then_goes_forward(monk
     class Lk:
         def send(self, c, **k): sent.append(c)
     bc.SerialRobot(Lk(), sleep=lambda s: None, clock=iter(range(0, 10000)).__next__).three_point_turn(-30.0, 1.0, 1.0)
-    assert [c for c in sent if c.startswith("k") and c != "kbalance"] == ["kbkL", "kwkL"]
+    assert [c for c in sent if c.startswith("k") and c != "kbalance"] == ["kbkL", "kwkR"]
 
 
 def test_the_three_point_hardware_test_reports_the_heading_changes():

@@ -71,7 +71,7 @@ SEARCH_ORDERS = {
     "back_and_turn": ((), ("back", "turn")),
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
-# The 3-point turn (user, 2026-11-01): back up while turning toward the new heading, then walk forward while turning the same way, so he comes round in less room than a spot turn
+# The 3-point turn (user, 2026-11-01): back up while turning one way, then walk forward while turning the OPPOSITE way (as a car does), so he comes round in less room than a spot turn
 # (a wall close ahead, or a search turn near things). Both uses are OFF until `python -m pi_pipeline.behavior.three_point --test` has shown the direction and size of the backward turn.
 THREE_POINT_BACK_S = 1.2       # the backing-up half
 THREE_POINT_BACK_TOKEN = {"right": "kbkR", "left": "kbkL"}      # the firmware's backward-turning gaits; which way each rotates the body is what the test measures
@@ -276,7 +276,7 @@ class ChasePlanner:
         return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
     def _three_point(self, kind: str, deg: float, why: str) -> Action:
-        """Back up while turning toward `deg`, then forward while turning the same way. `seconds` is the backing-up half; the forward half is sized from the turn rate."""
+        """Back up while turning toward `deg`, then forward while turning the opposite way. `seconds` is the backing-up half; the forward half is sized from the turn rate."""
         self.back_s += THREE_POINT_BACK_S
         return Action(kind, THREE_POINT_BACK_S, deg, why)
 
@@ -284,7 +284,7 @@ class ChasePlanner:
         side = 1 if wall.turn == "right" else -1
         deg = min(wall_turn_deg(), CHASE_WALL_TURN_MAX_DEG) * side
         if WALL_THREE_POINT and self._can_back(THREE_POINT_BACK_S):
-            return self._three_point("three_point", deg, why + " (a 3-point turn: back up while turning, then forward)")
+            return self._three_point("three_point", deg, why + " (a 3-point turn: back up while turning, then forward turning the other way)")
         return Action("wall_turn", abs(deg) / self._turn_rate(side, False), deg, why)
 
     def decide(self, ball: BallReading | None, wall: "WallSeen | None" = None) -> Action:
@@ -520,11 +520,12 @@ class SerialRobot:
         return self._skill("kbkF", seconds)
 
     def three_point_turn(self, degrees: float, back_s: float, forward_s: float) -> str:
-        """Back up while turning toward `degrees` (+ = right), then walk forward while turning the same way: the firmware's backward-turning gait, then its forward-turning one."""
+        """Back up while turning one way, then walk forward turning the OPPOSITE way (user, 2026-11-01: a 3-point turn steers the other way for the forward half, like a car): the firmware's
+        backward-turning gait for `degrees` (+ = right), then the forward-turning gait of the other side."""
         state = self._skill(THREE_POINT_BACK_TOKEN["right" if degrees > 0 else "left"], back_s)
         if state == "fell":
             return state
-        return self._skill("kwkR" if degrees > 0 else "kwkL", forward_s)
+        return self._skill("kwkL" if degrees > 0 else "kwkR", forward_s)
 
     def _pose_cmd(self, lift, sh, kn) -> str:
         return f"i1 {int(round(lift))} 2 0 8 {int(round(sh[0]))} 9 {int(round(sh[1]))} 10 {int(round(sh[2]))} 11 {int(round(sh[3]))} 12 {int(round(kn[0]))} 13 {int(round(kn[1]))} 14 {int(round(kn[2]))} 15 {int(round(kn[3]))}"
