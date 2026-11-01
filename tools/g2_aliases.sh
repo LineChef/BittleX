@@ -311,6 +311,22 @@ g2look() {
   esac
   ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.vision.wall_pictures shot --label '${1:-look}' ${2:+--inches '$2'} --angle '${3:-0}' --set '${G2_LOOKSET:-looks}' --stay 2>&1 | grep -v 'g2.link\\|g2.snapshot exposure unchanged'"
 }
+# g2claw calibrate|pictures|test|hold  -- the claw look hardware checks on the Pi (behavior/claw_look.py), from any folder; stops the voice service first (g2look done / g2goal start it again). G2 standing or lying with his hands-near rule.
+#   calibrate: the ball about 12 in straight ahead; measures which way a positive arm pan turns the camera and saves it.   pictures: three pictures (straight, pan +, pan -), copied to ~/Desktop/G2Memory/g2_pictures/claw/<time> and opened.
+#   test: one look around with the current settings, says where the ball was.   hold: stand and watch 20 s whether the legs hold.   He stays standing after pictures (no rest command); the others rest him.
+g2claw() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac
+  local out
+  out="$(ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.claw_look --$mode 2>&1 | grep -v 'g2.snapshot exposure unchanged\\|dark frame'" | tee /dev/tty)"
+  if [ "$mode" = pictures ]; then
+    local dir; dir="$(printf '%s\n' "$out" | sed -n 's/^PICTURES: \([^ ]*\).*/\1/p' | tail -1)"
+    if [ -n "$dir" ]; then
+      local dest="$HOME/Desktop/G2Memory/g2_pictures/claw/$(basename "$dir")"; mkdir -p "$dest"
+      scp -q "$G2_PI:$dir/*.jpg" "$dest/" && echo "pictures copied to $dest (straight, pan_plus, pan_minus)" && open "$dest" 2>/dev/null
+    fi
+  fi
+}
 # g2imu [rest|stand] [SECONDS]  -- record the raw IMU stream on the Pi (stop the voice service first: bash tools/g2_safe_stop.sh voice) and print its frame rate, accel bias and noise.
 g2imu() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && pi_pipeline/.venv/bin/python -m pi_pipeline.gait.imu_capture --pose ${1:-rest} --seconds ${2:-60}"; }
 # g2picscurate [IN_DIR] [OUT_DIR]  -- curate the pulled exploration pictures (default ~/Desktop/G2Memory/g2_pictures/explore -> training_data/exploration/<date_time>): scores lighting and

@@ -194,7 +194,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_SERIAL_BAUD` | `115200` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_SERIAL_PORT` | `"/dev/serial0"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md) |
 | `G2_SHUTDOWN_CONFIRM_S` | `6.0` | `config.py` | [`.env.example`](../../.env.example) |
-| `G2_SHUTTER` | `"on"` | `shutter.py` | [`.env.example`](../../.env.example) |
+| `G2_SHUTTER` | — | `wall_pictures.py`, `shutter.py` | [`.env.example`](../../.env.example) |
 | `G2_SHUTTER_PEAK` | `DEFAULT_PEAK` | `shutter.py` | [`.env.example`](../../.env.example) |
 | `G2_SIDE_MAX_WORDS` | `14` | `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_SIREN_PEAK` | `sound_levels.SIREN` | `config.py` | [`settings-switches.md`](settings-switches.md) |

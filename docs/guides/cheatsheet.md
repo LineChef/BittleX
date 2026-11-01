@@ -104,6 +104,7 @@ How the pictures flow: [`../vision/picture-library.md`](../vision/picture-librar
 | `g2walls` / `g2wallstats [days]` | the wall pictures; wall statistics from the Pi |
 | `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
 | `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
+| `g2claw calibrate\|pictures\|test\|hold` | the claw look hardware checks on the Pi, from any folder: `calibrate` (ball 12 in ahead: which way a positive pan turns the camera), `pictures` (straight, pan +, pan -, copied to the Mac and opened), `test` (one look around), `hold` (do the legs hold 20 s); stops the voice service first |
 | `g2look [LABEL] [INCHES] [ANGLE]` / `g2look list [N]` / `g2look done` | take one claw-camera picture now with G2 staying where he is (exposure balancing on), labelled; `g2look wall_straight 12` is a wall calibration picture; stops the voice service first, `done` starts it again; set `$G2_LOOKSET` (default `looks`) |
 | `g2mem [HOURS]` | the Pi's memory log (a reading every 10 s, kept in `~/.local/share/g2/memory_log.jsonl`): lowest available memory, G2's biggest total, swap, pressure, OOM kills, overall and between notes (voice service start, goal attempts, explorations); G2 off: from the Mac copy |
 | `g2ball` / `g2ballstop` (or voice: "G2, ball goal") | start the ball goal (up to 10 punt attempts, G2 in rest, ball in front, hands near) / stop it: the attempt ends at its next step and G2 rests; works from any folder |
