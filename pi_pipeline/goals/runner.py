@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from .curate import epoch_now
 
+import os
 import time
 import uuid
 from typing import Callable
@@ -52,6 +53,19 @@ class GoalSession:
                 pass
 
     def run(self) -> dict:
+        """The session, inside a task scope: every setting an attempt changed is put back when it ends, however it ends (util/task_scope.py)."""
+        from ..util.task_scope import task_scope
+        with task_scope(f"goal session {self.goal.id}") as scope:
+            def _clear_stop_files():
+                for f in ("~/.local/share/g2/goal_stop", "~/.local/share/g2/ball_chase_stop"):
+                    try:
+                        os.remove(os.path.expanduser(f))
+                    except OSError:
+                        pass
+            scope.on_exit(_clear_stop_files)
+            return self._run()
+
+    def _run(self) -> dict:
         g = self.goal
         need = getattr(g, "needs_attachment", None)
         if need and self.cond.get("attachment") not in (need, None):

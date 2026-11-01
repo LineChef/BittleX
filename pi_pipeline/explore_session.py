@@ -217,6 +217,13 @@ def run_inprocess(shared: SharedParts, roam_s: float) -> str:
 
 
 def run_session(args, shared: SharedParts | None = None) -> str:
+    """The exploration, inside a task scope: every setting it changed (the walls goal's values, the chase's) is put back when it ends, however it ends (util/task_scope.py)."""
+    from .util.task_scope import task_scope
+    with task_scope("exploration"):
+        return _run_session(args, shared)
+
+
+def _run_session(args, shared: SharedParts | None = None) -> str:
     """The exploration session. Standalone (`shared` None) it opens and closes everything itself; in-process it borrows the voice service's parts, gives
     them back as it found them, and never closes them. Returns how the session ended."""
     from .app.__main__ import _build_runtime, _make_link, _make_memory, _make_vision_source
@@ -230,7 +237,6 @@ def run_session(args, shared: SharedParts | None = None) -> str:
     try:
         from .diag import memlog
         memlog.start("exploration start")
-        memlog.note("exploration start")
     except Exception:  # noqa: BLE001
         pass
     from concurrent.futures import ThreadPoolExecutor

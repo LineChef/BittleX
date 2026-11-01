@@ -12,6 +12,7 @@ import types
 # touched the facts' recall times in g2_memory.db (the .env points G2_MEMORY_DB / G2_EXPERIENCES there) and rewrote ~/.local/share/g2/goal_state.json.
 _SANDBOX = tempfile.mkdtemp(prefix="g2_tests_")
 atexit.register(shutil.rmtree, _SANDBOX, True)
+os.environ["G2_TASK_SCOPE_STRICT"] = "1"                    # a task that changes a setting it did not declare fails its test (util/task_scope.py)
 os.environ["G2_MEMLOG"] = "off"                          # no memory sampler thread in tests (diag/memlog.py; its own tests pass explicit paths)
 os.environ["HOME"] = os.path.join(_SANDBOX, "home")
 os.makedirs(os.environ["HOME"], exist_ok=True)

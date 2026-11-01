@@ -780,6 +780,13 @@ def _stand_if_lying(link, token: str = "kbalance") -> None:
 
 
 def main() -> None:
+    """The chase from the command line, inside a task scope (util/task_scope.py): what the settings file and the command line changed is put back when it ends."""
+    from ..util.task_scope import task_scope
+    with task_scope("ball chase"):
+        _main()
+
+
+def _main() -> None:
     global PUNT_MAX_IN, NUDGE_MAX_IN, NUDGES_BEFORE_PUNT, SEARCH_WALK
     import argparse
     ap = argparse.ArgumentParser(description="Chase the green ball and punt it until stopped.")

@@ -76,7 +76,7 @@ def test_a_roam_bout_is_not_cut_off_by_the_behavior_layers_own_caps():
 def test_a_fall_ends_the_exploration_session_and_skips_the_stand_up_sequence():
     import inspect
     from pi_pipeline import explore_session as E
-    src = inspect.getsource(E.run_session)
+    src = inspect.getsource(E._run_session)
     assert "fell = threading.Event()" in src and "fell.set()" in src
     loop = src[src.index("while t.is_alive() and not stop_flag.is_set()"):]
     assert 'if fell.is_set():\n                    ended_by = "fell"\n                    break' in loop        # the main loop leaves within half a second of a fall
@@ -88,7 +88,7 @@ def test_the_slow_start_up_loads_run_in_the_background_and_the_hand_over_does_no
     import inspect
     from pi_pipeline import explore_session as E
     from pi_pipeline.voice import __main__ as V
-    src = inspect.getsource(E.run_session)
+    src = inspect.getsource(E._run_session)
     assert "prefetch.submit(_load_tts)" in src and "tts_future.result()" in src and "prefetch.submit(_load_vosk)" in src
     assert "threading.Timer(0.3, lambda: launch(" in inspect.getsource(V)
 
@@ -117,7 +117,7 @@ def test_in_process_exploration_borrows_and_never_closes_the_service_parts():
     """The voice service lends its link, memory, speech engine and microphone: the session must give them back open, restore the walker and hand back its IMU streams."""
     import inspect
     from pi_pipeline import explore_session as E
-    src = inspect.getsource(E.run_session)
+    src = inspect.getsource(E._run_session)
     cleanup = src[src.index("if lent:                                    # hand back"):]
     assert "fan.release(c)" in cleanup and "undo()" in cleanup
     lent_part = cleanup[:cleanup.index("else:")]

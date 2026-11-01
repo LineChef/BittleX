@@ -1366,3 +1366,68 @@ def test_the_memory_log_is_trimmed_past_its_size_and_off_means_off(tmp_path, mon
         memlog._append(p, {"t": f"2026-11-01 00:00:{i % 60:02d}", "kind": "sample", "avail_mb": 100.0 + i})
     assert 0 < len(open(p).read().splitlines()) < 100 and open(p).read().splitlines()[-1].endswith("199.0}")
     assert memlog.start("x") is None                                                      # G2_MEMLOG=off in the test run
+
+
+# ---------------------------------------------------------------------------------------------- tasks leave nothing behind (user, 2026-11-01)
+
+def test_a_task_puts_back_every_setting_it_changed_even_when_it_fails():
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.behavior import punt_settings as ps
+    from pi_pipeline.util import task_scope as ts
+    before = ts.capture()
+    with pytest.raises(RuntimeError):
+        with ts.task_scope("test task"):
+            ps.apply(chase, {"punt_max_in": 9.0, "search_order": "turn", "claw_pan_sign": "left"})
+            assert chase.PUNT_MAX_IN == 9.0
+            raise RuntimeError("the task failed")
+    assert ts.capture() == before and chase.PUNT_MAX_IN != 9.0
+
+
+def test_a_change_to_a_setting_the_task_did_not_declare_is_restored_logged_and_fails_the_test(monkeypatch):
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.util import task_scope as ts
+    old = chase.CLAW_PAN_SHARE
+    old_cap = chase.SEARCH_MOVE_MAX_S
+    with pytest.raises(AssertionError, match="SEARCH_MOVE_MAX_S"):
+        with ts.task_scope("sloppy task"):
+            chase.SEARCH_MOVE_MAX_S = 99.0                               # not in the settings table: undeclared
+    assert chase.SEARCH_MOVE_MAX_S == old_cap and chase.CLAW_PAN_SHARE == old
+    monkeypatch.delenv("G2_TASK_SCOPE_STRICT")
+    with ts.task_scope("sloppy task, lenient") as scope:
+        chase.SEARCH_MOVE_MAX_S = 98.0
+    assert chase.SEARCH_MOVE_MAX_S == old_cap and any("SEARCH_MOVE_MAX_S" in x for x in scope.leaks)
+
+
+def test_a_setting_left_changed_outside_any_task_is_found_and_put_back_when_the_next_task_starts(monkeypatch):
+    from pi_pipeline.behavior import ball_chase as chase
+    from pi_pipeline.util import task_scope as ts
+    with ts.task_scope("first"):
+        pass                                                              # the baseline is read
+    monkeypatch.setattr(chase, "PUNT_MAX_IN", 7.5)
+    monkeypatch.delenv("G2_TASK_SCOPE_STRICT")
+    with ts.task_scope("second") as scope:
+        assert chase.PUNT_MAX_IN != 7.5
+    assert any("PUNT_MAX_IN" in x for x in scope.leaks)
+
+
+def test_the_same_task_run_twice_in_one_process_starts_the_same_both_times_and_clears_its_stop_files(tmp_path, monkeypatch):
+    import os
+    from pi_pipeline.behavior import punt_settings as ps
+    from pi_pipeline.util import task_scope as ts
+    from pi_pipeline.behavior import ball_chase as chase
+    monkeypatch.setenv("HOME", str(tmp_path))
+    seen = []
+    for _ in range(2):
+        ap = FakeApproach([oc("bad", 0.2)] * 2)
+        orig = ap.run_attempt
+        def _attempt(settings, ctx, _o=orig):
+            seen.append(ts.capture())                                     # what the attempt starts with
+            ps.apply(chase, {"punt_max_in": 8.0, "nudge_max_in": 9.0})
+            return _o(settings, ctx)
+        ap.run_attempt = _attempt
+        s, _mem = _session(tmp_path, ap, attempts=2)
+        os.makedirs(tmp_path / ".local/share/g2", exist_ok=True)
+        (tmp_path / ".local/share/g2/goal_stop").write_text("")
+        s.run()
+        assert not (tmp_path / ".local/share/g2/goal_stop").exists()
+    assert seen[0] == seen[2]                                         # the first attempt of each run starts the same (inside a run the attempts apply their own values)
