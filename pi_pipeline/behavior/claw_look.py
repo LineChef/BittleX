@@ -61,6 +61,7 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
     pitch, roll = [], []
     base = None
     sag_at, max_dev, min_v, next_v, last_print = None, 0.0, None, 0.0, -1.0
+    board_lines = []                                           # [(seconds, line)]: what the firmware printed that is not an IMU line (it names the skill or behavior it runs)
     try:
         while clock() - t0 < seconds:
             t = clock() - t0
@@ -69,6 +70,11 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
                 if r is not None:
                     roll.append(math.degrees(r[0]))
                     pitch.append(math.degrees(r[1]))
+            other = getattr(link, "pop_other", None)
+            for ln in (other() if callable(other) else []):
+                if not ln.startswith("Voltage"):
+                    board_lines.append((round(t, 1), ln))
+                    say(f"  {t:4.1f} s: the board printed {ln!r}")
             if base is None and t >= 2.0 and pitch:
                 base = (statistics.median(pitch), statistics.median(roll))
                 say(f"standing baseline: pitch {base[0]:+.1f} roll {base[1]:+.1f} deg")
@@ -90,7 +96,7 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
     finally:
         link.send("gp", read_reply=False, settle=0.0)
     say(f"hold test done: " + (f"the legs gave way at {sag_at} s" if sag_at is not None else f"he held for {seconds:.0f} s (largest body movement {max_dev:.1f} deg)") + (f"; lowest pack {min_v:.2f} V" if min_v is not None else ""))
-    return {"sag_at_s": sag_at, "min_volts": min_v, "max_dev_deg": round(max_dev, 1)}
+    return {"sag_at_s": sag_at, "min_volts": min_v, "max_dev_deg": round(max_dev, 1), "board_lines": board_lines}
 
 
 def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=print, sleep=time.sleep, settle_s: float = 1.2) -> list:

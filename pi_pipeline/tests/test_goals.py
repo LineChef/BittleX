@@ -1164,6 +1164,12 @@ def test_the_hold_test_reports_when_the_body_moves_away_from_where_he_stood():
     said = []
     r = hold_test(Link(10.0), seconds=15.0, say=said.append, sleep=sleep, clock=clock)
     assert r["sag_at_s"] is not None and 9.5 <= r["sag_at_s"] <= 11.0 and r["min_volts"] == 8.4 and any("gave way" in m for m in said)
+    class Talk(Link):
+        def pop_other(self): return ["calib"] if t[0] >= self.sag_at else []
+    t[0] = 0.0
+    said = []
+    r = hold_test(Talk(10.0), seconds=12.0, say=said.append, sleep=sleep, clock=clock)
+    assert r["board_lines"] and r["board_lines"][0][1] == "calib" and any("board printed 'calib'" in m for m in said)         # what the firmware printed when it moved him
     t[0] = 0.0
     r = hold_test(Link(99.0), seconds=6.0, say=lambda m: None, sleep=sleep, clock=clock)
     assert r["sag_at_s"] is None and r["max_dev_deg"] < 2
