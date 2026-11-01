@@ -71,6 +71,12 @@ SEARCH_ORDERS = {
     "back_and_turn": ((), ("back", "turn")),
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
+# The 3-point turn (user, 2026-11-01): back up while turning toward the new heading, then walk forward while turning the same way, so he comes round in less room than a spot turn
+# (a wall close ahead, or a search turn near things). Both uses are OFF until `python -m pi_pipeline.behavior.three_point --test` has shown the direction and size of the backward turn.
+THREE_POINT_BACK_S = 1.2       # the backing-up half
+THREE_POINT_BACK_TOKEN = {"right": "kbkR", "left": "kbkL"}      # the firmware's backward-turning gaits; which way each rotates the body is what the test measures
+WALL_THREE_POINT = False       # a wall ahead: a 3-point turn instead of a plain turn away (needs room to back up)
+SEARCH_THREE_POINT = False     # a search turn step is a 3-point turn
 SEARCH_MOVE_MAX_S = 2.0        # the longest search turn before the next picture (user, 2026-11-01: a few steps, then look again)
 SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
 
@@ -199,6 +205,8 @@ class ChasePlanner:
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
     claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
+    align_before: float | None = None   # the ball's bearing when the last align turn was chosen: a swing to the other side afterwards is an overshoot
+    prev_kind: str | None = None   # the kind of the last action he carried out (run_chase sets it): a ball gone after a small step forward means he pushed it
     seen_ball: bool = False    # the ball has been seen this attempt: from then on only straight pictures, never a claw look (user, 2026-11-01)
     search_i: int = 0          # moves into the current search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
@@ -224,6 +232,8 @@ class ChasePlanner:
         once, cycle = SEARCH_ORDERS.get(SEARCH_ORDER, SEARCH_ORDERS["turn"])
         if not self.claw_ok or self.seen_ball:
             once, cycle = tuple(m for m in once if m != "claw"), tuple(m for m in cycle if m != "claw")
+        if SEARCH_THREE_POINT:
+            cycle = tuple("three_point" if m == "turn" else m for m in cycle)
         return once, (cycle or ("turn",))
 
     def _can_back(self, seconds: float) -> bool:
@@ -243,6 +253,11 @@ class ChasePlanner:
             if move == "claw":
                 self.claw_side = side
                 return Action("claw_look", why=f"searching: a look around with the claw, {'right' if side > 0 else 'left'} first")
+            if move == "three_point":
+                if self._can_back(THREE_POINT_BACK_S):
+                    deg = SCAN_TURN_DEG * side
+                    return self._three_point("three_point", deg, f"searching {'right' if side > 0 else 'left'}: a 3-point turn")
+                move = "turn"                                                   # no room to back up left: a plain turn step
             if move == "back":
                 if self._can_back(BACK_UP_S):
                     return self._back("search_back", BACK_UP_S, "searching: back up to see more of the floor")
@@ -260,9 +275,16 @@ class ChasePlanner:
             return Action("search_turn", secs, secs * rate * side, f"searching {'right' if side > 0 else 'left'}")
         return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
+    def _three_point(self, kind: str, deg: float, why: str) -> Action:
+        """Back up while turning toward `deg`, then forward while turning the same way. `seconds` is the backing-up half; the forward half is sized from the turn rate."""
+        self.back_s += THREE_POINT_BACK_S
+        return Action(kind, THREE_POINT_BACK_S, deg, why)
+
     def _wall_turn(self, wall: "WallSeen", why: str) -> Action:
         side = 1 if wall.turn == "right" else -1
         deg = min(wall_turn_deg(), CHASE_WALL_TURN_MAX_DEG) * side
+        if WALL_THREE_POINT and self._can_back(THREE_POINT_BACK_S):
+            return self._three_point("three_point", deg, why + " (a 3-point turn: back up while turning, then forward)")
         return Action("wall_turn", abs(deg) / self._turn_rate(side, False), deg, why)
 
     def decide(self, ball: BallReading | None, wall: "WallSeen | None" = None) -> Action:
@@ -271,8 +293,14 @@ class ChasePlanner:
             self.punts_in_range = 0
             self.nudges = 0
             if self.last_dist is not None and self.last_dist <= NUDGE_MAX_IN:      # it was right there and now it is gone: at the claw, too close for the camera to see (user, 2026-10-25: right in front of the ball and no punt, then a turn away)
+                pushed = self.prev_kind == "walk"                  # he stepped toward it and now it is gone: he bumped it and pushed it away, it is not at the claw (user, 2026-11-01)
                 self.last_dist = None
                 self.lost = 0
+                if pushed:
+                    self.lost = LOST_LOOKS                          # a look around first; if the ball is not found by it, the next empty picture starts the search
+                    if self.claw_ok:
+                        return Action("claw_look", why="the ball is gone after a small step: I probably pushed it away: a look around")
+                    return Action("look", 1.0, why="the ball is gone after a small step: I probably pushed it away: look again")
                 if WHEN_VANISHED == "back_up" and self._can_back(VANISH_BACK_S):
                     return self._back("back", VANISH_BACK_S, "the ball vanished at close range: back off a little to see it")
                 self.after_punt = True
@@ -312,8 +340,12 @@ class ChasePlanner:
         if not near:
             self.align_turns = 0
         if near and abs(ball.bearing_deg) > PUNT_ALIGN_DEG:
+            if self.prev_kind == "align" and self.align_before is not None and ball.bearing_deg * self.align_before < 0 and self._can_back(BACK_UP_S):
+                was, self.align_before, self.align_turns = self.align_before, None, 0         # overshot (user, 2026-11-01): back up, look again, then line up again from the start
+                return self._back("back", BACK_UP_S, f"overshot: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
             if self.align_turns < ALIGN_TRIES:                  # a small turn, then a new picture (the camera checks every pulse)
                 self.align_turns += 1
+                self.align_before = float(ball.bearing_deg)
                 side = 1 if ball.bearing_deg > 0 else -1
                 secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, abs(ball.bearing_deg) / self._turn_rate(side, True)))
                 return Action("align", secs, float(ball.bearing_deg), f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
@@ -487,6 +519,13 @@ class SerialRobot:
     def back(self, seconds: float) -> str:
         return self._skill("kbkF", seconds)
 
+    def three_point_turn(self, degrees: float, back_s: float, forward_s: float) -> str:
+        """Back up while turning toward `degrees` (+ = right), then walk forward while turning the same way: the firmware's backward-turning gait, then its forward-turning one."""
+        state = self._skill(THREE_POINT_BACK_TOKEN["right" if degrees > 0 else "left"], back_s)
+        if state == "fell":
+            return state
+        return self._skill("kwkR" if degrees > 0 else "kwkL", forward_s)
+
     def _pose_cmd(self, lift, sh, kn) -> str:
         return f"i1 {int(round(lift))} 2 0 8 {int(round(sh[0]))} 9 {int(round(sh[1]))} 10 {int(round(sh[2]))} 11 {int(round(sh[3]))} 12 {int(round(kn[0]))} 13 {int(round(kn[1]))} 14 {int(round(kn[2]))} 15 {int(round(kn[3]))}"
 
@@ -647,7 +686,7 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     return state, found
 
 
-TURN_CAUSE = {"wall_turn": "a wall ahead", "search_turn": "searching: no ball in sight", "align": "lining the claw up on a close ball", "turn": "the ball off to one side"}
+TURN_CAUSE = {"three_point": "a 3-point turn (back up while turning, then forward)", "wall_turn": "a wall ahead", "search_turn": "searching: no ball in sight", "align": "lining the claw up on a close ball", "turn": "the ball off to one side"}
 TURN_LOG = "~/.local/share/g2/turn_log.jsonl"
 
 
@@ -749,6 +788,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 cap = WALL_PACE_START_S + room / planner._walk_pace()
                 if act.seconds > cap:
                     act = Action(act.kind, round(cap, 2), act.degrees, act.why + f" (cut short: a wall {wall.nearest_in:.0f} in ahead)")
+        planner.prev_kind = act.kind
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
             note(kind="act", act=act.kind, why=act.why)
@@ -796,6 +836,11 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 ball = None                                                       # no pace sample from a walk that ended on a bump
             if ball is not None and act.kind == "walk":
                 last_move = ("walk", act.seconds, 0.0, ball)
+        elif act.kind == "three_point":
+            if announce is not None:
+                announce("backing up")
+            side = 1 if act.degrees > 0 else -1
+            state = robot.three_point_turn(act.degrees, act.seconds, abs(act.degrees) / planner._turn_rate(side, False))
         elif act.kind in ("back", "search_back"):
             if announce is not None:
                 announce("backing up")                    # he says it when he picks the back-up (user, 2026-11-01)

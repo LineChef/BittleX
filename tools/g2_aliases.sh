@@ -323,6 +323,11 @@ g2look() {
 # g2claw calibrate|pictures|test|hold  -- the claw look hardware checks on the Pi (behavior/claw_look.py), from any folder; stops the voice service first (g2look done / g2goal start it again). G2 standing or lying with his hands-near rule.
 #   calibrate: the ball about 12 in straight ahead; measures which way a positive arm pan turns the camera and saves it.   pictures: three pictures (straight, pan +, pan -), copied to ~/Desktop/G2Memory/g2_pictures/claw/<time> and opened.
 #   test: one look around with the current settings, says where the ball was.   hold: stand and watch 20 s whether the legs hold.   He stays standing after pictures (no rest command); the others rest him.
+# g2turn3 [left|right]  -- hardware test of the 3-point turn (back up while turning, then forward while turning): G2 on his feet, a clear foot behind, hands near; reports the heading change of each half. Stops the voice service first.
+g2turn3() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.three_point --test --side ${1:-left} 2>&1 | grep -v 'g2.snapshot exposure unchanged\\|dark frame'"
+}
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac

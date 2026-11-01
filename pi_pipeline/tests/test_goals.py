@@ -1563,3 +1563,62 @@ def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first():
     r = bc.SerialRobot(Lk(), sleep=lambda s: None)
     r.sit_down()
     assert sent.index("kbalance") < sent.index("ksit")                              # stand first, then sit
+
+
+def test_a_ball_gone_after_a_small_step_means_he_pushed_it_so_he_looks_around():
+    pl = bc.ChasePlanner()
+    pl.decide(bc.BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 0.0, False))        # a ball 5 in ahead: a small step
+    pl.prev_kind = "walk"
+    a = pl.decide(None)
+    assert a.kind == "claw_look" and "pushed" in a.why
+    assert pl.decide(None).kind != "punt"                                                  # the next empty picture goes on to the search
+    pl2 = bc.ChasePlanner()
+    pl2.decide(bc.BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 0.0, False))
+    pl2.prev_kind = "align"
+    assert pl2.decide(None).kind in ("punt", "back")                                       # after a turn it is at the claw: the old rule
+    pl3 = bc.ChasePlanner()
+    pl3.claw_ok = False
+    pl3.decide(bc.BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 0.0, False))
+    pl3.prev_kind = "walk"
+    assert pl3.decide(None).kind == "look"
+
+
+def test_the_three_point_turn_is_off_by_default_and_backs_then_goes_forward(monkeypatch):
+    pl = bc.ChasePlanner()
+    assert pl._wall_turn(bc.WallSeen(8.0, "left"), "x").kind == "wall_turn"                    # off: a plain turn
+    monkeypatch.setattr(bc, "WALL_THREE_POINT", True)
+    a = pl._wall_turn(bc.WallSeen(8.0, "left"), "x")
+    assert a.kind == "three_point" and a.degrees < 0 and a.seconds == bc.THREE_POINT_BACK_S and pl.back_s == bc.THREE_POINT_BACK_S
+    pl.back_s = bc.BACK_BUDGET_S
+    assert pl._wall_turn(bc.WallSeen(8.0, "left"), "x").kind == "wall_turn"                    # no room left to back up: a plain turn
+    monkeypatch.setattr(bc, "SEARCH_THREE_POINT", True)
+    pl2 = bc.ChasePlanner()
+    pl2.claw_ok = False
+    kinds = [pl2.decide(None).kind for _ in range(6)]
+    assert "three_point" in kinds
+    sent = []
+
+    class Lk:
+        def send(self, c, **k): sent.append(c)
+    bc.SerialRobot(Lk(), sleep=lambda s: None, clock=iter(range(0, 10000)).__next__).three_point_turn(-30.0, 1.0, 1.0)
+    assert [c for c in sent if c.startswith("k") and c != "kbalance"] == ["kbkL", "kwkL"]
+
+
+def test_the_three_point_hardware_test_reports_the_heading_changes():
+    from pi_pipeline.behavior import three_point as tp
+    heads = iter([10.0, -40.0, -95.0])
+    out = tp.run_test(type("R", (), {"_skill": lambda self, t, s: "ok"})(), object(), "left", 1.0, 1.0, say=lambda m: None, yaw=lambda lk: next(heads))
+    assert out["back"] == -50.0 and out["forward"] == -55.0 and out["total"] == -105.0
+
+
+def test_an_align_turn_that_overshoots_backs_up_and_lines_up_again():
+    from pi_pipeline.vision.ball_finder import BallReading
+    pl = bc.ChasePlanner()
+    first = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, -23.0, False))
+    assert first.kind == "align"
+    pl.prev_kind = "align"
+    over = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 2.5, 32.0, False))        # the ball swung to the other side
+    assert over.kind == "back" and "overshot" in over.why and pl.align_turns == 0
+    pl.prev_kind = "back"
+    again = pl.decide(BallReading(100.0, 120.0, 400, 22, 22, 22.0, 5.0, 14.0, False))
+    assert again.kind == "align"                                                                # after the back-up he lines up again
