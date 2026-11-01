@@ -794,6 +794,11 @@ def main() -> None:
     ap.add_argument("--punts", type=int, default=None, help="stop after this many punts (one attempt: walk up to the ball and punt it); default: until stopped")
     ap.add_argument("--save-to", default="~/.local/share/g2/explore_pictures/named/greenball", help="folder for the pictures with the ball found (where g2pics reads them)")
     args = ap.parse_args()
+    try:
+        from ..diag import memlog
+        memlog.start("ball chase start")
+    except Exception:  # noqa: BLE001
+        pass
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     import sys as _sys
     from . import punt_settings as _ps

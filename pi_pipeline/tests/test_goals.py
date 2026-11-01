@@ -1318,3 +1318,51 @@ def test_the_test_run_never_touches_the_real_home_or_memory_files():
     assert os.path.realpath(os.path.expanduser("~")).startswith(os.path.realpath(__import__("tempfile").gettempdir())) or not os.path.expanduser("~").startswith(real)
     for key in ("G2_MEMORY_DB", "G2_EXPERIENCES", "G2_MEMORY_CALL_LOG"):
         assert os.path.realpath(os.environ[key]).startswith(os.path.realpath(__import__("tempfile").gettempdir()))
+
+
+# ---------------------------------------------------------------------------------------------- memory log (user, 2026-11-01)
+
+def _fake_proc(tmp_path, avail_kb=200_000, oom=0):
+    p = tmp_path / "proc"
+    (p / "123").mkdir(parents=True, exist_ok=True)
+    (p / "124").mkdir(exist_ok=True)
+    (p / "meminfo").write_text(f"MemTotal:  480000 kB\nMemAvailable: {avail_kb} kB\nSwapTotal: 100000 kB\nSwapFree: 90000 kB\n")
+    (p / "vmstat").write_text(f"nr_free 1\noom_kill {oom}\n")
+    (p / "loadavg").write_text("1.5 1.0 0.5 1/100 99\n")
+    (p / "123" / "statm").write_text("100000 30000 0 0 0 0 0\n")           # 30000 pages
+    (p / "123" / "cmdline").write_text("python\0-m\0pi_pipeline.voice\0")
+    (p / "123" / "comm").write_text("python\n")
+    (p / "124" / "statm").write_text("100 50 0 0 0 0 0\n")
+    (p / "124" / "cmdline").write_text("sshd\0")
+    (p / "124" / "comm").write_text("sshd\n")
+    return str(p)
+
+
+def test_the_memory_log_reads_meminfo_and_sums_g2s_processes(tmp_path):
+    from pi_pipeline.diag import memlog
+    s = memlog.sample(_fake_proc(tmp_path))
+    assert s["avail_mb"] == 195.3 and s["swap_used_mb"] == 9.8 and s["oom_kills"] == 0 and s["load1"] == 1.5
+    assert s["g2_rss_mb"] > 100 and s["top"][0][0].startswith("g2:") and memlog.sample(str(tmp_path / "nothing")) == {}      # no /proc (the Mac): nothing
+
+
+def test_a_low_reading_is_logged_and_emitted_once_a_minute_and_marks_split_the_summary(tmp_path):
+    from pi_pipeline.diag import memlog
+    events, t = [], [1_800_000_000.0]
+    log = memlog.MemLog(str(tmp_path / "m.jsonl"), emit=lambda *a, **k: events.append((a, k)), sampler=lambda: memlog.sample(_fake_proc(tmp_path, avail_kb=50_000)), clock=lambda: t[0])
+    log.write("note", label="goal attempt 1")
+    log.sample_once()
+    t[0] += 10
+    log.sample_once()                                                                    # 10 s later: sampled again, not warned again
+    assert sum(1 for r in memlog.read_rows(None, str(tmp_path / "m.jsonl")) if r["kind"] == "low") == 1 and len(events) == 1 and events[0][0][2] == "memory.low"
+    out = memlog.summarize(memlog.read_rows(None, str(tmp_path / "m.jsonl")))
+    assert "overall: 2 samples" in out and "lowest available 49 MB" in out and "1 low-memory warning" in out and "goal attempt 1" in out
+
+
+def test_the_memory_log_is_trimmed_past_its_size_and_off_means_off(tmp_path, monkeypatch):
+    from pi_pipeline.diag import memlog
+    monkeypatch.setattr(memlog, "MAX_BYTES", 2000)
+    p = str(tmp_path / "m.jsonl")
+    for i in range(100):
+        memlog._append(p, {"t": f"2026-11-01 00:00:{i % 60:02d}", "kind": "sample", "avail_mb": 100.0 + i})
+    assert 0 < len(open(p).read().splitlines()) < 100 and open(p).read().splitlines()[-1].endswith("199.0}")
+    assert memlog.start("x") is None                                                      # G2_MEMLOG=off in the test run

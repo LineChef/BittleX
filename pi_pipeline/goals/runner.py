@@ -90,6 +90,12 @@ class GoalSession:
                 settings = self.judge.settings(base)
                 n = next_number(self.judge.state)                     # the attempt's number across sessions (this goal and these conditions), never reused
                 self.say(f"attempt {i} of {g.attempts} (#{n}), {bat}")
+                try:
+                    from ..diag import memlog
+                    memlog.start(f"goal session {self.session}")                           # a goal run standalone starts the log (once); in the voice service it only adds the note
+                    memlog.note(f"{g.id} attempt {i} (#{n}) start")
+                except Exception:  # noqa: BLE001
+                    pass
                 result = self.approach.run_attempt(settings, ctx)
                 outcome = self.approach.score(result, settings)
                 self.journal.write("attempt", session=self.session, goal=g.id, index=i, scoring_epoch=epoch_now(g.id), number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,

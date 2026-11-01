@@ -104,6 +104,7 @@ How the pictures flow: [`../vision/picture-library.md`](../vision/picture-librar
 | `g2walls` / `g2wallstats [days]` | the wall pictures; wall statistics from the Pi |
 | `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
 | `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
+| `g2mem [HOURS]` | the Pi's memory log (a reading every 10 s, kept in `~/.local/share/g2/memory_log.jsonl`): lowest available memory, G2's biggest total, swap, pressure, OOM kills, overall and between notes (voice service start, goal attempts, explorations); G2 off: from the Mac copy |
 | `g2ball` / `g2ballstop` (or voice: "G2, ball goal") | start the ball goal (up to 10 punt attempts, G2 in rest, ball in front, hands near) / stop it: the attempt ends at its next step and G2 rests; works from any folder |
 | `g2goal [report \| history GOAL \| show GOAL \| status \| suggestions \| confirm\|cancel GOAL KNOB \| run GOAL \| stop \| reset GOAL --yes]` (or voice: "G2, ball goal") | goal sessions: up to 10 attempts, G2 judges each and changes the next; `report` pulls the journal and opens the page; full guide [`goals.md`](goals.md) |
 | `g2goal priority [GOAL ...]`, `g2goal practise [GOAL]` (or voice: "G2, practise") | the goals' order, highest first (walls above the punt), and what "G2, practise" would choose now with each goal's score ([`goals.md`](goals.md) section 8) |

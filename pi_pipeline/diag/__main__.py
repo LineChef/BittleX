@@ -43,6 +43,11 @@ def cmd_list(_):
         print(f"{d.name}   {len(evs):5d} events  {n_warn:3d} warn+  {bb} blackbox  {dur:6.0f}s")
 
 
+def cmd_memlog(a):
+    from . import memlog
+    print(memlog.summarize(memlog.read_rows(a.hours, a.file)))
+
+
 def cmd_summarize(a):
     d = _resolve(a.session)  # validate + friendly exit before handing off
     print(_summarize_session(str(d)))
@@ -119,6 +124,8 @@ def main():
     rp = sub.add_parser("replay"); rp.add_argument("session")
     rp.add_argument("--around"); rp.add_argument("--window", type=float, default=0.0)
     rp.set_defaults(fn=cmd_replay)
+    mp = sub.add_parser("memlog", help="the Pi's memory log: lowest available memory, G2's biggest total, swap, pressure, OOM kills, overall and between notes")
+    mp.add_argument("--hours", type=float, default=24.0); mp.add_argument("--file", default=None); mp.set_defaults(fn=cmd_memlog)
     yp = sub.add_parser("sync"); yp.add_argument("session"); yp.add_argument("dest")
     yp.set_defaults(fn=cmd_sync)
     rr = sub.add_parser("report"); rr.add_argument("session", nargs="?"); rr.add_argument("--html", default=None)

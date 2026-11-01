@@ -417,6 +417,16 @@ g2goal() {
     *) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals $(printf '%q ' "$@")" ;;      # quoted: a --scope like attachment=arm|floor=tile is not a pipe
   esac
 }
+# g2mem [HOURS]  -- the Pi's memory log (default the last 24 hours): lowest available memory, G2's biggest total, swap, memory pressure, OOM kills, overall and between notes (voice service start, goal attempts, explorations). G2 off: from the copy `g2goal pull` last made.
+g2mem() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  if ssh -o BatchMode=yes -o ConnectTimeout=6 "$G2_PI" true 2>/dev/null; then
+    ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.diag memlog --hours ${1:-24}"
+  else
+    echo "G2 is offline: from the copy made at $(cat "$HOME/Desktop/G2Memory/goals/pulled_at.txt" 2>/dev/null || echo never)"
+    (cd "$G2_ROOT" && pi_pipeline/.venv/bin/python -m pi_pipeline.diag memlog --hours "${1:-24}" --file "$HOME/Desktop/G2Memory/goals/memory_log.jsonl")
+  fi
+}
 # g2ball  -- start the ball goal yourself (the same as saying "G2, ball goal"): up to 10 punt attempts; stops the voice service on the Pi, stands G2 up from rest, rests him at the end, starts the voice service and copies the goal data to the Mac. G2 in rest on the floor, the ball in front of him, your hands near.
 # g2ballstop  -- stop it: the attempt ends at its next step (a second or two), G2 rests, the voice service comes back. If it is still moving after that, say "emergency stop" or run app --halt.
 g2ball() { g2goal run ball_punt; }

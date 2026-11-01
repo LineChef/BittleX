@@ -227,6 +227,12 @@ def run_session(args, shared: SharedParts | None = None) -> str:
     from .features import features
 
     boot_t0 = time.monotonic()
+    try:
+        from .diag import memlog
+        memlog.start("exploration start")
+        memlog.note("exploration start")
+    except Exception:  # noqa: BLE001
+        pass
     from concurrent.futures import ThreadPoolExecutor
     prefetch = ThreadPoolExecutor(max_workers=2, thread_name_prefix="prefetch")        # the two slowest start-up steps on the Pi (Piper about 14 s, Vosk about 10 s, measured 2026-10-18) load in the background while the link, camera and policy come up
     tts_future = vosk_future = None
