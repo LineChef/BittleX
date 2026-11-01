@@ -110,4 +110,5 @@ else
   ssh "$G2_PI" 'sudo -n systemctl restart g2-voice; sleep 3; systemctl is-active g2-voice' 2>&1 | tee -a "$LOG"
 fi
 say "DEPLOYED. API call log on the Pi: ~/.local/share/g2/api_calls.jsonl  (python -m pi_pipeline.voice.api_log --last 40)"
+G2_PI="$G2_PI" bash "$(dirname "$0")/g2_goal_pull.sh" 2>&1 | tee -a "$LOG" || true      # a Mac copy of his goal data, readable while he is off (user, 2026-11-01)
 date > "$LOGDIR/deploy_done"

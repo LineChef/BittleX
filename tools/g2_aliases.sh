@@ -409,10 +409,9 @@ g2goal() {
   local d="$HOME/Desktop/G2Memory/goals"
   case "${1:-status}" in
     run) [ -n "${2:-}" ] || { echo "usage: g2goal run GOAL"; return 2; }
-         ssh -t "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.goals run '$2'; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice" ;;
+         ssh -t "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.goals run '$2'; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice"; g2goal pull ;;
     stop) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals stop; sudo systemctl stop g2-goal 2>/dev/null; true" ;;
-    pull) mkdir -p "$d" && rsync -a "$G2_PI:.local/share/g2/goal_journal.jsonl" "$G2_PI:.local/share/g2/goal_state.json" "$G2_PI:.local/share/g2/goals.json" "$d/" 2>/dev/null
-          ls "$d" >/dev/null && echo "copied to $d: $(ls "$d" | tr '\n' ' ')" ;;
+    pull) G2_GOALS_DIR="$d" bash "$G2_ROOT/tools/g2_goal_pull.sh" ;;                # also runs after every deploy and every `g2goal run`; G2 off: says when the last copy was taken
     report) g2goal pull >/dev/null; local g="${2:-ball_punt}"
             (cd "$G2_ROOT" && G2_GOAL_JOURNAL="$d/goal_journal.jsonl" G2_GOAL_STATE="$d/goal_state.json" G2_GOALS="$d/goals.json" pi_pipeline/.venv/bin/python -m pi_pipeline.goals report "$g" --html "$d/$g.html") && open "$d/$g.html" ;;
     *) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals $(printf '%q ' "$@")" ;;      # quoted: a --scope like attachment=arm|floor=tile is not a pipe

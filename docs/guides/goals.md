@@ -39,12 +39,17 @@ When the voice service comes back after a session, he says each new suggestion, 
 ## 4. Reading what he learned
 
 ```bash
-g2goal report                # copy the journal from the Pi and open the report page (ball_punt by default)
+g2goal report                # copy the journal from the Pi and open the report page (ball_punt by default); G2 off: the report from the Mac's copy
+g2goal pull                  # copy his goal data to the Mac now (also done after every deploy and every g2goal run)
 g2goal history ball_punt     # the last sessions as text
 g2goal show ball_punt        # every setting: who changes it, its range, the value he uses now, yours if different
 g2goal status                # what each goal has learned, per attachment and floor; a change being tried
 g2goal reset ball_punt --yes # forget what he learned (the journal keeps the history)
 ```
+
+The Mac keeps a copy in `~/Desktop/G2Memory/goals/` so you can read it while G2 is off: the journal, what he learned, your goals and overrides, the chase and wall
+settings, his measured pace, every chase turn and why (`turn_log.jsonl`), the lessons he saved to memory (`lessons.jsonl`), and `history/<date>/` with the copy as it was
+before each day's first pull. `pulled_at.txt` says when it was taken. The commands other than `report` and `pull` need G2 on.
 
 The report shows the success rate per session, the settings he uses now against the first session's, the record behind each setting (every value tried, how often it worked,
 which way his misses pointed), what he kept and undid, your overrides, each session's attempts,
