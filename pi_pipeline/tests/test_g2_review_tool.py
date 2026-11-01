@@ -496,3 +496,14 @@ def test_the_sync_now_button_starts_one_sync_at_a_time(monkeypatch, tmp_path):
     assert started[0][-3:] == ["run", "--force", "all"] and started[0][1].endswith("g2_sync.sh")
     app._sync.returncode = 0
     assert app.sync_now(start=False) == {"running": False, "started": False, "result": 0}
+
+
+def test_the_mic_button_reads_and_ends_a_wake_word_pause():
+    calls = []
+
+    def runner(args):
+        calls.append(args)
+        return json.dumps({"paused": args[1] == "status", "minutes_left": 7.5 if args[1] == "status" else 0.0, "until": "6:10 PM"})
+    app = G.App(G.Remote("pi@x", runner=runner))
+    assert app.mic()["paused"] and calls[-1] == ["pi_pipeline.voice.wake_pause", "status", "--json"]
+    assert app.mic(turn_on=True)["paused"] is False and calls[-1][1] == "on"

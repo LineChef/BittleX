@@ -143,3 +143,18 @@ def test_a_stalled_microphone_stream_is_replaced_by_the_keeper():
         for s in made:
             s.stopped_feeding = True
         w._keeper.stop()
+
+
+def test_while_the_wake_word_is_off_only_a_stop_word_ends_the_wait(tmp_path, monkeypatch):
+    monkeypatch.setenv("G2_WAKE_PAUSE_FILE", str(tmp_path / "p.json"))
+    from pi_pipeline.voice import wake_pause
+    wake_pause.pause(10)
+    heard = iter(["gee two", "hey buddy", "freeze"])                       # the wake phrases are ignored; the stop word ends the wait
+
+    class Rec(_Rec):
+        def PartialResult(self):
+            return json.dumps({"partial": next(heard, "")})
+    w, holder = _wake()
+    w._Recognizer, w._stop_grammar, w._pending = Rec, "[]", None
+    w.wait()
+    assert w.take_pending() == "freeze" and w.take_pending() is None

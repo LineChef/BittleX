@@ -70,6 +70,20 @@ def _log_trigger(hit, heard, data, conf, last_speaking, *, ignored) -> None:
 DECOYS = ("gee gee",)
 
 
+MIC_BACK_ON = "__mic_back_on__"   # what `take_pending()` returns when a wake-word pause has just ended (voice/wake_pause.py)
+
+
+def stop_words() -> list[str]:
+    """The stop words heard during a wake-word pause, said on their own (voice/commands.py's emergency stop phrases)."""
+    from .commands import _HALT
+    return list(_HALT)
+
+
+def stop_hit(heard: str) -> str | None:
+    h = (heard or "").lower()
+    return next((p for p in stop_words() if p in h), None)
+
+
 def wake_hit(heard: str, phrases) -> str | None:
     """The wake phrase in `heard`, or None (also None when a decoy is in it: "gee gee two" is a GG, not a call)."""
     h = (heard or "").lower()
@@ -141,6 +155,8 @@ class VoskWakeWord:
         self._model = get_model(str(p))      # shared with the speech-to-text recogniser
         # restrict the recogniser to the wake phrases + [unk] -> very low CPU
         self._grammar = json.dumps([*self._phrases, *[d for d in DECOYS if d not in self._phrases], "[unk]"])      # + the look-alikes (DECOYS), so they are written as themselves
+        self._stop_grammar = json.dumps([*stop_words(), "[unk]"])      # during a wake-word pause (voice/wake_pause.py): only the stop words
+        self._pending: str | None = None
         self._Recognizer = KaldiRecognizer
         # ONE microphone stream for the life of the process, never closed: closing a PortAudio stream segfaulted the whole voice service
         # (2026-10-08: sounddevice `close()` from the command window's timeout, a native crash with no Python traceback; the crash report in
@@ -237,8 +253,13 @@ class VoskWakeWord:
         self._handover = False
         return self._q, (lambda: None)
 
-    def _new_recognizer(self):
-        rec = self._Recognizer(self._model, self._rate, self._grammar)
+    def take_pending(self) -> str | None:
+        """What `wait()` returned for when it was not a wake word: a stop word heard during a pause, or MIC_BACK_ON when the pause ended. Read once."""
+        p, self._pending = self._pending, None
+        return p
+
+    def _new_recognizer(self, grammar: str | None = None):
+        rec = self._Recognizer(self._model, self._rate, grammar or self._grammar)
         try:
             rec.SetWords(True)                         # per-word confidence in the results (the wake gate)
         except Exception:  # noqa: BLE001
@@ -254,9 +275,25 @@ class VoskWakeWord:
                 q.get_nowait()
         except queue.Empty:
             pass
-        rec = self._new_recognizer()
+        from . import wake_pause
+        paused = wake_pause.is_paused()
+        rec = self._new_recognizer(self._stop_grammar if paused else None)
+        if paused:
+            log.info("wake word is OFF (%.1f min left): listening for the stop words only", wake_pause.remaining_s() / 60.0)
+        next_check = time.monotonic() + 1.0
         last_speaking = 0.0
         while True:
+            if time.monotonic() >= next_check:         # the pause can start (g2mic off), end early (g2mic on, the page) or run out at any time
+                next_check = time.monotonic() + 1.0
+                now_paused = wake_pause.is_paused()
+                if paused and not now_paused:
+                    log.info("wake word back ON")
+                    self._pending = MIC_BACK_ON
+                    return
+                if now_paused and not paused:
+                    paused = True
+                    rec = self._new_recognizer(self._stop_grammar)
+                    log.info("wake word is OFF: listening for the stop words only")
             if SPEAKING.is_set():                      # G2's own voice must not wake him (2026-10-08: the spoken battery alarm triggered "hey buddy")
                 last_speaking = time.monotonic()
             q = self._q                                # the keeper may have swapped in a fresh stream
@@ -267,7 +304,7 @@ class VoskWakeWord:
                     self._ensure_stream()
                 continue
             if time.monotonic() - last_speaking < _SELF_HEARING_TAIL_S:
-                rec = self._new_recognizer()       # drop what was heard while (and just after) G2 spoke
+                rec = self._new_recognizer(self._stop_grammar if paused else None)       # drop what was heard while (and just after) G2 spoke
                 continue
             final = None
             if rec.AcceptWaveform(data):
@@ -276,6 +313,16 @@ class VoskWakeWord:
             else:
                 heard = json.loads(rec.PartialResult()).get("partial", "")
             heard = heard.lower()
+            if paused:                                 # the wake word is off: a stop word said on its own is the only thing that counts
+                stop = stop_hit(heard)
+                if stop:
+                    log.info("stop word heard while the wake word is off: %r", stop)
+                    self._pending = stop
+                    self._handover = True
+                    return
+                if final is not None:
+                    rec = self._new_recognizer(self._stop_grammar)
+                continue
             hit = wake_hit(heard, self._phrases)
             if hit is None and any(d in heard for d in DECOYS) and final is not None:
                 log.info("wake word ignored: a look-alike (%r)", heard)

@@ -15,7 +15,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_WALL_SOUND` | on | the two-note turn-away sound |
 | `G2_HIT_SOUND` | on | the long "ooooof" when he hits a wall |
 | `G2_ACK_TONE` | `short_tone` | what acknowledges a command sent to Claude: `short_tone`, `ack_whistle`, `buzzer`, `off` (`star_trek_whistle` still works) |
-| `G2_FOLLOW_UP_S` | 5 | seconds the mic stays open after a reply (0 = no window, so no closing notes); `G2_QUESTION_WINDOW_S` (8) after a question |
+| `G2_FOLLOW_UP_S` | 3 (5 until 2026-11-01) | seconds the mic stays open after a reply (0 = no window, so no closing notes); `G2_QUESTION_WINDOW_S` (8) after a question |
 
 ## Exploration and walls
 

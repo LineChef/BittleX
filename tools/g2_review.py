@@ -202,6 +202,10 @@ class App:
                                       stdout=open(LOG_DIR / "sync_button.log", "a"), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
         return {"running": True, "started": True}
 
+    def mic(self, turn_on: bool = False) -> dict:
+        """G2's wake word: {"paused", "minutes_left", "until"}; `turn_on` ends a "mic off" pause early (voice/wake_pause.py)."""
+        return self.remote.call(["pi_pipeline.voice.wake_pause", "on" if turn_on else "status", "--json"])
+
     def sync_status(self) -> list:
         """When each copy from the Pi last worked, for the line under the title (tools/g2_sync.sh status)."""
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -681,6 +685,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._json(app.restore_pictures(list(body["paths"])))
                 if u.path == "/api/sync":
                     return self._json(app.sync_now(start=bool(body.get("start", True))))
+                if u.path == "/api/mic":
+                    return self._json(app.mic(turn_on=bool(body.get("on", False))))
                 if u.path == "/api/pictures/sync":
                     return self._json({"sync": app.remote.sync_pictures()})
                 if u.path == "/api/empty-trash":
@@ -721,7 +727,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 </style></head><body><div class="wrap">
 <h1>G2 Review</h1><div class="sub" id="status">connecting to the Pi…</div><div class="sub" id="lastsync"></div>
 <div class="tabs" role="tablist" id="tabs"></div>
-<div class="bar"><input id="q" type="search" placeholder="Filter this tab"><button class="btn" id="refresh">Refresh</button><button class="btn" id="syncnow" title="Copy everything from the Pi to this Mac now: goal data, pictures, walk logs, wall pictures, the memory DB, the logs (a few minutes)">Sync from the Pi</button><span id="extra"></span></div>
+<div class="bar"><input id="q" type="search" placeholder="Filter this tab"><button class="btn" id="refresh">Refresh</button><button class="btn" id="micon" style="display:none" title="G2's wake word is off (G2, mic off): turn it back on now">Mic on</button><span id="micstate" class="meta" style="margin-left:6px"></span><button class="btn" id="syncnow" title="Copy everything from the Pi to this Mac now: goal data, pictures, walk logs, wall pictures, the memory DB, the logs (a few minutes)">Sync from the Pi</button><span id="extra"></span></div>
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
@@ -769,6 +775,8 @@ addEventListener("pageshow",beat);addEventListener("pagehide",()=>{try{navigator
 async function showSync(){try{const r=await api("/api/sync");const ls=$("#lastsync");ls.replaceChildren(document.createTextNode(r.running?"Syncing from the Pi… ":"Last copy from the Pi: "));
   for(const t of r.tasks){const sp=el("span","",t.task+" "+t.last_ok+(t.failed?" (failed)":"")+"   ");if(t.stale||t.failed){sp.style.color="var(--x)";sp.style.fontWeight="600";sp.title="older than it should be"}ls.append(sp)}
   const b=$("#syncnow");b.disabled=r.running;b.textContent=r.running?"Syncing…":"Sync from the Pi";return r}catch(e){return null}}
+async function showMic(){try{const m=await api("/api/mic",{on:false});$("#micstate").textContent=m.paused?"Wake word off: "+Math.ceil(m.minutes_left)+" min left (until "+m.until+")":"";$("#micon").style.display=m.paused?"":"none"}catch(e){$("#micstate").textContent=""}}
+async function micOn(){try{await api("/api/mic",{on:true});toast("Wake word back on");showMic()}catch(e){toast("Failed: "+e.message)}}
 async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: a few minutes":"A sync is already running");await showSync();
   const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,5000);return}toast(s&&s.result===0?"Sync done":"Sync finished with a problem (see ~/g2_logs/sync.log)");load()};setTimeout(tick,5000)}catch(e){toast("Failed: "+e.message)}}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
@@ -854,7 +862,7 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
    meta.append(db,document.createTextNode((r.core?" \u00b7 core":"")+" \u00b7 importance "+r.importance+" (change it with the number box)"));main.append(el("div","",r.fact),meta)}
   row.append(main);if(tab==="facts")row.append(factTools(r));if(tab==="observations")row.append(obsTools(r));row.append(xbtn(async()=>{try{const t=await api("/api/delete",{kind:tab,id:r.id});data=data.filter(d=>d!==r);render();toast("Moved to the Trash",async()=>{await api("/api/restore",{trash_id:t.trash_id})})}catch(e){toast("Failed: "+e.message)}}));list.append(row)}}
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
-$("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;drawTabs();load();showSync();
+$("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;$("#micon").onclick=micOn;drawTabs();load();showSync();showMic();setInterval(showMic,60000);
 </script></body></html>"""
 
 

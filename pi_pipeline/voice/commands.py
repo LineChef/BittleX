@@ -69,6 +69,32 @@ _HALT = (
     "emergency stop", "freeze", "halt", "stop stop stop", "stop moving",
     "dont move", "hold still", "abort",
 )
+# The wake word off for a while (user, 2026-11-01; voice/wake_pause.py): "mic off" (10 minutes) or "mic off for 20 minutes"; the recogniser often writes "mic" as "mike".
+_MIC_OFF = ("mic off", "mike off", "microphone off", "turn off your mic", "turn your mic off", "turn off the mic", "turn the mic off", "turn off your microphone",
+            "turn off your mike", "turn your mike off", "mute your mic", "mute your mike", "mute your microphone")
+_MIC_ON = ("mic on", "mike on", "microphone on", "turn on your mic", "turn your mic on", "turn on your mike", "turn your mike on", "turn on your microphone", "unmute")
+_MIC_STATUS = ("mic status", "mike status", "microphone status", "is your mic on", "is your mike on", "is your microphone on", "is the mic on")
+_NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15, "twenty": 20,
+              "twenty five": 25, "thirty": 30, "forty": 40, "forty five": 45, "fifty": 50, "sixty": 60, "ninety": 90}
+
+
+def parse_mic_minutes(text: str) -> float | None:
+    """The length in "mic off for 20 minutes" / "for half an hour" / "for an hour"; None when no length is said (the default, 10 minutes)."""
+    n = _normalize(text)
+    if re.search(r"\bhalf (?:an |a )?hour\b", n):
+        return 30.0
+    m = re.search(r"\bfor (?:an|one|a) hour\b", n)
+    if m:
+        return 60.0
+    m = re.search(r"\bfor (\d+) (?:minute|minutes|min|mins)\b", n)
+    if m:
+        return float(m.group(1))
+    for w in sorted(_NUM_WORDS, key=len, reverse=True):
+        if re.search(rf"\bfor {w} (?:minute|minutes)\b", n):
+            return float(_NUM_WORDS[w])
+    return None
+
+
 _RESUME = (
     "resume", "you can move", "as you were", "unfreeze", "carry on",
     "at ease", "you can go", "release",
@@ -471,6 +497,12 @@ def match_local_command(text: str) -> str | None:
         return "halt"
     if _has_verb(n, _RESUME):
         return "resume"
+    if _hit(n, _MIC_STATUS):
+        return "mic_status"                            # before "mic on": "is your mic on" is a question
+    if _hit(n, _MIC_OFF):
+        return "mic_off"
+    if _hit(n, _MIC_ON):
+        return "mic_on"
     if _hit(n, _SHUTDOWN) or n in _SHUTDOWN_EXACT or _has_verb(n, ("shutdown",)):
         return "shutdown"
     if _hit(n, _COME):

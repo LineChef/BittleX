@@ -495,8 +495,16 @@ class VoiceLoop:
     def _one_turn(self) -> None:
         trace = TurnTrace()
         woke = not self._in_session            # False: this turn is taken without the wake word (a question window or conversation mode)
+        preset = None
         if not self._in_session:
             self._wake.wait()
+            take = getattr(self._wake, "take_pending", None)
+            preset = take() if callable(take) else None            # not a wake word: the wake-word pause ended, or a stop word was said during it (voice/wake_pause.py)
+            if preset == "__mic_back_on__":
+                self._cue.set("speaking")
+                self._speak("Mic back on.")
+                self._cue.set("idle")
+                return
             self._cue.set("awake")       # right after the wake word: the chime that says G2 is listening
             trace.stamp("wake")
             warm = getattr(self._conv, "warm_up", None)
@@ -508,7 +516,7 @@ class VoiceLoop:
 
         self._cue.set("listening")
         timeout = self._session_window if self._in_session else None
-        user_text = self._stt.listen(timeout_s=timeout).strip()
+        user_text = preset or self._stt.listen(timeout_s=timeout).strip()
         trace.stamp("transcript")
         speech_end = getattr(self._stt, "last_speech_t", None)
         if speech_end is not None:
@@ -767,6 +775,24 @@ class VoiceLoop:
             self._events(chirps_on=True)
             self._cue.set("speaking")
             self._speak("Okay, chirps on.")
+            self._set_session()
+            self._cue.set("idle")
+            return
+        if cmd in ("mic_off", "mic_on", "mic_status"):
+            from . import wake_pause
+            from .commands import parse_mic_minutes
+            self._cue.set("speaking")
+            if cmd == "mic_off":
+                m = wake_pause.pause(parse_mic_minutes(user_text), by="voice")
+                self._speak(f"Mic off for {m:.0f} minutes.")
+                self._end_session()                      # no follow-up window, no conversation: the wake word is off
+                self._cue.set("idle")
+                return
+            if cmd == "mic_on":
+                self._speak("Mic back on." if wake_pause.resume(by="voice") else "My mic is already on.")
+            else:
+                s = wake_pause.status()
+                self._speak(f"My mic is off for {s['minutes_left']:.0f} more minutes." if s["paused"] else "My mic is on.")
             self._set_session()
             self._cue.set("idle")
             return
