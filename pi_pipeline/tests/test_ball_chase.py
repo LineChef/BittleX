@@ -36,6 +36,13 @@ def rect(x0, y0, x1, y1, colour):
 
 # ------------------------------------------------------------------------------------------------- the finder
 
+def test_a_dim_ball_right_at_the_claw_is_found_but_a_small_dim_patch_is_not():
+    dim = (100, 118, 98)                                             # lamp light, 2026-11-01: green above red/blue by ~18, the normal pass misses it
+    close = bf.find_ball(picture([disc(60, 110, 95, dim)]))          # half the picture, cut off at the left edge
+    assert close is not None and close.distance_in < 4 and close.touches_edge
+    assert bf.find_ball(picture([disc(120, 110, 15, dim)])) is None  # the same colour, small: the close-up pass needs a big blob
+
+
 def test_the_ball_is_found_with_its_distance_and_direction():
     r = bf.find_ball(picture([disc(120, 110, 25)]))                  # 50 px across: about 6.6 in away, dead ahead
     assert r is not None and abs(r.x - 120) < 3 and 5.5 < r.distance_in < 8 and abs(r.bearing_deg) < 3 and not r.touches_edge

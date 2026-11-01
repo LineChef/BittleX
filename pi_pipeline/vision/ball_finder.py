@@ -23,6 +23,11 @@ MIN_AREA = 25                 # px (a ball about 6 px across: about 55 in away, 
 ASPECT = (0.65, 1.5)          # blob width / height of a round thing
 FILL_MIN = 0.6                # blob pixels / bounding box (a disc is 0.785)
 IGNORE_BOTTOM_PX = 24         # the jaws, the foot and the edge of the frame are down here
+# Close up in lamp light (2026-11-01): the ball filled half the picture right in front of the claw, but dim and washed out (green above red/blue by 9-24, median 17; green 90-131),
+# so the thresholds above found nothing and he searched instead of punting; everything else in that picture scored 7 or less. A second, looser pass accepts only a BIG blob
+# (a ball closer than about 5 in), where a false alarm would need a large lime-green patch.
+CLOSE_DOM_MIN, CLOSE_G_MIN = 12, 60
+CLOSE_MIN_AREA = 3000         # px: about 62 px across, the ball about 5 in away
 
 
 @dataclass(frozen=True)
@@ -77,9 +82,9 @@ def _blobs(mask: np.ndarray):
         yield np.array(ys), np.array(xs)
 
 
-def find_ball_array(rgb: np.ndarray) -> BallReading | None:
+def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReading | None:
     dom = rgb[..., 1] - np.maximum(rgb[..., 0], rgb[..., 2])
-    mask = (dom >= DOM_MIN) & (rgb[..., 1] >= G_MIN)
+    mask = (dom >= dom_min) & (rgb[..., 1] >= g_min)
     mask[rgb.shape[0] - IGNORE_BOTTOM_PX:, :] = False
     for _ in range(2):                                     # close a 1 px gap or a highlight: grow, then shrink
         mask = _shift_or(mask)
@@ -87,7 +92,7 @@ def find_ball_array(rgb: np.ndarray) -> BallReading | None:
         mask = _shift_and(mask)
     best: BallReading | None = None
     for ys, xs in _blobs(mask):
-        if len(xs) < MIN_AREA:
+        if len(xs) < min_area:
             continue
         w, h = int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)
         # a round thing is filled between its left and right edge on every row (this also fills the highlight): its area is the span sum
@@ -106,6 +111,11 @@ def find_ball_array(rgb: np.ndarray) -> BallReading | None:
         if best is None or reading.area > best.area:
             best = reading
     return best
+
+
+def find_ball_array(rgb: np.ndarray) -> BallReading | None:
+    """The normal pass, then (nothing found) the close-up pass for a big, dim ball right in front of the camera."""
+    return _find(rgb, DOM_MIN, G_MIN, MIN_AREA) or _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_MIN_AREA)
 
 
 def find_ball(jpeg: bytes) -> BallReading | None:
