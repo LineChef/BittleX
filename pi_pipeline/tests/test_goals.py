@@ -1126,3 +1126,21 @@ def test_a_goal_that_needs_the_arm_does_not_start_without_it(tmp_path, monkeypat
     g = Goal("g", "T", "fake", attempts=1, rest_between_s=0, needs_attachment="arm")
     out = GoalSession(g, ap, journal=Journal(str(tmp_path / "j.jsonl")), state=State(str(tmp_path / "s.json")), say=lambda m: None, conditions={"attachment": "head"}, sleep=lambda s: None, save_memory=False).run()
     assert out["why"] == "needs the arm" and not ap.ran and ap.opened == 0
+
+
+def test_the_claw_picture_test_takes_straight_then_plus_then_minus_and_saves_them(tmp_path):
+    from pi_pipeline.behavior.claw_look import take_pictures
+    robot, said = ClawRobot(), []
+    robot.swing_deg = lambda: 2.5
+    cam = FakeCamera([b"one", b"two", b"three"])
+    res = take_pictures(robot, cam, str(tmp_path / "pics"), pan=35.0, lift=15.0, say=said.append, sleep=lambda s: None)
+    assert [r[0] for r in res] == ["straight", "pan_plus", "pan_minus"] and [m for m in robot.moves if m[0] == "claw"] == [("claw", 0, 15), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)]
+    assert (tmp_path / "pics" / "pan_plus.jpg").read_bytes() == b"two" and "tilted 2.5 deg" in said[0]
+
+    class Falls(ClawRobot):
+        def claw_pose(self, pan, lift):
+            super().claw_pose(pan, lift)
+            return "fell" if pan else "ok"
+    f = Falls()
+    assert [r[0] for r in take_pictures(f, FakeCamera([b"a", b"b"]), str(tmp_path / "p2"), pan=35.0, lift=15.0, say=lambda m: None, sleep=lambda s: None)] == ["straight", "pan_plus"]
+    assert f.moves[-1] == ("claw", 35, 15)                                                     # stopped at the fall: nothing more was sent

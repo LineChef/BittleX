@@ -47,6 +47,33 @@ def calibrate(robot, camera, *, say=print, sleep=time.sleep) -> str | None:
     return sign
 
 
+def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=print, sleep=time.sleep, settle_s: float = 1.2) -> list:
+    """Three pictures from the claw camera, in this order: straight ahead (pan 0), then pan +`pan`, then pan -`pan`, all at `lift`; then the arm goes home. Each is saved as
+    straight.jpg / pan_plus.jpg / pan_minus.jpg in `outdir`. After each move it says how far the body tilted during it (`robot.swing_deg()`): a big number means the arm move leans him.
+    Stops at once on a fall. Returns [(name, pan, swing_deg, path or None)]."""
+    import os
+    os.makedirs(outdir, exist_ok=True)
+    out = []
+    for name, p in (("straight", 0.0), ("pan_plus", pan), ("pan_minus", -pan)):
+        state = robot.claw_pose(p, lift)
+        swing = robot.swing_deg() if hasattr(robot, "swing_deg") else 0.0
+        if state == "fell":
+            say(f"{name}: G2 fell during the move: stopping")
+            out.append((name, p, swing, None))
+            return out
+        sleep(settle_s)
+        jpeg = camera.look()
+        path = None
+        if jpeg:
+            path = os.path.join(outdir, f"{name}.jpg")
+            with open(path, "wb") as f:
+                f.write(jpeg)
+        say(f"{name}: pan {p:+.0f} lift {lift:.0f}: body tilted {swing:.1f} deg during the move; " + (f"picture saved to {path}" if path else "no picture from the camera"))
+        out.append((name, p, swing, path))
+    robot.claw_pose(0.0, 0.0)
+    return out
+
+
 def main() -> None:
     import argparse
     import sys
@@ -57,6 +84,8 @@ def main() -> None:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--calibrate", action="store_true", help="measure which way a positive pan turns the camera and save it (the ball about 12 in straight ahead)")
     g.add_argument("--test", action="store_true", help="one look around with the current settings")
+    g.add_argument("--pictures", action="store_true", help="three pictures (straight, pan +, pan -) saved to a folder; stays standing at the end (no rest command)")
+    ap.add_argument("--rest", action="store_true", help="with --pictures: lay him down at the end like the other modes")
     args = ap.parse_args()
     me = sys.modules[chase.__name__]
     _eff, problems = ps.effective(me)
@@ -76,7 +105,12 @@ def main() -> None:
     robot = chase.SerialRobot(link)
     try:
         chase._stand_if_lying(link)
-        if args.calibrate:
+        if args.pictures:
+            import os
+            outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/%Y%m%d_%H%M%S"))
+            res = take_pictures(robot, chase._SnapshotCamera(cam), outdir, pan=chase.CLAW_PAN_DEG, lift=chase.CLAW_LIFT_DEG)
+            print("PICTURES:", outdir, [r[0] for r in res if r[3]])
+        elif args.calibrate:
             sign = calibrate(robot, chase._SnapshotCamera(cam))
             if sign:
                 print("saved:", ps.set_value(me, "claw_pan_sign", sign))
@@ -90,8 +124,11 @@ def main() -> None:
             robot.claw_pose(0.0, 0.0)
         finally:
             cam.close()
-            link.send("krest", read_reply=False, settle=0.0)
-            time.sleep(2.5)
+            if not args.pictures or args.rest:
+                link.send("krest", read_reply=False, settle=0.0)
+                time.sleep(2.5)
+            else:
+                print("left standing (no rest command); arm home")
 
 
 if __name__ == "__main__":
