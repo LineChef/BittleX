@@ -745,9 +745,10 @@ def _stand_if_lying(link, token: str = "kbalance") -> None:
         time.sleep(1.0)
         rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
         j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
-        if j is None or (j[8] < 40 and j[12] > 30):
+        if j is not None and not (j[8] < 40 and j[12] > 30):
             return
-        print("lying down: standing up first")
+        # an unreadable pose (garbled serial reads, STATUS 15) counts as lying: a stand-up from standing changes nothing, a missed one leaves him lying while he "searches" (2026-11-01)
+        print("lying down: standing up first" if j is not None else "could not read the pose: standing up first")
         link.send(token, read_reply=False, settle=0.0)
         time.sleep(3.0)
     except Exception as e:  # noqa: BLE001
