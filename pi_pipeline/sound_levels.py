@@ -21,4 +21,4 @@ OOF = at(50)              # the wall-hit oof
 TURN_AWAY = at(50)
 TA_DA = at(70)
 START_HORN = at(90)       # the exploration start horn (user, 2026-11-01: 90%; it was 100%)
-SPEECH = at(90)           # his speaking voice after the robot effect (user, 2026-11-01: 90%; it was 100%); the plain voice (G2_VOICE_ROBOT_EFFECT=0) is not levelled
+SPEECH = at(80)           # his speaking voice after the robot effect (user, 2026-11-01: 80%; it was 100%, then 90%); the plain voice (G2_VOICE_ROBOT_EFFECT=0) is not levelled
