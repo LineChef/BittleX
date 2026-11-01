@@ -48,7 +48,8 @@ SEARCH_WALK = False            # walk on blind after a full circle without the b
 AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
-MAX_TURN_DEG = 35.0
+MAX_TURN_DEG = 20.0             # the most one turn toward the ball turns him (user, 2026-11-01: turns smaller in general; it was 35: a 31 deg turn took 5 s)
+CHASE_WALL_TURN_MAX_DEG = 30.0  # the most a wall turn in the chase turns him (the exploration keeps its own: it was 52 deg, 8.6 s)
 MIN_MOVE_S = 1.2               # a gait started and stopped for less than this does not move him
 CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than this, step closer before the next one (2026-10-25: a punt from 4.5 to 7 in was too far, from 2.6 in it threw the ball 18 in)
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
@@ -71,7 +72,7 @@ SEARCH_ORDERS = {
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
 SEARCH_MOVE_MAX_S = 2.0        # the longest search turn before the next picture (user, 2026-11-01: a few steps, then look again)
-SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
+SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
 
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
@@ -237,7 +238,7 @@ class ChasePlanner:
 
     def _wall_turn(self, wall: "WallSeen", why: str) -> Action:
         side = 1 if wall.turn == "right" else -1
-        deg = wall_turn_deg() * side
+        deg = min(wall_turn_deg(), CHASE_WALL_TURN_MAX_DEG) * side
         return Action("wall_turn", abs(deg) / self._turn_rate(side, False), deg, why)
 
     def decide(self, ball: BallReading | None, wall: "WallSeen | None" = None) -> Action:
