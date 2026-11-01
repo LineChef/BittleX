@@ -503,7 +503,7 @@ class PictureSaver:
             return
         self._last = self._clock()
         self._dir.mkdir(parents=True, exist_ok=True)
-        name = time.strftime(f"greenball_{tag}_%H%M%S")
+        name = time.strftime(f"greenball_{tag}_%Y%m%d_%H%M%S")              # the date too: the review page sorts by file name, and a time alone mixed nights together
         (self._dir / f"{name}.jpg").write_bytes(jpeg)
         mean = None
         try:                                                  # the sidecar format of the exploration pictures, so the review page (g2pics) lists them with the others
