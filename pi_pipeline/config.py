@@ -235,9 +235,9 @@ class Settings:
     poweroff_on_shutdown: bool = field(default_factory=lambda: _env("G2_POWEROFF_ON_SHUTDOWN", "1") not in ("0", "false", "no"))
     shutdown_confirm_s: float = field(default_factory=lambda: _env_float("G2_SHUTDOWN_CONFIRM_S", 6.0))
     ack_tone: str = field(default_factory=lambda: _env("G2_ACK_TONE", "short_tone"))
-    # loudness of the battery alert sounds (whistle for G2's pack, siren for the Pi's), fraction of full scale: 10% of the 0.45 reference
-    alert_peak: float = field(default_factory=lambda: _env_float("G2_ALERT_PEAK", 0.045))
-    siren_peak: float = field(default_factory=lambda: sound_levels.limit(_env_float("G2_SIREN_PEAK", sound_levels.SIREN)))     # 80% of max
+    # loudness of the two low-battery alarms (whistle for G2's pack, siren for the Pi's), fraction of full scale: both 50% of max (user, 2026-11-01)
+    alert_peak: float = field(default_factory=lambda: sound_levels.limit(_env_float("G2_ALERT_PEAK", sound_levels.BATTERY_WHISTLE)))
+    siren_peak: float = field(default_factory=lambda: sound_levels.limit(_env_float("G2_SIREN_PEAK", sound_levels.BATTERY_SIREN)))     # 50% of max
     ack_peak: float = field(default_factory=lambda: _env_float("G2_ACK_PEAK", 0.0225))   # fraction of full scale
     api_tone: str = field(default_factory=lambda: _env("G2_API_TONE", "on").lower())   # "on": a unique tone each time G2 calls the Claude API (not the free wake-word ping); "off" silences it
     api_peak: float = field(default_factory=lambda: sound_levels.limit(_env_float("G2_API_PEAK", sound_levels.API_TICK)))

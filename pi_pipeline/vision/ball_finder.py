@@ -9,6 +9,7 @@ found now and then (3 false alarms in 19 pictures without the ball), and a ball 
 Every picture is taken with the camera's exposure balancing on; the thresholds are for those pictures."""
 from __future__ import annotations
 
+import dataclasses
 import io
 import math
 from dataclasses import dataclass
@@ -45,6 +46,7 @@ class BallReading:
     distance_in: float        # from the camera, by the ball's size
     bearing_deg: float        # + = the ball is to G2's right, - = left (0 = straight ahead)
     touches_edge: bool        # the blob reaches the frame's edge: the ball is partly out of view, so size and distance are low estimates
+    via: str = "normal"       # which pass found it: "normal", "close" (a big blob right at the claw) or "dim" (the loose pass: it also takes round green things on the floor, so the chase wants a second picture)
 
 
 def _decode(jpeg: bytes) -> np.ndarray | None:
@@ -119,11 +121,15 @@ def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReadi
 
 def find_ball_array(rgb: np.ndarray) -> BallReading | None:
     """The normal pass, then (nothing found) the close-up pass for a big, dim ball right in front of the camera, then the dim pass for a round green blob on the floor."""
-    found = _find(rgb, DOM_MIN, G_MIN, MIN_AREA) or _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_MIN_AREA)
+    found = _find(rgb, DOM_MIN, G_MIN, MIN_AREA)
+    if found is None:
+        found = _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_MIN_AREA)
+        if found is not None:
+            found = dataclasses.replace(found, via="close")
     if found is None:
         dim = _find(rgb, DIM_DOM_MIN, DIM_G_MIN, DIM_MIN_AREA)
         if dim is not None and dim.y >= DIM_MIN_Y:
-            found = dim
+            found = dataclasses.replace(dim, via="dim")
     return found
 
 

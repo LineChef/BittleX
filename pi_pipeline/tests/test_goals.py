@@ -1478,3 +1478,23 @@ def test_the_stand_up_from_a_sit_lifts_the_back_legs_slowly_first(monkeypatch):
     nums = lambda c: dict(zip(*[iter(int(x) for x in c[1:].split())] * 2))                      # noqa: E731
     rear = [k for k in nums(sent[-1]) if k in (12, 13, 14, 15, 8, 9, 10, 11)]
     assert rear and nums(mid) != nums(first)
+
+
+def test_the_claw_look_uses_the_more_central_sighting_and_ignores_an_unchanged_second_frame():
+    bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.CLAW_FROM_SIT = 35.0, 15.0, "left", True
+    near_edge, central = picture([disc(215, 110, 14)]), picture([disc(130, 110, 14)])
+    said = []
+    _st, found = bc.claw_scan(SitRobot(), FakeCamera([near_edge, central]), bc.ChasePlanner(), sleep=lambda s: None, say=said.append)
+    assert found is not None and abs(found.bearing_deg - 40.0) < 6                      # the central one (second picture, pan -35: the camera turned right 35 deg, the ball a few deg right of its centre)
+    _st, found = bc.claw_scan(SitRobot(), FakeCamera([near_edge, near_edge]), bc.ChasePlanner(), sleep=lambda s: None, say=said.append)
+    assert any("old frame" in m for m in said) and found is not None                      # the same sighting twice although the arm moved: the first is used
+
+
+def test_a_ball_only_the_dim_pass_found_needs_a_second_picture():
+    from pi_pipeline.vision.ball_finder import BallReading
+    dim = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 15.0, 5.0, False, via="dim")
+    sure = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 15.0, 5.0, False)
+    assert bc.confirm_ball(FakeCamera([picture()]), sure, sleep=lambda s: None) is sure     # a normal reading is taken as it is
+    assert bc.confirm_ball(FakeCamera([picture()]), dim, sleep=lambda s: None) is None       # the second picture shows nothing: a false ball
+    again = picture([disc(125, 120, 12)])                                                     # the second picture shows it near the same direction (the dim pass may still be the one finding it)
+    assert bc.confirm_ball(FakeCamera([again]), dim, sleep=lambda s: None) is not None

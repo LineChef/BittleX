@@ -128,4 +128,4 @@ def test_every_sound_level_is_the_requested_percent_of_max_volume():
     }
     for name, (pcm, want) in expected.items():
         assert abs(pct(pcm) - want) < 1.0, (name, pct(pcm))
-    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(75)) < 1e-9
+    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(50)) < 1e-9 and abs(settings.alert_peak - lv.at(50)) < 1e-9

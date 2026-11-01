@@ -19,6 +19,8 @@ def limit(peak: float) -> float:
 
 LOSING_HORN = at(75)      # the refusal, the failed command and the fall alarm are the same horn at the same level
 CAMERA = at(70)           # the picture-click (voice/shutter.py) and the camera chirps (shutter, recording on, recording off)
+BATTERY_WHISTLE = at(50)  # the low-battery alarm for G2's pack (user, 2026-11-01: 50%; it was about 5%)
+BATTERY_SIREN = at(50)    # the low-battery alarm for the Pi's pack (user, 2026-11-01: 50%; the siren elsewhere keeps SIREN)
 SIREN = at(75)            # the red alert siren
 PROMPT_TONES = at(70)     # wake chime, beep, boop, close, double beep
 API_TICK = at(50)

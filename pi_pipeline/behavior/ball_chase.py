@@ -546,6 +546,24 @@ class PictureSaver:
         self.saved += 1
 
 
+CONFIRM_DIM_S = 1.2            # the wait before the second picture that confirms a ball only the loose "dim" pass found (the camera's frames are about 1 s old)
+CONFIRM_BEARING_DEG = 15.0     # the second picture must show it within this many degrees of where the first did
+
+
+def confirm_ball(camera, ball: BallReading | None, sleep=time.sleep, trace: list | None = None) -> BallReading | None:
+    """A ball only the loose "dim" pass found (it also takes round green things on the floor, 2026-11-01) counts only when the next picture shows it again, within CONFIRM_BEARING_DEG.
+    Any other reading is returned as it is."""
+    if ball is None or getattr(ball, "via", "normal") != "dim":
+        return ball
+    sleep(CONFIRM_DIM_S)
+    jpeg = camera.look()
+    again = find_ball(jpeg) if jpeg else None
+    ok = again is not None and abs(again.bearing_deg - ball.bearing_deg) <= CONFIRM_BEARING_DEG
+    if trace is not None:
+        trace.append({"kind": "dim_confirm", "ok": ok, "first": _ball_dict(ball), "second": _ball_dict(again)})
+    return again if ok else None
+
+
 def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
               stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
     """One look around with the arm: the camera to one side, then the other, a picture at each (two pictures: user, 2026-11-01; straight ahead is what the plain looks
@@ -566,23 +584,34 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
         side = planner.claw_side or planner.last_side or 1
         pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
+    seen = []                                                                         # [(pan, reading)]
     for pan in pans:
         state = robot.claw_pose(pan, CLAW_LIFT_DEG)
         if state == "fell":
             break
         sleep(CLAW_SETTLE_S)
         jpeg = camera.look()
-        ball = find_ball(jpeg) if jpeg else None
+        ball = confirm_ball(camera, find_ball(jpeg) if jpeg else None, sleep, trace)
         if ball is not None:
             if saver is not None:
                 saver.maybe_save(jpeg, ball, tag="claw")
-            found = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + claw_pan_body(pan))
-            if trace is not None:
-                trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
-                              **({"t": stamp()} if stamp else {}), **extra})
-            say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
+            seen.append((pan, ball))
             if not from_sit:
                 break                                                                  # from a sit both pictures are always taken (the arm goes back to centre and he stands up next)
+    if seen:
+        pan, ball = seen[0]
+        if len(seen) > 1:
+            (pan0, b0), (pan1, b1) = seen[0], seen[1]
+            stale = abs(b1.bearing_deg - b0.bearing_deg) < 4.0 and abs(b1.distance_in - b0.distance_in) < 1.0 and abs(pan1 - pan0) > 30.0       # the arm moved, the picture did not: the second is an old frame
+            if not stale and abs(b1.bearing_deg) < abs(b0.bearing_deg) - 3.0:        # the sighting nearer the middle of its picture is the better one (user, 2026-11-01: the last was used, +77 deg)
+                pan, ball = pan1, b1
+            if stale:
+                say("   the second claw picture matches the first although the arm moved: an old frame, ignored")
+        found = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + claw_pan_body(pan))
+        if trace is not None:
+            trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
+                          **({"t": stamp()} if stamp else {}), **extra})
+        say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
     if state != "fell":
         state = robot.claw_pose(0.0, 0.0)
     if from_sit and state != "fell":
@@ -658,7 +687,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 say(f"[{steps}] no picture from the camera: looking again")
                 note(kind="no_picture")
                 continue
-            ball = find_ball(jpeg)
+            ball = confirm_ball(camera, find_ball(jpeg), sleep, trace)         # a ball only the loose pass found needs a second picture (user, 2026-11-01: false balls)
             if saver is not None:
                 saver.maybe_save(jpeg, ball)
             if last_move is not None and planner.pace is not None and not dry_run:

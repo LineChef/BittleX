@@ -1,5 +1,6 @@
 import numpy as np
 
+from pi_pipeline import sound_levels as lv
 from pi_pipeline.config import Settings
 from pi_pipeline.voice import short_tone, ack_whistle
 from pi_pipeline.voice.cues import SpeakerCue
@@ -16,7 +17,7 @@ def test_one_short_tone_at_the_ack_level():
 def test_the_default_acknowledgement_is_the_short_tone_and_alerts_are_louder():
     s = Settings()
     assert s.ack_tone == "short_tone"
-    assert abs(s.ack_peak - 0.0225) < 1e-9 and abs(s.alert_peak - 0.045) < 1e-9
+    assert abs(s.ack_peak - 0.0225) < 1e-9 and abs(s.alert_peak - lv.at(50)) < 1e-9
 
 
 def test_speaker_cue_can_use_either_tone():
