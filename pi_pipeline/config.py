@@ -142,7 +142,7 @@ class Settings:
     # the wake word again. Resets on every exchange, so a normal back-and-forth
     # never re-triggers. A large value ~= "stay awake until I say 'go to sleep'".
     # 0 = every turn needs the wake word (most private).
-    follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 3.0))   # seconds the mic stays open after a reply (user, 2026-10-10: 5 s to start; 2026-11-01: shorter, 3 s; a reply ending in "?" gets G2_QUESTION_WINDOW_S = 8 s)
+    follow_up_s: float = field(default_factory=lambda: _env_float("G2_FOLLOW_UP_S", 3.0))   # seconds the mic stays open after a reply (user, 2026-10-10: 5 s to start; 2026-11-01: shorter, 3 s; a reply ending in "?" gets G2_QUESTION_WINDOW_S = 3 s)
     # Voice-loop speech output: auto (piper in --mode voice, mac in text) | mac | piper | print. Use `print`
     # on a Pi with no speaker wired: Piper would spend seconds synthesising audio nobody hears.
     tts_mode: str = field(default_factory=lambda: _env("G2_TTS", "auto"))
@@ -247,7 +247,7 @@ class Settings:
     buzzer_shift: float = field(default_factory=lambda: _env_float("G2_BUZZER_SHIFT", 0.0))
     buzzer_length: float = field(default_factory=lambda: _env_float("G2_BUZZER_LEN", 1.0))
     # After G2 asks a question, keep listening this many seconds for the answer without the wake word (0 = never).
-    question_window_s: float = field(default_factory=lambda: _env_float("G2_QUESTION_WINDOW_S", 8.0))
+    question_window_s: float = field(default_factory=lambda: _env_float("G2_QUESTION_WINDOW_S", 3.0))   # after a reply ending in "?" (user, 2026-11-01: 3 s, was 8)
     # Conversation mode ("let's talk"): no wake word between turns until a quiet gap, "that's all", "go to sleep" or the time limit.
     # conversation_window_s = how long G2 waits for you to START speaking each turn (0 turns the mode off).
     conversation_window_s: float = field(default_factory=lambda: _env_float("G2_CONVERSATION_WINDOW_S", 20.0))

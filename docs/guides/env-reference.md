@@ -184,7 +184,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_PRICE_OUT_PER_MTOK` | `0` | `usage.py` | [`api-setup.md`](api-setup.md) |
 | `G2_PROFILE` | `"0"` | `explore_session.py` | [`exploration-mode.md`](exploration-mode.md), [`settings-switches.md`](settings-switches.md), [`diagnostics.md`](../hardware/diagnostics.md) +1 |
 | `G2_PUNT_SETTINGS` | `PATH` | `punt_settings.py` | not documented |
-| `G2_QUESTION_WINDOW_S` | `8.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
+| `G2_QUESTION_WINDOW_S` | `3.0` | `config.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) +1 |
 | `G2_REFLECT` | `"dry"` | `config.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`settings-switches.md`](settings-switches.md) +1 |
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_REMOTE_MEMORY_DB` | — | `g2_memory_backup.sh` | [`settings-switches.md`](settings-switches.md) |
