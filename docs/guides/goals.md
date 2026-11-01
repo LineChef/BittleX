@@ -47,8 +47,8 @@ g2goal reset ball_punt --yes # forget what he learned (the journal keeps the his
 
 The report shows the success rate per session, the settings he uses now against the first session's, the record behind each setting (every value tried, how often it worked,
 which way his misses pointed), what he kept and undid, your overrides, each session's attempts,
-and the lessons he saved to memory (up to 3 per session, as facts with source `goal_lesson`; he can talk about them). Signs the learning is good: the success rate rises across sessions on
-the same floor, kept changes keep their gains, the notes match what you saw. A setting flagged "at the end of its range" means a rule may be wrong or the goal is out of reach.
+and the lessons he saved to memory (up to 3 per session, as facts with source `goal_lesson`; he can talk about them). Signs the learning is good: the record for the setting he works on settles on one value, the success rate rises across sessions on
+the same floor, the values he keeps hold their record in the next session, the notes match what you saw. A setting flagged "at the end of its range" means a rule may be wrong or the goal is out of reach.
 Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per

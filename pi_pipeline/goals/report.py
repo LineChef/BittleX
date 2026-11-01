@@ -170,7 +170,7 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
                 + (f"<h3>Saved to memory</h3><ul>{lessons}</ul>" if lessons else ""))
         out.append(f"<details class=card {'open' if idx == len(sessions) else ''}><summary>{head}</summary>{body}</details>")
 
-    out.append("<h2>What to look for</h2><ul><li>Does the success rate rise across sessions on the same floor?</li><li>Do kept changes keep their gains in the next session?</li>"
+    out.append("<h2>What to look for</h2><ul><li>Does the success rate rise across sessions on the same floor?</li><li>Does the record for the setting he works on settle on one value?</li><li>Do the values he keeps hold their record in the next session?</li>"
                "<li>Do the notes match what you saw?</li><li>Is a setting creeping to the end of its range (flagged above)?</li>"
                "<li>Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.</li></ul>")
     return _page(title, "".join(out))

@@ -86,7 +86,7 @@ Two layers, both plain code with tests:
 
 1. **Diagnosis: a table from a measured failure to the setting it points at.** Every attempt ends with an outcome code and its numbers. For the ball punt, for example:
 
-   | Outcome | Measured | Next attempt, in order (the first one that can still change) |
+   | Outcome | Measured | The settings it points at and which way (the first one gets the most weight toward the focus) |
    |---|---|---|
    | `hit` / `hit_unseen` | the ball moved 8 in or more / went out of sight | keep everything |
    | `missed` | the ball moved under 3 in | punch from closer, line up tighter, more small steps |
@@ -165,7 +165,7 @@ call (one per session, through `MemoryCallGate`) can be added later if the revie
 - **`python -m pi_pipeline.diag report`** gets a goal section, so a session's walks, camera faults and falls sit next to its attempts.
 - **`g2goal history` / `g2goal explain`** on the Pi: the same data as text. `g2goal reset GOAL` throws away what a goal has learned (the journal is kept).
 
-What to look for when judging the learning: does the success rate rise across sessions on the same floor; do the kept changes keep their gains in the next session; do the
+What to look for when judging the learning: does the success rate rise across sessions on the same floor; do the values he keeps hold their record in the next session; is the record for the setting he works on growing toward one value; do the
 notes match what you saw; is any setting drifting to one end of its bounds (a sign the rule is wrong, or the goal is out of reach).
 
 ## Adding a goal later
@@ -178,7 +178,7 @@ The framework knows nothing about balls. A goal is three pieces, each found by n
 | **Scorer** | `score(result) -> Outcome`: an outcome code, a graded score from 0 to 1 (not only hit or miss: "the ball moved 9 in" carries more to learn from than "hit") and the numbers |
 | **Diagnosis table** | Data, not code: outcome code -> the settings it points at and which way |
 
-Everything else is shared by every goal: the session loop and budget, the keep-or-undo judge, choosing between approaches, counting per conditions, the journal, notes,
+Everything else is shared by every goal: the session loop and budget, the judge (records, direction votes, the focus setting, Thompson sampling), the user's overrides, choosing between approaches, counting per conditions, the journal, notes,
 memory facts and the report. The conditions a result is counted under are the shared ones (attachment, floor) plus any the goal adds (a room once place memory names rooms,
 the light level). A goal can later be made of steps (find the ball, then punt it toward a spot), each step its own goal with its own scorer.
 
