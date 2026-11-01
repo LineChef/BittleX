@@ -162,7 +162,7 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
     for idx, s in reversed(list(enumerate(sessions, 1))):
         st0 = s["start"]
         end = s["end"] or {}
-        head = f"{'Plain punt' if st0.get('mode') == 'plain punt' else 'Session'} {idx}: {_e(st0.get('time'))}, {_e(_cond_key(st0))}; ended: {_e(end.get('why', 'did not finish'))}; {end.get('successes', '?')} of {end.get('attempts', '?')} succeeded"
+        head = f"{_e(str(st0.get('mode')).capitalize()) if st0.get('mode') else 'Session'} {idx}: {_e(st0.get('time'))}, {_e(_cond_key(st0))}; ended: {_e(end.get('why', 'did not finish'))}; {end.get('successes', '?')} of {end.get('attempts', '?')} succeeded"
         rows = []
         for a in s["attempts"]:
             o = a["outcome"]

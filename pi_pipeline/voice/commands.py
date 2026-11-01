@@ -81,6 +81,9 @@ _SHUTDOWN = (
     "shut yourself down", "time to shut down",
 )
 
+# "G2, practise" (user, 2026-10-31): he picks a goal to practise and says why; "practise walls" names one (goals/practice.py).
+_PRACTICE = ("practise", "practice", "go practise", "go practice", "time to practise", "time to practice", "lets practise", "lets practice", "do some practice", "do some practise")
+
 # One punt attempt ("G2, punt": stand, approach the ball, punch it once, rest). Short on purpose: a heard word inside a sentence must never start it.
 _PUNT = ("punt", "punt it", "punt the ball", "go punt", "do a punt", "punt test", "do the punt test", "punt attempt")
 
@@ -151,6 +154,26 @@ def _normalize(text: str) -> str:
 
 # "turn off" / "shut off" are also used about other things ("turn off the music"), so only the bare forms count
 _SHUTDOWN_EXACT = {"turn off", "shut off", "turn yourself off", "shut yourself off", "switch off", "switch yourself off"}
+
+
+_PRACTICE_FILLER = {"now", "please", "for a bit", "for a while", "a bit", "something", "time"}
+
+
+def _is_practice(norm: str) -> bool:
+    """'practise' on its own (or with a filler word), or followed by a goal's name ('practise walls'). Anything else ('practice makes perfect') is a sentence, not a command."""
+    for p in sorted(_PRACTICE, key=len, reverse=True):
+        if norm == p:
+            return True
+        if norm.startswith(p + " "):
+            rest = norm[len(p) + 1:]
+            if rest in _PRACTICE_FILLER:
+                return True
+            try:
+                from ..goals.practice import named_goal
+                return named_goal("practise " + rest) is not None
+            except Exception:  # noqa: BLE001
+                return False
+    return False
 
 
 def goal_for_text(text: str):
@@ -437,7 +460,7 @@ def asks_battery(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"goal"``, ``"punt"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"practice"``, ``"goal"``, ``"punt"``,
     ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -457,6 +480,8 @@ def match_local_command(text: str) -> str | None:
         return "gait"                                  # "hi step" / "walk normally": before "walk" so "walk normally" is never read as a walk command
     if parse_walk_command(text) is not None:
         return "walk"
+    if _is_practice(n):
+        return "practice"                              # before "goal" and "punt": "practise the punt" picks the goal, it is not one punt
     if goal_for_text(text) is not None:
         return "goal"                                  # "G2, ball goal": before "punt" so "punt goal" starts the goal session, not one punt
     if _hit_short(n, _PUNT, extra_words=1):

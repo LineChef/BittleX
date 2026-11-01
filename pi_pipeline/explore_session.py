@@ -304,6 +304,11 @@ def run_session(args, shared: SharedParts | None = None) -> str:
         places = None
         from .reflection.recap import SessionTally
         tally = SessionTally()                              # counts the session for its recap (reflection level 1): turns away from walls, hits, survey stops, falls
+        try:                                                # the walls goal: his current wall settings for this session (goals/standing.py; never raises)
+            from .goals.standing import apply as _apply_standing
+            walls_used = _apply_standing("walls")
+        except Exception:  # noqa: BLE001
+            walls_used = None
         session_started = time.time()
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env
@@ -575,6 +580,14 @@ def run_session(args, shared: SharedParts | None = None) -> str:
                         memory.record_observation(caption, labels)
             except Exception:  # noqa: BLE001
                 log.exception("could not keep the session recap")
+            try:                                                              # the walls goal learns from this session's wall encounters (never disturbs the shutdown)
+                from .goals.standing import learn as _learn_standing
+                from .goals.walls import events_from_diag
+                _n = _learn_standing("walls", events_from_diag(tally.events), "exploration", used=walls_used)
+                if _n:
+                    log.info("walls goal: %d wall encounter(s) judged", _n)
+            except Exception:  # noqa: BLE001
+                log.exception("could not hand the wall encounters to the walls goal")
             if watch is not None:
                 watch.stop()
             if profiler is not None:

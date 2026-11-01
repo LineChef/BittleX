@@ -308,6 +308,34 @@ class VoiceLoop:
             self._act.stop()
             self._act.close()
 
+    def _practise(self, user_text: str) -> None:
+        """'G2, practise [goal]': he picks a goal (goals/practice.py), says which and why, and starts it: a task's goal session, or an exploration roam for walls."""
+        from .commands import _normalize
+        ball = None
+        try:                                                     # for the punt: is the ball in the picture right now (no move, one picture)
+            snap = self._camera.snapshot() if self._camera is not None else None
+            if snap is not None and getattr(snap, "jpeg", None):
+                from ..vision.ball_finder import find_ball
+                ball = find_ball(snap.jpeg) is not None
+        except Exception:  # noqa: BLE001
+            ball = None
+        try:
+            from ..goals.practice import choose
+            goal, sentence = choose(_normalize(user_text), ball_visible=ball)
+        except Exception:  # noqa: BLE001
+            log.exception("practice choice failed")
+            goal, sentence = None, "I couldn't decide what to practise."
+        log.info("practice (voice): %s", goal.id if goal is not None else "nothing")
+        self._cue.set("speaking")
+        self._speak(sentence)                                     # said BEFORE the hand-over: the launch stops this service
+        if goal is not None:
+            if goal.kind == "standing":
+                self._events(arm_explore=True, roam_s=float(goal.minutes) * 60.0, practice=goal.id)
+            else:
+                self._events(arm_goal=goal.id)
+        self._set_session()
+        self._cue.set("idle")
+
     def _offer_goal_suggestions(self) -> int:
         """After a goal session (it ends by handing back to this service): say each new suggestion for a setting only the user changes and act on
         "confirm" / "cancel" / "review" (silence = review). goals/suggestions.py. Never raises."""
@@ -594,6 +622,9 @@ class VoiceLoop:
             self._speak("Okay, moving again.")
             self._set_session()
             self._cue.set("idle")
+            return
+        if cmd == "practice":
+            self._practise(user_text)
             return
         if cmd == "goal":
             from .commands import goal_for_text

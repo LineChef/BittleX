@@ -98,6 +98,10 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 | `align_tries` | 3 | 1 to 8 | Small turns to line up before `when_misaligned`. |
 | `when_misaligned` | punch | punch / back_up | Still off line after `align_tries`: punch anyway or back up and line up again. |
 
+**Walls come first** (user, 2026-10-31): with the camera's wall reading calibrated on the current hardware, the chase never walks closer than `chase_wall_in` (10 in, in
+`~/.local/share/g2/wall_settings.json`) to a wall, turns away when he is that close, and leaves a ball lying nearer a wall than that. Without that calibration the run prints
+"wall check: off" and the chase runs as before. [`goals.md`](goals.md) section 8.
+
 **Walking** is always the learned default gait policy (the arm's saved gait), never Petoi's walk (user, 2026-10-31). Each walk and turn is timed from the pace and turn rates G2 measures
 himself from the camera (`~/.local/share/g2/chase_pace.json`, per attachment and floor). **In a goal session** ([`goals.md`](goals.md)) G2 changes most of these settings himself between
 attempts, starting from the values in this file; he never writes to this file except when you confirm one of his suggestions.

@@ -105,6 +105,8 @@ How the pictures flow: [`../vision/picture-library.md`](../vision/picture-librar
 | `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
 | `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
 | `g2goal [report \| history GOAL \| show GOAL \| status \| suggestions \| confirm\|cancel GOAL KNOB \| run GOAL \| stop \| reset GOAL --yes]` (or voice: "G2, ball goal") | goal sessions: up to 10 attempts, G2 judges each and changes the next; `report` pulls the journal and opens the page; full guide [`goals.md`](goals.md) |
+| `g2goal priority [GOAL ...]`, `g2goal practise [GOAL]` (or voice: "G2, practise") | the goals' order, highest first (walls above the punt), and what "G2, practise" would choose now with each goal's score ([`goals.md`](goals.md) section 8) |
+| `python -m pi_pipeline.behavior.wall_settings [--set NAME VALUE]` | your own wall settings (`~/.local/share/g2/wall_settings.json`): where the walls goal starts, and `chase_wall_in` |
 | `g2goal verdict GOAL N right\|wrong` | your verdict on how attempt N was scored; a wrong one is taken out of his records ([`goals.md`](goals.md) section 5) |
 | `g2goal pin\|limit\|undo\|forget GOAL KNOB ... [--floor F]`, `g2goal overrides GOAL` | override what G2 learned: hold a value, keep him inside a range, ban his best value, or drop his record for one setting ([`goals.md`](goals.md) section 6) |
 | `g2punt [--punt-max IN]` / `g2puntstop` / `g2puntset [show\|init\|NAME VALUE]` (or voice: "G2, punt") | one punt attempt (stand, find the ball, walk, punch once, rest) and its settings file `~/.local/share/g2/punt_settings.json`; full guide [`punt.md`](punt.md) |

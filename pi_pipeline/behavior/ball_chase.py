@@ -83,6 +83,29 @@ CLAW_SETTLE_S = 0.6            # still before the picture
 # G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
 BACK_IN_S = 3.0                # a guess at the firmware back-up's pace (not measured: there is no reading before a back-up after a punt)
 
+# Walls while chasing (the "turn away from walls" standing goal ranks above the punt: user, 2026-10-31). Only with a wall check (run_chase's `wall_check`: the camera's wall
+# reading, calibrated on the current hardware): he never walks closer than CHASE_WALL_IN to a wall, turns away when he is that close, and leaves a ball lying nearer the wall than
+# CHASE_WALL_IN - BALL_TOUCH_IN alone (the attempt ends "ball_by_wall" after WALL_GIVE_UP looks agree).
+CHASE_WALL_IN = 10.0
+BALL_TOUCH_IN = 3.0            # he punches about this far from the ball
+WALL_GIVE_UP = 2
+
+
+@dataclass(frozen=True)
+class WallSeen:
+    nearest_in: float | None      # the nearest wall base ahead, inches (the ball's own columns left out)
+    turn: str | None              # "left" / "right": the side with more room
+
+
+def wall_turn_deg() -> float:
+    """How far to turn away from a wall: the walls goal's `wall_turn_deg` (BehaviorDriver.WALL_TURN_RAD)."""
+    try:
+        from .driver import BehaviorDriver
+        return math.degrees(BehaviorDriver.WALL_TURN_RAD)
+    except Exception:  # noqa: BLE001
+        return 50.0
+
+
 # Fine alignment before the punch (user, 2026-10-31: small turns, checked with the camera after each one). Inside NUDGE_MAX_IN, a ball more than PUNT_ALIGN_DEG off straight gets a
 # short turn pulse sized from his measured pulse turn rate, then a new picture; at most ALIGN_TRIES of them, then WHEN_MISALIGNED.
 ALIGN_PULSE_MIN_S = 1.0        # the shortest pulse (shorter ones may not move him at all: the measured log shows it)
@@ -141,6 +164,7 @@ class ChasePlanner:
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
     align_turns: int = 0       # fine-alignment pulses since the ball came within NUDGE_MAX_IN
+    by_wall: int = 0           # looks in a row with the ball too close to a wall
     pace: object = None        # a chase_pace.PaceBook (None: its defaults)
 
     def _walk_pace(self) -> float:
@@ -193,7 +217,12 @@ class ChasePlanner:
             return Action("search_turn", abs(step) / self._turn_rate(side, False), step * side, f"searching {'right' if side > 0 else 'left'}")
         return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
-    def decide(self, ball: BallReading | None) -> Action:
+    def _wall_turn(self, wall: "WallSeen", why: str) -> Action:
+        side = 1 if wall.turn == "right" else -1
+        deg = wall_turn_deg() * side
+        return Action("wall_turn", abs(deg) / self._turn_rate(side, False), deg, why)
+
+    def decide(self, ball: BallReading | None, wall: "WallSeen | None" = None) -> Action:
         if ball is None:
             self.lost += 1
             self.punts_in_range = 0
@@ -212,6 +241,17 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
+        if wall is not None and wall.nearest_in is not None:                 # walls rank above the punt
+            if ball.distance_in < wall.nearest_in and wall.nearest_in - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
+                self.by_wall += 1
+                if self.by_wall >= WALL_GIVE_UP:
+                    return Action("give_up", why=f"the ball is {wall.nearest_in - ball.distance_in:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
+                return Action("look", 1.0, why=f"the ball looks {wall.nearest_in - ball.distance_in:.0f} in from a wall: look again")
+            self.by_wall = 0
+            if wall.nearest_in <= CHASE_WALL_IN:
+                return self._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away")
+        else:
+            self.by_wall = 0
         self.last_dist = ball.distance_in
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
         near = ball.distance_in <= NUDGE_MAX_IN
@@ -486,10 +526,11 @@ def _ball_dict(ball: BallReading | None):
 
 def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
               settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
-              trace: list | None = None, after_punt_look: bool = False, pace=None) -> str:
+              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
     Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went.
-    `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one."""
+    `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one. `wall_check(jpeg, ball) -> WallSeen | None`: the wall
+    reading for each straight-ahead picture (goals/walls.py makes one only with a wall calibration from the current hardware); with it he keeps CHASE_WALL_IN from walls."""
     planner = planner or ChasePlanner()
     planner.claw_ok = callable(getattr(robot, "claw_pose", None))
     if pace is not None:
@@ -515,6 +556,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if steps % 15 == 1 and not dry_run and not robot.battery_ok():
             say("battery low or unreadable: stopping")
             return "battery"
+        wall = None
         if pending is not None:
             ball, pending = pending, None
             last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
@@ -534,20 +576,38 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 if got is not None:
                     note(kind="measured", what=kind, seconds=round(secs, 2), value=round(got, 2))
             last_move = None
-        note(kind="look", ball=_ball_dict(ball))
+            if wall_check is not None:
+                try:
+                    wall = wall_check(jpeg, ball)
+                except Exception:  # noqa: BLE001
+                    wall = None
+        note(kind="look", ball=_ball_dict(ball), **({"wall_in": None if wall.nearest_in is None else round(wall.nearest_in, 1)} if wall is not None else {}))
         if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
             if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or planner.search_i > 0 or not seen):
                 announce("target acquired")
             elif ball is None and planner.lost + 1 == LOST_LOOKS:                       # the look that starts a search
                 announce("searching")
         seen = seen or ball is not None
-        act = planner.decide(ball)
+        act = planner.decide(ball, wall)
+        if wall is not None and wall.nearest_in is not None and act.kind in ("walk", "search_walk"):      # never walk closer than CHASE_WALL_IN to a wall
+            from .chase_pace import WALL_PACE_START_S
+            room = wall.nearest_in - CHASE_WALL_IN
+            if room <= 0.5:
+                act = planner._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away instead of walking")
+            else:
+                cap = WALL_PACE_START_S + room / planner._walk_pace()
+                if act.seconds > cap:
+                    act = Action(act.kind, round(cap, 2), act.degrees, act.why + f" (cut short: a wall {wall.nearest_in:.0f} in ahead)")
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
             note(kind="act", act=act.kind, why=act.why)
             if act.kind == "look":
                 sleep(act.seconds)
             continue
+        if act.kind == "give_up":
+            note(kind="wall", event="ball_by_wall", wall_in=None if wall is None else wall.nearest_in, why=act.why)
+            say(act.why)
+            return "ball_by_wall"
         if act.kind == "claw_look":
             state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace)
             note(kind="act", act="claw_look", why=act.why, state=state, found=pending is not None)
@@ -555,7 +615,10 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                 say("G2 fell: stopping (fall recovery is off)")
                 return "fell"
             continue
-        if act.kind in ("turn", "search_turn", "align"):
+        if act.kind == "wall_turn":
+            note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
+            state = robot.turn(act.degrees, act.seconds)
+        elif act.kind in ("turn", "search_turn", "align"):
             state = robot.turn(act.degrees, act.seconds)
             if ball is not None:
                 last_move = ("turn", act.seconds, act.degrees, ball)
@@ -700,12 +763,28 @@ def main() -> None:
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     trace: list = []
     robot = SerialRobot(link, use_pick=args.use_pick)
+    walls_used, wall_check = None, None
+    try:                                                                 # the walls goal ranks above the punt: its settings and (with a wall calibration from this hardware) the wall check
+        from ..goals.standing import apply as _apply_standing
+        from ..goals.walls import make_wall_check
+        walls_used = _apply_standing("walls")
+        wall_check = make_wall_check()
+        print("wall check:", "on" if wall_check else "off (no wall calibration made on this hardware, or walls do not rank above the punt)")
+    except Exception as e:  # noqa: BLE001
+        print("wall check off:", e)
     used = dict(_ps.defaults(_self), max_seconds=args.max_seconds)          # the settings this run uses (the file and the command line applied)
     t0 = time.monotonic()
     try:
         why = run_chase(robot, _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce,
-                        pace=None if args.dry_run else _book(), trace=trace, after_punt_look=bool(args.punts) and not args.dry_run)
+                        pace=None if args.dry_run else _book(), trace=trace, after_punt_look=bool(args.punts) and not args.dry_run, wall_check=wall_check)
         print("ended:", why)
+        if not args.dry_run:
+            try:
+                from ..goals.standing import learn as _learn_standing
+                from ..goals.walls import events_from_trace
+                _learn_standing("walls", events_from_trace(trace), "ball chase", used=walls_used)
+            except Exception:  # noqa: BLE001
+                pass
         if args.punts == 1 and not args.dry_run:                         # one plain attempt teaches the ball-punt goal too (nothing is changed: goals/observe.py)
             from ..goals.observe import plain_punt
             said = plain_punt(trace, why, time.monotonic() - t0, used, getattr(robot, "last_pct", None))

@@ -143,4 +143,4 @@ def test_the_voice_service_stands_aside_while_an_exploration_runs_in_it():
     from pi_pipeline.voice import __main__ as V
     src = inspect.getsource(V.main)
     assert src.count("exploring.is_set()") >= 2 and "paused=exploring.is_set" in src         # stand guard, sleep watch, battery watch
-    assert "run_inprocess(lend, settings.explore_roam_s)" in src and "launch(settings.explore_roam_s)" in src       # in-process when ready, else the separate session
+    assert 'run_inprocess(lend, float(kw.get("roam_s") or settings.explore_roam_s))' in src and "launch(_roam)" in src and '_roam = float(kw.get("roam_s") or settings.explore_roam_s)' in src       # in-process when ready, else the separate session (a practice roam asks for its own length)

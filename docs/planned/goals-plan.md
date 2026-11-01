@@ -145,6 +145,35 @@ every attachment and floor. Who wins: a pin > a limit > what he learned > the us
 
 Every override goes into the journal and the report ("Your overrides").
 
+## Several goals: which one, and when (user-approved 2026-10-31, built the same day)
+
+Goals come in two kinds (`kind` in `goals/spec.py`):
+
+| | Task (punt the ball) | Standing (turn away from walls) |
+|---|---|---|
+| Shape | starts, succeeds or fails, ends | always on, no start or end |
+| An attempt | one find, walk and punch | every wall encounter, in any activity |
+| Chosen? | yes, one at a time | never: it runs inside every task as a limit |
+
+**The walls goal** (`goals/walls.py`, its settings in `behavior/wall_settings.py`, `~/.local/share/g2/wall_settings.json`): every exploration and every ball chase hands its wall
+encounters to it (`goals/standing.py`). A turn away with no touch in the next 8 s is a success; a turn away followed by a touch, or a touch with no turn away (the hit sequence or
+the IMU contact signal), is a failure that points at stopping farther out, turning farther, looking sooner or cutting walks shorter. He tunes the exploration's wall distances and
+his turn; `chase_wall_in` (how close the chase may get to a wall) is fixed. Nothing pushes his wall distances back toward the wall, so this goal only makes him more careful. The
+calibration time of the camera's wall reading is part of its conditions (a new calibration starts fresh records).
+
+**How he decides, highest first:**
+
+1. Safety: emergency stop, the fall guard, the battery limit.
+2. The user's command: a goal's start phrase runs that task.
+3. Standing goals limit every task, in the priority order (`g2goal priority`, default walls above the punt: user, 2026-10-31). While chasing he never walks closer than
+   `chase_wall_in` (10 in) to a wall, turns away when he is that close, and leaves a ball lying nearer a wall than that alone (the attempt ends "ball by the wall" and is not
+   counted against the punt). This chase wall check uses the camera's wall reading only once it has been calibrated on the current hardware (a calibration older than the
+   latest hardware epoch is ignored); until then the chase runs without it and says so.
+4. **"G2, practise"**: he picks a task or standing goal by your priority x his need (a low recent success rate, few attempts here, days since he practised it, minus settled
+   settings) x whether it can be done now (the attachment it needs; for the punt, the ball in the camera's picture right now). He says which and why ("I'll practise punt the
+   ball: 3 of 8 good here lately, and I can see the ball"); "G2, practise walls" names one. A task starts its goal session; walls start an exploration roam of 5 minutes.
+5. Not built, the user's later decision (B24): practising without being asked.
+
 ## Local reasoning or a Claude call
 
 | | Local on the Pi | A Claude call |
@@ -211,6 +240,6 @@ Goals that fit later, with what is needed first:
 |---|---|---|
 | **G0** | Goal format, scorers, judge, journal, report, spoken suggestions; tested against fakes and synthetic pictures | Built 2026-10-31, tests pass |
 | **G1** | The ball-punt goal live on G2: start phrase, 10 attempts, judging between attempts (no shadow mode), notes, report | The scorer agrees with the user's call on the attempts; no unsafe behaviour. The next hardware run |
-| **G2** | A second goal (exploring N minutes without a fall or a bump, scored from the recap) | Not yet (user, 2026-10-31) |
+| **G2** | Several goals: task and standing kinds, the walls goal, the priority order and the chase wall limit, "G2, practise" | Built 2026-10-31; the chase wall limit waits for a wall calibration on the claw camera |
 | **G3** | Optional end-of-session Claude review, if the reports show patterns the rules miss | Its notes beat the local ones in the user's reading, worth the cost |
 | **G4** | Several goals, G2 picks which to pursue (B24) | A later decision by the user |

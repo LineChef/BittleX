@@ -113,10 +113,11 @@ class BallPunt:
     diagnosis = DIAGNOSIS
     stage_of = STAGE_OF
 
-    def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None):
+    def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None, wall_check=None):
         self.robot, self.camera, self.saver, self._link, self.pace = robot, camera, saver, link, pace
         self._cam = None
         self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
+        self.wall_check = wall_check
 
     # ---------------------------------------------------------------------------------------------------- settings
     def knobs(self) -> list[Knob]:
@@ -163,6 +164,9 @@ class BallPunt:
         if self.pace is None:
             from ..behavior.chase_pace import book_for_now
             self.pace = book_for_now()                                       # G2's own measured pace and turn rates, per attachment and floor
+        if self.wall_check is None:
+            from .walls import make_wall_check
+            self.wall_check = make_wall_check()                              # walls rank above the punt; None without a wall calibration from this hardware
 
     def close(self) -> None:
         if self._link is None:
@@ -196,10 +200,14 @@ class BallPunt:
         ps.apply(chase, {k: v for k, v in settings.items() if k in ps.SPEC})
         planner = chase.ChasePlanner()
         trace: list = []
+        from .standing import apply as apply_standing, learn as learn_standing
+        walls_used = apply_standing("walls")                                 # the walls goal's current values (its chase_wall_in and turn) for this attempt
         t0 = time.monotonic()
         ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1,
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
-                                trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace)
+                                trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check)
+        from .walls import events_from_trace
+        learn_standing("walls", events_from_trace(trace), "ball chase", used=walls_used)
         extra = {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}
         if self.pace is not None:
             extra["pace"] = self.pace.snapshot()
@@ -260,6 +268,8 @@ class BallPunt:
                 "walks": sum(1 for e in tr if e.get("kind") == "act" and e.get("act") == "walk"), **align_stats(tr)}
         if result.ended == "fell":
             return Outcome("fell", 0.0, False, f"I fell after {_fmt_s(result.seconds)}", nums)
+        if result.ended == "ball_by_wall":
+            return Outcome("ball_by_wall", None, False, "the ball was too close to a wall, so I left it (walls come first): not counted", nums)
         if result.ended not in ("punted", "time"):
             return Outcome("aborted", None, False, f"the attempt ended early ({result.ended}): not counted", nums)
         if result.ended == "punted":

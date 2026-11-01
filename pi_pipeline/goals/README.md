@@ -12,6 +12,9 @@ Design and decisions: [`../../docs/planned/goals-plan.md`](../../docs/planned/go
 | `overrides.py` | The user's pins, limits and undone values (`g2goal pin / limit / undo / forget`), per scope (everywhere, a floor, an attachment) |
 | `journal.py` | `goal_journal.jsonl`, `goal_state.json`, conditions (attachment + floor + hardware epoch) and the nearest other conditions to start from, the lessons saved as memory facts |
 | `observe.py` | A plain "G2, punt" attempt scored and added to the ball goal's records; nothing is changed |
+| `walls.py` | The "turn away from walls" standing goal: wall encounters scored (turned away, turned but hit, bumped), its knobs (`behavior/wall_settings.py`), the chase wall check (only with a wall calibration from the current hardware) |
+| `standing.py` | Standing goals in practice: `apply` their values at the start of an activity, `learn` from its encounters at the end |
+| `practice.py` | "G2, practise": each goal's priority x need x can-do-now, the choice and the sentence he says |
 | `runner.py` | `GoalSession`: budget, battery before every attempt, attempt, score, judge, record; a fall ends it |
 | `suggestions.py` | Says the ask-knob suggestions when the voice service starts; confirm / cancel / review (silence = review) |
 | `report.py` | The HTML report and the text history |

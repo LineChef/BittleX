@@ -16,6 +16,7 @@ PATH = "~/.local/share/g2/chase_pace.json"
 ALPHA = 0.3                    # weight of a new sample in the running average
 MIN_SAMPLES = 2                # samples before a measured value replaces the default
 WALK_START_S = 1.0             # the policy walk covers nothing in about its first second (settle, ramp): not measured, the pace is fitted around it
+WALL_PACE_START_S = WALK_START_S
 SHORT_TURN_S = 1.6             # a turn this short or shorter is an alignment pulse
 
 DEFAULTS = {"walk_in_s": 4.2,                     # the policy walk with the arm: ARM1R 4 ft 5 in in 12.5 s on hardwood (2026-10-25)

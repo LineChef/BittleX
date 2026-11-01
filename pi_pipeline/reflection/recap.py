@@ -29,9 +29,14 @@ def experiences_path() -> str:
 class SessionTally:
     """Counts events by name; `note(name)` is safe to call from any thread."""
 
-    def __init__(self):
+    TIMED = ("wall.steer", "wall.hit", "contact")       # also kept with their time and reason, for the walls goal (goals/walls.py)
+
+    def __init__(self, clock=None):
+        import time as _time
         self._c: Counter = Counter()
         self._lock = threading.Lock()
+        self._clock = clock or _time.monotonic
+        self.events: list = []                         # [(t, name, reason)] for TIMED names
 
     def note(self, name, reason: str = "") -> None:
         try:
@@ -39,6 +44,8 @@ class SessionTally:
             if name in COUNTED:
                 with self._lock:
                     self._c[name] += 1
+                    if name in self.TIMED:
+                        self.events.append((self._clock(), name, str(reason)))
         except Exception:  # noqa: BLE001
             pass
 

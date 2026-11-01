@@ -23,6 +23,12 @@ Overrides, when G2 learned something bad (goals/overrides.py; add --floor tile o
 Your verdict on how an attempt was scored (the number is the one in the report):
 
     python -m pi_pipeline.goals verdict ball_punt 7 wrong              # scored wrong: taken out of his records (right: kept, and counted as agreement)
+
+Several goals:
+
+    python -m pi_pipeline.goals priority                               # the order, highest first (walls above the punt by default)
+    python -m pi_pipeline.goals priority walls ball_punt               # set it
+    python -m pi_pipeline.goals practise [walls]                       # what "G2, practise" would choose now, with each goal's score
 """
 from __future__ import annotations
 
@@ -140,6 +146,8 @@ def main(argv=None) -> None:
         p.add_argument("--floor", help="only on this floor label")
         p.add_argument("--scope", help="a conditions filter, e.g. attachment=arm|floor=tile (default: everywhere)")
     p = sub.add_parser("overrides"); p.add_argument("goal")
+    p = sub.add_parser("priority", help="show or set the goals' order, highest first (a standing goal above a task limits it)"); p.add_argument("order", nargs="*")
+    p = sub.add_parser("practise", help="what 'G2, practise' would choose now, and why"); p.add_argument("words", nargs="*")
     p = sub.add_parser("verdict", help="say whether an attempt was scored right; a wrong one is taken out of his records")
     p.add_argument("goal"); p.add_argument("number", type=int); p.add_argument("verdict", choices=("right", "wrong"))
     p.add_argument("--floor"); p.add_argument("--scope"); p.add_argument("--note", default="")
@@ -283,6 +291,25 @@ def main(argv=None) -> None:
             msg = f"forgot what he learned for {k.name} under {n} set(s) of conditions ({scope}): back to your value {k.show(base[k.name])}"
         journal.write("override", goal=g.id, action=a.cmd, knob=k.name, scope=scope, detail=msg)
         print(msg)
+    elif a.cmd == "priority":
+        if a.order:
+            unknown = [x for x in a.order if x not in goals]
+            if unknown:
+                raise SystemExit(f"unknown goal(s): {', '.join(unknown)} (known: {', '.join(goals)})")
+            order = spec.set_priority(a.order)
+        else:
+            order = spec.priority()
+        for i, gid in enumerate(order, 1):
+            g = goals[gid]
+            print(f"  {i}. {gid:12s} {g.title} ({g.kind})")
+        if spec.ranks_above("walls", "ball_punt"):
+            print("walls rank above the punt: he never chases the ball closer to a wall than chase_wall_in")
+    elif a.cmd == "practise":
+        from .practice import choose, score_goals
+        for c in score_goals():
+            print(f"  {c.goal.id:12s} {c.score:.2f}  {c.sentence}")
+        g, sentence = choose(" ".join(["practise"] + a.words))
+        print("he would say:", sentence)
     elif a.cmd == "verdict":
         from . import overrides as ovr
         from .approach import Outcome

@@ -93,7 +93,18 @@ file. Every override is in the report under "Your overrides". `g2goal reset ball
   value starts failing.
 - **The pack %** is kept with every attempt (the report's "pack" column); he does not learn from it yet.
 
-## 8. Where things live on the Pi
+## 8. Several goals
+
+- **Turn away from walls** is a standing goal: always on, never started. Every exploration and every ball chase hands it his wall encounters (turned away in time = good; a bump = bad),
+  and he tunes his wall distances and his turn from them. Its settings: `python -m pi_pipeline.behavior.wall_settings` (the file `~/.local/share/g2/wall_settings.json`).
+- **Walls come first.** While chasing the ball he never gets closer than 10 in (`chase_wall_in`) to a wall and leaves a ball lying nearer a wall than that (the attempt ends "ball by
+  the wall" and does not count against the punt). This needs the camera's wall reading calibrated with the claw camera on the current hardware
+  (`python -m pi_pipeline.vision.wall_distance calibrate`); until then the chase prints "wall check: off" and runs without it.
+- **The order:** `g2goal priority` shows it, `g2goal priority walls ball_punt` sets it (highest first).
+- **"G2, practise"** (or "practice"): he picks what to practise from your order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
+  goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
+
+## 9. Where things live on the Pi
 
 | File | What |
 |---|---|
@@ -103,5 +114,6 @@ file. Every override is in the report under "Your overrides". `g2goal reset ball
 | `~/.local/share/g2/punt_settings.json` | your own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md)) |
 | `~/.local/share/g2/chase_pace.json` | his measured pace and turn rates |
 | `~/.local/share/g2/goal_overrides.json` | your pins, limits and undone values |
+| `~/.local/share/g2/wall_settings.json` | your own wall settings: where the walls goal starts |
 
-Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE`, `G2_GOAL_OVERRIDES` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).
+Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE`, `G2_GOAL_OVERRIDES`, `G2_WALL_SETTINGS` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).

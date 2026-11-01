@@ -232,12 +232,13 @@ def main() -> None:
                 from ..explore_session import inprocess_ready, run_inprocess
                 ok, why = inprocess_ready(lend)
                 if ok:                                     # run the exploration here, on this (voice loop) thread: same link, walker, memory, speech engine and microphone
-                    run_inprocess(lend, settings.explore_roam_s)
+                    run_inprocess(lend, float(kw.get("roam_s") or settings.explore_roam_s))     # "G2, practise walls" asks for a roam of the walls goal's minutes
                     return
                 logging.getLogger("g2.voice").info("exploration as a separate session (%s)", why)
                 # hand over to an exploration session once the spoken reply is finished
                 from ..explore_launch import launch
-                threading.Timer(0.3, lambda: launch(settings.explore_roam_s)).start()      # the words and the horn have already finished when this event fires; the old 5 s wait was pure delay (2026-10-18)
+                _roam = float(kw.get("roam_s") or settings.explore_roam_s)
+                threading.Timer(0.3, lambda: launch(_roam)).start()      # the words and the horn have already finished when this event fires; the old 5 s wait was pure delay (2026-10-18)
 
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
             from ..power import power as _power
