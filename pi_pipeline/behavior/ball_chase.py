@@ -88,7 +88,9 @@ CLAW_LIFT_DEG = 15.0
 CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: LEFT on G2 (2026-11-01, pictures taken 1.3 s after each move: pan +35 put the ball 73 px to the right = camera 35 deg left, pan -35 about 39 deg right; the user saw the claw swing left); claw_look --calibrate can re-measure it
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
+CLAW_LOOK_POSE = "kcalib"      # the pose he holds for the claw look (user, 2026-11-01): the BiBoard's "attention" pose, the one the legs are calibrated in; "ksit" is the sit it replaced. He stands up normally afterwards (`kbalance`)
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
+CLAW_POSE_S = 2.0              # to settle into the attention pose
 SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
 CLAW_SETTLE_S = 0.8            # after the arm move and before the picture: the arm and body settle; the old camera frame is dropped by _SnapshotCamera.look (the module answers with the previous request's picture, 2026-11-01)
 
@@ -444,17 +446,17 @@ class SerialRobot:
         return state
 
     def sit_down(self) -> str:
-        """The claw look starts from a sit (user, 2026-11-01): the firmware sit, then still. No fall check while sitting (a sit tilts the body)."""
+        """The claw look starts from the "attention" pose (user, 2026-11-01; it used to be a sit): stand first, then CLAW_LOOK_POSE, then still. No fall check in it."""
         self._pitch, self._roll = [], []
         self._tx("gP")
         self._tx("kbalance")                                # stand first, always (user, 2026-11-01: the look began with him lying in the rest pose and stayed there: after a Pi-sent stand-up the legs can go limp, and
         self._sleep(SIT_STAND_FIRST_S)                      # a sit asked of limp legs changes nothing). The firmware stand drives every leg joint to its balance angle again.
-        self._tx("ksit")
-        self._sleep(2.5)
+        self._tx(CLAW_LOOK_POSE)
+        self._sleep(2.5 if CLAW_LOOK_POSE == "ksit" else CLAW_POSE_S)
         return "ok"
 
     def stand_from_sit(self) -> str:
-        """Up again after the claw look: the link stands him up slowly with the back legs first (gait/standup.py stand_from_sit), then still; "fell" if he went over."""
+        """Up again after the claw look: a normal stand-up (`kbalance`; from a sit the link stands him up slowly with the back legs first, gait/standup.py stand_from_sit), then still; "fell" if he went over."""
         self._pitch, self._roll = [], []
         self._tx("kbalance")
         t0, state = self._clock(), "ok"

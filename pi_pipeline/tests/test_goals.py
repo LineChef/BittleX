@@ -1564,7 +1564,7 @@ def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first():
         def send(self, c, **k): sent.append(c)
     r = bc.SerialRobot(Lk(), sleep=lambda s: None)
     r.sit_down()
-    assert sent.index("kbalance") < sent.index("ksit")                              # stand first, then sit
+    assert sent.index("kbalance") < sent.index(bc.CLAW_LOOK_POSE) and bc.CLAW_LOOK_POSE == "kcalib"      # stand first, then the attention pose
 
 
 def test_a_ball_gone_after_a_small_step_means_he_pushed_it_so_he_looks_around():
