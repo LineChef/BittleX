@@ -77,3 +77,4 @@ Status key: 🔴 hardware/camera-gated · 🟡 partial · ⚪ low priority · �
 | [B24](planned/behavior-ideas.md#b24--agency-g2-forms-its-own-goals-not-just-executes-rule-based-autonomy) | Agency: G2 forms its own goals, not just executes rule-based autonomy | — |
 | [B26](planned/behavior-ideas.md#b26--wire-the-servo-thermal-governor-into-the-behavior-layer--) | Wire the servo-thermal governor into the behavior layer | 🟡 |
 | [B27](planned/behavior-ideas.md#b27--supervise-the-microphone-and-wake-word-worker----built-camera-reader-and-microphone-stream-supervised-2026-10-18) | Supervise the microphone and wake-word worker | 🟢 BUILT (camera reader and microphone stream supervised 2026-10-18) |
+| [B28](planned/behavior-ideas.md#b28--goals-g2-works-toward-a-goal-you-set-and-learns-from-his-attempts----built-2026-10-31-not-run-on-g2) | Goals: G2 works toward a goal you set and learns from his attempts | 🟢 BUILT 2026-10-31, not run on G2 |

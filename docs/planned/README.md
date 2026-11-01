@@ -8,6 +8,7 @@ Work that is **not part of the running build**: ideas, plans and parked projects
 | [`robot-arm.md`](robot-arm.md) | Petoi's Bittle X+Arm gripper module: install, claw calibration, skill tokens, voice commands, open questions. |
 | [`place-memory-plan.md`](place-memory-plan.md) | Remembering places seen during exploration. |
 | [`reflection-plan.md`](reflection-plan.md) | Reflection over memory (sleep-time consolidation). |
+| [`goals-plan.md`](goals-plan.md) | Goals you set: G2 makes up to 10 attempts per session, judges each one on the Pi and changes the next one, with notes and a report. |
 | [`exploration-object-learning-plan.md`](exploration-object-learning-plan.md) | Exploration survey pictures, naming objects by voice, recognition, "what am I looking at?". |
 | [`firmware-fork-case.md`](firmware-fork-case.md) | What forking the BiBoard (or AI Head) firmware would unblock, with pros, cons and decision triggers. |
 | [`behavior-ideas.md`](behavior-ideas.md) | The behavior ideas (B#), the "what next" reference. |

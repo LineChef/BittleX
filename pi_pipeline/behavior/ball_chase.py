@@ -1,22 +1,26 @@
 """Chase the treat ball and punt it for the cat (user, 2026-10-25). Stop, look, step: a picture, one short move, a picture again, until someone says stop.
 
-G2 cannot grab the 3 in ball (the claw opens to about 2.75 in), but `kpickF` throws it straight ahead, which is what the cat game needs. The loop:
+G2 cannot grab the 3 in ball (the claw opens to about 2.75 in); the punch (the lunge with the claw shut) throws it straight ahead, which is what the cat game needs. The loop:
 
-  SEARCH   no ball in the picture: turn toward the side it was last seen on, else in 35 deg steps all the way round, a short walk after a full circle
+  SEARCH   no ball in the picture: the search order (SEARCH_ORDER): claw looks (the arm points the camera, the legs stay), turn steps toward the side it was last seen on, back-ups
+           (BACK_BUDGET_S caps them per attempt); a short walk after a full circle only with SEARCH_WALK (a big floor)
   TURN     the ball is more than 12 deg off straight: turn toward it
   WALK     it is straight ahead but farther than 7 in (measured from the camera): walk up to it, never more than 3 s at a time: look again
-  PUNT     it is within 6 in ahead and within 12 deg of straight: `kpickF` (never backs up for being too close: right in front of the ball, punt); then look where it went, and step closer if it is still more than 4 in away
-  BACK UP  it is still where it was after three punts: back up, then line it up again
+  ALIGN    within 7 in but more than PUNT_ALIGN_DEG off straight: a small turn pulse, a new picture, up to ALIGN_TRIES (user, 2026-10-31)
+  PUNT     close and lined up: punch (never backs up for being too close); then look where it went, and step closer if it is still more than 4 in away
+  BACK UP  it is still where it was after STUCK_PUNTS punts: back up, then line it up again
 
 Pure logic in `ChasePlanner` (a reading in, an `Action` out) so it runs against a recorded picture series; `run_chase` is the loop around it with a robot, a camera, a stop flag and a picture saver
-(every picture with the ball found goes to the training set, at most one per 2 s: user, 2026-10-25). Walks, turns and the punt are Petoi's own firmware skills (`kwkF`, `kwkL` / `kwkR`, `kbkF`,
-`kpickF`) because they are the steadiest with the claw fitted; the link turns the gyro assist back off after each (fall recovery is off for the arm).
+(every picture with the ball found goes to the training set, at most one per 2 s: user, 2026-10-25). Walks are always the learned default gait policy (user, 2026-10-31); turns and back-ups
+are Petoi's firmware skills (`kwkL` / `kwkR`, `kbkF`), the link turns the gyro assist back off after each (fall recovery is off for the arm). Each walk and turn is timed from the pace and
+turn rates G2 measures himself (behavior/chase_pace.py). The goals framework (pi_pipeline/goals) runs this as one attempt and tunes its settings between attempts.
 
     python -m pi_pipeline.behavior.ball_chase            # on the Pi, voice service stopped, G2 standing; Ctrl-C or `touch ~/.local/share/g2/ball_chase_stop` ends it
     python -m pi_pipeline.behavior.ball_chase --dry-run  # looks and says what it would do; sends no move
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import math
@@ -30,9 +34,7 @@ from ..vision.ball_finder import BallReading, find_ball
 
 log = logging.getLogger("g2.ball_chase")
 
-TURN_DEG_S = 6.0               # Petoi's arm turn (kwkL / kwkR), measured 2026-10-25: 30 deg in 4.8 s
-WALK_IN_S = 5.8                # Petoi's arm walk (kwkF): about 5 to 6 in a second once it is going (2026-10-25: 7 in in a 1.9 s step)
-WALK_START_S = 0.7             # a firmware gait covers nothing in its first 0.7 s or so
+# The walking pace and the turn rates are measured by G2 himself (behavior/chase_pace.py; its defaults: Petoi's arm turn 30 deg in 4.8 s, 2026-10-25, the policy walk 4.2 in a second)
 ALIGN_DEG = 12.0               # farther off straight than this: turn before walking
 PUNT_ALIGN_DEG = 12.0          # ... and before a punt
 PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 4.0      # camera to ball: the lunge reaches about this far (2.6 in threw the ball 18 in; 4.5 to 5 in was just out of reach, 2026-10-25)
@@ -51,6 +53,47 @@ CLOSE_IN_IN = 4.0              # after a punt that left the ball farther than th
 STUCK_PUNTS = 3                # punts with the ball still in range before backing up
 BACK_UP_S = 2.0
 SAVE_EVERY_S = 2.0
+BACK_BUDGET_S = 6.0            # the most backing up in one attempt (search moves, stuck punts and a vanished ball together): there is no edge detector, so keep it small on a desk (0 = never back up)
+WHEN_VANISHED = "punt"         # the ball vanished at close range: "punt" (it is at the claw) or "back_up" (back off a little and look again)
+VANISH_BACK_S = 1.0
+
+# Searching (goals plan, 2026-10-31): a search is a list of moves. The "once" moves play first, then the "cycle" moves repeat until the ball is seen. Moves: "claw" (look around with the
+# arm: the camera is on the claw), "turn" (a turn step in place), "back" (back up to see more floor). Without the claw (a robot that cannot move it) "claw" is left out.
+SEARCH_ORDERS = {
+    "turn": ((), ("turn",)),
+    "claw_then_turn": (("claw",), ("turn",)),
+    "claw_scan": (("claw",), ("turn", "claw")),
+    "back_claw_scan": (("back", "claw"), ("turn", "claw")),
+    "claw_back_scan": (("claw", "back", "claw"), ("turn", "claw")),
+    "back_turn": (("back",), ("turn",)),
+    "back_and_turn": ((), ("back", "turn")),
+}
+SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
+SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
+
+# The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
+CLAW_PAN_DEG = 35.0
+CLAW_LIFT_DEG = 15.0
+CLAW_PAN_SIGN = "right"        # which way a positive pan turns the camera (NOT yet checked on G2: `python -m pi_pipeline.behavior.claw_look --calibrate` measures it with the ball)
+CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
+CLAW_STEPS_PER_S = 40
+CLAW_SETTLE_S = 0.6            # still before the picture
+
+# The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
+# G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
+BACK_IN_S = 3.0                # a guess at the firmware back-up's pace (not measured: there is no reading before a back-up after a punt)
+
+# Fine alignment before the punch (user, 2026-10-31: small turns, checked with the camera after each one). Inside NUDGE_MAX_IN, a ball more than PUNT_ALIGN_DEG off straight gets a
+# short turn pulse sized from his measured pulse turn rate, then a new picture; at most ALIGN_TRIES of them, then WHEN_MISALIGNED.
+ALIGN_PULSE_MIN_S = 1.0        # the shortest pulse (shorter ones may not move him at all: the measured log shows it)
+ALIGN_PULSE_MAX_S = 1.6
+ALIGN_TRIES = 3
+WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
+
+
+def claw_pan_body(pan: float) -> float:
+    """The camera's direction, + = G2's right, for an arm pan of `pan` degrees."""
+    return pan if CLAW_PAN_SIGN == "right" else -pan
 # The punch (user, 2026-10-25: "test the punch, not attempting to pick it up with the claw"): the lunge of Petoi's `pickF` (decoded from InstinctBittleESP.h: a crouch, then front legs folded and the arm swung out to 75)
 # with the claw held CLOSED the whole time; `kpickF` opens the claw to 65 first and closes it on the way back, which is a grab attempt. Key poses are the skill's own angles (the arm firmware shifts the front
 # shoulders -10 and front knees +6 for a skill with no Arm variant, added below); (seconds to get there, arm lift, shoulders FL FR BR BL, knees FL FR BR BL).
@@ -75,7 +118,7 @@ STOP_FILE = "~/.local/share/g2/ball_chase_stop"
 
 @dataclass(frozen=True)
 class Action:
-    kind: str                  # "turn" | "walk" | "punt" | "back" | "look" | "search_turn" | "search_walk"
+    kind: str                  # "turn" | "align" | "walk" | "punt" | "back" | "look" | "search_turn" | "search_walk" | "search_back" | "claw_look"
     seconds: float = 0.0
     degrees: float = 0.0       # + = right, - = left
     why: str = ""
@@ -93,6 +136,62 @@ class ChasePlanner:
     punt_log: list = field(default_factory=list)   # (distance in, bearing deg) of the ball at each punt the planner asked for (None: it had vanished at close range)
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
+    claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
+    search_i: int = 0          # moves into the current search
+    back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
+    claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
+    align_turns: int = 0       # fine-alignment pulses since the ball came within NUDGE_MAX_IN
+    pace: object = None        # a chase_pace.PaceBook (None: its defaults)
+
+    def _walk_pace(self) -> float:
+        if self.pace is not None:
+            return self.pace.walk_in_s()
+        from .chase_pace import DEFAULTS
+        return DEFAULTS["walk_in_s"]
+
+    def _turn_rate(self, side: int, short: bool) -> float:
+        if self.pace is not None:
+            return self.pace.turn_deg_s(side, short)
+        from .chase_pace import DEFAULTS
+        return DEFAULTS["pulse_deg_s" if short else "turn_deg_s"]
+
+    def _order(self) -> tuple[tuple, tuple]:
+        once, cycle = SEARCH_ORDERS.get(SEARCH_ORDER, SEARCH_ORDERS["turn"])
+        if not self.claw_ok:
+            once, cycle = tuple(m for m in once if m != "claw"), tuple(m for m in cycle if m != "claw")
+        return once, (cycle or ("turn",))
+
+    def _can_back(self, seconds: float) -> bool:
+        return self.back_s + seconds <= BACK_BUDGET_S + 1e-9
+
+    def _back(self, kind: str, seconds: float, why: str) -> Action:
+        self.back_s += seconds
+        return Action(kind, seconds, why=why)
+
+    def _search_move(self) -> Action:
+        once, cycle = self._order()
+        for _ in range(len(once) + 2 * len(cycle) + 1):                # a move that cannot be made (no back-up left) is skipped
+            i = self.search_i
+            self.search_i += 1
+            move = once[i] if i < len(once) else cycle[(i - len(once)) % len(cycle)]
+            side = self.last_side or 1
+            if move == "claw":
+                self.claw_side = side
+                return Action("claw_look", why=f"searching: a look around with the claw, {'right' if side > 0 else 'left'} first")
+            if move == "back":
+                if self._can_back(BACK_UP_S):
+                    return self._back("search_back", BACK_UP_S, "searching: back up to see more of the floor")
+                continue
+            self.search_steps += 1
+            step = SCAN_TURN_DEG if "claw" in cycle else SEARCH_STEP_DEG
+            per_circle = max(1, int(math.ceil(360.0 / max(abs(step), 1.0)))) if "claw" in cycle else SEARCH_STEPS_PER_CIRCLE
+            if SEARCH_WALK and self.search_steps > per_circle:
+                self.search_steps = 0
+                return Action("search_walk", 2.0, why="a full circle without the ball: walk on and search again")
+            if self.search_steps > per_circle:
+                self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
+            return Action("search_turn", abs(step) / self._turn_rate(side, False), step * side, f"searching {'right' if side > 0 else 'left'}")
+        return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
     def decide(self, ball: BallReading | None) -> Action:
         if ball is None:
@@ -102,21 +201,17 @@ class ChasePlanner:
             if self.last_dist is not None and self.last_dist <= NUDGE_MAX_IN:      # it was right there and now it is gone: at the claw, too close for the camera to see (user, 2026-10-25: right in front of the ball and no punt, then a turn away)
                 self.last_dist = None
                 self.lost = 0
+                if WHEN_VANISHED == "back_up" and self._can_back(VANISH_BACK_S):
+                    return self._back("back", VANISH_BACK_S, "the ball vanished at close range: back off a little to see it")
                 self.after_punt = True
                 self.punt_log.append((None, None))
                 return Action("punt", 0.0, why="the ball vanished at close range: it is at the claw: punt")
             if self.lost < LOST_LOOKS:
                 return Action("look", 1.0, why=f"no ball ({self.lost} of {LOST_LOOKS}): look again before searching")
-            self.search_steps += 1
-            if SEARCH_WALK and self.search_steps > SEARCH_STEPS_PER_CIRCLE:
-                self.search_steps = 0
-                return Action("search_walk", 2.0, why="a full circle without the ball: walk on and search again")
-            if self.search_steps > SEARCH_STEPS_PER_CIRCLE:
-                self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
-            side = self.last_side or 1
-            return Action("search_turn", abs(SEARCH_STEP_DEG) / TURN_DEG_S, SEARCH_STEP_DEG * side, f"searching {'right' if side > 0 else 'left'}")
+            return self._search_move()
         self.lost = 0
         self.search_steps = 0
+        self.search_i = 0
         self.last_dist = ball.distance_in
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
         near = ball.distance_in <= NUDGE_MAX_IN
@@ -125,24 +220,38 @@ class ChasePlanner:
             self.nudges += 1
             self.after_punt = False
             return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})")
-        if abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
+        if not near:
+            self.align_turns = 0
+        if near and abs(ball.bearing_deg) > PUNT_ALIGN_DEG:
+            if self.align_turns < ALIGN_TRIES:                  # a small turn, then a new picture (the camera checks every pulse)
+                self.align_turns += 1
+                side = 1 if ball.bearing_deg > 0 else -1
+                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, abs(ball.bearing_deg) / self._turn_rate(side, True)))
+                return Action("align", secs, float(ball.bearing_deg), f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
+            if WHEN_MISALIGNED == "back_up" and self._can_back(BACK_UP_S):
+                self.align_turns = 0
+                return self._back("back", BACK_UP_S, f"still {ball.bearing_deg:+.0f} deg off after {ALIGN_TRIES} small turns: back up and line up again")
+        elif abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
-            return Action("turn", max(MIN_MOVE_S, abs(deg) / TURN_DEG_S), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
+            side = 1 if deg > 0 else -1
+            return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
         if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
             self.after_punt = False
             return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer")
         if near:
             self.after_punt = True
+            self.align_turns = 0
             self.punts_in_range += 1
-            if self.punts_in_range > STUCK_PUNTS:
+            if self.punts_in_range > STUCK_PUNTS and self._can_back(BACK_UP_S):
                 self.punts_in_range = 0
-                return Action("back", BACK_UP_S, why="three punts and the ball has not left: back up")
+                return self._back("back", BACK_UP_S, f"{STUCK_PUNTS} punts and the ball has not left: back up")
             self.punt_log.append((round(ball.distance_in, 1), round(ball.bearing_deg, 1)))
             return Action("punt", 0.0, why=f"ball {ball.distance_in:.1f} in ahead, {ball.bearing_deg:+.0f} deg: punt")
         self.punts_in_range = 0
         self.after_punt = False
         self.nudges = 0
-        secs = min(WALK_MAX_S, max(MIN_MOVE_S, WALK_START_S + (ball.distance_in - WALK_AIM_IN) / WALK_IN_S))      # aim for WALK_AIM_IN: a gait needs WALK_START_S just to get moving, and the ball is touched at about 3 in
+        from .chase_pace import WALK_START_S as start
+        secs = min(WALK_MAX_S, max(MIN_MOVE_S, start + (ball.distance_in - WALK_AIM_IN) / self._walk_pace()))      # aim for WALK_AIM_IN: a gait needs a moment just to get moving, and the ball is touched at about 3 in
         self.walk_log.append((round(ball.distance_in, 1), round(secs, 1)))
         return Action("walk", secs, why=f"ball {ball.distance_in:.0f} in ahead: walk {secs:.1f} s")
 
@@ -153,6 +262,7 @@ class Robot(Protocol):
     def back(self, seconds: float) -> str: ...
     def punt(self) -> str: ...
     def battery_ok(self) -> bool: ...
+    # optional: def claw_pose(self, pan: float, lift: float) -> str   (a robot without it never gets a claw look)
 
 
 class Camera(Protocol):
@@ -167,6 +277,8 @@ class SerialRobot:
         self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
         self._pitch, self._roll = [], []
+        self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
+        self._walker = None
 
     def _tx(self, c: str) -> None:
         self._lk.send(c, read_reply=False, settle=0.0)
@@ -208,7 +320,46 @@ class SerialRobot:
         return state
 
     def walk(self, seconds: float) -> str:
-        return self._skill("kwkF", seconds)
+        return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
+
+    def _policy_walk(self, seconds: float) -> str:
+        """The learned walk (the attachment's saved gait) for `seconds`, ending in a balanced stand. "fell" if it ended in a fall."""
+        from ..gait.policy_walker import PolicyWalker
+        fell = []
+        if self._walker is None:
+            self._walker = PolicyWalker(self._lk, hold_between_legs=True, on_fall=lambda: fell.append(1))
+        else:
+            self._walker._on_fall = lambda: fell.append(1)
+        self._walker.walk(seconds)
+        t0 = self._clock()
+        self._sleep(0.2)
+        while self._walker.busy and self._clock() - t0 < seconds + 10.0:
+            self._sleep(0.05)
+        if self._walker.busy:
+            self._walker.stop(rest=False)
+        return "fell" if fell else "ok"
+
+    def claw_pose(self, pan: float, lift: float) -> str:
+        """Move the arm (pan joint 0, lift joint 1) to point the camera, at CLAW_DEG_S, watching the IMU. The legs are not sent. "ok" or "fell"."""
+        pan = max(-45.0, min(45.0, float(pan)))
+        lift = max(0.0, min(40.0, float(lift)))
+        p0, l0 = self._claw
+        span = max(abs(pan - p0), abs(lift - l0))
+        steps = max(1, int(math.ceil(span / CLAW_DEG_S * CLAW_STEPS_PER_S)))
+        self._pitch, self._roll = [], []
+        self._tx("gP")
+        state = "ok"
+        for i in range(1, steps + 1):
+            u = i / steps
+            k = u * u * (3 - 2 * u)
+            self._tx(f"i0 {int(round(p0 + (pan - p0) * k))} 1 {int(round(l0 + (lift - l0) * k))}")
+            self._sleep(1.0 / CLAW_STEPS_PER_S)
+            if i % 5 == 0 and self._fell():
+                state = "fell"
+                break
+        self._claw = (pan, lift)
+        self._tx("gp")
+        return state
 
     def turn(self, degrees: float, seconds: float) -> str:
         return self._skill("kwkR" if degrees > 0 else "kwkL", seconds)
@@ -300,15 +451,59 @@ class PictureSaver:
         self.saved += 1
 
 
+def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None) -> tuple[str, BallReading | None]:
+    """One look around with the arm: the camera to one side, the other side, and (with the lift up) straight ahead, a picture at each; stops at the first sight of the ball. The arm goes back
+    to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None)."""
+    side = planner.claw_side or planner.last_side or 1
+    pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG] + ([0.0] if CLAW_LIFT_DEG > 0 else [])
+    found, state = None, "ok"
+    for pan in pans:
+        state = robot.claw_pose(pan, CLAW_LIFT_DEG)
+        if state == "fell":
+            break
+        sleep(CLAW_SETTLE_S)
+        jpeg = camera.look()
+        ball = find_ball(jpeg) if jpeg else None
+        if ball is not None:
+            if saver is not None:
+                saver.maybe_save(jpeg, ball, tag="claw")
+            found = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + claw_pan_body(pan))
+            if trace is not None:
+                trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1)})
+            say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
+            break
+    if state != "fell":
+        state = robot.claw_pose(0.0, 0.0)
+    if trace is not None:
+        trace.append({"kind": "claw_look", "found": found is not None, "state": state})
+    return state, found
+
+
+def _ball_dict(ball: BallReading | None):
+    return None if ball is None else {"distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}
+
+
 def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
-              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print) -> str:
+              settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
+              trace: list | None = None, after_punt_look: bool = False, pace=None) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
-    Never gives up on its own."""
+    Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went.
+    `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one."""
     planner = planner or ChasePlanner()
+    planner.claw_ok = callable(getattr(robot, "claw_pose", None))
+    if pace is not None:
+        planner.pace = pace
+    last_move = None                                      # (kind, seconds, degrees, the ball before it): measured against the next reading
     steps = 0
     punts = 0
     seen = False
+    pending: BallReading | None = None                    # the ball a claw look just found (the camera is back at straight ahead, so it would not see it now)
     t_start = clock()
+
+    def note(**kw):
+        if trace is not None:
+            trace.append({"t": round(clock() - t_start, 2), **kw})
+
     while not stop():
         if max_steps is not None and steps >= max_steps:
             return "steps"
@@ -319,16 +514,28 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if steps % 15 == 1 and not dry_run and not robot.battery_ok():
             say("battery low or unreadable: stopping")
             return "battery"
-        sleep(settle_s)                                   # let the body stop swaying before the picture
-        jpeg = camera.look()
-        if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
-            say(f"[{steps}] no picture from the camera: looking again")
-            continue
-        ball = find_ball(jpeg)
-        if saver is not None:
-            saver.maybe_save(jpeg, ball)
+        if pending is not None:
+            ball, pending = pending, None
+            last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
+        else:
+            sleep(settle_s)                                   # let the body stop swaying before the picture
+            jpeg = camera.look()
+            if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
+                say(f"[{steps}] no picture from the camera: looking again")
+                note(kind="no_picture")
+                continue
+            ball = find_ball(jpeg)
+            if saver is not None:
+                saver.maybe_save(jpeg, ball)
+            if last_move is not None and planner.pace is not None and not dry_run:
+                kind, secs, degs, before = last_move
+                got = planner.pace.record_walk(before, ball, secs) if kind == "walk" else planner.pace.record_turn(before, ball, degs, secs)
+                if got is not None:
+                    note(kind="measured", what=kind, seconds=round(secs, 2), value=round(got, 2))
+            last_move = None
+        note(kind="look", ball=_ball_dict(ball))
         if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
-            if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or not seen):
+            if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or planner.search_i > 0 or not seen):
                 announce("target acquired")
             elif ball is None and planner.lost + 1 == LOST_LOOKS:                       # the look that starts a search
                 announce("searching")
@@ -336,31 +543,76 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         act = planner.decide(ball)
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
+            note(kind="act", act=act.kind, why=act.why)
             if act.kind == "look":
                 sleep(act.seconds)
             continue
-        if act.kind in ("turn", "search_turn"):
+        if act.kind == "claw_look":
+            state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace)
+            note(kind="act", act="claw_look", why=act.why, state=state, found=pending is not None)
+            if state == "fell":
+                say("G2 fell: stopping (fall recovery is off)")
+                return "fell"
+            continue
+        if act.kind in ("turn", "search_turn", "align"):
             state = robot.turn(act.degrees, act.seconds)
+            if ball is not None:
+                last_move = ("turn", act.seconds, act.degrees, ball)
         elif act.kind in ("walk", "search_walk"):
             state = robot.walk(act.seconds)
-        elif act.kind == "back":
+            if ball is not None and act.kind == "walk":
+                last_move = ("walk", act.seconds, 0.0, ball)
+        elif act.kind in ("back", "search_back"):
             state = robot.back(act.seconds)
         elif act.kind == "punt":
             if announce is not None:
                 announce("punting")                       # he says it right before the lunge (user, 2026-10-25)
             state = robot.punt()
             punts += 1
+            note(kind="act", act="punt", why=act.why, state=state, at=planner.punt_log[-1] if planner.punt_log else None)
             sleep(1.5)                                    # the ball is rolling: look after it stops
             if state != "fell" and max_punts is not None and punts >= max_punts:
+                if after_punt_look:
+                    jpeg = camera.look()
+                    after = find_ball(jpeg) if jpeg else None
+                    if after is None and planner.claw_ok:
+                        _st, after = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace)
+                        if _st == "fell":
+                            say("G2 fell: stopping (fall recovery is off)")
+                            return "fell"
+                    if after is None and planner._can_back(VANISH_BACK_S):        # still not seen: it may be sitting under the claw (a miss), so back off a little and look again
+                        planner.back_s += VANISH_BACK_S
+                        if robot.back(VANISH_BACK_S) == "fell":
+                            say("G2 fell: stopping (fall recovery is off)")
+                            return "fell"
+                        sleep(settle_s)
+                        jpeg = camera.look()
+                        after = find_ball(jpeg) if jpeg else None
+                        if after is not None:                                        # he backed up: the ball's distance from where he punched is this reading less the back-up
+                            back_in = VANISH_BACK_S * BACK_IN_S
+                            after = dataclasses.replace(after, distance_in=max(0.0, after.distance_in - back_in))
+                    note(kind="after_punt", ball=_ball_dict(after), picture=bool(jpeg))
                 say(f"punted {punts}: done")
                 say(f"ATTEMPT: punted at {planner.punt_log[-1] if planner.punt_log else '?'} (in, deg) after {steps} looks; walk steps (ball in, seconds): {planner.walk_log}")
                 return "punted"
+            if state == "fell":
+                say("G2 fell: stopping (fall recovery is off)")
+                return "fell"
+            continue
         else:
             state = "ok"
+        note(kind="act", act=act.kind, why=act.why, state=state, seconds=round(act.seconds, 2), degrees=round(act.degrees, 1))
         if state == "fell":
             say("G2 fell: stopping (fall recovery is off)")
             return "fell"
     return "stopped"
+
+
+def _book():
+    from .chase_pace import book_for_now
+    b = book_for_now()
+    print(f"pace ({b.key}): walk {b.walk_in_s():.1f} in/s; turns {b.turn_deg_s(-1, False):.1f} / {b.turn_deg_s(1, False):.1f} deg/s (left / right), pulses {b.turn_deg_s(-1, True):.1f} / {b.turn_deg_s(1, True):.1f}")
+    return b
 
 
 def stop_requested() -> bool:
@@ -446,7 +698,8 @@ def main() -> None:
     _stand_if_lying(link)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
     try:
-        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce)
+        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce,
+                        pace=None if args.dry_run else _book())
         print("ended:", why)
     except KeyboardInterrupt:
         print("ended: stopped")

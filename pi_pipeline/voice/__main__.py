@@ -220,6 +220,10 @@ def main() -> None:
                 watcher_c.nudge()
             if watcher_r and kw.get("told_sleep"):
                 watcher_r.nudge()
+            if kw.get("arm_goal") and args.actuator == "serial":                       # "G2, ball goal": one goal session as its own unit (stops this service, rests G2, starts it again)
+                from ..goal_launch import launch as _goal_launch
+                threading.Timer(0.8, _goal_launch, args=(kw["arm_goal"],)).start()
+                return
             if kw.get("arm_punt") and args.actuator == "serial":                       # "G2, punt": one punt attempt as its own unit (stops this service, rests G2, starts it again)
                 from ..punt_launch import launch as _punt_launch
                 threading.Timer(0.8, _punt_launch).start()

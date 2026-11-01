@@ -1,0 +1,264 @@
+"""The first approach (goals plan, 2026-10-31): the ball chase (behavior/ball_chase.py) as one attempt = find the ball, walk up to it, punt it once, look where it went.
+
+Its knobs are the punt settings (behavior/punt_settings.py, with the same bounds); the user's punt_settings.json is where a goal's first session starts. Scored from the chase's trace:
+how far the ball moved, how long it took, and when there was no punt, how far he got (never saw it, never got close, pushed it away, got close but never punched).
+"""
+from __future__ import annotations
+
+import math
+import sys
+import time
+
+from .approach import AttemptContext, AttemptResult, Outcome, register
+from .spec import Knob
+
+# name -> (step, control, label, unit). Bounds and kinds come from punt_settings.SPEC. Controls agreed with the user 2026-10-31: free unless named here.
+KNOB_INFO = {
+    "punt_max_in": (0.25, "free", "punching from", "in"),
+    "nudge_max_in": (0.5, "free", "taking small steps closer from", "in"),
+    "nudges_before_punt": (1, "free", "small steps before punching anyway", ""),
+    "nudge_step_s": (0.15, "free", "one small step of", "s"),
+    "walk_aim_in": (0.5, "free", "ending my walks", "in from the ball"),
+    "punt_align_deg": (2.0, "free", "lining up within", "deg"),
+    "punch_lunge_s": (0.02, "ask", "a lunge time of", "s"),
+    "punch_hold_s": (0.05, "free", "holding the punch for", "s"),
+    "lost_looks": (1, "free", "looks before I start searching:", ""),
+    "back_up_s": (0.5, "free", "backing up for", "s"),
+    "stuck_punts": (1, "free", "punts before I back up:", ""),
+    "when_vanished": (None, "free", "when the ball vanishes up close, I", ""),
+    "search_order": (None, "free", "searching by", ""),
+    "search_step_deg": (5.0, "free", "search turns of", "deg"),
+    "scan_turn_deg": (10.0, "free", "turns between claw looks of", "deg"),
+    "claw_look_pan_deg": (5.0, "free", "claw looks out to", "deg"),
+    "claw_look_lift_deg": (5.0, "free", "lifting the claw to", "deg for a look"),
+    "align_pulse_min_s": (0.1, "free", "alignment turns of at least", "s"),
+    "align_tries": (1, "free", "alignment turns before giving up:", ""),
+    "when_misaligned": (None, "free", "when I can't line up, I", ""),
+    "search_walk": (None, "fixed", "walking on blind after a full search circle", ""),        # only safe on a big floor: the user's call
+    "max_seconds": (None, "fixed", "an attempt limit of", "s"),
+    "back_up_budget_s": (None, "fixed", "backing up at most", "s an attempt"),                    # no edge detector: the user's call
+    "claw_pan_sign": (None, "fixed", "the claw pan direction", ""),                                # measured (claw_look --calibrate), not learned
+}
+
+# outcome code -> the knobs it points at, in order (+1 / -1 = one step up / down, "other" = another option)
+DIAGNOSIS = {
+    "missed": [("punt_max_in", -1), ("punt_align_deg", -1), ("nudges_before_punt", +1)],
+    "missed_vanished": [("when_vanished", "other"), ("punt_max_in", -1)],
+    "weak_hit": [("punt_max_in", -1), ("punt_align_deg", -1), ("punch_lunge_s", -1)],
+    "never_punted": [("punt_align_deg", +1), ("nudges_before_punt", -1), ("punt_max_in", +1)],
+    "pushed_away": [("walk_aim_in", +1), ("nudge_step_s", -1)],
+    "never_reached": [("walk_aim_in", -1), ("nudge_max_in", +1)],
+    "missed_off_line": [("punt_align_deg", -1), ("align_tries", +1)],
+    "align_overshoot": [("align_pulse_min_s", -1), ("punt_align_deg", +1)],
+    "align_no_move": [("align_pulse_min_s", +1)],
+    "align_stuck": [("align_tries", +1), ("when_misaligned", "other"), ("punt_align_deg", +1)],
+    "never_found": [("search_order", "other"), ("claw_look_lift_deg", +1), ("claw_look_pan_deg", +1), ("scan_turn_deg", -1), ("lost_looks", -1)],
+}
+
+HIT_IN = 8.0                   # the ball moved at least this far: a hit
+WEAK_IN = 3.0                  # less than this: a miss
+PUSH_IN = 4.0                  # the ball farther by this much right after a walk toward it: he pushed it
+VANISHED_AT_IN = 2.5           # where the ball is taken to be when it vanished at the claw
+
+
+def _chase():
+    from ..behavior import ball_chase
+    return sys.modules[ball_chase.__name__]
+
+
+def moved_in(before: tuple, after: dict) -> float:
+    """How far the ball moved, from (distance, bearing) before the punt and the reading after (law of cosines)."""
+    d0, b0 = before
+    d1, b1 = after["distance_in"], after["bearing_deg"]
+    return math.sqrt(max(0.0, d0 * d0 + d1 * d1 - 2 * d0 * d1 * math.cos(math.radians(b1 - b0))))
+
+
+def align_stats(trace: list) -> dict:
+    """The fine-alignment pulses and what the next picture showed: overshoots (the ball swung past straight to the other side) and pulses that did not move him."""
+    pulses = overshoots = no_moves = 0
+    before = None
+    pending = False
+    for e in trace:
+        if e.get("kind") == "look":
+            b = e.get("ball")
+            if pending and before is not None and b is not None:
+                if (before > 0) != (b["bearing_deg"] > 0) and abs(b["bearing_deg"]) > 3:
+                    overshoots += 1
+                elif abs(b["bearing_deg"] - before) < 1.5:
+                    no_moves += 1
+            pending = False
+            before = b["bearing_deg"] if b is not None else None
+        elif e.get("kind") == "act" and e.get("act") == "align":
+            pulses += 1
+            pending = True
+    return {"align_pulses": pulses, "align_overshoots": overshoots, "align_no_moves": no_moves}
+
+
+def _fmt_s(x: float) -> str:
+    return f"{x:.0f} s"
+
+
+@register("ball_punt")
+class BallPunt:
+    name = "ball_punt"
+    diagnosis = DIAGNOSIS
+
+    def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None):
+        self.robot, self.camera, self.saver, self._link, self.pace = robot, camera, saver, link, pace
+        self._cam = None
+
+    # ---------------------------------------------------------------------------------------------------- settings
+    def knobs(self) -> list[Knob]:
+        from ..behavior import punt_settings as ps
+        out = []
+        for name, (_const, kind, lo, hi, _doc) in ps.SPEC.items():
+            step, control, label, unit = KNOB_INFO.get(name, (None, "free", "", ""))
+            if kind is str:
+                out.append(Knob(name, "choice", options=tuple(lo), control=control, label=label, unit=unit))
+            elif kind is bool:
+                out.append(Knob(name, "bool", control=control, label=label, unit=unit))
+            else:
+                out.append(Knob(name, "int" if kind is int else "float", lo=lo, hi=hi, step=step, control=control, label=label, unit=unit))
+        return out
+
+    def base_settings(self) -> dict:
+        from ..behavior import punt_settings as ps
+        eff, _problems = ps.effective(_chase())
+        return eff
+
+    def conditions(self) -> dict:
+        return {}
+
+    def set_user_setting(self, name: str, value) -> str:
+        """The user confirmed a suggestion: write it into their own punt settings file (checked like any change)."""
+        from ..behavior import punt_settings as ps
+        return ps.set_value(_chase(), name, str(value).lower() if isinstance(value, bool) else str(value))
+
+    # ---------------------------------------------------------------------------------------------------- hardware
+    def open(self) -> None:
+        if self.robot is not None:
+            return
+        from ..behavior import ball_chase as bc
+        from ..config import settings
+        from ..link.serial_link import SerialLink
+        from ..vision.snapshot import CameraSnapshotter
+        self._link = SerialLink("/dev/serial0")
+        self._link.connect()
+        bc._stand_if_lying(self._link)
+        self._cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)     # exposure balancing stays on
+        self.camera = bc._SnapshotCamera(self._cam)
+        self.robot = bc.SerialRobot(self._link)
+        self.saver = bc.PictureSaver("~/.local/share/g2/explore_pictures/named/greenball")
+        if self.pace is None:
+            from ..behavior.chase_pace import book_for_now
+            self.pace = book_for_now()                                       # G2's own measured pace and turn rates, per attachment and floor
+
+    def close(self) -> None:
+        if self._link is None:
+            return
+        try:
+            if self.robot is not None and callable(getattr(self.robot, "claw_pose", None)):
+                self.robot.claw_pose(0.0, 0.0)
+        finally:
+            if self._cam is not None:
+                self._cam.close()
+            self._link.send("krest", read_reply=False, settle=0.0)          # rest at the end of the session
+            time.sleep(2.5)
+
+    def battery_ok(self, min_pct: int) -> tuple[bool, str]:
+        if self._link is None:
+            ok = self.robot.battery_ok() if self.robot is not None else True
+            return ok, "battery ok" if ok else "battery low"
+        from ..power import battery
+        ok, pct, volts = battery.motion_gate(self._link)
+        if pct is None:
+            return False, "battery unreadable"
+        if not ok or pct < min_pct:
+            return False, f"battery {pct}% ({volts:.2f} V), below {min_pct}%"
+        return True, f"battery {pct}% ({volts:.2f} V)"
+
+    # ---------------------------------------------------------------------------------------------------- one attempt
+    def run_attempt(self, settings: dict, ctx: AttemptContext) -> AttemptResult:
+        from ..behavior import punt_settings as ps
+        chase = _chase()
+        ps.apply(chase, {k: v for k, v in settings.items() if k in ps.SPEC})
+        planner = chase.ChasePlanner()
+        trace: list = []
+        t0 = time.monotonic()
+        ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1,
+                                max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
+                                trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace)
+        extra = {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}
+        if self.pace is not None:
+            extra["pace"] = self.pace.snapshot()
+        return AttemptResult(ended, round(time.monotonic() - t0, 1), trace, extra)
+
+    # ---------------------------------------------------------------------------------------------------- scoring
+    def score(self, result: AttemptResult, settings: dict) -> Outcome:
+        tr = result.trace
+        max_s = float(settings.get("max_seconds", 75.0)) or 75.0
+        tfrac = min(1.0, result.seconds / max_s)
+        looks = [e for e in tr if e.get("kind") == "look"]
+        seen = [e["ball"] for e in looks if e.get("ball")] + [{"distance_in": e["distance_in"]} for e in tr if e.get("kind") == "claw_seen"]
+        first_seen = next((e.get("t") for e in tr if (e.get("kind") == "look" and e.get("ball")) or e.get("kind") == "claw_seen"), None)
+        found_by = "claw look" if any(e.get("kind") == "claw_seen" for e in tr) else ("straight look" if seen else None)
+        nums = {"seconds": result.seconds, "first_seen_s": first_seen, "found_by": found_by, "looks": len(looks),
+                "claw_looks": sum(1 for e in tr if e.get("kind") == "claw_look"), "backed_up_s": result.extra.get("back_s", 0.0),
+                "walks": sum(1 for e in tr if e.get("kind") == "act" and e.get("act") == "walk"), **align_stats(tr)}
+        if result.ended == "fell":
+            return Outcome("fell", 0.0, False, f"I fell after {_fmt_s(result.seconds)}", nums)
+        if result.ended not in ("punted", "time"):
+            return Outcome("aborted", None, False, f"the attempt ended early ({result.ended}): not counted", nums)
+        if result.ended == "punted":
+            punt = next((e for e in reversed(tr) if e.get("kind") == "act" and e.get("act") == "punt"), {})
+            at = punt.get("at")
+            vanished = not at or at[0] is None
+            before = (VANISHED_AT_IN, 0.0) if vanished else (float(at[0]), float(at[1]))
+            after_e = next((e for e in reversed(tr) if e.get("kind") == "after_punt"), {})
+            after = after_e.get("ball")
+            nums.update(punt_at_in=None if vanished else before[0], punt_bearing_deg=None if vanished else before[1], vanished=vanished)
+            where = "at the claw (out of sight)" if vanished else f"from {before[0]:.1f} in"
+            if after is None:
+                nums["moved_in"] = None
+                return Outcome("hit_unseen", round(0.6 - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went out of sight ({_fmt_s(result.seconds)})", nums)
+            mv = moved_in(before, after)
+            nums["moved_in"] = round(mv, 1)
+            if mv >= HIT_IN:
+                return Outcome("hit", round(0.75 + 0.25 * min(1.0, mv / 24.0) - 0.15 * tfrac, 3), True, f"I punched {where} and the ball went {mv:.0f} in ({_fmt_s(result.seconds)})", nums)
+            if mv >= WEAK_IN:
+                return Outcome("weak_hit", 0.4, False, f"I punched {where} but the ball only went {mv:.0f} in", nums)
+            if not vanished and abs(before[1]) > 0.6 * float(settings.get("punt_align_deg", 12.0)):
+                return Outcome("missed_off_line", 0.2, False, f"I punched {where}, {before[1]:+.0f} deg off straight, and missed: the ball moved {mv:.0f} in", nums)
+            return Outcome("missed_vanished" if vanished else "missed", 0.2, False, f"I punched {where} and missed: the ball moved {mv:.0f} in", nums)
+        # time ran out with no punt
+        if not seen:
+            return Outcome("never_found", 0.0, False, f"I never saw the ball in {_fmt_s(result.seconds)}", nums)
+        closest = min(b["distance_in"] for b in seen)
+        nums["closest_in"] = round(closest, 1)
+        pushes = 0
+        last_d = None
+        walked = False
+        for e in tr:
+            if e.get("kind") == "look":
+                b = e.get("ball")
+                if b is not None:
+                    if walked and last_d is not None and b["distance_in"] > last_d + PUSH_IN:
+                        pushes += 1
+                    last_d = b["distance_in"]
+                walked = False
+            elif e.get("kind") == "act" and e.get("act") == "walk":
+                walked = True
+        nums["pushes"] = pushes
+        if pushes:
+            return Outcome("pushed_away", 0.1, False, f"I pushed the ball away {pushes} time(s) while walking up to it and never punched", nums)
+        chase = _chase()
+        if nums["align_pulses"] >= 2:
+            if nums["align_overshoots"] >= 2:
+                return Outcome("align_overshoot", 0.15, False, f"I kept turning past the ball while lining up ({nums['align_overshoots']} times in {nums['align_pulses']} small turns)", nums)
+            if nums["align_no_moves"] >= 2:
+                return Outcome("align_no_move", 0.15, False, f"my small turns did not move me ({nums['align_no_moves']} of {nums['align_pulses']})", nums)
+            if closest <= chase.NUDGE_MAX_IN:
+                return Outcome("align_stuck", 0.15, False, f"I got within {closest:.0f} in but could not line up in {nums['align_pulses']} small turns", nums)
+        if closest <= chase.NUDGE_MAX_IN:
+            return Outcome("never_punted", 0.15, False, f"I got within {closest:.0f} in but never punched", nums)
+        return Outcome("never_reached", 0.1, False, f"I saw the ball but never got closer than {closest:.0f} in", nums)

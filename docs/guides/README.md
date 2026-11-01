@@ -22,6 +22,7 @@ How to do a thing on the current build.
 | [`feature-flags.md`](feature-flags.md) | `G2_FEATURES` staged-bring-up flags. |
 | [`attachments.md`](attachments.md) | Switch what G2 wears on the neck (none, the AI head, the arm) with `g2attach`; the gait policy saved for each, the firmware check. |
 | [`punt.md`](punt.md) | Dial in the ball punt: "G2, punt" (one attempt, then rest), the same without voice (`g2punt`, `g2puntset`), every setting, the file it lives in, how to change it. |
+| [`goals.md`](goals.md) | Goal sessions ("G2, ball goal"): up to 10 attempts, each judged on the Pi to change the next; his spoken suggestions (confirm / cancel / review); reading the report (`g2goal report`). |
 | [`shell-helpers.md`](shell-helpers.md) | Reference of every `g2*` shell helper (generated from `tools/g2_aliases.sh`). |
 | [`swappable-llm.md`](swappable-llm.md) | Change the Claude model, or use a cheaper/free OpenAI-style model alone or routed with Claude. |
 | [`api-setup.md`](api-setup.md) | Anthropic API key, workspace + spend-limit checklist. |

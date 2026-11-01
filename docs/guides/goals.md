@@ -1,0 +1,66 @@
+# Goals: start a session, answer his suggestions, read what he learned
+
+G2 works toward a goal you set. One spoken command starts a session of up to 10 attempts. After each attempt he scores it with his own camera and IMU, decides on the Pi what to change
+for the next attempt (no Claude call), and writes it all down. Design and decisions: [`../planned/goals-plan.md`](../planned/goals-plan.md). Code: `pi_pipeline/goals/`.
+The first goal is **the ball punt** (the arm fitted, the green treat ball on the floor).
+
+## 1. Before a session
+
+- The arm is fitted and G2 is on the floor, never a desk (there is no edge detector), with room around him and the ball in sight. Hands near.
+- Set the floor label (**"G2, the floor is hardwood"**): what he learns is kept per floor.
+- A charged pack: no attempt starts below 30%, and the session reads the pack before every attempt.
+- **Once, before the first claw look:** measure which way the arm pans. Put the ball about 12 in straight ahead, voice service stopped:
+  `ssh -t "$G2_PI"`, then `cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.claw_look --calibrate`. It saves `claw_pan_sign`.
+  `--test` does one look around with the current settings.
+
+## 2. Start and stop
+
+| | |
+|---|---|
+| Start | **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt"). He says "Starting the goal: punt the ball.", the voice service steps aside, the session runs. Without voice: `g2goal run ball_punt` |
+| Stop | **"emergency stop"** is not heard during a session (the voice service is stopped); use `g2goal stop` (he finishes the current move and rests) or `g2stop` |
+| It ends by itself | after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand) |
+
+He stands still for 5 s between attempts and rests at the end. Short cues: "target acquired", "searching", "punting", then "Got it." or "Missed."
+
+## 3. His suggestions
+
+Most settings are his to change ("free"). A few are yours: he may only suggest a change ("ask"; today only the lunge speed), and some he never touches ("fixed").
+When the voice service comes back after a session, he says each new suggestion, for example *"I have a suggestion from my practice at punt the ball: a lunge time of 0.1 s instead of
+0.12 s, because I punched from 3.1 in but the ball only went 4 in. Say confirm, cancel, or review."* No wake word is needed for the answer.
+
+| Say | What happens |
+|---|---|
+| "confirm" (or "yes") | the change goes into your punt settings file |
+| "cancel" (or "no") | dropped; he will not suggest that value again for a while |
+| "review", or nothing | kept for later, in the report and in `g2goal suggestions`; he does not say it again. Later: `g2goal confirm ball_punt punch_lunge_s` or `g2goal cancel ...` |
+
+## 4. Reading what he learned
+
+```bash
+g2goal report                # copy the journal from the Pi and open the report page (ball_punt by default)
+g2goal history ball_punt     # the last sessions as text
+g2goal show ball_punt        # every setting: who changes it, its range, the value he uses now, yours if different
+g2goal status                # what each goal has learned, per attachment and floor; a change being tried
+g2goal reset ball_punt --yes # forget what he learned (the journal keeps the history)
+```
+
+The report shows the success rate per session, the settings he uses now against the first session's, every change with its reason and the attempts behind it, each session's attempts,
+and the lessons he saved to memory (up to 3 per session, as facts with source `goal_lesson`; he can talk about them). Signs the learning is good: the success rate rises across sessions on
+the same floor, kept changes keep their gains, the notes match what you saw. A setting flagged "at the end of its range" means a rule may be wrong or the goal is out of reach.
+Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
+
+**Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
+attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt".
+
+## 5. Where things live on the Pi
+
+| File | What |
+|---|---|
+| `~/.local/share/g2/goals.json` | your changes to a goal (`g2goal set ball_punt --attempts 8 --control punt_max_in=fixed`); missing = the built-in goal |
+| `~/.local/share/g2/goal_journal.jsonl` | every session, attempt (with its full trace), decision, suggestion answer |
+| `~/.local/share/g2/goal_state.json` | what he learned, per goal, attachment and floor |
+| `~/.local/share/g2/punt_settings.json` | your own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md)) |
+| `~/.local/share/g2/chase_pace.json` | his measured pace and turn rates |
+
+Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).

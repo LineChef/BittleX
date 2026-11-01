@@ -14,6 +14,9 @@ from __future__ import annotations
 import json
 import os
 
+# the search orders ball_chase knows (kept here as names so this module stays importable without numpy)
+SEARCH_ORDER_NAMES = ("turn", "claw_then_turn", "claw_scan", "back_claw_scan", "claw_back_scan", "back_turn", "back_and_turn")
+
 PATH = "~/.local/share/g2/punt_settings.json"
 
 # name -> (ball_chase constant, kind, lowest, highest, what it does)
@@ -29,6 +32,20 @@ SPEC = {
     "lost_looks": ("LOST_LOOKS", int, 1, 8, "looks in a row without the ball before he starts searching"),
     "search_walk": ("SEARCH_WALK", bool, None, None, "after a full search circle, walk on blind (a big floor only; never on a desk)"),
     "max_seconds": (None, float, 10.0, 600.0, "an attempt ends (and he rests) after this many seconds"),
+    # added with the goals plan (2026-10-31); a choice setting is (constant, str, the allowed values, None, what it does)
+    "back_up_s": ("BACK_UP_S", float, 0.5, 4.0, "seconds of one back-up (after stuck punts, and as a search move)"),
+    "stuck_punts": ("STUCK_PUNTS", int, 1, 6, "punts with the ball still in range before he backs up"),
+    "back_up_budget_s": ("BACK_BUDGET_S", float, 0.0, 20.0, "the most backing up in one attempt (no edge detector: keep it small on a desk; 0 = never back up)"),
+    "when_vanished": ("WHEN_VANISHED", str, ("punt", "back_up"), None, "the ball vanished at close range: punt (it is at the claw) or back up a little to see it"),
+    "search_order": ("SEARCH_ORDER", str, tuple(SEARCH_ORDER_NAMES), None, "how he looks for the ball: claw looks, turn steps and back-ups in this order"),
+    "search_step_deg": ("SEARCH_STEP_DEG", float, 10.0, 60.0, "one turn step of a search without claw looks, degrees"),
+    "scan_turn_deg": ("SCAN_TURN_DEG", float, 20.0, 90.0, "one turn step between two claw looks, degrees"),
+    "claw_look_pan_deg": ("CLAW_PAN_DEG", float, 10.0, 45.0, "how far to each side the claw look points the camera, degrees"),
+    "claw_look_lift_deg": ("CLAW_LIFT_DEG", float, 0.0, 35.0, "how high the claw look lifts the arm (higher sees farther; 0 = level)"),
+    "claw_pan_sign": ("CLAW_PAN_SIGN", str, ("right", "left"), None, "which way a positive arm pan turns the camera (measure it: python -m pi_pipeline.behavior.claw_look --calibrate)"),
+    "align_pulse_min_s": ("ALIGN_PULSE_MIN_S", float, 0.3, 1.6, "the shortest small turn used to line the claw up with the ball, seconds"),
+    "align_tries": ("ALIGN_TRIES", int, 1, 8, "small turns to line up before giving up (then when_misaligned)"),
+    "when_misaligned": ("WHEN_MISALIGNED", str, ("punch", "back_up"), None, "still off line after align_tries small turns: punch anyway or back up and line up again"),
 }
 DEFAULT_MAX_SECONDS = 75.0
 
@@ -66,6 +83,10 @@ def load_file(p: str | None = None) -> tuple[dict, list]:
             if kind is bool:
                 if not isinstance(v, bool):
                     raise ValueError("must be true or false")
+                val = v
+            elif kind is str:
+                if v not in lo:
+                    raise ValueError(f"must be one of {', '.join(lo)}")
                 val = v
             else:
                 if isinstance(v, bool):
@@ -107,6 +128,10 @@ def set_value(chase, name: str, text: str, p: str | None = None) -> str:
         if text.strip().lower() not in ("true", "false", "yes", "no", "on", "off", "1", "0"):
             raise ValueError(f"{name} must be true or false")
         val = text.strip().lower() in ("true", "yes", "on", "1")
+    elif kind is str:
+        val = text.strip()
+        if val not in lo:
+            raise ValueError(f"{name} must be one of {', '.join(lo)}")
     else:
         try:
             val = kind(float(text)) if kind is int else float(text)

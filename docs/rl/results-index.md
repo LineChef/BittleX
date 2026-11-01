@@ -60,7 +60,7 @@ Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mount
 
 ## `control`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +53.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md) +54.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -83,7 +83,7 @@ Docs that mention this family: [`history.md`](../archive/history.md), [`phase3-r
 
 ## `decisions`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +29.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`README.md`](../archive/README.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +31.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -273,7 +273,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`high-step-creep-training-plan.md`](../archive/plan-detail/high-step-creep-training-plan.md) +45.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md) +51.
 
 | File | Size | Cited by |
 |---|---|---|

@@ -10,6 +10,7 @@ Where each part of the code is documented. Each package has its own README next 
 | `personality/` | Traits that shape the prompt, behavior and cues | [`personality/README.md`](../pi_pipeline/personality/README.md) | [`how-it-works.md`](how-it-works.md) |
 | `memory/` | Exchange log, facts, consolidation, review UI | [`memory/README.md`](../pi_pipeline/memory/README.md) | [`plan-detail/phase9-memory.md`](plan-detail/phase9-memory.md) |
 | `reflection/` | Session recaps and reflection notes | [`reflection/README.md`](../pi_pipeline/reflection/README.md) | [`planned/reflection-plan.md`](planned/reflection-plan.md) |
+| `goals/` | Goal sessions: attempts judged on the Pi to change the next, journal, spoken suggestions, report | [`goals/README.md`](../pi_pipeline/goals/README.md) | [`planned/goals-plan.md`](planned/goals-plan.md), [`guides/goals.md`](guides/goals.md) |
 | `behavior/` | The driver, exploration, idle, sleep, wall avoidance | [`behavior/README.md`](../pi_pipeline/behavior/README.md) | [`guides/exploration-mode.md`](guides/exploration-mode.md) |
 | `vision/` | Camera, detections, pictures, wall distance, recognition | [`vision/README.md`](../pi_pipeline/vision/README.md) | [`vision/README.md`](vision/README.md), [`vision/picture-library.md`](vision/picture-library.md) |
 | `gait/` | The 80 Hz loop, steering, stand-up, guards, tools | [`gait/README.md`](../pi_pipeline/gait/README.md) | [`guides/gait-deployment.md`](guides/gait-deployment.md), [`rl/walking-policy.md`](rl/walking-policy.md) |

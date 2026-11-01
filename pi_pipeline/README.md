@@ -33,6 +33,7 @@ Every hardware-specific dependency sits behind a small interface with a **mock o
 | Package | What it does | README |
 |---|---|---|
 | [`behavior/`](behavior/README.md) | `BehaviorDriver.tick()` returns ordered effects: modes, exploration, idle, sleep, wall avoidance, chirps, emergency stop | yes |
+| [`goals/`](goals/README.md) | Goals the user sets: sessions of attempts, each scored and judged on the Pi to change the next (no API call), the journal, spoken suggestions, the report | yes |
 | [`vision/`](vision/README.md) | Camera feed, detections, pictures, wall distance, recognition by instance | yes |
 | [`gait/`](gait/README.md) | The 80 Hz policy loop, steering trim, stand-up ramp, guards, IMU speed and stall, bench and logging tools | yes |
 | [`link/`](link/README.md) | The shared serial link to the BiBoard, command tracing, `check_serial` | yes |
@@ -55,7 +56,7 @@ Every hardware-specific dependency sits behind a small interface with a **mock o
 |---|---|---|
 | `tests/` | The suite: no network, audio or API key; run it before committing | |
 
-Top-level modules: `config.py` (settings, read once from the environment and `.env`), `features.py`, `sound_levels.py` (all sound levels as percent of the maximum), `doctor.py` (bring-up readiness checklist), `bringup.py` (guided, resumable bring-up), `benchmark_pi.py` (voice pipeline benchmark), `explore_session.py` and `explore_launch.py` (the supervised exploration session and its voice hand-over), and the Pi scripts `setup_pi.sh`, `fetch_models.sh` and `install_voice_service.sh`.
+Top-level modules: `config.py` (settings, read once from the environment and `.env`), `features.py`, `sound_levels.py` (all sound levels as percent of the maximum), `doctor.py` (bring-up readiness checklist), `bringup.py` (guided, resumable bring-up), `benchmark_pi.py` (voice pipeline benchmark), `explore_session.py` and `explore_launch.py` (the supervised exploration session and its voice hand-over), `punt_launch.py` and `goal_launch.py` (the voice hand-overs for one punt and a goal session), and the Pi scripts `setup_pi.sh`, `fetch_models.sh` and `install_voice_service.sh`.
 
 ### Built and tested, but not wired in
 
@@ -65,7 +66,7 @@ These modules have unit tests and a design, but no runtime module imports them y
 |---|---|---|
 | `gait/jam_guard.py` | Vision-free jam reflex: front-leg strain as a bump sensor | the feedback-only jam reflex, [B9a](../docs/planned/behavior-ideas.md); needs real strain traces |
 | `behavior/thermal_governor.py` | Servo-thermal Layer 2: throttle on AMBER, cooldown pose on RED, from the gait-side `ThermalGuard` | [B26](../docs/planned/behavior-ideas.md) |
-| `behavior/ball_chase.py` (with `vision/ball_finder.py`) | Chase the green treat ball and PUNCH it (the lunge of Petoi's pick with the claw held shut; `--use-pick` for the pick skill) until stopped or after one punch (`--punts 1`): stop, look, step; colour finder, search in place (no blind walking unless `--search-walk`), voice cues (searching / target acquired / punting), saves pictures with the ball found for the future ball class; punt distance and nudges are settings (`--punt-max`, `--nudge-max`, `--nudges`); tested on synthetic pictures and a fake robot, live attempts on G2 (2026-10-25), including one punch through the chase on a desk. `behavior/punt_test.py`: one punch at each ball distance with the results in a CSV, for dialing the distance in by hand | its own entry point: `python -m pi_pipeline.behavior.ball_chase [--dry-run]` on the Pi with the voice service stopped; not driven by the behavior layer yet |
+| `behavior/ball_chase.py` (with `vision/ball_finder.py`) | Chase the green treat ball and PUNCH it (the lunge of Petoi's pick with the claw held shut; `--use-pick` for the pick skill) until stopped or after one punch (`--punts 1`): stop, look, step; colour finder, search moves (claw looks with the arm, turns, back-ups; no blind walking unless `--search-walk`), small turns to line the claw up, walks always the default gait policy timed from his own measured pace (`behavior/chase_pace.py`), the claw look check (`behavior/claw_look.py`), voice cues (searching / target acquired / punting), saves pictures with the ball found for the future ball class; punt distance and nudges are settings (`--punt-max`, `--nudge-max`, `--nudges`); tested on synthetic pictures and a fake robot, live attempts on G2 (2026-10-25), including one punch through the chase on a desk. `behavior/punt_test.py`: one punch at each ball distance with the results in a CSV, for dialing the distance in by hand | its own entry point: `python -m pi_pipeline.behavior.ball_chase [--dry-run]` on the Pi with the voice service stopped; not driven by the behavior layer yet |
 | `link/recovery.py` | `RecoveryFSM`: choose between the learned catch, `rc` and `rl` after a fall | the recovery items in [`../docs/project-plan.md`](../docs/project-plan.md); retest with the Pi in the loop first |
 
 ## Setup

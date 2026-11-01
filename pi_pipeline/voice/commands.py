@@ -153,6 +153,22 @@ def _normalize(text: str) -> str:
 _SHUTDOWN_EXACT = {"turn off", "shut off", "turn yourself off", "shut yourself off", "switch off", "switch yourself off"}
 
 
+def goal_for_text(text: str):
+    """The goal (goals/spec.Goal) whose start phrase this is, at most one extra word after it ("ball goal please"), else None. Never raises."""
+    n = _normalize(text)
+    if not n:
+        return None
+    try:
+        from ..goals.spec import load
+        goals = load()[0]
+    except Exception:  # noqa: BLE001
+        return None
+    for g in goals.values():
+        if _hit_short(n, tuple(g.start_words), extra_words=1):
+            return g
+    return None
+
+
 def _hit(norm: str, phrases: tuple[str, ...]) -> bool:
     return any(norm == p or norm.startswith(p + " ") for p in phrases)
 
@@ -421,7 +437,7 @@ def asks_battery(text: str) -> bool:
 
 
 def match_local_command(text: str) -> str | None:
-    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"punt"``,
+    """Return ``"halt"``, ``"resume"``, ``"shutdown"``, ``"come"``, ``"gait"``, ``"walk"``, ``"explore"``, ``"goal"``, ``"punt"``,
     ``"unexplore"``, ``"end_explore"``, ``"forget"``, ``"sleep"``, ``"dismiss"``, ``"chirps_on"``, ``"chirps_off"``, ``"voice_language"``,
     ``"narration_level"``, ``"character"``, ``"floor"``, ``"floor_query"``, ``"battery_query"``, ``"recap_query"``, ``"learned_query"``, ``"converse"``, ``"end_converse"``, or ``None``. Checked in that order
     -- an emergency stop wins over everything."""
@@ -441,6 +457,8 @@ def match_local_command(text: str) -> str | None:
         return "gait"                                  # "hi step" / "walk normally": before "walk" so "walk normally" is never read as a walk command
     if parse_walk_command(text) is not None:
         return "walk"
+    if goal_for_text(text) is not None:
+        return "goal"                                  # "G2, ball goal": before "punt" so "punt goal" starts the goal session, not one punt
     if _hit_short(n, _PUNT, extra_words=1):
         return "punt"
     if _hit(n, _END_EXPLORE):

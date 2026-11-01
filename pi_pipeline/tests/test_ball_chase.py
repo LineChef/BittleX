@@ -75,7 +75,7 @@ def test_planner_turns_then_walks_then_punts():
     a = p.decide(reading(30, -20)); assert a.kind == "turn" and a.degrees < 0
     a = p.decide(reading(30, 3)); assert a.kind == "walk" and bc.MIN_MOVE_S <= a.seconds <= bc.WALK_MAX_S
     a = p.decide(reading(3, 3)); assert a.kind == "punt"
-    a = p.decide(reading(3, 16)); assert a.kind == "turn"                                          # near and off line: align before the punt
+    a = p.decide(reading(3, 16)); assert a.kind == "align"                                         # near and off line: a small turn to line up before the punt
     a = p.decide(reading(1.5, 0)); assert a.kind == "punt"                                           # too close to punt
 
 
@@ -86,7 +86,7 @@ def test_planner_backs_up_when_punts_do_not_move_the_ball():
 
 
 def test_planner_searches_toward_the_side_it_last_saw_and_never_gives_up():
-    p = bc.ChasePlanner()
+    p = bc.ChasePlanner(claw_ok=False)                                                             # no claw look (a robot that cannot move the arm): turn steps only
     p.decide(reading(20, -30))                                                                     # last seen on the left
     assert p.decide(None).kind == "look" and p.decide(None).kind == "look"                         # two more looks first (three real misses before a search)
     a = p.decide(None); assert a.kind == "search_turn" and a.degrees < 0
@@ -94,7 +94,7 @@ def test_planner_searches_toward_the_side_it_last_saw_and_never_gives_up():
     assert "search_walk" not in kinds and set(kinds) == {"search_turn"}                              # no blind walking by default (a desk): it keeps turning in place, never gives up
     bc.SEARCH_WALK = True
     try:
-        q = bc.ChasePlanner(); q.decide(reading(20, -30))
+        q = bc.ChasePlanner(claw_ok=False); q.decide(reading(20, -30))
         kinds = [q.decide(None).kind for _ in range(bc.SEARCH_STEPS_PER_CIRCLE + 3)]
         assert "search_walk" in kinds                                                                # on a big floor (--search-walk): a full circle, a short walk, and on
     finally:
@@ -164,9 +164,35 @@ def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand
         def poll_imu(self): return []
     lk = FakeLink()
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__, use_pick=True)
-    assert r.turn(20, 0.3) == "ok" and r.turn(-20, 0.3) == "ok" and r.walk(0.3) == "ok" and r.back(0.3) == "ok" and r.punt() == "ok"
+    assert r.turn(20, 0.3) == "ok" and r.turn(-20, 0.3) == "ok" and r.back(0.3) == "ok" and r.punt() == "ok"
     toks = [c for c in lk.sent if c.startswith("k")]
-    assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kwkF", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance", "kpickF", "kbalance"]      # (this fake link reports no IMU swing, so the punt is sent twice)
+    assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance", "kpickF", "kbalance"]      # (this fake link reports no IMU swing, so the punt is sent twice)
+
+
+def test_walks_are_always_the_default_gait_policy(monkeypatch):
+    from pi_pipeline.gait import policy_walker
+    made = []
+
+    class FakeWalker:
+        def __init__(self, link, **kw):
+            made.append(kw); self._on_fall = kw.get("on_fall"); self.n = 0; self.walked = []
+        @property
+        def busy(self):
+            self.n += 1
+            return self.n < 3
+        def walk(self, seconds): self.walked.append(seconds); self.n = 0
+        def stop(self, rest=True): pass
+    monkeypatch.setattr(policy_walker, "PolicyWalker", FakeWalker)
+
+    class FakeLink:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = FakeLink()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    assert r.walk(1.5) == "ok" and r.walk(2.0) == "ok"
+    assert len(made) == 1 and made[0]["hold_between_legs"] is True and r._walker.walked == [1.5, 2.0]     # one walker, ending each walk in a balanced stand
+    assert not any(c == "kwkF" for c in lk.sent)                                                          # never Petoi's walk
 
 
 def test_the_battery_gate_fails_safe_and_the_serial_robot_uses_it():

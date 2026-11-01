@@ -297,6 +297,7 @@ class VoiceLoop:
         if self._announce_online:
             from . import restart_notice
             restart_notice.announce_online(self._speak)        # "G2 online.": the loop has finished starting and is listening
+            self._offer_goal_suggestions()
         try:
             while True:
                 self._one_turn()
@@ -306,6 +307,25 @@ class VoiceLoop:
         finally:
             self._act.stop()
             self._act.close()
+
+    def _offer_goal_suggestions(self) -> int:
+        """After a goal session (it ends by handing back to this service): say each new suggestion for a setting only the user changes and act on
+        "confirm" / "cancel" / "review" (silence = review). goals/suggestions.py. Never raises."""
+        try:
+            from ..goals import suggestions
+        except Exception:  # noqa: BLE001
+            return 0
+
+        def listen(timeout_s):
+            self._cue.set("listening")
+            heard = self._stt.listen(timeout_s=timeout_s).strip()
+            self._cue.set("idle")
+            return heard
+        try:
+            return suggestions.offer(self._speak, listen, timeout_s=max(8.0, self._question_window_s or 12.0))
+        except Exception:  # noqa: BLE001
+            log.exception("goal suggestions failed")
+            return 0
 
     def _set_session(self, expects_reply: bool = False) -> None:
         """Decide whether the next turn needs the wake word. G2 listens on without it only for the short question window
@@ -575,6 +595,17 @@ class VoiceLoop:
             self._set_session()
             self._cue.set("idle")
             return
+        if cmd == "goal":
+            from .commands import goal_for_text
+            g = goal_for_text(user_text)
+            if g is not None:
+                log.info("goal session requested (voice): %s", g.id)
+                self._cue.set("speaking")
+                self._speak(f"Starting the goal: {g.title.lower()}.")         # said BEFORE the hand-over: the launch stops this service
+                self._events(arm_goal=g.id)
+                self._set_session()
+                self._cue.set("idle")
+                return
         if cmd == "punt":
             log.info("punt attempt requested (voice)")
             self._cue.set("speaking")

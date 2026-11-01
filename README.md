@@ -71,6 +71,7 @@ Say the wake word, "gee two" (or "hey buddy"), then the command. A short beep me
 | Say | What happens |
 |---|---|
 | "G2, explore" / "go ahead and look around" | exploration mode ([how it works](docs/guides/exploration-mode.md)) |
+| "G2, ball goal" | a goal session: up to 10 ball-punt attempts, each one changing the next ([how it works](docs/guides/goals.md)) |
 | "that's enough" / "end exploration mode" | ends the exploration |
 | "walk forward for ten seconds", "come here" | a walk, or a walk to you |
 | "hi step" / "walk normally" | switches the walking gait |

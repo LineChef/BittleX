@@ -27,6 +27,8 @@ Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/rob
   earlier", "did you notice...", "last time", and since 2026-10-18 "where's the ...", "what did you find", anything about exploring). `python -m pi_pipeline.memory sightings`. "Forget that" removes the session's sightings too.
   Each exploration also leaves one sighting built from its recap (`reflection/recap.py` `observation_from_recap`): what the detector saw at the
   survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
+* **Goal lessons.** A goal session (`goals/`) saves up to 3 notes about what he changed and why ("Punt the ball: punching from 3.5 in works better than 4 in ...") as facts with
+  source `goal_lesson`, importance 2, never core. Built from his own counts; no API call.
 * **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or you tell him to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
   (importance 1-2), and may write up to 3 reflections ("It seems ...", stored with source `reflection`, no dates or routines). At most

@@ -84,6 +84,23 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 | `lost_looks` | 3 | 1 to 8 | Looks in a row without the ball before he starts searching. He searches although the ball is there: **raise** it. |
 | `search_walk` | false | true / false | After a full search circle, walk on blind. **Leave false on a desk.** |
 | `max_seconds` | 75 | 10 to 600 | The attempt ends, and he rests, after this long. |
+| `search_order` | claw_scan | turn, claw_then_turn, claw_scan, back_claw_scan, claw_back_scan, back_turn, back_and_turn | How he looks for the ball: claw looks (the arm points the camera, the legs stay), turn steps, back-ups, in that order. `claw_scan` = a claw look first, then a turn and a claw look, repeated. |
+| `claw_look_pan_deg` | 35 | 10 to 45 | How far to each side a claw look points the camera. |
+| `claw_look_lift_deg` | 15 | 0 to 35 | How high a claw look lifts the arm (higher sees farther; 0 = level). |
+| `claw_pan_sign` | right | right / left | Which way a positive arm pan turns the camera. **Measure it once** with `python -m pi_pipeline.behavior.claw_look --calibrate` ([`goals.md`](goals.md)). |
+| `scan_turn_deg` | 60 | 20 to 90 | One turn between two claw looks. |
+| `search_step_deg` | 20 | 10 to 60 | One turn step of a search without claw looks. |
+| `back_up_s` | 2.0 | 0.5 to 4 | One back-up (after stuck punts, and as a search move). |
+| `back_up_budget_s` | 6.0 | 0 to 20 | The most backing up in one attempt. **Keep it small, or 0, on a desk.** |
+| `stuck_punts` | 3 | 1 to 6 | Punts with the ball still in range before he backs up. |
+| `when_vanished` | punt | punt / back_up | The ball vanished up close: punch (it is at the claw) or back off a little to see it. |
+| `align_pulse_min_s` | 1.0 | 0.3 to 1.6 | Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse. |
+| `align_tries` | 3 | 1 to 8 | Small turns to line up before `when_misaligned`. |
+| `when_misaligned` | punch | punch / back_up | Still off line after `align_tries`: punch anyway or back up and line up again. |
+
+**Walking** is always the learned default gait policy (the arm's saved gait), never Petoi's walk (user, 2026-10-31). Each walk and turn is timed from the pace and turn rates G2 measures
+himself from the camera (`~/.local/share/g2/chase_pace.json`, per attachment and floor). **In a goal session** ([`goals.md`](goals.md)) G2 changes most of these settings himself between
+attempts, starting from the values in this file; he never writes to this file except when you confirm one of his suggestions.
 
 **Change a value (from the Mac):**
 
@@ -97,7 +114,7 @@ g2puntset init                      # create the file with every setting at its 
 `cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings` prints what the next run will use and reports any line it did not accept (an unknown name or a value out of range is ignored and reported at the start of the run, never used silently).
 **Back to the defaults:** delete the file (`rm ~/.local/share/g2/punt_settings.json`) or set a value back.
 
-**Where the defaults are in the code** (only if you want to change what "default" means): `pi_pipeline/behavior/ball_chase.py`, the constants near the top: `PUNT_MAX_IN`, `NUDGE_MAX_IN`, `NUDGES_BEFORE_PUNT`, `NUDGE_S`, `WALK_AIM_IN`, `PUNT_ALIGN_DEG`, `PUNCH_LUNGE_S`, `PUNCH_HOLD_S`, `LOST_LOOKS`, `SEARCH_WALK`.
+**Where the defaults are in the code** (only if you want to change what "default" means): `pi_pipeline/behavior/ball_chase.py`, the constants near the top: `PUNT_MAX_IN`, `NUDGE_MAX_IN`, `NUDGES_BEFORE_PUNT`, `NUDGE_S`, `WALK_AIM_IN`, `PUNT_ALIGN_DEG`, `PUNCH_LUNGE_S`, `PUNCH_HOLD_S`, `LOST_LOOKS`, `SEARCH_WALK`, and the search, claw-look and alignment constants below them.
 The list of settings, their limits and their descriptions is `SPEC` in `pi_pipeline/behavior/punt_settings.py`. The punch's own key poses (the shape of the lunge) are `punch_keys()` in `ball_chase.py`.
 After editing code on the Mac: commit, then `g2deploy --once` (below). Do not edit the code on the Pi: the next deploy replaces it.
 
