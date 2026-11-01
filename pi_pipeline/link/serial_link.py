@@ -13,6 +13,7 @@ import threading
 import time
 
 from . import noise_log  # noqa: E402
+from . import command_log  # noqa: E402
 from . import opencat, transitions  # noqa: E402
 
 log = logging.getLogger("g2.link")
@@ -189,6 +190,8 @@ class SerialLink:
             # fire-and-forget (the walk loop's joint commands): no flush. On the Pi's UART flush() is tcdrain, which blocked every send tick ~5 ms and made
             # 30% of walk ticks late (2026-10-18, almost all on the send tick); the kernel sends the bytes in order anyway.
             noise_log.record(command)             # every command that makes the BiBoard make a noise is logged (link/noise_log.py)
+            self._last_sent_t = time.monotonic()
+            command_log.sent(command)             # and every command (not the joint streams), with who sent it (link/command_log.py)
             if command.strip() == "gB" or command[:1] == "k":
                 self.balance_epoch += 1                     # a command that can switch the firmware gyro balance on (`gB`, or a skill: kbalance can); the stand guard reads it
             if command[:1] == "k" and transitions.kind(command.strip()) != "gait":      # (never around a gait, before or behind it: any `gb` next to `kwkF` stopped the walk, 2026-10-25 hardware; the gyro is already off from the stand-up or the last posture)
@@ -366,6 +369,8 @@ class SerialLink:
                     if line:
                         log.debug("poll_imu kept non-IMU line %r", line)
                         self._other.append(line)
+                        last = getattr(self, "_last_sent_t", None)
+                        command_log.heard(line, None if last is None else time.monotonic() - last)      # a line nobody asked for: a voice command to the board shows up here
             except Exception as e:  # noqa: BLE001
                 log.warning("serial read failed (%s); marking disconnected", e)
                 self.close()

@@ -13,6 +13,7 @@ import types
 _SANDBOX = tempfile.mkdtemp(prefix="g2_tests_")
 atexit.register(shutil.rmtree, _SANDBOX, True)
 os.environ["G2_TASK_SCOPE_STRICT"] = "1"                    # a task that changes a setting it did not declare fails its test (util/task_scope.py)
+os.environ["G2_COMMAND_LOG"] = "off"                  # no command log in tests (link/command_log.py; its own test points it at a temp file)
 os.environ["G2_MEMLOG"] = "off"                          # no memory sampler thread in tests (diag/memlog.py; its own tests pass explicit paths)
 os.environ["HOME"] = os.path.join(_SANDBOX, "home")
 os.makedirs(os.environ["HOME"], exist_ok=True)

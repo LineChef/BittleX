@@ -328,6 +328,8 @@ g2turn3() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.three_point --test --side ${1:-left} 2>&1 | grep -v 'g2.snapshot exposure unchanged\\|dark frame'"
 }
+# g2cmds [--board] [--hours N] [--last N]  -- what the Pi sent to the BiBoard and what the board did on its own (a voice command you give the board, said without "G2", shows as BOARD (on its own)).
+g2cmds() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.link.command_log $*"; }
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac
