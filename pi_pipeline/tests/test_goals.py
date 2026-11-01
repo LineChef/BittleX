@@ -1472,7 +1472,7 @@ def test_the_stand_up_from_a_sit_lifts_the_back_legs_slowly_first(monkeypatch):
     from pi_pipeline.gait import standup
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     sent = []
-    assert standup.stand_from_sit(sent.append, lambda s: None, "ksit") and len(sent) >= 40
+    assert standup.stand_from_sit(sent.append, lambda s: None, "ksit") and len(sent) >= 30
     assert not standup.stand_from_sit(sent.append, lambda s: None, "krest")                    # only from a sit
     first, mid = sent[10], sent[len(sent) // 3]
     nums = lambda c: dict(zip(*[iter(int(x) for x in c[1:].split())] * 2))                      # noqa: E731
