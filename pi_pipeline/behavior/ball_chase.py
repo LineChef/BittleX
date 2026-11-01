@@ -81,6 +81,7 @@ CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: 
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
+SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
 CLAW_SETTLE_S = 0.8            # after the arm move and before the picture: the arm and body settle; the old camera frame is dropped by _SnapshotCamera.look (the module answers with the previous request's picture, 2026-11-01)
 
 # The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
@@ -101,6 +102,29 @@ class WallSeen:
     turn: str | None              # "left" / "right": the side with more room
     near_ball_in: float | None = None     # the nearest wall base in the columns right beside the ball (is the ball against a wall?); None: no ball, or nothing there
     # (a side wall elsewhere in the picture does not make a ball "by the wall")
+
+
+WALL_MIN_READING_IN = 8.5      # the wall calibration's closest row (8 in): a reading at it says "8 in or nearer", and on the claw camera it came back almost every look (2026-11-01)
+WALL_STUCK_LOOKS = 3           # this many looks in a row at that reading and the reading is not believed
+WALL_BALL_CONE_DEG = 35.0      # a ball seen this close to straight ahead is seen THROUGH the space a wall would fill
+
+
+def vet_wall(wall: "WallSeen | None", ball: BallReading | None, state: dict) -> tuple["WallSeen | None", str]:
+    """Believe the wall reading only when it makes sense (user, 2026-11-01: he turned away from a ball right in front of him, three times in one run, and fell during one of the turns).
+    Returns (the wall to use or None, why it was dropped or ""). Dropped when
+      - a ball is in view within WALL_BALL_CONE_DEG of straight ahead, the wall reads the closest row (the one that came back all the time) and the ball is more than 2 in beyond it:
+        a wall that near, dead ahead, would hide the ball (a nearer side wall at a real distance is still believed);
+      - the reading has sat at the calibration's closest row for WALL_STUCK_LOOKS looks in a row (state["stuck"] counts them; any other reading resets it).
+    A bump (the IMU contact signal) still stops him whatever the camera says."""
+    if wall is None or wall.nearest_in is None:
+        state["stuck"] = 0
+        return wall, ""
+    state["stuck"] = state.get("stuck", 0) + 1 if wall.nearest_in <= WALL_MIN_READING_IN else 0
+    if ball is not None and abs(ball.bearing_deg) <= WALL_BALL_CONE_DEG and wall.nearest_in <= WALL_MIN_READING_IN and wall.nearest_in + 2.0 < ball.distance_in:
+        return WallSeen(None, wall.turn, None), f"a wall {wall.nearest_in:.0f} in ahead would hide the ball I see {ball.distance_in:.0f} in away"
+    if state["stuck"] >= WALL_STUCK_LOOKS:
+        return WallSeen(None, wall.turn, None), f"the wall reading has said {wall.nearest_in:.0f} in for {state['stuck']} looks in a row"
+    return wall, ""
 
 
 WALL_TURNS_GIVE_UP = 3         # turns away from walls with the ball in sight in one attempt before he leaves it (the ball sits where walls keep him from it)
@@ -389,6 +413,8 @@ class SerialRobot:
         """The claw look starts from a sit (user, 2026-11-01): the firmware sit, then still. No fall check while sitting (a sit tilts the body)."""
         self._pitch, self._roll = [], []
         self._tx("gP")
+        self._tx("kbalance")                                # stand first, always (user, 2026-11-01: the look began with him lying in the rest pose and stayed there: after a Pi-sent stand-up the legs can go limp, and
+        self._sleep(SIT_STAND_FIRST_S)                      # a sit asked of limp legs changes nothing). The firmware stand drives every leg joint to its balance angle again.
         self._tx("ksit")
         self._sleep(2.5)
         return "ok"
@@ -666,6 +692,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if trace is not None:
             trace.append({"t": round(clock() - t_start, 2), **kw})
 
+    wall_state: dict = {}
     while not stop():
         if max_steps is not None and steps >= max_steps:
             return "steps"
@@ -701,6 +728,10 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                     wall = wall_check(jpeg, ball)
                 except Exception:  # noqa: BLE001
                     wall = None
+                wall, dropped = vet_wall(wall, ball, wall_state)
+                if dropped:
+                    say(f"[{steps}] wall reading ignored: {dropped}")
+                    note(kind="wall", event="ignored", why=dropped)
         note(kind="look", ball=_ball_dict(ball), **({"wall_in": None if wall.nearest_in is None else round(wall.nearest_in, 1)} if wall is not None else {}))
         if announce is not None:                          # real-time signal of what he sees (user, 2026-10-25): "searching" when a search starts, "target acquired" when the ball is found again
             if ball is not None and (planner.lost > 0 or planner.search_steps > 0 or planner.search_i > 0 or not seen):
@@ -832,6 +863,21 @@ class _SnapshotCamera:
         return snap.jpeg if snap is not None else None
 
 
+CAMERA_WAIT_S = 30.0
+
+
+def _wait_for_camera(port: str, wait_s: float | None = None, sleep=time.sleep, exists=os.path.exists, can_open=lambda p: os.access(p, os.R_OK | os.W_OK)) -> bool:
+    """Whether the camera's serial port is there and can be opened, waiting up to `wait_s`. 2026-11-01: after a power-cycle the port was missing and then refused (permission) for over a minute,
+    and the whole first attempt went to "no picture from the camera"."""
+    end = time.monotonic() + (CAMERA_WAIT_S if wait_s is None else wait_s)
+    while True:
+        if exists(port) and can_open(port):
+            return True
+        if time.monotonic() >= end:
+            return False
+        sleep(1.0)
+
+
 def _stand_if_lying(link, token: str = "kbalance") -> bool:
     """If the legs read the rest pose, stand him up with `token` (the plain firmware stand-up is `kbalance`; `kup` is the firmware's neutral stand: claw_look --stand kup compares them,
     2026-11-01, when his legs went limp about 10 s after our stand-up and not after the board's own). Never raises. Returns whether the pose could be read (False: the board gave no pose rows)."""
@@ -915,6 +961,9 @@ def _main() -> None:
         announce = lambda text: _tts.speak(text)         # noqa: E731
     except Exception as e:  # noqa: BLE001
         print("no voice (", e, "): the cues are printed only")
+    if not _wait_for_camera(settings.vision_serial_port):
+        print(f"THE CAMERA IS NOT THERE: {settings.vision_serial_port} did not appear or could not be opened within {CAMERA_WAIT_S:.0f} s. Check its USB plug. Nothing was moved.")
+        raise SystemExit(4)
     pose_read = _stand_if_lying(link)
     if not pose_read and not args.dry_run:                # no pose AND no pack reading: the BiBoard is not answering (hung or off), and he would "search" for the whole attempt without moving (2026-11-01, three times)
         from ..power import battery as _battery

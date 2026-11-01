@@ -1532,3 +1532,34 @@ def test_the_pose_check_says_when_the_board_gave_no_pose(monkeypatch):
         def send(self, *a, **k): self.sent.append(a)
     lk = Link()
     assert bc._stand_if_lying(lk) is False and lk.sent                       # unreadable: he is stood up to be safe, and the caller learns the board said nothing
+
+
+def test_a_wall_reading_that_would_hide_the_ball_or_never_changes_is_not_believed():
+    from pi_pipeline.vision.ball_finder import BallReading
+    ball = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 36.0, -20.0, False)
+    wall = bc.WallSeen(8.0, "left")
+    got, why = bc.vet_wall(wall, ball, {})
+    assert got.nearest_in is None and "hide the ball" in why                       # the wall is nearer than a ball seen almost straight on
+    near_ball = BallReading(100.0, 120.0, 400, 22, 22, 22.0, 6.0, -20.0, False)
+    got, why = bc.vet_wall(wall, near_ball, {})
+    assert got.nearest_in == 8.0 and not why                                       # the ball is nearer than the wall: the wall is believed
+    st = {}
+    for _ in range(2):
+        got, why = bc.vet_wall(wall, None, st)
+        assert got.nearest_in == 8.0
+    got, why = bc.vet_wall(wall, None, st)
+    assert got.nearest_in is None and "3 looks" in why                             # 8 in three looks in a row: not believed
+    got, why = bc.vet_wall(bc.WallSeen(20.0, "left"), None, st)
+    assert got.nearest_in == 20.0 and st["stuck"] == 0
+
+
+def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first():
+    assert bc._wait_for_camera("/dev/none", 0.0, sleep=lambda s: None, exists=lambda p: False) is False
+    assert bc._wait_for_camera("/dev/x", 5.0, sleep=lambda s: None, exists=lambda p: True, can_open=lambda p: True) is True
+    sent = []
+
+    class Lk:
+        def send(self, c, **k): sent.append(c)
+    r = bc.SerialRobot(Lk(), sleep=lambda s: None)
+    r.sit_down()
+    assert sent.index("kbalance") < sent.index("ksit")                              # stand first, then sit
