@@ -87,7 +87,7 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 | `search_order` | claw_scan | turn, claw_then_turn, claw_scan, back_claw_scan, claw_back_scan, back_turn, back_and_turn | How he looks for the ball: claw looks (the arm points the camera, the legs stay), turn steps, back-ups, in that order. `claw_scan` = a claw look first, then a turn and a claw look, repeated. |
 | `claw_look_pan_deg` | 35 | 10 to 45 | How far to each side a claw look points the camera. |
 | `claw_look_lift_deg` | 15 | 0 to 35 | How high a claw look lifts the arm (higher sees farther; 0 = level). |
-| `claw_pan_sign` | left | right / left | Which way a positive arm pan turns the camera: left on G2 (seen 2026-11-01). Re-measure with `python -m pi_pipeline.behavior.claw_look --calibrate` ([`goals.md`](goals.md)). |
+| `claw_pan_sign` | right | right / left | Which way a positive arm pan turns the camera: right on G2 (2026-11-01 sweeps; pan +35 barely turns it, pan -35 about 39 deg left: `CLAW_PAN_SHARE`). Re-measure with `python -m pi_pipeline.behavior.claw_look --calibrate` ([`goals.md`](goals.md)). |
 | `scan_turn_deg` | 60 | 20 to 90 | One turn between two claw looks. |
 | `search_step_deg` | 20 | 10 to 60 | One turn step of a search without claw looks. |
 | `back_up_s` | 2.0 | 0.5 to 4 | One back-up (after stuck punts, and as a search move). |

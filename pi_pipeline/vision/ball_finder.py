@@ -28,6 +28,10 @@ IGNORE_BOTTOM_PX = 24         # the jaws, the foot and the edge of the frame are
 # (a ball closer than about 5 in), where a false alarm would need a large lime-green patch.
 CLOSE_DOM_MIN, CLOSE_G_MIN = 12, 60
 CLOSE_MIN_AREA = 3000         # px: about 62 px across, the ball about 5 in away
+# Dim at a few inches more (2026-11-01, lamp light, the ball about 8 in away: green above red/blue by 13 at the median, green about 112): a third pass for a round blob on the floor
+# (its centre below the horizon), any size from about 20 px across. On 355 saved exploration pictures it added 7 real balls and 7 false finds (a green cup, a green lamp shade, 4 others).
+DIM_DOM_MIN, DIM_G_MIN, DIM_MIN_AREA = 11, 80, 300
+DIM_MIN_Y = 80                # px from the top: the claw camera's horizon is about here
 
 
 @dataclass(frozen=True)
@@ -114,8 +118,13 @@ def _find(rgb: np.ndarray, dom_min: int, g_min: int, min_area: int) -> BallReadi
 
 
 def find_ball_array(rgb: np.ndarray) -> BallReading | None:
-    """The normal pass, then (nothing found) the close-up pass for a big, dim ball right in front of the camera."""
-    return _find(rgb, DOM_MIN, G_MIN, MIN_AREA) or _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_MIN_AREA)
+    """The normal pass, then (nothing found) the close-up pass for a big, dim ball right in front of the camera, then the dim pass for a round green blob on the floor."""
+    found = _find(rgb, DOM_MIN, G_MIN, MIN_AREA) or _find(rgb, CLOSE_DOM_MIN, CLOSE_G_MIN, CLOSE_MIN_AREA)
+    if found is None:
+        dim = _find(rgb, DIM_DOM_MIN, DIM_G_MIN, DIM_MIN_AREA)
+        if dim is not None and dim.y >= DIM_MIN_Y:
+            found = dim
+    return found
 
 
 def find_ball(jpeg: bytes) -> BallReading | None:

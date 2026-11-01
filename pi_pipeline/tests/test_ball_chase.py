@@ -40,7 +40,8 @@ def test_a_dim_ball_right_at_the_claw_is_found_but_a_small_dim_patch_is_not():
     dim = (100, 118, 98)                                             # lamp light, 2026-11-01: green above red/blue by ~18, the normal pass misses it
     close = bf.find_ball(picture([disc(60, 110, 95, dim)]))          # half the picture, cut off at the left edge
     assert close is not None and close.distance_in < 4 and close.touches_edge
-    assert bf.find_ball(picture([disc(120, 110, 15, dim)])) is None  # the same colour, small: the close-up pass needs a big blob
+    assert bf.find_ball(picture([disc(120, 40, 15, dim)])) is None   # the same colour, small and above the horizon (a lamp shade): not the ball
+    assert bf.find_ball(picture([disc(120, 110, 15, dim)])) is not None   # small and dim on the floor: the dim pass finds it
 
 
 def test_the_ball_is_found_with_its_distance_and_direction():

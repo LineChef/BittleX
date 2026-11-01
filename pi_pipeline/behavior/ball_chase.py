@@ -76,7 +76,7 @@ SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
 CLAW_LIFT_DEG = 15.0
-CLAW_PAN_SIGN = "left"         # which way a positive pan turns the camera: LEFT on G2 (user, 2026-11-01: at pan +35 the ball was on his left and he turned right toward nothing; also the 10-31 pictures); claw_look --calibrate can re-measure it
+CLAW_PAN_SIGN = "right"        # which way a positive arm pan turns the camera: right (2026-11-01 sweeps: pan -35 turned the camera about 39 deg LEFT); claw_look --calibrate can re-measure it
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
 CLAW_SETTLE_S = 0.6            # still before the picture
@@ -121,9 +121,16 @@ ALIGN_TRIES = 3
 WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
 
 
+# How far the camera really turns for each side of the pan, as a share of the pan (two 3-picture sweeps, 2026-11-01, the ball about 8 in to his left): pan -35 moved the ball
+# from the picture's left edge to its centre (about 39 deg, a share of 1.1); pan +35 left the picture almost as it was straight ahead (share about 0), so a ball seen in that
+# picture is where a straight picture puts it. Counting the full +35 there turned a ball on his LEFT into one "on his right" and he turned right, away from it.
+CLAW_PAN_SHARE = {"right": 0.0, "left": 1.1}
+
+
 def claw_pan_body(pan: float) -> float:
-    """The camera's direction, + = G2's right, for an arm pan of `pan` degrees."""
-    return pan if CLAW_PAN_SIGN == "right" else -pan
+    """The camera's direction, + = G2's right, for an arm pan of `pan` degrees: the commanded direction times the measured share for that side."""
+    deg = pan if CLAW_PAN_SIGN == "right" else -pan
+    return deg * CLAW_PAN_SHARE["right" if deg > 0 else "left"]
 # The punch (user, 2026-10-25: "test the punch, not attempting to pick it up with the claw"): the lunge of Petoi's `pickF` (decoded from InstinctBittleESP.h: a crouch, then front legs folded and the arm swung out to 75)
 # with the claw held CLOSED the whole time; `kpickF` opens the claw to 65 first and closes it on the way back, which is a grab attempt. Key poses are the skill's own angles (the arm firmware shifts the front
 # shoulders -10 and front knees +6 for a skill with no Arm variant, added below); (seconds to get there, arm lift, shoulders FL FR BR BL, knees FL FR BR BL).
