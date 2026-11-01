@@ -81,7 +81,7 @@ CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: 
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
-CLAW_SETTLE_S = 1.5            # after the arm move and before the picture: the camera's frames are about 1 s old (2026-11-01), a shorter wait showed the pose before the move
+CLAW_SETTLE_S = 0.8            # after the arm move and before the picture: the arm and body settle; the old camera frame is dropped by _SnapshotCamera.look (the module answers with the previous request's picture, 2026-11-01)
 
 # The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
 # G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
@@ -123,8 +123,8 @@ ALIGN_TRIES = 3
 WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
 
 
-# How far the camera really turns for each side of the pan, as a share of the pan (2026-11-01: about 1.0 on both sides, 35 deg of pan = 35 to 39 deg of camera). The sweeps of
-# that evening that said "pan +35 barely turns it" had taken the picture 0.6 to 1.2 s after the move: the camera's frames are about 1 s old, so they showed the pose BEFORE.
+# How far the camera really turns for each side of the pan, as a share of the pan. Measured 2026-11-01 with the old frame dropped (ball 12 in ahead): pan +35 moved it 79 px right, pan -35 77 px left
+# (the finder's 2.1 px per degree: 35 to 38 deg of camera), so about 1.0 on both sides. Earlier readings of "pan +35 barely turns" were the module's previous-request frame.
 CLAW_PAN_SHARE = {"right": 1.0, "left": 1.0}
 
 
@@ -779,8 +779,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                     # One straight picture after the punch decides it (user, 2026-11-01): the ball gone from in front of the claw, or farther away, means it was punted. No claw look
                     # or back-up here: if it is gone, the next attempt looks, then searches. Let him settle and drop one frame first (it can be from before the punch).
                     sleep(AFTER_PUNT_SETTLE_S)
-                    camera.look()
-                    jpeg = camera.look()
+                    jpeg = camera.look()                       # (_SnapshotCamera.look already drops the old frame)
                     after = find_ball(jpeg) if jpeg else None
                     note(kind="after_punt", ball=_ball_dict(after), picture=bool(jpeg))
                 say(f"punted {punts}: done")
@@ -826,6 +825,9 @@ class _SnapshotCamera:
             pass
 
     def look(self) -> bytes | None:
+        drop = getattr(self._cam, "discard_one", None)
+        if callable(drop):
+            drop()                                       # the module returns the picture of the previous request: ask once and drop it, the second one is the scene now
         snap = self._cam.snapshot()                      # exposure balancing stays on (user, 2026-10-25)
         return snap.jpeg if snap is not None else None
 

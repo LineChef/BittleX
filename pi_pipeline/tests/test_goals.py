@@ -1498,3 +1498,18 @@ def test_a_ball_only_the_dim_pass_found_needs_a_second_picture():
     assert bc.confirm_ball(FakeCamera([picture()]), dim, sleep=lambda s: None) is None       # the second picture shows nothing: a false ball
     again = picture([disc(125, 120, 12)])                                                     # the second picture shows it near the same direction (the dim pass may still be the one finding it)
     assert bc.confirm_ball(FakeCamera([again]), dim, sleep=lambda s: None) is not None
+
+
+def test_a_look_drops_the_old_frame_the_module_answers_with():
+    class Cam:
+        def __init__(self):
+            self.dropped = self.taken = 0
+
+        def discard_one(self):
+            self.dropped += 1
+
+        def snapshot(self):
+            self.taken += 1
+            return type("S", (), {"jpeg": b"x"})()
+    cam = Cam()
+    assert bc._SnapshotCamera(cam).look() == b"x" and (cam.dropped, cam.taken) == (1, 1)

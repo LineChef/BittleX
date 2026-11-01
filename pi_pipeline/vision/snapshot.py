@@ -335,6 +335,17 @@ class CameraSnapshotter:
                 return Snapshot(lifted, snap.width, snap.height, snap.detections)
         return snap
 
+    def discard_one(self) -> None:
+        """Throw away one picture (no save, no click). The Grove module answers a request with the picture it took at the PREVIOUS request (2026-11-01, claw pictures at every wait up to
+        4 s: the first look after an arm move showed the pose before it, the second the new one), so a look that must show what is in front of G2 now asks twice and keeps the second. Never raises."""
+        try:
+            with self._lock:
+                self._open()
+                self._grab_one()
+        except Exception:  # noqa: BLE001
+            log.debug("discarding one picture failed", exc_info=True)
+            self._ser = None
+
     def snapshot(self) -> Snapshot | None:
         """One picture (re-taken in better light if the first is badly exposed), or None if the camera is unavailable or does not answer
         in time. Never raises."""
