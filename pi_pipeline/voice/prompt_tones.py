@@ -201,7 +201,7 @@ def render_complete(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray
 
 TURN_AWAY_LEVEL = 0.5          # the turn-away sound at 50% of the maximum clean level (user, 2026-10-11; it was at the maximum)
 COMPLETE_LEVEL = 0.7            # the ta-da at 70% of the maximum clean level (user, 2026-10-11; it was at the maximum)
-START_HORN_LEVEL = 0.9          # the Viking horn at 90% of the maximum clean level (user, 2026-11-01; it was 100% from 2026-10-11)
+START_HORN_LEVEL = lv.MAX_PERCENT / 100.0          # the Viking horn at the 75% cap of the maximum clean level (user, 2026-11-01; 90% before, 100% from 2026-10-11)
 
 
 def render_start_horn(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:

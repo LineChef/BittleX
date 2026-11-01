@@ -89,7 +89,7 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_start_horn()
     assert 2.55 < pcm.size / 48000 < 2.75 and abs(int(pcm.max())) > 100
-    assert abs(int(abs(pcm).max()) / (pt.MAX_PEAK * 32767) - 0.9) < 0.02           # 90% of the maximum clean level (user, 2026-11-01; it was 100%)
+    assert abs(int(abs(pcm).max()) / (pt.MAX_PEAK * 32767) - 0.75) < 0.02           # the 75% cap (user, 2026-11-01; 90% before, 100% earlier)
     import numpy as np
     r = 48000
     assert np.abs(pcm[-240:]).max() < 0.02 * np.abs(pcm[r:int(1.5 * r)]).max()          # it fades out to nothing at the end
@@ -119,13 +119,13 @@ def test_every_sound_level_is_the_requested_percent_of_max_volume():
         return np.abs(pcm.astype(float)).max() / (lv.MAX_PEAK * 32767) * 100
 
     expected = {
-        "losing horn": (pt.render_refuse(), 80), "picture click": (shutter.render(), 70), "camera shutter": (camera_sounds.render("shutter"), 70),
+        "losing horn": (pt.render_refuse(), 75), "picture click": (shutter.render(), 70), "camera shutter": (camera_sounds.render("shutter"), 70),
         "camera recording": (camera_sounds.render("recording"), 70), "camera recording stop": (camera_sounds.render("recording_stop"), 70),
-        "siren": (red_alert_siren.render(), 80), "wake chime": (wake_chime.render(), 70), "beep": (pt.render_beep(), 70), "boop": (pt.render_boop(), 70),
+        "siren": (red_alert_siren.render(), 75), "wake chime": (wake_chime.render(), 70), "beep": (pt.render_beep(), 70), "boop": (pt.render_boop(), 70),
         "close": (pt.render_close(), 70), "double": (pt.render_double(), 70), "api tick": (api_tone.render(), 50), "grunt": (pt.render_grunt(), 70),
         "sigh": (pt.render_sigh(), 70), "yawn": (pt.render_yawn(), 70), "oof": (pt.render_hit(), 50), "turn-away": (pt.render_turn_away(), 50),
-        "ta-da": (pt.render_complete(), 70), "viking horn": (pt.render_start_horn(), 90),
+        "ta-da": (pt.render_complete(), 70), "viking horn": (pt.render_start_horn(), 75),
     }
     for name, (pcm, want) in expected.items():
         assert abs(pct(pcm) - want) < 1.0, (name, pct(pcm))
-    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(80)) < 1e-9
+    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(75)) < 1e-9

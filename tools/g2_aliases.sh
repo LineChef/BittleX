@@ -445,7 +445,8 @@ g2rest() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bi
 # the documented recovery (same as saying "G2, switch to English"). Never sends Xa or XAd (they silently break its voice commands).
 g2english() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
-  _g2ssh "$G2_PI" 'cd ~/bittleX && for t in XAc XAb XAa; do pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send "$t" >/dev/null || exit 1; sleep 1.2; done && echo "voice module set to English (XAc, XAb, XAa sent)"'
+  # the voice service holds the port and reads the board's answers, so it is stopped first and started again after (2026-11-01: run beside it, every reply was a left-over "g" and nothing was confirmed)
+  _g2ssh "$G2_PI" 'sudo systemctl stop g2-voice; sleep 4; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.link.voice_module english 2>&1 | grep -v "g2.link\|g2.noise"; sudo systemctl --no-block start g2-voice'
 }
 # g2baseline [start [RUNS] [LABEL]|stop|status|logs|fetch]  -- logged walks on the Pi (the voice service is stopped for them and restarted after). `fetch` copies the logs to the Mac.
 g2baseline() { bash "$G2_ROOT/tools/g2_baseline.sh" "$@"; }

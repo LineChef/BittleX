@@ -1,0 +1,48 @@
+"""Set the BiBoard's onboard voice module to English (it falls back to Chinese or Korean after some power cycles): XAc (enable), XAb, XAa (English), one connection, 2.5 s apart.
+
+    python -m pi_pipeline.link.voice_module english      (g2english stops the voice service around it, then starts it again)
+
+`g2english` used to run one `check_serial send` process per command while the voice service held the port, and printed success whatever came back (2026-11-01: every reply was a left-over
+"g"). Here one connection sends the three commands with the voice service stopped, drains the board's answer after each, and prints it: the module answers `X` when it took the command.
+Never sends Xa or XAd (they silently break its voice commands).
+"""
+from __future__ import annotations
+
+import sys
+import time
+
+SEQUENCE = ("XAc", "XAb", "XAa")
+GAP_S = 2.5
+
+
+def set_english(ser, say=print, sleep=time.sleep, gap_s: float = GAP_S) -> dict:
+    """Send the sequence on an open serial port; returns {command: reply}. A command whose reply holds no `X` is reported, not hidden."""
+    sleep(1.5)
+    out = {}
+    for tok in SEQUENCE:
+        ser.reset_input_buffer()
+        ser.write((tok + "\n").encode("ascii"))
+        ser.flush()
+        sleep(gap_s)
+        reply = ser.read(ser.in_waiting or 1).decode("ascii", "ignore").replace("\r", " ").replace("\n", " ").strip()
+        out[tok] = reply
+        say(f"{tok}: " + (reply or "no reply") + ("" if "X" in reply else "   <- no X from the module"))
+    return out
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv != ["english"]:
+        print("usage: python -m pi_pipeline.link.voice_module english")
+        return 2
+    from .serial_link import SerialLink
+    link = SerialLink("/dev/serial0")
+    link.connect()
+    got = set_english(link._ser)
+    ok = all("X" in r for r in got.values() if r is not None) or "X" in got.get("XAa", "")
+    print("English set: the module answered X to XAa" if "X" in got.get("XAa", "") else "NOT confirmed: the module did not answer X to XAa; say a board command (\"play sound\") to check, or run it again")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -61,4 +61,4 @@ def test_apply_style_plain_unknown_and_metal():
     assert effects.apply_style("no-such-voice", a, 16000) is a           # unknown name: left alone
     m = effects.apply_style("metal", a, 16000)
     assert m.dtype == np.int16 and not np.array_equal(m, a)
-    assert abs(int(np.abs(m).max()) - int(0.8 * 0.95 * 32767)) < 50       # levelled to the style peak: 80% of max (user, 2026-11-01)
+    assert abs(int(np.abs(m).max()) - int(0.75 * 0.95 * 32767)) < 50       # levelled to the style peak: the 75% cap (user, 2026-11-01)
