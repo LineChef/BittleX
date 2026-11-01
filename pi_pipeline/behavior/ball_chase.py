@@ -522,12 +522,12 @@ class SerialRobot:
         return self._skill("kbkF", seconds)
 
     def three_point_turn(self, degrees: float, back_s: float, forward_s: float) -> str:
-        """Back up while turning one way, then walk forward turning the OPPOSITE way (user, 2026-11-01: a 3-point turn steers the other way for the forward half, like a car): the firmware's
-        backward-turning gait for `degrees` (+ = right), then the forward-turning gait of the other side."""
-        state = self._skill(THREE_POINT_BACK_TOKEN["right" if degrees > 0 else "left"], back_s)
+        """Back up while turning one way, then walk forward turning the OPPOSITE way, and he ends up facing `degrees` (+ = right) round (user, 2026-11-01: the forward half is the one that
+        takes him where he is going, so it turns toward `degrees` and the back-up turns the other way, like a car). The first real use turned him the wrong way: back right, forward left."""
+        state = self._skill(THREE_POINT_BACK_TOKEN["left" if degrees > 0 else "right"], back_s)
         if state == "fell":
             return state
-        return self._skill("kwkL" if degrees > 0 else "kwkR", forward_s)
+        return self._skill("kwkR" if degrees > 0 else "kwkL", forward_s)
 
     def _pose_cmd(self, lift, sh, kn) -> str:
         return f"i1 {int(round(lift))} 2 0 8 {int(round(sh[0]))} 9 {int(round(sh[1]))} 10 {int(round(sh[2]))} 11 {int(round(sh[3]))} 12 {int(round(kn[0]))} 13 {int(round(kn[1]))} 14 {int(round(kn[2]))} 15 {int(round(kn[3]))}"

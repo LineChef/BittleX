@@ -38,17 +38,18 @@ def run_test(robot, link, side: str, back_s: float, forward_s: float, say=print,
     from . import ball_chase as chase
     sign = 1 if side == "right" else -1
     y0 = yaw(link)
-    state = robot._skill(chase.THREE_POINT_BACK_TOKEN[side], back_s)
+    back_side = "left" if side == "right" else "right"                           # the back-up turns the other way; the forward half turns toward `side`, where he is going
+    state = robot._skill(chase.THREE_POINT_BACK_TOKEN[back_side], back_s)
     y1 = yaw(link)
     out = {"state": state, "back": _swing(y0, y1), "forward": None, "total": None}
-    say(f"backing up while turning {side} ({chase.THREE_POINT_BACK_TOKEN[side]}, {back_s:.1f} s): heading changed {out['back'] if out['back'] is None else format(out['back'], '+.0f')} deg ({'right' if sign > 0 else 'left'} is {'+' if sign > 0 else '-'})")
+    say(f"backing up while turning {back_side} ({chase.THREE_POINT_BACK_TOKEN[back_side]}, {back_s:.1f} s): heading changed {out['back'] if out['back'] is None else format(out['back'], '+.0f')} deg ({'right' if sign > 0 else 'left'} is {'+' if sign > 0 else '-'})")
     if state == "fell":
         return out
-    fwd = "kwkL" if side == "right" else "kwkR"                                    # the forward half steers the OTHER way
+    fwd = "kwkR" if side == "right" else "kwkL"
     state = robot._skill(fwd, forward_s)
     y2 = yaw(link)
     out.update(state=state, forward=_swing(y1, y2), total=_swing(y0, y2))
-    say(f"forward while turning the other way ({fwd}, {forward_s:.1f} s): heading changed {out['forward'] if out['forward'] is None else format(out['forward'], '+.0f')} deg; the whole turn {out['total'] if out['total'] is None else format(out['total'], '+.0f')} deg")
+    say(f"forward while turning {side} ({fwd}, {forward_s:.1f} s): heading changed {out['forward'] if out['forward'] is None else format(out['forward'], '+.0f')} deg; the whole turn {out['total'] if out['total'] is None else format(out['total'], '+.0f')} deg")
     return out
 
 
