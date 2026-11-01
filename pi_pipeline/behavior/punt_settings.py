@@ -15,7 +15,7 @@ import json
 import os
 
 # the search orders ball_chase knows (kept here as names so this module stays importable without numpy)
-SEARCH_ORDER_NAMES = ("turn", "claw_then_turn", "claw_scan", "back_claw_scan", "claw_back_scan", "back_turn", "back_and_turn")
+SEARCH_ORDER_NAMES = ("turn", "claw_then_turn", "claw_scan", "back_claw_scan", "claw_back_scan", "back_turn", "back_and_turn", "three_point_turn", "claw_three_point")
 
 PATH = "~/.local/share/g2/punt_settings.json"
 

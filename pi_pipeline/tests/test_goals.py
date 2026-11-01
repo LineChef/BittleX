@@ -820,7 +820,8 @@ def test_the_walls_goal_learns_from_encounters_and_puts_its_values_into_the_code
 import math  # noqa: E402
 
 
-def test_while_chasing_walls_come_first():
+def test_while_chasing_walls_come_first(monkeypatch):
+    monkeypatch.setattr(bc, "WALL_THREE_POINT", False)                                     # the plain wall turn is what this checks
     bc.CHASE_WALL_IN = 10.0
     p = bc.ChasePlanner()
     a = p.decide(reading(20, 0), bc.WallSeen(40.0, "left"))
@@ -1064,7 +1065,8 @@ def test_a_start_from_his_best_elsewhere_survives_a_short_first_session():
     assert j.begin_session(BASE)["a"] == 2.0                                # not back to your 3.0
 
 
-def test_walls_that_keep_turning_him_away_from_the_ball_end_the_attempt_uncounted():
+def test_walls_that_keep_turning_him_away_from_the_ball_end_the_attempt_uncounted(monkeypatch):
+    monkeypatch.setattr(bc, "WALL_THREE_POINT", False)
     bc.CHASE_WALL_IN = 10.0
     p = bc.ChasePlanner()
     kinds = [p.decide(reading(20, 0), bc.WallSeen(8.0, "left", None)).kind for _ in range(bc.WALL_TURNS_GIVE_UP)]
@@ -1583,7 +1585,8 @@ def test_a_ball_gone_after_a_small_step_means_he_pushed_it_so_he_looks_around():
     assert pl3.decide(None).kind == "look"
 
 
-def test_the_three_point_turn_is_off_by_default_and_backs_then_goes_forward(monkeypatch):
+def test_the_three_point_turn_can_be_switched_off_and_backs_then_goes_forward(monkeypatch):
+    monkeypatch.setattr(bc, "WALL_THREE_POINT", False)
     pl = bc.ChasePlanner()
     assert pl._wall_turn(bc.WallSeen(8.0, "left"), "x").kind == "wall_turn"                    # off: a plain turn
     monkeypatch.setattr(bc, "WALL_THREE_POINT", True)

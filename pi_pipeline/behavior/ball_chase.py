@@ -69,13 +69,15 @@ SEARCH_ORDERS = {
     "claw_back_scan": (("claw", "back", "claw"), ("turn", "claw")),
     "back_turn": (("back",), ("turn",)),
     "back_and_turn": ((), ("back", "turn")),
+    "three_point_turn": ((), ("three_point",)),                  # 3-point turn steps (user, 2026-11-01): back up while turning, then forward turning the other way
+    "claw_three_point": (("claw",), ("three_point", "claw")),
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
 # The 3-point turn (user, 2026-11-01): back up while turning one way, then walk forward while turning the OPPOSITE way (as a car does), so he comes round in less room than a spot turn
-# (a wall close ahead, or a search turn near things). Both uses are OFF until `python -m pi_pipeline.behavior.three_point --test` has shown the direction and size of the backward turn.
+# (a wall close ahead, or a search turn near things). Wall turns use it (user, 2026-11-01: the hardware test works); search turns use it when SEARCH_ORDER is three_point_turn or claw_three_point, which the goal can try.
 THREE_POINT_BACK_S = 1.2       # the backing-up half
 THREE_POINT_BACK_TOKEN = {"right": "kbkR", "left": "kbkL"}      # the firmware's backward-turning gaits; which way each rotates the body is what the test measures
-WALL_THREE_POINT = False       # a wall ahead: a 3-point turn instead of a plain turn away (needs room to back up)
+WALL_THREE_POINT = True        # a wall ahead: a 3-point turn instead of a plain turn away (needs room to back up); works on G2 (user, 2026-11-01)
 SEARCH_THREE_POINT = False     # a search turn step is a 3-point turn
 SEARCH_MOVE_MAX_S = 2.0        # the longest search turn before the next picture (user, 2026-11-01: a few steps, then look again)
 SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
