@@ -41,9 +41,10 @@ For the ball punt (settings from `behavior/punt_settings.py`, controls in `goals
 
 | Kind | Settings | Why |
 |---|---|---|
-| free | punch distance, small steps closer (from where, how many, how long), where the long walk stops, line-up tolerance, punch hold, looks before searching, the search order, search and scan turn sizes, claw-look pan and lift, one back-up, punts before backing up, what to do when the ball vanishes up close, the alignment pulse, alignment tries, what to do when he cannot line up | Where and when he punches, how he lines up, looks and searches: the outcome measures them directly |
+| free | punch distance, small steps closer (from where, how many, how long), where the long walk stops, line-up tolerance, looks before searching, the search order, the turn between claw looks, claw-look pan and lift, what to do when the ball vanishes up close, the alignment pulse, alignment tries, what to do when he cannot line up | Where and when he punches, how he lines up, looks and searches: the outcome measures them directly, and every free setting is named by at least one outcome (a test checks it) |
 | ask | `punch_lunge_s` | A faster lunge hits harder but is the move most likely to tip him on the arm payload |
 | fixed | `search_walk`, `max_seconds`, `back_up_budget_s`, `claw_pan_sign`, the budget, the success definition, battery limits | Walking blind and backing up are only safe on a big floor (no edge detector); the pan direction is measured, not learned; the rest define the goal |
+| fixed | `punch_hold_s`, `back_up_s`, `stuck_punts`, `search_step_deg` | No outcome points at them, so G2 could never change them anyway (user, 2026-10-31); they become free again only with an outcome that names them |
 
 **Not a setting at all: the walk.** Always the default gait policy (user, 2026-10-31). One gait keeps the learning clean: every change he makes is judged against the same walk,
 so a better score means the setting helped and not that the gait changed underneath; his measured pace stays one number per floor instead of two; it is the policy trained for

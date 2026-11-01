@@ -48,7 +48,7 @@ def test_a_goal_applies_the_users_controls_and_free_is_the_default():
     knobs = {k.name: k for k in g.knobs(ball_punt.BallPunt().knobs())}
     assert knobs["punt_max_in"].control == "fixed" and knobs["lost_looks"].control == "free" and knobs["punch_lunge_s"].control == "ask"
     assert "walk_gait" not in knobs and knobs["search_order"].control == "free" and knobs["align_tries"].control == "free"     # the walk is never switched (user, 2026-10-31)
-    for fixed in ("search_walk", "max_seconds", "back_up_budget_s", "claw_pan_sign"):
+    for fixed in ("search_walk", "max_seconds", "back_up_budget_s", "claw_pan_sign", "punch_hold_s", "back_up_s", "stuck_punts", "search_step_deg"):
         assert knobs[fixed].control == "fixed", fixed
 
 
@@ -178,11 +178,15 @@ def test_no_punt_is_scored_by_how_far_he_got():
     assert bp.score(_res("time", claw), S).numbers["found_by"] == "claw look"
 
 
-def test_every_diagnosis_knob_exists():
-    names = {k.name for k in ball_punt.BallPunt().knobs()}
+def test_every_diagnosis_knob_exists_and_every_free_knob_is_named_by_some_outcome():
+    knobs = {k.name: k for k in ball_punt.BallPunt().knobs()}
+    named = set()
     for code, items in ball_punt.DIAGNOSIS.items():
         for name, _d in items:
-            assert name in names, (code, name)
+            assert name in knobs, (code, name)
+            named.add(name)
+    unused = [n for n, k in knobs.items() if k.control == "free" and n not in named]
+    assert not unused, f"free but no outcome changes them (make them fixed or add a diagnosis): {unused}"
 
 
 # ------------------------------------------------------------------------------------------------- search moves and the claw look
