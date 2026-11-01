@@ -1144,3 +1144,47 @@ def test_the_claw_picture_test_takes_straight_then_plus_then_minus_and_saves_the
     f = Falls()
     assert [r[0] for r in take_pictures(f, FakeCamera([b"a", b"b"]), str(tmp_path / "p2"), pan=35.0, lift=15.0, say=lambda m: None, sleep=lambda s: None)] == ["straight", "pan_plus"]
     assert f.moves[-1] == ("claw", 35, 15)                                                     # stopped at the fall: nothing more was sent
+
+
+def test_the_hold_test_reports_when_the_body_moves_away_from_where_he_stood():
+    from pi_pipeline.behavior.claw_look import hold_test
+    t = [0.0]
+
+    def line(pitch_deg, roll_deg=0.0):                                                       # the firmware's fixed-width line: MCU:<ax><ay><az><yaw><pitch><roll>
+        return f"MCU:{0.0:6.2f}{0.0:6.2f}{1.0:6.2f}{0.0:7.1f}{pitch_deg:7.1f}{roll_deg:7.1f}"
+
+    class Link:
+        def __init__(self, sag_at): self.sag_at, self.sent = sag_at, []
+        def send(self, c, **k): self.sent.append(c); return "Voltage: 8.40 V"
+        def drain(self, s): pass
+        def poll_imu(self): return [line(1.0 if t[0] < self.sag_at else 22.0)]
+
+    def clock(): return t[0]
+    def sleep(s): t[0] += s
+    said = []
+    r = hold_test(Link(10.0), seconds=15.0, say=said.append, sleep=sleep, clock=clock)
+    assert r["sag_at_s"] is not None and 9.5 <= r["sag_at_s"] <= 11.0 and r["min_volts"] == 8.4 and any("gave way" in m for m in said)
+    t[0] = 0.0
+    r = hold_test(Link(99.0), seconds=6.0, say=lambda m: None, sleep=sleep, clock=clock)
+    assert r["sag_at_s"] is None and r["max_dev_deg"] < 2
+
+
+def test_the_exposure_is_checked_once_before_the_whole_claw_move():
+    from pi_pipeline.behavior.claw_look import take_pictures
+
+    class Cam(FakeCamera):
+        def __init__(self, frames):
+            super().__init__(frames); self.events = []
+        def refresh_exposure(self): self.events.append("meter")
+        def look(self):
+            self.events.append("look")
+            return super().look()
+    cam = Cam([b"a", b"b", b"c"])
+    take_pictures(ClawRobot(), cam, "/private/tmp/claude-502/-Users-markjohnson-Desktop-OneFolder-projects-bittleX/e357d825-4fe7-48cb-a2f9-37a04ee8c29e/scratchpad/exposure_t", pan=35.0, lift=15.0, say=lambda m: None, sleep=lambda s: None)
+    assert cam.events == ["meter", "look", "look", "look"]                                    # once, then the three pictures
+    import shutil
+    shutil.rmtree("/private/tmp/claude-502/-Users-markjohnson-Desktop-OneFolder-projects-bittleX/e357d825-4fe7-48cb-a2f9-37a04ee8c29e/scratchpad/exposure_t", ignore_errors=True)
+    bc.LOST_LOOKS, bc.CLAW_PAN_SIGN = 1, "right"
+    cam2 = Cam([picture(), picture([disc(120, 110, 12)])])
+    bc.claw_scan(ClawRobot(), cam2, bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None)
+    assert cam2.events == ["meter", "look", "look"]                                            # one meter, then two looks (the ball was in the second)

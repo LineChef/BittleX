@@ -47,6 +47,52 @@ def calibrate(robot, camera, *, say=print, sleep=time.sleep) -> str | None:
     return sign
 
 
+def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock=time.monotonic, sag_deg: float = 8.0) -> dict:
+    """Stand still and watch (no arm move, no picture): the IMU pitch and roll every 0.25 s and the pack voltage every 2 s for `seconds`, to see whether the legs relax by
+    themselves and when (2026-11-01: his legs let go about 10 s after the stand-up). A sag shows as pitch or roll moving more than `sag_deg` from where he stood in the
+    first 2 s. Returns {"sag_at_s": seconds or None, "min_volts": ..., "max_dev_deg": ...}. Moves nothing."""
+    import math
+    import statistics
+
+    from ..gait.imu_parse import parse_imu_line
+    from ..power import battery
+    link.send("gP", read_reply=False, settle=0.0)
+    t0 = clock()
+    pitch, roll = [], []
+    base = None
+    sag_at, max_dev, min_v, next_v, last_print = None, 0.0, None, 0.0, -1.0
+    try:
+        while clock() - t0 < seconds:
+            t = clock() - t0
+            for line in link.poll_imu():
+                r = parse_imu_line(line)
+                if r is not None:
+                    roll.append(math.degrees(r[0]))
+                    pitch.append(math.degrees(r[1]))
+            if base is None and t >= 2.0 and pitch:
+                base = (statistics.median(pitch), statistics.median(roll))
+                say(f"standing baseline: pitch {base[0]:+.1f} roll {base[1]:+.1f} deg")
+            if base is not None and pitch:
+                dev = max(abs(pitch[-1] - base[0]), abs(roll[-1] - base[1]))
+                max_dev = max(max_dev, dev)
+                if sag_at is None and dev > sag_deg:
+                    sag_at = round(t, 1)
+                    say(f"  {t:4.1f} s: the body moved {dev:.0f} deg from where he stood (pitch {pitch[-1]:+.1f}, roll {roll[-1]:+.1f}): the legs gave way")
+            if t >= next_v:
+                v = battery.read_voltage(link, attempts=1)
+                next_v = t + 2.0
+                if v is not None:
+                    min_v = v if min_v is None else min(min_v, v)
+            if int(t) != last_print and pitch:
+                last_print = int(t)
+                say(f"  {t:4.1f} s: pitch {pitch[-1]:+.1f} roll {roll[-1]:+.1f}" + (f"  pack {min_v:.2f} V (lowest so far)" if min_v is not None else ""))
+            sleep(0.25)
+    finally:
+        link.send("gp", read_reply=False, settle=0.0)
+    say(f"hold test done: " + (f"the legs gave way at {sag_at} s" if sag_at is not None else f"he held for {seconds:.0f} s (largest body movement {max_dev:.1f} deg)") + (f"; lowest pack {min_v:.2f} V" if min_v is not None else ""))
+    return {"sag_at_s": sag_at, "min_volts": min_v, "max_dev_deg": round(max_dev, 1)}
+
+
 def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=print, sleep=time.sleep, settle_s: float = 1.2) -> list:
     """Three pictures from the claw camera, in this order: straight ahead (pan 0), then pan +`pan`, then pan -`pan`, all at `lift`; then the arm goes home. Each is saved as
     straight.jpg / pan_plus.jpg / pan_minus.jpg in `outdir`. After each move it says how far the body tilted during it (`robot.swing_deg()`): a big number means the arm move leans him.
@@ -54,6 +100,9 @@ def take_pictures(robot, camera, outdir: str, *, pan: float, lift: float, say=pr
     import os
     os.makedirs(outdir, exist_ok=True)
     out = []
+    fresh = getattr(camera, "refresh_exposure", None)
+    if callable(fresh):
+        fresh()                                                                      # one exposure check before the whole move (user, 2026-10-31), not one per picture
     for name, p in (("straight", 0.0), ("pan_plus", pan), ("pan_minus", -pan)):
         state = robot.claw_pose(p, lift)
         swing = robot.swing_deg() if hasattr(robot, "swing_deg") else 0.0
@@ -84,6 +133,7 @@ def main() -> None:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--calibrate", action="store_true", help="measure which way a positive pan turns the camera and save it (the ball about 12 in straight ahead)")
     g.add_argument("--test", action="store_true", help="one look around with the current settings")
+    g.add_argument("--hold", action="store_true", help="stand, then do nothing for 20 s and watch whether the legs hold (IMU and pack voltage); no arm move")
     g.add_argument("--pictures", action="store_true", help="three pictures (straight, pan +, pan -) saved to a folder; stays standing at the end (no rest command)")
     ap.add_argument("--rest", action="store_true", help="with --pictures: lay him down at the end like the other modes")
     args = ap.parse_args()
@@ -105,7 +155,9 @@ def main() -> None:
     robot = chase.SerialRobot(link)
     try:
         chase._stand_if_lying(link)
-        if args.pictures:
+        if args.hold:
+            hold_test(link)
+        elif args.pictures:
             import os
             outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/%Y%m%d_%H%M%S"))
             res = take_pictures(robot, chase._SnapshotCamera(cam), outdir, pan=chase.CLAW_PAN_DEG, lift=chase.CLAW_LIFT_DEG)
@@ -124,11 +176,11 @@ def main() -> None:
             robot.claw_pose(0.0, 0.0)
         finally:
             cam.close()
-            if not args.pictures or args.rest:
+            if not (args.pictures or args.hold) or args.rest:
                 link.send("krest", read_reply=False, settle=0.0)
                 time.sleep(2.5)
             else:
-                print("left standing (no rest command); arm home")
+                print("no rest command sent: left as he is; arm home")
 
 
 if __name__ == "__main__":

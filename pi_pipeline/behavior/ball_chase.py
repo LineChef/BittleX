@@ -516,6 +516,9 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None). `stamp()` times the trace entries (the scorer needs when the ball was
     first seen); `after_punt` marks a look for where the ball went, which is not a search."""
     extra = {"after_punt": True} if after_punt else {}
+    fresh = getattr(camera, "refresh_exposure", None)
+    if callable(fresh):
+        fresh()                                                                      # one exposure check before the whole look around (user, 2026-10-31), not one per picture
     side = planner.claw_side or planner.last_side or 1
     pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG] + ([0.0] if CLAW_LIFT_DEG > 0 else [])
     found, state = None, "ok"
@@ -716,6 +719,15 @@ def stop_requested() -> bool:
 class _SnapshotCamera:
     def __init__(self, cam):
         self._cam = cam
+
+    def refresh_exposure(self) -> None:
+        """Make the next picture meter the light afresh (exposure balancing stays ON): the snapshot keeps a picture as it is when the light matches the last one, but a claw that has
+        turned to another direction sees different light (user, 2026-10-31: adjust the exposure before taking pictures with the claw)."""
+        try:
+            self._cam._metered_at = float("-inf")
+            self._cam._settled = None
+        except Exception:  # noqa: BLE001
+            pass
 
     def look(self) -> bytes | None:
         snap = self._cam.snapshot()                      # exposure balancing stays on (user, 2026-10-25)

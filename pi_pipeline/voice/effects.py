@@ -126,7 +126,9 @@ VOICES = {
 }
 
 
-STYLE_PEAK = 0.95    # loudest sample after styling, as a fraction of full scale
+from .. import sound_levels  # noqa: E402
+
+STYLE_PEAK = sound_levels.SPEECH    # loudest sample after styling, as a fraction of full scale: 90% of max (user, 2026-11-01)
 
 
 def apply_style(name: str, audio: np.ndarray, rate: int) -> np.ndarray:
