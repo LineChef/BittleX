@@ -39,13 +39,18 @@ def main(argv: list[str] | None = None) -> int:
     link = SerialLink("/dev/serial0")
     link.connect()
     ser = link._ser
-    ser.reset_input_buffer()
-    ser.write(b"P\n")
-    ser.flush()
-    time.sleep(2.0)
-    heard = ser.read(ser.in_waiting or 1).decode("ascii", "ignore")
+    time.sleep(2.0)                                                       # right after connecting the board is still answering the link's own start-up commands
+    heard = ""
+    for _ in range(3):
+        ser.reset_input_buffer()
+        ser.write(b"P\n")
+        ser.flush()
+        time.sleep(2.0)
+        heard = ser.read(ser.in_waiting or 1).decode("ascii", "ignore")
+        if "Voltage" in heard:
+            break
     if "Voltage" not in heard:                                           # a board that answers nothing cannot take the commands: say that, not "no X"
-        print("the BiBoard is NOT answering at all (no pack reading, no IMU lines): is it switched on, and is the Pi-to-BiBoard plug seated? Nothing was sent to the voice module.")
+        print("the BiBoard is NOT answering a pack read after 3 tries: is it switched on, and is the Pi-to-BiBoard plug seated? Nothing was sent to the voice module.")
         return 3
     print(f"the board answers (pack {heard.split('Voltage:')[1].split('V')[0].strip()} V); sending the three commands, 2.5 s apart")
     got = set_english(ser)
