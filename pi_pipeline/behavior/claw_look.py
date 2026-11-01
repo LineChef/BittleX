@@ -144,6 +144,7 @@ def main() -> None:
     g.add_argument("--hold", action="store_true", help="stand, then do nothing for 20 s and watch whether the legs hold (IMU and pack voltage); no arm move")
     g.add_argument("--pictures", action="store_true", help="three pictures (straight, pan +, pan -) saved to a folder; stays standing at the end (no rest command)")
     ap.add_argument("--rest", action="store_true", help="with --pictures: lay him down at the end like the other modes")
+    ap.add_argument("--settle", type=float, default=1.6, help="with --pictures: seconds to wait after each arm move before the picture (the camera's frames are old: 2026-11-01 the +35 picture still showed straight ahead at 1.6)")
     args = ap.parse_args()
     me = sys.modules[chase.__name__]
     _eff, problems = ps.effective(me)
@@ -171,7 +172,7 @@ def main() -> None:
         elif args.pictures:
             import os
             outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/%Y%m%d_%H%M%S"))
-            res = take_pictures(robot, chase._SnapshotCamera(cam), outdir, pan=chase.CLAW_PAN_DEG, lift=chase.CLAW_LIFT_DEG)
+            res = take_pictures(robot, chase._SnapshotCamera(cam), outdir, pan=chase.CLAW_PAN_DEG, lift=chase.CLAW_LIFT_DEG, settle_s=args.settle)
             print("PICTURES:", outdir, [r[0] for r in res if r[3]])
         elif args.calibrate:
             sign = calibrate(robot, chase._SnapshotCamera(cam))
