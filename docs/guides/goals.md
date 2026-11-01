@@ -47,6 +47,11 @@ g2goal status                # what each goal has learned, per attachment and fl
 g2goal reset ball_punt --yes # forget what he learned (the journal keeps the history)
 ```
 
+**Automatic curation** (`g2goal curate`, runs by itself after every goal session and every pull; `--dry` shows what it would do, `--restore` puts deleted lessons back): attempts made under an older
+scoring epoch (`SCORING_EPOCH` in `goals/curate.py`, bumped by any commit that changes how attempts are scored or the ball is seen) are taken out of his records unless you marked them right; a lesson saved to memory
+whose attempts were all retracted or retired is deleted (to a 30-day trash); a lesson newer attempts disagree with, or one over 60 days old with nothing newer behind it, is only flagged; the turn log keeps 30 days.
+`goal_curation/curation_report.md` says what it did and why. It never touches your goals, overrides or "right" verdicts, the journal, or facts you told him.
+
 The Mac keeps a copy in `~/Desktop/G2Memory/goals/` so you can read it while G2 is off: the journal, what he learned, your goals and overrides, the chase and wall
 settings, his measured pace, every chase turn and why (`turn_log.jsonl`), the lessons he saved to memory (`lessons.jsonl`), and `history/<date>/` with the copy as it was
 before each day's first pull. `pulled_at.txt` says when it was taken. The commands other than `report` and `pull` need G2 on.

@@ -7,6 +7,8 @@ Both never raise: a standing goal must never disturb the activity it rides on. E
 """
 from __future__ import annotations
 
+from .curate import epoch_now
+
 import logging
 import time
 import uuid
@@ -86,7 +88,7 @@ def learn(goal_id: str, events: list, source: str, *, used: dict | None = None, 
             from .journal import next_number
             n = next_number(judge.state)
             judge.state["last_number"] = n
-            journal.write("attempt", session=session, goal=goal.id, index=i, number=n, ended=o.code, seconds=0.0, settings=settings,
+            journal.write("attempt", session=session, goal=goal.id, index=i, scoring_epoch=epoch_now(goal.id), number=n, ended=o.code, seconds=0.0, settings=settings,
                           outcome={"code": o.code, "score": o.score, "success": o.success, "text": o.text, "stages": o.stages}, numbers=o.numbers, extra={}, trace=[])
             for d in judge.update(n, o, settings):
                 journal.write("decision", session=session, goal=goal.id, index=i, **d.as_dict())

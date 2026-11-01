@@ -12,7 +12,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 |---|---|---|---|
 | `G2_GOALS_DIR` | — | `g2_aliases.sh`, `g2_goal_pull.sh` | not documented |
 | `G2_PUNT_SETTINGS` | `PATH` | `punt_settings.py` | not documented |
-| `G2_TURN_LOG` | `TURN_LOG` | `ball_chase.py` | not documented |
+| `G2_TURN_LOG` | `TURN_LOG` | `ball_chase.py`, `curate.py` | not documented |
 
 ## All variables
 
@@ -181,7 +181,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_REFUSE_SOUND` | — | `loop.py`, `prompt_tones.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_REMOTE_MEMORY_DB` | — | `g2_memory_backup.sh` | [`settings-switches.md`](settings-switches.md) |
 | `G2_REVIEW_NO_OPEN` | — | `g2_review.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_ROOT` | — | `install_voice_service.sh`, `g2_aliases.sh` | [`settings-switches.md`](settings-switches.md) |
+| `G2_ROOT` | `"."` | `g2_goal_pull.sh` | [`settings-switches.md`](settings-switches.md) |
 | `G2_ROUTE_ESCALATE_PATTERN` | — | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
 | `G2_ROUTE_MAX_WORDS` | `25` | `config.py` | [`.env.example`](../../.env.example), [`swappable-llm.md`](swappable-llm.md) |
 | `G2_RUNS_DIR` | `"~/g2_runs"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
@@ -220,7 +220,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_TRANSITION_RAMP_S` | `""` | `transitions.py` | [`attachments.md`](attachments.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_TRANSITION_READ_POSE` | — | `check_serial.py`, `transitions.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
 | `G2_TTS` | `"auto"` | `config.py` | [`.env.example`](../../.env.example), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
-| `G2_TURN_LOG` | `TURN_LOG` | `ball_chase.py` | not documented |
+| `G2_TURN_LOG` | `TURN_LOG` | `ball_chase.py`, `curate.py` | not documented |
 | `G2_USAGE_FILE` | `"~/.local/share/g2/api_usage.json"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_VISION_CLASSES` | — | `g2_aliases.sh` | [`settings-switches.md`](settings-switches.md) |
 | `G2_VISION_DESCRIBE` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |

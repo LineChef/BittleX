@@ -6,6 +6,8 @@ memory facts and the learned state is saved.
 """
 from __future__ import annotations
 
+from .curate import epoch_now
+
 import time
 import uuid
 from typing import Callable
@@ -90,7 +92,7 @@ class GoalSession:
                 self.say(f"attempt {i} of {g.attempts} (#{n}), {bat}")
                 result = self.approach.run_attempt(settings, ctx)
                 outcome = self.approach.score(result, settings)
-                self.journal.write("attempt", session=self.session, goal=g.id, index=i, number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,
+                self.journal.write("attempt", session=self.session, goal=g.id, index=i, scoring_epoch=epoch_now(g.id), number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,
                                    settings=settings, outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text, "stages": outcome.stages},
                                    numbers=outcome.numbers, extra=result.extra, trace=result.trace, pack_pct=getattr(self.approach, "last_pack_pct", None))
                 if outcome.counted:
@@ -138,5 +140,10 @@ class GoalSession:
             summary = {"session": self.session, "goal": g.id, "why": why, "attempts": counted, "successes": successes, "minutes": round((self.clock() - t0) / 60.0, 1),
                        "lessons": lessons, "lessons_saved": saved, "settings_now": self.judge.settings(base)}
             self.journal.write("session_end", **summary)
+            try:                                                                  # keep what he learned curated after every session (user, 2026-11-01)
+                from .curate import curate
+                curate()
+            except Exception:  # noqa: BLE001
+                pass
             self.say(f"session ended ({why}): {successes} of {counted} counted attempts succeeded; {saved} lesson(s) saved to memory")
         return summary

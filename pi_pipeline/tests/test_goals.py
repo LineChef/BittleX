@@ -1208,3 +1208,113 @@ def test_the_exposure_is_checked_once_before_the_whole_claw_move():
     cam2 = Cam([picture(), picture([disc(120, 110, 12)])])
     bc.claw_scan(ClawRobot(), cam2, bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None)
     assert cam2.events == ["meter", "look", "look"]                                            # one meter, then two looks (the ball was in the second)
+
+
+# ---------------------------------------------------------------------------------------------- curation (user, 2026-11-01)
+
+class _FakeStore:
+    def __init__(self, facts):
+        self.facts = [dict(f) for f in facts]
+        self.added = []
+
+    def list_facts(self):
+        return list(self.facts)
+
+    def delete_fact(self, i):
+        self.facts = [f for f in self.facts if f["id"] != i]
+        return True
+
+    def add_fact(self, text, importance=2, core=False, source="told"):
+        self.added.append((text, source))
+        return True
+
+
+def _curation_setup(tmp_path, monkeypatch, when="2026-10-31 20:00:00"):
+    import time as _t
+
+    from pi_pipeline.goals.observe import plain_punt
+    for k, v in (("G2_GOAL_JOURNAL", "journal.jsonl"), ("G2_GOAL_STATE", "state.json"), ("G2_TURN_LOG", "turns.jsonl")):
+        monkeypatch.setenv(k, str(tmp_path / v))
+    cond = {"attachment": "arm", "floor": "hardwood", "hw": "hw-x"}
+    tr = [{"kind": "act", "act": "punt", "at": (3.0, 0.0)}, {"kind": "after_punt", "ball": None}]
+    settings = dict(ball_punt.BallPunt().base_settings())
+    stamp = _t.mktime(_t.strptime(when, "%Y-%m-%d %H:%M:%S"))
+    plain_punt(tr, "punted", 20.0, settings, state=State(str(tmp_path / "state.json")), journal=Journal(str(tmp_path / "journal.jsonl"), clock=lambda: stamp), conditions=cond)
+    if when < "2026-11-01 01:20:00":                                                         # made before the epoch 2 start: the writer stamps today's epoch, so take the stamp off
+        rows = [json.loads(x) for x in (tmp_path / "journal.jsonl").read_text().splitlines()]
+        for r in rows:
+            r.pop("scoring_epoch", None)
+        (tmp_path / "journal.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return cond, settings, stamp
+
+
+def test_an_attempt_from_an_older_scoring_epoch_is_retired_once_and_a_new_one_is_not(tmp_path, monkeypatch):
+    from pi_pipeline.goals import curate as cu
+    _curation_setup(tmp_path, monkeypatch)                                                  # made the night before the epoch 2 start
+    key = "attachment=arm|floor=hardwood|hw=hw-x"
+    assert State(str(tmp_path / "state.json")).data["ball_punt"][key]["count"] == 1
+    assert cu.curate(dry=True, store=_FakeStore([])) and State(str(tmp_path / "state.json")).data["ball_punt"][key]["count"] == 1      # a dry run changes nothing
+    said = cu.curate(store=_FakeStore([]))
+    assert any("retired ball_punt attempt #1" in x for x in said)
+    assert State(str(tmp_path / "state.json")).data["ball_punt"][key]["count"] == 0
+    assert not any("retired" in x for x in cu.curate(store=_FakeStore([])))                 # once only
+    assert cu.attempt_epoch({"goal": "ball_punt", "time": "2026-11-01 02:00:00"}) == 2 and cu.attempt_epoch({"goal": "ball_punt", "time": "2026-11-01 02:00:00", "scoring_epoch": 1}) == 1
+
+
+def test_an_attempt_you_marked_right_is_never_retired(tmp_path, monkeypatch):
+    from pi_pipeline.goals import curate as cu
+    from pi_pipeline.goals.__main__ import main
+    _curation_setup(tmp_path, monkeypatch)
+    main(["verdict", "ball_punt", "1", "right"])
+    assert not any("retired" in x for x in cu.curate(store=_FakeStore([])))
+
+
+def test_a_lesson_whose_attempts_were_retired_is_deleted_and_can_be_restored(tmp_path, monkeypatch):
+    from pi_pipeline.goals import curate as cu
+    _curation_setup(tmp_path, monkeypatch)
+    j = Journal(str(tmp_path / "journal.jsonl"))
+    sess = j.read()[0]["session"]
+    note = "Searching by back_claw_scan works best so far: 1 of 2 good"
+    j.write("decision", session=sess, goal="ball_punt", index=1, action="kept", note=note, knob="search_order", old="claw_scan", new="back_claw_scan", evidence=[])
+    store = _FakeStore([{"id": 7, "fact": f"Punt the ball: {note}", "source": "goal_lesson", "importance": 2}, {"id": 1, "fact": "The household pet has a name", "source": "told", "importance": 3}])
+    said = cu.curate(store=store)
+    assert any("lesson #7 deleted" in x for x in said) and [f["id"] for f in store.facts] == [1]                    # the told fact stays
+    assert cu.restore(store) and store.added == [(f"Punt the ball: {note}", "goal_lesson")]
+
+
+def test_a_lesson_the_newer_attempts_disagree_with_is_flagged_not_deleted(tmp_path, monkeypatch):
+    from pi_pipeline.goals import curate as cu
+    _curation_setup(tmp_path, monkeypatch, when="2026-11-01 02:00:00")                       # a current-epoch attempt behind the lesson
+    j = Journal(str(tmp_path / "journal.jsonl"), clock=lambda: 1_793_000_000)
+    sess = j.read()[0]["session"]
+    j.write("decision", session=sess, goal="ball_punt", index=1, action="kept", note="Lining up within 12 deg works: 2 of 2 good", knob="punt_align_deg", old=12.0, new=12.0, evidence=[])
+    j2 = Journal(str(tmp_path / "journal.jsonl"), clock=lambda: 1_793_000_050)                  # after the lesson
+    for k in range(2, 6):
+        j2.write("attempt", session=sess, goal="ball_punt", index=k, number=k, scoring_epoch=2, ended="punted", seconds=1.0, settings={"punt_align_deg": 12.0},
+                outcome={"code": "missed", "score": 0.2, "success": False, "text": ""}, numbers={}, extra={}, trace=[])
+    store = _FakeStore([{"id": 3, "fact": "Punt the ball: Lining up within 12 deg works: 2 of 2 good", "source": "goal_lesson", "importance": 2}])
+    said = cu.curate(store=store, now=1_793_000_100)
+    assert any("lesson #3 flagged: later attempts disagree" in x for x in said) and len(store.facts) == 1
+
+
+def test_old_turn_log_lines_and_mac_history_copies_are_rotated(tmp_path, monkeypatch):
+    import time
+    import json as _j
+
+    from pi_pipeline.goals import curate as cu
+    monkeypatch.setenv("G2_GOAL_JOURNAL", str(tmp_path / "journal.jsonl"))
+    monkeypatch.setenv("G2_TURN_LOG", str(tmp_path / "turns.jsonl"))
+    (tmp_path / "turns.jsonl").write_text(_j.dumps({"time": "2026-01-01 10:00:00"}) + "\n" + _j.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S")}) + "\n")
+    assert cu.rotate_turn_log(False) == 1 and len((tmp_path / "turns.jsonl").read_text().splitlines()) == 1
+    for d in ("20260101", "20260104", "20261030"):                                             # a Thursday, a Sunday, a recent one
+        (tmp_path / "mac" / "history" / d).mkdir(parents=True)
+    cu.prune_mac_history(str(tmp_path / "mac"), now=time.mktime(time.strptime("20261101", "%Y%m%d")))
+    assert sorted(p.name for p in (tmp_path / "mac" / "history").iterdir()) == ["20260104", "20261030"]
+
+
+def test_the_test_run_never_touches_the_real_home_or_memory_files():
+    import os
+    real = os.path.realpath("/Users") if os.path.exists("/Users") else "/home"
+    assert os.path.realpath(os.path.expanduser("~")).startswith(os.path.realpath(__import__("tempfile").gettempdir())) or not os.path.expanduser("~").startswith(real)
+    for key in ("G2_MEMORY_DB", "G2_EXPERIENCES", "G2_MEMORY_CALL_LOG"):
+        assert os.path.realpath(os.environ[key]).startswith(os.path.realpath(__import__("tempfile").gettempdir()))

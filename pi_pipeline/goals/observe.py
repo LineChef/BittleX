@@ -5,6 +5,8 @@ Written to the goal journal as a one-attempt session with mode "plain punt", so 
 """
 from __future__ import annotations
 
+from .curate import epoch_now
+
 import logging
 import time
 import uuid
@@ -38,7 +40,7 @@ def plain_punt(trace: list, ended: str, seconds: float, settings: dict, pack_pct
             judge.state["last_number"] = n
         session = "p" + uuid.uuid4().hex[:7]
         journal.write("session_start", session=session, goal=goal.id, title=goal.title, mode="plain punt", conditions=cond, settings=settings, controls={}, learned_from=n - 1)
-        journal.write("attempt", session=session, goal=goal.id, index=1, number=n if outcome.counted else None, ended=ended, seconds=result.seconds, settings=settings,
+        journal.write("attempt", session=session, goal=goal.id, index=1, scoring_epoch=epoch_now(goal.id), number=n if outcome.counted else None, ended=ended, seconds=result.seconds, settings=settings,
                       outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text, "stages": outcome.stages},
                       numbers=outcome.numbers, extra={}, trace=result.trace, pack_pct=pack_pct)
         for d in judge.observe(n, outcome, settings):

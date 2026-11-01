@@ -148,6 +148,9 @@ def main(argv=None) -> None:
     p = sub.add_parser("overrides"); p.add_argument("goal")
     p = sub.add_parser("priority", help="show or set the goals' order, highest first (a standing goal above a task limits it)"); p.add_argument("order", nargs="*")
     p = sub.add_parser("practise", help="what 'G2, practise' would choose now, and why"); p.add_argument("words", nargs="*")
+    p = sub.add_parser("curate", help="retire old-scoring attempts, check the saved lessons against their evidence, rotate logs, empty the trash (also runs after every session and pull)")
+    p.add_argument("--dry", action="store_true", help="say what it would do and change nothing"); p.add_argument("--restore", action="store_true", help="put the deleted lessons back")
+    p.add_argument("--mac-history", metavar="DIR", help="only prune DIR/history (the Mac copy of the goal data)")
     p = sub.add_parser("verdict", help="say whether an attempt was scored right; a wrong one is taken out of his records")
     p.add_argument("goal"); p.add_argument("number", type=int); p.add_argument("verdict", choices=("right", "wrong"))
     p.add_argument("--floor"); p.add_argument("--scope"); p.add_argument("--note", default="")
@@ -353,6 +356,17 @@ def main(argv=None) -> None:
         st.save()
         journal.write("verdict", goal=g.id, session=row["session"], index=row["index"], number=a.number, conditions=cond, verdict=a.verdict, scored=o["code"], note=a.note)
         print(f"attempt #{a.number} ({cond}, scored {o['code']}): {a.verdict}" + (f"; {changed}" if changed else ""))
+    elif a.cmd == "curate":
+        from . import curate as cu
+        if a.mac_history:
+            out = cu.prune_mac_history(a.mac_history, a.dry)
+        elif a.restore:
+            from ..config import settings
+            from ..memory.store import Store
+            out = cu.restore(Store(settings.memory_db_path), a.dry)
+        else:
+            out = cu.curate(dry=a.dry)
+        print(("DRY RUN, nothing changed:\n" if a.dry else "") + ("\n".join(f"  {x}" for x in out) if out else "nothing to do"))
     elif a.cmd == "overrides":
         from . import overrides as ovr
         for line in ovr.describe(a.goal) or ["no overrides"]:
