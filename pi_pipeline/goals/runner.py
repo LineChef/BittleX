@@ -35,6 +35,21 @@ class GoalSession:
         self.judge = Judge(self.knobs, approach.diagnosis, self.state.for_goal(goal.id, self.cond_key), stage_of=getattr(approach, "stage_of", None), overrides=overrides, rng=rng)
         self.session = uuid.uuid4().hex[:8]
 
+    def _prior(self, base: dict) -> tuple[dict | None, str | None]:
+        """His best values under the nearest other conditions (journal.prior_conditions), for the knobs with no record here yet."""
+        if self.judge.state.get("count"):
+            return None, None
+        import copy
+
+        from .journal import prior_conditions
+        goal_state = self.state.data.get(self.goal.id) or {}
+        for key in prior_conditions(goal_state, self.cond):
+            other = Judge(self.knobs, self.approach.diagnosis, copy.deepcopy(goal_state[key]), stage_of=getattr(self.approach, "stage_of", None), overrides=self.overrides)
+            vals = {n: other.best(n, base[n]) for n, k in other.knobs.items() if k.control == "free" and n in base and other.state["values"].get(n)}
+            if vals:
+                return vals, key
+        return None, None
+
     def _speak(self, text: str) -> None:
         if self.announce is not None:
             try:
@@ -45,10 +60,14 @@ class GoalSession:
     def run(self) -> dict:
         g = self.goal
         base = self.approach.base_settings()
-        start_settings = self.judge.begin_session(base)
+        prior, prior_from = self._prior(base)
+        start_settings = self.judge.begin_session(base, prior=prior, prior_from=prior_from)
         self.journal.write("session_start", session=self.session, goal=g.id, title=g.title, conditions=self.cond, budget={"attempts": g.attempts, "minutes": g.minutes,
                            "min_pack_pct": g.min_pack_pct, "target_successes": g.target_successes}, settings=start_settings,
-                           controls={k.name: k.control for k in self.knobs}, learned_from=self.judge.state.get("count", 0), overrides=self.overrides)
+                           controls={k.name: k.control for k in self.knobs}, learned_from=self.judge.state.get("count", 0), overrides=self.overrides,
+                           started_from=self.judge.started_from)
+        if self.judge.started_from:
+            self.say(f"new conditions: starting from my best values under {self.judge.started_from}")
         self.say(f"goal session {self.session}: {g.title}, up to {g.attempts} attempts ({self.cond_key}); {self.judge.state.get('count', 0)} attempts learned from before")
         t0 = self.clock()
         successes, counted, why = 0, 0, "attempts"
@@ -77,12 +96,13 @@ class GoalSession:
                 outcome = self.approach.score(result, settings)
                 self.journal.write("attempt", session=self.session, goal=g.id, index=i, number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,
                                    settings=settings, outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text, "stages": outcome.stages},
-                                   numbers=outcome.numbers, extra=result.extra, trace=result.trace)
+                                   numbers=outcome.numbers, extra=result.extra, trace=result.trace, pack_pct=getattr(self.approach, "last_pack_pct", None))
                 decisions = self.judge.update(n, outcome, settings)
                 for d in decisions:
                     row = self.journal.write("decision", session=self.session, goal=g.id, index=i, **d.as_dict())
                     decisions_all.append(row)
                     self.say("  " + d.note)
+                self.judge.state["updated"] = time.time()
                 self.state.save()                                     # after every attempt: a crash keeps what was learned
                 if outcome.counted:
                     counted += 1

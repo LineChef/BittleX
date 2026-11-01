@@ -54,7 +54,19 @@ Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
 attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt".
 
-## 5. When he learns something bad
+## 5. Telling him a score was wrong
+
+Every attempt in the report has a number and a "your verdict" column. If the score is wrong (the report says he hit the ball but it was still under the claw, or the finder misread
+it), say so from the Mac:
+
+```bash
+g2goal verdict ball_punt 7 wrong     # taken out of his records; add --note "under the claw" if you like, --floor F when two floors have an attempt #7
+g2goal verdict ball_punt 8 right     # kept, and counted as agreement
+```
+
+The report's "your verdicts" tile shows how often the scoring agrees with you: that number says how far to trust what he learns.
+
+## 6. When he learns something bad
 
 He keeps a record for every value he tries ("punching from 3 in: 7 of 9 good"), works on one setting at a time, and keeps the value with the best record, so one lucky attempt
 cannot set a value. When a value still looks wrong to you, override it from the Mac:
@@ -70,7 +82,18 @@ g2goal overrides ball_punt                       # list your overrides
 Add `--floor tile` to any of them for one floor only (the default is everywhere). A pin beats a limit, a limit beats what he learned, and what he learned beats your punt settings
 file. Every override is in the report under "Your overrides". `g2goal reset ball_punt --yes` still forgets everything a goal learned.
 
-## 6. Where things live on the Pi
+## 7. What else teaches him
+
+- **Plain punts count too.** A "G2, punt" or `g2punt` attempt is scored and added to the ball goal's records (shown as "Plain punt" in the report); nothing is changed by it.
+- **A new floor or new hardware starts from his best elsewhere.** His records are kept per attachment, floor and hardware epoch. Under new conditions he starts from his best
+  values on the nearest other ones (the same floor on the previous hardware first), with fresh records, so old evidence never holds him at an old answer. **When you change
+  the hardware** (ARM2's wider shoulders and paws, a new servo), add an entry to `pi_pipeline/telemetry/hardware_epochs.json` (or ask Claude Code to) and deploy; his walking
+  pace and turn rates start from the old values the same way.
+- **A settled setting is left alone.** When one value clearly beats the values next to it, he moves on to the next setting his failures point at; it is looked at again if that
+  value starts failing.
+- **The pack %** is kept with every attempt (the report's "pack" column); he does not learn from it yet.
+
+## 8. Where things live on the Pi
 
 | File | What |
 |---|---|

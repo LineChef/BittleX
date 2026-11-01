@@ -19,6 +19,10 @@ Overrides, when G2 learned something bad (goals/overrides.py; add --floor tile o
     python -m pi_pipeline.goals undo ball_punt punt_max_in             # take back what he learned for it: his best value is banned, he goes to his next best (unban to clear)
     python -m pi_pipeline.goals forget ball_punt punt_max_in           # drop his record for one setting: back to your file's value, he may learn it again
     python -m pi_pipeline.goals overrides ball_punt                    # list them
+
+Your verdict on how an attempt was scored (the number is the one in the report):
+
+    python -m pi_pipeline.goals verdict ball_punt 7 wrong              # scored wrong: taken out of his records (right: kept, and counted as agreement)
 """
 from __future__ import annotations
 
@@ -136,6 +140,9 @@ def main(argv=None) -> None:
         p.add_argument("--floor", help="only on this floor label")
         p.add_argument("--scope", help="a conditions filter, e.g. attachment=arm|floor=tile (default: everywhere)")
     p = sub.add_parser("overrides"); p.add_argument("goal")
+    p = sub.add_parser("verdict", help="say whether an attempt was scored right; a wrong one is taken out of his records")
+    p.add_argument("goal"); p.add_argument("number", type=int); p.add_argument("verdict", choices=("right", "wrong"))
+    p.add_argument("--floor"); p.add_argument("--scope"); p.add_argument("--note", default="")
     sub.add_parser("suggestions", help="the suggestions for settings only you change, with their status")
     for name in ("confirm", "cancel"):
         p = sub.add_parser(name, help=f"{name} a suggestion"); p.add_argument("goal"); p.add_argument("knob")
@@ -276,6 +283,44 @@ def main(argv=None) -> None:
             msg = f"forgot what he learned for {k.name} under {n} set(s) of conditions ({scope}): back to your value {k.show(base[k.name])}"
         journal.write("override", goal=g.id, action=a.cmd, knob=k.name, scope=scope, detail=msg)
         print(msg)
+    elif a.cmd == "verdict":
+        from . import overrides as ovr
+        from .approach import Outcome
+        from .journal import conditions_key
+        g = _goal(goals, a.goal)
+        journal = Journal()
+        rows = journal.read()
+        cond_of = {r["session"]: conditions_key(r.get("conditions") or {}) for r in rows if r.get("kind") == "session_start" and r.get("goal") == g.id}
+        scope = _scope(a)
+        hits = [r for r in rows if r.get("kind") == "attempt" and r.get("goal") == g.id and r.get("number") == a.number and ovr.scope_matches(scope, cond_of.get(r.get("session"), ""))]
+        conds = sorted({cond_of.get(r["session"], "") for r in hits})
+        if not hits:
+            raise SystemExit(f"no counted attempt #{a.number} for {g.id} under {scope}")
+        if len(conds) > 1:
+            raise SystemExit(f"attempt #{a.number} exists under {', '.join(conds)}: add --floor or --scope to say which")
+        row, cond = hits[-1], conds[0]
+        before = [v for v in rows if v.get("kind") == "verdict" and v.get("session") == row["session"] and v.get("index") == row["index"]]
+        was = before[-1]["verdict"] if before else None
+        o = row["outcome"]
+        outcome = Outcome(o["code"], o["score"], o["success"], o.get("text", ""), stages=o.get("stages"))
+        st = State()
+        _a, _k, _b, _c, j, _ov = _judge_for(g, cond, st)
+        live = st.for_goal(g.id, cond)
+        j.state = live                                                        # change the stored record itself
+        for kk, vv in (("values", {}), ("pressure", {}), ("settled", []), ("banned", {}), ("current", {}), ("suggestions", {})):
+            live.setdefault(kk, vv)
+        live.setdefault("count", 0)
+        changed = ""
+        if a.verdict == "wrong" and was != "wrong":
+            j.retract(outcome, row["settings"])
+            changed = "taken out of his records"
+        elif a.verdict == "right" and was == "wrong":
+            j._learn(a.number, outcome, row["settings"])
+            live["count"] += 1
+            changed = "put back into his records"
+        st.save()
+        journal.write("verdict", goal=g.id, session=row["session"], index=row["index"], number=a.number, conditions=cond, verdict=a.verdict, scored=o["code"], note=a.note)
+        print(f"attempt #{a.number} ({cond}, scored {o['code']}): {a.verdict}" + (f"; {changed}" if changed else ""))
     elif a.cmd == "overrides":
         from . import overrides as ovr
         for line in ovr.describe(a.goal) or ["no overrides"]:

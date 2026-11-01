@@ -115,6 +115,15 @@ Two layers, both plain code with tests:
    - keeps, and starts the next session from, the value with the best record over at least 2 attempts, not the last one tried;
    - bans a value he fell trying for 30 attempts.
 
+   - leaves a setting alone once it has settled (its best value has 5 attempts and every neighbour 3, all clearly worse) and moves on to the next one; looks again if that
+     value starts failing;
+   - keys the records by attachment, floor and **hardware epoch** (`telemetry/hardware_epochs.json`); new conditions start from his best values under the nearest other ones,
+     with fresh records (tested: after a hardware change that moves the best value, keeping the old records left him at the old answer in 90% of runs; starting fresh from
+     the old best reached the new one in 68%);
+   - counts plain "G2, punt" attempts in the records without changing anything (`goals/observe.py`);
+   - takes out an attempt the user marks wrong (`g2goal verdict GOAL N wrong`); the share of agreeing verdicts says how far to trust the scorer;
+   - keeps the pack % with every attempt (not learned from yet: 10 attempts a session is too little data for it).
+
    In the same made-up world it ends within one step of the best in 90% of runs after 30 attempts (95% after 60); in a noisier one (60% peak, 25% misread misses) 62% after 30
    and 77% after 60. A copy of that world is a permanent test (`tests/test_goals.py`: at least 85% within one step after 30 attempts). Expect about 3 sessions per setting to
    settle on a real floor, which is noisier than the made-up world.

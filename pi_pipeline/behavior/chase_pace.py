@@ -3,7 +3,7 @@
 Every walk toward the ball has a reading before and after it: the distance it closed over the walk's seconds is his pace. Every turn has the ball's bearing before and after: the
 angle it swung over the turn's seconds is his turn rate, kept per side (left and right differ on G2) and for short alignment pulses apart from longer turns (a short pulse spends
 more of its time getting going). A move is only counted when both readings are clean: the ball whole in the picture, near straight ahead for a walk, and it moved the right way
-(a pushed ball, a lost ball or a misread is left out). Kept per attachment and floor in `~/.local/share/g2/chase_pace.json` (G2_CHASE_PACE moves it), as a running average.
+(a pushed ball, a lost ball or a misread is left out). Kept per attachment, floor and hardware epoch in `~/.local/share/g2/chase_pace.json` (a new one starts from the nearest measured values) (G2_CHASE_PACE moves it), as a running average.
 
 The chase (behavior/ball_chase.py) times each walk and turn with these numbers; until a value has MIN_SAMPLES behind it the defaults below are used.
 """
@@ -29,12 +29,17 @@ def path() -> str:
 
 
 class PaceBook:
-    def __init__(self, key: str = "unknown", p: str | None = None, save: bool = True):
+    def __init__(self, key: str = "unknown", p: str | None = None, save: bool = True, fallback: list[str] | None = None):
         self.key, self.path, self._save = key, p or path(), save
         try:
             self._all = json.load(open(self.path))
         except (OSError, ValueError):
             self._all = {}
+        if key not in self._all:                     # new conditions (a hardware change, a new floor): start from the nearest measured ones, kept as a starting point only
+            for fb in fallback or []:
+                if self._all.get(fb):
+                    self._all[key] = {n: {"value": e["value"], "n": min(e.get("n", 0), MIN_SAMPLES), "from": fb} for n, e in self._all[fb].items()}
+                    break
         self.data = self._all.setdefault(key, {})
         self.log: list = []                          # this run's samples, for the attempt record
 
@@ -114,4 +119,13 @@ def book_for_now(save: bool = True) -> PaceBook:
         floor = get_surface()
     except Exception:  # noqa: BLE001
         floor = "unknown"
-    return PaceBook(f"attachment={att}|floor={floor}", save=save)
+    try:
+        from ..telemetry.epochs import epoch_at, load_epochs
+        e = epoch_at()
+        hw = e["id"] if e else "unknown"
+        earlier = [x["id"] for x in reversed(load_epochs()) if x["id"] != hw]
+    except Exception:  # noqa: BLE001
+        hw, earlier = "unknown", []
+    key = f"attachment={att}|floor={floor}|hw={hw}"
+    fallback = [f"attachment={att}|floor={floor}|hw={h}" for h in earlier] + [f"attachment={att}|floor={floor}"]     # the older key had no hardware part
+    return PaceBook(key, save=save, fallback=fallback)

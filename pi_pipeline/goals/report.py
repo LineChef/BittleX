@@ -84,10 +84,18 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
     counted = [a for a in attempts if a["outcome"].get("score") is not None]
     ok = sum(1 for a in counted if a["outcome"].get("success"))
     decisions = [d for s in sessions for d in s["decisions"]]
+    all_rows = journal.read()
+    verdicts = {}
+    for r in all_rows:
+        if r.get("kind") == "verdict" and r.get("goal") == goal_id:
+            verdicts[(r.get("session"), r.get("index"))] = r.get("verdict")
+    n_right = sum(1 for v in verdicts.values() if v == "right")
+    n_wrong = sum(1 for v in verdicts.values() if v == "wrong")
     kept = sum(1 for d in decisions if d.get("action") == "kept")
     undone = sum(1 for d in decisions if d.get("action") == "undo")
     out.append("<div class=tiles>" + "".join(f"<div class=tile><span class=mut>{_e(k)}</span><b>{_e(v)}</b></div>" for k, v in (
-        ("sessions", len(sessions)), ("counted attempts", len(counted)), ("succeeded", f"{ok} of {len(counted)}"), ("changes kept", kept), ("changes undone", undone))) + "</div>")
+        ("sessions", len(sessions)), ("counted attempts", len(counted)), ("succeeded", f"{ok} of {len(counted)}"), ("changes kept", kept), ("changes undone", undone),
+        ("your verdicts", f"{n_right} right, {n_wrong} wrong" if verdicts else "none yet"))) + "</div>")
     if not sessions:
         out.append("<p>No sessions yet.</p>")
         return _page(title, "".join(out))
@@ -154,18 +162,20 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
     for idx, s in reversed(list(enumerate(sessions, 1))):
         st0 = s["start"]
         end = s["end"] or {}
-        head = f"Session {idx}: {_e(st0.get('time'))}, {_e(_cond_key(st0))}; ended: {_e(end.get('why', 'did not finish'))}; {end.get('successes', '?')} of {end.get('attempts', '?')} succeeded"
+        head = f"{'Plain punt' if st0.get('mode') == 'plain punt' else 'Session'} {idx}: {_e(st0.get('time'))}, {_e(_cond_key(st0))}; ended: {_e(end.get('why', 'did not finish'))}; {end.get('successes', '?')} of {end.get('attempts', '?')} succeeded"
         rows = []
         for a in s["attempts"]:
             o = a["outcome"]
             cls = "good" if o.get("success") else ("mut" if o.get("score") is None else "bad")
             diff = ", ".join(f"{k}={v}" for k, v in a["settings"].items() if st0["settings"].get(k) != v)
             nums = a.get("numbers") or {}
-            rows.append(f"<tr><td>{a['index']}</td><td class={cls}>{_e(o.get('code'))}</td><td>{'' if o.get('score') is None else format(o['score'], '.2f')}</td><td>{_e(o.get('text'))}</td>"
-                        f"<td>{_e(nums.get('found_by') or '')}</td><td>{_e(diff)}</td></tr>")
+            v = verdicts.get((a.get("session"), a.get("index")))
+            vcell = f"<span class={'good' if v == 'right' else 'bad'}>{_e(v)}</span>" if v else (f"<code>g2goal verdict {_e(goal_id)} {a['number']} right|wrong</code>" if a.get("number") else "")
+            rows.append(f"<tr><td>{_e(a.get('number') or '')}</td><td class={cls}>{_e(o.get('code'))}</td><td>{'' if o.get('score') is None else format(o['score'], '.2f')}</td><td>{_e(o.get('text'))}</td>"
+                        f"<td>{_e(nums.get('found_by') or '')}</td><td>{_e('' if a.get('pack_pct') is None else str(a['pack_pct']) + '%')}</td><td>{_e(diff)}</td><td>{vcell}</td></tr>")
         notes = "".join(f"<li><span class=tag>{_e(ACTION_WORD.get(d['action'], d['action']))}</span> {_e(d.get('note'))}</li>" for d in s["decisions"])
         lessons = "".join(f"<li>{_e(x)}</li>" for x in end.get("lessons") or [])
-        body = ("<div class=scroll><table><tr><th>#</th><th>result</th><th>score</th><th>what happened</th><th>found by</th><th>settings changed this session</th></tr>"
+        body = ("<div class=scroll><table><tr><th>#</th><th>result</th><th>score</th><th>what happened</th><th>found by</th><th>pack</th><th>settings changed this session</th><th>your verdict</th></tr>"
                 + "".join(rows) + "</table></div>" + (f"<h3>His notes after each attempt</h3><ul>{notes}</ul>" if notes else "")
                 + (f"<h3>Saved to memory</h3><ul>{lessons}</ul>" if lessons else ""))
         out.append(f"<details class=card {'open' if idx == len(sessions) else ''}><summary>{head}</summary>{body}</details>")

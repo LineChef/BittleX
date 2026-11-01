@@ -413,6 +413,7 @@ class SerialRobot:
     def battery_ok(self) -> bool:
         from ..power import battery
         ok, pct, volts = battery.motion_gate(self._lk)
+        self.last_pct = pct
         if pct is None:
             log.warning("battery unreadable: stopping (fail safe)")
         else:
@@ -697,10 +698,19 @@ def main() -> None:
         print("no voice (", e, "): the cues are printed only")
     _stand_if_lying(link)
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)
+    trace: list = []
+    robot = SerialRobot(link, use_pick=args.use_pick)
+    used = dict(_ps.defaults(_self), max_seconds=args.max_seconds)          # the settings this run uses (the file and the command line applied)
+    t0 = time.monotonic()
     try:
-        why = run_chase(SerialRobot(link, use_pick=args.use_pick), _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce,
-                        pace=None if args.dry_run else _book())
+        why = run_chase(robot, _SnapshotCamera(cam), stop_requested, saver=PictureSaver(args.save_to), dry_run=args.dry_run, max_steps=args.max_steps, max_punts=args.punts, max_seconds=args.max_seconds, announce=announce,
+                        pace=None if args.dry_run else _book(), trace=trace, after_punt_look=bool(args.punts) and not args.dry_run)
         print("ended:", why)
+        if args.punts == 1 and not args.dry_run:                         # one plain attempt teaches the ball-punt goal too (nothing is changed: goals/observe.py)
+            from ..goals.observe import plain_punt
+            said = plain_punt(trace, why, time.monotonic() - t0, used, getattr(robot, "last_pct", None))
+            if said:
+                print("counted for the ball goal:", said)
     except KeyboardInterrupt:
         print("ended: stopped")
     finally:

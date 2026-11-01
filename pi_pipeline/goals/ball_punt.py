@@ -116,6 +116,7 @@ class BallPunt:
     def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None):
         self.robot, self.camera, self.saver, self._link, self.pace = robot, camera, saver, link, pace
         self._cam = None
+        self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
 
     # ---------------------------------------------------------------------------------------------------- settings
     def knobs(self) -> list[Knob]:
@@ -181,6 +182,7 @@ class BallPunt:
             return ok, "battery ok" if ok else "battery low"
         from ..power import battery
         ok, pct, volts = battery.motion_gate(self._link)
+        self.last_pack_pct = pct
         if pct is None:
             return False, "battery unreadable"
         if not ok or pct < min_pct:
@@ -226,13 +228,13 @@ class BallPunt:
             if e.get("kind") == "act" and e.get("act") in SEARCH_MOVES:
                 searched = True
                 break
-        if first is None:
+        punted = result.ended == "punted"
+        if first is None and not punted:                                       # never saw it (a punt always means he found it, even with no sighting in the trace)
             out["search"] = 0.0
             return out
-        if searched:
+        if searched and first is not None:
             out["search"] = round(max(0.0, 1.0 - float(first) / max_s), 3)
-        punted = result.ended == "punted"
-        close = punted or (nums.get("closest_in") is not None and nums["closest_in"] <= _chase().NUDGE_MAX_IN)
+        close = punted or (nums.get("closest_in") is not None and nums["closest_in"] <= float(settings.get("nudge_max_in", _chase().NUDGE_MAX_IN)))
         out["approach"] = (1.0 - (0.4 if nums.get("pushes") else 0.0)) if close else 0.0
         if close:
             tol = float(settings.get("punt_align_deg", 12.0))
@@ -308,8 +310,8 @@ class BallPunt:
                 return Outcome("align_overshoot", 0.15, False, f"I kept turning past the ball while lining up ({nums['align_overshoots']} times in {nums['align_pulses']} small turns)", nums)
             if nums["align_no_moves"] >= 2:
                 return Outcome("align_no_move", 0.15, False, f"my small turns did not move me ({nums['align_no_moves']} of {nums['align_pulses']})", nums)
-            if closest <= chase.NUDGE_MAX_IN:
+            if closest <= float(settings.get("nudge_max_in", chase.NUDGE_MAX_IN)):
                 return Outcome("align_stuck", 0.15, False, f"I got within {closest:.0f} in but could not line up in {nums['align_pulses']} small turns", nums)
-        if closest <= chase.NUDGE_MAX_IN:
+        if closest <= float(settings.get("nudge_max_in", chase.NUDGE_MAX_IN)):
             return Outcome("never_punted", 0.15, False, f"I got within {closest:.0f} in but never punched", nums)
         return Outcome("never_reached", 0.1, False, f"I saw the ball but never got closer than {closest:.0f} in", nums)

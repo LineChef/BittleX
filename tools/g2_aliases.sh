@@ -401,7 +401,7 @@ g2puntset() {
        ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings --set '$1' '$2'" ;;
   esac
 }
-# g2goal [list|show GOAL|set GOAL ...|run GOAL|stop|status|history GOAL|suggestions|confirm|cancel GOAL KNOB|pin|limit|undo|forget GOAL KNOB ...|overrides GOAL|reset GOAL --yes|pull|report [GOAL]]  -- goals G2 works toward and what he learned (docs/guides/goals.md).
+# g2goal [list|show GOAL|set GOAL ...|run GOAL|stop|status|history GOAL|suggestions|confirm|cancel GOAL KNOB|verdict GOAL N right|wrong|pin|limit|undo|forget GOAL KNOB ...|overrides GOAL|reset GOAL --yes|pull|report [GOAL]]  -- goals G2 works toward and what he learned (docs/guides/goals.md).
 #   run = one session without the voice command (the same as saying "G2, ball goal": the voice service stops and always comes back); stop = end it (he rests).
 #   pull = copy the journal and the learned state to ~/Desktop/G2Memory/goals; report [GOAL] = pull, build the report page there and open it.
 g2goal() {

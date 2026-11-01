@@ -10,7 +10,8 @@ Design and decisions: [`../../docs/planned/goals-plan.md`](../../docs/planned/go
 | `ball_punt.py` | The first approach: one ball-chase attempt (`behavior/ball_chase.py`) and its scorer (hit, missed, never found, pushed away, could not line up, ...) |
 | `judge.py` | The shared judgement: a record per setting and value judged by its own stage, failures vote a direction, one setting at a time, the next value by Thompson sampling one step at most, the best-supported value kept; ask knobs become suggestions. A made-up world in the tests checks it finds a known best |
 | `overrides.py` | The user's pins, limits and undone values (`g2goal pin / limit / undo / forget`), per scope (everywhere, a floor, an attachment) |
-| `journal.py` | `goal_journal.jsonl`, `goal_state.json`, conditions (attachment + floor), the lessons saved as memory facts |
+| `journal.py` | `goal_journal.jsonl`, `goal_state.json`, conditions (attachment + floor + hardware epoch) and the nearest other conditions to start from, the lessons saved as memory facts |
+| `observe.py` | A plain "G2, punt" attempt scored and added to the ball goal's records; nothing is changed |
 | `runner.py` | `GoalSession`: budget, battery before every attempt, attempt, score, judge, record; a fall ends it |
 | `suggestions.py` | Says the ask-knob suggestions when the voice service starts; confirm / cancel / review (silence = review) |
 | `report.py` | The HTML report and the text history |

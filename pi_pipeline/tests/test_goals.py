@@ -627,3 +627,129 @@ def test_pin_limit_undo_and_forget_from_the_command_line(tmp_path, capsys):
         main(["pin", "ball_punt", "punt_max_in", "99"])                                           # out of its range: refused, nothing changed
     with pytest.raises(SystemExit):
         main(["limit", "ball_punt", "search_order", "1", "2"])                                    # a choice setting has no range
+
+
+# ------------------------------------------------------------------------------------------------- learning upgrades (2026-10-31)
+
+def _shift_world(a, best, rng):
+    if rng.random() < max(0.05, 0.8 - 0.15 * abs(a - best) / 0.25):
+        return Outcome("hit", 0.9, True, "hit", stages={"punch": 0.9})
+    code = "missed" if a > best else ("never_punted" if a < best else rng.choice(["missed", "never_punted"]))
+    if rng.random() < 0.1:
+        code = "never_punted" if code == "missed" else "missed"
+    return Outcome(code, 0.2, False, code, stages={"punch": 0.2} if code == "missed" else {})
+
+
+def test_after_a_hardware_change_fresh_records_follow_the_new_best_in_a_made_up_world():
+    """The best moves from 3 to 3.75 in with the hardware (ARM2's parts, say). New records, starting from the old best values, follow it; old records would hold him."""
+    rng = random.Random(11)
+    near_new = 0
+    for _ in range(300):
+        j = Judge(PK, PDIAG, rng=rng, stage_of={"punt_max_in": "punch"})
+        base = {"punt_max_in": 4.0}
+        j.begin_session(base)
+        for n in range(1, 31):
+            a = j.settings(base)["punt_max_in"]
+            j.update(n, _shift_world(a, 3.0, rng), {"punt_max_in": a})
+        old_best = j.best("punt_max_in", 4.0)
+        k = Judge(PK, PDIAG, rng=rng, stage_of={"punt_max_in": "punch"})            # the new hardware epoch: no records
+        k.begin_session(base, prior={"punt_max_in": old_best}, prior_from="hw=old")
+        assert k.settings(base)["punt_max_in"] == old_best and k.started_from == "hw=old"
+        for n in range(1, 31):
+            a = k.settings(base)["punt_max_in"]
+            k.update(n, _shift_world(a, 3.75, rng), {"punt_max_in": a})
+        near_new += abs(k.best("punt_max_in", old_best) - 3.75) <= 0.26
+    assert near_new / 300 >= 0.55, near_new / 300
+
+
+def test_a_new_floor_or_hardware_starts_from_his_best_elsewhere(tmp_path):
+    st = State(str(tmp_path / "s.json"))
+    st.for_goal("g", "attachment=arm|floor=hardwood|hw=hw-old").update(count=8, updated=100.0, values={"a": {"2.0": {"v": 2.0, "n": 5, "hits": 4, "sum": 3.8, "down": 0, "up": 0, "last": 8, "recent": [1, 1]},
+                                                                                                  "3.0": {"v": 3.0, "n": 3, "hits": 0, "sum": 0.6, "down": 3, "up": 0, "last": 3, "recent": [0]}}})
+    st.save()
+    ap = FakeApproach([oc("hit", 0.9, True)])
+    g = Goal("g", "T", "fake", attempts=1, rest_between_s=0)
+    s = GoalSession(g, ap, journal=Journal(str(tmp_path / "j.jsonl")), state=State(str(tmp_path / "s.json")), say=lambda m: None,
+                    conditions={"attachment": "arm", "floor": "hardwood", "hw": "hw-new"}, sleep=lambda s: None, save_memory=False)
+    s.run()
+    assert ap.ran[0]["a"] == 2.0                                                           # his best under the old hardware, not your 3.0
+    start = Journal(str(tmp_path / "j.jsonl")).sessions("g")[0]["start"]
+    assert start["started_from"] == "attachment=arm|floor=hardwood|hw=hw-old"
+    new = State(str(tmp_path / "s.json")).data["g"]["attachment=arm|floor=hardwood|hw=hw-new"]
+    assert new["values"]["a"]["2.0"]["n"] == 1                                            # fresh records: the old ones did not come along
+
+
+def test_a_settled_setting_is_left_alone_and_the_focus_moves_on():
+    j = J()
+    j.begin_session(BASE)
+    recs = {"2.0": (4, 4), "3.0": (6, 6), "4.0": (4, 0)}
+    for key, (n, h) in recs.items():
+        j.state["values"].setdefault("a", {})[key] = {"v": float(key), "n": n, "hits": h, "sum": h * 0.9, "down": 0, "up": 0, "last": 1, "recent": [1] * min(h, 6)}
+    j.state["values"]["a"]["2.0"]["hits"] = 1
+    j.state["current"]["a"] = 3.0
+    d = j.update(20, oc("bad", 0.2), dict(BASE, a=3.0))                                   # "bad" points at a, but a has settled at 3.0
+    assert "a" in j.state["settled"] and any(x.action == "kept" and "settled" in x.note for x in d) and j.state["focus"] != "a"
+    assert j.settings(BASE)["a"] == 3.0
+    for n in range(21, 25):                                                                # its best starts failing: no longer settled
+        j.update(n, oc("bad", 0.2), dict(BASE, a=3.0))
+    assert "a" not in j.state["settled"]
+
+
+def test_a_plain_punt_adds_to_the_records_without_changing_anything(tmp_path):
+    from pi_pipeline.goals.observe import plain_punt
+    st = State(str(tmp_path / "s.json"))
+    tr = [{"kind": "look", "ball": {"distance_in": 12, "bearing_deg": 0}, "t": 1}, {"kind": "act", "act": "punt", "at": (3.0, 0.0)},
+          {"kind": "after_punt", "ball": {"distance_in": 20.0, "bearing_deg": 0.0}}]
+    settings = dict(ball_punt.BallPunt().base_settings())
+    cond = {"attachment": "arm", "floor": "hardwood", "hw": "hw-x"}
+    said = plain_punt(tr, "punted", 20.0, settings, 77, state=st, journal=Journal(str(tmp_path / "j.jsonl")), conditions=cond)
+    assert said and "went 17 in" in said
+    rec = State(str(tmp_path / "s.json")).data["ball_punt"]["attachment=arm|floor=hardwood|hw=hw-x"]
+    assert rec["count"] == 1 and rec["values"]["punt_max_in"]["4.0"]["hits"] == 1 and not rec.get("current", {}).get("punt_max_in", 4.0) != 4.0
+    rows = Journal(str(tmp_path / "j.jsonl")).sessions("ball_punt")
+    assert rows[0]["start"]["mode"] == "plain punt" and rows[0]["attempts"][0]["pack_pct"] == 77
+    assert plain_punt([], "punted", 1.0, {}, state=None, journal=None, conditions=cond, goal_id="nope") is None      # never raises
+
+
+def test_a_wrong_verdict_takes_the_attempt_out_and_right_puts_it_back(tmp_path, capsys):
+    from pi_pipeline.goals.__main__ import main
+    from pi_pipeline.goals.observe import plain_punt
+    cond = {"attachment": "arm", "floor": "hardwood", "hw": "hw-x"}
+    tr = [{"kind": "act", "act": "punt", "at": (3.0, 0.0)}, {"kind": "after_punt", "ball": None}]
+    settings = dict(ball_punt.BallPunt().base_settings())
+    plain_punt(tr, "punted", 20.0, settings, state=State(str(tmp_path / "state.json")), journal=Journal(str(tmp_path / "journal.jsonl")), conditions=cond)
+    key = "attachment=arm|floor=hardwood|hw=hw-x"
+    assert State(str(tmp_path / "state.json")).data["ball_punt"][key]["values"]["punt_max_in"]["4.0"]["hits"] == 1     # "went out of sight" counted as a hit
+    main(["verdict", "ball_punt", "1", "wrong", "--note", "it was under the claw"])
+    assert "taken out" in capsys.readouterr().out
+    rec = State(str(tmp_path / "state.json")).data["ball_punt"][key]
+    assert rec["values"]["punt_max_in"]["4.0"]["n"] == 0 and rec["count"] == 0
+    main(["verdict", "ball_punt", "1", "wrong"])                                                # twice: nothing more is taken out
+    assert State(str(tmp_path / "state.json")).data["ball_punt"][key]["values"]["punt_max_in"]["4.0"]["n"] == 0
+    main(["verdict", "ball_punt", "1", "right"])
+    assert State(str(tmp_path / "state.json")).data["ball_punt"][key]["values"]["punt_max_in"]["4.0"]["n"] == 1
+    from pi_pipeline.goals.report import goal_page
+    page = goal_page("ball_punt", Journal(str(tmp_path / "journal.jsonl")), State(str(tmp_path / "state.json")))
+    assert "your verdicts" in page and "1 right, 0 wrong" in page and "Plain punt" in page
+
+
+def test_the_pace_book_starts_new_hardware_from_the_nearest_measured_values(tmp_path):
+    from pi_pipeline.behavior.chase_pace import MIN_SAMPLES, PaceBook
+    p = str(tmp_path / "pace.json")
+    old = PaceBook("attachment=arm|floor=hardwood|hw=a", p)
+    for _ in range(5):
+        old.record_walk(reading(14, 0), reading(6, 0), 2.0)
+    new = PaceBook("attachment=arm|floor=hardwood|hw=b", p, fallback=["attachment=arm|floor=hardwood|hw=a"])
+    assert abs(new.walk_in_s() - old.walk_in_s()) < 1e-6 and new.data["walk_in_s"]["n"] == MIN_SAMPLES and new.data["walk_in_s"]["from"].endswith("hw=a")
+    new.record_walk(reading(14, 0), reading(12, 0), 2.0)                                   # its own samples take over
+    assert new.walk_in_s() < old.walk_in_s()
+
+
+def test_the_conditions_include_the_hardware_epoch():
+    from pi_pipeline.goals.journal import current_conditions, prior_conditions
+    c = current_conditions()
+    assert set(c) >= {"attachment", "floor", "hw"}
+    gs = {"attachment=arm|floor=tile|hw=h2": {"count": 3, "updated": 5}, "attachment=arm|floor=hardwood|hw=h1": {"count": 3, "updated": 1},
+          "attachment=arm|floor=hardwood|hw=h0": {"count": 3, "updated": 9}, "attachment=none|floor=hardwood|hw=h2": {"count": 9}}
+    order = prior_conditions(gs, {"attachment": "arm", "floor": "hardwood", "hw": "h2"})
+    assert order == ["attachment=arm|floor=hardwood|hw=h0", "attachment=arm|floor=hardwood|hw=h1", "attachment=arm|floor=tile|hw=h2"]

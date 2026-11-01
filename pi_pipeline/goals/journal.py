@@ -29,8 +29,35 @@ def conditions_key(cond: dict) -> str:
     return "|".join(f"{k}={cond[k]}" for k in sorted(cond))
 
 
+def current_hw() -> str:
+    """The hardware epoch in force now (telemetry/hardware_epochs.json): a hardware change starts fresh records (user-approved 2026-10-31)."""
+    try:
+        from ..telemetry.epochs import epoch_at
+        e = epoch_at()
+        return e["id"] if e else "unknown"
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def parse_key(cond_key: str) -> dict:
+    return dict(p.split("=", 1) for p in cond_key.split("|") if "=" in p)
+
+
+def prior_conditions(goal_state: dict, cond: dict) -> list[str]:
+    """Other conditions of the same goal to start a new one from, best first: the same attachment and floor under earlier hardware (newest first), then the same attachment
+    and hardware on another floor, then the same attachment anywhere. Only keys with attempts."""
+    rows = []
+    for key, st in (goal_state or {}).items():
+        c = parse_key(key)
+        if key == conditions_key(cond) or not st.get("count") or c.get("attachment") != cond.get("attachment"):
+            continue
+        rank = 0 if c.get("floor") == cond.get("floor") else (1 if c.get("hw") == cond.get("hw") else 2)
+        rows.append((rank, -float(st.get("updated", 0)), key))
+    return [k for _r, _u, k in sorted(rows)]
+
+
 def current_conditions(extra: dict | None = None) -> dict:
-    """The shared conditions (attachment, floor) plus the approach's own."""
+    """The shared conditions (attachment, floor, hardware epoch) plus the approach's own."""
     cond = {}
     try:
         from ..attachments import current
@@ -42,6 +69,7 @@ def current_conditions(extra: dict | None = None) -> dict:
         cond["floor"] = get_surface()
     except Exception:  # noqa: BLE001
         cond["floor"] = "unknown"
+    cond["hw"] = current_hw()
     cond.update(extra or {})
     return cond
 
