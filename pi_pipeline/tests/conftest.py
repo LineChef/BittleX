@@ -1,11 +1,25 @@
 """Shared test fixtures. No network, no audio, no API key."""
 from __future__ import annotations
 
+import atexit
+import os
+import shutil
+import tempfile
 import types
 
-import pytest
+# Before anything from pi_pipeline is imported (config.py loads the repo .env at import, without overriding what is already set): the whole run gets its own home folder
+# and memory paths, so no test can write to the developer's real data. 2026-11-01: a run wrote a fake exploration into ~/Desktop/G2Memory/memory/experiences.jsonl,
+# touched the facts' recall times in g2_memory.db (the .env points G2_MEMORY_DB / G2_EXPERIENCES there) and rewrote ~/.local/share/g2/goal_state.json.
+_SANDBOX = tempfile.mkdtemp(prefix="g2_tests_")
+atexit.register(shutil.rmtree, _SANDBOX, True)
+os.environ["HOME"] = os.path.join(_SANDBOX, "home")
+os.makedirs(os.environ["HOME"], exist_ok=True)
+for _key, _name in (("G2_MEMORY_DB", "g2_memory.db"), ("G2_MEMORY_CALL_LOG", "memory_calls.jsonl"), ("G2_EXPERIENCES", "experiences.jsonl")):
+    os.environ[_key] = os.path.join(_SANDBOX, _name)
 
-from pi_pipeline.config import Settings
+import pytest  # noqa: E402
+
+from pi_pipeline.config import Settings  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
