@@ -403,3 +403,18 @@ def test_set_value_checks_then_writes_one_setting(tmp_path):
             continue
         raise AssertionError((name, text))
     assert json.load(open(p))["punt_max_in"] == 3.5                                                                                # a rejected value changes nothing
+
+
+def test_a_search_turn_is_short_then_he_looks_again():
+    p = bc.ChasePlanner()
+    p.claw_ok = False
+    acts = [p.decide(None) for _ in range(bc.LOST_LOOKS + 2)]
+    turns = [a for a in acts if a.kind == "search_turn"]
+    assert turns and all(a.seconds <= bc.SEARCH_MOVE_MAX_S + 1e-9 for a in turns)
+
+
+def test_no_wall_turn_with_the_ball_in_reach():
+    p = bc.ChasePlanner()
+    ball = bf.find_ball(picture([disc(120, 110, 70)]))               # about 2.4 in, straight ahead
+    assert ball is not None and ball.distance_in <= bc.PUNT_MAX_IN
+    assert p.decide(ball, bc.WallSeen(6.0, "left")).kind == "punt"

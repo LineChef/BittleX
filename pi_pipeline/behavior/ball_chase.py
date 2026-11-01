@@ -45,6 +45,7 @@ NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2
 WALK_MAX_S = 3.0               # one walk step: then look again
 SEARCH_STEP_DEG = 20.0          # (was 35: a wrong turn away from a ball that was only missed once cost 6 s and the ball)
 SEARCH_WALK = False            # walk on blind after a full circle without the ball (off: only on a big floor, `--search-walk`)
+AFTER_PUNT_SETTLE_S = 1.0      # after the punch, before the picture that says where the ball went
 LOST_LOOKS = 3                 # real misses in a row before searching starts; a missing picture is not a miss
 SEARCH_STEPS_PER_CIRCLE = 10
 MAX_TURN_DEG = 35.0
@@ -69,6 +70,7 @@ SEARCH_ORDERS = {
     "back_and_turn": ((), ("back", "turn")),
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
+SEARCH_MOVE_MAX_S = 2.0        # the longest search turn before the next picture (user, 2026-11-01: a few steps, then look again)
 SCAN_TURN_DEG = 60.0           # a turn step between two claw looks (a claw look covers about 2 x CLAW_PAN_DEG plus the camera's own view)
 
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
@@ -220,7 +222,9 @@ class ChasePlanner:
                 return Action("search_walk", 2.0, why="a full circle without the ball: walk on and search again")
             if self.search_steps > per_circle:
                 self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
-            return Action("search_turn", abs(step) / self._turn_rate(side, False), step * side, f"searching {'right' if side > 0 else 'left'}")
+            rate = self._turn_rate(side, False)
+            secs = min(abs(step) / rate, SEARCH_MOVE_MAX_S)              # a few steps, then look again (user, 2026-11-01: a 60 deg step at 6 deg/s was 10 s of turning)
+            return Action("search_turn", secs, secs * rate * side, f"searching {'right' if side > 0 else 'left'}")
         return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
     def _wall_turn(self, wall: "WallSeen", why: str) -> Action:
@@ -247,7 +251,8 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
-        if wall is not None and wall.nearest_in is not None:                 # walls rank above the punt
+        if wall is not None and wall.nearest_in is not None and ball.distance_in > PUNT_MAX_IN:    # walls rank above the punt; but with the ball in reach the punch (and lining up)
+            # goes no closer to the wall, and the wall reading is not calibrated for the claw camera (user, 2026-11-01: he turned away from a ball right in front of him)
             behind = wall.near_ball_in
             if behind is not None and ball.distance_in < behind and behind - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
                 self.by_wall += 1
@@ -670,8 +675,19 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             sleep(1.5)                                    # the ball is rolling: look after it stops
             if state != "fell" and max_punts is not None and punts >= max_punts:
                 if after_punt_look:
+                    # 2026-11-01: the picture taken right after the punch showed the ball where it had been (2.4 in, -6 deg) and the punt was scored a miss, while the very next
+                    # look from the same spot found no ball (the user saw it hit). Let him settle, throw one frame away (it can be from before the punch), and when the reading is
+                    # still where the ball was punched from, look once more before believing it.
+                    sleep(AFTER_PUNT_SETTLE_S)
+                    camera.look()
                     jpeg = camera.look()
                     after = find_ball(jpeg) if jpeg else None
+                    at = planner.punt_log[-1] if planner.punt_log else None
+                    if after is not None and at and at[0] is not None and abs(after.distance_in - at[0]) < 1.5 and abs(after.bearing_deg - at[1]) < 8.0:
+                        sleep(1.0)
+                        jpeg2 = camera.look()
+                        if jpeg2:
+                            jpeg, after = jpeg2, find_ball(jpeg2)
                     if after is None and planner.claw_ok:
                         _st, after = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2), after_punt=True)
                         if _st == "fell":
