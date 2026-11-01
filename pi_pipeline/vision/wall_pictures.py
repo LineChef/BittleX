@@ -175,8 +175,9 @@ def shot(args) -> int:
     cam = None
     try:
         lk.send("gP", read_reply=False, settle=0.0)                  # the 5 Hz IMU print the stillness wait reads
-        lk.send("kup", read_reply=False, settle=0.0)                 # the eased stand-up
-        time.sleep(1.5)
+        if not args.stay:
+            lk.send("kup", read_reply=False, settle=0.0)             # the eased stand-up
+            time.sleep(1.5)
         still = StillnessWaiter(lk.poll_imu).wait(timeout_s=6.0)
         cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump,
                                 exposure_check=True, meter_every_s=0.0, idle_close_s=0)
@@ -205,8 +206,9 @@ def shot(args) -> int:
                 cam.close()
         except Exception:  # noqa: BLE001
             pass
-        lk.send("d", read_reply=False, settle=0.0)                   # lie down, servos relaxed
-        time.sleep(0.5)
+        if not args.stay:
+            lk.send("d", read_reply=False, settle=0.0)               # lie down, servos relaxed
+            time.sleep(0.5)
         lk.send("gp", read_reply=False, settle=0.0)
         lk.close()
 
@@ -222,6 +224,7 @@ def main(argv=None) -> int:
     s.add_argument("--note", default="")
     s.add_argument("--set", default="exposure-checked")
     s.add_argument("--force", action="store_true")
+    s.add_argument("--stay", action="store_true", help="G2 is already standing and stays standing: no stand-up before, no lying down after (faster; the person repositions him between pictures)")
     sub.add_parser("list")
     d = sub.add_parser("delete")
     d.add_argument("numbers", nargs="+", type=int)
