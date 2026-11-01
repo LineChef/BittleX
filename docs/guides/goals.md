@@ -18,8 +18,8 @@ in front of the claw, or at least 2 in farther away, counts as punted; still at 
 
 | | |
 |---|---|
-| Start | **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt"). He says "Starting the goal: punt the ball.", the voice service steps aside, the session runs. Without voice: `g2goal run ball_punt` |
-| Stop | **"emergency stop"** is not heard during a session (the voice service is stopped); use `g2goal stop` (he finishes the current move and rests) or `g2stop` |
+| Start | **"G2, ball goal"** (also "punt goal", "start the ball goal", "goal attempt"). He says "Starting the goal: punt the ball.", the voice service steps aside, the session runs. Without voice: `g2ball` (same as `g2goal run ball_punt`) |
+| Stop | **"emergency stop"** is not heard during a session (the voice service is stopped); use `g2ballstop` (or `g2goal stop`; he finishes the current move and rests) or `g2stop` |
 | It ends by itself | after 10 attempts, 20 minutes, a pack under 30%, or a fall (with the arm, fall recovery is off: right him by hand) |
 
 He stands still for 5 s between attempts and rests at the end. Short cues: "target acquired", "searching", "punting", then "Got it." or "Missed."

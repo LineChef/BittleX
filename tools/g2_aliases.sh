@@ -417,6 +417,10 @@ g2goal() {
     *) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals $(printf '%q ' "$@")" ;;      # quoted: a --scope like attachment=arm|floor=tile is not a pipe
   esac
 }
+# g2ball  -- start the ball goal yourself (the same as saying "G2, ball goal"): up to 10 punt attempts; stops the voice service on the Pi, stands G2 up from rest, rests him at the end, starts the voice service and copies the goal data to the Mac. G2 in rest on the floor, the ball in front of him, your hands near.
+# g2ballstop  -- stop it: the attempt ends at its next step (a second or two), G2 rests, the voice service comes back. If it is still moving after that, say "emergency stop" or run app --halt.
+g2ball() { g2goal run ball_punt; }
+g2ballstop() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "touch ~/.local/share/g2/goal_stop ~/.local/share/g2/ball_chase_stop; sudo systemctl stop g2-goal 2>/dev/null; true" && echo "stop sent: the attempt ends at its next step"; }
 # g2deploy [--once|--cancel|--max-hours N|--replace]  -- push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once;
 #   --once deploys now if the Pi answers. It refuses while an exploration or a walk is running. Never deploy while testing.
 g2deploy() { bash "$G2_ROOT/tools/g2_deploy_when_online.sh" "$@"; }
