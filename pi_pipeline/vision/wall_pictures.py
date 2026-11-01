@@ -205,6 +205,8 @@ def shot(args) -> int:
             shutter.play(wait=True)                                    # you hear the picture was taken (user, 2026-11-01: "I didn't hear a beep")
         except Exception:  # noqa: BLE001
             pass
+        if args.label == "look" and args.inches is None:
+            print("NOTE: saved with the default label 'look' and no distance. For a calibration picture run e.g. `g2look wall_straight 12`.")
         print(f"saved {path.name}: {args.label}{at}; still={still} retaken={retaken} exposure={info['exposure']}")
         return 0
     finally:
