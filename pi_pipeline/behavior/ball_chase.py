@@ -797,6 +797,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             if ball is not None and act.kind == "walk":
                 last_move = ("walk", act.seconds, 0.0, ball)
         elif act.kind in ("back", "search_back"):
+            if announce is not None:
+                announce("backing up")                    # he says it when he picks the back-up (user, 2026-11-01)
             state = robot.back(act.seconds)
         elif act.kind == "punt":
             if announce is not None:
