@@ -48,7 +48,7 @@ def calibrate(robot, camera, *, say=print, sleep=time.sleep) -> str | None:
 
 
 def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock=time.monotonic, sag_deg: float = 8.0) -> dict:
-    """Stand still and watch (no arm move, no picture): the IMU pitch and roll every 0.25 s and the pack voltage every 2 s for `seconds`, to see whether the legs relax by
+    """Stand still and watch (no arm move, no picture): the IMU pitch and roll every 0.25 s and the pack voltage every second for `seconds`, to see whether the legs relax by
     themselves and when (2026-11-01: his legs let go about 10 s after the stand-up). A sag shows as pitch or roll moving more than `sag_deg` from where he stood in the
     first 2 s. Returns {"sag_at_s": seconds or None, "min_volts": ..., "max_dev_deg": ...}. Moves nothing."""
     import math
@@ -86,7 +86,7 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
                     say(f"  {t:4.1f} s: the body moved {dev:.0f} deg from where he stood (pitch {pitch[-1]:+.1f}, roll {roll[-1]:+.1f}): the legs gave way")
             if t >= next_v:
                 v = battery.read_voltage(link, attempts=1)
-                next_v = t + 2.0
+                next_v = t + 1.0                                   # once a second: a short dip under load is what we are looking for
                 if v is not None:
                     min_v = v if min_v is None else min(min_v, v)
             if int(t) != last_print and pitch:
