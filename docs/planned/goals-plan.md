@@ -102,12 +102,39 @@ Two layers, both plain code with tests:
 
    The table is data (`DIAGNOSIS` in `goals/ball_punt.py`); the scores are 0 to 1, a hit higher the farther the ball went and the sooner it happened.
 
-2. **Evidence: a change is kept only if it helps.** One setting changes at a time, by one step. A change is judged over the next 2 to 3 attempts against the attempts before it.
-   If the score is no better it is undone and logged ("tried punching from 3.5 in: 1 of 3, back to 4 in"). One attempt is never enough to judge a change, except a fall, which
-   marks the setting in use as suspect. Results are counted per attachment and floor, so what works on hardwood is not carried to tile.
+2. **Evidence: every attempt counts** (rebuilt 2026-10-31). The first version judged a change on 2 or 3 attempts against the 3 before it and then banned the step it undid; in a
+   made-up world with a known best value (hit chance peaking at punching from 3 in, starting at 4 in, 2,000 runs) it ended within one step of the best only 14% of the time after
+   30 attempts: it got stuck, not random. The judge now:
+   - keeps a record per setting and value (attempts, hits, score), per attachment and floor, across sessions;
+   - judges each setting by its own stage: search settings by how fast he found the ball, walking-up settings by whether he got close without pushing it, lining-up settings
+     by whether he punched lined up, punch settings only on attempts that punched (`STAGE_OF` in `goals/ball_punt.py`);
+   - counts each failure as a vote for a direction at the value in use ("missed" votes for punching from closer);
+   - works on one setting at a time, the one recent failures point at most (the focus); the others stay at their best-supported value;
+   - picks the focus setting's next value among the current one and the neighbour the votes point to, by drawing a hit rate from each one's record (Thompson sampling): a value
+     with a good record is chosen most often, an untried neighbour still gets a chance, and a move is never more than one step;
+   - keeps, and starts the next session from, the value with the best record over at least 2 attempts, not the last one tried;
+   - bans a value he fell trying for 30 attempts.
 
-Ten attempts a session is a small sample. The judgement is deliberately slow (one step at a time, several attempts per verdict), and the report shows how many attempts back each
-conclusion, so a lucky streak reads as a lucky streak.
+   In the same made-up world it ends within one step of the best in 90% of runs after 30 attempts (95% after 60); in a noisier one (60% peak, 25% misread misses) 62% after 30
+   and 77% after 60. A copy of that world is a permanent test (`tests/test_goals.py`: at least 85% within one step after 30 attempts). Expect about 3 sessions per setting to
+   settle on a real floor, which is noisier than the made-up world.
+
+The report shows each value's record ("3 in: 7 of 9 good"), so a value backed by evidence and one still settling look different.
+
+## Overrides: when he learns something bad
+
+All from the Mac (`g2goal`, `goals/overrides.py`, `~/.local/share/g2/goal_overrides.json`); `--floor tile` or `--scope attachment=arm|floor=tile` narrows one, the default is
+every attachment and floor. Who wins: a pin > a limit > what he learned > the user's own settings file.
+
+| Command | What it does |
+|---|---|
+| `pin GOAL KNOB VALUE` / `unpin` | holds a setting at the user's value; he cannot change it |
+| `limit GOAL KNOB LO HI` / `unlimit` | he keeps learning it, only inside the user's range |
+| `undo GOAL KNOB` / `unban GOAL KNOB VALUE` | bans his best value for it (for good, until unbanned); he goes to his next best |
+| `forget GOAL KNOB` | drops his record for one setting: back to the user's value, he may learn it again |
+| `overrides GOAL` | lists them |
+
+Every override goes into the journal and the report ("Your overrides").
 
 ## Local reasoning or a Claude call
 

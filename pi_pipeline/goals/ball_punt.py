@@ -55,6 +55,15 @@ DIAGNOSIS = {
     "never_found": [("search_order", "other"), ("claw_look_lift_deg", +1), ("claw_look_pan_deg", +1), ("scan_turn_deg", -1), ("lost_looks", -1)],
 }
 
+# which stage judges each free knob (a search setting is never blamed for a missed punch)
+STAGE_OF = {
+    "search_order": "search", "claw_look_pan_deg": "search", "claw_look_lift_deg": "search", "scan_turn_deg": "search", "lost_looks": "search",
+    "walk_aim_in": "approach", "nudge_max_in": "approach", "nudge_step_s": "approach", "nudges_before_punt": "approach",
+    "punt_align_deg": "align", "align_pulse_min_s": "align", "align_tries": "align", "when_misaligned": "align",
+    "punt_max_in": "punch", "when_vanished": "punch",
+}
+SEARCH_MOVES = ("claw_look", "search_turn", "search_back", "search_walk")
+
 HIT_IN = 8.0                   # the ball moved at least this far: a hit
 WEAK_IN = 3.0                  # less than this: a miss
 PUSH_IN = 4.0                  # the ball farther by this much right after a walk toward it: he pushed it
@@ -102,6 +111,7 @@ def _fmt_s(x: float) -> str:
 class BallPunt:
     name = "ball_punt"
     diagnosis = DIAGNOSIS
+    stage_of = STAGE_OF
 
     def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None):
         self.robot, self.camera, self.saver, self._link, self.pace = robot, camera, saver, link, pace
@@ -195,6 +205,47 @@ class BallPunt:
 
     # ---------------------------------------------------------------------------------------------------- scoring
     def score(self, result: AttemptResult, settings: dict) -> Outcome:
+        o = self._score(result, settings)
+        if o.counted:
+            o.stages = self.stages(result, settings, o)
+        return o
+
+    def stages(self, result: AttemptResult, settings: dict, o: Outcome) -> dict:
+        """A score per stage the attempt reached. search: only when he had to search (or never found it), 1 = found at once, 0.5 = at half the time limit, 0 = never;
+        approach: once found, 1 = got close (minus 0.4 for pushing it away), 0 = never got close; align: once close, 1 = punched lined up, 0 = could not line up or punched
+        off line; punch: once punted, the outcome's score."""
+        tr = result.trace
+        nums = o.numbers
+        max_s = float(settings.get("max_seconds", 75.0)) or 75.0
+        out = {}
+        first = nums.get("first_seen_s")
+        searched = False
+        for e in tr:
+            if (e.get("kind") == "look" and e.get("ball")) or e.get("kind") == "claw_seen":
+                break
+            if e.get("kind") == "act" and e.get("act") in SEARCH_MOVES:
+                searched = True
+                break
+        if first is None:
+            out["search"] = 0.0
+            return out
+        if searched:
+            out["search"] = round(max(0.0, 1.0 - float(first) / max_s), 3)
+        punted = result.ended == "punted"
+        close = punted or (nums.get("closest_in") is not None and nums["closest_in"] <= _chase().NUDGE_MAX_IN)
+        out["approach"] = (1.0 - (0.4 if nums.get("pushes") else 0.0)) if close else 0.0
+        if close:
+            tol = float(settings.get("punt_align_deg", 12.0))
+            if punted:
+                b = nums.get("punt_bearing_deg")
+                out["align"] = 1.0 if (b is None or abs(b) <= tol) else 0.0
+            else:
+                out["align"] = 0.0 if o.code.startswith("align") or o.code == "never_punted" else 0.5
+        if punted:
+            out["punch"] = float(o.score)
+        return out
+
+    def _score(self, result: AttemptResult, settings: dict) -> Outcome:
         tr = result.trace
         max_s = float(settings.get("max_seconds", 75.0)) or 75.0
         tfrac = min(1.0, result.seconds / max_s)

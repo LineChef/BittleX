@@ -20,6 +20,7 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("G2_GOAL_JOURNAL", str(tmp_path / "journal.jsonl"))
     monkeypatch.setenv("G2_GOAL_STATE", str(tmp_path / "state.json"))
     monkeypatch.setenv("G2_PUNT_SETTINGS", str(tmp_path / "punt_settings.json"))
+    monkeypatch.setenv("G2_GOAL_OVERRIDES", str(tmp_path / "overrides.json"))
     names = [n for n in dir(bc) if n.isupper()]
     keep = {n: getattr(bc, n) for n in names}
     yield
@@ -64,69 +65,131 @@ def test_goals_file_overrides_the_builtin_and_survives_a_bad_file(tmp_path):
 
 # ------------------------------------------------------------------------------------------------- the judge
 
+import random  # noqa: E402
+
 KN = [Knob("a", "float", lo=1.0, hi=5.0, step=1.0, label="a at"), Knob("b", "choice", options=("x", "y", "z")),
       Knob("c", "float", lo=0.0, hi=1.0, step=0.1, control="ask"), Knob("f", "float", lo=0.0, hi=9.0, step=1.0, control="fixed")]
 DIAG = {"bad": [("f", 1), ("a", -1)], "lost": [("b", "other")], "soft": [("c", -1)], "askfirst": [("c", -1), ("a", +1)]}
 BASE = {"a": 3.0, "b": "x", "c": 0.5, "f": 4.0}
 
 
-def oc(code, score, success=False):
-    return Outcome(code, score, success, code)
+def oc(code, score, success=False, stages=None):
+    return Outcome(code, score, success, code, stages=stages)
 
 
-def test_a_failure_starts_a_trial_of_the_first_free_knob_and_a_better_result_keeps_it():
-    j = Judge(KN, DIAG)
-    s = j.settings(BASE)
-    d = j.update(1, oc("bad", 0.2), s)
-    assert d[-1].action == "try" and d[-1].knob == "a" and d[-1].new == 2.0                 # the fixed knob is skipped
-    s = j.settings(BASE)
-    assert s["a"] == 2.0 and s["f"] == 4.0
-    assert j.update(2, oc("hit", 0.9, True), s)[0].action == "wait"
-    d = j.update(3, oc("hit", 0.8, True), s)
-    assert d[0].action == "kept" and "works better" in d[0].note and 1 in d[0].evidence and 3 in d[0].evidence
-    assert j.settings(BASE)["a"] == 2.0 and j.state["trial"] is None
+def J(state=None, **kw):
+    return Judge(KN, DIAG, state, rng=random.Random(0), **kw)
 
 
-def test_a_change_that_does_not_help_is_undone_and_not_tried_again_soon():
-    j = Judge(KN, DIAG)
-    s = j.settings(BASE)
-    j.update(1, oc("bad", 0.4), s)
-    s = j.settings(BASE)
-    j.update(2, oc("bad", 0.1), s)
-    d = j.update(3, oc("bad", 0.1), s)
-    assert d[0].action == "undo" and j.settings(BASE)["a"] == 3.0
-    assert d[-1].action == "none"                     # a = 2 was just undone, a = 3 - 1 is that same value: nothing else to try for "bad"
-    assert "a=2.0" in j.state["rejected"]
+def test_every_attempt_counts_for_the_value_in_use_and_failures_vote_a_direction():
+    j = J()
+    s = j.begin_session(BASE)
+    j.update(1, oc("bad", 0.2), s)
+    r = j.record("a", 3.0)
+    assert r["n"] == 1 and r["hits"] == 0 and r["down"] == 1 and j.state["focus"] == "a"            # the fixed knob f is skipped
+    nxt = j.settings(BASE)["a"]
+    assert nxt in (2.0, 3.0)                                                                          # only the current value or the neighbour the misses point to
+    assert j.settings(BASE)["f"] == 4.0 and j.settings(BASE)["c"] == 0.5
 
 
-def test_a_fall_during_a_trial_undoes_it_at_once():
-    j = Judge(KN, DIAG)
-    j.update(1, oc("bad", 0.2), j.settings(BASE))
-    d = j.update(2, Outcome("fell", 0.0, False, "I fell"), j.settings(BASE))
-    assert d[0].action == "undo" and "fell" in d[0].note and j.settings(BASE)["a"] == 3.0
+def test_he_keeps_the_best_supported_value_not_the_last_one_tried():
+    j = J()
+    j.begin_session(BASE)
+    for n, (a, ok) in enumerate([(3.0, False), (3.0, False), (2.0, True), (2.0, True), (2.0, False), (3.0, False)], 1):
+        j.update(n, oc("hit" if ok else "bad", 0.9 if ok else 0.2, ok), dict(BASE, a=a))
+    assert j.best("a", 3.0) == 2.0                                                                    # 2 of 3 at 2.0 beats 0 of 3 at 3.0
+    kept = j.finish(BASE, 6)
+    assert kept and kept[0].action == "kept" and kept[0].new == 2.0 and "2 of 3 good" in kept[0].note and "0 of 3" in kept[0].note
+    assert j.begin_session(BASE)["a"] == 2.0                                                          # the next session starts from it
 
 
-def test_success_keeps_everything_and_an_uncounted_attempt_is_ignored():
-    j = Judge(KN, DIAG)
-    assert j.update(1, oc("hit", 0.9, True), j.settings(BASE))[0].action == "keep"
-    assert j.update(2, Outcome("aborted", None, False, "stopped"), j.settings(BASE))[0].action == "not_counted" and j.state["count"] == 1
+def test_a_knob_is_judged_only_by_its_own_stage():
+    j = Judge(KN, DIAG, rng=random.Random(0), stage_of={"a": "punch", "b": "search"})
+    j.begin_session(BASE)
+    j.update(1, oc("lost", 0.0, stages={"search": 0.0}), BASE)                                       # never found: no punch, so nothing about a
+    assert j.record("a", 3.0) is None and j.record("b", "x")["n"] == 1
+    j.update(2, oc("hit", 0.9, True, stages={"search": 0.9, "punch": 0.9}), BASE)
+    assert j.record("a", 3.0)["hits"] == 1
 
 
-def test_an_ask_knob_is_never_changed_only_suggested_and_learned_values_never_override_ask_or_fixed():
-    j = Judge(KN, DIAG)
-    d = j.update(1, oc("soft", 0.3), j.settings(BASE))
-    assert d[-1].action == "suggest" and j.settings(BASE)["c"] == 0.5 and j.state["suggestions"]["c"]["new"] == 0.4
-    d = j.update(2, oc("askfirst", 0.3), j.settings(BASE))
-    assert d[-1].action == "try" and d[-1].knob == "a" and "yours to change" in d[-1].note        # the suggestion rides along, the free knob is tried
-    j.state["settings"].update(c=0.1, f=9.0)                                                         # even if the file were edited by hand
-    s = j.settings(BASE)
-    assert s["c"] == 0.5 and s["f"] == 4.0
+def test_a_fall_while_trying_a_value_bans_it_and_goes_back_to_the_best():
+    j = J()
+    j.begin_session(BASE)
+    for n in (1, 2):
+        j.update(n, oc("hit", 0.9, True), BASE)                                                        # a = 3 has a record
+    j.update(3, oc("bad", 0.2), BASE)
+    j.state["focus"] = "a"
+    d = j.update(4, Outcome("fell", 0.0, False, "I fell"), dict(BASE, a=2.0))
+    assert d[0].action == "undo" and j.settings(BASE)["a"] == 3.0 and j._banned("a", 2.0)
 
 
-def test_a_choice_knob_tries_an_untried_option_first():
-    j = Judge(KN, DIAG)
-    d = j.update(1, oc("lost", 0.0), j.settings(BASE))
-    assert d[-1].knob == "b" and d[-1].new == "y"
+def test_an_ask_knob_is_only_suggested_and_pins_limits_and_undos_hold():
+    j = J()
+    j.begin_session(BASE)
+    d = j.update(1, oc("soft", 0.3), BASE)
+    assert any(x.action == "suggest" for x in d) and j.settings(BASE)["c"] == 0.5 and j.state["suggestions"]["c"]["new"] == 0.4
+    j = J(overrides={"pins": {"a": 4.0}})
+    j.begin_session(BASE)
+    for n in range(1, 6):
+        j.update(n, oc("bad", 0.2), j.settings(BASE))
+    assert j.settings(BASE)["a"] == 4.0 and j.state["focus"] != "a"                                   # pinned: never explored
+    j = J(overrides={"limits": {"a": [3.0, 5.0]}})
+    j.begin_session(BASE)
+    for n in range(1, 12):
+        j.update(n, oc("bad", 0.2), j.settings(BASE))
+        assert j.settings(BASE)["a"] >= 3.0                                                           # his misses say lower, the limit says no
+    j = J(overrides={"banned": {"a": {"2.0": None}}})
+    j.begin_session(BASE)
+    for n in range(1, 12):
+        j.update(n, oc("bad", 0.2), j.settings(BASE))
+        assert j.settings(BASE)["a"] != 2.0
+
+
+def test_a_choice_knob_samples_among_its_options():
+    j = J()
+    j.begin_session(BASE)
+    seen = set()
+    for n in range(1, 12):
+        s = j.settings(BASE)
+        seen.add(s["b"])
+        j.update(n, oc("lost", 0.0), s)
+    assert seen >= {"x", "y"}
+
+
+def test_an_uncounted_attempt_is_ignored():
+    j = J()
+    j.begin_session(BASE)
+    assert j.update(1, Outcome("aborted", None, False, "stopped"), BASE)[0].action == "not_counted" and j.state["count"] == 0
+
+
+# the permanent check: a made-up world with a known best (hit chance peaks at punching from 3 in), 10% misread misses, starting at 4 in
+BEST_IN = 3.0
+PK = [Knob("punt_max_in", "float", lo=1.0, hi=10.0, step=0.25)]
+PDIAG = {"missed": [("punt_max_in", -1)], "never_punted": [("punt_max_in", +1)]}
+
+
+def _world_run(attempts, rng, peak=0.8, fall=0.15, wrong=0.1):
+    j = Judge(PK, PDIAG, rng=rng, stage_of={"punt_max_in": "punch"})
+    base = {"punt_max_in": 4.0}
+    j.begin_session(base)
+    for n in range(1, attempts + 1):
+        a = j.settings(base)["punt_max_in"]
+        if rng.random() < max(0.05, peak - fall * abs(a - BEST_IN) / 0.25):
+            j.update(n, Outcome("hit", 0.9, True, "hit", stages={"punch": 0.9}), {"punt_max_in": a})
+        else:
+            code = "missed" if a > BEST_IN else ("never_punted" if a < BEST_IN else rng.choice(["missed", "never_punted"]))
+            if rng.random() < wrong:
+                code = "never_punted" if code == "missed" else "missed"
+            j.update(n, Outcome(code, 0.2, False, code, stages={"punch": 0.2} if code == "missed" else {}), {"punt_max_in": a})
+    return j.best("punt_max_in", 4.0)
+
+
+def test_the_judge_finds_the_best_value_in_a_made_up_world():
+    rng = random.Random(7)
+    finals = [_world_run(30, rng) for _ in range(400)]
+    near = sum(abs(f - BEST_IN) <= 0.26 for f in finals) / len(finals)
+    far = sum(abs(f - BEST_IN) >= 0.74 for f in finals) / len(finals)
+    assert near >= 0.85 and far <= 0.08, (near, far)
 
 
 # ------------------------------------------------------------------------------------------------- the ball-punt scorer
@@ -309,6 +372,7 @@ def test_the_serial_robot_moves_only_the_arm_for_a_claw_look_within_its_limits()
 class FakeApproach:
     name = "fake"
     diagnosis = {"bad": [("a", -1)]}
+    stage_of = {}
 
     def __init__(self, outcomes, battery=None):
         self.outcomes, self.battery, self.ran, self.opened, self.closed = list(outcomes), battery or [], [], 0, 0
@@ -341,21 +405,34 @@ def _session(tmp_path, approach, attempts=4, **kw):
     return s, mem
 
 
-def test_a_session_changes_the_next_attempt_writes_everything_and_saves_lessons(tmp_path):
-    ap = FakeApproach([oc("bad", 0.2), oc("hit", 0.9, True), oc("hit", 0.8, True), oc("hit", 0.9, True)])
-    s, mem = _session(tmp_path, ap)
+def test_a_session_learns_writes_everything_and_saves_lessons(tmp_path):
+    ap = FakeApproach([oc("bad", 0.2)] * 3 + [oc("hit", 0.9, True)] * 5)
+    real_score = ap.score
+    ap.score = lambda result, settings: (oc("hit", 0.9, True) if settings["a"] <= 2.0 else oc("bad", 0.2)) if ap.outcomes and ap.outcomes.pop(0) else real_score(result, settings)
+    s, mem = _session(tmp_path, ap, attempts=8, rng=random.Random(3))
     out = s.run()
-    assert [r["a"] for r in ap.ran] == [3.0, 2.0, 2.0, 2.0]                                # the next attempt used what the first one taught
-    assert out["attempts"] == 4 and out["successes"] == 3 and ap.opened == 1 and ap.closed == 1
+    used = [r["a"] for r in ap.ran]
+    assert used[0] == 3.0 and 2.0 in used                                                       # misses at 3 sent him to try 2
+    assert out["attempts"] == 8 and ap.opened == 1 and ap.closed == 1
     rows = Journal(str(tmp_path / "j.jsonl")).sessions("g")
-    assert len(rows) == 1 and len(rows[0]["attempts"]) == 4 and rows[0]["end"]["why"] == "attempts"
-    assert any(d["action"] == "kept" for d in rows[0]["decisions"])
+    assert len(rows) == 1 and len(rows[0]["attempts"]) == 8 and rows[0]["end"]["why"] == "attempts"
+    assert any(d["action"] == "kept" and d["new"] == 2.0 for d in rows[0]["decisions"])
     st = json.load(open(tmp_path / "s.json"))
-    assert st["g"]["attachment=arm|floor=hardwood"]["settings"]["a"] == 2.0
+    assert st["g"]["attachment=arm|floor=hardwood"]["values"]["a"]["2.0"]["hits"] >= 2
     assert mem.facts and all(f[3] == "goal_lesson" and f[1] == 2 and not f[2] for f in mem.facts) and mem.facts[0][0].startswith("The test goal:")
-    s2, _ = _session(tmp_path, FakeApproach([oc("hit", 0.9, True)]), attempts=1)               # the next session starts from what he learned
+    s2, _ = _session(tmp_path, FakeApproach([oc("hit", 0.9, True)]), attempts=1)               # the next session starts from his best value
     s2.run()
     assert s2.approach.ran[0]["a"] == 2.0
+
+
+def test_the_users_overrides_reach_the_session(tmp_path, monkeypatch):
+    from pi_pipeline.goals import overrides as ovr
+    ovr.set_pin("g", "a", 5.0, "floor=hardwood")
+    ap = FakeApproach([oc("bad", 0.2)] * 3)
+    s, _ = _session(tmp_path, ap, attempts=3)
+    s.run()
+    assert [r["a"] for r in ap.ran] == [5.0, 5.0, 5.0]
+    assert ovr.for_conditions("g", "attachment=arm|floor=tile")["pins"] == {}                   # another floor: not pinned
 
 
 def test_a_fall_or_a_low_battery_ends_the_session(tmp_path):
@@ -429,15 +506,30 @@ def test_the_goal_unit_stops_voice_runs_the_session_and_always_rests_then_restar
     assert goal_launch.launch("ball_punt", platform="linux", run=lambda cmd, **kw: calls.append(cmd) or R(3)) is True and calls[-1][:2] == ["sudo", "-n"]
 
 
-def test_the_report_shows_sessions_changes_and_settings(tmp_path):
-    ap = FakeApproach([oc("bad", 0.2), oc("hit", 0.9, True), oc("hit", 0.8, True)])
-    s, _ = _session(tmp_path, ap, attempts=3)
-    s.goal = Goal("ball_punt", "Punt the ball", "ball_punt", attempts=3, rest_between_s=0)        # the page names the knobs through the real approach
-    s.run()
+class PuntLikeApproach(FakeApproach):
+    """A fake with the real punch-distance setting, so the report can name it through the real approach: hits only from 3.5 in or closer."""
+    diagnosis = {"missed": [("punt_max_in", -1)]}
+
+    def knobs(self): return [Knob("punt_max_in", "float", lo=1.0, hi=10.0, step=0.25, label="punching from", unit="in")]
+    def base_settings(self): return {"punt_max_in": 4.0}
+    def score(self, result, settings):
+        ok = settings["punt_max_in"] <= 3.5
+        return Outcome("hit" if ok else "missed", 0.9 if ok else 0.2, ok, "hit" if ok else "missed")
+
+
+def test_the_report_shows_the_record_what_he_kept_and_your_overrides(tmp_path):
+    from pi_pipeline.goals import overrides as ovr
     from pi_pipeline.goals.report import goal_page, text_history
+    g = Goal("ball_punt", "Punt the ball", "ball_punt", attempts=10, rest_between_s=0)
+    GoalSession(g, PuntLikeApproach([]), journal=Journal(str(tmp_path / "j.jsonl")), state=State(str(tmp_path / "s.json")), say=lambda m: None,
+                conditions={"attachment": "arm", "floor": "hardwood"}, sleep=lambda s: None, save_memory=False, rng=random.Random(1)).run()
+    ovr.set_limit("ball_punt", "punt_max_in", 2.5, 4.5)
+    Journal(str(tmp_path / "j.jsonl")).write("override", goal="ball_punt", action="limit", knob="punt_max_in", scope="all", detail="limited punt_max_in to 2.5 to 4.5 (all)")
     page = goal_page("ball_punt", Journal(str(tmp_path / "j.jsonl")), State(str(tmp_path / "s.json")))
-    assert "<svg" in page and "Every change and why" in page and "Sessions" in page and "prefers-color-scheme" in page
-    assert "keeping it" in text_history("ball_punt", Journal(str(tmp_path / "j.jsonl")))
+    assert "<svg" in page and "Sessions" in page and "prefers-color-scheme" in page
+    assert "The record behind each setting" in page and "of" in page and "What he kept" in page and "works best so far" in page
+    assert "Your overrides" in page and "limited punt_max_in to 2.5 to 4.5" in page
+    assert "Next:" in text_history("ball_punt", Journal(str(tmp_path / "j.jsonl"))) or "Same again" in text_history("ball_punt", Journal(str(tmp_path / "j.jsonl")))
 
 
 def test_the_new_punt_settings_are_checked_like_the_others(tmp_path):
@@ -493,7 +585,7 @@ def test_silence_keeps_it_for_review_and_it_is_not_asked_again_and_cancel_is_not
     st = _state_with_suggestion(tmp_path)
     suggestions.offer(lambda m: None, lambda t: "cancel", state=st, journal=Journal(str(tmp_path / "j.jsonl")))
     row = State(str(tmp_path / "state.json")).data["ball_punt"]["attachment=arm|floor=hardwood"]
-    assert not row["suggestions"] and "punch_lunge_s=0.1" in row["rejected"]
+    assert not row["suggestions"] and "0.1" in row["banned"]["punch_lunge_s"]
 
 
 def test_the_voice_service_says_the_suggestion_when_it_starts(tmp_path):
@@ -501,3 +593,37 @@ def test_the_voice_service_says_the_suggestion_when_it_starts(tmp_path):
     _state_with_suggestion(tmp_path)
     lp, w, stt, conv, tts = _loop(["review"])
     assert lp._offer_goal_suggestions() == 1 and "suggestion" in tts.said[0] and w.calls == 0          # no wake word needed for the answer
+
+
+# ------------------------------------------------------------------------------------------------- the user's overrides from g2goal
+
+def test_pin_limit_undo_and_forget_from_the_command_line(tmp_path, capsys):
+    from pi_pipeline.goals import overrides as ovr
+    from pi_pipeline.goals.__main__ import main
+    cond = "attachment=arm|floor=hardwood"
+    st = State(str(tmp_path / "state.json"))
+    st.for_goal("ball_punt", cond).update(count=6, values={"punt_max_in": {"3.5": {"v": 3.5, "n": 4, "hits": 4, "sum": 3.6, "down": 0, "up": 0, "last": 6},
+                                                                          "4.0": {"v": 4.0, "n": 2, "hits": 0, "sum": 0.4, "down": 2, "up": 0, "last": 2},
+                                                                          "3.25": {"v": 3.25, "n": 2, "hits": 1, "sum": 1.1, "down": 0, "up": 0, "last": 4}}})
+    st.save()
+    main(["pin", "ball_punt", "lost_looks", "4", "--floor", "tile"])
+    assert ovr.for_conditions("ball_punt", "attachment=arm|floor=tile")["pins"] == {"lost_looks": 4} and ovr.for_conditions("ball_punt", cond)["pins"] == {}
+    main(["unpin", "ball_punt", "lost_looks", "--floor", "tile"])
+    assert ovr.for_conditions("ball_punt", "attachment=arm|floor=tile")["pins"] == {}
+    main(["limit", "ball_punt", "punt_max_in", "4.5", "2.5"])
+    assert ovr.for_conditions("ball_punt", cond)["limits"]["punt_max_in"] == [2.5, 4.5]
+    main(["undo", "ball_punt", "punt_max_in"])
+    out = capsys.readouterr().out
+    assert "3.5 in banned" in out and "next best 3.25 in" in out and "3.5" in ovr.for_conditions("ball_punt", cond)["banned"]["punt_max_in"]
+    main(["forget", "ball_punt", "punt_max_in"])
+    assert "punt_max_in" not in State(str(tmp_path / "state.json")).data["ball_punt"][cond]["values"]
+    main(["overrides", "ball_punt"])
+    assert "limited punt_max_in" in capsys.readouterr().out
+    kinds = [r["action"] for r in Journal(str(tmp_path / "journal.jsonl")).read() if r["kind"] == "override"]
+    assert kinds == ["pin", "unpin", "limit", "undo", "forget"]
+    with pytest.raises(SystemExit):
+        main(["pin", "ball_punt", "nope", "1"])                                                    # an unknown setting is refused
+    with pytest.raises(SystemExit):
+        main(["pin", "ball_punt", "punt_max_in", "99"])                                           # out of its range: refused, nothing changed
+    with pytest.raises(SystemExit):
+        main(["limit", "ball_punt", "search_order", "1", "2"])                                    # a choice setting has no range

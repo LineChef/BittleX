@@ -31,7 +31,7 @@ th{color:var(--mut);font-weight:600}ul{padding-left:20px}li{margin:4px 0}details
 .tag{display:inline-block;font-size:12px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);color:var(--mut)}
 """
 
-ACTION_WORD = {"try": "trying", "kept": "kept", "undo": "undone", "suggest": "suggestion", "keep": "kept the same", "wait": "still trying", "none": "no change", "not_counted": "not counted"}
+ACTION_WORD = {"try": "trying", "kept": "kept", "undo": "undone", "suggest": "suggestion", "keep": "same again", "none": "no change", "not_counted": "not counted"}
 
 
 def _curve(sessions: list[dict]) -> str:
@@ -77,6 +77,8 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
     state = state or State()
     sessions = journal.sessions(goal_id)
     knobs = _knobs_for(goal) if goal else {}
+    from . import overrides as ovr
+    overrides_data = ovr.load()
     out = [f"<h1>{_e(title)}</h1><p class=mut>Goal <code>{_e(goal_id)}</code>: what G2 tried, what he changed and why. Built from the goal journal; nothing here is a Claude call.</p>"]
     attempts = [a for s in sessions for a in s["attempts"]]
     counted = [a for a in attempts if a["outcome"].get("score") is not None]
@@ -107,10 +109,31 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
             changed = start != now
             rows.append(f"<tr><td>{_e(name)}</td><td><span class=tag>{_e(k.control)}</span></td><td>{_e(k.show(start) if start is not None else '')}</td>"
                         f"<td>{'<b>' if changed else ''}{_e(k.show(now))}{'</b>' if changed else ''}{edge}</td></tr>")
-        tr = st.get("trial")
-        trial = f"<p>Trying now: <b>{_e(tr['knob'])}</b> {_e(tr['old'])} &rarr; {_e(tr['new'])} ({len(tr['scores'])} attempt(s) so far).</p>" if tr else ""
+        from . import overrides as ovr
+        ov = ovr.for_conditions(goal_id, cond_key, overrides_data)
+        focus = st.get("focus")
+        trial = f"<p>Working on: <b>{_e(focus)}</b> (the setting his recent failures point at most).</p>" if focus else ""
+        mine = [f"<li>{_e(x)}</li>" for x in ovr.describe(goal_id, overrides_data)]
         out.append(f"<h2>Settings now <span class=mut>({_e(cond_key)}, {st.get('count', 0)} attempts)</span></h2>{trial}"
-                   "<div class=scroll><table><tr><th>setting</th><th>who changes it</th><th>first session</th><th>now</th></tr>" + "".join(rows) + "</table></div>")
+                   "<div class=scroll><table><tr><th>setting</th><th>who changes it</th><th>first session</th><th>now</th></tr>" + "".join(rows) + "</table></div>"
+                   + (f"<h3>Your overrides</h3><ul>{''.join(mine)}</ul>" if mine else ""))
+        recs = []
+        for name, vals in (st.get("values") or {}).items():
+            k = knobs.get(name)
+            tried = sorted((r for r in vals.values() if r.get("n")), key=lambda r: (str(type(r["v"])), r["v"]))
+            if k is None or not tried:
+                continue
+            nowv = last.get(name)
+            cells = []
+            for r in tried:
+                here = " <b>&larr; now</b>" if r["v"] == nowv else ""
+                ban = " <span class=bad>undone by you</span>" if str(r["v"]) in ((ov.get("banned") or {}).get(name) or {}) or _vk(r["v"]) in ((ov.get("banned") or {}).get(name) or {}) else ""
+                votes = f", misses say lower {r['down']} / higher {r['up']}" if (r.get("down") or r.get("up")) else ""
+                cells.append(f"{_e(k.show(r['v']))}: {r['hits']} of {r['n']} good{votes}{here}{ban}")
+            recs.append(f"<tr><td>{_e(name)}</td><td>{'<br>'.join(cells)}</td></tr>")
+        if recs:
+            out.append("<h3>The record behind each setting</h3><p class=mut>Every attempt counts for the value in use, judged by its own stage (search, walking up, lining up, the punch). "
+                       "He keeps the value with the best record over at least 2 attempts.</p><div class=scroll><table><tr><th>setting</th><th>values tried</th></tr>" + "".join(recs) + "</table></div>")
         sug = st.get("suggestions") or {}
         if sug:
             out.append("<h3>Suggestions for you (settings only you change)</h3><ul>" + "".join(
@@ -118,9 +141,12 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
                 f"<span class=mut>(attempt {', '.join(map(str, v.get('evidence', [])))}; <code>g2goal confirm {_e(goal_id)} {_e(n)}</code> or cancel)</span></li>" for n, v in sug.items()) + "</ul>")
 
     # every change
-    ch = [d for d in decisions if d.get("action") in ("try", "kept", "undo", "suggest")]
+    ch = [d for d in decisions if d.get("action") in ("kept", "undo", "suggest")]
+    yours = [r for r in journal.read() if r.get("kind") == "override" and r.get("goal") == goal_id]
+    if yours:
+        out.append("<h2>Your overrides, in order</h2><ul>" + "".join(f"<li>{_e(r.get('time'))}: {_e(r.get('detail'))}</li>" for r in yours) + "</ul>")
     if ch:
-        out.append("<h2>Every change and why</h2><ul>" + "".join(
+        out.append("<h2>What he kept, undid and suggested</h2><p class=mut>The values he tried along the way are in each session's notes below.</p><ul>" + "".join(
             f"<li><span class=tag>{_e(ACTION_WORD.get(d['action'], d['action']))}</span> {_e(d.get('note'))} <span class=mut>(attempts {', '.join(map(str, d.get('evidence') or []))})</span></li>" for d in ch) + "</ul>")
 
     # sessions, newest first
@@ -148,6 +174,11 @@ def goal_page(goal_id: str, journal: Journal | None = None, state: State | None 
                "<li>Do the notes match what you saw?</li><li>Is a setting creeping to the end of its range (flagged above)?</li>"
                "<li>Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.</li></ul>")
     return _page(title, "".join(out))
+
+
+def _vk(v) -> str:
+    from .judge import vkey
+    return vkey(v)
 
 
 def _cond_key(start: dict) -> str:

@@ -92,7 +92,8 @@ def resolve(goal_id: str, cond: str, knob: str, answer: str, *, state: State | N
         said = f"Done: {k.says()} {k.show(e['new'])}." if k else "Done."
     elif answer == "cancel":
         st["suggestions"].pop(knob, None)
-        st.setdefault("rejected", {})[f"{knob}={e.get('new')}"] = st.get("count", 0)
+        from .judge import vkey
+        st.setdefault("banned", {}).setdefault(knob, {})[vkey(e.get("new"))] = st.get("count", 0)      # the judge will not suggest it again for judge.RETRY_AFTER attempts
         said = "Okay, cancelled."
     else:
         e["status"] = "later"

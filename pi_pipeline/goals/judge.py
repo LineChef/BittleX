@@ -1,33 +1,42 @@
-"""How G2 judges an attempt, on the Pi with no API call (goals plan, "How G2 judges an attempt"). Shared by every goal.
+"""How G2 judges his attempts, on the Pi with no API call (goals plan, "How G2 judges an attempt"). Shared by every goal. Rebuilt 2026-10-31 after an offline test showed the
+first version mostly got stuck (it judged a change on 2 or 3 attempts and then banned the step it undid).
 
-After each counted attempt:
+1. **Every attempt counts, for every value tried.** Per knob and value: attempts, hits, score sum, kept per conditions (attachment + floor) across sessions.
+2. **Each knob is judged by its own stage.** The approach maps knobs to stages (search, approach, align, punch for the ball) and the outcome scores each stage it reached,
+   so a search setting is not blamed for a missed punch and a punch setting gets no record from an attempt that never punched.
+3. **Failures vote for a direction.** The approach's diagnosis table turns an outcome into the knobs it points at and which way ("missed" -> punch from closer). The votes
+   are counted at the value in use.
+4. **One knob at a time: the focus,** the free knob recent failures point at most. The others stay at their best-supported value.
+5. **The next value is chosen by evidence with some exploration** (Thompson sampling): among the current value and the neighbour the votes point to (both neighbours with no
+   lean; every option for a choice knob), each draws a hit rate from its record and the highest draw is used. A value with a good record is chosen most of the time; an
+   untried neighbour still gets a chance; a move is never more than one step.
+6. **What he keeps is the best-supported value** (the best record with at least MIN_TRIES attempts), not the last one tried. A session starts from those.
+7. **A fall** while trying a value that is not his best bans that value for RETRY_AFTER attempts.
 
-1. A change being tried (a "trial") gets the attempt's score. After TRIAL_N attempts with it, its mean is compared with the attempts just before it (the baseline): kept if it is
-   better, undone if not (one more attempt first when it is too close to call, up to TRIAL_MAX). A fall during a trial undoes it at once.
-2. With no trial running, a success keeps everything. A failure looks up the approach's diagnosis table for the outcome and starts a trial of the first knob that is free, has a step
-   left inside its bounds and was not undone recently. An `ask` knob is not changed: it becomes a suggestion in the report. A `fixed` knob is skipped.
+The user's overrides (goals/overrides.py) sit on top: a pinned knob is held at the user's value, a limit keeps every choice inside the user's range, an undone value is banned.
+Ask knobs are never changed: a failure that points at one becomes a suggestion. Fixed knobs are never touched.
 
-One knob changes at a time, by one step. Results are counted per conditions (attachment + floor + the approach's own), so what works on hardwood is not carried to tile.
-Every decision carries a first-person note built from the numbers and the attempt numbers behind it.
+`tests/test_goals.py` keeps a made-up world with a known best value as a permanent check: after 30 attempts the judge must end within one step of the best in at least
+85% of runs.
 """
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 
 from .approach import Outcome
 from .spec import Knob
 
-TRIAL_N = 2                    # attempts with a change before it is judged
-TRIAL_MAX = 3                  # ... at most, when the first two are too close to call
-BASELINE_N = 3                 # attempts before the change it is compared with
-MARGIN = 0.05                  # a change must beat the baseline by this much (scores are 0 to 1) to be kept
-CLOSE = 0.05                   # within this of the baseline after TRIAL_N: one more attempt
-RETRY_AFTER = 30               # an undone value may be tried again after this many more attempts
+HIT = 0.5                      # a stage score at or above this counts as a hit
+MIN_TRIES = 2                  # attempts before a value can be called the best
+RETRY_AFTER = 30               # a value banned after a fall may be tried again after this many more attempts
+PRESSURE_DECAY = 0.8           # how fast old failures stop counting toward the focus
+PRESSURE_WEIGHTS = (1.0, 0.5, 0.25)      # the first, second and third knob an outcome points at
 
 
 @dataclass
 class Decision:
-    action: str                # "keep" | "try" | "wait" | "kept" | "undo" | "suggest" | "none" | "not_counted"
+    action: str                # "keep" | "try" | "kept" | "undo" | "suggest" | "none" | "not_counted"
     note: str
     knob: str | None = None
     old: object = None
@@ -42,154 +51,270 @@ def _cap(s: str) -> str:
     return s[:1].upper() + s[1:]
 
 
-def _mean(xs):
-    return sum(xs) / len(xs) if xs else 0.0
-
-
-def _good(scores, threshold=0.5):
-    return sum(1 for s in scores if s >= threshold)
+def vkey(value) -> str:
+    """The record key of a value (JSON keys are strings)."""
+    if isinstance(value, bool) or isinstance(value, str):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return str(round(float(value), 4))
+    return str(value)
 
 
 class Judge:
-    """`state` is this goal's record for one set of conditions (journal.State keeps it on disk). `knobs` already carry the goal's controls."""
+    """`state`: this goal's record for one set of conditions (journal.State keeps it on disk). `knobs` carry the goal's controls. `stage_of`: knob -> stage name
+    (missing: the whole attempt's score). `overrides`: {"pins": {knob: value}, "limits": {knob: [lo, hi]}, "banned": {knob: {vkey: None}}} (goals/overrides.py)."""
 
-    def __init__(self, knobs: list[Knob], diagnosis: dict, state: dict | None = None):
+    def __init__(self, knobs: list[Knob], diagnosis: dict, state: dict | None = None, *, stage_of: dict | None = None, overrides: dict | None = None, rng=None):
         self.knobs = {k.name: k for k in knobs}
         self.diagnosis = diagnosis
+        self.stage_of = stage_of or {}
+        self.ov = overrides or {}
+        self.rng = rng or random.Random()
         self.state = state if state is not None else {}
         st = self.state
-        st.setdefault("settings", {})          # the free and ask knobs as G2 has them now (ask knobs only change when the user changes them)
-        st.setdefault("trial", None)
-        st.setdefault("history", [])           # [attempt number, score] under the current settings, newest last
-        st.setdefault("rejected", {})          # "knob=value" -> the attempt count when it was undone
-        st.setdefault("values", {})            # "knob=value" -> [attempts, score sum]: what each tried value scored
+        st.setdefault("values", {})            # knob -> {vkey: {"v", "n", "hits", "sum", "down", "up", "last"}}
+        st.setdefault("current", {})           # knob -> the value the next attempt uses (free knobs)
+        st.setdefault("pressure", {})          # knob -> decayed count of failures pointing at it
+        st.setdefault("focus", None)
         st.setdefault("count", 0)              # counted attempts under these conditions
-        st.setdefault("suggestions", {})       # knob -> {"new", "because", "evidence"}
+        st.setdefault("banned", {})            # knob -> {vkey: count when banned} (after a fall)
+        st.setdefault("suggestions", {})       # knob -> {"new", "old", "because", "evidence", "status"}
+        self._start_best = None
+
+    # ------------------------------------------------------------------------------------------------ records
+    def record(self, name: str, value) -> dict | None:
+        return self.state["values"].get(name, {}).get(vkey(value))
+
+    def _rec(self, name: str, value) -> dict:
+        return self.state["values"].setdefault(name, {}).setdefault(vkey(value), {"v": value, "n": 0, "hits": 0, "sum": 0.0, "down": 0, "up": 0, "last": 0})
+
+    def says(self, name: str, value) -> str:
+        r = self.record(name, value)
+        k = self.knobs[name]
+        tail = f" ({r['hits']} of {r['n']} good)" if r and r["n"] else " (not tried yet)"
+        return f"{k.says()} {k.show(value)}{tail}"
+
+    @staticmethod
+    def _mean(r) -> float:
+        return (r["hits"] + 1) / (r["n"] + 2)
+
+    def best(self, name: str, fallback):
+        """The best-supported value: the best record (hits, with one imagined hit and one imagined miss) among values tried MIN_TRIES times and still allowed;
+        `fallback` when none is, or when its own record is as good."""
+        tried = [r for r in self.state["values"].get(name, {}).values() if r["n"] >= MIN_TRIES and self._allowed(name, r["v"])]
+        if not tried:
+            return fallback if self._allowed(name, fallback) else self._clamp_to_limits(name, fallback)
+        top = max(tried, key=lambda r: (self._mean(r), r["n"]))
+        fb = self.record(name, fallback)
+        if fb is not None and fb["n"] >= MIN_TRIES and self._allowed(name, fallback) and self._mean(fb) >= self._mean(top):
+            return fallback
+        return top["v"]
+
+    # ------------------------------------------------------------------------------------------------ overrides
+    def _banned(self, name: str, value) -> bool:
+        k = vkey(value)
+        if k in ((self.ov.get("banned") or {}).get(name) or {}):
+            return True                                                             # the user undid it
+        at = (self.state["banned"].get(name) or {}).get(k)
+        return at is not None and self.state["count"] - at < RETRY_AFTER
+
+    def _in_limits(self, name: str, value) -> bool:
+        lim = (self.ov.get("limits") or {}).get(name)
+        if not lim or isinstance(value, (str, bool)):
+            return True
+        return lim[0] - 1e-9 <= float(value) <= lim[1] + 1e-9
+
+    def _allowed(self, name: str, value) -> bool:
+        k = self.knobs.get(name)
+        if k is None:
+            return False
+        try:
+            k.check(value)
+        except ValueError:
+            return False
+        return self._in_limits(name, value) and not self._banned(name, value)
+
+    def _clamp_to_limits(self, name: str, value):
+        lim = (self.ov.get("limits") or {}).get(name)
+        k = self.knobs[name]
+        if not lim or k.kind not in ("float", "int"):
+            return value
+        v = min(max(float(value), lim[0]), lim[1])
+        if k.step:                                                                  # onto the knob's own steps inside the limits
+            lo = k.lo if k.lo is not None else 0.0
+            v = lo + round((v - lo) / k.step) * k.step
+            v = min(max(v, lim[0]), lim[1])
+        return int(round(v)) if k.kind == "int" else round(v, 3)
+
+    def pinned(self, name: str):
+        pins = self.ov.get("pins") or {}
+        return pins.get(name), name in pins
+
+    def _free(self, name: str) -> bool:
+        k = self.knobs.get(name)
+        return k is not None and k.control == "free" and not self.pinned(name)[1]
 
     # ------------------------------------------------------------------------------------------------ settings
     def settings(self, base: dict) -> dict:
-        """The settings for the next attempt: the user's own (`base`) with G2's learned values for the free knobs on top. Ask and fixed knobs always come from `base`."""
+        """The next attempt's settings: the user's own (`base`), G2's values for the free knobs, the user's pins and limits on top."""
         out = dict(base)
-        for name, v in self.state["settings"].items():
-            k = self.knobs.get(name)
-            if k is None or k.control != "free":
+        for name, k in self.knobs.items():
+            if name not in out:
                 continue
-            try:
-                out[name] = k.check(v)
-            except ValueError:
-                continue
+            if k.control == "free":
+                v = self.state["current"].get(name)
+                if v is None or not self._allowed(name, v):
+                    v = self.best(name, out[name])
+                out[name] = self._clamp_to_limits(name, v)
+            pv, has = self.pinned(name)
+            if has:
+                try:
+                    out[name] = k.check(pv)
+                except ValueError:
+                    pass
         return out
 
-    def _say(self, name: str, v) -> str:
-        k = self.knobs[name]
-        return f"{k.says()} {k.show(v)}"
+    def begin_session(self, base: dict) -> dict:
+        """Start a session from the best-supported values (not where the last session's exploration stopped). Returns the first attempt's settings."""
+        for name, k in self.knobs.items():
+            if k.control == "free" and name in base:
+                self.state["current"][name] = self.best(name, base[name])
+        self._start_best = {n: self.state["current"][n] for n, k in self.knobs.items() if k.control == "free" and n in base}
+        return self.settings(base)
 
     # ------------------------------------------------------------------------------------------------ one attempt
+    def _stage_score(self, name: str, outcome: Outcome):
+        stage = self.stage_of.get(name)
+        stages = getattr(outcome, "stages", None)
+        if stage is None or stages is None:
+            return outcome.score
+        return stages.get(stage)
+
     def update(self, n: int, outcome: Outcome, used: dict) -> list[Decision]:
-        """Judge attempt number `n` (its outcome, the settings it used). Returns the decisions, in order; the next attempt's settings are then `settings(base)`."""
+        """Judge attempt number `n` (its outcome and the settings it used) and set the next attempt's values. Returns the decisions, in order."""
         st = self.state
         if not outcome.counted:
             return [Decision("not_counted", f"Attempt {n} is not counted: {outcome.text}.")]
         st["count"] += 1
         out: list[Decision] = []
-        tr = st["trial"]
-        if tr is not None:
-            tr["scores"].append(outcome.score)
-            tr["attempts"].append(n)
-            self._count_value(tr["knob"], tr["new"], outcome.score)
-            d = self._judge_trial(n, outcome)
-            out.append(d)
-            if d.action == "wait":
-                return out
-        else:
-            st["history"] = (st["history"] + [[n, outcome.score]])[-BASELINE_N:]
-            for name in self.knobs:                                              # what the values in use scored (the free knobs only)
-                if self.knobs[name].control == "free" and name in used:
-                    self._count_value(name, used[name], outcome.score)
-        if outcome.success:
-            if not out:
-                out.append(Decision("keep", f"Attempt {n}: {outcome.text}. That worked, so the same again.", evidence=[n]))
-            return out
+        # 1. the value of every free knob gets this attempt in its record, judged by its own stage
+        for name, k in self.knobs.items():
+            if name not in used or k.control != "free":
+                continue
+            s = self._stage_score(name, outcome)
+            if s is None:
+                continue                                                        # its stage was not reached: no evidence either way
+            r = self._rec(name, used[name])
+            r["n"] += 1
+            r["hits"] += int(s >= HIT)
+            r["sum"] = round(r["sum"] + float(s), 4)
+            r["last"] = n
+        # 2. a failure's direction votes and its pressure on the knobs it points at; ask knobs become suggestions
+        for name in list(st["pressure"]):
+            st["pressure"][name] = round(st["pressure"][name] * PRESSURE_DECAY, 4)
+        suggestion = None
+        if not outcome.success:
+            w = 0
+            for name, direction in self.diagnosis.get(outcome.code, []):
+                k = self.knobs.get(name)
+                if k is None or name not in used:
+                    continue
+                if k.control == "ask":
+                    new = k.stepped(used[name], direction) if direction in (1, -1) else None
+                    if new is not None and not self._banned(name, new):
+                        prev = st["suggestions"].get(name) or {}
+                        same = prev.get("new") == new
+                        st["suggestions"][name] = {"new": new, "old": used[name], "because": outcome.text,
+                                                   "evidence": sorted(set(prev.get("evidence", []) + [n])) if same else [n],
+                                                   "status": prev.get("status", "new") if same else "new"}
+                        suggestion = suggestion or Decision("suggest", f"I think {k.says()} {k.show(new)} would help, but that one is yours to change.", name, used[name], new, [n])
+                    continue
+                if not self._free(name):
+                    continue
+                if direction in (1, -1):
+                    self._rec(name, used[name])["down" if direction < 0 else "up"] += 1
+                if w < len(PRESSURE_WEIGHTS):
+                    st["pressure"][name] = round(st["pressure"].get(name, 0.0) + PRESSURE_WEIGHTS[w], 4)
+                    w += 1
+        # 3. a fall while trying a value that is not his best bans that value for a while
+        focus = st["focus"]
+        if outcome.fell and focus and focus in used and self._free(focus):
+            b = self.best(focus, used[focus])
+            if used[focus] != b:
+                st["banned"].setdefault(focus, {})[vkey(used[focus])] = st["count"]
+                st["current"][focus] = b
+                k = self.knobs[focus]
+                out.append(Decision("undo", f"I fell trying {k.says()} {k.show(used[focus])}: back to {k.show(b)}, and I won't try that again for a while.", focus, used[focus], b, [n]))
         if outcome.fell:
             out.append(Decision("none", f"Attempt {n}: {outcome.text}. The session ends here.", evidence=[n]))
             return out
-        out.append(self._next_change(n, outcome, used))
+        # 4. the focus: the free knob recent failures point at most (it changes only on a clear lead)
+        cands = [(p, name) for name, p in st["pressure"].items() if p > 0.05 and self._free(name) and name in used]
+        if cands:
+            top = max(cands)[1]
+            if focus is None or not self._free(focus) or focus not in used or st["pressure"].get(top, 0.0) > st["pressure"].get(focus, 0.0) + 0.25:
+                focus = top
+        st["focus"] = focus
+        for name in self.knobs:                                                    # every knob but the focus uses its best-supported value
+            if name != focus and self._free(name) and name in used:
+                st["current"][name] = self.best(name, used[name])
+        if focus is None or not self._free(focus) or focus not in used:
+            out.append(Decision("keep", f"Attempt {n}: {outcome.text}. " + ("That worked, so the same again." if outcome.success else "Nothing to change for that yet."), evidence=[n]))
+            if suggestion:
+                out.append(suggestion)
+            return out
+        # 5. the focus knob's next value, by evidence with some exploration
+        cur = used[focus]
+        nxt, lean = self._choose(focus, cur)
+        st["current"][focus] = nxt
+        k = self.knobs[focus]
+        if nxt == cur:
+            out.append(Decision("keep", f"Attempt {n}: {outcome.text}. Same again: {self.says(focus, nxt)}.{lean}", focus, cur, nxt, [n]))
+        else:
+            r = self.record(focus, cur)
+            was = f" ({r['hits']} of {r['n']} good)" if r and r["n"] else ""
+            out.append(Decision("try", f"Attempt {n}: {outcome.text}. Next: {self.says(focus, nxt)} instead of {k.show(cur)}{was}.{lean}", focus, cur, nxt, [n]))
+        if suggestion:
+            out.append(suggestion)
         return out
 
-    def _count_value(self, name, value, score):
-        key = f"{name}={value}"
-        c = self.state["values"].setdefault(key, [0, 0.0])
-        c[0] += 1
-        c[1] = round(c[1] + float(score), 4)
-
-    def _judge_trial(self, n: int, outcome: Outcome) -> Decision:
-        st = self.state
-        tr = st["trial"]
-        name, old, new = tr["knob"], tr["old"], tr["new"]
-        base = [s for _a, s in tr["baseline"]]
-        mb, mt = _mean(base), _mean(tr["scores"])
-        ev = [a for a, _s in tr["baseline"]] + tr["attempts"]
-        line = f"{_good(tr['scores'])} of {len(tr['scores'])} good with it, {_good(base)} of {len(base)} before (scores {mt:.2f} against {mb:.2f})"
-        if outcome.fell:
-            return self._undo(n, f"I fell trying {self._say(name, new)}: back to {self._say(name, old)}.", ev)
-        if len(tr["scores"]) < TRIAL_N:
-            return Decision("wait", f"Attempt {n}: {outcome.text}. Still trying {self._say(name, new)} ({len(tr['scores'])} of {TRIAL_N} attempts).", name, old, new, ev)
-        if mt > mb + MARGIN:
-            st["settings"][name] = new
-            st["history"] = [[a, s] for a, s in zip(tr["attempts"], tr["scores"])][-BASELINE_N:]
-            st["trial"] = None
-            return Decision("kept", f"{_cap(self._say(name, new))} works better than {self.knobs[name].show(old)}: {line}. I'm keeping it.", name, old, new, ev)
-        if abs(mt - mb) <= CLOSE and len(tr["scores"]) < TRIAL_MAX:
-            return Decision("wait", f"Attempt {n}: {outcome.text}. {_cap(self._say(name, new))} is too close to call so far ({line}): one more attempt with it.",
-                            name, old, new, ev)
-        return self._undo(n, f"{_cap(self._say(name, new))} didn't help ({line}): back to {self.knobs[name].show(old)}.", ev)
-
-    def _undo(self, n: int, note: str, ev: list) -> Decision:
-        st = self.state
-        tr = st["trial"]
-        st["settings"][tr["knob"]] = tr["old"]
-        st["rejected"][f"{tr['knob']}={tr['new']}"] = st["count"]
-        st["trial"] = None
-        return Decision("undo", note, tr["knob"], tr["old"], tr["new"], ev)
-
-    def _recently_rejected(self, name, value) -> bool:
-        at = self.state["rejected"].get(f"{name}={value}")
-        return at is not None and self.state["count"] - at < RETRY_AFTER
-
-    def _choice(self, k: Knob, current):
-        """Another option of a choice knob: one never tried first (in the knob's order), else the best scoring, never one undone recently."""
-        vals = self.state["values"]
-        cands = [o for o in k.options if o != current and not self._recently_rejected(k.name, o)]
+    def _choose(self, name: str, cur) -> tuple[object, str]:
+        """Thompson sampling among the current value and the allowed neighbour(s) the votes point to (every allowed option for a choice knob)."""
+        k = self.knobs[name]
+        lean = ""
+        if k.kind == "choice":
+            cands = [o for o in k.options if self._allowed(name, o)]
+        else:
+            r = self.record(name, cur) or {"down": 0, "up": 0}
+            dirs = [d for d, ok in ((-1, r["down"] >= r["up"]), (1, r["up"] >= r["down"])) if ok]
+            cands = [cur] + [v for v in (k.stepped(cur, d) for d in dirs) if v is not None]
+            cands = [c for c in cands if self._allowed(name, c)]
+            if r["down"] > r["up"]:
+                lean = " My misses point lower."
+            elif r["up"] > r["down"]:
+                lean = " My misses point higher."
         if not cands:
-            return None
-        untried = [o for o in cands if f"{k.name}={o}" not in vals]
-        if untried:
-            return untried[0]
-        return max(cands, key=lambda o: vals[f"{k.name}={o}"][1] / max(1, vals[f"{k.name}={o}"][0]))
+            return self.best(name, cur), lean
+        draws = []
+        for v in cands:
+            rec = self.record(name, v) or {"hits": 0, "n": 0}
+            draws.append((self.rng.betavariate(1 + rec["hits"], 1 + rec["n"] - rec["hits"]), cands.index(v), v))
+        return max(draws)[2], lean
 
-    def _next_change(self, n: int, outcome: Outcome, used: dict) -> Decision:
-        st = self.state
-        suggestion = None
-        for name, direction in self.diagnosis.get(outcome.code, []):
-            k = self.knobs.get(name)
-            if k is None or name not in used or k.control == "fixed":
+    # ------------------------------------------------------------------------------------------------ the end of a session
+    def finish(self, base: dict, n: int | None = None) -> list[Decision]:
+        """What he keeps: each free knob's best-supported value. A "kept" decision for each knob whose best value changed this session (these become the lessons)."""
+        out = []
+        start = self._start_best or {}
+        for name, k in self.knobs.items():
+            if k.control != "free" or name not in base:
                 continue
-            cur = st["settings"].get(name, used[name]) if k.control == "free" else used[name]      # after an undo, step from the value restored, not the one just tried
-            new = self._choice(k, cur) if direction == "other" else k.stepped(cur, direction)
-            if new is None or new == cur or self._recently_rejected(name, new):
-                continue
-            if k.control == "ask":
-                prev = st["suggestions"].get(name) or {}
-                status = prev.get("status", "new") if prev.get("new") == new else "new"          # the same suggestion again keeps its answer ("review" is not asked twice)
-                st["suggestions"][name] = {"new": new, "old": cur, "because": outcome.text, "evidence": sorted(set(prev.get("evidence", []) + [n])) if prev.get("new") == new else [n],
-                                           "status": status}
-                suggestion = suggestion or Decision("suggest", f"I think {self._say(name, new)} would help, but that one is yours to change.", name, cur, new, [n])
-                continue
-            st["trial"] = {"knob": name, "old": cur, "new": new, "baseline": list(st["history"])[-BASELINE_N:], "scores": [], "attempts": [], "why": outcome.code, "started_at": n}
-            st["settings"][name] = new
-            extra = f" ({suggestion.note})" if suggestion else ""
-            return Decision("try", f"Attempt {n}: {outcome.text}. Next I'll try {self._say(name, new)} instead of {k.show(cur)}.{extra}", name, cur, new, [n])
-        if suggestion is not None:
-            suggestion.note = f"Attempt {n}: {outcome.text}. " + suggestion.note
-            return suggestion
-        return Decision("none", f"Attempt {n}: {outcome.text}. I have nothing left to change for this right now.", evidence=[n])
+            b = self.best(name, base[name])
+            self.state["current"][name] = b
+            was = start.get(name, base[name])
+            if b != was:
+                r, r0 = self.record(name, b), self.record(name, was)
+                vs = f", against {r0['hits']} of {r0['n']} with {k.show(was)}" if r0 and r0["n"] else ""
+                out.append(Decision("kept", f"{_cap(k.says())} {k.show(b)} works best so far: {r['hits']} of {r['n']} good{vs}. I'm keeping it.", name, was, b,
+                                    [n] if n else []))
+        return out

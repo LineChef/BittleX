@@ -19,7 +19,7 @@ from .spec import Goal
 class GoalSession:
     def __init__(self, goal: Goal, approach: Approach, *, journal: Journal | None = None, state: State | None = None, stop: Callable[[], bool] = lambda: False,
                  say: Callable[[str], None] = print, announce: Callable[[str], None] | None = None, conditions: dict | None = None, sleep=time.sleep,
-                 clock=time.monotonic, save_memory: bool = True, memory_store=None):
+                 clock=time.monotonic, save_memory: bool = True, memory_store=None, overrides: dict | None = None, rng=None):
         self.goal, self.approach = goal, approach
         self.journal = journal or Journal()
         self.state = state or State()
@@ -28,7 +28,11 @@ class GoalSession:
         self.cond_key = conditions_key(self.cond)
         self.save_memory, self.memory_store = save_memory, memory_store
         self.knobs = goal.knobs(approach.knobs())
-        self.judge = Judge(self.knobs, approach.diagnosis, self.state.for_goal(goal.id, self.cond_key))
+        if overrides is None:
+            from . import overrides as ovr
+            overrides = ovr.for_conditions(goal.id, self.cond_key)
+        self.overrides = overrides
+        self.judge = Judge(self.knobs, approach.diagnosis, self.state.for_goal(goal.id, self.cond_key), stage_of=getattr(approach, "stage_of", None), overrides=overrides, rng=rng)
         self.session = uuid.uuid4().hex[:8]
 
     def _speak(self, text: str) -> None:
@@ -41,10 +45,10 @@ class GoalSession:
     def run(self) -> dict:
         g = self.goal
         base = self.approach.base_settings()
-        start_settings = self.judge.settings(base)
+        start_settings = self.judge.begin_session(base)
         self.journal.write("session_start", session=self.session, goal=g.id, title=g.title, conditions=self.cond, budget={"attempts": g.attempts, "minutes": g.minutes,
                            "min_pack_pct": g.min_pack_pct, "target_successes": g.target_successes}, settings=start_settings,
-                           controls={k.name: k.control for k in self.knobs}, learned_from=self.judge.state.get("count", 0))
+                           controls={k.name: k.control for k in self.knobs}, learned_from=self.judge.state.get("count", 0), overrides=self.overrides)
         self.say(f"goal session {self.session}: {g.title}, up to {g.attempts} attempts ({self.cond_key}); {self.judge.state.get('count', 0)} attempts learned from before")
         t0 = self.clock()
         successes, counted, why = 0, 0, "attempts"
@@ -72,7 +76,7 @@ class GoalSession:
                 result = self.approach.run_attempt(settings, ctx)
                 outcome = self.approach.score(result, settings)
                 self.journal.write("attempt", session=self.session, goal=g.id, index=i, number=n if outcome.counted else None, ended=result.ended, seconds=result.seconds,
-                                   settings=settings, outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text},
+                                   settings=settings, outcome={"code": outcome.code, "score": outcome.score, "success": outcome.success, "text": outcome.text, "stages": outcome.stages},
                                    numbers=outcome.numbers, extra=result.extra, trace=result.trace)
                 decisions = self.judge.update(n, outcome, settings)
                 for d in decisions:
@@ -83,7 +87,8 @@ class GoalSession:
                 if outcome.counted:
                     counted += 1
                     successes += int(outcome.success)
-                self._speak(("Got it." if outcome.success else "Missed.") if outcome.counted else "")
+                if outcome.counted:
+                    self._speak("Got it." if outcome.success else "Missed.")
                 if outcome.fell:
                     why = "fell"
                     break
@@ -101,6 +106,12 @@ class GoalSession:
         finally:
             try:
                 self.approach.close()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                for d in self.judge.finish(base, n_prev + counted):
+                    decisions_all.append(self.journal.write("decision", session=self.session, goal=g.id, index=None, **d.as_dict()))
+                    self.say("  " + d.note)
             except Exception:  # noqa: BLE001
                 pass
             lessons = lessons_from(decisions_all, g.title)

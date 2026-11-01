@@ -6,7 +6,9 @@ judges it on the Pi (no API call) and changes how he makes the next one. Everyth
   spec.py       Knob (one setting an approach exposes: bounds, step, free / ask / fixed), Goal (budget, controls), goals.json
   approach.py   the Approach protocol, AttemptResult, Outcome, the registry of approaches by name
   ball_punt.py  the first approach: the ball chase (behavior/ball_chase.py) as one attempt = find the ball, walk up, punt it once
-  judge.py      the shared judgement: a measured failure -> the setting it points at (the approach's diagnosis table), one change at a time, kept only if it helps
+  judge.py      the shared judgement: a record per setting and value (by its own stage), failures vote a direction, one setting at a time, Thompson sampling one step at most,
+                the best-supported value kept
+  overrides.py  the user's pins, limits and undone values
   journal.py    goal_journal.jsonl (sessions, attempts, decisions, notes) and goal_state.json (what each goal has learned, per attachment and floor)
   runner.py     GoalSession: budget -> settings -> attempt -> score -> judge -> record
   report.py     the HTML report the user reads to judge the learning

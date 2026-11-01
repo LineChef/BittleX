@@ -8,7 +8,8 @@ Design and decisions: [`../../docs/planned/goals-plan.md`](../../docs/planned/go
 | `spec.py` | `Knob` (one setting: kind, bounds, step, free / ask / fixed), `Goal` (budget, the user's controls, start phrases), `goals.json`, the built-in `ball_punt` |
 | `approach.py` | The `Approach` protocol a goal plugs in (knobs, one attempt, a scorer, a diagnosis table), `AttemptResult`, `Outcome`, the registry |
 | `ball_punt.py` | The first approach: one ball-chase attempt (`behavior/ball_chase.py`) and its scorer (hit, missed, never found, pushed away, could not line up, ...) |
-| `judge.py` | The shared judgement: a failure points at a knob (the diagnosis table), one step at a time, kept only if the next attempts score better; ask knobs become suggestions |
+| `judge.py` | The shared judgement: a record per setting and value judged by its own stage, failures vote a direction, one setting at a time, the next value by Thompson sampling one step at most, the best-supported value kept; ask knobs become suggestions. A made-up world in the tests checks it finds a known best |
+| `overrides.py` | The user's pins, limits and undone values (`g2goal pin / limit / undo / forget`), per scope (everywhere, a floor, an attachment) |
 | `journal.py` | `goal_journal.jsonl`, `goal_state.json`, conditions (attachment + floor), the lessons saved as memory facts |
 | `runner.py` | `GoalSession`: budget, battery before every attempt, attempt, score, judge, record; a fall ends it |
 | `suggestions.py` | Says the ask-knob suggestions when the voice service starts; confirm / cancel / review (silence = review) |

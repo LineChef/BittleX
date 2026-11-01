@@ -32,6 +32,7 @@ class Outcome:
     success: bool
     text: str                         # first person, plain ("I punched from 3.2 in and the ball went 14 in")
     numbers: dict = field(default_factory=dict)
+    stages: dict | None = None        # stage -> score 0 to 1 for each stage the attempt reached (the judge scores each knob by its own stage); None = the whole score
 
     @property
     def counted(self) -> bool:
@@ -45,6 +46,7 @@ class Outcome:
 class Approach(Protocol):
     name: str
     diagnosis: dict                   # outcome code -> [(knob name, +1 | -1 | "other"), ...] in order of preference
+    stage_of: dict                    # knob name -> the stage that judges it (a key of Outcome.stages)
 
     def knobs(self) -> list[Knob]: ...
     def base_settings(self) -> dict: ...                      # the user's own settings (their file) and the defaults: the start of a goal's first session

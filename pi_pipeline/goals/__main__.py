@@ -11,6 +11,14 @@
     python -m pi_pipeline.goals reset ball_punt --yes                  # forget what a goal learned (the journal keeps the history)
     python -m pi_pipeline.goals suggestions                            # suggestions for the settings only you change (G2 also says new ones when the voice service starts)
     python -m pi_pipeline.goals confirm ball_punt punch_lunge_s        # ... or cancel
+
+Overrides, when G2 learned something bad (goals/overrides.py; add --floor tile or --scope attachment=arm|floor=tile to narrow them, default: everywhere):
+
+    python -m pi_pipeline.goals pin ball_punt punt_max_in 3.5          # hold a setting at your value; G2 cannot change it (unpin to give it back)
+    python -m pi_pipeline.goals limit ball_punt punt_max_in 2.5 4.5    # G2 keeps learning it, only inside your range (unlimit to clear)
+    python -m pi_pipeline.goals undo ball_punt punt_max_in             # take back what he learned for it: his best value is banned, he goes to his next best (unban to clear)
+    python -m pi_pipeline.goals forget ball_punt punt_max_in           # drop his record for one setting: back to your file's value, he may learn it again
+    python -m pi_pipeline.goals overrides ball_punt                    # list them
 """
 from __future__ import annotations
 
@@ -41,23 +49,61 @@ def _goal(goals, gid):
     return goals[gid]
 
 
-def cmd_show(goal) -> None:
+def _judge_for(goal, cond: str | None = None, state: State | None = None):
+    """(approach, knobs, base settings, conditions key, judge over a COPY of the stored state, overrides)."""
+    import copy
+
+    from . import overrides as ovr
     from .approach import make
     from .judge import Judge
     from .journal import conditions_key, current_conditions
     ap = make(goal.approach)
     knobs = goal.knobs(ap.knobs())
     base = ap.base_settings()
-    cond = conditions_key(current_conditions(ap.conditions()))
-    st = State().data.get(goal.id, {}).get(cond)
-    now = Judge(knobs, ap.diagnosis, dict(st) if st else None).settings(base)
+    cond = cond or conditions_key(current_conditions(ap.conditions()))
+    st = (state or State()).data.get(goal.id, {}).get(cond)
+    ov = ovr.for_conditions(goal.id, cond)
+    j = Judge(knobs, ap.diagnosis, copy.deepcopy(st) if st else None, stage_of=getattr(ap, "stage_of", None), overrides=ov)
+    return ap, knobs, base, cond, j, ov
+
+
+def _scope(a) -> str:
+    if getattr(a, "scope", None):
+        return a.scope
+    if getattr(a, "floor", None):
+        return f"floor={a.floor}"
+    return "all"
+
+
+def _value_for(knob, text: str):
+    """A value the user typed, checked against the setting's own range; a bad one stops with a message (nothing is changed)."""
+    try:
+        if knob.kind == "choice":
+            return knob.check(text)
+        if knob.kind == "bool":
+            return knob.check(text.strip().lower() in ("true", "yes", "on", "1"))
+        return knob.check(int(float(text)) if knob.kind == "int" else float(text))
+    except ValueError as e:
+        raise SystemExit(f"not changed: {e}") from None
+
+
+def cmd_show(goal) -> None:
+    ap, knobs, base, cond, j, ov = _judge_for(goal)
+    st = j.state if j.state.get("count") else None
+    j.begin_session(base)
+    now = j.settings(base)
     print(f"{goal.title} ({goal.id}): approach {goal.approach}, {goal.attempts} attempts a session, {goal.minutes:g} min max, pack at least {goal.min_pack_pct}%"
           + (f", ends after {goal.target_successes} successes" if goal.target_successes else ""))
     print(f"start phrases: {', '.join(goal.start_words) or '(none)'}; conditions now: {cond}; learned from {st.get('count', 0) if st else 0} attempts here")
+    print(f"working on: {j.state.get('focus') or 'nothing yet'}")
     for k in knobs:
         rng = f"{k.lo:g} to {k.hi:g}, step {k.step:g}" if k.kind in ("float", "int") and k.step else (", ".join(map(str, k.options)) if k.options else k.kind)
         yours = "" if now.get(k.name) == base.get(k.name) else f"  (yours: {base.get(k.name)})"
-        print(f"  {k.control:5s}  {k.name:20s} {str(now.get(k.name)):12s} {rng}{yours}")
+        pin = "  PINNED by you" if k.name in ov["pins"] else ""
+        lim = f"  limited by you to {ov['limits'][k.name][0]:g}-{ov['limits'][k.name][1]:g}" if k.name in ov["limits"] else ""
+        recs = j.state["values"].get(k.name) or {}
+        rec = "  record: " + ", ".join(f"{k.show(r['v'])} {r['hits']}/{r['n']}" for r in sorted(recs.values(), key=lambda r: str(r["v"])) if r["n"]) if any(r["n"] for r in recs.values()) else ""
+        print(f"  {k.control:5s}  {k.name:20s} {str(now.get(k.name)):12s} {rng}{yours}{pin}{lim}{rec}")
 
 
 def main(argv=None) -> None:
@@ -82,6 +128,14 @@ def main(argv=None) -> None:
     p = sub.add_parser("history"); p.add_argument("goal"); p.add_argument("--last", type=int, default=3)
     p = sub.add_parser("report"); p.add_argument("goal", nargs="?", default="ball_punt"); p.add_argument("--html", required=True)
     p = sub.add_parser("reset"); p.add_argument("goal"); p.add_argument("--yes", action="store_true")
+    for name, extra in (("pin", ("value",)), ("unpin", ()), ("limit", ("lo", "hi")), ("unlimit", ()), ("undo", ()), ("unban", ("value",)), ("forget", ())):
+        p = sub.add_parser(name)
+        p.add_argument("goal"); p.add_argument("knob")
+        for x in extra:
+            p.add_argument(x)
+        p.add_argument("--floor", help="only on this floor label")
+        p.add_argument("--scope", help="a conditions filter, e.g. attachment=arm|floor=tile (default: everywhere)")
+    p = sub.add_parser("overrides"); p.add_argument("goal")
     sub.add_parser("suggestions", help="the suggestions for settings only you change, with their status")
     for name in ("confirm", "cancel"):
         p = sub.add_parser(name, help=f"{name} a suggestion"); p.add_argument("goal"); p.add_argument("knob")
@@ -154,10 +208,78 @@ def main(argv=None) -> None:
         if not data:
             print("nothing learned yet")
         for gid, per in data.items():
+            g = goals.get(gid)
             for cond, st in per.items():
-                tr = st.get("trial")
-                print(f"{gid} [{cond}]: {st.get('count', 0)} attempts; changed from yours: {st.get('settings') or 'nothing'}"
-                      + (f"; trying {tr['knob']} {tr['old']} -> {tr['new']}" if tr else "") + (f"; suggestions: {st['suggestions']}" if st.get("suggestions") else ""))
+                line = f"{gid} [{cond}]: {st.get('count', 0)} attempts; working on {st.get('focus') or 'nothing'}"
+                if g is not None:
+                    _ap, _k, base, _c, j, _ov = _judge_for(g, cond)
+                    best = {n: j.best(n, base[n]) for n, kk in j.knobs.items() if kk.control == "free" and n in base}
+                    diff = {n: v for n, v in best.items() if v != base.get(n)}
+                    line += f"; his best values that differ from yours: {diff or 'none'}"
+                if st.get("suggestions"):
+                    line += f"; suggestions: {', '.join(st['suggestions'])}"
+                print(line)
+    elif a.cmd in ("pin", "unpin", "limit", "unlimit", "undo", "unban", "forget"):
+        from . import overrides as ovr
+        g = _goal(goals, a.goal)
+        ap_, knobs, base, cond, j, _ov = _judge_for(g)
+        k = next((x for x in knobs if x.name == a.knob), None)
+        if k is None:
+            raise SystemExit(f"no setting {a.knob!r} (known: {', '.join(x.name for x in knobs)})")
+        scope = _scope(a)
+        journal = Journal()
+        if a.cmd == "pin":
+            v = _value_for(k, a.value)
+            ovr.set_pin(g.id, k.name, v, scope)
+            msg = f"pinned {k.name} = {v} ({scope}): G2 will not change it"
+        elif a.cmd == "unpin":
+            msg = f"unpinned {k.name} ({scope})" if ovr.clear(g.id, "pins", k.name, scope) else f"{k.name} was not pinned under {scope}"
+        elif a.cmd == "limit":
+            if k.kind not in ("float", "int"):
+                raise SystemExit(f"not changed: {k.name} is a {k.kind} setting; pin it instead")
+            lo, hi = _value_for(k, a.lo), _value_for(k, a.hi)
+            ovr.set_limit(g.id, k.name, lo, hi, scope)
+            msg = f"limited {k.name} to {min(lo, hi):g} to {max(lo, hi):g} ({scope})"
+        elif a.cmd == "unlimit":
+            msg = f"cleared the limit on {k.name} ({scope})" if ovr.clear(g.id, "limits", k.name, scope) else f"{k.name} had no limit under {scope}"
+        elif a.cmd == "undo":
+            from .judge import vkey
+            st = State()
+            done = []
+            for c, rec in (st.data.get(g.id) or {}).items():
+                if not ovr.scope_matches(scope, c):
+                    continue
+                _a, _k, _b, _c, jj, _o = _judge_for(g, c, st)
+                bad = jj.best(k.name, base[k.name])
+                if bad == base[k.name] and not jj.record(k.name, bad):
+                    continue
+                ovr.ban(g.id, k.name, vkey(bad), scope)
+                rec.get("current", {}).pop(k.name, None)
+                done.append(f"{c}: {k.show(bad)} banned, next best {k.show(_judge_for(g, c, st)[4].best(k.name, base[k.name]))}")
+            st.save()
+            msg = ("undone: " + "; ".join(done)) if done else f"nothing learned for {k.name} under {scope}"
+        elif a.cmd == "unban":
+            from .judge import vkey
+            v = _value_for(k, a.value)
+            msg = f"{k.name} = {v} allowed again ({scope})" if ovr.clear(g.id, "banned", k.name, scope, value_key=vkey(v)) else f"{k.name} = {v} was not undone under {scope}"
+        else:
+            st = State()
+            n = 0
+            for c, rec in (st.data.get(g.id) or {}).items():
+                if ovr.scope_matches(scope, c):
+                    n += int(rec.get("values", {}).pop(k.name, None) is not None)
+                    rec.get("current", {}).pop(k.name, None)
+                    rec.get("pressure", {}).pop(k.name, None)
+                    if rec.get("focus") == k.name:
+                        rec["focus"] = None
+            st.save()
+            msg = f"forgot what he learned for {k.name} under {n} set(s) of conditions ({scope}): back to your value {k.show(base[k.name])}"
+        journal.write("override", goal=g.id, action=a.cmd, knob=k.name, scope=scope, detail=msg)
+        print(msg)
+    elif a.cmd == "overrides":
+        from . import overrides as ovr
+        for line in ovr.describe(a.goal) or ["no overrides"]:
+            print(line)
     elif a.cmd == "history":
         from .report import text_history
         print(text_history(a.goal, last=a.last))

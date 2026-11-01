@@ -401,7 +401,7 @@ g2puntset() {
        ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.behavior.punt_settings --set '$1' '$2'" ;;
   esac
 }
-# g2goal [list|show GOAL|set GOAL ...|run GOAL|stop|status|history GOAL|reset GOAL --yes|pull|report [GOAL]]  -- goals G2 works toward and what he learned (docs/planned/goals-plan.md).
+# g2goal [list|show GOAL|set GOAL ...|run GOAL|stop|status|history GOAL|suggestions|confirm|cancel GOAL KNOB|pin|limit|undo|forget GOAL KNOB ...|overrides GOAL|reset GOAL --yes|pull|report [GOAL]]  -- goals G2 works toward and what he learned (docs/guides/goals.md).
 #   run = one session without the voice command (the same as saying "G2, ball goal": the voice service stops and always comes back); stop = end it (he rests).
 #   pull = copy the journal and the learned state to ~/Desktop/G2Memory/goals; report [GOAL] = pull, build the report page there and open it.
 g2goal() {
@@ -415,7 +415,7 @@ g2goal() {
           ls "$d" >/dev/null && echo "copied to $d: $(ls "$d" | tr '\n' ' ')" ;;
     report) g2goal pull >/dev/null; local g="${2:-ball_punt}"
             (cd "$G2_ROOT" && G2_GOAL_JOURNAL="$d/goal_journal.jsonl" G2_GOAL_STATE="$d/goal_state.json" G2_GOALS="$d/goals.json" pi_pipeline/.venv/bin/python -m pi_pipeline.goals report "$g" --html "$d/$g.html") && open "$d/$g.html" ;;
-    *) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals $*" ;;
+    *) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals $(printf '%q ' "$@")" ;;      # quoted: a --scope like attachment=arm|floor=tile is not a pipe
   esac
 }
 # g2deploy [--once|--cancel|--max-hours N|--replace]  -- push pi_pipeline/ and the deployed policy to the Pi and restart the voice service. With no flag it WAITS for the Pi (up to 24 h) and deploys once;

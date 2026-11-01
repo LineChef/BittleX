@@ -45,7 +45,8 @@ g2goal status                # what each goal has learned, per attachment and fl
 g2goal reset ball_punt --yes # forget what he learned (the journal keeps the history)
 ```
 
-The report shows the success rate per session, the settings he uses now against the first session's, every change with its reason and the attempts behind it, each session's attempts,
+The report shows the success rate per session, the settings he uses now against the first session's, the record behind each setting (every value tried, how often it worked,
+which way his misses pointed), what he kept and undid, your overrides, each session's attempts,
 and the lessons he saved to memory (up to 3 per session, as facts with source `goal_lesson`; he can talk about them). Signs the learning is good: the success rate rises across sessions on
 the same floor, kept changes keep their gains, the notes match what you saw. A setting flagged "at the end of its range" means a rule may be wrong or the goal is out of reach.
 Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
@@ -53,7 +54,23 @@ Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
 attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt".
 
-## 5. Where things live on the Pi
+## 5. When he learns something bad
+
+He keeps a record for every value he tries ("punching from 3 in: 7 of 9 good"), works on one setting at a time, and keeps the value with the best record, so one lucky attempt
+cannot set a value. When a value still looks wrong to you, override it from the Mac:
+
+```bash
+g2goal pin ball_punt punt_max_in 3.5             # hold it at your value; he cannot change it (g2goal unpin ball_punt punt_max_in to give it back)
+g2goal limit ball_punt punt_max_in 2.5 4.5       # he keeps learning it, only inside your range (unlimit to clear)
+g2goal undo ball_punt punt_max_in                # ban his best value for it; he goes to his next best (g2goal unban ball_punt punt_max_in 4.0 to allow it again)
+g2goal forget ball_punt punt_max_in              # drop his record for that one setting: back to your file's value
+g2goal overrides ball_punt                       # list your overrides
+```
+
+Add `--floor tile` to any of them for one floor only (the default is everywhere). A pin beats a limit, a limit beats what he learned, and what he learned beats your punt settings
+file. Every override is in the report under "Your overrides". `g2goal reset ball_punt --yes` still forgets everything a goal learned.
+
+## 6. Where things live on the Pi
 
 | File | What |
 |---|---|
@@ -62,5 +79,6 @@ attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every wal
 | `~/.local/share/g2/goal_state.json` | what he learned, per goal, attachment and floor |
 | `~/.local/share/g2/punt_settings.json` | your own punt settings: where a goal's first session starts; only a confirmed suggestion writes to it ([`punt.md`](punt.md)) |
 | `~/.local/share/g2/chase_pace.json` | his measured pace and turn rates |
+| `~/.local/share/g2/goal_overrides.json` | your pins, limits and undone values |
 
-Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).
+Switches: `G2_GOALS`, `G2_GOAL_JOURNAL`, `G2_GOAL_STATE`, `G2_GOAL_OVERRIDES` and `G2_CHASE_PACE` move the files above; `G2_GOAL_SUGGEST=0` stops the spoken suggestions (they stay in the report).
