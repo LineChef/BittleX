@@ -403,3 +403,36 @@ def test_rooms_are_set_by_file_name_survive_naming_can_be_cleared_and_undone(tmp
         app.set_rooms({"../x.jpg": "kitchen"})
     with pytest.raises(ValueError):
         app.set_rooms({})
+
+
+def test_presence_stops_the_server_when_the_last_tab_closes():
+    now = [1000.0]
+    P = G.Presence(clock=lambda: now[0])
+    assert not P.due()                                   # just started, nobody yet
+    P.beat("a")
+    P.beat("b")
+    P.bye("a")
+    now[0] += 60
+    assert not P.due()                                   # b is still open
+    P.bye("b")
+    now[0] += 3
+    assert not P.due()                                   # within the grace (a reload says bye then beats again)
+    P.beat("c")
+    now[0] += 60
+    assert not P.due()
+    P.bye("c")
+    now[0] += P.GRACE_S + 1
+    assert P.due()
+
+
+def test_presence_expires_a_silent_tab_and_a_never_opened_server():
+    now = [0.0]
+    P = G.Presence(clock=lambda: now[0])
+    now[0] += P.START_S + 1
+    assert P.due()                                       # nobody ever opened it
+    Q = G.Presence(clock=lambda: now[0])
+    Q.beat("x")
+    now[0] += Q.EXPIRE_S + 1
+    assert not Q.due()                                   # the first look drops the silent tab and starts the grace
+    now[0] += Q.GRACE_S + 1
+    assert Q.due()                                       # the tab went silent (browser closed without a bye)

@@ -495,7 +495,50 @@ class App:
         return p
 
 
-def make_handler(app: App, token: str, port: int):
+class Presence:
+    """Which browser tabs have the page open (user, 2026-11-01: closing the g2pics tab ends the server). Each tab sends a beat every few seconds and a bye when it closes; the server
+    stops when no tab is left for GRACE_S (a reload says bye then beats again at once, so it survives), a tab silent for EXPIRE_S counts as closed (a hidden tab's timers are slowed by
+    the browser), and a server nobody ever opened stops after START_S."""
+    GRACE_S = 6.0
+    EXPIRE_S = 600.0
+    START_S = 90.0
+
+    def __init__(self, clock=time.time):
+        self.clock = clock
+        self.tabs: dict[str, float] = {}
+        self.born = clock()
+        self.seen_any = False
+        self.empty_since: float | None = None
+        self._lock = threading.Lock()
+
+    def beat(self, tab: str) -> None:
+        with self._lock:
+            self.tabs[tab] = self.clock()
+            self.seen_any = True
+            self.empty_since = None
+
+    def bye(self, tab: str) -> None:
+        with self._lock:
+            self.tabs.pop(tab, None)
+            if not self.tabs and self.empty_since is None:
+                self.empty_since = self.clock()
+
+    def due(self) -> bool:
+        """True when the server should stop now."""
+        with self._lock:
+            now = self.clock()
+            for t in [t for t, at in self.tabs.items() if now - at > self.EXPIRE_S]:
+                del self.tabs[t]
+                if not self.tabs and self.empty_since is None:
+                    self.empty_since = now
+            if self.tabs:
+                return False
+            if not self.seen_any:
+                return now - self.born >= self.START_S
+            return self.empty_since is not None and now - self.empty_since >= self.GRACE_S
+
+
+def make_handler(app: App, token: str, port: int, presence: Presence | None = None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -556,11 +599,20 @@ def make_handler(app: App, token: str, port: int):
 
         def do_POST(self):
             u = urllib.parse.urlparse(self.path)
+            if u.path == "/api/bye" and presence is not None and self._ok_host():              # the tab's closing beacon (sendBeacon cannot set the token header: it rides in the query)
+                q = urllib.parse.parse_qs(u.query)
+                if q.get("t", [""])[0] == token:
+                    presence.bye(q.get("id", [""])[0])
+                return self._send(204, b"", "text/plain")
             if not self._ok_host() or self.headers.get("X-G2-Token") != token:
                 return self._send(403, b"bad token", "text/plain")
             n = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
+                if u.path == "/api/hb":
+                    if presence is not None:
+                        presence.beat(str(body.get("id", "")))
+                    return self._json({"ok": True})
                 if u.path == "/api/walls/label":
                     return self._json(app.label_wall(str(body["path"]), str(body.get("label", "")), body.get("distance_in"), str(body.get("note", ""))))
                 if u.path == "/api/walls/trash":
@@ -680,6 +732,8 @@ function picLabel(p){if(p.name)return p.name;if(!p.pose)return "";return p.pose=
 async function setRooms(ps,room){room=(room||"").trim().toLowerCase();const m={};for(const p of ps)m[p.path]=room;try{const r=await api("/api/pictures/room",{rooms:m});if(room)window.lastRoom=room;for(const p of ps)p.room=room;render();toast(room?"Room set to "+room+" for "+ps.length+" picture(s)":"Room cleared",async()=>{await api("/api/pictures/room",{rooms:r.previous});for(const p of ps)p.room=r.previous[p.path]||"";render()})}catch(e){toast("Failed: "+e.message)}}
 function xbtn(fn){const b=el("button","x","×");b.title="Delete (goes to the Trash; you can undo)";b.setAttribute("aria-label","Delete");b.onclick=fn;return b}
 function text(r){return r.fact||r.caption||(r.user_text?"You: "+r.user_text:"")}
+const TAB=Math.random().toString(36).slice(2);const beat=()=>{api("/api/hb",{id:TAB}).catch(()=>{})};beat();setInterval(beat,5000);       // tells the server this tab is open; closing the tab stops the server
+addEventListener("pageshow",beat);addEventListener("pagehide",()=>{try{navigator.sendBeacon("/api/bye?t="+encodeURIComponent(TOKEN)+"&id="+TAB)}catch(e){}});
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
   if(tab==="pictures"||tab==="looks"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
@@ -697,7 +751,9 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
 function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
- if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb)}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
+ if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
+  const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
+  if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
   if(!items.length){list.append(el("div","empty",tab==="looks"?"No look pictures.":window.noRoomOnly?"Every picture has a room.":"No pictures yet."));return}
   const groups={};for(const p of items){const g=p.group==="named"?"Named: "+p.folder:(p.group==="looks"?"Looks "+p.folder:"Not labeled");(groups[g]=groups[g]||[]).push(p)}
   const fname=p=>p.path.split("/").pop().toLowerCase();for(const g of Object.keys(groups))groups[g].sort((a,b)=>fname(a).localeCompare(fname(b)));       // A to Z by file name inside every group (classes first, then the unlabeled images, both alphabetical)
@@ -707,9 +763,16 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
   sum.append(document.createTextNode(named.length?named.map(g=>g.slice(7)+" ("+groups[g].length+")").join(" \u00b7 "):"none yet"));
   sum.append(el("div","sub",nl+" labeled, "+nu+" not labeled yet. Name a picture with its Name button; labeled pictures are listed first."));list.append(sum);
   const order=[...named,...survey];if(named.length&&survey.length){order.splice(named.length,0,"\u0000divider")}
-  for(const g of order){if(g==="\u0000divider"){list.append(el("div","divider","Not labeled yet"));continue}
-   if(g===named[0])list.append(el("div","divider","Labeled"));
+  window.closedSections=window.closedSections||{};let sec="Labeled";const isClosed=n=>window.closedSections[n]!==false;      // the two sections (Labeled, Not labeled yet) fold too (user, 2026-11-01); both start collapsed
+  const divider=name=>{const d=el("div","divider",(isClosed(name)?"\u25B8 ":"\u25BE ")+name);d.style.cursor="pointer";d.setAttribute("role","button");d.tabIndex=0;const flip=()=>{window.closedSections[name]=!isClosed(name);render()};d.onclick=flip;d.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();flip()}};list.append(d)};
+  for(const g of order){if(g==="\u0000divider"){sec="Not labeled yet";divider(sec);continue}
+   if(g===named[0])divider("Labeled");else if(!named.length&&g===survey[0])sec="Not labeled yet";
+   const secOpen=!isClosed(sec);
    {const gh=el("div","group",g+" ("+groups[g].length+(g.startsWith("Named: ")?" \u00b7 "+groups[g].filter(q=>q.promoted).length+" in the training data":"")+(groups[g].some(q=>q.room)?" \u00b7 "+groups[g].filter(q=>q.room).length+" with a room":"")+") ");const gb=el("button","btn","Set the room of all "+groups[g].length);gb.style.cssText="margin-left:8px;padding:1px 8px;font-size:.78rem";gb.onclick=async()=>{const r=prompt("Which room are all "+groups[g].length+" pictures in this group from? (you can change single ones afterwards)",window.lastRoom||"");if(r===null||!r.trim())return;await setRooms(groups[g],r)};gh.append(gb);list.append(gh);const grid=el("div","grid");
+   {window.openGroups=window.openGroups||{};if(!(g in window.openGroups))window.openGroups[g]=!g.startsWith("Named: ");      // named groups start collapsed, the unnamed ones open (user, 2026-11-01); the choice survives a redraw
+    const caret=el("span","caret");const sync=()=>{const o=window.openGroups[g];caret.textContent=o?"\u25BE ":"\u25B8 ";grid.style.display=o&&secOpen?"":"none";gh.style.display=secOpen?"":"none";gh.setAttribute("aria-expanded",o)};gh.prepend(caret);gh.style.cursor="pointer";gh.setAttribute("role","button");gh.tabIndex=0;
+    const flip=ev=>{if(ev.target.closest&&ev.target.closest("button"))return;window.openGroups[g]=!window.openGroups[g];sync()};gh.onclick=flip;gh.onkeydown=ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();flip(ev)}};sync()}
+
    for(const p of groups[g]){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=picLabel(p)||"picture";
     im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=picLabel(p)+" \u00b7 "+p.time+(p.cut_off?" \u00b7 cut off by the camera: only the top part is real, the rest is gray":"");lb.style.display="flex"};if(p.cut_off)c.append(el("div","badge","cut off"));if(["rejected","duplicate","people"].includes(p.status)){const sb=el("div","badge",p.status==="duplicate"?"duplicate":p.status==="people"?"person":"filtered: "+p.reason);sb.title=p.reason||"";c.append(sb)}if(p.person)c.classList.add("isperson");
     const pb=el("button","pbtn",p.person?"Person \u2713":"Person");pb.title=p.person?"Flagged as a person. Click to remove the flag":"Flag this picture: a person is in it (it is kept out of the object library)";pb.onclick=async(ev)=>{ev.stopPropagation();try{await api("/api/pictures/person",{paths:[p.path],value:!p.person});p.person=!p.person;render();const now=p.person;toast(now?"Flagged: a person is in it":"Person flag removed",async()=>{await api("/api/pictures/person",{paths:[p.path],value:!now});p.person=!now;render()})}catch(e){toast("Failed: "+e.message)}};c.append(pb);
@@ -758,8 +821,17 @@ def serve(port: int) -> int:
         print("set G2_PI to user@host of the Pi (in ~/.zshrc)", file=sys.stderr, flush=True)
         return 2
     token = secrets.token_urlsafe(24)
-    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(App(Remote(pi)), token, port))
+    presence = Presence()
+    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(App(Remote(pi)), token, port, presence))
     PIDFILE.write_text(str(os.getpid()))
+
+    def watch():                                                # the last tab closed: stop (the same as `g2pics stop`)
+        while True:
+            time.sleep(1.0)
+            if presence.due():
+                srv.shutdown()
+                return
+    threading.Thread(target=watch, daemon=True).start()
     signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=srv.shutdown, daemon=True).start())
     try:
         srv.serve_forever()
