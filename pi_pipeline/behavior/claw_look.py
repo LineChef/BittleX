@@ -139,6 +139,7 @@ def main() -> None:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--calibrate", action="store_true", help="measure which way a positive pan turns the camera and save it (the ball about 12 in straight ahead)")
     g.add_argument("--test", action="store_true", help="one look around with the current settings")
+    ap.add_argument("--stand", choices=("kbalance", "kup"), default="kbalance", help="the skill that stands him up from rest (default kbalance, the plain firmware stand-up)")
     ap.add_argument("--gb", action="store_true", help="with --hold: send `gb` (firmware gyro balance off) right after the stand-up, before watching")
     g.add_argument("--hold", action="store_true", help="stand, then do nothing for 20 s and watch whether the legs hold (IMU and pack voltage); no arm move")
     g.add_argument("--pictures", action="store_true", help="three pictures (straight, pan +, pan -) saved to a folder; stays standing at the end (no rest command)")
@@ -161,7 +162,7 @@ def main() -> None:
     cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)       # exposure balancing stays on
     robot = chase.SerialRobot(link)
     try:
-        chase._stand_if_lying(link)
+        chase._stand_if_lying(link, args.stand)
         if args.hold:
             if args.gb:
                 link.send("gb", read_reply=False, settle=0.0)

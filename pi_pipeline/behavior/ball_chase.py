@@ -734,8 +734,9 @@ class _SnapshotCamera:
         return snap.jpeg if snap is not None else None
 
 
-def _stand_if_lying(link) -> None:
-    """If the legs read the rest pose, stand him up (the link runs the arm build's own stand-up for a kbalance from lying). Never raises."""
+def _stand_if_lying(link, token: str = "kbalance") -> None:
+    """If the legs read the rest pose, stand him up with `token` (the plain firmware stand-up is `kbalance`; `kup` is the firmware's neutral stand: claw_look --stand kup compares them,
+    2026-11-01, when his legs went limp about 10 s after our stand-up and not after the board's own). Never raises."""
     import re
     try:
         s = link._ser
@@ -747,7 +748,7 @@ def _stand_if_lying(link) -> None:
         if j is None or (j[8] < 40 and j[12] > 30):
             return
         print("lying down: standing up first")
-        link.send("kbalance", read_reply=False, settle=0.0)
+        link.send(token, read_reply=False, settle=0.0)
         time.sleep(3.0)
     except Exception as e:  # noqa: BLE001
         print("could not check the pose:", e)
