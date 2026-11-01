@@ -1282,6 +1282,16 @@ def test_a_lesson_whose_attempts_were_retired_is_deleted_and_can_be_restored(tmp
     assert cu.restore(store) and store.added == [(f"Punt the ball: {note}", "goal_lesson")]
 
 
+def test_a_session_wide_lesson_is_judged_by_every_counted_attempt_of_its_session(tmp_path, monkeypatch):
+    from pi_pipeline.goals import curate as cu
+    _curation_setup(tmp_path, monkeypatch)
+    j = Journal(str(tmp_path / "journal.jsonl"))
+    sess = j.read()[0]["session"]
+    j.write("decision", session=sess, goal="ball_punt", index=None, action="kept", note="Searching by claw works best so far", knob="search_order", old="a", new="b", evidence=[])
+    store = _FakeStore([{"id": 9, "fact": "Punt the ball: Searching by claw works best so far", "source": "goal_lesson", "importance": 2}])
+    assert any("lesson #9 deleted" in x for x in cu.curate(store=store)) and store.facts == []
+
+
 def test_a_lesson_the_newer_attempts_disagree_with_is_flagged_not_deleted(tmp_path, monkeypatch):
     from pi_pipeline.goals import curate as cu
     _curation_setup(tmp_path, monkeypatch, when="2026-11-01 02:00:00")                       # a current-epoch attempt behind the lesson

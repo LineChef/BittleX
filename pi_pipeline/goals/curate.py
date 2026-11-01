@@ -126,8 +126,13 @@ def check_lessons(journal, store, goals: dict, dry: bool, now: float | None = No
         backing = [x for x in decisions if x["note"] and x["note"] in text]
         if not backing:
             continue                                                 # no evidence on record: left alone, not guessed at
-        evid = {(x["session"], x["index"]) for x in backing}
-        if all(gone(s, i) for s, i in evid):
+        evid = set()
+        for x in backing:
+            if x.get("index") is None:                              # a note about the whole session (e.g. which search order works best): every counted attempt of that session is its evidence
+                evid |= {k for k, a in attempts.items() if k[0] == x["session"] and a.get("number") is not None}
+            else:
+                evid.add((x["session"], x["index"]))
+        if evid and all(gone(s, i) for s, i in evid):
             deleted.append(f"lesson #{f['id']} deleted: every attempt behind it was retracted or retired: {text}")
             if not dry:
                 _trash(d, "lessons", {"id": f["id"], "fact": text, "importance": f["importance"], "reason": "evidence retracted"})
