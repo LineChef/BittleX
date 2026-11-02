@@ -94,6 +94,13 @@ CLAW_LOOK_POSE = "kcalib"      # the pose he holds for the claw look (user, 2026
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
 CLAW_POSE_S = 2.0              # to settle into the attention pose
 SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
+ATTENTION_WHEN_STILL = True    # (user, 2026-11-02) he never waits standing: after every move he goes into the attention pose (CLAW_LOOK_POSE, legs straight), and when he is ready to move
+                               # again he stands up (`kbalance`), takes the straight-ahead picture standing (the wall reading is calibrated on standing pictures; the ball distance comes
+                               # from its size and works in either pose) and moves at once. The legs went slack after 7 to 10 s of standing still (docs/STATUS.md open problem 14).
+# Close to the ball (within the nudge range, NUDGE_MAX_IN / PUNT_MAX_IN as the goal set them for this attempt, at the look before the move) he is dialing in: nudges, line-up turns,
+# a step closer after a punt. He stays standing between those small steps instead of going into the attention pose at each stop (user, 2026-11-02): `_dialing_in`.
+ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
+STAND_UP_WATCH_S = 1.0         # the stand-up out of the attention pose, watched for a fall
 CLAW_SETTLE_S = 0.8            # after the arm move and before the picture: the arm and body settle; the old camera frame is dropped by _SnapshotCamera.look (the module answers with the previous request's picture, 2026-11-01)
 
 # The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
@@ -407,6 +414,7 @@ class SerialRobot:
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
+        self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
 
     def _tx(self, c: str) -> None:
         self._lk.send(c, read_reply=False, settle=0.0)
@@ -441,23 +449,64 @@ class SerialRobot:
                 state = "fell"
                 break
             self._sleep(0.05)
+        self.posture = "stand"
         self._tx("kbalance")                              # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
         self._sleep(1.0)                                  # for over a minute: the firmware runs a gait until it is told something else)
         self._tx("gp")
         return state
 
-    def sit_down(self) -> str:
-        """The claw look starts from the "attention" pose (user, 2026-11-01; it used to be a sit): stand first, then CLAW_LOOK_POSE, then still. No fall check in it."""
+    def relax(self) -> str:
+        """Into the attention pose (CLAW_LOOK_POSE) to wait there instead of standing (ATTENTION_WHEN_STILL, user 2026-11-02). Nothing when he is already in it."""
+        if self.posture == "attention":
+            return "ok"
+        self._tx(CLAW_LOOK_POSE)
+        self._claw = (0.0, 0.0)                           # the pose puts the arm at its calibration zero too
+        self.posture = "attention"
+        self._sleep(ATTENTION_SETTLE_S)
+        return "ok"
+
+    def stand_up(self) -> str:
+        """Ready to move: up out of the attention pose with the plain firmware stand-up (`kbalance`), watched for STAND_UP_WATCH_S; "fell" if he went over. Nothing when he is not
+        in the attention pose (he is already standing)."""
+        if self.posture != "attention":
+            return "ok"
         self._pitch, self._roll = [], []
         self._tx("gP")
+        self._tx("kbalance")
+        t0, state = self._clock(), "ok"
+        while self._clock() - t0 < STAND_UP_WATCH_S:
+            if self._fell():
+                state = "fell"
+                break
+            self._sleep(0.05)
+        self._tx("gp")
+        self.posture = "stand"
+        return state
+
+    def sit_down(self) -> str:
+        """The claw look starts from the "attention" pose (user, 2026-11-01; it used to be a sit): stand first, then CLAW_LOOK_POSE, then still. No fall check in it. Already in the
+        attention pose: the pose is sent again (it drives every leg joint again) and no stand-up first; just stood up: no second stand-up."""
+        self._pitch, self._roll = [], []
+        self._tx("gP")
+        if self.posture in ("attention", "stand"):
+            self._tx(CLAW_LOOK_POSE)
+            self._claw = (0.0, 0.0)
+            self.posture = "attention"
+            self._sleep(CLAW_POSE_S)
+            return "ok"
         self._tx("kbalance")                                # stand first, always (user, 2026-11-01: the look began with him lying in the rest pose and stayed there: after a Pi-sent stand-up the legs can go limp, and
         self._sleep(SIT_STAND_FIRST_S)                      # a sit asked of limp legs changes nothing). The firmware stand drives every leg joint to its balance angle again.
         self._tx(CLAW_LOOK_POSE)
+        self._claw = (0.0, 0.0)
+        self.posture = "attention"
         self._sleep(2.5 if CLAW_LOOK_POSE == "ksit" else CLAW_POSE_S)
         return "ok"
 
     def stand_from_sit(self) -> str:
-        """Up again after the claw look: a normal stand-up (`kbalance`; from a sit the link stands him up slowly with the back legs first, gait/standup.py stand_from_sit), then still; "fell" if he went over."""
+        """Up again after the claw look: a normal stand-up (`kbalance`; from a sit the link stands him up slowly with the back legs first, gait/standup.py stand_from_sit), then still; "fell" if he went over.
+        With ATTENTION_WHEN_STILL he stays in the attention pose: the next move stands him up (stand_up) right before it starts."""
+        if ATTENTION_WHEN_STILL and self.posture == "attention":
+            return "ok"
         self._pitch, self._roll = [], []
         self._tx("kbalance")
         t0, state = self._clock(), "ok"
@@ -467,9 +516,13 @@ class SerialRobot:
                 break
             self._sleep(0.05)
         self._tx("gp")
+        self.posture = "stand"
         return state
 
     def walk(self, seconds: float) -> str:
+        if self.stand_up() == "fell":
+            return "fell"
+        self.posture = "stand"
         return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
 
     def _policy_walk(self, seconds: float) -> str:
@@ -519,14 +572,20 @@ class SerialRobot:
         return state
 
     def turn(self, degrees: float, seconds: float) -> str:
+        if self.stand_up() == "fell":
+            return "fell"
         return self._skill("kwkR" if degrees > 0 else "kwkL", seconds)
 
     def back(self, seconds: float) -> str:
+        if self.stand_up() == "fell":
+            return "fell"
         return self._skill("kbkF", seconds)
 
     def three_point_turn(self, degrees: float, back_s: float, forward_s: float) -> str:
         """Back up while turning one way, then walk forward turning the OPPOSITE way, and he ends up facing `degrees` (+ = right) round (user, 2026-11-01: the forward half is the one that
         takes him where he is going, so it turns toward `degrees` and the back-up turns the other way, like a car). The first real use turned him the wrong way: back right, forward left."""
+        if self.stand_up() == "fell":
+            return "fell"
         state = self._skill(THREE_POINT_BACK_TOKEN["left" if degrees > 0 else "right"], back_s)
         if state == "fell":
             return state
@@ -538,6 +597,9 @@ class SerialRobot:
     def punch(self) -> str:
         """The lunge with the claw shut (PUNCH_KEYS), played as `i` commands at 40 a second from the pose he stands in, then back to the balance pose. No firmware skill is sent."""
         from ..link import transitions
+        if self.stand_up() == "fell":                                   # the lunge starts from the balance pose
+            return "fell"
+        self.posture = "stand"
         self._pitch, self._roll = [], []
         self._tx("gP")
         bal = transitions.balance_pose()                              # Petoi order [FLs, FRs, BRs, BLs, FLk, FRk, BRk, BLk]
@@ -563,6 +625,8 @@ class SerialRobot:
         return "ok"
 
     def punt(self) -> str:
+        if self.stand_up() == "fell":
+            return "fell"
         if not self.use_pick:
             state = self.punch()
             if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved it did not play: once more
@@ -715,7 +779,34 @@ def _ball_dict(ball: BallReading | None):
     return None if ball is None else {"distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}
 
 
-def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
+def _relax(robot) -> None:
+    """Wait in the attention pose, not standing (ATTENTION_WHEN_STILL); a robot without the pose (a test double) is left alone."""
+    fn = getattr(robot, "relax", None)
+    if ATTENTION_WHEN_STILL and callable(fn):
+        fn()
+
+
+def _dialing_in(ball: BallReading | None) -> bool:
+    """The ball is close enough that the moves are small steps to line the claw up: no attention pose between them (read at each call: the goal sets the ranges per attempt)."""
+    return ball is not None and ball.distance_in <= max(NUDGE_MAX_IN, PUNT_MAX_IN)
+
+
+def _stand(robot) -> str:
+    """Up out of the attention pose before the straight-ahead picture and the move after it; "ok" when there is nothing to do."""
+    fn = getattr(robot, "stand_up", None)
+    return fn() if callable(fn) else "ok"
+
+
+def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], **kw) -> str:
+    """Look, decide, move, until `stop()` or a fall or a low battery (`_chase_loop` has the details and the keyword arguments). He ends in the attention pose (ATTENTION_WHEN_STILL),
+    unless he fell."""
+    ended = _chase_loop(robot, camera, stop, **kw)
+    if ended != "fell" and not kw.get("dry_run"):
+        _relax(robot)
+    return ended
+
+
+def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
               settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
               trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
@@ -753,6 +844,9 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             ball, pending = pending, None
             last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
         else:
+            if not dry_run and _stand(robot) == "fell":       # ready to move: up out of the attention pose; the picture is taken standing (the wall reading's calibration)
+                say("G2 fell: stopping (fall recovery is off)")
+                return "fell"
             sleep(settle_s)                                   # let the body stop swaying before the picture
             jpeg = camera.look()
             if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
@@ -801,6 +895,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if dry_run or act.kind == "look":
             note(kind="act", act=act.kind, why=act.why)
             if act.kind == "look":
+                if not dry_run and not _dialing_in(ball):
+                    _relax(robot)                         # not moving: wait in the attention pose
                 sleep(act.seconds)
             continue
         if act.kind == "give_up":
@@ -824,6 +920,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
                     if state == "fell":
                         say("G2 fell: stopping (fall recovery is off)")
                         return "fell"
+            _relax(robot)                                    # stays in (or goes back to) the attention pose until the next look stands him up
             continue
         if act.kind == "wall_turn":
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
@@ -874,6 +971,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
             if state == "fell":
                 say("G2 fell: stopping (fall recovery is off)")
                 return "fell"
+            if not _dialing_in(ball):                     # another punt or a step closer is next when the ball is still at the claw: stay up
+                _relax(robot)
             continue
         else:
             state = "ok"
@@ -883,6 +982,8 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner
         if state == "fell":
             say("G2 fell: stopping (fall recovery is off)")
             return "fell"
+        if not _dialing_in(ball):
+            _relax(robot)                                 # the move is over: wait in the attention pose, not standing (close to the ball he stays up between the small steps)
     return "stopped"
 
 

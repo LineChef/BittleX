@@ -439,3 +439,59 @@ def test_every_turn_is_logged_with_its_cause(tmp_path, monkeypatch):
     bc.log_turn(bc.Action("wall_turn", 2.0, -45.0, "a wall 8 in ahead: turn away"), None, bc.WallSeen(8.0, "left"), "ok")
     row = json.loads((tmp_path / "t.jsonl").read_text().splitlines()[0])
     assert row["cause"] == "a wall ahead" and row["direction"] == "left" and row["wall_in"] == 8.0 and row["ball"] is None
+
+
+def test_he_waits_in_the_attention_pose_and_stands_up_right_before_each_move():
+    class FakeLink:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = FakeLink()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 1000, 0.2)).__next__)
+    assert r.relax() == "ok" and r.relax() == "ok" and r.posture == "attention"        # the second does nothing
+    assert r.turn(20, 0.3) == "ok" and r.posture == "stand"
+    assert r.stand_up() == "ok"                                                         # standing already: nothing sent
+    r.relax()
+    assert r.back(0.3) == "ok"
+    toks = [c for c in lk.sent if c.startswith("k")]
+    assert toks == [bc.CLAW_LOOK_POSE, "kbalance", "kwkR", "kbalance", bc.CLAW_LOOK_POSE, "kbalance", "kbkF", "kbalance"]
+
+
+def test_the_claw_look_from_the_attention_pose_needs_no_stand_up_and_stays_down_afterwards():
+    class FakeLink:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = FakeLink()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 1000, 0.2)).__next__)
+    r.relax()
+    assert r.sit_down() == "ok" and r.stand_from_sit() == "ok" and r.posture == "attention"
+    assert [c for c in lk.sent if c.startswith("k")] == [bc.CLAW_LOOK_POSE, bc.CLAW_LOOK_POSE]   # the pose again (it drives the legs again), no kbalance either side
+
+
+def test_the_loop_stands_him_up_for_each_look_and_move_and_waits_in_the_attention_pose():
+    class PoseRobot(FakeRobot):
+        def relax(self): self.moves.append("attention"); return "ok"
+        def stand_up(self): self.moves.append("stand"); return "ok"
+    frames = [picture([disc(200, 110, 20)]), picture([disc(122, 110, 20)]), picture([disc(122, 110, 50)])]
+    robot = PoseRobot()
+    bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=6, sleep=lambda s: None, say=lambda m: None)
+    kinds = [m if isinstance(m, str) else m[0] for m in robot.moves]
+    assert kinds[0] == "stand" and kinds[-1] == "attention"                            # up for the first picture; down when the attempt is over
+    for i, k in enumerate(kinds):
+        if k in ("walk", "turn", "back"):
+            assert kinds[i - 1] == "stand" and kinds[i + 1] == "attention"             # every move: stood up right before, attention pose right after
+
+
+def test_close_to_the_ball_he_stays_standing_between_the_small_steps():
+    class PoseRobot(FakeRobot):
+        def relax(self): self.moves.append("attention"); return "ok"
+        def stand_up(self): self.moves.append("stand"); return "ok"
+    import types
+    near_off = picture([disc(165, 110, 33)])                 # about 5 in away, off to one side: a line-up turn
+    robot = PoseRobot()
+    bc.run_chase(robot, FakeCamera([near_off, picture([disc(122, 110, 60)])]), lambda: False, max_punts=1, max_steps=4, sleep=lambda s: None, say=lambda m: None)
+    kinds = [m if isinstance(m, str) else m[0] for m in robot.moves]
+    assert "turn" in kinds and kinds[kinds.index("turn") + 1] != "attention"             # no attention pose after the line-up turn
+    assert kinds[-1] == "attention"                                                     # but the attempt still ends in it
+    assert bc._dialing_in(None) is False and bc._dialing_in(types.SimpleNamespace(distance_in=bc.NUDGE_MAX_IN + 5)) is False
