@@ -161,7 +161,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_OBJECT_GALLERY_MAX_SAMPLES` | `5` | `config.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_OBSERVATION_DAYS` | `30.0` | `config.py` | [`.env.example`](../../.env.example) |
 | `G2_ORIGIN` | `""` | `command_log.py` | not documented |
-| `G2_PI` | — | `g2_cleanup.py`, `g2_review.py` | [`attachments.md`](attachments.md), [`cheatsheet.md`](cheatsheet.md), [`gait-deployment.md`](gait-deployment.md) +5 |
+| `G2_PI` | — | `g2_cleanup.py`, `g2_review.py`, `apply.py` | [`attachments.md`](attachments.md), [`cheatsheet.md`](cheatsheet.md), [`gait-deployment.md`](gait-deployment.md) +5 |
 | `G2_PICTURE_KEEP_DAYS` | `0.0` | `config.py` | [`.env.example`](../../.env.example), [`exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md) |
 | `G2_PICTURE_PREP_EVERY_S` | `"0"` | `explore_session.py` | [`settings-switches.md`](settings-switches.md), [`wall-check-plan.md`](../vision/wall-check-plan.md) |
 | `G2_PI_BATTERY_ARM` | `"boot"` | `config.py` | [`.env.example`](../../.env.example) |
