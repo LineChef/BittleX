@@ -13,21 +13,35 @@ from pi_pipeline.behavior import punt_settings as ps
 from pi_pipeline.behavior import ball_chase as bc
 
 RUN = os.path.expanduser(sys.argv[1]); QUICK = "--quick" in sys.argv
+SEARCH = "--search" in sys.argv                               # the search-focused run (owner, 2026-11-02: the punch is dialed in; what is missing is the best way to FIND and RE-ACQUIRE the ball)
+BASE_RUN = os.path.expanduser(sys.argv[sys.argv.index("--base") + 1]) if "--base" in sys.argv else None
 os.makedirs(RUN, exist_ok=True)
 NUM = {  # name: (lo, hi, int?)
     "walk_aim_in": (2.5, 7.0, False), "nudge_max_in": (4.5, 10.0, False), "nudges_before_punt": (0, 5, True), "nudge_step_s": (0.4, 1.6, False),
     "lost_looks": (1, 5, True), "scan_turn_deg": (20.0, 80.0, False), "search_step_deg": (10.0, 45.0, False), "punt_max_in": (3.0, 4.5, False)}
+if SEARCH:        # only the settings that govern searching are tuned; the rest stay at the first run's recommendation (or the current real values)
+    NUM = {k: NUM[k] for k in ("lost_looks", "scan_turn_deg", "search_step_deg")}
 NAMES = list(NUM)
 ORDERS, VANISH = ps.SPEC["search_order"][2], ps.SPEC["when_vanished"][2]
 MIX = {"ahead": .15, "angled": .20, "side": .15, "behind": .20, "far": .10, "wall_ball": .20}      # a deliberately hard mix: more "behind" and "by a wall" than real life
 REAL_LIKE = {"ahead": .45, "angled": .35, "far": .10, "side": .10}
+if SEARCH:
+    MIX = {"behind": .25, "side": .20, "lost": .20, "wall_ball": .10, "far": .15, "angled": .10}      # search-heavy: the ball is NOT where he is looking
+    HOLDOUT = {"corner": .25, "decoy": .25, "dim": .25, "behind": .125, "lost": .125}                  # (dim, corner and decoy are never trained on here)
+else:
+    HOLDOUT = {"corner": .34, "dim": .33, "decoy": .33}
 CURRENT = {"punt_max_in": 4.0, "nudge_max_in": 7.0, "nudges_before_punt": 3, "nudge_step_s": 0.9, "walk_aim_in": 4.0, "lost_looks": 3, "when_vanished": "punt", "search_order": "back_turn", "scan_turn_deg": 60.0, "search_step_deg": 20.0}
-S = dict(gens=3, pop=8, eps=40, final=300, workers=2) if QUICK else dict(gens=60, pop=48, eps=500, final=10000, workers=7)
+if SEARCH: VANISH = (CURRENT["when_vanished"],)                # the search run does not tune when_vanished (it belongs to the punch)
+REAL_CURRENT = dict(CURRENT)                                  # what G2 runs now: the baseline everything is compared with, in both runs
+S = dict(gens=3, pop=8, eps=40, final=300, workers=2) if QUICK else (dict(gens=40, pop=24, eps=600, final=8000, workers=7) if SEARCH else dict(gens=60, pop=48, eps=500, final=10000, workers=7))
+if SEARCH and BASE_RUN and os.path.exists(os.path.join(BASE_RUN, "recommended_punt_settings.json")):
+    CURRENT = {**CURRENT, **json.load(open(os.path.join(BASE_RUN, "recommended_punt_settings.json")))["recommended_settings"]}          # the approach settings the first run found stay
 CAL = world.load_cal()
 
 
 def decode(x, combo):
-    s = {"search_order": combo[0], "when_vanished": combo[1]}
+    s = dict(CURRENT) if SEARCH else {}
+    s.update({"search_order": combo[0], "when_vanished": combo[1]})
     for v, n in zip(x, NAMES):
         lo, hi, isint = NUM[n]; val = lo + min(1.0, max(0.0, v)) * (hi - lo); s[n] = int(round(val)) if isint else round(val, 2)
     s["nudge_max_in"] = max(s["nudge_max_in"], round(s["punt_max_in"] + 0.5, 2))
@@ -49,12 +63,16 @@ def pick_family(rng, mix):
 def evaluate(args):
     """(settings, mix, n, seed0) -> per-family score lists. Runs in a worker process."""
     s, mix, n, seed0 = args
-    full = settings_full(s); fam = collections.defaultdict(list); codes = collections.Counter(); secs = []
+    full = settings_full(s); fam = collections.defaultdict(list); codes = collections.Counter(); secs = []; seen = []
     for i in range(n):
         f = pick_family(random.Random(seed0 * 7919 + i), mix)
-        sc, code, t, _, _ = world.run_episode(full, f, seed0 * 100003 + i, CAL)
+        sc, code, t, _, stats = world.run_episode(full, f, seed0 * 100003 + i, CAL)
+        fs = stats.get("first_seen")
+        seen.append(fs)
+        if SEARCH:                                           # 70% how fast the ball was first found (0 = never, 1 = at once), 30% the whole attempt: finding it is the point, using it still counts
+            sc = 0.7 * (0.0 if fs is None else max(0.0, 1.0 - fs / 75.0)) + 0.3 * sc
         fam[f].append(sc); codes[code] += 1; secs.append(t)
-    return dict(fam), dict(codes), secs
+    return dict(fam), dict(codes), secs, seen
 
 
 def J(fam):
@@ -93,9 +111,9 @@ def main():
     # ------------------------------------------------------------------ validate
     if state["stage"] == "validate":
         n = 300 if QUICK else 4000
-        parts = pool.map(evaluate, [(CURRENT, REAL_LIKE, n // S["workers"], 5000 + k) for k in range(S["workers"])])
+        parts = pool.map(evaluate, [(REAL_CURRENT, REAL_LIKE, n // S["workers"], 5000 + k) for k in range(S["workers"])])
         codes = collections.Counter(); allv = []
-        for f, c, s_ in parts:
+        for f, c, s_, _sn in parts:
             codes.update(c); allv += [x for v in f.values() for x in v]
         tot = sum(codes.values()); simhit = (codes["hit"] + codes["hit_unseen"]) / tot
         real = real_summary()
@@ -126,20 +144,23 @@ def main():
         ranked = sorted(((k, c["best"]) for k, c in state["combos"].items()), key=lambda kv: -kv[1]["J"])
         cands = {f"sim#{i + 1} {k} (search average)": decode(np.array(state["combos"][k]["mean"]), tuple(k.split("|"))) for i, (k, b) in enumerate(ranked[:6])}      # the converged mean: less luck in it
         cands.update({f"sim-best#{i + 1} {k} (best sample)": decode(np.array(b["x"]), tuple(k.split("|"))) for i, (k, b) in enumerate(ranked[:3])})      # the single best-scoring sample (partly luck)
-        cands["CURRENT (real hardware)"] = dict(CURRENT)
-        cands["DEFAULTS (source)"] = {k: v for k, v in ps.defaults(bc).items() if k in NAMES or k in ("search_order", "when_vanished")}
+        cands["CURRENT (real hardware)"] = dict(REAL_CURRENT)
+        if SEARCH: cands["FIRST RUN's approach values only (current search values)"] = {**CURRENT, **{k: REAL_CURRENT[k] for k in NUM}}
+        cands["DEFAULTS (source)"] = {k: v for k, v in ps.defaults(bc).items() if k in list(NUM) + ["search_order", "when_vanished"] + (list(CURRENT) if SEARCH else [])}
         out = {}
         for name, s in cands.items():
             row = {"settings": s}
-            for label, mix, seed0 in (("train_mix", MIX, 900_000), ("holdout", {"corner": .34, "dim": .33, "decoy": .33}, 910_000), ("real_like", REAL_LIKE, 920_000)):
+            for label, mix, seed0 in (("train_mix", MIX, 900_000), ("holdout", HOLDOUT, 910_000), ("real_like", REAL_LIKE, 920_000)):
                 parts = pool.map(evaluate, [(s, mix, S["final"] // S["workers"], seed0 + k) for k in range(S["workers"])])
-                fam = collections.defaultdict(list); codes = collections.Counter(); secs = []
-                for f, c, s_ in parts:
+                fam = collections.defaultdict(list); codes = collections.Counter(); secs = []; seen = []
+                for f, c, s_, sn in parts:
                     for k, v in f.items(): fam[k] += v
-                    codes.update(c); secs += s_
+                    codes.update(c); secs += s_; seen += sn
                 allv = [x for v in fam.values() for x in v]; q = sorted(allv)
                 row[label] = {"mean": round(st.mean(allv), 3), "worst_quartile": round(st.mean(q[: max(1, len(q) // 4)]), 3), "families": {f: round(st.mean(v), 3) for f, v in fam.items()},
-                              "hit_rate": round((codes["hit"] + codes["hit_unseen"]) / sum(codes.values()), 3), "median_s": round(st.median(secs), 1), "codes": dict(codes.most_common(6))}
+                              "hit_rate": round((codes["hit"] + codes["hit_unseen"]) / sum(codes.values()), 3), "median_s": round(st.median(secs), 1), "codes": dict(codes.most_common(6)),
+                              "found_rate": round(sum(1 for x in seen if x is not None) / len(seen), 3), "found_within_30s": round(sum(1 for x in seen if x is not None and x <= 30) / len(seen), 3),
+                              "median_find_s": round(st.median([x for x in seen if x is not None] or [0]), 1)}
             out[name] = row; log(f"final {name}: train {row['train_mix']['mean']} holdout {row['holdout']['mean']} real-like {row['real_like']['mean']}")
         state["final"] = out; state["stage"] = "report"; save_state(state)
     # ------------------------------------------------------------------ report
@@ -149,7 +170,7 @@ def main():
         sims = {k: v for k, v in fin.items() if k.startswith("sim")}
         win = max(sims, key=lambda k: robust(sims[k])); w = sims[win]
         better = robust(w) > robust(base) + 0.01          # a simulated winner that does not clearly beat what G2 runs now is NOT recommended: the real settings stay
-        rec = dict(w["settings"]) if better else dict(CURRENT); rec_all = {**{k: v for k, v in settings_full(rec).items() if k in ps.SPEC}, **world.PINNED}
+        rec = dict(w["settings"]) if better else dict(REAL_CURRENT); rec_all = {**{k: v for k, v in settings_full(rec).items() if k in ps.SPEC}, **world.PINNED}
         json.dump({"recommended_settings": rec, "pinned_unchanged": world.PINNED, "winner": win if better else "none: the current real settings stay (no clear gain in simulation)", "best_sim_candidate": win, "robust_score": round(robust(w), 4), "current_robust_score": round(robust(base), 4)}, open(os.path.join(RUN, "recommended_punt_settings.json"), "w"), indent=1)
         json.dump(state, open(os.path.join(RUN, "results.json"), "w"), indent=1)
         rows = "".join(f"<tr><td>{k}</td><td>{v['train_mix']['mean']}</td><td>{v['train_mix']['worst_quartile']}</td><td>{v['holdout']['mean']}</td><td>{v['real_like']['mean']}</td><td>{v['real_like']['hit_rate']}</td><td>{v['real_like']['median_s']}</td><td><code>{json.dumps(v['settings'])}</code></td></tr>" for k, v in fin.items())

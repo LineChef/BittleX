@@ -53,6 +53,7 @@ class World:
             elif f == "angled": d, a = r.uniform(12, 32), r.choice([-1, 1]) * r.uniform(15, 55)
             elif f == "side": d, a = r.uniform(10, 28), r.choice([-1, 1]) * r.uniform(60, 110)
             elif f == "behind": d, a = r.uniform(10, 30), r.uniform(120, 240)
+            elif f == "lost": d, a = r.uniform(12, 28), r.choice([-1, 1]) * r.uniform(45, 65)         # at the edge of the picture: a little drift or a turn and it is gone
             elif f == "far": d, a = r.uniform(34, 60), r.uniform(-20, 20)
             else: d, a = r.uniform(10, 40), r.uniform(-180, 180)
             bx, by = self.x + d * math.cos(math.radians(self.h - a)), self.y + d * math.sin(math.radians(self.h - a))
@@ -149,4 +150,5 @@ def run_episode(settings, family, seed, cal=None, falls=True):
         if rng.random() < min(0.9, 0.08 * extra): ended = "fell"
     out = _scorer.score(AttemptResult(ended, round(w.t - t0, 1), trace, {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}), full)
     sc = out.score if out.score is not None else 0.2
-    return float(sc), out.code, w.t - t0, family, {"hit": w.punted, "still_max": still_long}
+    firsts = [e["t"] for e in trace if (e.get("kind") == "look" and e.get("ball")) or (e.get("kind") == "claw_seen" and not e.get("after_punt"))]
+    return float(sc), out.code, w.t - t0, family, {"hit": w.punted, "still_max": still_long, "first_seen": (firsts[0] if firsts else None)}
