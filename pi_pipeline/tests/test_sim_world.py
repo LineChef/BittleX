@@ -43,3 +43,12 @@ def test_a_walk_into_a_wall_bumps_and_the_ball_it_reaches_stops_him():
     w = world.World(random.Random(2), "ahead", {}); w.x, w.y, w.h, w.W, w.H = 20.0, 30.0, 180.0, 100, 100; w.bx, w.by = 90.0, 90.0
     bot = world.Bot(w); bot.walk(10.0)
     assert bot.bumped and w.x == 4.0                    # the wall behind the heading stopped him at the edge
+
+
+def test_a_session_carries_the_ball_and_the_robot_from_one_attempt_to_the_next():
+    """The owner does not put the ball back between attempts (2026-11-02): a session is one world, attempts one after another, the later ones labelled "chained"."""
+    res = world.run_session(_full(), "ahead", 11, {}, n_att=4)
+    assert [r[3] for r in res] == ["ahead", "chained", "chained", "chained"]
+    assert world.run_session(_full(), "ahead", 11, {}, n_att=4) == res                      # deterministic
+    first_alone = world.run_episode(_full(), "ahead", 11, {})
+    assert res[0][:3] == first_alone[:3]                                                     # the first attempt of a session is the same attempt as a lone one

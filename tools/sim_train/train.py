@@ -64,20 +64,22 @@ def evaluate(args):
     """(settings, mix, n, seed0) -> per-family score lists. Runs in a worker process."""
     s, mix, n, seed0 = args
     full = settings_full(s); fam = collections.defaultdict(list); codes = collections.Counter(); secs = []; seen = []
-    for i in range(n):
+    SESS = 6                                               # the search runs simulate whole sessions (the ball is not put back between attempts): SESS attempts, one after another
+    for i in range(max(1, n // SESS) if SEARCH else n):
         f = pick_family(random.Random(seed0 * 7919 + i), mix)
-        sc, code, t, _, stats = world.run_episode(full, f, seed0 * 100003 + i, CAL)
-        fs = stats.get("first_seen")
-        seen.append(fs)
-        if SEARCH:                                           # 70% how fast the ball was first found (0 = never, 1 = at once), 30% the whole attempt: finding it is the point, using it still counts
-            sc = 0.7 * (0.0 if fs is None else max(0.0, 1.0 - fs / 75.0)) + 0.3 * sc
-        fam[f].append(sc); codes[code] += 1; secs.append(t)
+        results = world.run_session(full, f, seed0 * 100003 + i, CAL, SESS) if SEARCH else [world.run_episode(full, f, seed0 * 100003 + i, CAL)]
+        for sc, code, t, label, stats in results:
+            fs = stats.get("first_seen")
+            seen.append(fs)
+            if SEARCH:                                       # 70% how fast the ball was first found (0 = never, 1 = at once), 30% the whole attempt: finding it is the point, using it still counts
+                sc = 0.7 * (0.0 if fs is None else max(0.0, 1.0 - fs / 75.0)) + 0.3 * sc
+            fam[label].append(sc); codes[code] += 1; secs.append(t)
     return dict(fam), dict(codes), secs, seen
 
 
 def J(fam):
     allv = [x for v in fam.values() for x in v]
-    means = [st.mean(v) for f, v in fam.items() if f in MIX and v]
+    means = [st.mean(v) for f, v in fam.items() if (f in MIX or f == "chained") and v]
     return 0.6 * st.mean(allv) + 0.4 * min(means), st.mean(allv), {f: round(st.mean(v), 3) for f, v in fam.items()}
 
 

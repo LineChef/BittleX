@@ -130,17 +130,37 @@ class Bot:
 
 
 _scorer = None
-def run_episode(settings, family, seed, cal=None, falls=True):
+def run_episode(settings, family, seed, cal=None, falls=True, max_punts=1):
     """One simulated attempt with `settings` (a full punt-settings dict); returns (score, outcome code, seconds, family, stats dict)."""
+    cal = cal if cal is not None else load_cal()
+    rng = random.Random(seed); w = World(rng, family, cal)
+    return _attempt(w, rng, settings, family, falls, max_punts)
+
+
+SESSION_REST_S = 5.0                                           # the goal's rest between attempts (rest_between_s)
+
+
+def run_session(settings, family, seed, cal=None, n_att=6, falls=True):
+    """A session as he runs it (owner, 2026-11-02: the ball is not put back between attempts, he finds it on his own): one world, `n_att` attempts, the ball and the robot where the last
+    attempt left them. The first attempt starts from a `family` situation; the later ones are labelled "chained". Returns the list of per-attempt results."""
+    cal = cal if cal is not None else load_cal()
+    rng = random.Random(seed); w = World(rng, family, cal); out = []
+    for k in range(n_att):
+        out.append(_attempt(w, rng, settings, family if k == 0 else "chained", falls, 1))
+        w.t += SESSION_REST_S; w.pan = 0.0
+    return out
+
+
+def _attempt(w, rng, settings, family, falls, max_punts):
     global _scorer
     from pi_pipeline.goals.ball_punt import BallPunt
     _scorer = _scorer or BallPunt()
-    cal = cal if cal is not None else load_cal()
-    rng = random.Random(seed); w = World(rng, family, cal); bot, cam, trace = Bot(w), Camera(w), []; planner = bc.ChasePlanner()
+    w.punted = False; w.bumped = False
+    bot, cam, trace = Bot(w), Camera(w), []; planner = bc.ChasePlanner()
     full = dict(settings); full.update(PINNED); ps.apply(bc, {k: v for k, v in full.items() if k in ps.SPEC})
     t0 = w.t
     try:
-        ended = bc.run_chase(bot, cam, lambda: False, planner=planner, max_punts=1, max_seconds=75.0, trace=trace, after_punt_look=True, pace=StubPace(),
+        ended = bc.run_chase(bot, cam, lambda: False, planner=planner, max_punts=max_punts, max_seconds=75.0 if max_punts == 1 else 75.0 + 40.0 * (max_punts - 1), trace=trace, after_punt_look=True, pace=StubPace(),
                              clock=lambda: w.t, sleep=lambda s: setattr(w, "t", w.t + s), say=lambda m: None)
     except Exception as e:  # a crash in the chase is a result too
         return 0.0, "crash:" + type(e).__name__, w.t, family, {}
@@ -151,4 +171,10 @@ def run_episode(settings, family, seed, cal=None, falls=True):
     out = _scorer.score(AttemptResult(ended, round(w.t - t0, 1), trace, {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}), full)
     sc = out.score if out.score is not None else 0.2
     firsts = [e["t"] for e in trace if (e.get("kind") == "look" and e.get("ball")) or (e.get("kind") == "claw_seen" and not e.get("after_punt"))]
-    return float(sc), out.code, w.t - t0, family, {"hit": w.punted, "still_max": still_long, "first_seen": (firsts[0] if firsts else None)}
+    punts = [e["t"] for e in trace if e.get("kind") == "act" and e.get("act") == "punt"]
+    seen_t = sorted([e["t"] for e in trace if (e.get("kind") == "look" and e.get("ball")) or (e.get("kind") == "claw_seen")])
+    reacq = []                                              # seconds from the end of each punt to the next sighting of the ball (None: never seen again)
+    for i, pt in enumerate(punts):
+        nxt = next((x for x in seen_t if x > pt + 0.5), None); lim = punts[i + 1] if i + 1 < len(punts) else 1e9
+        reacq.append(round(nxt - pt, 1) if nxt is not None and nxt < lim + 1e-9 else None)
+    return float(sc), out.code, w.t - t0, family, {"hit": w.punted, "still_max": still_long, "first_seen": (firsts[0] if firsts else None), "punts": len(punts), "reacquire_s": reacq}
