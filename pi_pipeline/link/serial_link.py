@@ -41,9 +41,9 @@ def feedback_row(line: str):
 
 
 # What the legs were last told to do, as far as the stand-up ramp is concerned. "" is a fresh process (assumed lying).
-LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit")
+LYING_OR_SITTING = ("", "d", "krest", "kzz", "ksit", "kcalib")      # kcalib: the attention pose (legs straight); a move out of it stands him up back legs first (user, 2026-11-02)
 # Skills that leave him lying or sitting, or that are not a stand-up: they never get the ramp.
-STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd"})
+STAY_DOWN_SKILLS = frozenset({"krest", "kzz", "ksit", "kzero", "kc", "kcd", "kcalib"})
 
 
 class SerialLink:
@@ -288,6 +288,9 @@ class SerialLink:
             _spec = _ilu.spec_from_file_location("g2_standup", _p)
             standup = _ilu.module_from_spec(_spec)
             _spec.loader.exec_module(standup)
+        if standup.stand_from_attention(self._write_pose, time.sleep, self.last_motion_command):  # from the attention pose (kcalib): the back legs first, then the front legs (user, 2026-11-02)
+            self._skip_firmware_stand = True
+            return transitions.balance_pose()
         if standup.stand_from_sit(self._write_pose, time.sleep, self.last_motion_command):        # the arm build from a sit (the claw look): the back legs rise slowly, then the front legs
             self._skip_firmware_stand = True
             return transitions.balance_pose()

@@ -369,7 +369,7 @@ def test_a_claw_look_takes_two_pictures_and_turns_g2_toward_the_ball_by_the_came
     robot, trace = ClawRobot(), []
     bc.run_chase(robot, cam, lambda: False, max_steps=3, sleep=lambda s: None, say=lambda m: None, trace=trace)
     claws = [m for m in robot.moves if m[0] == "claw"]
-    assert claws[:3] == [("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)]       # right, then left: two pictures, then the arm home
+    assert claws[:5] == [("claw", 0, 15), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)]       # raised first, two pictures, centre still raised, then lowered
     turns = [m for m in robot.moves if m[0] == "turn"]
     assert turns and turns[-1][1] < -20                                                  # it turned left, toward the ball
     assert any(e.get("kind") == "claw_seen" for e in trace)
@@ -1468,8 +1468,8 @@ def test_the_claw_look_sits_swings_left_then_right_returns_to_centre_and_stands_
     bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.CLAW_FROM_SIT = 35.0, 15.0, "left", True       # a positive pan points the camera left on G2
     robot, trace = SitRobot(), []
     state, found = bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=trace)
-    assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
-    assert robot.moves[1:4] == [("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)] and state == "ok" and found is None     # left first, then right, then centre
+    assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "claw", "claw", "stand_from_sit"]
+    assert robot.moves[1:6] == [("claw", 0, 15), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)] and state == "ok" and found is None     # raised clear of the legs, left, right, centre, lowered (user, 2026-11-02)
 
 
 def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_direction_is_used(monkeypatch):
@@ -1477,7 +1477,7 @@ def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_
     ahead = picture([disc(120, 110, 12)])
     robot = SitRobot()
     bc.run_chase(robot, FakeCamera([picture(), ahead, picture(), picture()]), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None, trace=[])
-    assert [m[0] for m in robot.moves][:5] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
+    assert [m[0] for m in robot.moves][:7] == ["sit", "claw", "claw", "claw", "claw", "claw", "stand_from_sit"]
     turns = [m for m in robot.moves if m[0] == "turn"]
     assert turns and turns[0][1] < -20                                   # seen in the left picture: he turns left toward it, and looks again standing instead of walking on a sit-height distance
 

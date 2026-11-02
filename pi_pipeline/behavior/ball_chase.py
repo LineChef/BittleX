@@ -87,6 +87,8 @@ SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
 CLAW_LIFT_DEG = 15.0
+CLAW_RAISE_FIRST = True        # (user, 2026-11-02) from the attention pose the claw sits between the front legs and cannot pan there: raise it straight up first (lift CLAW_LIFT_DEG, pan 0), then
+                               # pan left, picture, pan right, picture, back to the centre still raised, and lower it last
 CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: LEFT on G2 (2026-11-01, pictures taken 1.3 s after each move: pan +35 put the ball 73 px to the right = camera 35 deg left, pan -35 about 39 deg right; the user saw the claw swing left); claw_look --calibrate can re-measure it
 CLAW_DEG_S = 60.0              # how fast the arm moves for a look (below the 80 deg/s cap on eased moves)
 CLAW_STEPS_PER_S = 40
@@ -720,7 +722,9 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
         pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
     seen = []                                                                         # [(pan, reading)]
-    for pan in pans:
+    if CLAW_RAISE_FIRST:
+        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # up first, straight ahead: clear of the legs before any pan
+    for pan in (pans if state != "fell" else []):
         state = robot.claw_pose(pan, CLAW_LIFT_DEG)
         if state == "fell":
             break
@@ -747,8 +751,10 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
             trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
                           **({"t": stamp()} if stamp else {}), **extra})
         say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
+    if state != "fell" and CLAW_RAISE_FIRST:
+        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # back to the centre still raised ...
     if state != "fell":
-        state = robot.claw_pose(0.0, 0.0)
+        state = robot.claw_pose(0.0, 0.0)                                            # ... then lowered
     if from_sit and state != "fell":
         state = robot.stand_from_sit()
     if trace is not None:

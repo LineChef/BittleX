@@ -201,6 +201,33 @@ def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
     return True
 
 
+ATTENTION_URDF_DEG = [0.0] * 8               # the firmware `calib` pose ("attention", legs straight): every leg joint at 0 (InstinctBittleESP.h `calib`)
+ATT_REAR_S, ATT_FRONT_S = 1.2, 1.0           # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, THEN the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
+ATT_FRONT_START_S = ATT_REAR_S               # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
+
+
+def stand_from_attention(send, sleep=time.sleep, last_motion_command=None) -> bool:
+    """The stand-up from the attention pose (`kcalib`): back legs first, then the front legs (user, 2026-11-02), to the balance pose of the fitted attachment. Any build; only from
+    `kcalib`. No firmware `kbalance` after it (the caller skips it, as for the other stand-ups here: the firmware would stand up again from the pose it believes he is in). The arm and
+    the head are not sent. Returns True if it ran."""
+    if (last_motion_command or "").strip() != "kcalib":
+        return False
+    start, goal = list(ATTENTION_URDF_DEG), balance_pose()
+    end_s = max(ATT_REAR_S, ATT_FRONT_START_S + ATT_FRONT_S)
+    n = int(round(end_s * STEPS_PER_S))
+    for i in range(1, n + 1):
+        t = i / STEPS_PER_S
+        now = list(start)
+        for group, t0, dur in ((_REAR_URDF, 0.0, ATT_REAR_S), (_FRONT_URDF, ATT_FRONT_START_S, ATT_FRONT_S)):
+            u = min(1.0, max(0.0, (t - t0) / dur))
+            for k in group:
+                now[k] = start[k] + (goal[k] - start[k]) * _smooth(u)
+        send(move_cmd(now))
+        sleep(1.0 / STEPS_PER_S)
+    sleep(0.4)
+    return True
+
+
 def stand_via_firmware(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The arm build stands up with the plain firmware `kbalance` (profile "poses": {"stand_via": "kbalance"}), which also sets the lift servo to its walking angle (0). Used by the walk
     loops when they start from rest: the Pi never sets joint 1 itself, so a walk that began from `rest` walked with the claw reaching forward (lift 59, the claw on the floor).

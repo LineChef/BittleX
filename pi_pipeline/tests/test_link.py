@@ -465,3 +465,43 @@ def test_streamed_sends_do_not_wait_for_the_bytes_to_drain():
     assert flushes == []
     lk.send("P", read_reply=True, settle=0.0)                     # a reply follows: wait until it is on the wire
     assert flushes == [1]
+
+
+def test_a_move_out_of_the_attention_pose_stands_him_up_back_legs_first_then_front_legs():
+    from pi_pipeline.gait import standup
+    sent = []
+    assert standup.stand_from_attention(sent.append, lambda s: None, "kcalib")
+    assert not standup.stand_from_attention(sent.append, lambda s: None, "krest")      # only from the attention pose
+    poses = [[int(x) for x in c[1:].split()[1::2]] for c in sent]                     # "i8 a 12 b ...": the angles, servo order 8 12 9 13 10 14 11 15
+    rear = lambda p: p[4:]                                                              # noqa: E731  (servos 10 14 11 15: the back legs)
+    front = lambda p: p[:4]                                                             # noqa: E731
+    first_front_move = next(i for i, p in enumerate(poses) if front(p) != front(poses[0]) or any(front(p)))
+    assert rear(poses[first_front_move - 1]) == rear(poses[-1])                        # the back legs are all the way up before the front legs start
+    goal = standup.balance_pose()
+    assert sorted(poses[-1]) == sorted(int(round(g)) for g in goal)                     # ends at the balance pose
+    step = max(abs(a - b) for p, q in zip(poses, poses[1:]) for a, b in zip(p, q))
+    assert step * standup.STEPS_PER_S <= 80 + 1e-6                                      # no joint faster than the 80 deg/s cap
+
+
+def test_the_link_stands_him_up_from_the_attention_pose_itself_and_skips_the_firmware_stand(monkeypatch):
+    import time as _time
+    from pi_pipeline.link.serial_link import SerialLink
+
+    class FakeSerial:
+        def __init__(self):
+            self.out, self.is_open = [], True
+        def write(self, b): self.out.append(b.decode().strip())
+        def flush(self): pass
+        def reset_input_buffer(self): pass
+        def close(self): pass
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.setattr(_time, "sleep", lambda s: None)
+    lk = SerialLink("/dev/null")
+    lk._ser = FakeSerial()
+    lk.send("kcalib", read_reply=False, settle=0.0)
+    lk.send("kcalib", read_reply=False, settle=0.0)                                   # the pose sent again (the claw look): no stand-up
+    assert [c for c in lk._ser.out if c.startswith("i")] == []
+    lk.send("kbalance", read_reply=False, settle=0.0)                                 # ready to move: up out of it
+    out = lk._ser.out
+    legs = [c for c in out if c.startswith("i")]
+    assert len(legs) >= 30 and "kbalance" not in out[out.index(legs[0]):]            # the link's own back-legs-first stand-up, and no firmware stand-up after it
