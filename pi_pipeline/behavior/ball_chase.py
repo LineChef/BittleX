@@ -71,6 +71,8 @@ SEARCH_ORDERS = {
     "back_and_turn": ((), ("back", "turn")),
     "three_point_turn": ((), ("three_point",)),                  # 3-point turn steps (user, 2026-11-01): back up while turning, then forward turning the other way
     "claw_three_point": (("claw",), ("three_point", "claw")),
+    "full_circle": ((), ("circle",)),                            # a full-circle scan (user, 2026-11-02): turn steps that add up to one whole turn, counted; after each whole turn without the ball he backs up for a wider view
+    "claw_full_circle": (("claw",), ("circle", "claw")),         # the same with a claw look between the turn steps
 }
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
 # The 3-point turn (user, 2026-11-01): back up while turning one way, then walk forward while turning the OPPOSITE way (as a car does), so he comes round in less room than a spot turn
@@ -239,6 +241,8 @@ class ChasePlanner:
     prev_kind: str | None = None   # the kind of the last action he carried out (run_chase sets it): a ball gone after a small step forward means he pushed it
     seen_ball: bool = False    # the ball has been seen this attempt: from then on only straight pictures, never a claw look (user, 2026-11-01)
     search_i: int = 0          # moves into the current search
+    circle_deg: float = 0.0    # degrees turned in the current full-circle scan
+    circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
     align_turns: int = 0       # fine-alignment pulses since the ball came within NUDGE_MAX_IN
@@ -292,6 +296,11 @@ class ChasePlanner:
                 if self._can_back(BACK_UP_S):
                     return self._back("search_back", BACK_UP_S, "searching: back up to see more of the floor")
                 continue
+            if move == "circle" and self.circle_deg >= 360.0 - 1e-9:
+                self.circle_deg = 0.0
+                self.circles += 1
+                if self._can_back(BACK_UP_S):
+                    return self._back("search_back", BACK_UP_S, f"a full circle without the ball ({self.circles}): back up for a wider view")
             self.search_steps += 1
             step = SCAN_TURN_DEG if "claw" in cycle else SEARCH_STEP_DEG
             per_circle = max(1, int(math.ceil(360.0 / max(abs(step), 1.0)))) if "claw" in cycle else SEARCH_STEPS_PER_CIRCLE
@@ -302,7 +311,9 @@ class ChasePlanner:
                 self.search_steps = 1                          # a desk or any small surface: never walk blind, keep turning in place (user, 2026-10-25: "the desk isn't very long")
             rate = self._turn_rate(side, False)
             secs = min(abs(step) / rate, SEARCH_MOVE_MAX_S)              # a few steps, then look again (user, 2026-11-01: a 60 deg step at 6 deg/s was 10 s of turning)
-            return Action("search_turn", secs, secs * rate * side, f"searching {'right' if side > 0 else 'left'}")
+            if move == "circle":
+                self.circle_deg += secs * rate
+            return Action("search_turn", secs, secs * rate * side, f"searching {'right' if side > 0 else 'left'}" + (f": full circle, {min(self.circle_deg, 360.0):.0f} of 360 deg" if move == "circle" else ""))
         return Action("look", 1.0, why="searching: nothing left to try this round, look again")
 
     def _three_point(self, kind: str, deg: float, why: str) -> Action:
@@ -342,6 +353,8 @@ class ChasePlanner:
         self.lost = 0
         self.search_steps = 0
         self.search_i = 0
+        self.circle_deg = 0.0
+        self.circles = 0
         self.seen_ball = True
         if wall is not None and wall.nearest_in is not None and ball.distance_in > NUDGE_MAX_IN:   # walls rank above the punt; but with the ball within a few inches lining up and punching
             # goes no closer to the wall, and the wall reading is not calibrated for the claw camera (user, 2026-11-01: he turned away from a ball right in front of him)
