@@ -600,3 +600,13 @@ def test_a_quick_follow_on_move_skips_the_pose_read():
     assert r.stand_up() == "ok" and "j" not in lk.sent                                  # just moved: he goes at once
     r._moved_at = r._clock() - 10.0
     assert r.stand_up() == "ok" and "j" in lk.sent                                      # still a while: the pose is read first
+
+
+def test_a_walk_that_cannot_start_because_the_board_sends_nothing_ends_the_attempt():
+    class SilentBoard(FakeRobot):
+        def walk(self, s): self.moves.append(("walk", s)); return "board_silent"
+    said = []
+    robot = SilentBoard()
+    out = bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 20)])]), lambda: False, max_steps=10, sleep=lambda s: None, say=said.append)
+    assert out == "board_silent" and len([m for m in robot.moves if m[0] == "walk"]) == 1      # once, not rest-picture-stand over and over (2026-11-02)
+    assert any("power-cycle" in m for m in said)

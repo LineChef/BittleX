@@ -41,6 +41,7 @@ class _Stop(threading.Event):
 class PolicyWalker:
     def __init__(self, link, *, cmd_fwd: float = DEFAULT_CMD_FWD, run_fn=None, on_done=None, on_battery=None, on_fall=None, foot_hold: str | None = "env", hold_between_legs: bool = False, scripted_fn=None, on_stall=None, on_contact=None):
         self._scripted_fn = scripted_fn          # the open-loop player for a gait the policy does not know (tests inject one)
+        self.start_failure: str | None = None    # why the last walk never started (e.g. no IMU frame), or None
         self._hold = hold_between_legs          # exploration: a leg that ends by itself leaves G2 in a balanced stand, not lying down (the session rests at its end)
         self._foot_hold = default_foot_hold() if foot_hold == "env" else foot_hold
         self._link, self._cmd, self._run_fn, self._on_done = link, cmd_fwd, run_fn, on_done
@@ -117,6 +118,7 @@ class PolicyWalker:
                     log.exception("the fall handler failed")
         except SystemExit as e:                       # run() reports "no IMU frame" and similar this way
             log.error("policy walk could not start: %s", e)
+            self.start_failure = str(e)               # the caller can tell a walk that never started (2026-11-02: a board that stopped sending made the ball chase rest, stand and retry for minutes)
         except Exception:  # noqa: BLE001
             log.exception("policy walk failed")
         finally:

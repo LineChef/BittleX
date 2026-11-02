@@ -135,6 +135,10 @@ class GoalSession:
                 if result.ended == "battery":
                     why = "battery"
                     break
+                if result.ended == "board_silent":                    # the board sends nothing back (no IMU): every attempt would only rest and stand him; it needs a power-cycle
+                    self._speak("My board is not answering. Please switch it off and on.")
+                    why = "board_silent"
+                    break
                 if result.ended == "stopped" or self.stop():
                     why = "stopped"
                     break

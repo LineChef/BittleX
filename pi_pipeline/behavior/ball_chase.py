@@ -707,6 +707,7 @@ class SerialRobot:
             self._walker._on_fall = lambda: fell.append(1)
             self._walker._on_contact = lambda ev=None: hit.append(ev)
         self.bumped = False
+        self._walker.start_failure = None
         self._walker.walk(seconds)
         t0 = self._clock()
         self._sleep(0.2)
@@ -719,6 +720,8 @@ class SerialRobot:
             self._walker.stop(rest=False)
         self.bumped = bool(hit)
         self._moved_at = self._clock()
+        if getattr(self._walker, "start_failure", None) and "IMU" in str(self._walker.start_failure):
+            return "board_silent"                     # the board sends no IMU frames: the walk never started (it rested him); retrying only repeats rest, picture, stand-up
         return "fell" if fell else "ok"
 
     def claw_pose(self, pan: float, lift: float) -> str:
@@ -1111,6 +1114,10 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 last_move = ("turn", act.seconds, act.degrees, ball)
         elif act.kind in ("walk", "search_walk"):
             state = robot.walk(act.seconds)
+            if state == "board_silent":
+                say("the BiBoard is not sending anything back (no IMU frames): power-cycle it (switch it off and on), then try again")
+                note(kind="act", act=act.kind, why=act.why, state=state)
+                return "board_silent"
             if getattr(robot, "bumped", False):
                 note(kind="wall", event="bump", wall_in=None if wall is None else wall.nearest_in, why="bumped into something while walking")
                 say(f"[{steps}] bumped into something while walking: backing off")

@@ -97,6 +97,7 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 | `align_pulse_min_s` | 1.0 | 0.3 to 1.6 | Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse. |
 | `align_tries` | 3 | 1 to 8 | Small turns to line up before `when_misaligned`. |
 | `when_misaligned` | punch | punch / back_up | Still off line after `align_tries`: punch anyway or back up and line up again. |
+| `between_moves` | stand | stand / attention | While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up back legs first to move (2026-11-02, tried against the legs letting go after 7 to 10 s still; the standing flow is the default: more fluid). A fixed goal knob: G2 never changes it. |
 
 **Walls come first** (user, 2026-10-31): the chase never walks closer than `chase_wall_in` to a wall (10 in to start, learned by the walls goal, never below 4 in), turns away
 when he is that close, leaves a ball lying nearer a wall than that, and stops a walk on a bump. It uses the camera's wall reading as it is (calibrating it is optional); with no
