@@ -96,9 +96,10 @@ CLAW_LOOK_POSE = "kcalib"      # the pose he holds for the claw look (user, 2026
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
 CLAW_POSE_S = 2.0              # to settle into the attention pose
 SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
-ATTENTION_WHEN_STILL = True    # (user, 2026-11-02) he never waits standing: after every move he goes into the attention pose (CLAW_LOOK_POSE, legs straight), and when he is ready to move
-                               # again he stands up (`kbalance`), takes the straight-ahead picture standing (the wall reading is calibrated on standing pictures; the ball distance comes
-                               # from its size and works in either pose) and moves at once. The legs went slack after 7 to 10 s of standing still (docs/STATUS.md open problem 14).
+ATTENTION_WHEN_STILL = True    # (user, 2026-11-02) he never waits standing: after every move he goes into the attention pose (CLAW_LOOK_POSE, legs straight) and takes the straight-ahead
+                               # picture there, once settled; only when the decision is a move does he stand up (back legs first, the link's stand_from_attention), and the move starts at once.
+                               # The ball distance comes from its size, so it reads the same in either pose; the wall reading was calibrated on STANDING pictures and may read off from this
+                               # pose until a wall calibration is taken in it. The legs went slack after 7 to 10 s of standing still (docs/STATUS.md open problem 14).
 # Close to the ball (within the nudge range, NUDGE_MAX_IN / PUNT_MAX_IN as the goal set them for this attempt, at the look before the move) he is dialing in: nudges, line-up turns,
 # a step closer after a punt. He stays standing between those small steps instead of going into the attention pose at each stop (user, 2026-11-02): `_dialing_in`.
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -797,15 +798,11 @@ def _dialing_in(ball: BallReading | None) -> bool:
     return ball is not None and ball.distance_in <= max(NUDGE_MAX_IN, PUNT_MAX_IN)
 
 
-def _stand(robot) -> str:
-    """Up out of the attention pose before the straight-ahead picture and the move after it; "ok" when there is nothing to do."""
-    fn = getattr(robot, "stand_up", None)
-    return fn() if callable(fn) else "ok"
-
-
 def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], **kw) -> str:
-    """Look, decide, move, until `stop()` or a fall or a low battery (`_chase_loop` has the details and the keyword arguments). He ends in the attention pose (ATTENTION_WHEN_STILL),
-    unless he fell."""
+    """Look, decide, move, until `stop()` or a fall or a low battery (`_chase_loop` has the details and the keyword arguments). He starts and ends in the attention pose
+    (ATTENTION_WHEN_STILL), unless he fell; each move stands him up first (the robot's own move methods do it)."""
+    if not kw.get("dry_run"):
+        _relax(robot)                                     # the first picture is taken in the attention pose too
     ended = _chase_loop(robot, camera, stop, **kw)
     if ended != "fell" and not kw.get("dry_run"):
         _relax(robot)
@@ -850,10 +847,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             ball, pending = pending, None
             last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
         else:
-            if not dry_run and _stand(robot) == "fell":       # ready to move: up out of the attention pose; the picture is taken standing (the wall reading's calibration)
-                say("G2 fell: stopping (fall recovery is off)")
-                return "fell"
-            sleep(settle_s)                                   # let the body stop swaying before the picture
+            sleep(settle_s)                                   # let the body stop swaying before the picture (in the attention pose, or standing while he dials in close to the ball)
             jpeg = camera.look()
             if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
                 say(f"[{steps}] no picture from the camera: looking again")

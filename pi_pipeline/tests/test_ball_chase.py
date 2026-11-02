@@ -469,7 +469,7 @@ def test_the_claw_look_from_the_attention_pose_needs_no_stand_up_and_stays_down_
     assert [c for c in lk.sent if c.startswith("k")] == [bc.CLAW_LOOK_POSE, bc.CLAW_LOOK_POSE]   # the pose again (it drives the legs again), no kbalance either side
 
 
-def test_the_loop_stands_him_up_for_each_look_and_move_and_waits_in_the_attention_pose():
+def test_the_loop_takes_each_picture_in_the_attention_pose_and_goes_back_to_it_after_each_move():
     class PoseRobot(FakeRobot):
         def relax(self): self.moves.append("attention"); return "ok"
         def stand_up(self): self.moves.append("stand"); return "ok"
@@ -477,10 +477,11 @@ def test_the_loop_stands_him_up_for_each_look_and_move_and_waits_in_the_attentio
     robot = PoseRobot()
     bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=6, sleep=lambda s: None, say=lambda m: None)
     kinds = [m if isinstance(m, str) else m[0] for m in robot.moves]
-    assert kinds[0] == "stand" and kinds[-1] == "attention"                            # up for the first picture; down when the attempt is over
+    assert kinds[0] == "attention" and kinds[-1] == "attention"                        # the first picture is taken in the attention pose; down again when the attempt is over
+    assert "stand" not in kinds                                                         # the loop never stands him up for a picture: the robot's own moves do it (SerialRobot)
     for i, k in enumerate(kinds):
         if k in ("walk", "turn", "back"):
-            assert kinds[i - 1] == "stand" and kinds[i + 1] == "attention"             # every move: stood up right before, attention pose right after
+            assert kinds[i + 1] == "attention"                                          # every move: attention pose right after, and the next picture from there
 
 
 def test_close_to_the_ball_he_stays_standing_between_the_small_steps():
@@ -492,6 +493,7 @@ def test_close_to_the_ball_he_stays_standing_between_the_small_steps():
     robot = PoseRobot()
     bc.run_chase(robot, FakeCamera([near_off, picture([disc(122, 110, 60)])]), lambda: False, max_punts=1, max_steps=4, sleep=lambda s: None, say=lambda m: None)
     kinds = [m if isinstance(m, str) else m[0] for m in robot.moves]
-    assert "turn" in kinds and kinds[kinds.index("turn") + 1] != "attention"             # no attention pose after the line-up turn
+    i = kinds.index("turn")
+    assert kinds[i + 1] != "attention"                                                  # no attention pose after the line-up turn: the next picture is taken standing
     assert kinds[-1] == "attention"                                                     # but the attempt still ends in it
     assert bc._dialing_in(None) is False and bc._dialing_in(types.SimpleNamespace(distance_in=bc.NUDGE_MAX_IN + 5)) is False
