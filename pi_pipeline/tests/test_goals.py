@@ -842,13 +842,15 @@ def test_while_chasing_walls_come_first(monkeypatch):
     assert a.kind == "wall_turn" and a.degrees < 0
     q = bc.ChasePlanner()
     assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right", 14.0)).kind == "look"         # the ball is 4 in from the wall behind it: look again first
+    monkeypatch.setattr(bc, "WALL_SIDESTEP_TRIES", 0)                                        # with no sidesteps allowed (the old behaviour) ...
     assert q.decide(reading(10, 0), bc.WallSeen(14.0, "right", 14.0)).kind == "give_up"     # ... then leave it
     side = bc.ChasePlanner()
     for _ in range(3):
         assert side.decide(reading(20, 0), bc.WallSeen(14.0, "right", None)).kind == "walk"  # a side wall at 14 in is not "behind the ball": walk on (the walk is capped by the loop)
 
 
-def test_a_walk_is_cut_short_before_a_wall_and_a_ball_by_the_wall_ends_the_attempt_uncounted():
+def test_a_walk_is_cut_short_before_a_wall_and_a_ball_by_the_wall_ends_the_attempt_uncounted(monkeypatch):
+    monkeypatch.setattr(bc, "WALL_SIDESTEP_TRIES", 0)
     bc.CHASE_WALL_IN, bc.LOST_LOOKS = 10.0, 1
     robot, trace = ClawRobot(), []
     cam = FakeCamera([picture([disc(120, 90, 6)])])                                          # the ball far ahead (about 27 in)
@@ -1661,3 +1663,40 @@ def test_the_claw_look_from_the_attention_pose_raises_the_claw_first_and_lowers_
     robot = SitRobot()
     bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=[])
     assert [m for m in robot.moves if m[0] == "claw"] == [("claw", 0, 15), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)]
+
+
+def test_a_ball_against_a_wall_gets_a_sidestep_toward_the_room_then_the_other_side_then_he_leaves_it(monkeypatch):
+    assert bc.WALL_SIDESTEP_BALL_IN >= 10.0
+    """Owner, 2026-11-02: push the ball away from the wall and punt it again, do not leave it. A punch straight into a wall comes straight back; from the side it banks away."""
+    monkeypatch.setattr(bc, "CHASE_WALL_IN", 10.0)
+    p = bc.ChasePlanner(); w = bc.WallSeen(14.0, "right", 14.0)
+    assert p.decide(reading(10, 0), w).kind == "look"                                        # first a second look (a false wall reading is common)
+    a = p.decide(reading(10, 0), w)
+    assert a.kind == "sidestep" and a.degrees == bc.WALL_SIDESTEP_DEG and abs(a.seconds - bc.WALL_SIDESTEP_IN / p._walk_pace()) < 1e-6      # toward the side with more room: right
+    p.decide(reading(10, 0), w); b = p.decide(reading(10, 0), w)
+    assert b.kind == "sidestep" and b.degrees == -bc.WALL_SIDESTEP_DEG                                       # the second try goes the other way
+    p.decide(reading(10, 0), w); p.decide(reading(10, 0), w)
+    kinds = [p.decide(reading(10, 0), w).kind for _ in range(2)]
+    assert kinds[-1] == "give_up" and p.sidesteps == bc.WALL_SIDESTEP_TRIES                  # three tries, then he leaves it
+
+
+def test_the_chase_carries_a_sidestep_out_as_a_turn_and_a_step():
+    robot = ClawRobot(); said = []
+    bc.run_chase(robot, FakeCamera([picture([disc(120, 110, 12)])]), lambda: False, max_steps=4, sleep=lambda s: None, say=said.append,
+                 wall_check=lambda jpeg, ball: bc.WallSeen(ball.distance_in + 3.0, "right", ball.distance_in + 3.0))
+    mv = [m for m in robot.moves if m[0] in ("turn", "walk")]
+    assert mv[0][0] == "turn" and mv[0][1] > 0 and mv[1][0] == "walk"                                                  # right 40, the step; then the normal chase turns to the ball
+    assert any("step" in m and "from the side" in m for m in said)
+
+
+def test_a_sidestep_ends_facing_the_ball_again_so_it_stays_in_the_cameras_view():
+    """2026-11-02 sim: after a turn and a step the ball was 65 deg off and out of the picture (about 47 deg either way), so he searched. The closing turn is computed from where the ball is."""
+    import math
+    p = bc.ChasePlanner(); w = bc.WallSeen(14.0, "right", 14.0)
+    p.decide(reading(10, 0), w); a = p.decide(reading(10, 0), w)
+    assert a.kind == "sidestep" and a.degrees > 0 and a.degrees2 < 0                         # turned right to step, then back to the left toward the ball
+    th = math.radians(a.degrees); step = a.seconds * p._walk_pace()
+    px, py = step * math.sin(th), step * math.cos(th)
+    facing = a.degrees + a.degrees2                                                          # the heading after both turns, from straight ahead
+    toward = math.degrees(math.atan2(0.0 - px, 10.0 - py))                                   # the ball is straight ahead at 10 in
+    assert abs(facing - toward) < 1.0

@@ -346,6 +346,20 @@ class CameraSnapshotter:
             log.debug("discarding one picture failed", exc_info=True)
             self._ser = None
 
+    def premeter(self, force: bool = False) -> bool:
+        """Meter the light NOW if it was last measured more than half a metering interval ago (or `force`), so the next picture needs no metering of its own. Meant for a background
+        thread while G2 is moving or standing up: the metering used to run while he stood still waiting for the picture (docs/STATUS.md item 14: the legs let go after 7 to 10 s of standing).
+        Takes the camera lock, so a picture asked for meanwhile waits for it, never runs over it. Returns whether it metered. Never raises."""
+        try:
+            with self._lock:
+                self._open()
+                if self._exposure_check and (force or self._clock() - self._metered_at > self._meter_every_s * 0.5):
+                    self._meter()
+                    return True
+        except Exception:  # noqa: BLE001
+            log.debug("premetering failed", exc_info=True)
+        return False
+
     def snapshot(self) -> Snapshot | None:
         """One picture (re-taken in better light if the first is badly exposed), or None if the camera is unavailable or does not answer
         in time. Never raises."""

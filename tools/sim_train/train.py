@@ -14,6 +14,7 @@ from pi_pipeline.behavior import ball_chase as bc
 
 RUN = os.path.expanduser(sys.argv[1]); QUICK = "--quick" in sys.argv
 SEARCH = "--search" in sys.argv                               # the search-focused run (owner, 2026-11-02: the punch is dialed in; what is missing is the best way to FIND and RE-ACQUIRE the ball)
+WALLS = "--walls" in sys.argv                                 # the wall run (owner, 2026-11-02): tunes the sidestep for a ball against a wall on top of the earlier runs' values
 BASE_RUN = os.path.expanduser(sys.argv[sys.argv.index("--base") + 1]) if "--base" in sys.argv else None
 os.makedirs(RUN, exist_ok=True)
 NUM = {  # name: (lo, hi, int?)
@@ -21,21 +22,30 @@ NUM = {  # name: (lo, hi, int?)
     "lost_looks": (1, 5, True), "scan_turn_deg": (20.0, 80.0, False), "search_step_deg": (10.0, 45.0, False), "punt_max_in": (3.0, 4.5, False)}
 if SEARCH:        # only the settings that govern searching are tuned; the rest stay at the first run's recommendation (or the current real values)
     NUM = {k: NUM[k] for k in ("lost_looks", "scan_turn_deg", "search_step_deg")}
+if WALLS:
+    NUM = {"wall_sidestep_in": (4.0, 12.0, False), "wall_sidestep_deg": (10.0, 50.0, False), "wall_sidestep_tries": (0, 4, True)}
+SEARCH = SEARCH or WALLS                                      # sessions of attempts with the ball left where it ended, per-attempt scoring
 NAMES = list(NUM)
 ORDERS, VANISH = ps.SPEC["search_order"][2], ps.SPEC["when_vanished"][2]
 MIX = {"ahead": .15, "angled": .20, "side": .15, "behind": .20, "far": .10, "wall_ball": .20}      # a deliberately hard mix: more "behind" and "by a wall" than real life
 REAL_LIKE = {"ahead": .45, "angled": .35, "far": .10, "side": .10}
-if SEARCH:
+if WALLS:
+    MIX = {"wall_head_on": .35, "wall_ball": .20, "corner": .15, "ahead": .10, "angled": .10, "behind": .10}
+    HOLDOUT = {"dim": .30, "decoy": .30, "side": .20, "far": .20}
+elif SEARCH:
     MIX = {"behind": .25, "side": .20, "lost": .20, "wall_ball": .10, "far": .15, "angled": .10}      # search-heavy: the ball is NOT where he is looking
     HOLDOUT = {"corner": .25, "decoy": .25, "dim": .25, "behind": .125, "lost": .125}                  # (dim, corner and decoy are never trained on here)
 else:
     HOLDOUT = {"corner": .34, "dim": .33, "decoy": .33}
 CURRENT = {"punt_max_in": 4.0, "nudge_max_in": 7.0, "nudges_before_punt": 3, "nudge_step_s": 0.9, "walk_aim_in": 4.0, "lost_looks": 3, "when_vanished": "punt", "search_order": "back_turn", "scan_turn_deg": 60.0, "search_step_deg": 20.0}
-if SEARCH: VANISH = (CURRENT["when_vanished"],)                # the search run does not tune when_vanished (it belongs to the punch)
-REAL_CURRENT = dict(CURRENT)                                  # what G2 runs now: the baseline everything is compared with, in both runs
-S = dict(gens=3, pop=8, eps=40, final=300, workers=2) if QUICK else (dict(gens=40, pop=24, eps=600, final=8000, workers=7) if SEARCH else dict(gens=60, pop=48, eps=500, final=10000, workers=7))
+CURRENT.update({"wall_sidestep_tries": 0, "wall_sidestep_in": 7.0, "wall_sidestep_deg": 25.0})       # what G2 does today with a ball against a wall: leave it (no sidestep)
+REAL_CURRENT = dict(CURRENT)                                  # what G2 runs now: the baseline everything is compared with, in every run
+S = dict(gens=3, pop=8, eps=40, final=300, workers=2) if QUICK else (dict(gens=80, pop=48, eps=900, final=12000, workers=7) if WALLS else dict(gens=40, pop=24, eps=600, final=8000, workers=7) if SEARCH else dict(gens=60, pop=48, eps=500, final=10000, workers=7))
 if SEARCH and BASE_RUN and os.path.exists(os.path.join(BASE_RUN, "recommended_punt_settings.json")):
-    CURRENT = {**CURRENT, **json.load(open(os.path.join(BASE_RUN, "recommended_punt_settings.json")))["recommended_settings"]}          # the approach settings the first run found stay
+    CURRENT = {**CURRENT, **json.load(open(os.path.join(BASE_RUN, "recommended_punt_settings.json")))["recommended_settings"]}          # the approach settings the earlier run found stay
+CURRENT["punt_max_in"] = REAL_CURRENT["punt_max_in"]            # the punch is dialed in (owner, 2026-11-02): an earlier run's punt distance, an artifact of the simulator's punch model, is not carried over
+if SEARCH: VANISH = (CURRENT["when_vanished"],)                 # the search and wall runs do not tune when_vanished (it belongs to the punch)
+if WALLS: ORDERS = (CURRENT["search_order"],)
 CAL = world.load_cal()
 
 
@@ -71,7 +81,7 @@ def evaluate(args):
         for sc, code, t, label, stats in results:
             fs = stats.get("first_seen")
             seen.append(fs)
-            if SEARCH:                                       # 70% how fast the ball was first found (0 = never, 1 = at once), 30% the whole attempt: finding it is the point, using it still counts
+            if SEARCH and not WALLS:                         # 70% how fast the ball was first found (0 = never, 1 = at once), 30% the whole attempt: finding it is the point, using it still counts
                 sc = 0.7 * (0.0 if fs is None else max(0.0, 1.0 - fs / 75.0)) + 0.3 * sc
             fam[label].append(sc); codes[code] += 1; secs.append(t)
     return dict(fam), dict(codes), secs, seen
@@ -147,7 +157,7 @@ def main():
         cands = {f"sim#{i + 1} {k} (search average)": decode(np.array(state["combos"][k]["mean"]), tuple(k.split("|"))) for i, (k, b) in enumerate(ranked[:6])}      # the converged mean: less luck in it
         cands.update({f"sim-best#{i + 1} {k} (best sample)": decode(np.array(b["x"]), tuple(k.split("|"))) for i, (k, b) in enumerate(ranked[:3])})      # the single best-scoring sample (partly luck)
         cands["CURRENT (real hardware)"] = dict(REAL_CURRENT)
-        if SEARCH: cands["FIRST RUN's approach values only (current search values)"] = {**CURRENT, **{k: REAL_CURRENT[k] for k in NUM}}
+        if SEARCH: cands["EARLIER RUNS' values only (this run's settings as today)"] = {**CURRENT, **{k: REAL_CURRENT[k] for k in NUM}}
         cands["DEFAULTS (source)"] = {k: v for k, v in ps.defaults(bc).items() if k in list(NUM) + ["search_order", "when_vanished"] + (list(CURRENT) if SEARCH else [])}
         out = {}
         for name, s in cands.items():

@@ -46,6 +46,9 @@ SPEC = {
     "align_pulse_min_s": ("ALIGN_PULSE_MIN_S", float, 0.3, 1.6, "the shortest small turn used to line the claw up with the ball, seconds"),
     "align_tries": ("ALIGN_TRIES", int, 1, 8, "small turns to line up before giving up (then when_misaligned)"),
     "when_misaligned": ("WHEN_MISALIGNED", str, ("punch", "back_up"), None, "still off line after align_tries small turns: punch anyway or back up and line up again"),
+    "wall_sidestep_in": ("WALL_SIDESTEP_IN", float, 4.0, 14.0, "a ball against a wall: step this far sideways (toward the side with more room) and come at it from the side"),
+    "wall_sidestep_deg": ("WALL_SIDESTEP_DEG", float, 10.0, 60.0, "a ball against a wall: how far to turn toward the side with more room before the sidestep"),
+    "wall_sidestep_tries": ("WALL_SIDESTEP_TRIES", int, 0, 5, "sidesteps an attempt for a ball against a wall before he leaves it (0 = leave it)"),
     "between_moves": ("BETWEEN_MOVES", str, ("stand", "attention"), None, "while not moving: stand (default), or wait in the attention pose (legs straight) and stand up back legs first to move"),
 }
 DEFAULT_MAX_SECONDS = 75.0

@@ -33,16 +33,25 @@ def test_the_same_seed_gives_the_same_attempt_and_nothing_leaks_from_the_one_bef
     assert world.run_episode(_full(), "side", 4242, {})[:3] == a
 
 
-def test_the_searched_settings_and_the_pins_reach_the_real_chase_code():
+def test_the_searched_settings_and_the_pins_reach_the_real_chase_code_and_are_put_back_after(monkeypatch):
+    before = (bc.WALK_AIM_IN, bc.SEARCH_ORDER, bc.PUNT_MAX_IN, bc.find_ball, bc.CLAW_PAN_SIGN)
+    seen = {}
+    real = bc.run_chase
+
+    def spy(*a, **k):
+        seen.update(aim=bc.WALK_AIM_IN, order=bc.SEARCH_ORDER, punt=bc.PUNT_MAX_IN, tries=bc.ALIGN_TRIES, align=bc.PUNT_ALIGN_DEG, sign=bc.CLAW_PAN_SIGN, flow=bc.BETWEEN_MOVES)
+        return real(*a, **k)
+    monkeypatch.setattr(bc, "run_chase", spy)
     world.run_episode(_full(walk_aim_in=6.5, search_order="claw_scan", punt_max_in=3.3), "ahead", 3, {})
-    assert bc.WALK_AIM_IN == 6.5 and bc.SEARCH_ORDER == "claw_scan" and bc.PUNT_MAX_IN == 3.3
-    assert bc.ALIGN_TRIES == 3 and bc.PUNT_ALIGN_DEG == 12.0 and bc.CLAW_PAN_SIGN == "left" and bc.BETWEEN_MOVES == "stand"       # pinned
+    assert seen == {"aim": 6.5, "order": "claw_scan", "punt": 3.3, "tries": 3, "align": 12.0, "sign": "left", "flow": "stand"}          # searched settings and the pins, during the attempt
+    monkeypatch.setattr(bc, "run_chase", real)
+    assert (bc.WALK_AIM_IN, bc.SEARCH_ORDER, bc.PUNT_MAX_IN, bc.find_ball, bc.CLAW_PAN_SIGN) == before                                   # nothing left behind for other code in the process
 
 
 def test_a_walk_into_a_wall_bumps_and_the_ball_it_reaches_stops_him():
     w = world.World(random.Random(2), "ahead", {}); w.x, w.y, w.h, w.W, w.H = 20.0, 30.0, 180.0, 100, 100; w.bx, w.by = 90.0, 90.0
     bot = world.Bot(w); bot.walk(10.0)
-    assert bot.bumped and w.x == 4.0                    # the wall behind the heading stopped him at the edge
+    assert bot.bumped and w.x == 4.5                    # the wall behind the heading stopped him at the edge
 
 
 def test_a_session_carries_the_ball_and_the_robot_from_one_attempt_to_the_next():

@@ -38,6 +38,9 @@ KNOB_INFO = {
     "max_seconds": (None, "fixed", "an attempt limit of", "s"),
     "back_up_budget_s": (None, "fixed", "backing up at most", "s an attempt"),                    # no edge detector: the user's call
     "claw_pan_sign": (None, "fixed", "the claw pan direction", ""),
+    "wall_sidestep_in": (0.5, "fixed", "stepping aside from a wall by", "in"),                    # set by the sim training, adjusted by hand until an outcome points at it
+    "wall_sidestep_deg": (5.0, "fixed", "turning away from a wall by", "deg"),
+    "wall_sidestep_tries": (1, "fixed", "sidesteps for a ball by a wall:", ""),                       # the owner's call (2026-11-02)
     "between_moves": (None, "fixed", "between moves I wait", ""),                                    # the user's switch (2026-11-02): stand (default) or attention, never changed by G2                                # measured (claw_look --calibrate), not learned
 }
 
@@ -158,9 +161,11 @@ class BallPunt:
         from ..vision.snapshot import CameraSnapshotter
         self._link = SerialLink("/dev/serial0")
         self._link.connect()
-        bc._stand_if_lying(self._link)
         self._cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)     # exposure balancing stays on
         self.camera = bc._SnapshotCamera(self._cam)
+        import threading
+        threading.Timer(1.8, self.camera.premeter, kwargs={"force": True}).start()        # meter the light while he is standing up (the stand-up is 4 s of waiting anyway), not at the first picture
+        bc._stand_if_lying(self._link)
         self.robot = bc.SerialRobot(self._link)
         self.saver = bc.PictureSaver("~/.local/share/g2/explore_pictures/named/greenball")
         if self.pace is None:
@@ -207,7 +212,7 @@ class BallPunt:
         t0 = time.monotonic()
         ended = chase.run_chase(self.robot, self.camera, ctx.stop, planner=planner, saver=self.saver, announce=ctx.announce, max_punts=1,
                                 max_seconds=float(settings.get("max_seconds", chase.DEFAULT_MAX_SECONDS if hasattr(chase, "DEFAULT_MAX_SECONDS") else 75.0)),
-                                trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check)
+                                trace=trace, after_punt_look=True, say=ctx.say, pace=self.pace, wall_check=self.wall_check, battery_checked=True)
         from .walls import events_from_trace
         learn_standing("walls", events_from_trace(trace), "ball chase", used=walls_used)
         extra = {"punt_log": list(planner.punt_log), "walk_log": list(planner.walk_log), "back_s": round(planner.back_s, 1)}

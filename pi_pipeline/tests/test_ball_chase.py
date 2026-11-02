@@ -644,3 +644,47 @@ def test_the_session_start_reads_the_pose_once_and_waits_a_fixed_time(monkeypatc
     row2 = ",\t".join(str(v) for v in [0] * 16).encode()                                                   # the attention pose: the link must run its back-legs-first stand-up
     ser.read = lambda n: row2
     assert bc._stand_if_lying(lk) is True and sent == ["kbalance"] and lk.last_motion_command == "kcalib"
+
+
+def test_the_light_is_metered_in_the_background_before_a_move_and_the_pack_is_not_read_twice():
+    """2026-11-02: metering the light and a second pack read happened while he stood waiting for the first picture (the legs let go after 7 to 10 s standing)."""
+    import threading
+    metered, batteries = [], []
+
+    class Cam(FakeCamera):
+        def premeter(self, force=False): metered.append(threading.current_thread().name == "MainThread")
+
+    class Bot(FakeRobot):
+        def battery_ok(self): batteries.append(1); return True
+    frames = [picture([disc(200, 110, 20)]), picture([disc(122, 110, 20)]), picture([disc(122, 110, 50)])]
+    bc.run_chase(Bot(), Cam(frames), lambda: False, max_punts=1, max_steps=6, sleep=lambda s: None, say=lambda m: None, battery_checked=True)
+    assert len(metered) >= 2 and not batteries                                          # before each move; and no pack read at step 1 when the goal has just read it
+    batteries.clear()
+    bc.run_chase(Bot(), Cam(frames), lambda: False, max_punts=1, max_steps=3, sleep=lambda s: None, say=lambda m: None)
+    assert batteries == [1]                                                             # a lone chase still reads it at step 1
+
+
+def test_the_snapshot_camera_premeters_in_a_thread_one_at_a_time():
+    import threading
+    started, gate = [], threading.Event()
+
+    class Inner:
+        def premeter(self, force=False): started.append(force); gate.wait(2.0)
+    cam = bc._SnapshotCamera(Inner())
+    cam.premeter(); cam.premeter(force=True)                                           # the second is ignored while the first runs
+    gate.set(); cam._pre_thread.join(2.0)
+    assert started == [False]
+
+
+def test_premetering_skips_a_recent_measurement_and_forces_a_stale_one():
+    from pi_pipeline.vision.snapshot import CameraSnapshotter
+    cam = object.__new__(CameraSnapshotter)
+    import threading
+    cam._lock, cam._exposure_check, cam._meter_every_s, cam._metered_at, cam._clock = threading.Lock(), True, 30.0, 100.0, lambda: 105.0
+    calls = []
+    cam._open, cam._meter = lambda: None, lambda: calls.append(1)
+    assert cam.premeter() is False and calls == []                                      # metered 5 s ago: fine
+    cam._clock = lambda: 125.0
+    assert cam.premeter() is True and calls == [1]                                      # over half an interval old
+    cam._clock = lambda: 101.0
+    assert cam.premeter(force=True) is True and calls == [1, 1]

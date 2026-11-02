@@ -153,6 +153,14 @@ def vet_wall(wall: "WallSeen | None", ball: BallReading | None, state: dict) -> 
     return wall, ""
 
 
+# A ball against a wall (owner, 2026-11-02): instead of leaving it, he steps WALL_SIDESTEP_IN sideways toward the side with more room (turn 90, walk, turn back), so the normal chase sees the ball
+# at an angle and the punch banks off the wall and away (a punch straight into a wall comes straight back at him). Up to WALL_SIDESTEP_TRIES sidesteps an attempt, alternating sides after the
+# first; 0 = leave the ball as before. Near a ball he may come to WALL_FLOOR_IN of a wall (the owner's floor, 5 in; the claw sticks out ahead of the body).
+WALL_SIDESTEP_IN = 7.0
+WALL_SIDESTEP_DEG = 25.0       # the turn toward the side with more room: enough to make the punch oblique; a 90 deg turn costs 15 s at G2's long-turn rate (about 6 deg/s) and used up the attempt (sim, 2026-11-02)
+WALL_SIDESTEP_BALL_IN = 14.0   # only once the ball is this close: farther away he just walks on toward it
+WALL_SIDESTEP_TRIES = 3
+WALL_FLOOR_IN = 5.0
 WALL_TURNS_GIVE_UP = 3         # turns away from walls with the ball in sight in one attempt before he leaves it (the ball sits where walls keep him from it)
 
 
@@ -210,6 +218,7 @@ class Action:
     seconds: float = 0.0
     degrees: float = 0.0       # + = right, - = left
     why: str = ""
+    degrees2: float = 0.0      # a sidestep's closing turn: from the heading after the step to facing the ball again (so he does not lose it: the camera sees about 47 deg either side)
 
 
 @dataclass
@@ -221,6 +230,7 @@ class ChasePlanner:
     after_punt: bool = False   # the last action was a punt
     nudges: int = 0            # small steps closer taken since the ball was last far or in reach
     last_dist: float | None = None   # how far the ball was when it was last seen (None once acted on)
+    sidesteps: int = 0         # sideways steps taken this attempt to get a ball off a wall
     punt_log: list = field(default_factory=list)   # (distance in, bearing deg) of the ball at each punt the planner asked for (None: it had vanished at close range)
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
     log: list = field(default_factory=list)
@@ -338,15 +348,31 @@ class ChasePlanner:
             behind = wall.near_ball_in
             if behind is not None and ball.distance_in < behind and behind - ball.distance_in < CHASE_WALL_IN - BALL_TOUCH_IN:
                 self.by_wall += 1
-                if self.by_wall >= WALL_GIVE_UP:
-                    return Action("give_up", why=f"the ball is {behind - ball.distance_in:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
-                return Action("look", 1.0, why=f"the ball looks {behind - ball.distance_in:.0f} in from a wall: look again")
-            self.by_wall = 0
-            if wall.nearest_in <= CHASE_WALL_IN and ball.distance_in > NO_WALL_TURN_BALL_IN:      # the ball within 12 in: no turn away (the walk is still capped by the loop)
-                self.wall_turns += 1
-                if self.wall_turns >= WALL_TURNS_GIVE_UP:
-                    return Action("give_up", why=f"{self.wall_turns} turns away from walls with the ball in sight: walls keep me from it")
-                return self._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away")
+                gap = behind - ball.distance_in
+                if self.by_wall < WALL_GIVE_UP:
+                    return Action("look", 1.0, why=f"the ball looks {gap:.0f} in from a wall: look again")
+                if WALL_SIDESTEP_TRIES > 0 and ball.distance_in > WALL_SIDESTEP_BALL_IN:
+                    pass                                                                    # still far: walk on toward it; the sidestep is decided near the ball
+                elif self.sidesteps < WALL_SIDESTEP_TRIES:
+                    self.sidesteps += 1
+                    self.by_wall = 0
+                    away = 1 if wall.turn == "right" else -1                              # the side with more room first, then the other side, and so on
+                    side = away if self.sidesteps % 2 else -away
+                    theta = math.radians(WALL_SIDESTEP_DEG * side)
+                    step = max(1.0, min(WALL_SIDESTEP_IN, (ball.distance_in * math.cos(math.radians(ball.bearing_deg)) - BALL_TOUCH_IN) / max(0.3, math.cos(theta))))       # never past the ball
+                    bx, by = ball.distance_in * math.sin(math.radians(ball.bearing_deg)), ball.distance_in * math.cos(math.radians(ball.bearing_deg))      # the ball: right, forward (inches)
+                    px, py = step * math.sin(theta), step * math.cos(theta)                                                                                  # where the step ends
+                    close = math.degrees(math.atan2(bx - px, by - py)) - WALL_SIDESTEP_DEG * side                                                          # the turn that faces the ball from there
+                    return Action("sidestep", step / self._walk_pace(), WALL_SIDESTEP_DEG * side, f"the ball is {gap:.0f} in from a wall: turn {WALL_SIDESTEP_DEG:.0f} deg {'right' if side > 0 else 'left'}, step {WALL_SIDESTEP_IN:.0f} in and come at it from the side ({self.sidesteps} of {WALL_SIDESTEP_TRIES})", close)
+                else:
+                    return Action("give_up", why=f"the ball is {gap:.0f} in from a wall: too close to reach without getting nearer than {CHASE_WALL_IN:.0f} in to the wall")
+            else:
+                self.by_wall = 0
+                if wall.nearest_in <= CHASE_WALL_IN and ball.distance_in > NO_WALL_TURN_BALL_IN:      # the ball within 12 in: no turn away (the walk is still capped by the loop)
+                    self.wall_turns += 1
+                    if self.wall_turns >= WALL_TURNS_GIVE_UP:
+                        return Action("give_up", why=f"{self.wall_turns} turns away from walls with the ball in sight: walls keep me from it")
+                    return self._wall_turn(wall, f"a wall {wall.nearest_in:.0f} in ahead: turn away")
         else:
             self.by_wall = 0
         self.last_dist = ball.distance_in
@@ -966,6 +992,16 @@ def _ball_dict(ball: BallReading | None):
     return None if ball is None else {"distance_in": round(ball.distance_in, 1), "bearing_deg": round(ball.bearing_deg, 1), "edge": ball.touches_edge}
 
 
+def _premeter(camera) -> None:
+    """Just before a move: start metering the light in the background so the next picture does not do it while he stands waiting. A camera without it (a test double) is left alone."""
+    fn = getattr(camera, "premeter", None)
+    if callable(fn):
+        try:
+            fn()
+        except Exception:  # noqa: BLE001
+            log.debug("premeter failed", exc_info=True)
+
+
 def _relax(robot) -> None:
     """Wait in the attention pose, not standing (BETWEEN_MOVES "attention"); a robot without the pose (a test double) is left alone."""
     fn = getattr(robot, "relax", None)
@@ -991,7 +1027,7 @@ def run_chase(robot: Robot, camera: Camera, stop: Callable[[], bool], **kw) -> s
 
 def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, planner: ChasePlanner | None = None, saver: PictureSaver | None = None, dry_run: bool = False, announce: Callable[[str], None] | None = None,
               settle_s: float = 1.0, sleep=time.sleep, max_steps: int | None = None, max_punts: int | None = None, max_seconds: float | None = None, clock=time.monotonic, say: Callable[[str], None] = print,
-              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None) -> str:
+              trace: list | None = None, after_punt_look: bool = False, pace=None, wall_check=None, battery_checked: bool = False) -> str:
     """Look, decide, move, until `stop()` or a fall or a low battery. Returns "stopped", "fell", "battery", "steps" or (with `max_punts`: one attempt = walk up and punt that many times) "punted".
     Never gives up on its own. `trace` (a list) collects what happened, for the goals' scorer (pi_pipeline/goals). `after_punt_look`: one more look after the last punt, to see where the ball went.
     `pace` (a chase_pace.PaceBook): times the walks and turns, and is updated from the reading before and after each one. `wall_check(jpeg, ball) -> WallSeen | None`: the wall
@@ -1029,7 +1065,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             say(f"time is up ({max_seconds:.0f} s): ending the attempt")
             return "time"
         steps += 1
-        if steps % 15 == 1 and not dry_run and not timed("battery", robot.battery_ok):
+        if steps % 15 == 1 and not (battery_checked and steps == 1) and not dry_run and not timed("battery", robot.battery_ok):          # (the goal runner has just read the pack: not twice)
             say("battery low or unreadable: stopping")
             return "battery"
         wall = None
@@ -1071,7 +1107,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
         act = planner.decide(ball, wall)
         if wall is not None and wall.nearest_in is not None and act.kind in ("walk", "search_walk"):      # never walk closer than CHASE_WALL_IN to a wall
             from .chase_pace import WALL_PACE_START_S
-            room = wall.nearest_in - CHASE_WALL_IN
+            room = wall.nearest_in - (min(CHASE_WALL_IN, WALL_FLOOR_IN) if ball is not None and ball.distance_in <= 14.0 else CHASE_WALL_IN)         # near the ball: the owner's 5 in floor
             if room <= 0.5 and ball is not None and ball.distance_in <= NO_WALL_TURN_BALL_IN:
                 act = Action("look", 1.0, why=f"a wall {wall.nearest_in:.0f} in ahead and the ball {ball.distance_in:.0f} in away: no turn away, no step closer; look again")
             elif room <= 0.5:
@@ -1119,6 +1155,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             still_from, still_step = clock(), steps
             parts.clear()
             continue
+        if act.kind in ("wall_turn", "turn", "search_turn", "align", "walk", "search_walk", "back", "search_back", "three_point", "sidestep"):
+            _premeter(camera)                                 # meter the light while he moves, not while he stands waiting for the picture
         if act.kind == "wall_turn":
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
             state = robot.turn(act.degrees, act.seconds)
@@ -1126,6 +1164,14 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             state = robot.turn(act.degrees, act.seconds)
             if ball is not None:
                 last_move = ("turn", act.seconds, act.degrees, ball)
+        elif act.kind == "sidestep":
+            side = 1 if act.degrees > 0 else -1
+            state = robot.turn(act.degrees, abs(act.degrees) / planner._turn_rate(side, False))
+            if state not in ("fell", "board_silent"):
+                state = robot.walk(act.seconds)
+            if state not in ("fell", "board_silent") and abs(act.degrees2) >= 3.0:
+                state = robot.turn(act.degrees2, abs(act.degrees2) / planner._turn_rate(1 if act.degrees2 > 0 else -1, False))       # face the ball again: it would be outside the camera's view
+            last_move = None
         elif act.kind in ("walk", "search_walk"):
             state = robot.walk(act.seconds)
             if state == "board_silent":
@@ -1215,6 +1261,16 @@ class _SnapshotCamera:
             self._cam._settled = None
         except Exception:  # noqa: BLE001
             pass
+
+    def premeter(self, force: bool = False) -> None:
+        """Meter the light in a background thread (one at a time) while G2 moves: the picture after the move then needs no metering while he stands still (CameraSnapshotter.premeter)."""
+        fn = getattr(self._cam, "premeter", None)
+        t = getattr(self, "_pre_thread", None)
+        if not callable(fn) or (t is not None and t.is_alive()):
+            return
+        import threading
+        self._pre_thread = threading.Thread(target=fn, kwargs={"force": force}, name="premeter", daemon=True)
+        self._pre_thread.start()
 
     def look(self) -> bytes | None:
         drop = getattr(self._cam, "discard_one", None)

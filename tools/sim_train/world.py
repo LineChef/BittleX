@@ -14,8 +14,21 @@ TRAIN_FAMILIES = ("ahead", "angled", "side", "behind", "far", "wall_ball")
 HOLDOUT_FAMILIES = ("corner", "dim", "decoy")
 PINNED = {"punt_align_deg": 12.0, "align_pulse_min_s": 1.0, "align_tries": 3, "when_misaligned": "punch", "claw_look_pan_deg": 35.0, "claw_look_lift_deg": 15.0,
           "claw_pan_sign": "left", "max_seconds": 75.0}
-bc.find_ball = lambda pic: pic[1]                       # the simulated camera hands the reading itself
-bc.BETWEEN_MOVES = "stand"
+import contextlib
+
+
+@contextlib.contextmanager
+def patched():
+    """The simulation's changes to ball_chase (the finder reads the simulated camera's reading; the searched settings; the standing flow), for the length of one attempt only and put back
+    after: a test (or anything else in the process) that imports this module must see the real chase code (2026-11-02: patching at import broke 28 other tests)."""
+    names = [c for c, *_ in ps.SPEC.values() if c] + ["find_ball", "BETWEEN_MOVES"]
+    saved = {n: getattr(bc, n) for n in names if hasattr(bc, n)}
+    bc.find_ball = lambda pic: pic[1]                     # the simulated camera hands the reading itself
+    bc.BETWEEN_MOVES = "stand"
+    try:
+        yield
+    finally:
+        for n, v in saved.items(): setattr(bc, n, v)
 
 
 def load_cal():
@@ -48,6 +61,12 @@ class World:
 
     def _place_ball(self):
         r, f = self.rng, self.family
+        if f == "wall_head_on":                               # the ball lies 3-9 in from a wall and he is walking at it: the case the sidestep is for
+            side = r.choice("WESN"); near = r.uniform(3, 9); gap = r.uniform(14, 34)
+            ang = {"W": 180.0, "E": 0.0, "S": 270.0, "N": 90.0}[side]
+            if side in "WE": bx = near if side == "W" else self.W - near; by = r.uniform(25, self.H - 25); self.x = bx - math.cos(math.radians(ang)) * (near + gap) * -1 if False else (bx + gap if side == "W" else bx - gap); self.y = by + r.uniform(-4, 4)
+            else: by = near if side == "S" else self.H - near; bx = r.uniform(25, self.W - 25); self.y = (by + gap if side == "S" else by - gap); self.x = bx + r.uniform(-4, 4)
+            self.h = ang + r.gauss(0, 5); self.bx, self.by = bx, by; self.W = max(self.W, 90.0); self.H = max(self.H, 90.0); return
         for _ in range(200):
             if f == "ahead": d, a = r.uniform(14, 30), r.uniform(-8, 8)
             elif f == "angled": d, a = r.uniform(12, 32), r.choice([-1, 1]) * r.uniform(15, 55)
@@ -68,6 +87,38 @@ class World:
             if 3 < bx < self.W - 3 and 3 < by < self.H - 3 and math.hypot(bx - self.x, by - self.y) > 8: self.bx, self.by = bx, by; return
         self.bx, self.by = self.W / 2, self.H / 2
 
+    def _ray(self, x, y, ang_deg, lo=0.0):
+        """Distance from (x, y) along `ang_deg` to the room's boundary (inset by `lo`)."""
+        dx, dy = math.cos(math.radians(ang_deg)), math.sin(math.radians(ang_deg)); ts = []
+        if dx > 1e-9: ts.append((self.W - lo - x) / dx)
+        elif dx < -1e-9: ts.append((lo - x) / dx)
+        if dy > 1e-9: ts.append((self.H - lo - y) / dy)
+        elif dy < -1e-9: ts.append((lo - y) / dy)
+        return max(0.0, min(ts)) if ts else 1e9
+
+    def slide(self, x, y, ang_deg, d, lo=3.0):
+        """The ball rolls `d` inches along `ang_deg`; it bounces off the walls (keeps 60% of its way at each) so a punch straight into a wall comes straight back and one at an angle banks away."""
+        dx, dy = math.cos(math.radians(ang_deg)), math.sin(math.radians(ang_deg))
+        for _ in range(4):
+            t = self._ray(x, y, math.degrees(math.atan2(dy, dx)), lo)
+            if d <= t: return x + d * dx, y + d * dy
+            x, y = x + t * dx, y + t * dy; d = (d - t) * 0.6
+            if x <= lo + 1e-6 or x >= self.W - lo - 1e-6: dx = -dx
+            if y <= lo + 1e-6 or y >= self.H - lo - 1e-6: dy = -dy
+            if abs(dx) < 1e-9 and abs(dy) < 1e-9: break
+        return x, y
+
+    def wall_reading(self, ball):
+        """What the wall estimator would say: the nearest wall ahead, the side with more room, and (with the ball in view) how far the wall is behind the ball. Capped at 50 in, a little noise."""
+        cam = self.h + (self.pan if bc.CLAW_PAN_SIGN == "left" else -self.pan)
+        n = min(50.0, self._ray(self.x, self.y, cam) + self.rng.gauss(0, 0.8))
+        turn = "left" if self._ray(self.x, self.y, cam + 40) > self._ray(self.x, self.y, cam - 40) else "right"
+        behind = None
+        if ball is not None:
+            ang = cam - ball.bearing_deg
+            behind = min(50.0, self._ray(self.x, self.y, ang) * math.cos(math.radians(ball.bearing_deg)) + self.rng.gauss(0, 0.8))
+        return bc.WallSeen(round(n, 1), turn, None if behind is None else round(behind, 1))
+
     def rel(self):                                           # the ball in the camera frame: forward f, lateral l (+ right)
         cam = self.h + (self.pan if bc.CLAW_PAN_SIGN == "left" else -self.pan)
         dx, dy = self.bx - self.x, self.by - self.y; a = math.radians(cam)
@@ -75,7 +126,7 @@ class World:
 
     def advance(self, d):                                   # forward d inches (negative = back); bumps stop at the room's walls
         nx, ny = self.x + d * math.cos(math.radians(self.h)), self.y + d * math.sin(math.radians(self.h))
-        bx, by = max(4, min(self.W - 4, nx)), max(4, min(self.H - 4, ny))
+        bx, by = max(4.5, min(self.W - 4.5, nx)), max(4.5, min(self.H - 4.5, ny))
         if (bx, by) != (nx, ny): self.bumped = d > 0
         f, l = self.rel()
         if d > 0 and abs(l) < 2.8 and 0 < f:                # the claw reaches the ball: he stops against it
@@ -115,13 +166,12 @@ class Bot:
     def three_point_turn(self, deg, back_s, fwd_s): self.back(back_s); return self.turn(deg, abs(deg) / 6.0)
     def punt(self):
         w = self.w; self._t(1.5); f, l = w.rel(); b = math.degrees(math.atan2(l, max(f, .1)))
-        p = w.p_hit if 2.3 <= f <= 4.1 else (w.p_hit * 0.4 if f <= 4.8 else 0.02)
+        p = w.p_hit if 2.3 <= f <= 4.1 else (0.05 if f <= 4.8 else 0.0)          # real reach: hits at 2.7-3.8 in; a ball at 4.5-5 in was "just out of reach" (2026-10-25). Beyond 4.1 in: almost never.
         p *= 1.0 if abs(b) <= 10 else 0.6
         if w.rng.random() < p:
-            w.punted = True; d = w.rng.uniform(14, 26); a = math.radians(w.h + w.rng.gauss(0, 10))
-            w.bx, w.by = max(3, min(w.W - 3, w.bx + d * math.cos(a))), max(3, min(w.H - 3, w.by + d * math.sin(a)))
+            w.punted = True; w.bx, w.by = w.slide(w.bx, w.by, w.h + w.rng.gauss(0, 10), w.rng.uniform(14, 26))
         elif w.rng.random() < 0.3:                          # a miss that still shoves it
-            a = math.radians(w.h + w.rng.gauss(0, 30)); d = w.rng.uniform(1, 6); w.bx += d * math.cos(a); w.by += d * math.sin(a)
+            w.bx, w.by = w.slide(w.bx, w.by, w.h + w.rng.gauss(0, 30), w.rng.uniform(1, 6))
         return "ok"
     def battery_ok(self): return True
     def claw_pose(self, pan, lift): self.w.t += abs(pan - self.w.pan) / 60.0 + 0.3; self.w.pan = pan; return "ok"
@@ -152,6 +202,11 @@ def run_session(settings, family, seed, cal=None, n_att=6, falls=True):
 
 
 def _attempt(w, rng, settings, family, falls, max_punts, max_seconds=None):
+    with patched():
+        return _attempt_patched(w, rng, settings, family, falls, max_punts, max_seconds)
+
+
+def _attempt_patched(w, rng, settings, family, falls, max_punts, max_seconds=None):
     global _scorer
     from pi_pipeline.goals.ball_punt import BallPunt
     _scorer = _scorer or BallPunt()
@@ -161,7 +216,8 @@ def _attempt(w, rng, settings, family, falls, max_punts, max_seconds=None):
     t0 = w.t
     try:
         ended = bc.run_chase(bot, cam, lambda: False, planner=planner, max_punts=max_punts, max_seconds=max_seconds or (75.0 if max_punts == 1 else 75.0 + 40.0 * (max_punts - 1)), trace=trace, after_punt_look=True, pace=StubPace(),
-                             clock=lambda: w.t, sleep=lambda s: setattr(w, "t", w.t + s), say=lambda m: None)
+                             clock=lambda: w.t, sleep=lambda s: setattr(w, "t", w.t + s), say=lambda m: None,
+                             wall_check=lambda pic, ball: w.wall_reading(ball))
     except Exception as e:  # a crash in the chase is a result too
         return 0.0, "crash:" + type(e).__name__, w.t, family, {}
     still_long = max([e["seconds"] for e in trace if e.get("kind") == "still"] or [0.0])

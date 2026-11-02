@@ -86,7 +86,7 @@ class Goal:
     minutes: float = 20.0             # a session never runs longer
     min_pack_pct: int = 30            # no attempt starts below this pack % (and never past the battery gate)
     target_successes: int | None = None      # end the session early after this many successes (None: use every attempt)
-    rest_between_s: float = 5.0       # standing still between attempts
+    rest_between_s: float = 2.0       # standing still between attempts (was 5: standing still is what lets the legs go, 2026-11-02)
     controls: dict = field(default_factory=dict)       # knob name -> free / ask / fixed, the user's changes to the approach's defaults
     start_words: tuple = ()           # the spoken start phrases ("G2, ball goal")
     kind: str = "task"                # "task" | "standing"
