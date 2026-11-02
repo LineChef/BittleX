@@ -328,7 +328,7 @@ g2turn3() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   ssh "$G2_PI" "systemctl is-active --quiet g2-voice && sudo systemctl stop g2-voice && sleep 3; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.behavior.three_point --test --side ${1:-left} 2>&1 | grep -v 'g2.snapshot exposure unchanged\\|dark frame'"
 }
-# g2cmds [--board] [--hours N] [--last N]  -- what the Pi sent to the BiBoard and what the board did on its own (a voice command you give the board, said without "G2", shows as BOARD (on its own)).
+# g2cmds [--board] [--hours N] [--last N]  -- what the Pi sent to the BiBoard and what the board did on its own. A move the board started itself (its voice module: you, said without "G2", or a TV in the room) shows as BOARD (NOT FROM THE PI) (the `not_from_pi` flag); BOARD (on its own) is timing only and misses moves while the Pi is busy.
 g2cmds() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.link.command_log $*"; }
 # g2sync [status|run|now TASK]  -- every copy from the Pi to this Mac in one job (goal data, pictures, walk logs, wall pictures, the memory DB, the logs), each on its own schedule.
 #   status: when each last worked and STALE if too old. run: the ones that are due. now TASK (or now all): that one now. The background loop (g2_bg_jobs.sh) runs it every 30 min.

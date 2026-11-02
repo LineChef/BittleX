@@ -43,3 +43,21 @@ def test_the_serial_link_logs_what_it_sends_and_the_lines_nobody_asked_for(tmp_p
     lk.poll_imu()
     rows = cl.read()
     assert rows[0]["cmd"] == "kbalance" and rows[-1] == {**rows[-1], "dir": "board", "line": "sit", "unprompted": True}
+
+
+def test_a_skill_the_board_starts_with_no_skill_from_the_pi_is_marked_not_from_the_pi(monkeypatch, tmp_path):
+    import json
+    from pi_pipeline.link import command_log as cl
+    monkeypatch.setenv("G2_COMMAND_LOG", str(tmp_path / "c.jsonl"))
+    t = [100.0]
+    monkeypatch.setattr(cl.time, "monotonic", lambda: t[0])
+    cl.sent("kwkL")
+    t[0] += 0.3
+    cl.heard("wkArmL", 0.3)                              # the board naming the skill the Pi just sent
+    t[0] += 10.0
+    cl.sent("P"); t[0] += 0.3
+    cl.heard("ck", 0.3)                                   # a pack read 0.3 s before, but no skill: the board's own move (2026-11-02, a TV in the room)
+    cl.heard("Voltage: 7.80 V", 0.3)
+    rows = [json.loads(x) for x in (tmp_path / "c.jsonl").read_text().splitlines() if '"board"' in x]
+    assert [(r["line"], r["not_from_pi"]) for r in rows] == [("wkArmL", False), ("ck", True), ("Voltage: 7.80 V", False)]
+    assert rows[1]["unprompted"] is False                 # the timing flag alone could not tell
