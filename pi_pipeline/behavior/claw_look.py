@@ -47,10 +47,11 @@ def calibrate(robot, camera, *, say=print, sleep=time.sleep) -> str | None:
     return sign
 
 
-def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock=time.monotonic, sag_deg: float = 8.0) -> dict:
+def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock=time.monotonic, sag_deg: float = 8.0, redrive_s: float | None = None) -> dict:
     """Stand still and watch (no arm move, no picture): the IMU pitch and roll every 0.25 s and the pack voltage every second for `seconds`, to see whether the legs relax by
     themselves and when (2026-11-01: his legs let go about 10 s after the stand-up). A sag shows as pitch or roll moving more than `sag_deg` from where he stood in the
-    first 2 s. Returns {"sag_at_s": seconds or None, "min_volts": ..., "max_dev_deg": ...}. Moves nothing."""
+    first 2 s. Returns {"sag_at_s": seconds or None, "min_volts": ..., "max_dev_deg": ...}. Moves nothing, except with `redrive_s`: every that many seconds the stand angles are sent
+    again (the same pose: the legs do not move if they hold), to see whether a fresh command keeps the servos from letting go (user, 2026-11-02, plan step 4)."""
     import math
     import statistics
 
@@ -61,6 +62,12 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
     pitch, roll = [], []
     base = None
     sag_at, max_dev, min_v, next_v, last_print = None, 0.0, None, 0.0, -1.0
+    next_redrive = redrive_s if redrive_s else None
+    redrive_cmd = None
+    if redrive_s:
+        from ..gait import standup
+        redrive_cmd = standup.move_cmd(standup.balance_pose())
+        say(f"re-sending the stand angles every {redrive_s:g} s: {redrive_cmd}")
     board_lines = []                                           # [(seconds, line)]: what the firmware printed that is not an IMU line (it names the skill or behavior it runs)
     try:
         while clock() - t0 < seconds:
@@ -84,6 +91,9 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
                 if sag_at is None and dev > sag_deg:
                     sag_at = round(t, 1)
                     say(f"  {t:4.1f} s: the body moved {dev:.0f} deg from where he stood (pitch {pitch[-1]:+.1f}, roll {roll[-1]:+.1f}): the legs gave way")
+            if next_redrive is not None and t >= next_redrive:
+                link.send(redrive_cmd, read_reply=False, settle=0.0)
+                next_redrive += redrive_s
             if t >= next_v:
                 v = battery.read_voltage(link, attempts=1)
                 next_v = t + 1.0                                   # once a second: a short dip under load is what we are looking for
@@ -95,7 +105,7 @@ def hold_test(link, *, seconds: float = 20.0, say=print, sleep=time.sleep, clock
             sleep(0.25)
     finally:
         link.send("gp", read_reply=False, settle=0.0)
-    say(f"hold test done: " + (f"the legs gave way at {sag_at} s" if sag_at is not None else f"he held for {seconds:.0f} s (largest body movement {max_dev:.1f} deg)") + (f"; lowest pack {min_v:.2f} V" if min_v is not None else ""))
+    say("hold test done" + (f" (stand angles re-sent every {redrive_s:g} s)" if redrive_s else "") + ": " + (f"the legs gave way at {sag_at} s" if sag_at is not None else f"he held for {seconds:.0f} s (largest body movement {max_dev:.1f} deg)") + (f"; lowest pack {min_v:.2f} V" if min_v is not None else ""))
     return {"sag_at_s": sag_at, "min_volts": min_v, "max_dev_deg": round(max_dev, 1), "board_lines": board_lines}
 
 
@@ -143,7 +153,9 @@ def main() -> None:
     ap.add_argument("--gb", action="store_true", help="with --hold: send `gb` (firmware gyro balance off) right after the stand-up, before watching")
     g.add_argument("--hold", action="store_true", help="stand, then do nothing for 20 s and watch whether the legs hold (IMU and pack voltage); no arm move")
     g.add_argument("--pictures", action="store_true", help="three pictures (straight, pan +, pan -) saved to a folder; stays standing at the end (no rest command)")
-    ap.add_argument("--rest", action="store_true", help="with --pictures: lay him down at the end like the other modes")
+    ap.add_argument("--rest", action="store_true", help="with --pictures or --hold: lay him down at the end like the other modes")
+    ap.add_argument("--seconds", type=float, default=20.0, help="with --hold: how long to stand still and watch")
+    ap.add_argument("--redrive", type=float, default=None, help="with --hold: re-send the stand angles every this many seconds (does a fresh command keep the legs from letting go?)")
     ap.add_argument("--settle", type=float, default=1.6, help="with --pictures: seconds to wait after each arm move before the picture (the camera's frames are old: 2026-11-01 the +35 picture still showed straight ahead at 1.6)")
     args = ap.parse_args()
     me = sys.modules[chase.__name__]
@@ -168,7 +180,7 @@ def main() -> None:
             if args.gb:
                 link.send("gb", read_reply=False, settle=0.0)
                 print("sent gb (firmware gyro balance off) after the stand-up")
-            hold_test(link)
+            hold_test(link, seconds=args.seconds, redrive_s=args.redrive)
         elif args.pictures:
             import os
             outdir = os.path.expanduser(time.strftime("~/g2_claw_pics/%Y%m%d_%H%M%S"))

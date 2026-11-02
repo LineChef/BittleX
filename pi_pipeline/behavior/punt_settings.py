@@ -46,6 +46,7 @@ SPEC = {
     "align_pulse_min_s": ("ALIGN_PULSE_MIN_S", float, 0.3, 1.6, "the shortest small turn used to line the claw up with the ball, seconds"),
     "align_tries": ("ALIGN_TRIES", int, 1, 8, "small turns to line up before giving up (then when_misaligned)"),
     "when_misaligned": ("WHEN_MISALIGNED", str, ("punch", "back_up"), None, "still off line after align_tries small turns: punch anyway or back up and line up again"),
+    "between_moves": ("BETWEEN_MOVES", str, ("stand", "attention"), None, "while not moving: stand (default), or wait in the attention pose (legs straight) and stand up back legs first to move"),
 }
 DEFAULT_MAX_SECONDS = 75.0
 

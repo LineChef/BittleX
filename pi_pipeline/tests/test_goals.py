@@ -1199,6 +1199,10 @@ def test_the_hold_test_reports_when_the_body_moves_away_from_where_he_stood():
     r = hold_test(Talk(10.0), seconds=12.0, say=said.append, sleep=sleep, clock=clock)
     assert r["board_lines"] and r["board_lines"][0][1] == "calib" and any("board printed 'calib'" in m for m in said)         # what the firmware printed when it moved him
     t[0] = 0.0
+    lk = Link(1e9)
+    hold_test(lk, seconds=13.0, say=lambda m: None, sleep=sleep, clock=clock, redrive_s=4.0)
+    assert sum(c.startswith("i8") for c in lk.sent) == 3                                           # plan step 4: the stand angles re-sent every 4 s (at 4, 8, 12 s)
+    t[0] = 0.0
     r = hold_test(Link(99.0), seconds=6.0, say=lambda m: None, sleep=sleep, clock=clock)
     assert r["sag_at_s"] is None and r["max_dev_deg"] < 2
 

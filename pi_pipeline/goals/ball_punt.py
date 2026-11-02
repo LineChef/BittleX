@@ -37,7 +37,8 @@ KNOB_INFO = {
     "search_walk": (None, "fixed", "walking on blind after a full search circle", ""),        # only safe on a big floor: the user's call
     "max_seconds": (None, "fixed", "an attempt limit of", "s"),
     "back_up_budget_s": (None, "fixed", "backing up at most", "s an attempt"),                    # no edge detector: the user's call
-    "claw_pan_sign": (None, "fixed", "the claw pan direction", ""),                                # measured (claw_look --calibrate), not learned
+    "claw_pan_sign": (None, "fixed", "the claw pan direction", ""),
+    "between_moves": (None, "fixed", "between moves I wait", ""),                                    # the user's switch (2026-11-02): stand (default) or attention, never changed by G2                                # measured (claw_look --calibrate), not learned
 }
 
 # outcome code -> the knobs it points at, in order (+1 / -1 = one step up / down, "other" = another option)

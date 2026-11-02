@@ -441,7 +441,8 @@ def test_every_turn_is_logged_with_its_cause(tmp_path, monkeypatch):
     assert row["cause"] == "a wall ahead" and row["direction"] == "left" and row["wall_in"] == 8.0 and row["ball"] is None
 
 
-def test_he_waits_in_the_attention_pose_and_stands_up_right_before_each_move():
+def test_he_waits_in_the_attention_pose_and_stands_up_right_before_each_move(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the attention flow (the switch; the default is stand)
     class FakeLink:
         def __init__(self): self.sent = []
         def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
@@ -457,7 +458,8 @@ def test_he_waits_in_the_attention_pose_and_stands_up_right_before_each_move():
     assert toks == [bc.CLAW_LOOK_POSE, "kbalance", "kwkR", "kbalance", bc.CLAW_LOOK_POSE, "kbalance", "kbkF", "kbalance"]
 
 
-def test_the_claw_look_from_the_attention_pose_needs_no_stand_up_and_stays_down_afterwards():
+def test_the_claw_look_from_the_attention_pose_needs_no_stand_up_and_stays_down_afterwards(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the attention flow (the switch; the default is stand)
     class FakeLink:
         def __init__(self): self.sent = []
         def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
@@ -469,7 +471,8 @@ def test_the_claw_look_from_the_attention_pose_needs_no_stand_up_and_stays_down_
     assert [c for c in lk.sent if c.startswith("k")] == [bc.CLAW_LOOK_POSE, bc.CLAW_LOOK_POSE]   # the pose again (it drives the legs again), no kbalance either side
 
 
-def test_the_loop_takes_each_picture_in_the_attention_pose_and_goes_back_to_it_after_each_move():
+def test_the_loop_takes_each_picture_in_the_attention_pose_and_goes_back_to_it_after_each_move(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the attention flow (the switch; the default is stand)
     class PoseRobot(FakeRobot):
         def relax(self): self.moves.append("attention"); return "ok"
         def stand_up(self): self.moves.append("stand"); return "ok"
@@ -484,7 +487,8 @@ def test_the_loop_takes_each_picture_in_the_attention_pose_and_goes_back_to_it_a
             assert kinds[i + 1] == "attention"                                          # every move: attention pose right after, and the next picture from there
 
 
-def test_close_to_the_ball_he_stays_standing_between_the_small_steps():
+def test_close_to_the_ball_he_stays_standing_between_the_small_steps(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the attention flow (the switch; the default is stand)
     class PoseRobot(FakeRobot):
         def relax(self): self.moves.append("attention"); return "ok"
         def stand_up(self): self.moves.append("stand"); return "ok"
@@ -573,3 +577,26 @@ def test_standing_but_tilted_means_sagged_legs_and_they_are_driven_back_before_t
     tilt["pitch"] = -3.0
     lk.sent.clear()
     assert r.stand_up() == "ok" and not any(c.startswith("i8") for c in lk.sent)       # level enough: no re-drive
+
+
+def test_the_default_flow_stands_between_moves_and_logs_the_still_time_before_each_move():
+    class PoseRobot(FakeRobot):
+        def relax(self): self.moves.append("attention"); return "ok"
+        def stand_up(self): self.moves.append("stand"); return "ok"
+    assert bc.BETWEEN_MOVES == "stand"
+    frames = [picture([disc(200, 110, 20)]), picture([disc(122, 110, 20)]), picture([disc(122, 110, 50)])]
+    robot, trace = PoseRobot(), []
+    bc.run_chase(robot, FakeCamera(frames), lambda: False, max_punts=1, max_steps=6, sleep=lambda s: None, say=lambda m: None, trace=trace)
+    assert "attention" not in robot.moves                                               # no attention pose anywhere in the default flow
+    stills = [e for e in trace if e.get("kind") == "still"]
+    assert [e["before"] for e in stills] == ["turn", "walk", "punt"] and all(e["seconds"] >= 0 for e in stills)
+
+
+def test_a_quick_follow_on_move_skips_the_pose_read():
+    lk = _PoseLink("stand")
+    t = iter(np.arange(0, 1000, 0.2))
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
+    r.posture, r._moved_at = "stand", r._clock()
+    assert r.stand_up() == "ok" and "j" not in lk.sent                                  # just moved: he goes at once
+    r._moved_at = r._clock() - 10.0
+    assert r.stand_up() == "ok" and "j" in lk.sent                                      # still a while: the pose is read first
