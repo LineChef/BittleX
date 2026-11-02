@@ -232,6 +232,7 @@ class ChasePlanner:
     after_punt: bool = False   # the last action was a punt
     nudges: int = 0            # small steps closer taken since the ball was last far or in reach
     last_dist: float | None = None   # how far the ball was when it was last seen (None once acted on)
+    considered: list = field(default_factory=list)   # options he looked at and passed over for this decision, with why (decision log; the loop clears it before each decision)
     sidesteps: int = 0         # sideways steps taken this attempt to get a ball off a wall
     punt_log: list = field(default_factory=list)   # (distance in, bearing deg) of the ball at each punt the planner asked for (None: it had vanished at close range)
     walk_log: list = field(default_factory=list)   # (distance in, seconds) of each walk step
@@ -291,16 +292,19 @@ class ChasePlanner:
                 if self._can_back(THREE_POINT_BACK_S):
                     deg = SCAN_TURN_DEG * side
                     return self._three_point("three_point", deg, f"searching {'right' if side > 0 else 'left'}: a 3-point turn")
+                self.considered.append("3-point turn: skipped, no back-up budget left; a plain turn step instead")
                 move = "turn"                                                   # no room to back up left: a plain turn step
             if move == "back":
                 if self._can_back(BACK_UP_S):
                     return self._back("search_back", BACK_UP_S, "searching: back up to see more of the floor")
+                self.considered.append(f"back up: skipped, {self.back_s:.1f} of {BACK_BUDGET_S:.1f} s of back-up used")
                 continue
             if move == "circle" and self.circle_deg >= 360.0 - 1e-9:
                 self.circle_deg = 0.0
                 self.circles += 1
                 if self._can_back(BACK_UP_S):
                     return self._back("search_back", BACK_UP_S, f"a full circle without the ball ({self.circles}): back up for a wider view")
+                self.considered.append(f"full circle done ({self.circles}): no back-up left for a wider view, turning on")
             self.search_steps += 1
             step = SCAN_TURN_DEG if "claw" in cycle else SEARCH_STEP_DEG
             per_circle = max(1, int(math.ceil(360.0 / max(abs(step), 1.0)))) if "claw" in cycle else SEARCH_STEPS_PER_CIRCLE
@@ -365,6 +369,7 @@ class ChasePlanner:
                 if self.by_wall < WALL_GIVE_UP:
                     return Action("look", 1.0, why=f"the ball looks {gap:.0f} in from a wall: look again")
                 if WALL_SIDESTEP_TRIES > 0 and ball.distance_in > WALL_SIDESTEP_BALL_IN:
+                    self.considered.append(f"wall sidestep: not yet, the ball is {ball.distance_in:.0f} in away (sidestep inside {WALL_SIDESTEP_BALL_IN:.0f} in)")
                     pass                                                                    # still far: walk on toward it; the sidestep is decided near the ball
                 elif self.sidesteps < WALL_SIDESTEP_TRIES:
                     self.sidesteps += 1
@@ -984,6 +989,35 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
 
 TURN_CAUSE = {"three_point": "a 3-point turn (back up while turning, then forward)", "wall_turn": "a wall ahead", "search_turn": "searching: no ball in sight", "align": "lining the claw up on a close ball", "turn": "the ball off to one side"}
 TURN_LOG = "~/.local/share/g2/turn_log.jsonl"
+LOG_MAX_BYTES = 50 * 1024 * 1024          # a chase log stops growing at this size (2026-11-02: a sim run once wrote 42 GB to the turn log); the daily cleanup rotates old lines out
+
+
+def _log_full(path: str) -> bool:
+    try:
+        return os.path.getsize(path) >= LOG_MAX_BYTES
+    except OSError:
+        return False
+DECISION_LOG = "~/.local/share/g2/decision_log.jsonl"
+
+
+def log_decision(step: int, act, ball, wall, planner, t: float) -> None:
+    """One line per decision in DECISION_LOG (user, 2026-11-02: every choice and why, to debug bad behaviour): the move chosen and the reason in words, what he saw (ball, wall),
+    the planner's state when it chose (looks without the ball, search move, circle, back-up used, sidesteps, nudges ...), and the options it looked at and passed over. Never raises."""
+    try:
+        path = os.path.expanduser(os.environ.get("G2_DECISION_LOG", DECISION_LOG))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        row = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "t": round(t, 1), "step": step, "kind": act.kind, "why": act.why, "degrees": round(act.degrees, 1), "seconds": round(act.seconds, 2),
+               "ball": _ball_dict(ball), "wall_in": None if wall is None or wall.nearest_in is None else round(wall.nearest_in, 1),
+               "state": {"lost": planner.lost, "search_i": planner.search_i, "search_steps": planner.search_steps, "circle_deg": round(planner.circle_deg), "circles": planner.circles,
+                         "back_s": round(planner.back_s, 1), "sidesteps": planner.sidesteps, "by_wall": planner.by_wall, "nudges": planner.nudges, "align_turns": planner.align_turns,
+                         "punts_in_range": planner.punts_in_range, "last_side": planner.last_side, "seen_ball": planner.seen_ball, "search_order": SEARCH_ORDER},
+               "passed_over": list(planner.considered)}
+        if _log_full(path):
+            return
+        with open(path, "a") as f:
+            f.write(json.dumps(row) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def log_turn(act, ball, wall, state: str) -> None:
@@ -995,6 +1029,8 @@ def log_turn(act, ball, wall, state: str) -> None:
         row = {"time": time.strftime("%Y-%m-%d %H:%M:%S"), "kind": act.kind, "cause": TURN_CAUSE.get(act.kind, act.kind), "why": act.why,
                "direction": "right" if act.degrees > 0 else "left", "degrees": round(act.degrees, 1), "seconds": round(act.seconds, 2), "state": state,
                "ball": _ball_dict(ball), "wall_in": None if wall is None or wall.nearest_in is None else round(wall.nearest_in, 1)}
+        if _log_full(path):
+            return
         with open(path, "a") as f:
             f.write(json.dumps(row) + "\n")
     except Exception:  # noqa: BLE001
@@ -1117,6 +1153,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             elif ball is None and planner.lost + 1 == LOST_LOOKS:                       # the look that starts a search
                 announce("searching")
         seen = seen or ball is not None
+        planner.considered = []
         act = planner.decide(ball, wall)
         if wall is not None and wall.nearest_in is not None and act.kind in ("walk", "search_walk"):      # never walk closer than CHASE_WALL_IN to a wall
             from .chase_pace import WALL_PACE_START_S
@@ -1130,6 +1167,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 if act.seconds > cap:
                     act = Action(act.kind, round(cap, 2), act.degrees, act.why + f" (cut short: a wall {wall.nearest_in:.0f} in ahead)")
         planner.prev_kind = act.kind
+        log_decision(steps, act, ball, wall, planner, clock() - t_start)
         say(f"[{steps}] {'ball ' + format(ball.distance_in, '.0f') + ' in ' + format(ball.bearing_deg, '+.0f') + ' deg' if ball else 'no ball'} -> {act.kind}: {act.why}")
         if dry_run or act.kind == "look":
             note(kind="act", act=act.kind, why=act.why)

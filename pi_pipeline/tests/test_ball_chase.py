@@ -688,3 +688,37 @@ def test_premetering_skips_a_recent_measurement_and_forces_a_stale_one():
     assert cam.premeter() is True and calls == [1]                                      # over half an interval old
     cam._clock = lambda: 101.0
     assert cam.premeter(force=True) is True and calls == [1, 1]
+
+
+def test_every_decision_is_logged_with_its_reason_and_what_was_passed_over(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "full_circle")
+    monkeypatch.setattr(bc, "BACK_BUDGET_S", 0.0)                         # no back-up left: the circle's back-up is passed over
+    p = bc.ChasePlanner()
+    p.claw_ok = False
+    for _ in range(40):
+        p.considered = []
+        act = p.decide(None)
+        bc.log_decision(1, act, None, None, p, 3.0)
+    rows = [json.loads(ln) for ln in (tmp_path / "decision_log.jsonl").read_text().splitlines()]
+    assert len(rows) == 40 and all(r["why"] and "state" in r for r in rows)
+    assert rows[-1]["state"]["search_order"] == "full_circle" and p.circles >= 1 and any(r["passed_over"] for r in rows)
+
+
+def test_the_sim_never_writes_the_real_logs(tmp_path, monkeypatch):
+    import os
+    from tools.sim_train import world
+    monkeypatch.setenv("G2_TURN_LOG", "keep.jsonl")
+    with world.patched():
+        assert os.environ["G2_TURN_LOG"] == os.devnull and os.environ["G2_DECISION_LOG"] == os.devnull
+    assert os.environ["G2_TURN_LOG"] == "keep.jsonl"
+
+
+def test_the_chase_logs_stop_growing_at_the_size_cap(tmp_path, monkeypatch):
+    f = tmp_path / "d.jsonl"
+    monkeypatch.setenv("G2_DECISION_LOG", str(f))
+    monkeypatch.setattr(bc, "LOG_MAX_BYTES", 100)
+    p = bc.ChasePlanner()
+    for _ in range(20):
+        bc.log_decision(1, bc.Action("look", 1.0, why="x"), None, None, p, 0.0)
+    assert 0 < f.stat().st_size < 1500

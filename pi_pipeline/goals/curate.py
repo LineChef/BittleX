@@ -157,7 +157,13 @@ def check_lessons(journal, store, goals: dict, dry: bool, now: float | None = No
 
 
 def rotate_turn_log(dry: bool, now: float | None = None) -> int:
-    path = os.path.expanduser(os.environ.get("G2_TURN_LOG", "~/.local/share/g2/turn_log.jsonl"))
+    """Old lines of the turn log and the decision log go to the trash files."""
+    return (_rotate_log("G2_TURN_LOG", "~/.local/share/g2/turn_log.jsonl", "turn_log.jsonl", dry, now)
+            + _rotate_log("G2_DECISION_LOG", "~/.local/share/g2/decision_log.jsonl", "decision_log.jsonl", dry, now))
+
+
+def _rotate_log(env: str, default: str, trash_name: str, dry: bool, now: float | None = None) -> int:
+    path = os.path.expanduser(os.environ.get(env, default))
     if not os.path.exists(path):
         return 0
     cutoff = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime((now or time.time()) - LOG_DAYS * 86400))
@@ -168,7 +174,7 @@ def rotate_turn_log(dry: bool, now: float | None = None) -> int:
         except ValueError:
             keep.append(ln)
     if old and not dry:
-        with open(os.path.join(curation_dir(), "trash", "turn_log.jsonl"), "a") as f:
+        with open(os.path.join(curation_dir(), "trash", trash_name), "a") as f:
             f.writelines(old)
         with open(path, "w") as f:
             f.writelines(keep)

@@ -25,10 +25,16 @@ def patched():
     saved = {n: getattr(bc, n) for n in names if hasattr(bc, n)}
     bc.find_ball = lambda pic: pic[1]                     # the simulated camera hands the reading itself
     bc.BETWEEN_MOVES = "stand"
+    logs = ("G2_TURN_LOG", "G2_DECISION_LOG")                  # the chase writes a line per turn and per decision: a simulated attempt must never write to the real logs (2026-11-02: a training run put 42 GB in the turn log)
+    old_env = {k: os.environ.get(k) for k in logs}
+    for k in logs: os.environ[k] = os.devnull
     try:
         yield
     finally:
         for n, v in saved.items(): setattr(bc, n, v)
+        for k, v in old_env.items():
+            if v is None: os.environ.pop(k, None)
+            else: os.environ[k] = v
 
 
 def load_cal():
