@@ -600,6 +600,9 @@ class SerialRobot:
         first stand-up (the link's stand_from_attention); rest or a sit, the normal stand-up (the firmware `kbalance`; from a sit the link's slow back-legs stand-up). An unreadable
         pose falls back to the last one he was told to take (none yet: standing, as the session start left him). Then it waits until the board reads the stand,
         watching for a fall; "fell" if he went over. Standing, and the last move ended under QUICK_MOVE_S ago: nothing to check, he goes at once."""
+        if BETWEEN_MOVES != "attention":
+            return "ok"                                   # the standing flow sends nothing before a move (what the code did before 2026-11-02): the pose read, the tilt check and the stand-up wait
+                                                          # added serial traffic in front of every walk, and the walks that followed showed no board echoes (docs/STATUS.md item 14)
         if self.posture == "stand" and self._moved_at is not None and self._clock() - self._moved_at < QUICK_MOVE_S:
             return "ok"
         pose = self.read_pose()
@@ -658,7 +661,7 @@ class SerialRobot:
         attention pose: the pose is sent again (it drives every leg joint again) and no stand-up first; just stood up: no second stand-up."""
         self._pitch, self._roll = [], []
         self._tx("gP")
-        if self.posture in ("attention", "stand"):
+        if BETWEEN_MOVES == "attention" and self.posture in ("attention", "stand"):          # (the standing flow always stands first, as it did before 2026-11-02)
             self._tx(CLAW_LOOK_POSE)
             self._claw = (0.0, 0.0)
             self.posture = "attention"
@@ -899,7 +902,8 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
         pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
     seen = []                                                                         # [(pan, reading)]
-    if CLAW_RAISE_FIRST:
+    raise_first = CLAW_RAISE_FIRST and BETWEEN_MOVES == "attention"                  # only from the attention pose, where the claw sits between the legs; the standing flow pans at once, as before
+    if raise_first:
         state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # up first, straight ahead: clear of the legs before any pan
     for pan in (pans if state != "fell" else []):
         state = robot.claw_pose(pan, CLAW_LIFT_DEG)
@@ -928,7 +932,7 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
             trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
                           **({"t": stamp()} if stamp else {}), **extra})
         say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
-    if state != "fell" and CLAW_RAISE_FIRST:
+    if state != "fell" and raise_first:
         state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # back to the centre still raised ...
     if state != "fell":
         state = robot.claw_pose(0.0, 0.0)                                            # ... then lowered
@@ -1009,6 +1013,15 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
 
     wall_state: dict = {}
     still_from = clock()                                  # when he last stopped moving: the still time before each move is logged (the legs let go after 7 to 10 s)
+    still_step = 0                                        # the step he last moved in: pictures taken since = steps - still_step
+    parts: dict = {}                                      # where that still time went since the last move: {"settle": s, "camera": s, ...} (logged with it, 2026-11-02)
+
+    def timed(name, fn, *a, **kw):
+        t0 = clock()
+        try:
+            return fn(*a, **kw)
+        finally:
+            parts[name] = round(parts.get(name, 0.0) + clock() - t0, 2)
     while not stop():
         if max_steps is not None and steps >= max_steps:
             return "steps"
@@ -1016,7 +1029,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             say(f"time is up ({max_seconds:.0f} s): ending the attempt")
             return "time"
         steps += 1
-        if steps % 15 == 1 and not dry_run and not robot.battery_ok():
+        if steps % 15 == 1 and not dry_run and not timed("battery", robot.battery_ok):
             say("battery low or unreadable: stopping")
             return "battery"
         wall = None
@@ -1024,13 +1037,13 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             ball, pending = pending, None
             last_move = None                              # a claw-look reading is from another camera pose: not a before / after pair
         else:
-            sleep(settle_s)                                   # let the body stop swaying before the picture (in the attention pose, or standing while he dials in close to the ball)
-            jpeg = camera.look()
+            timed("settle", sleep, settle_s)                  # let the body stop swaying before the picture (in the attention pose, or standing while he dials in close to the ball)
+            jpeg = timed("camera", camera.look)
             if not jpeg:                                      # the camera gave no picture: that says nothing about the ball (2026-10-25: counting it as a miss sent him turning away from a ball straight ahead)
                 say(f"[{steps}] no picture from the camera: looking again")
                 note(kind="no_picture")
                 continue
-            ball = confirm_ball(camera, find_ball(jpeg), sleep, trace)         # a ball only the loose pass found needs a second picture (user, 2026-11-01: false balls)
+            ball = timed("confirm", confirm_ball, camera, timed("find", find_ball, jpeg), sleep, trace)         # a ball only the loose pass found needs a second picture (user, 2026-11-01: false balls)
             if saver is not None:
                 saver.maybe_save(jpeg, ball)
             if last_move is not None and planner.pace is not None and not dry_run:
@@ -1041,7 +1054,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             last_move = None
             if wall_check is not None:
                 try:
-                    wall = wall_check(jpeg, ball)
+                    wall = timed("wall", wall_check, jpeg, ball)
                 except Exception:  # noqa: BLE001
                     wall = None
                 wall, dropped = vet_wall(wall, ball, wall_state)
@@ -1074,7 +1087,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             if act.kind == "look":
                 if not dry_run and not _dialing_in(ball):
                     _relax(robot)                         # not moving: wait in the attention pose
-                sleep(act.seconds)
+                timed("look_again_wait", sleep, act.seconds)
             continue
         if act.kind == "give_up":
             note(kind="wall", event="ball_by_wall", wall_in=None if wall is None else wall.nearest_in, why=act.why)
@@ -1082,9 +1095,9 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             return "ball_by_wall"
         if act.kind != "claw_look":
             still = round(clock() - still_from, 1)
-            note(kind="still", seconds=still, before=act.kind)
+            note(kind="still", seconds=still, before=act.kind, parts=dict(parts), looks=steps - still_step)
             if still > STILL_SAY_S:
-                say(f"[{steps}] stood still {still:.1f} s before this {act.kind}")
+                say(f"[{steps}] stood still {still:.1f} s before this {act.kind}: " + ", ".join(f"{k} {v:.1f}" for k, v in sorted(parts.items(), key=lambda kv: -kv[1])[:4]) + f" ({steps - still_step} picture(s))")
         if act.kind == "claw_look":
             state, pending = claw_scan(robot, camera, planner, saver=saver, sleep=sleep, say=say, trace=trace, stamp=lambda: round(clock() - t_start, 2))
             note(kind="act", act="claw_look", why=act.why, state=state, found=pending is not None)
@@ -1103,7 +1116,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                         say("G2 fell: stopping (fall recovery is off)")
                         return "fell"
             _relax(robot)                                    # stays in (or goes back to) the attention pose until the next look stands him up
-            still_from = clock()
+            still_from, still_step = clock(), steps
+            parts.clear()
             continue
         if act.kind == "wall_turn":
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
@@ -1160,7 +1174,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 return "fell"
             if not _dialing_in(ball):                     # another punt or a step closer is next when the ball is still at the claw: stay up
                 _relax(robot)
-            still_from = clock()
+            still_from, still_step = clock(), steps
+            parts.clear()
             continue
         else:
             state = "ok"
@@ -1172,7 +1187,8 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             return "fell"
         if not _dialing_in(ball):
             _relax(robot)                                 # the move is over: wait in the attention pose, not standing (close to the ball he stays up between the small steps)
-        still_from = clock()
+        still_from, still_step = clock(), steps
+        parts.clear()
     return "stopped"
 
 
@@ -1224,22 +1240,32 @@ def _wait_for_camera(port: str, wait_s: float | None = None, sleep=time.sleep, e
 
 
 def _stand_if_lying(link, token: str = "kbalance") -> bool:
-    """At the start of a session: read the pose (`j`) and stand him up the way that pose needs (user, 2026-11-02): standing, nothing; the attention pose, the back-legs-first
-    stand-up (the link's stand_from_attention: the plain firmware stand-up out of it flipped him over); rest or a sit, `token` (the plain firmware stand-up is `kbalance`; `kup`
-    is the firmware's neutral stand, claw_look --stand kup). An unreadable pose counts as lying (a stand-up from standing changes nothing; a missed one leaves him lying while he
-    "searches", 2026-11-01). Then it waits until the board reads the stand. Never raises. Returns whether the pose could be read (False: the board gave no pose)."""
+    """At the start of a session: read the pose once (`j`) and stand him up the way it needs: standing, nothing; the attention pose, `token` with the link set up to run the
+    back-legs-first stand-up (the plain firmware stand-up out of it flipped him over, 2026-11-02); rest or a sit, `token` (the plain firmware stand-up is `kbalance`; `kup` is the
+    firmware's neutral stand, claw_look --stand kup). An unreadable pose counts as lying (a stand-up from standing changes nothing; a missed one leaves him lying while he "searches",
+    2026-11-01). Then a fixed wait, as before 2026-11-02: only the attention flow polls the board until it reads the stand. Never raises. Returns whether the pose could be read."""
+    import re
     try:
-        j = read_joints(link)
-        pose = classify_pose(j)
-        if pose == "stand":
+        s = link._ser
+        s.reset_input_buffer()
+        s.write(b"j\n")
+        time.sleep(1.0)
+        rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
+        j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
+        pose = classify_pose(j[:16] if j else None)
+        if pose == "stand":                                   # (the old test, j[8] < 40 and j[12] > 30, read the REST pose as standing; it only worked because the raw read usually failed)
             return True
-        print({"attention": "in the attention pose: standing up back legs first", "unknown": "could not read the pose: standing up first"}.get(pose, f"{pose}: standing up first"))
+        # an unreadable pose (garbled serial reads, STATUS 15) counts as lying: a stand-up from standing changes nothing, a missed one leaves him lying while he "searches" (2026-11-01)
+        print({"attention": "in the attention pose: standing up back legs first", "unknown": "could not read the pose: standing up first"}.get(pose, "lying down: standing up first"))
         if hasattr(link, "last_motion_command"):
             link.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read
         link.send(token, read_reply=False, settle=0.0)
-        got = wait_for_pose(link, "stand")
-        if got not in ("stand", "unknown"):
-            print(f"stood up, but the board reads {got}")
+        if BETWEEN_MOVES == "attention":
+            got = wait_for_pose(link, "stand")
+            if got not in ("stand", "unknown"):
+                print(f"stood up, but the board reads {got}")
+        else:
+            time.sleep(3.0)
         return j is not None
     except Exception as e:  # noqa: BLE001
         print("could not check the pose:", e)

@@ -540,7 +540,8 @@ def test_the_pose_read_names_each_known_pose_and_nothing_else():
 
 
 @pytest.mark.parametrize("pose, link_belief, sends_stand", [("attention", "kcalib", True), ("rest", "krest", True), ("sit", "ksit", True), ("stand", "", False)])
-def test_before_a_move_he_reads_his_pose_and_stands_up_the_way_that_pose_needs(pose, link_belief, sends_stand):
+def test_before_a_move_he_reads_his_pose_and_stands_up_the_way_that_pose_needs(pose, link_belief, sends_stand, monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the pose read and tilt check belong to the attention flow
     lk = _PoseLink(pose)
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 1000, 0.2)).__next__)
     assert r.stand_up() == "ok" and r.posture == "stand"
@@ -558,6 +559,7 @@ def test_an_attention_pose_the_board_ignores_is_asked_for_again_then_taken_as_st
 
 
 def test_standing_but_tilted_means_sagged_legs_and_they_are_driven_back_before_the_move(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the pose read and tilt check belong to the attention flow
     import math
     from pi_pipeline.gait import imu_parse, standup
     tilt = {"pitch": -33.0}
@@ -592,7 +594,8 @@ def test_the_default_flow_stands_between_moves_and_logs_the_still_time_before_ea
     assert [e["before"] for e in stills] == ["turn", "walk", "punt"] and all(e["seconds"] >= 0 for e in stills)
 
 
-def test_a_quick_follow_on_move_skips_the_pose_read():
+def test_a_quick_follow_on_move_skips_the_pose_read(monkeypatch):
+    monkeypatch.setattr(bc, "BETWEEN_MOVES", "attention")                         # the pose read and tilt check belong to the attention flow
     lk = _PoseLink("stand")
     t = iter(np.arange(0, 1000, 0.2))
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
@@ -610,3 +613,34 @@ def test_a_walk_that_cannot_start_because_the_board_sends_nothing_ends_the_attem
     out = bc.run_chase(robot, FakeCamera([picture([disc(122, 110, 20)])]), lambda: False, max_steps=10, sleep=lambda s: None, say=said.append)
     assert out == "board_silent" and len([m for m in robot.moves if m[0] == "walk"]) == 1      # once, not rest-picture-stand over and over (2026-11-02)
     assert any("power-cycle" in m for m in said)
+
+
+def test_the_standing_flow_sends_nothing_extra_before_a_move_or_at_session_start(monkeypatch):
+    """2026-11-02: the pose read, the tilt check and the stand-up polling put extra serial traffic in front of every walk, and the walks after them showed no board echoes. In the
+    default flow a move sends exactly what it sent before: no `j`, no `gp` / `gP` pair, nothing."""
+    assert bc.BETWEEN_MOVES == "stand"
+    lk = _PoseLink("stand")
+    t = iter(np.arange(0, 100000, 0.2))
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
+    r._moved_at = r._clock() - 60.0                                                    # long still: the attention flow would read the pose and the tilt now
+    assert r.stand_up() == "ok" and lk.sent == []
+    for move in (lambda: r.turn(20, 0.3), lambda: r.back(0.3)):
+        lk.sent.clear()
+        assert move() == "ok"
+        assert lk.sent[0] == "gP" and "j" not in lk.sent and lk.sent.count("gP") == 1 and lk.sent.count("gp") == 1       # the skill wrapper's own gP ... gp, as before
+
+
+def test_the_session_start_reads_the_pose_once_and_waits_a_fixed_time(monkeypatch):
+    import types
+    waits = []
+    monkeypatch.setattr(bc.time, "sleep", lambda s: waits.append(s))
+    writes, sent = [], []
+    row = ",\t".join(str(v) for v in [0] * 8 + [67, 67, 77, 77, -47, -47, -53, -53]).encode()          # the rest pose
+    ser = types.SimpleNamespace(in_waiting=len(row), reset_input_buffer=lambda: None, write=lambda b: writes.append(b), read=lambda n: row)
+    lk = types.SimpleNamespace(_ser=ser, send=lambda c, **k: sent.append(c), last_motion_command="")
+    assert bc._stand_if_lying(lk) is True
+    assert writes == [b"j\n"] and sent == ["kbalance"] and lk.last_motion_command == "krest" and waits == [1.0, 3.0]      # one `j`, one stand-up, a fixed 3 s: no polling loop
+    sent.clear(); writes.clear(); waits.clear()
+    row2 = ",\t".join(str(v) for v in [0] * 16).encode()                                                   # the attention pose: the link must run its back-legs-first stand-up
+    ser.read = lambda n: row2
+    assert bc._stand_if_lying(lk) is True and sent == ["kbalance"] and lk.last_motion_command == "kcalib"
