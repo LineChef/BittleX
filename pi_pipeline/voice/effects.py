@@ -128,12 +128,10 @@ VOICES = {
 
 from .. import sound_levels  # noqa: E402
 
-STYLE_PEAK = sound_levels.SPEECH    # loudest sample after styling, as a fraction of full scale: 90% of max (user, 2026-11-01)
-
-
 def apply_style(name: str, audio: np.ndarray, rate: int) -> np.ndarray:
-    """Apply the named voice from VOICES (unknown names fall back to plain) and level it for playback."""
+    """Apply the named voice from VOICES (unknown names fall back to plain), levelled to the global volume. The speaker levels every line again as it
+    plays it (`tts.PiperTTS.play`), so a line cached at another volume, and the plain voice, come out at the global volume too."""
     fn = VOICES.get(name)
     if fn is None or name == "plain":
         return audio
-    return normalize(fn(audio, rate), STYLE_PEAK)
+    return normalize(fn(audio, rate), sound_levels.peak())

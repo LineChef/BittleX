@@ -89,11 +89,13 @@ def test_shift_and_length_still_adjust_the_melody():
     assert sent == ["b1 3 1 3"]                    # never below tone 1
 
 
-def test_prime_sets_the_volume_once_and_zero_leaves_it_alone():
+def test_prime_sets_the_buzzer_to_the_global_volume(monkeypatch):
     sent = []
-    BuzzerCue(types.SimpleNamespace(send_token=sent.append), volume=10).prime()
-    BuzzerCue(types.SimpleNamespace(send_token=sent.append), volume=0).prime()
-    assert sent == ["b10"]
+    BuzzerCue(types.SimpleNamespace(send_token=sent.append)).prime()
+    assert sent == ["b6"]                          # 65% of max, rounded down so the buzzer is never louder than the speaker
+    monkeypatch.setenv("G2_VOLUME", "100")
+    BuzzerCue(types.SimpleNamespace(send_token=sent.append)).prime()
+    assert sent == ["b6", "b7"]                    # the 75% cap holds for the buzzer too
 
 
 def test_buzzer_volume_token_never_builds_the_mute_toggle():

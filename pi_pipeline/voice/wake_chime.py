@@ -9,8 +9,6 @@ import numpy as np
 
 from .. import sound_levels
 
-DEFAULT_PEAK = sound_levels.PROMPT_TONES          # 70% of max (user, 2026-10-11)
-
 log = logging.getLogger("g2.wake_chime")
 
 NOTES_HZ = (659.3, 880.0)          # E5 -> A5: a rising "I'm listening"
@@ -18,7 +16,7 @@ NOTE_S = 0.14
 HARMONICS = (1.0, 0.28, 0.10)      # a soft bell timbre
 
 
-def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render(rate: int = 48000) -> np.ndarray:
     parts = []
     for f in NOTES_HZ:
         t = np.arange(0, NOTE_S, 1.0 / rate)
@@ -26,16 +24,15 @@ def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
         y = y * np.minimum(1.0, t / 0.008) * np.exp(-t * 11.0)               # 8 ms attack, then a bell-like decay
         parts.append(y)
     y = np.concatenate(parts)
-    y = y / np.abs(y).max() * peak
-    return (y * 32767).astype(np.int16)
+    return sound_levels.level(y)
 
 
-def play(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play(rate: int = 48000, wait: bool = False) -> None:
     """Play the chime on the default output. Never raises: a speaker problem is logged and ignored."""
     def _run() -> None:
         try:
             import sounddevice as sd
-            sd.play(render(rate, peak), rate)
+            sd.play(render(rate), rate)
             if wait:
                 sd.wait()
         except Exception:  # noqa: BLE001

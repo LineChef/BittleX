@@ -6,7 +6,7 @@
                      every `reminder_s` while it runs.
   * recording_stop:  the same two notes falling, when it stops.
 All three differ from the acknowledgement tone (one 880 Hz blip), the whistle and the siren. `render()` returns int16 mono PCM;
-`play()` plays without blocking, at the alert level by default (a privacy indicator should be noticeable)."""
+`play()` plays without blocking, at the global volume (`sound_levels`)."""
 from __future__ import annotations
 
 import logging
@@ -18,8 +18,6 @@ from .. import sound_levels
 
 log = logging.getLogger("g2.camera_sounds")
 
-DEFAULT_PEAK = sound_levels.CAMERA          # 70% of max (user, 2026-10-11)
-
 
 def _note(freq: float, dur: float, rate: int, attack: float = 0.005, release: float = 0.03, harmonics=(1.0, 0.2)) -> np.ndarray:
     t = np.arange(0, dur, 1.0 / rate)
@@ -27,7 +25,7 @@ def _note(freq: float, dur: float, rate: int, attack: float = 0.005, release: fl
     return y * np.minimum(1.0, np.minimum(t / attack, (dur - t) / release))
 
 
-def render(name: str, rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render(name: str, rate: int = 48000) -> np.ndarray:
     gap = np.zeros(int(0.02 * rate))
     if name == "shutter":                      # a tick, then a short falling chirp: "click-brrp", twice
         one = np.concatenate([_note(3200, 0.012, rate, 0.001, 0.008, (1.0,)), np.zeros(int(0.012 * rate)),
@@ -39,16 +37,15 @@ def render(name: str, rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarr
         y = np.concatenate([_note(990, 0.09, rate), gap, _note(660, 0.14, rate)])
     else:
         raise ValueError(f"unknown camera sound {name!r}")
-    y = y / np.abs(y).max() * peak
-    return (y * 32767).astype(np.int16)
+    return sound_levels.level(y)
 
 
-def play(name: str, peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play(name: str, rate: int = 48000, wait: bool = False) -> None:
     """Never raises: a speaker problem is logged and ignored."""
     def _run() -> None:
         try:
             import sounddevice as sd
-            sd.play(render(name, rate, peak), rate)
+            sd.play(render(name, rate), rate)
             if wait:
                 sd.wait()
         except Exception:  # noqa: BLE001
@@ -63,9 +60,9 @@ class CameraActivityIndicator:
     """Plays `recording` when continuous capture starts, again every `reminder_s` while it runs (0 = no reminders), and
     `recording_stop` when it ends. `play` is injectable for tests."""
 
-    def __init__(self, *, peak: float = DEFAULT_PEAK, reminder_s: float = 60.0, play=None):
-        self._peak, self._reminder_s = peak, reminder_s
-        self._play = play or (lambda name: play_sound(name, self._peak))
+    def __init__(self, *, reminder_s: float = 60.0, play=None):
+        self._reminder_s = reminder_s
+        self._play = play or play_sound
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 

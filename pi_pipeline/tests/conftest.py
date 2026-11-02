@@ -36,6 +36,7 @@ def _isolate_api_log(tmp_path, monkeypatch):
 def _no_speaker_sounds(monkeypatch):
     """Tests never play a sound on the developer's speakers (the exploration fanfare came out of the Mac during a test run, 2026-10-09)."""
     monkeypatch.setenv("G2_SPEAKER_SOUNDS", "0")
+    monkeypatch.delenv("G2_VOLUME", raising=False)              # the tests hear the default global volume, whatever the .env says
 
 
 @pytest.fixture(autouse=True)

@@ -1,32 +1,46 @@
-"""The loudness of every speaker sound G2 makes, in one place, as a percent of MAX volume (user, 2026-10-11: "50%" always means 50% of max).
+"""G2's one volume (user, 2026-11-02): every sound he plays on the speaker -- his voice (any style, cached or not), the prompt tones, the chimes, the horns, the
+grunts, the alarms, the camera sounds -- comes out at the same level, and the BiBoard buzzer is set to match. No sound has a level of its own, and no setting
+changes one sound's level: the only knob is the global volume, `G2_VOLUME` (percent of max, default VOLUME_PERCENT).
 
-MAX_PEAK is the loudest clean sample, as a fraction of full scale. Each sound's peak is `MAX_PEAK * percent / 100`. Sounds not listed here (short tone, ack whistle, battery whistle)
-keep their own fixed levels in `voice/ack_whistle.py` and `config.py`."""
+Percent always means percent of MAX volume (user, 2026-10-11). MAX_PEAK is the loudest clean sample as a fraction of full scale, so the volume is a peak of
+`MAX_PEAK * percent / 100`. Nothing is ever louder than MAX_PERCENT of max (user, 2026-11-01): a higher `G2_VOLUME` is held to it."""
 from __future__ import annotations
 
+import os
+
 MAX_PEAK = 0.95
-MAX_PERCENT = 75.0        # no sound G2 makes is louder than this (user, 2026-11-01); `at()` clamps to it, and so does `limit()` for a level set from the environment
+MAX_PERCENT = 75.0        # the cap (user, 2026-11-01)
+VOLUME_PERCENT = 65.0     # the global volume (user, 2026-11-02)
 
 
-def at(percent: float) -> float:
-    return MAX_PEAK * min(percent, MAX_PERCENT) / 100.0
+def volume_percent() -> float:
+    """The global volume, percent of max: `G2_VOLUME` if set (held to 0..MAX_PERCENT), else VOLUME_PERCENT. Read at every sound, so a change in the environment
+    needs no restart of anything that only plays sounds."""
+    raw = os.environ.get("G2_VOLUME", "").strip()
+    try:
+        v = float(raw) if raw else VOLUME_PERCENT
+    except ValueError:
+        v = VOLUME_PERCENT
+    return max(0.0, min(v, MAX_PERCENT))
 
 
-def limit(peak: float) -> float:
-    """A peak (fraction of full scale) held to the cap: for a level a person can set from the environment."""
-    return min(peak, at(MAX_PERCENT))
+def peak() -> float:
+    """The loudest sample of every sound, as a fraction of full scale."""
+    return MAX_PEAK * volume_percent() / 100.0
 
 
-LOSING_HORN = at(75)      # the refusal, the failed command and the fall alarm are the same horn at the same level
-CAMERA = at(70)           # the picture-click (voice/shutter.py) and the camera chirps (shutter, recording on, recording off)
-BATTERY_WHISTLE = at(50)  # the low-battery alarm for G2's pack (user, 2026-11-01: 50%; it was about 5%)
-BATTERY_SIREN = at(50)    # the low-battery alarm for the Pi's pack (user, 2026-11-01: 50%; the siren elsewhere keeps SIREN)
-SIREN = at(75)            # the red alert siren
-PROMPT_TONES = at(70)     # wake chime, beep, boop, close, double beep
-API_TICK = at(50)
-VOICE_SOUNDS = at(70)     # grunt, sigh, yawn
-OOF = at(50)              # the wall-hit oof
-TURN_AWAY = at(50)
-TA_DA = at(70)
-START_HORN = at(75)       # the exploration start horn (user, 2026-11-01: 90%, then the 75% cap; it was 100%)
-SPEECH = at(75)           # his speaking voice after the robot effect (user, 2026-11-01: 80%, then the 75% cap; it was 100%, then 90%); the plain voice (G2_VOICE_ROBOT_EFFECT=0) is not levelled
+def level(samples):
+    """`samples` (any numeric array, int16 or float) scaled so its loudest sample is `peak()`, as int16 mono PCM. Silence stays silence. Every sound goes
+    through here on its way to the speaker."""
+    import numpy as np
+    y = np.asarray(samples, dtype=np.float64)
+    m = float(np.abs(y).max()) if y.size else 0.0
+    if m == 0.0:
+        return np.zeros(y.shape, dtype=np.int16)
+    return np.clip(np.round(y / m * peak() * 32767), -32768, 32767).astype(np.int16)
+
+
+def buzzer_level() -> int:
+    """The BiBoard buzzer volume (1-10, `b1`..`b10`) for the global volume, rounded down so the buzzer is never louder than the speaker sounds (65% -> 6).
+    Never 0: the board has no silent level short of its mute toggle."""
+    return max(1, min(10, int(volume_percent() // 10)))

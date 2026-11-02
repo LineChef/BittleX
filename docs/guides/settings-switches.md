@@ -115,13 +115,12 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 | `G2_DEFAULT_GAIT` | `policy` | `firmware` goes back to the stock scripted `wkF` for forward walking |
 | `G2_CONVERSATION_WINDOW_S`, `G2_CONVERSATION_MAX_S` | 20, 600 | conversation mode ("let's talk"): how long G2 waits for you to start each turn, and the session limit; 0 for the window turns the mode off |
 | `G2_CONVERSATION_MAX_WORDS`, `G2_SIDE_MAX_WORDS` | 30, 14 | a turn heard without the wake word that runs longer than this is dropped before Claude (the first number applies in conversation mode); 0 means no limit |
-| `G2_SIREN_PEAK` | 50% of max | loudness of the Pi battery alert siren (a fraction of full scale) |
-| `G2_ALERT_PEAK` | 50% of max | loudness of the whistle that warns about G2's pack (a fraction of full scale) |
+| `G2_VOLUME` | 65 | the one volume, percent of max, for every sound G2 plays (his voice, the tones, the alarms, the camera sounds) and the buzzer (65 -> `b6`); held to 75. No sound has a level of its own |
 | `G2_MEMLOG`, `G2_MEMLOG_S` | `~/.local/share/g2/memory_log.jsonl`, 10 | the memory log (`g2mem`): its file (`off` turns it off) and the seconds between readings |
 | `G2_TASK_SCOPE_STRICT` | off (on in the tests) | `1` makes a task that changes a setting it did not declare raise (util/task_scope.py) |
 | `G2_BATTERY_STRICT` | off | `1` stops a test when the pack cannot be read (default: warn and go on) |
 
-No sound G2 makes is louder than **75% of max** (user, 2026-11-01): `sound_levels.at()` clamps to it, and so does any level set from the environment. The two low-battery alarms are 50%; the buzzer volume is 7 of 10.
+**One volume for everything** (user, 2026-11-02): every sound G2 plays, his voice included, comes out at `G2_VOLUME` (default **65% of max**, `pi_pipeline/sound_levels.py`), and the buzzer is set to match (6 of 10). No sound has a level of its own; nothing is ever louder than 75% of max (user, 2026-11-01).
 | `G2_MEMORY_LOG_COMMANDS` | off | `1` logs the memory-related spoken commands |
 | `G2_NARRATE_HIDE_NAMES` | off | `1` makes G2 say "someone" instead of the names he knows when narrating |
 | `G2_INTEREST` | on | `0` turns off the interest watch that decides when an exploration stop is worth a picture |

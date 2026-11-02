@@ -45,7 +45,7 @@ class SpeakerCue:
     `short_tone` (default, one short blip) or `ack_whistle`. Replaces the buzzer blip for those stages, since the buzzer can
     only beep in separate notes."""
 
-    def __init__(self, inner: Cue | None = None, *, stages=DEFAULT_STAGES, peak: float | None = None, player=None,
+    def __init__(self, inner: Cue | None = None, *, stages=DEFAULT_STAGES, player=None,
                  tone: str = "short_tone"):
         from . import short_tone, ack_whistle, wake_chime
 
@@ -53,16 +53,15 @@ class SpeakerCue:
         module = {"short_tone": short_tone, "ack_whistle": ack_whistle}[tone]
         self._inner = inner or LogCue()
         self._stages = set(stages)
-        self._play = player or (lambda: module.play(peak if peak is not None else module.DEFAULT_PEAK))
+        self._play = player or module.play                                    # every sound at the global volume (sound_levels)
         # `wait=True`: the tone plays to its end before the loop goes on, because the next sound (the thinking tone, the spoken reply) starts at once and a second sounddevice play cuts the first one off -- the boop was never heard (user, 2026-10-10).
         # the three exchange stages each have their own sound whatever `tone` the others use (user, 2026-10-09): beep = listening, boop = your words are captured, close = he stopped listening
         from . import prompt_tones
-        pk = lambda default: default                                                    # noqa: E731  (own levels in sound_levels.py, not the shared ack peak; user, 2026-10-11)
         self._stage_play = {} if player else {
-            "awake": lambda: prompt_tones.play_beep(pk(prompt_tones.lv.PROMPT_TONES)),
-            "captured": lambda: prompt_tones.play_boop(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
-            "closed": lambda: prompt_tones.play_close(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
-            "gait_switch": lambda: prompt_tones.play_double(pk(prompt_tones.lv.PROMPT_TONES), wait=True),
+            "awake": lambda: prompt_tones.play_beep(),
+            "captured": lambda: prompt_tones.play_boop(wait=True),
+            "closed": lambda: prompt_tones.play_close(wait=True),
+            "gait_switch": lambda: prompt_tones.play_double(wait=True),
         }
 
     def set(self, stage: Stage) -> None:
@@ -93,24 +92,22 @@ class BuzzerCue:
     A beep failing never breaks the loop."""
 
     def __init__(self, actuator, inner: Cue | None = None, *, shift: float = 0.0, length: float = 1.0,
-                 stages=DEFAULT_STAGES, volume: int = 0):
+                 stages=DEFAULT_STAGES):
         self._act = actuator
         self._inner = inner or LogCue()
         self._shift = int(round(shift))
         self._length = length
         self._stages = set(stages)
-        self._volume = volume
 
     def prime(self) -> None:
-        """Set the buzzer volume once (call at startup). 0 leaves the board's volume alone."""
-        if not self._volume:
-            return
+        """Set the buzzer volume once (call at startup): the global volume's buzzer level (`sound_levels.buzzer_level`), never a level of its own."""
+        from .. import sound_levels
         from ..link import opencat
 
         send = getattr(self._act, "send_token", None)
         if send is not None:
             try:
-                send(opencat.buzzer_volume(self._volume))
+                send(opencat.buzzer_volume(sound_levels.buzzer_level()))
             except Exception:  # noqa: BLE001
                 log.debug("setting the buzzer volume failed", exc_info=True)
 

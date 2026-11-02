@@ -97,7 +97,7 @@ def _make_vision_source(sensor_opt: int | None = None):
     src = BackgroundFrameSource(feed).start()
     if settings.camera_sounds:                           # say out loud that the camera is running, and when it stops
         from ..voice.camera_sounds import CameraActivityIndicator
-        indicator = CameraActivityIndicator(peak=settings.camera_peak, reminder_s=settings.camera_reminder_s).start()
+        indicator = CameraActivityIndicator(reminder_s=settings.camera_reminder_s).start()
         _close = src.close
 
         def close() -> None:

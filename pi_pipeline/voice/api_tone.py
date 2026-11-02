@@ -11,8 +11,6 @@ import numpy as np
 
 from .. import sound_levels
 
-DEFAULT_PEAK = sound_levels.API_TICK          # 50% of max (user, 2026-10-11)
-
 log = logging.getLogger("g2.api_tone")
 
 FREQ_HZ = 1320.0
@@ -21,17 +19,16 @@ HARMONICS = (1.0, 0.45, 0.30)       # a hard edge so it cannot be mistaken for t
 WAIT_FOR_SPEECH_S = 6.0
 
 
-def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render(rate: int = 48000) -> np.ndarray:
     pulse_t = np.arange(0, PULSE_S, 1.0 / rate)
     pulse = sum(w * np.sin(2 * np.pi * (k + 1) * FREQ_HZ * pulse_t) for k, w in enumerate(HARMONICS))
     pulse = pulse * np.minimum(1.0, np.minimum(pulse_t / 0.004, (PULSE_S - pulse_t) / 0.012))
     gap = np.zeros(int(GAP_S * rate))
     y = np.concatenate([np.concatenate([pulse, gap]) for _ in range(PULSES)])[: -len(gap)]
-    y = y / np.abs(y).max() * peak
-    return (y * 32767).astype(np.int16)
+    return sound_levels.level(y)
 
 
-def play(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play(rate: int = 48000, wait: bool = False) -> None:
     """Play the tone without blocking the caller, after any speech in progress has finished. Never raises."""
     def _run() -> None:
         try:
@@ -40,7 +37,7 @@ def play(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> N
             while tts.SPEAKING.is_set() and time.monotonic() < deadline:
                 time.sleep(0.05)
             import sounddevice as sd
-            sd.play(render(rate, peak), rate)
+            sd.play(render(rate), rate)
             if wait:
                 sd.wait()
         except Exception:  # noqa: BLE001 -- a signal must never take a conversation down

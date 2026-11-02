@@ -11,10 +11,11 @@ def _peak_hz(y, t0, t1, rate=48000):
     return np.fft.rfftfreq(1 << 16, 1 / rate)[np.argmax(sp)]
 
 
-def test_one_burst_is_under_a_second_at_the_default_level():
+def test_one_burst_is_under_a_second_at_the_global_volume():
     y = ra.render(48000)
     assert 0.8 < len(y) / 48000 < 0.9
-    assert abs(np.abs(y).max() / 32767 - ra.DEFAULT_PEAK) < 0.002
+    from pi_pipeline import sound_levels as lv
+    assert abs(np.abs(y).max() / 32767 - lv.peak()) < 0.002
 
 
 def test_pitch_climbs_from_about_390_to_about_875_hz_as_it_plays():

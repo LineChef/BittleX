@@ -61,4 +61,20 @@ def test_apply_style_plain_unknown_and_metal():
     assert effects.apply_style("no-such-voice", a, 16000) is a           # unknown name: left alone
     m = effects.apply_style("metal", a, 16000)
     assert m.dtype == np.int16 and not np.array_equal(m, a)
-    assert abs(int(np.abs(m).max()) - int(0.75 * 0.95 * 32767)) < 50       # levelled to the style peak: the 75% cap (user, 2026-11-01)
+    assert abs(int(np.abs(m).max()) - int(0.65 * 0.95 * 32767)) < 50       # levelled to the global volume, 65% of max (user, 2026-11-02)
+
+
+def test_speech_plays_at_the_global_volume_whatever_level_it_was_made_or_cached_at(monkeypatch):
+    import types
+    import numpy as np
+    from pi_pipeline import sound_levels as lv
+    from pi_pipeline.voice import tts
+    played = []
+    t = object.__new__(tts.PiperTTS)                                   # no Piper model needed: only the playback path
+    t._sd = types.SimpleNamespace(play=lambda a, r: played.append(a), wait=lambda: None)
+    loud = (np.sin(np.linspace(0, 60, 4000)) * 32000).astype(np.int16)   # a line cached at almost full scale
+    t.play(("hi", loud, 16000))
+    assert abs(int(np.abs(played[-1]).max()) - int(lv.peak() * 32767)) <= 1
+    monkeypatch.setenv("G2_VOLUME", "30")
+    t.play(("hi", loud // 10, 16000))                                 # a quiet one comes up to the volume too
+    assert abs(int(np.abs(played[-1]).max()) - int(0.30 * 0.95 * 32767)) <= 1

@@ -171,8 +171,9 @@ def test_grunt_and_oof_render_short_audible_pcm():
 def test_refuse_horn_renders_the_measured_five_pieces_and_ends_on_a_falling_long_note():
     import numpy as np
     from pi_pipeline.voice import prompt_tones as pt
-    pcm = pt.render_refuse(48000, pt.DEFAULT_PEAK)
-    assert 3.6 < len(pcm) / 48000 < 3.9 and 300 < np.abs(pcm).max() < 1500
+    from pi_pipeline import sound_levels as lv
+    pcm = pt.render_refuse(48000)
+    assert 3.6 < len(pcm) / 48000 < 3.9 and abs(np.abs(pcm).max() / 32767 - lv.peak()) < 0.002
     assert len(pt.HORN) == 5 and pt.HORN[-1][1] - pt.HORN[-1][0] > 2.0
     assert pt.HORN_LAST_BREAKS[0][1] > pt.HORN_LAST_BREAKS[-1][1]      # the long note sags in pitch
 
@@ -180,9 +181,10 @@ def test_refuse_horn_renders_the_measured_five_pieces_and_ends_on_a_falling_long
 def test_complete_sting_is_a_ta_da_chord_stab_then_the_held_chord():
     import numpy as np
     from pi_pipeline.voice import prompt_tones as pt
-    pcm = pt.render_complete(48000, pt.DEFAULT_PEAK)
+    from pi_pipeline import sound_levels as lv
+    pcm = pt.render_complete(48000)
     r = 48000
-    assert 1.2 < len(pcm) / r < 1.5 and abs(np.abs(pcm).max() / (pt.MAX_PEAK * pt.COMPLETE_LEVEL * 32767) - 1.0) < 0.01      # 70% of the maximum clean level (user, 2026-10-11)
+    assert 1.2 < len(pcm) / r < 1.5 and abs(np.abs(pcm).max() / (lv.peak() * 32767) - 1.0) < 0.01      # the global volume (user, 2026-11-02)
     seg = pcm[int(0.6 * r):int(1.0 * r)].astype(float) * np.hanning(int(0.4 * r))
     sp = np.abs(np.fft.rfft(seg, 1 << 16)); fr = np.fft.rfftfreq(1 << 16, 1 / r)
     for hz in (523.3, 659.3, 784.0):                       # the held chord's notes stand clear of their neighbours

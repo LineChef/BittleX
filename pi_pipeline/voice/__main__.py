@@ -131,10 +131,10 @@ def main() -> None:
         # is one, else the buzzer cues on the real robot
         stages = tuple(x.strip() for x in settings.cue_stages.split(",") if x.strip())
         if features.sound_cues and voice and tts_mode == "piper" and settings.ack_tone in ("short_tone", "ack_whistle", "star_trek_whistle"):
-            cue = SpeakerCue(stages=stages, peak=settings.ack_peak, tone=settings.ack_tone)
+            cue = SpeakerCue(stages=stages, tone=settings.ack_tone)
         elif settings.ack_tone != "off" and args.actuator == "serial" and features.sound_cues:
             cue = BuzzerCue(actuator, shift=settings.buzzer_shift, length=settings.buzzer_length,
-                            stages=stages, volume=settings.buzzer_volume)
+                            stages=stages)
             cue.prime()
         else:
             cue = LogCue()
@@ -142,7 +142,7 @@ def main() -> None:
 
         if features.sound_cues and voice and tts_mode == "piper" and settings.api_tone == "on":
             from . import api_log, api_tone
-            api_log.set_call_hook(lambda api, source: api_tone.play(settings.api_peak))     # a unique tone on every billed Claude call
+            api_log.set_call_hook(lambda api, source: api_tone.play())     # a unique tone on every billed Claude call
 
         tts = make_tts(tts_mode, piper_model_path=settings.piper_model_path, style=settings.voice_style)
         if voice and tts_mode == "piper":
@@ -163,7 +163,7 @@ def main() -> None:
                 on_capture = None
                 if settings.camera_sounds and tts_mode != "print":
                     from . import camera_sounds
-                    on_capture = lambda: camera_sounds.play("shutter", settings.camera_peak)  # noqa: E731
+                    on_capture = lambda: camera_sounds.play("shutter")  # noqa: E731
                 wait_still = None
                 if fan is not None:
                     from ..gait.stillness import StillnessWaiter
@@ -318,12 +318,12 @@ def _note_fall() -> None:
 
 def _play_whistle() -> None:
     from . import ack_whistle
-    ack_whistle.play(peak=settings.alert_peak, wait=True)
+    ack_whistle.play(wait=True)
 
 
 def _play_siren() -> None:
     from . import red_alert_siren
-    red_alert_siren.play(peak=settings.siren_peak, count=2, wait=True)
+    red_alert_siren.play(count=2, wait=True)
 
 
 def _sound_then_say(tts, text: str, sound) -> None:

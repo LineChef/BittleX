@@ -41,9 +41,9 @@ def test_call_hook_fires_for_create_not_for_models_list():
         api_log.set_call_hook(None)
 
 
-def test_shutter_is_louder_than_the_other_signals():
+def test_the_shutter_is_as_loud_as_the_other_signals():
     from pi_pipeline.voice import shutter
-    assert np.abs(shutter.render().astype(float)).max() > 1.2 * np.abs(api_tone.render().astype(float)).max()
+    assert np.abs(shutter.render().astype(float)).max() == np.abs(api_tone.render().astype(float)).max()       # one global volume (user, 2026-11-02)
 
 
 def test_every_picture_path_clicks(monkeypatch):
@@ -89,7 +89,7 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     from pi_pipeline.voice import prompt_tones as pt
     pcm = pt.render_start_horn()
     assert 2.55 < pcm.size / 48000 < 2.75 and abs(int(pcm.max())) > 100
-    assert abs(int(abs(pcm).max()) / (pt.MAX_PEAK * 32767) - 0.75) < 0.02           # the 75% cap (user, 2026-11-01; 90% before, 100% earlier)
+    assert abs(int(abs(pcm).max()) / (pt.lv.MAX_PEAK * 32767) - 0.65) < 0.02           # the global volume (user, 2026-11-02)
     import numpy as np
     r = 48000
     assert np.abs(pcm[-240:]).max() < 0.02 * np.abs(pcm[r:int(1.5 * r)]).max()          # it fades out to nothing at the end
@@ -109,23 +109,28 @@ def test_the_start_horn_is_a_short_low_blast_and_the_roam_chirp_is_silent():
     assert sent == []                                                               # no buzzer notes for the roam start; the horn plays with the announcement
 
 
-def test_every_sound_level_is_the_requested_percent_of_max_volume():
+def test_every_sound_plays_at_the_one_global_volume(monkeypatch):
     import numpy as np
     from pi_pipeline import sound_levels as lv
-    from pi_pipeline.config import settings
-    from pi_pipeline.voice import camera_sounds, prompt_tones as pt, red_alert_siren, shutter, wake_chime
+    from pi_pipeline.voice import ack_whistle, camera_sounds, prompt_tones as pt, red_alert_siren, short_tone, shutter, wake_chime
 
     def pct(pcm):
         return np.abs(pcm.astype(float)).max() / (lv.MAX_PEAK * 32767) * 100
 
-    expected = {
-        "losing horn": (pt.render_refuse(), 75), "picture click": (shutter.render(), 70), "camera shutter": (camera_sounds.render("shutter"), 70),
-        "camera recording": (camera_sounds.render("recording"), 70), "camera recording stop": (camera_sounds.render("recording_stop"), 70),
-        "siren": (red_alert_siren.render(), 75), "wake chime": (wake_chime.render(), 70), "beep": (pt.render_beep(), 70), "boop": (pt.render_boop(), 70),
-        "close": (pt.render_close(), 70), "double": (pt.render_double(), 70), "api tick": (api_tone.render(), 50), "grunt": (pt.render_grunt(), 70),
-        "sigh": (pt.render_sigh(), 70), "yawn": (pt.render_yawn(), 70), "oof": (pt.render_hit(), 50), "turn-away": (pt.render_turn_away(), 50),
-        "ta-da": (pt.render_complete(), 70), "viking horn": (pt.render_start_horn(), 75),
-    }
-    for name, (pcm, want) in expected.items():
-        assert abs(pct(pcm) - want) < 1.0, (name, pct(pcm))
-    assert abs(settings.camera_peak - lv.at(70)) < 1e-9 and abs(settings.api_peak - lv.at(50)) < 1e-9 and abs(settings.siren_peak - lv.at(50)) < 1e-9 and abs(settings.alert_peak - lv.at(50)) < 1e-9
+    def every_sound():
+        return {
+            "losing horn": pt.render_refuse(), "picture click": shutter.render(), "camera shutter": camera_sounds.render("shutter"),
+            "camera recording": camera_sounds.render("recording"), "camera recording stop": camera_sounds.render("recording_stop"),
+            "siren": red_alert_siren.render(), "wake chime": wake_chime.render(), "beep": pt.render_beep(), "boop": pt.render_boop(),
+            "close": pt.render_close(), "double": pt.render_double(), "api tick": api_tone.render(), "grunt": pt.render_grunt(),
+            "sigh": pt.render_sigh(), "yawn": pt.render_yawn(), "oof": pt.render_hit(), "turn-away": pt.render_turn_away(), "ooof": pt.render_oof(),
+            "ta-da": pt.render_complete(), "viking horn": pt.render_start_horn(), "short tone": short_tone.render(), "battery whistle": ack_whistle.render(),
+        }
+    for want, env in ((65.0, None), (40.0, "40"), (75.0, "100"), (65.0, "loud")):          # the default, a change, the 75% cap, a bad value
+        if env is None:
+            monkeypatch.delenv("G2_VOLUME", raising=False)
+        else:
+            monkeypatch.setenv("G2_VOLUME", env)
+        assert lv.volume_percent() == want
+        for name, pcm in every_sound().items():
+            assert abs(pct(pcm) - want) < 0.5, (name, env, pct(pcm))

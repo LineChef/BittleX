@@ -4,7 +4,7 @@ flattening) and carries strong harmonics (the 1st to 3rd about equal, the 4th le
 burst, 1.83 s after the last began. Earlier versions (a ~1450-2100 Hz single sweep, then lower copies of it) were too high and too
 narrow in range; this one is fitted to the clip's measured fundamental, harmonic weights and loudness.
 
-G2 plays two bursts by default, at the same level as `ack_whistle`. `render()` returns int16 mono PCM; `play()` plays it
+G2 plays two bursts by default, at the global volume (`sound_levels`). `render()` returns int16 mono PCM; `play()` plays it
 without blocking."""
 from __future__ import annotations
 
@@ -14,8 +14,6 @@ import threading
 import numpy as np
 
 from .. import sound_levels
-
-DEFAULT_PEAK = sound_levels.SIREN          # 80% of max (user, 2026-10-11)
 
 log = logging.getLogger("g2.red_alert")
 
@@ -27,8 +25,8 @@ PITCH = 1.0             # multiplier on the fundamental; <1 is lower
 HARMONICS = (1.00, 1.08, 0.93, 0.40, 0.14, 0.08,)   # weights of the fundamental, 2x, 3x ... measured from the clip
 
 
-def render(rate: int = 48000, peak: float = DEFAULT_PEAK, count: int = 1, pitch: float = PITCH) -> np.ndarray:
-    """`count` bursts spaced PERIOD_S apart (start to start). Peak is a fraction of full scale; `pitch` multiplies the pitch."""
+def render(rate: int = 48000, count: int = 1, pitch: float = PITCH) -> np.ndarray:
+    """`count` bursts spaced PERIOD_S apart (start to start), at the global volume; `pitch` multiplies the pitch."""
     t_pts, f_pts, a_pts = (np.array(c) for c in zip(*CONTOUR))
     t = np.arange(0, CYCLE_S, 1.0 / rate)
     f0 = pitch * np.interp(t, t_pts, f_pts)
@@ -36,18 +34,17 @@ def render(rate: int = 48000, peak: float = DEFAULT_PEAK, count: int = 1, pitch:
     amp = amp * np.minimum(1.0, np.minimum(t / 0.02, (CYCLE_S - t) / 0.05))        # short fade in/out, no clicks
     phase = 2 * np.pi * np.cumsum(f0) / rate
     y = sum(w * np.sin((k + 1) * phase) for k, w in enumerate(HARMONICS)) * amp
-    y = y / np.abs(y).max() * peak
-    burst = (y * 32767).astype(np.int16)
+    burst = sound_levels.level(y)
     gap = np.zeros(int((PERIOD_S - CYCLE_S) * rate), dtype=np.int16)
     return np.concatenate([np.concatenate([burst, gap]) for _ in range(count - 1)] + [burst])
 
 
-def play(peak: float = DEFAULT_PEAK, count: int = 2, rate: int = 48000, wait: bool = False, pitch: float = PITCH) -> None:
+def play(count: int = 2, rate: int = 48000, wait: bool = False, pitch: float = PITCH) -> None:
     """Play the siren `count` times on the default output. Never raises: a speaker problem is logged and ignored."""
     def _run() -> None:
         try:
             import sounddevice as sd
-            sd.play(render(rate, peak, count, pitch), rate)
+            sd.play(render(rate, count, pitch), rate)
             if wait:
                 sd.wait()
         except Exception:  # noqa: BLE001 -- an alert sound must never take the loop down

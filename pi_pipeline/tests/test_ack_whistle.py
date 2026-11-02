@@ -1,17 +1,14 @@
 import numpy as np
 
+from pi_pipeline import sound_levels as lv
 from pi_pipeline.voice import ack_whistle
 from pi_pipeline.voice.cues import SpeakerCue
 
 
-def test_whistle_is_one_second_and_a_bit_at_the_requested_level():
-    y = ack_whistle.render(48000, peak=0.45)
+def test_whistle_is_one_second_and_a_bit_at_the_global_volume():
+    y = ack_whistle.render(48000)
     assert 1.15 < len(y) / 48000 < 1.22
-    assert abs(np.abs(y).max() / 32767 - 0.45) < 0.01
-
-
-def test_default_level_is_5_percent_of_the_0_45_level():
-    assert abs(ack_whistle.DEFAULT_PEAK - 0.45 * 0.05) < 1e-9
+    assert abs(np.abs(y).max() / 32767 - lv.peak()) < 0.002
 
 
 def _peak_hz(y, t0, t1, rate=48000):

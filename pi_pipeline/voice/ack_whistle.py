@@ -10,6 +10,8 @@ import threading
 
 import numpy as np
 
+from .. import sound_levels
+
 log = logging.getLogger("g2.ack")
 
 # (seconds, Hz, relative loudness 0..1), linearly interpolated
@@ -23,28 +25,23 @@ CONTOUR = [
     (1.18, 1947, 0.06),
 ]
 
-# Peak level as a fraction of full scale. 0.6 was the first level; 0.45 after a 25% cut; settled by ear on 2026-10-04 at 5% of that
-# (0.0225), since the speaker is loud at close range.
-DEFAULT_PEAK = 0.0225
-
-
-def render(rate: int = 48000, peak: float = DEFAULT_PEAK) -> np.ndarray:
+def render(rate: int = 48000) -> np.ndarray:
+    """At the global volume (`sound_levels`)."""
     t_pts, f_pts, a_pts = (np.array(c) for c in zip(*CONTOUR))
     t = np.arange(0, t_pts[-1], 1.0 / rate)
     freq = np.interp(t, t_pts, f_pts)
     amp = np.interp(t, t_pts, a_pts)
     phase = 2 * np.pi * np.cumsum(freq) / rate
     y = (np.sin(phase) + 0.08 * np.sin(2 * phase)) * amp
-    y = y / np.abs(y).max() * peak
-    return (y * 32767).astype(np.int16)
+    return sound_levels.level(y)
 
 
-def play(peak: float = DEFAULT_PEAK, rate: int = 48000, wait: bool = False) -> None:
+def play(rate: int = 48000, wait: bool = False) -> None:
     """Play the tone on the default output. Never raises: a speaker problem is logged and ignored."""
     def _run() -> None:
         try:
             import sounddevice as sd
-            sd.play(render(rate, peak), rate)
+            sd.play(render(rate), rate)
             if wait:
                 sd.wait()
         except Exception:  # noqa: BLE001 -- an acknowledgement must never take the loop down

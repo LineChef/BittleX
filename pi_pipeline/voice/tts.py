@@ -114,6 +114,8 @@ class PiperTTS:
             return
         text, audio, rate = item
         print(f"\n  G2: {text}\n")
+        from .. import sound_levels
+        audio = sound_levels.level(audio)              # his voice at the global volume, whatever level the line was made or cached at
         SPEAKING.set()
         try:
             self._sd.play(audio, rate)
