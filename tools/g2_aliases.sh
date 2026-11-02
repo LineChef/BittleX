@@ -215,6 +215,13 @@ g2visioneval() {
 }
 
 
+# g2simtrain [status|log|stop|report]  -- the sim training of the ball-chase settings (tools/sim_train, 2026-11-02): status = stage, progress, best scores, finish estimate (default); log = follow the log live; report = open the HTML report when done; stop = stop it for good. A plain Python simulation, nothing to watch in a window (g2watchrun is the PyBullet gait training).
+g2simtrain() { local r; r="$(cat "$HOME/g2_sim_train/CURRENT_RUN" 2>/dev/null)"; case "${1:-status}" in
+  status) "$G2_ROOT/.venv/bin/python" "$G2_ROOT/tools/sim_train/status.py" "$r" ;;
+  log) tail -n 20 -f "$r/progress.log" ;;
+  report) open "$r/report.html" ;;
+  stop) pkill -f "tools/sim_train/run.sh"; pkill -f "sim_train/train.py"; echo "sim training stopped (rerun tools/sim_train/run.sh $r to resume it)" ;;
+  *) echo "usage: g2simtrain [status|log|report|stop]" ;; esac; }
 # g2watchrun [--fast]  -- watch the training run that is going on RIGHT NOW: the actual episodes it is simulating, streamed from the run itself (no simulation of
 #   its own, not an approximation; it joins wherever the run is). Default = each episode at real speed, then the newest; --fast = follow live at training speed
 #   (about 4-5x real time). Drag or scroll to change the view: it is kept. Needs a run started after 2026-10-09 (older runs have no stream) and your own terminal for the window. Costs the run nothing when closed.
