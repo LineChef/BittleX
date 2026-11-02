@@ -441,9 +441,8 @@ class SerialRobot:
                 state = "fell"
                 break
             self._sleep(0.05)
-        if state == "ok":
-            self._tx("kbalance")
-            self._sleep(1.0)
+        self._tx("kbalance")                              # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
+        self._sleep(1.0)                                  # for over a minute: the firmware runs a gait until it is told something else)
         self._tx("gp")
         return state
 

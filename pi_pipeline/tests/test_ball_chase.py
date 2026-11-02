@@ -177,6 +177,18 @@ def test_the_serial_robot_sends_the_firmware_skills_and_ends_in_a_balanced_stand
     assert toks == ["kwkR", "kbalance", "kwkL", "kbalance", "kbkF", "kbalance", "kpickF", "kbalance", "kpickF", "kbalance"]      # (this fake link reports no IMU swing, so the punt is sent twice)
 
 
+def test_a_fall_during_a_firmware_move_still_stops_the_move():
+    class FakeLink:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    lk = FakeLink()
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 100, 0.2)).__next__)
+    r._fell = lambda: True                                                                           # the fall guard fires at once
+    assert r.back(1.0) == "fell"
+    assert [c for c in lk.sent if c.startswith("k")] == ["kbkF", "kbalance"]                        # 2026-11-02: no stop was sent and kbkF ran for over a minute
+
+
 def test_walks_are_always_the_default_gait_policy(monkeypatch):
     from pi_pipeline.gait import policy_walker
     made = []

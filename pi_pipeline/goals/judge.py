@@ -332,7 +332,8 @@ class Judge:
             out.append(Decision("kept", f"{_cap(k.says())} {k.show(b)} has settled: {r['hits']} of {r['n']} good, clearly better than the values next to it. I'll leave it there.", name, None, b, [n]))
         # 3. a fall while trying a value that is not his best bans that value for a while
         focus = st["focus"]
-        if outcome.fell and focus and focus in used and self._free(focus):
+        # (only when the fall came at or after the knob's own stage: a fall while searching says nothing about the punch distance; 2026-11-02 it banned one that way)
+        if outcome.fell and focus and focus in used and self._free(focus) and self._stage_score(focus, outcome) is not None:
             b = self.best(focus, used[focus])
             if used[focus] != b:
                 st["banned"].setdefault(focus, {})[vkey(used[focus])] = st["count"]

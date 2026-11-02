@@ -123,6 +123,18 @@ def test_a_fall_while_trying_a_value_bans_it_and_goes_back_to_the_best():
     assert d[0].action == "undo" and j.settings(BASE)["a"] == 3.0 and j._banned("a", 2.0)
 
 
+def test_a_fall_before_the_knobs_stage_bans_nothing():
+    j = Judge(KN, DIAG, rng=random.Random(0), stage_of={"a": "punch", "b": "search"})
+    j.begin_session(BASE)
+    for n in (1, 2):
+        j.update(n, oc("hit", 0.9, True, stages={"search": 0.9, "punch": 0.9}), BASE)
+    j.state["focus"] = "a"
+    fell = Outcome("fell", 0.0, False, "I fell")
+    fell.stages = {"search": 0.5}                                                                       # fell while searching: the punch never came
+    d = j.update(3, fell, dict(BASE, a=2.0))
+    assert not any(x.action == "undo" for x in d) and not j._banned("a", 2.0)
+
+
 def test_an_ask_knob_is_only_suggested_and_pins_limits_and_undos_hold():
     j = J()
     j.begin_session(BASE)
