@@ -130,11 +130,11 @@ class Bot:
 
 
 _scorer = None
-def run_episode(settings, family, seed, cal=None, falls=True, max_punts=1):
+def run_episode(settings, family, seed, cal=None, falls=True, max_punts=1, max_seconds=None):
     """One simulated attempt with `settings` (a full punt-settings dict); returns (score, outcome code, seconds, family, stats dict)."""
     cal = cal if cal is not None else load_cal()
     rng = random.Random(seed); w = World(rng, family, cal)
-    return _attempt(w, rng, settings, family, falls, max_punts)
+    return _attempt(w, rng, settings, family, falls, max_punts, max_seconds)
 
 
 SESSION_REST_S = 5.0                                           # the goal's rest between attempts (rest_between_s)
@@ -151,7 +151,7 @@ def run_session(settings, family, seed, cal=None, n_att=6, falls=True):
     return out
 
 
-def _attempt(w, rng, settings, family, falls, max_punts):
+def _attempt(w, rng, settings, family, falls, max_punts, max_seconds=None):
     global _scorer
     from pi_pipeline.goals.ball_punt import BallPunt
     _scorer = _scorer or BallPunt()
@@ -160,7 +160,7 @@ def _attempt(w, rng, settings, family, falls, max_punts):
     full = dict(settings); full.update(PINNED); ps.apply(bc, {k: v for k, v in full.items() if k in ps.SPEC})
     t0 = w.t
     try:
-        ended = bc.run_chase(bot, cam, lambda: False, planner=planner, max_punts=max_punts, max_seconds=75.0 if max_punts == 1 else 75.0 + 40.0 * (max_punts - 1), trace=trace, after_punt_look=True, pace=StubPace(),
+        ended = bc.run_chase(bot, cam, lambda: False, planner=planner, max_punts=max_punts, max_seconds=max_seconds or (75.0 if max_punts == 1 else 75.0 + 40.0 * (max_punts - 1)), trace=trace, after_punt_look=True, pace=StubPace(),
                              clock=lambda: w.t, sleep=lambda s: setattr(w, "t", w.t + s), say=lambda m: None)
     except Exception as e:  # a crash in the chase is a result too
         return 0.0, "crash:" + type(e).__name__, w.t, family, {}
