@@ -542,3 +542,34 @@ def test_before_a_move_he_reads_his_pose_and_stands_up_the_way_that_pose_needs(p
     assert r.stand_up() == "ok" and r.posture == "stand"
     assert ("kbalance" in lk.sent) is sends_stand and "j" in lk.sent
     assert lk.last_motion_command == link_belief                          # the link runs the stand-up that pose needs: back legs first from attention, the slow one from a sit, the firmware one from rest
+
+
+def test_an_attention_pose_the_board_ignores_is_asked_for_again_then_taken_as_standing():
+    lk = _PoseLink("stand")                                                           # the board keeps reading the stand whatever is sent
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 10000, 0.2)).__next__)
+    r.posture = "stand"
+    r.relax()
+    assert lk.sent.count(bc.CLAW_LOOK_POSE) == bc.ATTENTION_TRIES
+    assert r.posture == "stand" and lk.last_motion_command == "kbalance"              # nothing after this believes he is in the attention pose
+
+
+def test_standing_but_tilted_means_sagged_legs_and_they_are_driven_back_before_the_move(monkeypatch):
+    import math
+    from pi_pipeline.gait import imu_parse, standup
+    tilt = {"pitch": -33.0}
+    monkeypatch.setattr(imu_parse, "parse_imu_line", lambda line: (0.0, math.radians(tilt["pitch"])))
+
+    class Link(_PoseLink):
+        def poll_imu(self): return ["imu"]
+        def send(self, c, read_reply=False, settle=0.0):
+            if c.startswith("i8"):
+                tilt["pitch"] = -2.0                                                  # the stand angles sent again: the legs hold again
+            return super().send(c, read_reply, settle)
+    lk = Link("stand")
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 10000, 0.2)).__next__)
+    r._stand_tilt = (-1.0, 0.0)
+    assert r.stand_up() == "ok"
+    assert lk.sent.count(standup.move_cmd(standup.balance_pose())) == 2 and bc.CLAW_LOOK_POSE not in lk.sent
+    tilt["pitch"] = -3.0
+    lk.sent.clear()
+    assert r.stand_up() == "ok" and not any(c.startswith("i8") for c in lk.sent)       # level enough: no re-drive

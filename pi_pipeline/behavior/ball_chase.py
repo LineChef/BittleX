@@ -406,6 +406,9 @@ class Camera(Protocol):
     def look(self) -> bytes | None: ...
 
 
+SAG_TILT_DEG = 12.0            # standing, the body this far off the tilt measured right after his last good stand-up (or 20 deg off level before there is one): the legs have sagged
+SAG_TILT_LEVEL_DEG = 20.0      # (2026-11-02: the board still read the stand while the back legs had let go and the body sat 33 deg nose-up; the next turn tipped him over)
+ATTENTION_TRIES = 3            # kcalib sent this many times at most until the board reads the attention pose (2026-11-02: one sent 1 s after the stop at the end of a turn was ignored)
 POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose when every leg joint is within this of it
 POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pose to read as reached after asking for it (the firmware stand-up from rest takes about 2 to 3 s)
 
@@ -481,6 +484,7 @@ class SerialRobot:
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
+        self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
         self.last_fall: dict | None = None                # the angles of the last fall the guard saw (pitch, roll, which way, the posture he was in)
         self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
 
@@ -532,15 +536,51 @@ class SerialRobot:
         """Into the attention pose (CLAW_LOOK_POSE) to wait there instead of standing (ATTENTION_WHEN_STILL, user 2026-11-02). Nothing when he is already in it."""
         if self.posture == "attention":
             return "ok"
-        self._tx(CLAW_LOOK_POSE)
-        self._claw = (0.0, 0.0)                           # the pose puts the arm at its calibration zero too
-        self.posture = "attention"
-        self._sleep(0.5)
-        got = wait_for_pose(self._lk, "attention", sleep=self._sleep, clock=self._clock, fallback_s=ATTENTION_SETTLE_S)      # on only when the board says it is there
-        if got not in ("attention", "unknown"):
-            log.warning("asked for the attention pose, the board reads %s", got)
+        got = "unknown"
+        for attempt in range(ATTENTION_TRIES):
+            self._tx(CLAW_LOOK_POSE)
+            self._claw = (0.0, 0.0)                       # the pose puts the arm at its calibration zero too
+            self._sleep(0.5)
+            got = wait_for_pose(self._lk, "attention", timeout_s=1.5 if attempt < ATTENTION_TRIES - 1 else None, sleep=self._sleep, clock=self._clock,
+                                fallback_s=ATTENTION_SETTLE_S)                  # on only when the board says it is there
+            if got in ("attention", "unknown"):
+                break
+            log.warning("asked for the attention pose, the board reads %s%s", got, ": asking again" if attempt < ATTENTION_TRIES - 1 else "")
+        if got in ("attention", "unknown"):
+            self.posture = "attention"
+        else:                                             # it never took: say what he is in, so nothing after this assumes the attention pose
+            self.posture = got if got in ("stand", "rest", "sit") else "stand"
+            if hasattr(self._lk, "last_motion_command"):
+                self._lk.last_motion_command = {"stand": "kbalance", "rest": "krest", "sit": "ksit"}.get(self.posture, "kbalance")
         self._sleep(0.5)                                  # the body settles before a picture
         return "ok"
+
+    def _tilt(self, seconds: float = 0.5):
+        """The body's (pitch, roll) in degrees, the median of the IMU lines over `seconds` (the stream is switched on for it and off again), or None."""
+        import statistics
+        try:
+            from ..gait.imu_parse import parse_imu_line
+        except ImportError:
+            from gait.imu_parse import parse_imu_line  # type: ignore
+        self._tx("gP")
+        t0, pitch, roll = self._clock(), [], []
+        while self._clock() - t0 < seconds:
+            for line in self._lk.poll_imu():
+                r = parse_imu_line(line)
+                if r is not None:
+                    roll.append(math.degrees(r[0]))
+                    pitch.append(math.degrees(r[1]))
+            self._sleep(0.05)
+        self._tx("gp")
+        return (statistics.median(pitch), statistics.median(roll)) if pitch else None
+
+    def _sagged(self, tilt) -> bool:
+        """Standing, but tilted away from how he stood after his last good stand-up: the legs have let go (the pose read cannot see it, it reports the commanded angles)."""
+        if tilt is None:
+            return False
+        if self._stand_tilt is None:
+            return max(abs(tilt[0]), abs(tilt[1])) > SAG_TILT_LEVEL_DEG
+        return max(abs(tilt[0] - self._stand_tilt[0]), abs(tilt[1] - self._stand_tilt[1])) > SAG_TILT_DEG
 
     def read_pose(self) -> str:
         """What the board says his legs are in: "stand", "attention", "rest", "sit" or "unknown" (`j`, the commanded angles)."""
@@ -560,7 +600,25 @@ class SerialRobot:
             log.info("pose unreadable: going by the last pose asked for (%s)", pose)
         if pose == "stand":
             self.posture = "stand"
-            return "ok"
+            tilt = self._tilt()
+            if not self._sagged(tilt):
+                return "ok"
+            log.warning("the board reads the stand but he is tilted pitch %+.0f roll %+.0f deg (stood at %s): the legs have sagged, driving them back to the stand pose",
+                        tilt[0], tilt[1], "level" if self._stand_tilt is None else f"pitch {self._stand_tilt[0]:+.0f} roll {self._stand_tilt[1]:+.0f}")
+            from ..gait import standup
+            for _ in range(2):
+                self._tx(standup.move_cmd(standup.balance_pose()))          # every leg joint told its stand angle again
+                self._sleep(0.25)
+            self._sleep(0.5)
+            tilt = self._tilt()
+            if not self._sagged(tilt):
+                return "ok"
+            log.warning("still tilted (pitch %+.0f roll %+.0f deg): down into the attention pose and up again, back legs first", tilt[0], tilt[1])
+            self.posture = "stand"
+            self.relax()
+            pose = "attention" if self.posture == "attention" else self.read_pose()
+            if pose in ("stand", "unknown"):
+                return "ok"                                   # the attention pose did not take: go as he is (logged above)
         if hasattr(self._lk, "last_motion_command"):
             self._lk.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read
         self._pitch, self._roll = [], []
@@ -580,6 +638,10 @@ class SerialRobot:
             got = wait_for_pose(self._lk, "stand", sleep=self._sleep, clock=self._clock, fallback_s=0.0)
             if got not in ("stand", "unknown"):
                 log.warning("stood up from %s, but the board reads %s", pose, got)
+            else:
+                t = self._tilt(0.3)
+                if t is not None:
+                    self._stand_tilt = t                  # how he stands when the legs hold: the sag check compares with this
         return state
 
     def sit_down(self) -> str:
