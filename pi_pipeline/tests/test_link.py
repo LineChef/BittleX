@@ -472,15 +472,22 @@ def test_a_move_out_of_the_attention_pose_stands_him_up_back_legs_first_then_fro
     sent = []
     assert standup.stand_from_attention(sent.append, lambda s: None, "kcalib")
     assert not standup.stand_from_attention(sent.append, lambda s: None, "krest")      # only from the attention pose
-    poses = [[int(x) for x in c[1:].split()[1::2]] for c in sent]                     # "i8 a 12 b ...": the angles, servo order 8 12 9 13 10 14 11 15
-    rear = lambda p: p[4:]                                                              # noqa: E731  (servos 10 14 11 15: the back legs)
-    front = lambda p: p[:4]                                                             # noqa: E731
-    first_front_move = next(i for i, p in enumerate(poses) if front(p) != front(poses[0]) or any(front(p)))
-    assert rear(poses[first_front_move - 1]) == rear(poses[-1])                        # the back legs are all the way up before the front legs start
+    rear, front = {10, 11, 14, 15}, {8, 9, 12, 13}
+    pose, poses = {j: 0 for j in rear | front}, []
+    for c in sent:                                                                      # each `i` command sets only the joints it names
+        nums = [int(x) for x in c[1:].split()]
+        pose.update(dict(zip(nums[0::2], nums[1::2])))
+        poses.append(dict(pose))
+    first_front = next(i for i, p in enumerate(poses) if any(p[j] for j in front))
+    assert all(poses[first_front - 1][j] == poses[-1][j] for j in rear)                # the back legs are all the way up before the front legs start
     goal = standup.balance_pose()
-    assert sorted(poses[-1]) == sorted(int(round(g)) for g in goal)                     # ends at the balance pose
-    step = max(abs(a - b) for p, q in zip(poses, poses[1:]) for a, b in zip(p, q))
-    assert step * standup.STEPS_PER_S <= 80 + 1e-6                                      # no joint faster than the 80 deg/s cap
+    servo_goal = {standup._URDF_TO_SERVO[k]: int(round(goal[k])) for k in range(8)}
+    assert poses[-1] == servo_goal                                                      # ends at the balance pose
+    assert sent[-1] == sent[-2] == standup.move_cmd(goal) and standup.ATT_FINAL_REPEATS == 2      # the whole pose twice at the end (a garbled last command once left a leg folded)
+    ramp = sent[:-standup.ATT_FINAL_REPEATS]
+    assert len(ramp) <= standup.ATT_STEPS_PER_S * 2.3 and max(len(c) for c in ramp) <= 30          # fewer, shorter commands: only the moving legs
+    step = max(abs(a[j] - b[j]) for a, b in zip(poses, poses[1:]) for j in a)
+    assert step * standup.ATT_STEPS_PER_S <= 80 + 1e-6                                  # no joint faster than the 80 deg/s cap
 
 
 def test_the_link_stands_him_up_from_the_attention_pose_itself_and_skips_the_firmware_stand(monkeypatch):
@@ -504,4 +511,4 @@ def test_the_link_stands_him_up_from_the_attention_pose_itself_and_skips_the_fir
     lk.send("kbalance", read_reply=False, settle=0.0)                                 # ready to move: up out of it
     out = lk._ser.out
     legs = [c for c in out if c.startswith("i")]
-    assert len(legs) >= 30 and "kbalance" not in out[out.index(legs[0]):]            # the link's own back-legs-first stand-up, and no firmware stand-up after it
+    assert len(legs) >= 15 and "kbalance" not in out[out.index(legs[0]):]            # the link's own back-legs-first stand-up, and no firmware stand-up after it

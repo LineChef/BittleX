@@ -497,3 +497,48 @@ def test_close_to_the_ball_he_stays_standing_between_the_small_steps():
     assert kinds[i + 1] != "attention"                                                  # no attention pose after the line-up turn: the next picture is taken standing
     assert kinds[-1] == "attention"                                                     # but the attempt still ends in it
     assert bc._dialing_in(None) is False and bc._dialing_in(types.SimpleNamespace(distance_in=bc.NUDGE_MAX_IN + 5)) is False
+
+
+def test_a_fall_records_which_way_he_went(monkeypatch):
+    import math
+    from pi_pipeline.gait import imu_parse
+    monkeypatch.setattr(imu_parse, "parse_imu_line", lambda line: (math.radians(-5.0), math.radians(-60.0)))
+    class FakeLink:
+        def send(self, c, read_reply=False, settle=0.0): return ""
+        def poll_imu(self): return ["x"]
+    r = bc.SerialRobot(FakeLink(), sleep=lambda s: None)
+    r.posture = "attention"
+    assert r._fell() is True
+    assert r.last_fall == {"pitch": -60.0, "roll": -5.0, "way": "nose up", "posture": "attention"}
+
+
+class _PoseLink:
+    """Answers `j` with a fixed 16-joint pose (an index header row first, as the firmware may print one)."""
+    def __init__(self, pose_name):
+        legs = bc._known_poses()[pose_name]
+        self.joints = [0] * 8 + [int(round(legs[sv])) for sv in range(8, 16)]
+        self.sent, self._other, self.last_motion_command = [], [], ""
+    def send(self, c, read_reply=False, settle=0.0):
+        self.sent.append(c)
+        if c == "j":
+            self._other += [",".join(str(i) for i in range(16)), ",\t".join(str(v) for v in self.joints)]
+        return ""
+    def poll_imu(self): return []
+    def pop_other(self):
+        out, self._other = self._other, []
+        return out
+
+
+def test_the_pose_read_names_each_known_pose_and_nothing_else():
+    for name in ("stand", "attention", "rest", "sit"):
+        assert bc.classify_pose(bc.read_joints(_PoseLink(name), sleep=lambda s: None)) == name
+    assert bc.classify_pose([0] * 8 + [90] * 8) == "unknown" and bc.classify_pose(None) == "unknown"
+
+
+@pytest.mark.parametrize("pose, link_belief, sends_stand", [("attention", "kcalib", True), ("rest", "krest", True), ("sit", "ksit", True), ("stand", "", False)])
+def test_before_a_move_he_reads_his_pose_and_stands_up_the_way_that_pose_needs(pose, link_belief, sends_stand):
+    lk = _PoseLink(pose)
+    r = bc.SerialRobot(lk, sleep=lambda s: None, clock=iter(np.arange(0, 1000, 0.2)).__next__)
+    assert r.stand_up() == "ok" and r.posture == "stand"
+    assert ("kbalance" in lk.sent) is sends_stand and "j" in lk.sent
+    assert lk.last_motion_command == link_belief                          # the link runs the stand-up that pose needs: back legs first from attention, the slow one from a sit, the firmware one from rest

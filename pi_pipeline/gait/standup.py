@@ -204,27 +204,43 @@ def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
 ATTENTION_URDF_DEG = [0.0] * 8               # the firmware `calib` pose ("attention", legs straight): every leg joint at 0 (InstinctBittleESP.h `calib`)
 ATT_REAR_S, ATT_FRONT_S = 1.2, 1.0           # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, THEN the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
 ATT_FRONT_START_S = ATT_REAR_S               # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
+ATT_STEPS_PER_S = 10                         # (2026-11-02: one stand-up in 13 folded the front-right leg up instead of down. Likely cause: full 8-joint `i` commands at 20 a second, about 1 KB/s,
+                                             # while the board is still moving; a dropped byte turns a command into a wrong angle.) So: 10 a second, only the joints that changed, and
+ATT_FINAL_REPEATS = 2                        # the whole balance pose sent again this many times at the end, after a pause, so the last angles always arrive whole
+
+
+def _pairs_cmd(pairs) -> str:
+    """[(servo, deg), ...] -> one `i` command with only those joints."""
+    return "i" + " ".join(f"{j} {max(-120, min(120, int(round(d))))}" for j, d in pairs)
 
 
 def stand_from_attention(send, sleep=time.sleep, last_motion_command=None) -> bool:
     """The stand-up from the attention pose (`kcalib`): back legs first, then the front legs (user, 2026-11-02), to the balance pose of the fitted attachment. Any build; only from
-    `kcalib`. No firmware `kbalance` after it (the caller skips it, as for the other stand-ups here: the firmware would stand up again from the pose it believes he is in). The arm and
-    the head are not sent. Returns True if it ran."""
+    `kcalib`. Each step sends only the joints that changed (ATT_STEPS_PER_S a second), then the full balance pose ATT_FINAL_REPEATS times. No firmware `kbalance` after it (the caller
+    skips it, as for the other stand-ups here: the firmware would stand up again from the pose it believes he is in). The arm and the head are not sent. Returns True if it ran."""
     if (last_motion_command or "").strip() != "kcalib":
         return False
     start, goal = list(ATTENTION_URDF_DEG), balance_pose()
     end_s = max(ATT_REAR_S, ATT_FRONT_START_S + ATT_FRONT_S)
-    n = int(round(end_s * STEPS_PER_S))
+    n = int(round(end_s * ATT_STEPS_PER_S))
+    last = [int(round(x)) for x in start]
     for i in range(1, n + 1):
-        t = i / STEPS_PER_S
-        now = list(start)
+        t = i / ATT_STEPS_PER_S
+        changed = []
         for group, t0, dur in ((_REAR_URDF, 0.0, ATT_REAR_S), (_FRONT_URDF, ATT_FRONT_START_S, ATT_FRONT_S)):
             u = min(1.0, max(0.0, (t - t0) / dur))
             for k in group:
-                now[k] = start[k] + (goal[k] - start[k]) * _smooth(u)
-        send(move_cmd(now))
-        sleep(1.0 / STEPS_PER_S)
-    sleep(0.4)
+                d = int(round(start[k] + (goal[k] - start[k]) * _smooth(u)))
+                if d != last[k]:
+                    last[k] = d
+                    changed.append((_URDF_TO_SERVO[k], d))
+        if changed:
+            send(_pairs_cmd(changed))
+        sleep(1.0 / ATT_STEPS_PER_S)
+    for _ in range(ATT_FINAL_REPEATS):
+        sleep(0.25)                                              # let the board catch up first: these arrive whole
+        send(move_cmd(goal))
+    sleep(0.3)
     return True
 
 

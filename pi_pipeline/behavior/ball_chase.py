@@ -406,6 +406,70 @@ class Camera(Protocol):
     def look(self) -> bytes | None: ...
 
 
+POSE_TOL_DEG = 12.0            # a leg pose read with `j` names a known pose when every leg joint is within this of it
+POSE_WAIT_S = {"stand": 6.0, "attention": 3.0}      # the longest wait for a pose to read as reached after asking for it (the firmware stand-up from rest takes about 2 to 3 s)
+
+
+def _known_poses() -> dict:
+    """The leg poses G2 is ever left in, servo index -> commanded degrees: the stand (the attachment's balance pose), attention (`kcalib`, every leg joint 0), rest and sit."""
+    from ..gait import standup
+    to_servo = lambda urdf: {standup._URDF_TO_SERVO[k]: float(urdf[k]) for k in range(8)}         # noqa: E731
+    return {"stand": to_servo(standup.balance_pose()), "attention": to_servo(standup.ATTENTION_URDF_DEG), "rest": to_servo(standup.rest_pose()),
+            "sit": to_servo(standup.SIT_URDF_DEG)}
+
+
+def classify_pose(joints) -> str:
+    """"stand", "attention", "rest", "sit" or "unknown" from the 16 joint angles `j` reports (the angles the firmware last commanded: what it believes, not a measurement)."""
+    if not joints or len(joints) < 16:
+        return "unknown"
+    best, err = "unknown", 1e9
+    for name, pose in _known_poses().items():
+        e = max(abs(joints[sv] - d) for sv, d in pose.items())
+        if e < err:
+            best, err = name, e
+    return best if err <= POSE_TOL_DEG else "unknown"
+
+
+def read_joints(link, timeout_s: float = 1.0, sleep=time.sleep, clock=time.monotonic) -> list[int] | None:
+    """The 16 joint angles from the firmware's `j` (stops the IMU stream first: the read often failed while it ran), or None (no reply, a garbled one, or a link that cannot read)."""
+    import re
+    poll, other = getattr(link, "poll_imu", None), getattr(link, "pop_other", None)
+    if not callable(poll) or not callable(other):
+        return None
+    try:
+        link.send("gp", read_reply=False, settle=0.0)
+        sleep(0.1)
+        poll()
+        other()
+        link.send("j", read_reply=False, settle=0.0)
+        end = clock() + timeout_s
+        while clock() < end:
+            poll()
+            for ln in other():
+                if ln.count(",") >= 15:
+                    nums = [int(x) for x in re.findall(r"-?\d+", ln)]
+                    if len(nums) >= 16 and nums[:16] != list(range(16)):        # (the index header row, if the firmware prints one, is skipped)
+                        return nums[:16]
+            sleep(0.05)
+    except Exception as e:  # noqa: BLE001
+        log.warning("pose read failed: %s", e)
+    return None
+
+
+def wait_for_pose(link, target: str, timeout_s: float | None = None, sleep=time.sleep, clock=time.monotonic, fallback_s: float = 3.0) -> str:
+    """Read the pose until it is `target` or `timeout_s` (POSE_WAIT_S) runs out; returns the last pose read. A link that cannot read at all just waits `fallback_s`."""
+    if not callable(getattr(link, "pop_other", None)):
+        sleep(fallback_s)
+        return "unknown"
+    end = clock() + (timeout_s if timeout_s is not None else POSE_WAIT_S.get(target, 3.0))
+    pose = "unknown"
+    while True:
+        pose = classify_pose(read_joints(link, sleep=sleep, clock=clock))
+        if pose == target or clock() >= end:
+            return pose
+        sleep(0.2)
+
+
 class SerialRobot:
     """The firmware skills over the serial link. Every move ends in a balanced stand (`kbalance`); the link sends `gb` after each skill. Each returns "ok" or "fell"."""
 
@@ -417,6 +481,7 @@ class SerialRobot:
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
+        self.last_fall: dict | None = None                # the angles of the last fall the guard saw (pitch, roll, which way, the posture he was in)
         self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
 
     def _tx(self, c: str) -> None:
@@ -434,6 +499,11 @@ class SerialRobot:
             self._pitch.append(math.degrees(r[1]))
             self._roll.append(math.degrees(r[0]))
             if max(abs(r[0]), abs(r[1])) > self._fall_rad:
+                p, rl = math.degrees(r[1]), math.degrees(r[0])
+                way = ("nose down" if p > 0 else "nose up") if abs(p) >= abs(rl) else ("onto the left side" if rl < 0 else "onto the right side")
+                log.warning("fall: pitch %+.0f deg, roll %+.0f deg (%s), posture %s; tilt before it: pitch %s, roll %s", p, rl, way, self.posture,
+                            [round(x) for x in self._pitch[-8:]], [round(x) for x in self._roll[-8:]])      # which way he went (2026-11-02: two falls with no angle on record)
+                self.last_fall = {"pitch": round(p, 1), "roll": round(rl, 1), "way": way, "posture": self.posture}
                 return True
         return False
 
@@ -465,25 +535,51 @@ class SerialRobot:
         self._tx(CLAW_LOOK_POSE)
         self._claw = (0.0, 0.0)                           # the pose puts the arm at its calibration zero too
         self.posture = "attention"
-        self._sleep(ATTENTION_SETTLE_S)
+        self._sleep(0.5)
+        got = wait_for_pose(self._lk, "attention", sleep=self._sleep, clock=self._clock, fallback_s=ATTENTION_SETTLE_S)      # on only when the board says it is there
+        if got not in ("attention", "unknown"):
+            log.warning("asked for the attention pose, the board reads %s", got)
+        self._sleep(0.5)                                  # the body settles before a picture
         return "ok"
 
+    def read_pose(self) -> str:
+        """What the board says his legs are in: "stand", "attention", "rest", "sit" or "unknown" (`j`, the commanded angles)."""
+        j = read_joints(self._lk, sleep=self._sleep, clock=self._clock)
+        pose = classify_pose(j)
+        log.info("pose read: %s%s", pose, "" if j is None else f" (legs {j[8:16]})")
+        return pose
+
     def stand_up(self) -> str:
-        """Ready to move: up out of the attention pose with the plain firmware stand-up (`kbalance`), watched for STAND_UP_WATCH_S; "fell" if he went over. Nothing when he is not
-        in the attention pose (he is already standing)."""
-        if self.posture != "attention":
+        """Ready to move (user, 2026-11-02: check the pose before every move and decide from it). The pose is read (`j`): standing, nothing to do; the attention pose, the back-legs-
+        first stand-up (the link's stand_from_attention); rest or a sit, the normal stand-up (the firmware `kbalance`; from a sit the link's slow back-legs stand-up). An unreadable
+        pose falls back to the last one he was told to take (none yet: standing, as the session start left him). Then it waits until the board reads the stand,
+        watching for a fall; "fell" if he went over."""
+        pose = self.read_pose()
+        if pose == "unknown":
+            pose = "attention" if self.posture == "attention" else "stand"      # never told anything yet: the session start (_stand_if_lying) stood him up
+            log.info("pose unreadable: going by the last pose asked for (%s)", pose)
+        if pose == "stand":
+            self.posture = "stand"
             return "ok"
+        if hasattr(self._lk, "last_motion_command"):
+            self._lk.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read
         self._pitch, self._roll = [], []
-        self._tx("gP")
-        self._tx("kbalance")
+        log.info("standing up from %s: %s", pose, "back legs first, then the front legs" if pose == "attention" else "the normal stand-up")
+        self._tx("kbalance")                              # the link runs its own stand-up for it (attention, sit) or sends the firmware one (rest) ...
+        self._tx("gP")                                    # ... and only then the IMU stream: the board is not printing while it takes the joint commands
         t0, state = self._clock(), "ok"
-        while self._clock() - t0 < STAND_UP_WATCH_S:
+        watch = STAND_UP_WATCH_S if pose in ("attention", "sit") else STAND_UP_WATCH_S + 2.0      # the firmware stand-up from rest takes 2 to 3 s
+        while self._clock() - t0 < watch:
             if self._fell():
                 state = "fell"
                 break
             self._sleep(0.05)
         self._tx("gp")
         self.posture = "stand"
+        if state != "fell":
+            got = wait_for_pose(self._lk, "stand", sleep=self._sleep, clock=self._clock, fallback_s=0.0)
+            if got not in ("stand", "unknown"):
+                log.warning("stood up from %s, but the board reads %s", pose, got)
         return state
 
     def sit_down(self) -> str:
@@ -599,9 +695,12 @@ class SerialRobot:
 
     def punch(self) -> str:
         """The lunge with the claw shut (PUNCH_KEYS), played as `i` commands at 40 a second from the pose he stands in, then back to the balance pose. No firmware skill is sent."""
-        from ..link import transitions
         if self.stand_up() == "fell":                                   # the lunge starts from the balance pose
             return "fell"
+        return self._punch()
+
+    def _punch(self) -> str:
+        from ..link import transitions
         self.posture = "stand"
         self._pitch, self._roll = [], []
         self._tx("gP")
@@ -631,10 +730,10 @@ class SerialRobot:
         if self.stand_up() == "fell":
             return "fell"
         if not self.use_pick:
-            state = self.punch()
+            state = self._punch()
             if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved it did not play: once more
                 log.warning("the punch barely moved him (%.1f deg): once more", self.swing_deg())
-                state = self.punch()
+                state = self._punch()
             return state
         state = self._skill("kpickF", 2.0)
         if state == "ok" and self.swing_deg() < PUNT_MIN_SWING_DEG:       # the lunge tilts the body 15 deg or more; if he barely moved, it did not play (2026-10-25: a run said "punted" and he only lay down): send it again once
@@ -1035,22 +1134,22 @@ def _wait_for_camera(port: str, wait_s: float | None = None, sleep=time.sleep, e
 
 
 def _stand_if_lying(link, token: str = "kbalance") -> bool:
-    """If the legs read the rest pose, stand him up with `token` (the plain firmware stand-up is `kbalance`; `kup` is the firmware's neutral stand: claw_look --stand kup compares them,
-    2026-11-01, when his legs went limp about 10 s after our stand-up and not after the board's own). Never raises. Returns whether the pose could be read (False: the board gave no pose rows)."""
-    import re
+    """At the start of a session: read the pose (`j`) and stand him up the way that pose needs (user, 2026-11-02): standing, nothing; the attention pose, the back-legs-first
+    stand-up (the link's stand_from_attention: the plain firmware stand-up out of it flipped him over); rest or a sit, `token` (the plain firmware stand-up is `kbalance`; `kup`
+    is the firmware's neutral stand, claw_look --stand kup). An unreadable pose counts as lying (a stand-up from standing changes nothing; a missed one leaves him lying while he
+    "searches", 2026-11-01). Then it waits until the board reads the stand. Never raises. Returns whether the pose could be read (False: the board gave no pose)."""
     try:
-        s = link._ser
-        s.reset_input_buffer()
-        s.write(b"j\n")
-        time.sleep(1.0)
-        rows = [r for r in s.read(s.in_waiting or 1).decode("ascii", "ignore").splitlines() if r.count(",") >= 15]
-        j = [int(x) for x in re.findall(r"-?\d+", rows[-1])] if rows else None
-        if j is not None and not (j[8] < 40 and j[12] > 30):
+        j = read_joints(link)
+        pose = classify_pose(j)
+        if pose == "stand":
             return True
-        # an unreadable pose (garbled serial reads, STATUS 15) counts as lying: a stand-up from standing changes nothing, a missed one leaves him lying while he "searches" (2026-11-01)
-        print("lying down: standing up first" if j is not None else "could not read the pose: standing up first")
+        print({"attention": "in the attention pose: standing up back legs first", "unknown": "could not read the pose: standing up first"}.get(pose, f"{pose}: standing up first"))
+        if hasattr(link, "last_motion_command"):
+            link.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read
         link.send(token, read_reply=False, settle=0.0)
-        time.sleep(3.0)
+        got = wait_for_pose(link, "stand")
+        if got not in ("stand", "unknown"):
+            print(f"stood up, but the board reads {got}")
         return j is not None
     except Exception as e:  # noqa: BLE001
         print("could not check the pose:", e)
