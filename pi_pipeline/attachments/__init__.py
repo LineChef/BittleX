@@ -52,11 +52,21 @@ class Attachment:
     checklist: tuple[str, ...] = ()            # what to do by hand when switching to it
 
 
-# Petoi's arm page lists these tokens (docs/planned/robot-arm.md); none has been run on G2 yet.
+# Petoi's arm page lists these tokens (docs/planned/robot-arm.md). All enabled for voice 2026-11-02 (user); none has been run on G2 yet: hands near. `hunt` and `showOff` are inferred to be redefined by the arm build.
 _ARM_SKILLS = {
     "pick_up": ("pickF", "pick up the object in front with the claw", False),
+    "pick_up_below": ("pickD", "pick up the object below with the claw", False),
+    "pick_up_left": ("pickL", "pick up the object on the left with the claw", False),
+    "pick_up_right": ("pickR", "pick up the object on the right with the claw", False),
     "put_down": ("putF", "put the held object down in front", False),
+    "put_down_below": ("putD", "put the held object down below", False),
+    "put_down_left": ("putL", "put the held object down on the left", False),
+    "put_down_right": ("putR", "put the held object down on the right", False),
     "toss": ("tossF", "throw the held object forward", False),
+    "toss_left": ("tossL", "throw the held object to the left", False),
+    "toss_right": ("tossR", "throw the held object to the right", False),
+    "launch": ("launch", "launch the held object forward", False),
+    "hunt": ("hunt", "quickly grab the object in front", False),
     "show_off": ("showOff", "show off the held object", False),
     "clap": ("clap", "clap the claw", False),
 }

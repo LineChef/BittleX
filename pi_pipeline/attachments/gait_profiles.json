@@ -46,7 +46,7 @@
     "easing": false,
     "gyro_balance": false,
     "gait_switching": false,
-    "skills": false,
+    "skills": true,
     "fall_recovery": false,
     "poses": {
       "rest_urdf_deg": [

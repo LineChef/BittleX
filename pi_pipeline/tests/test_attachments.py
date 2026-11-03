@@ -192,16 +192,21 @@ def test_switches_are_on_unless_a_profile_says_false():
     assert A.flag("easing", "arm", {"arm": {}}) is True
 
 
-def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_skills():
+def test_the_shipped_arm_profile_runs_without_easing_gyro_gait_switching_or_fall_recovery():
     data = A.load_profiles()["arm"]
     assert data["payload_profile"] == "arm"
-    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "skills", "fall_recovery"))
+    assert not any(A.flag(k, "arm") for k in ("easing", "gyro_balance", "gait_switching", "fall_recovery"))
+    assert A.flag("skills", "arm")                                              # the claw's voice skills are on (user, 2026-11-02)
 
 
-def test_the_arm_keeps_its_claw_skills_out_of_the_conversation(monkeypatch):
+def test_the_arm_puts_all_its_claw_skills_into_the_conversation(monkeypatch):
     monkeypatch.setenv("G2_ATTACHMENT", "arm")
     S._add_attachment_skills()
-    assert not set(A._ARM_SKILLS) & set(S.SKILLS)
+    try:
+        assert set(A._ARM_SKILLS) <= set(S.SKILLS) and len(A._ARM_SKILLS) == 15
+        assert S.serial_command("pick_up") == "kpickF" and S.serial_command("clap") == "kclap" and S.serial_command("hunt") == "khunt"
+    finally:
+        S.remove_attachment_skills()
 
 
 def test_no_easing_with_the_arm(monkeypatch):
