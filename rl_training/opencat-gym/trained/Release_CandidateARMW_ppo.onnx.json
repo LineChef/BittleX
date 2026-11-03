@@ -1,0 +1,19 @@
+{
+ "residual_scale_deg": 15.0,
+ "cmd_send_every_n": 3,
+ "checkpoint": "armw_s4_avg5_ppo",
+ "exported": "2026-11-03",
+ "heading_blind": true,
+ "levers": [
+  "heading_blind"
+ ],
+ "payload_profile": "arm",
+ "base_ref": "wkArm",
+ "legs": {
+  "build": "arm_wide",
+  "shoulder_widen_mm": 5.08,
+  "paw": "none"
+ },
+ "gait": "ARMW: Petoi's arm walk held close and level, claw world as measured, 0.2 in wide shoulders on the stock feet (about 540 g, unweighed)",
+ "phase_rate_nom_cmd": 0.064
+}
