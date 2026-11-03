@@ -41,6 +41,27 @@
       "G2E_CLAW_REAL": "2026-11-01 (user: if it narrows the sim-to-real gap it is on): the claw's real outline from the user's photos (1.9 in wide, 0.6 in tall, about 1.3 in further forward than the old two bars, same weight and height off the floor), as a collision shape (arm_shapes.py). Scored on ARM2 and Petoi's walk: no measurable change (every difference under the 5 point noise), so the earlier ARM1 / ARM1X / ARM2 numbers stand. G2E_CLAW_REAL=0 turns it off"
     }
   },
+  "arm_wide": {
+    "payload": "arm",
+    "limits": {
+      "ledge_up": 0.015,
+      "snag": 0.5
+    },
+    "limits_why": {
+      "ledge_up": "2026-11-03: the stock feet, so the arm's own top (15 mm; the claw jams from about 20 mm whatever the feet; ARM1X's ladder on these legs is the check in the baselines). The wider shoulders do not change the feet",
+      "snag": "2026-11-03: the arm builds' top, size 0.5 (7 mm): the tallest round cord a policy crossed on stock feet (ARM1X 5.5 mm 67%, 7 mm 33%; Petoi's arm walk 0% from 5.5 mm)"
+    },
+    "env": {
+      "G2E_BODY_MASS_SCALE": "1.0853",
+      "G2E_SHOULDER_WIDEN_MM": "5.08",
+      "G2E_CLAW_REAL": "1"
+    },
+    "env_why": {
+      "G2E_BODY_MASS_SCALE": "2026-11-03: the arm build's 532 g plus about 8 g of wider shoulder plastic (estimate, not weighed; the user had no scale on 2026-11-03) on the body, as arm_wide_clpaw but with no paws: about 540 g in all. Retrain on the real number if it is more than 15 g off",
+      "G2E_SHOULDER_WIDEN_MM": "the printed 0.2 in wide_shoulder_ends part (user confirmed, 2026-11-03), stock feet: G2E_PAW stays none",
+      "G2E_CLAW_REAL": "2026-11-01 (user: if it narrows the sim-to-real gap it is on): the claw's real outline from the user's photos (1.9 in wide, 0.6 in tall, about 1.3 in further forward than the old two bars, same weight..."
+    }
+  },
   "_default": {
     "limits": {
       "snag": 1.5

@@ -87,7 +87,7 @@ def test_the_paw_model_in_the_environment():
 def test_snag_tops_for_every_build(monkeypatch):
     """Snags (user, 2026-10-31: fixed for all training): every build caps the cord height at its measured top; the ladder takes the same top."""
     import g2_profile as G
-    for payload, build, top in (("", "", "1.5"), ("pod", "", "1.5"), ("arm", "", "0.5"), ("arm", "arm_wide_clpaw", "0.5")):
+    for payload, build, top in (("", "", "1.5"), ("pod", "", "1.5"), ("arm", "", "0.5"), ("arm", "arm_wide_clpaw", "0.5"), ("arm", "arm_wide", "0.5")):
         monkeypatch.setenv("G2_PAYLOAD_PROFILE", payload)
         monkeypatch.setenv("G2_BUILD", build)
         env = G.env_for_job({"kind": "final", "tag": "t", "fresh": True, "levers": []})
@@ -172,3 +172,12 @@ def test_the_real_claw_outline():
     b = _j.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_limits.json")))
     assert b["arm"]["env"]["G2E_CLAW_REAL"] == "1" and b["arm_wide_clpaw"]["env"]["G2E_CLAW_REAL"] == "1"      # on in both arm builds
     assert "G2E_CLAW_REAL" not in b["pod"].get("env", {}) and "G2E_CLAW_REAL" not in b["_default"].get("env", {})     # and nowhere else
+
+
+def test_the_arm_wide_build_has_wide_shoulders_and_stock_feet(monkeypatch):
+    """ARMW (user, 2026-11-03): the 0.2 in wide shoulders on the stock feet: the shoulder setting is on, no paw is."""
+    import g2_profile as G
+    monkeypatch.setenv("G2_PAYLOAD_PROFILE", "arm")
+    monkeypatch.setenv("G2_BUILD", "arm_wide")
+    env = G.scoring_env()
+    assert env["G2E_SHOULDER_WIDEN_MM"] == "5.08" and env.get("G2E_PAW", "none") == "none"
