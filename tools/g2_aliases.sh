@@ -353,6 +353,35 @@ g2sync() {
 #   `on` turns it back on now (he cannot hear "mic on" while it is off), `status` says which and how long is left. "G2, mic off [for N minutes]" does `off` by voice. g2micon = g2mic on.
 g2mic() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.voice.wake_pause ${*:-status}"; }
 g2micon() { g2mic on; }
+# g2send CMD [CMD...]  -- send raw BiBoard commands from any folder, one argument per command, 5 s apart (e.g. `g2send kbalance klaunch`; quote joint commands: `g2send "i0 30 1 15"`).
+#   Stops the voice service, refuses below a 30% pack or a silent board, sends `gb` after the last skill (never after a gait), prints each reply (they lag one command behind),
+#   then starts the voice service again. Hands near: it moves G2.
+g2send() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  [ $# -gt 0 ] || { echo 'usage: g2send CMD [CMD...]   e.g. g2send kbalance klaunch   |   g2send "i0 30 1 15"'; return 2; }
+  ssh "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python - $(printf '%q ' "$@")" <<'PYEOF'
+import sys, time
+from pi_pipeline.link import check_serial as c
+from pi_pipeline.power import battery as b
+cmds = sys.argv[1:]
+l = c._link()
+v = b.read_voltage(l)
+pct = b.pack_percent(v) if v else None
+print('pack', v, pct)
+if not v or pct < 30:
+    print('NOT SENT: the board is silent or the pack is under 30%')
+    sys.exit(0)
+skill = False
+for x in cmds:
+    print('send', x, '->', repr(l.send(x, read_reply=True)))
+    skill = x.startswith('k') and not x.startswith(('kwk', 'kbk', 'ktr', 'kcr', 'kvt'))
+    time.sleep(5)
+if skill:
+    print('send gb ->', repr(l.send('gb', read_reply=True)))
+print('voltage', b.read_voltage(l))
+PYEOF
+  ssh "$G2_PI" "sudo systemctl --no-block start g2-voice" && echo "the voice service is starting again"
+}
 g2claw() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local mode="${1:-}"; case "$mode" in calibrate|pictures|test|hold) ;; *) echo "usage: g2claw calibrate|pictures|test|hold"; return 2 ;; esac
