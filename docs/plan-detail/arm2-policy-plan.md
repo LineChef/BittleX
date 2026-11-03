@@ -155,3 +155,23 @@ Promotion checks against ARM1X on the new legs: all five pass (reported only; no
 Stock legs against the new legs (`compare_legs.py`, scored the same day; `trained/arm2_report/legs_compare.json`): ARM1X on stock legs falls 1.8% over the hazards, roll 2.2, heading 7, success 73%, snag 46%, step-ups 26%; ARM1X on the new legs 0 falls, roll 1.6, heading 3, success 74%, snag 30%, step-ups 22%; Petoi's walk gains most from the parts (success 58% to 67%, step-down 57% to 96%, no falls). The parts help steadiness and hazard falls, cost cord and step-up crossing; ARM2 recovers part of it (snag 39%, step-ups 28%). Differences under about 5 points of success are inside the noise. Not tested: heavy loads (where the earlier sim tests found the parts' biggest gain), servo load and heat, the printed fit, the real pivot friction.
 
 Still stuck at 20M: step-ups, rubble, boxes (as ARM1X). Training with the paws ran 34% slower per step.
+
+## ARMW: the wide shoulders on the stock feet (2026-11-03)
+
+The CLpaw feet did not fit G2's feet (user, 2026-11-03), so only the 0.2 in wide shoulder part is fitted. ARM2 was trained for shoulders plus paws, so a new policy was trained for the build the robot actually wears:
+`G2_BUILD=arm_wide` (`build_limits.json`: `G2E_SHOULDER_WIDEN_MM` 5.08, no paw, claw as measured, body mass scale as `arm_wide_clpaw`, about 540 g, not weighed; the arm's own hazard tops, step-ups 15 mm and snags 7 mm, not re-measured:
+the feet are the stock ones). Runner `rl_training/opencat-gym/phase_armw.py` (babysitter `armw_babysit.sh`, log `trained/phase_armw.log`, reports `trained/armw_report/`): baselines, S0..S3 (9M, fresh, ARM2's adopted `slopes:15`, no screens), ONE 20M (seed 42, user's decision), pick final or avg5,
+export `ARMWcand`, verdict against ARM1X on the same legs. Promotion and deploy were automated and unconditional (user: the new build needs its own policy; `tools/armw_finish.sh`): promoted for the arm only (`--attachment-only`, `DEFAULT_POLICY` unchanged), hardware epoch `hw-2026-11-03` added.
+
+Training 12:57 AM to 4:31 AM; the 20M took 2:12 AM to 4:14 AM. No flat-ground falls at any 2M check; ledge-up, rubble and boxes were marked stuck by the frontier from 8M (as for ARM2); snag crossing rose to 84% at 20M. The pick was avg5 (0.000 against 0.001 ladder falls for the final weights). All on the new legs, 100 episodes a test (40 for the ladder):
+
+| | ARMW | ARM1X (the arm's gait until now) | ARM2 (trained with paws) | Petoi's walk |
+|---|---|---|---|---|
+| Flat-ground falls | 0.00 | 0.00 | 0.00 | 0.00 |
+| Calm speed (m/s) | 0.113 | 0.112 | 0.109 | 0.096 |
+| Roll / heading (deg) | 2.0 / 7 | 1.8 / 6 | 1.9 / 6 | 1.3 / 4 |
+| Ladder falls | 0.000 | 0.002 | 0.002 | 0.003 |
+| Ladder success | 80% | 75% | 77% | 60% |
+| Step-up success | 39% | 27% | 34% | 16% |
+
+Verdict PASS on all five rules (the scorer's noise is about 5 points, so the gain over ARM1X is modest; ARM2 transfers to the paw-less legs about as well). Not done: the real weight (retrain if more than 15 g off 540 g), the hazard tops re-measured on these legs, a second 20M seed. The first walks on G2 are the real test; deployed to the Pi when it next comes online.
