@@ -41,7 +41,7 @@ SPEC = {
     "search_step_deg": ("SEARCH_STEP_DEG", float, 10.0, 60.0, "one turn step of a search without claw looks, degrees"),
     "scan_turn_deg": ("SCAN_TURN_DEG", float, 20.0, 90.0, "one turn step between two claw looks, degrees"),
     "claw_look_pan_deg": ("CLAW_PAN_DEG", float, 10.0, 45.0, "how far to each side the claw look points the camera, degrees"),
-    "claw_look_lift_deg": ("CLAW_LIFT_DEG", float, 0.0, 35.0, "how high the claw look lifts the arm (higher sees farther; 0 = level)"),
+    "claw_look_lift_deg": ("CLAW_LIFT_DEG", float, 0.0, 120.0, "how high the claw look lifts the arm (positive is up; 0 = level, 120 = near the top)"),
     "claw_pan_sign": ("CLAW_PAN_SIGN", str, ("right", "left"), None, "which way a positive arm pan turns the camera (measure it: python -m pi_pipeline.behavior.claw_look --calibrate)"),
     "align_pulse_min_s": ("ALIGN_PULSE_MIN_S", float, 0.3, 1.6, "the shortest small turn used to line the claw up with the ball, seconds"),
     "align_tries": ("ALIGN_TRIES", int, 1, 8, "small turns to line up before giving up (then when_misaligned)"),

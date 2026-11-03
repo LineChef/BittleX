@@ -388,9 +388,9 @@ def test_the_serial_robot_moves_only_the_arm_for_a_claw_look_within_its_limits()
         def send(self, c, **kw): sent.append(c)
         def poll_imu(self): return []
     r = bc.SerialRobot(Link(), sleep=lambda s: None)
-    assert r.claw_pose(90, 70) == "ok"
+    assert r.claw_pose(90, 200) == "ok"
     moves = [c for c in sent if c.startswith("i")]
-    assert moves[-1] == "i0 45 1 40" and all(c.split()[0] == "i0" and len(c.split()) == 4 for c in moves)    # pan clamped to 45, lift to 40, no leg joints
+    assert moves[-1] == f"i0 45 1 {int(bc.CLAW_LIFT_MAX_DEG)}" and all(c.split()[0] == "i0" and len(c.split()) == 4 for c in moves)    # pan clamped to 45, lift to CLAW_LIFT_MAX_DEG, no leg joints
     assert len(moves) >= int(45 / bc.CLAW_DEG_S * bc.CLAW_STEPS_PER_S)                                       # at most CLAW_DEG_S
 
 
@@ -1476,7 +1476,7 @@ def test_the_claw_look_sits_swings_left_then_right_returns_to_centre_and_stands_
     robot, trace = SitRobot(), []
     state, found = bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=trace)
     assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "claw", "claw", "stand_from_sit"]
-    assert robot.moves[1:6] == [("claw", 0, bc.CLAW_RAISE_DEG), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)] and state == "ok" and found is None     # attention pose: raise, left, right, centre still raised, lower, stand up
+    assert robot.moves[1:6] == [("claw", 0, bc.CLAW_LIFT_DEG), ("claw", 35, bc.CLAW_LIFT_DEG), ("claw", -35, bc.CLAW_LIFT_DEG), ("claw", 0, bc.CLAW_LIFT_DEG), ("claw", 0, 0)] and state == "ok" and found is None     # attention pose: raise, left, right, centre still raised, lower, stand up
 
 
 def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_direction_is_used(monkeypatch):
@@ -1680,7 +1680,7 @@ def test_the_claw_look_from_the_attention_pose_raises_the_claw_first_and_lowers_
     monkeypatch.setattr(bc, "CLAW_PAN_DEG", 35.0); monkeypatch.setattr(bc, "CLAW_LIFT_DEG", 15.0); monkeypatch.setattr(bc, "CLAW_PAN_SIGN", "left"); monkeypatch.setattr(bc, "CLAW_FROM_SIT", True)
     robot = SitRobot()
     bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=[])
-    assert [m for m in robot.moves if m[0] == "claw"] == [("claw", 0, bc.CLAW_RAISE_DEG), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)]
+    assert [m for m in robot.moves if m[0] == "claw"] == [("claw", 0, bc.CLAW_LIFT_DEG), ("claw", 35, bc.CLAW_LIFT_DEG), ("claw", -35, bc.CLAW_LIFT_DEG), ("claw", 0, bc.CLAW_LIFT_DEG), ("claw", 0, 0)]
 
 
 def test_a_ball_against_a_wall_gets_a_sidestep_toward_the_room_then_the_other_side_then_he_leaves_it(monkeypatch):
