@@ -576,3 +576,14 @@ def test_the_arms_walking_lift_is_off_until_set_and_sent_once_per_walk(monkeypat
     assert "walk_lift_deg" not in json.loads(prof.read_text())["arm"]["poses"]
     monkeypatch.setenv("G2_ATTACHMENT", "none")
     assert standup.walk_lift() is None                                                                        # another build never sends it
+
+
+def test_startup_asks_again_when_the_first_reply_is_a_leftover(monkeypatch):
+    monkeypatch.setenv("G2_ATTACHMENT", "arm")
+    monkeypatch.setattr(A, "BANNER_RETRY_GAP_S", 0.0)
+    replies = iter(["X", "g", "Bittle X+Arm\nB10_260527"])
+
+    class Arm:
+        def send(self, cmd, **kw):
+            return next(replies) if cmd == "?" else ""
+    assert A.startup_check(Arm()) is True

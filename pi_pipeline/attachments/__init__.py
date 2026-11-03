@@ -335,6 +335,15 @@ def apply_voice_module_language(link, attachment: str | None = None) -> bool:
     return True
 
 
+BANNER_RETRIES = 4                         # extra `?` asks when the reply is a leftover from the previous command
+BANNER_RETRY_GAP_S = 0.4
+STALE_REPLY_MAX_CHARS = 5                  # a firmware name is longer than this ('Bittle X'); 'X', 'g', 'P' or nothing are leftovers
+
+
+def _first_line(text) -> str:
+    return next((l.strip() for l in str(text or "").splitlines() if l.strip()), "")
+
+
 def startup_check(link) -> bool | None:
     """Called once at start-up by the voice service and the app, with the shared serial link (or None). Attachment `none`: sets only the voice
     module's language (no `?`, no skills; returns None). Otherwise logs the attachment and its gait, sets the voice module's language when the profile says so, asks the BiBoard `?`, and when the firmware does not
@@ -349,6 +358,13 @@ def startup_check(link) -> bool | None:
     try:
         from ..link import opencat
         banner = link.send(opencat.QUERY, read_reply=True)
+        # The board answers one command late: right after other commands (the voice-module X commands) the first `?` returns their leftover ('X', 'g'), not the banner.
+        # A reply that short is not a banner: ask again (2026-11-03: this switched the arm's skills off at every start-up).
+        for _ in range(BANNER_RETRIES):
+            if check_firmware(banner, att)[0] or len(_first_line(banner)) >= STALE_REPLY_MAX_CHARS:
+                break
+            time.sleep(BANNER_RETRY_GAP_S)
+            banner = link.send(opencat.QUERY, read_reply=True)
     except Exception as e:  # noqa: BLE001 -- a failed query must never stop the service
         log.warning("attachment %s: could not ask the BiBoard its firmware (%s)", att, e)
         return None
