@@ -1,7 +1,7 @@
 #!/bin/bash
 # After the ARMW training (rl_training/opencat-gym/phase_armw.py) completes (user, 2026-11-03: promote the new policy to the new default, deploy it to the Pi the next time it comes online, commit and push):
 #   1. waits for "ARMW COMPLETE" in the phase log;
-#   2. only if the run's verdict is PASS (a failing policy is never put on the robot): adds the hardware epoch for the wide shoulders, promotes ARMWcand as the arm's gait
+#   2. whatever the verdict (user, 2026-11-03: there is no failing verdict, the new hardware build needs its own policy; the outcome is reported): adds the hardware epoch for the wide shoulders, promotes ARMWcand as the arm's gait
 #      (promote_release.py --attachment-only: the arm is the fitted attachment; DEFAULT_POLICY, the head's and no-attachment policy, stays), which runs the tests, commits and pushes;
 #   3. deploys to the Pi when it is online and idle (tools/g2_deploy_when_online.sh, waits up to 48 h).
 # Log: ~/g2_logs/armw_finish.log. Needs G2_PI in the environment.
@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GYM="$ROOT/rl_training/opencat-gym"; L
 say() { echo "[$(date '+%I:%M %p')] $*" >> "$LOG"; }
 until grep -q "ARMW COMPLETE" "$GYM/trained/phase_armw.log" 2>/dev/null; do sleep 120; if [ -f "$GYM/trained/armw_halt" ]; then say "training halted ($(head -c 200 "$GYM/trained/armw_halt")): nothing promoted; waiting"; sleep 600; fi; done
 say "training complete"
-if ! grep -q "VERDICT: PASS against ARM1X" "$GYM/trained/phase_armw.log"; then say "verdict is not PASS: NOT promoted, NOT deployed (see trained/phase_armw.log)"; exit 3; fi
+if grep -q "VERDICT: PASS against ARM1X" "$GYM/trained/phase_armw.log"; then say "verdict PASS against ARM1X on the new legs"; else say "verdict is not PASS (see trained/phase_armw.log): promoted anyway (user, 2026-11-03: the new hardware build needs its own policy, no failing verdict)"; fi
 cd "$ROOT" || exit 1
 python3 - <<'PY' >> "$LOG" 2>&1
 import json
