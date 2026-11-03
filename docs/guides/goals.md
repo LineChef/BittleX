@@ -54,7 +54,7 @@ whose attempts were all retracted or retired is deleted (to a 30-day trash); a l
 `goal_curation/curation_report.md` says what it did and why. It never touches your goals, overrides or "right" verdicts, the journal, or facts you told him.
 
 The Mac keeps a copy in `~/Desktop/G2Memory/goals/` so you can read it while G2 is off: the journal, what he learned, your goals and overrides, the chase and wall
-settings, his measured pace, every chase turn and why (`turn_log.jsonl`), the lessons he saved to memory (`lessons.jsonl`), and `history/<date>/` with the copy as it was
+settings, his measured pace, every chase turn and why (`turn_log.jsonl`), every chase decision and why (`decision_log.jsonl`, 50 MB cap, old lines rotated out by the cleanup), the lessons he saved to memory (`lessons.jsonl`), and `history/<date>/` with the copy as it was
 before each day's first pull. `pulled_at.txt` says when it was taken. The commands other than `report` and `pull` need G2 on.
 
 The report shows the success rate per session, the settings he uses now against the first session's, the record behind each setting (every value tried, how often it worked,
