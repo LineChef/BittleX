@@ -93,7 +93,7 @@ SCAN_TURN_DEG = 30.0           # a turn step between two claw looks (a claw look
 # The claw look: the arm's pan (joint 0) and lift (joint 1) point the camera; legs stay where they are. A positive lift swings the claw forward, out and up.
 CLAW_PAN_DEG = 35.0
 CLAW_LIFT_DEG = 15.0
-CLAW_RAISE_DEG = 40.0          # (user, 2026-11-03: "he isn't lifting the claw": 15 deg looked like no lift from the attention pose) the first move of a claw look from the attention pose: straight up this far (the arm's limit in claw_pose), clear of the legs; the pictures are still taken at CLAW_LIFT_DEG
+CLAW_RAISE_DEG = 15.0          # 40 deg tipped him nose down onto his face twice from the attention pose (2026-11-03, pitch 1 deg then 88 deg within a second of the raise); 15 is the lift the looks have always used. (user, 2026-11-03: "he isn't lifting the claw": 15 deg looks like no lift) the first move of a claw look from the attention pose: straight up this far (the arm's limit in claw_pose), clear of the legs; the pictures are still taken at CLAW_LIFT_DEG
 CLAW_RAISE_FIRST = True        # (user, 2026-11-02) from the attention pose the claw sits between the front legs and cannot pan there: raise it straight up first (lift CLAW_LIFT_DEG, pan 0), then
                                # pan left, picture, pan right, picture, back to the centre still raised, and lower it last
 CLAW_PAN_SIGN = "left"         # which way a positive arm pan turns the camera: LEFT on G2 (2026-11-01, pictures taken 1.3 s after each move: pan +35 put the ball 73 px to the right = camera 35 deg left, pan -35 about 39 deg right; the user saw the claw swing left); claw_look --calibrate can re-measure it
