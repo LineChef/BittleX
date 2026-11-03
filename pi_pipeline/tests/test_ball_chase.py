@@ -722,3 +722,33 @@ def test_the_chase_logs_stop_growing_at_the_size_cap(tmp_path, monkeypatch):
     for _ in range(20):
         bc.log_decision(1, bc.Action("look", 1.0, why="x"), None, None, p, 0.0)
     assert 0 < f.stat().st_size < 1500
+
+
+def test_the_180_search_turns_half_way_round_in_one_move(monkeypatch):
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "claw_turn_180")
+    p = bc.ChasePlanner()
+    p.claw_ok, p.seen_ball, p.last_side = True, False, 1
+    first, second, third = p._search_move(), p._search_move(), p._search_move()
+    assert first.kind == "claw_look"
+    assert second.kind == "search_turn" and second.degrees == bc.U_TURN_DEG and second.seconds > bc.SEARCH_MOVE_MAX_S
+    assert third.kind == "claw_look"
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "turn_180")
+    q = bc.ChasePlanner()
+    q.last_side = -1
+    a = q._search_move()
+    assert a.kind == "search_turn" and a.degrees == -bc.U_TURN_DEG
+
+
+def test_a_ball_gone_right_after_a_line_up_turn_means_he_turned_past_it_so_he_backs_up():
+    p = bc.ChasePlanner()
+    a = p.decide(reading(3, 36)); assert a.kind == "align"
+    assert a.seconds <= bc.ALIGN_PULSE_MAX_S
+    p.prev_kind = "align"
+    b = p.decide(None)
+    assert b.kind == "back" and "turned past" in b.why
+
+
+def test_a_line_up_pulse_turns_only_part_of_the_bearing_and_less_when_close():
+    p = bc.ChasePlanner()
+    far = p.decide(reading(6, 16)); near = bc.ChasePlanner().decide(reading(3, 16))
+    assert far.kind == near.kind == "align" and far.seconds >= near.seconds >= bc.ALIGN_PULSE_MIN_S

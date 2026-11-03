@@ -73,7 +73,10 @@ SEARCH_ORDERS = {
     "claw_three_point": (("claw",), ("three_point", "claw")),
     "full_circle": ((), ("circle",)),                            # a full-circle scan (user, 2026-11-02): turn steps that add up to one whole turn, counted; after each whole turn without the ball he backs up for a wider view
     "claw_full_circle": (("claw",), ("circle", "claw")),         # the same with a claw look between the turn steps
+    "turn_180": ((), ("u_turn",)),                               # (user, 2026-11-03) search by turning half way round (U_TURN_DEG) in one go, look, and again: the ball behind him is found in one move
+    "claw_turn_180": (("claw",), ("u_turn", "claw")),            # a claw look, then a half turn, a claw look, a half turn ...
 }
+U_TURN_DEG = 180.0             # the half turn of the "u_turn" search move
 SEARCH_ORDER = "claw_scan"     # the claw look first: it sees the most for the least moving (user, 2026-10-31)
 # The 3-point turn (user, 2026-11-01): back up while turning one way, then walk forward while turning the OPPOSITE way (as a car does), so he comes round in less room than a spot turn
 # (a wall close ahead, or a search turn near things). Wall turns use it (user, 2026-11-01: the hardware test works); search turns use it when SEARCH_ORDER is three_point_turn or claw_three_point, which the goal can try.
@@ -97,6 +100,8 @@ CLAW_STEPS_PER_S = 40
 CLAW_LOOK_POSE = "kcalib"      # the pose he holds for the claw look (user, 2026-11-01): the BiBoard's "attention" pose, the one the legs are calibrated in; "ksit" is the sit it replaced. He stands up normally afterwards (`kbalance`)
 CLAW_FROM_SIT = True           # the claw look is done from a sit: sit, swing the arm left, picture, swing right, picture, arm back to centre, stand up slowly with the back legs (user, 2026-11-01)
 CLAW_POSE_S = 2.0              # to settle into the attention pose
+CLAW_LOOK_STANDING = False     # (user, 2026-11-03: tried standing, reverted the same day: the attention pose prevents most of the servo sag) True = the claw look is taken STANDING: no attention pose (CLAW_LOOK_POSE) and no stand-up afterwards; the arm pans over the standing legs. False = the
+                               # old look from the attention pose. Not used with BETWEEN_MOVES "attention" (that flow waits in the attention pose by design).
 SIT_STAND_FIRST_S = 2.5        # the stand-up before the sit of a claw look
 BETWEEN_MOVES = "stand"        # the switch (user, 2026-11-02; the punt setting / goal knob `between_moves`): "stand", the original flow (the default: fluid, and the legs only let go after
                                # 7 to 10 s of standing still), or "attention":
@@ -178,8 +183,12 @@ def wall_turn_deg() -> float:
 # Fine alignment before the punch (user, 2026-10-31: small turns, checked with the camera after each one). Inside NUDGE_MAX_IN, a ball more than PUNT_ALIGN_DEG off straight gets a
 # short turn pulse sized from his measured pulse turn rate, then a new picture; at most ALIGN_TRIES of them, then WHEN_MISALIGNED.
 ALIGN_PULSE_MIN_S = 1.0        # the shortest pulse (shorter ones may not move him at all: the measured log shows it)
-ALIGN_PULSE_MAX_S = 1.6
-ALIGN_TRIES = 3
+ALIGN_PULSE_MAX_S = 1.2        # (user, 2026-11-03: he over-turned; was 1.6)
+ALIGN_GAIN = 0.6               # a line-up pulse turns only this share of the bearing: the pulse rate is a guess and an overshoot loses a ball 3 in away (user, 2026-11-03: smaller steps near the ball)
+ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one line-up pulse is sized to turn at most this many degrees, whatever the bearing; more pulses do the rest (ALIGN_TRIES)
+ALIGN_CLOSE_IN = 5.0           # closer than this (camera to ball) the pulse is smaller still
+ALIGN_CLOSE_GAIN = 0.7         # ... times this
+ALIGN_TRIES = 4
 WHEN_MISALIGNED = "punch"      # after ALIGN_TRIES pulses and still off: "punch" anyway or "back_up" and line up again
 
 
@@ -299,6 +308,9 @@ class ChasePlanner:
                     return self._back("search_back", BACK_UP_S, "searching: back up to see more of the floor")
                 self.considered.append(f"back up: skipped, {self.back_s:.1f} of {BACK_BUDGET_S:.1f} s of back-up used")
                 continue
+            if move == "u_turn":
+                rate = self._turn_rate(side, False)
+                return Action("search_turn", U_TURN_DEG / rate, U_TURN_DEG * side, f"searching {'right' if side > 0 else 'left'}: a {U_TURN_DEG:.0f} degree turn to look behind him")      # not capped by SEARCH_MOVE_MAX_S: the whole half turn is the move
             if move == "circle" and self.circle_deg >= 360.0 - 1e-9:
                 self.circle_deg = 0.0
                 self.circles += 1
@@ -346,6 +358,12 @@ class ChasePlanner:
                     if self.claw_ok:
                         return Action("claw_look", why="the ball is gone after a small step: I probably pushed it away: a look around")
                     return Action("look", 1.0, why="the ball is gone after a small step: I probably pushed it away: look again")
+                if self.prev_kind == "align":                       # (user, 2026-11-03) it vanished right after a line-up turn: he turned past it, it is not at the claw: back up, look, line up again
+                    self.align_before, self.align_turns = None, 0
+                    if self._can_back(VANISH_BACK_S):
+                        return self._back("back", VANISH_BACK_S, "the ball vanished after a line-up turn: I turned past it: back up and look again, then line up again")
+                    self.lost = LOST_LOOKS
+                    return Action("claw_look", why="the ball vanished after a line-up turn: I turned past it: a look around") if self.claw_ok else Action("look", 1.0, why="the ball vanished after a line-up turn: look again")
                 if WHEN_VANISHED == "back_up" and self._can_back(VANISH_BACK_S):
                     return self._back("back", VANISH_BACK_S, "the ball vanished at close range: back off a little to see it")
                 self.after_punt = True
@@ -411,7 +429,8 @@ class ChasePlanner:
                 self.align_turns += 1
                 self.align_before = float(ball.bearing_deg)
                 side = 1 if ball.bearing_deg > 0 else -1
-                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, abs(ball.bearing_deg) / self._turn_rate(side, True)))
+                gain = ALIGN_GAIN * (ALIGN_CLOSE_GAIN if ball.distance_in <= ALIGN_CLOSE_IN else 1.0)
+                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, min(gain * abs(ball.bearing_deg), ALIGN_MAX_DEG) / self._turn_rate(side, True)))
                 return Action("align", secs, float(ball.bearing_deg), f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
             if WHEN_MISALIGNED == "back_up" and self._can_back(BACK_UP_S):
                 self.align_turns = 0
@@ -711,6 +730,13 @@ class SerialRobot:
             self.posture = "attention"
             self._sleep(CLAW_POSE_S)
             return "ok"
+        if CLAW_LOOK_STANDING and BETWEEN_MOVES != "attention":      # (user, 2026-11-03) the look is taken standing: stand if he is not, then nothing else is sent to the legs
+            if self.posture != "stand":
+                self._tx("kbalance")
+                self._sleep(SIT_STAND_FIRST_S)
+            self._claw = (0.0, 0.0)
+            self.posture = "stand"
+            return "ok"
         self._tx("kbalance")                                # stand first, always (user, 2026-11-01: the look began with him lying in the rest pose and stayed there: after a Pi-sent stand-up the legs can go limp, and
         self._sleep(SIT_STAND_FIRST_S)                      # a sit asked of limp legs changes nothing). The firmware stand drives every leg joint to its balance angle again.
         self._tx(CLAW_LOOK_POSE)
@@ -724,6 +750,8 @@ class SerialRobot:
         With BETWEEN_MOVES "attention" he stays in the attention pose: the next move stands him up (stand_up) right before it starts."""
         if BETWEEN_MOVES == "attention" and self.posture == "attention":
             return "ok"
+        if CLAW_LOOK_STANDING and BETWEEN_MOVES != "attention" and self.posture == "stand":
+            return "ok"                                     # he never left the stand: nothing to stand up from
         self._pitch, self._roll = [], []
         self._tx("kbalance")
         t0, state = self._clock(), "ok"
@@ -946,7 +974,7 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
         pans = [side * CLAW_PAN_DEG, -side * CLAW_PAN_DEG]
     found, state = None, "ok"
     seen = []                                                                         # [(pan, reading)]
-    raise_first = CLAW_RAISE_FIRST and BETWEEN_MOVES == "attention"                  # only from the attention pose, where the claw sits between the legs; the standing flow pans at once, as before
+    raise_first = CLAW_RAISE_FIRST and (BETWEEN_MOVES == "attention" or (from_sit and not CLAW_LOOK_STANDING))      # only from the attention pose, where the claw sits between the legs (user, 2026-11-03: attention pose, raise the claw, pan left, picture, pan right, picture, centre, lower, stand up)
     if raise_first:
         state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # up first, straight ahead: clear of the legs before any pan
     for pan in (pans if state != "fell" else []):

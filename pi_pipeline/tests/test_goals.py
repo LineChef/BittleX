@@ -1474,8 +1474,8 @@ def test_the_claw_look_sits_swings_left_then_right_returns_to_centre_and_stands_
     bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.CLAW_FROM_SIT = 35.0, 15.0, "left", True       # a positive pan points the camera left on G2
     robot, trace = SitRobot(), []
     state, found = bc.claw_scan(robot, FakeCamera([picture(), picture()]), bc.ChasePlanner(), sleep=lambda s: None, say=lambda m: None, trace=trace)
-    assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
-    assert robot.moves[1:4] == [("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 0)] and state == "ok" and found is None     # left first, then right, then centre
+    assert [m[0] for m in robot.moves] == ["sit", "claw", "claw", "claw", "claw", "claw", "stand_from_sit"]
+    assert robot.moves[1:6] == [("claw", 0, 15), ("claw", 35, 15), ("claw", -35, 15), ("claw", 0, 15), ("claw", 0, 0)] and state == "ok" and found is None     # attention pose: raise, left, right, centre still raised, lower, stand up
 
 
 def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_direction_is_used(monkeypatch):
@@ -1483,7 +1483,7 @@ def test_a_ball_seen_in_the_first_picture_still_gets_both_pictures_and_only_its_
     ahead = picture([disc(120, 110, 12)])
     robot = SitRobot()
     bc.run_chase(robot, FakeCamera([picture(), ahead, picture(), picture()]), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None, trace=[])
-    assert [m[0] for m in robot.moves][:5] == ["sit", "claw", "claw", "claw", "stand_from_sit"]
+    assert [m[0] for m in robot.moves][:7] == ["sit", "claw", "claw", "claw", "claw", "claw", "stand_from_sit"]
     turns = [m for m in robot.moves if m[0] == "turn"]
     assert turns and turns[0][1] < -20                                   # seen in the left picture: he turns left toward it, and looks again standing instead of walking on a sit-height distance
 
@@ -1575,9 +1575,10 @@ def test_a_wall_reading_that_would_hide_the_ball_or_never_changes_is_not_believe
     assert got.nearest_in == 20.0 and st["stuck"] == 0
 
 
-def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first():
+def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first(monkeypatch):
     assert bc._wait_for_camera("/dev/none", 0.0, sleep=lambda s: None, exists=lambda p: False) is False
     assert bc._wait_for_camera("/dev/x", 5.0, sleep=lambda s: None, exists=lambda p: True, can_open=lambda p: True) is True
+    monkeypatch.setattr(bc, "CLAW_LOOK_STANDING", False)                                  # the old look, from the attention pose
     sent = []
 
     class Lk:
@@ -1585,6 +1586,22 @@ def test_the_camera_wait_gives_up_and_the_claw_sit_stands_first():
     r = bc.SerialRobot(Lk(), sleep=lambda s: None)
     r.sit_down()
     assert sent.index("kbalance") < sent.index(bc.CLAW_LOOK_POSE) and bc.CLAW_LOOK_POSE == "kcalib"      # stand first, then the attention pose
+
+
+def test_the_claw_look_is_taken_standing(monkeypatch):
+    monkeypatch.setattr(bc, "CLAW_LOOK_STANDING", True)
+    sent = []
+
+    class Lk:
+        def send(self, c, **k): sent.append(c)
+    r = bc.SerialRobot(Lk(), sleep=lambda s: None)
+    r.posture = "stand"
+    assert r.sit_down() == "ok" and r.stand_from_sit() == "ok"
+    assert not [c for c in sent if c.startswith("k")] and r.posture == "stand"            # no attention pose, no stand-up either side
+    sent.clear()
+    r.posture = "unknown"                                                                 # not standing: stands once, still no attention pose
+    r.sit_down()
+    assert [c for c in sent if c.startswith("k")] == ["kbalance"] and r.posture == "stand"
 
 
 def test_a_ball_gone_after_a_small_step_means_he_pushed_it_so_he_looks_around():

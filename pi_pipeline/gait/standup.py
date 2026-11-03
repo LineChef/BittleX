@@ -202,10 +202,12 @@ def stand_from_sit(send, sleep=time.sleep, last_motion_command=None) -> bool:
 
 
 ATTENTION_URDF_DEG = [0.0] * 8               # the firmware `calib` pose ("attention", legs straight): every leg joint at 0 (InstinctBittleESP.h `calib`)
-ATT_REAR_S, ATT_FRONT_S = 1.2, 1.0           # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, THEN the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
-ATT_FRONT_START_S = ATT_REAR_S               # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
-ATT_STEPS_PER_S = 10                         # (2026-11-02: one stand-up in 13 folded the front-right leg up instead of down. Likely cause: full 8-joint `i` commands at 20 a second, about 1 KB/s,
+ATT_REAR_S, ATT_FRONT_S = 1.2, 1.5           # the stand-up from the attention pose: the back legs rise over ATT_REAR_S, THEN the front legs over ATT_FRONT_S (user, 2026-11-02: the all-at-once
+ATT_FRONT_START_S = ATT_REAR_S                 # firmware kbalance out of the attention pose flipped him over); the biggest joint move (a knee, about 56 deg) peaks near 70 deg/s
+ATT_STEPS_PER_S = 14                         # (2026-11-02: one stand-up in 13 folded the front-right leg up instead of down. Likely cause: full 8-joint `i` commands at 20 a second, about 1 KB/s,
                                              # while the board is still moving; a dropped byte turns a command into a wrong angle.) So: 10 a second, only the joints that changed, and
+# (user, 2026-11-03: the front legs rising were jerky: 56 deg of knee in 1.0 s at 10 steps a second was 5 to 8 deg a step. Now 1.5 s, 14 steps a second (about 4 deg a step at the fastest), the front legs still
+# after the back legs. Still only the changed joints, so about 0.5 KB/s: well under the 1 KB/s that dropped a byte on 2026-11-02.)
 ATT_FINAL_REPEATS = 2                        # the whole balance pose sent again this many times at the end, after a pause, so the last angles always arrive whole
 
 
