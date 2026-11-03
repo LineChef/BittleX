@@ -217,7 +217,7 @@ def _attempt_patched(w, rng, settings, family, falls, max_punts, max_seconds=Non
     from pi_pipeline.goals.ball_punt import BallPunt
     _scorer = _scorer or BallPunt()
     w.punted = False; w.bumped = False
-    bot, cam, trace = Bot(w), Camera(w), []; planner = bc.ChasePlanner()
+    bot, cam, trace = Bot(w), Camera(w), []; planner = bc.ChasePlanner(rng=random.Random(rng.random()))      # the search-side coin follows the attempt's own seed
     full = dict(settings); full.update(PINNED); ps.apply(bc, {k: v for k, v in full.items() if k in ps.SPEC})
     t0 = w.t
     try:

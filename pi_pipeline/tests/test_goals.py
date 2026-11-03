@@ -285,7 +285,7 @@ def test_the_search_orders_match_the_settings_names():
 
 
 def test_the_default_search_starts_with_a_claw_look_then_turns_between_claw_looks():
-    p = bc.ChasePlanner()                                                       # the ball not seen yet this attempt
+    p = bc.ChasePlanner(); p.search_side = 1                                    # the ball not seen yet this attempt (the side is a coin flip when nothing says: fixed here)
     kinds = [p.decide(None).kind for _ in range(2 + 5)]
     assert kinds[:2] == ["look", "look"] and kinds[2:] == ["claw_look", "search_turn", "claw_look", "search_turn", "claw_look"]
     assert p.claw_side == 1
@@ -361,7 +361,8 @@ class ClawRobot:
     def battery_ok(self): return True
 
 
-def test_a_claw_look_takes_two_pictures_and_turns_g2_toward_the_ball_by_the_cameras_real_turn():
+def test_a_claw_look_takes_two_pictures_and_turns_g2_toward_the_ball_by_the_cameras_real_turn(monkeypatch):
+    monkeypatch.setattr(bc.random.Random, "choice", lambda self, seq: 1)      # no side known yet: the coin says right
     bc.CLAW_PAN_DEG, bc.CLAW_LIFT_DEG, bc.CLAW_PAN_SIGN, bc.LOST_LOOKS = 35.0, 15.0, "right", 1
     none = picture()
     ahead_in_picture = picture([disc(120, 110, 12)])                     # straight ahead in the camera's picture, which is pointed about 39 deg left (pan -35)

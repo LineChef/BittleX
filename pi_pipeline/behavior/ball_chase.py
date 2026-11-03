@@ -25,6 +25,7 @@ import json
 import logging
 import math
 import os
+import random
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -185,6 +186,7 @@ def wall_turn_deg() -> float:
 ALIGN_PULSE_MIN_S = 1.0        # the shortest pulse (shorter ones may not move him at all: the measured log shows it)
 ALIGN_PULSE_MAX_S = 1.2        # (user, 2026-11-03: he over-turned; was 1.6)
 ALIGN_GAIN = 0.6               # a line-up pulse turns only this share of the bearing: the pulse rate is a guess and an overshoot loses a ball 3 in away (user, 2026-11-03: smaller steps near the ball)
+SEARCH_SIDE_DEADBAND_DEG = 6.0 # a ball last seen less than this far off straight tells nothing about which way it went: the search side is chosen by chance
 ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one line-up pulse is sized to turn at most this many degrees, whatever the bearing; more pulses do the rest (ALIGN_TRIES)
 ALIGN_CLOSE_IN = 5.0           # closer than this (camera to ball) the pulse is smaller still
 ALIGN_CLOSE_GAIN = 0.7         # ... times this
@@ -255,6 +257,10 @@ class ChasePlanner:
     circles: int = 0           # whole turns finished without the ball this search
     back_s: float = 0.0        # seconds backed up this attempt (BACK_BUDGET_S caps it)
     claw_side: int = 0         # which side the claw look starts on (the side the ball was last seen)
+    last_bearing: float | None = None   # the ball's bearing when it was last seen (None: not this attempt)
+    last_edge: bool = False    # ... and whether it touched the picture's edge (it was leaving the view that way)
+    search_side: int = 0       # the side this search turns toward, chosen when it starts (0 = not chosen); cleared when the ball is seen again
+    rng: object = field(default_factory=random.Random)   # the coin for a search with no hint (tests seed it)
     align_turns: int = 0       # fine-alignment pulses since the ball came within NUDGE_MAX_IN
     by_wall: int = 0           # looks in a row with the ball too close to a wall
     wall_turns: int = 0        # turns away from walls this attempt while the ball was in sight
@@ -287,13 +293,28 @@ class ChasePlanner:
         self.back_s += seconds
         return Action(kind, seconds, why=why)
 
+    def _search_side(self) -> int:
+        """Which way a search turns (+1 right, -1 left), chosen once per search (user, 2026-11-03: it always went right). The first hint that applies: an overshoot hint (set when the ball
+        vanished after a line-up turn: it is on the other side of that turn); the side the ball was last seen on when it was clearly to one side (more than SEARCH_SIDE_DEADBAND_DEG off
+        straight, or touching the picture's edge); otherwise a coin flip (no information: before, a ball last seen near straight ahead, bearing 0 or more, always read as "right")."""
+        if self.search_side:
+            return self.search_side
+        b = self.last_bearing
+        if b is not None and (abs(b) >= SEARCH_SIDE_DEADBAND_DEG or (self.last_edge and b != 0)):
+            self.search_side = 1 if b > 0 else -1
+            self.considered.append(f"search side: {'right' if self.search_side > 0 else 'left'}, the ball was last seen {b:+.0f} deg off")
+        else:
+            self.search_side = self.rng.choice((-1, 1))
+            self.considered.append(f"search side: {'right' if self.search_side > 0 else 'left'} by chance, the ball was last seen {'nowhere' if b is None else f'{b:+.0f} deg'} (no clear side)")
+        return self.search_side
+
     def _search_move(self) -> Action:
         once, cycle = self._order()
         for _ in range(len(once) + 2 * len(cycle) + 1):                # a move that cannot be made (no back-up left) is skipped
             i = self.search_i
             self.search_i += 1
             move = once[i] if i < len(once) else cycle[(i - len(once)) % len(cycle)]
-            side = self.last_side or 1
+            side = self._search_side()
             if move == "claw":
                 self.claw_side = side
                 return Action("claw_look", why=f"searching: a look around with the claw, {'right' if side > 0 else 'left'} first")
@@ -359,6 +380,8 @@ class ChasePlanner:
                         return Action("claw_look", why="the ball is gone after a small step: I probably pushed it away: a look around")
                     return Action("look", 1.0, why="the ball is gone after a small step: I probably pushed it away: look again")
                 if self.prev_kind == "align":                       # (user, 2026-11-03) it vanished right after a line-up turn: he turned past it, it is not at the claw: back up, look, line up again
+                    if self.align_before:
+                        self.search_side = -1 if self.align_before > 0 else 1      # it is on the other side of the turn he made
                     self.align_before, self.align_turns = None, 0
                     if self._can_back(VANISH_BACK_S):
                         return self._back("back", VANISH_BACK_S, "the ball vanished after a line-up turn: I turned past it: back up and look again, then line up again")
@@ -378,6 +401,7 @@ class ChasePlanner:
         self.circle_deg = 0.0
         self.circles = 0
         self.seen_ball = True
+        self.search_side = 0
         if wall is not None and wall.nearest_in is not None and ball.distance_in > NUDGE_MAX_IN:   # walls rank above the punt; but with the ball within a few inches lining up and punching
             # goes no closer to the wall, and the wall reading is not calibrated for the claw camera (user, 2026-11-01: he turned away from a ball right in front of him)
             behind = wall.near_ball_in
@@ -413,6 +437,7 @@ class ChasePlanner:
             self.by_wall = 0
         self.last_dist = ball.distance_in
         self.last_side = 1 if ball.bearing_deg >= 0 else -1
+        self.last_bearing, self.last_edge = float(ball.bearing_deg), bool(getattr(ball, "touches_edge", False))
         near = ball.distance_in <= NUDGE_MAX_IN
         in_reach = ball.distance_in <= PUNT_MAX_IN
         if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
@@ -1223,6 +1248,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 b = pending.bearing_deg
                 pending = None
                 planner.last_side = 1 if b >= 0 else -1
+                planner.last_bearing, planner.last_edge = float(b), False
                 if abs(b) > 8.0:
                     side = 1 if b > 0 else -1
                     state = robot.turn(b, max(MIN_MOVE_S, abs(min(abs(b), MAX_TURN_DEG)) / planner._turn_rate(side, False)))

@@ -727,14 +727,14 @@ def test_the_chase_logs_stop_growing_at_the_size_cap(tmp_path, monkeypatch):
 def test_the_180_search_turns_half_way_round_in_one_move(monkeypatch):
     monkeypatch.setattr(bc, "SEARCH_ORDER", "claw_turn_180")
     p = bc.ChasePlanner()
-    p.claw_ok, p.seen_ball, p.last_side = True, False, 1
+    p.claw_ok, p.seen_ball, p.search_side = True, False, 1
     first, second, third = p._search_move(), p._search_move(), p._search_move()
     assert first.kind == "claw_look"
     assert second.kind == "search_turn" and second.degrees == bc.U_TURN_DEG and second.seconds > bc.SEARCH_MOVE_MAX_S
     assert third.kind == "claw_look"
     monkeypatch.setattr(bc, "SEARCH_ORDER", "turn_180")
     q = bc.ChasePlanner()
-    q.last_side = -1
+    q.search_side = -1
     a = q._search_move()
     assert a.kind == "search_turn" and a.degrees == -bc.U_TURN_DEG
 
@@ -752,3 +752,44 @@ def test_a_line_up_pulse_turns_only_part_of_the_bearing_and_less_when_close():
     p = bc.ChasePlanner()
     far = p.decide(reading(6, 16)); near = bc.ChasePlanner().decide(reading(3, 16))
     assert far.kind == near.kind == "align" and far.seconds >= near.seconds >= bc.ALIGN_PULSE_MIN_S
+
+
+def _search_dir(p):
+    for _ in range(6):
+        a = p.decide(None)
+        if a.kind == "search_turn":
+            return 1 if a.degrees > 0 else -1
+    return None
+
+
+def test_the_search_goes_toward_the_side_the_ball_was_last_seen_on(monkeypatch):
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "turn")
+    p = bc.ChasePlanner(); p.decide(reading(30, -25)); p.last_dist = None
+    assert _search_dir(p) == -1
+    q = bc.ChasePlanner(); q.decide(reading(30, 25)); q.last_dist = None
+    assert _search_dir(q) == 1
+
+
+def test_with_no_clear_side_the_search_picks_by_chance_so_it_goes_left_sometimes(monkeypatch):
+    import random
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "turn")
+    dirs = set()
+    for seed in range(12):
+        p = bc.ChasePlanner(rng=random.Random(seed))
+        p.decide(reading(30, 1)); p.last_dist = None            # a ball nearly dead ahead: no side
+        dirs.add(_search_dir(p))
+    assert dirs == {-1, 1}
+    dirs = set()
+    for seed in range(12):
+        dirs.add(_search_dir(bc.ChasePlanner(rng=random.Random(seed))))      # never seen
+    assert dirs == {-1, 1}
+
+
+def test_after_turning_past_the_ball_the_search_goes_back_the_other_way(monkeypatch):
+    monkeypatch.setattr(bc, "SEARCH_ORDER", "turn")
+    monkeypatch.setattr(bc, "BACK_BUDGET_S", 0.0)               # no back-up left: he searches
+    p = bc.ChasePlanner()
+    a = p.decide(reading(3, 36)); assert a.kind == "align" and a.degrees > 0     # turned right toward it
+    p.prev_kind = "align"
+    p.decide(None)
+    assert _search_dir(p) == -1                                  # it is on the left of that turn
