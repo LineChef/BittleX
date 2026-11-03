@@ -479,13 +479,13 @@ def test_a_move_out_of_the_attention_pose_stands_him_up_back_legs_first_then_fro
         pose.update(dict(zip(nums[0::2], nums[1::2])))
         poses.append(dict(pose))
     first_front = next(i for i, p in enumerate(poses) if any(p[j] for j in front))
-    assert all(poses[first_front - 1][j] == poses[-1][j] for j in rear)                # the back legs are all the way up before the front legs start
+    assert all(abs(poses[first_front - 1][j]) >= 0.75 * abs(poses[-1][j]) for j in rear)       # the back legs are at least three quarters of the way up before the front legs start (a little overlap, user 2026-11-03)
     goal = standup.balance_pose()
     servo_goal = {standup._URDF_TO_SERVO[k]: int(round(goal[k])) for k in range(8)}
     assert poses[-1] == servo_goal                                                      # ends at the balance pose
     assert sent[-1] == sent[-2] == standup.move_cmd(goal) and standup.ATT_FINAL_REPEATS == 2      # the whole pose twice at the end (a garbled last command once left a leg folded)
     ramp = sent[:-standup.ATT_FINAL_REPEATS]
-    assert len(ramp) <= standup.ATT_STEPS_PER_S * 2.8 and max(len(c) for c in ramp) <= 30          # fewer, shorter commands: only the moving legs
+    assert len(ramp) <= standup.ATT_STEPS_PER_S * 2.8 and max(len(c) for c in ramp) <= 44          # only the moving legs; in the 0.3 s overlap all eight (42 characters, about 0.6 KB/s: under the 1 KB/s that dropped a byte on 2026-11-02)
     step = max(abs(a[j] - b[j]) for a, b in zip(poses, poses[1:]) for j in a)
     assert step * standup.ATT_STEPS_PER_S <= 80 + 1e-6                                  # no joint faster than the 80 deg/s cap
 

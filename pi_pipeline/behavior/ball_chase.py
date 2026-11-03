@@ -980,8 +980,7 @@ def confirm_ball(camera, ball: BallReading | None, sleep=time.sleep, trace: list
 
 def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sleep, say: Callable[[str], None] = print, trace: list | None = None,
               stamp: Callable[[], float] | None = None, after_punt: bool = False) -> tuple[str, BallReading | None]:
-    """One look around with the arm: the camera to one side, then the other, a picture at each (two pictures: user, 2026-11-01; straight ahead is what the plain looks
-    already see); stops at the first sight of the ball. The arm goes back
+    """One look around with the arm: the camera to one side, then the other, then the centre, a picture at each (user, 2026-11-03: left, right, centre; from a sit all three are always taken); stops at the first sight of the ball. The arm goes back
     to (0, 0) at the end. Returns (state, the ball with its bearing turned into G2's own direction, or None). `stamp()` times the trace entries (the scorer needs when the ball was
     first seen); `after_punt` marks a look for where the ball went, which is not a search."""
     extra = {"after_punt": True} if after_punt else {}
@@ -991,7 +990,7 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
     from_sit = CLAW_FROM_SIT and not after_punt and hasattr(robot, "sit_down") and hasattr(robot, "stand_from_sit")
     if from_sit:
         left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG            # the pan that points the camera to G2's left
-        pans = [left, -left]                                                          # always left first, then right (user, 2026-11-01)
+        pans = [left, -left, 0.0]                                                     # always left first, then right (user, 2026-11-01), then the centre, claw still raised (user, 2026-11-03)
         if robot.sit_down() == "fell":
             return "fell", None
     else:
@@ -1017,20 +1016,23 @@ def claw_scan(robot, camera, planner: ChasePlanner, *, saver=None, sleep=time.sl
                 break                                                                  # from a sit both pictures are always taken (the arm goes back to centre and he stands up next)
     if seen:
         pan, ball = seen[0]
-        if len(seen) > 1:
-            (pan0, b0), (pan1, b1) = seen[0], seen[1]
-            stale = abs(b1.bearing_deg - b0.bearing_deg) < 4.0 and abs(b1.distance_in - b0.distance_in) < 1.0 and abs(pan1 - pan0) > 30.0       # the arm moved, the picture did not: the second is an old frame
-            if not stale and abs(b1.bearing_deg) < abs(b0.bearing_deg) - 3.0:        # the sighting nearer the middle of its picture is the better one (user, 2026-11-01: the last was used, +77 deg)
-                pan, ball = pan1, b1
-            if stale:
-                say("   the second claw picture matches the first although the arm moved: an old frame, ignored")
+        kept = [seen[0]]
+        for pan_i, b_i in seen[1:]:
+            pan_p, b_p = kept[-1]
+            if abs(b_i.bearing_deg - b_p.bearing_deg) < 4.0 and abs(b_i.distance_in - b_p.distance_in) < 1.0 and abs(pan_i - pan_p) > 30.0:
+                say(f"   the claw picture at pan {pan_i:+.0f} matches the one before although the arm moved: an old frame, ignored")      # the arm moved, the picture did not
+                continue
+            kept.append((pan_i, b_i))
+        for pan_i, b_i in kept[1:]:
+            if abs(b_i.bearing_deg) < abs(ball.bearing_deg) - 3.0:        # the sighting nearer the middle of its picture is the better one (user, 2026-11-01: the last was used, +77 deg)
+                pan, ball = pan_i, b_i
         found = dataclasses.replace(ball, bearing_deg=ball.bearing_deg + claw_pan_body(pan))
         if trace is not None:
             trace.append({"kind": "claw_seen", "pan": pan, "lift": CLAW_LIFT_DEG, "cam_bearing": round(ball.bearing_deg, 1), "distance_in": round(ball.distance_in, 1),
                           **({"t": stamp()} if stamp else {}), **extra})
         say(f"   claw look at pan {pan:+.0f} lift {CLAW_LIFT_DEG:.0f}: ball {ball.distance_in:.0f} in, {found.bearing_deg:+.0f} deg from straight ahead")
-    if state != "fell" and raise_first:
-        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # back to the centre still raised ...
+    if state != "fell" and raise_first and (not pans or pans[-1] != 0.0):
+        state = robot.claw_pose(0.0, CLAW_LIFT_DEG)                                  # back to the centre still raised (a look that ends on the centre picture is there already) ...
     if state != "fell":
         state = robot.claw_pose(0.0, 0.0)                                            # ... then lowered
     if from_sit and state != "fell":
