@@ -790,7 +790,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
 function fold(title,open){const d=document.createElement("details");d.open=!!open;const sm=document.createElement("summary");sm.textContent=title;sm.style.cssText="cursor:pointer;font-weight:600;color:var(--ink2);margin:10px 0 4px";d.append(sm);return d}
-function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div","empty","No goal data."));return}
+function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div","empty","No goal data."));return}const m=d.memory||{};
  const sum=el("div","labelsum");sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));
  if(m.lowest_mb!==undefined)sum.append(el("div","sub","Pi memory: lowest available "+Math.round(m.lowest_mb)+" MB ("+m.when+"), swap up to "+Math.round(m.swap_mb)+" MB"+(m.oom_kills?", OOM KILLS: "+m.oom_kills:"")));
  const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}list.append(sum);
