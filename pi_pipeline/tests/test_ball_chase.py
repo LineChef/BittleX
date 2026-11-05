@@ -118,7 +118,7 @@ class FakeRobot:
         self.moves.append(what)
         return "fell" if self.fall_at is not None and len(self.moves) >= self.fall_at else "ok"
     def walk(self, s): return self._do(("walk", round(s, 1)))
-    def turn(self, d, s): return self._do(("turn", round(d)))
+    def turn(self, d, s, stop_deg=0.0): return self._do(("turn", round(d)))
     def back(self, s): return self._do(("back", round(s, 1)))
     def punt(self): return self._do(("punt",))
     def battery_ok(self): return True
@@ -821,3 +821,57 @@ def test_the_loop_sends_a_scripted_step_to_walk_scripted_and_a_robot_without_one
         robot = robot_cls()
         bc.run_chase(robot, FakeCamera(frames), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None)
         assert [m[0] for m in robot.moves][:1] == [want], robot.moves
+
+
+# ------------------------------------------------------------------------------------------------- gyro-stopped line-up turns (2026-11-05)
+
+def _gyro_robot(deg_per_s, imu=True, coast_deg=1.0):
+    """A SerialRobot on a fake link whose yaw turns at deg_per_s once the turn skill is sent (and coasts a little after kbalance); time moves only when the robot sleeps."""
+    t = {"now": 0.0, "since": None, "yaw": 100.0, "stopped": False}
+
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0):
+            self.sent.append((c, round(t["now"], 2)))
+            if c in ("kwkL", "kwkR"): t["since"] = t["now"]
+            if c == "kbalance" and t["since"] is not None:
+                t["yaw"] += (t["now"] - t["since"]) * deg_per_s + coast_deg; t["since"] = None
+            return ""
+        def poll_imu(self):
+            if not imu: return []
+            yaw = t["yaw"] + ((t["now"] - t["since"]) * deg_per_s if t["since"] is not None else 0.0)
+            return [f"ICM:{0.0:6.2f}{0.0:6.2f}{1.0:6.2f}{yaw:7.1f}{0.0:7.1f}{0.0:7.1f}"]
+
+    def sleep(s): t["now"] += s
+    lk = Link()
+    r = bc.SerialRobot(lk, sleep=sleep, clock=lambda: t["now"])
+    r.stand_up = lambda: "ok"
+    return r, lk
+
+
+def test_a_line_up_turn_stops_on_the_gyro_not_the_clock():
+    r, lk = _gyro_robot(28.0)
+    assert r.turn(30.0, 1.0, stop_deg=5.0) == "ok"                                                  # timed, this would be 1 s = 28 deg
+    sent = [c for c, _ in lk.sent]
+    assert sent.index("kwkR") < sent.index("kbalance")
+    stop_at = [at for c, at in lk.sent if c == "kbalance"][0] - [at for c, at in lk.sent if c == "kwkR"][0]
+    assert stop_at < 0.5                                                                            # stopped by the yaw, long before the timed second
+    assert r.last_turn_deg is not None and r.last_turn_deg < 8.0 and r.last_turn_s == stop_at
+
+
+def test_a_gyro_turn_that_barely_moves_ends_at_the_cap_and_no_imu_means_the_timed_turn():
+    r, lk = _gyro_robot(0.5)
+    r.turn(-30.0, 1.0, stop_deg=5.0)
+    at = {c: t for c, t in lk.sent}
+    assert at["kbalance"] - at["kwkL"] <= bc.ALIGN_CAP_S + 0.1 and r.last_turn_deg < 5.0
+    r2, lk2 = _gyro_robot(28.0, imu=False)
+    r2.turn(30.0, 1.0, stop_deg=5.0)
+    at2 = {c: t for c, t in lk2.sent}
+    assert abs((at2["kbalance"] - at2["kwkR"]) - 1.0) < 0.1 and r2.last_turn_deg is None            # no yaw frames: the old timed turn
+
+
+def test_the_line_up_target_is_small_and_inside_its_limits():
+    for bearing, dist in ((16, 6), (40, 6), (75, 3), (13, 4)):
+        a = bc.ChasePlanner().decide(reading(dist, bearing))
+        assert a.kind == "align" and bc.ALIGN_MIN_DEG <= a.stop_deg <= bc.ALIGN_MAX_DEG
+    assert bc.ChasePlanner().decide(reading(6, 40)).stop_deg == bc.ALIGN_MAX_DEG

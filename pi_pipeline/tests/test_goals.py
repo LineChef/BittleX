@@ -354,7 +354,7 @@ class ClawRobot:
         self.moves.append(what)
         return "ok"
     def walk(self, s): return self._do(("walk", round(s, 1)))
-    def turn(self, d, s): return self._do(("turn", round(d)))
+    def turn(self, d, s, stop_deg=0.0): return self._do(("turn", round(d)))
     def back(self, s): return self._do(("back", round(s, 1)))
     def punt(self): return self._do(("punt",))
     def claw_pose(self, pan, lift): return self._do(("claw", round(pan), round(lift)))

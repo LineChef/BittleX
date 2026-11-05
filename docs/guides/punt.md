@@ -95,7 +95,7 @@ It is read at the **start of every run** (voice or not), so a change takes effec
 | `back_up_budget_s` | 6.0 | 0 to 20 | The most backing up in one attempt. **Keep it small, or 0, on a desk.** |
 | `stuck_punts` | 3 | 1 to 6 | Punts with the ball still in range before he backs up. |
 | `when_vanished` | punt | punt / back_up | The ball vanished up close: punch (it is at the claw) or back off a little to see it. |
-| `align_pulse_min_s` | 1.0 | 0.3 to 1.6 | Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse. |
+| `align_pulse_min_s` | 1.0 | 0.3 to 1.6 | Within 7 in and off line he lines the claw up with small turns, a picture after each: the shortest pulse. Each turn is stopped on the gyro once he has turned the planned 3 to 6 deg (40% of the bearing, `ALIGN_GAIN`); this time is only the fallback when no IMU frames arrive, and the cap is 2.5 s (2026-11-05, after a 1 s pulse turned him 25 to 70 deg). |
 | `align_tries` | 3 | 1 to 8 | Small turns to line up before `when_misaligned`. |
 | `when_misaligned` | punch | punch / back_up | Still off line after `align_tries`: punch anyway or back up and line up again. |
 | `between_moves` | stand | stand / attention | While not moving: stand (the original flow), or wait in the attention pose (legs straight, the picture taken there) and stand up back legs first to move (2026-11-02, tried against the legs letting go after 7 to 10 s still; the standing flow is the default: more fluid). A fixed goal knob: G2 never changes it. |

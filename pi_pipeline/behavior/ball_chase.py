@@ -188,9 +188,12 @@ def wall_turn_deg() -> float:
 # short turn pulse sized from his measured pulse turn rate, then a new picture; at most ALIGN_TRIES of them, then WHEN_MISALIGNED.
 ALIGN_PULSE_MIN_S = 1.0        # the shortest pulse (shorter ones may not move him at all: the measured log shows it)
 ALIGN_PULSE_MAX_S = 1.2        # (user, 2026-11-03: he over-turned; was 1.6)
-ALIGN_GAIN = 0.6               # a line-up pulse turns only this share of the bearing: the pulse rate is a guess and an overshoot loses a ball 3 in away (user, 2026-11-03: smaller steps near the ball)
+ALIGN_GAIN = 0.4               # a line-up pulse turns only this share of the bearing: the pulse rate is a guess and an overshoot loses a ball 3 in away (user, 2026-11-03: smaller steps near the ball; 0.6 -> 0.4 on 2026-11-05: still overshooting)
 SEARCH_SIDE_DEADBAND_DEG = 6.0 # a ball last seen less than this far off straight tells nothing about which way it went: the search side is chosen by chance
 ALIGN_MAX_DEG = 6.0            # (user, 2026-11-03: still turning too much) one line-up pulse is sized to turn at most this many degrees, whatever the bearing; more pulses do the rest (ALIGN_TRIES)
+ALIGN_MIN_DEG = 3.0            # the smallest line-up turn asked for (gyro-stopped turns, 2026-11-05)
+ALIGN_STOP_LEAD_DEG = 1.5      # the gyro stop sends `kbalance` this many degrees early: the body keeps turning a moment after it
+ALIGN_CAP_S = 2.5              # a gyro-stopped turn never runs longer than this (or twice its timed length), however slowly the yaw changes
 ALIGN_CLOSE_IN = 5.0           # closer than this (camera to ball) the pulse is smaller still
 ALIGN_CLOSE_GAIN = 0.7         # ... times this
 ALIGN_TRIES = 4
@@ -236,6 +239,7 @@ class Action:
     why: str = ""
     degrees2: float = 0.0      # a sidestep's closing turn: from the heading after the step to facing the ball again (so he does not lose it: the camera sees about 47 deg either side)
     scripted: bool = False     # a walk: Petoi's scripted walk (kwkF) instead of the learned policy (the dialing-in steps, NUDGE_GAIT)
+    stop_deg: float = 0.0      # a line-up turn: stop on the gyro once he has turned this many degrees (`seconds` is then only the fallback when no IMU frames arrive)
 
 
 @dataclass
@@ -459,8 +463,9 @@ class ChasePlanner:
                 self.align_before = float(ball.bearing_deg)
                 side = 1 if ball.bearing_deg > 0 else -1
                 gain = ALIGN_GAIN * (ALIGN_CLOSE_GAIN if ball.distance_in <= ALIGN_CLOSE_IN else 1.0)
-                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, min(gain * abs(ball.bearing_deg), ALIGN_MAX_DEG) / self._turn_rate(side, True)))
-                return Action("align", secs, float(ball.bearing_deg), f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
+                want = max(ALIGN_MIN_DEG, min(gain * abs(ball.bearing_deg), ALIGN_MAX_DEG))
+                secs = max(ALIGN_PULSE_MIN_S, min(ALIGN_PULSE_MAX_S, want / self._turn_rate(side, True)))
+                return Action("align", secs, float(ball.bearing_deg), stop_deg=want, why=f"ball {ball.bearing_deg:+.0f} deg off at {ball.distance_in:.0f} in: a small turn to line the claw up ({self.align_turns} of {ALIGN_TRIES})")
             if WHEN_MISALIGNED == "back_up" and self._can_back(BACK_UP_S):
                 self.align_turns = 0
                 return self._back("back", BACK_UP_S, f"still {ball.bearing_deg:+.0f} deg off after {ALIGN_TRIES} small turns: back up and line up again")
@@ -492,7 +497,7 @@ class ChasePlanner:
 class Robot(Protocol):
     def walk(self, seconds: float) -> str: ...
     # optional: def walk_scripted(self, seconds: float) -> str   (Petoi's kwkF walk; a robot without it walks the dialing-in steps with walk())
-    def turn(self, degrees: float, seconds: float) -> str: ...
+    def turn(self, degrees: float, seconds: float, stop_deg: float = 0.0) -> str: ...
     def back(self, seconds: float) -> str: ...
     def punt(self) -> str: ...
     def battery_ok(self) -> bool: ...
@@ -578,6 +583,9 @@ class SerialRobot:
         self.use_pick = use_pick                          # True: `kpickF`, the pick skill (it opens and closes the claw); the default is the punch
         self._fall_rad = math.radians(fall_deg)
         self._pitch, self._roll = [], []
+        self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
+        self.last_turn_deg: float | None = None
+        self.last_turn_s: float | None = None
         self._claw = (0.0, 0.0)                           # (pan, lift) the arm was last sent to by a claw look; every walk, turn and punch starts from (0, 0)
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
@@ -598,6 +606,8 @@ class SerialRobot:
             r = parse_imu_line(line)
             if r is None:
                 continue
+            if len(r) > 2:
+                self._yaw = math.degrees(r[2])
             self._pitch.append(math.degrees(r[1]))
             self._roll.append(math.degrees(r[0]))
             if max(abs(r[0]), abs(r[1])) > self._fall_rad:
@@ -614,19 +624,38 @@ class SerialRobot:
         rng = lambda v: (max(v) - min(v)) if len(v) > 1 else 0.0   # noqa: E731
         return max(rng(self._pitch), rng(self._roll))
 
-    def _skill(self, token: str, seconds: float) -> str:
+    def _skill(self, token: str, seconds: float, stop_yaw_deg: float | None = None) -> str:
         self._pitch, self._roll = [], []
         self._tx("gP")
+        self.last_turn_deg, self.last_turn_s = None, None
+        yaw0 = None
+        if stop_yaw_deg is not None:
+            self._sleep(0.15)                             # a few frames, so there is a yaw to count from
+            self._yaw = None
+            if self._fell():
+                return "fell"
+            yaw0 = self._yaw
         self._tx(token)
         t0, state = self._clock(), "ok"
-        while self._clock() - t0 < seconds:
+        limit = seconds
+        if yaw0 is not None:
+            limit = max(ALIGN_CAP_S, 2.0 * seconds)
+        while self._clock() - t0 < limit:
             if self._fell():
                 state = "fell"
                 break
-            self._sleep(0.05)
+            if yaw0 is not None and self._yaw is not None and abs(self._yaw - yaw0) >= max(0.0, stop_yaw_deg - ALIGN_STOP_LEAD_DEG):
+                break
+            self._sleep(0.02 if yaw0 is not None else 0.05)
+        ran = self._clock() - t0
         self.posture = "stand"
         self._tx("kbalance")                              # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
         self._sleep(1.0)                                  # for over a minute: the firmware runs a gait until it is told something else)
+        if yaw0 is not None:
+            self._fell()                                  # the last frames: where the yaw ended once the body had stopped
+            if self._yaw is not None:
+                self.last_turn_deg, self.last_turn_s = abs(self._yaw - yaw0), ran
+                log.info("gyro-stopped turn: asked %.1f deg, got %.1f deg in %.2f s", stop_yaw_deg, self.last_turn_deg, ran)
         self._tx("gp")
         self._moved_at = self._clock()
         return state
@@ -860,10 +889,12 @@ class SerialRobot:
         self._tx("gp")
         return state
 
-    def turn(self, degrees: float, seconds: float) -> str:
+    def turn(self, degrees: float, seconds: float, stop_deg: float = 0.0) -> str:
+        """Turn by firmware skill for `seconds`. With `stop_deg` (the line-up turns) the turn ends on the gyro instead: once the yaw has changed by that much (less ALIGN_STOP_LEAD_DEG),
+        or after ALIGN_CAP_S; with no yaw reading the timed `seconds` apply. `last_turn_deg` / `last_turn_s` say what he did."""
         if self.stand_up() == "fell":
             return "fell"
-        return self._skill("kwkR" if degrees > 0 else "kwkL", seconds)
+        return self._skill("kwkR" if degrees > 0 else "kwkL", seconds, stop_yaw_deg=stop_deg if stop_deg > 0 else None)
 
     def back(self, seconds: float) -> str:
         if self.stand_up() == "fell":
@@ -1282,9 +1313,9 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
             note(kind="wall", event="steer", wall_in=None if wall is None else wall.nearest_in, why=act.why)
             state = robot.turn(act.degrees, act.seconds)
         elif act.kind in ("turn", "search_turn", "align"):
-            state = robot.turn(act.degrees, act.seconds)
+            state = robot.turn(act.degrees, act.seconds, stop_deg=act.stop_deg) if act.stop_deg > 0 else robot.turn(act.degrees, act.seconds)
             if ball is not None:
-                last_move = ("turn", act.seconds, act.degrees, ball)
+                last_move = ("turn", getattr(robot, "last_turn_s", None) or act.seconds, act.degrees, ball)      # a gyro-stopped turn ran for its own time, not the timed fallback
         elif act.kind == "sidestep":
             side = 1 if act.degrees > 0 else -1
             state = robot.turn(act.degrees, abs(act.degrees) / planner._turn_rate(side, False))
