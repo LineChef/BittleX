@@ -300,14 +300,25 @@ class Conversation:
         """Compose the live system prompt: base + personality fragments + an
         optional slow-mood line + an optional narration-verbosity line. Called
         on any personality / mood / verbosity change."""
-        s = self._personality.system_prompt(self._base_system)
-        if self._mood_hint:
-            s = s.rstrip() + "\n\n" + self._mood_hint
-        if self._narration_hint:
-            s = s.rstrip() + "\n\n" + self._narration_hint
-        if getattr(self, "_gait_hint", ""):
-            s = s.rstrip() + "\n\n" + self._gait_hint
+        self._system_static = self._personality.system_prompt(self._base_system)       # changes only with the personality: this is what the prompt cache holds
+        hints = [h for h in (self._mood_hint, self._narration_hint, getattr(self, "_gait_hint", "")) if h]
+        self._system_hints = "\n\n".join(hints)                                      # changes with the mood, the narration level, the gait: kept out of the cached part
+        s = self._system_static
+        if self._system_hints:
+            s = s.rstrip() + "\n\n" + self._system_hints
         self._system_prompt = s
+
+    def _system_for_claude(self):
+        """The `system` argument of a Claude request. With the prompt cache on (G2_PROMPT_CACHE, default 1h) it is two blocks: the static prompt with a cache breakpoint (the tool list
+        before it is cached with it), then the hints that change, which come after the breakpoint so changing one never invalidates the cache. Off: the plain string."""
+        mode = (getattr(self._cfg, "prompt_cache", "1h") or "off").lower()
+        if mode not in ("5m", "1h"):
+            return self._system_prompt
+        cc = {"type": "ephemeral"} if mode == "5m" else {"type": "ephemeral", "ttl": "1h"}
+        blocks = [{"type": "text", "text": self._system_static.rstrip(), "cache_control": cc}]
+        if self._system_hints:
+            blocks.append({"type": "text", "text": self._system_hints})
+        return blocks
 
     def set_gait_hint(self, hint: str) -> None:
         """The current walking gait (gait_mode.claude_hint), so a walk Claude starts uses it."""
@@ -475,10 +486,15 @@ class Conversation:
                     log.warning("fast LLM failed (%s); falling back to Claude", e)
             else:
                 log.info("routing to Claude: %s", why)
+        from . import api_budget
+        state, spent, ceiling = api_budget.check()
+        if state == "over":
+            log.warning("no Claude call: about $%.2f spent today, the daily ceiling is $%.2f (G2_API_DAILY_USD)", spent, ceiling)
+            raise ConversationError("limit", "I've used up my thinking budget for today, so I can't chat until tomorrow. I can still move and I still hear stop.")
         kw = dict(
             model=self._cfg.claude_model,
             max_tokens=self._cfg.claude_max_tokens,
-            system=self._system_prompt,
+            system=self._system_for_claude(),
             tools=self._tools,
             messages=history_for_claude(self._history),
             **({"output_config": {"effort": self._cfg.claude_effort}} if self._cfg.claude_effort else {}),
@@ -489,13 +505,13 @@ class Conversation:
             return self._create_stream(kw, on_action, on_speech), "claude"
         return self._create(**kw), "claude"
 
-    def _digest(self, resp, picture) -> tuple[list[str], list[str], list, list[str], bool]:
+    def _digest(self, resp, picture, edited: bool = False) -> tuple[list[str], list[str], list, list[str], bool]:
         """Store an assistant reply in the history and sort it into (speech parts, skills to perform, their seconds, facts to remember,
         whether a reply is expected). Tool calls are acknowledged for the next user message."""
         stored = resp.content
-        if picture is not None:
-            # a thinking block is bound to everything before it, and the picture in this turn's user message is about to be
-            # replaced by a placeholder: keep no thinking blocks from a picture turn
+        if picture is not None or edited:
+            # a thinking block is bound to everything before it, and the picture or the memory notes in this turn's user message are about to be
+            # taken out: keep no thinking blocks from such a turn
             stored = [b for b in resp.content if getattr(b, "type", None) not in ("thinking", "redacted_thinking")]
         if not stored:
             # the API rejects an empty assistant message on the next request: keep a placeholder so the history stays valid
@@ -565,11 +581,13 @@ class Conversation:
         acks = list(self._pending_tool_results)
         blocks: list[dict] = list(acks)
         self._pending_tool_results = []
+        notes = None
         if memory_context:
-            blocks.append({
+            notes = {
                 "type": "text",
                 "text": f"[Memory of past conversations]\n{memory_context}",
-            })
+            }
+            blocks.append(notes)
         picture = None
         if image is not None:                       # a snapshot from G2's camera, sent with this one message only
             import base64
@@ -607,7 +625,7 @@ class Conversation:
         if self._usage is not None and backend == "claude":
             self._usage.record("turn", getattr(resp, "usage", None))
 
-        speech_parts, actions, action_seconds, facts, expects_reply = self._digest(resp, picture)
+        speech_parts, actions, action_seconds, facts, expects_reply = self._digest(resp, picture, edited=notes is not None)
         if not any(speech_parts) and (picture is not None or not actions or _looks_like_question(user_text)):
             # nothing was said and no move answered the request: ask once more for words only, so a question is never left unanswered
             log.warning("reply had no speech (%s); asking once more for words only",
@@ -621,13 +639,15 @@ class Conversation:
                 log.info("retry reply blocks: %s", ", ".join(_describe_block(b) for b in resp2.content) or "none")
                 if self._usage is not None:
                     self._usage.record("retry", getattr(resp2, "usage", None))
-                s2, a2, sec2, f2, e2 = self._digest(resp2, picture)
+                s2, a2, sec2, f2, e2 = self._digest(resp2, picture, edited=notes is not None)
                 speech_parts += s2; actions += a2; action_seconds += sec2; facts += f2; expects_reply = expects_reply or e2
             except Exception:  # noqa: BLE001 -- the first reply stands; take the retry message back out and keep its acks
                 log.warning("the words-only retry failed", exc_info=True)
                 if self._history and self._history[-1].get("content") is retry_blocks:
                     self._history.pop()
                 self._pending_tool_results = [b for b in retry_blocks if b.get("type") == "tool_result"] + self._pending_tool_results
+        if notes is not None and any(b is notes for b in blocks):      # the memory notes were for this request only: fresh ones are looked up for the next, and keeping every old copy
+            blocks[:] = [b for b in blocks if b is not notes]          # made each request carry the notes of all the earlier turns (the main reason a request grew)
         if picture is not None and picture in blocks:         # never keep (or resend) the picture in the history
             blocks[blocks.index(picture)] = {"type": "text", "text": "[a picture from G2's camera was shown here]"}
         self._trim()

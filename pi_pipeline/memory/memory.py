@@ -69,6 +69,7 @@ class Memory:
         if pruned:
             log.info("pruned %d old sighting(s)", pruned)
         self._recall_exchanges = cfg.memory_recall_exchanges
+        self._recall_max_chars = int(getattr(cfg, "recall_max_chars", 2400))     # G2_RECALL_MAX_CHARS: the notes of one request; 0 = no limit
         # roughly how many recent turns conversation.py keeps in-context, so we
         # don't re-surface them here
         self._recent_window = cfg.history_turns
@@ -122,36 +123,39 @@ class Memory:
         return f"[{kind}{nid}] " if self._mode == "declare" else ""
 
     def recall(self, user_text: str) -> str:
-        parts: list[str] = []
-
+        """The memory notes for ONE request: the always-true core facts, the best-ranked other facts, sightings when asked about, and a few relevant past moments. Longer than
+        `recall_max_chars` (G2_RECALL_MAX_CHARS), the lowest-ranked facts go first, then past moments, then sightings; the core facts stay."""
         core = self._store.list_core(self._core_max)
-        if core:
-            parts.append("About you and your people (always true):\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in core))
-        facts = self._store.list_ranked(self._max_facts)          # importance + recency; the core facts are already above
-        if facts:
-            parts.append("What you know:\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in facts))
-        self._store.touch_facts([f["id"] for f in core] + [f["id"] for f in facts])
-
+        facts = list(self._store.list_ranked(self._max_facts))        # importance + recency; the core facts are already above
         seen: list = []
         if _PAST_SIGHT_RE.search(user_text or ""):
-            seen = self._store.search_observations(user_text, limit=3) or self._store.recent_observations(3)
+            seen = list(self._store.search_observations(user_text, limit=3) or self._store.recent_observations(3))
+        older = list(self._store.search_exchanges(user_text, limit=self._recall_exchanges, exclude_last=self._recent_window))
+
+        def render() -> str:
+            parts: list[str] = []
+            if core:
+                parts.append("About you and your people (always true):\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in core))
+            if facts:
+                parts.append("What you know:\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in facts))
             if seen:
-                lines = [f"- {self._tag('s', r['id'])}({_when(r['ts'])}) {r['caption']}" + (f" [detector: {r['labels']}]" if r["labels"] else "")
-                         for r in seen]
+                lines = [f"- {self._tag('s', r['id'])}({_when(r['ts'])}) {r['caption']}" + (f" [detector: {r['labels']}]" if r["labels"] else "") for r in seen]
                 parts.append("Things you saw earlier:\n" + "\n".join(lines))
+            if older:
+                parts.append("Relevant past moments:\n" + "\n".join(
+                    f'- earlier they said "{r["user_text"]}"; you replied "{r["assistant_text"]}"' for r in older))
+            return "\n\n".join(parts)
 
-        older = self._store.search_exchanges(
-            user_text, limit=self._recall_exchanges, exclude_last=self._recent_window
-        )
-        if older:
-            lines = [
-                f'- earlier they said "{r["user_text"]}"; you replied "{r["assistant_text"]}"'
-                for r in older
-            ]
-            parts.append("Relevant past moments:\n" + "\n".join(lines))
-
+        ctx = render()
+        budget = self._recall_max_chars
+        n_all = len(facts) + len(older) + len(seen)
+        while budget > 0 and len(ctx) > budget and (facts or older or seen):
+            (facts or older or seen).pop()                              # the last fact is the lowest ranked; then the least relevant past moment; then a sighting
+            ctx = render()
+        if len(facts) + len(older) + len(seen) < n_all:
+            log.info("recall trimmed to %d chars (budget %d): %d facts, %d sightings, %d past moments kept", len(ctx), budget, len(facts), len(seen), len(older))
+        self._store.touch_facts([f["id"] for f in core] + [f["id"] for f in facts])
         self._last_injected = {"facts": {f["id"]: f["fact"] for f in core + facts}, "sights": {r["id"]: r["caption"] for r in seen}}
-        ctx = "\n\n".join(parts)
         if ctx:
             log.info("recall: %d core, %d facts, %d sightings, %d past moments", len(core), len(facts), len(seen), len(older))
         return ctx

@@ -96,5 +96,15 @@ def test_summarize_counts_and_costs():
     ]]
     out = api_log.summarize(lines, 1, now)
     assert "voice" in out and "1 billed + 1 free" in out and "old" not in out
-    assert "~$4.500" in out          # 1M in at $3 + 0.1M out at $15
+    assert "~$3.000" in out          # 1M in at $2 + 0.1M out at $10 (the default price is Sonnet 5.5's)
     assert "none logged" in api_log.summarize([], 1, now)
+
+
+def test_cache_reads_and_writes_are_priced_as_the_api_bills_them(monkeypatch):
+    monkeypatch.setenv("G2_API_PRICE", "2,10")
+    monkeypatch.setenv("G2_PROMPT_CACHE", "1h")
+    r = {"input_tokens": 1000, "cache_read_tokens": 3000, "cache_write_tokens": 500, "output_tokens": 100}
+    # 1000 plain at $2/M + 3000 read at a tenth + 500 written at twice the price (1-hour entry) + 100 out at $10/M
+    assert abs(api_log.cost_of(r, 2.0, 10.0) - (1000 * 2 + 3000 * 0.2 + 500 * 4 + 100 * 10) / 1e6) < 1e-12
+    monkeypatch.setenv("G2_PROMPT_CACHE", "5m")
+    assert abs(api_log.cost_of(r, 2.0, 10.0) - (1000 * 2 + 3000 * 0.2 + 500 * 2.5 + 100 * 10) / 1e6) < 1e-12

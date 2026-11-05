@@ -96,6 +96,15 @@ class Settings:
     request_timeout_s: float = field(default_factory=lambda: _env_float("CLAUDE_TIMEOUT_S", 30.0))
     system_prompt: str = field(default_factory=lambda: _env("G2_SYSTEM_PROMPT") or _DEFAULT_SYSTEM_PROMPT)
     history_turns: int = field(default_factory=lambda: _env_int("G2_HISTORY_TURNS", 12))
+    # --- Keeping each request small and cheap (user, 2026-11-04) ---
+    # The part of every request that never changes (the tool list and the system prompt, about 2,500 tokens) is cached by the API and billed at a tenth of the
+    # input price on a hit: "1h" (default; the calls come in bursts with gaps of minutes, and a 1-hour entry survives them), "5m" or "off".
+    prompt_cache: str = field(default_factory=lambda: _env("G2_PROMPT_CACHE", "1h").lower())
+    # The memory notes of ONE request, in characters (about 4 per token): over it the lowest-ranked facts go first, then past moments; the always-true core facts stay.
+    recall_max_chars: int = field(default_factory=lambda: _env_int("G2_RECALL_MAX_CHARS", 2400))
+    # A daily ceiling on Claude API spend, in dollars, from the call log (voice/api_budget.py). At 80% G2 logs a warning; at the ceiling he says so and makes no more
+    # Claude calls until midnight. 0 = no ceiling. The busiest day so far cost $0.44.
+    api_daily_usd: float = field(default_factory=lambda: _env_float("G2_API_DAILY_USD", 2.0))
 
     # --- Feature flags (staged bring-up) ---
     # empty = everything on. e.g. "profile:p2-gait" or "-explore, gait:scripted".

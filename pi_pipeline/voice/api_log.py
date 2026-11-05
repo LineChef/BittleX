@@ -116,7 +116,8 @@ class _StreamManager:
             log_event("error" if exc_type else "done", self._source, id=self._id, api=self._fields["api"], seconds=round(time.monotonic() - self._t0, 2),
                       error=exc_type.__name__ if exc_type else None,
                       input_tokens=getattr(usage, "input_tokens", None), output_tokens=getattr(usage, "output_tokens", None),
-                      cache_read_tokens=getattr(usage, "cache_read_input_tokens", None))
+                      cache_read_tokens=getattr(usage, "cache_read_input_tokens", None),
+                      cache_write_tokens=getattr(usage, "cache_creation_input_tokens", None))
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
@@ -143,7 +144,8 @@ def instrument(client, source: str):
             u = getattr(resp, "usage", None)
             log_event("done", source, id=i, api="messages.create", seconds=round(time.monotonic() - t0, 2), stop_reason=getattr(resp, "stop_reason", None),
                       input_tokens=getattr(u, "input_tokens", None), output_tokens=getattr(u, "output_tokens", None),
-                      cache_read_tokens=getattr(u, "cache_read_input_tokens", None))
+                      cache_read_tokens=getattr(u, "cache_read_input_tokens", None),
+                      cache_write_tokens=getattr(u, "cache_creation_input_tokens", None))
             return resp
 
         msgs.create = create
@@ -181,18 +183,30 @@ def instrument(client, source: str):
 
 
 def _price() -> tuple[float, float]:
-    """(input, output) dollars per million tokens used for the estimate. ASSUMED Sonnet-class rates; set G2_API_PRICE="in,out" to match the real price list."""
+    """(input, output) dollars per million tokens used for the estimate. The default is Claude Sonnet 5.5's list price ($2 / $10), G2's default model; set G2_API_PRICE="in,out" to match another."""
     try:
-        i, o = os.environ.get("G2_API_PRICE", "3,15").split(",")
+        i, o = os.environ.get("G2_API_PRICE", "2,10").split(",")
         return float(i), float(o)
     except ValueError:
-        return 3.0, 15.0
+        return 2.0, 10.0
+
+
+def _write_multiplier() -> float:
+    """What writing the prompt cache costs relative to plain input: 1.25 for the 5-minute entry, 2 for the 1-hour entry (G2_PROMPT_CACHE)."""
+    return 2.0 if os.environ.get("G2_PROMPT_CACHE", "1h").strip().lower() == "1h" else 1.25
+
+
+def cost_of(r: dict, pi: float, po: float) -> float:
+    """Dollars for one logged call: uncached input at the input price, cache reads at a tenth of it, cache writes at the write multiplier, output at the output price."""
+    return ((r.get("input_tokens") or 0) * pi + (r.get("cache_read_tokens") or 0) * pi * 0.1
+            + (r.get("cache_write_tokens") or 0) * pi * _write_multiplier() + (r.get("output_tokens") or 0) * po) / 1e6
 
 
 def summarize(lines: list[str], hours: float, now: float | None = None) -> str:
-    """Calls, tokens and an approximate cost in the last `hours`, by source. Cached-input tokens are priced as normal input (a slight over-estimate)."""
+    """Calls, tokens and an approximate cost in the last `hours`, by source (cache reads and writes priced as the API bills them)."""
     cutoff = (now if now is not None else time.time()) - hours * 3600
     by: dict[str, dict] = {}
+    pi, po = _price()
     for line in lines:
         try:
             r = json.loads(line)
@@ -201,7 +215,7 @@ def summarize(lines: list[str], hours: float, now: float | None = None) -> str:
             continue
         if t < cutoff or r.get("event") not in ("start", "done", "error"):
             continue
-        d = by.setdefault(r.get("source", "?"), {"billed": 0, "free": 0, "errors": 0, "in": 0, "out": 0, "unknown": 0, "last": ""})
+        d = by.setdefault(r.get("source", "?"), {"billed": 0, "free": 0, "errors": 0, "in": 0, "out": 0, "cached": 0, "cost": 0.0, "unknown": 0, "last": ""})
         if r["event"] == "start":
             d["free" if r.get("api") == "models.list" else "billed"] += 1
             d["last"] = r["ts"]
@@ -210,19 +224,25 @@ def summarize(lines: list[str], hours: float, now: float | None = None) -> str:
         elif r.get("api") != "models.list":
             if r.get("input_tokens") is None and r.get("output_tokens") is None:
                 d["unknown"] += 1
-            d["in"] += (r.get("input_tokens") or 0) + (r.get("cache_read_tokens") or 0)
+            d["in"] += (r.get("input_tokens") or 0) + (r.get("cache_read_tokens") or 0) + (r.get("cache_write_tokens") or 0)
+            d["cached"] += r.get("cache_read_tokens") or 0
             d["out"] += r.get("output_tokens") or 0
-    pi, po = _price()
+            d["cost"] += cost_of(r, pi, po)
     out = [f"API calls in the last {hours:g} h (cost assumes ${pi:g} in / ${po:g} out per million tokens; set G2_API_PRICE=in,out to change)"]
     if not by:
         return out[0] + "\nnone logged"
     tot = 0.0
     for src, d in sorted(by.items()):
-        cost = d["in"] / 1e6 * pi + d["out"] / 1e6 * po
-        tot += cost
+        tot += d["cost"]
         note = f", {d['unknown']} without token counts (cost understated)" if d["unknown"] else ""
-        out.append(f"  {src:<12} {d['billed']} billed + {d['free']} free pings, {d['errors']} errors, {d['in']} in / {d['out']} out tokens, ~${cost:.3f}, last {d['last']}{note}")
+        cached = f" ({d['cached']} read from the prompt cache)" if d["cached"] else ""
+        out.append(f"  {src:<12} {d['billed']} billed + {d['free']} free pings, {d['errors']} errors, {d['in']} in{cached} / {d['out']} out tokens, ~${d['cost']:.3f}, last {d['last']}{note}")
     out.append(f"  total ~${tot:.3f}  ({sum(d['billed'] for d in by.values())} billed calls)")
+    try:
+        from . import api_budget
+        out.append("  " + api_budget.status_line())
+    except Exception:  # noqa: BLE001
+        pass
     return "\n".join(out)
 
 

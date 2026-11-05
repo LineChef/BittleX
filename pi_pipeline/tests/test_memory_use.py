@@ -5,6 +5,7 @@ from pi_pipeline.memory.memory import Memory
 from pi_pipeline.memory.use_log import format_report, overlap_used, parse_tags
 from pi_pipeline.tests.conftest import Block, Resp
 from pi_pipeline.voice.conversation import Conversation
+from pi_pipeline.tests._system_text import system_text
 
 
 def mem(cfg, tmp_path, **over):
@@ -90,7 +91,7 @@ def test_memory_used_is_a_tool_with_a_standing_instruction_and_never_changes_the
     conv = Conversation(dataclasses.replace(cfg, memory_use_log="declare"))
     t = conv.send("tell me about my dog")
     call = fake_anthropic.calls[-1]
-    assert any(x["name"] == "memory_used" for x in call["tools"]) and "never say them aloud" in call["system"]
+    assert any(x["name"] == "memory_used" for x in call["tools"]) and "never say them aloud" in system_text(call["system"])
     assert t.speech == "Biscuit sounds lovely." and t.memory_used == ["#1", "s2"]
     assert conv._pending_tool_results[0]["tool_use_id"] == "m1" and conv._pending_tool_results[0]["content"] == "noted"
 
@@ -124,7 +125,7 @@ def test_by_default_g2_gets_no_tags_no_tool_and_no_extra_instruction(cfg, fake_a
     fake_anthropic.set_reply(Resp(Block("text", text="ok")))
     Conversation(cfg).send("hi")
     call = fake_anthropic.calls[-1]
-    assert not any(t["name"] == "memory_used" for t in call["tools"]) and "never say them aloud" not in call["system"]
+    assert not any(t["name"] == "memory_used" for t in call["tools"]) and "never say them aloud" not in system_text(call["system"])
     m = mem(cfg, tmp_path, memory_use_log="match")
     m.store.add_fact("The dog is called Biscuit.", importance=5, core=True)
     ctx = m.recall("hello")

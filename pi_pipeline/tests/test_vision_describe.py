@@ -6,6 +6,7 @@ from pi_pipeline.tests.conftest import Block, Resp
 from pi_pipeline.vision.snapshot import CameraSnapshotter, Snapshot, parse_invoke_line
 from pi_pipeline.voice.conversation import Conversation
 from pi_pipeline.voice.loop import VoiceLoop, asks_what_g2_sees
+from pi_pipeline.tests._system_text import system_text
 
 JPEG = b"\xff\xd8\xff\xe0fake-jpeg-bytes\xff\xd9"
 
@@ -114,7 +115,7 @@ def test_picture_is_sent_to_claude_but_replaced_by_a_placeholder_in_history(cfg,
 def test_system_prompt_tells_claude_about_pictures(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(Block("text", text="ok")))
     Conversation(cfg).send("hi")
-    assert "small picture from your own camera" in fake_anthropic.calls[-1]["system"]
+    assert "small picture from your own camera" in system_text(fake_anthropic.calls[-1]["system"])
 
 
 # ---- the voice loop
@@ -281,7 +282,7 @@ def test_a_silent_reply_to_a_picture_is_replaced_by_a_spoken_fallback():
 def test_the_picture_note_tells_claude_to_speak_and_not_to_move(cfg, fake_anthropic):
     fake_anthropic.set_reply(Resp(Block("text", text="ok")))
     Conversation(cfg).send("hi")
-    system = fake_anthropic.calls[-1]["system"]
+    system = system_text(fake_anthropic.calls[-1]["system"])
     assert "Always speak the description first" in system and "check_around" in system
 
 
@@ -321,7 +322,7 @@ def test_remember_tool_and_system_prompt_cover_g2s_own_appearance(cfg, fake_anth
     fake_anthropic.set_reply(Resp(Block("text", text="ok")))
     Conversation(cfg).send("hi")
     call = fake_anthropic.calls[-1]
-    assert "that is you, G2" in call["system"]
+    assert "that is you, G2" in system_text(call["system"])
     assert any("what you look like" in t["description"] for t in call["tools"] if t["name"] == "remember")
 
 

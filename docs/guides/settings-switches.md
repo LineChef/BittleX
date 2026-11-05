@@ -99,7 +99,10 @@ Where G2 keeps things, and the limits people occasionally change. Every variable
 | Switch | Default | What it does |
 |---|---|---|
 | `G2_API_LOG` | `~/.local/share/g2/api_calls.jsonl` | the log of every Claude API call (one JSON line each); `off` turns it off. Read with `g2api` |
-| `G2_API_PRICE` | `3,15` | input and output dollars per million tokens, used for the cost estimate; set it to match the current price list |
+| `G2_API_PRICE` | `2,10` | input and output dollars per million tokens, used for the cost estimate (Sonnet 5.5's list price); set it to match the model in use |
+| `G2_PROMPT_CACHE` | `1h` | the part of every Claude request that never changes (tool list and system prompt, about 2,500 tokens) is cached and billed at a tenth of the input price on a hit: `1h`, `5m` or `off`. The mood, narration and gait hints sit after the cached part so changing one never resets it. `g2api` shows the tokens read from the cache |
+| `G2_RECALL_MAX_CHARS` | `2400` | the memory notes of ONE request, in characters (about 4 per token). Over it the lowest-ranked facts go first, then past moments; the core facts stay. `0` = no limit. Notes are sent with their own request only, never repeated in the history |
+| `G2_API_DAILY_USD` | `2.0` | a daily ceiling on Claude spend, worked out from the API call log. A warning in the log at 80%; at the ceiling G2 says he has used up his thinking budget and makes no more Claude calls until midnight (moves and stop words still work). `0` = no ceiling. The busiest day so far cost $0.44. `g2api` ends with today's figure |
 | `G2_USAGE_FILE` | `~/.local/share/g2/api_usage.json` | per-day call and token counts, including retries (`python -m pi_pipeline.voice.usage`) |
 | `G2_BATTERY_WATCH` | on | the low-battery watch for G2's pack; `0` turns it off |
 | `G2_BATTERY_LOG`, `G2_BATTERY_LOG_EVERY_S` | `~/.local/share/g2/battery_voltage.csv`, 300 | the pack-voltage history, one line per interval (an empty path turns it off) |
