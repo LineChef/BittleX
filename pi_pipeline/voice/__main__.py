@@ -274,6 +274,7 @@ def main() -> None:
             actuator=actuator,
             cue=cue,
             memory=memory,
+            is_resting=lambda: getattr(link, "last_motion_command", "") in ("", "d"),        # the same rest test as the sleep watch below
             follow_up_s=settings.follow_up_s if voice else 0.0,
             question_window_s=settings.question_window_s if voice else 0.0,
             conversation_window_s=settings.conversation_window_s if voice else 0.0,

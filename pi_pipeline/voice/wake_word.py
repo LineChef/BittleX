@@ -84,6 +84,34 @@ def stop_hit(heard: str) -> str | None:
     return next((p for p in stop_words() if p in h), None)
 
 
+def stop_min_confidence() -> float:
+    """`G2_STOP_MIN_CONF`: while the wake word is off, a stop phrase whose words Kaldi is less sure of than this is ignored (default 0.5; 0 = no check)."""
+    try:
+        return max(0.0, float(os.environ.get("G2_STOP_MIN_CONF", "0.5") or 0))
+    except ValueError:
+        return 0.5
+
+
+def paused_stop(final_json: str | None, floor: float) -> tuple[str | None, str]:
+    """(stop phrase or None, why) for what the recogniser heard while the wake word is off (user, 2026-11-04: after `g2mic off 30` he kept saying "Stopping." at noise).
+    Restricted to a handful of stop phrases, Kaldi writes ambient sound as the nearest one, and it did so in its unfinished guesses (partial results). So only a FINISHED
+    recognition counts, the whole utterance must be one stop phrase (not a stop word inside longer talk), and every word must have at least `floor` confidence."""
+    if not final_json:
+        return None, "not finished"
+    try:
+        text = (json.loads(final_json).get("text") or "").strip().lower()
+    except (ValueError, AttributeError):
+        return None, "unreadable"
+    if not text:
+        return None, "silence"
+    if text not in stop_words():
+        return None, f"not a stop phrase on its own: {text!r}"
+    conf = phrase_confidence(final_json, text)
+    if floor and (conf is None or conf < floor):
+        return None, f"{text!r} with confidence {'?' if conf is None else f'{conf:.2f}'} below {floor:.2f}"
+    return text, "ok"
+
+
 def wake_hit(heard: str, phrases) -> str | None:
     """The wake phrase in `heard`, or None (also None when a decoy is in it: "gee gee two" is a GG, not a call)."""
     h = (heard or "").lower()
@@ -313,14 +341,16 @@ class VoskWakeWord:
             else:
                 heard = json.loads(rec.PartialResult()).get("partial", "")
             heard = heard.lower()
-            if paused:                                 # the wake word is off: a stop word said on its own is the only thing that counts
-                stop = stop_hit(heard)
+            if paused:                                 # the wake word is off: a stop phrase said on its own, finished and confidently heard, is the only thing that counts
+                stop, why = paused_stop(final, stop_min_confidence())
                 if stop:
                     log.info("stop word heard while the wake word is off: %r", stop)
                     self._pending = stop
                     self._handover = True
                     return
                 if final is not None:
+                    if stop_hit(heard):
+                        log.info("stop word ignored while the wake word is off (%s)", why)
                     rec = self._new_recognizer(self._stop_grammar)
                 continue
             hit = wake_hit(heard, self._phrases)

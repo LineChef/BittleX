@@ -578,3 +578,30 @@ def test_the_floor_question_can_be_switched_off(monkeypatch, tmp_path):
     monkeypatch.setenv("G2_FLOOR_PROMPT_S", "0")
     _run(lp, 1)
     assert "What surface will I be walking on?" not in tts.said and any(e.get("arm_explore") for e in events)
+
+
+# ---- a stop heard with the wake word off while G2 lies at rest has nothing to stop (user, 2026-11-04)
+
+def _stop_loop(monkeypatch, tmp_path, paused, resting):
+    from pi_pipeline.voice import wake_pause
+    monkeypatch.setenv("G2_WAKE_PAUSE_FILE", str(tmp_path / "wake_paused.json"))
+    wake_pause.resume()
+    if paused:
+        wake_pause.pause(30)
+    lp, w, stt, conv, tts = _loop(["emergency stop"], follow_up_s=0.0)
+    lp._is_resting = None if resting is None else (lambda: resting)
+    seen = []
+    lp._events = lambda **kw: seen.append(kw)
+    lp._one_turn()
+    return seen, tts
+
+
+def test_a_stop_with_the_wake_word_off_and_g2_at_rest_is_ignored_not_announced(monkeypatch, tmp_path):
+    seen, tts = _stop_loop(monkeypatch, tmp_path, paused=True, resting=True)
+    assert not any(k.get("halt") for k in seen) and "Stopping." not in tts.said
+
+
+def test_a_stop_still_works_when_g2_may_be_moving_or_the_wake_word_is_on_or_the_rest_state_is_unknown(monkeypatch, tmp_path):
+    for paused, resting in ((True, False), (False, True), (False, False), (True, None)):
+        seen, tts = _stop_loop(monkeypatch, tmp_path, paused=paused, resting=resting)
+        assert any(k.get("halt") for k in seen) and "Stopping." in tts.said, (paused, resting)

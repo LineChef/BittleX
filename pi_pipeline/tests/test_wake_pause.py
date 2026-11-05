@@ -53,3 +53,31 @@ def test_the_voice_loop_turns_it_off_and_says_when_it_is_back(monkeypatch):
     w.take_pending = lambda: "emergency stop"                           # a stop word said during a pause: handled without listening for more
     _run(lp, 1)
     assert conv.sent == [] and stt._script == ["this is never heard"]
+
+
+# ---- a stop phrase heard while the wake word is off must be real (user, 2026-11-04: after `g2mic off 30` he kept saying "Stopping." at noise)
+
+def _final(text, conf=0.9):
+    words = [{"word": w, "conf": conf} for w in text.split()]
+    return json.dumps({"text": text, "result": words})
+
+
+def test_only_a_finished_confident_whole_utterance_stop_phrase_counts_while_the_wake_word_is_off():
+    assert ww.paused_stop(_final("abort", 0.9), 0.5) == ("abort", "ok")
+    assert ww.paused_stop(_final("hold still", 0.8), 0.5)[0] == "hold still"
+    assert ww.paused_stop(None, 0.5) == (None, "not finished")                            # an unfinished guess (a partial result) never counts
+    assert ww.paused_stop(_final("abort", 0.3), 0.5)[0] is None                           # noise forced into the nearest phrase is not sure of itself
+    assert ww.paused_stop(_final("hold still", 0.9).replace('"conf": 0.9}]', '"conf": 0.2}]'), 0.5)[0] is None   # every word needs the confidence
+    assert ww.paused_stop(_final("please halt the music now"), 0.5)[0] is None            # a stop word inside longer talk is not a command
+    assert ww.paused_stop(_final("[unk] abort"), 0.5)[0] is None
+    assert ww.paused_stop(_final(""), 0.5) == (None, "silence")
+    assert ww.paused_stop(_final("abort", 0.1), 0.0)[0] == "abort"                        # a floor of 0 turns the confidence check off
+    assert ww.paused_stop(json.dumps({"text": "abort"}), 0.5)[0] is None                  # no word confidences at all: not sure enough
+
+
+def test_the_stop_confidence_setting(monkeypatch):
+    assert ww.stop_min_confidence() == 0.5
+    monkeypatch.setenv("G2_STOP_MIN_CONF", "0.8")
+    assert ww.stop_min_confidence() == 0.8
+    monkeypatch.setenv("G2_STOP_MIN_CONF", "junk")
+    assert ww.stop_min_confidence() == 0.5

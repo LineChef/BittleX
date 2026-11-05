@@ -145,16 +145,26 @@ def test_a_stalled_microphone_stream_is_replaced_by_the_keeper():
         w._keeper.stop()
 
 
-def test_while_the_wake_word_is_off_only_a_stop_word_ends_the_wait(tmp_path, monkeypatch):
+def test_while_the_wake_word_is_off_only_a_finished_confident_stop_phrase_ends_the_wait(tmp_path, monkeypatch):
     monkeypatch.setenv("G2_WAKE_PAUSE_FILE", str(tmp_path / "p.json"))
     from pi_pipeline.voice import wake_pause
     wake_pause.pause(10)
-    heard = iter(["gee two", "hey buddy", "freeze"])                       # the wake phrases are ignored; the stop word ends the wait
+    # what the recogniser says, one finished result per block: the wake phrases and a stop word inside talk are ignored, so is a weak "halt", and only a sure "freeze" ends the wait
+    said = iter([("gee two", 0.9), ("hey buddy", 0.9), ("please halt the music", 0.9), ("halt", 0.2), ("freeze", 0.9)])
+    cur = {}
 
     class Rec(_Rec):
+        def AcceptWaveform(self, _d):
+            cur["text"], cur["conf"] = next(said, ("", 0.0))
+            return True
+
         def PartialResult(self):
-            return json.dumps({"partial": next(heard, "")})
+            return json.dumps({"partial": "freeze"})                        # an unfinished guess of a stop word is never acted on
+
+        def Result(self):
+            return json.dumps({"text": cur["text"], "result": [{"word": t, "conf": cur["conf"]} for t in cur["text"].split()]})
     w, holder = _wake()
     w._Recognizer, w._stop_grammar, w._pending = Rec, "[]", None
     w.wait()
     assert w.take_pending() == "freeze" and w.take_pending() is None
+    assert next(said, None) is None                                         # every earlier result was heard and ignored before the sure one

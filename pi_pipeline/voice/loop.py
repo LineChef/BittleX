@@ -195,9 +195,11 @@ class VoiceLoop:
         conversation_max_s: float = 600.0,  # conversation mode ends by itself after this long
         side_max_words: int = 0,  # a question-window turn (no wake word) longer than this many words is treated as side chatter (0 = no limit)
         conversation_max_words: int = 0,  # the same limit inside conversation mode (0 = no limit)
+        is_resting=None,  # callable -> True when G2 lies at rest (nothing is moving): then a stop heard while the wake word is off is ignored, not announced
         namer=None,  # object called with a picture kind ("name:mug") that takes and saves one picture and returns its path or None (vision.exploration_pictures.ExplorationPictureSaver)
     ):
         self._namer = namer
+        self._is_resting = is_resting
         self._announce_online = announce_online
         self._wake = wake_word
         self._stt = stt
@@ -401,6 +403,17 @@ class VoiceLoop:
             self._speak("Image discarded.")
         self._set_session()
         self._cue.set("idle")
+
+    def _nothing_to_stop(self) -> bool:
+        """A stop heard while the wake word is off (`g2mic off`) and G2 lies at rest: nothing is moving, so it is neither announced nor latched (user, 2026-11-04). Anything else,
+        or a loop built without a rest check, stops as before."""
+        if self._is_resting is None:
+            return False
+        try:
+            from . import wake_pause
+            return bool(wake_pause.is_paused()) and bool(self._is_resting())
+        except Exception:  # noqa: BLE001 -- when in doubt, stop
+            return False
 
     def _end_session(self) -> None:
         if self._conversing:
@@ -617,6 +630,10 @@ class VoiceLoop:
             self._end_session()
             return
         if cmd == "halt":
+            if self._nothing_to_stop():
+                log.info("stop word %r ignored: the wake word is off and G2 is at rest, so there is nothing to stop", user_text)
+                self._end_session()
+                return
             log.warning("EMERGENCY STOP (voice command %r)", user_text)
             self._events(halt=True)
             self._cue.set("speaking")
