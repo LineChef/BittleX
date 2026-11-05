@@ -9,13 +9,17 @@ The page runs as a background server (so your terminal is free): the first call 
 
 Tabs: Facts, Conversations, Observations (what G2 noticed), Pictures (survey stops and objects you named), Looks (throwaway left / right look pictures), Walls, Trash. The X moves a record to the Trash
 (you get an Undo for a few seconds, and the Trash tab restores anything later); only "Empty trash" deletes for good, and it asks twice. A safe copy of the
-memory database is made before the first delete of each session. Everything runs on the Pi through ssh (needs G2_PI, e.g. user@g2pi.local); the pictures
-are copied to ~/Desktop/G2Memory/g2_pictures/explore on this Mac so the page can show them. The page listens on 127.0.0.1 only and every action needs a token that only the
+memory database is made before the first delete of each session. The tabs read the copy of G2's data on this Mac (the newest memory snapshot in ~/Desktop/G2Memory/memory-backups,
+the pictures in ~/Desktop/G2Memory/g2_pictures), so they work with the Pi off; "Sync now" refreshes the copy. An edit is applied to the copy at once and queued for the Pi
+(tools/g2_review_queue.py), which gets it when it is reachable (needs G2_PI, e.g. user@g2pi.local). The page listens on 127.0.0.1 only and every action needs a token that only the
 page you opened knows. Standard library only.
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib
+import io
 import json
 import os
 import re
@@ -165,6 +169,240 @@ class Remote:
         return "ok" if not msgs else "; ".join(msgs)
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class MirrorRemote(Remote):
+    """The tabs read the copy of G2's data on this Mac, so they work with the Pi off (user, 2026-11-04). Memory comes from the newest valid snapshot in ~/Desktop/G2Memory/memory-backups, the
+    pictures from ~/Desktop/G2Memory/g2_pictures. An edit is applied to that copy at once and also queued (tools/g2_review_queue.py) for the Pi, which gets the same command when it is reachable.
+    Anything that is not data (the mic switch, the training gallery) still goes to the Pi live."""
+
+    mirror = True
+
+    def __init__(self, pi: str, runner=None, root: str | None = None, pictures_root=None):
+        super().__init__(pi, runner)
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        import g2_review_queue
+        self.q = g2_review_queue
+        self.root = Path(root) if root else Path(g2_review_queue.folder())
+        self.pictures_root = Path(pictures_root) if pictures_root else CACHE
+        self.lock = threading.RLock()
+
+    # ---- the memory copy: the newest good snapshot, plus the edits still waiting for the Pi
+    def snapshot(self) -> Path | None:
+        import sqlite3
+        for f in sorted((self.root / "memory-backups").glob("g2_memory-*.db"), reverse=True):
+            try:
+                if f.stat().st_size == 0:
+                    continue
+                c = sqlite3.connect(f"file:{f}?mode=ro", uri=True)
+                try:
+                    c.execute("SELECT COUNT(*) FROM facts").fetchone()
+                finally:
+                    c.close()
+                return f
+            except (OSError, sqlite3.Error):
+                continue
+        return None
+
+    def view_paths(self) -> tuple[Path, Path]:
+        return self.root / "memory" / "review_view.db", self.root / "memory" / "review_view.json"
+
+    def copy_info(self) -> dict:
+        snap = self.snapshot()
+        m = re.match(r"g2_memory-(\d{8})-(\d{6})\.db", snap.name) if snap else None
+        when = time.strftime("%b %-d, %-I:%M %p", time.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")) if m else None
+        return {"memory_from": when, "has_memory": snap is not None}
+
+    def view(self) -> str:
+        """The path of the memory copy the tabs show; rebuilt from the snapshot (and the waiting edits) when a newer snapshot arrived."""
+        import shutil
+        import sqlite3
+        with self.lock:
+            snap = self.snapshot()
+            if snap is None:
+                raise RuntimeError("no memory copy on this Mac yet: press Sync now while the Pi is on")
+            db, key_file = self.view_paths()
+            ident = {"snapshot": snap.name, "size": snap.stat().st_size}
+            try:
+                key = json.loads(key_file.read_text())
+            except (OSError, ValueError):
+                key = {}
+            if db.exists() and all(key.get(k) == v for k, v in ident.items()):
+                return str(db)
+            db.parent.mkdir(parents=True, exist_ok=True)
+            tmp = db.with_suffix(".tmp")
+            shutil.copyfile(snap, tmp)
+            os.replace(tmp, db)
+            c = sqlite3.connect(db)
+            try:
+                tables = {"facts": "facts", "observations": "observations", "exchanges": "exchanges"}
+                ident["max"] = {k: int(c.execute(f"SELECT COALESCE(MAX(id),0) FROM {t}").fetchone()[0]) for k, t in tables.items()}
+            finally:
+                c.close()
+            key_file.write_text(json.dumps(ident))
+            for e in self.q.pending(str(self.root)):                         # the edits not yet at the Pi go back on top of the fresh copy
+                if e["module"] == "pi_pipeline.memory.review":
+                    try:
+                        self._run(e["module"], ["--db", str(db), *e["args"]])
+                    except Exception:  # noqa: BLE001  (an edit that no longer fits stays queued; the Pi will say why)
+                        pass
+            return str(db)
+
+    def rebuild(self) -> None:
+        with self.lock:
+            db, key = self.view_paths()
+            for f in (key,):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+            self.view()
+
+    def snap_max(self, kind: str) -> int:
+        self.view()
+        return int(json.loads(self.view_paths()[1].read_text()).get("max", {}).get(kind, 0))
+
+    # ---- running the Pi's own modules on the copy
+    def _run(self, module: str, argv: list[str]):
+        mod = importlib.import_module(module)
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                mod.main(argv)
+        except SystemExit as e:
+            if e.code not in (0, None):
+                raise ValueError("that command was refused") from None
+        lines = buf.getvalue().strip().splitlines()
+        if not lines:
+            raise RuntimeError("the local copy returned nothing")
+        data = json.loads(lines[-1])
+        if isinstance(data, dict) and "error" in data:
+            raise ValueError(data["error"])
+        return data
+
+    def call(self, args: list[str]):
+        module, rest = args[0], list(args[1:])
+        with self.lock:
+            if module == "pi_pipeline.memory.review":
+                return self._memory(rest)
+            if module == "pi_pipeline.vision.exploration_pictures":
+                return self._pictures(rest)
+            if module == "pi_pipeline.vision.wall_pictures" and rest and rest[0] in ("trash", "restore", "empty-trash"):
+                return self._walls(rest)
+        return super().call(args)
+
+    def _queue(self, module: str, args: list[str], text: str, **extra):
+        return self.q.add(module, args, text, str(self.root), **extra)
+
+    def _memory(self, rest: list[str]):
+        mod, sub = "pi_pipeline.memory.review", rest[0]
+        db = self.view()
+        if sub in ("list", "count", "trash"):
+            return self._run(mod, ["--db", db, *rest])
+        if sub == "backup":
+            return {"backup": "the copy on this Mac"}                         # the snapshot is the safe copy
+        kind_of = {"add-fact": "facts", "edit-fact": "facts", "add-observation": "observations", "edit-observation": "observations"}
+        if sub in ("add-fact", "add-observation"):
+            res = self._run(mod, ["--db", db, *rest])
+            self._queue(mod, rest, ("Add fact: " if sub == "add-fact" else "Add observation: ") + rest[1][:80], local_id=res["id"], local_kind=kind_of[sub])
+            return res
+        if sub in ("edit-fact", "edit-observation"):
+            rid, kind = int(rest[1]), kind_of[sub]
+            res = self._run(mod, ["--db", db, *rest])
+            if rid > self.snap_max(kind):                                    # a row the Pi does not have yet: change the waiting "add" instead
+                for e in self.q.pending(str(self.root)):
+                    if e.get("local_id") == rid and e.get("local_kind") == kind:
+                        flags = {rest[i]: rest[i + 1] for i in range(2, len(rest) - 1, 2)}
+                        a = list(e["args"])
+                        if sub == "edit-fact":
+                            fact = flags.get("--fact", a[1])
+                            imp = flags.get("--importance", a[a.index("--importance") + 1] if "--importance" in a else "3")
+                            core = flags.get("--core", "1" if "--core" in a else "0") == "1"
+                            a = ["add-fact", fact, "--importance", imp] + (["--core"] if core else [])
+                        else:
+                            cap = flags.get("--caption", a[1])
+                            lab = flags.get("--labels", a[a.index("--labels") + 1] if "--labels" in a else "")
+                            a = ["add-observation", cap, "--labels", lab]
+                        rows = self.q.pending(str(self.root))
+                        for r in rows:
+                            if r["id"] == e["id"]:
+                                r["args"], r["text"] = a, ("Add fact: " if sub == "edit-fact" else "Add observation: ") + a[1][:80]
+                        self.q.save(rows, str(self.root))
+                return res
+            self._queue(mod, rest, f"Change {'fact' if sub == 'edit-fact' else 'observation'} #{rid}" + (f": {rest[rest.index('--fact') + 1][:70]}" if "--fact" in rest else ""))
+            return res
+        if sub == "delete":
+            kind, rid = rest[1], int(rest[2])
+            res = self._run(mod, ["--db", db, *rest])
+            if rid > self.snap_max(kind):                                    # never reached the Pi: just drop its waiting "add"
+                for e in self.q.pending(str(self.root)):
+                    if e.get("local_id") == rid and e.get("local_kind") == kind:
+                        self.q.remove(e["id"], str(self.root))
+                return res
+            self._queue(mod, rest, f"Delete {kind[:-1] if kind.endswith('s') else kind} #{rid}")
+            return res
+        if sub == "restore":
+            tid = int(rest[1])
+            row = next((t for t in self._run(mod, ["--db", db, "trash"]) if t["trash_id"] == tid), None)
+            res = self._run(mod, ["--db", db, *rest])
+            if row is None:
+                return res
+            kind, rid = row["kind"], int(row["row_id"])
+            waiting = next((e for e in self.q.pending(str(self.root)) if e["module"] == mod and e["args"][:3] == ["delete", kind, str(rid)]), None)
+            if waiting:                                                      # its delete never left this Mac: cancel it
+                self.q.remove(waiting["id"], str(self.root))
+            elif rid > self.snap_max(kind):                                  # a row added here, deleted, now back: queue its "add" again
+                r = row["row"]
+                if kind == "facts":
+                    self._queue(mod, ["add-fact", r["fact"], "--importance", str(r.get("importance", 3))] + (["--core"] if r.get("core") else []), "Add fact: " + r["fact"][:80], local_id=rid, local_kind=kind)
+                elif kind == "observations":
+                    self._queue(mod, ["add-observation", r["caption"], "--labels", r.get("labels") or ""], "Add observation: " + r["caption"][:80], local_id=rid, local_kind=kind)
+            else:
+                self._queue(mod, rest, f"Put record #{rid} back")
+            return res
+        if sub == "empty-trash":
+            res = self._run(mod, ["--db", db, *rest])
+            self._queue(mod, rest, "Empty the memory Trash for good")
+            return res
+        raise ValueError(f"not available on the copy: {sub}")
+
+    def _pictures(self, rest: list[str]):
+        mod, sub = "pi_pipeline.vision.exploration_pictures", rest[0]
+        argv = ["--root", str(self.pictures_root), *rest]
+        if sub in ("list", "trash-list", "status"):
+            return self._run(mod, argv)
+        n = max(len(rest) - 1, 1)
+        if sub == "restore":
+            waiting = next((e for e in self.q.pending(str(self.root)) if e["module"] == mod and e["args"] == ["trash", *rest[1:]]), None)
+            res = self._run(mod, argv)
+            if waiting:
+                self.q.remove(waiting["id"], str(self.root))
+            else:
+                self._queue(mod, rest, f"Put {n} picture(s) back")
+            return res
+        res = self._run(mod, argv)
+        text = {"trash": f"Move {n} picture(s) to the Trash", "name": f"Name {n - 1} picture(s) {rest[1]}", "label": f"Flag a label on {rest[1]}", "move": f"Move {n} picture(s)",
+                "empty-trash": "Empty the picture Trash for good"}.get(sub, sub)
+        self._queue(mod, rest, text)
+        return res
+
+    def _walls(self, rest: list[str]):
+        mod, sub = "pi_pipeline.vision.wall_pictures", rest[0]
+        names = rest[1:]
+        if sub == "restore":
+            waiting = next((e for e in self.q.pending(str(self.root)) if e["module"] == mod and e["args"] == ["trash", *names]), None)
+            if waiting:
+                self.q.remove(waiting["id"], str(self.root))
+            else:
+                self._queue(mod, rest, f"Put {len(names)} wall picture(s) back")
+            return {"restored": names}
+        self._queue(mod, rest, f"Move {len(names)} wall picture(s) to the Trash" if sub == "trash" else "Empty the wall-picture Trash for good")
+        return {"moved": names} if sub == "trash" else {"removed": 0}
+
+
 def read_estimates() -> dict:
     """{roam picture file name: what the wall estimator read at that look} from `wall_dryrun.jsonl` (the lines that name a kept picture)."""
     out = {}
@@ -188,6 +426,86 @@ class App:
         self.remote = remote
         self._sync: subprocess.Popen | None = None
         self._backed_up = False
+
+    @property
+    def mirror(self) -> bool:
+        return bool(getattr(self.remote, "mirror", False))
+
+    def facts_info(self) -> dict:
+        """The memory limits the Facts tab shows next to its counts: how many core facts G2 is given, and how many facts the memory keeps."""
+        try:
+            sys.path.insert(0, str(ROOT))
+            from pi_pipeline.config import settings
+            return {"core_max": int(settings.memory_core_max), "max_facts": int(settings.memory_max_facts)}
+        except Exception:  # noqa: BLE001
+            return {"core_max": 12, "max_facts": 30}
+
+    def facts_tidy(self) -> dict:
+        """What the Facts tab's tidy-up view lists, found with the memory's own rules (pi_pipeline/memory/store.py): pairs of facts that say nearly the same thing, facts that name a date or
+        time (the memory refuses those when G2 saves them himself), and more than one "I look like ..." fact (that is a single slot)."""
+        sys.path.insert(0, str(ROOT))
+        from pi_pipeline.memory.store import NEAR_DUPLICATE, has_temporal_detail, similarity
+        rows = self.remote.memory("list", "facts", "--limit", "2000", "--query", "")
+        keep = ("id", "fact", "source", "importance", "core", "ts", "injected", "declared", "matched", "last_used")
+        slim = [{k: r.get(k) for k in keep} for r in rows]
+        pairs = []
+        for i, a in enumerate(slim):
+            for b in slim[i + 1:]:
+                sc = similarity(a["fact"], b["fact"])
+                if sc >= NEAR_DUPLICATE:                                   # the memory's own rule for "the same fact reworded" (a cat and a dog with the same name stay two facts)
+                    pairs.append({"a": a, "b": b, "score": round(sc, 2)})
+        pairs.sort(key=lambda p: -p["score"])
+        looks = [r for r in slim if re.match(r"\s*i look like\b", r["fact"] or "", re.I)]
+        return {"duplicates": pairs[:40], "dated": [r for r in slim if has_temporal_detail(r["fact"] or "")], "look_like": looks if len(looks) > 1 else []}
+
+    def review_state(self) -> dict:
+        """What the tabs are showing and what still waits for the Pi (the queue of tools/g2_review_queue.py)."""
+        if not self.mirror:
+            return {"mirror": False, "pending": [], "history": [], "copy": {}}
+        q = self.remote.q
+        rows = q.pending(str(self.remote.root))
+        def undo_ok(e):
+            a0 = e["args"][0]
+            return (e["module"].endswith("memory.review") and a0 != "empty-trash") or (e["module"].endswith("exploration_pictures") and a0 in ("trash", "restore")) or (e["module"].endswith("wall_pictures") and a0 == "trash")
+        return {"mirror": True, "copy": self.remote.copy_info(), "history": q.history(str(self.remote.root), 10),
+                "pending": [{"id": e["id"], "text": q.describe(e), "error": e.get("error"), "cancellable": bool(undo_ok(e))} for e in rows]}
+
+    def review_cancel(self, edit_id: str) -> dict:
+        """Take one waiting edit back: its effect on the copy is undone too (not possible for naming, moving and flagging pictures, which are sent on the next sync)."""
+        r = self.remote
+        with r.lock:
+            e = next((x for x in r.q.pending(str(r.root)) if x["id"] == edit_id), None)
+            if e is None:
+                raise ValueError("that edit has already gone")
+            mod, a = e["module"], e["args"]
+            if mod.endswith("memory.review") and a[0] != "empty-trash":
+                r.q.remove(edit_id, str(r.root))
+                r.rebuild()
+            elif mod.endswith("exploration_pictures") and a[0] in ("trash", "restore"):
+                r._run(mod, ["--root", str(r.pictures_root), "restore" if a[0] == "trash" else "trash", *a[1:]])
+                r.q.remove(edit_id, str(r.root))
+            elif mod.endswith("wall_pictures") and a[0] == "trash":
+                self._wall_back(a[1:])
+                r.q.remove(edit_id, str(r.root))
+            else:
+                raise ValueError("this one cannot be taken back from here; it is sent to the Pi on the next sync")
+        return self.review_state()
+
+    def review_apply(self) -> dict:
+        res = self.remote.q.apply(str(self.remote.root), self.remote.pi)
+        if res["applied"]:
+            self.remote.rebuild()
+        return {**res, **self.review_state()}
+
+    def _wall_back(self, names: list[str]) -> None:
+        trash = WALL_CACHE.parent / "wall_trash"
+        for n in names:
+            for ext in (".jpg", ".json"):
+                src = trash / (n + ext)
+                if src.exists():
+                    dst = WALL_CACHE / (n + ext)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(src), str(dst))
 
     def sync_now(self, start: bool = True) -> dict:
         """The "Sync now" button (user, 2026-11-01): every copy from the Pi now (tools/g2_sync.sh run --force all), in the background. Returns whether one is running."""
@@ -264,10 +582,16 @@ class App:
         """Move wall pictures to a trash folder on the Pi (nothing is erased; the page's Undo restores them) and drop the local copies; the next sync brings back anything restored."""
         names = [self._wall_name(p) for p in paths]
         out = self.remote.call(["pi_pipeline.vision.wall_pictures", "trash", *names])
+        trash = WALL_CACHE.parent / "wall_trash"
         for p in paths:
             for f in (WALL_CACHE / p, (WALL_CACHE / p).with_suffix(".json")):
                 try:
-                    f.unlink()
+                    if self.mirror and f.exists():                        # kept on this Mac so Undo can bring it back before the Pi has been told
+                        dst = trash / f.relative_to(WALL_CACHE)
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(f), str(dst))
+                    else:
+                        f.unlink()
                 except OSError:
                     pass
         return out
@@ -275,7 +599,10 @@ class App:
     def restore_walls(self, paths: list[str]):
         names = [self._wall_name(p) for p in paths]
         out = self.remote.call(["pi_pipeline.vision.wall_pictures", "restore", *names])
-        self.remote.sync_walls()
+        if self.mirror:
+            self._wall_back(names)
+        else:
+            self.remote.sync_walls()
         return out
 
     def list(self, kind: str, q: str = "", limit: int = 300):
@@ -288,6 +615,29 @@ class App:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import g2_goals_view
         return g2_goals_view.build()
+
+    def goal_edit(self, op: dict) -> dict:
+        """Queue one Goals-tab edit on this Mac (applied to the Pi later: tools/g2_goal_edits.py). A bad edit is refused here, with the reason."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import g2_goal_edits
+        row = g2_goal_edits.add(op)
+        return {"ok": True, "id": row["id"], "pending": g2_goal_edits.with_text(g2_goal_edits.pending())}
+
+    def goal_edit_cancel(self, edit_id: str) -> dict:
+        import g2_goal_edits
+        return {"ok": g2_goal_edits.cancel(edit_id), "pending": g2_goal_edits.with_text(g2_goal_edits.pending())}
+
+    def goal_edits_apply(self) -> dict:
+        """Send the queued edits to the Pi now (only when it is up and no goal session runs), then copy the goal data down again."""
+        import g2_goal_edits
+        res = g2_goal_edits.apply()
+        if res["applied"]:
+            try:
+                subprocess.run(["bash", str(Path(__file__).resolve().parent / "g2_goal_pull.sh")], capture_output=True, timeout=150)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        res["pending"] = g2_goal_edits.with_text(g2_goal_edits.pending())
+        return res
 
     def counts(self) -> dict:
         """Totals for the tab labels: records of each memory kind, pictures kept, and what is in the Trash."""
@@ -462,7 +812,7 @@ class App:
         if not nm:
             raise ValueError("give a name")
         out = self.remote.pictures("name", nm, *rels)
-        for m in out.get("named", []):                        # the old local copy goes; the new one comes with the sync
+        for m in ([] if self.mirror else out.get("named", [])):                        # the old local copy goes; the new one comes with the sync
             f = CACHE / m["from"]
             if m["from"] != m["to"]:
                 for g in (f, f.with_suffix(".json")):
@@ -470,7 +820,8 @@ class App:
                         g.unlink()
                     except OSError:
                         pass
-        self.remote.sync_pictures()
+        if not self.mirror:
+            self.remote.sync_pictures()
         return out
 
     def dismiss_label(self, path: str, label: str, restore: bool = False):
@@ -483,17 +834,18 @@ class App:
     def move_pictures(self, pairs: list[list[str]]):
         out = self.remote.pictures("move", *[f"{self._rel(a)}:{self._rel(b)}" for a, b in pairs])
         for a, b in pairs:
-            for g in (CACHE / b, (CACHE / b).with_suffix(".json")):
+            for g in ([] if self.mirror else (CACHE / b, (CACHE / b).with_suffix(".json"))):
                 try:
                     g.unlink()
                 except OSError:
                     pass
-        self.remote.sync_pictures()
+        if not self.mirror:
+            self.remote.sync_pictures()
         return out
 
     def trash_pictures(self, paths: list[str]):
         out = self.remote.pictures("trash", *[self._rel(p) for p in paths])
-        for p in paths:                                       # the local copy goes too
+        for p in ([] if self.mirror else paths):               # the local copy goes too (on the mirror the local module already moved it to the Trash)
             f = CACHE / self._rel(p)
             for g in (f, f.with_suffix(".json")):
                 try:
@@ -504,7 +856,8 @@ class App:
 
     def restore_pictures(self, paths: list[str]):
         out = self.remote.pictures("restore", *[self._rel(p) for p in paths])
-        self.remote.sync_pictures()
+        if not self.mirror:
+            self.remote.sync_pictures()
         return out
 
     def trash(self):
@@ -612,6 +965,12 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._json({"tasks": app.sync_status(), **app.sync_now(start=False)})
                 if u.path == "/api/goals":
                     return self._json(app.goals())
+                if u.path == "/api/facts/tidy":
+                    return self._json(app.facts_tidy())
+                if u.path == "/api/facts/info":
+                    return self._json(app.facts_info())
+                if u.path == "/api/review/state":
+                    return self._json(app.review_state())
                 if u.path == "/api/counts":
                     return self._json(app.counts())
                 if u.path == "/api/pictures":
@@ -647,6 +1006,16 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     if presence is not None:
                         presence.beat(str(body.get("id", "")))
                     return self._json({"ok": True})
+                if u.path == "/api/review/cancel":
+                    return self._json(app.review_cancel(str(body["id"])))
+                if u.path == "/api/review/apply":
+                    return self._json(app.review_apply())
+                if u.path == "/api/goals/edit":
+                    return self._json(app.goal_edit(dict(body)))
+                if u.path == "/api/goals/cancel":
+                    return self._json(app.goal_edit_cancel(str(body["id"])))
+                if u.path == "/api/goals/apply":
+                    return self._json(app.goal_edits_apply())
                 if u.path == "/api/walls/label":
                     return self._json(app.label_wall(str(body["path"]), str(body.get("label", "")), body.get("distance_in"), str(body.get("note", ""))))
                 if u.path == "/api/walls/trash":
@@ -758,8 +1127,7 @@ function obsTools(r){const d=el("div","");d.style.cssText="display:flex;gap:6px;
  d.append(e);return d}
 function addObservationButton(){const b=el("button","btn","Add observation");b.onclick=async()=>{const t=prompt("What G2 saw (a sentence, for example: The dishwasher has a steel door with a black handle)");if(!t||!t.trim())return;const l=prompt("Detector labels for it (optional, comma separated)","");if(l===null)return;
   try{const r=await api("/api/observations/add",{caption:t.trim(),labels:l});toast("Observation added",async()=>{await api("/api/delete",{kind:"observations",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
-function addFactButton(){const b=el("button","btn","Add fact");b.onclick=async()=>{const t=prompt("A fact for G2 to remember (a stable thing, for example: The dishwasher is next to the fridge)");if(!t||!t.trim())return;
-  try{const r=await api("/api/facts/add",{fact:t.trim()});toast("Fact added",async()=>{await api("/api/delete",{kind:"facts",id:r.id})});load()}catch(x){toast("Failed: "+x.message)}};return b}
+function addFactButton(){const b=el("button","btn","Add fact");b.onclick=()=>window.factForm(null);return b}
 function chip(text,onx){const c=el("span","chip",text+" ");c.style.cssText="display:inline-block;border:1px solid var(--line);border-radius:10px;padding:0 6px;margin:2px 4px 2px 0;font-size:.74rem;background:var(--surface)";
  const x=el("button","","\u00d7");x.title="Wrong: remove this tag (you can undo)";x.style.cssText="border:0;background:none;color:var(--x);cursor:pointer;padding:0 0 0 2px;font:inherit";x.onclick=(ev)=>{ev.stopPropagation();onx()};c.append(x);return c}
 function picCaption(p){const d=el("div","cap",picLabel(p)+(p.room?" \u00b7 room: "+p.room:"")+" \u00b7 "+p.time+(p.detector.length?" \u00b7 sees: ":""));
@@ -781,31 +1149,18 @@ async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r
   const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,5000);return}toast(s&&s.result===0?"Sync done":"Sync finished with a problem (see ~/g2_logs/sync.log)");load()};setTimeout(tick,5000)}catch(e){toast("Failed: "+e.message)}}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
-  if(tab==="pictures"||tab==="looks"){await api("/api/pictures/sync",{});data=await api("/api/pictures")}
-  else if(tab==="walls"){await api("/api/walls/sync",{});data=await api("/api/walls")}
+  if(tab==="pictures"||tab==="looks"){data=await api("/api/pictures")}
+  else if(tab==="walls"){data=await api("/api/walls")}
   else if(tab==="goals"){data=await api("/api/goals")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
-  $("#status").textContent="Connected to the Pi. Deleted records go to the Trash first; nothing is removed for good until you empty it.";
+  try{window.reviewState=await api("/api/review/state")}catch(e){window.reviewState=null}
+  $("#status").textContent="Showing the copy of G2's data on this Mac (works with the Pi off). Deleted records go to the Trash first; nothing is removed for good until you empty it.";
  }catch(e){$("#status").textContent="Problem: "+e.message;list.replaceChildren(el("div","empty",e.message));return}
  render();clearTimeout(window.ct);window.ct=setTimeout(refreshCounts,300)}
 function fold(title,open){const d=document.createElement("details");d.open=!!open;const sm=document.createElement("summary");sm.textContent=title;sm.style.cssText="cursor:pointer;font-weight:600;color:var(--ink2);margin:10px 0 4px";d.append(sm);return d}
-function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div","empty","No goal data."));return}const m=d.memory||{};
- const sum=el("div","labelsum");sum.append(el("b","","Goal data copied from the Pi: "),document.createTextNode(d.pulled||"never"));
- if(m.lowest_mb!==undefined)sum.append(el("div","sub","Pi memory: lowest available "+Math.round(m.lowest_mb)+" MB ("+m.when+"), swap up to "+Math.round(m.swap_mb)+" MB"+(m.oom_kills?", OOM KILLS: "+m.oom_kills:"")));
- const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}list.append(sum);
- for(const g of d.goals){const rate=g.counted?Math.round(100*g.successes/g.counted):null;list.append(el("div","divider",g.title+" \u00b7 "+g.counted+" counted attempts, "+g.successes+" good"+(rate===null?"":" ("+rate+"%)")));
-  if(g.trend&&g.trend.length){list.append(el("div","meta","By session: "+g.trend.map(t=>t.successes+" of "+t.attempts+" ("+t.session+")").join(" \u2192 ")))}
-  const les=g.lessons.filter(l=>!f||l.text.toLowerCase().includes(f));const lf=fold("What he learned ("+les.length+")",true);
-  if(!les.length)lf.append(el("div","empty","No lessons saved yet."));
-  for(const l of les){const r=el("div","row");const mn=el("div","main");mn.append(el("div","",l.text),el("div","meta","#"+l.id+" \u00b7 "+l.time));if(l.flag){const b=el("div","meta","Flagged: "+l.flag);b.style.color="var(--x)";mn.append(b)}r.append(mn);lf.append(r)}list.append(lf);
-  if(g.learned&&g.learned.length){const sf=fold("Settings and what worked ("+g.learned.length+")",false);for(const k of g.learned){const r=el("div","row");const mn=el("div","main");mn.append(el("div","",(k.focus?"\u2605 ":"")+k.setting+": now "+k.now),el("div","meta",k.tried.map(t=>t.value+" ("+t.good+" of "+t.tries+" good)").join(" \u00b7 ")));r.append(mn);sf.append(r)}list.append(sf)}
-  const ov=g.overrides||{},pins=Object.keys(ov.pins||{});if(pins.length||Object.keys(ov.limits||{}).length){const of=fold("Your overrides",true);for(const k of pins)of.append(el("div","meta","Pinned "+k+" = "+JSON.stringify(ov.pins[k])));for(const k of Object.keys(ov.limits||{}))of.append(el("div","meta","Limit "+k+": "+JSON.stringify(ov.limits[k])));list.append(of)}
-  const att=g.attempts.filter(a=>!f||JSON.stringify(a).toLowerCase().includes(f));const af=fold("Attempts ("+att.length+")",false);
-  for(const a of att){const r=el("div","row");if(a.retracted)r.style.opacity=".5";const mn=el("div","main");mn.append(el("div","",(a.number?"#"+a.number:"not counted")+" \u00b7 "+a.time+" \u00b7 "+(a.success?"good":"not good")+" \u00b7 "+(a.text||a.outcome||a.ended)),el("div","meta",(a.retracted?(a.retired?"retired (old scoring)":"retracted by you")+" \u00b7 ":"")+(a.seconds?Math.round(a.seconds)+" s \u00b7 ":"")+"search by "+(a.settings.search_order||"?")+", punch within "+(a.settings.punt_max_in||"?")+" in"));r.append(mn);af.append(r)}list.append(af);
-  const sess=fold("Sessions ("+g.sessions.length+")",false);for(const s of g.sessions){sess.append(el("div","meta",s.time+" \u00b7 "+s.successes+" of "+s.attempts+" good \u00b7 "+(s.minutes||0).toFixed(1)+" min \u00b7 ended: "+s.why))}list.append(sess)}
- const t=d.turns||{};const tf=fold("Turns in the last "+t.days+" days ("+(t.count||0)+")",false);for(const c of (t.causes||[]))tf.append(el("div","meta",c.n+" \u00d7 "+c.cause));for(const r of (t.recent||[]))tf.append(el("div","meta",r.time+" \u00b7 "+r.kind+" "+(r.direction||"")+" "+(r.degrees||"")+"\u00b0 \u00b7 "+r.why+(r.ball?" \u00b7 ball "+Math.round(r.ball)+" in at "+Math.round(r.ball_deg)+"\u00b0":"")+(r.wall_in?" \u00b7 wall reading "+r.wall_in+" in":"")));list.append(tf);
- if((d.other_lessons||[]).length){const of=fold("Other lessons ("+d.other_lessons.length+")",false);for(const l of d.other_lessons)of.append(el("div","meta","#"+l.id+" \u00b7 "+l.time+": "+l.text));list.append(of)}}
+/*GOALS_UI*/
+/*MEMORY_UI*/
 function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=data.filter(p=>(!onlyNew||(p.src==="roam"&&!p.labelled))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));const nun=data.filter(p=>p.src==="roam"&&!p.labelled).length;if(nun){const fb=el("button","btn",onlyNew?"Show all wall pictures":"Show only the "+nun+" roam pictures without a label");fb.onclick=()=>{window.wallsUnlabeled=!onlyNew;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",onlyNew?"Every roam picture has a label.":"No wall pictures yet."));return}
  const sum=el("div","labelsum");sum.append(el("b","","Wall pictures: "),document.createTextNode(items.filter(p=>p.src==="recognition").length+" recognition shots, "+items.filter(p=>p.src==="roam").length+" kept in roams. Distances are in inches from the camera lens to the base of the wall. These are kept apart from the object pictures."));list.append(sum);
  const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/wimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
@@ -813,7 +1168,7 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab==="walls"){renderWalls(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts")$("#extra").replaceChildren(addFactButton());if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab!=="goals"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
   const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
   if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
@@ -864,6 +1219,8 @@ function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.repla
 window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");if(TABS.some(t=>t[0]===h)){tab=h;drawTabs();load()}});
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;$("#micon").onclick=micOn;drawTabs();load();showSync();showMic();setInterval(showMic,60000);
 </script></body></html>"""
+PAGE = PAGE.replace("/*GOALS_UI*/", (Path(__file__).resolve().parent / "g2_goals_ui.js").read_text())          # the Goals tab's drawing code lives in its own file
+PAGE = PAGE.replace("/*MEMORY_UI*/", (Path(__file__).resolve().parent / "g2_memory_ui.js").read_text())        # ... and so does the Facts tab's
 
 
 PIDFILE = Path(os.path.expanduser("~/.g2_review.pid"))
@@ -885,7 +1242,7 @@ def serve(port: int) -> int:
         return 2
     token = secrets.token_urlsafe(24)
     presence = Presence()
-    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(App(Remote(pi)), token, port, presence))
+    srv = ThreadingHTTPServer(("127.0.0.1", port), make_handler(App(MirrorRemote(pi)), token, port, presence))
     PIDFILE.write_text(str(os.getpid()))
 
     def watch():                                                # the last tab closed: stop (the same as `g2pics stop`)

@@ -12,12 +12,17 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 from collections import Counter
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 DEFAULT_DIR = "~/Desktop/G2Memory/goals"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (_HERE, os.path.dirname(_HERE)):                 # g2_goal_edits (tools/) and pi_pipeline (repo root) import from anywhere
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 EASTERN = ZoneInfo("America/New_York")
 
 
@@ -141,6 +146,70 @@ def sync_status(path: str, now: float | None = None) -> list[dict]:
     return out
 
 
+def _definitions(d: str) -> tuple[dict, list[str]]:
+    """({goal id: {definition fields, knobs: [setting catalog]}}, priority order) from the goals file on this Mac plus the built-in goals."""
+    try:
+        from pi_pipeline.goals import spec
+        from pi_pipeline.goals.approach import make
+        path = os.path.join(d, "goals.json")
+        goals, _problems = spec.load(path)
+        order = spec.priority(path)
+    except Exception:  # noqa: BLE001  (the tab still shows the history without the definitions)
+        return {}, []
+    out = {}
+    for gid, g in goals.items():
+        try:
+            knobs = [{"name": k.name, "label": k.says(), "kind": k.kind, "lo": k.lo, "hi": k.hi, "step": k.step, "options": list(k.options), "unit": k.unit, "control": k.control}
+                     for k in g.knobs(make(g.approach).knobs())]
+        except Exception:  # noqa: BLE001
+            knobs = []
+        out[gid] = {"id": gid, "title": g.title, "approach": g.approach, "kind": g.kind, "attempts": g.attempts, "minutes": g.minutes, "min_pack_pct": g.min_pack_pct,
+                    "target_successes": g.target_successes or 0, "rest_between_s": g.rest_between_s, "start_words": list(g.start_words), "needs_attachment": g.needs_attachment,
+                    "controls": dict(g.controls), "knobs": knobs}
+    return out, order
+
+
+def _override_rows(ov: dict) -> list[dict]:
+    """The overrides file's {scope: {pins, limits, banned}} as flat rows for the tab."""
+    rows = []
+    for scope, e in (ov or {}).items():
+        for knob, v in ((e or {}).get("pins") or {}).items():
+            rows.append({"kind": "pin", "knob": knob, "value": v, "scope": scope})
+        for knob, v in ((e or {}).get("limits") or {}).items():
+            rows.append({"kind": "limit", "knob": knob, "lo": v[0] if v else None, "hi": v[1] if v else None, "scope": scope})
+        for knob, vals in ((e or {}).get("banned") or {}).items():
+            for vk in (vals or {}):
+                rows.append({"kind": "banned", "knob": knob, "value": vk, "scope": scope})
+    return rows
+
+
+def _suggestions(state: dict) -> list[dict]:
+    out = []
+    for gid, per in (state or {}).items():
+        for cond, st in (per or {}).items():
+            for knob, e in ((st or {}).get("suggestions") or {}).items():
+                if e.get("status", "new") in ("new", "later"):
+                    try:
+                        from pi_pipeline.goals.suggestions import describe
+                        text = describe(gid, knob, e)
+                    except Exception:  # noqa: BLE001
+                        text = f"{knob}: {json.dumps(e)[:200]}"
+                    out.append({"goal": gid, "knob": knob, "conditions": cond, "status": e.get("status", "new"), "text": text})
+    return out
+
+
+def _age_hours(stamp: str) -> float | None:
+    """Hours since a pulled_at.txt time ('2026-11-04 8:34 AM EST'); None when it cannot be read."""
+    m = re.match(r"(\d{4}-\d\d-\d\d) (\d{1,2}):(\d\d) (AM|PM)", (stamp or "").strip())
+    if not m:
+        return None
+    try:
+        t = time.mktime(time.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)} {m.group(4)}", "%Y-%m-%d %I:%M %p"))
+    except ValueError:
+        return None
+    return round((time.time() - t) / 3600, 1)
+
+
 def build(folder: str | None = None) -> dict:
     d = os.path.expanduser(folder or os.environ.get("G2_GOALS_DIR", DEFAULT_DIR))
     journal = _lines(os.path.join(d, "goal_journal.jsonl"))
@@ -150,10 +219,12 @@ def build(folder: str | None = None) -> dict:
     report = _text(os.path.join(d, "goal_curation", "curation_report.md"))
     flags = _flags(report)
     verdicts = _verdicts(journal)
-    titles, goals = {}, {}
+    titles, goals, cond_of = {}, {}, {}
     for r in journal:
         if r.get("kind") == "session_start":
             titles[r["goal"]] = r.get("title") or r["goal"]
+            c = r.get("conditions") or {}
+            cond_of[r.get("session")] = {k: v for k, v in c.items() if k in ("attachment", "floor", "hw")}
     for gid in list(dict.fromkeys([*state.keys(), *[r.get("goal") for r in journal if r.get("goal")]])):
         goals[gid] = {"id": gid, "title": titles.get(gid, gid), "lessons": [], "sessions": [], "attempts": [], "learned": _best_values(state.get(gid)),
                       "overrides": overrides.get(gid) or {}, "counted": 0, "successes": 0}
@@ -168,7 +239,7 @@ def build(folder: str | None = None) -> dict:
             counted = r.get("number") is not None and o.get("score") is not None and not retracted
             g["attempts"].append({"number": r.get("number"), "time": nice_time(r.get("time")), "raw_time": r.get("time"), "session": r.get("session"), "ended": r.get("ended"),
                                   "seconds": r.get("seconds"), "outcome": o.get("code"), "text": o.get("text"), "success": bool(o.get("success")), "counted": counted,
-                                  "retracted": retracted, "retired": bool(retracted and (v or {}).get("note", "").startswith("retired")), "notes": (v or {}).get("note", ""),
+                                  "conditions": cond_of.get(r.get("session"), {}), "retracted": retracted, "retired": bool(retracted and (v or {}).get("note", "").startswith("retired")), "notes": (v or {}).get("note", ""),
                                   "settings": r.get("settings") or {}})
             if counted:
                 g["counted"] += 1
@@ -182,6 +253,20 @@ def build(folder: str | None = None) -> dict:
         g["settings_now"] = (g["sessions"][0]["settings_now"] if g["sessions"] else {})
         g["trend"] = [{"session": s["time"], "rate": (s["successes"] / s["attempts"]) if s.get("attempts") else None, "attempts": s.get("attempts"), "successes": s.get("successes")}
                       for s in reversed(g["sessions"]) if s.get("attempts")][-8:]
+    defs, order = _definitions(d)
+    from g2_goal_edits import history, pending, with_text
+    for gid, g in goals.items():
+        df = defs.get(gid) or {}
+        g["definition"] = df
+        g["kind"] = df.get("kind", "task")
+        g["override_rows"] = _override_rows(overrides.get(gid) or {})
+        g["conditions_seen"] = sorted({json.dumps(a["conditions"], sort_keys=True) for a in g["attempts"]})
+        for a in g["attempts"]:
+            a["session_why"] = next((s["why"] for s in g["sessions"] if s["session"] == a["session"]), None)
+    for gid, df in defs.items():                                     # a goal with no attempts yet is still listed (so it can be edited)
+        if gid not in goals:
+            goals[gid] = {"id": gid, "title": df["title"], "lessons": [], "sessions": [], "attempts": [], "learned": [], "overrides": {}, "counted": 0, "successes": 0,
+                          "definition": df, "kind": df["kind"], "override_rows": _override_rows(overrides.get(gid) or {}), "conditions_seen": [], "settings_now": {}, "trend": []}
     unmatched = []
     for les in lessons:
         text = les.get("lesson", "")
@@ -193,6 +278,8 @@ def build(folder: str | None = None) -> dict:
                 break
         else:
             unmatched.append(row)
-    return {"pulled": _text(os.path.join(d, "pulled_at.txt")).strip(), "goals": list(goals.values()), "other_lessons": unmatched, "memory": _memory(os.path.join(d, "memory_log.jsonl")),
+    pulled = _text(os.path.join(d, "pulled_at.txt")).strip()
+    return {"pulled": pulled, "pulled_age_h": _age_hours(pulled), "priority": order, "suggestions": _suggestions(state), "pending": with_text(pending(d)), "edit_history": history(d),
+            "goals": list(goals.values()), "other_lessons": unmatched, "memory": _memory(os.path.join(d, "memory_log.jsonl")),
             "turns": _turns(os.path.join(d, "turn_log.jsonl")), "curation": report.strip(), "folder": d,
             "sync": sync_status(os.path.join(os.path.dirname(d.rstrip("/")), "sync_status.json"))}

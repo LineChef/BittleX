@@ -154,6 +154,8 @@ def main(argv=None) -> None:
     p = sub.add_parser("verdict", help="say whether an attempt was scored right; a wrong one is taken out of his records")
     p.add_argument("goal"); p.add_argument("number", type=int); p.add_argument("verdict", choices=("right", "wrong"))
     p.add_argument("--floor"); p.add_argument("--scope"); p.add_argument("--note", default="")
+    p = sub.add_parser("lesson", help="add, edit or delete a lesson G2 saved to memory (a delete goes to the review Trash, so it can be put back)")
+    p.add_argument("action", choices=("add", "edit", "delete")); p.add_argument("args", nargs="*", help="add TEXT | edit ID TEXT | delete ID")
     sub.add_parser("suggestions", help="the suggestions for settings only you change, with their status")
     for name in ("confirm", "cancel"):
         p = sub.add_parser(name, help=f"{name} a suggestion"); p.add_argument("goal"); p.add_argument("knob")
@@ -394,6 +396,32 @@ def main(argv=None) -> None:
             raise SystemExit(f"no suggestion for {a.goal} {a.knob}")
         for g, c, k in hits:
             print(resolve(g, c, k, a.cmd, state=st))
+    elif a.cmd == "lesson":
+        from ..config import settings
+        from ..memory import review
+        from ..memory.store import Store
+        from .journal import LESSON_SOURCE
+        store = Store(settings.memory_db_path)
+        if a.action == "add":
+            text = " ".join(a.args).strip()
+            if not text:
+                raise SystemExit("usage: g2goal lesson add TEXT")
+            print("lesson saved" if store.add_fact(text, importance=2, core=False, source=LESSON_SOURCE) else "not saved (empty, a near-duplicate, or it names a date or time)")
+        else:
+            if not a.args or not a.args[0].isdigit():
+                raise SystemExit(f"usage: g2goal lesson {a.action} ID" + (" TEXT" if a.action == "edit" else ""))
+            fid = int(a.args[0])
+            row = next((f for f in store.list_facts() if f["id"] == fid), None)
+            if row is None or row["source"] != LESSON_SOURCE:
+                raise SystemExit(f"no goal lesson #{fid} (only lessons G2 saved from goal sessions can be changed here)")
+            if a.action == "edit":
+                text = " ".join(a.args[1:]).strip()
+                if not text:
+                    raise SystemExit("usage: g2goal lesson edit ID TEXT")
+                print(f"lesson #{fid} rewritten" if store.update_fact(fid, text) else "not changed (the same text is already another fact)")
+            else:
+                review.delete_record(settings.memory_db_path, "facts", fid)
+                print(f"lesson #{fid} moved to the review Trash")
     elif a.cmd == "reset":
         if not a.yes:
             raise SystemExit("this forgets what the goal learned (the journal is kept): add --yes")

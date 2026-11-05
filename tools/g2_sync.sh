@@ -120,6 +120,8 @@ case "${1:-status}" in
     ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" true 2>/dev/null || { say "the Pi does not answer: nothing synced"; exit 0; }
     busy="$(pi_busy)"
     if [ -n "$busy" ]; then say "the Pi is busy ($busy): nothing synced, the next run tries again"; exit 0; fi
+    python3 "$ROOT/tools/g2_review_queue.py" apply 2>&1 | sed 's/^/review edits: /' >> "$LOG"         # edits made in the review page wait on this Mac: they go to the Pi before anything is copied down
+    python3 "$ROOT/tools/g2_goal_edits.py" apply 2>&1 | sed 's/^/goal edits: /' >> "$LOG"
     for spec in $TASKS; do
       name="${spec%%:*}"; rest="${spec#*:}"; every="${rest%%:*}"
       if [ -z "$force" ] || { [ "$force" != all ] && [ "$force" != "$name" ]; }; then

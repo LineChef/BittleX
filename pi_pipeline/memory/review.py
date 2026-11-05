@@ -49,7 +49,12 @@ def list_records(db: str, kind: str, limit: int = 200, query: str = "") -> list[
         if query:
             where = " WHERE " + " OR ".join(f"{col} LIKE ?" for col in text_cols)
             params = [f"%{query}%"] * len(text_cols)
-        rows = c.execute(f"SELECT * FROM {table}{where} ORDER BY id DESC LIMIT ?", (*params, int(limit))).fetchall()
+        if kind == "facts" and c.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'fact_use'").fetchone():
+            # each fact with how often it was given to Claude (injected), named by G2 as used (declared), echoed in a reply (matched) and when (memory/use_log.py)
+            rows = c.execute("SELECT f.*, COALESCE(u.injected, 0) AS injected, COALESCE(u.declared, 0) AS declared, COALESCE(u.matched, 0) AS matched, u.last_used AS last_used "
+                             f"FROM facts f LEFT JOIN fact_use u ON u.fact_id = f.id{where} ORDER BY f.id DESC LIMIT ?", (*params, int(limit))).fetchall()
+        else:
+            rows = c.execute(f"SELECT * FROM {table}{where} ORDER BY id DESC LIMIT ?", (*params, int(limit))).fetchall()
         return [dict(r) for r in rows]
     finally:
         c.close()

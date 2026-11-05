@@ -463,7 +463,8 @@ def test_the_goals_tab_reads_the_mac_copy_of_the_goal_data(tmp_path):
     assert [a["retracted"] for a in g["attempts"]] == [True, False] and g["lessons"][0]["text"] == "keep punching from 4 in."
     assert g["lessons"][0]["flag"] and g["lessons"][0]["time"] == "Nov 1, 3:57 PM"                    # 12-hour Eastern
     assert g["learned"][0]["setting"] == "punt_max_in" and g["learned"][0]["focus"] and g["learned"][0]["tried"][0]["good"] == 2
-    assert V.build(str(tmp_path / "nothing"))["goals"] == []                                          # no data yet: an empty page, no error
+    empty = V.build(str(tmp_path / "nothing"))["goals"]            # no data yet: the defined goals are listed (so they can be edited), with no attempts
+    assert all(not x["attempts"] and not x["lessons"] for x in empty)
 
 
 def test_the_goals_tab_shows_each_copy_from_the_pi_and_flags_old_ones(tmp_path):

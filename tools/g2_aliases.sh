@@ -499,12 +499,15 @@ g2puntset() {
 }
 # g2goal [list|show GOAL|set GOAL ...|run GOAL|stop|status|history GOAL|suggestions|confirm|cancel GOAL KNOB|verdict GOAL N right|wrong|pin|limit|undo|forget GOAL KNOB ...|overrides GOAL|reset GOAL --yes|pull|report [GOAL]]  -- goals G2 works toward and what he learned (docs/guides/goals.md).
 #   run = one session without the voice command (the same as saying "G2, ball goal": the voice service stops and always comes back); stop = end it (he rests).
+#   apply = send the edits queued in the review page's Goals tab to the Pi (also done by pull and run);
 #   pull = copy the journal and the learned state to ~/Desktop/G2Memory/goals; report [GOAL] = pull, build the report page there and open it.
 g2goal() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   local d="$HOME/Desktop/G2Memory/goals"
   case "${1:-status}" in
+    apply) python3 "$G2_ROOT/tools/g2_goal_edits.py" apply ;;                           # apply the edits made in the review page's Goals tab (they wait on this Mac until the Pi is free)
     run) [ -n "${2:-}" ] || { echo "usage: g2goal run GOAL"; return 2; }
+         python3 "$G2_ROOT/tools/g2_goal_edits.py" apply                                  # edits queued in the Goals tab go in before the session starts
          ssh -t "$G2_PI" "sudo systemctl stop g2-voice; cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -u -m pi_pipeline.goals run '$2'; pi_pipeline/.venv/bin/python -m pi_pipeline.link.check_serial send krest >/dev/null 2>&1; sleep 2; sudo systemctl --no-block start g2-voice"; bash "$G2_ROOT/tools/g2_sync.sh" run --force goals ;;
     stop) ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals stop; sudo systemctl stop g2-goal 2>/dev/null; true" ;;
     pull) G2_GOALS_DIR="$d" bash "$G2_ROOT/tools/g2_goal_pull.sh" ;;                # also runs after every deploy and every `g2goal run`; G2 off: says when the last copy was taken

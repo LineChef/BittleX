@@ -19,6 +19,8 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=6 "$host" true 2>/dev/null; then
   echo "G2 is offline: the copy in $dest is from $(cat "$dest/pulled_at.txt" 2>/dev/null || echo 'never')"
   exit 0
 fi
+# edits made in the Goals tab wait in a queue on this Mac (tools/g2_goal_edits.py); apply them now, before the data is copied down (nothing is applied while a goal session runs)
+python3 "${G2_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/tools/g2_goal_edits.py" apply 2>&1 | sed 's/^/edits: /'
 # curate the Pi's goal data first (retire old-scoring attempts, check the saved lessons, rotate logs: `g2goal curate`), then copy the curated data down
 ssh -o BatchMode=yes -o ConnectTimeout=6 "$host" 'cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.goals curate' 2>&1 | sed 's/^/curate: /'
 day="$dest/history/$(date +%Y%m%d)"

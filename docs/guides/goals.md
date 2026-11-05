@@ -66,6 +66,12 @@ Ten attempts is a small sample: a change kept on 2 or 3 attempts can be luck.
 **Measured, not judged:** his walking pace and turn rates (left and right, long turns and the small alignment pulses) come from the camera, before and after each move, and are kept per
 attachment and floor in `~/.local/share/g2/chase_pace.json`. They time every walk and turn, also in a plain "G2, punt".
 
+### Editing from the Goals tab
+
+The tab (review page, `g2pics`) also changes things: a goal's size and start phrases, who controls each setting (G2, you with his suggestion, you only), pins and limits per floor or attachment, undoing or forgetting a learned value, scoring an attempt right or wrong, his lessons (add, rewrite, delete), the order of the goals, new goals and confirming or cancelling his suggestions. Each is the same `g2goal` command described here.
+
+An edit is not sent at once. It waits in `~/Desktop/G2Memory/goals/pending_edits.json` on the Mac, shown in the tab as "pending" with a Cancel, and is sent to the Pi when the Pi is up and no goal session is running: at the start of `g2goal pull`, at the start of `g2goal run`, with `g2goal apply`, or the tab's Apply now button. A newer edit of the same thing replaces the older one. An edit the Pi refuses stays in the list with the reason; what was sent is listed under "Edits sent to G2". A session started by voice ("G2, ball goal") does not send them, so run `g2goal apply` first if you want them in.
+
 ## 5. Telling him a score was wrong
 
 Every attempt in the report has a number and a "your verdict" column. If the score is wrong (the report says he hit the ball but it was still under the claw, or the finder misread
