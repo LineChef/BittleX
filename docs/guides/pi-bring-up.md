@@ -80,9 +80,12 @@ console, so if SSH never comes up after ~5 min, re-flash and re-check the Wi-Fi
 country + SSID/password in Imager settings.
 
 Gotcha: if the Pi answers from other machines on the network but the Mac gets
-`EHOSTUNREACH`, check for an MDM / endpoint-security agent on the Mac (a Jamf
-framework was the cause here, not the router). See
-[`gait-deployment.md`](gait-deployment.md) "Network — Mac→Pi SSH".
+`EHOSTUNREACH` ("No route to host"), first check System Settings, Privacy &
+Security, Local Network: every app you type commands in (iTerm, Visual Studio
+Code, `claude`) needs its switch on, and the app must be reopened after a change.
+Then check for an MDM / endpoint-security agent on the Mac (a Jamf framework was
+the cause once, not the router). Full order of checks:
+[`gait-deployment.md`](gait-deployment.md) troubleshooting.
 
 ## 3. Kill Wi-Fi power-save (do this before anything heavy)
 
