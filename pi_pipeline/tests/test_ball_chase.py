@@ -907,3 +907,23 @@ def test_standing_five_seconds_then_tilted_means_sagged_legs_even_in_the_standin
     assert r.stand_up() == "ok"
     assert bc.CLAW_LOOK_POSE in lk.sent and lk.sent.index(bc.CLAW_LOOK_POSE) < lk.sent.index("kbalance")        # attention pose first, then the stand-up
     assert r.posture == "stand"
+
+
+def test_a_ball_that_swings_to_the_other_side_after_an_approach_turn_means_back_up_and_look_again():
+    p = bc.ChasePlanner()
+    a = p.decide(reading(20, 30)); assert a.kind == "turn" and a.degrees > 0                 # on the right: turn right
+    p.prev_kind = "turn"
+    b = p.decide(reading(19, -22))                                                          # next picture: on the left
+    assert b.kind == "back" and "overshot the turn" in b.why
+    p.prev_kind = "back"
+    c = p.decide(reading(21, -20))
+    assert c.kind == "turn" and c.degrees < 0                                               # re-acquired, then lines up again from the new picture
+
+
+def test_a_turn_that_leaves_the_ball_on_the_same_side_or_near_straight_is_not_an_overshoot():
+    p = bc.ChasePlanner(); p.decide(reading(20, 30)); p.prev_kind = "turn"
+    assert p.decide(reading(19, 14)).kind != "back"                                         # still right, just less
+    q = bc.ChasePlanner(); q.decide(reading(20, 30)); q.prev_kind = "turn"
+    assert q.decide(reading(19, -4)).kind != "back"                                         # within the dead band around straight: noise, not a swing
+    r = bc.ChasePlanner(); r.decide(reading(20, 30)); r.prev_kind = "walk"
+    assert r.decide(reading(19, -22)).kind != "back"                                        # only a turn is judged this way

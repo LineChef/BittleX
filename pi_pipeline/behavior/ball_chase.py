@@ -260,6 +260,7 @@ class ChasePlanner:
     log: list = field(default_factory=list)
     claw_ok: bool = True       # the robot can move the arm for a claw look (run_chase sets it from the robot)
     align_before: float | None = None   # the ball's bearing when the last align turn was chosen: a swing to the other side afterwards is an overshoot
+    turn_before: float | None = None   # the ball's bearing when the last approach turn toward it was chosen: a swing to the other side afterwards is an overshoot (user, 2026-11-05)
     prev_kind: str | None = None   # the kind of the last action he carried out (run_chase sets it): a ball gone after a small step forward means he pushed it
     seen_ball: bool = False    # the ball has been seen this attempt: from then on only straight pictures, never a claw look (user, 2026-11-01)
     search_i: int = 0          # moves into the current search
@@ -450,6 +451,10 @@ class ChasePlanner:
         self.last_bearing, self.last_edge = float(ball.bearing_deg), bool(getattr(ball, "touches_edge", False))
         near = ball.distance_in <= NUDGE_MAX_IN
         in_reach = ball.distance_in <= PUNT_MAX_IN
+        if (self.prev_kind == "turn" and self.turn_before is not None and ball.bearing_deg * self.turn_before < 0           # (user, 2026-11-05) he turned toward the ball and it is now on the OTHER side:
+                and abs(ball.bearing_deg) > SEARCH_SIDE_DEADBAND_DEG and abs(self.turn_before) > SEARCH_SIDE_DEADBAND_DEG and self._can_back(BACK_UP_S)):      # he overshot: back up, look again, then line up again
+            was, self.turn_before, self.align_before, self.align_turns = self.turn_before, None, None, 0
+            return self._back("back", BACK_UP_S, f"overshot the turn: the ball swung from {was:+.0f} to {ball.bearing_deg:+.0f} deg: back up and look again, then line up again")
         if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
             self.nudges += 1
             self.after_punt = False
@@ -474,6 +479,7 @@ class ChasePlanner:
         elif abs(ball.bearing_deg) > (PUNT_ALIGN_DEG if near else ALIGN_DEG):
             deg = max(-MAX_TURN_DEG, min(MAX_TURN_DEG, ball.bearing_deg))
             side = 1 if deg > 0 else -1
+            self.turn_before = float(ball.bearing_deg)
             return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
         if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
             self.after_punt = False
