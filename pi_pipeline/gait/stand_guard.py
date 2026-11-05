@@ -88,7 +88,8 @@ class StandGuard:
     def __init__(self, link, *, is_busy=lambda: False, detector: WobbleDetector | None = None, balance_off_idle: bool = True,
                  guard: bool = True, reassert_s: float = 60.0, quiet_after_activity_s: float = 8.0, on_trip=None,
                  reenable_after_s: float | None = None, max_reenable_s: float = 3600.0, on_fall=None, fall_deg: float = 60.0,
-                 clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2):
+                 clock=time.monotonic, sleep=time.sleep, poll_s: float = 0.2,
+                 on_sag=None, is_standing=lambda: True, sag_after_s: float = 5.0, sag_deg: float = 10.0, sag_level_deg: float = 20.0, sag_every_s: float = 10.0):
         self._link, self._is_busy = link, is_busy
         self._det = detector or WobbleDetector()
         self._balance_off_idle, self._guard = balance_off_idle, guard
@@ -110,12 +111,66 @@ class StandGuard:
         self._on_fall, self._fall_deg = on_fall, fall_deg
         self._tilt_since: float | None = None
         self._fell = False
+        # Sagging legs (user, 2026-11-05: any time he stands more than 5 s, check the tilt and react). The IMU stream is already read here, so the check costs no serial traffic.
+        self._on_sag, self._is_standing = on_sag, is_standing
+        self._sag_after_s, self._sag_deg, self._sag_level_deg, self._sag_every_s = sag_after_s, sag_deg, sag_level_deg, sag_every_s
+        self._hist: deque = deque(maxlen=60)      # (time, roll, pitch) of the last frames
+        self._active_at = clock()                 # when the last command was sent: how long he has stood since
+        self._ref: tuple | None = None            # (roll, pitch) a few seconds into this stand, while the legs hold: the sag check compares with it
+        self._sag_checked_at = -1e9
+        self._sag_running = False
+        self.sags = 0
 
     OFF_RESEND_S = 30.0
 
     def note_activity(self) -> None:
         self._quiet_until = self._clock() + self._quiet_s
+        self._active_at = self._clock()
+        self._ref = None
         self._det.reset()
+
+    @staticmethod
+    def _median_tilt(rows):
+        import statistics
+        return (statistics.median(r for _t, r, _p in rows), statistics.median(p for _t, _r, p in rows)) if rows else None
+
+    def _check_sag(self, now: float) -> None:
+        """Standing `sag_after_s` or more since the last command: compare the tilt of the last 1.5 s with how he stood a few seconds in (or, with no reference, with level). A sag calls
+        `on_sag(roll, pitch)` once on its own thread; the next check is `sag_every_s` later."""
+        if self._on_sag is None or self._sag_running or not self._is_standing():
+            return
+        since = now - self._active_at
+        if self._ref is None and 3.0 <= since <= 4.8:
+            rows = [x for x in self._hist if self._active_at + 3.0 <= x[0]]
+            if len(rows) >= 3:
+                self._ref = self._median_tilt(rows)
+        if since < self._sag_after_s or now - self._sag_checked_at < self._sag_every_s:
+            return
+        rows = [x for x in self._hist if x[0] >= now - 1.5]
+        if len(rows) < 4:
+            return
+        self._sag_checked_at = now
+        roll, pitch = self._median_tilt(rows)
+        if self._ref is not None:
+            sagged = max(abs(roll - self._ref[0]), abs(pitch - self._ref[1])) > self._sag_deg
+        else:
+            sagged = max(abs(roll), abs(pitch)) > self._sag_level_deg
+        if not sagged or max(abs(roll), abs(pitch)) > 40.0:        # past 40 deg he has fallen: the fall handler's business, not a sag
+            return
+        self.sags += 1
+        self._sag_running = True
+        log.warning("standing legs have sagged (roll %+.0f pitch %+.0f deg, %s): attention pose, then stand up again", roll, pitch,
+                    "level" if self._ref is None else f"stood at roll {self._ref[0]:+.0f} pitch {self._ref[1]:+.0f}")
+
+        def work():
+            try:
+                self._on_sag(roll, pitch)
+            except Exception:  # noqa: BLE001
+                log.exception("sag recovery failed")
+            finally:
+                self._sag_running = False
+                self.note_activity()                  # the recovery's own moves are not a stand to judge
+        threading.Thread(target=work, name="sag-recovery", daemon=True).start()
 
     def _gb(self, why: str) -> None:
         try:
@@ -205,6 +260,10 @@ class StandGuard:
                 self._link.send("gP", read_reply=False, settle=0.0)
             except Exception:  # noqa: BLE001
                 pass
+        for line in lines:
+            r = parse_imu_line(line)
+            if r is not None:
+                self._hist.append((now, math.degrees(r[0]), math.degrees(r[1])))
         if self._on_fall is not None:
             for line in lines:                        # a fall at any time, walking or not (the walk loops have their own detector); before the busy / quiet checks
                 r = parse_imu_line(line)
@@ -214,6 +273,8 @@ class StandGuard:
             self._quiet_until = now + self._quiet_s
             self._det.reset()
             return False
+        if not getattr(self, "_paused", False) and self._guard:
+            self._check_sag(now)
         if self._balance_off_idle and now >= self._quiet_until:            # never inside the quiet window: a pose plays with balance on (user, 2026-10-19)
             if now - self._last_gb >= self._reassert_s:
                 self._gb("periodic re-assert")

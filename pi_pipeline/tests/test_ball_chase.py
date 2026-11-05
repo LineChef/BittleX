@@ -627,7 +627,7 @@ def test_the_standing_flow_sends_nothing_extra_before_a_move_or_at_session_start
     t = iter(np.arange(0, 100000, 0.2))
     r = bc.SerialRobot(lk, sleep=lambda s: None, clock=t.__next__)
     r._moved_at = r._clock() - 60.0                                                    # long still: the attention flow would read the pose and the tilt now
-    assert r.stand_up() == "ok" and lk.sent == []
+    assert r.stand_up() == "ok" and lk.sent == ["gP", "gp"]                           # (user, 2026-11-05) standing 5 s or more: only the tilt read for the sag check, no pose read
     for move in (lambda: r.turn(20, 0.3), lambda: r.back(0.3)):
         lk.sent.clear()
         assert move() == "ok"
@@ -875,3 +875,35 @@ def test_the_line_up_target_is_small_and_inside_its_limits():
         a = bc.ChasePlanner().decide(reading(dist, bearing))
         assert a.kind == "align" and bc.ALIGN_MIN_DEG <= a.stop_deg <= bc.ALIGN_MAX_DEG
     assert bc.ChasePlanner().decide(reading(6, 40)).stop_deg == bc.ALIGN_MAX_DEG
+
+
+def test_standing_five_seconds_then_tilted_means_sagged_legs_even_in_the_standing_flow(monkeypatch):
+    import math
+    from pi_pipeline.gait import imu_parse
+    assert bc.BETWEEN_MOVES == "stand"
+    tilt = {"pitch": -2.0}
+    monkeypatch.setattr(imu_parse, "parse_imu_line", lambda line: (0.0, math.radians(tilt["pitch"])))
+
+    class Link(_PoseLink):
+        def poll_imu(self): return ["imu"]
+        def send(self, c, read_reply=False, settle=0.0):
+            if c == bc.CLAW_LOOK_POSE:
+                legs = bc._known_poses()["attention"]; self.joints = [0] * 8 + [int(round(legs[sv])) for sv in range(8, 16)]
+            if c == "kbalance":
+                tilt["pitch"] = -2.0                                                   # up again from the attention pose: the legs hold
+                legs = bc._known_poses()["stand"]; self.joints = [0] * 8 + [int(round(legs[sv])) for sv in range(8, 16)]
+            return super().send(c, read_reply, settle)
+    lk = Link("stand")
+    now = {"t": 100.0}
+    r = bc.SerialRobot(lk, sleep=lambda s: now.__setitem__("t", now["t"] + s), clock=lambda: now["t"])
+    r.posture, r._moved_at = "stand", 100.0
+    now["t"] = 103.0
+    assert r.stand_up() == "ok" and bc.CLAW_LOOK_POSE not in lk.sent                    # 3 s: too soon to check
+    now["t"] = 106.0
+    assert r.stand_up() == "ok" and bc.CLAW_LOOK_POSE not in lk.sent                    # 6 s, legs holding: nothing to do
+    r._moved_at = 106.0; now["t"] = 112.0
+    tilt["pitch"] = -30.0                                                              # the legs let go
+    lk.sent.clear()
+    assert r.stand_up() == "ok"
+    assert bc.CLAW_LOOK_POSE in lk.sent and lk.sent.index(bc.CLAW_LOOK_POSE) < lk.sent.index("kbalance")        # attention pose first, then the stand-up
+    assert r.posture == "stand"

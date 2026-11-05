@@ -115,6 +115,8 @@ BETWEEN_MOVES = "stand"        # the switch (user, 2026-11-02; the punt setting 
                                # pose until a wall calibration is taken in it. The legs went slack after 7 to 10 s of standing still (docs/STATUS.md open problem 14).
 # Close to the ball (within the nudge range, NUDGE_MAX_IN / PUNT_MAX_IN as the goal set them for this attempt, at the look before the move) he is dialing in: nudges, line-up turns,
 # a step closer after a punt. He stays standing between those small steps instead of going into the attention pose at each stop (user, 2026-11-02): `_dialing_in`.
+SAG_CHECK_AFTER_S = 5.0        # (user, 2026-11-05) standing this long since the last move ended: before the next move the IMU tilt is checked for sagging legs, and if they have sagged he goes
+                               # into the attention pose and stands up again (back legs first) before moving. Always on, in every flow (the standing flow included)
 QUICK_MOVE_S = 3.0             # a move this soon after the last one ended goes without the pose read and the tilt check (he is standing as the last move left him): no added stillness
 STILL_SAY_S = 4.0              # stood still longer than this before a move: said in the log (the still time of every move is in the trace)
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -590,6 +592,7 @@ class SerialRobot:
         self._walker = None
         self.bumped = False                               # the last walk ended on a bump (the IMU contact signal)
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
+        self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
         self.last_fall: dict | None = None                # the angles of the last fall the guard saw (pitch, roll, which way, the posture he was in)
         self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
@@ -722,6 +725,11 @@ class SerialRobot:
         first stand-up (the link's stand_from_attention); rest or a sit, the normal stand-up (the firmware `kbalance`; from a sit the link's slow back-legs stand-up). An unreadable
         pose falls back to the last one he was told to take (none yet: standing, as the session start left him). Then it waits until the board reads the stand,
         watching for a fall; "fell" if he went over. Standing, and the last move ended under QUICK_MOVE_S ago: nothing to check, he goes at once."""
+        if self.posture in ("stand", "unknown") and self._moved_at is not None and self._sag_checked_at != self._moved_at and self._clock() - self._moved_at >= SAG_CHECK_AFTER_S:
+            self._sag_checked_at = self._moved_at         # one check per stand: a clean one is not repeated until he has moved again
+            tilt = self._tilt()
+            if self._sagged(tilt):
+                return self.recover_sag(tilt)
         if BETWEEN_MOVES != "attention":
             return "ok"                                   # the standing flow sends nothing before a move (what the code did before 2026-11-02): the pose read, the tilt check and the stand-up wait
                                                           # added serial traffic in front of every walk, and the walks that followed showed no board echoes (docs/STATUS.md item 14)
@@ -752,6 +760,21 @@ class SerialRobot:
             pose = "attention" if self.posture == "attention" else self.read_pose()
             if pose in ("stand", "unknown"):
                 return "ok"                                   # the attention pose did not take: go as he is (logged above)
+        return self._stand_up_from(pose)
+
+    def recover_sag(self, tilt=None) -> str:
+        """The legs have sagged (the body is tilted away from how he stands when they hold): down into the attention pose, then up again, back legs first. Used by every flow:
+        the goal sessions before a move (stand_up) and the voice service's stand guard while he stands idle."""
+        log.warning("legs sagged%s: down into the attention pose and up again, back legs first", "" if tilt is None else f" (pitch {tilt[0]:+.0f} roll {tilt[1]:+.0f} deg)")
+        self.posture = "stand"
+        self.relax()
+        if self.posture != "attention":
+            log.warning("the attention pose did not take (%s): leaving him as he is", self.posture)
+            self._moved_at = self._clock()
+            return "ok"
+        return self._stand_up_from("attention")
+
+    def _stand_up_from(self, pose: str) -> str:
         if hasattr(self._lk, "last_motion_command"):
             self._lk.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read
         self._pitch, self._roll = [], []

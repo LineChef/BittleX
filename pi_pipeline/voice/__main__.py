@@ -119,12 +119,23 @@ def main() -> None:
             args.actuator, port=settings.serial_port, baud=settings.serial_baud, link=link,
             max_continuous_s=args.max_gait_s, balance_off_idle=settings.balance_off_idle, policy_walker=policy_walker,
         )
+        def _sag_recover(roll, pitch):
+            """Standing legs sagged (gait/stand_guard.py): the attention pose, then up again, back legs first. Runs on its own IMU copy; the actuator's walks are never running (the guard is busy then)."""
+            from ..behavior.ball_chase import SerialRobot
+            c = fan.consumer() if fan is not None else link
+            try:
+                SerialRobot(c).recover_sag((pitch, roll))
+            finally:
+                if fan is not None:
+                    fan.release(c)
+
         guard = None
         if link is not None and (settings.stand_guard or settings.balance_off_idle):
             from ..gait.stand_guard import StandGuard
             guard = StandGuard(fan.consumer() if fan is not None else link, is_busy=lambda: getattr(actuator, "busy", False) or exploring.is_set(), guard=settings.stand_guard,
                                balance_off_idle=settings.balance_off_idle, reassert_s=settings.stand_reassert_s,
                                reenable_after_s=None if settings.balance_off_idle else 300.0,
+                               on_sag=_sag_recover, is_standing=lambda: getattr(link, "last_motion_command", "") not in ("", "d", "krest", "ksit", "kcalib"),
                                on_fall=lambda: (_note_fall(), __import__("pi_pipeline.voice.prompt_tones", fromlist=["x"]).play_horn_if_enabled("G2_FALL_HORN"))).start()   # tipped over at any time: the losing horn
             actuator.on_command = guard.note_activity
         # acknowledgement tone (the sound_cues feature flag turns all cues off): the whistle through the speaker when there

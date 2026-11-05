@@ -241,3 +241,39 @@ def test_the_link_counts_commands_that_can_switch_balance_on(monkeypatch):
     for c in ("gb", "gP", "d", "i8 30", "gB", "kbalance", "b9 5"):
         lk.send(c, read_reply=False, settle=0.0)
     assert lk.balance_epoch == 2 and LockedLink(lk).balance_epoch == 2
+
+
+# ---- sagging legs (user, 2026-11-05): standing 5 s or more with the body tilted away from how the legs held it
+
+def sag_run(tilt_at, seconds=16.0, standing=True, ref_pitch=-2.0):
+    """Drive a guard at 5 frames a second; tilt_at(t_since_activity) gives the pitch. Returns (guard, calls to on_sag)."""
+    link, clock, calls = FakeLink(), Clock(), []
+    g = StandGuard(link, guard=True, balance_off_idle=False, clock=clock, on_sag=lambda r, p: calls.append((round(r), round(p))), is_standing=lambda: standing)
+    g.note_activity()
+    t0 = clock.t
+    for _ in range(int(seconds / 0.2)):
+        clock.t += 0.2
+        link.queue = [imu_line(1.0, tilt_at(clock.t - t0))]
+        g.tick()
+        for th in __import__("threading").enumerate():
+            if th.name == "sag-recovery":
+                th.join(2)
+    return g, calls
+
+
+def test_legs_that_sag_after_the_stand_are_caught_after_five_seconds_standing():
+    g, calls = sag_run(lambda s: -2.0 if s < 7.0 else -20.0)              # held for 7 s, then the back legs let go
+    assert len(calls) >= 1 and calls[0][1] == -20
+    assert g.sags >= 1
+
+
+def test_legs_that_hold_never_trigger_it_and_a_tilted_stand_that_started_tilted_is_the_reference():
+    assert sag_run(lambda s: -2.0)[1] == []
+    assert sag_run(lambda s: -15.0)[1] == []                              # tilted from the start (the arm's weight): that is how he stands, not a sag
+
+
+def test_a_sag_is_not_looked_for_while_not_standing_or_before_five_seconds_or_after_a_fall():
+    assert sag_run(lambda s: -2.0 if s < 7.0 else -20.0, standing=False)[1] == []
+    assert sag_run(lambda s: -2.0 if s < 3.5 else -20.0, seconds=4.9)[1] == []
+    assert sag_run(lambda s: -2.0 if s < 7.0 else -55.0)[1] == []         # past 40 deg: a fall, the fall handler's business
+
