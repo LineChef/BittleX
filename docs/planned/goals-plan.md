@@ -13,7 +13,7 @@ Agreed with the user 2026-10-31. Backlog item [B28](behavior-ideas.md#b28--goals
 - **The user reads the learning data to judge its quality** (see "Reading the data").
 - **Local first.** G2 judges his attempts on the Pi with no API call (see "Local reasoning or a Claude call"). No Claude calls to start; looked at again later if it makes sense.
 - **Free is the default** for any setting the user does not name; the free / ask / fixed split below is agreed.
-- **The walk is never switched:** G2 always walks with the default gait policy (the attachment's saved gait).
+- **The walk is the default gait policy** (the attachment's saved gait) for everything except the dialing-in steps close to the ball, which use Petoi's scripted walk (`nudge_gait`, a fixed setting G2 never changes; user, 2026-11-04). The long walk is never switched.
 - **Searching:** a claw look (the arm points the camera), turns, back-ups and back-ups with turns are all his to order; the claw look comes first by default.
 - **Lining up:** small turns checked with the camera after each one.
 - **He measures his own pace and turn rates** from the camera and times his moves with them.

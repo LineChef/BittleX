@@ -18,6 +18,7 @@ KNOB_INFO = {
     "nudge_max_in": (0.5, "free", "taking small steps closer from", "in"),
     "nudges_before_punt": (1, "free", "small steps before punching anyway", ""),
     "nudge_step_s": (0.15, "free", "one small step of", "s"),
+    "nudge_gait": (None, "fixed", "small steps closer with the", "walk"),                         # the user's switch (2026-11-04): Petoi's scripted walk or the learned policy, never changed by G2
     "walk_aim_in": (0.5, "free", "ending my walks", "in from the ball"),
     "punt_align_deg": (2.0, "free", "lining up within", "deg"),
     "punch_lunge_s": (0.02, "ask", "a lunge time of", "s"),

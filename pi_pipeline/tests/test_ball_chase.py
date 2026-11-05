@@ -124,6 +124,10 @@ class FakeRobot:
     def battery_ok(self): return True
 
 
+class ScriptedRobot(FakeRobot):
+    def walk_scripted(self, s): return self._do(("scripted", round(s, 1)))
+
+
 class FakeCamera:
     def __init__(self, frames):
         self.frames, self.i = frames, 0
@@ -793,3 +797,27 @@ def test_after_turning_past_the_ball_the_search_goes_back_the_other_way(monkeypa
     p.prev_kind = "align"
     p.decide(None)
     assert _search_dir(p) == -1                                  # it is on the left of that turn
+
+
+# ------------------------------------------------------------------------------------------------- the dialing-in steps use Petoi's scripted walk (user, 2026-11-04)
+
+def test_the_small_steps_closer_are_planned_as_scripted_walks_and_the_long_walk_is_not():
+    p = bc.ChasePlanner()
+    near = p.decide(reading(5.5, 0))                                                                 # between punt_max_in and nudge_max_in, straight ahead: a small step closer
+    assert near.kind == "walk" and near.scripted and near.seconds == bc.NUDGE_S
+    far = bc.ChasePlanner().decide(reading(30, 0))
+    assert far.kind == "walk" and not far.scripted                                                   # the long walk stays the learned policy
+    old = bc.NUDGE_GAIT
+    bc.NUDGE_GAIT = "policy"
+    try:
+        assert not bc.ChasePlanner().decide(reading(5.5, 0)).scripted                                # the switch back
+    finally:
+        bc.NUDGE_GAIT = old
+
+
+def test_the_loop_sends_a_scripted_step_to_walk_scripted_and_a_robot_without_one_still_walks():
+    frames = [picture([disc(122, 110, 30)]), picture([disc(122, 110, 50)])]
+    for robot_cls, want in ((ScriptedRobot, "scripted"), (FakeRobot, "walk")):
+        robot = robot_cls()
+        bc.run_chase(robot, FakeCamera(frames), lambda: False, max_steps=2, sleep=lambda s: None, say=lambda m: None)
+        assert [m[0] for m in robot.moves][:1] == [want], robot.moves

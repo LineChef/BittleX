@@ -41,6 +41,7 @@ PUNT_ALIGN_DEG = 12.0          # ... and before a punt
 PUNT_MIN_IN, PUNT_MAX_IN = 0.0, 4.0      # camera to ball: the lunge reaches about this far (2.6 in threw the ball 18 in; 4.5 to 5 in was just out of reach, 2026-10-25)
 NUDGE_MAX_IN = 7.0             # between PUNT_MAX_IN and this: small steps closer, then punt anyway after NUDGES_BEFORE_PUNT of them
 NUDGE_S = 0.9
+NUDGE_GAIT = "scripted"      # how the small steps closer are walked (user, 2026-11-04): "scripted" = Petoi's own forward walk (kwkF) for NUDGE_S, which is steadier than the learned policy for dialing in the distance; "policy" = the learned gait
 WALK_AIM_IN = 4.0              # a walk step is timed to leave the ball about this far from the camera (the ball is touched at about 3 in)
 NUDGES_BEFORE_PUNT = 3      # camera to ball, measured 2026-10-25: the ball at 2.6 in is a good punt (the claw hits it first and it goes straight ahead); at 4.5 in it is too far to be hit
 WALK_MAX_S = 3.0               # one walk step: then look again
@@ -120,7 +121,7 @@ ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is
 STAND_UP_WATCH_S = 1.0         # the stand-up out of the attention pose, watched for a fall
 CLAW_SETTLE_S = 0.8            # after the arm move and before the picture: the arm and body settle; the old camera frame is dropped by _SnapshotCamera.look (the module answers with the previous request's picture, 2026-11-01)
 
-# The walk is always the learned default gait policy (the attachment's saved gait: ARM1X with the arm), never switched (user, 2026-10-31). Its pace and the turn rates are measured by
+# The walk is the learned default gait policy (the attachment's saved gait: ARM1X with the arm) (user, 2026-10-31); only the dialing-in steps close to the ball use Petoi's scripted walk instead (NUDGE_GAIT, user, 2026-11-04). Its pace and the turn rates are measured by
 # G2 himself from the camera (behavior/chase_pace.py) and used to time each move; the defaults there stand in until he has measured them.
 BACK_IN_S = 3.0                # a guess at the firmware back-up's pace (not measured: there is no reading before a back-up after a punt)
 
@@ -234,6 +235,7 @@ class Action:
     degrees: float = 0.0       # + = right, - = left
     why: str = ""
     degrees2: float = 0.0      # a sidestep's closing turn: from the heading after the step to facing the ball again (so he does not lose it: the camera sees about 47 deg either side)
+    scripted: bool = False     # a walk: Petoi's scripted walk (kwkF) instead of the learned policy (the dialing-in steps, NUDGE_GAIT)
 
 
 @dataclass
@@ -445,7 +447,7 @@ class ChasePlanner:
         if near and not in_reach and abs(ball.bearing_deg) <= PUNT_ALIGN_DEG and self.nudges < NUDGES_BEFORE_PUNT:
             self.nudges += 1
             self.after_punt = False
-            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})")
+            return Action("walk", NUDGE_S, why=f"ball {ball.distance_in:.1f} in ahead, just out of reach: a small step closer ({self.nudges} of {NUDGES_BEFORE_PUNT})", scripted=NUDGE_GAIT == "scripted")
         if not near:
             self.align_turns = 0
         if near and abs(ball.bearing_deg) > PUNT_ALIGN_DEG:
@@ -468,7 +470,7 @@ class ChasePlanner:
             return Action("turn", max(MIN_MOVE_S, abs(deg) / self._turn_rate(side, False)), deg, f"ball {ball.bearing_deg:+.0f} deg off straight: turn")
         if near and self.after_punt and ball.distance_in > CLOSE_IN_IN:
             self.after_punt = False
-            return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer")
+            return Action("walk", 0.9, why=f"ball still {ball.distance_in:.0f} in away after the punt: step closer", scripted=NUDGE_GAIT == "scripted")
         if near:
             self.after_punt = True
             self.align_turns = 0
@@ -489,6 +491,7 @@ class ChasePlanner:
 
 class Robot(Protocol):
     def walk(self, seconds: float) -> str: ...
+    # optional: def walk_scripted(self, seconds: float) -> str   (Petoi's kwkF walk; a robot without it walks the dialing-in steps with walk())
     def turn(self, degrees: float, seconds: float) -> str: ...
     def back(self, seconds: float) -> str: ...
     def punt(self) -> str: ...
@@ -797,6 +800,15 @@ class SerialRobot:
             return "fell"
         self.posture = "stand"
         return self._policy_walk(seconds)                 # always the default gait policy (user, 2026-10-31)
+
+    def walk_scripted(self, seconds: float) -> str:
+        """Petoi's scripted forward walk (`kwkF`) for `seconds`, then the balance pose. The dialing-in steps use it (user, 2026-11-04): much steadier than the learned policy, so the distance to the
+        ball can be set reliably. "ok" or "fell". The walk has no contact signal (no IMU stream is read), so a bump is not reported."""
+        if self.stand_up() == "fell":
+            return "fell"
+        self.posture = "stand"
+        self.bumped = False
+        return self._skill("kwkF", seconds)
 
     def _policy_walk(self, seconds: float) -> str:
         """The learned walk (the attachment's saved gait) for `seconds`, ending in a balanced stand. "fell" if it ended in a fall. A bump (the walk's IMU contact signal, the same one
@@ -1282,7 +1294,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                 state = robot.turn(act.degrees2, abs(act.degrees2) / planner._turn_rate(1 if act.degrees2 > 0 else -1, False))       # face the ball again: it would be outside the camera's view
             last_move = None
         elif act.kind in ("walk", "search_walk"):
-            state = robot.walk(act.seconds)
+            state = robot.walk_scripted(act.seconds) if act.scripted and hasattr(robot, "walk_scripted") else robot.walk(act.seconds)
             if state == "board_silent":
                 say("the BiBoard is not sending anything back (no IMU frames): power-cycle it (switch it off and on), then try again")
                 note(kind="act", act=act.kind, why=act.why, state=state)
@@ -1295,7 +1307,7 @@ def _chase_loop(robot: Robot, camera: Camera, stop: Callable[[], bool], *, plann
                     state = robot.back(VANISH_BACK_S)
                 last_move = None
                 ball = None                                                       # no pace sample from a walk that ended on a bump
-            if ball is not None and act.kind == "walk":
+            if ball is not None and act.kind == "walk" and not act.scripted:         # (the pace book measures the learned walk; a scripted step must not pull it)
                 last_move = ("walk", act.seconds, 0.0, ball)
         elif act.kind == "three_point":
             if announce is not None:

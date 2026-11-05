@@ -48,7 +48,7 @@ def test_a_goal_applies_the_users_controls_and_free_is_the_default():
     g = Goal("x", "X", "ball_punt", controls={"punt_max_in": "fixed", "nope": "free", "lost_looks": "banana"})
     knobs = {k.name: k for k in g.knobs(ball_punt.BallPunt().knobs())}
     assert knobs["punt_max_in"].control == "fixed" and knobs["lost_looks"].control == "free" and knobs["punch_lunge_s"].control == "ask"
-    assert "walk_gait" not in knobs and knobs["search_order"].control == "free" and knobs["align_tries"].control == "free"     # the walk is never switched (user, 2026-10-31)
+    assert "walk_gait" not in knobs and knobs["search_order"].control == "free" and knobs["align_tries"].control == "free"     # the long walk is never switched (user, 2026-10-31)
     for fixed in ("search_walk", "max_seconds", "back_up_budget_s", "claw_pan_sign", "punch_hold_s", "back_up_s", "stuck_punts", "search_step_deg"):
         assert knobs[fixed].control == "fixed", fixed
 
