@@ -492,11 +492,11 @@ def test_the_sync_now_button_starts_one_sync_at_a_time(monkeypatch, tmp_path):
     monkeypatch.setattr(G.subprocess, "Popen", Proc)
     monkeypatch.setenv("HOME", str(tmp_path))
     app = G.App(G.Remote("pi@x", runner=FakePi()))
-    assert app.sync_now() == {"running": True, "started": True}
+    assert app.sync_now() == {"running": True, "started": True, "last": None}
     assert app.sync_now()["started"] is False and len(started) == 1                 # one at a time
     assert started[0][-3:] == ["run", "--force", "all"] and started[0][1].endswith("g2_sync.sh")
     app._sync.returncode = 0
-    assert app.sync_now(start=False) == {"running": False, "started": False, "result": 0}
+    assert app.sync_now(start=False) == {"running": False, "started": False, "result": 0, "last": None}
 
 
 def test_the_mic_button_reads_and_ends_a_wake_word_pause():

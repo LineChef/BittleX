@@ -71,3 +71,18 @@ def test_the_page_carries_the_facts_tab_code():
     R = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(R)
     assert "/*MEMORY_UI*/" not in R.PAGE and "renderFacts" in R.PAGE and "renderTidy" in R.PAGE and "window.g2ask" in R.PAGE
+
+
+def test_the_sync_button_reports_what_the_last_run_did(tmp_path, monkeypatch):
+    """g2_sync.sh exits 0 even when the Pi does not answer, so the page reads sync_last.json instead of the exit code."""
+    import json
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "Desktop" / "G2Memory").mkdir(parents=True)
+    (tmp_path / "Desktop" / "G2Memory" / "sync_last.json").write_text(json.dumps({"time": "2026-11-04 20:44:02", "outcome": "offline", "message": "the Pi does not answer"}))
+    spec = importlib.util.spec_from_file_location("g2_review_s", TOOLS / "g2_review.py")
+    R = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(R)
+    last = R.App.sync_last()
+    assert last["outcome"] == "offline" and last["when"] == "Nov 4, 8:44 PM"
+    (tmp_path / "Desktop" / "G2Memory" / "sync_last.json").unlink()
+    assert R.App.sync_last() is None

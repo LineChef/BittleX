@@ -507,18 +507,29 @@ class App:
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(src), str(dst))
 
+    @staticmethod
+    def sync_last() -> dict | None:
+        """What the latest sync run did, from ~/Desktop/G2Memory/sync_last.json (tools/g2_sync.sh): {"outcome": ok|partial|offline|busy|running|no_pi, "message", "when" (12-hour)}."""
+        try:
+            d = json.loads(Path(os.path.expanduser("~/Desktop/G2Memory/sync_last.json")).read_text())
+            d["when"] = time.strftime("%b %-d, %-I:%M %p", time.strptime(d["time"], "%Y-%m-%d %H:%M:%S"))
+            return d
+        except (OSError, ValueError, KeyError):
+            return None
+
     def sync_now(self, start: bool = True) -> dict:
-        """The "Sync now" button (user, 2026-11-01): every copy from the Pi now (tools/g2_sync.sh run --force all), in the background. Returns whether one is running."""
+        """The "Sync now" button (user, 2026-11-01): every copy from the Pi now (tools/g2_sync.sh run --force all), in the background. Returns whether one is running and what the last run did
+        (the script exits 0 even when the Pi does not answer, so the exit code alone cannot say whether anything was copied)."""
         if self._sync is not None and self._sync.poll() is None:
-            return {"running": True, "started": False}
+            return {"running": True, "started": False, "last": self.sync_last()}
         if not start:
-            return {"running": False, "started": False, "result": None if self._sync is None else self._sync.returncode}
+            return {"running": False, "started": False, "result": None if self._sync is None else self._sync.returncode, "last": self.sync_last()}
         LOG_DIR = Path(os.path.expanduser("~/g2_logs"))
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         script = Path(__file__).resolve().parent / "g2_sync.sh"
         self._sync = subprocess.Popen(["bash", str(script), "run", "--force", "all"], env={**os.environ, "G2_PI": self.remote.pi},
                                       stdout=open(LOG_DIR / "sync_button.log", "a"), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
-        return {"running": True, "started": True}
+        return {"running": True, "started": True, "last": self.sync_last()}
 
     def mic(self, turn_on: bool = False) -> dict:
         """G2's wake word: {"paused", "minutes_left", "until"}; `turn_on` ends a "mic off" pause early (voice/wake_pause.py)."""
@@ -1142,11 +1153,14 @@ const TAB=Math.random().toString(36).slice(2);const beat=()=>{api("/api/hb",{id:
 addEventListener("pageshow",beat);addEventListener("pagehide",()=>{try{navigator.sendBeacon("/api/bye?t="+encodeURIComponent(TOKEN)+"&id="+TAB)}catch(e){}});
 async function showSync(){try{const r=await api("/api/sync");const ls=$("#lastsync");ls.replaceChildren(document.createTextNode(r.running?"Syncing from the Pi… ":"Last copy from the Pi: "));
   for(const t of r.tasks){const sp=el("span","",t.task+" "+t.last_ok+(t.failed?" (failed)":"")+"   ");if(t.stale||t.failed){sp.style.color="var(--x)";sp.style.fontWeight="600";sp.title="older than it should be"}ls.append(sp)}
+  if(r.last&&r.last.outcome!=="ok"&&!r.running){const w=el("div","","Last try "+r.last.when+": "+r.last.message);w.style.cssText="color:var(--x);font-weight:600;margin-top:2px";ls.append(w)}
   const b=$("#syncnow");b.disabled=r.running;b.textContent=r.running?"Syncing…":"Sync from the Pi";return r}catch(e){return null}}
 async function showMic(){try{const m=await api("/api/mic",{on:false});$("#micstate").textContent=m.paused?"Wake word off: "+Math.ceil(m.minutes_left)+" min left (until "+m.until+")":"";$("#micon").style.display=m.paused?"":"none"}catch(e){$("#micstate").textContent=""}}
 async function micOn(){try{await api("/api/mic",{on:true});toast("Wake word back on");showMic()}catch(e){toast("Failed: "+e.message)}}
-async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: a few minutes":"A sync is already running");await showSync();
-  const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,5000);return}toast(s&&s.result===0?"Sync done":"Sync finished with a problem (see ~/g2_logs/sync.log)");load()};setTimeout(tick,5000)}catch(e){toast("Failed: "+e.message)}}
+async function syncNow(){try{const r=await api("/api/sync",{start:true});toast(r.started?"Sync started: a few minutes if the Pi is on":"A sync is already running");await showSync();
+  const tick=async()=>{const s=await showSync();if(s&&s.running){setTimeout(tick,4000);return}const l=s&&s.last;
+   const say=!l?"Sync finished: see ~/g2_logs/sync.log":l.outcome==="ok"?"Sync done: "+l.message:l.outcome==="partial"?"Sync finished with a problem: "+l.message:"Sync did not run: "+l.message;
+   toast(say);load()};setTimeout(tick,3000)}catch(e){toast("Failed: "+e.message)}}
 async function load(){const list=$("#list");$("#extra").replaceChildren();list.replaceChildren(el("div","empty","Loading…"));
  try{
   if(tab==="pictures"||tab==="looks"){data=await api("/api/pictures")}

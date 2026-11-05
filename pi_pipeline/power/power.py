@@ -67,13 +67,19 @@ def disable_onboard_leds(dry_run: bool | None = None) -> list[str]:
 
 # --- 2. Wi-Fi power save ----------------------------------------------------
 def set_wifi_power_save(on: bool, dry_run: bool | None = None) -> tuple[bool, str]:
+    """Wi-Fi power-save on or off. On the charger (`power plugged`) it is never turned on: a sleeping radio can drop off the network, and the charger makes the saving pointless."""
+    from .charger import is_plugged
+    kept_off = on and is_plugged()
+    if kept_off:
+        on = False
     dry = (not shutil.which("iw")) if dry_run is None else dry_run
     cmd = ["iw", "dev", _WIFI_IF, "set", "power_save", "on" if on else "off"]
     if dry:
-        return True, "DRY-RUN: " + " ".join(cmd)
+        return True, "DRY-RUN: " + " ".join(cmd) + (" (kept off: on the charger)" if kept_off else "")
     if hasattr(os, "geteuid") and os.geteuid() != 0:
         cmd = ["sudo", "-n", *cmd]          # the voice service runs as a normal user; the Pi's sudo needs no password (setup_pi.sh)
-    return _run(cmd)
+    ok, out = _run(cmd)
+    return ok, (out + " (kept off: on the charger)") if kept_off else out
 
 
 def get_wifi_power_save() -> str:
@@ -135,5 +141,6 @@ def status() -> dict:
         "on_pi": _on_pi(),
         "cpu_governor": get_cpu_governor(),
         "wifi_power_save": get_wifi_power_save(),
+        "on_charger": __import__("pi_pipeline.power.charger", fromlist=["is_plugged"]).is_plugged(),
         "boot_config_lines_needed": BOOT_CONFIG_LINES,
     }

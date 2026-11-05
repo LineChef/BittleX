@@ -218,6 +218,22 @@ def env_reference_errors(root):
     return []
 
 
+def cheatsheet_errors(root):
+    """The cheat sheet stays a quick reference (examples you can copy, short descriptions, real aliases) and its A to Z index is current (tools/gen_cheatsheet_index.py; only for the real repo tree)."""
+    try:
+        import gen_cheatsheet_index as g
+    except ImportError:
+        return []
+    if os.path.realpath(root) != os.path.realpath(g.ROOT):
+        return []
+    out = g.errors(root)
+    target = os.path.join(root, "docs", "guides", "cheatsheet.md")
+    cur = open(target).read() if os.path.exists(target) else ""
+    if cur != g.build(root):
+        out.append("docs/guides/cheatsheet.md: the A to Z index is out of date -- run: python tools/gen_cheatsheet_index.py")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--staged", action="store_true")
@@ -232,6 +248,7 @@ def main():
     errors += helpers_doc_errors(root)
     errors += results_index_errors(root)
     errors += env_reference_errors(root)
+    errors += cheatsheet_errors(root)
     if not args.quiet_warnings:
         for w in warnings:
             print(f"warning: {w}")

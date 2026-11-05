@@ -250,7 +250,7 @@ Docs that mention this family: [`STATUS.md`](../STATUS.md), [`capabilities.md`](
 
 ## `Release_Candidate`
 
-Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`shell-helpers.md`](../guides/shell-helpers.md), [`training-pipeline.md`](training-pipeline.md).
+Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`cheatsheet-advanced.md`](../guides/cheatsheet-advanced.md), [`shell-helpers.md`](../guides/shell-helpers.md), [`training-pipeline.md`](training-pipeline.md).
 
 | File | Size | Cited by |
 |---|---|---|
@@ -275,7 +275,7 @@ Docs that mention this family: [`attachments.md`](../guides/attachments.md), [`s
 
 ## `report`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md) +51.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`automated-testing-loop.md`](../archive/automated-testing-loop.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md) +52.
 
 | File | Size | Cited by |
 |---|---|---|

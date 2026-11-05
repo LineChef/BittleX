@@ -8,15 +8,13 @@
 # (~/.local/share/g2/pi_last_ip), then the router's address table (`arp -a` lists the Pi by its short name).
 host="$1"; port="${2:-22}"
 cache="$HOME/.local/share/g2/pi_last_ip"
-ip=$(perl -e 'alarm shift; exec @ARGV' 2 dscacheutil -q host -a name "$host" 2>/dev/null | awk '/^ip_address:/ {print $2; exit}')
-if [ -n "$ip" ]; then
-  mkdir -p "$(dirname "$cache")" && echo "$ip" > "$cache"
-  exec nc "$ip" "$port"
-fi
-ip=$(cat "$cache" 2>/dev/null)
-if [ -z "$ip" ] || ! nc -z -G 2 "$ip" "$port" 2>/dev/null; then
-  ip=$(arp -a 2>/dev/null | awk -v h="${host%.local}" '$1 == h {gsub(/[()]/, "", $2); print $2; exit}')
-fi
-[ -n "$ip" ] || { echo "g2_pi_connect: $host does not resolve and no address for it is known" >&2; exit 1; }
-mkdir -p "$(dirname "$cache")" && echo "$ip" > "$cache"
-exec nc "$ip" "$port"
+up() { [ -n "$1" ] && nc -z -G 3 "$1" "$port" 2>/dev/null; }          # does something answer on the ssh port there? (a stale address otherwise ends as "Connection closed by UNKNOWN port 65535")
+tried=""
+try() { [ -n "$1" ] || return 1; tried="$tried $1"; up "$1" || return 1; mkdir -p "$(dirname "$cache")" && echo "$1" > "$cache"; exec nc "$1" "$port"; }
+try "$(perl -e 'alarm shift; exec @ARGV' 2 dscacheutil -q host -a name "$host" 2>/dev/null | awk '/^ip_address:/ {print $2; exit}')"
+try "$(perl -e 'alarm shift; exec @ARGV' 4 dns-sd -G v4 "$host" 2>/dev/null | awk '/^[0-9].* Add / {print $6; exit}')"     # the name lookup above found no IPv4 address (it can list only the IPv6 one): ask mDNS for it
+try "$(cat "$cache" 2>/dev/null)"
+try "$(arp -a 2>/dev/null | awk -v h="${host%.local}" '$1 == h {gsub(/[()]/, "", $2); print $2; exit}')"
+if [ -n "$tried" ]; then echo "g2_pi_connect: $host is known at$tried but nothing answers on port $port: the Pi is off, not on this network, or its ssh service is down" >&2
+else echo "g2_pi_connect: $host does not resolve and no address for it is known" >&2; fi
+exit 1

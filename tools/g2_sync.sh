@@ -20,6 +20,13 @@ LOG="$HOME/g2_logs/sync.log"
 mkdir -p "$HOME/g2_logs" "$MEM"
 TASKS="goals:30:24 pictures:30:48 walklogs:30:72 walls:30:72 memorydb:1440:48 logs:1440:72"
 
+LASTFILE="$(dirname "$STATUS")/sync_last.json"
+last() {   # what the latest run did, for the review page's Sync button: ok | partial | offline | busy | running | no_pi
+  python3 - "$LASTFILE" "$1" "$2" <<'PY'
+import json, sys, time
+json.dump({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "outcome": sys.argv[2], "message": sys.argv[3]}, open(sys.argv[1], "w"))
+PY
+}
 say() { echo "$(date '+%Y-%m-%d %I:%M:%S %p')  $*" >> "$LOG"; echo "$*"; }
 
 if [ -z "${G2_PI:-}" ]; then                     # a background loop has no shell profile: take the one line that sets it (the value is never printed)
@@ -110,18 +117,19 @@ case "${1:-status}" in
   run)
     LOCK="$HOME/g2_logs/sync.lock"                                                   # one sync at a time (the background loop, a deploy, the page's Sync now button)
     if ! mkdir "$LOCK" 2>/dev/null; then
-      if kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; then say "another sync is running: skipped"; exit 0; fi
+      if kill -0 "$(cat "$LOCK/pid" 2>/dev/null)" 2>/dev/null; then say "another sync is running: skipped"; last running "another sync is already running"; exit 0; fi
       rm -rf "$LOCK"; mkdir "$LOCK" 2>/dev/null || { say "could not take the sync lock: skipped"; exit 0; }
     fi
     echo $$ > "$LOCK/pid"; trap 'rm -rf "$LOCK"' EXIT
     force=""
     [ "${2:-}" = "--force" ] && force="${3:-all}"
-    [ -n "${G2_PI:-}" ] || { say "G2_PI is not set: nothing to sync"; exit 0; }
-    ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" true 2>/dev/null || { say "the Pi does not answer: nothing synced"; exit 0; }
+    [ -n "${G2_PI:-}" ] || { say "G2_PI is not set: nothing to sync"; last no_pi "G2_PI is not set, so there is nothing to sync from"; exit 0; }
+    ssh -o ConnectTimeout=8 -o BatchMode=yes "$G2_PI" true 2>/dev/null || { say "the Pi does not answer: nothing synced"; last offline "the Pi does not answer (it is off, or not reachable from this Mac): nothing was copied; edits you made stay queued"; exit 0; }
     busy="$(pi_busy)"
-    if [ -n "$busy" ]; then say "the Pi is busy ($busy): nothing synced, the next run tries again"; exit 0; fi
+    if [ -n "$busy" ]; then say "the Pi is busy ($busy): nothing synced, the next run tries again"; last busy "the Pi is busy ($busy): try again when it is done"; exit 0; fi
     python3 "$ROOT/tools/g2_review_queue.py" apply 2>&1 | sed 's/^/review edits: /' >> "$LOG"         # edits made in the review page wait on this Mac: they go to the Pi before anything is copied down
     python3 "$ROOT/tools/g2_goal_edits.py" apply 2>&1 | sed 's/^/goal edits: /' >> "$LOG"
+    nfail=0; ndone=0
     for spec in $TASKS; do
       name="${spec%%:*}"; rest="${spec#*:}"; every="${rest%%:*}"
       if [ -z "$force" ] || { [ "$force" != all ] && [ "$force" != "$name" ]; }; then
@@ -130,9 +138,10 @@ case "${1:-status}" in
       fi
       out="$(do_task "$name" 2>&1)"; rc=$?
       echo "$out" >> "$LOG"
-      if [ $rc = 0 ]; then stamp "$name" ok "$(printf '%s' "$out" | tail -1)"; say "$name: ok"
-      else stamp "$name" failed "$(printf '%s' "$out" | tail -1)"; say "$name: FAILED ($(printf '%s' "$out" | tail -1 | cut -c1-120))"; fi
-    done ;;
+      if [ $rc = 0 ]; then stamp "$name" ok "$(printf '%s' "$out" | tail -1)"; say "$name: ok"; ndone=$((ndone + 1))
+      else stamp "$name" failed "$(printf '%s' "$out" | tail -1)"; say "$name: FAILED ($(printf '%s' "$out" | tail -1 | cut -c1-120))"; nfail=$((nfail + 1)); fi
+    done
+    if [ "$nfail" = 0 ]; then last ok "copied $ndone item(s) from the Pi"; else last partial "$nfail of $((ndone + nfail)) copies failed (the red items on the line above say which)"; fi ;;
   status)
     for spec in $TASKS; do
       name="${spec%%:*}"; rest="${spec#*:}"; every="${rest%%:*}"; stale_h="${rest#*:}"

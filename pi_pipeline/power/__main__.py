@@ -1,4 +1,5 @@
 """python -m pi_pipeline.power  status | headless | interactive | governor <name> | wifi on|off | leds-off
+                               | plugged | unplugged   (tell the Pi it is on / off its charger; on the charger Wi-Fi power-save stays off so the Mac can always reach it)
                                | stats   (sleeps and wakes from the power log) | log [N]   (the last N lines of the power log: start/stop, sleep/wake, heartbeats; see power_log.py)
                                | runtime [list] | runtime add <seconds> [full] | runtime forget <index> | runtime count <index> | runtime path
                                | runtime test start|status|collect|cancel   (an intentional battery-life test; see runtime_tracker.py)"""
@@ -21,6 +22,13 @@ def main(argv=None):
         print(json.dumps(P.apply_interactive_profile(), indent=2, default=str))
     elif cmd == "governor" and len(a) > 1:
         print("\n".join(P.set_cpu_governor(a[1])))
+    elif cmd == "plugged":
+        from . import charger
+        changed = charger.set_plugged(True)
+        print(("on the charger: " if changed else "already on the charger: ") + "Wi-Fi power-save is off and stays off (" + P.set_wifi_power_save(False)[1] + ")")
+    elif cmd == "unplugged":
+        from . import charger
+        print("off the charger: sleep mode turns Wi-Fi power-save on again the next time he sleeps" if charger.set_plugged(False) else "was not marked as on the charger")
     elif cmd == "wifi" and len(a) > 1:
         print(P.set_wifi_power_save(a[1] == "on"))
     elif cmd == "runtime":
@@ -50,13 +58,18 @@ def _runtime(a):
         return _runtime_test(t, a[1:])
     if sub in ("unplugged", "plugged"):
         if sub == "unplugged":
+            from . import charger
+            charger.set_plugged(False)
             t.arm_now()
             full = t.mean_runtime_s(sources=MEASURED)
             print("counting from now (this boot only)" + (f"; the warning fires after {settings.pi_warn_fraction * full / 3600:.2f} h on battery"
                                                         if full else "; no measured runtime yet, so no warning"))
         else:
+            from . import charger
+            charger.set_plugged(True)
+            P.set_wifi_power_save(False)
             t.disarm()
-            print("charging: the battery warning is paused for this boot")
+            print("charging: the battery warning is paused for this boot, and Wi-Fi power-save stays off")
         return
     if sub == "path":
         print(t.path)

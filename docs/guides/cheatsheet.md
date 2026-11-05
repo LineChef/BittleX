@@ -1,212 +1,264 @@
 # Cheat sheet
 
-The commands you actually run, grouped by what you are doing. Nearly everything is a `g2*` alias; the full list with every option is [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Safety rules before G2 moves: [`operating-g2.md`](operating-g2.md).
+Commands you run, one example per row: copy it and change the value. Every option is in [`shell-helpers.md`](shell-helpers.md) (`g2help` prints it in the terminal). Before G2 moves: [`operating-g2.md`](operating-g2.md). Setup, training, bring-up and repo commands: [`cheatsheet-advanced.md`](cheatsheet-advanced.md).
 
-**Jump to:** [1 Setup](#1-setup) · [2 Day to day](#2-day-to-day) · [3 Stop and safety](#3-stop-and-safety) · [4 Test walks and logs](#4-test-walks-and-logs) · [5 Real data and calibration](#5-real-data-and-calibration) · [6 Pictures and memory](#6-pictures-and-memory) · [7 Camera and vision](#7-camera-and-vision) · [8 Voice](#8-voice) · [9 Training and policies](#9-training-and-policies) · [10 Bring-up and hardware](#10-bring-up-and-hardware) · [11 Docs and repo](#11-docs-and-repo) · [12 Things you say to G2](#12-things-you-say-to-g2)
+**Jump to:** [Most used](#most-used) · [Stop](#stop-and-safety) · [Walk tests](#walk-tests) · [Explore](#explore) · [Ball goal](#ball-goal-and-punts) · [Claw and camera](#claw-and-camera) · [Data](#data-and-review) · [Pi power](#pi-power-and-network) · [Voice and mic](#voice-and-mic) · [Say to G2](#things-you-say-to-g2) · [A to Z](#a-to-z)
 
-## 1. Setup
+## Most used
 
-Load the helpers once by adding this line to `~/.zshrc`, and set where the Pi is:
-
-```bash
-source /Users/markjohnson/Desktop/OneFolder/projects/bittleX/tools/g2_aliases.sh
-export G2_PI=<user>@g2pi.local          # the Pi login; kept out of the repo
-```
-
-If the Mac sometimes cannot resolve `g2pi.local` while the Pi is up, run `bash tools/g2_pi_ssh_setup.sh` once: it adds a `Host g2pi.local` block to `~/.ssh/config` that falls back to the Pi's last known address (`tools/g2_pi_connect.sh`), still checking the Pi's host key, so every alias, deploy and tool keeps working. `--remove` takes it out.
-
-Deploys (`tools/g2_deploy_when_online.sh`) ship the last commit, never uncommitted changes; the log lists anything under `pi_pipeline/` that was left out.
-
-Every alias works from any directory and leaves you where you were, except `g2` and `g2rl`, which move you on purpose. In Claude Code, the `!` prefix runs each line in a fresh shell, so `source` and the alias must be on one line.
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2` / `g2rl` | go to the repo with the pipeline venv / go to `rl_training/opencat-gym` with the RL venv |
-| `g2back` | return to where you were before `g2` or `g2rl` |
-| `g2help` / `g2docs` | list every helper / list the key docs |
+| `g2rest` | rest G2 now |
+| `g2stop voice` | stop the voice service safely |
+| `g2reset` | restart the voice loop |
+| `g2floor hardwood` | set the floor before any walk |
+| `g2ball` | start the ball goal |
+| `g2ballstop` | stop the ball goal |
+| `g2explore start` | start exploring |
+| `g2pics` | open the review page |
+| `g2sync run --force all` | copy everything from the Pi |
+| `g2mic off 30` | wake word off for 30 minutes |
+| `g2deploy` | push the last commit to the Pi |
 | `g2ssh` | open a shell on the Pi |
 
-## 2. Day to day
+## Stop and safety
 
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2reset` | restart the voice loop on the Pi (also ends an exploration session). `g2reset status` shows what is running, `g2reset logs` the recent log |
-| `g2floor <label>` | set the floor G2 is on (`hardwood`, `tile`, `carpet`); every walk log records it. No argument shows it. **Set it before any walking run** |
-| `g2explore start [secs]` | start a supervised exploration on the floor (asks the floor first if its label is unknown or over an hour old). `g2explore stop`, `status`, `logs`, `heard` (what the listener heard), `report` (the last roam's report and checks; `report html` opens the page) |
-| `g2deploy` | push `pi_pipeline/` and the deployed policy to the Pi and restart the voice service. Waits for the Pi to answer; `g2deploy --once` deploys now. Refuses during an exploration or a walk. **Never deploy while testing** |
-| `g2api [hours]` | Claude API calls and approximate cost on the Pi |
-| `g2crash [n]` | why the voice service or an exploration crashed |
-| `g2wifi list` | the Wi-Fi networks the Pi joins; `g2wifi add <ssid>` adds one |
-| `g2membackup` | copy the Pi's memory database to the Mac |
+| `"G2, emergency stop"` | freeze everything ("resume" releases) |
+| `g2rest` | rest G2 when nothing is in control |
+| `g2stop voice` | stop the voice service (rests him first) |
+| `g2stop explore` | stop an exploration (rests him first) |
+| `g2explore halt` | freeze an exploration |
+| `g2explore release` | release the freeze |
+| `g2app --bench` | work on the bench: no autonomous movement |
 
-## 3. Stop and safety
+Never put G2 on his back. Tests start on his feet, hands near. Never deploy while testing.
 
-| What | How |
+## Walk tests
+
+| Command | Does |
 |---|---|
-| Stop everything now | **say "emergency stop"** (also "freeze", "halt", "abort"); say "resume" to release |
-| He is moving and nothing is in control | `g2rest` |
-| Stop a service the safe way (rests him first) | `g2stop voice` or `g2stop explore`, never a plain service stop |
-| Freeze or release an exploration session | `g2explore halt` / `g2explore release` |
-| Work on the bench without autonomous movement | `g2app --bench` |
+| `g2floor tile` | set the floor (every log records it) |
+| `g2walk 3 hardwood` | three logged 12.5 s walks |
+| `g2baseline status` | check a baseline run |
+| `g2baseline fetch` | copy the baseline logs to the Mac |
+| `g2turns start` | logged turn runs (real turn rate) |
+| `g2walklog ~/g2_runs/x.csv` | summarize a walk log |
+| `g2imu rest 20` | record the raw IMU for 20 s |
 
-Never put G2 on his back; tests start on his feet with your hands near. More: [`operating-g2.md`](operating-g2.md), and the printable [`operating-g2-quick-guide.pdf`](operating-g2-quick-guide.pdf).
+## Explore
 
-## 4. Test walks and logs
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2walk [runs] [label]` | logged 12.5 s walks at 0.10 m/s with the deployed policy; the voice service is stopped for them and restarted after, and G2 tells you when to set him down |
-| `g2baseline start|stop|status|logs|fetch` | the same walks with more options; `fetch` copies the logs to the Mac |
-| `g2turns start|fetch` | logged firmware turn runs, to measure the real turn rate |
-| `python pi_pipeline/gait/run_gait.py --openloop --base wkArm --cycles 6` | Petoi's arm walk played from the Pi, no policy (on the Pi; the arm build) |
-| `g2walklog <log.csv>` | summarize a walk log: roll, pitch, yaw, the first fall, battery |
-| `python -m pi_pipeline.diag report [SESSION | --kind explore] --html out.html` | one report for a session (on the Pi): walks, speech lag, wake triggers, API calls, camera timeouts, problems |
-| `python -m pi_pipeline.attachments floor-trim tile fl=-0.1` | save a trim measured on one floor for the fitted attachment's gait (`off` removes it); used when `g2floor` is set and under 12 h old |
-| `g2imu rest|stand [secs]` | record the raw IMU on the Pi and print its rate, bias and noise (stop the voice service first with `g2stop voice`) |
+| `g2explore start 300` | explore for 300 s |
+| `g2explore stop` | end the session |
+| `g2explore status` | what is running |
+| `g2explore logs` | the recent log |
+| `g2explore heard` | what the listener heard |
+| `g2explore report html` | open the last roam's report |
 
-To walk by hand on the Pi (`g2stop voice` first, then `g2ssh`, then `cd ~/bittleX`):
+## Ball goal and punts
 
-```bash
-pi_pipeline/.venv/bin/python pi_pipeline/gait/run_gait.py --cmd 0.10 --seconds 12.5 --log ~/g2_runs/x.csv
-pi_pipeline/.venv/bin/python pi_pipeline/gait/run_gait.py --dry-run --seconds 5    # the loop with a synthetic IMU, no serial
-```
+Voice: "G2, ball goal". The goal tools are also in the review page's Goals tab ([`goals.md`](goals.md)).
 
-Details: [`gait-deployment.md`](gait-deployment.md).
-
-## 5. Real data and calibration
-
-How G2's own walks become sim calibration: [`../rl/real-data-pipeline.md`](../rl/real-data-pipeline.md).
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2data` | sync the Pi's logs, ingest them through the quality gates, show the status |
-| `g2cal status` | the calibration snapshots; `g2cal show <id>` one in detail, `g2cal revert` undoes an automatic approval |
-| `g2calauto` | run the whole calibration step now |
-| `g2bg start|stop|status` | the Mac background loop (every 30 min): picture curation and calibration. It ends at a restart; run `g2bg start` again |
+| `g2ball` | start a session (G2 in rest, hands near) |
+| `g2ballstop` | end it; G2 rests |
+| `g2goal report` | open the goal report |
+| `g2goal status` | what each goal has learned |
+| `g2goal history ball_punt` | the last sessions |
+| `g2goal show ball_punt` | every setting and who changes it |
+| `g2goal suggestions` | changes G2 suggests |
+| `g2goal confirm ball_punt punt_max_in` | accept a suggestion |
+| `g2goal cancel ball_punt punt_max_in` | decline it |
+| `g2goal pin ball_punt punt_max_in 4` | hold a value |
+| `g2goal limit ball_punt punt_max_in 3 5` | keep it between 3 and 5 |
+| `g2goal undo ball_punt punt_max_in` | ban the value he settled on |
+| `g2goal forget ball_punt punt_max_in` | drop what he learned for it |
+| `g2goal overrides ball_punt` | list your pins and limits |
+| `g2goal verdict ball_punt 22 wrong` | attempt 22 was scored wrong |
+| `g2goal set ball_punt --attempts 8` | change a goal's size |
+| `g2goal reset ball_punt --yes` | forget everything it learned |
+| `g2goal priority walls ball_punt` | set the goal order |
+| `g2goal practise` | what "G2, practise" would choose |
+| `g2goal apply` | send queued Goals-tab edits to the Pi |
+| `g2punt` | one punt attempt |
+| `g2puntstop` | stop it |
+| `g2puntset show` | the punt settings in use |
+| `g2puntset punt_max_in 3.5` | change one punt setting |
+| `g2puntset nudge_gait policy` | small steps with the learned walk (default: scripted) |
 
-## 6. Pictures and memory
+## Claw and camera
 
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2pics` | the pictures G2 took while exploring, in a review page (closing its browser tab stops it; every tab reads the copy on this Mac, so it works with G2 off; edits are applied to the copy at once and queued for the Pi, which gets them at the start of Sync now or `g2goal apply`; the Goals tab shows what G2 learned for each goal and edits goals the same way; the Facts tab shows each fact's source and how often G2 was given and used it, filters and sorts them, and has a Tidy up view for near-duplicates, dated facts and unused ones): name them, X to remove (Trash with Undo), promote to the training set. `g2pics pull` copies them from the Pi first |
-| `g2picscurate` | curate the pulled pictures (lighting, sharpness, duplicates, people left out); the background loop does this too |
-| `g2pimem` | G2's real memory on the Pi in the review page: facts, conversations, what he noticed. `g2pimem stop` ends it |
-| `g2mem facts|log N|search <q>` | the same memory from the command line |
+| `g2claw calibrate` | which way a positive pan turns the camera |
+| `g2claw pictures` | straight, left, right pictures |
+| `g2claw test` | one look around |
+| `g2claw hold` | do the legs hold 20 s |
+| `g2look wall_straight 12` | one claw-camera picture, labelled, 12 in |
+| `g2look done` | start the voice service again |
+| `g2turn3 left` | test the 3-point turn |
+| `g2send kbalance` | send a raw BiBoard command |
+| `g2see` | live camera view at localhost:8080 |
+| `g2vision` | print live detections |
+| `g2walls` | the wall pictures |
+| `g2wallstats 7` | wall statistics, last 7 days |
+| `g2wallpic wall_straight 12` | take one wall picture |
+| `g2wallreplay` | what G2 would do with each wall picture |
 
-How the pictures flow: [`../vision/picture-library.md`](../vision/picture-library.md).
+## Data and review
 
-## 7. Camera and vision
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2see` | live view with detection boxes from the camera on G2, at localhost:8080 |
-| `g2vision` | print live detections from the camera over serial; `g2vision-demo` uses a mock feed |
-| `g2walls` / `g2wallstats [days]` | the wall pictures; wall statistics from the Pi |
-| `g2wallpic <label> <inches> [angle]` | take one labelled wall picture on the Pi (stop the voice service first) |
-| `g2wallreplay` | what an exploring G2 would do with each saved wall picture; nothing moves |
-| `g2sync [status\|run\|now TASK]` | every copy from the Pi to this Mac in one job, each on its own schedule: goal data, exploration pictures, walk logs, wall pictures every 30 min; the memory DB snapshot (14 daily, 8 weekly kept) and the logs once a day. `status` says when each last worked and STALE if too old; the background loop (`tools/g2_bg_jobs.sh start`) runs it every 30 min, and every deploy and `g2goal run` copies the goal data |
-| `g2mic [status\|on\|off [MIN]]` | G2's wake word: `off` for MIN minutes (default 10; only the stop words are heard), `on` now (he cannot hear "mic on" while it is off), `status`. By voice: "G2, mic off [for 20 minutes]". `g2micon` = `g2mic on`; the review page has a **Mic on** button while it is off |
-| `g2cmds [--board] [--hours N]` | what the Pi sent to the BiBoard (with who sent it) and what the board did on its own. A move the board started itself (its voice module: you without "G2", or a TV in the room) shows as `BOARD (NOT FROM THE PI)`, the `not_from_pi` flag; check it first when G2 does something nobody asked for |
-| `g2turn3 [left\|right]` | hardware test of the 3-point turn (back up while turning one way, then forward turning the other way): G2 on his feet, a clear foot behind, hands near; prints the heading change of each half; stops the voice service first. The chase uses it only after `WALL_THREE_POINT` / `SEARCH_THREE_POINT` are set (off) |
-| `g2send CMD [CMD...]` | send raw BiBoard commands from any folder, one argument per command, 5 s apart (`g2send kbalance klaunch`, `g2send "i0 30 1 15"`): stops the voice service, refuses under a 30% pack or a silent board, sends `gb` after the last skill, prints each reply (they lag one command behind), starts the voice service again. Hands near |
-| `g2claw calibrate\|pictures\|test\|hold` | the claw look hardware checks on the Pi, from any folder: `calibrate` (ball 12 in ahead: which way a positive pan turns the camera), `pictures` (straight, pan +, pan -, copied to the Mac and opened), `test` (one look around), `hold` (do the legs hold 20 s); stops the voice service first |
-| `g2look [LABEL] [INCHES] [ANGLE]` / `g2look list [N]` / `g2look done` | take one claw-camera picture now with G2 staying where he is (exposure balancing on), labelled; `g2look wall_straight 12` is a wall calibration picture; stops the voice service first, `done` starts it again; set `$G2_LOOKSET` (default `looks`) |
-| `g2mem [HOURS]` | the Pi's memory log (a reading every 10 s, kept in `~/.local/share/g2/memory_log.jsonl`): lowest available memory, G2's biggest total, swap, pressure, OOM kills, overall and between notes (voice service start, goal attempts, explorations); G2 off: from the Mac copy |
-| `g2ball` / `g2ballstop` (or voice: "G2, ball goal") | start the ball goal (up to 10 punt attempts, G2 in rest, ball in front, hands near) / stop it: the attempt ends at its next step and G2 rests; works from any folder |
-| `g2goal [report \| history GOAL \| show GOAL \| status \| suggestions \| confirm\|cancel GOAL KNOB \| run GOAL \| stop \| reset GOAL --yes]` (or voice: "G2, ball goal") | goal sessions: up to 10 attempts, G2 judges each and changes the next; `report` pulls the journal and opens the page; full guide [`goals.md`](goals.md) |
-| `g2goal priority [GOAL ...]`, `g2goal practise [GOAL]` (or voice: "G2, practise") | the goals' order, highest first (walls above the punt), and what "G2, practise" would choose now with each goal's score ([`goals.md`](goals.md) section 8) |
-| `python -m pi_pipeline.behavior.wall_settings [--set NAME VALUE]` | your own wall settings (`~/.local/share/g2/wall_settings.json`): where the walls goal starts, and `chase_wall_in` |
-| `g2goal verdict GOAL N right\|wrong` | your verdict on how attempt N was scored; a wrong one is taken out of his records ([`goals.md`](goals.md) section 5) |
-| `g2goal pin\|limit\|undo\|forget GOAL KNOB ... [--floor F]`, `g2goal overrides GOAL` | override what G2 learned: hold a value, keep him inside a range, ban his best value, or drop his record for one setting ([`goals.md`](goals.md) section 6) |
-| `g2punt [--punt-max IN]` / `g2puntstop` / `g2puntset [show\|init\|NAME VALUE]` (or voice: "G2, punt") | one punt attempt (stand, find the ball, walk, punch once, rest) and its settings file `~/.local/share/g2/punt_settings.json`; full guide [`punt.md`](punt.md) |
-| `python -m pi_pipeline.behavior.punt_test [--distances 2 3 4 5] [--repeat N]` | on the Pi (ssh -t), voice service stopped, G2 in rest: one punch (claw shut) at each ball distance, you place the ball and report how far it went; rows go to `~/g2_punt_tests.csv`. Dials in `PUNT_MAX_IN` in `behavior/ball_chase.py` |
-| `python -m pi_pipeline.behavior.ball_chase [--dry-run] [--max-steps N]` | on the Pi, voice service stopped, G2 standing (arm fitted): chase the green treat ball and punch it (claw shut) until stopped (`touch ~/.local/share/g2/ball_chase_stop` or Ctrl-C) or after one punch (`--punts 1`, he rests at the end); `--dry-run` only prints what it would do; `--punt-max IN --nudge-max IN --max-seconds S` set the punt distance and a time limit. Its pictures with the ball found go to `g2pics` (Named: greenball). Read the battery percent first |
+| `g2sync status` | when each copy last worked |
+| `g2sync run --force all` | copy everything from the Pi now |
+| `g2sync now goals` | copy one thing (goals, pictures, memorydb, logs...) |
+| `g2pics` | the review page: pictures, facts, goals |
+| `g2pics stop` | end the review page |
+| `g2picscurate` | filter pictures (light, blur, duplicates) |
+| `g2pimem` | G2's memory on the Pi, in the review page |
+| `g2pimem search dishwasher` | search his memory as text |
+| `g2mem 24` | Pi memory use, last 24 h |
+| `g2membackup` | snapshot the memory database |
+| `g2data` | sync walk logs and run the quality gates |
+| `g2cal status` | the calibration snapshots |
+| `g2calauto` | run the calibration step now |
+| `g2bg start` | the Mac's 30-minute background jobs |
+| `g2cmds --board` | what the BiBoard did on its own |
+| `g2api 24` | API calls and cost, last 24 h |
+| `g2crash 3` | why the voice service crashed |
 
-Building the camera's detection model (capture, curate, promote, upload to SenseCraft): capture with `g2pcam <name>` (the camera on G2, run on the Pi; `g2pcam-pull <name>` copies the session to the Mac) or `g2cam <name>` (a camera plugged into the Mac); `g2curate <name>` filters it, `g2promote <class>` adds it to the library, `g2auto` runs the rest and builds the upload set, `g2libstatus` shows the counts. Walkthrough: [`train-vision-model.md`](train-vision-model.md); capture routine: [`../vision/capture-checklist.md`](../vision/capture-checklist.md).
+## Pi power and network
 
-## 8. Voice
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2chat` | talk to Claude by typing (needs the API key) |
-| `g2voice` | the full voice loop on this machine: wake word, mic, speaker |
-| `g2audio devices|wake|stt|tts` | audio diagnostics |
-| `g2reset` | restart the voice loop on the Pi |
-| `g2api [hours]` | what the voice loop has cost in API calls |
-| `python -m pi_pipeline.voice.wake_log --days 7` | wake triggers: how many looked false, their confidence and words-before counts, and a suggested `G2_WAKE_MIN_CONF` |
+| `g2power plugged` | Pi is on its charger: Wi-Fi power-save stays off |
+| `g2power unplugged` | Pi is on its battery again |
+| `g2power status` | power-save, CPU governor, charger |
+| `g2wifi list` | the Wi-Fi networks the Pi joins |
+| `g2wifi add HomeNet` | add a network |
+| `g2deploy --once` | deploy now (no waiting) |
+| `g2deploy --cancel` | stop a waiting deploy |
 
-The things you can say: [`voice-commands.md`](voice-commands.md). Settings and switches: [`settings-switches.md`](settings-switches.md).
+## Voice and mic
 
-## 9. Training and policies
-
-Run from anywhere; the RL venv is used automatically. Rules for every run (a fresh candidate each time, never a 20M unasked, screens capped at 3M): [`../rl/training-pipeline.md`](../rl/training-pipeline.md).
-
-| Alias | Does |
+| Command | Does |
 |---|---|
-| `g2eta plan --steps 3e6 --tail stage` | a timing estimate before launching. During a run: `g2eta now --target 20e6 --tail final20m` |
-| `g2train <tag>` | start a run with the pre-run checklist (the tag must be new) |
-| `g2preflight` | must print ALL PASS before a 20M is offered |
-| `g2watchrun` | watch the training run happening right now (it waits between a chain's stages). `g2watch` replays the newest finished policy. G2's real look needs `python build_body_mesh.py` once (looks only) |
-| `g2tb` | open TensorBoard (`g2tb stop` ends it) |
-| `g2rltest` | the RL test files. `g2test` is the pipeline suite |
-| `g2policy <tag> <name>` | promote a trained policy to G2's default and arm the deploy (your call only). One attachment only: `python promote_release.py --candidate trained/X.onnx --name ARM1 --attachment arm --attachment-only --payload-profile arm` |
+| `g2mic off 30` | wake word off for 30 minutes |
+| `g2mic on` | wake word back on |
+| `g2micon` | same as `g2mic on` |
+| `g2mic status` | on or off, time left |
+| `g2chat` | talk to Claude by typing |
+| `g2voice` | the voice loop on this Mac |
+| `g2audio devices` | audio diagnostics |
 
-Score, export and check a policy, from `rl_training/opencat-gym` (`g2rl` takes you there):
+By voice: "G2, mic off for 20 minutes". The review page shows a **Mic on** button while it is off.
 
-```bash
-python benchmark_decathlon.py --learned trained/<tag>_ppo --episodes 24 --hw i --json-out /tmp/dec.json   # the graded cells, through G2's real control path
-python export_onnx.py --model trained/<tag>_ppo --residual-scale-deg 30 --cmd-send-every-n 3 --out trained/<tag>_ppo.onnx   # writes the .onnx and its .onnx.json sidecar
-python validate_deploy.py --onnx trained/<tag>_ppo.onnx                                                    # must print ALL OK
-```
+## Things you say to G2
 
-## 10. Bring-up and hardware
-
-| Alias | Does |
-|---|---|
-| `g2doctor [--serial]` | the readiness checklist: `.env`, API key, models, serial port, audio, disk |
-| `g2bringup` | the guided, resumable hardware bring-up (`--list`, `--restart`, `--from <id>`) |
-| `g2serial ports|ping|send <cmd>|skills|rest|firstmove|allmoves` | talk to the BiBoard; `firstmove` is the guided one-joint-at-a-time first movement |
-| `g2app [--serial|--bench]` | the whole robot as one program (mock by default) |
-| `g2power [status]` | the Pi power levers (a dry run unless run on the Pi) |
-| `g2feat` / `g2traits` / `g2diag` | resolve feature flags / the personality traits / read a diagnostics session |
-
-The BiBoard tokens worth knowing (send with `g2serial send <token>`; full reference: [`../hardware/petoi-firmware-reference.md`](../hardware/petoi-firmware-reference.md)):
-
-| Token | Does |
-|---|---|
-| `d` | rest (servos relax) |
-| `kbalance` | the calibration and stand pose; all four legs identical |
-| `P` | battery voltage |
-| `gc` | calibrate the IMU (G2 standing level and still); persists |
-| `gb` / `gB` | firmware gyro balance off / on |
-| `XS` | enable Serial-2 so the BiBoard listens to the Pi; once, redo after a reflash |
-| `f` | servo position feedback stream (USB only) |
-
-Never send `Xa` or `XAd`.
-
-## 11. Docs and repo
-
-| Alias | Does |
-|---|---|
-| `g2check` | the docs checks: broken links, facts in the wrong page, stale generated pages (the pre-commit hook runs it) |
-| `g2docsgen` | regenerate the generated docs: backlog, shell-helpers, results index |
-| `g2clean` | list scratch files on the Mac and Pi; `g2clean --apply` deletes them. Run before reporting a task done |
-| `g2test` | the `pi_pipeline` test suite |
-| `pi_pipeline/.venv/bin/ruff check` | lint, correctness rules only (the pre-commit hook runs it on staged `.py` files) |
-
-Where each kind of change is written down: [`../README.md`](../README.md#where-to-update-what). `git commit --no-verify` bypasses the hooks for a genuine false positive.
-
-## 12. Things you say to G2
-
-Wake with "gee two". The full list and the conversational skills: [`voice-commands.md`](voice-commands.md).
+Wake with "gee two". The full list: [`voice-commands.md`](voice-commands.md).
 
 | Say | Does |
 |---|---|
 | "emergency stop" / "resume" | freeze and hold / release |
-| "gee two, let's talk" / "that's all" | conversation without the wake word until you stop |
+| "gee two, let's talk" / "that's all" | talk without the wake word until you stop |
 | "go ahead and look around" / "end exploration mode" | start / end exploration |
 | "come here" | walk to you |
 | "hi step" / "walk normally" | switch gait |
 | "the floor is tile" | set the floor label |
 | "what do you see" | describe a picture |
-| "go to sleep" / "shut down" | sleep / lie down and shut the Pi down (flip the PiSugar switch by hand after) |
+| "ball goal" / "punt" | start the ball goal / one punt |
+| "mic off for 20 minutes" | wake word off |
+| "go to sleep" / "shut down" | sleep / lie down and shut the Pi down (flip the PiSugar switch by hand) |
+
+## A to Z
+
+Every command on this page and in [`cheatsheet-advanced.md`](cheatsheet-advanced.md) (generated; `python tools/gen_cheatsheet_index.py` rewrites it).
+
+<!-- index:start -->
+| Command | Where |
+|---|---|
+| `g2` | [Setup](cheatsheet-advanced.md#setup) |
+| `g2api` | [Data and review](#data-and-review) |
+| `g2app` | [Stop and safety](#stop-and-safety), [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2attach` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2audio` | [Voice and mic](#voice-and-mic) |
+| `g2auto` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2back` | [Setup](cheatsheet-advanced.md#setup) |
+| `g2ball` | [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts) |
+| `g2ballstop` | [Most used](#most-used), [Ball goal and punts](#ball-goal-and-punts) |
+| `g2baseline` | [Walk tests](#walk-tests) |
+| `g2bg` | [Data and review](#data-and-review) |
+| `g2bringup` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2cal` | [Data and review](#data-and-review) |
+| `g2calauto` | [Data and review](#data-and-review) |
+| `g2cam` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2chat` | [Voice and mic](#voice-and-mic) |
+| `g2check` | [Docs and repo](cheatsheet-advanced.md#docs-and-repo) |
+| `g2claw` | [Claw and camera](#claw-and-camera) |
+| `g2clean` | [Docs and repo](cheatsheet-advanced.md#docs-and-repo) |
+| `g2cmds` | [Data and review](#data-and-review) |
+| `g2crash` | [Data and review](#data-and-review) |
+| `g2curate` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2data` | [Data and review](#data-and-review) |
+| `g2deploy` | [Most used](#most-used), [Pi power and network](#pi-power-and-network) |
+| `g2diag` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2docs` | [Setup](cheatsheet-advanced.md#setup) |
+| `g2docsgen` | [Docs and repo](cheatsheet-advanced.md#docs-and-repo) |
+| `g2doctor` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2eta` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2explore` | [Most used](#most-used), [Stop and safety](#stop-and-safety), [Explore](#explore) |
+| `g2feat` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2floor` | [Most used](#most-used), [Walk tests](#walk-tests) |
+| `g2goal` | [Ball goal and punts](#ball-goal-and-punts) |
+| `g2help` | [Setup](cheatsheet-advanced.md#setup) |
+| `g2imu` | [Walk tests](#walk-tests) |
+| `g2libstatus` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2look` | [Claw and camera](#claw-and-camera) |
+| `g2mem` | [Data and review](#data-and-review) |
+| `g2membackup` | [Data and review](#data-and-review) |
+| `g2mic` | [Most used](#most-used), [Voice and mic](#voice-and-mic) |
+| `g2micon` | [Voice and mic](#voice-and-mic) |
+| `g2pcam` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2pcam-pull` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2pics` | [Most used](#most-used), [Data and review](#data-and-review) |
+| `g2picscurate` | [Data and review](#data-and-review) |
+| `g2pimem` | [Data and review](#data-and-review) |
+| `g2policy` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2power` | [Pi power and network](#pi-power-and-network) |
+| `g2preflight` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2promote` | [Camera model](cheatsheet-advanced.md#camera-model) |
+| `g2punt` | [Ball goal and punts](#ball-goal-and-punts) |
+| `g2puntset` | [Ball goal and punts](#ball-goal-and-punts) |
+| `g2puntstop` | [Ball goal and punts](#ball-goal-and-punts) |
+| `g2reset` | [Most used](#most-used) |
+| `g2rest` | [Most used](#most-used), [Stop and safety](#stop-and-safety) |
+| `g2rl` | [Setup](cheatsheet-advanced.md#setup) |
+| `g2rltest` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2see` | [Claw and camera](#claw-and-camera) |
+| `g2send` | [Claw and camera](#claw-and-camera) |
+| `g2serial` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2ssh` | [Most used](#most-used), [Setup](cheatsheet-advanced.md#setup) |
+| `g2stop` | [Most used](#most-used), [Stop and safety](#stop-and-safety) |
+| `g2sync` | [Most used](#most-used), [Data and review](#data-and-review) |
+| `g2tb` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2test` | [Training and policies](cheatsheet-advanced.md#training-and-policies), [Docs and repo](cheatsheet-advanced.md#docs-and-repo) |
+| `g2train` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2traits` | [Bring-up and hardware](cheatsheet-advanced.md#bring-up-and-hardware) |
+| `g2turn3` | [Claw and camera](#claw-and-camera) |
+| `g2turns` | [Walk tests](#walk-tests) |
+| `g2vision` | [Claw and camera](#claw-and-camera) |
+| `g2voice` | [Voice and mic](#voice-and-mic) |
+| `g2walk` | [Walk tests](#walk-tests) |
+| `g2walklog` | [Walk tests](#walk-tests) |
+| `g2wallpic` | [Claw and camera](#claw-and-camera) |
+| `g2wallreplay` | [Claw and camera](#claw-and-camera) |
+| `g2walls` | [Claw and camera](#claw-and-camera) |
+| `g2wallstats` | [Claw and camera](#claw-and-camera) |
+| `g2watch` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2watchrun` | [Training and policies](cheatsheet-advanced.md#training-and-policies) |
+| `g2wifi` | [Pi power and network](#pi-power-and-network) |
+<!-- index:end -->
