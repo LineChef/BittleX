@@ -166,6 +166,8 @@ _QUEUE_BLOCKS = 200                     # about 50 s of audio (4000-sample block
 
 
 class VoskWakeWord:
+    _poked: str | None = None                       # a command handed in from outside (poke()); a class default so a detector built without __init__ (tests) has it
+
     def __init__(self, model_path: str, phrase: str | list[str], sample_rate: int = 16000):
         import sounddevice as sd
         from vosk import KaldiRecognizer
@@ -185,6 +187,7 @@ class VoskWakeWord:
         self._grammar = json.dumps([*self._phrases, *[d for d in DECOYS if d not in self._phrases], "[unk]"])      # + the look-alikes (DECOYS), so they are written as themselves
         self._stop_grammar = json.dumps([*stop_words(), "[unk]"])      # during a wake-word pause (voice/wake_pause.py): only the stop words
         self._pending: str | None = None
+        self._poked: str | None = None                    # a command handed in from outside (poke()): taken by wait() within about a second
         self._Recognizer = KaldiRecognizer
         # ONE microphone stream for the life of the process, never closed: closing a PortAudio stream segfaulted the whole voice service
         # (2026-10-08: sounddevice `close()` from the command window's timeout, a native crash with no Python traceback; the crash report in
@@ -281,6 +284,11 @@ class VoskWakeWord:
         self._handover = False
         return self._q, (lambda: None)
 
+    def poke(self, text: str) -> None:
+        """Hand the voice loop a command from outside, to be taken as if it had been heard ("ball goal": `g2goal run` asks the running service this way, goals/inprocess.py).
+        `wait()` returns it through `take_pending()` within about a second, whether the wake word is on or off; if the loop is busy it waits for the next `wait()`."""
+        self._poked = (text or "").strip() or None
+
     def take_pending(self) -> str | None:
         """What `wait()` returned for when it was not a wake word: a stop word heard during a pause, or MIC_BACK_ON when the pause ended. Read once."""
         p, self._pending = self._pending, None
@@ -313,6 +321,11 @@ class VoskWakeWord:
         while True:
             if time.monotonic() >= next_check:         # the pause can start (g2mic off), end early (g2mic on, the page) or run out at any time
                 next_check = time.monotonic() + 1.0
+                if self._poked is not None:            # a command handed in from outside (poke)
+                    self._pending, self._poked = self._poked, None
+                    self._handover = True
+                    log.info("command handed in from outside: %r", self._pending)
+                    return
                 now_paused = wake_pause.is_paused()
                 if paused and not now_paused:
                     log.info("wake word back ON")

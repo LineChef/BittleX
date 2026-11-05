@@ -116,6 +116,47 @@ def cmd_show(goal) -> None:
         print(f"  {k.control:5s}  {k.name:20s} {str(now.get(k.name)):12s} {rng}{yours}{pin}{lim}{rec}")
 
 
+
+def _run_standalone(g, a) -> None:
+    """The session in this process (the old way): the voice service is stopped first and started again at the end, with G2 laid down in the rest pose before that.
+    When the service is not running (the systemd hand-over unit stopped it itself) nothing is stopped or started."""
+    import subprocess
+    import time
+    from . import inprocess
+    was_active = inprocess.service_active()
+    if was_active:
+        subprocess.run(["sudo", "-n", "systemctl", "stop", "g2-voice"], timeout=60)
+    try:
+        from .approach import make
+        from .runner import GoalSession
+        announce = None
+        if not a.quiet:
+            try:
+                from ..config import settings
+                from ..voice.tts import make_tts
+                _tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
+                announce = lambda text: text and _tts.speak(text)        # noqa: E731
+            except Exception as e:  # noqa: BLE001
+                print("no voice (", e, "): the cues are printed only")
+        from ..behavior.ball_chase import STOP_FILE as CHASE_STOP
+        for f in (stop_path(), os.path.expanduser(CHASE_STOP)):
+            try:
+                os.remove(f)
+            except FileNotFoundError:
+                pass
+        try:
+            GoalSession(g, make(g.approach), stop=_stop_requested, announce=announce).run()
+        except KeyboardInterrupt:
+            print("ended: stopped")
+    finally:
+        if was_active:
+            try:
+                subprocess.run([sys.executable, "-m", "pi_pipeline.link.check_serial", "send", "krest"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(2)
+            subprocess.run(["sudo", "-n", "systemctl", "--no-block", "start", "g2-voice"], timeout=60)
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(prog="g2goal", description="Goals G2 works toward, and what he learns from his attempts.")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -132,7 +173,9 @@ def main(argv=None) -> None:
     p.add_argument("--rest", type=float, dest="rest_between_s", help="seconds standing still between attempts")
     p.add_argument("--control", action="append", default=[], metavar="KNOB=free|ask|fixed")
     p.add_argument("--start-words", nargs="+", help="spoken start phrases")
-    p = sub.add_parser("run"); p.add_argument("goal"); p.add_argument("--quiet", action="store_true", help="no spoken cues")
+    p = sub.add_parser("run", help="run a goal session: inside the running voice service (default), or on its own with --standalone")
+    p.add_argument("goal"); p.add_argument("--quiet", action="store_true", help="no spoken cues")
+    p.add_argument("--standalone", action="store_true", help="do not ask the voice service: stop it, run the session in this process, start it again (the old way; also G2_GOAL_INPROCESS=0)")
     sub.add_parser("stop")
     sub.add_parser("status")
     p = sub.add_parser("history"); p.add_argument("goal"); p.add_argument("--last", type=int, default=3)
@@ -201,27 +244,13 @@ def main(argv=None) -> None:
     elif a.cmd == "run":
         logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
         g = _goal(goals, a.goal)
-        from .approach import make
-        from .runner import GoalSession
-        announce = None
-        if not a.quiet:
-            try:
-                from ..config import settings
-                from ..voice.tts import make_tts
-                _tts = make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
-                announce = lambda text: text and _tts.speak(text)        # noqa: E731
-            except Exception as e:  # noqa: BLE001
-                print("no voice (", e, "): the cues are printed only")
-        from ..behavior.ball_chase import STOP_FILE as CHASE_STOP
-        for f in (stop_path(), os.path.expanduser(CHASE_STOP)):
-            try:
-                os.remove(f)
-            except FileNotFoundError:
-                pass
-        try:
-            GoalSession(g, make(g.approach), stop=_stop_requested, announce=announce).run()
-        except KeyboardInterrupt:
-            print("ended: stopped")
+        from . import inprocess
+        if not a.standalone:
+            res = inprocess.delegate(g.id)                           # inside the running voice service: its serial port stays open (docs/STATUS.md open problems 15 and 18)
+            if res is not None:
+                print("session ended:", res.get("why"))
+                return
+        _run_standalone(g, a)
     elif a.cmd == "stop":
         os.makedirs(os.path.dirname(stop_path()), exist_ok=True)
         open(stop_path(), "w").close()

@@ -66,6 +66,7 @@ PY
 pi_busy() {   # prints what is running on the Pi when a sync must wait; nothing when it is free
   ssh -o BatchMode=yes -o ConnectTimeout=8 "$G2_PI" '
     for s in g2-explore g2-goal; do [ "$(systemctl is-active $s 2>/dev/null)" = active ] && echo "$s"; done
+    [ -n "$(find ~/.local/share/g2/goal_running -mmin -45 2>/dev/null)" ] && echo "goal session in the voice service"
     pgrep -fa "pi_pipeline.(goals run|behavior.ball_chase|behavior.claw_look|behavior.three_point)|run_gait.py|fw_skill_log.py|explore_session" | grep -v pgrep | head -1 | cut -c1-80' 2>/dev/null
 }
 

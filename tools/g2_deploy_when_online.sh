@@ -47,7 +47,7 @@ say "the Pi answers; letting its services settle for 25 s"
 reachable || { say "the Pi stopped answering; not deploying"; exit 1; }
 
 # never deploy while G2 is exploring or walking (user rule 2026-10-10; a deploy mid-run restarted the voice service on top of a running exploration)
-if ssh "$G2_PI" 'systemctl is-active --quiet g2-explore || systemctl is-active --quiet g2-baseline || pgrep -f "[r]un_gait" >/dev/null'; then
+if ssh "$G2_PI" 'systemctl is-active --quiet g2-explore || systemctl is-active --quiet g2-baseline || pgrep -f "[r]un_gait" >/dev/null || [ -n "$(find ~/.local/share/g2/goal_running -mmin -45 2>/dev/null)" ]'; then
   say "an exploration, a baseline run or a walk is running on the Pi: NOT deploying (stop it first: bash tools/g2_safe_stop.sh all)"
   exit 1
 fi

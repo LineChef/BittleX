@@ -225,8 +225,15 @@ def main() -> None:
                 watcher_c.nudge()
             if watcher_r and kw.get("told_sleep"):
                 watcher_r.nudge()
-            if kw.get("arm_goal") and args.actuator == "serial":                       # "G2, ball goal": one goal session as its own unit (stops this service, rests G2, starts it again)
-                from ..goal_launch import launch as _goal_launch
+            if kw.get("arm_goal") and args.actuator == "serial":                       # "G2, ball goal"
+                from ..goals import inprocess as _goals_inprocess
+                ok, why = _goals_inprocess.ready(lend)
+                if ok:                                     # run it here, on this (voice loop) thread, with this service's serial link, IMU stream and camera: the port is never closed
+                    _goals_inprocess.run_goal_inprocess(lend, kw["arm_goal"])
+                    return
+                logging.getLogger("g2.voice").info("goal as a separate session (%s)", why)
+                _goals_inprocess.log_line(f"{_goals_inprocess.HANDOVER_MARK} ({why}) ==")
+                from ..goal_launch import launch as _goal_launch                          # the old way: its own unit (stops this service, rests G2, starts it again)
                 threading.Timer(0.8, _goal_launch, args=(kw["arm_goal"],)).start()
                 return
             if kw.get("arm_punt") and args.actuator == "serial":                       # "G2, punt": one punt attempt as its own unit (stops this service, rests G2, starts it again)
@@ -244,6 +251,11 @@ def main() -> None:
                 from ..explore_launch import launch
                 _roam = float(kw.get("roam_s") or settings.explore_roam_s)
                 threading.Timer(0.3, lambda: launch(_roam)).start()      # the words and the horn have already finished when this event fires; the old 5 s wait was pure delay (2026-10-18)
+
+        if voice and use_wake and args.actuator == "serial":                    # `g2goal run GOAL` asks this service to run the goal (goals/inprocess.py): its start phrase is handed to the voice loop
+            from ..goals import inprocess as _goals_request
+            if _goals_request.enabled():
+                _goals_request.watch(lambda phrase: getattr(wake, "poke", lambda _t: None)(phrase))
 
         if voice and link is not None and settings.sleep_after_s > 0:           # power-saving sleep after a long rest (user, 2026-10-10)
             from ..power import power as _power

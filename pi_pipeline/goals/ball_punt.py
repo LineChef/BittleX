@@ -119,8 +119,10 @@ class BallPunt:
     diagnosis = DIAGNOSIS
     stage_of = STAGE_OF
 
-    def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None, wall_check=None):
+    def __init__(self, *, robot=None, camera=None, saver=None, link=None, pace=None, wall_check=None, shared=None):
         self.robot, self.camera, self.saver, self._link, self.pace = robot, camera, saver, link, pace
+        self._shared = shared                                               # the voice service's parts (explore_session.SharedParts): run inside the service, never closing them
+        self._consumers: list = []                                          # IMU streams taken from the service's fan-out, handed back by close()
         self._cam = None
         self.last_pack_pct = None                                           # the pack % read before the last attempt (kept with every attempt, not learned from yet)
         self.wall_check = wall_check
@@ -158,12 +160,21 @@ class BallPunt:
             return
         from ..behavior import ball_chase as bc
         from ..config import settings
-        from ..link.serial_link import SerialLink
-        from ..vision.snapshot import CameraSnapshotter
-        self._link = SerialLink("/dev/serial0")
-        self._link.connect()
-        self._cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)     # exposure balancing stays on
-        self.camera = bc._SnapshotCamera(self._cam)
+        if self._shared is not None:                                        # inside the voice service: its serial link stays open all the time (a port closed and reopened after the service
+            sh = self._shared                                               # stopped left the BiBoard silent, docs/STATUS.md open problems 15 and 18), and so does its camera
+            if sh.fan is not None:
+                self._link = sh.fan.consumer()                              # this session's own copy of the IMU stream (the chase polls it for falls and the learned walk reads it)
+                self._consumers.append(self._link)
+            else:
+                self._link = sh.link
+            self.camera = bc._SnapshotCamera(sh.camera)                     # not closed here: the service owns it
+        else:
+            from ..link.serial_link import SerialLink
+            from ..vision.snapshot import CameraSnapshotter
+            self._link = SerialLink("/dev/serial0")
+            self._link.connect()
+            self._cam = CameraSnapshotter(settings.vision_serial_port, labels=settings.vision_labels, sensor_opt=0, ae_bump=settings.vision_ae_bump)     # exposure balancing stays on
+            self.camera = bc._SnapshotCamera(self._cam)
         import threading
         threading.Timer(1.8, self.camera.premeter, kwargs={"force": True}).start()        # meter the light while he is standing up (the stand-up is 4 s of waiting anyway), not at the first picture
         bc._stand_if_lying(self._link)
@@ -183,10 +194,28 @@ class BallPunt:
             if self.robot is not None and callable(getattr(self.robot, "claw_pose", None)):
                 self.robot.claw_pose(0.0, 0.0)
         finally:
-            if self._cam is not None:
-                self._cam.close()
-            self._link.send("krest", read_reply=False, settle=0.0)          # rest at the end of the session
-            time.sleep(2.5)
+            try:
+                if self._cam is not None:
+                    self._cam.close()
+                self._link.send("krest", read_reply=False, settle=0.0)      # rest at the end of the session
+                time.sleep(2.5)
+            finally:
+                self._release()
+
+    def _release(self) -> None:
+        """Hand back what was borrowed from the voice service: the learned walk is stopped and the IMU streams are returned to the fan-out."""
+        walker = getattr(self.robot, "_walker", None)
+        if walker is not None:
+            try:
+                walker.stop(rest=False)
+            except Exception:  # noqa: BLE001
+                pass
+        for c in self._consumers:
+            try:
+                self._shared.fan.release(c)
+            except Exception:  # noqa: BLE001
+                pass
+        self._consumers = []
 
     def battery_ok(self, min_pct: int) -> tuple[bool, str]:
         if self._link is None:
