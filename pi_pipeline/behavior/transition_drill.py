@@ -1,6 +1,6 @@
 """The hardware A/B for falls at transitions (user, 2026-11-06). Runs ONLY on the user's go, on hardwood, hands near, the voice service stopped (like claw_look).
 
-A cycle is the transitions that logged falls were made of: pose -> pose -> turn -> stop. Attention pose (`relax`), the back-legs-first stand-up, a firmware turn (alternating left and right), the stop. One variant per run:
+A cycle is the transitions that logged falls were made of, back to back: attention pose, a full claw look, the back-legs-first stand-up, a firmware turn and at once a turn the other way, with a stop after each. One variant per run:
 
     baseline   no gate, no calm stop (what the code did)       calm   the stop waits for a calm moment        gate   the pose gate before the turn        both
     python -m pi_pipeline.behavior.transition_drill --variant calm --cycles 10
@@ -15,27 +15,47 @@ import time
 VARIANTS = {"baseline": (False, False), "calm": (True, False), "gate": (False, True), "both": (True, True)}      # name -> (calm stop, pose gate)
 
 
-def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1.0, say=print, sleep=time.sleep) -> dict:
-    """`cycles` of pose -> turn -> stop on a SerialRobot. Stops at the first fall. Returns {"cycles", "fell", "worst_swing_deg", "reseats"}."""
-    worst, done, fell = 0.0, 0, False
+NEAR_FALL_DEG = 20.0      # a tilt swing this big in one phase counts as a near fall (most falls are never recorded, so variants are compared on swings too)
+
+
+def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1.0, look=None, say=print, sleep=time.sleep) -> dict:
+    """`cycles` of the pattern the logged falls follow, with no rest between cycles: attention pose, a full claw look (arm up, left, right, centre, down), the back-legs-first stand-up, a turn, and at
+    once a turn back the other way. Stops at the first fall. `look(robot)` makes the claw look (default: claw_survey.run_claw_look without pictures). Returns
+    {"cycles", "fell", "worst_swing_deg", "near_falls", "reseats"}."""
+    if look is None:
+        from . import claw_survey
+        look = lambda r: claw_survey.run_claw_look(r._lk, None, "drill")      # noqa: E731
+    worst, near, done, fell = 0.0, 0, 0, False
+
+    def note(phase: str) -> None:
+        nonlocal worst, near
+        sw = robot.swing_deg()
+        worst = max(worst, sw)
+        if sw >= NEAR_FALL_DEG:
+            near += 1
+        say(f"   {phase}: swing {sw:.0f} deg")
+
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
         if robot.relax() != "ok":
             fell = True
             break
-        sleep(1.0)
-        if robot.stand_up_from_attention() == "fell":                  # the pose -> pose move the logged falls follow: attention pose to the back-legs-first stand-up
+        look(robot)
+        if robot.stand_up_from_attention() == "fell":
             fell = True
             break
-        state = robot.turn(side * turn_deg, turn_s)                    # the gate if on, the turn, the calm stop (turn() does not stand him up itself: the standing flow sends nothing before a move)
-        worst = max(worst, robot.swing_deg())
-        say(f"cycle {i + 1}/{cycles}: turn {'right' if side > 0 else 'left'} -> {state}, swing {robot.swing_deg():.0f} deg, re-seats so far {robot.gate_reseats}")
-        if state == "fell":
-            fell = True
+        note("stand-up from attention")
+        for k, deg in enumerate((side * turn_deg, -side * turn_deg)):
+            state = robot.turn(deg, turn_s)
+            note(f"turn {'right' if deg > 0 else 'left'}")
+            if state == "fell":
+                fell = True
+                break
+        say(f"cycle {i + 1}/{cycles}: {'FELL' if fell else 'ok'}, re-seats so far {robot.gate_reseats}")
+        if fell:
             break
         done += 1
-        sleep(1.0)
-    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "reseats": robot.gate_reseats}
+    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats}
 
 
 def main() -> None:

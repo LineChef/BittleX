@@ -999,14 +999,17 @@ def test_a_stop_with_no_imu_frames_does_not_wait():
     assert r._calm_before_stop() == "ok" and t["now"] == 0.0
 
 
-def test_the_transition_drill_counts_cycles_and_stops_at_the_first_fall():
+def test_the_transition_drill_counts_cycles_near_falls_and_stops_at_the_first_fall():
     from pi_pipeline.behavior import transition_drill as td
     class R:
         gate_reseats = 0
-        def __init__(self, fell_on): self.n, self.fell_on = 0, fell_on
+        def __init__(self, fell_on, swing=3.0): self.n, self.fell_on, self.swing = 0, fell_on, swing
         def relax(self): return "ok"
         def stand_up_from_attention(self): return "ok"
         def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
-        def swing_deg(self): return 3.0
-    assert td.run_variant(R(0), 4, say=lambda *a: None, sleep=lambda s: None) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "reseats": 0}
-    assert td.run_variant(R(3), 10, say=lambda *a: None, sleep=lambda s: None)["cycles"] == 2
+        def swing_deg(self): return self.swing
+    kw = dict(look=lambda r: None, say=lambda *a: None, sleep=lambda s: None)
+    assert td.run_variant(R(0), 4, **kw) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "near_falls": 0, "reseats": 0}
+    assert td.run_variant(R(3), 10, **kw)["cycles"] == 1                                # two turns a cycle: the third turn is in cycle 2
+    big = td.run_variant(R(0, swing=25.0), 2, **kw)
+    assert big["near_falls"] == 6 and big["worst_swing_deg"] == 25.0                    # stand-up and two turns, twice
