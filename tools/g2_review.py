@@ -463,6 +463,28 @@ class App:
         except Exception:  # noqa: BLE001
             return {"core_max": 12, "max_facts": 30}
 
+    def observations_tidy(self) -> dict:
+        """Observations (what G2 saw) worth deleting, with the reason (user, 2026-11-06): near-duplicates of a newer or better-labelled one (the memory's own rule, shared with facts) and captions of
+        two words or fewer, which say too little to recall. The kept one of a duplicate set is the one with more detector labels, then the newer. {"suggestions": [{"id", "caption", "why"}]}"""
+        sys.path.insert(0, str(ROOT))
+        from pi_pipeline.memory.store import NEAR_DUPLICATE, similarity
+        rows = self.remote.memory("list", "observations", "--limit", "3000", "--query", "")
+        nlab = lambda r: len([x for x in (r.get("labels") or "").split(",") if x.strip()])      # noqa: E731
+        drop: dict[int, str] = {}
+        for i, a in enumerate(rows):
+            if len((a.get("caption") or "").split()) <= 2:
+                drop[a["id"]] = "too short to recall (two words or fewer)"
+        live = [r for r in rows if r["id"] not in drop]
+        for i, a in enumerate(live):
+            for b in live[i + 1:]:
+                if a["id"] in drop or b["id"] in drop:
+                    continue
+                if similarity(a.get("caption") or "", b.get("caption") or "") >= NEAR_DUPLICATE:
+                    keep, gone = (a, b) if (nlab(a), a["id"]) > (nlab(b), b["id"]) else (b, a)
+                    drop[gone["id"]] = f"says nearly the same as #{keep['id']}, which is kept"
+        by = {r["id"]: r for r in rows}
+        return {"suggestions": [{"id": k, "caption": (by[k].get("caption") or "")[:160], "why": v} for k, v in sorted(drop.items())]}
+
     def facts_tidy(self) -> dict:
         """What the Facts tab's tidy-up view lists, found with the memory's own rules (pi_pipeline/memory/store.py): pairs of facts that say nearly the same thing, facts that name a date or
         time (the memory refuses those when G2 saves them himself), and more than one "I look like ..." fact (that is a single slot)."""
@@ -1014,6 +1036,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._json({"tasks": app.sync_status(), **app.sync_now(start=False)})
                 if u.path == "/api/goals":
                     return self._json(app.goals())
+                if u.path == "/api/observations/tidy":
+                    return self._json(app.observations_tidy())
                 if u.path == "/api/facts/tidy":
                     return self._json(app.facts_tidy())
                 if u.path == "/api/facts/info":
@@ -1217,6 +1241,7 @@ function fold(title,open){const d=document.createElement("details");d.open=!!ope
 /*GOALS_UI*/
 /*MEMORY_UI*/
 /*EXCHANGES_UI*/
+/*CURATE_UI*/
 function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=data.filter(p=>(!onlyNew||(p.src==="roam"&&!p.labelled))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));const nun=data.filter(p=>p.src==="roam"&&!p.labelled).length;if(nun){const fb=el("button","btn",onlyNew?"Show all wall pictures":"Show only the "+nun+" roam pictures without a label");fb.onclick=()=>{window.wallsUnlabeled=!onlyNew;render()};list.append(fb)}if(!items.length){list.append(el("div","empty",onlyNew?"Every roam picture has a label.":"No wall pictures yet."));return}
  const sum=el("div","labelsum");sum.append(el("b","","Wall pictures: "),document.createTextNode(items.filter(p=>p.src==="recognition").length+" recognition shots, "+items.filter(p=>p.src==="roam").length+" kept in roams. Distances are in inches from the camera lens to the base of the wall. These are kept apart from the object pictures."));list.append(sum);
  const grid=el("div","grid");for(const p of items){const c=el("div","card");const im=el("img");im.loading="lazy";im.src="/wimg/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.label;
@@ -1224,7 +1249,7 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab!=="goals"&&tab!=="sync"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab!=="goals"&&tab!=="sync"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")window.observationsPanel(list);if(tab==="pictures")window.curatePanel(list);if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
   const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
   if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}
@@ -1276,6 +1301,7 @@ window.addEventListener("hashchange",()=>{const h=location.hash.replace("#","");
 $("#q").oninput=()=>{if(tab==="facts"||tab==="exchanges"||tab==="observations"){clearTimeout(window.qt);window.qt=setTimeout(load,300)}else render()};$("#refresh").onclick=load;$("#syncnow").onclick=syncNow;$("#micon").onclick=micOn;drawTabs();load();showSync();showMic();setInterval(showMic,60000);
 </script></body></html>"""
 PAGE = PAGE.replace("/*GOALS_UI*/", (Path(__file__).resolve().parent / "g2_goals_ui.js").read_text())          # the Goals tab's drawing code lives in its own file
+PAGE = PAGE.replace("/*CURATE_UI*/", (Path(__file__).resolve().parent / "g2_curate_ui.js").read_text())        # ... the Observations clean-up and the Pictures curate panels
 PAGE = PAGE.replace("/*EXCHANGES_UI*/", (Path(__file__).resolve().parent / "g2_exchanges_ui.js").read_text())        # ... and the Conversations tab's
 PAGE = PAGE.replace("/*MEMORY_UI*/", (Path(__file__).resolve().parent / "g2_memory_ui.js").read_text())        # ... and so does the Facts tab's
 

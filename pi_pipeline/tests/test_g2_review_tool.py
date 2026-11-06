@@ -521,3 +521,18 @@ def test_lesson_cleanup_keeps_the_newest_of_a_repeated_lesson_and_flags_dated_on
     out = {c["id"]: c["why"] for c in G.lesson_cleanup({"goals": [{"id": "ball_punt", "title": "Punt the ball", "lessons": lessons}]})}
     assert set(out) == {3, 14}                                   # 3 is said again by 12 (kept); 14 names a date; 9, 12 and 15 stay
     assert "#12" in out[3] and "date" in out[14]
+
+
+def test_observation_cleanup_drops_near_duplicates_keeping_the_better_labelled_and_very_short_captions():
+    import types
+    rows = [
+        {"id": 1, "caption": "The kitchen has a steel fridge with a black handle and a small magnet on it.", "labels": ""},
+        {"id": 2, "caption": "The kitchen has a steel fridge with a black handle and a small magnet on it.", "labels": "fridge"},
+        {"id": 3, "caption": "The piano stands against the lounge wall near the window.", "labels": ""},
+        {"id": 4, "caption": "A mug", "labels": "cup"},
+        {"id": 5, "caption": "Maple trees line the street outside the front window.", "labels": ""},
+    ]
+    stub = types.SimpleNamespace(remote=types.SimpleNamespace(memory=lambda *a: rows))
+    out = {s["id"]: s["why"] for s in G.App.observations_tidy(stub)["suggestions"]}
+    assert set(out) == {1, 4}                                    # 1 repeats 2 (the labelled one stays); 4 is two words
+    assert "#2" in out[1] and "short" in out[4]
