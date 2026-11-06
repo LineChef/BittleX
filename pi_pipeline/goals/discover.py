@@ -42,6 +42,8 @@ DIAGNOSIS = {
 }
 STAGE_OF = {k: "find" for k in SPEC}
 ENV = {"peek_every_s": "G2_INTEREST_EVERY_S", "fallback_s": "G2_INTEREST_FALLBACK_S", "relax_s": "G2_SURVEY_RELAX_S"}
+GOAL_ROAM_ENV = "G2_GOAL_ROAM"          # set while the goal itself runs a roam: that roam is judged by the goal session, so the exploration does not feed it a second time
+_applied: list = []                       # the env vars an exploration set from his learned values (put back by restore_env)
 PEOPLE = frozenset({"person", "face", "human"})
 
 
@@ -143,7 +145,23 @@ class DiscoverObjects:
             return False, f"battery {pct}% ({volts:.2f} V), below {min_pct}%"
         return True, f"battery {pct}% ({volts:.2f} V)"
 
+    def apply(self, settings: dict) -> None:
+        """An exploration (not the goal's own roam) starts with his learned look settings, unless the variable was set by hand."""
+        if os.environ.get(GOAL_ROAM_ENV):
+            return
+        for k, var in ENV.items():
+            if k in settings and var not in os.environ:
+                os.environ[var] = str(settings[k])
+                _applied.append(var)
+
     def run_attempt(self, settings: dict, ctx: AttemptContext) -> AttemptResult:
+        os.environ[GOAL_ROAM_ENV] = "1"
+        try:
+            return self._run_attempt(settings, ctx)
+        finally:
+            os.environ.pop(GOAL_ROAM_ENV, None)
+
+    def _run_attempt(self, settings: dict, ctx: AttemptContext) -> AttemptResult:
         t_wall, t0 = time.time(), time.monotonic()
         before = gallery_state()
         roam_s = int(settings.get("roam_s", SPEC["roam_s"][4]))
@@ -201,3 +219,22 @@ class DiscoverObjects:
         if x.get("pictures", 0) > 0:
             return Outcome("nothing_new", 0.2, False, f"I took {x['pictures']} pictures but everything in them was already known", n, stages={"find": 0.2})
         return Outcome("never_found", 0.0, False, "I did not find anything worth a picture", n, stages={"find": 0.0})
+
+
+def restore_env() -> None:
+    """Put back the variables `DiscoverObjects.apply` set for an exploration."""
+    while _applied:
+        os.environ.pop(_applied.pop(), None)
+
+
+MIN_ROAM_S = 60.0                         # a shorter exploration says too little to judge
+
+
+def outcome_of_exploration(ended: str, before: dict, session_started: float, seconds: float):
+    """The Identify-new-objects outcome of a whole exploration session (read back from the gallery file and the new pictures like a goal roam), or None when it was too short or is the goal's own roam."""
+    if os.environ.get(GOAL_ROAM_ENV) or seconds < MIN_ROAM_S:
+        return None
+    from .approach import AttemptResult
+    extra = judge_roam(str(ended), before, gallery_state(), pictures_since(session_started - 1.0))
+    extra["roam_s"] = int(seconds)
+    return DiscoverObjects().score(AttemptResult(str(ended), round(seconds, 1), [], extra), {})

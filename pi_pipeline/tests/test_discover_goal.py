@@ -87,3 +87,33 @@ def test_a_goal_that_explores_needs_the_service_ready_for_an_exploration(monkeyp
     ok, why = inprocess.ready(shared, "discover_objects")
     assert not ok and "explor" in why                                                              # the old hand-over is used instead
     assert inprocess.ready(shared, "ball_punt") == (True, "")                                      # the ball goal does not need it
+
+
+# ---- an exploration feeds the goal too (user, 2026-11-06)
+
+def test_an_exploration_is_judged_like_a_roam_and_the_goals_own_roam_is_left_to_its_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("G2_EXPLORE_PICTURES_DIR", str(tmp_path))
+    gal = tmp_path / "gallery.json"
+    gal.write_text(json.dumps({"entries": {"a": {"name": "mug", "sample_count": 3}}}))
+    monkeypatch.setattr(discover, "gallery_path", lambda: gal)
+    before = discover.gallery_state()
+    started = time.time()
+    for i in range(3):
+        _pic(tmp_path, "survey/20261106", f"p{i}")
+    gal.write_text(json.dumps({"entries": {"a": {"name": "mug", "sample_count": 3}, "b": {"sample_count": 3}}}))        # a new unnamed candidate
+    o = discover.outcome_of_exploration("roam time limit", before, started - 1, 200.0)
+    assert o is not None and o.code == "new_object" and o.success
+    assert discover.outcome_of_exploration("roam time limit", before, started - 1, 20.0) is None                        # too short to say anything
+    monkeypatch.setenv(discover.GOAL_ROAM_ENV, "1")
+    assert discover.outcome_of_exploration("roam time limit", before, started - 1, 200.0) is None                       # the goal's own roam
+
+
+def test_an_exploration_starts_with_his_learned_look_settings_and_puts_the_variables_back(monkeypatch):
+    for var in discover.ENV.values():
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("G2_INTEREST_FALLBACK_S", "123")                                                                  # set by hand: left alone
+    ap = discover.DiscoverObjects()
+    ap.apply({"peek_every_s": 6.0, "fallback_s": 240, "relax_s": 40})
+    assert os.environ["G2_INTEREST_EVERY_S"] == "6.0" and os.environ["G2_INTEREST_FALLBACK_S"] == "123"
+    discover.restore_env()
+    assert "G2_INTEREST_EVERY_S" not in os.environ and os.environ["G2_INTEREST_FALLBACK_S"] == "123"

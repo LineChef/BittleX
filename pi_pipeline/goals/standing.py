@@ -61,18 +61,18 @@ def apply(goal_id: str = "walls", *, conditions: dict | None = None, state=None)
         return None
 
 
-def learn(goal_id: str, events: list, source: str, *, used: dict | None = None, conditions: dict | None = None, state=None, journal=None) -> int:
-    """Score `events` (goals/walls.py events) as encounters and judge each one. Returns how many were counted."""
+def learn(goal_id: str, events: list, source: str, *, used: dict | None = None, conditions: dict | None = None, state=None, journal=None, outcomes: list | None = None) -> int:
+    """Score `events` (goals/walls.py events) as encounters and judge each one, or judge the ready-made `outcomes` (a task goal an activity feeds: discover_objects). Returns how many were counted."""
     try:
         from .journal import Journal
         from .walls import score_encounters
-        if not events:
+        if not events and not outcomes:
             return 0
         parts = _parts(goal_id, conditions, state)
         if parts is None:
             return 0
         goal, ap, cond, _key, state, judge = parts
-        outcomes = score_encounters(events) if goal.approach == "walls" else []
+        outcomes = outcomes if outcomes is not None else (score_encounters(events) if goal.approach == "walls" else [])
         if not outcomes:
             return 0
         journal = journal or Journal()

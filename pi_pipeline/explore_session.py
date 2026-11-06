@@ -325,6 +325,14 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         except Exception:  # noqa: BLE001
             walls_used = None
         session_started = time.time()
+        discover_before = None
+        try:                                                # Identify new objects: an exploration feeds it too (user, 2026-11-06); his learned look settings for this session, and what is in the gallery now
+            from .goals import discover as _discover
+            from .goals.standing import apply as _apply_standing2
+            _apply_standing2("discover_objects")
+            discover_before = _discover.gallery_state()
+        except Exception:  # noqa: BLE001
+            log.exception("could not set up the Identify new objects goal for this exploration")
         if vision is not None and os.environ.get("G2_EXPLORE_SURVEY", "1") != "0":
             from .behavior.survey import survey_config_from_env
             from .vision.exploration_pictures import DEFAULT_ROOT, ExplorationPictureSaver
@@ -608,6 +616,20 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                     log.info("walls goal: %d wall encounter(s) judged", _n)
             except Exception:  # noqa: BLE001
                 log.exception("could not hand the wall encounters to the walls goal")
+            try:                                                              # Identify new objects learns from this exploration: new candidates, usable pictures (goals/discover.py; the goal's own roams are judged by its session)
+                if discover_before is not None:
+                    from .goals import discover as _discover
+                    from .goals.standing import learn as _learn_standing2
+                    _o = _discover.outcome_of_exploration(ended_by, discover_before, session_started, time.time() - session_started)
+                    if _o is not None and _learn_standing2("discover_objects", [], "exploration", outcomes=[_o]):
+                        log.info("Identify new objects: this exploration judged as %s", _o.code)
+            except Exception:  # noqa: BLE001
+                log.exception("could not hand the exploration to the Identify new objects goal")
+            try:
+                from .goals import discover as _discover
+                _discover.restore_env()
+            except Exception:  # noqa: BLE001
+                pass
             if watch is not None:
                 watch.stop()
             if profiler is not None:
