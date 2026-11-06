@@ -341,6 +341,9 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         rt = _build_runtime(link, hz=args.hz, memory=deferred, frame_source=vision, policy_walker=policy_walker, imu_link=consumer(),
                             camera_snapshot=saver, wall_source=lambda: getattr(getattr(rt, "wall_log", None), "last", None))
         rt.bindings.wrap_diag(tally.wrap)
+        if saver is not None:
+            from .behavior import claw_survey
+            rt.bindings.claw_look = lambda kind: claw_survey.run_claw_look(link, saver, kind)          # a look is the claw look when the arm is fitted (behavior/claw_survey.py)
         hub = getattr(getattr(rt, "_sensors", None), "__self__", None)
         if hub is not None and hasattr(hub, "yaw_deg") and getattr(rt.bindings, "walker", None) is not None:
             rt.bindings.walker.yaw_fn = hub.yaw_deg               # every timed turn logs how far the IMU saw him turn
@@ -564,7 +567,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 link.send("kbalance", read_reply=False, settle=0.0)           # resting straight out of a stride or a turn dropped G2 on his side (2026-10-09)
                 time.sleep(1.5)
                 say("Exploration complete.")                                   # said first (user, 2026-10-07; wording 2026-10-10), then the "da naaaa", then G2 lies down
-                if os.environ.get("G2_COMPLETE_SOUND", "1") != "0":
+                if os.environ.get("G2_COMPLETE_SOUND", "1") != "0" and not args.light:          # a goal's roam (--light) is one attempt: the goal session plays it once at its end
                     from .voice import prompt_tones
                     prompt_tones.play_complete(wait=True)
                 link.send("d", read_reply=False, settle=0.0)                  # lie down, servos relaxed

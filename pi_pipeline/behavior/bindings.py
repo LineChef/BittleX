@@ -45,7 +45,7 @@ class DriverBindings:
         self._on_diag = wrapper(self._on_diag)
 
     def __init__(self, *, actuator=None, tts=None, camera=None, cue=None,
-                 walker=None, head=None, power=None, on_diag=None, avoid_sound=None, hit_sound=None, contact=None):
+                 walker=None, head=None, power=None, on_diag=None, avoid_sound=None, hit_sound=None, contact=None, claw_look=None):
         self.actuator = actuator
         self.tts = tts
         self.camera = camera
@@ -53,6 +53,7 @@ class DriverBindings:
         self.walker = walker
         self.head = head
         self.power = power
+        self.claw_look = claw_look               # callable(kind): the claw look, started in a worker thread (explore_session sets it; behavior/claw_survey.py)
         self.contact = contact                   # callable(reason): instant diagnosis pictures when he hits a wall (vision/contact_pictures.py)
         self.hit_sound = hit_sound               # callable() -> bool: the "ooooof" on the speaker when he hits a wall (True = it played)
         self.avoid_sound = avoid_sound         # callable() -> bool: the turn-away sound on the speaker (True = it played, so no buzzer notes)
@@ -126,6 +127,13 @@ class DriverBindings:
                     return self._miss("contact")
                 fn(kind)
                 return f"contact:{kind}"
+            if on == "claw":                      # the claw look: a worker thread, so the behaviour loop keeps ticking while the arm moves and the pictures are taken
+                fn = self.claw_look
+                if not fn:
+                    return self._miss("claw_look")
+                import threading
+                threading.Thread(target=fn, args=(kind,), name="claw-look", daemon=True).start()
+                return f"claw:{kind}"
             if on == "shot":                      # take ONE picture now (survey / naming): a camera call, no network
                 fn = self.camera and _call(self.camera, "snapshot")
                 if not fn:

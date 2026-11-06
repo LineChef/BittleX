@@ -19,6 +19,9 @@ from .judge import Judge
 from .spec import Goal
 
 
+COMPLETE_WHY = ("attempts", "target", "time")        # the ways a session ends that count as finished
+
+
 class GoalSession:
     def __init__(self, goal: Goal, approach: Approach, *, journal: Journal | None = None, state: State | None = None, stop: Callable[[], bool] = lambda: False,
                  say: Callable[[str], None] = print, announce: Callable[[str], None] | None = None, conditions: dict | None = None, sleep=time.sleep,
@@ -63,7 +66,14 @@ class GoalSession:
                     except OSError:
                         pass
             scope.on_exit(_clear_stop_files)
-            return self._run()
+            res = self._run()
+        if res.get("why") in COMPLETE_WHY and os.environ.get("G2_COMPLETE_SOUND", "1") != "0":          # the "da naaaa" when a task finishes (user, 2026-11-06: any goal run or exploration); not after a fall, a stop, the battery or a silent board
+            try:
+                from ..voice import prompt_tones
+                prompt_tones.play_complete(wait=True)
+            except Exception:  # noqa: BLE001
+                pass
+        return res
 
     def _run(self) -> dict:
         g = self.goal

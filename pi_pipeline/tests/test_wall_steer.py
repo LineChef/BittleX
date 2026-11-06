@@ -21,7 +21,23 @@ def _wall(c, state="near", confirmed=True, turn="left", inches=9.0, age=0.5, gro
     return WallReading(c() - age, state, inches, turn, confirmed, groups, (2 if groups >= 3 else 0) if votes is None else votes, prev, prev_age)
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _chirp_on(monkeypatch):
+    monkeypatch.setenv("G2_AVOID_CHIRP", "1")                                  # these tests are about the steering and its chirp; the default (off) has its own test below
+
+
+def test_the_turning_chirp_is_off_by_default(monkeypatch):
+    monkeypatch.delenv("G2_AVOID_CHIRP")
+    d, c = _explorer(monkeypatch)
+    t = d.tick(DriverInputs(frame=[], wall=_wall(c, turn="left")))
+    assert payloads(t, EffectKind.TURN) and ChirpMood.AVOID not in payloads(t, EffectKind.CHIRP)       # (user, 2026-11-06)
+
+
 def test_a_confirmed_near_wall_turns_him_toward_the_open_side_with_a_soft_sound_once_per_look(monkeypatch):
+    monkeypatch.setenv("G2_AVOID_CHIRP", "1")                                  # the chirp is off unless asked for
     d, c = _explorer(monkeypatch)
     w = _wall(c, turn="left")
     t = d.tick(DriverInputs(frame=[], wall=w))

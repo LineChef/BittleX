@@ -37,6 +37,7 @@ class SurveyConfig:
     look_deg: float = 45.0          # how far he turns to each side (left, then right through the middle to the other side, then back to the middle)
     turn_rate_dps: tuple = (11.0, 18.0)      # measured yaw rates of the firmware left / right turn gaits (app/sinks.py WalkerSink.TURN_RATE_DPS)
     turn_gain: float = 0.85         # the walker turns a bit less than asked (WalkerSink.TURN_GAIN)
+    claw: bool | None = None        # looks use the claw (behavior/claw_survey.py: attention pose, claw up, left, right, centre picture, stand) instead of the bow, the sit and the check pose (user, 2026-11-06); None = whenever the arm is fitted
     look_pause_s: float = 1.2       # after a turn is stopped, before the picture (the picture then waits for the IMU to show he has stopped swaying)
 
 
@@ -120,6 +121,15 @@ def _picture_steps(cfg: SurveyConfig, kind: str, why: str) -> tuple[list, float]
     picture, look RIGHT and pause for a throwaway picture, come back to the middle, settle, and take the picture that counts. Pictures taken in the bow and sit poses themselves were not good, so no
     picture is taken in them. A look is a small timed turn (`("turn", radians)`, + = right) followed by a stop (`kbalance`). Returns the steps and the time of the last shot."""
     t = 0.0
+    from . import claw_survey
+    if (claw_survey.wanted() if cfg.claw is None else cfg.claw):
+        plan = [(t, "skill", "kcalib", f"{why}: the attention pose for the claw look")]
+        t += 2.0                                                                  # to settle into it (ball_chase.CLAW_POSE_S)
+        plan.append((t, "claw", kind if kind != "look" else "look", f"{why}: claw look, left, right and centre pictures"))
+        t += claw_survey.look_seconds()
+        plan.append((t, "skill", cfg.stand_skill, f"{why}: stand up after the claw look"))
+        t += cfg.stand_settle_s
+        return plan, t
     plan = [(t, "skill", cfg.look_up_skill, f"{why}: look up")]
     t += cfg.pose_settle_s
     plan.append((t, "skill", cfg.look_down_skill, f"{why}: look down, the inspect bow (the walk stops, no rest)"))
@@ -158,7 +168,7 @@ def picture_pose_steps(cfg: SurveyConfig, settle_only: bool = False):
 def survey_plan(cfg: SurveyConfig, shot_kind: str = "after_bow") -> list:
     """A survey stop: bow, look up, stand, settle, one picture, then walk on. `shot_kind` names the picture (a scheduled milestone picture is `after_bow_m25` and so on)."""
     plan, t = _picture_steps(cfg, "after_bow", "survey")
-    plan = [(d, k, (shot_kind if k == "shot" and p == "after_bow" else p), w) for d, k, p, w in plan]
+    plan = [(d, k, (shot_kind if k in ("shot", "claw") and p == "after_bow" else p), w) for d, k, p, w in plan]
     t += 0.4
     plan.append((t, "diag", "survey.done", "survey: finished, walking on"))
     return plan

@@ -308,6 +308,7 @@ def main() -> None:
             conversation_max_words=settings.conversation_max_words if voice else 0,
             camera=camera,
             namer=namer,
+            claw_link=link,
             announce_online=os.environ.get("G2_ANNOUNCE_ONLINE", "on").strip().lower() not in ("off", "0", "false", "no"),
             on_event=on_event,
             on_poweroff=((lambda: power_off_pi(actuator)) if (voice and settings.poweroff_on_shutdown) else None),

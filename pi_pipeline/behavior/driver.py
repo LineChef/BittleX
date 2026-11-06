@@ -248,6 +248,8 @@ def _plan_steps(plan: list) -> list:
     for delay, kind, payload, reason in plan:
         if kind == "shot":
             steps.append((delay, Effect(EffectKind.CAPTURE, ("shot", payload), reason)))
+        elif kind == "claw":                                      # the claw look (behavior/claw_survey.py): runs in a worker thread, the pictures are taken inside it
+            steps.append((delay, Effect(EffectKind.CAPTURE, ("claw", payload), reason)))
         elif kind == "diag":
             steps.append((delay, Effect(EffectKind.DIAG, (payload, reason), reason)))
         else:
@@ -570,7 +572,7 @@ class BehaviorDriver:
         why = f"wall {'blocked' if blocked else 'ahead'} ({w.nearest_in if w.nearest_in is not None else 0:g} in, {w.near_groups} groups): turn {side}"
         logging.getLogger("g2.wall.steer").info("%s", why)
         fx = [Effect(EffectKind.DIAG, ("wall.steer", why), why)]
-        if self.chirper is not None:                          # the reason for the turn is always audible: it is not held back by the chirp cooldown (it still restarts it)
+        if self.chirper is not None and os.environ.get("G2_AVOID_CHIRP", "0") == "1":          # the turning chirp is OFF (user, 2026-11-06); G2_AVOID_CHIRP=1 brings it back (not held back by the chirp cooldown, which it still restarts)
             self.chirper.fired(now)
             _chirp_log.info("chirp %s asked for (%s)", ChirpMood.AVOID.value, why)
             fx.append(Effect(EffectKind.CHIRP, ChirpMood.AVOID, why))

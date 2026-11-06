@@ -207,9 +207,12 @@ class VoiceLoop:
         side_max_words: int = 0,  # a question-window turn (no wake word) longer than this many words is treated as side chatter (0 = no limit)
         conversation_max_words: int = 0,  # the same limit inside conversation mode (0 = no limit)
         is_resting=None,  # callable -> True when G2 lies at rest (nothing is moving): then a stop heard while the wake word is off is ignored, not announced
+        claw_link=None,  # the serial link for the claw look (behavior/claw_survey.py): with the arm fitted, a voice look or naming is the claw look; None = the old bow and sit
         namer=None,  # object called with a picture kind ("name:mug") that takes and saves one picture and returns its path or None (vision.exploration_pictures.ExplorationPictureSaver)
     ):
         self._namer = namer
+        self._claw_link = claw_link
+        self._claw_jpeg = None          # the centre picture of the last claw look made for a voice look
         self._is_resting = is_resting
         self._announce_online = announce_online
         self._wake = wake_word
@@ -249,8 +252,9 @@ class VoiceLoop:
         if self._camera is None or not (learn or asks_what_g2_sees(user_text)):
             return {}
         self._cue.set("thinking")
+        self._claw_jpeg = None
         self._pose_for_picture()
-        snap = self._camera.snapshot()
+        snap = self._claw_jpeg or self._camera.snapshot()
         self._last_look = snap
         if snap is None:
             return {"image_note": "[G2's camera could not take a picture right now.]"}
@@ -267,6 +271,12 @@ class VoiceLoop:
         fn = getattr(self._act, "perform_token", None)
         (fn or self._act.perform)(token)
 
+    def _claw_look_wanted(self) -> bool:
+        if self._claw_link is None:
+            return False
+        from ..behavior import claw_survey
+        return claw_survey.wanted()
+
     def _pose_for_picture(self) -> None:
         """Any picture, any time the camera is used (user, 2026-10-07): look down (the inspect bow), look up, stand again and settle before the shot, the same sequence as a survey stop
         or a naming. A failed skill must not stop the picture or the voice loop."""
@@ -275,6 +285,14 @@ class VoiceLoop:
             return
         t0 = time.monotonic()
         try:
+            if self._claw_look_wanted():                                  # the claw look (user, 2026-11-06): the centre picture is the one he describes
+                from ..behavior import claw_survey
+                self._pose_token("kcalib")
+                time.sleep(2.0)
+                claw_survey.run_claw_look(self._claw_link, lambda label: setattr(self, "_claw_jpeg", self._camera.snapshot()) if label == "look" else None, "look")
+                self._pose_token("kup")
+                time.sleep(SurveyConfig().stand_settle_s)
+                return
             for delay, skill in picture_pose_steps(SurveyConfig()):
                 wait = delay - (time.monotonic() - t0)
                 if wait > 0:
@@ -404,6 +422,11 @@ class VoiceLoop:
                     time.sleep(wait)
                 if kind == "skill":
                     self._pose_token(payload)
+                elif kind == "claw" and self._claw_link is not None:          # the claw look: the throwaway pictures are kept as look_left / look_right, the centre one is the named one
+                    from ..behavior import claw_survey
+                    got = {}
+                    claw_survey.run_claw_look(self._claw_link, lambda label: got.__setitem__(label, self._namer(label)), payload)
+                    saved = got.get(payload)
                 elif kind == "shot":
                     saved = self._namer(payload)
         except Exception:  # noqa: BLE001 -- a failed picture must not end the voice loop
