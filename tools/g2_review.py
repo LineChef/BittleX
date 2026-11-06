@@ -1139,7 +1139,7 @@ function drawTabs(){const t=$("#tabs");t.replaceChildren();for(const [k,n] of TA
 function factTools(r){const d=el("div","");d.style.cssText="display:flex;gap:6px;align-items:center;flex:none";
  const e=el("button","btn","Edit");e.onclick=async()=>{const t=prompt("Edit this fact",r.fact);if(t===null||!t.trim()||t.trim()===r.fact)return;const old=r.fact;
   try{await api("/api/facts/edit",{id:r.id,fact:t.trim()});r.fact=t.trim();render();toast("Fact updated",async()=>{await api("/api/facts/edit",{id:r.id,fact:old});load()})}catch(x){toast("Failed: "+x.message)}};
- const s=el("select");for(let i=1;i<=5;i++){const o=el("option","",String(i));o.value=i;if(i===r.importance)o.selected=true;s.append(o)}s.title="Importance (1-5)";
+ const s=el("select");for(let i=1;i<=5;i++){const o=el("option","",String(i));o.value=i;if(i===r.importance)o.selected=true;s.append(o)}s.title="Importance: 1 = rarely matters, 5 = essential";
  s.onchange=async()=>{try{await api("/api/facts/edit",{id:r.id,importance:+s.value});r.importance=+s.value}catch(x){toast("Failed: "+x.message)}};
  const c=el("button","btn",r.core?"Core \u2713":"Core");c.title="Core facts are always told to Claude";
  c.onclick=async()=>{try{await api("/api/facts/edit",{id:r.id,core:!r.core});r.core=r.core?0:1;render()}catch(x){toast("Failed: "+x.message)}};
