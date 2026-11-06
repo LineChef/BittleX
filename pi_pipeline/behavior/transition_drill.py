@@ -50,7 +50,10 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
 
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
-        if robot.relax() != "ok" or robot.fallen():                   # a fall anywhere ends the round at once: nothing more is sent to a fallen G2
+        r_state = robot.relax()
+        trace("attention pose")
+        if r_state != "ok" or robot.fallen():                         # a fall anywhere ends the round at once: nothing more is sent to a fallen G2
+            trace("fall in the attention pose")
             fell = True
             break
         look(robot)

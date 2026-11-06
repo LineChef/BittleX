@@ -672,6 +672,27 @@ class SerialRobot:
         self._gate_done_at = self._posed_at
         return "ok"
 
+    SETTLE_POSE_MAX_S = 1.0        # the longest a pose change waits for the body to be steady after the move before it
+    SETTLE_POSE_AFTER_S = 6.0      # only when the last move ended this recently (a stance held for longer is the sag check's business)
+
+    def _settle_before_pose(self) -> None:
+        """Walking or turning to a pose is where the logged falls came (drill 2026-11-06: fell going from the stand into the attention pose right after a turn). Before the pose is commanded,
+        wait up to SETTLE_POSE_MAX_S for the body to be steady: near its stand tilt and the two readings 0.25 s apart agreeing. Unproven; G2_POSE_GATE=0 turns it off."""
+        if not POSE_GATE or self.posture != "stand" or self._moved_at is None or self._clock() - self._moved_at > self.SETTLE_POSE_AFTER_S:
+            return
+        ref = self._stand_tilt or (0.0, 0.0)
+        t0, last = self._clock(), None
+        while self._clock() - t0 < self.SETTLE_POSE_MAX_S:
+            cur = self._tilt(0.25)
+            if cur is None:
+                return                                    # no IMU frames: nothing to judge by
+            steady = max(abs(cur[0] - ref[0]), abs(cur[1] - ref[1])) <= CALM_TILT_DEG and (last is not None and max(abs(cur[0] - last[0]), abs(cur[1] - last[1])) <= GATE_DRIFT_DEG)
+            last = cur
+            if steady:
+                log.info("steady before the pose change (pitch %+.0f roll %+.0f deg), %.2f s after the move", cur[0], cur[1], self._clock() - t0)
+                return
+        log.warning("not steady before the pose change after %.1f s (pitch %+.0f roll %+.0f deg): going anyway", self.SETTLE_POSE_MAX_S, last[0], last[1])
+
     def _calm_before_stop(self) -> str:
         """A firmware move ends with a stop; stopped at an arbitrary gait phase the legs are mid-stride and he can go over (13 of 18 logged falls were in turns). Wait up to CALM_MAX_S for
         a calm moment: the body near how it stands and the tilt barely changing between IMU samples. "ok" or "fell"; with no IMU frames it does not wait."""
@@ -744,6 +765,7 @@ class SerialRobot:
         """Into the attention pose (CLAW_LOOK_POSE) to wait there instead of standing (BETWEEN_MOVES "attention", user 2026-11-02). Nothing when he is already in it."""
         if self.posture == "attention":
             return "ok"
+        self._settle_before_pose()
         got = "unknown"
         for attempt in range(ATTENTION_TRIES):
             self._tx(CLAW_LOOK_POSE)
