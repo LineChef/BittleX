@@ -63,3 +63,34 @@ def test_a_rebuild_teaches_each_labelled_picture_to_a_fresh_gallery_under_its_na
     assert g.embedder == "test.onnx" and {e.name for e in g.entries.values()} == {"mug", "lamp", "cat"} and all(e.name for e in g.entries.values())
     entry, sim = g.match(list(vecs[0]), named_only=True)
     assert entry.name == "mug" and sim >= t_same
+
+
+def test_the_lazy_embedder_loads_on_first_use_and_lets_go_when_idle():
+    import numpy as np
+
+    class Inner:
+        def embed(self, img): return np.ones(4, dtype=np.float32) / 2.0
+
+    class Timer:
+        instances = []
+        def __init__(self, s, fn): self.s, self.fn, self.daemon, self.cancelled = s, fn, False, False; Timer.instances.append(self)
+        def start(self): pass
+        def cancel(self): self.cancelled = True
+    e = emb.LazyOnnxEmbedder("/m/dinov2_small.onnx", pool="cls", idle_s=90, factory=Inner, clock_timer=Timer)
+    assert e.key == "dinov2_small.onnx#cls" and not e.loaded and e.loads == 0
+    e.embed(object()); e.embed(object())
+    assert e.loaded and e.loads == 1 and e.dim == 4                           # one load for two pictures
+    assert Timer.instances[0].cancelled and Timer.instances[-1].s == 90         # each use pushes the release back
+    Timer.instances[-1].fn()                                                   # the idle time passes
+    assert not e.loaded
+    e.embed(object())
+    assert e.loaded and e.loads == 2                                           # the next picture loads it again
+
+
+def test_the_idle_setting_picks_the_lazy_embedder(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_EMBEDDER_IDLE_S", "60")
+    assert isinstance(emb.make_embedder(f"onnx:{tmp_path}/x.onnx#cls"), emb.LazyOnnxEmbedder)             # nothing is loaded until the first picture
+    monkeypatch.delenv("G2_EMBEDDER_IDLE_S")
+    import pytest
+    with pytest.raises(Exception):
+        emb.make_embedder(f"onnx:{tmp_path}/missing.onnx")                                                  # the eager one needs the file at once

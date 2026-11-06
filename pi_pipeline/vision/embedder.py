@@ -107,6 +107,50 @@ class OnnxEmbedder:
         return v
 
 
+class LazyOnnxEmbedder:
+    """An ONNX embedder that holds its model in memory only while it is being used (user, 2026-11-06: the Pi has about 75 MB free beside the voice service, and the model needs about 100 MB).
+    The first `embed` loads the model; `idle_s` seconds after the last one it is released again (the next call loads it, about a second on the Pi). Same interface as OnnxEmbedder."""
+
+    def __init__(self, path: str, *, pool: str = "auto", idle_s: float = 90.0, factory=None, clock_timer=None):
+        import threading
+        self._path, self._pool, self.idle_s = str(path), pool, float(idle_s)
+        self._factory = factory or (lambda: OnnxEmbedder(self._path, pool=self._pool))
+        self._timer_cls = clock_timer or threading.Timer
+        self._lock = threading.RLock()
+        self._inner = None
+        self._timer = None
+        self.loads = 0
+        self.name = "onnx:" + self._path.rsplit("/", 1)[-1]
+        self.key = self._path.rsplit("/", 1)[-1] + (f"#{pool}" if pool != "auto" else "")
+        self.dim = 0
+
+    @property
+    def loaded(self) -> bool:
+        return self._inner is not None
+
+    def embed(self, img):
+        with self._lock:
+            if self._inner is None:
+                self._inner = self._factory()
+                self.loads += 1
+            v = self._inner.embed(img)
+            self.dim = int(getattr(v, "size", 0) or self.dim)
+            if self.idle_s > 0:
+                if self._timer is not None:
+                    self._timer.cancel()
+                self._timer = self._timer_cls(self.idle_s, self.unload)
+                self._timer.daemon = True
+                self._timer.start()
+            return v
+
+    def unload(self) -> None:
+        with self._lock:
+            self._inner = None
+            self._timer = None
+            import gc
+            gc.collect()
+
+
 def pool_output(out: np.ndarray, pool: str = "auto") -> np.ndarray:
     """One unit vector from a model output: a 2-D (1, D) output is used as is; a 4-D feature map is averaged over its spatial axes; a 3-D token output (1, tokens, D) with a leading class token
     (a ViT / DINO encoder) is pooled as 'cls' (token 0), 'mean' (the other tokens averaged) or 'cls+mean' (both, each normalised, joined; the default for 3-D)."""
@@ -164,5 +208,10 @@ def make_embedder(spec: str = "histogram"):
         return e
     if spec.startswith("onnx:"):
         path, _, pool = spec[5:].partition("#")            # 'onnx:/path/model.onnx#cls' picks the token pooling of a ViT / DINO encoder
+        import os
+        import sys
+        idle = float(os.environ.get("G2_EMBEDDER_IDLE_S", "90" if sys.platform == "linux" else "0"))       # >0: hold the model only while it is used (the Pi, Linux: 90 s); 0 = keep it loaded (the Mac tools)
+        if idle > 0:
+            return LazyOnnxEmbedder(path, pool=pool or "auto", idle_s=idle)
         return OnnxEmbedder(path, pool=pool or "auto")
     raise ValueError(f"unknown embedder {spec!r}: use 'histogram' or 'onnx:/path/model.onnx'")
