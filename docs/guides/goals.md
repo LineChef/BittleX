@@ -133,6 +133,10 @@ An attempt is scored from what the roam left behind: **new object** (a new candi
 
 It needs an exploration to run: inside the voice service that is `G2_EXPLORE_INPROCESS=1` with the explore, vision and vision_safety features on (not yet tried on G2); when the service is not set up for it, `g2goal run` falls back to the old stop-and-run hand-over (`--standalone`).
 
+**What the first run showed (2026-11-06):** the hand-over run works, with two things to know. The roam skips the speech models (`--light`: no narration, no wake word), because with them loaded the process ran out of memory and sat in swap, never reaching the roam. And the gallery's queue of promoted pictures (`~/.local/share/g2/gallery_pending.json`) is learned at the start of every roam: at about 2 s a picture with the learned embedder, a long queue (349 pictures) held the roam for minutes, so a stale queue is moved aside, not learned again, after a rebuild (`tools/rebuild_gallery.py`). Result of the first run: 0 of 3 (3 to 4 usable pictures each, all of things already known).
+
+**Plain exploration feeds the goal too:** every exploration of a minute or more is judged like a roam (new candidates, usable pictures) and starts with the goal's learned look settings (peek interval, fallback picture, pickiness; a value set by hand wins). The goal's own roams are not counted twice. When a goal session ends normally (all attempts, the target, the time), the "da naaaa" plays once; not after a fall, a stop, the battery or a silent board.
+
 ## 9. Where things live on the Pi
 
 | File | What |

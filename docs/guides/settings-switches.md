@@ -11,7 +11,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_FAIL_SOUND` | on | the losing horn when a command fails (once per 8 s) |
 | `G2_FALL_HORN` | on | the losing horn when he tips over (tilt past 60 degrees for 0.3 s), walking or not |
 | `G2_GRUNT` | on | the grunt when you rebuff him |
-| `G2_COMPLETE_SOUND` | on | the ta-da at the end of an exploration |
+| `G2_COMPLETE_SOUND` | on | the ta-da at the end of an exploration, and once when a goal session finishes normally (all attempts, the target or the time; not after a fall, a stop, the battery or a silent board) |
 | `G2_WALL_SOUND` | on | the two-note turn-away sound |
 | `G2_HIT_SOUND` | on | the long "ooooof" when he hits a wall |
 | `G2_ACK_TONE` | `short_tone` | what acknowledges a command sent to Claude: `short_tone`, `ack_whistle`, `buzzer`, `off` (`star_trek_whistle` still works) |
@@ -80,6 +80,11 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 
 | Switch | Default | What it does |
 |---|---|---|
+| `G2_SURVEY_CLAW` | auto | with the arm fitted every look is the claw look (attention pose, claw up, left, right and centre pictures, claw down, stand) instead of the bow, the sit and the check pose; `1` forces it, `0` brings the old looks back |
+| `G2_AVOID_CHIRP` | off | `1` brings back the soft chirp when he turns away from a wall (off since 2026-11-06) |
+| `G2_POSE_GATE` | on (unproven) | before a move that follows a pose change, and before a pose change shortly after a move, the body's real tilt is checked and lagging legs are re-seated; `0` turns it off (see `plan-detail/falls-at-transitions-2026-11-06.md`) |
+| `G2_STOP_CALM` | on (unproven) | a firmware move waits up to 0.4 s for a calm moment before its stop; `0` stops immediately as before |
+| `G2_LEG_CHECK` | on | after a stand-up from the attention pose or a sit the board's believed leg angles are compared with the stand pose and logged to `~/.local/share/g2/leg_check.jsonl` (report only); `0` turns it off |
 | `G2_SURVEY_CHECK` | on | a survey stop is look up, look down, stand, firmware `check` (`kck`, the body lean; G2 has no head to pan), stand, settle, one picture; `0` skips the check |
 | `G2_SURVEY_LOOKS` | off | `1` adds left and right turns with a throwaway picture each (open-loop turns were off by 30 to 70 deg) |
 | `G2_NEAR_LOOK_IN` | 30 | a wall this close (inches) starts the fast 3 s wall looks and blocks surveys and object checks for 20 s |
