@@ -171,7 +171,7 @@ class DiscoverObjects:
                 ended = run_inprocess(self._shared, roam_s)
             else:
                 from ..explore_session import parse_args, run_session
-                ended = run_session(parse_args(["--arm-on-start", "--exit-when-roam-ends", "--roam-s", str(roam_s)]))
+                ended = run_session(parse_args(["--arm-on-start", "--exit-when-roam-ends", "--light", "--roam-s", str(roam_s)]))
         finally:
             done.set()
             for var, old in saved.items():

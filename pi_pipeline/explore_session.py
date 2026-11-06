@@ -131,6 +131,7 @@ def parse_args(argv=None):
     ap.add_argument("--exit-when-roam-ends", action="store_true", help="end the session (the voice service comes back) when roaming ends")
     ap.add_argument("--max-s", type=float, default=7200.0, help="the whole session ends after this long, so a forgotten session cannot keep the voice service off")
     ap.add_argument("--no-narrate", action="store_true")
+    ap.add_argument("--light", action="store_true", help="a goal's roam as its own process: no narration and no wake word / speech-to-text, so the speech models are never loaded (the Pi has 512 MB and the roam thrashed in swap with them, 2026-11-06); stop it with `g2goal stop`")
     ap.add_argument("--hz", type=float, default=8.0)
     args = ap.parse_args(argv)
     args.arm_on_start = args.arm_on_start or not args.stationary
@@ -254,12 +255,12 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         from concurrent.futures import Future
         tts_future = Future()
         tts_future.set_result(shared.tts)              # the service's speech engine is already loaded
-    elif not args.no_narrate:
+    elif not args.no_narrate and not args.light:
         def _load_tts():
             from .voice.tts import make_tts
             return make_tts("piper", piper_model_path=settings.piper_model_path, style=settings.voice_style)
         tts_future = prefetch.submit(_load_tts)
-    if features.mic and features.wake_word and not (lent and shared.wake is not None):
+    if features.mic and features.wake_word and not args.light and not (lent and shared.wake is not None):
         def _load_vosk():
             try:
                 from .voice import vosk_model
@@ -366,7 +367,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
         tts = None
         narrator = None
         say = lambda text: None  # noqa: E731
-        if not args.no_narrate:
+        if not args.no_narrate and not args.light:
             raw = tts_future.result()                                            # started at the top of main()
             log.info("speech engine ready %.1f s after the session started", time.monotonic() - boot_t0)
             lock = threading.Lock()
@@ -445,7 +446,7 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
             if features.sound_cues and not args.no_narrate:
                 from .voice import wake_chime
                 wake_chime.play()
-        if features.mic and features.wake_word:
+        if features.mic and features.wake_word and not args.light:
             from .behavior.explore_listener import ExploreListener
             if lent and shared.wake is not None and shared.stt is not None:
                 wake, stt = shared.wake, shared.stt     # the service's one microphone stream (it cannot be opened twice); its voice loop is blocked meanwhile
