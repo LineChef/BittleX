@@ -92,7 +92,14 @@ class OnnxEmbedder:
         self.key = self.path.rsplit("/", 1)[-1] + (f"#{pool}" if pool != "auto" else "")          # the same on every machine: the gallery file records it
         self._mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
         self._std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
-        self._sess = ort.InferenceSession(self.path, providers=list(providers))
+        import os
+        import sys
+        so = ort.SessionOptions()
+        threads = int(os.environ.get("G2_EMBEDDER_THREADS", "2" if sys.platform == "linux" else "0"))      # the Pi: two of the four cores, so the walking loop's 80 Hz ticks are not crowded out (0 = all)
+        if threads > 0:
+            so.intra_op_num_threads = threads
+            so.inter_op_num_threads = 1
+        self._sess = ort.InferenceSession(self.path, sess_options=so, providers=list(providers))
         self._in = self._sess.get_inputs()[0].name
         self.dim = 0
 
