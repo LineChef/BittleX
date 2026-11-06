@@ -274,7 +274,12 @@ class ObjectGallery:
         return g
 
     def save(self, path: str | Path) -> None:
-        Path(path).write_text(json.dumps(self.to_dict(), indent=2))
+        """Written to a temporary file and moved into place, so a second save at the same moment (the interest feeder and the promoted-picture loader) can never leave a half-written file."""
+        import os
+        p = Path(path)
+        tmp = p.with_name(p.name + f".{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(self.to_dict(), indent=2))
+        os.replace(tmp, p)
 
     @classmethod
     def load(cls, path: str | Path, cfg: ObjectGalleryConfig | None = None, *,
@@ -282,4 +287,9 @@ class ObjectGallery:
         p = Path(path)
         if not p.exists():
             return cls(cfg, clock=clock)
-        return cls.from_dict(json.loads(p.read_text()), cfg, clock=clock)
+        text = p.read_text()
+        try:
+            data = json.loads(text)
+        except ValueError:                                         # a file damaged by an overlapping write (2026-11-06: one stray "}" at the end): the first complete object is the gallery
+            data, _end = json.JSONDecoder().raw_decode(text.lstrip())
+        return cls.from_dict(data, cfg, clock=clock)

@@ -1,3 +1,4 @@
+import pytest
 from pi_pipeline.vision.object_gallery import (
     GalleryDecision,
     ObjectGallery,
@@ -161,3 +162,18 @@ def test_an_entry_that_looks_like_another_named_entry_does_not_lock():
         g.consider(_vec(rng, a, 0.12), quality=1.0)
     assert not g.entries[first].locked or g.holdout_accuracy(first)[0] >= 0.9                       # never locks on a false 'recognised'
     assert g.to_dict()["entries"][first]["samples"]                                                  # and the samples are saved
+
+
+def test_a_gallery_file_with_a_stray_closing_brace_still_loads_and_a_save_is_atomic(tmp_path):
+    import json
+    from pi_pipeline.vision.object_gallery import ObjectGallery
+    g = ObjectGallery()
+    g.consider([1.0, 0.0, 0.0], quality=0.9)
+    p = tmp_path / "gallery.json"
+    g.save(p)
+    assert not list(tmp_path.glob("*.tmp"))                                 # moved into place, nothing left behind
+    p.write_text(p.read_text() + "}")                                       # what an overlapping write left on the Pi (2026-11-06)
+    assert len(ObjectGallery.load(p).entries) == 1
+    p.write_text("{" + p.read_text()[:20])                                  # a truly broken file still fails loudly rather than loading nothing
+    with pytest.raises(ValueError):
+        ObjectGallery.load(p)
