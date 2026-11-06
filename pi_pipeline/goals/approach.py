@@ -70,7 +70,7 @@ def register(name: str):
 
 def make(name: str, **kw) -> Approach:
     if name not in REGISTRY:
-        from . import ball_punt, walls  # noqa: F401  -- they register themselves
+        from . import ball_punt, discover, walls  # noqa: F401  -- they register themselves
     if name not in REGISTRY:
         raise KeyError(f"no approach named {name!r} (known: {', '.join(sorted(REGISTRY))})")
     return REGISTRY[name](**kw)

@@ -125,6 +125,14 @@ file. Every override is in the report under "Your overrides". `g2goal reset ball
 - **"G2, practise"** (or "practice"): he picks what to practise from your order, how much he needs it and what he can do right now, says which and why, and starts it (the punt's
   goal session, or a 5-minute exploration roam for walls). "G2, practise walls" or "practise the punt" names one. `g2goal practise` shows his scores without moving him.
 
+## 8b. The "Identify new objects" goal (2026-11-06)
+
+`g2goal run discover_objects`, or "G2, find new objects" / "G2, object goal". A session is 3 roams of about 3 minutes (10 minutes at most, `minutes` in the goal), in any room and with the head or the arm fitted. G2 explores; whenever something that matches no named object is in view (not a person, not the base of a wall) he takes the picture routine, and the pictures are filed as an unnamed candidate under the room he was told he is in (`you're in the kitchen`). Nothing is named by him: open `g2pics`, look at the new candidates on the Pictures tab and name or promote them, or answer when he asks "what am I looking at?".
+
+An attempt is scored from what the roam left behind: **new object** (a new candidate with at least 3 usable pictures: sharp enough, sensibly exposed, no person), **few pictures**, **nothing new** (pictures taken, all of it already known), **never found** (no picture stop), fell, or stopped (not counted). He tunes how often he looks for something new (`peek_every_s`), when he stops being picky (`relax_s`, `fallback_s`) and how long a roam is (`roam_s`), per floor and hardware, like the ball goal. "G2, practise" never picks this goal by itself; name it.
+
+It needs an exploration to run: inside the voice service that is `G2_EXPLORE_INPROCESS=1` with the explore, vision and vision_safety features on (not yet tried on G2); when the service is not set up for it, `g2goal run` falls back to the old stop-and-run hand-over (`--standalone`).
+
 ## 9. Where things live on the Pi
 
 | File | What |

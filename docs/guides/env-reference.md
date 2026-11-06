@@ -102,8 +102,8 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_EXCITED_HOP` | `"0"` | `gestures.py` | [`capabilities.md`](../capabilities.md) |
 | `G2_EXPERIENCES` | `DEFAULT_PATH` | `recap.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_HANDOVER` | `"1"` | `config.py` | [`settings-switches.md`](settings-switches.md) |
-| `G2_EXPLORE_INPROCESS` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`exploration-mode.md`](exploration-mode.md) +2 |
-| `G2_EXPLORE_PICTURES_DIR` | `DEFAULT_ROOT` | `explore_session.py`, `exploration_pictures.py`, `promoted_loader.py` +1 | [`settings-switches.md`](settings-switches.md) |
+| `G2_EXPLORE_INPROCESS` | `"0"` | `explore_session.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`exploration-mode.md`](exploration-mode.md) +3 |
+| `G2_EXPLORE_PICTURES_DIR` | `DEFAULT_ROOT` | `explore_session.py`, `discover.py`, `exploration_pictures.py` +2 | [`settings-switches.md`](settings-switches.md) |
 | `G2_EXPLORE_ROAM_S` | `600.0` | `config.py` | [`settings-switches.md`](settings-switches.md), [`voice-commands.md`](voice-commands.md) |
 | `G2_EXPLORE_SURVEY` | `"1"` | `explore_session.py` | [`exploration-object-learning-plan.md`](../planned/exploration-object-learning-plan.md) |
 | `G2_EXPOSURE_CHECK` | `"1"` | `config.py` | [`.env.example`](../../.env.example) |

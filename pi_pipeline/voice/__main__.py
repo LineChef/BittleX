@@ -240,7 +240,7 @@ def main() -> None:
                 watcher_r.nudge()
             if kw.get("arm_goal") and args.actuator == "serial":                       # "G2, ball goal"
                 from ..goals import inprocess as _goals_inprocess
-                ok, why = _goals_inprocess.ready(lend)
+                ok, why = _goals_inprocess.ready(lend, kw["arm_goal"])
                 if ok:                                     # run it here, on this (voice loop) thread, with this service's serial link, IMU stream and camera: the port is never closed
                     _goals_inprocess.run_goal_inprocess(lend, kw["arm_goal"])
                     return

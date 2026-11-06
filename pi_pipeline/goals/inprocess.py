@@ -47,7 +47,10 @@ def log_path() -> str:
     return os.path.expanduser(os.environ.get("G2_GOAL_SESSION_LOG", SESSION_LOG))
 
 
-def ready(shared) -> tuple[bool, str]:
+NEEDS_EXPLORATION = ("discover_objects",)                 # approaches that run an exploration roam: they need the service ready for an in-process exploration too
+
+
+def ready(shared, goal_id: str | None = None) -> tuple[bool, str]:
     """Whether a goal can run inside the voice service, and why not."""
     if not enabled():
         return False, "G2_GOAL_INPROCESS is off"
@@ -55,6 +58,11 @@ def ready(shared) -> tuple[bool, str]:
         return False, "no serial link"
     if getattr(shared, "camera", None) is None:
         return False, "no camera in this service"
+    if goal_id in NEEDS_EXPLORATION:
+        from ..explore_session import inprocess_ready
+        ok, why = inprocess_ready(shared)
+        if not ok:
+            return False, f"this goal explores, and an exploration cannot run inside the service: {why}"
     return True, ""
 
 

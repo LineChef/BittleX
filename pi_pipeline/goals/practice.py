@@ -72,6 +72,8 @@ def score_goals(*, goals=None, order=None, attachment: str | None = None, ball_v
             continue
         if g.needs_attachment and g.needs_attachment != attachment:
             continue
+        if not g.auto_practice:
+            continue
         try:
             ap = make(g.approach)
         except KeyError:
