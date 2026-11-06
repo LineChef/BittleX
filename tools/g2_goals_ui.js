@@ -41,6 +41,11 @@ function ask(title,fields,okText,submit){return new Promise(res=>{
   if(submit){ok.disabled=true;try{await submit(out)}catch(x){err.textContent=x.message;err.style.display="";ok.disabled=false;return}}done(out)}})}      // with a `submit`, a refusal is shown in the form and the form stays open
 
 async function queue(op,what){try{const r=await api("/api/goals/edit",op);data.pending=r.pending;render();toast("Queued: "+(what||"edit")+" (applies on the next sync)",async()=>{await api("/api/goals/cancel",{id:r.id});load()})}catch(e){toast("Not queued: "+e.message)}}
+// queue many edits at once (Accept all): each is a normal queued edit, so each still shows in Waiting to sync and the toast's Undo takes them all back
+async function queueMany(ops,what){const ids=[];let failed=0,last=null;
+ for(const op of ops){try{const r=await api("/api/goals/edit",op);ids.push(r.id);last=r.pending}catch(e){failed++}}
+ if(last)data.pending=last;render();
+ toast("Queued "+ids.length+" "+what+(failed?"; "+failed+" refused":"")+" (they apply on the next sync)",async()=>{for(const id of ids){try{await api("/api/goals/cancel",{id})}catch(e){}}load()})}
 async function confirmThen(msg,fn){const v=await ask(msg,[],"Yes, queue it");if(v)fn()}
 
 function valueField(k,value,label){
@@ -72,9 +77,20 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
  list.append(bar);
 
  // suggestions
- if((d.suggestions||[]).length){const sf=fold("G2 suggests a change ("+d.suggestions.length+")",true);for(const s of d.suggestions){const r=el("div","row"),mn=el("div","main");mn.append(el("div","",s.text),el("div","meta",s.goal+" · "+s.status));
+ if((d.suggestions||[]).length){const sf=fold("G2 suggests a change ("+d.suggestions.length+")",true);
+  const open=d.suggestions.filter(s=>!pend(s.goal,p=>(p.op==="confirm"||p.op==="cancel")&&p.knob===s.knob).length);
+  if(open.length){const ab=btn("Accept all "+open.length+" suggestions",()=>confirmThen("Confirm all "+open.length+" suggested changes? Each one is queued for the Pi and can be taken back from Waiting to sync.",()=>queueMany(open.map(s=>({op:"confirm",goal:s.goal,knob:s.knob})),"confirmations")),"on");ab.style.marginBottom="6px";sf.append(ab)}
+  for(const s of d.suggestions){const r=el("div","row"),mn=el("div","main");mn.append(el("div","",s.text),el("div","meta",s.goal+" · "+s.status));
    const q=pend(s.goal,p=>(p.op==="confirm"||p.op==="cancel")&&p.knob===s.knob);if(q.length)mn.append(pendChip(q[0].text));else{mn.append(btn("Confirm",()=>queue({op:"confirm",goal:s.goal,knob:s.knob},"confirm "+s.knob),"on"),btn("Cancel it",()=>queue({op:"cancel",goal:s.goal,knob:s.knob},"cancel the suggestion for "+s.knob)))}
    r.append(mn);sf.append(r)}list.append(sf)}
+
+ // suggested lesson clean-up (user, 2026-11-06): older lessons a newer one replaces, and ones naming a date; worked out on this Mac, one button queues the deletes
+ {const lc=(d.lesson_cleanup||[]).filter(c=>!pend(undefined,p=>p.op==="lesson_delete"&&Number(p.id)===Number(c.id)).length);
+  if(lc.length){const lf=fold("Suggested lesson clean-up ("+lc.length+")",true);
+   lf.append(el("div","meta","Lessons the goal has since learned again in newer words, or that name a date or time. Deleted lessons move to the review Trash on the Pi, so they can be put back."));
+   const ab=btn("Delete all "+lc.length+" suggested lessons",()=>confirmThen("Queue the deletion of "+lc.length+" lessons? They move to the Trash on the Pi at the next sync.",()=>queueMany(lc.map(c=>({op:"lesson_delete",id:c.id})),"lesson deletions")),"danger");ab.style.margin="6px 0";lf.append(ab);
+   for(const c of lc)lf.append(el("div","meta","#"+c.id+" · "+c.goal+": "+c.text.slice(0,120)+" — "+c.why));
+   list.append(lf)}}
 
  d.goals.forEach((g,i)=>goalCard(list,g,f,i));
 

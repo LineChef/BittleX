@@ -508,3 +508,16 @@ def test_the_mic_button_reads_and_ends_a_wake_word_pause():
     app = G.App(G.Remote("pi@x", runner=runner))
     assert app.mic()["paused"] and calls[-1] == ["pi_pipeline.voice.wake_pause", "status", "--json"]
     assert app.mic(turn_on=True)["paused"] is False and calls[-1][1] == "on"
+
+
+def test_lesson_cleanup_keeps_the_newest_of_a_repeated_lesson_and_flags_dated_ones():
+    lessons = [
+        {"id": 3, "text": "Searching by turn works best so far: 2 of 2 good, against 2 of 7 with claw_scan. I'm keeping it."},
+        {"id": 9, "text": "I fell trying punching from 3.5 in: back to 4 in, and I won't try that again for a while."},
+        {"id": 12, "text": "Searching by turn works best so far: 5 of 6 good, against 2 of 9 with claw_scan. I'm keeping it."},
+        {"id": 14, "text": "On 2026-11-02 at 3 PM the ball rolled under the couch."},
+        {"id": 15, "text": "Lifting the claw to 120 deg for a look works best so far: 2 of 3 good."},
+    ]
+    out = {c["id"]: c["why"] for c in G.lesson_cleanup({"goals": [{"id": "ball_punt", "title": "Punt the ball", "lessons": lessons}]})}
+    assert set(out) == {3, 14}                                   # 3 is said again by 12 (kept); 14 names a date; 9, 12 and 15 stay
+    assert "#12" in out[3] and "date" in out[14]
