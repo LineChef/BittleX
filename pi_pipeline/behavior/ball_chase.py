@@ -125,6 +125,7 @@ STOP_CALM = os.environ.get("G2_STOP_CALM", "1").strip().lower() not in ("0", "of
 CALM_MAX_S = 0.4               # the longest the stop waits for it
 CALM_TILT_DEG = 4.0            # calm: the body within this of how it stands (the reference stand tilt, else level) ...
 CALM_STEP_DEG = 1.5            # ... and the tilt moving less than this between samples
+LEG_CORRECT = os.environ.get("G2_LEG_CORRECT", "1").strip().lower() not in ("0", "off", "false", "no")      # (UNPROVEN) a leg joint the board holds off its stand angle after a stand-up is driven back (G2_LEG_CHECK=0 turns the whole check off)
 QUICK_MOVE_S = 3.0             # a move this soon after the last one ended goes without the pose read and the tilt check (he is standing as the last move left him): no added stillness
 STILL_SAY_S = 4.0              # stood still longer than this before a move: said in the log (the still time of every move is in the trace)
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -874,6 +875,17 @@ class SerialRobot:
             return "ok"
         return self._stand_up_from("attention")
 
+    def imu_alive(self, seconds: float = 1.0) -> bool:
+        """Whether IMU frames are arriving (the stream switched on for `seconds`). A silent board makes every guard that reads the tilt do nothing, so the fall drill refuses to run on one."""
+        before = len(self._roll)
+        self._tx("gP")
+        t0 = self._clock()
+        while self._clock() - t0 < seconds:
+            self._fell()
+            self._sleep(0.05)
+        self._tx("gp")
+        return len(self._roll) > before
+
     def fallen(self) -> bool:
         """Whether the IMU says he has gone over (a fresh look at the stream). The tests and drills stop at once on it."""
         return self._fell()
@@ -892,17 +904,41 @@ class SerialRobot:
             if not joints or len(joints) < 16:
                 return []
             exp = _known_poses()["stand"]
-            bad = [(sv, round(d), joints[sv]) for sv, d in sorted(exp.items()) if abs(joints[sv] - d) > self.LEG_CHECK_TOL_DEG]
+            off = lambda js: [(sv, round(d), js[sv]) for sv, d in sorted(exp.items()) if abs(js[sv] - d) > self.LEG_CHECK_TOL_DEG]      # noqa: E731
+            bad = off(joints)
+            fixed = None
             if bad:
                 log.warning("leg check after the %s: %s", source, "; ".join(f"servo {sv} should be {d} deg, the board holds {g}" for sv, d, g in bad))
+                if LEG_CORRECT:                                    # an earlier stand-up (2026-11-02) lost a byte and a joint took a wrong angle: drive just those joints to the stand angle again and read back
+                    from ..gait import standup
+                    for _ in range(2):
+                        self._tx(standup._pairs_cmd([(sv, d) for sv, d, _g in bad]))
+                        self._sleep(0.4)
+                        again = read_joints(self._lk, sleep=self._sleep, clock=self._clock)
+                        if again and len(again) >= 16:
+                            bad2 = off(again)
+                            if not bad2:
+                                fixed = True
+                                log.warning("leg check: the odd leg(s) driven back to the stand angle")
+                                break
+                            bad = bad2
+                    if fixed is None:
+                        fixed = False
+                        log.warning("leg check: still off after re-driving: %s", bad)
             else:
                 log.info("leg check after the %s: all eight leg joints hold their stand angles", source)
+            volts = None
+            try:
+                from ..power import battery
+                volts = battery.read_voltage(self._lk)             # the stand-up is the biggest current surge: a dip on the bad ones points at a servo that did not track
+            except Exception:  # noqa: BLE001
+                pass
             try:
                 import json
                 path = os.path.expanduser("~/.local/share/g2/leg_check.jsonl")
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "a") as f:
-                    f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "source": source, "bad": bad, "tilt": self._stand_tilt}) + "\n")
+                    f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "source": source, "bad": bad, "fixed": fixed, "volts": volts, "tilt": self._stand_tilt}) + "\n")
             except OSError:
                 pass
             self.last_leg_check = bad

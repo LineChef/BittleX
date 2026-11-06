@@ -623,3 +623,9 @@ EOF
 
 # g2help  -- print the bare list of helpers with their one-line comments.
 g2help() { grep -E '^g2[a-z-]*\(\)' "$G2_ROOT/tools/g2_aliases.sh" | grep -v '^g2help' | sed 's/() *{.*# */\t/; s/() *{.*//'; }
+
+# g2oddleg [note]  -- flag an odd leg the moment you see one after a stand-up (a different leg ~2% of the time): writes the time, your note and the last leg checks (angles the board held, pack volts, tilt) to ~/.local/share/g2/odd_leg.jsonl on the Pi, so the logs can be lined up with what you saw. Sends nothing to G2.
+g2oddleg() {
+  : "${G2_PI:?set G2_PI to user@host of the Pi}"
+  ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.diag.odd_leg $*"
+}

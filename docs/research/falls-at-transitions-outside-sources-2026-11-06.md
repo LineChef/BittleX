@@ -22,6 +22,24 @@ Question: does Petoi (or anyone) have advice for a Bittle that falls when it goe
 - Learned transitions ("viability" as the objective) exist in the research ([Nature Communications 2024 via DOAJ](https://doaj.org/article/681d691c189d4fbfa72337c06b0d43da), [DeepTransition](https://arxiv.org/pdf/2306.07419)); they need sim training and do not fit a hand-tuned servo robot like this.
 - Falling safely is its own literature ([Guardians as You Fall](https://arxiv.org/pdf/2310.04828)); not pursued.
 
+## How Petoi's own firmware changes from one skill to the next (read from the public source, 2026-11-06)
+
+Read from the public OpenCat repository (`src/skill.h`, `src/motion.h`; page text read as data, the board runs firmware B10_260527 so details may differ). This is the part that bears on falls at transitions:
+
+- **There is no intermediate posture.** Every switch loads the new skill's FIRST frame and moves there at once. `loadFrame()` sets `frame = 0` and the old gait's phase is thrown away.
+- **The move is a cosine-eased interpolation from `currentAng[]`**, the last angle the firmware wrote to each servo (not the last target), at a fixed speed ratio (`transformSpeed = 2` for everything except landing): about `maxDiff / 2` steps, so a joint that has to travel 40 deg takes 20 steps whatever the skill. Joint limits clamp, nothing else slows it.
+- **So a stop out of a stride, and the start of a turn from a pose, are each one fast whole-body move from an arbitrary joint set to a different one.** Stopped mid-stride, the legs are wherever the gait left them (some feet in the air) and all eight joints race to the balance pose together; started from the stand, the turn skill's first frame is not the balance pose (left and right turns apply a +25 / -25 shoulder offset, `offsetLR`).
+- **Balance is a gyro correction added to each frame** (`adjust()`), with a dead band; it is not a transition mechanism, and no gating during a transition is visible in the files read.
+- The `up` posture is loaded when serial input interrupts a behavior.
+- Open: the gait generator and `transform()` callers outside these two files were not read; the units of the speed ratio are described inconsistently in the comments; the Petoi forum threads on balance problems are unreadable.
+
+**What this means:** our gate, steady check and calm stop only choose WHEN to command the next skill. None of them reduces how big the jump is, and the firmware decides that. Two levers that do, both on the Pi side (no firmware fork):
+
+1. **Stop at a whole number of gait cycles.** The gait starts at frame 0 and repeats, so after N whole cycles the legs are back at (about) frame 0, close to where the move started, instead of mid-stride. The firmware's jump to the balance pose is then small. Needs the cycle time of each gait (kwkL, kwkR, kwkF, kbkF), measurable from the roll oscillation in our walk logs.
+2. **Pre-position before a skill that starts from a pose.** Drive the legs (the Pi's own eased `i` commands) to the new skill's first frame before sending the skill, so the firmware's interpolation has almost nothing to travel. Needs the first frames (public: `InstinctBittle*.h`).
+
+A third, bigger option (the Pi ramps from its estimate of the mid-stride pose to the balance pose itself) conflicts with the owner's immediate-stop rule and needs the gait timing as well.
+
 ## What we could not find
 
 - Any Petoi statement on gait-to-pose stop timing, transition tuning or servo lag.

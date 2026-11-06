@@ -14,6 +14,10 @@
 - **The BiBoard's own voice module starts moves** (`not_from_pi` in the command log: 127 rows in 3 days, including `pee`, `hi`, `ck`, `bx`, `fiv`, `wkArmF`). Some falls may be those. Sending `Xa`/`XAd` to silence it breaks its voice commands (rule), so use a quiet room for tests.
 - **Claw partly open at rest** (new on 2026-11-06): nothing in the code commands the gripper joint (the claw look drives joints 0 and 1). Read the commanded angle of the claw joint at rest with `j`: closed on the board but open in the hand = mechanical (horn slipped, jolted by falls); open on the board = send a close.
 
+## Built for the odd leg (lower priority than the transition falls; it is rare)
+
+- `leg_check` now corrects: a leg joint the board holds more than 4 deg off its stand angle after a stand-up is driven back (just those joints, twice at most, read back), and the pack voltage at the stand-up is logged with it (`leg_check.jsonl`: `bad`, `fixed`, `volts`). `G2_LEG_CORRECT=0` makes it report only. `g2oddleg [note]` flags an odd leg the moment it is seen (`odd_leg.jsonl` on the Pi, with the last leg checks attached).
+
 ## What is built (all `unproven`; `G2_POSE_GATE=0` and `G2_STOP_CALM=0` switch them off)
 
 - `SerialRobot._gate`: before a walk or turn that follows a pose change, lower the claw, read the real tilt twice (0.25 s each), compare with the last good stand (`_stand_tilt`) and check the drift; re-seat the legs (attention pose and up, `recover_sag`) up to twice; then go anyway, logged.
@@ -26,10 +30,14 @@
 
 Petoi has no published advice for this; the old forum is gone. The findings, and one useful pointer (its calibration pointer, a slipped horn, was ruled out as the cause of the odd leg: that leg is right about 98% of the time and it is a different leg each time), are in [`../research/falls-at-transitions-outside-sources-2026-11-06.md`](../research/falls-at-transitions-outside-sources-2026-11-06.md).
 
+## What the firmware does at a transition (the main lever)
+
+Read from the public OpenCat source (details in the research page): a skill switch loads the new skill's first frame and jumps there by a cosine-eased interpolation from the last written joint angles at a fixed speed; the old gait's phase is discarded; no intermediate posture. So the size of the jump at a stop or a turn start is set by where the legs are, which our guards (they only choose when to send) do not change. **Priority next lever: stop after a whole number of gait cycles (legs back near the start pose) and pre-position the legs to the new skill's first frame before starting it.** Both need the gait cycle times (from the roll oscillation in the walk logs) and the skills' first frames (public `InstinctBittle*.h`).
+
 ## Next steps, in order
 
 0. **The odd leg on stand-up (right about 98% of the time, a different leg each time).** Candidates: a lost or garbled joint command on the serial link, a servo that did not track in the stand-up surge (voltage dip), the firmware overwriting a joint mid-move. To separate them: resend the final stand pose a second time after the ramp (a mitigation and a test), log the pack voltage at the end of the ramp beside the leg check, and a way for the owner to flag an odd leg when seen. The leg check (`leg_check.jsonl`) has seen about six stand-ups, all clean: no evidence either way yet. Petoi's joint and gyro calibration is hygiene only.
-1. **Make the drill refuse to start, and stop mid-round, when no IMU frames arrive** (a silent board must never look like a pass). Add the BiBoard plug/answer check first.
+1. **(Built 2026-11-06) The drill refuses to start, and voids a round, when no IMU frames arrive** (a silent board must never look like a pass). Add the BiBoard plug/answer check first.
 2. Rerun `baseline` and `both` for at least 3 valid rounds each (a quiet room, the plug checked, the pack read), then `calm` and `gate` alone; compare cycles to the first fall, tilt swings and near falls.
 3. If the attention-pose entry still falls: test a lower claw lift than 120 deg, a slower sweep, a standing look, and holding the attention pose for 10 s before the arm moves.
 4. Try an eased stop out of a stride as another variant (the owner's 2026-10-10 rule keeps a stop out of a stride immediate; it is a rule they can change).

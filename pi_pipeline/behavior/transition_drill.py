@@ -48,6 +48,9 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
             legs_off.append(bad)
             say(f"   LEGS OFF their stand angle after the stand-up: {bad}")
 
+    if hasattr(robot, "imu_alive") and not robot.imu_alive():
+        say("NO IMU FRAMES: the board is silent, the guards would do nothing. Check the Pi-to-BiBoard plug and the board's power. Round not run.")
+        return {"cycles": 0, "fell": False, "worst_swing_deg": 0.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0, "void": "no IMU frames"}
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
         r_state = robot.relax()
@@ -58,6 +61,9 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
             break
         look(robot)
         trace("claw look")
+        if hasattr(robot, "imu_alive") and i > 0 and not getattr(robot, "_pitch", None):
+            say("NO IMU FRAMES during the round: void.")
+            return {"cycles": done, "fell": False, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off), "void": "IMU went silent"}
         if robot.fallen():
             trace("fall")
             fell = True

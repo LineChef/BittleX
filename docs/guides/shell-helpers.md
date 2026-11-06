@@ -152,3 +152,4 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 |---|---|
 | `g2docs` | print the list of key docs (the full index is docs/README.md) |
 | `g2help` | print the bare list of helpers with their one-line comments. |
+| `g2oddleg [note]` | flag an odd leg the moment you see one after a stand-up (a different leg ~2% of the time): writes the time, your note and the last leg checks (angles the board held, pack volts, tilt) to ~/.local/share/g2/odd_leg.jsonl on the Pi, so the logs can be lined up with what you saw. Sends nothing to G2. |
