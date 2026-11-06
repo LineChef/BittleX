@@ -117,6 +117,14 @@ BETWEEN_MOVES = "stand"        # the switch (user, 2026-11-02; the punt setting 
 # a step closer after a punt. He stays standing between those small steps instead of going into the attention pose at each stop (user, 2026-11-02): `_dialing_in`.
 SAG_CHECK_AFTER_S = 5.0        # (user, 2026-11-05) standing this long since the last move ended: before the next move the IMU tilt is checked for sagging legs, and if they have sagged he goes
                                # into the attention pose and stands up again (back legs first) before moving. Always on, in every flow (the standing flow included)
+POSE_GATE = os.environ.get("G2_POSE_GATE", "1").strip().lower() not in ("0", "off", "false", "no")      # (user, 2026-11-06; UNPROVEN until the hardware A/B) before a walk or turn that follows a pose change, read the body's real state from the IMU and re-seat the legs if they lag
+GATE_TILT_S = 0.25             # each of the two tilt readings the gate takes
+GATE_DRIFT_DEG = 2.0           # the two readings differ by more than this: the legs are still settling, not yet a stance to move from
+GATE_RESEATS = 2               # re-seats (attention pose and up) tried before going anyway
+STOP_CALM = os.environ.get("G2_STOP_CALM", "1").strip().lower() not in ("0", "off", "false", "no")        # (UNPROVEN) a firmware move is ended on a calm moment, not at an arbitrary gait phase
+CALM_MAX_S = 0.4               # the longest the stop waits for it
+CALM_TILT_DEG = 4.0            # calm: the body within this of how it stands (the reference stand tilt, else level) ...
+CALM_STEP_DEG = 1.5            # ... and the tilt moving less than this between samples
 QUICK_MOVE_S = 3.0             # a move this soon after the last one ended goes without the pose read and the tilt check (he is standing as the last move left him): no added stillness
 STILL_SAY_S = 4.0              # stood still longer than this before a move: said in the log (the still time of every move is in the trace)
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -600,6 +608,9 @@ class SerialRobot:
         self._moved_at: float | None = None              # when the last move (or stand-up) ended: a move soon after it needs no pose read (QUICK_MOVE_S)
         self._sag_checked_at: float | None = None         # the _moved_at the last sag check was made for
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
+        self._posed_at: float | None = None               # when the legs last changed pose (attention, stand-up): the next move is checked once against the real tilt (_gate)
+        self._gate_done_at: float | None = None
+        self.gate_reseats = 0                             # legs re-seated by the gate this session (the goal can report it)
         self.last_fall: dict | None = None                # the angles of the last fall the guard saw (pitch, roll, which way, the posture he was in)
         self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
 
@@ -633,7 +644,64 @@ class SerialRobot:
         rng = lambda v: (max(v) - min(v)) if len(v) > 1 else 0.0   # noqa: E731
         return max(rng(self._pitch), rng(self._roll))
 
+    def _gate(self) -> str:
+        """Before a walk or turn that follows a pose change (user, 2026-11-06: falls come at transitions, and a servo that lags leaves the body in a state the commands do not show):
+        the claw down first, then the body's real tilt twice, 0.25 s each. Off the last good stand, or still drifting: the legs are driven back (the attention pose and up again,
+        `recover_sag`), twice at most, then he goes anyway (logged). Checked once per pose change. The pack is never a reason: sag is normal. "ok" or "fell"."""
+        if not POSE_GATE or self._posed_at is None or self._gate_done_at == self._posed_at or self.posture != "stand":
+            return "ok"
+        if self._claw != (0.0, 0.0) and self.claw_pose(0.0, 0.0) == "fell":
+            return "fell"                                 # a raised claw moves the weight forward: never start a leg move with it up
+        for attempt in range(GATE_RESEATS + 1):
+            a = self._tilt(GATE_TILT_S)
+            b = self._tilt(GATE_TILT_S)
+            if a is None or b is None:
+                break                                     # no IMU: nothing to judge by
+            drift = max(abs(a[0] - b[0]), abs(a[1] - b[1]))
+            if not self._sagged(b) and drift <= GATE_DRIFT_DEG:
+                log.info("pose gate: steady (pitch %+.0f roll %+.0f deg, drift %.1f)%s", b[0], b[1], drift, f" after {attempt} re-seat(s)" if attempt else "")
+                break
+            if attempt >= GATE_RESEATS:
+                log.warning("pose gate: still off after %d re-seat(s) (pitch %+.0f roll %+.0f deg, drift %.1f): going anyway", attempt, b[0], b[1], drift)
+                break
+            log.warning("pose gate: not steady (pitch %+.0f roll %+.0f deg, drift %.1f): re-seating the legs", b[0], b[1], drift)
+            self.gate_reseats += 1
+            if self.recover_sag(b) == "fell":
+                return "fell"
+        self._gate_done_at = self._posed_at
+        return "ok"
+
+    def _calm_before_stop(self) -> str:
+        """A firmware move ends with a stop; stopped at an arbitrary gait phase the legs are mid-stride and he can go over (13 of 18 logged falls were in turns). Wait up to CALM_MAX_S for
+        a calm moment: the body near how it stands and the tilt barely changing between IMU samples. "ok" or "fell"; with no IMU frames it does not wait."""
+        if not STOP_CALM:
+            return "ok"
+        if not callable(getattr(self._lk, "poll_imu", None)):
+            return "ok"
+        ref = self._stand_tilt or (0.0, 0.0)
+        t0, waited, last = self._clock(), 0.0, None
+        while True:
+            n = len(self._roll)
+            if self._fell():
+                return "fell"
+            if len(self._roll) == n and last is None:
+                return "ok"                               # no frames came: nothing to judge by
+            if self._roll:
+                cur = (self._pitch[-1], self._roll[-1])
+                step = 99.0 if last is None else max(abs(cur[0] - last[0]), abs(cur[1] - last[1]))
+                last = cur
+                if max(abs(cur[0] - ref[0]), abs(cur[1] - ref[1])) <= CALM_TILT_DEG and step <= CALM_STEP_DEG:
+                    break
+            waited = self._clock() - t0
+            if waited >= CALM_MAX_S:
+                break
+            self._sleep(0.02)
+        log.info("stop on a calm moment: waited %.2f s%s", waited, "" if waited < CALM_MAX_S else " (gave up waiting)")
+        return "ok"
+
     def _skill(self, token: str, seconds: float, stop_yaw_deg: float | None = None) -> str:
+        if self._gate() == "fell":
+            return "fell"
         self._pitch, self._roll = [], []
         self._tx("gP")
         self.last_turn_deg, self.last_turn_s = None, None
@@ -657,6 +725,8 @@ class SerialRobot:
                 break
             self._sleep(0.02 if yaw0 is not None else 0.05)
         ran = self._clock() - t0
+        if state != "fell" and yaw0 is None and self._calm_before_stop() == "fell":          # (a gyro-stopped line-up turn is ended on its yaw at once: waiting would turn it further)
+            state = "fell"
         self.posture = "stand"
         self._tx("kbalance")                              # ALWAYS end the firmware move, a fall included (2026-11-02: a fall during a back-up skipped this and `kbkF` kept going
         self._sleep(1.0)                                  # for over a minute: the firmware runs a gait until it is told something else)
@@ -690,6 +760,7 @@ class SerialRobot:
             if hasattr(self._lk, "last_motion_command"):
                 self._lk.last_motion_command = {"stand": "kbalance", "rest": "krest", "sit": "ksit"}.get(self.posture, "kbalance")
         self._sleep(0.5)                                  # the body settles before a picture
+        self._posed_at = self._clock()
         return "ok"
 
     def _tilt(self, seconds: float = 0.5):
@@ -805,6 +876,7 @@ class SerialRobot:
                 if t is not None:
                     self._stand_tilt = t                  # how he stands when the legs hold: the sag check compares with this
         self._moved_at = self._clock()
+        self._posed_at = self._moved_at
         return state
 
     def sit_down(self) -> str:
@@ -871,6 +943,8 @@ class SerialRobot:
     def _policy_walk(self, seconds: float) -> str:
         """The learned walk (the attachment's saved gait) for `seconds`, ending in a balanced stand. "fell" if it ended in a fall. A bump (the walk's IMU contact signal, the same one
         exploration uses) stops the walk at once and sets `bumped` (the walls goal counts it)."""
+        if self._gate() == "fell":
+            return "fell"
         from ..gait.policy_walker import PolicyWalker
         fell, hit = [], []
         if self._walker is None:

@@ -927,3 +927,85 @@ def test_a_turn_that_leaves_the_ball_on_the_same_side_or_near_straight_is_not_an
     assert q.decide(reading(19, -4)).kind != "back"                                         # within the dead band around straight: noise, not a swing
     r = bc.ChasePlanner(); r.decide(reading(20, 30)); r.prev_kind = "walk"
     assert r.decide(reading(19, -22)).kind != "back"                                        # only a turn is judged this way
+
+
+# ---- falls at transitions (user, 2026-11-06): the pose gate and the calm stop (unproven on G2 until the hardware A/B)
+
+def _gate_robot(tilts):
+    """A robot that just changed pose; `_tilt` answers from the list (the last value repeats), `recover_sag` is counted."""
+    class Link:
+        def __init__(self): self.sent = []
+        def send(self, c, read_reply=False, settle=0.0): self.sent.append(c); return ""
+        def poll_imu(self): return []
+    r = bc.SerialRobot(Link(), sleep=lambda s: None, clock=lambda: 10.0)
+    r.posture, r._posed_at, r._stand_tilt = "stand", 5.0, (0.0, 0.0)
+    seq = list(tilts)
+    r._tilt = lambda seconds=0.5: seq.pop(0) if len(seq) > 1 else seq[0]
+    r.reseats = []
+    r.recover_sag = lambda tilt=None: (r.reseats.append(tilt), "ok")[1]
+    return r
+
+
+def test_the_gate_lets_a_steady_stance_go_and_checks_once_per_pose_change():
+    r = _gate_robot([(1.0, 0.5), (1.2, 0.4)])
+    assert r._gate() == "ok" and r.reseats == [] and r.gate_reseats == 0
+    r._tilt = lambda seconds=0.5: (_ for _ in ()).throw(AssertionError("checked twice"))
+    assert r._gate() == "ok"                                                         # the same pose change is not checked again
+
+
+def test_the_gate_reseats_legs_that_lag_then_goes_and_never_looks_at_the_pack(monkeypatch):
+    r = _gate_robot([(15.0, 0.0), (15.0, 0.0), (1.0, 0.0), (1.0, 0.0)])               # tilted 15 deg off the stand, then steady after the re-seat
+    assert r._gate() == "ok" and len(r.reseats) == 1 and r.gate_reseats == 1
+    bad = _gate_robot([(20.0, 0.0)])
+    assert bad._gate() == "ok" and len(bad.reseats) == bc.GATE_RESEATS               # still off: tried twice, then goes anyway (logged)
+    drift = _gate_robot([(0.0, 0.0), (4.0, 0.0), (1.0, 0.0), (1.0, 0.0)])            # steady tilt on average but still moving: the legs are settling
+    assert drift._gate() == "ok" and len(drift.reseats) == 1
+    assert "battery" not in __import__("inspect").getsource(bc.SerialRobot._gate)
+
+
+def test_the_gate_lowers_a_raised_claw_first_and_is_off_without_a_pose_change():
+    r = _gate_robot([(0.0, 0.0)])
+    r._claw = (35.0, 120.0)
+    moved = []
+    r.claw_pose = lambda pan, lift: (moved.append((pan, lift)), "ok")[1]
+    assert r._gate() == "ok" and moved == [(0.0, 0.0)]
+    idle = _gate_robot([(30.0, 0.0)])
+    idle._posed_at = None
+    assert idle._gate() == "ok" and idle.reseats == []                                # no pose change since a verified stance: nothing to check
+
+
+def test_the_stop_waits_for_a_calm_moment_and_gives_up_after_the_cap(monkeypatch):
+    t = {"now": 0.0}
+    r = bc.SerialRobot(type("L", (), {"send": lambda s, *a, **k: "", "poll_imu": lambda s: []})(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    frames = iter([(8.0, 9.0), (6.0, 7.0), (0.5, 0.4), (0.4, 0.5)])                   # swaying through the stride, then calm
+    def fell():
+        p, ro = next(frames, (0.0, 0.0))
+        r._pitch.append(p); r._roll.append(ro)
+        return False
+    r._fell = fell
+    assert r._calm_before_stop() == "ok" and t["now"] < bc.CALM_MAX_S                  # it waited a few samples, not the whole cap
+    t["now"] = 0.0
+    r2 = bc.SerialRobot(type("L", (), {"send": lambda s, *a, **k: "", "poll_imu": lambda s: []})(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    def swaying():
+        r2._pitch.append(9.0 if len(r2._pitch) % 2 else -9.0); r2._roll.append(9.0)
+        return False
+    r2._fell = swaying
+    assert r2._calm_before_stop() == "ok" and t["now"] >= bc.CALM_MAX_S                # never calm: stops anyway after the cap
+
+
+def test_a_stop_with_no_imu_frames_does_not_wait():
+    t = {"now": 0.0}
+    r = bc.SerialRobot(type("L", (), {"send": lambda s, *a, **k: "", "poll_imu": lambda s: []})(), sleep=lambda s: t.__setitem__("now", t["now"] + s), clock=lambda: t["now"])
+    assert r._calm_before_stop() == "ok" and t["now"] == 0.0
+
+
+def test_the_transition_drill_counts_cycles_and_stops_at_the_first_fall():
+    from pi_pipeline.behavior import transition_drill as td
+    class R:
+        gate_reseats = 0
+        def __init__(self, fell_on): self.n, self.fell_on = 0, fell_on
+        def relax(self): return "ok"
+        def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
+        def swing_deg(self): return 3.0
+    assert td.run_variant(R(0), 4, say=lambda *a: None, sleep=lambda s: None) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "reseats": 0}
+    assert td.run_variant(R(3), 10, say=lambda *a: None, sleep=lambda s: None)["cycles"] == 2
