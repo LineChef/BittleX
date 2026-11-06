@@ -72,7 +72,8 @@ def _start_interest(survey, saver, vision, rt, settings, args):
         log.exception("loading the promoted pictures failed")
     gallery = ObjectGallery.load(gpath, ObjectGalleryConfig(lock_by_holdout=True))
     base = frozenset({"face", "person", "human"})
-    scorer = InterestScorer(ForegroundLocalizer(), make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gallery,
+    from .vision.embedder import embedder_for
+    scorer = InterestScorer(ForegroundLocalizer(), embedder_for(gallery, os.environ.get("G2_EMBEDDER", "histogram")), gallery,
                             veto_labels=lambda: base | frozenset(str(x).lower() for x in ((getattr(rt, "_roster", None) or (lambda: ()))() or ()) if x))
     saver._on_saved = GalleryFeeder(scorer, gallery, gpath)
     watch = InterestWatch(scorer, vision, every_s=float(os.environ.get("G2_INTEREST_EVERY_S", "8")),     # the wall look rides the peek: every 3 s while the wall steers him

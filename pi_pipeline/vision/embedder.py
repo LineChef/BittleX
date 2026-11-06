@@ -89,6 +89,7 @@ class OnnxEmbedder:
         import onnxruntime as ort
         self.path, self.size, self.pool = str(path), int(size), pool
         self.name = "onnx:" + self.path.rsplit("/", 1)[-1]
+        self.key = self.path.rsplit("/", 1)[-1] + (f"#{pool}" if pool != "auto" else "")          # the same on every machine: the gallery file records it
         self._mean = np.array(mean, dtype=np.float32).reshape(1, 1, 3)
         self._std = np.array(std, dtype=np.float32).reshape(1, 1, 3)
         self._sess = ort.InferenceSession(self.path, providers=list(providers))
@@ -125,10 +126,42 @@ def pool_output(out: np.ndarray, pool: str = "auto") -> np.ndarray:
     return _unit(out.reshape(-1))
 
 
+def models_dir() -> str:
+    """Where the embedder model files live: G2_MODELS_DIR, else ~/g2_data/models on the Mac (outside the repo, docs/vision/downloaded-models.md), else ~/.local/share/g2/models on the Pi."""
+    import os
+    d = os.environ.get("G2_MODELS_DIR")
+    if d:
+        return os.path.expanduser(d)
+    mac = os.path.expanduser("~/g2_data/models")
+    return mac if os.path.isdir(mac) else os.path.expanduser("~/.local/share/g2/models")
+
+
+def spec_for(key: str) -> str:
+    """The embedder spec for a gallery's recorded key: 'histogram', or 'dinov2_small.onnx#cls' -> 'onnx:<models dir>/dinov2_small.onnx#cls'."""
+    key = (key or "histogram").strip()
+    return "histogram" if key == "histogram" else "onnx:" + models_dir() + "/" + key
+
+
+def embedder_for(gallery, default: str = "histogram"):
+    """The embedder a gallery's fingerprints belong to. A gallery that records one uses it; one that has entries and records none predates the record and is histogram; an empty one takes
+    `default` (G2_EMBEDDER). Fingerprints from different models cannot be compared, so the gallery, not the environment, decides once it holds any."""
+    key = getattr(gallery, "embedder", None)
+    if key:
+        return make_embedder(spec_for(key))
+    e = make_embedder("histogram" if getattr(gallery, "entries", None) else default)
+    try:
+        gallery.embedder = e.key                                   # recorded from now on, so a later change of the environment cannot mix two models in one file
+    except AttributeError:
+        pass
+    return e
+
+
 def make_embedder(spec: str = "histogram"):
     spec = (spec or "histogram").strip()
     if spec == "histogram":
-        return HistogramEmbedder()
+        e = HistogramEmbedder()
+        e.key = "histogram"
+        return e
     if spec.startswith("onnx:"):
         path, _, pool = spec[5:].partition("#")            # 'onnx:/path/model.onnx#cls' picks the token pooling of a ViT / DINO encoder
         return OnnxEmbedder(path, pool=pool or "auto")

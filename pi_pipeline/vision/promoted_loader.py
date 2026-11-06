@@ -48,7 +48,7 @@ def process(gallery_path: str | None = None, pictures_root: str | None = None, *
     from ..config import settings
     from .object_gallery import ObjectGallery, ObjectGalleryConfig
     from .recognizer import Recognizer
-    from .embedder import make_embedder, to_image
+    from .embedder import embedder_for, make_embedder, to_image
     from .interest import crop_quality
     rels = _pending()
     out = {"loaded": [], "conflicts": [], "missing": []}
@@ -56,7 +56,7 @@ def process(gallery_path: str | None = None, pictures_root: str | None = None, *
         return out
     gpath = Path(gallery_path or os.path.join(os.path.expanduser(settings.object_gallery_dir), "gallery.json"))
     gal = gallery or ObjectGallery.load(gpath, ObjectGalleryConfig(lock_by_holdout=True))
-    rec = Recognizer(embedder or make_embedder(os.environ.get("G2_EMBEDDER", "histogram")), gal)
+    rec = Recognizer(embedder or embedder_for(gal, os.environ.get("G2_EMBEDDER", "histogram")), gal)
     root = Path(os.path.expanduser(pictures_root or PICTURES))
     for rel in rels:
         f = root / rel

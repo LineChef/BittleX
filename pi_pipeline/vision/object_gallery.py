@@ -126,6 +126,7 @@ class ObjectGallery:
         self.entries: dict[str, GalleryEntry] = {}
         self.last_decision: GalleryDecision | None = None
         self.last_entry_id: str | None = None
+        self.embedder: str | None = None        # the key of the embedder the fingerprints belong to (vision/embedder.py): fingerprints from different models are not comparable
 
     # ------------------------------------------------------------- consider
 
@@ -261,12 +262,19 @@ class ObjectGallery:
     # ---------------------------------------------------------- persistence
 
     def to_dict(self) -> dict:
-        return {"entries": {eid: vars(e) for eid, e in self.entries.items()}}
+        return {"embedder": self.embedder, "thresholds": {"same_instance": self.cfg.same_instance_threshold, "near_duplicate": self.cfg.near_duplicate_threshold},
+                "entries": {eid: vars(e) for eid, e in self.entries.items()}}
 
     @classmethod
     def from_dict(cls, data: dict, cfg: ObjectGalleryConfig | None = None, *,
                  clock=time.time) -> "ObjectGallery":
+        th = data.get("thresholds") or {}
+        if th and data.get("embedder"):                                       # the scale of the similarities depends on the embedder: its thresholds travel with its fingerprints
+            from dataclasses import replace
+            cfg = replace(cfg or ObjectGalleryConfig(), same_instance_threshold=float(th.get("same_instance", (cfg or ObjectGalleryConfig()).same_instance_threshold)),
+                          near_duplicate_threshold=float(th.get("near_duplicate", (cfg or ObjectGalleryConfig()).near_duplicate_threshold)))
         g = cls(cfg, clock=clock)
+        g.embedder = data.get("embedder")
         for eid, ev in data.get("entries", {}).items():
             ev = dict(ev)
             ev.setdefault("samples", [ev["centroid"]] * 0)          # galleries saved before samples were kept have none: they lock by count only
