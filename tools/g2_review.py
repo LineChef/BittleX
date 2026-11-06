@@ -419,29 +419,6 @@ def read_estimates() -> dict:
     return out
 
 
-def lesson_cleanup(d: dict) -> list[dict]:
-    """Goal lessons worth deleting, with the reason (user, 2026-11-06): an older lesson a newer one of the same goal says again (the memory's own near-duplicate rule, or the same first six
-    words: "Searching by turn works best so far: ..." is re-learned with fresh counts), and a lesson that names a date or time. The newest of a set is kept."""
-    sys.path.insert(0, str(ROOT))
-    from pi_pipeline.memory.store import NEAR_DUPLICATE, has_temporal_detail, similarity
-    out, seen = [], set()
-    lead = lambda t: " ".join(re.findall(r"[a-z0-9_']+", (t or "").lower())[:6])      # noqa: E731
-    for g in d.get("goals", []):
-        ls = sorted(g.get("lessons") or [], key=lambda x: int(x["id"]))
-        for i, a in enumerate(ls):
-            why = None
-            for b in ls[i + 1:]:
-                if similarity(a["text"], b["text"]) >= NEAR_DUPLICATE or (lead(a["text"]) and lead(a["text"]) == lead(b["text"])):
-                    why = f"said again, newer, in lesson #{b['id']}"
-                    break
-            if why is None and has_temporal_detail(a["text"]):
-                why = "names a date or time"
-            if why and a["id"] not in seen:
-                seen.add(a["id"])
-                out.append({"id": a["id"], "goal": g.get("title") or g.get("id"), "text": a["text"], "why": why})
-    return out
-
-
 class App:
     """The actions behind the page. Pure of HTTP, so it can be tested with a fake Remote."""
 
@@ -671,10 +648,7 @@ class App:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import g2_goals_view
         d = g2_goals_view.build()
-        try:
-            d["lesson_cleanup"] = lesson_cleanup(d)
-        except Exception:  # noqa: BLE001 -- a clean-up hint must never break the tab
-            d["lesson_cleanup"] = []
+        d["lesson_cleanup"] = [r for r in d.get("lesson_review", []) if r["verdict"] == "delete"]       # judged on the evidence in tools/g2_goals_view.py
         return d
 
     def goal_edit(self, op: dict) -> dict:

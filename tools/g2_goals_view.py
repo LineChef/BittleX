@@ -210,6 +210,101 @@ def _age_hours(stamp: str) -> float | None:
     return round((time.time() - t) / 3600, 1)
 
 
+# ---- which lessons are worth keeping (user, 2026-11-06: judge them on the evidence, not on wording)
+# A lesson is a note G2 saved after he KEPT a setting value ("Searching by turn works best so far: 2 of 2 good, against...") or UNDID one ("I won't try that again for a while"). The note's counts
+# are a snapshot: a lesson written after 2 attempts says little. So each lesson is re-judged on what the journal holds NOW, for the same goal, settings value, floor and hardware, counting only attempts
+# that still count (not retracted, current scoring version):
+#   - the value's record n/h, with a 95% Wilson range, and how likely it still beats the best alternative tried (Beta posterior, 4000 draws, fixed seed);
+#   - keep: 8+ attempts and it still beats the alternatives (75%+ likely, or none tried 3+ times); an undo lesson whose value really does fail (3+ tries, under 40% good)
+#   - delete: nothing behind it still counts; an older lesson on the same setting and value than a newer one; 5+ attempts and the alternatives now beat it (under 25%) or it succeeds under a third;
+#     an undo lesson older than 30 days ("for a while" is over); a lesson that names a date or time
+#   - unsure: everything else, shown with its numbers so more attempts can settle it
+MIN_KEEP_N, MIN_JUDGE_N, ALT_MIN_N = 8, 5, 3
+UNDO_DAYS = 30
+
+
+def wilson(h: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    if n <= 0:
+        return 0.0, 1.0
+    p = h / n
+    den = 1 + z * z / n
+    mid = (p + z * z / (2 * n)) / den
+    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / den
+    return max(0.0, mid - half), min(1.0, mid + half)
+
+
+def p_better(h1: int, n1: int, h2: int, n2: int, draws: int = 4000, seed: int = 7) -> float:
+    """How likely the first value's true success rate is above the second's, from Beta(1+h, 1+n-h) posteriors."""
+    import random
+    rng = random.Random(seed)
+    return sum(rng.betavariate(1 + h1, 1 + n1 - h1) > rng.betavariate(1 + h2, 1 + n2 - h2) for _ in range(draws)) / draws
+
+
+def lesson_review(journal: list[dict], lessons: list[dict], titles: dict, cond_of: dict, now: float | None = None) -> list[dict]:
+    """[{id, goal, text, verdict: keep|delete|unsure, why, n, h}] for every saved goal lesson. See the block comment above for the rules."""
+    from pi_pipeline.goals.curate import attempt_epoch, epoch_now
+    from pi_pipeline.memory.store import has_temporal_detail
+    now = now or time.time()
+    gone = {k for k, v in _verdicts(journal).items() if v.get("verdict") == "wrong"}
+    attempts = [r for r in journal if r.get("kind") == "attempt" and r.get("number") is not None and (r.get("outcome") or {}).get("score") is not None
+                and (r.get("session"), r.get("index")) not in gone and attempt_epoch(r) >= epoch_now(r.get("goal"))]
+    decisions = [r for r in journal if r.get("kind") == "decision" and r.get("note") and r.get("knob") and r.get("action") in ("kept", "undo")]
+    out, by_key = [], {}
+    for les in sorted(lessons, key=lambda x: int(x.get("id") or 0)):
+        text = les.get("lesson", "")
+        backing = next((d for d in decisions if d["note"] in text), None)
+        goal = next((g for g, t in titles.items() if text.startswith(t + ":")), None)
+        row = {"id": les.get("id"), "goal": titles.get(goal, goal or "?"), "text": text.split(":", 1)[-1].strip() if goal else text, "verdict": "unsure", "why": "", "n": 0, "h": 0}
+        out.append(row)
+        if has_temporal_detail(row["text"]):
+            row.update(verdict="delete", why="names a date or time: a lesson should stay true")
+            continue
+        if backing is None:
+            row["why"] = "no record in the journal says where it came from, so it is left alone"
+            continue
+        knob, val, cond = backing["knob"], backing["new"], cond_of.get(backing.get("session"), {})
+        by_key.setdefault((backing["goal"], knob, json.dumps(val), json.dumps(cond, sort_keys=True)), []).append(row)
+        pool = [a for a in attempts if a.get("goal") == backing["goal"] and cond_of.get(a.get("session"), {}) == cond]
+        rec = {}
+        for a in pool:
+            v = (a.get("settings") or {}).get(knob)
+            h, n = rec.get(json.dumps(v), (0, 0))
+            rec[json.dumps(v)] = (h + (1 if (a.get("outcome") or {}).get("success") else 0), n + 1)
+        h, n = rec.get(json.dumps(val), (0, 0))
+        row["n"], row["h"] = n, h
+        age_days = (now - time.mktime(time.strptime(backing["time"], "%Y-%m-%d %H:%M:%S"))) / 86400.0
+        alts = {k: v for k, v in rec.items() if k != json.dumps(val) and v[1] >= ALT_MIN_N}
+        best_alt = max(alts.items(), key=lambda kv: kv[1][0] / kv[1][1]) if alts else None
+        lo, hi = wilson(h, n)
+        rng = f"{h} of {n} good (between {round(lo * 100)}% and {round(hi * 100)}% likely)"
+        if n == 0:
+            row.update(verdict="delete", why="none of the attempts behind it still count (retracted, or from an older scoring version)")
+        elif backing["action"] == "undo":
+            worse = p_better(best_alt[1][0], best_alt[1][1], h, n) if best_alt else None        # how likely the best alternative really does better than the value he undid
+            if n >= ALT_MIN_N and ((worse is not None and worse >= 0.75) or (best_alt is None and h / n < 0.4)):
+                row.update(verdict="keep", why=f"confirmed: {rng} with it" + ("" if worse is None else f"; the best alternative ({best_alt[1][0]} of {best_alt[1][1]}) does better in {round(worse * 100)}% of simulations"))
+            elif age_days > UNDO_DAYS:
+                row.update(verdict="delete", why=f"\u201cfor a while\u201d is over ({round(age_days)} days) and the data does not confirm it ({rng})")
+            else:
+                row.update(why=f"not confirmed yet: {rng}")
+        else:
+            p = p_better(h, n, best_alt[1][0], best_alt[1][1]) if best_alt else None
+            vs = "" if p is None else f"; beats the best alternative ({best_alt[1][0]} of {best_alt[1][1]}) in {round(p * 100)}% of simulations"
+            if n >= MIN_KEEP_N and ((p is not None and p >= 0.75) or (p is None and h / n >= 1 / 3)):
+                row.update(verdict="keep", why=f"supported: {rng}{vs}")
+            elif n >= MIN_JUDGE_N and p is not None and p < 0.25:
+                row.update(verdict="delete", why=f"now looks worse than an alternative: {rng}{vs}")
+            elif n >= MIN_JUDGE_N and p is None and h / n < 1 / 3:                        # no alternative to compare with: judged on its own record
+                row.update(verdict="delete", why=f"it mostly fails now and nothing else was tried to compare: {rng}")
+            else:
+                row.update(why=f"not enough evidence yet: {rng}{vs}" if n < MIN_KEEP_N else f"unclear: {rng}{vs}")
+    for rows in by_key.values():                                     # the same setting and value learned again: only the newest note stays
+        for old in rows[:-1]:
+            if old["verdict"] != "delete":
+                old.update(verdict="delete", why=f"said again, newer, in lesson #{rows[-1]['id']}")
+    return out
+
+
 def build(folder: str | None = None) -> dict:
     d = os.path.expanduser(folder or os.environ.get("G2_GOALS_DIR", DEFAULT_DIR))
     journal = _lines(os.path.join(d, "goal_journal.jsonl"))
@@ -278,8 +373,12 @@ def build(folder: str | None = None) -> dict:
                 break
         else:
             unmatched.append(row)
+    try:
+        review = lesson_review(journal, lessons, {gid: g["title"] for gid, g in goals.items()}, cond_of)
+    except Exception:  # noqa: BLE001 -- a hint must never break the tab
+        review = []
     pulled = _text(os.path.join(d, "pulled_at.txt")).strip()
-    return {"pulled": pulled, "pulled_age_h": _age_hours(pulled), "priority": order, "suggestions": _suggestions(state), "pending": with_text(pending(d)), "edit_history": history(d),
+    return {"lesson_review": review, "pulled": pulled, "pulled_age_h": _age_hours(pulled), "priority": order, "suggestions": _suggestions(state), "pending": with_text(pending(d)), "edit_history": history(d),
             "goals": list(goals.values()), "other_lessons": unmatched, "memory": _memory(os.path.join(d, "memory_log.jsonl")),
             "turns": _turns(os.path.join(d, "turn_log.jsonl")), "curation": report.strip(), "folder": d,
             "sync": sync_status(os.path.join(os.path.dirname(d.rstrip("/")), "sync_status.json"))}

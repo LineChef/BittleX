@@ -84,12 +84,15 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
    const q=pend(s.goal,p=>(p.op==="confirm"||p.op==="cancel")&&p.knob===s.knob);if(q.length)mn.append(pendChip(q[0].text));else{mn.append(btn("Confirm",()=>queue({op:"confirm",goal:s.goal,knob:s.knob},"confirm "+s.knob),"on"),btn("Cancel it",()=>queue({op:"cancel",goal:s.goal,knob:s.knob},"cancel the suggestion for "+s.knob)))}
    r.append(mn);sf.append(r)}list.append(sf)}
 
- // suggested lesson clean-up (user, 2026-11-06): older lessons a newer one replaces, and ones naming a date; worked out on this Mac, one button queues the deletes
- {const lc=(d.lesson_cleanup||[]).filter(c=>!pend(undefined,p=>p.op==="lesson_delete"&&Number(p.id)===Number(c.id)).length);
-  if(lc.length){const lf=fold("Suggested lesson clean-up ("+lc.length+")",true);
-   lf.append(el("div","meta","Lessons the goal has since learned again in newer words, or that name a date or time. Deleted lessons move to the review Trash on the Pi, so they can be put back."));
-   const ab=btn("Delete all "+lc.length+" suggested lessons",()=>confirmThen("Queue the deletion of "+lc.length+" lessons? They move to the Trash on the Pi at the next sync.",()=>queueMany(lc.map(c=>({op:"lesson_delete",id:c.id})),"lesson deletions")),"danger");ab.style.margin="6px 0";lf.append(ab);
-   for(const c of lc)lf.append(el("div","meta","#"+c.id+" · "+c.goal+": "+c.text.slice(0,120)+" — "+c.why));
+ // lesson review (user, 2026-11-06): every saved lesson is re-judged on the attempts the journal holds now (tools/g2_goals_view.py lesson_review): delete / keep / not enough evidence yet
+ {const rv=d.lesson_review||[];
+  const queued=c=>pend(undefined,p=>p.op==="lesson_delete"&&Number(p.id)===Number(c.id)).length;
+  const del=rv.filter(r=>r.verdict==="delete"&&!queued(r)),keep=rv.filter(r=>r.verdict==="keep"),unsure=rv.filter(r=>r.verdict==="unsure");
+  if(rv.length){const lf=fold("Lesson review ("+rv.length+" lessons: "+del.length+" to delete, "+keep.length+" supported, "+unsure.length+" unsure)",del.length>0);
+   lf.append(el("div","meta","Each lesson was written after only a few attempts. Here it is re-judged on every attempt on record now, for the same setting, floor and hardware: its record with a 95% range, and how likely it still beats the best alternative that was tried. Delete = nothing backs it any more, a newer lesson says it again, or the alternatives now clearly do better. Deleted lessons move to the review Trash on the Pi."));
+   if(del.length){const ab=btn("Delete the "+del.length+" lessons the data does not support",()=>confirmThen("Queue the deletion of "+del.length+" lessons? They move to the Trash on the Pi at the next sync.",()=>queueMany(del.map(c=>({op:"lesson_delete",id:c.id})),"lesson deletions")),"danger");ab.style.margin="6px 0";lf.append(ab)}
+   const show=(title,rows,open)=>{if(!rows.length)return;const sf=fold(title+" ("+rows.length+")",open);for(const c of rows)sf.append(el("div","meta","#"+c.id+" \u00b7 "+c.goal+": "+c.text.slice(0,110)+" \u2014 "+c.why));lf.append(sf)};
+   show("Delete: not supported by the data",del,true);show("Keep: supported by the data",keep,false);show("Unsure: more attempts needed",unsure,false);
    list.append(lf)}}
 
  d.goals.forEach((g,i)=>goalCard(list,g,f,i));

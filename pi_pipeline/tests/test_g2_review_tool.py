@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 SPEC = importlib.util.spec_from_file_location("g2_review", Path(__file__).resolve().parents[2] / "tools" / "g2_review.py")
 G = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(G)
@@ -510,17 +512,52 @@ def test_the_mic_button_reads_and_ends_a_wake_word_pause():
     assert app.mic(turn_on=True)["paused"] is False and calls[-1][1] == "on"
 
 
-def test_lesson_cleanup_keeps_the_newest_of_a_repeated_lesson_and_flags_dated_ones():
-    lessons = [
-        {"id": 3, "text": "Searching by turn works best so far: 2 of 2 good, against 2 of 7 with claw_scan. I'm keeping it."},
-        {"id": 9, "text": "I fell trying punching from 3.5 in: back to 4 in, and I won't try that again for a while."},
-        {"id": 12, "text": "Searching by turn works best so far: 5 of 6 good, against 2 of 9 with claw_scan. I'm keeping it."},
-        {"id": 14, "text": "On 2026-11-02 at 3 PM the ball rolled under the couch."},
-        {"id": 15, "text": "Lifting the claw to 120 deg for a look works best so far: 2 of 3 good."},
-    ]
-    out = {c["id"]: c["why"] for c in G.lesson_cleanup({"goals": [{"id": "ball_punt", "title": "Punt the ball", "lessons": lessons}]})}
-    assert set(out) == {3, 14}                                   # 3 is said again by 12 (kept); 14 names a date; 9, 12 and 15 stay
-    assert "#12" in out[3] and "date" in out[14]
+def _journal_with(rates):
+    """Attempts for goal g under one floor, settings.knob -> (good, tried), plus the session that holds the conditions."""
+    rows = [{"kind": "session_start", "goal": "g", "session": "s", "title": "Punt", "conditions": {"attachment": "arm", "floor": "wood", "hw": "h1"}}]
+    i = 0
+    for val, (good, tried) in rates.items():
+        for k in range(tried):
+            i += 1
+            rows.append({"kind": "attempt", "goal": "g", "session": "s", "index": i, "number": i, "time": "2026-11-05 10:00:00", "scoring_epoch": 2,
+                         "settings": {"knob": val}, "outcome": {"score": 1.0 if k < good else 0.0, "success": k < good}})
+    return rows
+
+
+def _decision(i, val, action="kept", note="Order turn works best so far: 2 of 2 good.", time="2026-11-04 10:00:00"):
+    return {"kind": "decision", "goal": "g", "session": "s", "index": i, "action": action, "knob": "knob", "old": "b", "new": val, "note": note, "time": time}
+
+
+def test_lessons_are_judged_on_the_evidence_not_the_wording():
+    V = importlib.import_module("g2_goals_view") if "g2_goals_view" in globals() else __import__("g2_goals_view")
+    now = __import__("time").mktime(__import__("time").strptime("2026-11-06 12:00:00", "%Y-%m-%d %H:%M:%S"))
+    titles, cond = {"g": "Punt"}, {"s": {"attachment": "arm", "floor": "wood", "hw": "h1"}}
+    # supported: 'a' did 12 of 16 good, the alternative 'b' 3 of 12
+    j = _journal_with({"a": (12, 16), "b": (3, 12)}) + [_decision(1, "a", note="A works best.")]
+    r = V.lesson_review(j, [{"id": 1, "lesson": "Punt: A works best."}], titles, cond, now)[0]
+    assert r["verdict"] == "keep" and r["n"] == 16 and "simulations" in r["why"]
+    # contradicted: the kept value 'a' did 3 of 12, the alternative 'b' 11 of 14
+    j = _journal_with({"a": (3, 12), "b": (11, 14)}) + [_decision(1, "a", note="A works best.")]
+    assert V.lesson_review(j, [{"id": 1, "lesson": "Punt: A works best."}], titles, cond, now)[0]["verdict"] == "delete"
+    # too little evidence either way
+    j = _journal_with({"a": (2, 3), "b": (1, 4)}) + [_decision(1, "a", note="A works best.")]
+    assert V.lesson_review(j, [{"id": 1, "lesson": "Punt: A works best."}], titles, cond, now)[0]["verdict"] == "unsure"
+    # nothing behind it counts any more
+    j = _journal_with({"b": (2, 5)}) + [_decision(1, "a", note="A works best.")]
+    assert "none of the attempts" in V.lesson_review(j, [{"id": 1, "lesson": "Punt: A works best."}], titles, cond, now)[0]["why"]
+    # the same setting and value learned twice: only the newest stays
+    j = _journal_with({"a": (12, 16), "b": (3, 12)}) + [_decision(1, "a", note="A works best (old)."), _decision(2, "a", note="A works best (new).", time="2026-11-05 10:00:00")]
+    out = V.lesson_review(j, [{"id": 1, "lesson": "Punt: A works best (old)."}, {"id": 2, "lesson": "Punt: A works best (new)."}], titles, cond, now)
+    assert [r["verdict"] for r in out] == ["delete", "keep"] and "#2" in out[0]["why"]
+    # a lesson that names a date goes
+    assert V.lesson_review([], [{"id": 5, "lesson": "Punt: On 2026-11-02 at 3 PM the ball rolled away."}], titles, cond, now)[0]["verdict"] == "delete"
+
+
+def test_the_statistics_helpers():
+    V = __import__("g2_goals_view")
+    lo, hi = V.wilson(2, 3)
+    assert 0.2 < lo < 0.3 and 0.9 < hi <= 1.0 and V.wilson(0, 0) == (0.0, 1.0)
+    assert V.p_better(12, 16, 3, 12) > 0.95 and V.p_better(3, 12, 12, 16) < 0.05 and abs(V.p_better(5, 10, 5, 10) - 0.5) < 0.05
 
 
 def test_observation_cleanup_drops_near_duplicates_keeping_the_better_labelled_and_very_short_captions():
