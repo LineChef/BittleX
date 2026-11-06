@@ -851,6 +851,10 @@ class SerialRobot:
             return "ok"
         return self._stand_up_from("attention")
 
+    def stand_up_from_attention(self) -> str:
+        """The attention pose to the stand, back legs first (what a goal session does when a move follows a claw look). "ok" or "fell"."""
+        return self._stand_up_from("attention")
+
     def _stand_up_from(self, pose: str) -> str:
         if hasattr(self._lk, "last_motion_command"):
             self._lk.last_motion_command = {"attention": "kcalib", "sit": "ksit"}.get(pose, "krest")      # the link picks its stand-up from this: make it the pose just read

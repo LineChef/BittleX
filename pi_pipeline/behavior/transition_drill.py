@@ -1,6 +1,6 @@
 """The hardware A/B for falls at transitions (user, 2026-11-06). Runs ONLY on the user's go, on hardwood, hands near, the voice service stopped (like claw_look).
 
-A cycle is the transitions that logged falls were made of: pose -> turn -> stop. Attention pose (`relax`), stand up, a firmware turn (alternating left and right), the stop. One variant per run:
+A cycle is the transitions that logged falls were made of: pose -> pose -> turn -> stop. Attention pose (`relax`), the back-legs-first stand-up, a firmware turn (alternating left and right), the stop. One variant per run:
 
     baseline   no gate, no calm stop (what the code did)       calm   the stop waits for a calm moment        gate   the pose gate before the turn        both
     python -m pi_pipeline.behavior.transition_drill --variant calm --cycles 10
@@ -24,7 +24,10 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
             fell = True
             break
         sleep(1.0)
-        state = robot.turn(side * turn_deg, turn_s)                    # stand_up (from the attention pose), the gate if on, the turn, the calm stop
+        if robot.stand_up_from_attention() == "fell":                  # the pose -> pose move the logged falls follow: attention pose to the back-legs-first stand-up
+            fell = True
+            break
+        state = robot.turn(side * turn_deg, turn_s)                    # the gate if on, the turn, the calm stop (turn() does not stand him up itself: the standing flow sends nothing before a move)
         worst = max(worst, robot.swing_deg())
         say(f"cycle {i + 1}/{cycles}: turn {'right' if side > 0 else 'left'} -> {state}, swing {robot.swing_deg():.0f} deg, re-seats so far {robot.gate_reseats}")
         if state == "fell":

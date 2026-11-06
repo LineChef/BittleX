@@ -1005,6 +1005,7 @@ def test_the_transition_drill_counts_cycles_and_stops_at_the_first_fall():
         gate_reseats = 0
         def __init__(self, fell_on): self.n, self.fell_on = 0, fell_on
         def relax(self): return "ok"
+        def stand_up_from_attention(self): return "ok"
         def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
         def swing_deg(self): return 3.0
     assert td.run_variant(R(0), 4, say=lambda *a: None, sleep=lambda s: None) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "reseats": 0}
