@@ -60,14 +60,7 @@ function renderGoals(list,f){const d=data;if(!d||!d.goals){list.append(el("div",
  const cur=(d.curation||"").split("\n").filter(x=>x.startsWith("- "));if(cur.length){const fl=fold("Curation notes ("+cur.length+")",false);for(const c of cur)fl.append(el("div","meta",c.slice(2)));sum.append(fl)}
  list.append(sum);
 
- // waiting edits
- const pe=d.pending||[];
- if(pe.length){const box=el("div","labelsum");box.style.borderColor="#e0c15a";box.append(el("b","",pe.length+(pe.length===1?" edit is":" edits are")+" waiting to be sent to G2"));
-  box.append(el("div","sub","They are kept on this Mac and sent when the Pi is up and no goal session is running (on g2goal pull, g2goal run or the button below)."));
-  for(const p of pe){const r=el("div","meta",p.text);if(p.error){const e=el("div","meta","Last try failed: "+p.error);e.style.color="var(--x)";r.append(e)}
-   r.append(btn("Cancel",async()=>{try{const x=await api("/api/goals/cancel",{id:p.id});d.pending=x.pending;render()}catch(e){toast("Failed: "+e.message)}},"danger"));box.append(r)}
-  box.append(btn("Apply now",async()=>{toast("Sending to G2…");try{const x=await api("/api/goals/apply",{});toast(x.message);load()}catch(e){toast("Failed: "+e.message)}},"on"));list.append(box)}
- else if((d.edit_history||[]).length){const h=d.edit_history[0];const b=el("div","sub","Last edit sent to G2: "+h.text+" ("+h.time+")"+(h.ok?"":" — failed"));b.style.margin="6px 0";list.append(b)}
+ // (the edits waiting for the Pi are on the Waiting to sync tab; the goal rows below carry a "pending" chip)
 
  // toolbar: new goal, order
  const bar=el("div");bar.style.margin="8px 0";
@@ -217,11 +210,25 @@ async function addGoal(){
 window.reviewPanel=function(list){const s=window.reviewState;if(!s||!s.mirror)return;
  const box=el("div","labelsum"),c=s.copy||{};
  box.append(el("b","","This is the copy on this Mac. "),document.createTextNode((c.has_memory?"Memory as of "+c.memory_from+". ":"No memory copy yet: press Sync now while the Pi is on. ")+"Edits are applied here at once and sent to the Pi when it is reachable (Sync now sends them first)."));
- if((s.pending||[]).length){const w=el("div");w.style.cssText="margin-top:6px;padding-top:6px;border-top:1px solid var(--line)";w.append(el("b","",s.pending.length+(s.pending.length===1?" edit is":" edits are")+" waiting for the Pi"));
-  for(const p of s.pending){const r=el("div","meta",p.text);if(p.error){const e=el("div","meta","Last try failed: "+p.error);e.style.color="var(--x)";r.append(e)}
-   if(p.cancellable)r.append(btn("Cancel",async()=>{try{window.reviewState=await api("/api/review/cancel",{id:p.id});load()}catch(e){toast("Failed: "+e.message)}},"danger"));w.append(r)}
-  w.append(btn("Send to the Pi now",async()=>{toast("Sending…");try{const x=await api("/api/review/apply",{});window.reviewState=x;toast(x.message);load()}catch(e){toast("Failed: "+e.message)}},"on"));box.append(w)}
+ if((s.pending||[]).length){const w=el("div","meta",s.pending.length+(s.pending.length===1?" edit is":" edits are")+" waiting for the Pi: see the Waiting to sync tab.");w.style.marginTop="4px";box.append(w)}
  list.append(box)};
+// ---- the Waiting to sync tab: every edit queued on this Mac for the Pi, in one place
+window.renderSync=function(list){const w=data||{},mem=(window.reviewState&&window.reviewState.pending)||[],gl=w.goals||[];
+ const total=mem.length+gl.length;
+ const head=el("div","labelsum");head.append(el("b","",total?total+(total===1?" edit is":" edits are")+" waiting to be sent to the Pi":"Nothing is waiting: the Pi has every edit."));
+ head.append(el("div","sub","Edits are kept on this Mac and sent when the Pi is up (memory and pictures at the start of every sync; goal edits when no goal session is running). A delete the Pi no longer has simply leaves this list."));
+ if(total){const row=el("div");row.style.marginTop="6px";
+  row.append(btn("Send to the Pi now",async()=>{toast("Sending…");try{let msg=[];if(mem.length){const x=await api("/api/review/apply",{});window.reviewState=x;msg.push(x.message)}
+   if(gl.length){const y=await api("/api/goals/apply",{});msg.push(y.message)}toast(msg.join("; ")||"Sent");load()}catch(e){toast("Failed: "+e.message)}},"on"));head.append(row)}
+ list.append(head);
+ const f=$("#q").value.toLowerCase();
+ const group=(title,rows,cancel)=>{const r=rows.filter(p=>!f||JSON.stringify(p).toLowerCase().includes(f));if(!r.length)return;list.append(el("div","group",title+" ("+r.length+")"));
+  for(const p of r){const line=el("div","meta",p.text);if(p.error){const e=el("div","meta","Last try failed: "+p.error);e.style.color="var(--x)";line.append(e)}
+   if(cancel&&(p.cancellable===undefined||p.cancellable))line.append(btn("Cancel",()=>cancel(p),"danger"));list.append(line)}};
+ group("Memory and pictures",mem,async p=>{try{window.reviewState=await api("/api/review/cancel",{id:p.id});load()}catch(e){toast("Failed: "+e.message)}});
+ group("Goals",gl,async p=>{try{await api("/api/goals/cancel",{id:p.id});load()}catch(e){toast("Failed: "+e.message)}});
+ const hist=((window.reviewState&&window.reviewState.history)||[]).slice(0,5);
+ if(hist.length){list.append(el("div","group","Last sent"));for(const h of hist)list.append(el("div","meta",h.text+" ("+h.time+")"))}};
 window.g2ask=ask;window.g2btn=btn;
 window.renderGoals=renderGoals;
 })();

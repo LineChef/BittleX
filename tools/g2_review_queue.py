@@ -13,8 +13,10 @@ Standard library only.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -98,8 +100,22 @@ def _ssh(host: str, remote: str, timeout: int = 120) -> tuple[int, str]:
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+GONE = re.compile(r"\bno \w+ record \d+\b")           # the Pi's answer to a delete of a record it no longer has
+
+
 def apply(d: str | None = None, host: str | None = None, run=_ssh) -> dict:
-    """Send every queued edit to the Pi, oldest first. {"applied", "failed", "left", "message"}; nothing is lost when the Pi cannot be reached."""
+    """Send every queued edit to the Pi, oldest first. {"applied", "failed", "left", "message"}; nothing is lost when the Pi cannot be reached.
+    One send at a time (a sync and the page's button at once left deletes behind that the second one failed on: the record was already gone)."""
+    os.makedirs(folder(d), exist_ok=True)
+    with open(_path(d, "review_edits.lock"), "w") as lk:
+        try:
+            fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return {"applied": 0, "failed": 0, "left": len(pending(d)), "message": "another send is running: wait for it"}
+        return _apply(d, host, run)
+
+
+def _apply(d, host, run) -> dict:
     rows = pending(d)
     if not rows:
         return {"applied": 0, "failed": 0, "left": 0, "message": "nothing waiting"}
@@ -130,6 +146,11 @@ def apply(d: str | None = None, host: str | None = None, run=_ssh) -> dict:
             save(keep, d)
             return {"applied": done, "failed": len(keep) - len(rows[i:]), "left": len(keep), "message": f"lost the Pi part way ({e}): the rest stay queued"}
         except (ValueError, RuntimeError) as e:
+            if r["args"][0] == "delete" and GONE.search(str(e)):          # already deleted on the Pi (user, 2026-11-06): nothing left to send, so it leaves the queue
+                with open(_path(d, "review_edits_applied.jsonl"), "a") as f:
+                    f.write(json.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "ok": True, "text": describe(r), "answer": "already gone on the Pi"}) + "\n")
+                done += 1
+                continue
             keep.append({**r, "error": str(e)[-300:]})
             continue
         done += 1
