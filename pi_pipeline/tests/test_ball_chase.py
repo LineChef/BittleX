@@ -1005,6 +1005,7 @@ def test_the_transition_drill_counts_cycles_near_falls_and_stops_at_the_first_fa
         gate_reseats = 0
         def __init__(self, fell_on, swing=3.0): self.n, self.fell_on, self.swing = 0, fell_on, swing
         def relax(self): return "ok"
+        def fallen(self): return False
         def stand_up_from_attention(self): return "ok"
         def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
         def swing_deg(self): return self.swing
@@ -1013,3 +1014,26 @@ def test_the_transition_drill_counts_cycles_near_falls_and_stops_at_the_first_fa
     assert td.run_variant(R(3), 10, **kw)["cycles"] == 1                                # two turns a cycle: the third turn is in cycle 2
     big = td.run_variant(R(0, swing=25.0), 2, **kw)
     assert big["near_falls"] == 6 and big["worst_swing_deg"] == 25.0                    # stand-up and two turns, twice
+
+
+def test_the_drill_stops_at_once_when_he_is_found_fallen_after_the_attention_pose():
+    from pi_pipeline.behavior import transition_drill as td
+    calls = []
+    class R:
+        gate_reseats = 0
+        def relax(self): return "ok"
+        def fallen(self): return True
+        def stand_up_from_attention(self): calls.append("stand"); return "ok"
+        def turn(self, deg, s): calls.append("turn"); return "ok"
+        def swing_deg(self): return 0.0
+    res = td.run_variant(R(), 5, look=lambda r: calls.append("look"), say=lambda *a: None, sleep=lambda s: None)
+    assert res["fell"] and res["cycles"] == 0 and calls == []                       # no claw look, no stand-up, no turn on a fallen G2
+
+
+def test_a_fall_in_the_middle_of_the_claw_look_stops_the_arm_moves():
+    from pi_pipeline.behavior import claw_survey
+    sent = []
+    class L:
+        def send(self, c, **k): sent.append(c)
+    state = claw_survey.run_claw_look(L(), None, "x", sleep=lambda s: None, stopped=lambda: True)
+    assert state == "stopped" and len([c for c in sent if c.startswith("i0")]) <= 10 and sent[-1] == "gp"

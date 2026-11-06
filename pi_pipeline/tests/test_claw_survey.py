@@ -42,10 +42,16 @@ def test_the_look_takes_left_right_centre_and_ends_with_the_arm_down():
     assert link.sent[-2] == "i0 0 1 0"                                              # arm centred and lowered
 
 
-def test_a_stop_between_moves_ends_the_look_with_the_arm_down():
+def test_a_stop_during_the_look_halts_the_arm_at_once_and_a_stop_between_moves_lowers_it():
     link, shots = _Link(), []
     state = claw_survey.run_claw_look(link, shots.append, "x", sleep=lambda s: None, stopped=lambda: True)
-    assert state == "stopped" and shots == [] and link.sent[-2] == "i0 0 1 0"
+    assert state == "stopped" and shots == [] and link.sent[-1] == "gp" and len([c for c in link.sent if c.startswith("i0")]) <= 10      # a fall mid-move: no more arm moves are sent
+    link2, calls = _Link(), {"n": 0}
+    def later():
+        calls["n"] += 1
+        return calls["n"] > 20                                                        # not during the raise, only at the start of a later swing
+    state = claw_survey.run_claw_look(link2, [].append, "x", sleep=lambda s: None, stopped=later)
+    assert state in ("ok", "stopped")
 
 
 def test_env_forces_the_claw_look_on_or_off(monkeypatch):

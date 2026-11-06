@@ -851,6 +851,10 @@ class SerialRobot:
             return "ok"
         return self._stand_up_from("attention")
 
+    def fallen(self) -> bool:
+        """Whether the IMU says he has gone over (a fresh look at the stream). The tests and drills stop at once on it."""
+        return self._fell()
+
     def stand_up_from_attention(self) -> str:
         """The attention pose to the stand, back legs first (what a goal session does when a move follows a claw look). "ok" or "fell"."""
         return self._stand_up_from("attention")

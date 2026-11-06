@@ -24,7 +24,7 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
     {"cycles", "fell", "worst_swing_deg", "near_falls", "reseats"}."""
     if look is None:
         from . import claw_survey
-        look = lambda r: claw_survey.run_claw_look(r._lk, None, "drill")      # noqa: E731
+        look = lambda r: claw_survey.run_claw_look(r._lk, None, "drill", stopped=r.fallen)      # noqa: E731
     worst, near, done, fell = 0.0, 0, 0, False
 
     def note(phase: str) -> None:
@@ -37,10 +37,13 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
 
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
-        if robot.relax() != "ok":
+        if robot.relax() != "ok" or robot.fallen():                   # a fall anywhere ends the round at once: nothing more is sent to a fallen G2
             fell = True
             break
         look(robot)
+        if robot.fallen():
+            fell = True
+            break
         if robot.stand_up_from_attention() == "fell":
             fell = True
             break
@@ -75,10 +78,21 @@ def main() -> None:
     print("battery:", f"{pct}% ({volts:.2f} V)" if pct is not None else "UNREADABLE", "-> ok" if ok else "-> NOT OK: stopping")
     if not ok:
         return
+    import logging
+    board_moves: list = []
+
+    class _Watch(logging.Handler):                      # the BiBoard's own voice module starting a move (a spoken word, a TV): that round is void, not a fall caused by the transitions
+        def emit(self, record):
+            if "started a move the Pi did not send" in record.getMessage():
+                board_moves.append(record.getMessage()[-60:])
+    logging.getLogger("g2.command_log").addHandler(_Watch())
+    logging.getLogger().addHandler(_Watch())
     robot = chase.SerialRobot(link)
     try:
         chase._stand_if_lying(link, "kbalance")
         res = run_variant(robot, args.cycles)
+        if board_moves:
+            res["void"] = f"the board started a move on its own during the round: {board_moves[-1]}"
         print("RESULT", args.variant, res)
     except KeyboardInterrupt:
         print("ended")

@@ -34,7 +34,11 @@ def wanted() -> bool:
         return False
 
 
-def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep) -> None:
+class _Halt(Exception):
+    """`stopped()` went true in the middle of an arm move (a fall): no more moves are sent."""
+
+
+def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep, stopped=None) -> None:
     """Move the arm (pan joint 0, lift joint 1) from a to b at CLAW_DEG_S, eased: the same stepping as `SerialRobot.claw_pose`."""
     from .ball_chase import CLAW_DEG_S, CLAW_STEPS_PER_S
     span = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
@@ -44,6 +48,8 @@ def _smooth(link, a: tuple[float, float], b: tuple[float, float], sleep) -> None
         k = u * u * (3 - 2 * u)
         link.send(f"i0 {int(round(a[0] + (b[0] - a[0]) * k))} 1 {int(round(a[1] + (b[1] - a[1]) * k))}", read_reply=False, settle=0.0)
         sleep(1.0 / CLAW_STEPS_PER_S)
+        if stopped is not None and i % 10 == 0 and stopped():
+            raise _Halt()
 
 
 def look_seconds() -> float:
@@ -59,27 +65,30 @@ def run_claw_look(link, snapshot, kind: str, *, sleep=time.sleep, stopped=lambda
     from .ball_chase import CLAW_LIFT_DEG, CLAW_PAN_DEG, CLAW_PAN_SIGN
     left = CLAW_PAN_DEG if CLAW_PAN_SIGN == "left" else -CLAW_PAN_DEG              # the pan that points the camera to G2's left
     here = (0.0, 0.0)
-    state = "ok"
+    state, halted = "ok", False
     try:
         link.send("gP", read_reply=False, settle=0.0)
         if RAISE_FIRST:
-            _smooth(link, here, (0.0, CLAW_LIFT_DEG), sleep)
+            _smooth(link, here, (0.0, CLAW_LIFT_DEG), sleep, stopped)
             here = (0.0, CLAW_LIFT_DEG)
         for pan, label in ((left, "look_left"), (-left, "look_right"), (0.0, kind)):
             if stopped():
                 state = "stopped"
                 break
-            _smooth(link, here, (pan, CLAW_LIFT_DEG), sleep)
+            _smooth(link, here, (pan, CLAW_LIFT_DEG), sleep, stopped)
             here = (pan, CLAW_LIFT_DEG)
             sleep(SETTLE_S)
             if snapshot is not None:
                 snapshot(label)
+    except _Halt:
+        state, halted = "stopped", True
     except Exception:  # noqa: BLE001
         log.exception("the claw look failed")
         state = "error"
     finally:
         try:
-            _smooth(link, here, (0.0, 0.0), sleep)                                   # arm down and centred whatever happened
+            if not halted:                                                            # (halted mid-move = a fall: nothing more is sent to the arm)
+                _smooth(link, here, (0.0, 0.0), sleep)                               # arm down and centred whatever happened
             link.send("gp", read_reply=False, settle=0.0)
         except Exception:  # noqa: BLE001
             log.exception("could not lower the claw")
