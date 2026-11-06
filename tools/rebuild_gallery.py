@@ -25,6 +25,8 @@ from pi_pipeline.vision.object_gallery import ObjectGallery, ObjectGalleryConfig
 from pi_pipeline.vision.recognizer import Recognizer  # noqa: E402
 
 DEFAULT_PICTURES = Path(__file__).resolve().parents[1] / "training_data" / "exploration" / "promoted"
+MAX_KEPT = 30
+SKIP_NAMES = {"not what i said i said"}                      # a mis-transcribed voice name in the labelled set (docs/vision/picture-library.md): not an object
 DEFAULT_OUT = Path(os.path.expanduser("~/g2_data/gallery_rebuilt/gallery.json"))
 
 
@@ -32,7 +34,7 @@ def load_labelled(root: Path) -> dict[str, list[Path]]:
     out = {}
     for d in sorted(p for p in root.iterdir() if p.is_dir()):
         files = sorted(d.glob("*.jpg"))
-        if files:
+        if files and d.name.replace("-", " ") not in SKIP_NAMES:
             out[d.name.replace("-", " ")] = files
     return out
 
@@ -81,19 +83,24 @@ def leave_one_out(names: list[str], vecs: np.ndarray) -> float:
 
 
 def build_gallery(names, vecs, paths, key: str, t_same: float, t_near: float) -> ObjectGallery:
+    """One entry per labelled name, built directly: its centroid is the mean of ALL that name's picture fingerprints (so no name is lost to a look-alike with another name, which teaching the
+    pictures one by one would refuse), up to MAX_KEPT of its fingerprints and picture references are kept, spread evenly. Matching then picks the nearest centroid."""
+    import time
+    import uuid
+
+    from pi_pipeline.vision.object_gallery import GalleryEntry
     cfg = ObjectGalleryConfig(lock_by_holdout=True, same_instance_threshold=t_same, near_duplicate_threshold=t_near)
     gal = ObjectGallery(cfg)
     gal.embedder = key
-
-    class Fixed:                                                 # the vectors are already computed
-        def __init__(self): self.table, self.dim, self.name = {}, int(vecs.shape[1]), key
-        def embed(self, img): return self.table[id(img)]
-    fixed = Fixed()
-    rec = Recognizer(fixed, gal)
-    for name, v, p in zip(names, vecs, paths):
-        marker = object()
-        fixed.table[id(marker)] = v
-        rec.learn_named(marker, name, quality=1.0, crop_ref=str(p.relative_to(p.parents[1])))
+    now = time.time()
+    for name in dict.fromkeys(names):
+        idx = [i for i, n in enumerate(names) if n == name]
+        cen = vecs[idx].mean(axis=0)
+        cen = cen / (np.linalg.norm(cen) or 1.0)
+        keep = idx if len(idx) <= MAX_KEPT else [idx[int(round(k * (len(idx) - 1) / (MAX_KEPT - 1)))] for k in range(MAX_KEPT)]
+        eid = uuid.uuid4().hex[:12]
+        gal.entries[eid] = GalleryEntry(id=eid, centroid=[float(x) for x in cen], sample_count=len(idx), name=name, locked=False, first_seen=now, last_seen=now,
+                                        crop_files=[str(paths[i].relative_to(paths[i].parents[1])) for i in keep], samples=[[float(x) for x in vecs[i]] for i in keep])
     return gal
 
 

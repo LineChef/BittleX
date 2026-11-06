@@ -61,6 +61,7 @@ def test_a_rebuild_teaches_each_labelled_picture_to_a_fresh_gallery_under_its_na
     t_same, t_near = RG.choose_thresholds(same, diff)
     g = RG.build_gallery(names, vecs, paths, "test.onnx", t_same, t_near)
     assert g.embedder == "test.onnx" and {e.name for e in g.entries.values()} == {"mug", "lamp", "cat"} and all(e.name for e in g.entries.values())
+    assert all(e.sample_count == 4 and len(e.samples) == 4 and abs(float(np.linalg.norm(e.centroid)) - 1.0) < 1e-5 for e in g.entries.values())
     entry, sim = g.match(list(vecs[0]), named_only=True)
     assert entry.name == "mug" and sim >= t_same
 
@@ -94,3 +95,12 @@ def test_the_idle_setting_picks_the_lazy_embedder(monkeypatch, tmp_path):
     import pytest
     with pytest.raises(Exception):
         emb.make_embedder(f"onnx:{tmp_path}/missing.onnx")                                                  # the eager one needs the file at once
+
+
+def test_look_alike_names_are_both_kept_in_a_rebuild(tmp_path):
+    v = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    names = ["fridge", "fridge", "refrigerator", "refrigerator"]
+    vecs = np.vstack([v, v, v * 0.999, v * 0.998])
+    paths = [tmp_path / n / f"{n}_{i}.jpg" for i, n in enumerate(names)]
+    g = RG.build_gallery(names, vecs, paths, "test.onnx", 0.5, 0.9)
+    assert sorted(e.name for e in g.entries.values()) == ["fridge", "refrigerator"]                    # teaching them one by one would have refused the second name
