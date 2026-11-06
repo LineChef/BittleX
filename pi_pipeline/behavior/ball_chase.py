@@ -610,6 +610,7 @@ class SerialRobot:
         self._stand_tilt: tuple | None = None             # (pitch, roll) right after the last good stand-up: the reference for the sag check
         self._posed_at: float | None = None               # when the legs last changed pose (attention, stand-up): the next move is checked once against the real tilt (_gate)
         self._gate_done_at: float | None = None
+        self.last_leg_check: list = []                    # the legs the last leg_check found off their stand angle
         self.gate_reseats = 0                             # legs re-seated by the gate this session (the goal can report it)
         self.last_fall: dict | None = None                # the angles of the last fall the guard saw (pitch, roll, which way, the posture he was in)
         self.posture = "unknown"                          # "stand", "attention" or "unknown" (as the session found him: _stand_if_lying stood him up if he was lying)
@@ -855,6 +856,39 @@ class SerialRobot:
         """Whether the IMU says he has gone over (a fresh look at the stream). The tests and drills stop at once on it."""
         return self._fell()
 
+    LEG_CHECK_TOL_DEG = 4.0        # a leg joint the board believes more than this off its stand angle is reported (the pose read's 12 deg tolerance hides one odd leg)
+
+    def leg_check(self, source: str = "stand-up") -> list:
+        """After a stand-up (user, 2026-11-06: "a random leg points at an odd angle on stand-up"): read the angles the board believes its leg joints hold (`j`) and compare each with the
+        stand pose. This sees a joint command that was lost or garbled on the serial link (the board keeps the old angle); it cannot see a servo that was commanded right but lags (the
+        Pi gets no servo feedback: `f` is echo-only over the UART), which only the IMU tilt shows. Logs every deviation, appends the result to ~/.local/share/g2/leg_check.jsonl, and returns
+        [(servo, expected, got)]. It only reports (G2_LEG_CHECK=0 turns it off). Never raises."""
+        if os.environ.get("G2_LEG_CHECK", "1").strip().lower() in ("0", "off", "false", "no"):
+            return []
+        try:
+            joints = read_joints(self._lk, sleep=self._sleep, clock=self._clock)
+            if not joints or len(joints) < 16:
+                return []
+            exp = _known_poses()["stand"]
+            bad = [(sv, round(d), joints[sv]) for sv, d in sorted(exp.items()) if abs(joints[sv] - d) > self.LEG_CHECK_TOL_DEG]
+            if bad:
+                log.warning("leg check after the %s: %s", source, "; ".join(f"servo {sv} should be {d} deg, the board holds {g}" for sv, d, g in bad))
+            else:
+                log.info("leg check after the %s: all eight leg joints hold their stand angles", source)
+            try:
+                import json
+                path = os.path.expanduser("~/.local/share/g2/leg_check.jsonl")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "a") as f:
+                    f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "source": source, "bad": bad, "tilt": self._stand_tilt}) + "\n")
+            except OSError:
+                pass
+            self.last_leg_check = bad
+            return bad
+        except Exception:  # noqa: BLE001
+            log.exception("leg check failed")
+            return []
+
     def stand_up_from_attention(self) -> str:
         """The attention pose to the stand, back legs first (what a goal session does when a move follows a claw look). "ok" or "fell"."""
         return self._stand_up_from("attention")
@@ -883,6 +917,7 @@ class SerialRobot:
                 t = self._tilt(0.3)
                 if t is not None:
                     self._stand_tilt = t                  # how he stands when the legs hold: the sag check compares with this
+                self.leg_check(f"stand-up from {pose}")
         self._moved_at = self._clock()
         self._posed_at = self._moved_at
         return state

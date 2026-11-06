@@ -27,6 +27,14 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
         look = lambda r: claw_survey.run_claw_look(r._lk, None, "drill", stopped=r.fallen)      # noqa: E731
     worst, near, done, fell = 0.0, 0, 0, False
 
+    legs_off: list = []
+
+    def trace(phase: str) -> None:
+        """The IMU tilt through a phase (pitch / roll min and max, and the last readings), so a fall leaves something to read."""
+        p, r = list(getattr(robot, "_pitch", []) or []), list(getattr(robot, "_roll", []) or [])
+        if p and r:
+            say(f"   {phase} tilt: pitch {min(p):+.0f}..{max(p):+.0f}, roll {min(r):+.0f}..{max(r):+.0f}; last pitch {[round(x) for x in p[-6:]]} roll {[round(x) for x in r[-6:]]}")
+
     def note(phase: str) -> None:
         nonlocal worst, near
         sw = robot.swing_deg()
@@ -34,6 +42,11 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
         if sw >= NEAR_FALL_DEG:
             near += 1
         say(f"   {phase}: swing {sw:.0f} deg")
+        trace(phase)
+        bad = getattr(robot, "last_leg_check", None)
+        if phase.startswith("stand-up") and bad:
+            legs_off.append(bad)
+            say(f"   LEGS OFF their stand angle after the stand-up: {bad}")
 
     for i in range(cycles):
         side = 1 if i % 2 == 0 else -1
@@ -41,7 +54,9 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
             fell = True
             break
         look(robot)
+        trace("claw look")
         if robot.fallen():
+            trace("fall")
             fell = True
             break
         if robot.stand_up_from_attention() == "fell":
@@ -58,7 +73,7 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
         if fell:
             break
         done += 1
-    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats}
+    return {"cycles": done, "fell": fell, "worst_swing_deg": round(worst, 1), "near_falls": near, "reseats": robot.gate_reseats, "stand_ups_with_legs_off": len(legs_off)}
 
 
 def main() -> None:

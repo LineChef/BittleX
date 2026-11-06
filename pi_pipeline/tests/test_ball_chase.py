@@ -1010,7 +1010,7 @@ def test_the_transition_drill_counts_cycles_near_falls_and_stops_at_the_first_fa
         def turn(self, deg, s): self.n += 1; return "fell" if self.n == self.fell_on else "ok"
         def swing_deg(self): return self.swing
     kw = dict(look=lambda r: None, say=lambda *a: None, sleep=lambda s: None)
-    assert td.run_variant(R(0), 4, **kw) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "near_falls": 0, "reseats": 0}
+    assert td.run_variant(R(0), 4, **kw) == {"cycles": 4, "fell": False, "worst_swing_deg": 3.0, "near_falls": 0, "reseats": 0, "stand_ups_with_legs_off": 0}
     assert td.run_variant(R(3), 10, **kw)["cycles"] == 1                                # two turns a cycle: the third turn is in cycle 2
     big = td.run_variant(R(0, swing=25.0), 2, **kw)
     assert big["near_falls"] == 6 and big["worst_swing_deg"] == 25.0                    # stand-up and two turns, twice
@@ -1037,3 +1037,20 @@ def test_a_fall_in_the_middle_of_the_claw_look_stops_the_arm_moves():
         def send(self, c, **k): sent.append(c)
     state = claw_survey.run_claw_look(L(), None, "x", sleep=lambda s: None, stopped=lambda: True)
     assert state == "stopped" and len([c for c in sent if c.startswith("i0")]) <= 10 and sent[-1] == "gp"
+
+
+def test_the_leg_check_names_a_joint_that_holds_the_wrong_angle_after_a_stand_up(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    stand = bc._known_poses()["stand"]
+    joints = [0] * 16
+    for sv, d in stand.items():
+        joints[sv] = d
+    r = bc.SerialRobot(type("L", (), {"send": lambda s, *a, **k: "", "poll_imu": lambda s: []})(), sleep=lambda s: None, clock=lambda: 0.0)
+    monkeypatch.setattr(bc, "read_joints", lambda *a, **k: list(joints))
+    assert r.leg_check() == [] and r.last_leg_check == []
+    sv = sorted(stand)[3]
+    joints[sv] = stand[sv] + 40                                                      # one leg joint kept an old angle (a lost command)
+    bad = r.leg_check("test")
+    assert [b[0] for b in bad] == [sv] and bad[0][2] == stand[sv] + 40
+    monkeypatch.setenv("G2_LEG_CHECK", "0")
+    assert r.leg_check() == []
