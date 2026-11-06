@@ -20,15 +20,15 @@
 - `SerialRobot._settle_before_pose`: before a pose change within 6 s of a move, wait up to 1 s for a steady body.
 - `SerialRobot._calm_before_stop`: a firmware move waits up to 0.4 s for a calm moment before its stop (not for gyro-stopped turns, waiting would turn them further).
 - The claw look is the look everywhere with the arm fitted (`behavior/claw_survey.py`).
-- `behavior/transition_drill.py`: `python -m pi_pipeline.behavior.transition_drill --variant baseline|calm|gate|both --cycles 10` on the Pi with the voice service stopped (on the owner's go, hardwood, hands near). A cycle is attention pose, a claw look, the back-legs-first stand-up, a turn, a turn back, no rest. It stops at the first fall, prints the IMU tilt through every phase, counts near falls (swing of 20 deg or more) and marks a round void when the board started a move on its own.
+- `behavior/transition_drill.py`: `python -m pi_pipeline.behavior.transition_drill --variant baseline|calm|gate|both --cycles 10` on the Pi with the voice service stopped (on the owner's go, hardwood, hands near). A cycle is attention pose, a claw look, the back-legs-first stand-up, a turn, a turn back, no rest. It stops at the first fall, prints the IMU tilt through every phase, counts near falls (swing of 20 deg or more) and flags a round as void when the board started a move on its own.
 
 ## Outside sources (searched 2026-11-06)
 
-Petoi has no published advice for this; the old forum is gone. The findings, and one useful pointer (a servo horn slipped by a tooth gives a 14.4 deg error that the commands do not show), are in [`../research/falls-at-transitions-outside-sources-2026-11-06.md`](../research/falls-at-transitions-outside-sources-2026-11-06.md).
+Petoi has no published advice for this; the old forum is gone. The findings, and one useful pointer (its calibration pointer, a slipped horn, was ruled out as the cause of the odd leg: that leg is right about 98% of the time and it is a different leg each time), are in [`../research/falls-at-transitions-outside-sources-2026-11-06.md`](../research/falls-at-transitions-outside-sources-2026-11-06.md).
 
 ## Next steps, in order
 
-0. **Run Petoi's joint calibrator and the gyroscope calibration (board level) and look for a slipped horn** before more A/B rounds.
+0. **The odd leg on stand-up (right about 98% of the time, a different leg each time).** Candidates: a lost or garbled joint command on the serial link, a servo that did not track in the stand-up surge (voltage dip), the firmware overwriting a joint mid-move. To separate them: resend the final stand pose a second time after the ramp (a mitigation and a test), log the pack voltage at the end of the ramp beside the leg check, and a way for the owner to flag an odd leg when seen. The leg check (`leg_check.jsonl`) has seen about six stand-ups, all clean: no evidence either way yet. Petoi's joint and gyro calibration is hygiene only.
 1. **Make the drill refuse to start, and stop mid-round, when no IMU frames arrive** (a silent board must never look like a pass). Add the BiBoard plug/answer check first.
 2. Rerun `baseline` and `both` for at least 3 valid rounds each (a quiet room, the plug checked, the pack read), then `calm` and `gate` alone; compare cycles to the first fall, tilt swings and near falls.
 3. If the attention-pose entry still falls: test a lower claw lift than 120 deg, a slower sweep, a standing look, and holding the attention pose for 10 s before the arm moves.
