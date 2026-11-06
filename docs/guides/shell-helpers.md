@@ -60,6 +60,7 @@ from any directory and leaves you where you were. `g2help` prints the bare list.
 |---|---|
 | `g2mem [facts / log N / search <q> / recall <q> / export [--scrub] / wipe --yes]` | inspect and edit G2's memory on this machine (the Mac's copy; `g2pimem` reads the real one on the Pi). |
 | `g2pimem` | G2's real memory on the Pi, in the review page (facts, conversations, what he noticed, pictures; an X on every record goes to a Trash with Undo, |
+| `g2places` | feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics. |
 | `g2pics` | the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo). |
 | `g2walls` | the wall pictures (the labelled recognition shots and the near-wall pictures kept in roams) as thumbnails on the Walls tab of the review page. |
 | `g2wallstats [DAYS]` | statistics from the wall and detection logs on the Pi: looks per state, the nearest wall in inches, the turns, the times he stayed near a wall. |

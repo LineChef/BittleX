@@ -279,6 +279,8 @@ g2pimem() {
 }
 # g2pics  -- the pictures G2 saved while exploring (survey stops, objects you named), as thumbnails in the same review page (X on each, Trash with Undo).
 # g2pics status = text summary from the Pi; g2pics pull = copy them to ~/Desktop/G2Memory/g2_pictures/explore; g2pics stop = end the page.
+# g2places  -- feed G2's places memory from the room tags you set on pictures (counts only, no pictures or times go to the Pi), then copy his places memory back for the Rooms tab of g2pics.
+g2places() { python3 "$G2_ROOT/tools/g2_places_sync.py" "$@"; }
 g2pics() {
   : "${G2_PI:?set G2_PI to user@host of the Pi}"
   case "${1:-ui}" in

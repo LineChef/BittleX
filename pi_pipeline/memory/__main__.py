@@ -132,6 +132,10 @@ def main() -> None:
         elif args.name == "clear":
             places.clear_current()
             print("  cleared")
+        elif args.name == "import":                       # JSON on stdin: the room tags set in g2pics, as counts (tools/g2_places_sync.py)
+            import json as _json
+            import sys as _sys
+            print(f"  imported {places.import_tagged(_json.load(_sys.stdin))} room(s)")
         else:
             got = places.set_current(args.name)
             print(f"  now in the {got}" if got else "  not a room name (one to three words)")

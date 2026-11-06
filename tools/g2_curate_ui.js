@@ -48,4 +48,22 @@ function curatePanel(list){
   fl.append(grid);if(bad.length>60)fl.append(el("div","meta","…and "+(bad.length-60)+" more"))});
  box.append(fl);list.append(box)}
 window.curatePanel=curatePanel;
+
+// ---- Rooms: what G2 knows about each room (counts only, no dates) and the pictures tagged with it
+window.renderRooms=function(list,f){
+ const d=data||{rooms:[]},rooms=(d.rooms||[]).filter(r=>!f||JSON.stringify(r).toLowerCase().includes(f));
+ const head=el("div","labelsum");head.append(el("b","",(d.rooms||[]).length+" rooms"),el("div","sub","From his places memory (counts only, no dates or times) and the pictures you tagged with a room on the Pictures tab. Tell him a room by voice (\u201cyou\u2019re in the kitchen\u201d) so explorations and ball sessions are filed under it; `g2places` copies the tags to him and his counts back here."));
+ if(!d.synced)head.append(el("div","gwarn","His places memory has not been copied here yet: run g2places in a terminal."));
+ list.append(head);
+ if(!rooms.length){list.append(el("div","empty","No rooms yet. Tag pictures with a room on the Pictures tab, or tell G2 which room he is in."));return}
+ for(const r of rooms){const row=el("div","row"),main=el("div","main");
+  main.append(el("div","",r.name.charAt(0).toUpperCase()+r.name.slice(1)+(r.floor?" \u00b7 "+r.floor+" floor":"")));
+  const bits=[r.tagged+" tagged pictures"];if(r.sessions)bits.push(r.sessions+" explorations");if(r.goal_sessions)bits.push(r.goal_sessions+" ball sessions");if(r.stops)bits.push(r.stops+" survey stops");
+  if((r.hazards||{}).fall)bits.push((r.hazards.fall)+" falls");if((r.hazards||{}).bump)bits.push((r.hazards.bump)+" bumps");
+  main.append(el("div","meta",bits.join(" \u00b7 ")));
+  main.append(el("div","meta",r.items.length?"Seen here: "+r.items.map(([k,v])=>k+" ("+v+")").join(", "):"Nothing named here yet."));
+  if(r.pictures.length){const g=el("div","grid");g.style.cssText="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;margin-top:6px";
+   for(const p of r.pictures){const im=el("img");im.loading="lazy";im.src="/img/"+p.path.split("/").map(encodeURIComponent).join("/")+"?t="+TOKEN;im.alt=p.name||"";im.style.cssText="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:zoom-in";
+    im.onclick=()=>{const lb=$("#lb");lb.querySelector("img").src=im.src;lb.querySelector("div").textContent=(p.name||"")+" \u00b7 "+r.name;lb.style.display="flex"};g.append(im)}main.append(g)}
+  row.append(main);list.append(row)}};
 })();

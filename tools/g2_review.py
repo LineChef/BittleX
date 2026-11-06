@@ -687,6 +687,32 @@ class App:
         out["sync"] = (len(self.remote.q.pending(str(self.remote.root))) if self.mirror else 0) + len(g2_goal_edits.pending())          # the Waiting to sync tab
         return out
 
+    def rooms(self) -> dict:
+        """The Rooms tab: what G2 knows about each room (his places memory, copied here by tools/g2_places_sync.py; counts only) and the pictures you tagged with that room."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            mem = json.loads((Path(os.path.expanduser("~/Desktop/G2Memory")) / "places.json").read_text())
+        except (OSError, ValueError):
+            mem = {}
+        rooms_of = read_rooms()
+        pics = [p for p in self.remote.pictures("list") if p.get("group") != "looks"]
+        by: dict[str, list] = {}
+        for p in pics:
+            r = rooms_of.get(p["path"].rsplit("/", 1)[-1], "")
+            if r:
+                by.setdefault(r, []).append({"path": p["path"], "name": p.get("name"), "pose": p.get("pose")})
+        out = []
+        for name in sorted(set(mem) | set(by)):
+            e = mem.get(name) or {}
+            items = dict(e.get("items") or {})
+            for k, v in ((e.get("tagged") or {}).get("items") or {}).items():
+                items[k] = items.get(k, 0) + v
+            out.append({"name": name, "floor": e.get("floor"), "sessions": e.get("sessions", 0), "goal_sessions": e.get("goal_sessions", 0), "stops": e.get("stops", 0),
+                        "hazards": e.get("hazards") or {}, "items": sorted(items.items(), key=lambda kv: -kv[1])[:8], "tagged": len(by.get(name, [])),
+                        "pictures": by.get(name, [])[:8]})
+        out.sort(key=lambda r: -(r["tagged"] + r["sessions"] + r["goal_sessions"]))
+        return {"rooms": out, "synced": mem != {}}
+
     def waiting(self) -> dict:
         """The Waiting to sync tab: every edit queued on this Mac for the Pi (memory, pictures and goals) and the last ones sent."""
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -1016,6 +1042,8 @@ def make_handler(app: App, token: str, port: int, presence: Presence | None = No
                     return self._json(app.facts_tidy())
                 if u.path == "/api/facts/info":
                     return self._json(app.facts_info())
+                if u.path == "/api/rooms":
+                    return self._json(app.rooms())
                 if u.path == "/api/waiting":
                     return self._json(app.waiting())
                 if u.path == "/api/review/state":
@@ -1149,7 +1177,7 @@ button{font:inherit;cursor:pointer}.row{display:flex;gap:10px;align-items:flex-s
 <div id="list"></div></div><div class="lb" id="lb" onclick="this.style.display='none'"><img alt=""><div></div></div>
 <div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
 <script>
-const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["goals","Goals"],["sync","Waiting to sync"],["trash","Trash"]];
+const TOKEN="__TOKEN__";const TABS=[["facts","Facts"],["exchanges","Conversations"],["observations","Observations"],["pictures","Pictures"],["looks","Looks"],["walls","Walls"],["goals","Goals"],["rooms","Rooms"],["sync","Waiting to sync"],["trash","Trash"]];
 let data=[],undoFn=null,timer=null,confirmAt=0;      // declared: confirmAt was read before it was ever set, so the Empty trash button threw and did nothing
 let tab=(location.hash||"").replace("#","")||localStorage.getItem("g2tab")||"facts";if(!TABS.some(t=>t[0]===tab))tab="facts";
 const $=s=>document.querySelector(s);
@@ -1206,6 +1234,7 @@ async function load(){const list=$("#list");$("#extra").replaceChildren();list.r
   else if(tab==="goals"){data=await api("/api/goals")}
   else if(tab==="trash"){data=await api("/api/trash")}
   else if(tab==="sync"){data=await api("/api/waiting")}
+  else if(tab==="rooms"){data=await api("/api/rooms")}
   else{data=await api("/api/list?kind="+tab+"&q="+encodeURIComponent($("#q").value))}
   try{window.reviewState=await api("/api/review/state")}catch(e){window.reviewState=null}
   $("#status").textContent="Showing the copy of G2's data on this Mac (works with the Pi off). Deleted records go to the Trash first; nothing is removed for good until you empty it.";
@@ -1223,7 +1252,7 @@ function renderWalls(list,f){const onlyNew=!!window.wallsUnlabeled;const items=d
   const cap=el("div","meta",p.label+(p.distance_in!=null?" \u00b7 "+p.distance_in+" in":"")+(p.angle_deg?" \u00b7 "+p.angle_deg+" deg":"")+(p.set?" \u00b7 "+p.set:"")+(p.estimate?" \u00b7 the estimator read "+(p.estimate.nearest_in!=null?p.estimate.nearest_in+" in":"clear")+" ("+p.estimate.state+")":""));if(p.src==="roam"){const lb2=el("button","pbtn",p.labelled?"Relabel":"Label");lb2.title="Say what this picture shows (wall, door, corner, chair, ...) and, if you know it, the real distance in inches";lb2.onclick=async(ev)=>{ev.stopPropagation();const l=prompt("What does this show? (wall, door, corner, chair, box, nothing, ...)",p.labelled?p.label:"wall");if(l===null)return;const d=l.trim()?prompt("Real distance to it in inches (leave blank if you do not know)",p.distance_in!=null?String(p.distance_in):""):"";if(d===null)return;try{await api("/api/walls/label",{path:p.path,label:l,distance_in:d===""?null:d});load();toast(l.trim()?"Labelled: "+l.trim():"Label cleared")}catch(e){toast("Failed: "+e.message)}};c.append(lb2)}
   c.append(im,cap,xbtn(async()=>{try{await api("/api/walls/trash",{paths:[p.path]});data=data.filter(d=>d!==p);render();toast("Wall picture moved to the trash",async()=>{await api("/api/walls/restore",{paths:[p.path]});load()})}catch(e){toast("Failed: "+e.message)}}));
   if(p.flags&&p.flags.length)c.append(el("div","meta",p.flags.join("; ")));grid.append(c)}list.append(grid)}
-function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab!=="goals"&&tab!=="sync"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")window.observationsPanel(list);if(tab==="pictures")window.curatePanel(list);if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
+function render(){const list=$("#list"),f=$("#q").value.toLowerCase();list.replaceChildren();if(tab!=="goals"&&tab!=="sync"&&tab!=="rooms"&&window.reviewPanel)window.reviewPanel(list);if(tab==="walls"){renderWalls(list,f);return}if(tab==="sync"){window.renderSync(list);return}if(tab==="rooms"){window.renderRooms(list,f);return}if(tab==="goals"){renderGoals(list,f);return}if(tab==="facts"){$("#extra").replaceChildren(addFactButton());window.renderFacts(list,f);return}if(tab==="exchanges"){window.renderExchanges(list,f);return}if(tab==="observations")window.observationsPanel(list);if(tab==="pictures")window.curatePanel(list);if(tab==="observations")$("#extra").replaceChildren(addObservationButton());
  if(tab==="pictures"||tab==="looks"){const showAll=!!window.showFiltered;const filteredOut=data.filter(p=>p.group!=="looks"&&["rejected","duplicate","people"].includes(p.status)).length;const items=data.filter(p=>(!window.noRoomOnly||tab==="looks"||!p.room)&&((p.group==="looks")===(tab==="looks"))&&(tab==="looks"||showAll||!["rejected","duplicate","people"].includes(p.status))&&(!f||JSON.stringify(p).toLowerCase().includes(f)));if(tab==="pictures"&&filteredOut){const fb=el("button","btn",showAll?"Hide the "+filteredOut+" filtered (bad quality, duplicates, people)":"Show the "+filteredOut+" filtered (bad quality, duplicates, people)");fb.onclick=()=>{window.showFiltered=!showAll;render()};list.append(fb);
   const bad=data.filter(p=>p.group!=="looks"&&p.group!=="named"&&["rejected","duplicate","people"].includes(p.status)),keepNamed=filteredOut-bad.length;      // user, 2026-11-01: flagged pictures are deleted, not kept hidden; ones you named stay
   if(bad.length){const db=el("button","btn danger","Delete the "+bad.length+" filtered pictures");db.style.marginLeft="8px";db.title="Moves them to the Trash (Undo brings them back; the Trash empties for good with Empty trash)"+(keepNamed?". The "+keepNamed+" you have named are kept.":"");db.onclick=async()=>{const ps=bad.map(q=>q.path);try{await api("/api/pictures/trash",{paths:ps});data=data.filter(d=>!ps.includes(d.path));render();toast(ps.length+" filtered pictures moved to the Trash",async()=>{await api("/api/pictures/restore",{paths:ps});load()})}catch(e){toast("Failed: "+e.message)}};list.append(db)}}if(tab==="pictures"){const nr=data.filter(p=>p.group!=="looks"&&!p.room).length,rr={};for(const p of data)if(p.room)rr[p.room]=(rr[p.room]||0)+1;const rs=el("div","labelsum");rs.append(el("b","","Rooms: "),document.createTextNode(Object.keys(rr).length?Object.keys(rr).sort().map(k=>k+" ("+rr[k]+")").join(" \u00b7 "):"none set yet"));rs.append(el("div","sub",nr+" pictures without a room. Use Room on a picture, or Set the room of all in a group header."));list.append(rs);const nb2=el("button","btn",window.noRoomOnly?"Show all pictures":"Show only the "+nr+" without a room");nb2.onclick=()=>{window.noRoomOnly=!window.noRoomOnly;render()};list.append(nb2)}

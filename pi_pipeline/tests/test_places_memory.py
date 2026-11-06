@@ -96,3 +96,30 @@ def test_saying_you_are_in_a_room_files_it_and_gets_an_answer_without_claude():
     lp, w, stt, conv, tts = _loop(["you're in the kitchen"])
     _run(lp, 1)
     assert places.current() == "kitchen" and conv.sent == [] and any("kitchen" in x.lower() for x in tts.said)
+
+
+def test_room_tags_from_the_mac_are_imported_as_counts_and_importing_twice_counts_nothing_twice():
+    stats = {"Kitchen": {"views": 35, "items": {"dog bowl": 2, "cat": 1}}, "foyer": {"views": 4, "items": {}}}
+    assert places.import_tagged(stats) == 2 and places.import_tagged(stats) == 2
+    d = places.load()
+    assert d["kitchen"]["tagged"] == {"views": 35, "items": {"dog bowl": 2, "cat": 1}} and d["foyer"]["tagged"]["views"] == 4
+    places.record_session("kitchen", {"stops": 1, "seen": {"cat": 2}, "events": {}})
+    text = places.summary("kitchen")
+    assert "I know it from 35 pictures" in text and "cat" in text
+    assert "kitchen" in places.recall_block("what do you know about the kitchen?")
+
+
+def test_the_mac_tool_counts_a_tagged_picture_once_and_names_what_is_in_it(tmp_path):
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("g2_places_sync", Path(__file__).resolve().parents[2] / "tools" / "g2_places_sync.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    (tmp_path / "named" / "dog-bowl").mkdir(parents=True)
+    (tmp_path / "survey" / "20261011").mkdir(parents=True)
+    (tmp_path / "named" / "dog-bowl" / "a.jpg").write_bytes(b"x")
+    (tmp_path / "named" / "dog-bowl" / "a.json").write_text(json.dumps({"name": "dog-bowl", "detections": []}))
+    (tmp_path / "survey" / "20261011" / "b.jpg").write_bytes(b"x")
+    (tmp_path / "survey" / "20261011" / "b.json").write_text(json.dumps({"detections": [{"label": "cat"}, {"label": "cat"}]}))
+    (tmp_path / "rooms.json").write_text(json.dumps({"a.jpg": "Kitchen", "b.jpg": "kitchen", "gone.jpg": "kitchen", "c.jpg": ""}))
+    assert m.tagged_stats(tmp_path) == {"kitchen": {"views": 2, "items": {"dog bowl": 1, "cat": 1}}}

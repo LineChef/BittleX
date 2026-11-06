@@ -150,12 +150,38 @@ def note_view(place: str | None) -> None:
         pass
 
 
+def import_tagged(stats: dict) -> int:
+    """The room tags a person set on pictures in g2pics (kept on the Mac) as per-room counts: {"kitchen": {"views": 36, "items": {"dog bowl": 2, "cat": 1}}}. They replace the previous import of the same
+    room (`tagged`), so importing twice never counts a picture twice. Returns how many rooms. Never raises."""
+    try:
+        d = load()
+        n = 0
+        for raw, st in (stats or {}).items():
+            name = norm(raw)
+            if not name or not isinstance(st, dict):
+                continue
+            e = _entry(d, name)
+            e["tagged"] = {"views": int(st.get("views") or 0), "items": {str(k): int(v) for k, v in (st.get("items") or {}).items()}}
+            n += 1
+        save(d)
+        return n
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _items(e: dict) -> dict:
+    out = dict(e.get("items") or {})
+    for k, v in ((e.get("tagged") or {}).get("items") or {}).items():
+        out[k] = out.get(k, 0) + v
+    return out
+
+
 def summary(name: str, e: dict | None = None) -> str:
     e = e if e is not None else load().get(name) or {}
     bits = []
     if e.get("floor"):
         bits.append(f"{e['floor']} floor")
-    items = sorted((e.get("items") or {}).items(), key=lambda kv: -kv[1])[:4]
+    items = sorted(_items(e).items(), key=lambda kv: -kv[1])[:4]
     if items:
         bits.append("I often see " + ", ".join(k for k, _ in items))
     hz = e.get("hazards") or {}
@@ -166,6 +192,9 @@ def summary(name: str, e: dict | None = None) -> str:
     visits = int(e.get("sessions", 0)) + int(e.get("goal_sessions", 0))
     if visits:
         bits.append(f"I have been there {visits} time{'s' if visits != 1 else ''}")
+    views = int(e.get("views", 0)) + int((e.get("tagged") or {}).get("views", 0))
+    if views:
+        bits.append(f"I know it from {views} pictures")
     return f"The {name}: " + "; ".join(bits) + "." if bits else ""
 
 
