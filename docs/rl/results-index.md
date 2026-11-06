@@ -52,7 +52,7 @@ Docs that mention this family: [`automated-testing-loop.md`](../archive/automate
 
 ## `compare`
 
-Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +20.
+Docs that mention this family: [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md), [`decisions-log-2026-10-08.md`](../archive/plan-detail/decisions-log-2026-10-08.md), [`phase3-rl-training.md`](../archive/plan-detail/phase3-rl-training.md), [`v3-decisions-log.md`](../archive/rl/v3-decisions-log.md) +21.
 
 | File | Size | Cited by |
 |---|---|---|
@@ -170,7 +170,7 @@ Docs that mention this family: [`phase10-integration.md`](../archive/plan-detail
 
 ## `joint`
 
-Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +66.
+Docs that mention this family: [`STATUS.md`](../STATUS.md), [`architecture.md`](../architecture.md), [`history.md`](../archive/history.md), [`mounting-research-2026-09.md`](../archive/mounting-research-2026-09.md) +67.
 
 | File | Size | Cited by |
 |---|---|---|
