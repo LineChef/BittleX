@@ -585,6 +585,19 @@ class VoiceLoop:
                         self._speak(said)                 # why (the arm holds the normal gait)
                 user_text = both[1]
                 cmd = match_local_command(user_text)
+        if cmd is None:
+            from .commands import parse_place
+            room = parse_place(user_text)
+            if room:                                       # "you're in the kitchen": the room explorations, goal sessions and pictures are filed under for a few hours (memory/places.py)
+                from ..memory import places
+                places.set_current(room)
+                log.info("place told: %s", room)
+                self._events(ack=True)
+                self._cue.set("speaking")
+                self._speak(f"Okay, the {room}.")
+                self._set_session()
+                self._cue.set("idle")
+                return
         if cmd is None and self._namer is not None:
             name = clean_name(parse_naming(user_text))
             if name:                                       # "this is the dishwasher": the same picture sequence as in an exploration session, no Claude call

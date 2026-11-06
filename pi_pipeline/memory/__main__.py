@@ -2,6 +2,7 @@
 
     python -m pi_pipeline.memory facts                 # list durable facts (importance, core, reflections marked)
     python -m pi_pipeline.memory pin 3                 # make fact #3 core (always injected); unpin 3 undoes it
+    python -m pi_pipeline.memory place [NAME|clear|list]   # tell G2 which room he is in (or: say "you're in the kitchen"); list = what he knows about each room
     python -m pi_pipeline.memory sightings [N]         # what G2 saw when he looked (text, date only)
     python -m pi_pipeline.memory consolidate [--apply] # the idle-time tidy-up: dry run by default
     python -m pi_pipeline.memory usage                 # which facts shape G2's replies (injected / declared / matched counts)
@@ -45,6 +46,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="pi_pipeline.memory")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("facts")
+    p_pl = sub.add_parser("place"); p_pl.add_argument("name", nargs="?", default="list")
     p_pin = sub.add_parser("pin"); p_pin.add_argument("id", type=int)
     p_unpin = sub.add_parser("unpin"); p_unpin.add_argument("id", type=int)
     p_si = sub.add_parser("sightings"); p_si.add_argument("n", type=int, nargs="?", default=10)
@@ -119,6 +121,20 @@ def main() -> None:
     elif args.cmd == "calls":
         from .call_log import summary
         print(summary(args.days))
+
+    elif args.cmd == "place":
+        from . import places
+        if args.name == "list":
+            d = places.load()
+            print(f"  now in: {places.current() or '(not told)'}")
+            for n in sorted(d):
+                print("  " + (places.summary(n, d[n]) or f"The {n}: nothing recorded yet."))
+        elif args.name == "clear":
+            places.clear_current()
+            print("  cleared")
+        else:
+            got = places.set_current(args.name)
+            print(f"  now in the {got}" if got else "  not a room name (one to three words)")
 
     elif args.cmd == "recaps":
         from ..reflection.recap import ExperienceLog, recap_text

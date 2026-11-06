@@ -1,6 +1,6 @@
 """Memory log (user, 2026-11-01): how much memory the Pi has left, kept after every run so a problem can be looked at afterwards, before the activities move inside the voice service.
 
-A background thread appends one JSON line every `G2_MEMLOG_S` (default 10) seconds to `~/.local/share/g2/memory_log.jsonl` (`G2_MEMLOG` moves it, `G2_MEMLOG=off` turns it off):
+A background thread appends one JSON line every `G2_MEMLOG_S` (default 60) seconds to `~/.local/share/g2/memory_log.jsonl` (`G2_MEMLOG` moves it, `G2_MEMLOG=off` turns it off):
 
   {"t": "...", "kind": "sample", "avail_mb": ..., "used_mb": ..., "swap_used_mb": ..., "g2_rss_mb": all pi_pipeline processes together, "self_rss_mb", "self_peak_mb",
    "threads", "top": [[name, rss_mb] x3, any process], "oom_kills": count since boot, "psi_some_avg10": memory pressure share (the kernel's own number, 0 = none), "load1", "soc_c"}
@@ -18,7 +18,7 @@ import threading
 import time
 
 PATH = "~/.local/share/g2/memory_log.jsonl"
-INTERVAL_S = 10.0
+INTERVAL_S = 60.0                                          # (user, 2026-11-06: was 10 s; the memory problem is understood and the log was 2 MB)
 LOW_AVAIL_MB = 80.0              # the Pi Zero 2 W has 512 MB in all
 MAX_BYTES = 8 * 1024 * 1024
 _PROC = "/proc"

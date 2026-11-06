@@ -3,7 +3,7 @@
 def test_a_recap_becomes_an_observation_for_the_memory():
     from pi_pipeline.reflection.recap import observation_from_recap
     cap, labels = observation_from_recap({"seen": {"chair": 3, "dog": 1}, "rooms": {"kitchen": 4, "hall": 1}, "events": {"wall.hit": 2}})
-    assert cap == "While exploring I saw a chair (at 3 stops), a dog; I was mostly in the kitchen, also the hall; I bumped into something twice."
+    assert cap == "While exploring I saw a chair (at 3 stops), a dog; I was mostly in the kitchen, also the hall."
     assert labels == "chair,dog"
     assert observation_from_recap({"seen": {}, "events": {"wall.steer": 3}}) == ("", "")
     assert observation_from_recap({}) == ("", "")

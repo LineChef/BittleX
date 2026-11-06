@@ -159,7 +159,15 @@ class GoalSession:
             except Exception:  # noqa: BLE001
                 pass
             lessons = lessons_from(decisions_all, g.title)
-            saved = save_lessons(lessons, self.memory_store) if self.save_memory else 0
+            from . import summary as _summary
+            saved = save_lessons(lessons, self.memory_store) if (self.save_memory and _summary.lessons_as_facts()) else 0       # (2026-11-06) the per-session notes stay in the journal; ONE note per goal goes to memory
+            if self.save_memory:
+                _summary.save_note(g.title, self.cond, self.state.for_goal(g.id, self.cond_key), self.memory_store)
+            try:
+                from ..memory import places as _places
+                _places.record_goal(_places.current(), why, floor=self.cond.get("floor"))        # which room it ran in (a count), and the floor
+            except Exception:  # noqa: BLE001
+                pass
             self.state.save()
             summary = {"session": self.session, "goal": g.id, "why": why, "attempts": counted, "successes": successes, "minutes": round((self.clock() - t0) / 60.0, 1),
                        "lessons": lessons, "lessons_saved": saved, "settings_now": self.judge.settings(base)}

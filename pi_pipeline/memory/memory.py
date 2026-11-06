@@ -55,6 +55,10 @@ def _when(ts: str) -> str:
     return "today" if d == today else "yesterday" if (today - d).days == 1 else ts
 
 
+_GOAL_SOURCES = ("goal_lesson", "goal_summary")
+_GOAL_Q_RE = re.compile(r"\b(ball|punt|goals?|practi[cs]e|practi[cs]ing|lessons?|skills?|chase|chasing|learn(?:ed|ing|t)?)\b", re.I)
+
+
 class Memory:
     def __init__(self, cfg: Settings, *, clock=time.monotonic):
         self._cfg = cfg
@@ -127,10 +131,17 @@ class Memory:
         `recall_max_chars` (G2_RECALL_MAX_CHARS), the lowest-ranked facts go first, then past moments, then sightings; the core facts stay."""
         core = self._store.list_core(self._core_max)
         facts = list(self._store.list_ranked(self._max_facts))        # importance + recency; the core facts are already above
+        if not _GOAL_Q_RE.search(user_text or ""):
+            facts = [f for f in facts if f["source"] not in _GOAL_SOURCES]       # (2026-11-06) the ball goal's notes were put in front of him in every chat; the journal and the Goals tab keep them
         seen: list = []
         if _PAST_SIGHT_RE.search(user_text or ""):
             seen = list(self._store.search_observations(user_text, limit=3) or self._store.recent_observations(3))
         older = list(self._store.search_exchanges(user_text, limit=self._recall_exchanges, exclude_last=self._recent_window))
+        try:
+            from . import places
+            where = places.recall_block(user_text)
+        except Exception:  # noqa: BLE001
+            where = ""
 
         def render() -> str:
             parts: list[str] = []
@@ -138,6 +149,8 @@ class Memory:
                 parts.append("About you and your people (always true):\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in core))
             if facts:
                 parts.append("What you know:\n" + "\n".join(f"- {self._tag('#', f['id'])}{f['fact']}" for f in facts))
+            if where:
+                parts.append("What you know about the rooms:\n" + where)
             if seen:
                 lines = [f"- {self._tag('s', r['id'])}({_when(r['ts'])}) {r['caption']}" + (f" [detector: {r['labels']}]" if r["labels"] else "") for r in seen]
                 parts.append("Things you saw earlier:\n" + "\n".join(lines))

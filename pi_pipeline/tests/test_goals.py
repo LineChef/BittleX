@@ -432,7 +432,8 @@ def _session(tmp_path, approach, attempts=4, **kw):
     return s, mem
 
 
-def test_a_session_learns_writes_everything_and_saves_lessons(tmp_path):
+def test_a_session_learns_writes_everything_and_saves_lessons(tmp_path, monkeypatch):
+    monkeypatch.setenv("G2_GOAL_LESSONS", "1")                                                    # the per-session notes as facts are opt-in since 2026-11-06 (one note per goal instead: goals/summary.py)
     ap = FakeApproach([oc("bad", 0.2)] * 3 + [oc("hit", 0.9, True)] * 5)
     real_score = ap.score
     ap.score = lambda result, settings: (oc("hit", 0.9, True) if settings["a"] <= 2.0 else oc("bad", 0.2)) if ap.outcomes and ap.outcomes.pop(0) else real_score(result, settings)

@@ -555,3 +555,22 @@ def match_local_command(text: str) -> str | None:
     if asks_learned(text):
         return "learned_query"
     return None
+
+
+_PLACE_RE = re.compile(r"^\s*(?:g2\s+|gee two\s+)?(?:you(?:'re| are)|we(?:'re| are)|this room is|the room is|this is)\s+(?:now\s+|both\s+)?(?:in\s+)?(?:the\s+|a\s+|my\s+|our\s+)?([a-z]+(?: [a-z]+)?)\s*[.!]?\s*$", re.I)
+
+
+def parse_place(text: str) -> str | None:
+    """"you're in the kitchen" / "we are in the living room" / "this room is the hallway" -> the room name, only for a room name G2 knows (a short list, plus the rooms already in his places memory):
+    "you're in the way" and "this is the dishwasher" (an object to name) are not rooms."""
+    m = _PLACE_RE.match(text or "")
+    if not m:
+        return None
+    if re.match(r"^\s*(?:g2\s+|gee two\s+)?this is\b", text or "", re.I) and "room" not in (text or "").lower():
+        return None                                           # "this is the kitchen" is how an object is named; a room is told as "you're in the kitchen"
+    try:
+        from ..memory import places
+        name = places.norm(m.group(1))
+        return name if name in places.known_names() else None
+    except Exception:  # noqa: BLE001
+        return None

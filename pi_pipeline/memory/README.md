@@ -29,6 +29,8 @@ Design notes: [`docs/research/robot-memory-patterns.md`](../../docs/research/rob
   survey stops, the room he was mostly in, bumps and falls. Local data only; no picture and no extra API call.
 * **Goal lessons.** A goal session (`goals/`) saves up to 3 notes about what he changed and why ("Punt the ball: Punching from 3 in works best so far: 6 of 8 good, against 2 of 6 with 4 in. I'm keeping it.") as facts with
   source `goal_lesson`, importance 2, never core. Built from his own counts; no API call.
+* **Places** (`places.py`, 2026-11-06). Per room, counts only and no dates or times: things the detector saw, falls and bumps, explorations and goal sessions held there, pictures taken there, the floor. A room is told to him ("you're in the kitchen"), never invented; it lapses after 6 hours. A summary of a room reaches the prompt when it is mentioned or asked about. Falls and bumps are counted here, not written as sightings.
+* **Goal notes.** One `goal_summary` fact per goal replaces the per-session lessons (those stay in the journal; `G2_GOAL_LESSONS=1` saves them again). Neither kind is put in the chat prompt unless the ball, a goal, practice or learning comes up.
 * **Consolidation.** When G2 has been idle `G2_CONSOLIDATE_IDLE_S` (20 min) or you tell him to go to sleep, and at least
   `G2_CONSOLIDATE_MIN_EXCHANGES` (6) new exchanges have happened, one Claude call merges duplicate facts, drops clearly trivial ones
   (importance 1-2), and may write up to 3 reflections ("It seems ...", stored with source `reflection`, no dates or routines). At most

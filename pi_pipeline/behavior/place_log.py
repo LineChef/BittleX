@@ -31,6 +31,17 @@ def _wrap_deg(d: float) -> float:
     return ((d + 180.0) % 360.0) - 180.0
 
 
+def _current_room():
+    try:
+        from ..memory import places
+        r = places.current()
+        if r:
+            places.note_view(r)
+        return r
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _histogram_embed(jpeg: bytes):
     from ..vision.embedder import make_embedder
     return make_embedder("histogram").embed(jpeg)
@@ -85,7 +96,7 @@ class PlaceLog:
             self.n += 1
             rec = {"session": self.session, "n": self.n, "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)), "picture": rel,
                    "embedder": "histogram" if emb is not None else None, "embedding": emb, "wall": self._wall(),
-                   "detections": (meta or {}).get("detections", []), "yaw": yaw, "since_prev_s": since, "yaw_change": yaw_change}
+                   "detections": (meta or {}).get("detections", []), "yaw": yaw, "since_prev_s": since, "yaw_change": yaw_change, "room": _current_room()}
             self._root.mkdir(parents=True, exist_ok=True)
             with self.path.open("a") as f:
                 f.write(json.dumps(rec) + "\n")

@@ -149,11 +149,7 @@ def observation_from_recap(r: dict) -> tuple[str, str]:
         parts.append("while exploring I saw " + ", ".join(f"a {k}" + (f" (at {_n(v, 'stop')})" if v > 1 else "") for k, v in seen[:6]))
     if rooms:
         parts.append(f"I was mostly in the {rooms[0][0]}" + (f", also the {', the '.join(k for k, _v in rooms[1:3])}" if len(rooms) > 1 else ""))
-    if ev.get("wall.hit"):
-        parts.append(f"I bumped into something {_times(ev['wall.hit'])}")
-    if ev.get("fall"):
-        parts.append(f"I fell down {_times(ev['fall'])}")
-    if not parts:
+    if not parts:                                          # (2026-11-06) bumps and falls are counted per room in the places memory (memory/places.py), not kept as sightings
         return "", ""
     caption = "; ".join(parts)
     return caption[0].upper() + caption[1:] + ".", ",".join(k for k, _v in seen[:10])

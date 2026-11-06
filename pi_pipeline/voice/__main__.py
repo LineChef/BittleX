@@ -37,9 +37,11 @@ def main() -> None:
     ap.add_argument("--no-memory", action="store_true", help="run without persistent memory")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
-    try:                                                              # the memory log (diag/memlog.py): one reading every 10 s, kept for debugging after runs
+    try:                                                              # the memory log (diag/memlog.py): one reading a minute, kept for debugging after runs
         from ..diag import memlog
         memlog.start("voice service start")
+        from ..util import log_retention
+        log_retention.start_daily()             # the debug logs keep a week (util/log_retention.py)
     except Exception:  # noqa: BLE001
         pass
     from . import audio_gate as _gate

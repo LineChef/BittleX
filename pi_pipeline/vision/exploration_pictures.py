@@ -196,6 +196,11 @@ class ExplorationPictureSaver:
                 "detections": [{"label": d[0], "score": round(float(d[1]), 3), "cx": round(float(d[2]), 3), "cy": round(float(d[3]), 3),
                                 "w": round(float(d[4]), 3), "h": round(float(d[5]), 3)} for d in (snap.detections or [])]}
         try:
+            from ..memory import places
+            meta["place"] = places.current()                      # the room he was told he is in (not a time): the picture belongs to it
+        except Exception:  # noqa: BLE001
+            meta["place"] = None
+        try:
             from .snapshot import exposure_stats
             st = exposure_stats(snap.jpeg)
             meta["exposure"] = None if st is None else {"mean": round(st.mean, 1), "clip_high": round(st.clip_high, 4), "clip_low": round(st.clip_low, 4)}

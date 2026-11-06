@@ -583,6 +583,8 @@ def _run_session(args, shared: SharedParts | None = None) -> str:
                 ended_by = ended_by or ("voice command" if stop_flag.is_set() else "time limit" if time.monotonic() - started >= args.max_s else "runtime stopped")
                 rec = ExperienceLog().append(build_recap(tally, started=session_started, ended=time.time(), ended_by=ended_by, stops=stops, wall_path=_WALL_LOG))
                 if rec:
+                    from .memory import places as _places
+                    _places.record_session(_places.current(), rec)             # the room he was told he is in: stops, things seen, falls and bumps (counts only)
                     from .personality import body
                     body.note_exploration(rec)                                # how it went colours his mood for a few hours (personality/body.py)
                 if rec and memory is not None and hasattr(memory, "record_observation"):      # what he saw goes into the memory Claude recalls from ("where's the chair?")
