@@ -349,7 +349,7 @@ g2sync() {
     *) echo "usage: g2sync [status|run|now TASK|now all]"; return 2 ;;
   esac
 }
-# g2mic [status|on|off [MINUTES]]  -- G2's wake word ("G2", "hey buddy"): `off` turns it off for MINUTES (default 10, at most 120; only the stop words are heard meanwhile),
+# g2mic [status|on|off [MINUTES]]  -- G2's wake word ("G2"): `off` turns it off for MINUTES (default 10, at most 120; only the stop words are heard meanwhile),
 #   `on` turns it back on now (he cannot hear "mic on" while it is off), `status` says which and how long is left. "G2, mic off [for N minutes]" does `off` by voice. g2micon = g2mic on.
 g2mic() { : "${G2_PI:?set G2_PI to user@host of the Pi}"; ssh "$G2_PI" "cd ~/bittleX && PYTHONPATH=. pi_pipeline/.venv/bin/python -m pi_pipeline.voice.wake_pause ${*:-status}"; }
 g2micon() { g2mic on; }

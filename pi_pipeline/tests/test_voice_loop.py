@@ -154,10 +154,10 @@ def test_forget_that_with_nothing_new_says_so():
 
 def test_session_start_marked_once_per_wake():
     m = _Mem()
-    lp, w, stt, conv, tts = _loop(["a", "b", ""], memory=m)
+    lp, w, stt, conv, tts = _loop(["tell me a joke", "and another one", ""], memory=m)
     _run(lp, 3)
     assert m.marks == 1
-    assert m.recorded == ["a", "b"]
+    assert m.recorded == ["tell me a joke", "and another one"]
 
 
 # ------------------------------------------------ Phase 10 event bridge
@@ -235,7 +235,7 @@ def test_loop_passes_seconds_to_the_actuator():
 
 
 def test_wake_word_triggers_the_api_warm_up_once_per_session():
-    lp, w, stt, conv, tts = _loop(["hello", "again", ""])
+    lp, w, stt, conv, tts = _loop(["hello", "and then what", ""])
     warmed = []
     conv.warm_up = lambda: warmed.append(1)
     _run(lp, 3)

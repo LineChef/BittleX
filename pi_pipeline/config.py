@@ -129,7 +129,8 @@ class Settings:
     # Comma-separated -- any one of them wakes G2. Spelled the way Vosk
     # transcribes each phrase, not necessarily how it's written ("gee two", not
     # "G2").
-    wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "gee two, hey buddy, hey bud"))
+    # (user, 2026-11-06: "hey buddy" and "hey bud" were 29 of the week's 54 false triggers, so the default is "gee two" alone; G2_WAKE_WORD="gee two, hey buddy, hey bud" brings them back)
+    wake_word: str = field(default_factory=lambda: _env("G2_WAKE_WORD", "gee two"))
     vosk_model_path: str = field(default_factory=lambda: _env("VOSK_MODEL_PATH", "models/vosk"))
     # Default = the Pi Zero 2 W-safe 'low' tier (fetch_models.sh's primary). On a
     # dev machine, override PIPER_MODEL_PATH in .env to a 'medium' voice if you

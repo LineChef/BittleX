@@ -173,6 +173,17 @@ class _SpeechWorker:
             t.join()
 
 
+def _drop_fragment(text: str) -> bool:
+    from . import fragments
+    return fragments.enabled() and fragments.is_fragment(text)
+
+
+def _drop_follow_up_scrap(text: str) -> bool:
+    """In the follow-up window (no wake word, no question asked): a single word or a pair of fillers is the room talking, not a request."""
+    from . import fragments
+    return fragments.enabled() and (fragments.is_fragment(text) or len((text or "").split()) <= 1)
+
+
 class VoiceLoop:
     def __init__(
         self,
@@ -214,6 +225,7 @@ class VoiceLoop:
         self._last_look = None                         # the Snapshot of the look in progress, for the sighting note
         self._follow_up_s = max(0.0, follow_up_s)
         self._question_window_s = max(0.0, question_window_s)
+        self._expects_reply = False                      # the last reply asked something: a short answer is expected in the question window
         self._session_window = self._follow_up_s
         self._in_session = False
         self._conv_window_s = max(0.0, conversation_window_s)
@@ -361,6 +373,7 @@ class VoiceLoop:
         """Decide whether the next turn needs the wake word. G2 listens on without it only for the short question window
         (when its reply asked something) or the general follow-up window (off on the robot). In conversation mode the
         conversation window applies after every turn, until the mode's time limit."""
+        self._expects_reply = bool(expects_reply)
         if self._conversing:
             if self._conv_max_s and time.monotonic() - self._conv_started > self._conv_max_s:
                 log.info("conversation mode ended: time limit (%.0f s)", self._conv_max_s)
@@ -590,6 +603,8 @@ class VoiceLoop:
             self._log_wake_outcome("dismissed")             # a person saying nobody called him: a certain false trigger for the wake log
         elif woke and cmd is not None:
             self._log_wake_outcome("command")
+        elif woke and _drop_fragment(user_text):
+            self._log_wake_outcome("ignored")
         elif woke and addressed_elsewhere(user_text):
             self._log_wake_outcome("ignored")
         elif woke:
@@ -598,6 +613,16 @@ class VoiceLoop:
         if cmd == "dismiss":
             log.info("dismissed (voice): the wake word was a false trigger -- window closed")
             self._cue.set("closed")                         # the short closing tone is the only acknowledgement
+            self._end_session()
+            return
+        if not woke and cmd is None and not self._conversing and not self._expects_reply and _drop_follow_up_scrap(user_text):
+            log.info("ignored: %r heard in the follow-up window is a scrap, not a request (the room, not a person talking to G2)", user_text)       # (user, 2026-11-06)
+            self._cue.set("closed")
+            self._end_session()
+            return
+        if woke and cmd is None and _drop_fragment(user_text):
+            log.info("ignored: only %r heard after the wake word (a false trigger): no reply, nothing saved", user_text)       # (user, 2026-11-06) it used to cost a Claude call and fill the Conversations tab
+            self._cue.set("closed")
             self._end_session()
             return
         if cmd == "end_converse" and not self._conversing:

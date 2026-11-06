@@ -224,7 +224,7 @@ def test_balance_goes_off_once_a_pose_with_balance_on_is_over():
     link, clock = EpochLink(), Clock()
     link.pose_balance_epoch = 0
     g = StandGuard(link, clock=clock, sleep=lambda s: None, quiet_after_activity_s=8.0, reassert_s=1e9)
-    g.start(); g._stop.set()
+    g.start(); g._stop.set(); g._thread.join(2)                    # the background thread must be finished before the test drives the ticks by hand (it raced them)
     link.sent.clear()
     link.pose_balance_epoch += 1; g.note_activity()                # the link sent `gB` before a pose
     for _ in range(35):                                            # 7 s: inside the quiet window, the pose keeps balance on
