@@ -250,7 +250,7 @@ Add a line for each to `settings-switches.md` (or the guide for its subsystem), 
 | `G2_VOLUME` | `""` | `sound_levels.py` | [`.env.example`](../../.env.example), [`settings-switches.md`](settings-switches.md), [`phase7-voice.md`](../plan-detail/phase7-voice.md) |
 | `G2_WAKE_LOG` | `DEFAULT_PATH` | `wake_log.py` | [`settings-switches.md`](settings-switches.md) |
 | `G2_WAKE_MAX_BEFORE` | `""` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`settings-switches.md`](settings-switches.md) |
-| `G2_WAKE_MIN_CONF` | `"0"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`settings-switches.md`](settings-switches.md) +1 |
+| `G2_WAKE_MIN_CONF` | `"0.6"` | `wake_word.py` | [`STATUS.md`](../STATUS.md), [`capabilities.md`](../capabilities.md), [`settings-switches.md`](settings-switches.md) +1 |
 | `G2_WAKE_PAUSE_FILE` | `""` | `wake_pause.py` | not documented |
 | `G2_WAKE_WORD` | `"gee two"` | `config.py` | [`.env.example`](../../.env.example), [`bring-up-sequence.md`](bring-up-sequence.md), [`pi-bring-up.md`](pi-bring-up.md) +1 |
 | `G2_WALK_RAMP_S` | `"0"` | `run_gait.py` | [`settings-switches.md`](settings-switches.md) |

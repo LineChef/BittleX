@@ -113,3 +113,18 @@ def test_gg_and_gee_gee_never_wake_him():
     assert ww.wake_hit("gee two", phrases) == "gee two" and ww.wake_hit("hey buddy", phrases) == "hey buddy"
     assert ww.wake_hit("gee gee", phrases) is None and ww.wake_hit("gee gee two", phrases) is None and ww.wake_hit("[unk] gee gee", phrases) is None
     assert "gee gee" in ww.DECOYS
+
+
+def test_a_spoken_gg_or_gee_gee_is_never_a_call_but_eggs_and_a_real_call_still_are():
+    from pi_pipeline.voice.wake_word import wake_hit, has_decoy
+    for t in ("gee gee", "gg", "g g", "gee gee two", "hello gg two", "gee g"):
+        assert wake_hit(t, ["gee two"]) is None, t
+    assert not has_decoy("eggs") and wake_hit("gee two", ["gee two"]) == "gee two"
+
+
+def test_the_default_confidence_floor_is_0_6_and_the_env_can_turn_it_off(monkeypatch):
+    from pi_pipeline.voice.wake_word import min_confidence
+    monkeypatch.delenv("G2_WAKE_MIN_CONF", raising=False)
+    assert min_confidence() == 0.6
+    monkeypatch.setenv("G2_WAKE_MIN_CONF", "0")
+    assert min_confidence() == 0.0

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 from pathlib import Path
@@ -67,7 +68,14 @@ def _log_trigger(hit, heard, data, conf, last_speaking, *, ignored) -> None:
 
 # Look-alikes that must never wake him (user, 2026-11-01: "GG" / "gee gee"). They go into the recogniser's grammar as decoys: restricted to the wake words alone, Kaldi has to
 # write a spoken "GG" as the closest allowed words, which can be "gee two"; with "gee gee" allowed it writes that instead, and a text holding a decoy never counts as a wake word.
-DECOYS = ("gee gee",)
+DECOYS = ("gee gee", "g g", "gg", "gee g", "jee jee", "gi gi")           # how a spoken "GG" / "gee gee" is written (user, 2026-11-06: add GG and gee gee to the false trigger words); words the speech model does not have are ignored in the grammar
+_DECOY_RES = tuple(re.compile(r"(?<![a-z])" + re.escape(d) + r"(?![a-z])") for d in DECOYS)
+
+
+def has_decoy(heard: str) -> bool:
+    """A decoy as whole words ("gg" is not "eggs")."""
+    h = (heard or "").lower()
+    return any(r.search(h) for r in _DECOY_RES)
 
 
 MIC_BACK_ON = "__mic_back_on__"   # what `take_pending()` returns when a wake-word pause has just ended (voice/wake_pause.py)
@@ -115,18 +123,18 @@ def paused_stop(final_json: str | None, floor: float) -> tuple[str | None, str]:
 def wake_hit(heard: str, phrases) -> str | None:
     """The wake phrase in `heard`, or None (also None when a decoy is in it: "gee gee two" is a GG, not a call)."""
     h = (heard or "").lower()
-    if any(d in h for d in DECOYS):
+    if has_decoy(h):
         return None
     return next((p for p in phrases if p in h), None)
 
 
 def min_confidence() -> float:
-    """`G2_WAKE_MIN_CONF`: a wake phrase whose words Kaldi is less sure of than this is ignored (0 = off, the default until a day of logged
-    triggers shows where real calls and background talk separate; 2026-10-18: 4 of 7 triggers were people talking nearby, and loudness did not
+    """`G2_WAKE_MIN_CONF`: a wake phrase whose words Kaldi is less sure of than this is ignored (0 = off; it was the default until a day of logged
+    triggers shows where real calls and background talk separate; since 2026-11-06 the default is 0.6 -- over two weeks of logged triggers it dropped 4 of 48 real calls and 6 of 23 false ones whose confidence was known; 2026-10-18: 4 of 7 triggers were people talking nearby, and loudness did not
     separate them, a false one at level 313 and a real one at 314)."""
     import os
     try:
-        return max(0.0, float(os.environ.get("G2_WAKE_MIN_CONF", "0") or 0))
+        return max(0.0, float(os.environ.get("G2_WAKE_MIN_CONF", "0.6") or 0))
     except ValueError:
         return 0.0
 
@@ -367,7 +375,7 @@ class VoskWakeWord:
                     rec = self._new_recognizer(self._stop_grammar)
                 continue
             hit = wake_hit(heard, self._phrases)
-            if hit is None and any(d in heard for d in DECOYS) and final is not None:
+            if hit is None and has_decoy(heard) and final is not None:
                 log.info("wake word ignored: a look-alike (%r)", heard)
             if hit:
                 if final is None:
