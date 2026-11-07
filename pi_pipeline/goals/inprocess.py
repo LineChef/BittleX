@@ -35,6 +35,11 @@ def enabled() -> bool:
     return os.environ.get("G2_GOAL_INPROCESS", "1").strip().lower() not in ("0", "off", "false", "no")
 
 
+def release_voice_enabled() -> bool:
+    """`G2_RELEASE_VOICE=0` keeps the speech engine loaded during sessions."""
+    return os.environ.get("G2_RELEASE_VOICE", "1").strip().lower() not in ("0", "off", "false", "no")
+
+
 def request_path() -> str:
     return os.path.expanduser(os.environ.get("G2_GOAL_REQUEST", REQUEST))
 
@@ -197,6 +202,10 @@ def run_goal_inprocess(shared, goal_id: str) -> dict:
     except OSError:
         pass
     shared.exploring.set()                    # the service's stand guard, battery watch and sleep watch stand aside meanwhile
+    from ..voice.tts import release_speech, warm_speech
+    released = release_speech(getattr(shared, "tts", None)) if release_voice_enabled() else False   # Piper's ~155 MB is freed for the session (user, 2026-11-07); a line that needs synthesis loads it again
+    if released:
+        log_line("speech engine released for the session (memory); it loads again if a new line is needed")
     summary: dict = {"goal": goal_id, "why": "error"}
     try:
         approach = make(g.approach, shared=shared)
@@ -212,6 +221,8 @@ def run_goal_inprocess(shared, goal_id: str) -> dict:
             pass
     finally:
         shared.exploring.clear()
+        if released:
+            warm_speech(getattr(shared, "tts", None))
         try:
             os.remove(running_path())
         except OSError:

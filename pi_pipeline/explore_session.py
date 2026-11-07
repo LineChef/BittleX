@@ -211,9 +211,14 @@ def run_inprocess(shared: SharedParts, roam_s: float) -> str:
     diag.event("explore", "INFO", "explore.start", inprocess=True, roam_s=roam_s)
     ended = "error"
     t_start = time.time()
+    from .goals.inprocess import release_voice_enabled
+    from .voice.tts import release_speech, warm_speech
+    released = release_speech(getattr(shared, "tts", None)) if release_voice_enabled() else False      # Piper's ~155 MB is freed for the roam (user, 2026-11-07)
     try:
         ended = run_session(args, shared)
     finally:
+        if released:
+            warm_speech(getattr(shared, "tts", None))
         diag.event("explore", "INFO", "explore.end", ended_by=ended)
         _write_report(diag.session_dir, t_start, time.time(), "explore_" + time.strftime("%H%M%S", time.localtime(t_start)))       # the service's session is long: only this roam's window
     return ended

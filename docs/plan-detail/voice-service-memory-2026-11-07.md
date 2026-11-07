@@ -21,7 +21,14 @@ The service itself read 280 MB resident plus 71 MB in swap 3 minutes after boot 
 The embedder (DINOv2 session, about 100 MB) is lazy: it loads on first use and is released 90 s after the last (`LazyOnnxEmbedder`). Vosk is one shared model for the wake word and the speech-to-text. The Vosk model in use is already the small one.
 
 ## Options left, biggest first (none done)
-1. **Release Piper while no sentence is likely** (about 155 MB). Loading takes about 10 s, so the first reply after a release would lag; the speech cache already covers fixed lines. A release only during a goal session or an exploration roam (which speak little) avoids the lag in conversation.
+1. **(Built 2026-11-07, `G2_RELEASE_VOICE`)** **Release Piper while no sentence is likely** (about 155 MB). Loading takes about 10 s, so the first reply after a release would lag; the speech cache already covers fixed lines. A release only during a goal session or an exploration roam (which speak little) avoids the lag in conversation.
 2. **A smaller or quantised Piper voice** (the 63 MB `ryan-low` is already the low-quality one; a smaller voice would sound worse; needs a download, which needs the owner's yes).
 3. **A systemd `MemoryHigh` limit** so a runaway is throttled instead of dragging the whole box into swap. Untested.
 4. **Run heavy work in-process** (already the direction for goals), so no second copy of the stack is loaded.
+
+## Smaller Piper voices (researched 2026-11-07; nothing downloaded)
+The robot filter (`voice/effects.py`, `apply_style`) runs on the synthesised audio array and takes the sample rate as an argument, so it works the same on any Piper voice; the speech cache is keyed by voice file plus style, so a new voice starts with an empty cache.
+- **Every English voice is the same size.** From the official voice list (rhasspy/piper-voices `voices.json`): all English "low" and "medium" voices have a 63.0-63.5 MB model file (our `ryan-low` is 63,104,526 bytes, the same as `amy-low`, `danny-low`, `kathleen-low`, `alan-low`; medium ones 62.95-63.5 MB). "Low" means a 16 kHz output, not a smaller network. Multi-speaker voices are 76-81 MB, high-quality ones 114-137 MB.
+- **`x_low` voices are the small ones (21-28 MB), but none exists for English** in the list read (Spanish only: `es_MX-ald` 21 MB, `es_ES-carlfm` 28 MB). Part of the list (the last 82 KB) was not read, so a late entry could be missing.
+- So within official Piper voices there is no smaller English choice than the one in use. The memory is mostly the network's working buffers rather than the 63 MB of weights, so even a half-size model would not halve the 155 MB.
+- **Left to try (no download):** an int8 dynamic quantisation of our own `ryan-low` with onnxruntime's quantisation tool on the Mac (a local conversion; may need the `onnx` package, which would be a pip install and so needs a yes), then listen and measure memory. VITS models can lose quality or fail to quantise, so it is an experiment.

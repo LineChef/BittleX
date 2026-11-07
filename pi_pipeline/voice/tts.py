@@ -71,13 +71,45 @@ class PiperTTS:
                 f"Piper model not found at {p}. See pi_pipeline/voice/README.md "
                 "for how to download a voice."
             )
-        from ..util.ort_memory import lean_sessions
-        with lean_sessions():                                   # (arena off: about 20 MB less once it has spoken, same speed; docs/plan-detail/voice-service-memory-2026-11-07.md)
-            self._voice = PiperVoice.load(str(p))
+        import threading
+        self._path = str(p)
+        self._lock = threading.RLock()
+        self._voice = None
+        self._load()
         self._sd = sd
         self._rate = self._voice.config.sample_rate
         self._style = style or ("current" if robot_effect else "plain")   # a name from effects.VOICES
         self._cache_tag = f"{p.name}:{self._style}"                       # the speech cache is keyed by voice file + style (voice/speech_cache.py)
+
+    def _load(self) -> None:
+        """Load the voice if it is not in memory (about 10 s on the Pi Zero 2 W)."""
+        from piper.voice import PiperVoice
+        from ..util.ort_memory import lean_sessions
+        with self._lock:
+            if self._voice is None:
+                with lean_sessions():                           # (arena off: about 20 MB less once it has spoken, same speed; docs/plan-detail/voice-service-memory-2026-11-07.md)
+                    self._voice = PiperVoice.load(self._path)
+
+    @property
+    def loaded(self) -> bool:
+        return self._voice is not None
+
+    def release(self) -> bool:
+        """Free the voice's memory (about 155 MB on the Pi) while no uncached sentence is expected (a goal session, an exploration roam: user, 2026-11-07). Lines already in the speech cache
+        still play; a line that needs synthesis loads the voice again first. Returns True if it released one."""
+        import gc
+        with self._lock:
+            if self._voice is None:
+                return False
+            self._voice = None
+        gc.collect()
+        return True
+
+    def warm(self) -> None:
+        """Load the voice again in the background (the end of a session), so the next conversation reply does not wait for it."""
+        import threading
+        if self._voice is None:
+            threading.Thread(target=lambda: self._load(), name="piper-warm", daemon=True).start()
 
     def is_cached(self, text: str) -> bool:
         from . import speech_cache
@@ -85,6 +117,7 @@ class PiperTTS:
 
     def _synth(self, text: str):
         import numpy as np
+        self._load()                                                      # a released voice comes back first
         chunks = list(self._voice.synthesize(pronounce(text)))
         if not chunks:
             return None, self._rate
@@ -154,3 +187,20 @@ def make_tts(mode: str, *, piper_model_path: str, robot_effect: bool = False, st
     except RuntimeError:
         log.info("MacTTS unavailable, falling back to PrintTTS")
         return PrintTTS()
+
+
+def release_speech(tts) -> bool:
+    """Free the speech engine's memory for a session that speaks little, if it can be freed (only Piper can). Never raises."""
+    try:
+        return bool(callable(getattr(tts, "release", None)) and tts.release())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def warm_speech(tts) -> None:
+    """Load the speech engine again in the background after `release_speech`. Never raises."""
+    try:
+        if callable(getattr(tts, "warm", None)):
+            tts.warm()
+    except Exception:  # noqa: BLE001
+        pass

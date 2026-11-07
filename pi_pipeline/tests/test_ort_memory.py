@@ -23,3 +23,44 @@ def test_lean_sessions_patches_and_restores(monkeypatch):
         assert ort.InferenceSession("m.onnx") == "s"
     assert ort.InferenceSession is inner and seen[0].enable_cpu_mem_arena is False
     monkeypatch.setattr(ort, "InferenceSession", orig)
+
+
+def test_piper_tts_release_and_reload(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    from pi_pipeline.voice import tts as T
+    loads = []
+
+    class FakeVoice:
+        config = types.SimpleNamespace(sample_rate=22050)
+
+        @staticmethod
+        def load(path):
+            loads.append(path)
+            return FakeVoice()
+
+        def synthesize(self, text):
+            return []
+    mod = types.ModuleType("piper.voice")
+    mod.PiperVoice = FakeVoice
+    monkeypatch.setitem(sys.modules, "piper", types.ModuleType("piper"))
+    monkeypatch.setitem(sys.modules, "piper.voice", mod)
+    monkeypatch.setitem(sys.modules, "sounddevice", types.ModuleType("sounddevice"))
+    model = tmp_path / "v.onnx"
+    model.write_bytes(b"x")
+    t = T.PiperTTS(str(model))
+    assert t.loaded and len(loads) == 1
+    assert T.release_speech(t) is True and not t.loaded
+    assert T.release_speech(t) is False                                    # already released
+    t._synth("hi")                                                          # a line that needs synthesis loads it again
+    assert t.loaded and len(loads) == 2
+    T.release_speech(t)
+    T.warm_speech(t)
+    for _ in range(100):
+        if t.loaded:
+            break
+        import time
+        time.sleep(0.02)
+    assert t.loaded and len(loads) == 3
+    assert T.release_speech(object()) is False                             # an engine that cannot release is left alone
