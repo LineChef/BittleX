@@ -115,6 +115,15 @@ class OnnxEmbedder:
         return v
 
 
+def _mem_note(label: str) -> None:
+    """A memory-log note with the reading beside it (never raises)."""
+    try:
+        from ..diag import memlog
+        memlog.note(label)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 class LazyOnnxEmbedder:
     """An ONNX embedder that holds its model in memory only while it is being used (user, 2026-11-06: the Pi has about 75 MB free beside the voice service, and the model needs about 100 MB).
     The first `embed` loads the model; `idle_s` seconds after the last one it is released again (the next call loads it, about a second on the Pi). Same interface as OnnxEmbedder."""
@@ -141,6 +150,7 @@ class LazyOnnxEmbedder:
             if self._inner is None:
                 self._inner = self._factory()
                 self.loads += 1
+                _mem_note("embedder loaded")
             v = self._inner.embed(img)
             self.dim = int(getattr(v, "size", 0) or self.dim)
             if self.idle_s > 0:
@@ -157,6 +167,7 @@ class LazyOnnxEmbedder:
             self._timer = None
             import gc
             gc.collect()
+            _mem_note("embedder released")
 
 
 def pool_output(out: np.ndarray, pool: str = "auto") -> np.ndarray:

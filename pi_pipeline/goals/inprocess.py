@@ -206,6 +206,9 @@ def run_goal_inprocess(shared, goal_id: str) -> dict:
     released = release_speech(getattr(shared, "tts", None)) if release_voice_enabled() else False   # Piper's ~155 MB is freed for the session (user, 2026-11-07); a line that needs synthesis loads it again
     if released:
         log_line("speech engine released for the session (memory); it loads again if a new line is needed")
+    from ..diag import memlog
+    mem_since = memlog.now_str()
+    memlog.fast(True)                         # a reading every 10 s while the session runs, with the swapping beside it
     summary: dict = {"goal": goal_id, "why": "error"}
     try:
         approach = make(g.approach, shared=shared)
@@ -221,6 +224,13 @@ def run_goal_inprocess(shared, goal_id: str) -> dict:
             pass
     finally:
         shared.exploring.clear()
+        memlog.fast(False)
+        try:
+            line = memlog.window_summary(mem_since)
+            if line:
+                log_line("memory during the session: " + line)
+        except Exception:  # noqa: BLE001
+            pass
         if released:
             warm_speech(getattr(shared, "tts", None))
         try:

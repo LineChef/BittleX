@@ -174,3 +174,33 @@ def test_the_old_behaviour_comes_back_with_the_setting(cfg):
     on = dataclasses.replace(cfg, memory_log_commands=True)
     Memory(on).record("rest", _turn("Okay.", actions=["d"]))
     assert Store(cfg.memory_db_path).exchange_count() == 1
+
+
+# ---- 2026-11-07: swap rates, fast sampling, window summary
+def test_memlog_swap_rates_between_samples(tmp_path):
+    from pi_pipeline.diag import memlog
+    t = {"now": 100.0}
+    reads = iter([{"avail_mb": 80.0, "swap_used_mb": 10.0, "_pswpout": 1000, "_pswpin": 500, "_pgmajfault": 100, "_allocstall": 1},
+                  {"avail_mb": 40.0, "swap_used_mb": 60.0, "_pswpout": 3560, "_pswpin": 500, "_pgmajfault": 160, "_allocstall": 4}])
+    m = memlog.MemLog(log_path=str(tmp_path / "m.jsonl"), interval_s=60, sampler=lambda: dict(next(reads)), clock=lambda: t["now"])
+    first = m.sample_once()
+    assert "swap_out_mb_s" not in first and not any(k.startswith("_") for k in first)       # nothing to compare with yet
+    t["now"] = 110.0
+    second = m.sample_once()
+    assert second["swap_out_mb_s"] == 1.0 and second["swap_in_mb_s"] == 0.0               # 2560 pages in 10 s = 1 MB/s
+    assert second["major_faults_s"] == 6.0 and second["alloc_stalls"] == 3
+
+
+def test_memlog_fast_nests_and_window_summary(tmp_path, monkeypatch):
+    from pi_pipeline.diag import memlog
+    monkeypatch.setattr(memlog, "_LOG", memlog.MemLog(log_path=str(tmp_path / "m.jsonl"), sampler=lambda: {}))
+    memlog.fast(True); memlog.fast(True); memlog.fast(False)
+    assert memlog._LOG._fast == 1
+    memlog.fast(False); memlog.fast(False)
+    assert memlog._LOG._fast == 0
+    rows = [{"kind": "sample", "t": "2026-11-07 10:00:00", "avail_mb": 90.0, "swap_used_mb": 5.0},
+            {"kind": "sample", "t": "2026-11-07 10:00:10", "avail_mb": 35.0, "swap_used_mb": 80.0, "swap_out_mb_s": 2.0},
+            {"kind": "sample", "t": "2026-11-07 10:00:20", "avail_mb": 50.0, "swap_used_mb": 70.0, "swap_out_mb_s": 0.5}]
+    line = memlog.window_summary("2026-11-07 10:00:05", rows)
+    assert "lowest free memory 35 MB" in line and "peak swap 80 MB" in line and "swapped out" in line
+    assert memlog.window_summary("2026-11-08 00:00:00", rows) == ""

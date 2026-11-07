@@ -214,9 +214,19 @@ def run_inprocess(shared: SharedParts, roam_s: float) -> str:
     from .goals.inprocess import release_voice_enabled
     from .voice.tts import release_speech, warm_speech
     released = release_speech(getattr(shared, "tts", None)) if release_voice_enabled() else False      # Piper's ~155 MB is freed for the roam (user, 2026-11-07)
+    from .diag import memlog
+    mem_since = memlog.now_str()
+    memlog.fast(True)
     try:
         ended = run_session(args, shared)
     finally:
+        memlog.fast(False)
+        try:
+            line = memlog.window_summary(mem_since)
+            if line:
+                diag.event("explore", "INFO", "explore.memory", summary=line)
+        except Exception:  # noqa: BLE001
+            pass
         if released:
             warm_speech(getattr(shared, "tts", None))
         diag.event("explore", "INFO", "explore.end", ended_by=ended)

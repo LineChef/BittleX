@@ -57,6 +57,15 @@ class MacTTS:
         subprocess.run(["say", "-v", self._voice, "-r", str(self._rate), text], check=False)
 
 
+def _mem_note(label: str) -> None:
+    """A memory-log note with the reading beside it (never raises)."""
+    try:
+        from ..diag import memlog
+        memlog.note(label)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 class PiperTTS:
     """Local neural TTS via Piper (piper-tts >= 1.7), played through the default
     output device."""
@@ -89,6 +98,7 @@ class PiperTTS:
             if self._voice is None:
                 with lean_sessions():                           # (arena off: about 20 MB less once it has spoken, same speed; docs/plan-detail/voice-service-memory-2026-11-07.md)
                     self._voice = PiperVoice.load(self._path)
+                _mem_note("speech engine loaded")
 
     @property
     def loaded(self) -> bool:
@@ -103,6 +113,7 @@ class PiperTTS:
                 return False
             self._voice = None
         gc.collect()
+        _mem_note("speech engine released")
         return True
 
     def warm(self) -> None:
