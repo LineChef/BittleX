@@ -99,7 +99,8 @@ class OnnxEmbedder:
         if threads > 0:
             so.intra_op_num_threads = threads
             so.inter_op_num_threads = 1
-        self._sess = ort.InferenceSession(self.path, sess_options=so, providers=list(providers))
+        from ..util.ort_memory import apply as _lean
+        self._sess = ort.InferenceSession(self.path, sess_options=_lean(so), providers=list(providers))
         self._in = self._sess.get_inputs()[0].name
         self.dim = 0
 

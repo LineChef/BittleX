@@ -71,7 +71,9 @@ class PiperTTS:
                 f"Piper model not found at {p}. See pi_pipeline/voice/README.md "
                 "for how to download a voice."
             )
-        self._voice = PiperVoice.load(str(p))
+        from ..util.ort_memory import lean_sessions
+        with lean_sessions():                                   # (arena off: about 20 MB less once it has spoken, same speed; docs/plan-detail/voice-service-memory-2026-11-07.md)
+            self._voice = PiperVoice.load(str(p))
         self._sd = sd
         self._rate = self._voice.config.sample_rate
         self._style = style or ("current" if robot_effect else "plain")   # a name from effects.VOICES
