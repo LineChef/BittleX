@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import time
 
-# name -> (calm stop, pose gate, whole-cycle stop, pre-position). One lever at a time against baseline; the first two are the 2026-11-06 guards, the last two the firmware-reading levers.
-VARIANTS = {"baseline": (False, False, False, False), "calm": (True, False, False, False), "gate": (False, True, False, False), "both": (True, True, False, False),
-            "cycle": (False, False, True, False), "pre": (False, False, False, True), "cycle_pre": (False, False, True, True)}
+# name -> (calm stop, pose gate, whole-cycle stop, pre-position, eased stop). One lever at a time against baseline; the first two are the 2026-11-06 guards, the last two the firmware-reading levers.
+VARIANTS = {"baseline": (False, False, False, False, False), "calm": (True, False, False, False, False), "gate": (False, True, False, False, False), "both": (True, True, False, False, False),
+            "cycle": (False, False, True, False, False), "pre": (False, False, False, True, False), "cycle_pre": (False, False, True, True, False), "eased": (False, False, False, False, True)}
 
 
 NEAR_FALL_DEG = 20.0      # a tilt swing this big in one phase counts as a near fall (most falls are never recorded, so variants are compared on swings too)
@@ -77,7 +77,7 @@ def run_variant(robot, cycles: int, *, turn_deg: float = 25.0, turn_s: float = 1
         for k, deg in enumerate((side * turn_deg, -side * turn_deg)):
             state = robot.turn(deg, turn_s)
             note(f"turn {'right' if deg > 0 else 'left'}")
-            for what in ("last_preposition", "last_cycle_stop"):
+            for what in ("last_preposition", "last_cycle_stop", "last_eased_stop"):
                 if getattr(robot, what, None):
                     say(f"   {what.replace('_', ' ')}: {getattr(robot, what)}")
             le = getattr(getattr(robot, "_lk", None), "last_ease", None)
@@ -133,7 +133,7 @@ def main() -> None:
     args = ap.parse_args()
     if not args.measure and not args.variant:
         ap.error("--variant or --measure is required")
-    chase.STOP_CALM, chase.POSE_GATE, chase.CYCLE_STOP, chase.PREPOSITION = VARIANTS[args.variant]
+    chase.STOP_CALM, chase.POSE_GATE, chase.CYCLE_STOP, chase.PREPOSITION, chase.EASED_STOP = VARIANTS[args.variant]
     from ..link.serial_link import SerialLink
     from ..power import battery
     link = SerialLink("/dev/serial0")

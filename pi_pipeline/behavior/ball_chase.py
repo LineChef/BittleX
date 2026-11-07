@@ -130,6 +130,7 @@ LEG_CORRECT = os.environ.get("G2_LEG_CORRECT", "1").strip().lower() not in ("0",
 CYCLE_STOP = os.environ.get("G2_CYCLE_STOP", "0").strip().lower() in ("1", "on", "true", "yes")      # (UNPROVEN, default OFF until the hardware A/B) a timed firmware turn / back-up ends after a whole number of gait cycles (behavior/gait_cycle.py)
 CYCLE_MAX_EXTRA_S = 0.8        # the most a turn is lengthened to reach a cycle boundary; further than that it stops on time
 PREPOSITION = os.environ.get("G2_PREPOSITION", "0").strip().lower() in ("1", "on", "true", "yes")  # (UNPROVEN, default OFF) before a firmware turn / walk the legs are eased to the skill's first frame by the Pi even when the link does not know the pose
+EASED_STOP = os.environ.get("G2_EASED_STOP", "0").strip().lower() in ("1", "on", "true", "yes")    # (TEST variant, default OFF; the owner allowed the trial 2026-11-06, the 2026-10-10 rule stays otherwise) the normal end of a timed turn / back-up is eased (behavior/eased_stop.py)
 QUICK_MOVE_S = 3.0             # a move this soon after the last one ended goes without the pose read and the tilt check (he is standing as the last move left him): no added stillness
 STILL_SAY_S = 4.0              # stood still longer than this before a move: said in the log (the still time of every move is in the trace)
 ATTENTION_SETTLE_S = 1.0       # into the attention pose before anything else is sent
@@ -607,6 +608,7 @@ class SerialRobot:
         self._imu_t: list = []                            # when each IMU frame was read (parallel to the END of _roll: the lists are reset at every move, this one is only trimmed)
         self._last_poll_t: float | None = None
         self.last_move_imu: tuple = ([], [], [])
+        self.last_eased_stop: dict | None = None
         self.last_cycle_stop: dict | None = None          # what the whole-cycle stop did on the last timed move
         self.last_preposition: dict | None = None         # what the pre-position did before the last skill
         self._yaw: float | None = None                    # the last yaw frame (deg, accumulated by the firmware), for the gyro-stopped line-up turns
@@ -709,6 +711,40 @@ class SerialRobot:
                 return
         log.warning("not steady before the pose change after %.1f s (pitch %+.0f roll %+.0f deg): going anyway", self.SETTLE_POSE_MAX_S, last[0], last[1])
 
+    def _eased_stop(self, token: str, run_s: float) -> str:
+        """Freeze the legs at the gait's estimated pose and ease them to the balance pose before the `kbalance` (behavior/eased_stop.py). Anything missing: nothing is done (the stop stays immediate).
+        What happened is in `last_eased_stop` for the drill. "ok" or "fell"."""
+        from ..link import transitions
+        from . import eased_stop
+        info = self.last_eased_stop = {"token": token, "ran": False, "why": "", "from": None, "secs": 0.0}
+        write = getattr(self._lk, "_write_pose", None)
+        arm = bool(transitions._arm_poses())
+        period, src = gait_cycle.period_for(token, *(self.last_move_imu[0], self.last_move_imu[1], self.last_move_imu[2]))
+        if period is None or not callable(write):
+            info["why"] = "no gait period" if period is None else "link cannot write a raw pose"
+            return "ok"
+        start = eased_stop.pose_at(token, run_s, period, arm)
+        end = transitions.balance_pose() if arm else [30.0] * 8
+        if start is None:
+            info["why"] = "no frames for this gait"
+            return "ok"
+        secs = transitions.ramp_seconds(start, end, cap=eased_stop.MAX_RAMP_S)
+        info.update(**{"from": [round(x) for x in start], "period_s": round(period, 3), "period_src": src})
+        if secs <= 0:
+            info["why"] = "already near the balance pose"
+            return "ok"
+        steps = transitions.ramp_poses(start, end, secs)
+        write(transitions.leg_cmd(start))                     # freeze where the gait is
+        for pose in steps:
+            write(transitions.leg_cmd(pose))
+            self._sleep(1.0 / transitions.STEPS_PER_S)
+            if self._fell():
+                info["why"] = "fell during the eased stop"
+                return "fell"
+        info.update(ran=True, secs=round(secs, 2))
+        log.info("eased stop: froze at the estimated pose %s (period %.2f s, %s) and eased to balance over %.2f s", info["from"], period, src, secs)
+        return "ok"
+
     def _finish_cycle(self, token: str, ran: float) -> str:
         """Keep the gait going to the next whole cycle (user lever 1, 2026-11-06: the firmware's stop is one fast jump from the mid-stride pose to the balance pose; after whole cycles the legs are
         back near where the gait began, so the jump is small). The period is the measured one (`--measure`), the override, or an estimate from this move's own IMU frames. Never more than
@@ -795,6 +831,8 @@ class SerialRobot:
         if state != "fell" and yaw0 is None and CYCLE_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):
             state = self._finish_cycle(token, ran)
             ran = self._clock() - t0
+        if state != "fell" and yaw0 is None and EASED_STOP and token in ("kwkL", "kwkR", "kbkF", "kwkF"):
+            state = self._eased_stop(token, self._clock() - t0)
         if state != "fell" and yaw0 is None and self._calm_before_stop() == "fell":          # (a gyro-stopped line-up turn is ended on its yaw at once: waiting would turn it further)
             state = "fell"
         self.posture = "stand"

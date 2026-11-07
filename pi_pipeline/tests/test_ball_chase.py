@@ -1114,3 +1114,30 @@ def test_the_preposition_asks_the_link_only_when_on(monkeypatch):
         r._lk.ease_into = lambda token: (asked.append(token), {"cmd": token, "ran": True})[1]
         r.turn(25.0, 0.3)
     assert asked == ["kwkR"] and r.last_preposition == {"cmd": "kwkR", "ran": True}
+
+
+def test_eased_stop_freezes_then_eases_to_balance_before_the_kbalance(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_GAIT_CYCLES", str(tmp_path / "c.json"))
+    monkeypatch.setenv("G2_GAIT_CYCLE_S", "0.5")
+    for k, v in (("EASED_STOP", True), ("CYCLE_STOP", False), ("STOP_CALM", False), ("POSE_GATE", False)):
+        monkeypatch.setattr(bc, k, v)
+    sent, raw = [], []
+    r, t = _timed_robot(monkeypatch, sent)
+    r._lk._write_pose = raw.append
+    assert r.turn(25.0, 1.0) == "ok"
+    assert raw[0].startswith("i8 ") and raw[-1].startswith("i8 ") and len(raw) > 5      # frozen, then a ramp
+    assert r.last_eased_stop["ran"] and r.last_eased_stop["secs"] > 0
+    kb = [x for x in sent if x[1] == "kbalance"][0][0]
+    assert kb >= 1.0 + r.last_eased_stop["secs"] * 0.9                                 # the kbalance came after the ramp
+
+
+def test_eased_stop_does_nothing_without_a_period_or_a_writer(monkeypatch, tmp_path):
+    monkeypatch.setenv("G2_GAIT_CYCLES", str(tmp_path / "c.json"))
+    monkeypatch.delenv("G2_GAIT_CYCLE_S", raising=False)
+    for k, v in (("EASED_STOP", True), ("CYCLE_STOP", False), ("STOP_CALM", False), ("POSE_GATE", False)):
+        monkeypatch.setattr(bc, k, v)
+    sent = []
+    r, t = _timed_robot(monkeypatch, sent)
+    r._lk._write_pose = lambda c: None
+    r.turn(25.0, 1.0)
+    assert not r.last_eased_stop["ran"] and "period" in r.last_eased_stop["why"]

@@ -50,6 +50,32 @@ def build(text: str) -> dict:
     return dict(sorted(out.items()))
 
 
+GAIT_OUT = ROOT / "pi_pipeline" / "link" / "gait_frames.json"
+GAITS = ("wkL", "wkF", "bkF", "wkArmL", "wkArmF", "bkArmF")          # the gaits the Pi stops out of (a turn right is wkL mirrored): every frame, for the eased stop (behavior/eased_stop.py)
+
+
+def build_gaits(text: str) -> dict:
+    out = {}
+    for name in GAITS:
+        m = re.search(r"const int8_t %s\[\] PROGMEM = \{(.*?)\};" % re.escape(name), text, re.S)
+        if not m:
+            continue
+        nums = [int(x) for x in re.findall(r"-?\d+", m.group(1))]
+        period, ratio = nums[0], nums[3]
+        if period > 1:
+            out[name] = [[v * ratio for v in nums[4 + k * 8: 12 + k * 8]] for k in range(period)]
+    return out
+
+
+def render_gaits(table: dict) -> str:
+    lines = ["{"]
+    items = list(table.items())
+    for i, (name, rows) in enumerate(items):
+        lines.append(f'  "{name}": {json.dumps(rows, separators=(",", ":"))}' + ("," if i < len(items) - 1 else ""))
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
 def render(table: dict) -> str:
     lines = ["{"]
     items = list(table.items())
@@ -62,11 +88,13 @@ def render(table: dict) -> str:
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     text = render(build(SRC.read_text()))
+    gtext = render_gaits(build_gaits(SRC.read_text()))
     if "--check" in argv:
-        if not OUT.exists() or OUT.read_text() != text:
-            print(f"{OUT.relative_to(ROOT)} is out of date: run python tools/gen_skill_frames.py")
+        if not OUT.exists() or OUT.read_text() != text or not GAIT_OUT.exists() or GAIT_OUT.read_text() != gtext:
+            print(f"{OUT.relative_to(ROOT)} or {GAIT_OUT.relative_to(ROOT)} is out of date: run python tools/gen_skill_frames.py")
             return 1
         return 0
+    GAIT_OUT.write_text(gtext)
     OUT.write_text(text)
     print(f"wrote {OUT.relative_to(ROOT)} ({len(json.loads(text))} skills)")
     return 0

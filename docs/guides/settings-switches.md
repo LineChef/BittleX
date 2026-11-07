@@ -87,6 +87,7 @@ Set in the Pi's `.env` (never `cat` that file; add a line with `echo 'KEY=value'
 | `G2_LEG_CORRECT` | on (unproven) | a leg joint the board holds off its stand angle after a stand-up is driven back to it (just those joints, read back); `0` reports only |
 | `G2_CYCLE_STOP` | off (unproven) | a timed firmware turn or back-up runs on to the next whole gait cycle (at most 0.8 s longer) before its stop; period from `gait_cycles.json` (`transition_drill --measure`), `G2_GAIT_CYCLE_S`, or the move's own IMU frames |
 | `G2_PREPOSITION` | off (unproven) | before a firmware turn or walk the Pi eases the legs to the skill's first frame itself, even where the link does not know the pose |
+| `G2_EASED_STOP` | off (test) | the normal end of a timed turn or back-up freezes the legs at the gait's estimated pose and eases to balance (0.8 s at most) before `kbalance`; never for an emergency stop; needs a gait period |
 | `G2_GAIT_CYCLE_S` | unset | one gait period in seconds (0.25-2.0) for every gait: overrides the measured file |
 | `G2_LEG_CHECK` | on | after a stand-up from the attention pose or a sit the board's believed leg angles are compared with the stand pose and logged to `~/.local/share/g2/leg_check.jsonl` (report only); `0` turns it off |
 | `G2_SURVEY_CHECK` | on | a survey stop is look up, look down, stand, firmware `check` (`kck`, the body lean; G2 has no head to pan), stand, settle, one picture; `0` skips the check |

@@ -41,13 +41,13 @@ def test_period_order_and_file(tmp_path, monkeypatch):
 
 
 def test_variants_have_the_two_new_levers():
-    assert transition_drill.VARIANTS["baseline"] == (False, False, False, False)
+    assert transition_drill.VARIANTS["baseline"] == (False,) * 5 and transition_drill.VARIANTS["eased"][4]
     assert transition_drill.VARIANTS["cycle"][2] and transition_drill.VARIANTS["pre"][3]
-    assert all(len(v) == 4 for v in transition_drill.VARIANTS.values())
+    assert all(len(v) == 5 for v in transition_drill.VARIANTS.values())
 
 
 def test_levers_default_off():
-    assert chase.CYCLE_STOP is False and chase.PREPOSITION is False
+    assert chase.CYCLE_STOP is False and chase.PREPOSITION is False and chase.EASED_STOP is False
 
 
 def test_ease_into_records_and_skips_the_second_ramp(monkeypatch):
@@ -67,3 +67,13 @@ def test_ease_into_records_and_skips_the_second_ramp(monkeypatch):
         assert len(written) == n and lk._ease_done is None               # send()'s own ramp is skipped once
     else:
         assert rec["why"]
+
+
+def test_eased_stop_pose_estimates():
+    from pi_pipeline.behavior import eased_stop
+    a = eased_stop.pose_at("kwkL", 0.0, 0.5)
+    assert len(a) == 8 and a == [float(x) for x in eased_stop.frames()["wkL"][0]]
+    r = eased_stop.pose_at("kwkR", 0.0, 0.5)
+    assert r == [a[1], a[0], a[3], a[2], a[5], a[4], a[7], a[6]]            # a right turn is the left one mirrored
+    assert eased_stop.pose_at("kwkL", 0.25, 0.5) != a                       # half way round is another frame
+    assert eased_stop.pose_at("kwkL", 1.0, 0.0) is None and eased_stop.pose_at("kfoo", 1.0, 0.5) is None
